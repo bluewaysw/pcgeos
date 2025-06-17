@@ -602,7 +602,7 @@ constructed string's null terminator.
 **Destroyed:**  
 ax, dx, bp.
 
-**Library:**	genC.def
+**Library:**    genC.def
 
 ----------
 #### GenPathGetObjectPath
@@ -769,7 +769,7 @@ cx:dx - TrackScrollingParams.
 *ds:si - Pointer to view's instance data.
 
 **Returns:**  
-ss:bp 	(unchanged) updated TrackScrollingParams.
+ss:bp   (unchanged) updated TrackScrollingParams.
 
 **Destroyed:**  
 Nothing.
@@ -1727,7 +1727,7 @@ Nothing.
 **Destroyed:**  
 Nothing.
 
-**Library:**	graphics.def
+**Library:**    graphics.def
 
 ----------
 #### GrComment
@@ -2771,7 +2771,7 @@ ds:si - Pointer to text at offset
 
 
 
-**Library:**	graphics.def
+**Library:**    graphics.def
 
 ----------
 #### GrDrawVLine
@@ -2927,11 +2927,11 @@ Write an "escape" element to a graphics string. This call is meaningful only
 between calls to **GrBeginGString** and **GrEndGString**. The element, in 
 full, will have the following structure:
 
-	Byte	Contents	Description  
-	0		0xFF		GString escape indicator  
-	1, 2	ax			Application's escape code  
-	2, 3	cx			Size of escape data  
-	4,-n	ds:si		Data from passed buffer.
+    Byte    Contents    Description  
+    0       0xFF        GString escape indicator  
+    1, 2    ax          Application's escape code  
+    2, 3    cx          Size of escape data  
+    4,-n    ds:si       Data from passed buffer.
 
 **Pass:**  
 di - Handle of GString to write to.  
@@ -3091,7 +3091,7 @@ The bitmap should be stored in a huge array.
 di - GStateHandle  
 ax,bx - *x,y* coordinate to draw at.  
 dx - VM file handle (or zero if *TPD_file* is set)  
-cx - VM block handle	
+cx - VM block handle    
 
 **Returns:**  
 Nothing.
@@ -3248,7 +3248,7 @@ Nothing.
 Return the area color set for the given GState.
 
 **Pass:**  
-di	Handle of the GState.
+di  Handle of the GState.
 
 **Returns:**  
 al - Red value of color.  
@@ -3313,7 +3313,7 @@ cx - Size of **HatchPattern** or **Bitmap** in **bx**, if applicable.
 **Destroyed:**  
 Depending on return values, **ah**.
 
-**Library:**	graphics.def
+**Library:**    graphics.def
 
 ----------
 #### GrGetBitmap
@@ -3583,7 +3583,7 @@ Get coordinate bounds of a graphics string.
 di - Graphics state handle, or zero for no graphics state.  
 si - Graphics string handle.  
 dx - Enum of type **GSControl**.  
-ds:bx - Far pointer to buffer the size of **RectDWord**	.
+ds:bx - Far pointer to buffer the size of **RectDWord** .
 
 **Returns:**  
 ds:bx - **RectDWord** structure filled in with the bounds.
@@ -3642,7 +3642,7 @@ ax, bx - *x, y* size in points.
 Nothing.
 
 **Library:** graphics.def
-	
+    
 ----------
 #### GrGetInfo
 Return information about the GState as requested.
@@ -3930,7 +3930,7 @@ would be filled)
 di - Handle of GState maintaining path.  
 ax - **GetPathType** value.  
 ds:bx - Far pointer to buffer large enough to hold a **RectDWord** 
-structure.	
+structure.  
 
 **Returns:**  
 CF - Clear on success, set on failure.  
@@ -4512,7 +4512,7 @@ bx - Fractional portion of returned value.
 **Destroyed:**  
 Nothing.
 
-**Library:**	graphics.def
+**Library:**    graphics.def
 
 ----------
 #### GrMulWWFixed
@@ -5630,8 +5630,8 @@ This routine must be called is the VM file handle stored in the Window or
 GString may have changed (e.g., via **VMSave**)
 
 **Pass:**  
-di	Handle of GState  
-ax	VM file handle.	
+di  Handle of GState  
+ax  VM file handle. 
 
 **Returns:**  
 Nothing.
@@ -6154,7 +6154,7 @@ bx.ax - **WWFixed** value of untransformed *y* (document coordinates).
 **Destroyed:**  
 Nothing.
 
-**Library:**	graphics.def
+**Library:**    graphics.def
 
 [Routines E-F](asme_f.md) <-- [Table of Contents](../asmref.md) &nbsp;&nbsp; --> [Routines H-L](asmh_l.md)
 

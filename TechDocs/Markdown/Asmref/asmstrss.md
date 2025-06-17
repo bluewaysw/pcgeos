@@ -2,40 +2,40 @@
 
 ----------
 #### SampleFormat
-	SampleFormat		record
-		SMID_format			DAC_SampleFormat:15
-		SMID_refernce		DAC_ReferenceByte:1
-	SampleFormat		end
+    SampleFormat        record
+        SMID_format         DAC_SampleFormat:15
+        SMID_refernce       DAC_ReferenceByte:1
+    SampleFormat        end
 
 **Library:** sound.def
 
 ----------
 #### SampleFormatDescription
-	SampleFormatDescription			struct
-		SFD_manufact			ManufacturerID
-		SFD_format				SampleFormat
-		SFD_rate				word
-		SFD_playFlags			DACPlayFlags
-	SampleFormatDescription			ends
+    SampleFormatDescription         struct
+        SFD_manufact            ManufacturerID
+        SFD_format              SampleFormat
+        SFD_rate                word
+        SFD_playFlags           DACPlayFlags
+    SampleFormatDescription         ends
 
 **Library:** sound.def
 
 ----------
 #### SamplesStruc
-	SamplesStruc		struc
-		SS_sample1Str		char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
-		SS_sample2Str		char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
-		SS_formatPosStr		char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
-		SS_formatNegStr		char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
-	SamplesStruc		ends
+    SamplesStruc        struc
+        SS_sample1Str       char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
+        SS_sample2Str       char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
+        SS_formatPosStr     char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
+        SS_formatNegStr     char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
+    SamplesStruc        ends
 
 **Library:** math.def
 
 ----------
 #### SansFace
-	SansFace		etype byte
-		SF_A_OPEN			enum SansFace, 0
-		SF_A_CLOSED			enum SansFace, 0x80
+    SansFace        etype byte
+        SF_A_OPEN           enum SansFace, 0
+        SF_A_CLOSED         enum SansFace, 0x80
 
 There is not much to distinguish between these typefaces. We've decided to 
 use the style of the lower case "a" character -- that is, whether it is "closed" 
@@ -46,30 +46,30 @@ the bottom, and an extra stem on top).
 
 ----------
 #### ScaleChangedParams
-	ScaleChangedParams			struct
-		SCP_scaleFactor		PointWWFixed	;new scale factor
-		SCP_window			lptr Window		;window of view
-	ScaleChangedParams			ends
+    ScaleChangedParams          struct
+        SCP_scaleFactor     PointWWFixed    ;new scale factor
+        SCP_window          lptr Window     ;window of view
+    ScaleChangedParams          ends
 
 **Library:** Objects/gViewC.def
 
 ----------
 #### ScaleViewParams
-	ScaleViewParams		struct
-		SVP_scaleFactor		PointWWFixed		;new, absolute scale factor
-		SVP_unused			byte
-		SVP_type			ScaleViewType		;type of scaling to perform
-		SVP_point			PointDWord			;point to scale around
-	ScaleViewParams		ends
+    ScaleViewParams     struct
+        SVP_scaleFactor     PointWWFixed        ;new, absolute scale factor
+        SVP_unused          byte
+        SVP_type            ScaleViewType       ;type of scaling to perform
+        SVP_point           PointDWord          ;point to scale around
+    ScaleViewParams     ends
 
 **Library:** Objects/gViewC.def
 
 ----------
 #### ScaleViewType
-	ScaleViewType		etype byte
-		SVT_AROUND_UPPER_LEFT 			enum ScaleViewType
-		SVT_AROUND_CENTER				enum ScaleViewType
-		SVT_AROUND_POINT				enum ScaleViewType
+    ScaleViewType       etype byte
+        SVT_AROUND_UPPER_LEFT           enum ScaleViewType
+        SVT_AROUND_CENTER               enum ScaleViewType
+        SVT_AROUND_POINT                enum ScaleViewType
 
 SVT_AROUND_UPPER_LEFT  
 Upper left corner of subview is kept fixed as we scale.
@@ -84,111 +84,111 @@ Point specified in *SVP_point* is kept fixed as we scale.
 
 ----------
 #### ScannerToken
-	ScannerToken		struct
-		ST_type		ScannerTokenType	; The type of token
-		ST_data		ScannerTokenData	; The data associated with the token
-	ScannerToken		ends
+    ScannerToken        struct
+        ST_type     ScannerTokenType    ; The type of token
+        ST_data     ScannerTokenData    ; The data associated with the token
+    ScannerToken        ends
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenCellData
-	ScannerTokenCellData			struct
-		STCD_cellRef			CellReference <>
-	ScannerTokenCellData			ends
+    ScannerTokenCellData            struct
+        STCD_cellRef            CellReference <>
+    ScannerTokenCellData            ends
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenData
-	ScannerTokenData	union
-		STD_number			ScannerTokenNumberData
-		STD_string			ScannerTokenStringData
-		STD_cell			ScannerTokenCellData
-		STD_identifier		ScannerTokenIdentifierData
-		STD_operator		ScannerTokenOperatorData
-	ScannerTokenData	end
+    ScannerTokenData    union
+        STD_number          ScannerTokenNumberData
+        STD_string          ScannerTokenStringData
+        STD_cell            ScannerTokenCellData
+        STD_identifier      ScannerTokenIdentifierData
+        STD_operator        ScannerTokenOperatorData
+    ScannerTokenData    end
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenIdentifierData
-	ScannerTokenIdentifierData				struct
-		STID_start		word	; The offset to the start of the identifier
-	ScannerTokenIdentifierData				ends
+    ScannerTokenIdentifierData              struct
+        STID_start      word    ; The offset to the start of the identifier
+    ScannerTokenIdentifierData              ends
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenNumberData
-	ScannerTokenNumberData			struct
-		STND_value			FloatNum		; 8 byte constant
-	ScannerTokenNumberData			ends
+    ScannerTokenNumberData          struct
+        STND_value          FloatNum        ; 8 byte constant
+    ScannerTokenNumberData          ends
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenOperatorData
-	ScannerTokenOperatorData				struct
-		STOD_operatorID		OperatorType	; Identifier for this operator
-	ScannerTokenOperatorData				ends
+    ScannerTokenOperatorData                struct
+        STOD_operatorID     OperatorType    ; Identifier for this operator
+    ScannerTokenOperatorData                ends
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenStringData
-	ScannerTokenStringData		struct
-		STSD_start		word		; Offset to start of string
-		STSD_length		word		; Length of the string
-	ScannerTokenStringData		ends
+    ScannerTokenStringData      struct
+        STSD_start      word        ; Offset to start of string
+        STSD_length     word        ; Length of the string
+    ScannerTokenStringData      ends
 
 **Library:** parse.def
 
 ----------
 #### ScannerTokenType
-	ScannerTokenType		etype byte, 0, 1
-		SCANNER_TOKEN_NUMBER			enum ScannerTokenType
-		SCANNER_TOKEN_STRING			enum ScannerTokenType
-		SCANNER_TOKEN_CELL				enum ScannerTokenType
-		SCANNER_TOKEN_END_OF_EXPRESSION	enum ScannerTokenType
-		SCANNER_TOKEN_OPEN_PAREN		enum ScannerTokenType
-		SCANNER_TOKEN_CLOSE_PAREN		enum ScannerTokenType
-		SCANNER_TOKEN_IDENTIFIER		enum ScannerTokenType
-		;
-		; All the items above are in common with the ParserTokenType list.
-		; You can add or delete items below this point without changing
-		; the other table.
-		;
-		SCANNER_TOKEN_OPERATOR			enum ScannerTokenType
-		SCANNER_TOKEN_LIST_SEPARATOR	enum ScannerTokenType
+    ScannerTokenType        etype byte, 0, 1
+        SCANNER_TOKEN_NUMBER            enum ScannerTokenType
+        SCANNER_TOKEN_STRING            enum ScannerTokenType
+        SCANNER_TOKEN_CELL              enum ScannerTokenType
+        SCANNER_TOKEN_END_OF_EXPRESSION enum ScannerTokenType
+        SCANNER_TOKEN_OPEN_PAREN        enum ScannerTokenType
+        SCANNER_TOKEN_CLOSE_PAREN       enum ScannerTokenType
+        SCANNER_TOKEN_IDENTIFIER        enum ScannerTokenType
+        ;
+        ; All the items above are in common with the ParserTokenType list.
+        ; You can add or delete items below this point without changing
+        ; the other table.
+        ;
+        SCANNER_TOKEN_OPERATOR          enum ScannerTokenType
+        SCANNER_TOKEN_LIST_SEPARATOR    enum ScannerTokenType
 
 **Library:** parse.def
 
 ----------
 #### ScriptFace
-	ScriptFace		etype byte
-		SF_CALLIGRAPHIC	enum ScriptFace, 0		; variable thickness stroke
-		SF_CURSIVE		enum ScriptFace, 0x80	; single thickness stroke
+    ScriptFace      etype byte
+        SF_CALLIGRAPHIC enum ScriptFace, 0      ; variable thickness stroke
+        SF_CURSIVE      enum ScriptFace, 0x80   ; single thickness stroke
 
 **Library:** fontID.def
 ----------
 #### ScrollAction
-	ScrollAction		etype byte
-		SA_NOTHING 					enum ScrollAction
-		SA_TO_BEGINNING 			enum ScrollAction
-		SA_PAGE_BACK 				enum ScrollAction
-		SA_INC_BACK 				enum ScrollAction
-		SA_INC_FWD 					enum ScrollAction
-		SA_DRAGGING 				enum ScrollAction
-		SA_PAGE_FWD 				enum ScrollAction
-		SA_TO_END 					enum ScrollAction
-		SA_SCROLL					enum ScrollAction
-		SA_SCROLL_INTO				enum ScrollAction
-		SA_INITIAL_POS				enum ScrollAction
-		SA_SCALE					enum ScrollAction
-		SA_PAN						enum ScrollAction
-		SA_DRAG_SCROLL				enum ScrollAction
-		SA_SCROLL_FOR_SIZE_CHANGE 	enum ScrollAction
+    ScrollAction        etype byte
+        SA_NOTHING                  enum ScrollAction
+        SA_TO_BEGINNING             enum ScrollAction
+        SA_PAGE_BACK                enum ScrollAction
+        SA_INC_BACK                 enum ScrollAction
+        SA_INC_FWD                  enum ScrollAction
+        SA_DRAGGING                 enum ScrollAction
+        SA_PAGE_FWD                 enum ScrollAction
+        SA_TO_END                   enum ScrollAction
+        SA_SCROLL                   enum ScrollAction
+        SA_SCROLL_INTO              enum ScrollAction
+        SA_INITIAL_POS              enum ScrollAction
+        SA_SCALE                    enum ScrollAction
+        SA_PAN                      enum ScrollAction
+        SA_DRAG_SCROLL              enum ScrollAction
+        SA_SCROLL_FOR_SIZE_CHANGE   enum ScrollAction
 
 SA_NOTHING  
 No scroll action.
@@ -242,16 +242,16 @@ Any scrolling that's required as a result of the view size change
 
 ----------
 #### ScrollFlags
-	ScrollFlags		record
-		SF_VERTICAL					:1
-		SF_ABSOLUTE					:1
-		SF_DOC_SIZE_CHANGE			:1
-		SF_WINDOW_NOT_SUSPENDED		:1
-		SF_SCALE_TO_FIT				:1
-		SF_SETUP_HAPPENED			:1
-		SF_EC_SETUP_CALLED			:1
-									:1
-	ScrollFlags		end
+    ScrollFlags     record
+        SF_VERTICAL                 :1
+        SF_ABSOLUTE                 :1
+        SF_DOC_SIZE_CHANGE          :1
+        SF_WINDOW_NOT_SUSPENDED     :1
+        SF_SCALE_TO_FIT             :1
+        SF_SETUP_HAPPENED           :1
+        SF_EC_SETUP_CALLED          :1
+                                    :1
+    ScrollFlags     end
 
 SF_VERTICAL  
 Direction of scroll. Invalid for SA_SCROLL_INTO, SA_SCROLL, 
@@ -289,11 +289,11 @@ routines.
 ----------
 #### SearchFromOffsetFlags
 
-SearchFromOffsetFlags			record
+SearchFromOffsetFlags           record
 
-SFOF_STOP_AT_STARTING_POINT					:1
+SFOF_STOP_AT_STARTING_POINT                 :1
 
-SearchFromOffsetFlags			end
+SearchFromOffsetFlags           end
 
 SFOF_STOP_AT_STARTING_POINT
 Set (internally) if this search has wrapped around.
@@ -302,11 +302,11 @@ Set (internally) if this search has wrapped around.
 
 ----------
 #### SearchFromOffsetReturnStruct
-	SearchFromOffsetReturnStruct				struct
-		SFORS_object			optr (?)
-		SFORS_offset			dword (?)
-		SFORS_len				dword (?)
-	SearchFromOffsetReturnStruct				ends
+    SearchFromOffsetReturnStruct                struct
+        SFORS_object            optr (?)
+        SFORS_offset            dword (?)
+        SFORS_len               dword (?)
+    SearchFromOffsetReturnStruct                ends
 
 *SFORS_object* stores the pointer to the object that the match was found in (or 
 0:0 if not found).
@@ -320,15 +320,15 @@ Set (internally) if this search has wrapped around.
 
 ----------
 #### SearchFromOffsetStruct
-	SearchFromOffsetStruct			struct
-		SFOS_data			hptr.SearchReplaceStruct
-		SFOS_startObject	optr
-		SFOS_startOffset	dword
-		SFOS_currentOffset	dword
-		SFOS_flags			SearchFromOffsetFlags
-		SFOS_retStruct		fptr.SearchFromOffsetReturnStruct
-		even
-	SearchFromOffsetStruct			ends
+    SearchFromOffsetStruct          struct
+        SFOS_data           hptr.SearchReplaceStruct
+        SFOS_startObject    optr
+        SFOS_startOffset    dword
+        SFOS_currentOffset  dword
+        SFOS_flags          SearchFromOffsetFlags
+        SFOS_retStruct      fptr.SearchFromOffsetReturnStruct
+        even
+    SearchFromOffsetStruct          ends
 
 *SFOS_data* stores the handle of the data block. This data is organized in the 
 following format:  
@@ -352,15 +352,15 @@ start search. (This value can range from 0 to <text size>).
 
 ----------
 #### SearchOptions
-	SearchOptions		record
-												:2
-		SO_NO_WILDCARDS							:1
-		SO_IGNORE_SOFT_HYPHENS					:1
-		SO_BACKWARD_SEARCH						:1
-		SO_IGNORE_CASE							:1
-		SO_PARTIAL_WIDTH						:1
-		SO_PRESERVE_CASE_OF_DOCUMENT_STRING		:1
-	SearchOptions		end
+    SearchOptions       record
+                                                :2
+        SO_NO_WILDCARDS                         :1
+        SO_IGNORE_SOFT_HYPHENS                  :1
+        SO_BACKWARD_SEARCH                      :1
+        SO_IGNORE_CASE                          :1
+        SO_PARTIAL_WIDTH                        :1
+        SO_PRESERVE_CASE_OF_DOCUMENT_STRING     :1
+    SearchOptions       end
 
 SO_NO_WILDCARDS  
 Set if you want to treat wildcard chars as literal chars.
@@ -390,31 +390,31 @@ replacing it).
 
 ----------
 #### SearchReplaceEnableFlags
-	SearchReplaceEnableFlags			record
-		SREF_SEARCH		:1	; Set if the object can handle searches
-		SREF_REPLACE	:1	; Set if the object can handle replaces
-	SearchReplaceEnableFlags			end
+    SearchReplaceEnableFlags            record
+        SREF_SEARCH     :1  ; Set if the object can handle searches
+        SREF_REPLACE    :1  ; Set if the object can handle replaces
+    SearchReplaceEnableFlags            end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### SearchReplaceFocusInfo
-	SearchReplaceFocusInfo			etype byte
-		SRFI_SEARCH_TEXT				enum SearchReplaceFocusInfo
-	SRFI_REPLACE_TEXT				enum SearchReplaceFocusInfo
+    SearchReplaceFocusInfo          etype byte
+        SRFI_SEARCH_TEXT                enum SearchReplaceFocusInfo
+    SRFI_REPLACE_TEXT               enum SearchReplaceFocusInfo
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### SearchReplaceStruct
-	SearchReplaceStruct		struct
-		SRS_searchSize			word
-		SRS_replaceSize			word
-		SRS_params				SearchOptions
-		SRS_replyObject			optr
-		SRS_replyMsg			word
-		SRS_searchString		label char
-	SearchReplaceStruct		ends
+    SearchReplaceStruct     struct
+        SRS_searchSize          word
+        SRS_replaceSize         word
+        SRS_params              SearchOptions
+        SRS_replyObject         optr
+        SRS_replyMsg            word
+        SRS_searchString        label char
+    SearchReplaceStruct     ends
 
 *SRS_searchSize* stores the number of characters in the search string 
 (including the null terminator).
@@ -436,41 +436,41 @@ was not found.
 
 ----------
 #### SelectionDataType
-	SelectionDataType		etype word
-		SDT_TEXT				enum SelectionDataType
-		SDT_GRAPHICS			enum SelectionDataType
-		SDT_SPREADSHEET			enum SelectionDataType
-		SDT_INK					enum SelectionDataType
-		SDT_OTHER				enum SelectionDataType
+    SelectionDataType       etype word
+        SDT_TEXT                enum SelectionDataType
+        SDT_GRAPHICS            enum SelectionDataType
+        SDT_SPREADSHEET         enum SelectionDataType
+        SDT_INK                 enum SelectionDataType
+        SDT_OTHER               enum SelectionDataType
 
 **Library:** Objects/gEditCC.def
 
 ----------
 #### SelectionType
-	SelectionType		etype byte
-		ST_DOING_CHAR_SELECTION				enum SelectionType
-		ST_DOING_WORD_SELECTION				enum SelectionType
-		ST_DOING_LINE_SELECTION				enum SelectionType
-		ST_DOING_PARA_SELECTION				enum SelectionType
+    SelectionType       etype byte
+        ST_DOING_CHAR_SELECTION             enum SelectionType
+        ST_DOING_WORD_SELECTION             enum SelectionType
+        ST_DOING_LINE_SELECTION             enum SelectionType
+        ST_DOING_PARA_SELECTION             enum SelectionType
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### SemaphoreError
-	SemaphoreError		etype word
-		SE_NO_ERROR					enum SemaphoreError
-		SE_TIMEOUT					enum SemaphoreError
-		SE_PREVIOUS_OWNER_DIED		enum SemaphoreError
+    SemaphoreError      etype word
+        SE_NO_ERROR                 enum SemaphoreError
+        SE_TIMEOUT                  enum SemaphoreError
+        SE_PREVIOUS_OWNER_DIED      enum SemaphoreError
 
 **Library:** sem.def
 
 ----------
 #### SerifFace
-	SerifFace		etype byte, 0
-		SF_OLD			enum SerifFace, 0
-		SF_TRANS		enum SerifFace, 0x40
-		SF_MODERN		enum SerifFace, 0x80
-		SF_SLAB			enum SerifFace, 0xc0
+    SerifFace       etype byte, 0
+        SF_OLD          enum SerifFace, 0
+        SF_TRANS        enum SerifFace, 0x40
+        SF_MODERN       enum SerifFace, 0x80
+        SF_SLAB         enum SerifFace, 0xc0
 
 SF_OLD  
 Old Style. Characterized by axes of curves inclined to left, 
@@ -495,20 +495,20 @@ are usually unbracketed
 
 ----------
 #### SetDateTimeParams
-	SetDateTimeParams		record
-		SDTP_SET_DATE			:1	;TRUE: set date (must be bit 7)
-		SDTP_SET_TIME			:1	;TRUE: set time (must be bit 6)
-								:6
-	SetDateTimeParams		end
+    SetDateTimeParams       record
+        SDTP_SET_DATE           :1  ;TRUE: set date (must be bit 7)
+        SDTP_SET_TIME           :1  ;TRUE: set time (must be bit 6)
+                                :6
+    SetDateTimeParams       end
 
 **Library:** timedate.def
 
 ----------
 #### SetPalElement
-	SetPalElement		 struct
-		SPE_entry		byte			; palette entry number
-		SPE_color		RGBValue <>		; color to set that entry
-	SetPalElement	 	ends
+    SetPalElement        struct
+        SPE_entry       byte            ; palette entry number
+        SPE_color       RGBValue <>     ; color to set that entry
+    SetPalElement       ends
 
 This structure is passed to GrSetPalette.
 
@@ -516,78 +516,78 @@ This structure is passed to GrSetPalette.
 
 ----------
 #### SetSizeArgs
-	SetSizeArgs		struct
-		SSA_width		SpecWidth <>	;Width of the composite
-		SSA_height		SpecHeight <>	;Height of each child
-		SSA_count		sword			;Number of children, or zero if not 
-										;applicable
-		SSA_updateMode	VisUpdateMode	;Update mode to perform geometry redos
-		align			word
-	SetSizeArgs		ends
+    SetSizeArgs     struct
+        SSA_width       SpecWidth <>    ;Width of the composite
+        SSA_height      SpecHeight <>   ;Height of each child
+        SSA_count       sword           ;Number of children, or zero if not 
+                                        ;applicable
+        SSA_updateMode  VisUpdateMode   ;Update mode to perform geometry redos
+        align           word
+    SetSizeArgs     ends
 
 **Library:** Objects/genC.def
 
 ----------
 #### ShadowAnchor
-	ShadowAnchor		etype byte
-		SA_TOP_LEFT				enum ShadowAnchor
-		SA_TOP_RIGHT			enum ShadowAnchor
-		SA_BOTTOM_LEFT			enum ShadowAnchor
-		SA_BOTTOM_RIGHT			enum ShadowAnchor
+    ShadowAnchor        etype byte
+        SA_TOP_LEFT             enum ShadowAnchor
+        SA_TOP_RIGHT            enum ShadowAnchor
+        SA_BOTTOM_LEFT          enum ShadowAnchor
+        SA_BOTTOM_RIGHT         enum ShadowAnchor
 
 **Library:** Objects/Text/tCommon.def
 
 ----------
 #### ShiftState
-	ShiftState		record
-		SS_LALT				:1	;Set if left ALT modifier
-		SS_RALT				:1	;Set if right ALT modifier
-		SS_LCTRL			:1	;Set if left CTRL modifier
-		SS_RCTRL			:1	;Set if right CTRL modifier
-		SS_LSHIFT			:1	;Set if left SHIFT modifier
-		SS_RSHIFT			:1	;Set if right SHIFT modifier
-		SS_FIRE_BUTTON_1	:1	;Set if fire button1 modifier
-		SS_FIRE_BUTTON_2	:1	;Set if fire button1 modifier
-	ShiftState		end
+    ShiftState      record
+        SS_LALT             :1  ;Set if left ALT modifier
+        SS_RALT             :1  ;Set if right ALT modifier
+        SS_LCTRL            :1  ;Set if left CTRL modifier
+        SS_RCTRL            :1  ;Set if right CTRL modifier
+        SS_LSHIFT           :1  ;Set if left SHIFT modifier
+        SS_RSHIFT           :1  ;Set if right SHIFT modifier
+        SS_FIRE_BUTTON_1    :1  ;Set if fire button1 modifier
+        SS_FIRE_BUTTON_2    :1  ;Set if fire button1 modifier
+    ShiftState      end
 
 **Library:** input.def
 
 ----------
 #### SortableArrayElement
-	SortableArrayElement			struct
-		SAE_OD		optr
-		SAE_key		DWFixed
-	SortableArrayElement			ends
+    SortableArrayElement            struct
+        SAE_OD      optr
+        SAE_key     DWFixed
+    SortableArrayElement            ends
 
 **Library:** grobj.def
 
 ----------
 #### SortableArrayHeader
-	SortableArrayHeader			struct
-		SAH_CAH						ChunkArrayHeader
-		SAH_originalArray			optr
-	SortableArrayHeader			ends
+    SortableArrayHeader         struct
+        SAH_CAH                     ChunkArrayHeader
+        SAH_originalArray           optr
+    SortableArrayHeader         ends
 
 **Library:** grobj.def
 
 ----------
 #### SortedNameArrayFindFlags
-	SortedNameArrayFindFlags			record
-		SNAFF_IGNORE_CASE			:1
-	SortedNameArrayFindFlags			end
+    SortedNameArrayFindFlags            record
+        SNAFF_IGNORE_CASE           :1
+    SortedNameArrayFindFlags            end
 
 **Library:** config.def
 
 ----------
 #### SoundBasicStatus
-	SoundBasicStatus		struct
-		SBS_blockHandle		word 0				; handle of block
-		SBS_ID				word SOUND_ID		; Says this struct is a sound
-		SBS_mutExSem		hptr 0				; mutual exclusive sempahore
-		SBS_type			SoundType 0			; the type of block
-		SBS_priority		SoundPriority 0		; current priority
-		SBS_EOS				EndOfSongFlags 0	; what to do at EOS
-	SoundBasicStatus		ends
+    SoundBasicStatus        struct
+        SBS_blockHandle     word 0              ; handle of block
+        SBS_ID              word SOUND_ID       ; Says this struct is a sound
+        SBS_mutExSem        hptr 0              ; mutual exclusive sempahore
+        SBS_type            SoundType 0         ; the type of block
+        SBS_priority        SoundPriority 0     ; current priority
+        SBS_EOS             EndOfSongFlags 0    ; what to do at EOS
+    SoundBasicStatus        ends
 
 This structure stores a number of pieces of information that are common to 
 all sounds. This structure is an entry within the basic Sound structure.
@@ -596,126 +596,126 @@ all sounds. This structure is an entry within the basic Sound structure.
 
 ----------
 #### SoundControl
-	SoundControl		struct
-		SC_status			SoundBasicStatus
-		SC_format			SoundFormatStatus
-		SC_position			SoundPositionStatus
-		SC_voice			label SoundVoiceStatus
-	SoundControl ends
+    SoundControl        struct
+        SC_status           SoundBasicStatus
+        SC_format           SoundFormatStatus
+        SC_position         SoundPositionStatus
+        SC_voice            label SoundVoiceStatus
+    SoundControl ends
 
-**Library:**		sound.def
+**Library:**        sound.def
 
 ----------
 #### SoundDACStatus
-	SoundDACStatus		struct
-		SDACS_rate			word 0				; sample rate of sound
-		SDACS_format		DACSampleFormat 0	; sample format of sound
-		SDACS_manufactID	ManufacturerID0		; sample ManufacturerID
-	SoundDACStatus		ends
+    SoundDACStatus      struct
+        SDACS_rate          word 0              ; sample rate of sound
+        SDACS_format        DACSampleFormat 0   ; sample format of sound
+        SDACS_manufactID    ManufacturerID0     ; sample ManufacturerID
+    SoundDACStatus      ends
 
 **Library:** sound.def
 
 ----------
 #### SoundErrors
-	SoundErrors					etype   word, 0, 2
-		SOUND_ERROR_NO_ERROR 						enum	SoundErrors
-		SOUND_ERROR_EXCLUSIVE_ACCESS_GRANTED 		enum	SoundErrors
-		SOUND_ERROR_OUT_OF_MEMORY 					enum	SoundErrors
-		SOUND_ERROR_UNABLE_TO_ALLOCATE_STREAM 		enum	SoundErrors
-		SOUND_ERROR_HARDWARE_NOT_AVAILABLE 			enum	SoundErrors
-		SOUND_ERROR_FAILED_ATTACH_TO_HARDWARE 		enum	SoundErrors
-		SOUND_ERROR_HARDWARE_DOESNT_SUPPORT_FORMAT 	enum	SoundErrors
-		SOUND_ERROR_DAC_UNATTACHED 					enum	SoundErrors
-		SOUND_ERROR_STREAM_DESTROYED 				enum	SoundErrors
+    SoundErrors                 etype   word, 0, 2
+        SOUND_ERROR_NO_ERROR                        enum    SoundErrors
+        SOUND_ERROR_EXCLUSIVE_ACCESS_GRANTED        enum    SoundErrors
+        SOUND_ERROR_OUT_OF_MEMORY                   enum    SoundErrors
+        SOUND_ERROR_UNABLE_TO_ALLOCATE_STREAM       enum    SoundErrors
+        SOUND_ERROR_HARDWARE_NOT_AVAILABLE          enum    SoundErrors
+        SOUND_ERROR_FAILED_ATTACH_TO_HARDWARE       enum    SoundErrors
+        SOUND_ERROR_HARDWARE_DOESNT_SUPPORT_FORMAT  enum    SoundErrors
+        SOUND_ERROR_DAC_UNATTACHED                  enum    SoundErrors
+        SOUND_ERROR_STREAM_DESTROYED                enum    SoundErrors
 
 **Library:** sound.def
 
 ----------
 #### SoundFMStatus
-	SoundFMStatus		struct
-		SFMS_timerHandle	hptr 0		; current timer handle
-		SFMS_timerID		word 0		; current timer ID
-		SFMS_timeRemaining	word 0		; Number of 65535 msec left to event
-		SFMS_tempo			word 0		; Number of msec per 64th note
-		SFMS_voicesUsed		byte 0		; Number of voices used in stream
-	SoundFMStatus		ends
+    SoundFMStatus       struct
+        SFMS_timerHandle    hptr 0      ; current timer handle
+        SFMS_timerID        word 0      ; current timer ID
+        SFMS_timeRemaining  word 0      ; Number of 65535 msec left to event
+        SFMS_tempo          word 0      ; Number of msec per 64th note
+        SFMS_voicesUsed     byte 0      ; Number of voices used in stream
+    SoundFMStatus       ends
 
 **Library:** sound.def
 
 ----------
 #### SoundFormatStatus
-	SoundFormatStatus		union
-		SFS_fm		SoundFMStatus
-		SFS_dac		SoundDACStatus
-	SoundFormatStatus		ends
+    SoundFormatStatus       union
+        SFS_fm      SoundFMStatus
+        SFS_dac     SoundDACStatus
+    SoundFormatStatus       ends
 
 **Library:** sound.def
 
 ----------
 #### SoundFunction
-	SoundFunction		etype word, DriverFunction, 2
-		DR_SOUND_ENTER_LIBRARY_ROUTINE	enum SoundFunction
-		DR_SOUND_EXIT_LIBRARY_ROUTINE	enum SoundFunction
-		DR_SOUND_ALLOC_MUSIC			enum SoundFunction
-		DR_SOUND_ALLOC_MUSIC_STREAM		enum SoundFunction
-		DR_SOUND_ALLOC_MUSIC_NOTE		enum SoundFunction
-		DR_SOUND_REALLOC_MUSIC			enum SoundFunction
-		DR_SOUND_REALLOC_MUSIC_NOTE		enum SoundFunction
-		DR_SOUND_PLAY_MUSIC				enum SoundFunction
-		DR_SOUND_PLAY_TO_MUSIC_STREAM	enum SoundFunction
-		DR_SOUND_STOP_MUSIC				enum SoundFunction
-		DR_SOUND_STOP_MUSIC_STREAM		enum SoundFunction
-		DR_SOUND_INIT_MUSIC				enum SoundFunction
-		DR_SOUND_FREE_SIMPLE			enum SoundFunction
-		DR_SOUND_FREE_STREAM			enum SoundFunction
-		DR_SOUND_CHANGE_OWNER_SIMPLE	enum SoundFunction
-		DR_SOUND_CHANGE_OWNER_STREAM	enum SoundFunction
-		DR_SOUND_ALLOC_SAMPLE_STREAM	enum SoundFunction
-		DR_SOUND_ENABLE_SAMPLE_STREAM	enum SoundFunction
-		DR_SOUND_PLAY_TO_SAMPLE_STREAM	enum SoundFunction
-		DR_SOUND_DISABLE_SAMPLE_STREAM	enum SoundFunction
-		DR_SOUND_FREE_SAMPLE_STREAM		enum SoundFunction
+    SoundFunction       etype word, DriverFunction, 2
+        DR_SOUND_ENTER_LIBRARY_ROUTINE  enum SoundFunction
+        DR_SOUND_EXIT_LIBRARY_ROUTINE   enum SoundFunction
+        DR_SOUND_ALLOC_MUSIC            enum SoundFunction
+        DR_SOUND_ALLOC_MUSIC_STREAM     enum SoundFunction
+        DR_SOUND_ALLOC_MUSIC_NOTE       enum SoundFunction
+        DR_SOUND_REALLOC_MUSIC          enum SoundFunction
+        DR_SOUND_REALLOC_MUSIC_NOTE     enum SoundFunction
+        DR_SOUND_PLAY_MUSIC             enum SoundFunction
+        DR_SOUND_PLAY_TO_MUSIC_STREAM   enum SoundFunction
+        DR_SOUND_STOP_MUSIC             enum SoundFunction
+        DR_SOUND_STOP_MUSIC_STREAM      enum SoundFunction
+        DR_SOUND_INIT_MUSIC             enum SoundFunction
+        DR_SOUND_FREE_SIMPLE            enum SoundFunction
+        DR_SOUND_FREE_STREAM            enum SoundFunction
+        DR_SOUND_CHANGE_OWNER_SIMPLE    enum SoundFunction
+        DR_SOUND_CHANGE_OWNER_STREAM    enum SoundFunction
+        DR_SOUND_ALLOC_SAMPLE_STREAM    enum SoundFunction
+        DR_SOUND_ENABLE_SAMPLE_STREAM   enum SoundFunction
+        DR_SOUND_PLAY_TO_SAMPLE_STREAM  enum SoundFunction
+        DR_SOUND_DISABLE_SAMPLE_STREAM  enum SoundFunction
+        DR_SOUND_FREE_SAMPLE_STREAM     enum SoundFunction
 
 **Library:** sound.def
 
 ----------
 #### SoundPositionStatus
-	SoundPositionStatus			union
-		SSS_simple		SoundSimpleStatus
-		SSS_stream		SoundStreamStatus
-	SoundPositionStatus			end
+    SoundPositionStatus         union
+        SSS_simple      SoundSimpleStatus
+        SSS_stream      SoundStreamStatus
+    SoundPositionStatus         end
 
 **Library:** sound.def
 
 ----------
 #### SoundPriority
-	SoundPriority		etype word, 10, 10
-		SP_SYSTEM_LEVEL		enum SoundPriority
-		SP_ALARM			enum SoundPriority
-		SP_STANDARD			enum SoundPriority
-		SP_GAME				enum SoundPriority
-		SP_BACKGROUND		enum SoundPriority
+    SoundPriority       etype word, 10, 10
+        SP_SYSTEM_LEVEL     enum SoundPriority
+        SP_ALARM            enum SoundPriority
+        SP_STANDARD         enum SoundPriority
+        SP_GAME             enum SoundPriority
+        SP_BACKGROUND       enum SoundPriority
 
-		SP_IMMEDIATE		equ -1
-		SP_THEME			equ +1
+        SP_IMMEDIATE        equ -1
+        SP_THEME            equ +1
 
 **Library:** sound.def
 
 ----------
 #### SoundSimpleStatus
-	SoundSimpleStatus			struct
-		SSS_songBuffer		fptr 0			; fptr to song buffer
-		SSS_songPointer		nptr 0			; current place in song
-	SoundSimpleStatus			ends
+    SoundSimpleStatus           struct
+        SSS_songBuffer      fptr 0          ; fptr to song buffer
+        SSS_songPointer     nptr 0          ; current place in song
+    SoundSimpleStatus           ends
 
 **Library:** sound.def
 
 ----------
 #### SoundStreamDeltaTimeType
-	SoundStreamDeltaTimeType		etype word, SoundStreamEvent, 2
-		SSDTT_MSEC			enum SoundStreamDeltaTimeType
-		SSDTT_TICKS			enum SoundStreamDeltaTimeType
-		SSDTT_TEMPO			enum SoundStreamDeltaTimeType	
+    SoundStreamDeltaTimeType        etype word, SoundStreamEvent, 2
+        SSDTT_MSEC          enum SoundStreamDeltaTimeType
+        SSDTT_TICKS         enum SoundStreamDeltaTimeType
+        SSDTT_TEMPO         enum SoundStreamDeltaTimeType   
 
 Between each event is the delay time from the current event to the next 
 event. The value can be either in msec (giving a maximum delay of 65.535 
@@ -726,11 +726,11 @@ seconds, in ticks (giving a maximum delay of ~18 minutes, or in 1/64th notes
 
 ----------
 #### SoundStreamEvent
-	SoundStreamEvent		etype word, 0, 2
-		SSE_VOICE_ON			enum SoundStreamEvent
-		SSE_VOICE_OFF			enum SoundStreamEvent
-		SSE_CHANGE				enum SoundStreamEvent
-		SSE_GENERAL				enum SoundStreamEvent
+    SoundStreamEvent        etype word, 0, 2
+        SSE_VOICE_ON            enum SoundStreamEvent
+        SSE_VOICE_OFF           enum SoundStreamEvent
+        SSE_CHANGE              enum SoundStreamEvent
+        SSE_GENERAL             enum SoundStreamEvent
 
 A sound stream is just made up of a bunch of events.
 
@@ -738,48 +738,48 @@ A sound stream is just made up of a bunch of events.
 
 ----------
 #### SoundStreamSize
-	SoundStreamSize		etype	word
-		SSS_ONE_SHOT 		enum	SoundStreamSize, 128; bytes
-		SSS_SMALL 			enum	SoundStreamSize, 256; bytes
-		SSS_MEDIUM 			enum	SoundStreamSize, 512; bytes
-		SSS_LARGE 			enum	SoundStreamSize, 1024; bytes
+    SoundStreamSize     etype   word
+        SSS_ONE_SHOT        enum    SoundStreamSize, 128; bytes
+        SSS_SMALL           enum    SoundStreamSize, 256; bytes
+        SSS_MEDIUM          enum    SoundStreamSize, 512; bytes
+        SSS_LARGE           enum    SoundStreamSize, 1024; bytes
 
 **Library:** sound.def
 
 ----------
 #### SoundStreamState
-	SoundStreamState	record
-		SSS_active 			:1 	; does a reader exist?
-		SSS_destroying 		:1 	; is it being destroyed?
-		SSS_locked 			:1 	; still an outstanding lock?
-							:5
-	SoundStreamState	end
+    SoundStreamState    record
+        SSS_active          :1  ; does a reader exist?
+        SSS_destroying      :1  ; is it being destroyed?
+        SSS_locked          :1  ; still an outstanding lock?
+                            :5
+    SoundStreamState    end
 
 **Library:** sound.def
 
 ----------
 #### SoundStreamStatus
-	SoundStreamStatus		struct
-		SSS_streamToken			word 0				; stream handle
-		SSS_streamSegment		word 0				; stream segment
-		SSS_dataSem				Semaphore <1,>		; all data on stream?
-		SSS_activeReaderSem		Semaphore <1,>		; reader currently on?
-		SSS_writerSem			Semaphore <1,>		; writer mutEx sem
-		SSS_buffer				fptr 0				; fptr to buffer
-		SSS_dataRemaining		word 0				; Number of bytes left
-		SSS_dataOnStream		word 0				; Number of events/samples
-		SSS_streamState			SoundStreamState	; state of stream
-	SoundStreamStatus		ends
+    SoundStreamStatus       struct
+        SSS_streamToken         word 0              ; stream handle
+        SSS_streamSegment       word 0              ; stream segment
+        SSS_dataSem             Semaphore <1,>      ; all data on stream?
+        SSS_activeReaderSem     Semaphore <1,>      ; reader currently on?
+        SSS_writerSem           Semaphore <1,>      ; writer mutEx sem
+        SSS_buffer              fptr 0              ; fptr to buffer
+        SSS_dataRemaining       word 0              ; Number of bytes left
+        SSS_dataOnStream        word 0              ; Number of events/samples
+        SSS_streamState         SoundStreamState    ; state of stream
+    SoundStreamStatus       ends
 
 **Library:** sound.def
 
 ----------
 #### SoundType
-	SoundType		etype word, 0, 2
-		ST_SIMPLE_FM			enum SoundType
-		ST_STREAM_FM			enum SoundType
-		ST_SIMPLE_DAC			enum SoundType
-		ST_STREAM_DAC			enum SoundType
+    SoundType       etype word, 0, 2
+        ST_SIMPLE_FM            enum SoundType
+        ST_STREAM_FM            enum SoundType
+        ST_SIMPLE_DAC           enum SoundType
+        ST_STREAM_DAC           enum SoundType
 
 There are a couple of different types of sounds. The first category is where it 
 is stored. A simple sound is played from fixed memory. Simple. A stream 
@@ -792,11 +792,11 @@ analog.
 
 ----------
 #### SoundVoiceStatus
-	SoundVoiceStatus		struct
-		SVS_instrument			fptr.InstrumentEnvelope 0
-		SVS_physicalVoice		word 0
-								word 0
-	SoundVoiceStatus		ends
+    SoundVoiceStatus        struct
+        SVS_instrument          fptr.InstrumentEnvelope 0
+        SVS_physicalVoice       word 0
+                                word 0
+    SoundVoiceStatus        ends
 
 For every FM sound, whether simple or stream, the VoiceManager must be 
 able to tell what the current instrument is and which voice (if any) the stream 
@@ -812,16 +812,16 @@ The **SoundVoiceStatus** structure stores these two pieces of information.
 
 ----------
 #### SpecAttrs
-	SpecAttrs		record
-		SA_ATTACHED						:1
-		SA_REALIZABLE					:1
-		SA_BRANCH_MINIMIZED				:1
-		SA_USES_DUAL_BUILD				:1
-		SA_CUSTOM_VIS_PARENT			:1
-		SA_SIMPLE_GEN_OBJ				:1
-		SA_CUSTOM_VIS_PARENT_FOR_CHILD	:1
-		SA_TREE_BUILT_BUT_NOT_REALIZED	:1
-	SpecAttrs		end
+    SpecAttrs       record
+        SA_ATTACHED                     :1
+        SA_REALIZABLE                   :1
+        SA_BRANCH_MINIMIZED             :1
+        SA_USES_DUAL_BUILD              :1
+        SA_CUSTOM_VIS_PARENT            :1
+        SA_SIMPLE_GEN_OBJ               :1
+        SA_CUSTOM_VIS_PARENT_FOR_CHILD  :1
+        SA_TREE_BUILT_BUT_NOT_REALIZED  :1
+    SpecAttrs       end
 
 SA_ATTACHED  
 For WIN_GROUP's only (Ignored if non-WIN-GROUP object). Set 
@@ -840,7 +840,7 @@ SA_BRANCH_MINIMIZED
 Set if this generic object is "minimized" and specific UI wants to 
 force all generic children in the branch to become non-visible. 
 If this bit is set, the no objects in the generic branch below this 
-point which have WIN_GROUP parts 	will be allowed to be 
+point which have WIN_GROUP parts    will be allowed to be 
 visible.
 
 SA_USES_DUAL_BUILD  
@@ -892,18 +892,18 @@ send a recursive MSG_SPEC_BUILD_BRANCH down the tree.
 
 ----------
 #### SpecBuildFlags
-	SpecBuildFlags		record
-		SBF_IN_UPDATE_WIN_GROUP							:1
-		SBF_WIN_GROUP									:1
-		SBF_TREE_BUILD									:1
-		SBF_VIS_PARENT_WITHIN_SCOPE_OF_TREE_BUILD		:1
-		SBF_SKIP_CHILD									:1
-		SBF_FIND_LAST									:1
-		SBF_VIS_PARENT_UNBUILDING						:1
-		SBF_VIS_PARENT_FULLY_ENABLED					:1
-														:6
-		SBF_UPDATE_MODE									:2
-	SpecBuildFlags		end
+    SpecBuildFlags      record
+        SBF_IN_UPDATE_WIN_GROUP                         :1
+        SBF_WIN_GROUP                                   :1
+        SBF_TREE_BUILD                                  :1
+        SBF_VIS_PARENT_WITHIN_SCOPE_OF_TREE_BUILD       :1
+        SBF_SKIP_CHILD                                  :1
+        SBF_FIND_LAST                                   :1
+        SBF_VIS_PARENT_UNBUILDING                       :1
+        SBF_VIS_PARENT_FULLY_ENABLED                    :1
+                                                        :6
+        SBF_UPDATE_MODE                                 :2
+    SpecBuildFlags      end
 
 SBF_IN_UPDATE_WIN_GROUP 
 Used for Building only (Not used in Unbuilding). Set if 
@@ -984,71 +984,71 @@ VisUpdateMode to use.
 
 ----------
 #### SpecChildCount
-	SpecChildCount		record
-		SCC_DATA		:16
-	SpecChildCount		end
+    SpecChildCount      record
+        SCC_DATA        :16
+    SpecChildCount      end
 
 **Library:** Objects/visC.def
 
 ----------
 #### SpecHeight
-	SpecHeight		record
-		SH_TYPE			SpecSizeType:6
-		SH_DATA			:10
-	SpecHeight		end
+    SpecHeight      record
+        SH_TYPE         SpecSizeType:6
+        SH_DATA         :10
+    SpecHeight      end
 
 **Library:** Objects/visC.def
 
 ----------
 #### SpecialChar
-	SpecialChar		etype word, 0, 2
-		SC_WILDCARD				enum	SpecialChar
-		SC_WILDCHAR				enum	SpecialChar
-		SC_GRAPHIC				enum	SpecialChar
-		SC_CR					enum	SpecialChar
-		SC_PAGE_BREAK			enum	SpecialChar
-		SC_TAB					enum	SpecialChar
+    SpecialChar     etype word, 0, 2
+        SC_WILDCARD             enum    SpecialChar
+        SC_WILDCHAR             enum    SpecialChar
+        SC_GRAPHIC              enum    SpecialChar
+        SC_CR                   enum    SpecialChar
+        SC_PAGE_BREAK           enum    SpecialChar
+        SC_TAB                  enum    SpecialChar
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### SpecialFunction
-	SpecialFunction		etype word, 0, 2
-		SF_FILENAME			enum SpecialFunction
-		SF_PAGE				enum SpecialFunction
-		SF_PAGES			enum SpecialFunction
+    SpecialFunction     etype word, 0, 2
+        SF_FILENAME         enum SpecialFunction
+        SF_PAGE             enum SpecialFunction
+        SF_PAGES            enum SpecialFunction
 
 **Library:** parse.def
 
 ----------
 #### SpecQueryVisParentType
-	SpecQueryVisParentType				etype word
-		SQT_VIS_PARENT_FOR_FIELD		enum SpecQueryVisParentType
-		SQT_VIS_PARENT_FOR_APPLICATION	enum SpecQueryVisParentType
-		SQT_VIS_PARENT_FOR_PRIMARY		enum SpecQueryVisParentType
-		SQT_VIS_PARENT_FOR_DISPLAY		enum SpecQueryVisParentType
-		SQT_VIS_PARENT_FOR_POPUP		enum SpecQueryVisParentType
-		SQT_VIS_PARENT_FOR_URGENT		enum SpecQueryVisParentType
-		SQT_VIS_PARENT_FOR_SYS_MODAL	enum SpecQueryVisParentType
+    SpecQueryVisParentType              etype word
+        SQT_VIS_PARENT_FOR_FIELD        enum SpecQueryVisParentType
+        SQT_VIS_PARENT_FOR_APPLICATION  enum SpecQueryVisParentType
+        SQT_VIS_PARENT_FOR_PRIMARY      enum SpecQueryVisParentType
+        SQT_VIS_PARENT_FOR_DISPLAY      enum SpecQueryVisParentType
+        SQT_VIS_PARENT_FOR_POPUP        enum SpecQueryVisParentType
+        SQT_VIS_PARENT_FOR_URGENT       enum SpecQueryVisParentType
+        SQT_VIS_PARENT_FOR_SYS_MODAL    enum SpecQueryVisParentType
 
 **Library:** Objects/visC.def
 
 ----------
 #### SpecSizeArgs
-	SpecSizeArgs		struct
-		SSA_minWidth			sword		; HINT_MINIMUM_SIZE
-		SSA_minHeight			sword
-		SSA_minNumChildren		sword
-		SSA_maxWidth			sword		; HINT_MAXIMUM_SIZE
-		SSA_maxHeight			sword
-		SSA_maxNumChildren		sword
-		SSA_initWidth			sword		; HINT_INITIAL_SIZE
-		SSA_initHeight			sword
-		SSA_initNumChildren		sword
-		SSA_fixedWidth			sword		; HINT_FIXED_SIZE
-		SSA_fixedHeight			sword
-		SSA_fixedNumChildren	sword
-	SpecSizeArgs		ends
+    SpecSizeArgs        struct
+        SSA_minWidth            sword       ; HINT_MINIMUM_SIZE
+        SSA_minHeight           sword
+        SSA_minNumChildren      sword
+        SSA_maxWidth            sword       ; HINT_MAXIMUM_SIZE
+        SSA_maxHeight           sword
+        SSA_maxNumChildren      sword
+        SSA_initWidth           sword       ; HINT_INITIAL_SIZE
+        SSA_initHeight          sword
+        SSA_initNumChildren     sword
+        SSA_fixedWidth          sword       ; HINT_FIXED_SIZE
+        SSA_fixedHeight         sword
+        SSA_fixedNumChildren    sword
+    SpecSizeArgs        ends
 
 This structure is filled in by **VisSetupSizeArgs**, finding all the desired size 
 hints and converting them as appropriate. You can then pass the results to 
@@ -1060,44 +1060,44 @@ suggested size arguments in various ways.
 
 ----------
 #### SpecSizeSpec
-	SpecSizeSpec			record
-		SSS_TYPE		SpecSizeType:6
-		SSS_DATA		:10
-	SpecSizeSpec			end
+    SpecSizeSpec            record
+        SSS_TYPE        SpecSizeType:6
+        SSS_DATA        :10
+    SpecSizeSpec            end
 
 **Library:** Objects/visC.def
 
 ----------
 #### SpecSizeType
-	SpecSizeType		etype byte
-		SST_PIXELS 						enum SpecSizeType
-		SST_COUNT 						enum SpecSizeType
-		SST_PCT_OF_FIELD_WIDTH 			enum SpecSizeType
-		SST_PCT_OF_FIELD_HEIGHT 		enum SpecSizeType
-							PCT_0		equ 0000000000b
-							PCT_5		equ 0000110011b
-							PCT_10		equ 0001100110b
-							PCT_15		equ 0010011001b
-							PCT_20		equ 0011001100b
-							PCT_25		equ 0100000000b
-							PCT_30		equ 0100110011b
-							PCT_35		equ 0101100110b
-							PCT_40		equ 0110011001b
-							PCT_45		equ 0111001100b
-							PCT_50		equ 1000000000b
-							PCT_55		equ 1000110011b
-							PCT_60		equ 1001100110b
-							PCT_65		equ 1010011001b
-							PCT_70		equ 1011001100b
-							PCT_75		equ 1100000000b
-							PCT_80		equ 1100110011b
-							PCT_85		equ 1101100110b
-							PCT_90		equ 1110011001b
-							PCT_95		equ 1111001100b
-							PCT_100		equ 1111111111b
-		SST_AVG_CHAR_WIDTHS 			enum SpecSizeType
-		SST_WIDE_CHAR_WIDTHS 			enum SpecSizeType
-		SST_LINES_OF_TEXT 				enum SpecSizeType
+    SpecSizeType        etype byte
+        SST_PIXELS                      enum SpecSizeType
+        SST_COUNT                       enum SpecSizeType
+        SST_PCT_OF_FIELD_WIDTH          enum SpecSizeType
+        SST_PCT_OF_FIELD_HEIGHT         enum SpecSizeType
+                            PCT_0       equ 0000000000b
+                            PCT_5       equ 0000110011b
+                            PCT_10      equ 0001100110b
+                            PCT_15      equ 0010011001b
+                            PCT_20      equ 0011001100b
+                            PCT_25      equ 0100000000b
+                            PCT_30      equ 0100110011b
+                            PCT_35      equ 0101100110b
+                            PCT_40      equ 0110011001b
+                            PCT_45      equ 0111001100b
+                            PCT_50      equ 1000000000b
+                            PCT_55      equ 1000110011b
+                            PCT_60      equ 1001100110b
+                            PCT_65      equ 1010011001b
+                            PCT_70      equ 1011001100b
+                            PCT_75      equ 1100000000b
+                            PCT_80      equ 1100110011b
+                            PCT_85      equ 1101100110b
+                            PCT_90      equ 1110011001b
+                            PCT_95      equ 1111001100b
+                            PCT_100     equ 1111111111b
+        SST_AVG_CHAR_WIDTHS             enum SpecSizeType
+        SST_WIDE_CHAR_WIDTHS            enum SpecSizeType
+        SST_LINES_OF_TEXT               enum SpecSizeType
 
 SST_PIXELS  
 Size in pixels. This can be 0 through 1023. This also may imply 
@@ -1111,7 +1111,7 @@ FATAL_ERROR if passed this). This is offered because some
 generic objects would like to provide a "Count" option in 
 addition to having an actual distance. An example is a scrolling 
 list, where we want to have both a SpecSizeSpec to indicate the 
-height of each moniker, 	 and one more to indicate how tall we 
+height of each moniker,      and one more to indicate how tall we 
 want the scrolling list to be. A nice option for how tall the 
 scrolling list should be is to provide a "count" of how many list 
 entries we'd like to display.
@@ -1135,7 +1135,7 @@ SST_WIDE_CHAR_WIDTHS
 Data is number to multiply by the width of the widest character 
 in the set of the font being used. To be used in cases where we 
 want to ensure that "any 8 characters" for example, could be 
-displayed in the space allocated. This may 	be 0 to 1023.
+displayed in the space allocated. This may  be 0 to 1023.
 
 SST_LINES_OF_TEXT  
 Data is the # to multiply times the height of a line of text in the 
@@ -1146,25 +1146,25 @@ lines of text are normally only handled by the text object.
 
 ----------
 #### SpecUINavigationID
-	SpecUINavigationID		etype word, NAVIGATION_ID_UI_START
+    SpecUINavigationID      etype word, NAVIGATION_ID_UI_START
 
 **Library:** Objects/genC.def
 
 ----------
 #### SpecWidth
-	SpecWidth			record
-		SW_TYPE		SpecSizeType:6
-		SW_DATA		:10
-	SpecWidth			end
+    SpecWidth           record
+        SW_TYPE     SpecSizeType:6
+        SW_DATA     :10
+    SpecWidth           end
 
 **Library:** Objects/visC.def
 
 ----------
 #### SpecWinSizePair
-	SpecWinSizePair		struct
-		SWSP_x	SpecWinSizeSpec
-		SWSP_y	SpecWinSizeSpec
-	SpecWinSizePair		ends
+    SpecWinSizePair     struct
+        SWSP_x  SpecWinSizeSpec
+        SWSP_y  SpecWinSizeSpec
+    SpecWinSizePair     ends
 
 This structure stores an (x,y) pair of **SpecWinSIzeSpec** structures. This 
 structure allows us to represent the generic position and size of a windowed 
@@ -1174,22 +1174,22 @@ object.
 
 ----------
 #### SpecWinSizeSpec
-	SpecWinSizeSpec		record
-		SWSS_RATIO		:1		;TRUE if value is ratio. If FALSE,
-								;bits 14-0 contain signed pixel value.
-								;(need to extend sign to bit 15)
-		SWSS_SIGN		:1		;sign of ratio (MUST BE BIT 14)
-		SWSS_MANTISSA	:4		;integer portion: 0-15
-		SWSS_FRACTION	:10		;fractional portion: 1/1024 to 1023/1024.
-	SpecWinSizeSpec		end
+    SpecWinSizeSpec     record
+        SWSS_RATIO      :1      ;TRUE if value is ratio. If FALSE,
+                                ;bits 14-0 contain signed pixel value.
+                                ;(need to extend sign to bit 15)
+        SWSS_SIGN       :1      ;sign of ratio (MUST BE BIT 14)
+        SWSS_MANTISSA   :4      ;integer portion: 0-15
+        SWSS_FRACTION   :10     ;fractional portion: 1/1024 to 1023/1024.
+    SpecWinSizeSpec     end
 
 **Library:** Objects/visC.def
 
 ----------
 #### SpellCheckFromOffsetFlags
-	SpellCheckFromOffsetFlags				record
-		SCFOF_CHECK_NUM_CHARS			:1
-	SpellCheckFromOffsetFlags				end
+    SpellCheckFromOffsetFlags               record
+        SCFOF_CHECK_NUM_CHARS           :1
+    SpellCheckFromOffsetFlags               end
 
 SCFOF_CHECK_NUM_CHARS  
 If set, **VisTextSpellCheckFromOffset** will check the passed 
@@ -1199,14 +1199,14 @@ number of characters.
 
 ----------
 #### SpellCheckFromOffsetStruct
-	SpellCheckFromOffsetStruct				struct
-		SCFOS_ICBuff				hptr
-		SCFOS_flags					SpellCheckFromOffsetFlags
-		SCFOS_numChars				dword
-		SCFOS_offset				dword
-		SCFOS_replyOptr				optr
-		even
-	SpellCheckFromOffsetStruct				ends
+    SpellCheckFromOffsetStruct              struct
+        SCFOS_ICBuff                hptr
+        SCFOS_flags                 SpellCheckFromOffsetFlags
+        SCFOS_numChars              dword
+        SCFOS_offset                dword
+        SCFOS_replyOptr             optr
+        even
+    SpellCheckFromOffsetStruct              ends
 
 *SCFOS_ICBuff* stores the **ICBuff** to pass to the spell check library.
 
@@ -1226,11 +1226,11 @@ SPELL_CHECK_COMPLETED) should be sent to.
 
 ----------
 #### SpoolFileName
-	SpoolFileName		struct
-		SFN_base	char "spool"
-		SFN_num		char "000"
-		SFN_ext		char ".dat",0
-	SpoolFileName		ends
+    SpoolFileName       struct
+        SFN_base    char "spool"
+        SFN_num     char "000"
+        SFN_ext     char ".dat",0
+    SpoolFileName       ends
 
 This structure stores the default names to attach to spool files.
 
@@ -1238,32 +1238,32 @@ This structure stores the default names to attach to spool files.
 
 ----------
 #### SpoolInfoType
-	SpoolInfoType		etype word, 0, 2
-		SIT_JOB_INFO				enum SpoolInfoType
-		SIT_QUEUE_INFO				enum SpoolInfoType
+    SpoolInfoType       etype word, 0, 2
+        SIT_JOB_INFO                enum SpoolInfoType
+        SIT_QUEUE_INFO              enum SpoolInfoType
 
 **Library:** spool.def
 
 ----------
 #### SpoolOpStatus
-	SpoolOpStatus		etype word, 0, 1
-		SPOOL_OPERATION_SUCCESSFUL			enum SpoolOpStatus
-		SPOOL_JOB_NOT_FOUND					enum SpoolOpStatus
-		SPOOL_QUEUE_EMPTY					enum SpoolOpStatus
-		SPOOL_QUEUE_NOT_EMPTY				enum SpoolOpStatus
-		SPOOL_QUEUE_NOT_FOUND				enum SpoolOpStatus
-		SPOOL_CANT_VERIFY_PORT				enum SpoolOpStatus
-		SPOOL_OPERATION_FAILED				enum SpoolOpStatus
+    SpoolOpStatus       etype word, 0, 1
+        SPOOL_OPERATION_SUCCESSFUL          enum SpoolOpStatus
+        SPOOL_JOB_NOT_FOUND                 enum SpoolOpStatus
+        SPOOL_QUEUE_EMPTY                   enum SpoolOpStatus
+        SPOOL_QUEUE_NOT_EMPTY               enum SpoolOpStatus
+        SPOOL_QUEUE_NOT_FOUND               enum SpoolOpStatus
+        SPOOL_CANT_VERIFY_PORT              enum SpoolOpStatus
+        SPOOL_OPERATION_FAILED              enum SpoolOpStatus
 
 **Library:** spool.def
 
 ----------
 #### SpoolTimeStruct
-	SpoolTimeStruct		struct
-		STS_second		byte		; second of the minute (0-59)
-		STS_minute		byte		; minute of the hour (0-59)
-		STS_hour		byte		; hour of the day (0-23)
-	SpoolTimeStruct		ends
+    SpoolTimeStruct     struct
+        STS_second      byte        ; second of the minute (0-59)
+        STS_minute      byte        ; minute of the hour (0-59)
+        STS_hour        byte        ; hour of the day (0-23)
+    SpoolTimeStruct     ends
 
 This structure holds the time stamp for a print spool job.
 
@@ -1271,50 +1271,50 @@ This structure holds the time stamp for a print spool job.
 
 ----------
 #### SRCFeatures
-	SRCFeatures		record
-		SRCF_CLOSE						:1
-		SRCF_FIND_NEXT					:1
-		SRCF_FIND_PREV					:1
-		SRCF_REPLACE_CURRENT			:1
-		SRCF_REPLACE_ALL_IN_SELECTION	:1
-		SRCF_REPLACE_ALL				:1
-		SRCF_PARTIAL_WORDS				:1
-		SRCF_IGNORE_CASE				:1
-		SRCF_WILDCARDS					:1
-		SRCF_SPECIAL_CHARS				:1
-	SRCFeatures		end
+    SRCFeatures     record
+        SRCF_CLOSE                      :1
+        SRCF_FIND_NEXT                  :1
+        SRCF_FIND_PREV                  :1
+        SRCF_REPLACE_CURRENT            :1
+        SRCF_REPLACE_ALL_IN_SELECTION   :1
+        SRCF_REPLACE_ALL                :1
+        SRCF_PARTIAL_WORDS              :1
+        SRCF_IGNORE_CASE                :1
+        SRCF_WILDCARDS                  :1
+        SRCF_SPECIAL_CHARS              :1
+    SRCFeatures     end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### SRCToolboxFeatures
-	SRCToolboxFeatures		record
-		SRCTF_SEARCH_REPLACE		:1
-	SRCToolboxFeatures		end
+    SRCToolboxFeatures      record
+        SRCTF_SEARCH_REPLACE        :1
+    SRCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### StandardArrowheadType
-	StandardArrowheadType			record
-		SAT_LENGTH							:6
-		SAT_FILLED							:1
-		SAT_FILL_WITH_AREA_ATTRIBUTES		:1
-		SAT_ANGLE							:8
-	StandardArrowheadType			end
+    StandardArrowheadType           record
+        SAT_LENGTH                          :6
+        SAT_FILLED                          :1
+        SAT_FILL_WITH_AREA_ATTRIBUTES       :1
+        SAT_ANGLE                           :8
+    StandardArrowheadType           end
 
 **Library:** grobj.def
 
 ----------
 #### StandardDialogOptrParams
-	StandardDialogOptrParams				struct
-		SDOP_customFlags			CustomDialogBoxFlags
-		SDOP_customString			optr
-		SDOP_stringArg1				optr
-		SDOP_stringArg2				optr
-		SDOP_customTriggers			fptr.StandardDialogResponseTriggerTable
-		SDOP_helpContext			fptr
-	StandardDialogOptrParams				ends
+    StandardDialogOptrParams                struct
+        SDOP_customFlags            CustomDialogBoxFlags
+        SDOP_customString           optr
+        SDOP_stringArg1             optr
+        SDOP_stringArg2             optr
+        SDOP_customTriggers         fptr.StandardDialogResponseTriggerTable
+        SDOP_helpContext            fptr
+    StandardDialogOptrParams                ends
 
 This structure stores parameters passed to the **UserStandardDialogOptr** 
 routine. These entries must be in the same order as 
@@ -1324,14 +1324,14 @@ routine. These entries must be in the same order as
 
 ----------
 #### StandardDialogParams
-	StandardDialogParams			struct
-		SDP_customFlags			CustomDialogBoxFlags
-		SDP_customString		fptr
-		SDP_stringArg1			fptr
-		SDP_stringArg2			fptr
-		SDP_customTriggers		fptr.StandardDialogResponseTriggerTable
-		SDP_helpContext			fptr
-	StandardDialogParams			ends
+    StandardDialogParams            struct
+        SDP_customFlags         CustomDialogBoxFlags
+        SDP_customString        fptr
+        SDP_stringArg1          fptr
+        SDP_stringArg2          fptr
+        SDP_customTriggers      fptr.StandardDialogResponseTriggerTable
+        SDP_helpContext         fptr
+    StandardDialogParams            ends
 
 This structure stores parameters passed to **UserStandardDialog** and 
 MSG_GEN_APPLICATION_DO_STANDARD_DIALOG.
@@ -1340,10 +1340,10 @@ MSG_GEN_APPLICATION_DO_STANDARD_DIALOG.
 
 ----------
 #### StandardDialogResponseTriggerEntry
-	StandardDialogResponseTriggerEntry	struct
-		SDRTE_moniker				optr
-		SDRTE_responseValue			word
-	StandardDialogResponseTriggerEntry	ends
+    StandardDialogResponseTriggerEntry  struct
+        SDRTE_moniker               optr
+        SDRTE_responseValue         word
+    StandardDialogResponseTriggerEntry  ends
 
 This structure defines a custom trigger for a GenInteraction of type 
 GIT_MULTIPLE_RESPONSE initiated through **UserStandardDialog**. This 
@@ -1360,10 +1360,10 @@ value.
 
 ----------
 #### StandardDialogResponseTriggerTable
-	StandardDialogResponseTriggerTable	struct
-		SDRTT_numTriggers		word
-		SDRTT_triggers			label StandardDialogResponseTriggerEntry
-	StandardDialogResponseTriggerTable	ends
+    StandardDialogResponseTriggerTable  struct
+        SDRTT_numTriggers       word
+        SDRTT_triggers          label StandardDialogResponseTriggerEntry
+    StandardDialogResponseTriggerTable  ends
 
 This structure stores a table of custom response triggers for a GenInteraction 
 of type GIT_MULTIPLE_RESPONSE initiated through 
@@ -1373,84 +1373,84 @@ of type GIT_MULTIPLE_RESPONSE initiated through
 
 ----------
 #### StandardLanguage
-	StandardLanguage		etype byte, 0, 1
-		SL_UNIVERSAL			enum StandardLanguage,0	; Universal Language code
+    StandardLanguage        etype byte, 0, 1
+        SL_UNIVERSAL            enum StandardLanguage,0 ; Universal Language code
 
-		SL_FRENCH			enum StandardLanguage,5		; French
-		SL_GERMAN			enum StandardLanguage,6		; German
-		SL_SWEDISH			enum StandardLanguage,7		; Swedish
-		SL_SPANISH			enum StandardLanguage,8		; Spanish
-		SL_ITALIAN			enum StandardLanguage,9		; Italian
-		SL_DANISH			enum StandardLanguage,10	; Danish
-		SL_DUTCH 			enum StandardLanguage,11	; Dutch
-		SL_PORTUGUESE		enum StandardLanguage,12	; Portuguese
-		SL_NORWEGIAN		enum StandardLanguage,13	; Norwegian Becalm
-		SL_FINNISH			enum StandardLanguage,14	; Finnish
-		SL_SWISS			enum StandardLanguage,15	; Swiss
-		SL_ENGLISH			enum StandardLanguage,16	; English
-		SL_ARABIC			enum StandardLanguage,20	; Arabic
-		SL_AUSTRALIAN		enum StandardLanguage,21	; Australian
-		SL_CHINESE			enum StandardLanguage,22	; Chines (Pinyon)
-		SL_GAELIC			enum StandardLanguage,23	; Gallic
-		SL_GREEK			enum StandardLanguage,24	; Greek
-		SL_HEBREW			enum StandardLanguage,25	; Hebrew
-		SL_HUNGARIAN		enum StandardLanguage,26	; Hungarian (Meager)
-		SL_JAPANESE			enum StandardLanguage,27	; Japanese
-		SL_POLISH			enum StandardLanguage,28	; Polish
-		SL_SERBO_CROATN		enum StandardLanguage,29	; Sorb-Creatine
-		SL_SLOVAK			enum StandardLanguage,30	; Slovak/Czech (Czechoslovakia)
-		SL_RUSSIAN			enum StandardLanguage,31	; Russian
-		SL_TURKISH			enum StandardLanguage,32	; Turkish
-		SL_URDU				enum StandardLanguage,33	; Rudy/Hindu
-		SL_AFRIKAANS		enum StandardLanguage,34	; Afrikaans
-		SL_BASQUE			enum StandardLanguage,35	; Basque
-		SL_CATALAN			enum StandardLanguage,36	; Chatelaine
-		SL_CANADIAN			enum StandardLanguage,37	; Canadian
-		SL_FLEMISH			enum StandardLanguage,38	; Flemish
-		SL_HAWAIIAN			enum StandardLanguage,39	; Hawaiian
-		SL_KOREAN			enum StandardLanguage,40	; Korean (Angel)
-		SL_LATIN			enum StandardLanguage,41	; Latin
-		SL_MAORI			enum StandardLanguage,42	; Mario
-		SL_NZEALAND			enum StandardLanguage,43	; New Sealant
-		SL_BRITISH			enum StandardLanguage,44	; U.K. English
+        SL_FRENCH           enum StandardLanguage,5     ; French
+        SL_GERMAN           enum StandardLanguage,6     ; German
+        SL_SWEDISH          enum StandardLanguage,7     ; Swedish
+        SL_SPANISH          enum StandardLanguage,8     ; Spanish
+        SL_ITALIAN          enum StandardLanguage,9     ; Italian
+        SL_DANISH           enum StandardLanguage,10    ; Danish
+        SL_DUTCH            enum StandardLanguage,11    ; Dutch
+        SL_PORTUGUESE       enum StandardLanguage,12    ; Portuguese
+        SL_NORWEGIAN        enum StandardLanguage,13    ; Norwegian Becalm
+        SL_FINNISH          enum StandardLanguage,14    ; Finnish
+        SL_SWISS            enum StandardLanguage,15    ; Swiss
+        SL_ENGLISH          enum StandardLanguage,16    ; English
+        SL_ARABIC           enum StandardLanguage,20    ; Arabic
+        SL_AUSTRALIAN       enum StandardLanguage,21    ; Australian
+        SL_CHINESE          enum StandardLanguage,22    ; Chines (Pinyon)
+        SL_GAELIC           enum StandardLanguage,23    ; Gallic
+        SL_GREEK            enum StandardLanguage,24    ; Greek
+        SL_HEBREW           enum StandardLanguage,25    ; Hebrew
+        SL_HUNGARIAN        enum StandardLanguage,26    ; Hungarian (Meager)
+        SL_JAPANESE         enum StandardLanguage,27    ; Japanese
+        SL_POLISH           enum StandardLanguage,28    ; Polish
+        SL_SERBO_CROATN     enum StandardLanguage,29    ; Sorb-Creatine
+        SL_SLOVAK           enum StandardLanguage,30    ; Slovak/Czech (Czechoslovakia)
+        SL_RUSSIAN          enum StandardLanguage,31    ; Russian
+        SL_TURKISH          enum StandardLanguage,32    ; Turkish
+        SL_URDU             enum StandardLanguage,33    ; Rudy/Hindu
+        SL_AFRIKAANS        enum StandardLanguage,34    ; Afrikaans
+        SL_BASQUE           enum StandardLanguage,35    ; Basque
+        SL_CATALAN          enum StandardLanguage,36    ; Chatelaine
+        SL_CANADIAN         enum StandardLanguage,37    ; Canadian
+        SL_FLEMISH          enum StandardLanguage,38    ; Flemish
+        SL_HAWAIIAN         enum StandardLanguage,39    ; Hawaiian
+        SL_KOREAN           enum StandardLanguage,40    ; Korean (Angel)
+        SL_LATIN            enum StandardLanguage,41    ; Latin
+        SL_MAORI            enum StandardLanguage,42    ; Mario
+        SL_NZEALAND         enum StandardLanguage,43    ; New Sealant
+        SL_BRITISH          enum StandardLanguage,44    ; U.K. English
 
-		SL_DEFAULT			equ SL_ENGLISH
+        SL_DEFAULT          equ SL_ENGLISH
 
 **Library:** sllang.def
 
 ----------
 #### StandardPath
-	StandardPath		etype word, 1, 2
-		SP_NOT_STANDARD_PATH		enum StandardPath,0
-		SP_TOP						enum StandardPath,1
-		SP_APPLICATION				enum StandardPath
-		SP_DOCUMENT					enum StandardPath
-		SP_SYSTEM					enum StandardPath
-		SP_PRIVATE_DATA				enum StandardPath
-		SP_STATE					enum StandardPath
-		SP_FONT						enum StandardPath
-		SP_SPOOL					enum StandardPath
-		SP_SYS_APPLICATION			enum StandardPath
-		SP_USER_DATA				enum StandardPath
-		SP_MOUSE_DRIVERS			enum StandardPath
-		SP_PRINTER_DRIVERS			enum StandardPath
-		SP_FILE_SYSTEM_DRIVERS		enum StandardPath
-		SP_VIDEO_DRIVERS			enum StandardPath
-		SP_SWAP_DRIVERS				enum StandardPath
-		SP_KEYBOARD_DRIVERS			enum StandardPath
-		SP_FONT_DRIVERS				enum StandardPath
-		SP_IMPORT_EXPORT_DRIVERS	enum StandardPath
-		SP_TASK_SWITCH_DRIVERS		enum StandardPath
-		SP_HELP_FILES				enum StandardPath
-		SP_TEMPLATE					enum StandardPath
-		SP_POWER_DRIVERS			enum StandardPath
-		SP_DOS_ROOM					enum StandardPath
-		SP_HWR						enum StandardPath
-		SP_WASTE_BASKET				enum StandardPath
-		SP_BACKUP					enum StandardPath
-		SP_PAGER_DRIVERS			enum StandardPath
+    StandardPath        etype word, 1, 2
+        SP_NOT_STANDARD_PATH        enum StandardPath,0
+        SP_TOP                      enum StandardPath,1
+        SP_APPLICATION              enum StandardPath
+        SP_DOCUMENT                 enum StandardPath
+        SP_SYSTEM                   enum StandardPath
+        SP_PRIVATE_DATA             enum StandardPath
+        SP_STATE                    enum StandardPath
+        SP_FONT                     enum StandardPath
+        SP_SPOOL                    enum StandardPath
+        SP_SYS_APPLICATION          enum StandardPath
+        SP_USER_DATA                enum StandardPath
+        SP_MOUSE_DRIVERS            enum StandardPath
+        SP_PRINTER_DRIVERS          enum StandardPath
+        SP_FILE_SYSTEM_DRIVERS      enum StandardPath
+        SP_VIDEO_DRIVERS            enum StandardPath
+        SP_SWAP_DRIVERS             enum StandardPath
+        SP_KEYBOARD_DRIVERS         enum StandardPath
+        SP_FONT_DRIVERS             enum StandardPath
+        SP_IMPORT_EXPORT_DRIVERS    enum StandardPath
+        SP_TASK_SWITCH_DRIVERS      enum StandardPath
+        SP_HELP_FILES               enum StandardPath
+        SP_TEMPLATE                 enum StandardPath
+        SP_POWER_DRIVERS            enum StandardPath
+        SP_DOS_ROOM                 enum StandardPath
+        SP_HWR                      enum StandardPath
+        SP_WASTE_BASKET             enum StandardPath
+        SP_BACKUP                   enum StandardPath
+        SP_PAGER_DRIVERS            enum StandardPath
 
-		SP_TEMP_FILES		equ SP_WASTE_BASKET
+        SP_TEMP_FILES       equ SP_WASTE_BASKET
 
 SP_NOT_STANDARD_PATH  
 Not a standard path.
@@ -1547,24 +1547,24 @@ his is where backup files go. Default is PRIVDATA/BACKUP.
 
 ----------
 #### StandardPathByte
-	StandardPathByte		record
-		SPB_SP		StandardPath:8
-	StandardPathByte		end
+    StandardPathByte        record
+        SPB_SP      StandardPath:8
+    StandardPathByte        end
 
 **Library:** file.def
 
 ----------
 #### StandardSoundType
-	StandardSoundType		etype word
-		SST_ERROR				enum StandardSoundType
-		SST_WARNING				enum StandardSoundType
-		SST_NOTIFY				enum StandardSoundType
-		SST_NO_INPUT			enum StandardSoundType
-		SST_KEY_CLICK			enum StandardSoundType
-		SST_ALARM				enum StandardSoundType
-		SST_CUSTOM_SOUND		equ 0xfffd
-		SST_CUSTOM_BUFFER		equ 0xfffe	
-		SST_CUSTOM_NOTE			equ 0xffff
+    StandardSoundType       etype word
+        SST_ERROR               enum StandardSoundType
+        SST_WARNING             enum StandardSoundType
+        SST_NOTIFY              enum StandardSoundType
+        SST_NO_INPUT            enum StandardSoundType
+        SST_KEY_CLICK           enum StandardSoundType
+        SST_ALARM               enum StandardSoundType
+        SST_CUSTOM_SOUND        equ 0xfffd
+        SST_CUSTOM_BUFFER       equ 0xfffe  
+        SST_CUSTOM_NOTE         equ 0xffff
 
 SST_ERROR  
 Sound produced when an Error box comes up. 
@@ -1608,10 +1608,10 @@ PRIORITY = SYSTEM_IMMEDIATE.
 
 ----------
 #### StartUndoChainStruct
-	StartUndoChainStruct			struct
-		SUCS_owner			optr
-		SUCS_title			optr
-	StartUndoChainStruct			ends
+    StartUndoChainStruct            struct
+        SUCS_owner          optr
+        SUCS_title          optr
+    StartUndoChainStruct            ends
 
 *SUCS_owner* stores the owner of this action.
 
@@ -1623,160 +1623,160 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 
 ----------
 #### SubscriptPosition
-	SubscriptPosition		etype byte
-		SBP_CHEMICAL				enum SubscriptPosition, 30
-		SBP_DENOMINATOR				enum SubscriptPosition, 0
-		SBP_DEFAULT					enum SubscriptPosition, 50
+    SubscriptPosition       etype byte
+        SBP_CHEMICAL                enum SubscriptPosition, 30
+        SBP_DENOMINATOR             enum SubscriptPosition, 0
+        SBP_DEFAULT                 enum SubscriptPosition, 50
 
 **Library:** font.def
 
 ----------
 #### SubscriptSize
-	SubscriptSize		etype byte
-		SBS_CHEMICAL				enum SubscriptSize, 65
-		SBS_DENOMINATOR				enum SubscriptSize, 60
-		SBS_DEFAULT					enum SubscriptSize, 50
+    SubscriptSize       etype byte
+        SBS_CHEMICAL                enum SubscriptSize, 65
+        SBS_DENOMINATOR             enum SubscriptSize, 60
+        SBS_DEFAULT                 enum SubscriptSize, 50
 
 **Library:** font.def
 
 ----------
 #### SuperscriptPosition
-	SuperscriptPosition			etype byte
-		SPP_DISPLAY			enum SuperscriptPosition, 50
-		SPP_FOOTNOTE		enum SuperscriptPosition, 40
-		SPP_ALPHA			enum SuperscriptPosition, 45
-		SPP_NUMERATOR		enum SuperscriptPosition, 50
-		SPP_DEFAULT			enum SuperscriptPosition, 50
+    SuperscriptPosition         etype byte
+        SPP_DISPLAY         enum SuperscriptPosition, 50
+        SPP_FOOTNOTE        enum SuperscriptPosition, 40
+        SPP_ALPHA           enum SuperscriptPosition, 45
+        SPP_NUMERATOR       enum SuperscriptPosition, 50
+        SPP_DEFAULT         enum SuperscriptPosition, 50
 
 **Library:** font.def
 
 ----------
 #### SuperscriptSize
-	SuperscriptSize		etype byte
-		SPS_DISPLAY			enum SuperscriptSize, 55
-		SPS_FOOTNOTE		enum SuperscriptSize, 65
-		SPS_ALPHA			enum SuperscriptSize, 75
-		SPS_NUMERATOR		enum SuperscriptSize, 60
-		SPS_DEFAULT			enum SuperscriptSize, 50
+    SuperscriptSize     etype byte
+        SPS_DISPLAY         enum SuperscriptSize, 55
+        SPS_FOOTNOTE        enum SuperscriptSize, 65
+        SPS_ALPHA           enum SuperscriptSize, 75
+        SPS_NUMERATOR       enum SuperscriptSize, 60
+        SPS_DEFAULT         enum SuperscriptSize, 50
 
 **Library:** font.def
 
 ----------
 #### SysConfigFlags
-	SysConfigFlags		record
-		SCF_UNDER_SWAT	:1,	; Non-zero if kernel started by Swat stub
-		SCF_2ND_IC		:1,	; Non-zero if second 8259 present
-		SCF_RTC			:1,	; Non-zero if real-time clock around
-		SCF_COPROC		:1,	; Non-zero if math coprocessor present
-		SCF_RESTARTED	:1	; Non-zero if restarted from our tsr
-		SCF_CRASHED		:1	; Non-zero if we crashed the last time we ran
-		SCF_MCA			:1	; Non-zero if we're on a Micro Channel machine
-		SCF_LOGGING		:1	; Non-zero if we're writing log messages
-	SysConfigFlags		end
+    SysConfigFlags      record
+        SCF_UNDER_SWAT  :1, ; Non-zero if kernel started by Swat stub
+        SCF_2ND_IC      :1, ; Non-zero if second 8259 present
+        SCF_RTC         :1, ; Non-zero if real-time clock around
+        SCF_COPROC      :1, ; Non-zero if math coprocessor present
+        SCF_RESTARTED   :1  ; Non-zero if restarted from our tsr
+        SCF_CRASHED     :1  ; Non-zero if we crashed the last time we ran
+        SCF_MCA         :1  ; Non-zero if we're on a Micro Channel machine
+        SCF_LOGGING     :1  ; Non-zero if we're writing log messages
+    SysConfigFlags      end
 
 **Library:** system.def
 
 ----------
 #### SysDrawMask
-	SysDrawMask		record
-		SDM_INVERSE		:1					; bit 7: 0 for mask as is
-											; 1 for inverse of mask
-		SDM_MASK 		SystemDrawMask:7	; bits 6-0: draw mask number
-											; 0x7f to set custom mask
-	SysDrawMask		end
+    SysDrawMask     record
+        SDM_INVERSE     :1                  ; bit 7: 0 for mask as is
+                                            ; 1 for inverse of mask
+        SDM_MASK        SystemDrawMask:7    ; bits 6-0: draw mask number
+                                            ; 0x7f to set custom mask
+    SysDrawMask     end
 
 **Library:** graphics.def
 
 ----------
 #### SysGetInfoType
-	SysGetInfoType		etype word, 0, 2
-		SGIT_TOTAL_HANDLES			enum SysGetInfoType
-		SGIT_HEAP_SIZE				enum SysGetInfoType
-		SGIT_LARGEST_FREE_BLOCK		enum SysGetInfoType
-		SGIT_TOTAL_COUNT			enum SysGetInfoType
-		SGIT_NUMBER_OF_VOLUMES		enum SysGetInfoType
-		SGIT_TOTAL_GEODES			enum SysGetInfoType
-		SGIT_NUMBER_OF_PROCESSES	enum SysGetInfoType
-		SGIT_NUMBER_OF_LIBRARIES	enum SysGetInfoType
-		SGIT_NUMBER_OF_DRIVERS		enum SysGetInfoType
-		SGIT_CPU_SPEED				enum SysGetInfoType
-		SGIT_SYSTEM_DISK			enum SysGetInfoType
-		SGIT_UI_PROCESS				enum SysGetInfoType
+    SysGetInfoType      etype word, 0, 2
+        SGIT_TOTAL_HANDLES          enum SysGetInfoType
+        SGIT_HEAP_SIZE              enum SysGetInfoType
+        SGIT_LARGEST_FREE_BLOCK     enum SysGetInfoType
+        SGIT_TOTAL_COUNT            enum SysGetInfoType
+        SGIT_NUMBER_OF_VOLUMES      enum SysGetInfoType
+        SGIT_TOTAL_GEODES           enum SysGetInfoType
+        SGIT_NUMBER_OF_PROCESSES    enum SysGetInfoType
+        SGIT_NUMBER_OF_LIBRARIES    enum SysGetInfoType
+        SGIT_NUMBER_OF_DRIVERS      enum SysGetInfoType
+        SGIT_CPU_SPEED              enum SysGetInfoType
+        SGIT_SYSTEM_DISK            enum SysGetInfoType
+        SGIT_UI_PROCESS             enum SysGetInfoType
 
 **Library:** sysstats.def
 
 ----------
 #### SysInitialTextMode
-	SysInitialTextMode		etype	byte, 0
-		SITM_UNKNOWN				enum SysInitialTextMode, 0
-		SITM_TEXT_80_25_16_COLOR	enum SysInitialTextMode, 3
-		SITM_TEXT_80_25_MONO		enum SysInitialTextMode, 7
+    SysInitialTextMode      etype   byte, 0
+        SITM_UNKNOWN                enum SysInitialTextMode, 0
+        SITM_TEXT_80_25_16_COLOR    enum SysInitialTextMode, 3
+        SITM_TEXT_80_25_MONO        enum SysInitialTextMode, 7
 
 **Library:** system.def
 
 ----------
 #### SysMachineType
-	SysMachineType		etype byte, 0
-		SMT_UNKNOWN			enum SysMachineType
-		SMT_PC				enum SysMachineType
-		SMT_PC_CONV			enum SysMachineType
-		SMT_PC_JR			enum SysMachineType
-		SMT_PC_XT			enum SysMachineType
-		SMT_PC_XT_286		enum SysMachineType
-		SMT_PC_AT			enum SysMachineType
-		SMT_PS2_30			enum SysMachineType
-		SMT_PS2_50			enum SysMachineType
-		SMT_PS2_60			enum SysMachineType
-		SMT_PS2_80			enum SysMachineType
-		SMT_PS1				enum SysMachineType
+    SysMachineType      etype byte, 0
+        SMT_UNKNOWN         enum SysMachineType
+        SMT_PC              enum SysMachineType
+        SMT_PC_CONV         enum SysMachineType
+        SMT_PC_JR           enum SysMachineType
+        SMT_PC_XT           enum SysMachineType
+        SMT_PC_XT_286       enum SysMachineType
+        SMT_PC_AT           enum SysMachineType
+        SMT_PS2_30          enum SysMachineType
+        SMT_PS2_50          enum SysMachineType
+        SMT_PS2_60          enum SysMachineType
+        SMT_PS2_80          enum SysMachineType
+        SMT_PS1             enum SysMachineType
 
 **Library:** system.def
 
 ----------
 #### SysNotifyFlags
-	SysNotifyFlags			record
-		SNF_RETRY		:1,	; Retry the operation.
-		SNF_EXIT		:1,	; Shutdown the system.
-		SNF_ABORT		:1,	; Abort the operation.
-		SNF_CONTINUE	:1,	; Continue when done. This is different from
-							; SNF_RETRY as it implies the notification is
-							; not for a real error, but just to notify
-							; the user of something.
-		SNF_REBOOT		:1,	; Hard exit -- dirty shutdown followed by
-							; reload/restart of GEOS
-		SNF_BIZARRE		:1,	; Indicates notice is unexpected and user
-							; should be directed to the trouble-shooting
-							; guide.
-						:10
-	SysNotifyFlags			end
+    SysNotifyFlags          record
+        SNF_RETRY       :1, ; Retry the operation.
+        SNF_EXIT        :1, ; Shutdown the system.
+        SNF_ABORT       :1, ; Abort the operation.
+        SNF_CONTINUE    :1, ; Continue when done. This is different from
+                            ; SNF_RETRY as it implies the notification is
+                            ; not for a real error, but just to notify
+                            ; the user of something.
+        SNF_REBOOT      :1, ; Hard exit -- dirty shutdown followed by
+                            ; reload/restart of GEOS
+        SNF_BIZARRE     :1, ; Indicates notice is unexpected and user
+                            ; should be directed to the trouble-shooting
+                            ; guide.
+                        :10
+    SysNotifyFlags          end
 
 **Library:** system.def
 
 ----------
 #### SysProcessorType
-	SysProcessorType		etype byte, 0
-		SPT_8088			enum SysProcessorType
-		SPT_8086			enum SysProcessorType, SPT_8088
-		SPT_80186			enum SysProcessorType
-		SPT_80286			enum SysProcessorType
-		SPT_80386			enum SysProcessorType
-		SPT_80486			enum SysProcessorType
+    SysProcessorType        etype byte, 0
+        SPT_8088            enum SysProcessorType
+        SPT_8086            enum SysProcessorType, SPT_8088
+        SPT_80186           enum SysProcessorType
+        SPT_80286           enum SysProcessorType
+        SPT_80386           enum SysProcessorType
+        SPT_80486           enum SysProcessorType
 
 **Library:** system.def
 
 ----------
 #### SysShutdownType
-	SysShutdownType		etype word
-		SST_CLEAN			enum SysShutdownType
-		SST_CLEAN_FORCED	enum SysShutdownType
-		SST_DIRTY			enum SysShutdownType
-		SST_PANIC			enum SysShutdownType
-		SST_REBOOT			enum SysShutdownType
-		SST_RESTART			enum SysShutdownType
-		SST_FINAL			enum SysShutdownType
-		SST_SUSPEND			enum SysShutdownType
-		SST_CONFIRM_START 	enum SysShutdownType
-		SST_CONFIRM_END 	enum SysShutdownType
+    SysShutdownType     etype word
+        SST_CLEAN           enum SysShutdownType
+        SST_CLEAN_FORCED    enum SysShutdownType
+        SST_DIRTY           enum SysShutdownType
+        SST_PANIC           enum SysShutdownType
+        SST_REBOOT          enum SysShutdownType
+        SST_RESTART         enum SysShutdownType
+        SST_FINAL           enum SysShutdownType
+        SST_SUSPEND         enum SysShutdownType
+        SST_CONFIRM_START   enum SysShutdownType
+        SST_CONFIRM_END     enum SysShutdownType
 
 Note: SysNotify depends on these things increasing in severity as the 
 number increases. Place any new modes in the proper order.
@@ -1788,10 +1788,10 @@ MSG_META_CONFIRM_SHUTDOWN is sent out via the
 MANUFACTURER_ID_GEOWORKS: 
 GCNSLT_SHUTDOWN_CONTROL list.  
 **Pass:**  
-^lcx:dx	- object to notify when everything's been confirmed; or 
+^lcx:dx - object to notify when everything's been confirmed; or 
 0:0 to simply notify the UI in the standard fashion (via 
 MSG_META_DETACH).  
-bp - message to send it. When the message is sent, cx 			 		will be 0 
+bp - message to send it. When the message is sent, cx                   will be 0 
 if the shutdown request has been denied; non-zero if the 
 shutdown may proceed.  
 **Return:** - carry set if another shutdown is already in-progress
@@ -1825,7 +1825,7 @@ exiting to DOS.
 
 SST_RESTART  
 Like SST_CLEAN_FORCED, but reload the system, rather than 
-exiting to 	DOS.  
+exiting to  DOS.  
 **Pass:** - nothing.  
 **Return:** - only if couldn't set up for restart (e.g. loader.exe wasn't 
 found).
@@ -1840,10 +1840,10 @@ ds:si - reason for shutdown (si = -1 if no reason to give).
 SST_SUSPEND  
 Suspend system operation in preparation for switching to a 
 new DOS task. Broadcasts MSG_META_CONFIRM_SHUTDOWN 
-through the system's 	MANUFACTURER_ID_GEOWORKS: 
+through the system's    MANUFACTURER_ID_GEOWORKS: 
 GCNSLT_SHUTDOWN_CONTROL list.  
 **Pass:**  
-^lcx:dx	- object to notify when everything's been confirmed  
+^lcx:dx - object to notify when everything's been confirmed  
 bp - message to send it. When the message is sent, cx will be 0 
 if the shutdown request has been denied; non-zero if the 
 shutdown may proceed.  
@@ -1873,28 +1873,28 @@ cx - 0 to deny the shutdown.
 
 ----------
 #### SysSimpleGraphicsMode
-	SysSimpleGraphicsMode	etype	byte, 0
-		SSGM_NONE 				enum	SysSimpleGraphicsMode, 0
-		SSGM_VGA 				enum	SysSimpleGraphicsMode, 1
-		SSGM_EGA 				enum	SysSimpleGraphicsMode, 2
-		SSGM_MCGA 				enum	SysSimpleGraphicsMode, 3
-		SSGM_HGC     			enum	SysSimpleGraphicsMode, 4
-		SSGM_CGA 				enum	SysSimpleGraphicsMode, 5
-		SSGM_SPECIAL 			enum	SysSimpleGraphicsMode, 6
-		SSGM_SVGA_VESA 			enum	SysSimpleGraphicsMode, 7
+    SysSimpleGraphicsMode   etype   byte, 0
+        SSGM_NONE               enum    SysSimpleGraphicsMode, 0
+        SSGM_VGA                enum    SysSimpleGraphicsMode, 1
+        SSGM_EGA                enum    SysSimpleGraphicsMode, 2
+        SSGM_MCGA               enum    SysSimpleGraphicsMode, 3
+        SSGM_HGC                enum    SysSimpleGraphicsMode, 4
+        SSGM_CGA                enum    SysSimpleGraphicsMode, 5
+        SSGM_SPECIAL            enum    SysSimpleGraphicsMode, 6
+        SSGM_SVGA_VESA          enum    SysSimpleGraphicsMode, 7
 
 **Library:** system.def
 
 ----------
 #### SysStats
-	SysStats		struct
-		SS_idleCount			dword
-		SS_swapOuts				SysSwapInfo
-		SS_swapIns				SysSwapInfo
-		SS_contextSwitches		word
-		SS_interrupts			word
-		SS_runQueue				word
-	SysStats		ends
+    SysStats        struct
+        SS_idleCount            dword
+        SS_swapOuts             SysSwapInfo
+        SS_swapIns              SysSwapInfo
+        SS_contextSwitches      word
+        SS_interrupts           word
+        SS_runQueue             word
+    SysStats        ends
 
 This structure is returned by **SysStatistics** and stores the current 
 performance statistics of GEOS.
@@ -1918,10 +1918,10 @@ second.
 
 ----------
 #### SysSwapInfo
-	SysSwapInfo		struct
-		SSI_paragraphs		word
-		SSI_blocks			word
-	SysSwapInfo		ends
+    SysSwapInfo     struct
+        SSI_paragraphs      word
+        SSI_blocks          word
+    SysSwapInfo     ends
 
 This structure stores the current swap activity of the system. This swap 
 information is used in the **SysStats** structure.
@@ -1934,84 +1934,84 @@ information is used in the **SysStats** structure.
 
 ----------
 #### SystemAttrs
-	SystemAttrs     record
-		SA_NOT					:1	;Any following set bits must be OFF for hints
-									;to be included, rather than on.
-		SA_TINY					:1	;If set, screen must be either horizontally or
-									;vertically tiny for hints to be included.
-		SA_HORIZONTALLY_TINY	:1	;If set, screen must be horizontally tiny for
-									;hints to be included.
-		SA_VERTICALLY_TINY		:1	;If set, screen must be vertically tiny for
-									;hints to be included.
-		SA_COLOR				:1	;If set, must be a color screen for hints to
-									;be included.
-		SA_PEN_BASED			:1	;If set, system must be pen based for hints
-									;to be included.
-		SA_KEYBOARD_ONLY		:1	;If set, system must be set keyboard-only for
-									;hints to be included.
-		SA_NO_KEYBOARD			:1	;If set, system must be set no-keyboard for
-									;hints to be included.
-			:8
-	SystemAttrs     end
+    SystemAttrs     record
+        SA_NOT                  :1  ;Any following set bits must be OFF for hints
+                                    ;to be included, rather than on.
+        SA_TINY                 :1  ;If set, screen must be either horizontally or
+                                    ;vertically tiny for hints to be included.
+        SA_HORIZONTALLY_TINY    :1  ;If set, screen must be horizontally tiny for
+                                    ;hints to be included.
+        SA_VERTICALLY_TINY      :1  ;If set, screen must be vertically tiny for
+                                    ;hints to be included.
+        SA_COLOR                :1  ;If set, must be a color screen for hints to
+                                    ;be included.
+        SA_PEN_BASED            :1  ;If set, system must be pen based for hints
+                                    ;to be included.
+        SA_KEYBOARD_ONLY        :1  ;If set, system must be set keyboard-only for
+                                    ;hints to be included.
+        SA_NO_KEYBOARD          :1  ;If set, system must be set no-keyboard for
+                                    ;hints to be included.
+            :8
+    SystemAttrs     end
 
 **Library:** genC.def
 
 ----------
 #### SystemBitmap
-	SystemBitmap		etype byte
+    SystemBitmap        etype byte
 
 **Library:** graphics.def
 
 ----------
 #### SystemDrawMask
-	SystemDrawMask		 etype byte
-		SDM_TILE		enum SystemDrawMask		; tile pattern
-		SDM_SHADED_BAR	enum SystemDrawMask		; shaded bar
-		SDM_HORIZONTAL	enum SystemDrawMask		; horizontal lines
-		SDM_VERTICAL	enum SystemDrawMask		; vertical lines
-		SDM_DIAG_NE		enum SystemDrawMask		; diagonal lines going up to NorthEast
-		SDM_DIAG_NW		enum SystemDrawMask		; diagonal lines going up to NorthWest
-		SDM_GRID		enum SystemDrawMask		; checkerboard
-		SDM_BIG_GRID	enum SystemDrawMask		; larger checkerboard
-		SDM_BRICK		enum SystemDrawMask		; brick wall
-		SDM_SLANT_BRICK enum SystemDrawMask		; slanted brick wall
+    SystemDrawMask       etype byte
+        SDM_TILE        enum SystemDrawMask     ; tile pattern
+        SDM_SHADED_BAR  enum SystemDrawMask     ; shaded bar
+        SDM_HORIZONTAL  enum SystemDrawMask     ; horizontal lines
+        SDM_VERTICAL    enum SystemDrawMask     ; vertical lines
+        SDM_DIAG_NE     enum SystemDrawMask     ; diagonal lines going up to NorthEast
+        SDM_DIAG_NW     enum SystemDrawMask     ; diagonal lines going up to NorthWest
+        SDM_GRID        enum SystemDrawMask     ; checkerboard
+        SDM_BIG_GRID    enum SystemDrawMask     ; larger checkerboard
+        SDM_BRICK       enum SystemDrawMask     ; brick wall
+        SDM_SLANT_BRICK enum SystemDrawMask     ; slanted brick wall
 
-		SDM_0			enum SystemDrawMask, 89		; all zeroes
-		SDM_12_5		enum SystemDrawMask, 81
-		SDM_25			enum SystemDrawMask, 73
-		SDM_37_5		enum SystemDrawMask, 65
-		SDM_50			enum SystemDrawMask, 57
-		SDM_62_5		enum SystemDrawMask, 49
-		SDM_75			enum SystemDrawMask, 41
-		SDM_87_5		enum SystemDrawMask, 33
-		SDM_100			enum SystemDrawMask, 25		; all ones
-		SDM_CUSTOM		enum SystemDrawMask, 0x7f	; setting a custom mask
-		SET_CUSTOM_PATTERN = SDM_CUSTOM
+        SDM_0           enum SystemDrawMask, 89     ; all zeroes
+        SDM_12_5        enum SystemDrawMask, 81
+        SDM_25          enum SystemDrawMask, 73
+        SDM_37_5        enum SystemDrawMask, 65
+        SDM_50          enum SystemDrawMask, 57
+        SDM_62_5        enum SystemDrawMask, 49
+        SDM_75          enum SystemDrawMask, 41
+        SDM_87_5        enum SystemDrawMask, 33
+        SDM_100         enum SystemDrawMask, 25     ; all ones
+        SDM_CUSTOM      enum SystemDrawMask, 0x7f   ; setting a custom mask
+        SET_CUSTOM_PATTERN = SDM_CUSTOM
 
 **Library:** graphics.def
 
 ----------
 #### SystemHatch
-	SystemHatch		etype byte
-	SH_VERTICAL			enum SystemHatch	; vertical lines
-	SH_HORIZONTAL		enum SystemHatch	; horizontal lines
-	SH_45_DEGREE		enum SystemHatch	; lines at 45 degrees
-	SH_135_DEGREE		enum SystemHatch	; lines at 135 degrees
-	SH_BRICK			enum SystemHatch	; basic brick
-	SH_SLANTED_BRICK	enum SystemHatch	; basic brick, slanted
+    SystemHatch     etype byte
+    SH_VERTICAL         enum SystemHatch    ; vertical lines
+    SH_HORIZONTAL       enum SystemHatch    ; horizontal lines
+    SH_45_DEGREE        enum SystemHatch    ; lines at 45 degrees
+    SH_135_DEGREE       enum SystemHatch    ; lines at 135 degrees
+    SH_BRICK            enum SystemHatch    ; basic brick
+    SH_SLANTED_BRICK    enum SystemHatch    ; basic brick, slanted
 
 **Library:** graphics.def
 
 ----------
 #### SystemVMID
-	SystemVMID		etype word, 0xff00
-		SVMID_RANGE_DBASE	equ 0xff00			;Reserved for DB code
+    SystemVMID      etype word, 0xff00
+        SVMID_RANGE_DBASE   equ 0xff00          ;Reserved for DB code
 
-		DB_MAP_ID			enum SystemVMID 	; ID for DB map block
-		DB_GROUP_ID			enum SystemVMID		; ID for new DB group
-		DB_ITEM_BLOCK_ID 	enum SystemVMID		; ID for new DB item block
-		SVMID_HA_DIR_ID		enum SystemVMID		; ID for HugeArray dir blocks
-		SVMID_HA_BLOCK_ID	enum SystemVMID		; ID for HugeArray data blocks
+        DB_MAP_ID           enum SystemVMID     ; ID for DB map block
+        DB_GROUP_ID         enum SystemVMID     ; ID for new DB group
+        DB_ITEM_BLOCK_ID    enum SystemVMID     ; ID for new DB item block
+        SVMID_HA_DIR_ID     enum SystemVMID     ; ID for HugeArray dir blocks
+        SVMID_HA_BLOCK_ID   enum SystemVMID     ; ID for HugeArray data blocks
 
 **Library:** vm.def
 

@@ -82,9 +82,9 @@ provided for editing them. You can select the red, green, and blue
 components of the area or line color from the "Area Color" and "Line 
 Color" dialogs. 256-color icons aren't much use unless either:
 
-	They use colors only from the system's default palette, or
+    They use colors only from the system's default palette, or
 
-	They are being used in a 24-bit color environment. 
+    They are being used in a 24-bit color environment. 
 
 + You can select the aspect ratio for your icon. This will allow the system to 
 make the best choice among formats when selecting from your moniker 
@@ -97,10 +97,10 @@ under many video modes that you create the three standard formats for
 the art (VGA, mono VGA, CGA). This shouldn't be too difficult, since 
 there are several tools for working with several formats:
 
-	The "transform format" dialog can be used to create exact 
+    The "transform format" dialog can be used to create exact 
 copies, or transformed copies, of one format to another.
 
-	The "resize format" dialog changes the size and shape of a 
+    The "resize format" dialog changes the size and shape of a 
 single format.
 
 ### 7.4 Writing Source Code
@@ -138,7 +138,7 @@ between statements like:
 
     `@end APPMONIKERRESOURCE;`
 
-	In your .gp file, this resource should have the attributes "lmem, 
+    In your .gp file, this resource should have the attributes "lmem, 
 read-only, shared".
 
 + You may wish to add the line "style = tool;" for icons that are going to be 

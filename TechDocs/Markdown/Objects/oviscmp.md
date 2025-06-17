@@ -51,69 +51,69 @@ shown in Code Display 24-1.
 ----------
 **Code Display 24-1 VisCompClass Instance Fields**
 
-	/* The VisCompClass instance data fields are shown below and are discussed in
-	 * detail throughout the chapter. */
+    /* The VisCompClass instance data fields are shown below and are discussed in
+     * detail throughout the chapter. */
 
-	/* VCI_comp
-	 * VCI_comp contains the link to the composite object's first child. */
-	@instance @composite		VCI_comp = VI_link;
+    /* VCI_comp
+     * VCI_comp contains the link to the composite object's first child. */
+    @instance @composite        VCI_comp = VI_link;
 
-	/* VCI_gadgetExcl
-	 * VCI_gadgetExcl is an optr to the object that currently has the gadget
-	 * exclusive. This field is rarely used directly by applications. */
-	@instance optr				VCI_gadgetExcl;
+    /* VCI_gadgetExcl
+     * VCI_gadgetExcl is an optr to the object that currently has the gadget
+     * exclusive. This field is rarely used directly by applications. */
+    @instance optr              VCI_gadgetExcl;
 
-	/* VCI_window
-	 * VCI_window contains the window handle of the graphics window associated
-	 * with this object. This field is rarely accessed directly by
-	 * applications; it is set by the visual update mechanism. */
-	@instance WindowHandle		VCI_window = NullHandle;
+    /* VCI_window
+     * VCI_window contains the window handle of the graphics window associated
+     * with this object. This field is rarely accessed directly by
+     * applications; it is set by the visual update mechanism. */
+    @instance WindowHandle      VCI_window = NullHandle;
 
-	/* VCI_geoAttrs
-	 * VCI_geoAttrs is a record that defines some of the geometry management
-	 * information for the composite. None of its values are set by default;
-	 * the possible flags in this record are shown after the definition. */
-	@instance VisCompGeoAttrs	VCI_geoAttrs = 0;
-	/* Possible flags:
-	 *	VCGA_ORIENT_CHILDREN_VERTICALLY			0x80
-	 *	VCGA_INCLUDE_ENDS_IN_CHILD_SPACING		0x40
-	 *	VCGA_ALLOW_CHILDREN_TO_WRAP				0x20
-	 *	VCGA_ONE_PASS_OPTIMIZATION				0x10
-	 *	VCGA_CUSTOM_MANAGE_CHILDREN				0x08
-	 *	VCGA_HAS_MINIMUM_SIZE					0x04
-	 *	VCGA_WRAP_AFTER_CHILD_COUNT				0x02
-	 *	VCGA_ONLY_DRAWS_IN_MARGINS 				0x01
-	 */
+    /* VCI_geoAttrs
+     * VCI_geoAttrs is a record that defines some of the geometry management
+     * information for the composite. None of its values are set by default;
+     * the possible flags in this record are shown after the definition. */
+    @instance VisCompGeoAttrs   VCI_geoAttrs = 0;
+    /* Possible flags:
+     *  VCGA_ORIENT_CHILDREN_VERTICALLY         0x80
+     *  VCGA_INCLUDE_ENDS_IN_CHILD_SPACING      0x40
+     *  VCGA_ALLOW_CHILDREN_TO_WRAP             0x20
+     *  VCGA_ONE_PASS_OPTIMIZATION              0x10
+     *  VCGA_CUSTOM_MANAGE_CHILDREN             0x08
+     *  VCGA_HAS_MINIMUM_SIZE                   0x04
+     *  VCGA_WRAP_AFTER_CHILD_COUNT             0x02
+     *  VCGA_ONLY_DRAWS_IN_MARGINS              0x01
+     */
 
-	/* VCI_geoDimensionAttrs
-	 * VCI_geoDimensionAttrs is a record that contains additional information
-	 * about the composite's geometry. This field contains two two-bit fields
-	 * among its other flags. The default settings are shown in the definition;
-	 * all possible flags and settings are shown following. */
-	@instance VisCompGeoDimensionAttrs		VCI_geoDimensionAttrs = 0;
-	/* Possible flags:
-	 * Width Justification flags (mutually exclusive):
-	 * VCGDA_WIDTH_JUSTIFICATION				0xc0
-	 *	WJ_LEFT_JUSTIFY_CHILDREN				0x00
-	 *	WJ_RIGHT_JUSTIFY_CHILDREN				0x40
-	 *	WJ_CENTER_CHILDREN_HORIZONTALLY			0x80
-	 *	WJ_FULL_JUSTIFY_CHILDREN_HORIZONTALLY	0xc0
-	 *
-	 * Height Justification flags (mutually exclusive):
-	 * VCGDA_HEIGHT_JUSTIFICATION 				0x0c
-	 *	HJ_TOP_JUSTIFY_CHILDREN					0x00
-	 *	HJ_BOTTOM_JUSTIFY_CHILDREN,				0x04
-	 *	HJ_CENTER_CHILDREN_VERTICALLY			0x08
-	 *	HJ_FULL_JUSTIFY_CHILDREN_VERTICALLY		0x0c
-	 *
-	 * Other flags:
-	 *	VCGDA_EXPAND_WIDTH_TO_FIT_PARENT		0x20
-	 *	VCGDA_DIVIDE_WIDTH_EQUALLY				0x10
-	 *	VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT		0x02
-	 *	VCGDA_DIVIDE_HEIGHT_EQUALLY				0x01
-	 */
+    /* VCI_geoDimensionAttrs
+     * VCI_geoDimensionAttrs is a record that contains additional information
+     * about the composite's geometry. This field contains two two-bit fields
+     * among its other flags. The default settings are shown in the definition;
+     * all possible flags and settings are shown following. */
+    @instance VisCompGeoDimensionAttrs      VCI_geoDimensionAttrs = 0;
+    /* Possible flags:
+     * Width Justification flags (mutually exclusive):
+     * VCGDA_WIDTH_JUSTIFICATION                0xc0
+     *  WJ_LEFT_JUSTIFY_CHILDREN                0x00
+     *  WJ_RIGHT_JUSTIFY_CHILDREN               0x40
+     *  WJ_CENTER_CHILDREN_HORIZONTALLY         0x80
+     *  WJ_FULL_JUSTIFY_CHILDREN_HORIZONTALLY   0xc0
+     *
+     * Height Justification flags (mutually exclusive):
+     * VCGDA_HEIGHT_JUSTIFICATION               0x0c
+     *  HJ_TOP_JUSTIFY_CHILDREN                 0x00
+     *  HJ_BOTTOM_JUSTIFY_CHILDREN,             0x04
+     *  HJ_CENTER_CHILDREN_VERTICALLY           0x08
+     *  HJ_FULL_JUSTIFY_CHILDREN_VERTICALLY     0x0c
+     *
+     * Other flags:
+     *  VCGDA_EXPAND_WIDTH_TO_FIT_PARENT        0x20
+     *  VCGDA_DIVIDE_WIDTH_EQUALLY              0x10
+     *  VCGDA_EXPAND_HEIGHT_TO_FIT_PARENT       0x02
+     *  VCGDA_DIVIDE_HEIGHT_EQUALLY             0x01
+     */
 
-	@default VI_typeFlags = VTF_IS_COMPOSITE;
+    @default VI_typeFlags = VTF_IS_COMPOSITE;
 
 ----------
 ### 24.2.1 VCI_comp
@@ -321,7 +321,7 @@ composite will only suggest sizes - the children may or may not
 cooperate.
 
 ### 24.2.6 Managing Instance Data
-	MSG_VIS_COMP_GET_GEO_ATTRS, MSG_VIS_COMP_SET_GEO_ATTRS
+    MSG_VIS_COMP_GET_GEO_ATTRS, MSG_VIS_COMP_SET_GEO_ATTRS
 
 To retrieve the flags currently set in both *VCI_geoAttrs* and 
 *VCI_geoDimensionAttrs*, use MSG_VIS_COMP_GET_GEO_ATTRS. To set the 
@@ -330,9 +330,9 @@ both of these messages are detailed below.
 
 ----------
 #### MSG_VIS_COMP_SET_GEO_ATTRS
-	void	MSG_VIS_COMP_SET_GEO_ATTRS(
-			word	attrsToSet,
-			word	attrsToClear);
+    void    MSG_VIS_COMP_SET_GEO_ATTRS(
+            word    attrsToSet,
+            word    attrsToClear);
 
 This message sets the flags in the composite object's *VCI_geoAttrs* and 
 *VCI_geoDimensionAttrs* fields. The high byte of each parameter represents 
@@ -361,7 +361,7 @@ cleared in the instance fields.
 
 ----------
 #### MSG_VIS_COMP_GET_GEO_ATTRS
-	word	MSG_VIS_COMP_GET_GEO_ATTRS();
+    word    MSG_VIS_COMP_GET_GEO_ATTRS();
 
 This message retrieves the flags set in the object's *VCI_geoAttrs* and 
 *VCI_geoDimensionAttrs* fields. The high byte of the return value represents 
@@ -407,9 +407,9 @@ automatically. You can, however, change this behavior by subclassing
 interested.
 
 ### 24.3.1 Managing Geometry
-	MSG_VIS_COMP_GET_CHILD_SPACING, 
-	MSG_VIS_COMP_GET_MINIMUM_SIZE, MSG_VIS_COMP_GET_MARGINS, 
-	MSG_VIS_COMP_GET_WRAP_COUNT
+    MSG_VIS_COMP_GET_CHILD_SPACING, 
+    MSG_VIS_COMP_GET_MINIMUM_SIZE, MSG_VIS_COMP_GET_MARGINS, 
+    MSG_VIS_COMP_GET_WRAP_COUNT
 
 A special feature of **VisCompClass**, and one that can be used in many ways, 
 is its ability to automatically manage its children. By setting various flags in 
@@ -432,25 +432,25 @@ Visible Objects" in "VisClass," Chapter 23.
 
 ----------
 #### DWORD_CHILD_SPACING
-	word	DWORD_CHILD_SPACING(val);
-			SpacingAsDWord val;
+    word    DWORD_CHILD_SPACING(val);
+            SpacingAsDWord val;
 
 This macro extracts the child spacing from the given **SpacingAsDWord** 
 value. Use it with MSG_VIS_COMP_GET_CHILD_SPACING.
 
 ----------
 #### DWORD_WRAP_SPACING
-	word	DWORD_WRAP_SPACING(val);
-			SpacingAsDWord val;
+    word    DWORD_WRAP_SPACING(val);
+            SpacingAsDWord val;
 
 This macro extracts the wrap spacing from the given **SpacingAsDWord** 
 value. Use it with MSG_VIS_COMP_GET_CHILD_SPACING.
 
 ----------
 #### MAKE_SPACING_DWORD
-	SpacingAsDWord	MAKE_SPACING_DWORD(child, wrap);
-					word	child;
-					word	wrap;
+    SpacingAsDWord  MAKE_SPACING_DWORD(child, wrap);
+                    word    child;
+                    word    wrap;
 
 This macro creates a **SpacingAsDWord** dword from the two given 
 arguments. The *child* argument is the child spacing, and the *wrap* argument 
@@ -459,7 +459,7 @@ MSG_VIS_COMP_GET_CHILD_SPACING.
 
 ----------
 #### MSG_VIS_COMP_GET_CHILD_SPACING
-	SpacingAsDWord	MSG_VIS_COMP_GET_CHILD_SPACING();
+    SpacingAsDWord  MSG_VIS_COMP_GET_CHILD_SPACING();
 
 This message returns the child spacing used by the composite. The high word 
 of the return value is the spacing between lines of wrapped children; the low 
@@ -489,7 +489,7 @@ form the return value from the two spacing values.
 
 ----------
 #### MSG_VIS_COMP_GET_MINIMUM_SIZE
-	SizeAsDWord 	SG_VIS_COMP_GET_MINIMUM_SIZE();
+    SizeAsDWord     SG_VIS_COMP_GET_MINIMUM_SIZE();
 
 This message returns the minimum size of the composite. It is used by the 
 geometry manager if the composite has VCGDA_HAS_MINIMUM_SIZE set. 
@@ -517,8 +517,8 @@ the same format as MAKE_SPACING_DWORD.
 
 ----------
 #### MSG_VIS_COMP_GET_MARGINS
-	void	MSG_VIS_COMP_GET_MARGINS(
-			Rectangle *retValue);
+    void    MSG_VIS_COMP_GET_MARGINS(
+            Rectangle *retValue);
 
 This message returns the margins the composite should use when 
 recalculating its child spacing. If you want a special left, top, right, or bottom 
@@ -547,7 +547,7 @@ handler.
 
 ----------
 #### MSG_VIS_COMP_GET_WRAP_COUNT
-	word	MSG_VIS_COMP_GET_WRAP_COUNT();
+    word    MSG_VIS_COMP_GET_WRAP_COUNT();
 
 This message returns the number of children to be counted before wrapping 
 if the composite has VCGA_WRAP_AFTER_CHILD_COUNT set.

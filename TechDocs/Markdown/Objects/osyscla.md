@@ -45,7 +45,7 @@ general.
 
 #### MSG_META_NULL
 
-`void	MSG_META_NULL();`
+`void   MSG_META_NULL();`
 
 This message has no handler and is unused. It essentially ensures that no 
 other message will ever have the value zero.
@@ -137,9 +137,9 @@ and MSG_META_ATTACH_GENAPPLICATION, each described below.)
 
 `@alias (MSG_META_ATTACH)`
 
-	void 	MSG_META_ATTACH_PROCESS(  
-	word 	value1,  
-	word 	value2);
+    void    MSG_META_ATTACH_PROCESS(  
+    word    value1,  
+    word    value2);
 
 This message is sent to any geode which has a process when the geode is first 
 loaded. By default, the handler for this message does nothing.
@@ -165,8 +165,8 @@ message.
 
 `@alias (MSG_META_ATTACH)`
 
-	void	MSG_META_ATTACH_GENPROCESSCLASS(  
-			MemHandle appLaunchBlock);
+    void    MSG_META_ATTACH_GENPROCESSCLASS(  
+            MemHandle appLaunchBlock);
 
 This message is sent to the GenProcess object when the geode is first loaded. 
 By default, the handler for this message calls 
@@ -211,9 +211,9 @@ message.
 
 `@alias (MSG_META_ATTACH)`
 
-	void	MSG_META_ATTACH_PROCESS(  
-			MemHandle 	bh1,  
-			MemHandle 	bh2);
+    void    MSG_META_ATTACH_PROCESS(  
+            MemHandle   bh1,  
+            MemHandle   bh2);
 
 This message is sent to the GenApplication object by **GenProcessClass** 
 when the application starts up (either for the first time, or when being 
@@ -245,10 +245,10 @@ causes the interface for the application to come up on screen.
 
 `@alias (MSG_META_ATTACH)`
 
-	void 	MSG_META_ATTACH_OBJECT(  
-			word	 		flags,  
-			MemHandle 		appLaunchBlock,  
-			MemHandle 		extraState);
+    void    MSG_META_ATTACH_OBJECT(  
+            word            flags,  
+            MemHandle       appLaunchBlock,  
+            MemHandle       extraState);
 
 This message is sent to any object on the GenApplication object's active lists, 
 or on one of those object's active lists. Note that this will not happen until the 
@@ -268,7 +268,7 @@ is the same block as returned from
 MSG_GEN_PROCESS_CLOSE_APPLICATION, in 
 some previous detach.
 
-**Return:**	Nothing.
+**Return:** Nothing.
 
 **Interception:** Standard UI objects defined as needing to be placed on an active list 
 will intercept this message to do whatever it is that they needed to do 
@@ -286,7 +286,7 @@ by the time the MSG_META_ATTACH is sent to objects on its active list.
 
 `@alias (MSG_META_ATTACH)`
 
-	void 	MSG_META_ATTACH_THREAD();
+    void    MSG_META_ATTACH_THREAD();
 
 This message is sent to any thread spawned by 
 MSG_PROCESS_CREATE_EVENT_THREAD.
@@ -308,8 +308,8 @@ message.
 
 #### MSG_META_APP_STARTUP
 
-	void	MSG_META_APP_STARTUP(
-			MemHandle		appLaunchBlock);
+    void    MSG_META_APP_STARTUP(
+            MemHandle       appLaunchBlock);
 
 This message is related to MSG_META_ATTACH; the message is sent by the 
 generic UI to the GenApplication object before it sends MSG_META_ATTACH 
@@ -331,7 +331,7 @@ regardless of whether the user will be interacting with the application.
 **Parameters:**  
 *appLaunchBlock* - Handle of an **AppLaunchBlock**.
 
-**Return:**	The **AppLaunchBlock** is preserved.
+**Return:** The **AppLaunchBlock** is preserved.
 
 **Interception:** Usually intercepted by any object on the MGCNLT_APP_STARTUP list.
 
@@ -339,9 +339,9 @@ regardless of whether the user will be interacting with the application.
 
 #### MSG_META_UPDATE_WINDOW
 
-	void	MSG_META_UPDATE_WINDOW(
-			UpdateWindowFlags		updateFlags,
-			VisUpdateMode		updateMode);
+    void    MSG_META_UPDATE_WINDOW(
+            UpdateWindowFlags       updateFlags,
+            VisUpdateMode       updateMode);
 
 This message is sent as part of the system's window update mechanism. 
 Typically, this message is sent to windowed objects on the 
@@ -384,9 +384,9 @@ set.
 
 #### MSG_META_DETACH
 
-	void	MSG_META_DETACH(
-			word	callerID,
-			optr	caller);
+    void    MSG_META_DETACH(
+            word    callerID,
+            optr    caller);
 
 This message severs the links between an object and the rest of the system. 
 The exact way this is handled depends on the object being detached. For full 
@@ -449,7 +449,7 @@ however.
 
 #### MSG_META_DETACH_COMPLETE
 
-	void	MSG_META_DETACH_COMPLETE();
+    void    MSG_META_DETACH_COMPLETE();
 
 This message is sent to an object being detached when all of its children and 
 active participants have acknowledged the detach. For full information on 
@@ -489,7 +489,7 @@ the detach cycle for this object - by simply starting up another
 
 #### MSG_META_DETACH_ABORT
 
-	void	MSG_META_DETACH_ABORT();
+    void    MSG_META_DETACH_ABORT();
 
 This message causes a detach to be aborted. This can cause some very 
 complex synchronization problems and should not be used lightly. You will 
@@ -514,9 +514,9 @@ a way to do it itself.
 
 #### MSG_META_APP_SHUTDOWN
 
-	void	MSG_META_APP_SHUTDOWN(
-			word		callerID,
-			optr		ackOD);
+    void    MSG_META_APP_SHUTDOWN(
+            word        callerID,
+            optr        ackOD);
 
 This message is the complement to MSG_META_APP_STARTUP. This message 
 is sent to objects on the MGCNLT_APP_STARTUP list before an application 
@@ -538,13 +538,13 @@ exit.
 *ackOD* - Optr of object to be sent 
 MSG_META_SHUTDOWN_ACK.
 
-**Interception:**	Usually intercepted by objects on the MGCNLT_APP_STARTUP list.
+**Interception:**   Usually intercepted by objects on the MGCNLT_APP_STARTUP list.
 
 ----------
 
 #### MSG_META_SHUTDOWN_COMPLETE
 
-	void	MSG_META_SHUTDOWN_COMPLETE();
+    void    MSG_META_SHUTDOWN_COMPLETE();
 
 This message is sent to the object that initiated the detach sequence after it 
 has received MSG_META_SHUTDOWN_ACK for each **ObjIncDetach()** that 
@@ -567,9 +567,9 @@ to be notified when all objects have been notified of the detach.
 
 #### MSG_META_SHUTDOWN_ACK
 
-	void	MSG_META_SHUTDOWN_ACK(
-			word		callerID,
-			optr		ackOD);
+    void    MSG_META_SHUTDOWN_ACK(
+            word        callerID,
+            optr        ackOD);
 
 This message is sent back in response to a MSG_META_APP_SHUTDOWN. 
 This message serves to notify the object the object has fulfilled the request.
@@ -595,9 +595,9 @@ object has completed shutting down.
 ----------
 #### MSG_META_ACK
 
-	void	MSG_META_ACK(
-			word	callerID,
-			optr	caller);
+    void    MSG_META_ACK(
+            word    callerID,
+            optr    caller);
 
 This message acknowledges a detach message. It is sent by objects that have 
 been notified of another object's detach. The default handler for 
@@ -638,7 +638,7 @@ assuming you are using such a mechanism.
 
 #### MSG_META_BLOCK_FREE
 
-	void	MSG_META_BLOCK_FREE();
+    void    MSG_META_BLOCK_FREE();
 
 This message initiates a sequence which will free an entire object block when 
 received by any object within that block. The block will be freed when its 
@@ -668,7 +668,7 @@ blocks, etc.).
 
 #### MSG_META_OBJ_FREE
 
-	void	MSG_META_OBJ_FREE();
+    void    MSG_META_OBJ_FREE();
 
 This message initiates a sequence which will free an object. The object will 
 be freed after its message queues have been flushed.
@@ -694,9 +694,9 @@ blocks, etc.).
 
 #### MSG_META_DEC_BLOCK_REF_COUNT
 
-	void	MSG_META_DEC_BLOCK_REF_COUNT(
-			MemHandle		block1,
-			MemHandle		block2);
+    void    MSG_META_DEC_BLOCK_REF_COUNT(
+            MemHandle       block1,
+            MemHandle       block2);
 
 This message is a utility message to call **MemDecRefCount()** on one or two 
 memory handles. 
@@ -723,10 +723,10 @@ decremented, or 0 if none.
 
 #### MSG_META_OBJ_FLUSH_INPUT_QUEUE
 
-	void	MSG_META_OBJ_FLUSH_INPUT_QUEUE(
-			EventHandle					event,
-			ObjFlushInputQueueNextStop	nextStop,
-			MemHandle 					objBlock);
+    void    MSG_META_OBJ_FLUSH_INPUT_QUEUE(
+            EventHandle                 event,
+            ObjFlushInputQueueNextStop  nextStop,
+            MemHandle                   objBlock);
 
 This message clears out the message queues associated with an object. This 
 is rarely, if ever called from within an application, and there is little call to 
@@ -764,12 +764,12 @@ sequenced by default **MetaClass** handler)
 
 **Structures:**  
 
-	typedef enum {
-		OFIQNS_SYSTEM_INPUT_OBJ,
-		OFIQNS_INPUT_OBJ_OF_OWNING_GEODE,
-		OFIQNS_PROCESS_OF_OWNING_GEODE,
-		OFIQNS_DISPATCH
-	} ObjFlushInputQueueNextStop;
+    typedef enum {
+        OFIQNS_SYSTEM_INPUT_OBJ,
+        OFIQNS_INPUT_OBJ_OF_OWNING_GEODE,
+        OFIQNS_PROCESS_OF_OWNING_GEODE,
+        OFIQNS_DISPATCH
+    } ObjFlushInputQueueNextStop;
 
 **Interception:** Default **MetaClass** handler implements relay of message from one 
 object to the next, and dispatches the passed event. Must be 
@@ -790,7 +790,7 @@ Chapter 5 of the Concepts Book.
 
 #### MSG_META_GET_CLASS
 
-	ClassStruct * MSG_META_GET_CLASS();
+    ClassStruct * MSG_META_GET_CLASS();
 
 This message returns a pointer to the **ClassStruct** structure of the recipient 
 object's class.
@@ -809,8 +809,8 @@ object's class.
 
 #### MSG_META_IS_OBJECT_IN_CLASS
 
-	Boolean	MSG_META_IS_OBJECT_IN_CLASS(
-	ClassStruct * class);
+    Boolean MSG_META_IS_OBJECT_IN_CLASS(
+    ClassStruct * class);
 
 This message determines whether the recipient object is a member of a given 
 class (or a subclass of the given class). If the return is true, the object is in the 
@@ -827,7 +827,7 @@ MSG_META_DUMMY first.
 **Parameters:**  
 *class* - Class to see if object is a member of.
 
-**Return:**	Returns *true* if object is a member of the passed class (or a subclass), 
+**Return:** Returns *true* if object is a member of the passed class (or a subclass), 
 *false* otherwise.
 
 **Interception:** Don't.
@@ -842,8 +842,8 @@ ever).
 
 #### MSG_META_RESOLVE_VARIANT_SUPERCLASS
 
-	ClassStruct * MSG_META_RESOLVE_VARIANT_SUPERCLASS(
-			word	MasterOffset);
+    ClassStruct * MSG_META_RESOLVE_VARIANT_SUPERCLASS(
+            word    MasterOffset);
 
 This message is sent by the object system when it needs to know the run-time 
 superclass of a particular object's variant master class. The system sends this 
@@ -873,9 +873,9 @@ one above you.
 
 #### MSG_META_RELOCATE
 
-	Boolean 	MSG_META_RELOCATE(
-				word		vMRelocType,
-				word		frame);
+    Boolean     MSG_META_RELOCATE(
+                word        vMRelocType,
+                word        frame);
 
 This message is sent by the object system to evaluate and resolve all of the 
 object's relocatable instance data fields (pointers, optrs, etc.). Note that this 
@@ -911,15 +911,15 @@ needs to perform this operation on its own instance data.
 
 **Return:** If an error occurred, this will return true.
 
-**Structures:**	
+**Structures:** 
 
-	typedef enum {
-		VMRT_UNRELOCATE_BEFORE_WRITE,
-		VMRT_RELOCATE_AFTER_READ,
-		VMRT_RELOCATE_AFTER_WRITE,
-		VMRT_RELOCATE_FROM_RESOURCE,
-		VMRT_UNRELOCATE_FROM_RESOURCE
-	} VMRelocType;
+    typedef enum {
+        VMRT_UNRELOCATE_BEFORE_WRITE,
+        VMRT_RELOCATE_AFTER_READ,
+        VMRT_RELOCATE_AFTER_WRITE,
+        VMRT_RELOCATE_FROM_RESOURCE,
+        VMRT_UNRELOCATE_FROM_RESOURCE
+    } VMRelocType;
 
 **Warnings:** This method may not call **LMemAlloc()**, **LMemReAlloc()**, or 
 **LMemFree()**.
@@ -928,9 +928,9 @@ needs to perform this operation on its own instance data.
 
 #### MSG_META_UNRELOCATE
 
-	Boolean 	MSG_META_UNRELOCATE(
-				word		vMRelocType,
-				word		frame);
+    Boolean     MSG_META_UNRELOCATE(
+                word        vMRelocType,
+                word        frame);
 
 This message causes an object to unresolve all its relocatable instance data 
 fields, returning them to special index values.
@@ -953,15 +953,15 @@ frame - Frame to pass to ObjRelocOrUnRelocSuper().
 
 **Return:** If an error occurred, this will return true.
 
-**Structures:**	
+**Structures:** 
 
-	typedef enum {
-		VMRT_UNRELOCATE_BEFORE_WRITE,
-		VMRT_RELOCATE_AFTER_READ,
-		VMRT_RELOCATE_AFTER_WRITE,
-		VMRT_RELOCATE_FROM_RESOURCE,
-		VMRT_UNRELOCATE_FROM_RESOURCE
-	} VMRelocType;
+    typedef enum {
+        VMRT_UNRELOCATE_BEFORE_WRITE,
+        VMRT_RELOCATE_AFTER_READ,
+        VMRT_RELOCATE_AFTER_WRITE,
+        VMRT_RELOCATE_FROM_RESOURCE,
+        VMRT_UNRELOCATE_FROM_RESOURCE
+    } VMRelocType;
 
 **Warnings:** This method may not call **LMemAlloc()**, **LMemReAlloc()**, or 
 **LMemFree()**.
@@ -975,10 +975,10 @@ little call to subclass or send them.
 
 #### MSG_META_SET_FLAGS
 
-	void 	MSG_META_SET_FLAGS(
-			ChunkHandle 	objChunk,
-			ObjChunkFlags 	bitsToSet,
-			ObjChunkFlags 	bitsToClear);
+    void    MSG_META_SET_FLAGS(
+            ChunkHandle     objChunk,
+            ObjChunkFlags   bitsToSet,
+            ObjChunkFlags   bitsToClear);
 
 This message sets the chunk flags for an object. The chunk flags determine 
 how the object is handled with regard to state saving, dirty state, etc.
@@ -1002,8 +1002,8 @@ how the object is handled with regard to state saving, dirty state, etc.
 
 #### MSG_META_GET_FLAGS
 
-	word 	MSG_META_GET_FLAGS( /* low byte = ObjChunkFlags */
-			ChunkHandle 	ch);
+    word    MSG_META_GET_FLAGS( /* low byte = ObjChunkFlags */
+            ChunkHandle     ch);
 
 This message returns the chunk flags for the object. This works just like the 
 ObjGetFlags() routine, but can be used when the object queried is being run 
@@ -1024,7 +1024,7 @@ by a different thread.
 
 #### MSG_META_QUIT
 
-	void 	MSG_META_QUIT();
+    void    MSG_META_QUIT();
 
 This message, when sent to a GenApplication object, initiates the shutdown 
 sequence for the application. All affected objects are notified.
@@ -1074,9 +1074,9 @@ may be sent to a Process object, or any object).
 
 `@alias (MSG_META_QUIT)`
 
-	void 	MSG_META_QUIT_PROCESS(
-			word		quitLevel,
-			ChunkHandle 		ackODChunk);
+    void    MSG_META_QUIT_PROCESS(
+            word        quitLevel,
+            ChunkHandle         ackODChunk);
 
 For information about the quit mechanism, see MSG_META_QUIT, above.
 
@@ -1115,8 +1115,8 @@ MSG_META_QUIT_ACK.
 
 `@alias (MSG_META_QUIT)`
 
-	void 	MSG_META_QUIT_OBJECT(
-	optr 	obj);
+    void    MSG_META_QUIT_OBJECT(
+    optr    obj);
 
 For information about the quit mechanism, see MSG_META_QUIT, above.
 
@@ -1135,9 +1135,9 @@ For information about the quit mechanism, see MSG_META_QUIT, above.
 
 #### MSG_META_QUIT_ACK
 
-	void 	MSG_META_QUIT_ACK(
-			word 		quitLevel,
-			word 		abortFlag);
+    void    MSG_META_QUIT_ACK(
+            word        quitLevel,
+            word        abortFlag);
 
 This message is sent to a Process object in response to a MSG_META_QUIT. 
 The Process object handles this message by continuing the quit sequence.
@@ -1161,8 +1161,8 @@ quit at the QL_DETACH stage or later.
 
 #### MSG_META_FINISH_QUIT
 
-	void 	MSG_META_FINISH_QUIT(
-			Boolean		abortFlag);
+    void    MSG_META_FINISH_QUIT(
+            Boolean     abortFlag);
 
 This message is sent to the object that initiated MSG_META_QUIT and has 
 received MSG_META_QUIT_ACK from each party notified. This message 
@@ -1185,10 +1185,10 @@ event is typically an event stored earlier with the Goc keyword **@record**.
 
 #### MSG_META_DISPATCH_EVENT
 
-	Boolean	MSG_META_DISPATCH_EVENT(
-			AsmPassReturn 	*retVals,
-			EventHandle 	eventHandle,
-			MessageFlags msgFlags););
+    Boolean MSG_META_DISPATCH_EVENT(
+            AsmPassReturn   *retVals,
+            EventHandle     eventHandle,
+            MessageFlags msgFlags););
 
 This message causes an object to **@send** or **@call** a message of another object. 
 This is useful for getting one object run by a different thread to call yet 
@@ -1210,22 +1210,22 @@ complex synchronization problems if not used with extreme care.
 
 **Return:** If MF_CALL specified, then carry flag return value will be returned.
 
-**Structures:**	
+**Structures:** 
 
-	typedef struct {
-		word 	ax;
-		word 	cx;
-		word 	dx;
-		word 	bp;
-	} AsmPassReturn;
+    typedef struct {
+        word    ax;
+        word    cx;
+        word    dx;
+        word    bp;
+    } AsmPassReturn;
 
 ----------
 
 #### MSG_META_SEND_CLASSED_EVENT
 
-	void	MSG_META_SEND_CLASSED_EVENT(
-			EventHandle	 	event,
-		****	TravelOption 		whereTo);
+    void    MSG_META_SEND_CLASSED_EVENT(
+            EventHandle     event,
+        ****    TravelOption        whereTo);
 
 This message is similar to several MSG_GEN_SEND_- messages defined in 
 **GenClass**. This message sends a previously recorded classed event to a 
@@ -1268,7 +1268,7 @@ the superclass if it doesn't recognize the **TravelOption** passed).
 
 #### MSG_META_GET_OBJ_BLOCK_OUTPUT
 
-	optr	MSG_META_GET_OBJ_BLOCK_OUTPUT();
+    optr    MSG_META_GET_OBJ_BLOCK_OUTPUT();
 
 This message returns the output optr of an object block that contains the 
 object that sent the message.
@@ -1285,8 +1285,8 @@ object that sent the message.
 
 #### MSG_META_SET_OBJ_BLOCK_OUTPUT
 
-	void	MSG_META_SET_OBJ_BLOCK_OUTPUT(
-			optr		output);
+    void    MSG_META_SET_OBJ_BLOCK_OUTPUT(
+            optr        output);
 
 This message sets the object block output - the block containing the object 
 that sent the message - to the passed optr. 
@@ -1304,7 +1304,7 @@ that sent the message - to the passed optr.
 
 #### MSG_META_GET_OPTR
 
-	optr	MSG_META_GET_OPTR();
+    optr    MSG_META_GET_OPTR();
 
 This message returns the object's optr. This is useful when combined with 
 MSG_GEN_GUP_CALL_OBJECT_OF_CLASS to get the optr of an object of a 
@@ -1329,9 +1329,9 @@ to whether an object of a given class exists.
 
 #### MSG_META_GET_TARGET_AT_TARGET_LEVEL
 
-	void	MSG_META_GET_TARGET_AT_TARGET_LEVEL(
-			GetTargetParams *retValue,
-			TargetLevel level);
+    void    MSG_META_GET_TARGET_AT_TARGET_LEVEL(
+            GetTargetParams *retValue,
+            TargetLevel level);
 
 This message returns the **GetTargetParams** structure containing, among 
 other things, the current target object at a given target level. The **MetaClass** 
@@ -1357,10 +1357,10 @@ UI.
 
 **Structures:**
 
-	typedef struct {
-		ClassStruct 		*GTP_class;
-		optr 				GTP_target;
-	} GetTargetParams;
+    typedef struct {
+        ClassStruct         *GTP_class;
+        optr                GTP_target;
+    } GetTargetParams;
 
 #### 1.1.2.6 Variable Data Messages
 
@@ -1373,10 +1373,10 @@ Concepts Book.
 
 #### MSG_META_ADD_VAR_DATA
 
-	void	MSG_META_ADD_VAR_DATA(@stack
-			word	dataType,
-			word	dataSize,
-			word	*data)
+    void    MSG_META_ADD_VAR_DATA(@stack
+            word    dataType,
+            word    dataSize,
+            word    *data)
 
 This message adds a variable data type to the recipient object's instance data. 
 If the variable data field was already present, this will change its value. This 
@@ -1408,8 +1408,8 @@ this may be a pointer to data to initialize data with.
 
 #### MSG_META_DELETE_VAR_DATA
 
-	Boolean	MSG_META_DELETE_VAR_DATA(
-			word	dataType);
+    Boolean MSG_META_DELETE_VAR_DATA(
+            word    dataType);
 
 This message removes a particular variable data entry from the recipient 
 object's instance data. This is useful for removing hints from generic objects 
@@ -1425,15 +1425,15 @@ desired function.
 **Parameters:**  
 *dataType* - Data type to delete. **VarDataFlags** ignored.
 
-**Return:**	Returns false if data deleted, true if data was not found. Object marked 
+**Return:** Returns false if data deleted, true if data was not found. Object marked 
 dirty if data type found and deleted.
 
 ----------
 
 #### MSG_META_INITIALIZE_VAR_DATA
 
-	word	MSG_META_INITIALIZE_VAR_DATA(
-			word	dataType);
+    word    MSG_META_INITIALIZE_VAR_DATA(
+            word    dataType);
 
 This message is sent to an object any time the **ObjVarDerefData()** routine 
 is called and the data type is not found. It should be subclassed by any object 
@@ -1470,11 +1470,11 @@ returned by the call to **ObjVarAddData()**.
 
 #### MSG_META_GET_VAR_DATA
 
-	word MSG_META_GET_VAR_DATA( /* returns size of data returned in buf;
+    word MSG_META_GET_VAR_DATA( /* returns size of data returned in buf;
               * -1 if not found */
-			word 	dataType,
-			word 	bufSize,
-			void 	*buf);
+            word    dataType,
+            word    bufSize,
+            void    *buf);
 
 This message fetches variable data of a given type from an object.
 
@@ -1506,10 +1506,10 @@ the system.
 
 #### MSG_META_NOTIFY
 
-	void	MSG_META_NOTIFY(
-			ManufacturerID manufID,
-			word	notificationType,
-			word 	data);
+    void    MSG_META_NOTIFY(
+            ManufacturerID manufID,
+            word    notificationType,
+            word    data);
 
 This message notifies the recipient that some change or action has taken 
 place. The object must have registered for the notification. The type of change 
@@ -1541,10 +1541,10 @@ MSG_META_NOTIFY_WITH_DATA_BLOCK, below.
 
 #### MSG_META_NOTIFY_WITH_DATA_BLOCK
 
-	void	MSG_META_NOTIFY_WITH_DATA_BLOCK(
-			ManufacturerID manufID,
-			word	notificationType,
-			MemHandle data);
+    void    MSG_META_NOTIFY_WITH_DATA_BLOCK(
+            ManufacturerID manufID,
+            word    notificationType,
+            MemHandle data);
 
 This message acts like MSG_META_NOTIFY, but it also carries a handle of a 
 block of data. It is absolutely imperative that if this message is subclassed, 
@@ -1597,10 +1597,10 @@ so that the block can be freed when no longer referenced.
 
 #### MSG_META_GCN_LIST_ADD
 
-	Boolean	MSG_META_GCN_LIST_ADD(@stack
-			optr			dest,
-			word 		listType,
-			ManufacturerID 		listManuf);
+    Boolean MSG_META_GCN_LIST_ADD(@stack
+            optr            dest,
+            word        listType,
+            ManufacturerID      listManuf);
 
 This message adds the passed object to a particular notification list. It 
 returns true if the object was successfully added, false otherwise. This 
@@ -1619,16 +1619,16 @@ message is the equivalent of **GCNListAdd()** for individual object GCN list.
 
 *listManuf* - Manufacturer ID associated with GCN list.
 
-**Return:**	Returns true if optr added, false otherwise.
+**Return:** Returns true if optr added, false otherwise.
 
 ----------
 
 #### MSG_META_GCN_LIST_REMOVE
 
-	Boolean	MSG_META_GCN_LIST_REMOVE(@stack
-			optr	dest,
-			word	listType,
-			ManufacturerID listManuf);
+    Boolean MSG_META_GCN_LIST_REMOVE(@stack
+            optr    dest,
+            word    listType,
+            ManufacturerID listManuf);
 
 This message removes the passed object from a particular notification list. It 
 returns true if the object was successfully removed, false otherwise. This 
@@ -1654,12 +1654,12 @@ GCN list.
 
 #### MSG_META_GCN_LIST_SEND
 
-	void	MSG_META_GCN_LIST_SEND(@stack
-			GCNListSendFlags 		flags,
-			EventHandle		event,
-			MemHandle 		block,
-			word		listType,
-			ManufacturerID 		listManuf);
+    void    MSG_META_GCN_LIST_SEND(@stack
+            GCNListSendFlags        flags,
+            EventHandle     event,
+            MemHandle       block,
+            word        listType,
+            ManufacturerID      listManuf);
 
 This message sends the given event to all objects in a particular notification 
 list. The event will be freed after being sent. This message is the equivalent 
@@ -1687,10 +1687,10 @@ have **MetaClass** handlers which call
 
 **Structures:**  
 
-	typedef WordFlags GCNListSendFlags;
-	/* These flags may be combined using | and &:
-		GCNLSF_SET_STATUS,
-		GCNLSF_IGNORE_IF_STATUS_TRANSITIONING */
+    typedef WordFlags GCNListSendFlags;
+    /* These flags may be combined using | and &:
+        GCNLSF_SET_STATUS,
+        GCNLSF_IGNORE_IF_STATUS_TRANSITIONING */
 
 GCNLSF_SET_STATUS  
 Additionally saves the message as the list's current "status." 
@@ -1720,10 +1720,10 @@ not pass this bit set.
 
 #### MSG_META_GCN_LIST_FIND_ITEM
 
-	Boolean	MSG_META_GCN_LIST_FIND_ITEM(@stack
-			optr		dest,
-			word		listType,
-			ManufacturerID		listManuf);
+    Boolean MSG_META_GCN_LIST_FIND_ITEM(@stack
+            optr        dest,
+            word        listType,
+            ManufacturerID      listManuf);
 
 This message checks whether an object is on a particular GCN list.
 
@@ -1740,13 +1740,13 @@ This message checks whether an object is on a particular GCN list.
 
 **Return:** *true* if object is on the GCN list.
 
-**Interception:**	Unnecessary.
+**Interception:**   Unnecessary.
 
 ----------
 
 #### MSG_META_GCN_LIST_DESTROY
 
-	void	MSG_META_GCN_LIST_DESTROY();
+    void    MSG_META_GCN_LIST_DESTROY();
 
 This message completely destroys the GCN setup for the caller. It frees all 
 GCN lists, cached events, and overhead data storage. This should only be 
@@ -1768,8 +1768,8 @@ MSG_META_FINAL_OBJ_FREE.
 
 #### MSG_META_NOTIFY_OBJ_BLOCK_INTERACTIBLE
 
-	void	MSG_META_NOTIFY_OBJ_BLOCK_INTERICTABLE(
-			MemHandle objBlock);
+    void    MSG_META_NOTIFY_OBJ_BLOCK_INTERICTABLE(
+            MemHandle objBlock);
 
 This message is sent to an object block's output object when the block changes 
 from being not in-use to being in-use. An object may handle this message to 
@@ -1795,8 +1795,8 @@ well.
 
 #### MSG_META_NOTIFY_OBJ_BLOCK_NOT_INTERACTIBLE
 
-	void	MSG_META_NOTIFY_OBJ_BLOCK_NOT_INTERACTIBLE(
-			MemHandle objBlock);
+    void    MSG_META_NOTIFY_OBJ_BLOCK_NOT_INTERACTIBLE(
+            MemHandle objBlock);
 
 This message is sent to an object block's output object when the block changes 
 from being not in-use to being in-use. An object may handle this message to 
@@ -1822,8 +1822,8 @@ well.
 
 #### MSG_META_VM_FILE_DIRTY
 
-	void	MSG_META_VM_FILE_DIRTY(
-			FileHandle file);
+    void    MSG_META_VM_FILE_DIRTY(
+            FileHandle file);
 
 This message is sent to all processes that have a VM file open when a block 
 in the file becomes marked dirty for the first time. This is useful if many 
@@ -1842,7 +1842,7 @@ notification to the current model **GenDocumentGroupClass** object.
 file* - Handle open to the VM file, from the receiving 
 process's perspective.
 
-Return:	Nothing.
+Return: Nothing.
 
 #### 1.1.2.8 Options Messages
 
@@ -1854,7 +1854,7 @@ messages.
 
 #### MSG_META_SAVE_OPTIONS
 
-	void	MSG_META_SAVE_OPTIONS();
+    void    MSG_META_SAVE_OPTIONS();
 
 This message saves an object's options to the .INI file for an object. It is sent 
 via the UI's active list mechanism.
@@ -1871,7 +1871,7 @@ be called in case any of the superclasses needs similar notification.
 
 #### MSG_META_LOAD_OPTIONS
 
-	void	MSG_META_SAVE_OPTIONS();
+    void    MSG_META_SAVE_OPTIONS();
 
 This message loads the object's setting from the .INI file.
 
@@ -1886,7 +1886,7 @@ is currently implemented for Generic UI objects.
 
 #### MSG_META_RESET_OPTIONS
 
-	void	MSG_META_RESET_OPTIONS();
+    void    MSG_META_RESET_OPTIONS();
 
 This message resets the object's settings from the .INI file to their initial 
 state.
@@ -1904,8 +1904,8 @@ Behavior is currently implemented for Generic UI objects.
 
 #### MSG_META_GET_INI_CATEGORY
 
-	void	MSG_META_GET_INI_CATEGORY(
-			char	*buf);
+    void    MSG_META_GET_INI_CATEGORY(
+            char    *buf);
 
 This message returns the .INI file category of the object.
 
@@ -1943,7 +1943,7 @@ since multiple class levels could be implementing this mechanism.
 
 #### MSG_META_SUSPEND
 
-	void 	MSG_META_SUSPEND();
+    void    MSG_META_SUSPEND();
 
 Suspend calculation in an object.
 
@@ -1961,7 +1961,7 @@ Suspend calculation in an object.
 
 #### MSG_META_UNSUSPEND 
 
-	void 	MSG_META_UNSUSPEND();
+    void    MSG_META_UNSUSPEND();
 
 Unsuspend calculation in an object.
 
@@ -1977,8 +1977,8 @@ Unsuspend calculation in an object.
 
 #### 1.1.2.10 Help Files
 
-	MSG_META_GET_HELP_FILE, MSG_META_SET_HELP_FILE, 
-	MSG_META_BRING_UP_HELP
+    MSG_META_GET_HELP_FILE, MSG_META_SET_HELP_FILE, 
+    MSG_META_BRING_UP_HELP
 
 These help messages are contained within MetaClass to allow help files 
 within any object in the GEOS system.
@@ -1987,8 +1987,8 @@ within any object in the GEOS system.
 
 #### MSG_META_GET_HELP_FILE
 
-	void	MSG_META_GET_HELP_FILE(
-			char		*buf);
+    void    MSG_META_GET_HELP_FILE(
+            char        *buf);
 
 This message returns the name of the help file attached to the object sent this 
 message. If no help file is found, the default MetaClass handler walks up the 
@@ -2010,8 +2010,8 @@ help file for a branch.
 
 #### MSG_META_SET_HELP_FILE
 
-	void	MSG_META_SET_HELP_FILE(
-			char		*buf);
+    void    MSG_META_SET_HELP_FILE(
+            char        *buf);
 
 This message sets the help file for the object sent this message.
 
@@ -2029,7 +2029,7 @@ at least FILE_LONGNAME_BUFFER_SIZE.
 
 #### MSG_META_BRING_UP_HELP
 
-	void	MSG_META_BRING_UP_HELP();
+    void    MSG_META_BRING_UP_HELP();
 
 This message finds a help context for the current object tree and sends a 
 notification to bring up help with that context.
@@ -2084,16 +2084,16 @@ Thus, your application could contain the header listed below, and then
 write handlers for the message in two completely unrelated 
 application-defined classes:
 
-	@importMessage MetaApplicationMessages,  
-		type0	MSG_MYAPP_DO_SOMETHING(  
-				type1		arg1,  
-				type2		arg2);  
-	/* - \*/  
-	@method MyProcessClass, MSG_MYAPP_DO_SOMETHING  
-	/* -Insert Handler here \*/  
-	/* - \*/  
-	@method MyDocumentClass, MSG_MYAPP_DO_SOMETHING  
-	/* -Insert Handler here */
+    @importMessage MetaApplicationMessages,  
+        type0   MSG_MYAPP_DO_SOMETHING(  
+                type1       arg1,  
+                type2       arg2);  
+    /* - \*/  
+    @method MyProcessClass, MSG_MYAPP_DO_SOMETHING  
+    /* -Insert Handler here \*/  
+    /* - \*/  
+    @method MyDocumentClass, MSG_MYAPP_DO_SOMETHING  
+    /* -Insert Handler here */
 + MetaGrObjMessages  
 This message range is reserved for notification messages associated with 
 the graphic object library.
@@ -2148,8 +2148,8 @@ messages.
 
 #### MSG_META_EXPOSED
 
-	@importMessage MetaWindowMessages, void MSG_META_EXPOSED(
-			WindowHandle win);
+    @importMessage MetaWindowMessages, void MSG_META_EXPOSED(
+            WindowHandle win);
 
 This message is sent to a Window's exposure object any time a portion of the 
 window is visible on screen, has become invalid, and needs to be redrawn. 
@@ -2188,7 +2188,7 @@ on to application objects.
 
 #### MSG_META_WIN_CHANGE
 
-	@importMessage MetaWindowMessages, void MSG_META_WIN_CHANGE();
+    @importMessage MetaWindowMessages, void MSG_META_WIN_CHANGE();
 
 Sent to the System Input Object (Normally the UI's GenSystem obj), when 
 the pointer position, as passed to the window system in calls to 
@@ -2211,9 +2211,9 @@ change.
 
 #### MSG_META_IMPLIED_WIN_CHANGE
 
-	@importMessage MetaWindowMessages, void MSG_META_IMPLIED_WIN_CHANGE(
-			optr 			inputObj,
-			WindowHandle 	ptrWin);
+    @importMessage MetaWindowMessages, void MSG_META_IMPLIED_WIN_CHANGE(
+            optr            inputObj,
+            WindowHandle    ptrWin);
 
 Sent to the System Input Object (Normally the UI's GenSystem obj) in 
 response to a call to **WinChangeAck()**, to inform it which window the mouse 
@@ -2241,9 +2241,9 @@ no implied grab).
 
 #### MSG_META_RAW_UNIV_ENTER
 
-	@importMessage MetaWindowMessages, void MSG_META_RAW_UNIV_ENTER(
-		optr 			inputObj,
-		WindowHandle 	ptrWin);
+    @importMessage MetaWindowMessages, void MSG_META_RAW_UNIV_ENTER(
+        optr            inputObj,
+        WindowHandle    ptrWin);
 
 This message is generated by the window system whenever the mouse 
 crosses into a window. This message is sent to the window's input object. This 
@@ -2273,9 +2273,9 @@ grab interaction behavior.
 
 #### MSG_META_RAW_UNIV_LEAVE
 
-	@importMessage MetaWindowMessages, void MSG_META_RAW_UNIV_LEAVE(
-			optr 			inputObj,
-			WindowHandle 	ptrWin);
+    @importMessage MetaWindowMessages, void MSG_META_RAW_UNIV_LEAVE(
+            optr            inputObj,
+            WindowHandle    ptrWin);
 
 This message is generated by the window system whenever the mouse 
 crosses out of a window. This message is sent to the window's input object. 
@@ -2311,10 +2311,10 @@ should intercept events which have been so processed, as described in the next s
 
 #### MSG_META_MOUSE_BUTTON
 
-	@importMessage MetaInputMessages, void MSG_META_BUTTON(
-			word 	xPosition,
-			word 	yPosition,
-			word 	inputState); 
+    @importMessage MetaInputMessages, void MSG_META_BUTTON(
+            word    xPosition,
+            word    yPosition,
+            word    inputState); 
 
 This message is sent out on any button press or release.
 
@@ -2331,10 +2331,10 @@ This message is sent out on any button press or release.
 
 #### MSG_META_MOUSE_PTR
 
-	@importMessage MetaInputMessages, void MSG_META_PTR(
-			word 	xPosition,
-			word 	yPosition,
-			word 	inputState); 
+    @importMessage MetaInputMessages, void MSG_META_PTR(
+            word    xPosition,
+            word    yPosition,
+            word    inputState); 
 
 This message is sent out on any mouse movement.
 
@@ -2351,10 +2351,10 @@ This message is sent out on any mouse movement.
 
 #### MSG_META_KBD_CHAR
 
-	@importMessage MetaInputMessages, void MSG_META_KBD_CHAR(
-		word 	character,
-		word 	flags, /* low byte = CharFlags, high byte = ShiftState */
-		word 	state);/* low byte = ToggleState, high byte = scan code */
+    @importMessage MetaInputMessages, void MSG_META_KBD_CHAR(
+        word    character,
+        word    flags, /* low byte = CharFlags, high byte = ShiftState */
+        word    state);/* low byte = ToggleState, high byte = scan code */
 
 This is the message sent out on any keyboard press or release. To determine 
 whether the message is in response to a press or a release, check the 
@@ -2375,10 +2375,10 @@ ToggleState.
 
 #### MSG_META_MOUSE_DRAG
 
-	@importMessage MetaInputMessages, void MSG_META_MOUSE_DRAG(
-			word 	xPosition,
-			word 	yPosition,
-			word 	inputState);
+    @importMessage MetaInputMessages, void MSG_META_MOUSE_DRAG(
+            word    xPosition,
+            word    yPosition,
+            word    inputState);
 
 This is a very low-level message, signalling that the user is dragging the 
 mouse.
@@ -2407,7 +2407,7 @@ The following messages are used to implement common clipboard functions.
 
 #### MSG_META_CLIPBOARD_CUT
 
-	@importMessage MetaUIMessages, void 	MSG_META_CLIPBOARD_CUT();
+    @importMessage MetaUIMessages, void     MSG_META_CLIPBOARD_CUT();
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation. MSG_META_CLIPBOARD_CUT should register the 
@@ -2431,7 +2431,7 @@ functionality of object that does support the clipboard.
 
 #### MSG_META_CLIPBOARD_COPY
 
-	@importMessage MetaUIMessages, void 	MSG_META_CLIPBOARD_COPY();
+    @importMessage MetaUIMessages, void     MSG_META_CLIPBOARD_COPY();
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation. MSG_META_CLIPBOARD_COPY should be handled by 
@@ -2454,7 +2454,7 @@ functionality of object that does support the clipboard.
 
 #### MSG_META_CLIPBOARD_PASTE
 
-	@importMessage MetaUIMessages, void 	MSG_META_CLIPBOARD_PASTE();
+    @importMessage MetaUIMessages, void     MSG_META_CLIPBOARD_PASTE();
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation. MSG_META_CLIPBOARD_PASTE should replace the 
@@ -2478,9 +2478,9 @@ functionality of object that does support the clipboard.
 
 #### MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK
 
-	@importMessage MetaUIMessages, 
-		void	MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK(
-				ClipboardQuickNotifyFlags flags);
+    @importMessage MetaUIMessages, 
+        void    MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK(
+                ClipboardQuickNotifyFlags flags);
 
 This message is sent to the source of a quick transfer item when a potential 
 destination provides feedback to the user indicating whether a move, a copy 
@@ -2506,9 +2506,9 @@ a potential destination will perform. Handler need not call superclass.
 
 #### MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED
 
-	@importMessage MetaUIMessages, 
-		void	MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK(
-				ClipboardQuickNotifyFlags 	flags);
+    @importMessage MetaUIMessages, 
+        void    MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK(
+                ClipboardQuickNotifyFlags   flags);
 
 This message is sent to the source of a quick transfer item when the 
 operation is completed. The **ClipboardQuickNotifyFlags** are set by any 
@@ -2534,10 +2534,10 @@ was performed. Handler need not call superclass.
 
 #### MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED
 
-	@importMessage MetaUIMessages, 
-		void 	MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED(
-				VMFileHandle 	itemFile,
-				VMBlockHandle 	itemBlock);
+    @importMessage MetaUIMessages, 
+        void    MSG_META_CLIPBOARD_NOTIFY_TRANSFER_ITEM_FREED(
+                VMFileHandle    itemFile,
+                VMBlockHandle   itemBlock);
 
 Sent to all ODs in Transfer Notify List to help maintain integrity of transfer 
 items from VM files other than the UI's transfer VM file. Only sent if VM file 
@@ -2568,8 +2568,8 @@ need to be monitored.
 
 #### MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
 
-	@importMessage MetaUIMessages, 
-		void 	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED();
+    @importMessage MetaUIMessages, 
+        void    MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED();
 
 Sent to all ODs in Transfer Notify List to help with updating of Cut, Copy, and 
 Paste button states. Recipients can call **ClipboardQueryItem()** to check if 
@@ -2598,8 +2598,8 @@ about Undo, see "GenProcessClass".
 
 #### MSG_META_UNDO
 
-	@importMessage MetaUIMessages, 
-		void 	MSG_META_UNDO(AddUndoActionStruct *data);
+    @importMessage MetaUIMessages, 
+        void    MSG_META_UNDO(AddUndoActionStruct *data);
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation.
@@ -2621,9 +2621,9 @@ functionality of object that does support the clipboard.
 
 #### MSG_META_UNDO_FREEING_ACTION
 
-	@importMessage MetaUIMessages,
-		void 	MSG_META_UNDO_FREEING_ACTION(
-				AddUndoActionStruct *data);
+    @importMessage MetaUIMessages,
+        void    MSG_META_UNDO_FREEING_ACTION(
+                AddUndoActionStruct *data);
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation. This message is used to undo those actions which may 
@@ -2646,7 +2646,7 @@ functionality of object that does support the clipboard.
 
 #### MSG_META_SELECT_ALL
 
-	@importMessage MetaUIMessages, void MSG_META_SELECT_ALL();
+    @importMessage MetaUIMessages, void MSG_META_SELECT_ALL();
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation.
@@ -2668,7 +2668,7 @@ functionality of object that does support the clipboard.
 
 #### MSG_META_DELETE
 
-	@importMessage MetaUIMessages, void MSG_META_DELETE();
+    @importMessage MetaUIMessages, void MSG_META_DELETE();
 
 This message is sent to an object which is supposed to be the destination of a 
 clipboard operation. 
@@ -2695,7 +2695,7 @@ detect input events.
 
 #### MSG_META_GAINED_MOUSE_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_MOUSE_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_MOUSE_EXCL();
 
 The object will receive this message when it has received the mouse 
 exclusive.
@@ -2704,7 +2704,7 @@ exclusive.
 
 #### MSG_META_LOST_MOUSE_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_MOUSE_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_MOUSE_EXCL();
 
 The object will receive this message when it has lost the mouse exclusive.
 
@@ -2712,7 +2712,7 @@ The object will receive this message when it has lost the mouse exclusive.
 
 #### MSG_META_GAINED_KBD_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_KBD_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_KBD_EXCL();
 
 The object will receive this message when it has received the keyboard 
 exclusive.
@@ -2721,7 +2721,7 @@ exclusive.
 
 #### MSG_META_LOST_KBD_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_KBD_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_KBD_EXCL();
 
 The object will receive this message when it has lost the keyboard exclusive.
 
@@ -2729,7 +2729,7 @@ The object will receive this message when it has lost the keyboard exclusive.
 
 #### MSG_META_GAINED_PRESSURE_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_PRESSURE_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_PRESSURE_EXCL();
 
 The object will receive this message when it has received the pressure 
 exclusive, meaning it will get certain low-level mouse events.
@@ -2738,7 +2738,7 @@ exclusive, meaning it will get certain low-level mouse events.
 
 #### MSG_META_LOST_PRESSURE_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_PRESSURE_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_PRESSURE_EXCL();
 
 The object will receive this message when it has lost the pressure exclusive.
 
@@ -2746,7 +2746,7 @@ The object will receive this message when it has lost the pressure exclusive.
 
 #### MSG_META_GAINED_DIRECTION_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_DIRECTION_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_DIRECTION_EXCL();
 
 The object will receive this message when it has received the direction 
 exclusive, meaning it will get certain low-level mouse events.
@@ -2755,7 +2755,7 @@ exclusive, meaning it will get certain low-level mouse events.
 
 #### MSG_META_LOST_DIRECTION_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_DIRECTION_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_DIRECTION_EXCL();
 
 The object will receive this message when it has lost the direction exclusive.
 
@@ -2770,7 +2770,7 @@ Focus, Target, and Model hierarchies. These hierarchies are discussed in
 
 #### MSG_META_GRAB_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GRAB_FOCUS_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GRAB_FOCUS_EXCL();
 
 May be passed to any visible or generic object to cause it to become the active 
 focus within its focus level. The leaf object in the hierarchy which gains the 
@@ -2793,7 +2793,7 @@ This is the message equivalent of HINT_DEFAULT_FOCUS on generic objects.
 
 #### MSG_META_RELEASE_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_RELEASE_FOCUS_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_RELEASE_FOCUS_EXCL();
 
 Opposite of MSG_META_GRAB_FOCUS_EXCL. If the object does not currently 
 have the exclusive, nothing will be done.
@@ -2802,8 +2802,8 @@ have the exclusive, nothing will be done.
 
 #### MSG_META_GET_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, Boolean MSG_META_GET_FOCUS_EXCL(
-			optr 	*focusObject);
+    @importMessage MetaUIMessages, Boolean MSG_META_GET_FOCUS_EXCL(
+            optr    *focusObject);
 
 May be sent to any visible or generic object which is a focus node, to get 
 current focus object directly below the node, if any, regardless of whether 
@@ -2834,7 +2834,7 @@ operation if at all possible.
 
 #### MSG_META_GRAB_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GRAB_TARGET_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GRAB_TARGET_EXCL();
 
 May be passed to any visible or generic object to cause it to become the active 
 target within the target level that it is in. The active target hierarchy is the 
@@ -2858,7 +2858,7 @@ levels. This is the message equivalent of HINT_DEFAULT_TARGET.
 
 #### MSG_META_RELEASE_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_RELEASE_TARGET_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_RELEASE_TARGET_EXCL();
 
 Opposite of MSG_META_GRAB_TARGET_EXCL. If the object does not 
 currently have the exclusive, nothing will be done.
@@ -2867,8 +2867,8 @@ currently have the exclusive, nothing will be done.
 
 #### MSG_META_GET_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GET_TARGET_EXCL(
-			optr targetObject);
+    @importMessage MetaUIMessages, void MSG_META_GET_TARGET_EXCL(
+            optr targetObject);
 
 May be sent to any visible or generic object which is a target node, to get the 
 current target object directly below the node, if any, regardless of whether the 
@@ -2898,7 +2898,7 @@ operation if at all possible.
 
 #### MSG_META_GRAB_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GRAB_MODEL_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GRAB_MODEL_EXCL();
 
 May be passed to any visible or generic object to cause it to become the active 
 model within the model level that it is in. The active model hierarchy is the 
@@ -2914,7 +2914,7 @@ levels. This is the message equivalent of HINT_MAKE_DEFAULT_MODEL.
 
 #### MSG_META_RELEASE_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_RELEASE_MODEL_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_RELEASE_MODEL_EXCL();
 
 Opposite of MSG_META_GRAB_MODEL_EXCL. If the object does not currently 
 have the exclusive, nothing will be done.
@@ -2923,8 +2923,8 @@ have the exclusive, nothing will be done.
 
 #### MSG_META_GET_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GET_MODEL_EXCL(
-			optr targetObject);
+    @importMessage MetaUIMessages, void MSG_META_GET_MODEL_EXCL(
+            optr targetObject);
 
 May be sent to any visible or generic object which is a model node, to get 
 current model object directly below the node, if any, regardless of whether 
@@ -2953,7 +2953,7 @@ operation if at all possible.
 
 #### MSG_META_GAINED_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_FOCUS_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_FOCUS_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -2971,7 +2971,7 @@ MSG_META_LOST_FOCUS_EXCL.
 
 #### MSG_META_LOST_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_FOCUS_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_FOCUS_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -2989,7 +2989,7 @@ MSG_META_LOST_FOCUS_EXCL.
 
 #### MSG_META_GAINED_SYS_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_SYS_FOCUS_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_SYS_FOCUS_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -2997,7 +2997,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_LOST_SYS_FOCUS_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_SYS_FOCUS_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_SYS_FOCUS_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3005,7 +3005,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_GAINED_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_TARGET_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_TARGET_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3013,7 +3013,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_LOST_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_TARGET_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_TARGET_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3021,7 +3021,7 @@ See description for this and other gained/lost exclusive messages below.
 
 ####MSG_META_GAINED_SYS_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_SYS_TARGET_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_SYS_TARGET_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3029,7 +3029,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_LOST_SYS_TARGET_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_SYS_TARGET_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_SYS_TARGET_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3037,7 +3037,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_GAINED_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void	MSG_META_GAINED_MODEL_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_MODEL_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3045,7 +3045,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_LOST_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_MODEL_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_MODEL_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3053,7 +3053,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_GAINED_SYS_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_SYS_MODEL_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_SYS_MODEL_EXCL();
 
 See description for this and other gained/lost exclusive messages below.
 
@@ -3061,7 +3061,7 @@ See description for this and other gained/lost exclusive messages below.
 
 #### MSG_META_LOST_SYS_MODEL_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_SYS_MODEL_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_SYS_MODEL_EXCL();
 
 These paired gained/lost messages for the Focus, Target, and Model 
 hierarchies are sent, always in the order GAINED, then at some point LOST, 
@@ -3103,7 +3103,7 @@ exclusive has been gained.
 
 #### MSG_META_GRAB_KBD
 
-	@importMessage MetaUIMessages, void MSG_META_GRAB_KBD();
+    @importMessage MetaUIMessages, void MSG_META_GRAB_KBD();
 
 This message grabs the keyboard for an object. The grab will not be taken 
 away from another object if it currently has the keyboard grab. To forcefully 
@@ -3113,7 +3113,7 @@ grab the keyboard in this case, use MSG_META_FORCE_GRAB_KBD.
 
 #### MSG_META_FORCE_GRAB_KBD
 
-	@importMessage MetaUIMessages, void MSG_META_FORCE_GRAB_KBD();
+    @importMessage MetaUIMessages, void MSG_META_FORCE_GRAB_KBD();
 
 This message forcefully grabs the keyboard for an object, tasking the grab 
 away from another object, if necessary.
@@ -3122,7 +3122,7 @@ away from another object, if necessary.
 
 #### MSG_META_RELEASE_KBD
 
-	@importMessage MetaUIMessages, void MSG_META_RELEASE_KBD();
+    @importMessage MetaUIMessages, void MSG_META_RELEASE_KBD();
 
 This message releases the keyboard grab for an object.
 
@@ -3130,7 +3130,7 @@ This message releases the keyboard grab for an object.
 
 #### MSG_META_RELEASE_FT_EXCL
 
-	@importMessage MetaUIMessages, void 	MSG_META_RELEASE_FT_EXCL();
+    @importMessage MetaUIMessages, void     MSG_META_RELEASE_FT_EXCL();
 
 This message releases exclusive(s) that the object may have on the Focus and 
 Target hierarchies.
@@ -3139,7 +3139,7 @@ Target hierarchies.
 
 #### MSG_META_GAINED_DEFAULT_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_DEFAULT_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_DEFAULT_EXCL();
 
 Sent out in response to this object receiving MSG_VIS_VUP_QUERY with 
 SVQT_TAKE_DEFAULT_EXCLUSIVE, to notify a GenTrigger that it has gained 
@@ -3149,7 +3149,7 @@ the default exclusive.
 
 #### MSG_META_LOST_DEFAULT_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_DEFAULT_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_DEFAULT_EXCL();
 
 Sent out in response to this object receiving MSG_VIS_VUP_QUERY with 
 SVQT_RELEASE_DEFAULT_EXCLUSIVE, to notify a GenTrigger that it has 
@@ -3159,7 +3159,7 @@ lost the default exclusive.
 
 #### MSG_META_GAINED_FULL_SCREEN_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_GAINED_FULL_SCREEN_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_GAINED_FULL_SCREEN_EXCL();
 
 This message is sent to GenFields or GenApplications upon gain of the 
 "full-screen" exclusive. The full-screen exclusive grants the object the top 
@@ -3169,7 +3169,7 @@ screen-dominating object at its level.
 
 #### MSG_META_LOST_FULL_SCREEN_EXCL
 
-	@importMessage MetaUIMessages, void MSG_META_LOST_FULL_SCREEN_EXCL();
+    @importMessage MetaUIMessages, void MSG_META_LOST_FULL_SCREEN_EXCL();
 
 This message is sent to GenFields or GenApplications upon loss of the 
 "full-screen" exclusive. The full-screen exclusive grants the object the top 
@@ -3179,9 +3179,9 @@ screen-dominating object at its level.
 
 #### MSG_META_MOUSE_BUMP_NOTIFICATION
 
-	@importMessage MetaUIMessages, void MSG_META_MOUSE_BUMP_NOTIFICATION(
-			sword 	xBump,
-			sword 	yBump);
+    @importMessage MetaUIMessages, void MSG_META_MOUSE_BUMP_NOTIFICATION(
+            sword   xBump,
+            sword   yBump);
 
 This message is an event that the input manager places in the input queue 
 to notify the UI that it has bumped the mouse position past this point in the 
@@ -3196,10 +3196,10 @@ queue. This method is sent only when **IMBumpMouse()** is called.
 
 #### MSG_META_FUP_KBD_CHAR
 
-	@importMessage MetaUIMessages, Boolean MSG_META_FUP_KBD_CHAR(
-			word 	character,
-			word 	flags,
-			word 	state);
+    @importMessage MetaUIMessages, Boolean MSG_META_FUP_KBD_CHAR(
+            word    character,
+            word    flags,
+            word    state);
 
 When a leaf object in the focus hierarchy gets a MSG_META_KBD_CHAR, and 
 does not care about the character, it sends this message to itself to see if a 
@@ -3214,18 +3214,18 @@ parent object wants to handle it.
 *inputState* - High byte is the raw PC scan code; low byte is a 
 **ToggleState** field.
 
-**Return:**	Will return true if the character was handled by someone (and should 
+**Return:** Will return true if the character was handled by someone (and should 
 not be used elsewhere).
 
 ----------
 
 #### MSG_META_PRE_PASSIVE_KBD_CHAR
 
-	@importMessage MetaUIMessages, 
-		KbdReturnFlags MSG_META_PRE_PASSIVE_KBD_CHAR(
-			word 	character,
-			word 	flags,
-			word 	state);
+    @importMessage MetaUIMessages, 
+        KbdReturnFlags MSG_META_PRE_PASSIVE_KBD_CHAR(
+            word    character,
+            word    flags,
+            word    state);
 
 This message sends a keyboard character to any object requesting preview of 
 the keyboard events.
@@ -3243,21 +3243,21 @@ the keyboard events.
 
 **Structures:**
 
-	typedef WordFlags 	KbdReturnFlags;
-	#define KRF_PREVENT_PASS_THROUGH 0x8000
-	/* Set for passive keyboard routines if event should
-	 * be destroyed and not passed on to implied or
-	 * default grab. */
+    typedef WordFlags   KbdReturnFlags;
+    #define KRF_PREVENT_PASS_THROUGH 0x8000
+    /* Set for passive keyboard routines if event should
+     * be destroyed and not passed on to implied or
+     * default grab. */
 
 ----------
 
 #### MSG_META_POST_PASSIVE_KBD_CHAR
 
-	@importMessage MetaUIMessages, 
-		KbdReturnFlags MSG_META_POST_PASSIVE_KBD_CHAR(
-			word 	character,
-			word 	flags,
-			word 	state);
+    @importMessage MetaUIMessages, 
+        KbdReturnFlags MSG_META_POST_PASSIVE_KBD_CHAR(
+            word    character,
+            word    flags,
+            word    state);
 
 This message passes keyboard characters to all objects having registered 
 interest in getting keyboard events after they have been handled.
@@ -3275,20 +3275,20 @@ interest in getting keyboard events after they have been handled.
 
 **Structures:**
 
-	typedef WordFlags 	KbdReturnFlags;
-	#define KRF_PREVENT_PASS_THROUGH 0x8000
-	/* Set for passive keyboard routines if event should
-	 * be destroyed and not passed on to implied or
-	 * default grab. */
+    typedef WordFlags   KbdReturnFlags;
+    #define KRF_PREVENT_PASS_THROUGH 0x8000
+    /* Set for passive keyboard routines if event should
+     * be destroyed and not passed on to implied or
+     * default grab. */
 
 ----------
 
 #### MSG_META_QUERY_IF_PRESS_IS_INK
 
-	@importMessage MetaUIMessages, 
-		InkReturnValue MSG_META_QUERY_IF_PRESS_IS_INK(
-			sword 	xPosition,
-			sword 	yPosition);
+    @importMessage MetaUIMessages, 
+        InkReturnValue MSG_META_QUERY_IF_PRESS_IS_INK(
+            sword   xPosition,
+            sword   yPosition);
 
 Return whether or not a MSG_META_START_SELECT should be passed on to 
 the object, or whether it should be intercepted and turned into ink.
@@ -3319,10 +3319,10 @@ handler for this message.
 
 #### MSG_META_LARGE_QUERY_IF_PRESS_IS_INK
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_LARGE_QUERY_IF_PRESS_IS_INK(
-			InkReturnParams		*retVal,
-			LargeMouseData		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, 
+        void MSG_META_LARGE_QUERY_IF_PRESS_IS_INK(
+            InkReturnParams     *retVal,
+            LargeMouseData      *largeMouseDataStruct);
 
 This message is sent by the system to children with the 
 VCNA_LARGE_DOCUMENT_MODEL bit set to determines whether or not a 
@@ -3357,11 +3357,11 @@ behavior of pointing devices within the system.
 
 #### MSG_META_START_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_START_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_START_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3369,11 +3369,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_END_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_END_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_END_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3381,11 +3381,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_START_MOVE_COPY
 
-	@importMessage MetaUIMessages, void MSG_META_START_MOVE_COPY(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_START_MOVE_COPY(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3393,11 +3393,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_END_MOVE_COPY
 
-	@importMessage MetaUIMessages, void MSG_META_END_MOVE_COPY(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_END_MOVE_COPY(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3405,11 +3405,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_START_FEATURES
 
-	@importMessage MetaUIMessages, void MSG_META_START_FEATURES(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_START_FEATURES(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3417,11 +3417,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_END_FEATURES
 
-	@importMessage MetaUIMessages, void MSG_META_END_FEATURES(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_END_FEATURES(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3429,12 +3429,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_START_OTHER
 
-	@importMessage MetaUIMessages, void MSG_META_START_OTHER(
-	
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_START_OTHER(
+    
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3442,11 +3442,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_END_OTHER
 
-	@importMessage MetaUIMessages, void MSG_META_END_OTHER(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_END_OTHER(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3454,11 +3454,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_DRAG_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_DRAG_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_DRAG_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3466,11 +3466,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_DRAG_MOVE_COPY
 
-	@importMessage MetaUIMessages, void MSG_META_DRAG_MOVE_COPY(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_DRAG_MOVE_COPY(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3478,11 +3478,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_DRAG_FEATURES
 
-	@importMessage MetaUIMessages, void MSG_META_DRAG_FEATURES(
-			MouseReturnParams 		*retVal,
-			sword 		xPosition,
-			sword 		yPosition,
-			word, 		inputState);
+    @importMessage MetaUIMessages, void MSG_META_DRAG_FEATURES(
+            MouseReturnParams       *retVal,
+            sword       xPosition,
+            sword       yPosition,
+            word,       inputState);
 
 For description of this and other button messages, see below.
 
@@ -3490,11 +3490,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_DRAG_OTHER
 
-	@importMessage MetaUIMessages, void MSG_META_DRAG_OTHER(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_DRAG_OTHER(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3502,11 +3502,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_BUTTON
 
-	@importMessage MetaUIMessages, void MSG_META_PRE_PASSIVE_BUTTON(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_PRE_PASSIVE_BUTTON(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3514,11 +3514,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_BUTTON
 
-	@importMessage MetaUIMessages, void MSG_META_POST_PASSIVE_BUTTON(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_POST_PASSIVE_BUTTON(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3526,11 +3526,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_START_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_PRE_PASSIVE_START_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_PRE_PASSIVE_START_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3538,11 +3538,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_START_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_POST_PASSIVE_START_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_POST_PASSIVE_START_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3550,11 +3550,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_END_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_PRE_PASSIVE_END_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_PRE_PASSIVE_END_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3562,11 +3562,11 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_END_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_POST_PASSIVE_END_SELECT(
-			MouseReturnParams 	*retVal,
-			sword 				xPosition,
-			sword 				yPosition,
-			word, 				inputState);
+    @importMessage MetaUIMessages, void MSG_META_POST_PASSIVE_END_SELECT(
+            MouseReturnParams   *retVal,
+            sword               xPosition,
+            sword               yPosition,
+            word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3574,12 +3574,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_START_MOVE_COPY
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PRE_PASSIVE_START_MOVE_COPY(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_PRE_PASSIVE_START_MOVE_COPY(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3587,12 +3587,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_START_MOVE_COPY
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_POST_PASSIVE_START_MOVE_COPY(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_POST_PASSIVE_START_MOVE_COPY(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3600,12 +3600,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_END_MOVE_COPY
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PRE_PASSIVE_END_MOVE_COPY(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_PRE_PASSIVE_END_MOVE_COPY(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3613,12 +3613,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_END_MOVE_COPY
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_POST_PASSIVE_END_MOVE_COPY(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_POST_PASSIVE_END_MOVE_COPY(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3626,12 +3626,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_START_FEATURES
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PRE_PASSIVE_START_FEATURES(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_PRE_PASSIVE_START_FEATURES(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3639,12 +3639,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_START_FEATURES
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_POST_PASSIVE_START_FEATURES(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_POST_PASSIVE_START_FEATURES(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3652,12 +3652,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_END_FEATURES
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PRE_PASSIVE_END_FEATURES(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_PRE_PASSIVE_END_FEATURES(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3665,12 +3665,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_END_FEATURES
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_POST_PASSIVE_END_FEATURES(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_POST_PASSIVE_END_FEATURES(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3678,12 +3678,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_START_OTHER
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PRE_PASSIVE_START_OTHER(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_PRE_PASSIVE_START_OTHER(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3691,12 +3691,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_START_OTHER
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_POST_PASSIVE_START_OTHER(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_POST_PASSIVE_START_OTHER(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3704,12 +3704,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_PRE_PASSIVE_END_OTHER
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PRE_PASSIVE_END_OTHER(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_PRE_PASSIVE_END_OTHER(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 For description of this and other button messages, see below.
 
@@ -3717,12 +3717,12 @@ For description of this and other button messages, see below.
 
 #### MSG_META_POST_PASSIVE_END_OTHER
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_POST_PASSIVE_END_OTHER(
-				MouseReturnParams 	*retVal,
-				sword 				xPosition,
-				sword 				yPosition,
-				word, 				inputState);
+    @importMessage MetaUIMessages, 
+        void MSG_META_POST_PASSIVE_END_OTHER(
+                MouseReturnParams   *retVal,
+                sword               xPosition,
+                sword               yPosition,
+                word,               inputState);
 
 The above messages are the standard button functions generated by the UI 
 upon receiving MSG_META_BUTTON events from the Input Manager. These 
@@ -3742,26 +3742,26 @@ byte is **ButtonInfo** structure.
 
 **Structures:**
 
-	typedef struct {
-		word 				unused;
-		MouseReturnFlags 	flags;
-		optr 				ptrImage;
-	} MouseReturnParameters;
-	typedef WordFlags MouseReturnFlags;
-	/* These flags may be combined using | and &:
-		MRF_PROCESSED,
-		MRF_REPLAY,
-		MRF_PREVENT_PASS_THROUGH,
-		MRF_SET_POINTER_IMAGE,
-		MRF_CLEAR_POINTER_IMAGE */
+    typedef struct {
+        word                unused;
+        MouseReturnFlags    flags;
+        optr                ptrImage;
+    } MouseReturnParameters;
+    typedef WordFlags MouseReturnFlags;
+    /* These flags may be combined using | and &:
+        MRF_PROCESSED,
+        MRF_REPLAY,
+        MRF_PREVENT_PASS_THROUGH,
+        MRF_SET_POINTER_IMAGE,
+        MRF_CLEAR_POINTER_IMAGE */
 
 ----------
 
 #### MSG_META_LARGE_PTR
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_PTR(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_PTR(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3769,9 +3769,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_START_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_START_SELECT(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_START_SELECT(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3779,9 +3779,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_END_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_END_SELECT(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_END_SELECT(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3789,9 +3789,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_START_MOVE_COPY
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_START_MOVE_COPY(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_START_MOVE_COPY(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3799,9 +3799,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_END_MOVE_COPY
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_END_MOVE_COPY(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_END_MOVE_COPY(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3809,9 +3809,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_START_FEATURES
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_START_FEATURES(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_START_FEATURES(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3819,9 +3819,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_END_FEATURES
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_END_FEATURES(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_END_FEATURES(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3829,9 +3829,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_START_OTHER
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_START_OTHER(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_START_OTHER(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3839,9 +3839,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_END_OTHER
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_END_OTHER(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_END_OTHER(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3849,9 +3849,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_DRAG_SELECT
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_SELECT(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_SELECT(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3859,9 +3859,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_DRAG_MOVE_COPY
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_MOVE_COPY(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_MOVE_COPY(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3869,9 +3869,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_DRAG_FEATURES
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_FEATURES(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_FEATURES(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 See below for information about this and other large mouse messages.
 
@@ -3879,9 +3879,9 @@ See below for information about this and other large mouse messages.
 
 #### MSG_META_LARGE_DRAG_OTHER
 
-	@importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_OTHER(
-		MouseReturnParams 	*retVal,
-		LargeMouseData 		*largeMouseDataStruct);
+    @importMessage MetaUIMessages, void MSG_META_LARGE_DRAG_OTHER(
+        MouseReturnParams   *retVal,
+        LargeMouseData      *largeMouseDataStruct);
 
 Objects which have been set up with 32-bit coordinate spaces must be 
 prepared to handle large mouse events along with regular mouse events.
@@ -3900,25 +3900,25 @@ format, as generated by GenView.
 
 **Structures:**
 
-	typedef struct {
-		PointDWFixed 		LMD_location;
-		byte 				LMD_buttonInfo;
-		UIFunctionsActive 	LMD_uiFunctionsActive;
-	} LargeMouseData;
-	typedef struct {
-		word 				unused;
-		MouseReturnFlags 	flags;
-		optr 				ptrImage;
-		/* Pointer image to use, if MRF_SET_PTR_IMAGE
-		 * returned */
-	} MouseReturnParams;
+    typedef struct {
+        PointDWFixed        LMD_location;
+        byte                LMD_buttonInfo;
+        UIFunctionsActive   LMD_uiFunctionsActive;
+    } LargeMouseData;
+    typedef struct {
+        word                unused;
+        MouseReturnFlags    flags;
+        optr                ptrImage;
+        /* Pointer image to use, if MRF_SET_PTR_IMAGE
+         * returned */
+    } MouseReturnParams;
 
 ----------
 
 #### MSG_META_ENSURE_MOUSE_NOT_ACTIVELY_TRESPASSING
 
-	@importMessage MetaUIMessages, 
-		MouseReturnFlags MSG_META_ENSURE_MOUSE_NOT_ACTIVELY_TRESPASSING();
+    @importMessage MetaUIMessages, 
+        MouseReturnFlags MSG_META_ENSURE_MOUSE_NOT_ACTIVELY_TRESPASSING();
 
 Sent to the passive, active, or implied mouse grab chain whenever modality 
 status changes within the system - any object receiving this message which 
@@ -3940,8 +3940,8 @@ and return a flag indicating the result.
 
 #### MSG_META_ENSURE_NO_MENUS_IN_STAY_UP_MODE
 
-	@importMessage MetaUIMessages, 
-	MouseReturnFlags MSG_META_ENSURE_NO_MENUS_IN_STAY_UP_MODE();
+    @importMessage MetaUIMessages, 
+    MouseReturnFlags MSG_META_ENSURE_NO_MENUS_IN_STAY_UP_MODE();
 
 Sent to the passive, active/implied mouse grab chain whenever we want to 
 make sure all of an application's menus are closed. Sent directly to the Flow 
@@ -3956,7 +3956,7 @@ which are in stay-up mode should dismiss themselves.
 
 #### MSG_META_ENSURE_ACTIVE_FT
 
-	@importMessage MetaUIMessages, void MSG_META_ENSURE_ACTIVE_FT();
+    @importMessage MetaUIMessages, void MSG_META_ENSURE_ACTIVE_FT();
 
 Makes sure that some object with the Focus/Target node to which this 
 message may be sent has the Focus and Target exclusives. Called from 
@@ -3972,18 +3972,18 @@ window, to give the Focus and/or Target to the next best location.
 Typical click-to-type model is implemented using the following rules:
 For Target, the priority order is:
 
-1	Anything already having the exclusive.  
-2	Top targetable PRIO_STD priority level window.  
-3	Top targetable PRIO_COMMAND priority level window. 
+1   Anything already having the exclusive.  
+2   Top targetable PRIO_STD priority level window.  
+3   Top targetable PRIO_COMMAND priority level window. 
 
 For Focus, priority goes to:
 
-1	Anything already having the exclusive.  
-2	Top system modal window.  
-3	Top application modal window.  
-4	Last non-modal window to have or request the exclusive.  
-5	Window having Target exclusive.  
-6	Top focusable PRIO_COMMAND priority level window.
+1   Anything already having the exclusive.  
+2   Top system modal window.  
+3   Top application modal window.  
+4   Last non-modal window to have or request the exclusive.  
+5   Window having Target exclusive.  
+6   Top focusable PRIO_COMMAND priority level window.
 
 **Source:** Most always internally from the UI, though is unrestricted.
 
@@ -4002,8 +4002,8 @@ UI, results could be unpredictable.
 
 #### MSG_META_NOTIFY_NO_FOCUS_WITHIN_NODE
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_NOTIFY_NO_FOCUS_WITHIN_NODE();
+    @importMessage MetaUIMessages, 
+        void MSG_META_NOTIFY_NO_FOCUS_WITHIN_NODE();
 
 Notification from Focus node MSG_META_ENSURE_ACTIVE_FT handler that 
 it was unable to keep/find an object below it suitable for being the focus. The 
@@ -4031,10 +4031,10 @@ has exited, so it's time to shut down.
 
 #### MSG_META_UI_FORCE_CONTROLLER_UPDATE
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_UI_FORCE_CONTROLLER_UPDATE(
-			ManufacturerID	manufID,
-			word			changeID);
+    @importMessage MetaUIMessages, 
+        void MSG_META_UI_FORCE_CONTROLLER_UPDATE(
+            ManufacturerID  manufID,
+            word            changeID);
 
 This message forces an object to update one or all of the GCN notification lists 
 that it communicates with.
@@ -4058,15 +4058,15 @@ message.
 
 #### MSG_META_GEN_PATH_RESTORE_DISK_PROMPT
 
-	@importMessage MetaUIMessages, 
-		Boolean MSG_META_GEN_PATH_RESTORE_DISK_PROMPT(
-			DiskRestoreError			*error,
-			GenPathDiskRestoreArgs		*args);
+    @importMessage MetaUIMessages, 
+        Boolean MSG_META_GEN_PATH_RESTORE_DISK_PROMPT(
+            DiskRestoreError            *error,
+            GenPathDiskRestoreArgs      *args);
 
 This message prompts the user to insert a particular disk into a particular 
 drive when restoring a disk handle for the object's path.
 
-**Source:**	Sent by the callback passed to **DiskRestore()** when a disk handle 
+**Source:** Sent by the callback passed to **DiskRestore()** when a disk handle 
 saved in an object's path is being restored after a shutdown.
 
 **Destination:** Any object possessing a path.
@@ -4079,13 +4079,13 @@ be returned to **DiskRestore()**.
 
 **Structures:**
 
-	typedef struct {
-		word				GPDRA_pathType;
-		word				GPDRA_savedDiskType;
-		char				*GPDRA_driveName;
-		char				*GPDRA_diskName;
-		DiskRestoreError	GPDRA_errorCode;
-	} GenPathDiskRestoreArgs;
+    typedef struct {
+        word                GPDRA_pathType;
+        word                GPDRA_savedDiskType;
+        char                *GPDRA_driveName;
+        char                *GPDRA_diskName;
+        DiskRestoreError    GPDRA_errorCode;
+    } GenPathDiskRestoreArgs;
 
 *GPDRA_pathType* stores the vardata tag holding the path.
 
@@ -4104,8 +4104,8 @@ intercepted, it should not call its superclass.
 
 #### MSG_META_PAGED_OBJECT_GOTO_PAGE
 
-	@importMessage MetaUIMessages, void MSG_META_PAGED_OBJECT_GOTO_PAGE(
-		word	page);
+    @importMessage MetaUIMessages, void MSG_META_PAGED_OBJECT_GOTO_PAGE(
+        word    page);
 
 This message instructs a GenDocument to go to the passed page.
 
@@ -4125,7 +4125,7 @@ GenApplication's subclassed GenDocument object.
 
 #### MSG_META_PAGED_OBJECT_NEXT_PAGE
 
-	@importMessage MetaUIMessages, void MSG_META_PAGED_OBJECT_NEXT_PAGE();
+    @importMessage MetaUIMessages, void MSG_META_PAGED_OBJECT_NEXT_PAGE();
 
 This message instructs a GenDocument to go to the next page.
 
@@ -4142,8 +4142,8 @@ GenApplication's subclassed GenDocument object.
 
 #### MSG_META_PAGED_OBJECT_PREVIOUS_PAGE
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_PAGED_OBJECT_PREVIOUS_PAGE();
+    @importMessage MetaUIMessages, 
+        void MSG_META_PAGED_OBJECT_PREVIOUS_PAGE();
 
 This message instructs a GenDocument to go to the previous page.
 
@@ -4160,9 +4160,9 @@ GenApplication's subclassed GenDocument object.
 
 #### MSG_META_DELETE_RANGE_OF_CHARS
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_DELETE_RANGE_OF_CHARS(@stack
-			VisTextRange		rangeToDelete);
+    @importMessage MetaUIMessages, 
+        void MSG_META_DELETE_RANGE_OF_CHARS(@stack
+            VisTextRange        rangeToDelete);
 
 This message instructs an object to delete a range of characters passed in a 
 **VisTextRange**. Generally, this message is sent out when the user crosses 
@@ -4183,7 +4183,7 @@ interpret this value.
 
 #### MSG_META_NOTIFY_TASK_SELECTED
 
-	@importMessage MetaUIMessages, void MSG_META_NOTIFY_TASK_SELECTED();
+    @importMessage MetaUIMessages, void MSG_META_NOTIFY_TASK_SELECTED();
 
 This message is sent when a task list item of an application in the Express 
 Menu is selected. The default behavior brings the application to the front and 
@@ -4193,9 +4193,9 @@ gives it the focus.
 
 #### MSG_META_FIELD_NOTIFY_DETACH
 
-	@importMessage MetaUIMessages, void MSG_META_FIELD_NOTIFY_DETACH(
-		optr		field,
-		word		shutdownFlag);
+    @importMessage MetaUIMessages, void MSG_META_FIELD_NOTIFY_DETACH(
+        optr        field,
+        word        shutdownFlag);
 
 This message is sent by the GenField object when it is detaching.
 
@@ -4216,9 +4216,9 @@ notification only, you should not call the superclass.
 
 #### MSG_META_FIELD_NOTIFY_NO_FOCUS
 
-	@importMessage MetaUIMessages, void MSG_META_FIELD_NOTIFY_NO_FOCUS(
-		optr		field,
-		word		shutdownFlag);
+    @importMessage MetaUIMessages, void MSG_META_FIELD_NOTIFY_NO_FOCUS(
+        optr        field,
+        word        shutdownFlag);
 
 This message is sent by the GenField when it no longer has any applications 
 in the focus hierarchy.
@@ -4240,9 +4240,9 @@ notification only, you should not call the superclass.
 
 #### MSG_META_FIELD_NOTIFY_START_LAUNCHER_ERROR
 
-	@importMessage MetaUIMessages, 
-		void MSG_META_FIELD_NOTIFY_START_LAUNCHER_ERROR(
-			optr		field);
+    @importMessage MetaUIMessages, 
+        void MSG_META_FIELD_NOTIFY_START_LAUNCHER_ERROR(
+            optr        field);
 
 This message is sent by the GenField when an error occurs while attempting 
 to run the launcher for the field object.
@@ -4261,15 +4261,15 @@ notification only, you should not call the superclass.
 
 #### MSG_META_TEST_WIN_INTERACTIBILITY
 
-	@importMessage MetaUIMessages, 
-		Boolean MSG_META_TEST_WIN_INTERACTIBILITY(
-			optr			inputOD,
-			WindowHandle	window);
+    @importMessage MetaUIMessages, 
+        Boolean MSG_META_TEST_WIN_INTERACTIBILITY(
+            optr            inputOD,
+            WindowHandle    window);
 
 This message checks whether a pointing device (usually a mouse) can 
 interact with the passed window.
 
-**Source:**	
+**Source:** 
 
 **Destination:** A windowed object.
 
@@ -4284,9 +4284,9 @@ interact with the passed window.
 
 #### MSG_META_CHECK_IF_INTERACTIBLE_OBJECT
 
-	@importMessage MetaUIMessages, 
-		Boolean MSG_META_CHECK_IF_INTERACTIBLE_OBJECT(
-			optr	obj);
+    @importMessage MetaUIMessages, 
+        Boolean MSG_META_CHECK_IF_INTERACTIBLE_OBJECT(
+            optr    obj);
 
 This message is sent to objects on the 
 GAGCNLT_ALWAYS_INTERACTABLE_WINDOWS GCN list. 
@@ -4312,8 +4312,8 @@ appropriate GCN lists may receive and handle.
 
 #### MSG_NOTIFY_FILE_CHANGE
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_FILE_CHANGE(
-			MemHandle 		data);
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_FILE_CHANGE(
+            MemHandle       data);
 
 This notification is sent out whenever the file system changes in any way.
 
@@ -4328,26 +4328,26 @@ This notification is sent out whenever the file system changes in any way.
 
 **Structures:**
 
-	typedef struct {
-		PathName			FCND_pathname;
-		DiskHandle			FCND_diskHandle;
-		FileChangeType		FCND_changeType;
-	} FileChangeNotificationData;
-	typedef ByteEnum FileChangeType;
-	/* These flags may be combined using | and &:
-		FCT_CREATE
-		FCT_DELETE
-		FCT_RENAME
-		FCT_CONTENTS
-	FCT_DISK_FORMAT */
+    typedef struct {
+        PathName            FCND_pathname;
+        DiskHandle          FCND_diskHandle;
+        FileChangeType      FCND_changeType;
+    } FileChangeNotificationData;
+    typedef ByteEnum FileChangeType;
+    /* These flags may be combined using | and &:
+        FCT_CREATE
+        FCT_DELETE
+        FCT_RENAME
+        FCT_CONTENTS
+    FCT_DISK_FORMAT */
 
 ----------
 
 #### MSG_NOTIFY_DRIVE_CHANGE
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_DRIVE_CHANGE(
-		GCNDriveChangeNotificationType 		type,
-		word 								driveNum);
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_DRIVE_CHANGE(
+        GCNDriveChangeNotificationType      type,
+        word                                driveNum);
 
 This is sent to notify various system utilities that a drive has been created or 
 destroyed or has changed ownership from one installable file system driver 
@@ -4376,7 +4376,7 @@ It is intended for system objects, such as the GenFileSelector.
 
 #### MSG_NOTIFY_APP_STARTED
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_APP_STARTED();
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_APP_STARTED();
 
 This message is sent out when an application attaches to the UI.
 
@@ -4392,7 +4392,7 @@ This message is sent out when an application attaches to the UI.
 
 #### MSG_NOTIFY_APP_EXITED
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_APP_EXITED();
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_APP_EXITED();
 
 This message is sent out when an application thread exits.
 
@@ -4408,7 +4408,7 @@ This message is sent out when an application thread exits.
 
 #### MSG_NOTIFY_DATE_TIME_CHANGE
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_DATE_TIME_CHANGE();
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_DATE_TIME_CHANGE();
 
 This message is sent out when the date or time changes - whenever the 
 system comes back or the system time is altered (e.g. by the User in 
@@ -4426,9 +4426,9 @@ Preferences).
 
 #### MSG_NOTIFY_USER_DICT_CHANGE
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_USER_DICT_CHANGE(
-			MemHandle 		sendingSpellBox,
-			MemHandle 		userDictChanged);
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_USER_DICT_CHANGE(
+            MemHandle       sendingSpellBox,
+            MemHandle       userDictChanged);
 
 This message is sent out when an application attaches to the UI.
 
@@ -4447,8 +4447,8 @@ This message is sent out when an application attaches to the UI.
 
 #### MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE
 
-	@importMessage MetaGCNMessages, 
-			void MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE();
+    @importMessage MetaGCNMessages, 
+            void MSG_NOTIFY_KEYBOARD_LAYOUT_CHANGE();
 
 This message is sent out when the keyboard layout is changing. Usually this 
 involves a change in status of the floating keyboard. When passing this event 
@@ -4469,9 +4469,9 @@ message.)
 
 #### MSG_NOTIFY_EXPRESS_MENU_CHANGE
 
-	@importMessage MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
-			GCNExpressMenuNotificationTypes 	type,
-			optr 								affectedField);
+    @importMessage MetaGCNMessages, void MSG_NOTIFY_EXPRESS_MENU_CHANGE(
+            GCNExpressMenuNotificationTypes     type,
+            optr                                affectedField);
 
 This message is sent to notify various system utilities that an express menu 
 has been created or destroyed. The recipient receives the optr of the field to 
@@ -4494,19 +4494,19 @@ be the optr of the express menu itself.)
 
 **Return:** Nothing.
 
-**Structures:**	
+**Structures:** 
 
-	typedef enum {
-		GCNEMNT_CREATED,
-		GCNEMNT_DESTROYED
-	} GCNExpressMenuNotificationTypes;
+    typedef enum {
+        GCNEMNT_CREATED,
+        GCNEMNT_DESTROYED
+    } GCNExpressMenuNotificationTypes;
 
 ----------
 
 #### MSG_PRINTER_INSTALLED_REMOVED
 
-	@importMessage MetaGCNMessages, 
-			void MSG_PRINTER_INSTALLED_REMOVED();
+    @importMessage MetaGCNMessages, 
+            void MSG_PRINTER_INSTALLED_REMOVED();
 
 This message is sent whenever a printer is installed or removed. The 
 recipient of this message might call **SpoolGetNumPrinters()** to determine 
@@ -4524,8 +4524,8 @@ if any printers or fax machines are currently installed.
 
 #### MSG_META_CONFIRM_SHUTDOWN
 
-	@importMessage MetaGCNMessages, void MSG_META_CONFIRM_SHUTDOWN(
-			GCNShutdownControlType 		type);
+    @importMessage MetaGCNMessages, void MSG_META_CONFIRM_SHUTDOWN(
+            GCNShutdownControlType      type);
 
 This message is sent out when the system is about to shut down.
 
@@ -4563,10 +4563,10 @@ Concepts Book.
 
 #### MSG_META_IACP_PROCESS_MESSAGE
 
-	@importMessage MetaIACPMessages, void MSG_META_IACP_PROCESS_MESSAGE(
-			EventHandle		msgToSend,
-			TravelOption	topt,
-			EventHandle		completionMsg);
+    @importMessage MetaIACPMessages, void MSG_META_IACP_PROCESS_MESSAGE(
+            EventHandle     msgToSend,
+            TravelOption    topt,
+            EventHandle     completionMsg);
 
 This message dispatches an IACP message to its proper destination, sending 
 a completion message back when that has finished.
@@ -4597,10 +4597,10 @@ to call **IACPProcessMessage()**.
 
 #### MSG_META_IACP_NEW_CONNECTION
 
-	@importMessage MetaIACPMessages, void MSG_META_IACP_NEW_CONNECTION(
-			MemHandle			appLaunchBlock,
-			Boolean				justLaunched,
-			IACPConnection		connection);
+    @importMessage MetaIACPMessages, void MSG_META_IACP_NEW_CONNECTION(
+            MemHandle           appLaunchBlock,
+            Boolean             justLaunched,
+            IACPConnection      connection);
 
 This message informs servers that a new client has connected to the server.
 
@@ -4626,14 +4626,14 @@ intercept this message, no harm is done.
 
 #### MSG_META_IACP_LOST_CONNECTION
 
-	@importMessage MetaIACPMessages, void MSG_META_IACP_LOST_CONNECTION(
-			IACPConnection		connection,
-			word				serverNum);
+    @importMessage MetaIACPMessages, void MSG_META_IACP_LOST_CONNECTION(
+            IACPConnection      connection,
+            word                serverNum);
 
 This message informs a server (or client) that one of its clients (or servers) 
 has shut down.
 
-**Source:**	**IACPShutdown()**.
+**Source:** **IACPShutdown()**.
 
 **Destination:** Any object registered as an IACP server, or the GenApplication object 
 of a geode who is a client of such.
@@ -4654,9 +4654,9 @@ that connections don't linger after a client has shut down its end.
 
 #### MSG_META_IACP_SHUTDOWN_CONNECTION
 
-	@importMessage MetaIACPMessages, 
-			void MSG_META_IACP_SHUTDOWN_CONNECTION(
-				IACPConnection		connection);
+    @importMessage MetaIACPMessages, 
+            void MSG_META_IACP_SHUTDOWN_CONNECTION(
+                IACPConnection      connection);
 
 This message shuts down the appropriate side of the indicated connection.
 
@@ -4675,8 +4675,8 @@ default handling of this message.
 
 #### MSG_META_IACP_DOC_OPEN_ACK
 
-	@importMessage MetaIACPMessages, void MSG_META_IACP_DOC_OPEN_ACK(
-			IACPDocOpenAckParams		*params);
+    @importMessage MetaIACPMessages, void MSG_META_IACP_DOC_OPEN_ACK(
+            IACPDocOpenAckParams        *params);
 
 This message is sent when a document has been opened; the document must 
 have previously been passed in the **AppLaunchBlock** when the IACP 
@@ -4696,11 +4696,11 @@ structure.
 
 **Structures:**
 
-	typedef struct {
-		optr				IDOAP_docObj;
-		IACPConnection		IDOAP_connection;
-		word				IDOAP_serverNum;
-	} IACPDocOpenAckParams;
+    typedef struct {
+        optr                IDOAP_docObj;
+        IACPConnection      IDOAP_connection;
+        word                IDOAP_serverNum;
+    } IACPDocOpenAckParams;
 
 *IDOAP_docObj* stores the optr of the document object managing the 
 document.
@@ -4719,8 +4719,8 @@ provide custom behavior.
 
 #### MSG_META_IACP_DOC_CLOSE_ACK
 
-	@importMessage MetaIACPMessages, void MSG_META_IACP_DOC_CLOSE_ACK(
-			IACPDocCloseAckParams		*params);
+    @importMessage MetaIACPMessages, void MSG_META_IACP_DOC_CLOSE_ACK(
+            IACPDocCloseAckParams       *params);
 
 This message acts as the acknowledgment sent by a GenDocument object 
 after it successfully processes MSG_GEN_DOCUMENT_CLOSE. Documents 
@@ -4736,14 +4736,14 @@ message to revert the document.
 *params* - Pointer to a **IACPDocCloseAckParams** 
 structure.
 
-**Structures:**	
+**Structures:** 
 
-	typedef struct {
-		optr				IDCAP_docObj;
-		IACPConnection		IDCAP_connection;
-		word				IDCAP_serverNum;
-		word				IDCAP_status;
-	} IACPDocCloseAckParams;
+    typedef struct {
+        optr                IDCAP_docObj;
+        IACPConnection      IDCAP_connection;
+        word                IDCAP_serverNum;
+        word                IDCAP_status;
+    } IACPDocCloseAckParams;
 
 *IDCAP_docObj* stores the optr of the document object that was managing the 
 document.
@@ -4779,9 +4779,9 @@ by it are listed below:
 
 #### MSG_PROCESS_NOTIFY_PROCESS_EXIT
 
-	void	MSG_PROCESS_NOTIFY_PROCESS_EXIT(
-			GeodeHandle 		exitProcess,
-			word				exitCode);
+    void    MSG_PROCESS_NOTIFY_PROCESS_EXIT(
+            GeodeHandle         exitProcess,
+            word                exitCode);
 
 This is sent to a Process object when one of its child processes exits. Many 
 types of processes do not need to know when a child process exists; these 
@@ -4799,15 +4799,15 @@ handling of it. May be intercepted as desired.
 
 *exitCode* - Exit code. May be an error code.
 
-**Return:**	Nothing.
+**Return:** Nothing.
 
 ----------
 
 #### MSG_PROCESS_NOTIFY_THREAD_EXIT
 
-	void	MSG_PROCESS_NOTIFY_THREAD_EXIT(
-			ThreadHandle		exitProcess,
-			word				exitCode);
+    void    MSG_PROCESS_NOTIFY_THREAD_EXIT(
+            ThreadHandle        exitProcess,
+            word                exitCode);
 
 This message is sent to a Process object when a thread owned by it (via the 
 **ThreadCreate()** routine) exits.
@@ -4824,14 +4824,14 @@ handling of it). May be intercepted as desired.
 
 *exitCode* - Exit code (may be an error code).
 
-**Return:**	Nothing.
+**Return:** Nothing.
 
 ----------
 
 #### MSG_PROCESS_MEM_FULL
 
-	void	MSG_PROCESS_MEM_FULL(
-			word 	type);
+    void    MSG_PROCESS_MEM_FULL(
+            word    type);
 
 This message is sent to a Process object by the memory manager when the 
 heap is getting full. A Process object receiving this message should try to free 
@@ -4853,27 +4853,27 @@ performance reasons could be freed or reduced in number.
 
 **Structures:**
 
-	typedef enum {
-		/* HC_SCRUBBING: 
-		 * Heap is being scrubbed. */
-		HC_SCRUBBING,
-		/* HC_CONGESTED:
-		 * Scrubber couldn't free a satisfactory 
-		 * amount of memory. */
-		HC_CONGESTED,
-		/* HC_DESPERATE:
-		 * Heap is perilously close to overflowing. */
-		HC_DESPERATE
-	} HeapCongestion;
+    typedef enum {
+        /* HC_SCRUBBING: 
+         * Heap is being scrubbed. */
+        HC_SCRUBBING,
+        /* HC_CONGESTED:
+         * Scrubber couldn't free a satisfactory 
+         * amount of memory. */
+        HC_CONGESTED,
+        /* HC_DESPERATE:
+         * Heap is perilously close to overflowing. */
+        HC_DESPERATE
+    } HeapCongestion;
 
 ----------
 
 #### MSG_PROCESS_CREATE_UI_THREAD
 
-	Boolean		MSG_PROCESS_CREATE_UI_THREAD(
-				ThreadHandle		*newThread,
-				ClassStruct 		*class,
-				word 				stackSize);
+    Boolean     MSG_PROCESS_CREATE_UI_THREAD(
+                ThreadHandle        *newThread,
+                ClassStruct         *class,
+                word                stackSize);
 
 This is a low-level utility message requesting that the process create the UI 
 thread for an application. Does nothing more than 
@@ -4909,10 +4909,10 @@ reasonable).
 
 #### MSG_PROCESS_CREATE_EVENT_THREAD
 
-	Boolean		MSG_PROCESS_CREATE_EVENT_THREAD(
-				ThreadHandle		*newThread
-				ClassStruct 		*class,
-				word				stackSize);
+    Boolean     MSG_PROCESS_CREATE_EVENT_THREAD(
+                ThreadHandle        *newThread
+                ClassStruct         *class,
+                word                stackSize);
 
 This message is a utility that creates a new event-driven thread owned by the 
 recipient Process object. Typically, a Process object will send this message to 
@@ -4974,11 +4974,11 @@ below), see "GEOS Programming," Chapter 5 of the Concepts Book.
 Many of the following messages need AppAttachFlags to tell them how the 
 process is attaching:
 
-	typedef WordFlags AppAttachFlags;
-	#define AAF_RESTORING_FROM_STATE		0x8000
-	#define AAF_STATE_FILE_PASSED			0x4000
-	#define AAF_DATA_FILE_PASSED			0x2000
-	#define AAF_RESTORING_FROM_QUIT			0x1000
+    typedef WordFlags AppAttachFlags;
+    #define AAF_RESTORING_FROM_STATE        0x8000
+    #define AAF_STATE_FILE_PASSED           0x4000
+    #define AAF_DATA_FILE_PASSED            0x2000
+    #define AAF_RESTORING_FROM_QUIT         0x1000
 
 + AAF_RESTORING_FROM_STATE indicates that the application is coming 
 up from a previous state, either by re-launching using a state file, or 
@@ -5008,10 +5008,10 @@ up in whatever state we originally entered engine mode.
 
 #### MSG_GEN_PROCESS_RESTORE_FROM_STATE
 
-	void 	MSG_GEN_PROCESS_RESTORE_FROM_STATE(
-			AppAttachFlags 		attachFlags,
-			MemHandle 			launchBlock,
-			MemHandle 			extraState);
+    void    MSG_GEN_PROCESS_RESTORE_FROM_STATE(
+            AppAttachFlags      attachFlags,
+            MemHandle           launchBlock,
+            MemHandle           extraState);
 
 This message is sent by the User Interface when an application is being 
 loaded from a state file. This is sent to the process itself from 
@@ -5054,10 +5054,10 @@ state files.
 
 #### MSG_GEN_PROCESS_OPEN_APPLICATION
 
-	void	MSG_GEN_PROCESS_OPEN_APPLICATION(
-		AppAttachFlags		attachFlags,
-		MemHandle			launchBlock,
-		MemHandle 			extraState);
+    void    MSG_GEN_PROCESS_OPEN_APPLICATION(
+        AppAttachFlags      attachFlags,
+        MemHandle           launchBlock,
+        MemHandle           extraState);
 
 This message is sent by the User Interface when an application is being 
 loaded from its resource blocks. Applications will often intercept this 
@@ -5111,7 +5111,7 @@ extra state block.
 
 #### MSG_GEN_PROCESS_CLOSE_APPLICATION
 
-	MemHandle MSG_GEN_PROCESS_CLOSE_APPLICATION();
+    MemHandle MSG_GEN_PROCESS_CLOSE_APPLICATION();
 
 This message is sent by the User Interface whenever the application is being 
 shut down (during a detach) and it had been launched in application (as 
@@ -5134,9 +5134,9 @@ that block.
 
 #### MSG_GEN_PROCESS_OPEN_ENGINE
 
-	void 	MSG_GEN_PROCESS_OPEN_ENGINE(
-			AppAttachFlags 		attachFlags,
-			MemHandle 			launchBlock);
+    void    MSG_GEN_PROCESS_OPEN_ENGINE(
+            AppAttachFlags      attachFlags,
+            MemHandle           launchBlock);
 
 This is sent to the process itself from MSG_META_ATTACH, whenever the 
 application is being restored to engine mode, or whenever it is being invoked 
@@ -5167,7 +5167,7 @@ passed into the application on invocation.
 
 #### MSG_GEN_PROCESS_CLOSE_ENGINE
 
-	void 	MSG_GEN_PROCESS_CLOSE_ENGINE();
+    void    MSG_GEN_PROCESS_CLOSE_ENGINE();
 
 This message is sent by the User Interface whenever the application is being 
 shut down (during a detach) and it had been launched in "engine" mode.
@@ -5183,7 +5183,7 @@ application exits, for engine mode cases. Superclass must be called.
 
 #### MSG_GEN_PROCESS_CLOSE_CUSTOM
 
-	MemHandle MSG_GEN_PROCESS_CLOSE_CUSTOM();
+    MemHandle MSG_GEN_PROCESS_CLOSE_CUSTOM();
 
 This message is sent by the User Interface whenever the application is being 
 shut down (during a detach) and it had been launched in some custom mode 
@@ -5204,9 +5204,9 @@ application exits, for custom mode cases. Superclass must be called.
 
 ####MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE
 
-	MemHandle 	MSG_GEN_PROCESS_ATTACH_TO_STATE_FILE(
-				AppAttachFlags		attachFlags,
-				MemHandle			launchBlock);
+    MemHandle   MSG_GEN_PROCESS_ATTACH_TO_STATE_FILE(
+                AppAttachFlags      attachFlags,
+                MemHandle           launchBlock);
 
 This message is sent by the User Interface whenever the application is being 
 attached to a state file. This message is sent when either restoring from state 
@@ -5225,14 +5225,14 @@ the name of the state file to use before calling superclass).
 
 *launchBlock* - Block of structure **AppLaunchBlock**.
 
-**Return:**	Handle of extra block of state data (zero for none).
+**Return:** Handle of extra block of state data (zero for none).
 
 ----------
 
 #### MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
 
-	word	MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE(
-			MemHandle appInstanceReference);
+    word    MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE(
+            MemHandle appInstanceReference);
 
 This replaces MSG_GEN_PROCESS_ATTACHED_TO_PASSED_STATE_FILE if 
 no state file had been specified in that message. This message's default 
@@ -5256,9 +5256,9 @@ quitting.
 
 #### MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE
 
-	void 	MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE(
-			MemHandle 		extraState,
-			word 			appStates);
+    void    MSG_GEN_PROCESS_DETACH_FROM_STATE_FILE(
+            MemHandle       extraState,
+            word            appStates);
 
 This message is sent by the User Interface when the application is detaching 
 or quitting (may or may not be attached to a state file) and the detach is 
@@ -5288,7 +5288,7 @@ the application state.
 
 #### MSG_GEN_PROCESS_INSTALL_TOKEN
 
-	void 	MSG_GEN_PROCESS_INSTALL_TOKEN();
+    void    MSG_GEN_PROCESS_INSTALL_TOKEN();
 
 This message is sent by the desktop to a process to get that process to install 
 its token and moniker lists into the token database.
@@ -5309,7 +5309,7 @@ installs only application icon.
 
 #### MSG_GEN_PROCESS_GET_PARENT_FIELD
 
-	optr 	MSG_GEN_PROCESS_GET_PARENT_FIELD();
+    optr    MSG_GEN_PROCESS_GET_PARENT_FIELD();
 
 This message is sent by process-libraries (such as the Spool Object Library) 
 to find out which field object is its parent. This message will return the field 
@@ -5329,12 +5329,12 @@ of the first client of the library.
 
 #### MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST
 
-	void	MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(@stack
-			word				sendFlags,
-			EventHandle 		event,
-			MemHandle 			block,
-			word				manufListType,
-			ManufacturerID 		manufID);
+    void    MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(@stack
+            word                sendFlags,
+            EventHandle         event,
+            MemHandle           block,
+            word                manufListType,
+            ManufacturerID      manufID);
 
 This message sends the specified event to all the objects registered with the 
 passed GCN list. This message should be subclassed by UI Controller objects.
@@ -5405,11 +5405,11 @@ actions to be undone in reverse order. Each element in an undo chain is made
 up of an **UndoActionStruct**. These structures are usually added with an 
 **AddUndoActionStruct**. This structure has several elements:
 
-	typedef struct {
-		UndoActionStruct		AUAS_data;
-		optr					AUAS_output;
-		AddUndoActionFlags		AUAS_flags;
-	} AddUndoActionStruct
+    typedef struct {
+        UndoActionStruct        AUAS_data;
+        optr                    AUAS_output;
+        AddUndoActionFlags      AUAS_flags;
+    } AddUndoActionStruct
 
 A chain of undo actions is stored for each object. If you want your object to 
 recognize undo-able actions, you must add the undo actions yourself and 
@@ -5449,9 +5449,9 @@ can avoid creating unnecessary undo information.
 
 #### MSG_GEN_PROCESS_UNDO_START_CHAIN
 
-	void 	MSG_GEN_PROCESS_UNDO_START_CHAIN(@stack
-			optr 	title,
-			optr 	owner);
+    void    MSG_GEN_PROCESS_UNDO_START_CHAIN(@stack
+            optr    title,
+            optr    owner);
 
 This message notifies the process of the start of an undo-able action. Note 
 that all this message does is increment a count - a new undo chain is created 
@@ -5478,8 +5478,8 @@ passed with the next UNDO_START_CHAIN.
 
 #### MSG_GEN_PROCESS_UNDO_END_CHAIN
 
-	void 	MSG_GEN_PROCESS_UNDO_END_CHAIN(
-			BooleanWord 	flushChainIfEmpty);
+    void    MSG_GEN_PROCESS_UNDO_END_CHAIN(
+            BooleanWord     flushChainIfEmpty);
 
 This message notifies the process of the end of an undo-able action. Note that 
 all this message does is decrement a count - the current undo chain is 
@@ -5502,7 +5502,7 @@ actions; zero if the chain is OK without actions
 
 #### MSG_GEN_PROCESS_UNDO_ABORT_CHAIN
 
-	void	MSG_GEN_PROCESS_UNDO_ABORT_CHAIN();
+    void    MSG_GEN_PROCESS_UNDO_ABORT_CHAIN();
 
 This message aborts the current undo chain, destroying all actions in place 
 on the current chain, and instructs the undo mechanism to ignore any undo 
@@ -5520,8 +5520,8 @@ must ignore undo chain actions until the outermost chain is ended.
 
 #### MSG_GEN_PROCESS_UNDO_ADD_ACTION
 
-	VMChain 	MSG_GEN_PROCESS_UNDO_ADD_ACTION(
-				AddUndoActionStruct 	*data);
+    VMChain     MSG_GEN_PROCESS_UNDO_ADD_ACTION(
+                AddUndoActionStruct     *data);
 
 This message adds a new undo action to the current undo chain.
 
@@ -5545,7 +5545,7 @@ value is meaningless.
 
 #### MSG_GEN_PROCESS_UNDO_GET_FILE
 
-	VMFileHandle MSG_GEN_PROCESS_UNDO_GET_FILE();
+    VMFileHandle MSG_GEN_PROCESS_UNDO_GET_FILE();
 
 This message returns a VM file handle to store undo actions. This message is 
 useful to access undo data in either a huge array or DB item. You may also 
@@ -5563,7 +5563,7 @@ use **GenProcessUndoGetFile()** to retrieve this file instead.
 
 #### MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS
 
-	void 	MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();
+    void    MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();
 
 This message flushes the current undo chain (frees all undo actions, notifies 
 edit control that there is no undo item).
@@ -5580,8 +5580,8 @@ edit control that there is no undo item).
 
 #### MSG_GEN_PROCESS_UNDO_SET_CONTEXT
 
-	dword 	MSG_GEN_PROCESS_UNDO_SET_CONTEXT(
-			dword 	context);
+    dword   MSG_GEN_PROCESS_UNDO_SET_CONTEXT(
+            dword   context);
 
 This message sets the current undo context. This allows the application to 
 have separate undo chains associated with various documents or modes. This 
@@ -5602,17 +5602,17 @@ as they will probably not be valid in the new context.
 *context* - New context (this has no meaning to the undo 
 mechanism - it's just a value).
 
-**Return:**	Old context.
+**Return:** Old context.
 
 **Structures:**
 
-	#define NULL_UNDO_CONTEXT 0
+    #define NULL_UNDO_CONTEXT 0
 
 ----------
 
 #### MSG_GEN_PROCESS_UNDO_GET_CONTEXT
 
-	dword 	MSG_GEN_PROCESS_UNDO_GET_CONTEXT();
+    dword   MSG_GEN_PROCESS_UNDO_GET_CONTEXT();
 
 This message gets the current undo context.
 
@@ -5628,7 +5628,7 @@ This message gets the current undo context.
 
 #### MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN
 
-	void 	MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN();
+    void    MSG_GEN_PROCESS_UNDO_PLAYBACK_CHAIN();
 
 This message plays back the current undo chain, one action at a time. It 
 simultaneously creates a "redo" chain, so the undone action can be redone.
@@ -5645,8 +5645,8 @@ simultaneously creates a "redo" chain, so the undone action can be redone.
 
 #### MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS
 
-	void 	MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(
-			Boolean		flushActions);
+    void    MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(
+            Boolean     flushActions);
 
 This message causes a process to reject any undo messages.
 
@@ -5661,7 +5661,7 @@ This message causes a process to reject any undo messages.
 
 #### MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS
 
-	void 	MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();
+    void    MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();
 
 This message causes a process to accept undo messages again.
 
@@ -5673,7 +5673,7 @@ This message causes a process to accept undo messages again.
 
 #### MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING
 
-	Boolean 	MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING();
+    Boolean     MSG_GEN_PROCESS_UNDO_CHECK_IF_IGNORING();
 
 This message checks to see if the system is currently ignoring undo actions.
 

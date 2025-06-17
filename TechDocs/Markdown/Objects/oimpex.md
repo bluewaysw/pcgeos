@@ -160,7 +160,7 @@ Impex objects. Applications which use the Impex objects will have to be
 familiar with them.
 
 #### 16.2.1.1 Metafile Formats
-	ImpexDataClasses
+    ImpexDataClasses
 
 The Impex objects are designed to translate into a few specific formats. These 
 formats are known collectively as the Metafile formats. These formats (except 
@@ -198,7 +198,7 @@ will be allowed to choose translation libraries which translate to or from a
 supported Metafile format.
 
 #### 16.2.1.2 ImpexTranslationParams
-	ImpexTranslationParams
+    ImpexTranslationParams
 
 The Import and Export objects have to pass information to the application 
 and the translation libraries. The same sort of information gets passed in 
@@ -212,16 +212,16 @@ necessary; it then sends a response message, which takes a pointer to the
 same **ImpexTranslationParams**. **ImpexTranslationParams** has the 
 following structure:
 
-	typedef struct {
-		optr				ITP_impexOD;
-		Message				ITP_returnMsg;
-		ImpexDataClasses	ITP_dataClass;
-		VMFileHandle		ITP_transferVMFile;
-		VMBlockHandle		ITP_transferVMChain;
-		dword				ITP_internal;
-		ManufacturerID		ITP_manufacturerID;
-		ClipboardFormat		ITP_clipboardFormat;
-	} ImpexTranslationParams;
+    typedef struct {
+        optr                ITP_impexOD;
+        Message             ITP_returnMsg;
+        ImpexDataClasses    ITP_dataClass;
+        VMFileHandle        ITP_transferVMFile;
+        VMBlockHandle       ITP_transferVMChain;
+        dword               ITP_internal;
+        ManufacturerID      ITP_manufacturerID;
+        ClipboardFormat     ITP_clipboardFormat;
+    } ImpexTranslationParams;
 
 *ITP_impexOD*  
 This field holds the optr of whatever Impex object sent the 
@@ -295,38 +295,38 @@ Code Display 16-1.
 ----------
 **Code Display 16-1 ImportControlClass Instance Data**
 
-	/* ICI_attrs is a word-length record which stores attribute information for the
-	 * ImportControl object. It has only one flag, ICA_IGNORE_INPUT. */
-	@instance ImportControlAttrs	ICI_attrs = 0;
+    /* ICI_attrs is a word-length record which stores attribute information for the
+     * ImportControl object. It has only one flag, ICA_IGNORE_INPUT. */
+    @instance ImportControlAttrs    ICI_attrs = 0;
 
-	/* ICI_dataClasses is a word-length record which indicates what Metafile formats
-	 * are supported by the application. The application must set this field. */
-	@instance ImpexDataClasses		ICI_dataClasses = 0;
+    /* ICI_dataClasses is a word-length record which indicates what Metafile formats
+     * are supported by the application. The application must set this field. */
+    @instance ImpexDataClasses      ICI_dataClasses = 0;
 
-	/* ICI_destination and ICI_message indicate what message should be sent when the
-	 * ImportControl object has finished importing a file. The application must set
-	 * these fields. The message must take a single argument, namely a pointer to an
-	 * ImpexTranslationParams structure in ss:bp (on the stack). */
-	@instance optr					ICI_destination;
-	@instance word					ICI_message;
+    /* ICI_destination and ICI_message indicate what message should be sent when the
+     * ImportControl object has finished importing a file. The application must set
+     * these fields. The message must take a single argument, namely a pointer to an
+     * ImpexTranslationParams structure in ss:bp (on the stack). */
+    @instance optr                  ICI_destination;
+    @instance word                  ICI_message;
 
-	/* Applications may wish to add their own UI objects to the Import dialog box.
-	 * They can do so by defining a generic tree (the top object of which must be not
-	 * "usable"), and putting an optr to the top object in ATTR_IMPORT_CONTROL_APP_UI.
-	 */
-	@vardata optr 					ATTR_IMPORT_CONTROL_APP_UI;
+    /* Applications may wish to add their own UI objects to the Import dialog box.
+     * They can do so by defining a generic tree (the top object of which must be not
+     * "usable"), and putting an optr to the top object in ATTR_IMPORT_CONTROL_APP_UI.
+     */
+    @vardata optr                   ATTR_IMPORT_CONTROL_APP_UI;
 
-	/* Controller features flags */
-	typedef ByteFlags 			ImportControlFeatures;
-	#define IMPORTCF_BASIC		0x01
+    /* Controller features flags */
+    typedef ByteFlags           ImportControlFeatures;
+    #define IMPORTCF_BASIC      0x01
 
-	typedef	ByteFlags 				ImportControlToolboxFeatures;
-	#define IMPORTCTF_DIALOG_BOX	0x01
+    typedef ByteFlags               ImportControlToolboxFeatures;
+    #define IMPORTCTF_DIALOG_BOX    0x01
 
 ----------
 #### 16.2.2.1 ICI_attrs
-	ImportControlAttrs, MSG_IMPORT_CONTROL_GET_ATTRS, 
-	MSG_IMPORT_CONTROL_SET_ATTRS
+    ImportControlAttrs, MSG_IMPORT_CONTROL_GET_ATTRS, 
+    MSG_IMPORT_CONTROL_SET_ATTRS
 
 *ICI_attrs* is a word-length record of type **ImportControlAttrs**. This record 
 contains only one flag:
@@ -342,7 +342,7 @@ field, send MSG_IMPORT_CONTROL_SET_ATTRS to the ImportControl.
 
 ----------
 #### MSG_IMPORT_CONTROL_GET_ATTRS
-	ImportControlAttrs	 MSG_IMPORT_CONTROL_GET_ATTRS();
+    ImportControlAttrs   MSG_IMPORT_CONTROL_GET_ATTRS();
 
 This message retrieves the current setting of the ImportControl's *ICI_attrs* 
 field.
@@ -357,8 +357,8 @@ field.
 
 ----------
 #### MSG_IMPORT_CONTROL_SET_ATTRS
-	void	MSG_IMPORT_CONTROL_SET_ATTRS(
-			ImportControlAttrs		attrs);
+    void    MSG_IMPORT_CONTROL_SET_ATTRS(
+            ImportControlAttrs      attrs);
 
 This message changes the current settings of an ImportControl's *ICI_attrs* 
 field. 
@@ -373,8 +373,8 @@ field.
 **Interception:** This message should not be intercepted.
 
 #### 16.2.2.2 ICI_dataClasses
-	MSG_IMPORT_CONTROL_GET_DATA_CLASSES, 
-	MSG_IMPORT_CONTROL_SET_DATA_CLASSES
+    MSG_IMPORT_CONTROL_GET_DATA_CLASSES, 
+    MSG_IMPORT_CONTROL_SET_DATA_CLASSES
 
 When you declare an Import object, you must specify what kind of Metafiles 
 your application is prepared to accept. You do this by setting the value of the 
@@ -391,7 +391,7 @@ this field, send MSG_IMPORT_CONTROL_SET_DATA_CLASSES.
 
 ----------
 #### MSG_IMPORT_CONTROL_GET_DATA_CLASSES
-	ImpexDataClasses	 MSG_IMPORT_CONTROL_GET_DATA_CLASSES();
+    ImpexDataClasses     MSG_IMPORT_CONTROL_GET_DATA_CLASSES();
 
 This message retrieves the current setting of the ImportControl's 
 *ICI_dataClasses* field. This tells you what kind of data can be imported.
@@ -406,8 +406,8 @@ This message retrieves the current setting of the ImportControl's
 
 ----------
 #### MSG_IMPORT_CONTROL_SET_DATA_CLASSES
-	void	MSG_IMPORT_CONTROL_SET_DATA_CLASSES(
-			ImpexDataClasses 		dataClass);
+    void    MSG_IMPORT_CONTROL_SET_DATA_CLASSES(
+            ImpexDataClasses        dataClass);
 
 This message changes the current settings of an ImportControl's 
 *ICI_dataClasses* field. 
@@ -422,9 +422,9 @@ This message changes the current settings of an ImportControl's
 **Interception:** This message should not be intercepted.
 
 #### 16.2.2.3 The ImportControl Action
-	MSG_IMPORT_CONTROL_GET_ACTION, 
-	MSG_IMPORT_CONTROL_SET_ACTION, 
-	ImpexImportExportCompleted()
+    MSG_IMPORT_CONTROL_GET_ACTION, 
+    MSG_IMPORT_CONTROL_SET_ACTION, 
+    ImpexImportExportCompleted()
 
 The ImportControl does most of its work transparently to the application. It 
 interacts with the rest of the application only when the user has selected a 
@@ -485,8 +485,8 @@ MSG_IMPORT_CONTROL_SET_ACTION.
 
 ----------
 #### MSG_IMPORT_CONTROL_GET_ACTION
-	void	MSG_IMPORT_CONTROL_GET_ACTION(
-			ImpexAction *		retValue);
+    void    MSG_IMPORT_CONTROL_GET_ACTION(
+            ImpexAction *       retValue);
 
 This message retrieves the values of an ImportControl's *ICI_destination* and 
 *ICI_message* fields. These fields indicate what action the ImportControl will 
@@ -508,17 +508,17 @@ the message sent.
 
 **Structures:** The message and recipient are written to an **ImpexAction** structure:
 
-	typedef struct {
-		word	message;	/* message sent */
-		word	unused;
-		optr	destOD;		/* Destination of message */
-	} ImpexAction;
+    typedef struct {
+        word    message;    /* message sent */
+        word    unused;
+        optr    destOD;     /* Destination of message */
+    } ImpexAction;
 
 ----------
 #### MSG_IMPORT_CONTROL_SET_ACTION
-	void	MSG_IMPORT_CONTROL_SET_ACTION(
-			optr	destOD,		/* Send messages to this object. */
-			word	ICImsg);	/* Send this message to the above recipient. */
+    void    MSG_IMPORT_CONTROL_SET_ACTION(
+            optr    destOD,     /* Send messages to this object. */
+            word    ICImsg);    /* Send this message to the above recipient. */
 
 This message changes the values of an ImportControl's *ICI_destination* and 
 *ICI_message* fields. These fields indicate what action the ImportControl will 
@@ -562,38 +562,38 @@ Code Display 16-2.
 ----------
 **Code Display 16-2 ExportControlClass Instance Data**
 
-	/* ECI_attrs is a word-length record which stores attribute information for the
-	 * ImportControl object. It has only one flag, ECA_IGNORE_INPUT. */
-	@instance ExportControlAttrs		ECI_attrs = 0;
+    /* ECI_attrs is a word-length record which stores attribute information for the
+     * ImportControl object. It has only one flag, ECA_IGNORE_INPUT. */
+    @instance ExportControlAttrs        ECI_attrs = 0;
 
-	/* ECI_dataClasses is a word-length record which indicates what Metafile formats
-	 * are supported by the application. The application must set this field. */
-	@instance ImpexDataClasses			ECI_dataClasses = 0;
+    /* ECI_dataClasses is a word-length record which indicates what Metafile formats
+     * are supported by the application. The application must set this field. */
+    @instance ImpexDataClasses          ECI_dataClasses = 0;
 
-	/* ECI_destination and ECI_message indicate what message should be sent when the
-	 * ExportControl object is preparing to export a file. The application must set
-	 * these fields. The message must take a single argument, namely a pointer to an
-	 * ImpexTranslationParams structure in ss:bp (on the stack). */
-	@instance optr					ECI_destination;
-	@instance word					ECI_message;
+    /* ECI_destination and ECI_message indicate what message should be sent when the
+     * ExportControl object is preparing to export a file. The application must set
+     * these fields. The message must take a single argument, namely a pointer to an
+     * ImpexTranslationParams structure in ss:bp (on the stack). */
+    @instance optr                  ECI_destination;
+    @instance word                  ECI_message;
 
-	/* Applications may wish to add their own UI objects to the Export dialog box.
-	 * They can do so by defining a generic tree (the top object of which must be not
-	 * "usable"), and putting an optr to the top object in ATTR_EXPORT_CONTROL_APP_UI.
-	 */
-	@vardata optr 					ATTR_EXPORT_CONTROL_APP_UI;
+    /* Applications may wish to add their own UI objects to the Export dialog box.
+     * They can do so by defining a generic tree (the top object of which must be not
+     * "usable"), and putting an optr to the top object in ATTR_EXPORT_CONTROL_APP_UI.
+     */
+    @vardata optr                   ATTR_EXPORT_CONTROL_APP_UI;
 
-	/* Controller features flags */
-	typedef ByteFlags 			ExportControlFeatures;
-	#define EXPORTCF_BASIC			0x01
+    /* Controller features flags */
+    typedef ByteFlags           ExportControlFeatures;
+    #define EXPORTCF_BASIC          0x01
 
-	typedef	ByteFlags 			ExportControlToolboxFeatures;
-	#define EXPORTCTF_DIALOG_BOX				0x01
+    typedef ByteFlags           ExportControlToolboxFeatures;
+    #define EXPORTCTF_DIALOG_BOX                0x01
 
 ----------
 #### 16.2.3.1 ECI_attrs
-	ExportControlAttrs, MSG_EXPORT_CONTROL_GET_ATTRS, 
-	MSG_EXPORT_CONTROL_SET_ATTRS
+    ExportControlAttrs, MSG_EXPORT_CONTROL_GET_ATTRS, 
+    MSG_EXPORT_CONTROL_SET_ATTRS
 
 *ECI_attrs* is a word-length record of type **ExportControlAttrs**. This record 
 contains only one flag:
@@ -609,7 +609,7 @@ field, send MSG_EXPORT_CONTROL_SET_ATTRS to the ImportControl.
 
 ----------
 #### MSG_EXPORT_CONTROL_GET_ATTRS
-	ExportControlAttrs	 MSG_EXPORT_CONTROL_GET_ATTRS();
+    ExportControlAttrs   MSG_EXPORT_CONTROL_GET_ATTRS();
 
 This message retrieves the current setting of the ExportControl's *ECI_attrs* 
 field.
@@ -624,8 +624,8 @@ field.
 
 ----------
 #### MSG_EXPORT_CONTROL_SET_ATTRS
-	void	MSG_EXPORT_CONTROL_SET_ATTRS(
-			ExportControlAttrs		attrs);
+    void    MSG_EXPORT_CONTROL_SET_ATTRS(
+            ExportControlAttrs      attrs);
 
 This message changes the current settings of an ExportControl's *ECI_attrs* 
 field. 
@@ -640,8 +640,8 @@ field.
 **Interception:** This message should not be intercepted.
 
 #### 16.2.3.2 ECI_dataClasses
-	MSG_EXPORT_CONTROL_GET_DATA_CLASSES, 
-	MSG_EXPORT_CONTROL_SET_DATA_CLASSES
+    MSG_EXPORT_CONTROL_GET_DATA_CLASSES, 
+    MSG_EXPORT_CONTROL_SET_DATA_CLASSES
 
 When you declare an Export object, you must specify what kind of Metafiles 
 your application is able to create. You do this by setting the value of the 
@@ -658,7 +658,7 @@ this field, send MSG_EXPORT_CONTROL_SET_DATA_CLASSES.
 
 ----------
 #### MSG_EXPORT_CONTROL_GET_DATA_CLASSES
-	ImpexDataClasses	 MSG_EXPORT_CONTROL_GET_DATA_CLASSES();
+    ImpexDataClasses     MSG_EXPORT_CONTROL_GET_DATA_CLASSES();
 
 This message retrieves the current setting of the ExportControl's 
 *ECI_dataClasses* field. This tells you what kind of data can be exported.
@@ -673,8 +673,8 @@ This message retrieves the current setting of the ExportControl's
 
 ----------
 #### MSG_EXPORT_CONTROL_SET_DATA_CLASSES
-	void	MSG_EXPORT_CONTROL_SET_DATA_CLASSES(
-			ImpexDataClasses 		dataClasses);
+    void    MSG_EXPORT_CONTROL_SET_DATA_CLASSES(
+            ImpexDataClasses        dataClasses);
 
 This message changes the current settings of an ExportControl's 
 *ECI_dataClasses* field. 
@@ -689,8 +689,8 @@ This message changes the current settings of an ExportControl's
 **Interception:** This message should not be intercepted.
 
 #### 16.2.3.3 The ExportControl Action
-	MSG_EXPORT_CONTROL_GET_ACTION, 
-	MSG_EXPORT_CONTROL_SET_ACTION
+    MSG_EXPORT_CONTROL_GET_ACTION, 
+    MSG_EXPORT_CONTROL_SET_ACTION
 
 The ExportControl does most of its work transparently to the application. It 
 interacts with the rest of the application after the user selects the name, 
@@ -765,8 +765,8 @@ MSG_EXPORT_CONTROL_SET_ACTION.
 
 ----------
 #### MSG_EXPORT_CONTROL_GET_ACTION
-	void	MSG_EXPORT_CONTROL_GET_ACTION(
-			ObjectState *		retValue);
+    void    MSG_EXPORT_CONTROL_GET_ACTION(
+            ObjectState *       retValue);
 
 This message retrieves the values of an ExportControl's *ECI_destination* and 
 *ECI_message* fields. These fields indicate what action the ExportControl will 
@@ -788,17 +788,17 @@ the message sent.
 
 **Structures:** The message and recipient are written to an **ObjectState** structure:
 
-	typedef struct {
-		int	notUsed;
-		word	message;		/* Message sent */
-		optr	destOD;		/* Destination of message */
-	} ObjectState;
+    typedef struct {
+        int notUsed;
+        word    message;        /* Message sent */
+        optr    destOD;     /* Destination of message */
+    } ObjectState;
 
 ----------
 #### MSG_EXPORT_CONTROL_SET_ACTION
-	void	MSG_EXPORT_CONTROL_SET_ACTION(
-			optr	destOD, 	/* Send messages to this object. */
-			word	ECImsg);	/* Send this message to the above recipient. */
+    void    MSG_EXPORT_CONTROL_SET_ACTION(
+            optr    destOD,     /* Send messages to this object. */
+            word    ECImsg);    /* Send this message to the above recipient. */
 
 This message changes the values of an ExportControl's *ECI_destination* and 
 *ECI_message* fields. These fields indicate what action the ExportControl will 

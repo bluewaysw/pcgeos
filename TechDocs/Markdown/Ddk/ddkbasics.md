@@ -173,11 +173,11 @@ the strategy routine.
 
 The DriverInfoStruct has the following definition:
 ~~~
-	DriverInfoStruct struct
-		DIS_strategy			fptr.far
-		DIS_driverAttributes	DriverAttrs
-		DIS_driverType			DriverType
-		DriverInfoStruct ends
+    DriverInfoStruct struct
+        DIS_strategy            fptr.far
+        DIS_driverAttributes    DriverAttrs
+        DIS_driverType          DriverType
+        DriverInfoStruct ends
 ~~~
 *DIS _strategy*  
 This is the address of the strategy routine. The strategy routine
@@ -195,12 +195,12 @@ It specifies specifically what kind of device the driver drives.
 The *DIS _driverAttributes* field contains a DriverAttrs record. This record
 has the following fields:
 ~~~
-	DriverAttrs record
-		DA_FILE_SYSTEM:1,
-		DA_CHARACTER:1,
-		DA_HAS_EXTENDED_INFO:1,
-		:13
-	DriverAttrs end
+    DriverAttrs record
+        DA_FILE_SYSTEM:1,
+        DA_CHARACTER:1,
+        DA_HAS_EXTENDED_INFO:1,
+        :13
+    DriverAttrs end
 ~~~
 ``DA_FILE_SYSTEM``  
 The driver is for file access.
@@ -216,32 +216,32 @@ The *DIS _driverType* field contains a member of the DriverType enumerated
 type. This type specifies what kind of driver this is. The type has the
 following members:
 ~~~
-	DRIVER_TYPE_VIDEO
-	DRIVER_TYPE_INPUT
-	DRIVER_TYPE_MASS_STORAGE
-	DRIVER_TYPE_STREAM
-	DRIVER_TYPE_FONT
-	DRIVER_TYPE_OUTPUT
-	DRIVER_TYPE_LOCALIZATION
-	DRIVER_TYPE_FILE_SYSTEM
-	DRIVER_TYPE_PRINTER
-	DRIVER_TYPE_SWAP
-	DRIVER_TYPE_POWER_MANAGEMENT
-	DRIVER_TYPE_TASK_SWITCH
-	DRIVER_TYPE_NETWORK
-	DRIVER_TYPE_SOUND
-	DRIVER_TYPE_PAGER
-	DRIVER_TYPE_PCMCIA
-	DRIVER_TYPE_FEP
-	DRIVER_TYPE_MAILBOX_DATA
-	DRIVER_TYPE_MAILBOX_TRANSPORT
-	DRIVER_TYPE_SOCKET
-	DRIVER_TYPE_SCAN
-	DRIVER_TYPE_OTHER_PROCESSOR
-	DRIVER_TYPE_MAILBOX_RECEIVE
-	DRIVER_TYPE_MODEM
-	DRIVER_TYPE_CONNECT_TRANSLATE
-	DRIVER_TYPE_CONNECT_TRANSFER
+    DRIVER_TYPE_VIDEO
+    DRIVER_TYPE_INPUT
+    DRIVER_TYPE_MASS_STORAGE
+    DRIVER_TYPE_STREAM
+    DRIVER_TYPE_FONT
+    DRIVER_TYPE_OUTPUT
+    DRIVER_TYPE_LOCALIZATION
+    DRIVER_TYPE_FILE_SYSTEM
+    DRIVER_TYPE_PRINTER
+    DRIVER_TYPE_SWAP
+    DRIVER_TYPE_POWER_MANAGEMENT
+    DRIVER_TYPE_TASK_SWITCH
+    DRIVER_TYPE_NETWORK
+    DRIVER_TYPE_SOUND
+    DRIVER_TYPE_PAGER
+    DRIVER_TYPE_PCMCIA
+    DRIVER_TYPE_FEP
+    DRIVER_TYPE_MAILBOX_DATA
+    DRIVER_TYPE_MAILBOX_TRANSPORT
+    DRIVER_TYPE_SOCKET
+    DRIVER_TYPE_SCAN
+    DRIVER_TYPE_OTHER_PROCESSOR
+    DRIVER_TYPE_MAILBOX_RECEIVE
+    DRIVER_TYPE_MODEM
+    DRIVER_TYPE_CONNECT_TRANSLATE
+    DRIVER_TYPE_CONNECT_TRANSFER
 ~~~
 
 Code Display 1-1 A Sample DriverTable
@@ -281,11 +281,11 @@ must begin its dgroup segment (or fixed, read-only, code resource) with a
 DriverExtendedInfoStruct. The DriverExtendedInfoStruct has the
 following definition:
 ~~~
-	DriverExtendedInfoStruct struct
-		DEIS_common        DriverInfoStruct
-		DEIS_resource      hptr.DriverExtendedInfoTable
-	DriverExtendedInfoStruct ends
-~~~	
+    DriverExtendedInfoStruct struct
+        DEIS_common        DriverInfoStruct
+        DEIS_resource      hptr.DriverExtendedInfoTable
+    DriverExtendedInfoStruct ends
+~~~ 
 This structure’s first field is a regular DriverInfoStruct, so the segment
 still begins with a DriverInfoStruct and a strategy routine, as is required.
 The other field should contain the handle of a sharable lmem segment that
@@ -298,12 +298,12 @@ The DriverExtendedInfoTable structure must be at the beginning of the
 resource. The DriverExtendedInfoTable structure has the following
 definition:
 ~~~
-	DriverExtendedInfoTable struct
-		DEIT_common        LMemBlockHeader
-		DEIT_numDevices    word
-		DEIT_nameTable     nptr.lptr.char
-		DEIT_infoTable     nptr.word
-	DriverExtendedInfoTable ends
+    DriverExtendedInfoTable struct
+        DEIT_common        LMemBlockHeader
+        DEIT_numDevices    word
+        DEIT_nameTable     nptr.lptr.char
+        DEIT_infoTable     nptr.word
+    DriverExtendedInfoTable ends
 ~~~
 *DEIT_common*  
 This is the standard LMem block header structure. You must
@@ -571,7 +571,7 @@ MyStrategy   proc far
              ; Now call the appropriate driver routine. Load DS and ES with our dgroup
              ; for future use
 
-	     segmov      ds, dgroup, ax
+             segmov      ds, dgroup, ax
              mov         es, ax
              shl         di
              pushdw      cs:[pfuncs][di]

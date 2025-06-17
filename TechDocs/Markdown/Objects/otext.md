@@ -318,23 +318,23 @@ structure.
 ----------
 **Code Display 10-1 The VisTextCharAttr Structure**
 
-	typedef struct {
-		StyleSheetElementHeader		VTCA_meta;
-		FontID						VTCA_fontID;
-		WBFixed						VTCA_pointSize;
-		TextStyle					VTCA_textStyles;
-		ColorQuad					VTCA_color;
-		sword						VTCA_trackKerning;
-		byte						VTCA_fontWeight;
-		byte						VTCA_fontWidth;
-		VisTextExtendedStyles		VTCA_extendedStyles;
-		SystemDrawMask				VTCA_grayScreen;
-		GraphicPattern				VTCA_pattern;
-		ColorQuad					VTCA_bgColor;
-		SystemDrawMask				VTCA_bgGrayScreen;
-		GraphicPattern				VTCA_bgPattern;
-		byte						VTCA_reserved[7];
-	} VisTextCharAttr;
+    typedef struct {
+        StyleSheetElementHeader     VTCA_meta;
+        FontID                      VTCA_fontID;
+        WBFixed                     VTCA_pointSize;
+        TextStyle                   VTCA_textStyles;
+        ColorQuad                   VTCA_color;
+        sword                       VTCA_trackKerning;
+        byte                        VTCA_fontWeight;
+        byte                        VTCA_fontWidth;
+        VisTextExtendedStyles       VTCA_extendedStyles;
+        SystemDrawMask              VTCA_grayScreen;
+        GraphicPattern              VTCA_pattern;
+        ColorQuad                   VTCA_bgColor;
+        SystemDrawMask              VTCA_bgGrayScreen;
+        GraphicPattern              VTCA_bgPattern;
+        byte                        VTCA_reserved[7];
+    } VisTextCharAttr;
 
 ----------
 *VTCA_meta* stores a **StyleSheetElementHeader**. This structure field 
@@ -391,16 +391,16 @@ background.
 ----------
 **Code Display 10-2 VisTextExtendedStyles**
 
-	/* These flags are stored in the VisTextCharAttr entry VTCA_extendedStyles */
-	typedef WordFlags VisTextExtendedStyles;
-	#define VTES_BOXED				0x8000
-	#define VTES_BUTTON				0x4000
-	#define VTES_INDEX				0x2000
-	#define VTES_ALL_CAP			0x1000
-	#define VTES_SMALL_CAP			0x0800
-	#define VTES_HIDDEN				0x0400
-	#define VTES_CHANGE_BAR			0x0200
-	#define VTES_BACKGROUND_COLOR	0x0100
+    /* These flags are stored in the VisTextCharAttr entry VTCA_extendedStyles */
+    typedef WordFlags VisTextExtendedStyles;
+    #define VTES_BOXED              0x8000
+    #define VTES_BUTTON             0x4000
+    #define VTES_INDEX              0x2000
+    #define VTES_ALL_CAP            0x1000
+    #define VTES_SMALL_CAP          0x0800
+    #define VTES_HIDDEN             0x0400
+    #define VTES_CHANGE_BAR         0x0200
+    #define VTES_BACKGROUND_COLOR   0x0100
 
 ----------
 VTES_BOXED draws the character within a box (a rectangle surrounding the 
@@ -444,44 +444,44 @@ sizes, and 32 different fonts.
 ----------
 **Code Display 10-3 VisTextDefaultCharAttr**
 
-	typedef WordFlags VisTextDefaultCharAttr;
-	#define VTDCA_UNDERLINE		0x8000
-	#define VTDCA_BOLD			0x4000
-	#define VTDCA_ITALIC		0x2000
-	#define VTDCA_COLOR			0x0f00	/* Color */
-	#define VTDCA_SIZE			0x00e0	/* VisTextDefaultSize */
-	#define VTDCA_FONT			0x001f	/* VisTextDefaultFont */
+    typedef WordFlags VisTextDefaultCharAttr;
+    #define VTDCA_UNDERLINE     0x8000
+    #define VTDCA_BOLD          0x4000
+    #define VTDCA_ITALIC        0x2000
+    #define VTDCA_COLOR         0x0f00  /* Color */
+    #define VTDCA_SIZE          0x00e0  /* VisTextDefaultSize */
+    #define VTDCA_FONT          0x001f  /* VisTextDefaultFont */
 
-	#define VTDCA_COLOR_OFFSET			8
-	#define VTDCA_SIZE_OFFSET			5
-	#define VTDCA_FONT_OFFSET			0
+    #define VTDCA_COLOR_OFFSET          8
+    #define VTDCA_SIZE_OFFSET           5
+    #define VTDCA_FONT_OFFSET           0
 
-	typedef ByteEnum VisTextDefaultSize;
-		#define		VTDS_8	0		/* Point size of 8 */
-		#define		VTDS_9	1		/* Point size of 9 */
-		#define		VTDS_10	2		/* Point size of 10 */
-		#define		VTDS_12	3		/* Point size of 12 */
-		#define		VTDS_14	4		/* Point size of 14 */
-		#define		VTDS_18	5		/* Point size of 18 */
-		#define		VTDS_24	6		/* Point size of 24 */
-		#define		VTDS_36	7		/* Point size of 36 */
+    typedef ByteEnum VisTextDefaultSize;
+        #define     VTDS_8  0       /* Point size of 8 */
+        #define     VTDS_9  1       /* Point size of 9 */
+        #define     VTDS_10 2       /* Point size of 10 */
+        #define     VTDS_12 3       /* Point size of 12 */
+        #define     VTDS_14 4       /* Point size of 14 */
+        #define     VTDS_18 5       /* Point size of 18 */
+        #define     VTDS_24 6       /* Point size of 24 */
+        #define     VTDS_36 7       /* Point size of 36 */
 
-	typedef ByteEnum VisTextDefaultFont;
-		#define		VTDF_BERKELEY	0		/* Berkeley Font */
-		#define		VTDF_CHICAGO	1		/* Chicago Font */
-		#define		VTDF_BISON		2		/* Bison Font */
-		#define		VTDF_WINDOWS	3		/* Windows Font */
-		#define		VTDF_LED		4		/* LED Font */
-		#define		VTDF_ROMA		5		/* Roma Font */
-		#define		VTDF_UNIVERSITY	6		/* University Font */
-		#define		VTDF_URW_ROMAN	7		/* URW Roman Font */
-		#define		VTDF_URW_SANS	8		/* URW Sans Font */
-		#define		VTDF_URW_MONO	9		/* URW Mono Font */
-		#define		VTDF_URW_SYMBOLPS 10	/* URW Symbols Font */
-		#define		VTDF_CENTURY_SCHOOLBOOK 11	/* Century Schoolbook Font */
+    typedef ByteEnum VisTextDefaultFont;
+        #define     VTDF_BERKELEY   0       /* Berkeley Font */
+        #define     VTDF_CHICAGO    1       /* Chicago Font */
+        #define     VTDF_BISON      2       /* Bison Font */
+        #define     VTDF_WINDOWS    3       /* Windows Font */
+        #define     VTDF_LED        4       /* LED Font */
+        #define     VTDF_ROMA       5       /* Roma Font */
+        #define     VTDF_UNIVERSITY 6       /* University Font */
+        #define     VTDF_URW_ROMAN  7       /* URW Roman Font */
+        #define     VTDF_URW_SANS   8       /* URW Sans Font */
+        #define     VTDF_URW_MONO   9       /* URW Mono Font */
+        #define     VTDF_URW_SYMBOLPS 10    /* URW Symbols Font */
+        #define     VTDF_CENTURY_SCHOOLBOOK 11  /* Century Schoolbook Font */
 
-	#define VIS_TEXT_INITIAL_CHAR_ATTR \
-			((VTDS_12 << VTDCA_SIZE_OFFSET) || VTDF_BERKELEY)
+    #define VIS_TEXT_INITIAL_CHAR_ATTR \
+            ((VTDS_12 << VTDCA_SIZE_OFFSET) || VTDF_BERKELEY)
 
 ----------
 #### 10.3.1.3Macros for Defining VisTextCharAttr Structures
@@ -494,19 +494,19 @@ style runs vastly easier.
 ----------
 **Code Display 10-4 VisTextCharAttr Macros**
 
-	#define CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(ref, style, font, psize, tstyle, \ 
-	color) { \
-		{{{ref, 0}}, style}, font, {0, psize}, tstyle, \
-			{color, CF_INDEX, 0, 0}, 0, FWI_MEDIUM, FW_NORMAL, 0, SDM_100, {0}, \
-			{C_WHITE, CF_INDEX, 0, 0}, SDM_0, {0}, {0, 0, 0, 0, 0, 0, 0}}
+    #define CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(ref, style, font, psize, tstyle, \ 
+    color) { \
+        {{{ref, 0}}, style}, font, {0, psize}, tstyle, \
+            {color, CF_INDEX, 0, 0}, 0, FWI_MEDIUM, FW_NORMAL, 0, SDM_100, {0}, \
+            {C_WHITE, CF_INDEX, 0, 0}, SDM_0, {0}, {0, 0, 0, 0, 0, 0, 0}}
 
-	#define CHAR_ATTR_FONT_SIZE_STYLE(font, psize, tstyle) \
-			CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(2, CA_NULL_ELEMENT, font, \
-						psize, tstyle, C_BLACK)
+    #define CHAR_ATTR_FONT_SIZE_STYLE(font, psize, tstyle) \
+            CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(2, CA_NULL_ELEMENT, font, \
+                        psize, tstyle, C_BLACK)
 
-	#define CHAR_ATTR_FONT_SIZE(font, psize) \
-			CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(2, CA_NULL_ELEMENT, font, \
-						psize, 0, C_BLACK)
+    #define CHAR_ATTR_FONT_SIZE(font, psize) \
+            CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(2, CA_NULL_ELEMENT, font, \
+                        psize, 0, C_BLACK)
 
 ----------
 ### 10.3.2 Paragraph Attribute Definitions
@@ -526,37 +526,37 @@ Display 10-5. Comments follow the code display.
 ----------
 **Code Display 10-5 VisTextParaAttr**
 
-	typedef struct {
-		StyleSheetElementHeader		VTPA_meta;
-		VisTextParaBorderFlags		VTPA_borderFlags;
-		ColorQuad					VTPA_borderColor;
-		VisTextParaAttrAttributes	VTPA_attributes;
-		word						VTPA_leftMargin;
-		word						VTPA_rightMargin;
-		word						VTPA_paraMargin;
-		BBFixedAsWord				VTPA_lineSpacing;
-		word						VTPA_leading;
-		BBFixedAsWord				VTPA_spaceOnTop;
-		BBFixedAsWord				VTPA_spaceOnBottom;
-		ColorQuad					VTPA_bgColor;
-		byte						VTPA_numberOfTabs;
-		byte						VTPA_borderWidth;
-		byte						VTPA_borderSpacing;
-		byte						VTPA_borderShadow;
-		SystemDrawMask				VTPA_borderGrayScreen;
-		SystemDrawMask				VTPA_bgGrayScreen;
-		HatchPattern				VTPA_borderHatch;
-		HatchPattern				VTPA_bgHatch;
-		word						VTPA_defaultTabs;
-		word						VTPA_startingParaNumber;
-		char						VTPA_prependChars[4];
-		VisTextHyphenationInfo		VTPA_hyphenationInfo;
-		VisTextKeepInfo				VTPA_keepInfo;
-		VisTextDropCapInfo			VTPA_dropCapInfo;
-		word						VTPA_nextStyle;
-		StandardLanguage			VTPA_language;
-		byte						VTPA_reserved[15];
-	} VisTextParaAttr;
+    typedef struct {
+        StyleSheetElementHeader     VTPA_meta;
+        VisTextParaBorderFlags      VTPA_borderFlags;
+        ColorQuad                   VTPA_borderColor;
+        VisTextParaAttrAttributes   VTPA_attributes;
+        word                        VTPA_leftMargin;
+        word                        VTPA_rightMargin;
+        word                        VTPA_paraMargin;
+        BBFixedAsWord               VTPA_lineSpacing;
+        word                        VTPA_leading;
+        BBFixedAsWord               VTPA_spaceOnTop;
+        BBFixedAsWord               VTPA_spaceOnBottom;
+        ColorQuad                   VTPA_bgColor;
+        byte                        VTPA_numberOfTabs;
+        byte                        VTPA_borderWidth;
+        byte                        VTPA_borderSpacing;
+        byte                        VTPA_borderShadow;
+        SystemDrawMask              VTPA_borderGrayScreen;
+        SystemDrawMask              VTPA_bgGrayScreen;
+        HatchPattern                VTPA_borderHatch;
+        HatchPattern                VTPA_bgHatch;
+        word                        VTPA_defaultTabs;
+        word                        VTPA_startingParaNumber;
+        char                        VTPA_prependChars[4];
+        VisTextHyphenationInfo      VTPA_hyphenationInfo;
+        VisTextKeepInfo             VTPA_keepInfo;
+        VisTextDropCapInfo          VTPA_dropCapInfo;
+        word                        VTPA_nextStyle;
+        StandardLanguage            VTPA_language;
+        byte                        VTPA_reserved[15];
+    } VisTextParaAttr;
 
 ----------
 *VTPA_meta* stores a **StyleSheetElementHeader**. This structure field allows 
@@ -654,23 +654,23 @@ currently unimplemented but will be added.
 ----------
 **Code Display 10-6 VisTextParaBorderFlags**
 
-	typedef WordFlags VisTextParaBorderFlags;
-	#define VTPBF_LEFT				0x8000
-	#define VTPBF_TOP				0x4000
-	#define VTPBF_RIGHT				0x2000
-	#define VTPBF_BOTTOM			0x1000
-	#define VTPBF_DOUBLE			0x0800
-	#define VTPBF_DRAW_INNER_LINES	0x0400
-	#define VTPBF_SHADOW			0x0200
-	#define VTPBF_ANCHOR			0x0003 /* ShadowAnchor */
+    typedef WordFlags VisTextParaBorderFlags;
+    #define VTPBF_LEFT              0x8000
+    #define VTPBF_TOP               0x4000
+    #define VTPBF_RIGHT             0x2000
+    #define VTPBF_BOTTOM            0x1000
+    #define VTPBF_DOUBLE            0x0800
+    #define VTPBF_DRAW_INNER_LINES  0x0400
+    #define VTPBF_SHADOW            0x0200
+    #define VTPBF_ANCHOR            0x0003 /* ShadowAnchor */
 
-	#define VTPBF_ANCHOR_OFFSET				0
+    #define VTPBF_ANCHOR_OFFSET             0
 
-	typedef ByteEnum ShadowAnchor;
-	#define	SA_TOP_LEFT			0
-	#define	SA_TOP_RIGHT		1
-	#define	SA_BOTTOM_LEFT		2
-	#define	SA_BOTTOM_RIGHT		3
+    typedef ByteEnum ShadowAnchor;
+    #define SA_TOP_LEFT         0
+    #define SA_TOP_RIGHT        1
+    #define SA_BOTTOM_LEFT      2
+    #define SA_BOTTOM_RIGHT     3
 
 ----------
 The **VisTextParaBorderFlags** specify the manner in which a border should 
@@ -699,12 +699,12 @@ corner towards the opposite corner.
 ----------
 **Code Display 10-7 VisTextNumberType**
 
-	typedef ByteEnum VisTextNumberType;
-	#define	VTNT_NUMBER					0
-	#define	VTNT_LETTER_UPPER_A			1
-	#define	VTNT_LETTER_LOWER_A			2
-	#define	VTNT_ROMAN_NUMERAL_UPPER	3
-	#define	VTNT_ROMAN_NUMERAL_LOWER	4
+    typedef ByteEnum VisTextNumberType;
+    #define VTNT_NUMBER                 0
+    #define VTNT_LETTER_UPPER_A         1
+    #define VTNT_LETTER_LOWER_A         2
+    #define VTNT_ROMAN_NUMERAL_UPPER    3
+    #define VTNT_ROMAN_NUMERAL_LOWER    4
 
 ----------
 The **VisTextNumberType** specifies the paragraph numbering scheme for 
@@ -716,19 +716,19 @@ in the *VTPA_startingParaNumber* entry.
 ----------
 **Code Display 10-8 VisTextParaAttrAttributes**
 
-	typedef WordFlags VisTextParaAttrAttributes;
-	#define VTPAA_JUSTIFICATION				0xc000
-	#define VTPAA_KEEP_PARA_WITH_NEXT		0x2000
-	#define VTPAA_KEEP_PARA_TOGETHER		0x1000
-	#define VTPAA_ALLOW_AUTO_HYPHENATION	0x0800
-	#define VTPAA_DISABLE_WORD_WRAP			0x0400
-	#define VTPAA_COLUMN_BREAK_BEFORE		0x0200
-	#define VTPAA_PARA_NUMBER_TYPE			0x01c0
-	#define VTPAA_DROP_CAP					0x0020
-	#define VTPAA_KEEP_LINES				0x0010
+    typedef WordFlags VisTextParaAttrAttributes;
+    #define VTPAA_JUSTIFICATION             0xc000
+    #define VTPAA_KEEP_PARA_WITH_NEXT       0x2000
+    #define VTPAA_KEEP_PARA_TOGETHER        0x1000
+    #define VTPAA_ALLOW_AUTO_HYPHENATION    0x0800
+    #define VTPAA_DISABLE_WORD_WRAP         0x0400
+    #define VTPAA_COLUMN_BREAK_BEFORE       0x0200
+    #define VTPAA_PARA_NUMBER_TYPE          0x01c0
+    #define VTPAA_DROP_CAP                  0x0020
+    #define VTPAA_KEEP_LINES                0x0010
 
-	#define VTPAA_JUSTIFICATION_OFFSET		14
-	#define VTPAA_PARA_NUMBER_TYPE_OFFSET	5
+    #define VTPAA_JUSTIFICATION_OFFSET      14
+    #define VTPAA_PARA_NUMBER_TYPE_OFFSET   5
 
 ----------
 VTPAA_JUSTIFICATION stores the **Justification** to use with this paragraph.
@@ -766,16 +766,16 @@ the **VisTextKeepInfo** (see below).
 ----------
 **Code Display 10-9 VisTextHyphenationInfo**
 
-	typedef WordFlags VisTextHyphenationInfo;
-	#define VTHI_HYPHEN_MAX_LINES				0xf000
-	#define VTHI_HYPHEN_SHORTEST_WORD			0x0f00
-	#define VTHI_HYPHEN_SHORTEST_PREFIX			0x00f0
-	#define VTHI_HYPHEN_SHORTEST_SUFFIX			0x000f
+    typedef WordFlags VisTextHyphenationInfo;
+    #define VTHI_HYPHEN_MAX_LINES               0xf000
+    #define VTHI_HYPHEN_SHORTEST_WORD           0x0f00
+    #define VTHI_HYPHEN_SHORTEST_PREFIX         0x00f0
+    #define VTHI_HYPHEN_SHORTEST_SUFFIX         0x000f
 
-	#define VTHI_HYPHEN_MAX_LINES_OFFSET			12
-	#define VTHI_HYPHEN_SHORTEST_WORD_OFFSET		 8
-	#define VTHI_HYPHEN_SHORTEST_PREFIX_OFFSET		 4
-	#define VTHI_HYPHEN_SHORTEST_SUFFIX_OFFSET		 0
+    #define VTHI_HYPHEN_MAX_LINES_OFFSET            12
+    #define VTHI_HYPHEN_SHORTEST_WORD_OFFSET         8
+    #define VTHI_HYPHEN_SHORTEST_PREFIX_OFFSET       4
+    #define VTHI_HYPHEN_SHORTEST_SUFFIX_OFFSET       0
 
 ----------
 If the *VTPA_attributes* flag VTPAA_ALLOW_AUTO_HYPHENATION is set, 
@@ -795,12 +795,12 @@ if necessary.
 ----------
 **Code Display 10-10 VisTextKeepInfo**
 
-	typedef ByteFlags VisTextKeepInfo;
-	#define VTKI_TOP_LINES				0xf0
-	#define VTKI_BOTTOM_LINES			0x0f
+    typedef ByteFlags VisTextKeepInfo;
+    #define VTKI_TOP_LINES              0xf0
+    #define VTKI_BOTTOM_LINES           0x0f
 
-	#define VTKI_TOP_LINES_OFFSET		4
-	#define VTKI_BOTTOM_LINES_OFFSET	0
+    #define VTKI_TOP_LINES_OFFSET       4
+    #define VTKI_BOTTOM_LINES_OFFSET    0
 
 ----------
 If the *VTPA_attributes* flag VTPAA_KEEP_LINES is set, **VisTextKeepInfo** 
@@ -825,14 +825,14 @@ brought over from the preceding page to pad the next page.
 ----------
 **Code Display 10-11 VisTextDropCapInfo**
 
-	typedef WordFlags VisTextDropCapInfo;
-	#define VTDCI_CHAR_COUNT			0xf000
-	#define VTDCI_LINE_COUNT			0x0f00
-	#define VTDCI_POSITION				0x00f0
+    typedef WordFlags VisTextDropCapInfo;
+    #define VTDCI_CHAR_COUNT            0xf000
+    #define VTDCI_LINE_COUNT            0x0f00
+    #define VTDCI_POSITION              0x00f0
 
-	#define VTDCI_CHAR_COUNT_OFFSET			12
-	#define VTDCI_LINE_COUNT_OFFSET			8
-	#define VTDCI_POSITION_OFFSET			4
+    #define VTDCI_CHAR_COUNT_OFFSET         12
+    #define VTDCI_LINE_COUNT_OFFSET         8
+    #define VTDCI_POSITION_OFFSET           4
 
 ----------
 If the *VTPA_attributes* flag VTPAA_DROP_CAP is set, **VisTextDropCapInfo** 
@@ -849,39 +849,39 @@ paragraph before resuming normal capitalization.
 ----------
 **Code Display 10-12 Tabs**
 
-	typedef ByteEnum TabLeader;
-	#define	TL_NONE 		0
-	#define	TL_DOT 			1
-	#define	TL_LINE			2
-	#define	TL_BULLET		3
-	#define	TL_GRAY_LINE	4
+    typedef ByteEnum TabLeader;
+    #define TL_NONE         0
+    #define TL_DOT          1
+    #define TL_LINE         2
+    #define TL_BULLET       3
+    #define TL_GRAY_LINE    4
 
-	typedef ByteEnum TabType;
-	#define TT_LEFT			0
-	#define TT_CENTER		1
-	#define TT_RIGHT		2
-	#define TT_ANCHORED		3
+    typedef ByteEnum TabType;
+    #define TT_LEFT         0
+    #define TT_CENTER       1
+    #define TT_RIGHT        2
+    #define TT_ANCHORED     3
 
-	typedef ByteFlags TabAttributes;
-	#define	TA_LEADER		0x1c		/* TabLeader */
-	#define	TA_TYPE			0x03		/* TabType */
+    typedef ByteFlags TabAttributes;
+    #define TA_LEADER       0x1c        /* TabLeader */
+    #define TA_TYPE         0x03        /* TabType */
 
-	#define TA_LEADER_OFFSET	2
-	#define TA_TYPE_OFFSET		
+    #define TA_LEADER_OFFSET    2
+    #define TA_TYPE_OFFSET      
 
-	typedef struct {
-		word			T_position;
-		TabAttributes	T_attr;			/* TabAttributes */
-		SystemDrawMask	T_grayScreen;
-		byte			T_lineWidth;
-		byte			T_lineSpacing;
-		word			T_anchor;
-	} Tab;
+    typedef struct {
+        word            T_position;
+        TabAttributes   T_attr;         /* TabAttributes */
+        SystemDrawMask  T_grayScreen;
+        byte            T_lineWidth;
+        byte            T_lineSpacing;
+        word            T_anchor;
+    } Tab;
 
-	typedef struct {
-		VisTextParaAttr		VTMPA_paraAttr;
-		Tab					VTMPA_tabs[VIS_TEXT_MAX_TABS];
-	} VisTextMaxParaAttr;
+    typedef struct {
+        VisTextParaAttr     VTMPA_paraAttr;
+        Tab                 VTMPA_tabs[VIS_TEXT_MAX_TABS];
+    } VisTextMaxParaAttr;
 
 ----------
 The **Tab** structure allows your paragraph to add custom tab stops to a 
@@ -908,30 +908,30 @@ margins.
 ----------
 **Code Display 10-13 VisTextDefaultParaAttr**
 
-	typedef WordFlags VisTextDefaultParaAttr;
-	#define VTDPA_JUSTIFICATION				0xc000 /* Justification */
-	#define VTDPA_DEFAULT_TABS				0x3000 /* VisTextDefaultTab */
-	#define VTDPA_LEFT_MARGIN				0x0f00 /* In units of half-inches */
-	#define VTDPA_PARA_MARGIN				0x00f0 /* In units of half-inches */
-	#define VTDPA_RIGHT_MARGIN				0x000f /* In units of half-inches */
+    typedef WordFlags VisTextDefaultParaAttr;
+    #define VTDPA_JUSTIFICATION             0xc000 /* Justification */
+    #define VTDPA_DEFAULT_TABS              0x3000 /* VisTextDefaultTab */
+    #define VTDPA_LEFT_MARGIN               0x0f00 /* In units of half-inches */
+    #define VTDPA_PARA_MARGIN               0x00f0 /* In units of half-inches */
+    #define VTDPA_RIGHT_MARGIN              0x000f /* In units of half-inches */
 
-	#define VTDPA_JUSTIFICATION_OFFSET			14
-	#define VTDPA_DEFAULT_TABS_OFFSET			12
-	#define VTDPA_LEFT_MARGIN_OFFSET			8
-	#define VTDPA_PARA_MARGIN_OFFSET			4
-	#define VTDPA_RIGHT_MARGIN_OFFSET			0
+    #define VTDPA_JUSTIFICATION_OFFSET          14
+    #define VTDPA_DEFAULT_TABS_OFFSET           12
+    #define VTDPA_LEFT_MARGIN_OFFSET            8
+    #define VTDPA_PARA_MARGIN_OFFSET            4
+    #define VTDPA_RIGHT_MARGIN_OFFSET           0
 
-	#define VIS_TEXT_INITIAL_PARA_ATTR ( (0*2) << VTDPA_LEFT_MARGIN_OFFSET) | \
-				( (0*2) << VTDPA_PARA_MARGIN_OFFSET) | \
-				( (0*2) << VTDPA_RIGHT_MARGIN_OFFSET) | \
-				(VTDDT_INCH << VTDPA_DEFAULT_TABS_OFFSET) | \
-				(J_LEFT << VTDPA_JUSTIFICATION_OFFSET)
+    #define VIS_TEXT_INITIAL_PARA_ATTR ( (0*2) << VTDPA_LEFT_MARGIN_OFFSET) | \
+                ( (0*2) << VTDPA_PARA_MARGIN_OFFSET) | \
+                ( (0*2) << VTDPA_RIGHT_MARGIN_OFFSET) | \
+                (VTDDT_INCH << VTDPA_DEFAULT_TABS_OFFSET) | \
+                (J_LEFT << VTDPA_JUSTIFICATION_OFFSET)
 
-	typedef ByteEnum VisTextDefaultDefaultTab;
-	#define VTDDT_NONE				0
-	#define VTDDT_HALF_INCH			1
-	#define VTDDT_INCH				2
-	#define VTDDT_CENTIMETER		3
+    typedef ByteEnum VisTextDefaultDefaultTab;
+    #define VTDDT_NONE              0
+    #define VTDDT_HALF_INCH         1
+    #define VTDDT_INCH              2
+    #define VTDDT_CENTIMETER        3
 
 ----------
 The **VisTextDefaultDefaultTab** type is solely for use within a 
@@ -950,26 +950,26 @@ style runs vastly easier.
 ----------
 **Code Display 10-14 VisTextParaAttr Macros**
 
-	#define PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(ref, style, just, left, right, para)\
-	{ \
-			{{{ref, 0}}, style}, 0, {C_BLACK, CF_INDEX, 0, 0}, \
-			just << VTPAA_JUSTIFICATION_OFFSET, (left)*PIXELS_PER_INCH, \
-			(right)*PIXELS_PER_INCH, (para)*PIXELS_PER_INCH, \
-			1<<8, 0, 0, 0, {C_WHITE, CF_INDEX, 0, 0}, \
-			0, 1*8, 2*8, 1*8, SDM_100, SDM_0, {0}, {0}, \
-			PIXELS_PER_INCH/2*8, VIS_TEXT_DEFAULT_STARTING_NUMBER, "", 0, 0, 0,
-			CA_NULL_ELEMENT, SL_ENGLISH, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
+    #define PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(ref, style, just, left, right, para)\
+    { \
+            {{{ref, 0}}, style}, 0, {C_BLACK, CF_INDEX, 0, 0}, \
+            just << VTPAA_JUSTIFICATION_OFFSET, (left)*PIXELS_PER_INCH, \
+            (right)*PIXELS_PER_INCH, (para)*PIXELS_PER_INCH, \
+            1<<8, 0, 0, 0, {C_WHITE, CF_INDEX, 0, 0}, \
+            0, 1*8, 2*8, 1*8, SDM_100, SDM_0, {0}, {0}, \
+            PIXELS_PER_INCH/2*8, VIS_TEXT_DEFAULT_STARTING_NUMBER, "", 0, 0, 0,
+            CA_NULL_ELEMENT, SL_ENGLISH, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
 
-	#define DEF_PARA_ATTR_JUST_TABS(just, tabs) \
-			(( (0*2) << VTDPA_LEFT_MARGIN_OFFSET ) | \
-			 ( (0*2) << VTDPA_PARA_MARGIN_OFFSET ) | \
-			 ( (0*2) << VTDPA_RIGHT_MARGIN_OFFSET ) | \
-			 ( (tabs) << VTDPA_DEFAULT_TABS_OFFSET ) | \
-			 ( (just) << VTDPA_JUSTIFICATION_OFFSET ))
+    #define DEF_PARA_ATTR_JUST_TABS(just, tabs) \
+            (( (0*2) << VTDPA_LEFT_MARGIN_OFFSET ) | \
+             ( (0*2) << VTDPA_PARA_MARGIN_OFFSET ) | \
+             ( (0*2) << VTDPA_RIGHT_MARGIN_OFFSET ) | \
+             ( (tabs) << VTDPA_DEFAULT_TABS_OFFSET ) | \
+             ( (just) << VTDPA_JUSTIFICATION_OFFSET ))
 
-	#define DEF_PARA_ATTR_CENTER DEF_PARA_ATTR_JUST_TABS(J_CENTER, VTDDT_INCH)
+    #define DEF_PARA_ATTR_CENTER DEF_PARA_ATTR_JUST_TABS(J_CENTER, VTDDT_INCH)
 
-	#define DEF_PARA_ATTR_RIGHT DEF_PARA_ATTR_JUST_TABS(J_RIGHT, VTDDT_INCH)
+    #define DEF_PARA_ATTR_RIGHT DEF_PARA_ATTR_JUST_TABS(J_RIGHT, VTDDT_INCH)
 
 ----------
 ### 10.3.3 Storage Flags
@@ -988,15 +988,15 @@ specified in the **VisTextStorageFlags** of the text object.
 ----------
 **Code Display 10-15 VisTextStorageFlags**
 
-	typedef ByteFlags VisTextStorageFlags;
-	#define VTSF_LARGE					0x80
-	#define VTSF_MULTIPLE_CHAR_ATTRS	0x40
-	#define VTSF_MULTIPLE_PARA_ATTRS	0x20
-	#define VTSF_TYPES					0x10
-	#define VTSF_GRAPHICS				0x08
-	#define VTSF_DEFAULT_CHAR_ATTR		0x04
-	#define VTSF_DEFAULT_PARA_ATTR		0x02
-	#define VTSF_STYLES					0x01
+    typedef ByteFlags VisTextStorageFlags;
+    #define VTSF_LARGE                  0x80
+    #define VTSF_MULTIPLE_CHAR_ATTRS    0x40
+    #define VTSF_MULTIPLE_PARA_ATTRS    0x20
+    #define VTSF_TYPES                  0x10
+    #define VTSF_GRAPHICS               0x08
+    #define VTSF_DEFAULT_CHAR_ATTR      0x04
+    #define VTSF_DEFAULT_PARA_ATTR      0x02
+    #define VTSF_STYLES                 0x01
 
 ----------
 VTSF_LARGE  
@@ -1123,20 +1123,20 @@ messages tailored to the format you are retrieving text from or transferring
 text to.
 
 #### 10.4.1.1 Text Ranges
-	VisTextRange, MSG_VIS_TEXT_GET_RANGE, VisTextRangeContext, 
-	MSG_VIS_TEXT_GET_TEXT_SIZE
+    VisTextRange, MSG_VIS_TEXT_GET_RANGE, VisTextRangeContext, 
+    MSG_VIS_TEXT_GET_TEXT_SIZE
 
 Frequently, your application may wish to specify a range of text to act on. 
 This range specifies the starting and ending points within the text for the 
 relevant operation. Each of these starting and ending points is a zero-based 
 character position. 
 
-	typedef struct {
-		dword	VTR_start;
-				/* starting character position */
-		dword	VTR_end;
-				/* ending character position */
-	} VisTextRange;
+    typedef struct {
+        dword   VTR_start;
+                /* starting character position */
+        dword   VTR_end;
+                /* ending character position */
+    } VisTextRange;
 
 To select a starting point at the first character, set VTR_start to zero. To select 
 an ending point at the last character, set VTR_end to the special constant 
@@ -1156,19 +1156,19 @@ of the selection (or paragraph selection). Pass this message a
 **VisTextRangeContext**, which specifies whether the range will include just 
 the selection or kick out the range to its paragraph boundaries.
 
-	typedef WordFlags VisTextRangeContext;
-	#define VTRC_PARAGRAPH_CHANGE				0x8000
-	#define VTRC_CHAR_ATTR_CHANGE				0x4000
-	#define VTRC_PARA_ATTR_BORDER_CHANGE		0x2000
+    typedef WordFlags VisTextRangeContext;
+    #define VTRC_PARAGRAPH_CHANGE               0x8000
+    #define VTRC_CHAR_ATTR_CHANGE               0x4000
+    #define VTRC_PARA_ATTR_BORDER_CHANGE        0x2000
 
 MSG_VIS_TEXT_GET_TEXT_SIZE returns the total size of the text within the 
 text object.
 
 ----------
 #### MSG_VIS_TEXT_GET_RANGE
-	void	MSG_VIS_TEXT_GET_RANGE(
-			VisTextRange	*range,
-			word			context);
+    void    MSG_VIS_TEXT_GET_RANGE(
+            VisTextRange    *range,
+            word            context);
 
 This message fills in a **VisTextRange** buffer based on the selection criteria 
 passed in the context argument. The context information specifies whether 
@@ -1193,7 +1193,7 @@ from the message handler.
 
 ----------
 #### MSG_VIS_TEXT_GET_TEXT_SIZE
-	dword	MSG_VIS_TEXT_GET_TEXT_SIZE();
+    dword   MSG_VIS_TEXT_GET_TEXT_SIZE();
 
 This message returns the current size of text.
 
@@ -1207,12 +1207,12 @@ This message returns the current size of text.
 
 #### 10.4.1.2 Replacing Text All At Once
 
-	MSG_VIS_TEXT_REPLACE_ALL_PTR, 
-	MSG_VIS_TEXT_REPLACE_ALL_OPTR, 
-	MSG_VIS_TEXT_REPLACE_ALL_BLOCK, 
-	MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK, 
-	MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM, 
-	MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY
+    MSG_VIS_TEXT_REPLACE_ALL_PTR, 
+    MSG_VIS_TEXT_REPLACE_ALL_OPTR, 
+    MSG_VIS_TEXT_REPLACE_ALL_BLOCK, 
+    MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK, 
+    MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM, 
+    MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY
 
 You may replace the text displayed within a Text Object all at once with the 
 following messages. Any previous text within the text object will be replaced 
@@ -1242,9 +1242,9 @@ from a huge array.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_ALL_PTR
-	void	MSG_VIS_TEXT_REPLACE_ALL_PTR(
-			const char 		*text, 
-			word 			textLen);
+    void    MSG_VIS_TEXT_REPLACE_ALL_PTR(
+            const char      *text, 
+            word            textLen);
 
 This message replaces the text string within a text object (either a VisText or 
 a GenText object) with the text referenced by the passed pointer. 
@@ -1265,9 +1265,9 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_ALL_OPTR
-	void	MSG_VIS_TEXT_REPLACE_ALL_OPTR(
-			optr	o,
-			word	textLen);
+    void    MSG_VIS_TEXT_REPLACE_ALL_OPTR(
+            optr    o,
+            word    textLen);
 
 This message replaces the text string within a text object (either a VisText or 
 a GenText) with the text referenced by the passed optr. 
@@ -1287,9 +1287,9 @@ a GenText) with the text referenced by the passed optr.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_ALL_BLOCK
-	void	MSG_VIS_TEXT_REPLACE_ALL_BLOCK(
-			word	block,
-			word	textLen);
+    void    MSG_VIS_TEXT_REPLACE_ALL_BLOCK(
+            word    block,
+            word    textLen);
 
 This message replaces the text string within a text object (either a VisText or 
 a GenText) with the text within the passed data block. 
@@ -1310,10 +1310,10 @@ use in the replacement operation.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK
-	void	MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK(
-			VMFileHandle		file,
-			VMBlockHandle		block,
-			word 				textLen);
+    void    MSG_VIS_TEXT_REPLACE_ALL_VM_BLOCK(
+            VMFileHandle        file,
+            VMBlockHandle       block,
+            word                textLen);
 
 This message replaces the text string within a text object (either a VisText or 
 a GenText) with the text within the passed data block. 
@@ -1336,10 +1336,10 @@ file.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM
-	void	MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM(
-			VMFileHandle 	file,
-			DBGroup 		group,
-			DBItem			item);
+    void    MSG_VIS_TEXT_REPLACE_ALL_DB_ITEM(
+            VMFileHandle    file,
+            DBGroup         group,
+            DBItem          item);
 
 This message replaces the text string within a text object (either a VisText or 
 a GenText) with the text within the passed database item. The text is 
@@ -1363,10 +1363,10 @@ file.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY
-	void	MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY(
-			VMFileHandle		file,
-			VMBlockHandle		hugeArrayBlock,
-			word				textLen);
+    void    MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY(
+            VMFileHandle        file,
+            VMBlockHandle       hugeArrayBlock,
+            word                textLen);
 
 This message replaces the text string within a text object (either a VisText or 
 a GenText) with the text within the passed HugeArray.
@@ -1389,12 +1389,12 @@ block.
 
 #### 10.4.1.3 Replacing the Text Within a Selection
 
-	MSG_VIS_TEXT_REPLACE_SELECTION_PTR, 
-	MSG_VIS_TEXT_REPLACE_SELECTION_OPTR, 
-	MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK, 
-	MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK, 
-	MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM, 
-	MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY
+    MSG_VIS_TEXT_REPLACE_SELECTION_PTR, 
+    MSG_VIS_TEXT_REPLACE_SELECTION_OPTR, 
+    MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK, 
+    MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK, 
+    MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM, 
+    MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY
 
 The text object library automatically allows text selection. By using the 
 mouse (or other device, depending on the specific UI), a user may select any 
@@ -1411,9 +1411,9 @@ position will overstrike current text.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_SELECTION_PTR
-	void	MSG_VIS_TEXT_REPLACE_SELECTION_PTR(
-			const char		*text,
-			word			textLen);
+    void    MSG_VIS_TEXT_REPLACE_SELECTION_PTR(
+            const char      *text,
+            word            textLen);
 
 This message replaces the current selection within a text object with the text 
 contained in the passed string pointer. If no text is currently selected, the text 
@@ -1435,9 +1435,9 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_SELECTION_OPTR
-	void	MSG_VIS_TEXT_REPLACE_SELECTION_OPTR(
-			optr	o,
-			word	textLen);
+    void    MSG_VIS_TEXT_REPLACE_SELECTION_OPTR(
+            optr    o,
+            word    textLen);
 
 This message replaces the current selection within a text object with the text 
 in the chunk specified by o. If no text is currently selected, the text will be 
@@ -1459,9 +1459,9 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK
-	void	MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK(
-			word	block,
-			word	textLen);
+    void    MSG_VIS_TEXT_REPLACE_SELECTION_BLOCK(
+            word    block,
+            word    textLen);
 
 This message replaces the current selection within a text object with the text 
 contained in the passed block. If no text is currently selected, the text will be 
@@ -1483,10 +1483,10 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK
-	void	MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK(
-			VMFileHandle		file,
-			VMBlockHandle		block,
-			word				textLen);
+    void    MSG_VIS_TEXT_REPLACE_SELECTION_VM_BLOCK(
+            VMFileHandle        file,
+            VMBlockHandle       block,
+            word                textLen);
 
 This message replaces the current selection within a text object by the text 
 contained in the passed VM block. If no text is currently selected, the text will 
@@ -1510,10 +1510,10 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM
-	void	MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM(
-			VMFileHandle		file,
-			DBGroup				group,
-			DBItem				item);
+    void    MSG_VIS_TEXT_REPLACE_SELECTION_DB_ITEM(
+            VMFileHandle        file,
+            DBGroup             group,
+            DBItem              item);
 
 This message replaces the current selection within a text object with the text 
 contained in the passed database item. If no text is currently selected, the 
@@ -1537,10 +1537,10 @@ Parameters:**
 
 ----------
 #### MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY
-	void	MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY(
-			VMFileHandle		file,
-			VMBlockHandle		hugeArrayBlock,
-			word				textLen);
+    void    MSG_VIS_TEXT_REPLACE_SELECTION_HUGE_ARRAY(
+            VMFileHandle        file,
+            VMBlockHandle       hugeArrayBlock,
+            word                textLen);
 
 This message replaces the current selection within a text object with the text 
 contained in the passed huge array. If no text is currently selected, the text 
@@ -1564,10 +1564,10 @@ null-terminated.
 **Interception:** Generally not intercepted.
 
 #### 10.4.1.4 Appending the Text
-	MSG_VIS_TEXT_APPEND_PTR, MSG_VIS_TEXT_APPEND_OPTR, 
-	MSG_VIS_TEXT_APPEND_BLOCK, MSG_VIS_TEXT_APPEND_VM_BLOCK, 
-	MSG_VIS_TEXT_APPEND_DB_ITEM, 
-	MSG_VIS_TEXT_APPEND_HUGE_ARRAY
+    MSG_VIS_TEXT_APPEND_PTR, MSG_VIS_TEXT_APPEND_OPTR, 
+    MSG_VIS_TEXT_APPEND_BLOCK, MSG_VIS_TEXT_APPEND_VM_BLOCK, 
+    MSG_VIS_TEXT_APPEND_DB_ITEM, 
+    MSG_VIS_TEXT_APPEND_HUGE_ARRAY
 
 In many cases, you may not want to replace text but instead add it to the end 
 of the current text. You may use any of the following messages to append text 
@@ -1577,9 +1577,9 @@ you should use to add the text.
 
 ----------
 #### MSG_VIS_TEXT_APPEND_PTR
-	void	MSG_VIS_TEXT_APPEND_PTR(
-			const char		*text,
-			word			textLen);
+    void    MSG_VIS_TEXT_APPEND_PTR(
+            const char      *text,
+            word            textLen);
 
 This message appends text to a text object; the text is added at the end of the 
 current text. None of the previous text is changed.
@@ -1600,9 +1600,9 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_APPEND_OPTR
-	void	MSG_VIS_TEXT_APPEND_OPTR(
-			optr	o,
-			word	textLen);
+    void    MSG_VIS_TEXT_APPEND_OPTR(
+            optr    o,
+            word    textLen);
 
 This message adds text to a text object; the text is added at the end of the 
 current text. None of the previous text is changed.
@@ -1623,9 +1623,9 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_APPEND_BLOCK
-	void	MSG_VIS_TEXT_APPEND_BLOCK(
-			word	block,
-			word	textLen);
+    void    MSG_VIS_TEXT_APPEND_BLOCK(
+            word    block,
+            word    textLen);
 
 This message appends text to a text object; the text is added at the end of the 
 current text. None of the previous text is changed.
@@ -1646,10 +1646,10 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_APPEND_VM_BLOCK
-	void	MSG_VIS_TEXT_APPEND_VM_BLOCK(
-			VMFileHandle		file,
-			VMBlockHandle		block,
-			word				textLen);
+    void    MSG_VIS_TEXT_APPEND_VM_BLOCK(
+            VMFileHandle        file,
+            VMBlockHandle       block,
+            word                textLen);
 
 This message appends text to a text object; the text is added at the end of the 
 current text. None of the previous text is changed.
@@ -1672,10 +1672,10 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_APPEND_DB_ITEM
-	void	MSG_VIS_TEXT_APPEND_DB_ITEM(
-			VMFileHandle		file,
-			DBGroup				group,
-			DBItem				item);
+    void    MSG_VIS_TEXT_APPEND_DB_ITEM(
+            VMFileHandle        file,
+            DBGroup             group,
+            DBItem              item);
 
 This message appends text to a text object; the text is added at the end of the 
 current text. None of the previous text is changed. The text is assumed to be 
@@ -1698,10 +1698,10 @@ null-terminated.
 
 ----------
 #### MSG_VIS_TEXT_APPEND_HUGE_ARRAY
-	void	MSG_VIS_TEXT_APPEND_HUGE_ARRAY(
-			VMFileHandle		file,
-			VMBlockHandle		hugeArrayBlock,
-			word				textLen);
+    void    MSG_VIS_TEXT_APPEND_HUGE_ARRAY(
+            VMFileHandle        file,
+            VMBlockHandle       hugeArrayBlock,
+            word                textLen);
 
 This message appends text to a text object; the text is added at the end of the 
 current text. None of the previous text is changed.
@@ -1723,18 +1723,18 @@ null-terminated.
 **Interception:** Generally not intercepted.
 
 #### 10.4.1.5 Retrieving the Text
-	MSG_VIS_TEXT_GET_ALL_PTR, MSG_VIS_TEXT_GET_ALL_OPTR, 
-	MSG_VIS_TEXT_GET_ALL_BLOCK, 
-	MSG_VIS_TEXT_GET_ALL_VM_BLOCK, 
-	MSG_VIS_TEXT_GET_ALL_DB_ITEM, 
-	MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY
+    MSG_VIS_TEXT_GET_ALL_PTR, MSG_VIS_TEXT_GET_ALL_OPTR, 
+    MSG_VIS_TEXT_GET_ALL_BLOCK, 
+    MSG_VIS_TEXT_GET_ALL_VM_BLOCK, 
+    MSG_VIS_TEXT_GET_ALL_DB_ITEM, 
+    MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY
 
 You may also retrieve the text from your text object and place its text into any 
 of the previously mentioned formats. The format of your destination 
 determines which message you should use.
 #### MSG_VIS_TEXT_GET_ALL_PTR
-	word	MSG_VIS_TEXT_GET_ALL_PTR(
-			const char		*text);
+    word    MSG_VIS_TEXT_GET_ALL_PTR(
+            const char      *text);
 
 This message retrieves the entire text of a text object and copies it to the 
 buffer passed. The text within the text object is unchanged.
@@ -1757,8 +1757,8 @@ null-terminated text of the text object.
 
 ----------
 #### MSG_VIS_TEXT_GET_ALL_OPTR
-	word	MSG_VIS_TEXT_GET_ALL_OPTR(
-			optr	o);
+    word    MSG_VIS_TEXT_GET_ALL_OPTR(
+            optr    o);
 
 This message retrieves the entire text of a text object and copies it into the 
 chunk specified by o. The text within the text object is unchanged. 
@@ -1781,8 +1781,8 @@ character.
 
 ----------
 #### MSG_VIS_TEXT_GET_ALL_BLOCK
-	word	MSG_VIS_TEXT_GET_ALL_BLOCK(
-			word	block);
+    word    MSG_VIS_TEXT_GET_ALL_BLOCK(
+            word    block);
 
 This message retrieves the entire text of a text object and copies it into the 
 passed data block.
@@ -1801,9 +1801,9 @@ upon return and will contain at least the terminating null character.
 
 **Interception:** Generally not intercepted.
 #### MSG_VIS_TEXT_GET_ALL_VM_BLOCK
-	word	MSG_VIS_TEXT_GET_ALL_VM_BLOCK(
-			VMFileHandle		file,
-			VMBlockHandle		block);
+    word    MSG_VIS_TEXT_GET_ALL_VM_BLOCK(
+            VMFileHandle        file,
+            VMBlockHandle       block);
 
 This message retrieves the entire text of a text object and copies it into the 
 passed VM block.
@@ -1827,10 +1827,10 @@ contain at least the terminating null character.
 
 ----------
 #### MSG_VIS_TEXT_GET_ALL_DB_ITEM
-	DBGroupAndItem	MSG_VIS_TEXT_GET_ALL_DB_ITEM(
-					VMFileHandle	file,
-					DBGroup			group,
-					DBItem			item);
+    DBGroupAndItem  MSG_VIS_TEXT_GET_ALL_DB_ITEM(
+                    VMFileHandle    file,
+                    DBGroup         group,
+                    DBItem          item);
 
 This message retrieves the entire text of a text object and copies it into the 
 passed database item. 
@@ -1859,9 +1859,9 @@ terminating null character.
 
 ----------
 #### MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY
-	word	MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY(
-			VMFileHandle		file,
-			VMBlockHandle		hugeArrayBlock);
+    word    MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY(
+            VMFileHandle        file,
+            VMBlockHandle       hugeArrayBlock);
 
 This message retrieves the entire text of a text object and copies it into the 
 passed huge array block.
@@ -1887,12 +1887,12 @@ character.
 
 #### 10.4.1.6 Retrieving the Text Within a Selection
 
-	MSG_VIS_TEXT_GET_SELECTION_PTR, 
-	MSG_VIS_TEXT_GET_SELECTION_OPTR, 
-	MSG_VIS_TEXT_GET_SELECTION_BLOCK, 
-	MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK, 
-	MSG_VIS_TEXT_GET_SELECTION_DB_ITEM, 
-	MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY
+    MSG_VIS_TEXT_GET_SELECTION_PTR, 
+    MSG_VIS_TEXT_GET_SELECTION_OPTR, 
+    MSG_VIS_TEXT_GET_SELECTION_BLOCK, 
+    MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK, 
+    MSG_VIS_TEXT_GET_SELECTION_DB_ITEM, 
+    MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY
 
 To retrieve the text within the current selection, you may send any of the 
 following messages to your text object. If no text is currently selected no text 
@@ -1900,8 +1900,8 @@ will be retrieved.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_PTR
-	word	MSG_VIS_TEXT_GET_SELECTION_PTR(
-			const char		*text);
+    word    MSG_VIS_TEXT_GET_SELECTION_PTR(
+            const char      *text);
 
 This message retrieves the currently selected text and stores it in the 
 character string referenced by the passed pointer. The text remains selected 
@@ -1924,8 +1924,8 @@ null-terminated character string.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_OPTR
-	word	MSG_VIS_TEXT_GET_SELECTION_OPTR(
-			optr	o);
+    word    MSG_VIS_TEXT_GET_SELECTION_OPTR(
+            optr    o);
 
 This message retrieves the currently selected text and copies it into the 
 passed chunk. The text remains selected and intact in the original text object.
@@ -1947,8 +1947,8 @@ The chunk will contain at least the terminating null character.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_BLOCK
-	word	MSG_VIS_TEXT_GET_SELECTION_BLOCK(
-			word	block);
+    word    MSG_VIS_TEXT_GET_SELECTION_BLOCK(
+            word    block);
 
 This message retrieves the currently selected text and copies it into the 
 passed data block. The text remains selected and intact in the original text 
@@ -1971,9 +1971,9 @@ character.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK
-	word	MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK(
-			VMFileHandle		file,
-			VMBlockHandle		block);
+    word    MSG_VIS_TEXT_GET_SELECTION_VM_BLOCK(
+            VMFileHandle        file,
+            VMBlockHandle       block);
 
 This message retrieves the currently selected text and copies it into the 
 passed VM block. The text remains selected and intact in the original text 
@@ -1997,10 +1997,10 @@ will contain at least the terminating null character.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_DB_ITEM
-	DBGroupAndItem	MSG_VIS_TEXT_GET_SELECTION_DB_ITEM(
-					VMFileHandle	file,
-					DBGroup			group,
-					DBItem			item);
+    DBGroupAndItem  MSG_VIS_TEXT_GET_SELECTION_DB_ITEM(
+                    VMFileHandle    file,
+                    DBGroup         group,
+                    DBItem          item);
 
 This message retrieves the currently selected text and copies it into the given 
 database item. The text remains selected and intact in the original text 
@@ -2028,9 +2028,9 @@ item. The item will contain at least the terminating null character.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY
-	word	MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY(
-			VMFileHandle		file,
-			VMBlockHandle		hugeArrayBlock);
+    word    MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY(
+            VMFileHandle        file,
+            VMBlockHandle       hugeArrayBlock);
 
 This message retrieves the currently selected text and copies it into the 
 passed huge array. The text remains selected and intact in the original text 
@@ -2054,7 +2054,7 @@ array will contain at least the terminating null character.
 **Interception:** Generally not intercepted.
 
 #### 10.4.1.7 Other Operations on the Text
-	MSG_VIS_TEXT_DELETE_ALL, MSG_VIS_TEXT_DELETE_SELECTION
+    MSG_VIS_TEXT_DELETE_ALL, MSG_VIS_TEXT_DELETE_SELECTION
 
 To delete the entire contents of a text object, send it 
 MSG_VIS_TEXT_DELETE_ALL. This message will also resize the text's chunk 
@@ -2064,7 +2064,7 @@ message is sent.
 
 ----------
 #### MSG_VIS_TEXT_DELETE_ALL
-	void	MSG_VIS_TEXT_DELETE_ALL();
+    void    MSG_VIS_TEXT_DELETE_ALL();
 
 This message deletes the entire contents of a text object's text chunk. The 
 chunk will be resized to zero.
@@ -2081,7 +2081,7 @@ chunk will be resized to zero.
 
 ----------
 #### MSG_VIS_TEXT_DELETE_SELECTION
-	void	MSG_VIS_TEXT_DELETE_SELECTION();
+    void    MSG_VIS_TEXT_DELETE_SELECTION();
 
 This message deletes the currently selected text. The text after the deletion 
 will be automatically repositioned, and the text chunk will be resized.
@@ -2097,11 +2097,11 @@ will be automatically repositioned, and the text chunk will be resized.
 **Interception:** Generally not intercepted.
 
 #### 10.4.1.8 Marking the Text Selection
-	MSG_VIS_TEXT_GET_SELECTION_RANGE, 
-	MSG_VIS_TEXT_SELECT_RANGE, 
-	MSG_VIS_TEXT_SELECT_RANGE_SMALL, MSG_VIS_TEXT_SELECT_ALL, 
-	MSG_VIS_TEXT_SELECT_START, MSG_VIS_TEXT_SELECT_END, 
-	MSG_VIS_TEXT_SELECT_RELATIVE
+    MSG_VIS_TEXT_GET_SELECTION_RANGE, 
+    MSG_VIS_TEXT_SELECT_RANGE, 
+    MSG_VIS_TEXT_SELECT_RANGE_SMALL, MSG_VIS_TEXT_SELECT_ALL, 
+    MSG_VIS_TEXT_SELECT_START, MSG_VIS_TEXT_SELECT_END, 
+    MSG_VIS_TEXT_SELECT_RELATIVE
 
 MSG_VIS_TEXT_GET_SELECTION_RANGE returns the **VisTextRange** of the 
 current selection. 
@@ -2131,8 +2131,8 @@ new position.
 
 ----------
 #### MSG_VIS_TEXT_GET_SELECTION_RANGE
-	void	MSG_VIS_TEXT_GET_SELECTION_RANGE(
-			VisTextRange		*vtr);
+    void    MSG_VIS_TEXT_GET_SELECTION_RANGE(
+            VisTextRange        *vtr);
 
 This message returns the range of the text object's current selection. You 
 must pass this message a **VisTextRange** buffer for the message to fill in with 
@@ -2152,9 +2152,9 @@ with the selection range.
 
 ----------
 #### MSG_VIS_TEXT_SELECT_RANGE
-	void	MSG_VIS_TEXT_SELECT_RANGE(@stack
-			dword	end
-			dword	start);
+    void    MSG_VIS_TEXT_SELECT_RANGE(@stack
+            dword   end
+            dword   start);
 
 This message creates a selection for a text object. The message must pass the 
 starting and ending character positions to mark as the text object's selection. 
@@ -2180,9 +2180,9 @@ start position.
 
 ----------
 #### MSG_VIS_TEXT_SELECT_RANGE_SMALL
-	void	MSG_VIS_TEXT_SELECT_RANGE_SMALL(
-			word	start,
-			word	end);
+    void    MSG_VIS_TEXT_SELECT_RANGE_SMALL(
+            word    start,
+            word    end);
 
 This message creates a selection for a text object. The message must pass the 
 starting and ending character positions to mark as the text object's selection. 
@@ -2206,7 +2206,7 @@ start position.
 
 ----------
 #### MSG_VIS_TEXT_SELECT_ALL
-	void	MSG_VIS_TEXT_SELECT_ALL();
+    void    MSG_VIS_TEXT_SELECT_ALL();
 
 This message selects the entire text of a text object as its selection. 
 
@@ -2222,7 +2222,7 @@ This message selects the entire text of a text object as its selection.
 
 ----------
 #### MSG_VIS_TEXT_SELECT_START
-	void	MSG_VIS_TEXT_SELECT_START();
+    void    MSG_VIS_TEXT_SELECT_START();
 
 This message places the cursor at the start of the text. Any current selection 
 will be deselected.
@@ -2239,7 +2239,7 @@ will be deselected.
 
 ----------
 #### MSG_VIS_TEXT_SELECT_END
-	void	MSG_VIS_TEXT_SELECT_END();
+    void    MSG_VIS_TEXT_SELECT_END();
 
 This message places the cursor at the end of the text. Any current selection 
 will be deselected.
@@ -2256,9 +2256,9 @@ will be deselected.
 
 ----------
 #### MSG_VIS_TEXT_SELECT_RELATIVE
-	void	MSG_VIS_TEXT_SELECT_RELATIVE(
-			word	newStart,
-			word	newEnd);
+    void    MSG_VIS_TEXT_SELECT_RELATIVE(
+            word    newStart,
+            word    newEnd);
 
 This message moves a selection from the current cursor position to a position 
 relative to that position.
@@ -2336,31 +2336,31 @@ will contain a ChunkHandle to this structure instead of the
 ----------
 **Code Display 10-16 Setting Character Attributes**
 
-	/* This example shows how to set the default character attributes. */
+    /* This example shows how to set the default character attributes. */
 
-	@object GenTextClass MyTextObject = {
-		GTXI_text = "";
-		ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = (VTDCA_UNDERLINE |
-				(VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
-				/* This sets the default character attributes record (of type
-				 * VisTextDefaultCharAttr) to use underlined Berkeley font in
-		* point size 18. */
-	}
+    @object GenTextClass MyTextObject = {
+        GTXI_text = "";
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = (VTDCA_UNDERLINE |
+                (VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BERKELEY);
+                /* This sets the default character attributes record (of type
+                 * VisTextDefaultCharAttr) to use underlined Berkeley font in
+        * point size 18. */
+    }
 
-	/* This example shows how to use non-default singular character attributes. */
+    /* This example shows how to use non-default singular character attributes. */
 
-	@object GenTextClass MyTextObject = {
-		GTXI_text = "";
-		ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @MyTextCharAttrs;
-				/* This is a chunk handle to the chunk holding the text
-				 * attributes (of type VisTextCharAttr). */
-	}
+    @object GenTextClass MyTextObject = {
+        GTXI_text = "";
+        ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @MyTextCharAttrs;
+                /* This is a chunk handle to the chunk holding the text
+                 * attributes (of type VisTextCharAttr). */
+    }
 
-	@chunk VisTextCharAttr MyCharAttrs = 
-		CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 32, TS_UNDERLINE);
-				/* This chunk holds the record that will determine the character
-				 * attributes of all the GenText's text. The text will be
-				 * 32-point Roman, underlined. */
+    @chunk VisTextCharAttr MyCharAttrs = 
+        CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 32, TS_UNDERLINE);
+                /* This chunk holds the record that will determine the character
+                 * attributes of all the GenText's text. The text will be
+                 * 32-point Roman, underlined. */
 
 ----------
 #### 10.4.3.2 Multiple Character Attributes
@@ -2405,23 +2405,23 @@ Figure 10-3.
 ----------
 **Code Display 10-17 Setting Multiple Character Attribute Runs**
 
-	@object GenTextClass MultipleCharAttrsObject = {
-		ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = (ChunkHandle) @MyMultCharAttrs;
-		GTXI_text = "Initial Text Here";
-	}
-	#define MCA_PLAIN			0
-	#define MCA_UNDERLINE		1
+    @object GenTextClass MultipleCharAttrsObject = {
+        ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS = (ChunkHandle) @MyMultCharAttrs;
+        GTXI_text = "Initial Text Here";
+    }
+    #define MCA_PLAIN           0
+    #define MCA_UNDERLINE       1
 
-	CHAR_ATTR_ELEMENT_ARRAY_HEADER CharAttrElements = {
-		CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 12, 0),			/* Element 0 */
-		CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 12, TS_UNDERLINE)	/* Element 1 */
-	};
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER CharAttrElements = {
+        CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 12, 0),            /* Element 0 */
+        CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_ROMAN, 12, TS_UNDERLINE)  /* Element 1 */
+    };
 
-	RUN_ARRAY_HEADER(CharAttrElements) MyMultCharAttrs = {
-		TRAE_ABS(0, MCA_PLAIN),					/* Element 0 */
-		TRAE_ABS(8, MCA_UNDERLINE),				/* Element 1 */
-		TRAE_END
-	};
+    RUN_ARRAY_HEADER(CharAttrElements) MyMultCharAttrs = {
+        TRAE_ABS(0, MCA_PLAIN),                 /* Element 0 */
+        TRAE_ABS(8, MCA_UNDERLINE),             /* Element 1 */
+        TRAE_END
+    };
 
 ----------
 
@@ -2434,11 +2434,11 @@ each run (in this case, CharAttrElements). This example shows three style
 runs of two different styles.*
 
 #### 10.4.3.3 Changing Character Attributes
-	MSG_VIS_TEXT_GET_CHAR_ATTR,VisTextCharAttrFlags, 
-	VisTextCharAttrDiffs, VisTextGetAttrFlags, 
-	MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT, 
-	MSG_VIS_TEXT_SET_CHAR_ATTR, MSG_VIS_TEXT_SET_FONT_ID, 
-	MSG_VIS_TEXT_SET_POINT_SIZE, MSG_VIS_TEXT_SET_TEXT_STYLE
+    MSG_VIS_TEXT_GET_CHAR_ATTR,VisTextCharAttrFlags, 
+    VisTextCharAttrDiffs, VisTextGetAttrFlags, 
+    MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT, 
+    MSG_VIS_TEXT_SET_CHAR_ATTR, MSG_VIS_TEXT_SET_FONT_ID, 
+    MSG_VIS_TEXT_SET_POINT_SIZE, MSG_VIS_TEXT_SET_TEXT_STYLE
 
 There may be cases in which you would like to change the attributes 
 exhibited by certain characters in your Text object. In most cases, you can do 
@@ -2451,12 +2451,12 @@ are several messages to retrieve and set character attributes.
 
 ----------
 #### MSG_VIS_TEXT_GET_CHAR_ATTR
-	word 	MSG_VIS_TEXT_GET_CHAR_ATTR(@stack
-			VisTextGetAttrFlags 		flags,
-			VisTextCharAttrDiffs 		*diffs,
-			VisTextCharAttr 			*attrs,
-			dword 						rangeEnd,
-			dword 						rangeStart);
+    word    MSG_VIS_TEXT_GET_CHAR_ATTR(@stack
+            VisTextGetAttrFlags         flags,
+            VisTextCharAttrDiffs        *diffs,
+            VisTextCharAttr             *attrs,
+            dword                       rangeEnd,
+            dword                       rangeStart);
 
 This message returns a buffer filled in with the **VisTextCharAttr** attributes 
 of the given range of text. If VTGAF_MERGE_WITH_PASSED is passed in the 
@@ -2487,12 +2487,12 @@ VTCAF_MULTIPLE_STYLES
 
 **Structures:**
 
-	typedef struct {
-		VisTextCharAttrFlags 				VTCAD_diffs;
-		VisTextExtendedStyles 				VTCAD_extendedStyles;
-		TextStyle 				VTCAD_textStyles;
-		byte 				VTCAD_unused;
-	} VisTextCharAttrDiffs;
+    typedef struct {
+        VisTextCharAttrFlags                VTCAD_diffs;
+        VisTextExtendedStyles               VTCAD_extendedStyles;
+        TextStyle               VTCAD_textStyles;
+        byte                VTCAD_unused;
+    } VisTextCharAttrDiffs;
 
 **Source:** Unrestricted.
 
@@ -2524,10 +2524,10 @@ object is storing runs of **VisTextCharAttr** structures. The *attrs* and
 
 ----------
 #### MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT
-	void	MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(@stack
-			VisTextDefaultCharAttr 		defCharAttrs,
-			dword 						rangeEnd,
-			dword 						rangeStart);
+    void    MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(@stack
+            VisTextDefaultCharAttr      defCharAttrs,
+            dword                       rangeEnd,
+            dword                       rangeStart);
 
 This message sets the character attributes passed in 
 **VisTextDefaultCharAttr** over the specified range of the text object. If the 
@@ -2551,10 +2551,10 @@ passed range of text.
 
 ----------
 #### MSG_VIS_TEXT_SET_CHAR_ATTR
-	void	MSG_VIS_TEXT_SET_CHAR_ATTR(@stack
-			VisTextCharAttr 	*attrs,
-			dword 				rangeEnd,
-			dword 				rangeStart);
+    void    MSG_VIS_TEXT_SET_CHAR_ATTR(@stack
+            VisTextCharAttr     *attrs,
+            dword               rangeEnd,
+            dword               rangeStart);
 
 This message sets the character attributes passed in the **VisTextCharAttr** 
 buffer over the specified range of the text object. If the text object is in 
@@ -2576,10 +2576,10 @@ storing runs of **VisTextCharAttr** structures.
 
 ----------
 #### MSG_VIS_TEXT_SET_FONT_ID
-	@importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_FONT_ID(@stack
-			FontID 		fid,
-			dword 		rangeEnd,
-			dword 		rangeStart);
+    @importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_FONT_ID(@stack
+            FontID      fid,
+            dword       rangeEnd,
+            dword       rangeStart);
 
 This message sets the passed **FontID** over the specified range of the text 
 object. If the text object currently displays its values in "default" character 
@@ -2594,10 +2594,10 @@ its **VisTextCharAttr** structures.
 
 ----------
 #### MSG_VIS_TEXT_SET_POINT_SIZE
-	@importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_POINT_SIZE(@stack
-			WWFixedAsDWord 		pointSize,
-			dword 				rangeEnd,
-			dword 				rangeStart);
+    @importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_POINT_SIZE(@stack
+            WWFixedAsDWord      pointSize,
+            dword               rangeEnd,
+            dword               rangeStart);
 
 This message sets the passed point size over the specified range of the text 
 object. If the text object currently displays its values in "default" character 
@@ -2612,13 +2612,13 @@ its **VisTextCharAttr** structures.
 
 ----------
 #### MSG_VIS_TEXT_SET_TEXT_STYLE
-	@importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_TEXT_STYLE(@stack
-			word 		extBitsToClear, 
-			word 		extBitsToSet,
-			word 		styleBitsToClear, 
-			word 		styleBitsToSet,
-			dword 		rangeEnd,
-			dword 		rangeStart);
+    @importMessage MetaTextMessages, void MSG_VIS_TEXT_SET_TEXT_STYLE(@stack
+            word        extBitsToClear, 
+            word        extBitsToSet,
+            word        styleBitsToClear, 
+            word        styleBitsToSet,
+            dword       rangeEnd,
+            dword       rangeStart);
 
 This message sets the passed text styles over the specified range of the text 
 object. You must specify the specific style bits to set and clear, both for the 
@@ -2687,23 +2687,23 @@ record.
 ----------
 **Code Display 10-18 Setting VisTextParaAttr Attributes**
 
-	/* This example shows setting the initial default paragraph attributes. */
-	@object GenTextClass MyTextObject = {
-		GTXI_text = "";
-		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = ((J_CENTER << VTDPA_JUSTIFICATION_OFFSET) | 
-					( (2*2) << VTDPA_LEFT_MARGIN_OFFSET) |
-					( (1*2) << VTDPA_PARA_MARGIN_OFFSET) |
-					( VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET));
-	}
+    /* This example shows setting the initial default paragraph attributes. */
+    @object GenTextClass MyTextObject = {
+        GTXI_text = "";
+        ATTR_GEN_TEXT_DEFAULT_PARA_ATTR = ((J_CENTER << VTDPA_JUSTIFICATION_OFFSET) | 
+                    ( (2*2) << VTDPA_LEFT_MARGIN_OFFSET) |
+                    ( (1*2) << VTDPA_PARA_MARGIN_OFFSET) |
+                    ( VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET));
+    }
 
-	/* This example shows setting non-default singular paragraph attributes. */
-	@object GenTextClass MyTextObject = {
-		GTXI_text = "";
-		ATTR_GEN_TEXT_PARA_ATTR = (ChunkHandle) @MyParaAttrs;
-	}
+    /* This example shows setting non-default singular paragraph attributes. */
+    @object GenTextClass MyTextObject = {
+        GTXI_text = "";
+        ATTR_GEN_TEXT_PARA_ATTR = (ChunkHandle) @MyParaAttrs;
+    }
 
-	@chunk VisTextParaAttr MyParaAttrs = 
-		PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(0, 0, J_CENTER, 0, 2, 1);
+    @chunk VisTextParaAttr MyParaAttrs = 
+        PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(0, 0, J_CENTER, 0, 2, 1);
 
 ----------
 #### 10.4.4.2 Multiple Paragraph Attributes
@@ -2735,12 +2735,12 @@ paragraph. At the character position, the token corresponds to a
 element.
 
 #### 10.4.4.3 Changing Paragraph Attributes
-	MSG_VIS_TEXT_GET_PARA_ATTR,VisTextParaAttrFlags, 
-	VisTextParaAttrBorderFlags, VisTextParaAttrDiffs, 
-	MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT, 
-	MSG_VIS_TEXT_SET_PARA_ATTR, 
-	MSG_VIS_TEXT_SET_PARA_ATTRIBUTES, 
-	MSG_VIS_TEXT_ADD_PARA_ATTR
+    MSG_VIS_TEXT_GET_PARA_ATTR,VisTextParaAttrFlags, 
+    VisTextParaAttrBorderFlags, VisTextParaAttrDiffs, 
+    MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT, 
+    MSG_VIS_TEXT_SET_PARA_ATTR, 
+    MSG_VIS_TEXT_SET_PARA_ATTRIBUTES, 
+    MSG_VIS_TEXT_ADD_PARA_ATTR
 
 There may be cases in which you would like to change the attributes 
 exhibited by certain paragraphs in your Text object. As with character 
@@ -2752,12 +2752,12 @@ are several messages to retrieve and set character attributes.
 
 ----------
 #### MSG_VIS_TEXT_GET_PARA_ATTR
-	word 	MSG_VIS_TEXT_GET_PARA_ATTR(@stack
-			VisTextGetAttrFlags 	flags,
-			VisTextParaAttrDiffs 	*diffs,
-			VisTextParaAttr 		*attrs,
-			dword 					rangeEnd,
-			dword 					rangeStart);
+    word    MSG_VIS_TEXT_GET_PARA_ATTR(@stack
+            VisTextGetAttrFlags     flags,
+            VisTextParaAttrDiffs    *diffs,
+            VisTextParaAttr         *attrs,
+            dword                   rangeEnd,
+            dword                   rangeStart);
 
 This message returns a buffer filled in with the **VisTextParaAttr** attributes 
 of the given range of text. If VTGAF_MERGE_WITH_PASSED is passed in the 
@@ -2810,14 +2810,14 @@ VTPABF_MULTIPLE_BORDER_PATTERNS
 
 **Structures:**
 
-	typedef struct {
-		VisTextParaAttrFlags 			VTPAD_diffs;
-		VisTextParaAttrBorderFlags		VTPAD_borderDiffs;
-		VisTextParaAttrAttributes		VTPAD_attributes;
-		VisTextHyphenationInfo			VTPAD_hyphenationInfo;
-		VisTextKeepInfo					VTPAD_keepInfo;
-		VisTextDropCapInfo				VTPAD_dropCapInfo;
-	} VisTextParaAttrDiffs;
+    typedef struct {
+        VisTextParaAttrFlags            VTPAD_diffs;
+        VisTextParaAttrBorderFlags      VTPAD_borderDiffs;
+        VisTextParaAttrAttributes       VTPAD_attributes;
+        VisTextHyphenationInfo          VTPAD_hyphenationInfo;
+        VisTextKeepInfo                 VTPAD_keepInfo;
+        VisTextDropCapInfo              VTPAD_dropCapInfo;
+    } VisTextParaAttrDiffs;
 
 **Source:** Unrestricted.
 
@@ -2849,10 +2849,10 @@ and *diffs* buffers are also filled with their relevant information.
 
 ----------
 #### MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT
-	void	MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(@stack
-			VisTextDefaultParaAttr 		defParaAttrs,
-			dword 						rangeEnd,
-			dword 						rangeStart);
+    void    MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(@stack
+            VisTextDefaultParaAttr      defParaAttrs,
+            dword                       rangeEnd,
+            dword                       rangeStart);
 
 This message sets the paragraph attributes passed in 
 **VisTextDefaultParaAttr** over the specified range of the text object. If the 
@@ -2876,10 +2876,10 @@ passed range of text.
 
 ----------
 #### MSG_VIS_TEXT_SET_PARA_ATTR
-	void	MSG_VIS_TEXT_SET_PARA_ATTR(@stack
-			VisTextParaAttr 	*newParaAttrs,
-			dword 				rangeEnd,
-			dword 				rangeStart);
+    void    MSG_VIS_TEXT_SET_PARA_ATTR(@stack
+            VisTextParaAttr     *newParaAttrs,
+            dword               rangeEnd,
+            dword               rangeStart);
 
 This message sets the paragraph attributes passed in the **VisTextParaAttr** 
 buffer over the specified range of the text object. If the text object is in 
@@ -2901,8 +2901,8 @@ storing runs of **VisTextParaAttr** structures.
 
 ----------
 #### MSG_VIS_TEXT_ADD_PARA_ATTR
-	word	MSG_VIS_TEXT_ADD_PARA_ATTR(
-			VisTextMaxParaAttr 		*paraAttr);
+    word    MSG_VIS_TEXT_ADD_PARA_ATTR(
+            VisTextMaxParaAttr      *paraAttr);
 
 This message adds a given set of paragraph attributes passed in the 
 **VisTextParaAttr** buffer to the paragraph "run" for that text object. The text 
@@ -2933,48 +2933,48 @@ Following the display are descriptions of the individual fields.
 ----------
 Code Display 10-19 VisText Instance Fields
 
-	/* These are all the instance data fields of the VisText. Many of them are used
-	 * internally by the class and should not be used by applications. Because they
-	 * are documented as internal, Geoworks reserves the right to change their meaning
-	 * or use at any time. Those that are internal are clearly noted as such. */
+    /* These are all the instance data fields of the VisText. Many of them are used
+     * internally by the class and should not be used by applications. Because they
+     * are documented as internal, Geoworks reserves the right to change their meaning
+     * or use at any time. Those that are internal are clearly noted as such. */
 
-	@instance ChunkHandle			VTI_text;
-	@instance word					VTI_charAttrRuns = VIS_TEXT_INITIAL_CHAR_ATTR;
-	@instance word					VTI_paraAttrRuns = VIS_TEXT_INITIAL_PARA_ATTR;
-	@instance VMFileHandle			VTI_vmFile = NullHandle;
-	@instance word					VTI_lines = 0;			/* INTERNAL */
-	@instance VisTextStorageFlags	VTI_storageFlags = (VTSF_DEFAULT_CHAR_ATTR |
-										 VTSF_DEFAULT_PARA_ATTR);
-	@instance VisTextFeatures		VTI_features = 0;
-	@instance VisTextStates			VTI_state = 0;
-	@instance VisTextIntFlags		VTI_intFlags = 0;		/* INTERNAL */
-	@instance VisTextIntSelFlags	VTI_intSelFlags = 0;	/* INTERNAL */
-	@instance GSRefCountAndFlags	VTI_gsRefCount = 0;		/* INTERNAL */
-	@instance GStateHandle			VTI_gstate = NullHandle; /* INTERNAL */
-	@instance word					VTI_gstateRegion = -1;	/* INTERNAL */
-	@instance dword					VTI_selectStart = 0;
-	@instance dword					VTI_selectEnd = 0;
-	@instance PointDWord			VTI_startEventPos = {0,0}; /* INTERNAL */
-	@instance dword					VTI_selectMinStart = 0;	/* INTERNAL */
-	@instance dword					VTI_selectMinEnd =0;	/* INTERNAL */
-	@instance dword					VTI_lastOffset = 0;		/* INTERNAL */
-	@instance word					VTI_goalPosition = 0;	/* INTERNAL */
-	@instance Point					VTI_cursorPos = {0,0};	/* INTERNAL */
-	@instance word					VTI_cursorRegion = 0;	/* INTERNAL */
-	@instance word					VTI_leftOffset = 0;		/* INTERNAL */
-	@instance byte					VTI_lrMargin = 0;
-	@instance byte					VTI_tbMargin = 0;
-	@instance ColorQuad				VTI_washColor = {
-											C_WHITE,
-											CF_INDEX,
-											0, 0 }
-	@instance word					VTI_maxLength = 10000;
-	@instance VisTextFilters		VTI_filters = 0;
-	@instance optr					VTI_output;
-	@instance WBFixed				VTI_height = {0,0};		/* INTERNAL */
-	@instance word					VTI_lastWidth = -1;		/* INTERNAL */
-	@instance TimerHandle			VTI_timerHandle = NullHandle; /* INTERNAL */
-	@instance word					VTI_timerID = 0;		/* INTERNAL */
+    @instance ChunkHandle           VTI_text;
+    @instance word                  VTI_charAttrRuns = VIS_TEXT_INITIAL_CHAR_ATTR;
+    @instance word                  VTI_paraAttrRuns = VIS_TEXT_INITIAL_PARA_ATTR;
+    @instance VMFileHandle          VTI_vmFile = NullHandle;
+    @instance word                  VTI_lines = 0;          /* INTERNAL */
+    @instance VisTextStorageFlags   VTI_storageFlags = (VTSF_DEFAULT_CHAR_ATTR |
+                                         VTSF_DEFAULT_PARA_ATTR);
+    @instance VisTextFeatures       VTI_features = 0;
+    @instance VisTextStates         VTI_state = 0;
+    @instance VisTextIntFlags       VTI_intFlags = 0;       /* INTERNAL */
+    @instance VisTextIntSelFlags    VTI_intSelFlags = 0;    /* INTERNAL */
+    @instance GSRefCountAndFlags    VTI_gsRefCount = 0;     /* INTERNAL */
+    @instance GStateHandle          VTI_gstate = NullHandle; /* INTERNAL */
+    @instance word                  VTI_gstateRegion = -1;  /* INTERNAL */
+    @instance dword                 VTI_selectStart = 0;
+    @instance dword                 VTI_selectEnd = 0;
+    @instance PointDWord            VTI_startEventPos = {0,0}; /* INTERNAL */
+    @instance dword                 VTI_selectMinStart = 0; /* INTERNAL */
+    @instance dword                 VTI_selectMinEnd =0;    /* INTERNAL */
+    @instance dword                 VTI_lastOffset = 0;     /* INTERNAL */
+    @instance word                  VTI_goalPosition = 0;   /* INTERNAL */
+    @instance Point                 VTI_cursorPos = {0,0};  /* INTERNAL */
+    @instance word                  VTI_cursorRegion = 0;   /* INTERNAL */
+    @instance word                  VTI_leftOffset = 0;     /* INTERNAL */
+    @instance byte                  VTI_lrMargin = 0;
+    @instance byte                  VTI_tbMargin = 0;
+    @instance ColorQuad             VTI_washColor = {
+                                            C_WHITE,
+                                            CF_INDEX,
+                                            0, 0 }
+    @instance word                  VTI_maxLength = 10000;
+    @instance VisTextFilters        VTI_filters = 0;
+    @instance optr                  VTI_output;
+    @instance WBFixed               VTI_height = {0,0};     /* INTERNAL */
+    @instance word                  VTI_lastWidth = -1;     /* INTERNAL */
+    @instance TimerHandle           VTI_timerHandle = NullHandle; /* INTERNAL */
+    @instance word                  VTI_timerID = 0;        /* INTERNAL */
 
 ----------
 *VTI_text* stores the ChunkHandle of the object's text chunk. This chunk will 
@@ -3027,46 +3027,46 @@ your text object to accept or reject certain sets of characters.
 ----------
 **Code Display 10-20 VisText Variable Data**
 
-	@vardata word		ATTR_VIS_TEXT_TYPE_RUNS;
-	@vardata word		ATTR_VIS_TEXT_GRAPHICS_RUNS;
-	@vardata word		ATTR_VIS_TEXT_REGION_ARRAY;
-	@vardata word		ATTR_VIS_TEXT_STYLE_ARRAY;
-	@vardata word		ATTR_VIS_TEXT_NAME_ARRAY;
+    @vardata word       ATTR_VIS_TEXT_TYPE_RUNS;
+    @vardata word       ATTR_VIS_TEXT_GRAPHICS_RUNS;
+    @vardata word       ATTR_VIS_TEXT_REGION_ARRAY;
+    @vardata word       ATTR_VIS_TEXT_STYLE_ARRAY;
+    @vardata word       ATTR_VIS_TEXT_NAME_ARRAY;
 
-	@vardata word		ATTR_VIS_TEXT_SELECTED_TAB;
-	@vardata void		ATTR_VIS_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
-	@vardata VisTextExtendedFilterType ATTR_VIS_TEXT_EXTENDED_FILTER;
+    @vardata word       ATTR_VIS_TEXT_SELECTED_TAB;
+    @vardata void       ATTR_VIS_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+    @vardata VisTextExtendedFilterType ATTR_VIS_TEXT_EXTENDED_FILTER;
 
-	typedef struct {
-		word				VTSD_count;
-		VisTextRange		VTSD_recalcRange;
-		VisTextRange		VTSD_selectRange;
-		dword				VTSD_showSelectionPos;
-		WordFlags			VTSD_notifications;
-		byte				VTSD_needsRecalc;
-	} VisTextSuspendData;
+    typedef struct {
+        word                VTSD_count;
+        VisTextRange        VTSD_recalcRange;
+        VisTextRange        VTSD_selectRange;
+        dword               VTSD_showSelectionPos;
+        WordFlags           VTSD_notifications;
+        byte                VTSD_needsRecalc;
+    } VisTextSuspendData;
 
-	@vardata VisTextSuspendData ATTR_VIS_TEXT_SUSPEND_DATA;
+    @vardata VisTextSuspendData ATTR_VIS_TEXT_SUSPEND_DATA;
 
-	@vardata void		ATTR_VIS_TEXT_NOTIFY_CONTENT;
-	@vardata void		ATTR_VIS_TEXT_DO_NOT_NOTIFY_CONTENT;
-	@vardata void		ATTR_VIS_TEXT_SEND_CONTEXT_NOTIFICATIONS_EVEN_IF_NOT_FOCUSED;
+    @vardata void       ATTR_VIS_TEXT_NOTIFY_CONTENT;
+    @vardata void       ATTR_VIS_TEXT_DO_NOT_NOTIFY_CONTENT;
+    @vardata void       ATTR_VIS_TEXT_SEND_CONTEXT_NOTIFICATIONS_EVEN_IF_NOT_FOCUSED;
 
-	typedef struct {
-		wchar		VTCFD_startOfRange;
-		wchar		VTCFD_endOfRange;
-	} VisTextCustomFilterData;
+    typedef struct {
+        wchar       VTCFD_startOfRange;
+        wchar       VTCFD_endOfRange;
+    } VisTextCustomFilterData;
 
-	@vardata ChunkHandle ATTR_VIS_TEXT_CUSTOM_FILTER;
+    @vardata ChunkHandle ATTR_VIS_TEXT_CUSTOM_FILTER;
 
-	@vardata word		ATTR_VIS_TEXT_CHAR_ATTR_INSERTION_TOKEN;
-	@vardata word		ATTR_VIS_TEXT_TYPE_INSERTION_TOKEN;
+    @vardata word       ATTR_VIS_TEXT_CHAR_ATTR_INSERTION_TOKEN;
+    @vardata word       ATTR_VIS_TEXT_TYPE_INSERTION_TOKEN;
 
-	@vardata void		ATTR_VIS_TEXT_UPDATE_VIA_PROCESS;
-	@vardata void		ATTR_VIS_TEXT_DOES_NOT_ACCEPT_INK;
-	@vardata WBFixed		ATTR_VIS_TEXT_MINIMUM_SINGLE_LINE_HEIGHT;
+    @vardata void       ATTR_VIS_TEXT_UPDATE_VIA_PROCESS;
+    @vardata void       ATTR_VIS_TEXT_DOES_NOT_ACCEPT_INK;
+    @vardata WBFixed        ATTR_VIS_TEXT_MINIMUM_SINGLE_LINE_HEIGHT;
 
-	@vardata word		ATTR_VIS_TEXT_ADD_SPACE_TO_ALL_LINES;
+    @vardata word       ATTR_VIS_TEXT_ADD_SPACE_TO_ALL_LINES;
 
 ----------
 ATTR_VIS_TEXT_TYPE_RUNS specifies the Type runs for this text object. You 
@@ -3120,8 +3120,8 @@ also affect any text lines that contain borders, adding additional space
 between the text and the border.
 
 ### 10.5.1 VisText Features
-	VTI_features, VisTextFeatures, MSG_VIS_TEXT_SET_FEATURES, 
-	MSG_VIS_TEXT_GET_FEATURES
+    VTI_features, VisTextFeatures, MSG_VIS_TEXT_SET_FEATURES, 
+    MSG_VIS_TEXT_GET_FEATURES
 
 *VTI_features* stores a bitfield of **VisTextFeatures** specifying whether a 
 particular feature is enabled in the Text object. These flags are listed below.
@@ -3167,9 +3167,9 @@ GenText object to show a disabled state.
 
 ----------
 #### MSG_VIS_TEXT_SET_FEATURES
-	void	MSG_VIS_TEXT_SET_FEATURES(
-			VisTextFeatures		bitsToSet,
-			VisTextFeatures		bitsToClear);
+    void    MSG_VIS_TEXT_SET_FEATURES(
+            VisTextFeatures     bitsToSet,
+            VisTextFeatures     bitsToClear);
 
 This message sets a text object's **VisTextFeatures** (*VTI_features*). 
 
@@ -3188,7 +3188,7 @@ This message sets a text object's **VisTextFeatures** (*VTI_features*).
 
 ----------
 #### MSG_VIS_TEXT_GET_FEATURES
-	VisTextFeatures MSG_VIS_TEXT_GET_FEATURES();
+    VisTextFeatures MSG_VIS_TEXT_GET_FEATURES();
 
 This message retrieves the text object's **VisTextFeatures** (*VTI_features*).
 
@@ -3203,12 +3203,12 @@ This message retrieves the text object's **VisTextFeatures** (*VTI_features*).
 **Interception:** Generally not intercepted.
 
 #### 10.5.2 VisText States
-	VTI_state, VisTextStates, MSG_VIS_TEXT_GET_STATE, 
-	MSG_VIS_TEXT_GET_USER_MODIFIED_STATE, 
-	MSG_VIS_TEXT_SET_NOT_USER_MODIFIED, 
-	MSG_VIS_TEXT_SET_USER_MODIFIED, 
-	MSG_VIS_TEXT_ENTER_OVERSTRIKE_MODE, 
-	MSG_VIS_TEXT_ENTER_INSERT_MODE
+    VTI_state, VisTextStates, MSG_VIS_TEXT_GET_STATE, 
+    MSG_VIS_TEXT_GET_USER_MODIFIED_STATE, 
+    MSG_VIS_TEXT_SET_NOT_USER_MODIFIED, 
+    MSG_VIS_TEXT_SET_USER_MODIFIED, 
+    MSG_VIS_TEXT_ENTER_OVERSTRIKE_MODE, 
+    MSG_VIS_TEXT_ENTER_INSERT_MODE
 
 *VTI_state* stores a bitfield of **VisTextStates** that determine the ability of the 
 user to interact with the text object. These flags are listed below.
@@ -3252,7 +3252,7 @@ MSG_VIS_TEXT_SET_USER_MODIFIED to clear or set this flag.
 
 ----------
 #### MSG_VIS_TEXT_GET_STATE
-	VisTextStates MSG_VIS_TEXT_GET_STATE();
+    VisTextStates MSG_VIS_TEXT_GET_STATE();
 
 This message retrieves the text object's **VisTextStates** (*VTI_state*).
 
@@ -3268,7 +3268,7 @@ This message retrieves the text object's **VisTextStates** (*VTI_state*).
 
 ----------
 #### MSG_VIS_TEXT_GET_USER_MODIFIED_STATE
-	word	MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+    word    MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
 
 This message returns the state of the text object's VTS_MODIFIED flag in its 
 *VTI_state* entry.
@@ -3285,7 +3285,7 @@ This message returns the state of the text object's VTS_MODIFIED flag in its
 
 ----------
 #### MSG_VIS_TEXT_SET_NOT_USER_MODIFIED
-	void	MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    void    MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
 
 This message clears the text object's VTS_USER_MODIFIED flag.
 
@@ -3297,7 +3297,7 @@ This message clears the text object's VTS_USER_MODIFIED flag.
 
 ----------
 #### MSG_VIS_TEXT_SET_USER_MODIFIED
-	void	MSG_VIS_TEXT_SET_USER_MODIFIED();
+    void    MSG_VIS_TEXT_SET_USER_MODIFIED();
 
 This message sets the text object's VTS_USER_MODIFIED flag.
 
@@ -3309,9 +3309,9 @@ This message sets the text object's VTS_USER_MODIFIED flag.
 
 ----------
 #### MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE
-	void	MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(
-			VisTextStates		setBits,
-			VisTextStates		clearBits);
+    void    MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(
+            VisTextStates       setBits,
+            VisTextStates       clearBits);
 
 This message modifies the text object's VTS_EDITABLE and 
 VTS_SELECTABLE states. These are the only VisTextStates you should 
@@ -3332,8 +3332,8 @@ states to clear.
 
 ----------
 #### MSG_VIS_TEXT_ENTER_OVERSTRIKE_MODE
-	void	MSG_VIS_TEXT_ENTER_OVERSTRIKE_MODE(
-			Boolean		calledFromTextObject);
+    void    MSG_VIS_TEXT_ENTER_OVERSTRIKE_MODE(
+            Boolean     calledFromTextObject);
 
 This message enters the text object into overstrike mode (setting the 
 VTS_OVERSTRIKE_MODE flag).
@@ -3350,8 +3350,8 @@ text object.
 
 ----------
 #### MSG_VIS_TEXT_ENTER_INSERT_MODE
-	void	MSG_VIS_TEXT_ENTER_INSERT_MODE(
-			Boolean		calledFromTextObject);
+    void    MSG_VIS_TEXT_ENTER_INSERT_MODE(
+            Boolean     calledFromTextObject);
 
 This message enters the text object into insert mode (clearing the 
 VTS_OVERSTRIKE_MODE flag).
@@ -3367,11 +3367,11 @@ text object.
 **Interception:** Generally not intercepted.
 
 ### 10.5.3 VisText VM File Storage
-	VTI_vmFile, MSG_VIS_TEXT_SET_VM_FILE, 
-	MSG_VIS_TEXT_SAVE_TO_DB_ITEM, 
-	MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES, 
-	MSG_VIS_TEXT_LOAD_FROM_DB_ITEM, 
-	MSG_VIS_TEXT_LOAD_FROM_DB_ITEM_WITH_STYLES
+    VTI_vmFile, MSG_VIS_TEXT_SET_VM_FILE, 
+    MSG_VIS_TEXT_SAVE_TO_DB_ITEM, 
+    MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES, 
+    MSG_VIS_TEXT_LOAD_FROM_DB_ITEM, 
+    MSG_VIS_TEXT_LOAD_FROM_DB_ITEM_WITH_STYLES
 
 *VTI_vmFile* stores the VM file handle that is associated with this text object. 
 This file is the default VM file that will be used for operations that require a 
@@ -3398,8 +3398,8 @@ were saved previously.
 
 ----------
 #### MSG_VIS_TEXT_SET_VM_FILE
-	void	MSG_VIS_TEXT_SET_VM_FILE(
-			VMFileHandle		file);
+    void    MSG_VIS_TEXT_SET_VM_FILE(
+            VMFileHandle        file);
 
 This message sets the text object's *VTI_vmFile* instance field to the passed VM 
 file handle. This file handle will be used as the default for operations that 
@@ -3416,9 +3416,9 @@ require a VM file.
 
 ----------
 #### MSG_VIS_TEXT_SAVE_TO_DB_ITEM
-	DBGroupAndItem	MSG_VIS_TEXT_SAVE_TO_DB_ITEM(
-					DBGroupAndItem			item,
-					VisTextSaveDBFlags		flags);
+    DBGroupAndItem  MSG_VIS_TEXT_SAVE_TO_DB_ITEM(
+                    DBGroupAndItem          item,
+                    VisTextSaveDBFlags      flags);
 
 This message saves information about the current state of the text object. 
 Data saved with this message can be retrieved with 
@@ -3442,11 +3442,11 @@ the text's info to save.
 
 ----------
 #### MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES
-	DBGroupAndItem	MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES(
-					FileHandle				xferFile,
-					VisTextSaveDBFlags		flags,
-					DBGroupAndItem			item,
-					StyleSheetParams		*params);
+    DBGroupAndItem  MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES(
+                    FileHandle              xferFile,
+                    VisTextSaveDBFlags      flags,
+                    DBGroupAndItem          item,
+                    StyleSheetParams        *params);
 
 This message saves information about the current state of the text object, 
 passing a **StyleSheetParams** structure.
@@ -3476,9 +3476,9 @@ specified in *VTI_vmFile*.
 
 ----------
 #### MSG_VIS_TEXT_LOAD_FROM_DB_ITEM
-	void	MSG_VIS_TEXT_LOAD_FROM_DB_ITEM(
-			DBGroupAndItem		item,
-			VMFileHandle		file);
+    void    MSG_VIS_TEXT_LOAD_FROM_DB_ITEM(
+            DBGroupAndItem      item,
+            VMFileHandle        file);
 
 This message loads text saved with MSG_VIS_TEXT_SAVE_TO_DB_ITEM.
 
@@ -3496,10 +3496,10 @@ This message loads text saved with MSG_VIS_TEXT_SAVE_TO_DB_ITEM.
 
 ----------
 #### MSG_VIS_TEXT_LOAD_FROM_DB_ITEM_WITH_STYLES
-	void	MSG_VIS_TEXT_LOAD_FROM_DB_ITEM_WITH_STYLES(
-			FileHandle			file,
-			DBGroupAndItem		item,
-			StyleSheetParams	*params);
+    void    MSG_VIS_TEXT_LOAD_FROM_DB_ITEM_WITH_STYLES(
+            FileHandle          file,
+            DBGroupAndItem      item,
+            StyleSheetParams    *params);
 
 This message loads text and style sheets saved with 
 MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES.
@@ -3519,9 +3519,9 @@ MSG_VIS_TEXT_SAVE_TO_DB_ITEM_WITH_STYLES.
 **Interception:** Generally not intercepted.
 
 ### 10.5.4 Text Filters
-	VTI_filters, VisTextFilters, VisTextFilterClass, 
-	ATTR_VIS_TEXT_EXTENDED_FILTER, MSG_VIS_TEXT_SET_FILTER, 
-	MSG_VIS_TEXT_GET_FILTER
+    VTI_filters, VisTextFilters, VisTextFilterClass, 
+    ATTR_VIS_TEXT_EXTENDED_FILTER, MSG_VIS_TEXT_SET_FILTER, 
+    MSG_VIS_TEXT_GET_FILTER
 
 
 When the user enters text into the text object, the text object is able to filter 
@@ -3584,7 +3584,7 @@ release.
 
 ----------
 #### MSG_VIS_TEXT_GET_FILTER
-	byte	MSG_VIS_TEXT_GET_FILTER();
+    byte    MSG_VIS_TEXT_GET_FILTER();
 
 This message retrieves the current **VisTextFilters** in use by the text object 
 (stored in *VTI_filters*).
@@ -3599,8 +3599,8 @@ This message retrieves the current **VisTextFilters** in use by the text object
 
 ----------
 #### MSG_VIS_TEXT_SET_FILTER
-	void	MSG_VIS_TEXT_SET_FILTER(
-			byte		filter);
+    void    MSG_VIS_TEXT_SET_FILTER(
+            byte        filter);
 
 This message sets the text object's **VisTextFilters** (stored in *VTI_filters*) to 
 the passed value. Resetting this filter does not affect any text that already 
@@ -3617,8 +3617,8 @@ exists in the text object.
 
 ----------
 #### MSG_VIS_TEXT_FILTER_VIA_CHARACTER
-	word	MSG_VIS_TEXT_FILTER_VIA_CHARACTER(
-			word		charToFilter);
+    word    MSG_VIS_TEXT_FILTER_VIA_CHARACTER(
+            word        charToFilter);
 
 This message allows the text object to filter text on a character by character 
 basis. This message is called for each character that is entered into the text 
@@ -3642,7 +3642,7 @@ this value on to the superclass or filter it out.
 **Interception:** Must intercept to provide character by character filtering.
 
 ### 10.5.5 Key Functions
-	VisTextKeyFunction, MSG_VIS_TEXT_DO_KEY_FUNCTION
+    VisTextKeyFunction, MSG_VIS_TEXT_DO_KEY_FUNCTION
 
 The VisText object is able to recognize certain generic functions that operate 
 on text. Most of these functions are initiated through a key sequence entered 
@@ -3697,9 +3697,9 @@ VTKF_TOGGLE_SMART_QUOTES
 
 ----------
 #### MSG_VIS_TEXT_DO_KEY_FUNCTION
-	void	MSG_VIS_TEXT_DO_KEY_FUNCTION
-			VisTextKeyFunction		func,
-			word					data);
+    void    MSG_VIS_TEXT_DO_KEY_FUNCTION
+            VisTextKeyFunction      func,
+            word                    data);
 
 This message allows the text object to mimic certain text operations that 
 normally are the result of user keystrokes.
@@ -3720,13 +3720,13 @@ in an upcoming release.
 **Interception:** Generally not intercepted.
 
 #### 10.5.6 Setting Text Confines
-	MSG_VIS_TEXT_GET_MAX_LENGTH, MSG_VIS_TEXT_SET_MAX_LENGTH, 
-	MSG_VIS_TEXT_GET_LR_MARGIN, MSG_VIS_TEXT_SET_LR_MARGIN, 
-	MSG_VIS_TEXT_GET_TB_MARGIN, MSG_VIS_TEXT_SET_TB_MARGIN
+    MSG_VIS_TEXT_GET_MAX_LENGTH, MSG_VIS_TEXT_SET_MAX_LENGTH, 
+    MSG_VIS_TEXT_GET_LR_MARGIN, MSG_VIS_TEXT_SET_LR_MARGIN, 
+    MSG_VIS_TEXT_GET_TB_MARGIN, MSG_VIS_TEXT_SET_TB_MARGIN
 
 ----------
 #### MSG_VIS_TEXT_GET_MAX_LENGTH
-	word	MSG_VIS_TEXT_GET_MAX_LENGTH();
+    word    MSG_VIS_TEXT_GET_MAX_LENGTH();
 
 This message returns the maximum length of text in the text object (stored 
 in *VTI_maxLength*).
@@ -3741,8 +3741,8 @@ in *VTI_maxLength*).
 
 ----------
 #### MSG_VIS_TEXT_SET_MAX_LENGTH
-	void	MSG_VIS_TEXT_SET_MAX_LENGTH(
-			word		newMaxLength);
+    void    MSG_VIS_TEXT_SET_MAX_LENGTH(
+            word        newMaxLength);
 
 This message sets the maximum length of text within a text object (stored in 
 *VTI_maxLength*). If the current text is too long, any excess text is removed. 
@@ -3758,7 +3758,7 @@ This message sets the maximum length of text within a text object (stored in
 
 ----------
 #### MSG_VIS_TEXT_GET_LR_MARGIN
-	byte	MSG_VIS_TEXT_GET_LR_MARGIN();
+    byte    MSG_VIS_TEXT_GET_LR_MARGIN();
 
 This message returns the current left/right margins. Both margins are the 
 same and are thus represented by the same returned value.
@@ -3773,8 +3773,8 @@ same and are thus represented by the same returned value.
 
 ----------
 #### MSG_VIS_TEXT_SET_LR_MARGIN
-	void	MSG_VIS_TEXT_SET_LR_MARGIN(
-			byte		lrMargin);
+    void    MSG_VIS_TEXT_SET_LR_MARGIN(
+            byte        lrMargin);
 
 This message sets the left/right margins of the text object. Both margins will 
 be set to the same value. Do not use this message on GenText objects, as the 
@@ -3791,7 +3791,7 @@ specific UI is responsible for this behavior.
 
 ----------
 #### MSG_VIS_TEXT_GET_LR_MARGIN
-	byte	MSG_VIS_TEXT_GET_LR_MARGIN();
+    byte    MSG_VIS_TEXT_GET_LR_MARGIN();
 
 This message returns the current left/right margins. Both margins are the 
 same and are thus represented by the same returned value.
@@ -3806,8 +3806,8 @@ same and are thus represented by the same returned value.
 
 ----------
 #### MSG_VIS_TEXT_SET_TB_MARGIN
-	void	MSG_VIS_TEXT_SET_TB_MARGIN(
-			byte		tbMargin);
+    void    MSG_VIS_TEXT_SET_TB_MARGIN(
+            byte        tbMargin);
 
 This message sets the top/bottom margins of the text object. Both margins 
 will be set to the same value. Do not use this message on GenText objects, as 
@@ -3823,13 +3823,13 @@ the specific UI is responsible for this behavior.
 **Interception:** Generally not intercepted.
 
 ### 10.5.7 Output Messages
-	VTI_output, MSG_VIS_TEXT_GET_OUTPUT, 
-	MSG_VIS_TEXT_SET_OUTPUT, MSG_META_TEXT_USER_MODIFIED, 
-	MSG_META_TEXT_NOT_USER_MODIFIED,MSG_META_TEXT_CR_FILTERED,
-	MSG_META_TEXT_TAB_FILTERED, MSG_META_TEXT_LOST_FOCUS, 
-	MSG_META_TEXT_GAINED_FOCUS, MSG_META_TEXT_LOST_TARGET, 
-	MSG_META_TEXT_GAINED_TARGET, 
-	MSG_META_TEXT_EMPTY_STATUS_CHANGED
+    VTI_output, MSG_VIS_TEXT_GET_OUTPUT, 
+    MSG_VIS_TEXT_SET_OUTPUT, MSG_META_TEXT_USER_MODIFIED, 
+    MSG_META_TEXT_NOT_USER_MODIFIED,MSG_META_TEXT_CR_FILTERED,
+    MSG_META_TEXT_TAB_FILTERED, MSG_META_TEXT_LOST_FOCUS, 
+    MSG_META_TEXT_GAINED_FOCUS, MSG_META_TEXT_LOST_TARGET, 
+    MSG_META_TEXT_GAINED_TARGET, 
+    MSG_META_TEXT_EMPTY_STATUS_CHANGED
 
 *VTI_output* stores the object to receive messages sent out by the text object. 
 A range of messages imported from **MetaClass** (**MetaTextMessages**) are 
@@ -3867,8 +3867,8 @@ MSG_VIS_TEXT_SET_OUTPUT.
 
 ----------
 #### MSG_META_TEXT_USER_MODIFIED
-	@importMessage MetaTextMessages, void MSG_META_TEXT_USER_MODIFIED(
-				optr		obj);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_USER_MODIFIED(
+                optr        obj);
 
 MSG_META_TEXT_USER_MODIFIED is sent to *VTI_output* when the user 
 modifies text within the object. The message is also sent to the text object 
@@ -3893,8 +3893,8 @@ using MF_FORCE_QUEUE
 
 ----------
 #### MSG_META_TEXT_NOT_USER_MODIFIED
-	@importMessage MetaTextMessages, void MSG_META_TEXT_NOT_USER_MODIFIED(
-				optr		obj);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_NOT_USER_MODIFIED(
+                optr        obj);
 
 This message is sent to *VTI_output* when the VTS_MODIFIED state of the text 
 object is cleared, either by the system, or by an application inspired action.
@@ -3912,10 +3912,10 @@ modified.
 
 ----------
 #### MSG_META_TEXT_CR_FILTERED
-	@importMessage MetaTextMessages, void MSG_META_TEXT_CR_FILTERED(
-				word		character,
-				word		flags,
-				word		state);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_CR_FILTERED(
+                word        character,
+                word        flags,
+                word        state);
 
 This message is sent to ---------- when a Carriage Return is filtered out in 
 the text input stream.
@@ -3938,10 +3938,10 @@ filtered out of the text object.
 
 ----------
 #### MSG_META_TEXT_TAB_FILTERED
-	@importMessage MetaTextMessages, void MSG_META_TEXT_TAB_FILTERED(
-				word		character,
-				word		flags,
-				word		state);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_TAB_FILTERED(
+                word        character,
+                word        flags,
+                word        state);
 
 This message is sent to *VTI_output* when a Tab is filtered out in the text input 
 stream.
@@ -3964,8 +3964,8 @@ text object.
 
 ----------
 #### MSG_META_TEXT_LOST_FOCUS
-	@importMessage MetaTextMessages, void MSG_META_TEXT_LOST_FOCUS(
-				optr		obj);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_LOST_FOCUS(
+                optr        obj);
 
 This message is sent when the text object loses the focus of the application. 
 
@@ -3980,8 +3980,8 @@ This message is sent when the text object loses the focus of the application.
 
 ----------
 #### MSG_META_TEXT_GAINED_FOCUS
-	@importMessage MetaTextMessages, void MSG_META_TEXT_GAINED_FOCUS(
-				optr		obj);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_GAINED_FOCUS(
+                optr        obj);
 
 This message is sent when the text object gains the focus of the application.
 
@@ -3996,8 +3996,8 @@ This message is sent when the text object gains the focus of the application.
 
 ----------
 #### ###MSG_META_TEXT_LOST_TARGET
-	@importMessage MetaTextMessages, void MSG_META_TEXT_LOST_TARGET(
-				optr		obj);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_LOST_TARGET(
+                optr        obj);
 
 This message is sent when the text object loses the target of an application.
 
@@ -4012,8 +4012,8 @@ This message is sent when the text object loses the target of an application.
 
 ----------
 #### MSG_META_TEXT_GAINED_TARGET
-	@importMessage MetaTextMessages, void MSG_META_TEXT_GAINED_TARGET(
-				optr		obj);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_GAINED_TARGET(
+                optr        obj);
 
 This message is sent when the text object gains the target of an application.
 
@@ -4028,9 +4028,9 @@ This message is sent when the text object gains the target of an application.
 
 ----------
 #### MSG_META_TEXT_EMPTY_STATUS_CHANGED
-	@importMessage MetaTextMessages, void MSG_META_TEXT_EMPTY_STATUS_CHANGED(
-				optr		object,
-				Boolean		hasTextFlag);
+    @importMessage MetaTextMessages, void MSG_META_TEXT_EMPTY_STATUS_CHANGED(
+                optr        object,
+                Boolean     hasTextFlag);
 
 This message is sent out when the text object is either becoming empty or not 
 empty.
@@ -4051,7 +4051,7 @@ object is changing.
 
 ----------
 #### MSG_VIS_TEXT_GET_OUTPUT
-	optr	MSG_VIS_TEXT_GET_OUTPUT();
+    optr    MSG_VIS_TEXT_GET_OUTPUT();
 
 This message returns the current destination (output) for actions taken by 
 the text object.
@@ -4066,8 +4066,8 @@ the text object.
 
 ----------
 #### MSG_VIS_TEXT_SET_OUTPUT
-	void	MSG_VIS_TEXT_SET_OUTPUT(
-			optr		newOutput);
+    void    MSG_VIS_TEXT_SET_OUTPUT(
+            optr        newOutput);
 
 This message sets the destination object for actions taken by this text object.
 
@@ -4082,16 +4082,16 @@ This message sets the destination object for actions taken by this text object.
 **Interception:** Generally not intercepted.
 
 ### 10.5.8 Getting Geometry Information
-	MSG_VIS_TEXT_GET_MIN_WIDTH, 
-	MSG_VIS_TEXT_GET_AVERAGE_CHAR_WIDTH, 
-	MSG_VIS_TEXT_GET_LINE_HEIGHT, 
-	MSG_VIS_TEXT_RECALC_AND_DRAW, 
-	MSG_VIS_TEXT_GET_ONE_LINE_WIDTH, 
-	MSG_VIS_TEXT_GET_SIMPLE_MIN_WIDTH
+    MSG_VIS_TEXT_GET_MIN_WIDTH, 
+    MSG_VIS_TEXT_GET_AVERAGE_CHAR_WIDTH, 
+    MSG_VIS_TEXT_GET_LINE_HEIGHT, 
+    MSG_VIS_TEXT_RECALC_AND_DRAW, 
+    MSG_VIS_TEXT_GET_ONE_LINE_WIDTH, 
+    MSG_VIS_TEXT_GET_SIMPLE_MIN_WIDTH
 
 ----------
 #### MSG_VIS_TEXT_GET_MIN_WIDTH
-	word	MSG_VIS_TEXT_GET_MIN_WIDTH();
+    word    MSG_VIS_TEXT_GET_MIN_WIDTH();
 
 This message returns the minimum width that can be supported for 
 attributes of the text object.
@@ -4104,7 +4104,7 @@ attributes of the text object.
 
 ----------
 #### MSG_VIS_TEXT_GET_AVERAGE_CHAR_WIDTH
-	word	MSG_VIS_TEXT_GET_AVERAGE_CHAR_WIDTH();
+    word    MSG_VIS_TEXT_GET_AVERAGE_CHAR_WIDTH();
 
 This message returns the average character width for the first font/character 
 attribute run.
@@ -4117,7 +4117,7 @@ attribute run.
 
 ----------
 #### MSG_VIS_TEXT_GET_LINE_HEIGHT
-	word	MSG_VIS_TEXT_GET_LINE_HEIGHT();
+    word    MSG_VIS_TEXT_GET_LINE_HEIGHT();
 
 This message returns the height of a line (in points) for a single-line text 
 object only.
@@ -4130,7 +4130,7 @@ object only.
 
 ----------
 #### MSG_VIS_TEXT_RECALC_AND_DRAW
-	void	MSG_VIS_TEXT_RECALC_AND_DRAW();
+    void    MSG_VIS_TEXT_RECALC_AND_DRAW();
 
 This message recalculates and redraws a text object, usually after 
 constraints on either its width or its height is made without its knowledge.
@@ -4143,8 +4143,8 @@ constraints on either its width or its height is made without its knowledge.
 
 ----------
 #### MSG_VIS_TEXT_GET_ONE_LINE_WIDTH
-	word	MSG_VIS_TEXT_GET_ONE_LINE_WIDTH(
-			word		charsToCalc);
+    word    MSG_VIS_TEXT_GET_ONE_LINE_WIDTH(
+            word        charsToCalc);
 
 This message calculates the width of a single-line text object. This width is 
 calculated using the first encountered character attributes.
@@ -4161,7 +4161,7 @@ the calculation.
 
 ----------
 #### MSG_VIS_TEXT_GET_SIMPLE_MIN_WIDTH
-	word	MSG_VIS_TEXT_GET_SIMPLE_MIN_WIDTH();
+    word    MSG_VIS_TEXT_GET_SIMPLE_MIN_WIDTH();
 
 This message returns the minimum width that can be supported for the text 
 object's current text, font and character attributes. This message assumes 
@@ -4257,27 +4257,27 @@ presentation of text. These are listed in Code Display 10-21.
 ----------
 **Code Display 10-21 GenText Instance Data**
 
-	@instance ChunkHandle			GTXI_text;
-	@instance word					GTXI_maxLength = 32767;
-	@instance GenTextAttrs			GTXI_attrs = GTA_USE_TAB_FOR_NAVIGATION;
-	@instance GenTextStateFlags		GTXI_stateFlags = 0;
-	@instance optr					GTXI_destination;
-	@instance word					GTXI_applyMsg = 0;
+    @instance ChunkHandle           GTXI_text;
+    @instance word                  GTXI_maxLength = 32767;
+    @instance GenTextAttrs          GTXI_attrs = GTA_USE_TAB_FOR_NAVIGATION;
+    @instance GenTextStateFlags     GTXI_stateFlags = 0;
+    @instance optr                  GTXI_destination;
+    @instance word                  GTXI_applyMsg = 0;
 
-	/* GenTextAttrs */
-	typedef ByteFlags GenTextAttrs;
-	#define GTA_SINGLE_LINE_TEXT			0x80
-	#define GTA_USE_TAB_FOR_NAVIGATION		0x40
-	#define GTA_INIT_SCROLLING				0x20
-	#define GTA_NO_WORD_WRAPPING			0x10
-	#define GTA_ALLOW_TEXT_OFF_END			0x08
-	#define GTA_TAIL_ORIENTED				0x04
-	#define GTA_DONT_SCROLL_TO_CHANGES		0X02
+    /* GenTextAttrs */
+    typedef ByteFlags GenTextAttrs;
+    #define GTA_SINGLE_LINE_TEXT            0x80
+    #define GTA_USE_TAB_FOR_NAVIGATION      0x40
+    #define GTA_INIT_SCROLLING              0x20
+    #define GTA_NO_WORD_WRAPPING            0x10
+    #define GTA_ALLOW_TEXT_OFF_END          0x08
+    #define GTA_TAIL_ORIENTED               0x04
+    #define GTA_DONT_SCROLL_TO_CHANGES      0X02
 
-	/* GenTextStateFlags */
-	typedef ByteFlags GenTextStateFlags
-	#define GTSF_INDETERMINATE				0x80
-	#define GTSF_MODIFIED					0x40
+    /* GenTextStateFlags */
+    typedef ByteFlags GenTextStateFlags
+    #define GTSF_INDETERMINATE              0x80
+    #define GTSF_MODIFIED                   0x40
 
 ----------
 *GTXI_text* stores the ChunkHandle of the chunk containing the GenText's 
@@ -4308,53 +4308,53 @@ by this object.
 ----------
 **Code Display 10-22 GenText VarData Instance Fields**
 
-	@vardata Message		ATTR_GEN_TEXT_STATUS_MSG;
-	@vardata void			ATTR_GEN_TEXT_SET_MODIFIED_ON_REDUNDANT_SELECTION;
-	@vardata void			ATTR_GEN_TEXT_SELECTABLE;
-	@vardata VisTextDefaultCharAttr ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR;
-	@vardata VisTextDefaultParaAttr ATTR_GEN_TEXT_DEFAULT_PARA_ATTR;
-	@vardata ChunkHandle	ATTR_GEN_TEXT_CHAR_ATTR;
-	@vardata ChunkHandle	ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS;
-	@vardata ChunkHandle	ATTR_GEN_TEXT_PARA_ATTR;
-	@vardata ChunkHandle	ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS;
+    @vardata Message        ATTR_GEN_TEXT_STATUS_MSG;
+    @vardata void           ATTR_GEN_TEXT_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+    @vardata void           ATTR_GEN_TEXT_SELECTABLE;
+    @vardata VisTextDefaultCharAttr ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR;
+    @vardata VisTextDefaultParaAttr ATTR_GEN_TEXT_DEFAULT_PARA_ATTR;
+    @vardata ChunkHandle    ATTR_GEN_TEXT_CHAR_ATTR;
+    @vardata ChunkHandle    ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS;
+    @vardata ChunkHandle    ATTR_GEN_TEXT_PARA_ATTR;
+    @vardata ChunkHandle    ATTR_GEN_TEXT_MULTIPLE_PARA_ATTR_RUNS;
 
-	@vardata word			ATTR_GEN_TEXT_EXTENDED_FILTER;
+    @vardata word           ATTR_GEN_TEXT_EXTENDED_FILTER;
 
-	@vardata word			ATTR_GEN_TEXT_TYPE_RUNS;
-	@vardata word			ATTR_GEN_TEXT_GRAPHIC_RUNS;
-	@vardata word			ATTR_GEN_TEXT_REGION_ARRAY;
-	@vardata word			ATTR_GEN_TEXT_STYLE_ARRAY;
-	@vardata word			ATTR_GEN_TEXT_NAME_ARRAY;
+    @vardata word           ATTR_GEN_TEXT_TYPE_RUNS;
+    @vardata word           ATTR_GEN_TEXT_GRAPHIC_RUNS;
+    @vardata word           ATTR_GEN_TEXT_REGION_ARRAY;
+    @vardata word           ATTR_GEN_TEXT_STYLE_ARRAY;
+    @vardata word           ATTR_GEN_TEXT_NAME_ARRAY;
 
-	@vardata optr			ATTR_GEN_TEXT_RUNS_ITEM_GROUP;
-		@reloc		ATTR_GEN_TEXT_RUNS_ITEM_GROUP;
+    @vardata optr           ATTR_GEN_TEXT_RUNS_ITEM_GROUP;
+        @reloc      ATTR_GEN_TEXT_RUNS_ITEM_GROUP;
 
-	@vardata void			ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
-	@vardata optr			ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS;
-	@vardata void			ATTR_GEN_TEXT_LEGAL_DOS_PATH;
-	@vardata void			ATTR_GEN_TEXT_DATE;
-	@vardata void			ATTR_GEN_TEXT_TIME;
-	@vardata void			ATTR_GEN_TEXT_MAKE_UPPERCASE;
-	@vardata void			ATTR_GEN_TEXT_ALLOW_COLUMN_BREAKS;
-	@vardata void			ATTR_GEN_TEXT_UPPERCASE_ALPHA;
-	@vardata void			ATTR_GEN_TEXT_UPPERCASE_ALPHA_NUMERIC;
-	@vardata void			ATTR_GEN_TEXT_DASHED_ALPHA_NUMERIC;
-	@vardata void			ATTR_GEN_TEXT_NORMAL_ASCII;
-	@vardata void			ATTR_GEN_TEXT_LEGAL_DOS_VOLUME_NAMES;
-	@vardata void			ATTR_GEN_TEXT_DOS_CHARACTER_SET;
-	@vardata void			ATTR_GEN_TEXT_NO_SPACES;
-	@vardata void			ATTR_GEN_TEXT_ALLOW_SPACES;
-	@vardata void			ATTR_GEN_TEXT_ALPHA;
-	@vardata void			ATTR_GEN_TEXT_NUMERIC;
-	@vardata void			ATTR_GEN_TEXT_SIGNED_NUMERIC;
-	@vardata void			ATTR_GEN_TEXT_SIGNED_DECIMAL;
-	@vardata void			ATTR_GEN_TEXT_FLOAT_DECIMAL;
-	@vardata void			ATTR_GEN_TEXT_ALPHA_NUMERIC;
-	@vardata void			ATTR_GEN_TEXT_LEGAL_FILENAMES;
-	@vardata void			ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
-	@vardata void			ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
-	@vardata void			ATTR_GEN_TEXT_DOES_NOT_ACCEPT_INK;
-	@vardata ChunkHandle	ATTR_GEN_TEXT_CUSTOM_FILTER;
+    @vardata void           ATTR_GEN_TEXT_DO_NOT_INTERACT_WITH_SEARCH_CONTROL;
+    @vardata optr           ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS;
+    @vardata void           ATTR_GEN_TEXT_LEGAL_DOS_PATH;
+    @vardata void           ATTR_GEN_TEXT_DATE;
+    @vardata void           ATTR_GEN_TEXT_TIME;
+    @vardata void           ATTR_GEN_TEXT_MAKE_UPPERCASE;
+    @vardata void           ATTR_GEN_TEXT_ALLOW_COLUMN_BREAKS;
+    @vardata void           ATTR_GEN_TEXT_UPPERCASE_ALPHA;
+    @vardata void           ATTR_GEN_TEXT_UPPERCASE_ALPHA_NUMERIC;
+    @vardata void           ATTR_GEN_TEXT_DASHED_ALPHA_NUMERIC;
+    @vardata void           ATTR_GEN_TEXT_NORMAL_ASCII;
+    @vardata void           ATTR_GEN_TEXT_LEGAL_DOS_VOLUME_NAMES;
+    @vardata void           ATTR_GEN_TEXT_DOS_CHARACTER_SET;
+    @vardata void           ATTR_GEN_TEXT_NO_SPACES;
+    @vardata void           ATTR_GEN_TEXT_ALLOW_SPACES;
+    @vardata void           ATTR_GEN_TEXT_ALPHA;
+    @vardata void           ATTR_GEN_TEXT_NUMERIC;
+    @vardata void           ATTR_GEN_TEXT_SIGNED_NUMERIC;
+    @vardata void           ATTR_GEN_TEXT_SIGNED_DECIMAL;
+    @vardata void           ATTR_GEN_TEXT_FLOAT_DECIMAL;
+    @vardata void           ATTR_GEN_TEXT_ALPHA_NUMERIC;
+    @vardata void           ATTR_GEN_TEXT_LEGAL_FILENAMES;
+    @vardata void           ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+    @vardata void           ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+    @vardata void           ATTR_GEN_TEXT_DOES_NOT_ACCEPT_INK;
+    @vardata ChunkHandle    ATTR_GEN_TEXT_CUSTOM_FILTER;
 
 ----------
 ATTR_GEN_TEXT_STATUS_MSG sets a status message for this GenText. A 
@@ -4474,17 +4474,17 @@ place by getting the size of the chunk.
 ----------
 **Code Display 10-23 GenText Hints**
 
-	@vardata ColorQuad		HINT_TEXT_WASH_COLOR
-	@vardata void			HINT_TEXT_WHITE_WASH_COLOR;
-	@vardata void			HINT_TEXT_AUTO_HYPHENATE;
-	@vardata void			HINT_TEXT_SELECT_TEXT;
-	@vardata void			HINT_TEXT_CURSOR_AT_START;
-	@vardata void			HINT_TEXT_CURSOR_AT_END;
-	@vardata void			HINT_TEXT_FRAME;
-	@vardata void			HINT_TEXT_NO_FRAME;
-	@vardata void			HINT_TEXT_ALLOW_UNDO;
-	@vardata void			HINT_TEXT_ALLOW_SMART_QUOTES;
-	@vardata void			HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+    @vardata ColorQuad      HINT_TEXT_WASH_COLOR
+    @vardata void           HINT_TEXT_WHITE_WASH_COLOR;
+    @vardata void           HINT_TEXT_AUTO_HYPHENATE;
+    @vardata void           HINT_TEXT_SELECT_TEXT;
+    @vardata void           HINT_TEXT_CURSOR_AT_START;
+    @vardata void           HINT_TEXT_CURSOR_AT_END;
+    @vardata void           HINT_TEXT_FRAME;
+    @vardata void           HINT_TEXT_NO_FRAME;
+    @vardata void           HINT_TEXT_ALLOW_UNDO;
+    @vardata void           HINT_TEXT_ALLOW_SMART_QUOTES;
+    @vardata void           HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
 
 ----------
 
@@ -4518,7 +4518,7 @@ object maximum length stored in *GTXI_maxLength* is copied to
 appropriate message under "Using VisText" above.
 
 #### 10.6.2.2 GenText Attributes
-	GTXI_attrs, MSG_GEN_TEXT_SET_ATTRS, MSG_GEN_TEXT_GET_ATTRS
+    GTXI_attrs, MSG_GEN_TEXT_SET_ATTRS, MSG_GEN_TEXT_GET_ATTRS
 
 *GTXI_attrs* stores the **GenTextAttrs** of the GenText object. These attribute 
 flags are listed below.
@@ -4565,9 +4565,9 @@ MSG_GEN_TEXT_GET_ATTRS.
 
 ----------
 #### MSG_GEN_TEXT_SET_ATTRS
-	void	MSG_GEN_TEXT_SET_ATTRS(
-			byte	attrsToSet,
-			byte	attrsToClear);
+    void    MSG_GEN_TEXT_SET_ATTRS(
+            byte    attrsToSet,
+            byte    attrsToClear);
 
 This message sets a GenText object's **GenTextAttrs** (*GTXI_attrs*). The 
 GenText object must not be GS_USABLE when sent this message. 
@@ -4588,7 +4588,7 @@ parameters will be cleared.
 
 ----------
 #### MSG_GEN_TEXT_GET_ATTRS
-	byte	MSG_GEN_TEXT_GET_ATTRS();
+    byte    MSG_GEN_TEXT_GET_ATTRS();
 
 This message retrieves the GenText object's **GenTextAttrs** (*GTXI_attrs*).
 
@@ -4603,9 +4603,9 @@ This message retrieves the GenText object's **GenTextAttrs** (*GTXI_attrs*).
 **Interception:** Generally not intercepted.
 
 #### 10.6.2.3 GenTextStates
-	GTXI_stateFlags, MSG_GEN_TEXT_SET_INDETERMINATE_STATE, 
-	MSG_GEN_TEXT_SET_MODIFIED_STATE, 
-	MSG_GEN_TEXT_IS_INDETERMINATE, MSG_GEN_TEXT_IS_MODIFIED
+    GTXI_stateFlags, MSG_GEN_TEXT_SET_INDETERMINATE_STATE, 
+    MSG_GEN_TEXT_SET_MODIFIED_STATE, 
+    MSG_GEN_TEXT_IS_INDETERMINATE, MSG_GEN_TEXT_IS_MODIFIED
 
 *GTXI_stateFlags* stores the current state of the GenText object. There are two 
 **GenTextStateFlags**:
@@ -4634,8 +4634,8 @@ MSG_GEN_TEXT_IS_INDETERMINATE or MSG_GEN_TEXT_IS_MODIFIED.
 
 ----------
 #### MSG_GEN_TEXT_SET_INDETERMINATE_STATE
-	void	MSG_GEN_TEXT_SET_INDETERMINATE_STATE(
-			Boolean indeterminateState);
+    void    MSG_GEN_TEXT_SET_INDETERMINATE_STATE(
+            Boolean indeterminateState);
 
 This message sets the GenText object's indeterminate state (the 
 GTSF_INDETERMINATE flag in *GTXI_stateFlags*). This message does not 
@@ -4655,8 +4655,8 @@ affect the stored text.
 
 ----------
 ####MSG_GEN_TEXT_SET_MODIFIED_STATE
-	void	MSG_GEN_TEXT_SET_MODIFIED_STATE(
-			Boolean modifiedState);
+    void    MSG_GEN_TEXT_SET_MODIFIED_STATE(
+            Boolean modifiedState);
 
 This message allows you to set the modified state of a GenText object (the 
 GTSF_MODIFIED flag in *GTXI_stateFlags*). This message does not affect the 
@@ -4676,7 +4676,7 @@ stored text.
 
 ----------
 #### MSG_GEN_TEXT_IS_INDETERMINATE
-	Boolean	MSG_GEN_TEXT_IS_INDETERMINATE();
+    Boolean MSG_GEN_TEXT_IS_INDETERMINATE();
 
 This message checks whether a GenText object is indeterminate in state.
 
@@ -4693,7 +4693,7 @@ indeterminate, *false* otherwise).
 
 ----------
 ####MSG_GEN_TEXT_IS_MODIFIED
-	Boolean	MSG_GEN_TEXT_IS_MODIFIED();
+    Boolean MSG_GEN_TEXT_IS_MODIFIED();
 
 This message checks whether a GenText object has been modified.
 
@@ -4709,10 +4709,10 @@ modified, *false* otherwise).
 **Interception:** Generally not intercepted.
 
 #### 10.6.2.4 Sending an Action
-	GTXI_applyMsg, GTXI_destination, 
-	MSG_GEN_TEXT_GET_DESTINATION, 
-	MSG_GEN_TEXT_SET_DESTINATION, MSG_GEN_TEXT_GET_APPLY_MSG, 
-	MSG_GEN_TEXT_SET_APPLY_MSG
+    GTXI_applyMsg, GTXI_destination, 
+    MSG_GEN_TEXT_GET_DESTINATION, 
+    MSG_GEN_TEXT_SET_DESTINATION, MSG_GEN_TEXT_GET_APPLY_MSG, 
+    MSG_GEN_TEXT_SET_APPLY_MSG
 
 GTXI_applyMsg holds the message for the GenText to send out whenever it 
 has been modified and needs to apply its changes. Whenever a GenText 
@@ -4731,25 +4731,25 @@ Code Display 10-24.
 ----------
 **Code Display 10-24 Sending an Apply Message**
 
-	/* Define the apply message using the provided prototype. */
-	@message (GEN_TEXT_APPLY_MSG) MSG_MY_TEXT_STUFF_TEXT_IN_BUFFER;
+    /* Define the apply message using the provided prototype. */
+    @message (GEN_TEXT_APPLY_MSG) MSG_MY_TEXT_STUFF_TEXT_IN_BUFFER;
 
-	/* In the object declaration, set the destination and the apply message. */
-	@object GenTextClass MyText = {
-		GI_visMoniker = "My Text Object";
-		GTXI_text = "Initial Text Here";
-		GTXI_maxLength = 99;
-		GTXI_applyMsg = MSG_MY_TEXT_STUFF_TEXT_IN_BUFFER;
-		GTXI_destination = process;
-	}
+    /* In the object declaration, set the destination and the apply message. */
+    @object GenTextClass MyText = {
+        GI_visMoniker = "My Text Object";
+        GTXI_text = "Initial Text Here";
+        GTXI_maxLength = 99;
+        GTXI_applyMsg = MSG_MY_TEXT_STUFF_TEXT_IN_BUFFER;
+        GTXI_destination = process;
+    }
 
-	/* Retrieve the current text and place it in the indicated buffer. */
-	@method MyTextProcessClass, MSG_MY_TEXT_STUFF_TEXT_IN_BUFFER {
-		char tempBuffer[100];
-		/* The GET_ALL_PTR retrieves the current text and stuffs at the location it in the
-		 * passed pointer. Pass a text length of zero for null-terminated text strings. */
-		@call MyText::MSG_VIS_TEXT_GET_ALL_PTR(tempBuffer);
-	}
+    /* Retrieve the current text and place it in the indicated buffer. */
+    @method MyTextProcessClass, MSG_MY_TEXT_STUFF_TEXT_IN_BUFFER {
+        char tempBuffer[100];
+        /* The GET_ALL_PTR retrieves the current text and stuffs at the location it in the
+         * passed pointer. Pass a text length of zero for null-terminated text strings. */
+        @call MyText::MSG_VIS_TEXT_GET_ALL_PTR(tempBuffer);
+    }
 
 ----------
 To change a GenText's apply message or destination, send it 
@@ -4760,8 +4760,8 @@ destination.
 
 ----------
 #### MSG_GEN_TEXT_SET_APPLY_MSG
-	void	MSG_GEN_TEXT_SET_APPLY_MSG(
-			Message		message);
+    void    MSG_GEN_TEXT_SET_APPLY_MSG(
+            Message     message);
 
 This message sets a new apply message (*GTXI_applyMsg*) for the text object.
 
@@ -4778,7 +4778,7 @@ This message sets a new apply message (*GTXI_applyMsg*) for the text object.
 
 ----------
 #### MSG_GEN_TEXT_GET_APPLY_MSG
-	Message	MSG_GEN_TEXT_GET_APPLY_MSG();
+    Message MSG_GEN_TEXT_GET_APPLY_MSG();
 
 This message retrieves the current apply message (*GTXI_applyMsg*) of a 
 GenText object.
@@ -4795,8 +4795,8 @@ GenText object.
 
 ----------
 #### MSG_GEN_TEXT_SET_DESTINATION
-	void	MSG_GEN_TEXT_SET_DESTINATION(
-			optr	dest);
+    void    MSG_GEN_TEXT_SET_DESTINATION(
+            optr    dest);
 
 This message sets the destination object or process (*GTXI_destination*) of a 
 GenText object.
@@ -4814,7 +4814,7 @@ GenText object.
 
 ----------
 #### MSG_GEN_TEXT_GET_DESTINATION
-	optr	MSG_GEN_TEXT_GET_DESTINATION();
+    optr    MSG_GEN_TEXT_GET_DESTINATION();
 
 This message returns the current destination object (*GTXI_destination*) of a 
 GenText object.
@@ -4831,8 +4831,8 @@ GenText object.
 
 ----------
 #### GEN_TEXT_APPLY__MSG
-	void	GEN_TEXT_APPLY_MSG(
-			word	stateFlags);
+    void    GEN_TEXT_APPLY_MSG(
+            word    stateFlags);
 
 This prototype should be used to define your GenText's apply message (with 
 *GTXI_applyMsg*).
@@ -4841,7 +4841,7 @@ This prototype should be used to define your GenText's apply message (with
 *stateFlags* - The text object's GTXI_stateFlags status.
 
 #### 10.6.2.5 Status Messages
-	ATTR_GEN_TEXT_STATUS_MSG, MSG_GEN_TEXT_SEND_STATUS_MSG
+    ATTR_GEN_TEXT_STATUS_MSG, MSG_GEN_TEXT_SEND_STATUS_MSG
 
 If your GenText is operating in delayed mode, there usually occur times when 
 its current state may not reflect the most recent changes. In most cases, this 
@@ -4870,8 +4870,8 @@ MSG_GEN_TEXT_SEND_STATUS_MSG.
 
 ----------
 #### MSG_GEN_TEXT_SEND_STATUS_MSG
-	void	MSG_GEN_TEXT_SEND_STATUS_MSG(
-			Boolean		modifiedState);
+    void    MSG_GEN_TEXT_SEND_STATUS_MSG(
+            Boolean     modifiedState);
 
 This message causes a GenText object to send out its status message, stored 
 in the text object's ATTR_GEN_TEXT_STATUS_MSG vardata field. This 
@@ -4891,8 +4891,8 @@ with the status message.
 
 ----------
 #### GEN_TEXT_STATUS__MSG
-	void	GEN_TEXT_STATUS_MSG(
-			word	stateFlags);
+    void    GEN_TEXT_STATUS_MSG(
+            word    stateFlags);
 
 This prototype should be used to define your GenText's status message (with 
 ATTR_GEN_TEXT_STATUS_MSG).
@@ -4920,41 +4920,41 @@ Display 10-25.
 ----------
 **Code Display 10-25 TextStyleControlClass Features**
 
-	typedef WordFlags TSCFeatures;
-	#define TSCF_PLAIN					0x0800
-	#define TSCF_BOLD					0x0400
-	#define TSCF_ITALIC					0x0200
-	#define TSCF_UNDERLINE				0x0100
-	#define TSCF_STRIKE_THRU			0x0080
-	#define TSCF_SUBSCRIPT				0x0040
-	#define TSCF_SUPERSCRIPT			0x0020
-	#define TSCF_BOXED					0x0010
-	#define TSCF_BUTTON					0x0008
-	#define TSCF_INDEX					0x0004
-	#define TSCF_ALL_CAP				0x0002
-	#define TSCF_SMALL_CAP				0x0001
+    typedef WordFlags TSCFeatures;
+    #define TSCF_PLAIN                  0x0800
+    #define TSCF_BOLD                   0x0400
+    #define TSCF_ITALIC                 0x0200
+    #define TSCF_UNDERLINE              0x0100
+    #define TSCF_STRIKE_THRU            0x0080
+    #define TSCF_SUBSCRIPT              0x0040
+    #define TSCF_SUPERSCRIPT            0x0020
+    #define TSCF_BOXED                  0x0010
+    #define TSCF_BUTTON                 0x0008
+    #define TSCF_INDEX                  0x0004
+    #define TSCF_ALL_CAP                0x0002
+    #define TSCF_SMALL_CAP              0x0001
 
-	typedef WordFlags TSCToolboxFeatures;
-	#define TSCTF_PLAIN					0x0800
-	#define TSCTF_BOLD					0x0400
-	#define TSCTF_ITALIC				0x0200
-	#define TSCTF_UNDERLINE				0x0100
-	#define TSCTF_STRIKE_THRU			0x0080
-	#define TSCTF_SUBSCRIPT				0x0040
-	#define TSCTF_SUPERSCRIPT			0x0020
-	#define TSCTF_BOXED					0x0010
-	#define TSCTF_BUTTON				0x0008
-	#define TSCTF_INDEX					0x0004
-	#define TSCTF_ALL_CAP				0x0002
-	#define TSCTF_SMALL_CAP				0x0001
+    typedef WordFlags TSCToolboxFeatures;
+    #define TSCTF_PLAIN                 0x0800
+    #define TSCTF_BOLD                  0x0400
+    #define TSCTF_ITALIC                0x0200
+    #define TSCTF_UNDERLINE             0x0100
+    #define TSCTF_STRIKE_THRU           0x0080
+    #define TSCTF_SUBSCRIPT             0x0040
+    #define TSCTF_SUPERSCRIPT           0x0020
+    #define TSCTF_BOXED                 0x0010
+    #define TSCTF_BUTTON                0x0008
+    #define TSCTF_INDEX                 0x0004
+    #define TSCTF_ALL_CAP               0x0002
+    #define TSCTF_SMALL_CAP             0x0001
 
-	#define TSC_DEFAULT_FEATURES	(TSCF_PLAIN | TSCF_BOLD | TSCF_ITALIC |
-							 TSCF_UNDERLINE | TSCF_SUBSCRIPT |
-							 TSCF_SUPERSCRIPT | TSCF_STRIKE_THRU |
-							 TSCF_BOXED | TSCF_BUTTON | TSCF_INDEX |
-							 TSCF_ALL_CAP | TSCF_SMALL_CAP)
-	#define TSC_DEFAULT_TOOLBOX_FEATURES (TSCTF_PLAIN | TSCTF_BOLD | TSCTF_ITALIC |
-							TSCTF_UNDERLINE)
+    #define TSC_DEFAULT_FEATURES    (TSCF_PLAIN | TSCF_BOLD | TSCF_ITALIC |
+                             TSCF_UNDERLINE | TSCF_SUBSCRIPT |
+                             TSCF_SUPERSCRIPT | TSCF_STRIKE_THRU |
+                             TSCF_BOXED | TSCF_BUTTON | TSCF_INDEX |
+                             TSCF_ALL_CAP | TSCF_SMALL_CAP)
+    #define TSC_DEFAULT_TOOLBOX_FEATURES (TSCTF_PLAIN | TSCTF_BOLD | TSCTF_ITALIC |
+                            TSCTF_UNDERLINE)
 
 ----------
 #### FontControlClass
@@ -4964,17 +4964,17 @@ selection. Its features and tools are shown in Code Display 10-26.
 ----------
 **Code Display 10-26 FontControlClass Features**
 
-	typedef WordFlags FCFeatures;
-	#define FCF_SHORT_LIST		0x0002
-	#define FCF_LONG_LIST		0x0001
+    typedef WordFlags FCFeatures;
+    #define FCF_SHORT_LIST      0x0002
+    #define FCF_LONG_LIST       0x0001
 
-	typedef WordFlags FCToolboxFeatures;
-	#define FCTF_ROMAN			0x0004
-	#define FCTF_SANS			0x0002
-	#define FCTF_MONO			0x0001
+    typedef WordFlags FCToolboxFeatures;
+    #define FCTF_ROMAN          0x0004
+    #define FCTF_SANS           0x0002
+    #define FCTF_MONO           0x0001
 
-	#define FC_DEFAULT_FEATURES		(FCF_SHORT_LIST | FCF_LONG_LIST)
-	#define FC_DEFAULT_TOOLBOX_FEATURES (FCTF_ROMAN | FCTF_SANS | FCTF_MONO)
+    #define FC_DEFAULT_FEATURES     (FCF_SHORT_LIST | FCF_LONG_LIST)
+    #define FC_DEFAULT_TOOLBOX_FEATURES (FCTF_ROMAN | FCTF_SANS | FCTF_MONO)
 
 ----------
 #### PointSizeControlClass
@@ -4984,40 +4984,40 @@ features and tools are shown in Code Display 10-27.
 ----------
 Code Display 10-27 PointSizeControlClass Features
 
-	typedef WordFlags PSCFeatures;
-	#define PSCF_9					0x0800
-	#define PSCF_10					0x0400
-	#define PSCF_12					0x0200
-	#define PSCF_14					0x0100
-	#define PSCF_18					0x0080
-	#define PSCF_24					0x0040
-	#define PSCF_36					0x0020
-	#define PSCF_54					0x0010
-	#define PSCF_72					0x0008
-	#define PSCF_SMALLER			0x0004
-	#define PSCF_LARGER				0x0002
-	#define PSCF_CUSTOM_SIZE				0x0001
+    typedef WordFlags PSCFeatures;
+    #define PSCF_9                  0x0800
+    #define PSCF_10                 0x0400
+    #define PSCF_12                 0x0200
+    #define PSCF_14                 0x0100
+    #define PSCF_18                 0x0080
+    #define PSCF_24                 0x0040
+    #define PSCF_36                 0x0020
+    #define PSCF_54                 0x0010
+    #define PSCF_72                 0x0008
+    #define PSCF_SMALLER            0x0004
+    #define PSCF_LARGER             0x0002
+    #define PSCF_CUSTOM_SIZE                0x0001
 
-	typedef WordFlags PSCToolboxFeatures;
-	#define PSCTF_9					0x0400
-	#define PSCTF_10				0x0200
-	#define PSCTF_12				0x0100
-	#define PSCTF_14				0x0080
-	#define PSCTF_18				0x0040
-	#define PSCTF_24				0x0020
-	#define PSCTF_36				0x0010
-	#define PSCTF_54				0x0008
-	#define PSCTF_72				0x0004
-	#define PSCTF_SMALLER			0x0002
-	#define PSCTF_LARGER			0x0001
-	#define PSC_DEFAULT_FEATURES 	(PSCF_9 | PSCF_10 | PSCF_12 | PSCF_14 |
-					 PSCF_18 | PSCF_24 | PSCF_36 | PSCF_72 |
-					 PSCF_CUSTOM_SIZE | PSCF_SMALLER |
-					 PSCF_LARGER)
-	#define PSC_DEFAULT_TOOLBOX_FEATURES	(PSCTF_9 | PSCTF_10 | PSCTF_12 |
-					 PSCTF_14 | PSCTF_18 | PSCTF_24 |
-					 PSCTF_36 | PSCTF_72 | PSCTF_SMALLER |
-					 PSCTF_LARGER)
+    typedef WordFlags PSCToolboxFeatures;
+    #define PSCTF_9                 0x0400
+    #define PSCTF_10                0x0200
+    #define PSCTF_12                0x0100
+    #define PSCTF_14                0x0080
+    #define PSCTF_18                0x0040
+    #define PSCTF_24                0x0020
+    #define PSCTF_36                0x0010
+    #define PSCTF_54                0x0008
+    #define PSCTF_72                0x0004
+    #define PSCTF_SMALLER           0x0002
+    #define PSCTF_LARGER            0x0001
+    #define PSC_DEFAULT_FEATURES    (PSCF_9 | PSCF_10 | PSCF_12 | PSCF_14 |
+                     PSCF_18 | PSCF_24 | PSCF_36 | PSCF_72 |
+                     PSCF_CUSTOM_SIZE | PSCF_SMALLER |
+                     PSCF_LARGER)
+    #define PSC_DEFAULT_TOOLBOX_FEATURES    (PSCTF_9 | PSCTF_10 | PSCTF_12 |
+                     PSCTF_14 | PSCTF_18 | PSCTF_24 |
+                     PSCTF_36 | PSCTF_72 | PSCTF_SMALLER |
+                     PSCTF_LARGER)
 
 ----------
 #### CharFGColorControlClass and CharBGColorControlClass
@@ -5029,22 +5029,22 @@ additional definitions for these classes are given in Code Display 10-28.
 ----------
 **Code Display 10-28 Character Color Controller Features**
 
-	/* Both CharFGColorControlClass and CharBGColorControlClass are subclasses of
-	 * ColorSelectorClass. For full details, see that class. */
+    /* Both CharFGColorControlClass and CharBGColorControlClass are subclasses of
+     * ColorSelectorClass. For full details, see that class. */
 
-	@class CharFGColorControlClass, ColorSelectorClass;
-	#define CFGCC_DEFAULT_FEATURES	(CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
-							 CSF_PATTERN)
-		@default GI_states = @default & ~GS_ENABLED;
-		@default GCI_output = (TO_APP_TARGET);
-	@endc
+    @class CharFGColorControlClass, ColorSelectorClass;
+    #define CFGCC_DEFAULT_FEATURES  (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
+                             CSF_PATTERN)
+        @default GI_states = @default & ~GS_ENABLED;
+        @default GCI_output = (TO_APP_TARGET);
+    @endc
 
-	@class CharBGColorControlClass, ColorSelectorClass;
-	#define CBGCC_DEFAULT_FEATURES	(CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
-							 CSF_PATTERN)
-		@default GI_states = @default & ~GS_ENABLED;
-		@default GCI_output = (TO_APP_TARGET);
-	@endc
+    @class CharBGColorControlClass, ColorSelectorClass;
+    #define CBGCC_DEFAULT_FEATURES  (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
+                             CSF_PATTERN)
+        @default GI_states = @default & ~GS_ENABLED;
+        @default GCI_output = (TO_APP_TARGET);
+    @endc
 
 ----------
 #### FontAttrControlClass
@@ -5055,17 +5055,17 @@ Display 10-29.
 ----------
 **Code Display 10-29 FontAttrControlClass Features**
 
-	typedef WordFlags FACFeatures;
-	#define FACF_FONT_WEIGHT			0x0004
-	#define FACF_FONT_WIDTH				0x0002
-	#define FACF_TRACK_KERNING			0x0001
+    typedef WordFlags FACFeatures;
+    #define FACF_FONT_WEIGHT            0x0004
+    #define FACF_FONT_WIDTH             0x0002
+    #define FACF_TRACK_KERNING          0x0001
 
-	typedef WordFlags FACToolboxFeatures;
+    typedef WordFlags FACToolboxFeatures;
 
-	#define FAC_DEFAULT_FEATURES	(FACF_FONT_WEIGHT | FACF_FONT_WIDTH |
-							 FACF_TRACK_KERNING)
-	#define FAC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define FAC_DEFAULT_FEATURES    (FACF_FONT_WEIGHT | FACF_FONT_WIDTH |
+                             FACF_TRACK_KERNING)
+    #define FAC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 ### 10.7.2 Paragraph Attribute Controllers
@@ -5082,23 +5082,23 @@ shown in Code Display 10-30.
 ----------
 **Code Display 10-30 JustificationControlClass Features**
 
-	typedef WordFlags JCFeatures;
-	#define JCF_LEFT				0x0008
-	#define JCF_RIGHT				0x0004
-	#define JCF_CENTER				0x0002
-	#define JCF_FULL				0x0001
+    typedef WordFlags JCFeatures;
+    #define JCF_LEFT                0x0008
+    #define JCF_RIGHT               0x0004
+    #define JCF_CENTER              0x0002
+    #define JCF_FULL                0x0001
 
-	typedef WordFlags JCToolboxFeatures;
-	#define JCTF_LEFT				0x0008
-	#define JCTF_RIGHT				0x0004
-	#define JCTF_CENTER				0x0002
-	#define JCTF_FULL				0x0001
-	#define JC_DEFAULT_FEATURES		(JCF_LEFT | JCF_RIGHT | JCF_CENTER | JCF_FULL)
+    typedef WordFlags JCToolboxFeatures;
+    #define JCTF_LEFT               0x0008
+    #define JCTF_RIGHT              0x0004
+    #define JCTF_CENTER             0x0002
+    #define JCTF_FULL               0x0001
+    #define JC_DEFAULT_FEATURES     (JCF_LEFT | JCF_RIGHT | JCF_CENTER | JCF_FULL)
 
-	#define JC_DEFAULT_TOOLBOX_FEATURES (JCTF_LEFT | JCTF_RIGHT | JCTF_CENTER |
-							  JCTF_FULL)
-		@default GCI_output = (TO_APP_TARGET);
-		@default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+    #define JC_DEFAULT_TOOLBOX_FEATURES (JCTF_LEFT | JCTF_RIGHT | JCTF_CENTER |
+                              JCTF_FULL)
+        @default GCI_output = (TO_APP_TARGET);
+        @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
 
 ----------
 #### ParaSpacingControlClass
@@ -5110,20 +5110,20 @@ Display 10-31.
 ----------
 **Code Display 10-31 ParaSpacingControlClass Features**
 
-	typedef WordFlags PASCFeatures;
-	#define PASCF_SPACE_ON_TOP_BOTTOM	0x0002
-	#define PASCF_LEADING				0x0001
+    typedef WordFlags PASCFeatures;
+    #define PASCF_SPACE_ON_TOP_BOTTOM   0x0002
+    #define PASCF_LEADING               0x0001
 
-	typedef WordFlags PASCToolboxFeatures;
-	#define PASCTF_SINGLE				0x8000
-	#define PASCTF_ONE_AND_A_HALF		0x4000
-	#define PASCTF_DOUBLE				0x2000
-	#define PASCTF_TRIPLE				0x1000
+    typedef WordFlags PASCToolboxFeatures;
+    #define PASCTF_SINGLE               0x8000
+    #define PASCTF_ONE_AND_A_HALF       0x4000
+    #define PASCTF_DOUBLE               0x2000
+    #define PASCTF_TRIPLE               0x1000
 
-	#define PASC_DEFAULT_FEATURES		(PASCF_SPACE_ON_TOP_BOTTOM | PASCF_LEADING)
-	#define PASC_DEFAULT_TOOLBOX_FEATURES (PASCTF_SINGLE | PASCTF_ONE_AND_A_HALF |
-						PASCTF_DOUBLE | PASCTF_TRIPLE)
-	@default GCI_output = (TO_APP_TARGET);
+    #define PASC_DEFAULT_FEATURES       (PASCF_SPACE_ON_TOP_BOTTOM | PASCF_LEADING)
+    #define PASC_DEFAULT_TOOLBOX_FEATURES (PASCTF_SINGLE | PASCTF_ONE_AND_A_HALF |
+                        PASCTF_DOUBLE | PASCTF_TRIPLE)
+    @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### DefaultTabsControlClass and TabControlClass
@@ -5134,38 +5134,38 @@ controllers are shown in Code Display 10-32.
 ----------
 **Code Display 10-32 Tab Controllers**
 
-	/* DefaultTabsControlClass */
-	typedef WordFlags DTCFeatures;
-	#define DTCF_LIST				0x0002
-	#define DTCF_CUSTOM				0x0001
+    /* DefaultTabsControlClass */
+    typedef WordFlags DTCFeatures;
+    #define DTCF_LIST               0x0002
+    #define DTCF_CUSTOM             0x0001
 
-	typedef WordFlags DTCToolboxFeatures;
+    typedef WordFlags DTCToolboxFeatures;
 
-	#define DTC_DEFAULT_FEATURES	(DTCF_LIST | DTCF_CUSTOM)
-	#define DTC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define DTC_DEFAULT_FEATURES    (DTCF_LIST | DTCF_CUSTOM)
+    #define DTC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
-	/* TabControlClass */
-	typedef WordFlags TCFeatures;
-	#define TCF_LIST					0x0080
-	#define TCF_POSITION				0x0040
-	#define TCF_GRAY_SCREEN				0x0020
-	#define TCF_TYPE					0x0010
-	#define TCF_LEADER					0x0008
-	#define TCF_LINE					0x0004
-	#define TCF_CLEAR					0x0002
-	#define TCF_CLEAR_ALL				0x0001
+    /* TabControlClass */
+    typedef WordFlags TCFeatures;
+    #define TCF_LIST                    0x0080
+    #define TCF_POSITION                0x0040
+    #define TCF_GRAY_SCREEN             0x0020
+    #define TCF_TYPE                    0x0010
+    #define TCF_LEADER                  0x0008
+    #define TCF_LINE                    0x0004
+    #define TCF_CLEAR                   0x0002
+    #define TCF_CLEAR_ALL               0x0001
 
-	typedef WordFlags TCToolboxFeatures;
+    typedef WordFlags TCToolboxFeatures;
 
-	#define TC_DEFAULT_FEATURES			(TCF_LIST | TCF_POSITION | TCF_GRAY_SCREEN |
-				 TCF_TYPE | TCF_LEADER | TCF_LINE | TCF_CLEAR |
-				 TCF_CLEAR_ALL)
-	#define TC_DEFAULT_TOOLBOX_FEATURES 0
-	@instance word TCI_numberOfTabs;
-	@instance Tab TCI_tabList[VIS_TEXT_MAX_TABS];
-	@instance word TCI_selectedTab;
-	@default GCI_output = (TO_APP_TARGET);
+    #define TC_DEFAULT_FEATURES         (TCF_LIST | TCF_POSITION | TCF_GRAY_SCREEN |
+                 TCF_TYPE | TCF_LEADER | TCF_LINE | TCF_CLEAR |
+                 TCF_CLEAR_ALL)
+    #define TC_DEFAULT_TOOLBOX_FEATURES 0
+    @instance word TCI_numberOfTabs;
+    @instance Tab TCI_tabList[VIS_TEXT_MAX_TABS];
+    @instance word TCI_selectedTab;
+    @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### ParaBGColorControlClass
@@ -5178,10 +5178,10 @@ Display 10-33.
 ----------
 **Code Display 10-33 ParaBGColorControlClass Features**
 
-	#define PBGCC_DEFAULT_FEATURES		(CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
-						 CSF_PATTERN)
-		@default GI_states = @default & ~GS_ENABLED;
-		@default GCI_output = (TO_APP_TARGET);
+    #define PBGCC_DEFAULT_FEATURES      (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
+                         CSF_PATTERN)
+        @default GI_states = @default & ~GS_ENABLED;
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### ParaAttrControlClass
@@ -5192,20 +5192,20 @@ and tools are shown in Code Display 10-34.
 ----------
 **Code Display 10-34 ParaAttrControlClass Features**
 
-	typedef WordFlags PACFeatures;
-	#define PACF_WORD_WRAP					0x0010
-	#define PACF_HIDDEN_TEXT				0x0008
-	#define PACF_KEEP_PARA_WITH_NEXT		0x0004
-	#define PACF_KEEP_PARA_TOGETHER			0x0002
-	#define PACF_KEEP_LINES					0x0001
+    typedef WordFlags PACFeatures;
+    #define PACF_WORD_WRAP                  0x0010
+    #define PACF_HIDDEN_TEXT                0x0008
+    #define PACF_KEEP_PARA_WITH_NEXT        0x0004
+    #define PACF_KEEP_PARA_TOGETHER         0x0002
+    #define PACF_KEEP_LINES                 0x0001
 
-	typedef WordFlags PACToolboxFeatures;
+    typedef WordFlags PACToolboxFeatures;
 
-	#define PAC_DEFAULT_FEATURES	(PACF_WORD_WRAP | PACF_HIDDEN_TEXT |
-				 PACF_KEEP_PARA_WITH_NEXT |
-				 PACF_KEEP_PARA_TOGETHER | PACF_KEEP_LINES
-	#define PAC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define PAC_DEFAULT_FEATURES    (PACF_WORD_WRAP | PACF_HIDDEN_TEXT |
+                 PACF_KEEP_PARA_WITH_NEXT |
+                 PACF_KEEP_PARA_TOGETHER | PACF_KEEP_LINES
+    #define PAC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### BorderControlClass and BorderColorControlClass
@@ -5217,24 +5217,24 @@ Code Display 10-35.
 ----------
 **Code Display 10-35 Border Controller Features**
 
-	/* BorderControlClass */
-	typedef WordFlags BCFeatures;
-	#define BCF_LIST				0x0002
-	#define BCF_CUSTOM				0x0001
+    /* BorderControlClass */
+    typedef WordFlags BCFeatures;
+    #define BCF_LIST                0x0002
+    #define BCF_CUSTOM              0x0001
 
-	typedef WordFlags BCToolboxFeatures;
+    typedef WordFlags BCToolboxFeatures;
 
-	#define BC_DEFAULT_FEATURES		(BCF_LIST | BCF_CUSTOM)
-	#define BC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define BC_DEFAULT_FEATURES     (BCF_LIST | BCF_CUSTOM)
+    #define BC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
-	/* BorderColorControlClass */
-	typedef WordFlags BCCToolboxFeatures;
-	#define BCC_DEFAULT_FEATURES	(CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
-							 CSF_PATTERN)
-	#define BCC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GI_states = @default & ~GS_ENABLED;
-		@default GCI_output = (TO_APP_TARGET);
+    /* BorderColorControlClass */
+    typedef WordFlags BCCToolboxFeatures;
+    #define BCC_DEFAULT_FEATURES    (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
+                             CSF_PATTERN)
+    #define BCC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GI_states = @default & ~GS_ENABLED;
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### DropCapControlClass
@@ -5244,14 +5244,14 @@ paragraph selection. Its features and tools are shown in Code Display 10-36.
 ----------
 **Code Display 10-36 DropCapControlClass Features**
 
-	typedef WordFlags DCCFeatures;
-	#define DCCF_DROP_CAP				0x0001
+    typedef WordFlags DCCFeatures;
+    #define DCCF_DROP_CAP               0x0001
 
-	typedef WordFlags DCCToolboxFeatures;
+    typedef WordFlags DCCToolboxFeatures;
 
-	#define DCC_DEFAULT_FEATURES		(DCCF_DROP_CAP)
-	#define DCC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define DCC_DEFAULT_FEATURES        (DCCF_DROP_CAP)
+    #define DCC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### HyphenationControlClass
@@ -5262,14 +5262,14 @@ Display 10-37.
 ----------
 **Code Display 10-37 HyphenationControlClass**
 
-	typedef WordFlags HCFeatures;
-	#define HCF_LIST				0x0001
+    typedef WordFlags HCFeatures;
+    #define HCF_LIST                0x0001
 
-	typedef WordFlags HCToolboxFeatures;
+    typedef WordFlags HCToolboxFeatures;
 
-	#define HC_DEFAULT_FEATURES		(HCF_LIST)
-	#define HC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define HC_DEFAULT_FEATURES     (HCF_LIST)
+    #define HC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### MarginControlClass
@@ -5279,17 +5279,17 @@ paragraph selection. Its tools and features are shown in Code Display 10-38.
 ----------
 **Code Display 10-38 MarginControlClass**
 
-	typedef WordFlags MCFeatures;
-	#define MCF_LEFT_MARGIN				0x0004
-	#define MCF_PARA_MARGIN				0x0002
-	#define MCF_RIGHT_MARGIN			0x0001
+    typedef WordFlags MCFeatures;
+    #define MCF_LEFT_MARGIN             0x0004
+    #define MCF_PARA_MARGIN             0x0002
+    #define MCF_RIGHT_MARGIN            0x0001
 
-	typedef WordFlags MCToolboxFeatures;
+    typedef WordFlags MCToolboxFeatures;
 
-	#define MC_DEFAULT_FEATURES			(MCF_LEFT_MARGIN | MCF_PARA_MARGIN |
-										 MCF_RIGHT_MARGIN)
-	#define MC_DEFAULT_TOOLBOX_FEATURES 0
-		@default GCI_output = (TO_APP_TARGET);
+    #define MC_DEFAULT_FEATURES         (MCF_LEFT_MARGIN | MCF_PARA_MARGIN |
+                                         MCF_RIGHT_MARGIN)
+    #define MC_DEFAULT_TOOLBOX_FEATURES 0
+        @default GCI_output = (TO_APP_TARGET);
 
 ----------
 #### TextRulerControlClass
@@ -5300,19 +5300,19 @@ features and tools of the TextRulerControl are shown in Code Display 10-39.
 ----------
 **Code Display 10-39 TextRulerControlClass**
 
-	typedef WordFlags TRCCFeatures;
-	#define TRCCF_ROUND					0x0002
-	#define TRCCF_IGNORE_ORIGIN			0x0001
+    typedef WordFlags TRCCFeatures;
+    #define TRCCF_ROUND                 0x0002
+    #define TRCCF_IGNORE_ORIGIN         0x0001
 
-	typedef WordFlags TRCCToolboxFeatures;
+    typedef WordFlags TRCCToolboxFeatures;
 
-	#define TRCC_DEFAULT_FEATURES		(TRCCF_ROUND | TRCCF_IGNORE_ORIGIN)
-	#define TRCC_DEFAULT_TOOLBOX_FEATURES 0
+    #define TRCC_DEFAULT_FEATURES       (TRCCF_ROUND | TRCCF_IGNORE_ORIGIN)
+    #define TRCC_DEFAULT_TOOLBOX_FEATURES 0
 
-	typedef WordFlags TextRulerControlAttributes;
-	#define TRCA_ROUND					0x8000
-	#define TRCA_IGNORE_ORIGIN			0x4000
-		@instance TextRulerControlAttributes TRCI_attrs = TRCA_ROUND;
+    typedef WordFlags TextRulerControlAttributes;
+    #define TRCA_ROUND                  0x8000
+    #define TRCA_IGNORE_ORIGIN          0x4000
+        @instance TextRulerControlAttributes TRCI_attrs = TRCA_ROUND;
 
 ----------
 #### TextStyleSheetControlClass
@@ -5322,8 +5322,8 @@ features and tools of that class. It has no additional tools or features of its
 own.
 
 ### 10.7.3 Search and Replace and Spell-Checking
-	TextSearchInString(), TextSearchInHugeArray(), 
-	SearchOptions, WildCard
+    TextSearchInString(), TextSearchInHugeArray(), 
+    SearchOptions, WildCard
 
 Text searches are not specifically part of **VisTextClass**, but are commonly 
 used on text objects, and they are discussed here for that reason.
@@ -5400,13 +5400,13 @@ structure is followed by text string(s) that represent the strings to search
 (unless SO_NO_WILDCARDS is set in *params*).The **SearchReplaceStruct** is 
 shown below:
 
-	typedef struct {
-		word		searchSize;
-		word		replaceSize;
-		byte		params;
-		optr		replyObject;
-		Message		replyMsg;
-	} SearchReplaceStruct;
+    typedef struct {
+        word        searchSize;
+        word        replaceSize;
+        byte        params;
+        optr        replyObject;
+        Message     replyMsg;
+    } SearchReplaceStruct;
 
 *searchSize* stores the number of characters in the search string, including the 
 null terminator.
@@ -5428,8 +5428,8 @@ a null-terminated search string followed by a null-terminated replace string
 
 ----------
 #### MSG_SEARCH
-	@importMessage MetaSearchSpellMessages, void MSG_SEARCH(
-				MemHandle		searchInfo);
+    @importMessage MetaSearchSpellMessages, void MSG_SEARCH(
+                MemHandle       searchInfo);
 
 This message is sent by the SearchReplace controller when an object is 
 starting a search operation. You may intercept this message to find out the 
@@ -5453,27 +5453,27 @@ The features and tools of this controller are shown in Code Display 10-40.
 ----------
 **Code Display 10-40 SearchReplaceControlClass Features**
 
-	typedef WordFlags SRCFeatures;
-	#define SRCF_CLOSE						0x200
-	#define SRCF_FIND_NEXT					0x100
-	#define SRCF_FIND_PREV					0x80
-	#define SRCF_REPLACE_CURRENT			0x40
-	#define SRCF_REPLACE_ALL_IN_SELECTION	0x20
-	#define SRCF_REPLACE_ALL				0x10
-	#define SRCF_PARTIAL_WORDS				0x08
-	#define SRCF_IGNORE_CASE				0x04
-	#define SRCF_WILDCARDS					0x02
-	#define SRCF_SPECIAL_CHARS				0x01
+    typedef WordFlags SRCFeatures;
+    #define SRCF_CLOSE                      0x200
+    #define SRCF_FIND_NEXT                  0x100
+    #define SRCF_FIND_PREV                  0x80
+    #define SRCF_REPLACE_CURRENT            0x40
+    #define SRCF_REPLACE_ALL_IN_SELECTION   0x20
+    #define SRCF_REPLACE_ALL                0x10
+    #define SRCF_PARTIAL_WORDS              0x08
+    #define SRCF_IGNORE_CASE                0x04
+    #define SRCF_WILDCARDS                  0x02
+    #define SRCF_SPECIAL_CHARS              0x01
 
-	typedef WordFlags SRCToolboxFeatures;
-	#define SRCTF_SEARCH_REPLACE			0x01
+    typedef WordFlags SRCToolboxFeatures;
+    #define SRCTF_SEARCH_REPLACE            0x01
 
-	#define SRC_DEFAULT_FEATURES			(SRCF_FIND_NEXT | SRCF_FIND_PREV |
-							 SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL |
-							 SRCF_PARTIAL_WORDS | SRCF_IGNORE_CASE |
-							 SRCF_WILDCARDS | SRCF_SPECIAL_CHARS | 
-							 SRCF_REPLACE_ALL_IN_SELECTION | SRCF_CLOSE)
-	#define SRC_DEFAULT_TOOLBOX_FEATURES (SRCTF_SEARCH_REPLACE)
+    #define SRC_DEFAULT_FEATURES            (SRCF_FIND_NEXT | SRCF_FIND_PREV |
+                             SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL |
+                             SRCF_PARTIAL_WORDS | SRCF_IGNORE_CASE |
+                             SRCF_WILDCARDS | SRCF_SPECIAL_CHARS | 
+                             SRCF_REPLACE_ALL_IN_SELECTION | SRCF_CLOSE)
+    #define SRC_DEFAULT_TOOLBOX_FEATURES (SRCTF_SEARCH_REPLACE)
 
 ----------
 #### SpellControlClass
@@ -5493,11 +5493,11 @@ MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL
 
 ----------
 #### MSG_SPELL_CHECK
-	@importMessage MetaSearchSpellMessages, void MSG_SPELL_CHECK(@stack
-				optr				replyObj,
-				dword				numCharsToCheck,
-				SpellCheckOptions	options,
-				MemHandle			ICbuff);
+    @importMessage MetaSearchSpellMessages, void MSG_SPELL_CHECK(@stack
+                optr                replyObj,
+                dword               numCharsToCheck,
+                SpellCheckOptions   options,
+                MemHandle           ICbuff);
 
 This message is sent by the Spell controller to continue spell checking from 
 the current position in the document.
@@ -5520,11 +5520,11 @@ SCO_CHECK_NUM_CHARS set).
 
 ----------
 #### MSG_META_GET_CONTEXT
-	@importMessage MetaSearchSpellMessages, void MSG_META_GET_CONTEXT(@stack
-				dword				position,
-				ContextLocation		location,
-				word				numCharsToGet,
-				optr				replyObj);
+    @importMessage MetaSearchSpellMessages, void MSG_META_GET_CONTEXT(@stack
+                dword               position,
+                ContextLocation     location,
+                word                numCharsToGet,
+                optr                replyObj);
 
 This message is sent by the Spell controller to find out the current context of 
 the text object. Other objects may also send this message to the text object. 
@@ -5549,7 +5549,7 @@ CL_CENTERED_AROUND_SELECTION
 CL_CENTERED_AROUND_SELECTION_START  
 CL_SELECTED_WORD
 
-*numCharsToGet*	 - Maximum number of characters to return.
+*numCharsToGet*  - Maximum number of characters to return.
 *
 replyObj* - Optr of the object to reply to via 
 MSG_META_CONTEXT.
@@ -5558,8 +5558,8 @@ MSG_META_CONTEXT.
 
 ----------
 #### MSG_META_CONTEXT
-	@importMessage MetaSearchSpellMessages, void MSG_META_CONTEXT(
-				MemHandle		data);
+    @importMessage MetaSearchSpellMessages, void MSG_META_CONTEXT(
+                MemHandle       data);
 
 This message returns the current context to the SpellControl object.
 
@@ -5573,12 +5573,12 @@ context, and the null-terminated context string.
 
 **Structures:**
 
-	typedef struct {
-		optr			CD_object;
-		dword			CD_numChars;
-		dword			CD_startPos;
-		VisTextRange			CD_selection;
-	} ContextData;
+    typedef struct {
+        optr            CD_object;
+        dword           CD_numChars;
+        dword           CD_startPos;
+        VisTextRange            CD_selection;
+    } ContextData;
 
 *CD_object* stores the optr of the object that the context is coming from.
 
@@ -5599,30 +5599,30 @@ Its feature and tool definitions are shown in Code Display 10-41.
 ----------
 **Code Display 10-41 SpellControlClass**
 
-	typedef WordFlags SpellFeatures;
-	#define SF_CLOSE					0x2000
-	#define SF_CONTEXT					0x1000
-	#define SF_SIMPLE_MODAL_BOX			0x0800
-	#define SF_SUGGESTIONS				0x0400
-	#define SF_CHECK_ALL				0x0200
-	#define SF_CHECK_TO_END				0x0100
-	#define SF_CHECK_SELECTION			0x0080
-	#define SF_SKIP						0x0040
-	#define SF_SKIP_ALL					0x0020
-	#define SF_REPLACE_CURRENT			0x0010
-	#define SF_REPLACE_ALL				0x0008
-	#define SF_ADD_TO_USER_DICTIONARY	0x0004
-	#define SF_EDIT_USER_DICTIONARY		0x0002
-	#define SF_STATUS					0x0001
+    typedef WordFlags SpellFeatures;
+    #define SF_CLOSE                    0x2000
+    #define SF_CONTEXT                  0x1000
+    #define SF_SIMPLE_MODAL_BOX         0x0800
+    #define SF_SUGGESTIONS              0x0400
+    #define SF_CHECK_ALL                0x0200
+    #define SF_CHECK_TO_END             0x0100
+    #define SF_CHECK_SELECTION          0x0080
+    #define SF_SKIP                     0x0040
+    #define SF_SKIP_ALL                 0x0020
+    #define SF_REPLACE_CURRENT          0x0010
+    #define SF_REPLACE_ALL              0x0008
+    #define SF_ADD_TO_USER_DICTIONARY   0x0004
+    #define SF_EDIT_USER_DICTIONARY     0x0002
+    #define SF_STATUS                   0x0001
 
-	typedef WordFlags SpellToolboxFeatures;
-	#define STF_SPELL					0x01
+    typedef WordFlags SpellToolboxFeatures;
+    #define STF_SPELL                   0x01
 
-	#define SC_DEFAULT_FEATURES		(SF_STATUS | SF_EDIT_USER_DICTIONARY | 
-					SF_ADD_TO_USER_DICTIONARY | SF_REPLACE_ALL | SF_REPLACE_CURRENT |
-					SF_SKIP_ALL | SF_SKIP | SF_CHECK_SELECTION | SF_CHECK_TO_END |
-					SF_SUGGESTIONS | SF_CLOSE | SF_CONTEXT)
-	#define SC_DEFAULT_TOOLBOX_FEATURES		STF_SPELL
+    #define SC_DEFAULT_FEATURES     (SF_STATUS | SF_EDIT_USER_DICTIONARY | 
+                    SF_ADD_TO_USER_DICTIONARY | SF_REPLACE_ALL | SF_REPLACE_CURRENT |
+                    SF_SKIP_ALL | SF_SKIP | SF_CHECK_SELECTION | SF_CHECK_TO_END |
+                    SF_SUGGESTIONS | SF_CLOSE | SF_CONTEXT)
+    #define SC_DEFAULT_TOOLBOX_FEATURES     STF_SPELL
 
 ----------
 #### Shared Functionality
@@ -5634,8 +5634,8 @@ controllers are listed and described here.
 
 ----------
 ####MSG_REPLACE_CURRENT
-	@importMessage MetaSearchSpellMessages, void MSG_REPLACE_CURRENT(
-				MemHandle		replaceInfo);
+    @importMessage MetaSearchSpellMessages, void MSG_REPLACE_CURRENT(
+                MemHandle       replaceInfo);
 
 This message is sent by the SearchReplace controller when an object is 
 starting a search operation that should replace the found match with the 
@@ -5659,10 +5659,10 @@ handler.
 
 ----------
 #### MSG_REPLACE_ALL_OCCURRENCES
-	@importMessage  MetaSearchSpellMessages, void 
-					MSG_REPLACE_ALL_OCCURRENCES(
-				MemHandle		replaceInfo,
-				Boolean			replaceFromBeginning);
+    @importMessage  MetaSearchSpellMessages, void 
+                    MSG_REPLACE_ALL_OCCURRENCES(
+                MemHandle       replaceInfo,
+                Boolean         replaceFromBeginning);
 
 This message is sent by the SearchReplace controller when an object is 
 starting a search operation that should replace all found matches (in the 
@@ -5689,10 +5689,10 @@ current position.
 
 ----------
 #### MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION
-	@importMessage  MetaSearchSpellMessages, void 
-					MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION(
-				MemHandle		replaceInfo,
-				Boolean			replaceFromBeginning);
+    @importMessage  MetaSearchSpellMessages, void 
+                    MSG_REPLACE_ALL_OCCURRENCES_IN_SELECTION(
+                MemHandle       replaceInfo,
+                Boolean         replaceFromBeginning);
 
 This message is sent by the SearchReplace controller when an object is 
 starting a search operation that should replace all found matches within a 
@@ -5719,10 +5719,10 @@ current position.
 
 ----------
 #### MSG_META_GET_OBJECT_FOR_SEARCH_SPELL
-	@importMessage MetaSearchSpellMessages, void 
-					MSG_META_GET_OBJECT_FOR_SEARCH_SPELL(
-				GetSearchSpellObjectOption	option,
-				optr						curObject);
+    @importMessage MetaSearchSpellMessages, void 
+                    MSG_META_GET_OBJECT_FOR_SEARCH_SPELL(
+                GetSearchSpellObjectOption  option,
+                optr                        curObject);
 
 This message is sent by a text object to itself when a search reaches the end 
 of the current object and needs to determine where to continue the search. 
@@ -5747,8 +5747,8 @@ operation should continue to.
 
 ----------
 #### MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL
-	@importMessage MetaSearchSpellMessages, void 
-							MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL();
+    @importMessage MetaSearchSpellMessages, void 
+                            MSG_META_DISPLAY_OBJECT_FOR_SEARCH_SPELL();
 
 This message is sent by the text object to itself when a matching word (or 
 misspelled word if the controller is a Spell controller) has been found and 

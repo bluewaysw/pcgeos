@@ -42,54 +42,54 @@ the object in any case.
 ----------
 **Code Display 21-1 InkClass Instance Data**
 
-	/* 	II_flags:
-	 * 	This field holds flags governing the object's behavior:
-	 *		IF_MOUSE_FLAGS, 	
-	 * 		IF_SELECTING, 		
-	 * 		IF_HAS_TARGET,
-	 *		IF_HAS_SYS_TARGET,
-	 *		IF_DIRTY,
-	 *		IF_ONLY_CHILD_OF_CONTENT, 
-	 *		IF_CONTROLLED, (Set if to be used with an InkControl)
-	 *		IF_INVALIDATE_ERASURES,
-	 * 		IF_HAS_UNDO */
-	@instance 	InkFlags 			II_flags = IF_HAS_UNDO;
+    /*  II_flags:
+     *  This field holds flags governing the object's behavior:
+     *      IF_MOUSE_FLAGS,     
+     *      IF_SELECTING,       
+     *      IF_HAS_TARGET,
+     *      IF_HAS_SYS_TARGET,
+     *      IF_DIRTY,
+     *      IF_ONLY_CHILD_OF_CONTENT, 
+     *      IF_CONTROLLED, (Set if to be used with an InkControl)
+     *      IF_INVALIDATE_ERASURES,
+     *      IF_HAS_UNDO */
+    @instance   InkFlags            II_flags = IF_HAS_UNDO;
 
-	/* 	II_tool:
-	 * 	This field keeps track of how the user is interacting with the Ink. There
-	 * 	are three possible tools: IT_PENCIL, IT_SELECTOR, and IT_ERASER. */
-	@instance 	InkTool 		II_tool;
+    /*  II_tool:
+     *  This field keeps track of how the user is interacting with the Ink. There
+     *  are three possible tools: IT_PENCIL, IT_SELECTOR, and IT_ERASER. */
+    @instance   InkTool         II_tool;
 
-	/* 	II_penColor:
-	 * 	The color to use when drawing ink. */
-	@instance 	Color 		II_penColor = C_BLACK;
+    /*  II_penColor:
+     *  The color to use when drawing ink. */
+    @instance   Color       II_penColor = C_BLACK;
 
-	/* 	II_segments:
-	 * 	Do not set this field explicitly. This field is a handle to the chunk array
-	 * 	containing the pen segments. The segments are stored as an array of Point
-	 * 	structures. The stored coordinates are all positive; any x coordinate with
-	 * 	its sign bit set belongs to the last point in a gesture. Thus, a small 
-	 * 	cross shape centered at (72, 72) might be stored:
-	 * 		(0x0048, 0x0046) 
-	 * 		(0x8048, 0x004A) [note sign bit set in x coordinate]
-	 * 		(0x0046, 0x0048)
-	 * 		(0x804A, 0x0048) [sign bit set in x coordinate]	*/
-	@instance 	ChunkHandle 		II_segments;
+    /*  II_segments:
+     *  Do not set this field explicitly. This field is a handle to the chunk array
+     *  containing the pen segments. The segments are stored as an array of Point
+     *  structures. The stored coordinates are all positive; any x coordinate with
+     *  its sign bit set belongs to the last point in a gesture. Thus, a small 
+     *  cross shape centered at (72, 72) might be stored:
+     *      (0x0048, 0x0046) 
+     *      (0x8048, 0x004A) [note sign bit set in x coordinate]
+     *      (0x0046, 0x0048)
+     *      (0x804A, 0x0048) [sign bit set in x coordinate] */
+    @instance   ChunkHandle         II_segments;
 
-	/* 	II_dirtyMsg, II_dirtyOutput:
-	 * 	Together, these fields form an Action Descriptor. When the Ink processes
-	 * 	a point of pen information, erases anything, or handles an undo event the
-	 * 	IF_DIRTY flag will be set. If the flag was not set already, then the Ink
-	 *	will send the AD's message to the AD's object. The handler for this message
-	 * 	should probably clear the IF_DIRTY bit. */
-	@instance optr			II_dirtyOutput;
-	@instance Message	 	II_dirtyMsg;
+    /*  II_dirtyMsg, II_dirtyOutput:
+     *  Together, these fields form an Action Descriptor. When the Ink processes
+     *  a point of pen information, erases anything, or handles an undo event the
+     *  IF_DIRTY flag will be set. If the flag was not set already, then the Ink
+     *  will send the AD's message to the AD's object. The handler for this message
+     *  should probably clear the IF_DIRTY bit. */
+    @instance optr          II_dirtyOutput;
+    @instance Message       II_dirtyMsg;
 
-	@instance Rectangle 	II_selectBounds;	/* Internal */
-	@instance GStateHandle	II_cachedGState;	/* Internal */
-	@instance TimerHandle 	II_antTimer;		/* Internal */
-	@instance word 			II_antTimerID;		/* Internal */
-	@instance byte			II_antMask;			/* Internal */
+    @instance Rectangle     II_selectBounds;    /* Internal */
+    @instance GStateHandle  II_cachedGState;    /* Internal */
+    @instance TimerHandle   II_antTimer;        /* Internal */
+    @instance word          II_antTimerID;      /* Internal */
+    @instance byte          II_antMask;         /* Internal */
 
 ----------
 Most of the Ink messages just change or retrieve the values of the instance 
@@ -101,8 +101,8 @@ ink object, use MSG_INK_LOAD_FROM_DB_ITEM.
 
 ----------
 #### MSG_INK_SET_TOOL
-	void 	MSG_INK_SET_TOOL(
-			InkTool 	tool);
+    void    MSG_INK_SET_TOOL(
+            InkTool     tool);
 
 This message allows the Ink to switch between pencil and eraser tools, 
 changing the *II_tool* field.
@@ -120,7 +120,7 @@ changing the *II_tool* field.
 
 ----------
 #### MSG_INK_GET_TOOL
-	InkTool 	MSG_INK_GET_TOOL();
+    InkTool     MSG_INK_GET_TOOL();
 
 This message returns the Ink's present tool, as stored in *II_tool*.
 
@@ -136,8 +136,8 @@ This message returns the Ink's present tool, as stored in *II_tool*.
 
 ----------
 #### MSG_INK_SET_PEN_COLOR
-	void 	MSG_INK_SET_PEN_COLOR(
-			Color 	clr);
+    void    MSG_INK_SET_PEN_COLOR(
+            Color   clr);
 
 This message changes the color used to draw the ink, changing the value in 
 *II_penColor*.
@@ -155,9 +155,9 @@ This message changes the color used to draw the ink, changing the value in
 
 ----------
 #### MSG_INK_SET_DIRTY_AD
-	void 	MSG_INK_SET_DIRTY_AD(
-			word	 method,
-			optr	 object);
+    void    MSG_INK_SET_DIRTY_AD(
+            word     method,
+            optr     object);
 
 This message sets the Action Descriptor to be activated when the user dirties 
 the object, changing the values in *II_dirtyMsg* and *II_dirtyOutput*.
@@ -177,9 +177,9 @@ the object, changing the values in *II_dirtyMsg* and *II_dirtyOutput*.
 
 ----------
 #### MSG_INK_SET_FLAGS
-	void 	MSG_INK_SET_FLAGS(
-			InkFlags 	setFlags,
-			InkFlags 	clearFlags);
+    void    MSG_INK_SET_FLAGS(
+            InkFlags    setFlags,
+            InkFlags    clearFlags);
 
 This message changes the value of the *II_flags* field. Note that something 
 which sets the IF_DIRTY bit should probably also perform the action stored 
@@ -200,7 +200,7 @@ in the *II_dirtyMsg* and *II_dirtyOutput* fields.
 
 ----------
 #### MSG_INK_GET_FLAGS
-	InkFlags 	MSG_INK_GET_FLAGS();
+    InkFlags    MSG_INK_GET_FLAGS();
 
 This message gets the value of the *II_flags* field.
 
@@ -216,9 +216,9 @@ This message gets the value of the *II_flags* field.
 
 ----------
 #### MSG_INK_SAVE_TO_DB_ITEM
-	void	MSG_INK_SAVE_TO_DB_ITEM(
-			DBReturn		* RetValue,
-			InkDBFrame		* ptr);
+    void    MSG_INK_SAVE_TO_DB_ITEM(
+            DBReturn        * RetValue,
+            InkDBFrame      * ptr);
 
 This message saves the Ink's pen data into the passed DB item. The pen data 
 will be stored compressed. Calling this message sets the object not dirty.
@@ -239,32 +239,32 @@ information.
 
 **Structures:** The **InkDBFrame** and **DBReturn** structures are defined below:
 
-	typedef struct {
-		Rectangle			IDBF_bounds;
-			/* The bounds of the Ink data */
-		VMFileHandle		IDBF_vmFile;
-			/* VM file to write to*/
-		DBGroupAndItem 		IDBF_DBGroupAndItem;
-			/* DB Item to save to 
-			 * (or NULL to create a new one) */
-		word 				IDBF_DBExtra;
-			/* Extra space to skip at start
-			 * of block */
-	} InkDBFrame;
+    typedef struct {
+        Rectangle           IDBF_bounds;
+            /* The bounds of the Ink data */
+        VMFileHandle        IDBF_vmFile;
+            /* VM file to write to*/
+        DBGroupAndItem      IDBF_DBGroupAndItem;
+            /* DB Item to save to 
+             * (or NULL to create a new one) */
+        word                IDBF_DBExtra;
+            /* Extra space to skip at start
+             * of block */
+    } InkDBFrame;
 
-	typedef struct {
-		word		DBR_group;
-		word		DBR_item;
-		word		DBR_unused1;
-		word		DBR_unused2;
-	} DBReturn;
+    typedef struct {
+        word        DBR_group;
+        word        DBR_item;
+        word        DBR_unused1;
+        word        DBR_unused2;
+    } DBReturn;
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_INK_LOAD_FROM_DB_ITEM
-	void	MSG_INK_LOAD_FROM_DB_ITEM(
-			InkDBFrame 	*ptr);
+    void    MSG_INK_LOAD_FROM_DB_ITEM(
+            InkDBFrame  *ptr);
 
 This message loads the compressed data into the Ink from the passed DB 
 item. If a NULL handle is passed, then the Ink is cleared. This message 
@@ -319,28 +319,28 @@ bitstream.
 
 **Table 21-1** Components of the Ink's Bitstream
 
-	Bit Pattern					Meaning						Total Bits
-	00							0 offset							2
-	01							+1 offset							2
-	10 00 000					terminate segment					7
-	10 00 001					+2 offset							7
-	10 00 010					+3 offset							7
-	10 00 011 					+4 offset							7
-	10 00 100					+5 offset							7
-	10 00 101 					+6 offset							7
-	10 00 110 					+7 offset							7
-	10 00 111 					+8 offset							7
-	10 01 000					(reserved for future use)			7
-	10 01 001 					-2 offset							7
-	10 01 010					-3 offset							7
-	10 01 011 					-4 offset							7
-	10 01 100					-5 offset							7
-	10 01 101 					-6 offset							7
-	10 01 110 					-7 offset							7
-	10 01 111 					-8 offset							7
-	10 10 xxxxxx 				6-bit keyword (reserved)			10
-	10 11 xxxx xxxx xxxx xxx	15-bit (unsigned) absolute position	19
-	11 							-1 offset							2
+    Bit Pattern                 Meaning                     Total Bits
+    00                          0 offset                            2
+    01                          +1 offset                           2
+    10 00 000                   terminate segment                   7
+    10 00 001                   +2 offset                           7
+    10 00 010                   +3 offset                           7
+    10 00 011                   +4 offset                           7
+    10 00 100                   +5 offset                           7
+    10 00 101                   +6 offset                           7
+    10 00 110                   +7 offset                           7
+    10 00 111                   +8 offset                           7
+    10 01 000                   (reserved for future use)           7
+    10 01 001                   -2 offset                           7
+    10 01 010                   -3 offset                           7
+    10 01 011                   -4 offset                           7
+    10 01 100                   -5 offset                           7
+    10 01 101                   -6 offset                           7
+    10 01 110                   -7 offset                           7
+    10 01 111                   -8 offset                           7
+    10 10 xxxxxx                6-bit keyword (reserved)            10
+    10 11 xxxx xxxx xxxx xxx    15-bit (unsigned) absolute position 19
+    11                          -1 offset                           2
 
 When writing out a gesture to a DB item, the first point will always be 
 recorded as an absolute position. Thus, first the *x* coordinate will be recorded, 
@@ -374,10 +374,10 @@ the appropriate patterns.
 As an example of how the algorithm compresses pen input, suppose the Ink 
 object were writing the following gesture to a DB item:
 
-	(72, 71)
-	(82, 74)
-	(84, 74)
-	(85, 72)
+    (72, 71)
+    (82, 74)
+    (84, 74)
+    (85, 72)
 
 The first coordinate is 72, so the algorithm will write out:  
 *1011* (signals absolute coordinate) *000000001001000*  
@@ -423,7 +423,7 @@ routines described below to determine where a note or folder appears in the
 folder tree.
 
 ### 21.2.1 Getting Started
-	InkDBInit()
+    InkDBInit()
 
 To create an Ink Database, an application needs a file handle, perhaps the 
 file holding a GenDocument's data. Before calling any other Ink Database 
@@ -435,9 +435,9 @@ MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE. Other routines
 Database include **InkSetDocPageInfo()** and **InkSetDocGString()**.
 
 ### 21.2.2 Displaying the Data
-	InkNoteLoadPage(), InkNoteSavePage(), InkGetDocPageInfo(), 
-	InkSetDocPageInfo(), InkSetDocGString(), 
-	InkGetDocGString(), InkNoteGetNoteType()
+    InkNoteLoadPage(), InkNoteSavePage(), InkGetDocPageInfo(), 
+    InkSetDocPageInfo(), InkSetDocGString(), 
+    InkGetDocGString(), InkNoteGetNoteType()
 
 Assuming that the application is using text and ink objects to display the 
 information held in the Ink DB, use **InkNoteLoadPage()** and 
@@ -461,11 +461,11 @@ The background GString is stored in VM; call **GrLoadGString()** and
 **GrDrawGString()** to draw it.
 
 ### 21.2.3 Titles and Keywords
-	InkNoteSetKeywords(), InkNoteSetKeywordsFromTextObject(), 
-	InkNoteGetKeywords(), InkNoteSendKeywordsToTextObject(), 
-	InkGetTitle(), InkSendTitleToTextObject(), 
-	InkFolderSetTitle(), InkFolderSetTitleFromTextObject(), 
-	InkNoteSetTitle(), InkNoteSetTitleFromTextObject()
+    InkNoteSetKeywords(), InkNoteSetKeywordsFromTextObject(), 
+    InkNoteGetKeywords(), InkNoteSendKeywordsToTextObject(), 
+    InkGetTitle(), InkSendTitleToTextObject(), 
+    InkFolderSetTitle(), InkFolderSetTitleFromTextObject(), 
+    InkNoteSetTitle(), InkNoteSetTitleFromTextObject()
 
 Each note may have two text strings which are helpful for identification: a 
 title and a set of keywords. These words may be used as the fields for a 
@@ -492,11 +492,11 @@ the passed note's keywords. The maximum length of any keyword should be
 INK_DB_MAX_NOTE_KEYWORDS_SIZE.
 
 ### 21.2.4 Navigating the Folder Tree
-	InkDBGetDisplayInfo(), InkDBSetDisplayInfo(), 
-	InkDBGetHeadFolder(), InkGetParentFolder(), 
-	InkFolderGetContents(), InkFolderGetNumChildren(), 
-	InkFolderDisplayChildInList(), InkFolderGetChildInfo(), 
-	InkFolderGetChildNumber(), InkNoteGetNumPages()
+    InkDBGetDisplayInfo(), InkDBSetDisplayInfo(), 
+    InkDBGetHeadFolder(), InkGetParentFolder(), 
+    InkFolderGetContents(), InkFolderGetNumChildren(), 
+    InkFolderDisplayChildInList(), InkFolderGetChildInfo(), 
+    InkFolderGetChildNumber(), InkNoteGetNumPages()
 
 Assuming the application allows the existence of more than one folder, it 
 must allow some way to move around within the folder tree. If the application 
@@ -533,9 +533,9 @@ along with the child's ID number. The **InkFolderGetChildNumber()**
 routine returns the passed child's place number within the folder.
 
 ### 21.2.5 Managing Notes and Folders
-	InkFolderCreateSubFolder(), InkFolderMove(), 
-	InkFolderDelete(), InkNoteCreate(), InkNoteDelete(), 
-	InkNoteMove(), InkNoteCreatePage()
+    InkFolderCreateSubFolder(), InkFolderMove(), 
+    InkFolderDelete(), InkNoteCreate(), InkNoteDelete(), 
+    InkNoteMove(), InkNoteCreatePage()
 
 Some Ink DB applications might just create a hierarchy of notes and not 
 allow the user to move or change notes. Applications that will move notes and 
@@ -549,11 +549,11 @@ folder contained. **InkNoteCreate()** creates a new note. **InkNoteDelete()**
 deletes a note. **InkNoteCreatePage()** adds a new page to a note.
 
 ### 21.2.6 Manipulating Notes
-	InkNoteGetPages(), InkNoteGetNumPages(), 
-	InkNoteSetModificationDate(), 
-	InkNoteGetModificationDate(), InkNoteGetCreationDate(), 
-	InkNoteSetNoteType(), InkNoteGetNoteType()
-	
+    InkNoteGetPages(), InkNoteGetNumPages(), 
+    InkNoteSetModificationDate(), 
+    InkNoteGetModificationDate(), InkNoteGetCreationDate(), 
+    InkNoteSetNoteType(), InkNoteGetNoteType()
+    
 Normally, the note will store information supplied by an Ink or Text object. 
 However, applications may work with a note's information directly. Call 
 **InkNoteGetPages()** to get the DB item in which the note's information is 
@@ -573,8 +573,8 @@ out the date last modified, call **InkNoteGetModificationDate()**. To find out
 the date the note was created, call **InkNoteGetCreationDate()**.
 
 ### 21.2.7 Searching and Traversing the Tree
-	InkNoteFindByTitle(), InkNoteFindByKeywords(), 
-	InkFolderDepthFirstTraverse()
+    InkNoteFindByTitle(), InkNoteFindByKeywords(), 
+    InkFolderDepthFirstTraverse()
 
 Sometimes the user will remember what a note is called, but has lost it in the 
 tree of folders. Sometimes the user will want to find all notes which contain 
@@ -594,24 +594,24 @@ allows the user to select an Ink tool for use with an Ink object.
 ----------
 **Code Display 21-2 InkControlClass Features**
 
-	typedef ByteFlags 	InkControlFeatures;
-	/* These features may be combined using | and &:
-		ICF_PENCIL_TOOL,
-		ICF_ERASER_TOOL 
-		ICF_SELECTION_TOOL */
+    typedef ByteFlags   InkControlFeatures;
+    /* These features may be combined using | and &:
+        ICF_PENCIL_TOOL,
+        ICF_ERASER_TOOL 
+        ICF_SELECTION_TOOL */
 
-	typedef ByteFlags 	InkControlToolboxFeatures;
-	/* These features may be combined using | and &:
-		ICTF_PENCIL_TOOL,
-		ICTF_ERASER_TOOL 
-		ICTF_SELECTION_TOOL */
+    typedef ByteFlags   InkControlToolboxFeatures;
+    /* These features may be combined using | and &:
+        ICTF_PENCIL_TOOL,
+        ICTF_ERASER_TOOL 
+        ICTF_SELECTION_TOOL */
 
-	#define IC_DEFAULT_FEATURES 			(ICF_PENCIL_TOOL | ICF_ERASER_TOOL | \
-											 ICF_SELECTION_TOOL)
-	#define IC_DEFAULT_TOOLBOX_FEATURES 	(ICTF_PENCIL_TOOL | ICTF_ERASER_TOOL | \
-											 ICTF_SELECTION_TOOL)
+    #define IC_DEFAULT_FEATURES             (ICF_PENCIL_TOOL | ICF_ERASER_TOOL | \
+                                             ICF_SELECTION_TOOL)
+    #define IC_DEFAULT_TOOLBOX_FEATURES     (ICTF_PENCIL_TOOL | ICTF_ERASER_TOOL | \
+                                             ICTF_SELECTION_TOOL)
 
-	/* Add this controller to the application's self-load options GCN list. */
+    /* Add this controller to the application's self-load options GCN list. */
 
 ----------
 

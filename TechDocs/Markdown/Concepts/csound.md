@@ -228,22 +228,22 @@ library will understand. See Code Display 13-1 for an example.
 Code Display 13-1 Allocating Single Music Notes
 ~~~
 /* BigBlatt is a Cb (C flat) Half-note, which will sound as if played by a trumpet.
- * 	This means a tone of 494Hz with duration (128 * playing tempo). */
-SoundErr = SoundAllocMusicNote ( IP_TRUMPET, 0,	/* Play as if with a trumpet */
-				MIDDLE_C_b,    /* C flat, 494 Hz. */
-				DYNAMIC_FFF,   /* Play it rather loudly */
-				SSDTT_TEMPO,   /* Length based on 128th notes */
-				WHOLE,         /* Duration = 128/128 notes */
-				&BigBlatt);		
+ *  This means a tone of 494Hz with duration (128 * playing tempo). */
+SoundErr = SoundAllocMusicNote ( IP_TRUMPET, 0, /* Play as if with a trumpet */
+                MIDDLE_C_b,    /* C flat, 494 Hz. */
+                DYNAMIC_FFF,   /* Play it rather loudly */
+                SSDTT_TEMPO,   /* Length based on 128th notes */
+                WHOLE,         /* Duration = 128/128 notes */
+                &BigBlatt);     
 
 /* SubliminalTone is an A note lasting 0.3 sec which will sound as if it was being
- * 	played very quietly on an electric piano. It will play at 880Hz. */
+ *  played very quietly on an electric piano. It will play at 880Hz. */
 SoundAllocMusicNote( IP_ELECTRIC_PIANO_1, 0, /* As if on piano */
-				MIDDLE_A,      /* Middle A, 880 Hz. */
-				DYNAMIC_PP,    /* Play it rather quietly. */
-				SSDTT_MSEC,    /* Length based on milliseconds */
-				300,           /* Duration = 0.300 seconds */
-				&SubliminalTone);
+                MIDDLE_A,      /* Middle A, 880 Hz. */
+                DYNAMIC_PP,    /* Play it rather quietly. */
+                SSDTT_MSEC,    /* Length based on milliseconds */
+                300,           /* Duration = 0.300 seconds */
+                &SubliminalTone);
 ~~~
 
 There are two ways to play a note. The first is to call **UserStandardSound()** 
@@ -314,7 +314,7 @@ Code Display 13-3 Stopping and Freeing a Note
 /* Stop the SubliminalTone if we're playing it, then change the stored note */
 SoundStopMusicNote(SubliminalTone);
 SoundReallocMusicNote(SubliminalTone, LOW_C, DYNAMIC_PPP,
-					SSDTT_MSEC, 500, IP_TINKLE_BELL, 0);
+                    SSDTT_MSEC, 500, IP_TINKLE_BELL, 0);
 
 /* Stop the BigBlatt if we're playing it, then discard it */
 SoundStopMusicNote(BigBlatt);
@@ -502,10 +502,10 @@ Code Display 13-5 Preparing and Playing Sound Buffers
 ~~~
 SoundInitMusic(MySongResource, 1);
 
-SoundErr = SoundAllocMusic(	&themeSongBuf, 
-				2, 		/* themeSongBuf has two voices,
-						 * MELODY and PERC. */
-				&theSong);		
+SoundErr = SoundAllocMusic( &themeSongBuf, 
+                2,      /* themeSongBuf has two voices,
+                         * MELODY and PERC. */
+                &theSong);      
 
 SoundPlayMusic(theSong, SP_STANDARD, 125, EOSF_UNLOCK);
 
@@ -729,10 +729,10 @@ levels and leave the noise component as zero.
 
 ~~~
 CTIEnvelopeFormat BrokenTuba =
-	{255, 		/* Primary: full strength */
-	 64, 		/* First harmonic: 25% strength */
-	 10, 		/* 2nd harmonic: 10% strength */
-	 0};		/* No noise */
+    {255,       /* Primary: full strength */
+     64,        /* First harmonic: 25% strength */
+     10,        /* 2nd harmonic: 10% strength */
+     0};        /* No noise */
 ~~~
 
 To describe an instrument with noise, you must specify a type and a degree 
@@ -741,10 +741,10 @@ six bits describing the degree of noise, if any):
 
 ~~~
 CTIEnvelopeFormat FunkyPiano = 
-	{ 255, 32, 17, ((NT_WHITE_NOISE << 6) | 10) };
+    { 255, 32, 17, ((NT_WHITE_NOISE << 6) | 10) };
 
 CTIEnvelopeFormat NoisyDrum = 
-	{ 0, 0, 0, ((NT_METAL_NOISE << 6) | 63 ) };
+    { 0, 0, 0, ((NT_METAL_NOISE << 6) | 63 ) };
 ~~~
 
 #### 13.10.3 Advanced Description

@@ -261,13 +261,13 @@ BCC -D__GEOS__ -u- -c -v -y -Ot -Oi -i200 -ml -I. -IC:\PCGEOS\INCLUDE -IC:\PCGEO
 NCLUDE\ANSI -oHELLO.OBJ HELLO.C
 Borland C++ Version 3.1 Copyright (c) 1992 Borland International
 hello.c:
-	Available memory 3475572
+    Available memory 3475572
 glue -Og HELLO.GP -P 0.0 -R 0.0.0.0 -m -LC:\PCGEOS\INCLUDE\LDF -T 1 -o HELLOEC.GEO 
 HELLO.OBJ
 Resource            Size    # Relocs
 --------------------------------------------------
 CoreBlock              0       0
-dgroup               144	   3
+dgroup               144       3
 HELLO_TEXT           125       8
 INTERFACE            180       1
 APPRESOURCE          416       1
@@ -277,7 +277,7 @@ Uninitialized data/stack: 2000 bytes
 
 Import  Number  Type   Protocol
 ----------------------------------
-geos      0	   library  654.000
+geos      0    library  654.000
 ui        1    library  741.001
 borlandc  2    library    1.000
 ~~~
