@@ -908,6 +908,7 @@ member of the **FileError** enumerated type. If the routine fails and
     word    FileCommit( /* returns error */
             FileHandle  fh,
             Boolean     noErrorFlag);   /* set if can't handle errors */
+
 **FileCommit()** forces the file system to write any cached information about 
 a file to the disk immediately. If it is successful, it returns zero. If it fails, it 
 returns an error code. If the routine fails and *noErrorFlag* is *true* (i.e. 
@@ -1501,6 +1502,7 @@ constant might nevertheless be SP_TOP.
             FileExtendedAttribute   attr,   /* Search for this attribute */
             const char *            * name);    /* Attribute name (if second
                                                  * argument is FEA_CUSTOM) */
+
 **FileEnum()** can be instructed to call a callback routine to decide which files 
 to filter out. This callback routine is passed an array of **FileExtAttrDesc** 
 structures. To find a particular extended attribute in this array, call 
@@ -1791,6 +1793,7 @@ be returned, and the pointer will not be changed.
 ----------
 #### FilePopDir()
     void    FilePopDir();
+
 **FilePopDir()** pops the top directory off the thread's directory stack and 
 makes it the current working directory.
 
@@ -1834,6 +1837,7 @@ mode FILE_POS_RELATIVE and offset zero.
 ----------
 #### FilePushDir()
     void    FilePushDir();
+
 **FilePushDir()** pushes the current working directory onto the thread's 
 directory stack. It does not change the current working directory.
 

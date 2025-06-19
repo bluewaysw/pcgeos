@@ -1396,8 +1396,7 @@ its modified state.
 **Parameters:**  
 *text* * The pointer to a null-terminated text string to set 
 the GenValue's text to.
-*
-valueType* - The **GenValueType**, specifying the instance data 
+*valueType* - The **GenValueType**, specifying the instance data 
 to convert into a fixed point value from the passed 
 text.
 

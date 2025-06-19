@@ -1822,6 +1822,7 @@ about the disk containing the main **geos.ini** file.
 #### DiskCheckWritable()
     Boolean DiskCheckWritable(
             DiskHandle      disk);
+
 **DiskCheckWritable()** checks if a disk is currently writable. It returns *false* 
 (i.e. zero) if the disk is not writable, whether by nature (e.g. a CD-ROM disk) 
 or because the write-protect tab is on; otherwise it returns *true* (i.e. non-zero). 
@@ -2200,6 +2201,7 @@ temporary name to the disk, it will not present an alert box to the user.
                      const char                 *diskName,
                      void                       **bufferPtr,
                      DiskRestoreError           error);
+
 **DiskRestore()** examines a buffer written by **DiskSave()** and returns the 
 handle of the disk described by that buffer. If that disk is already registered, 
 **DiskRestore()** will simply return its handle. If the disk is not registered and 

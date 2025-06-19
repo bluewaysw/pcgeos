@@ -4100,6 +4100,7 @@ message may not be handled before the pointers are invalidated.
     MSG_VIS_VUP_CALL_OBJECT_OF_CLASS, 
     MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS, 
     MSG_VIS_VUP_TEST_FOR_OBJECT_OF_CLASS
+
 **VisClass** has several messages that automatically travel up the visible 
 object tree until they get to an object that meets the proper criteria; they then 
 deliver themselves to that object. This is accomplished by the default handler 
@@ -4758,6 +4759,7 @@ to set a temporary boundary on drag scrolling.
     MSG_VIS_VUP_EC_ENSURE_WINDOW_NOT_REFERENCED, 
     MSG_VIS_VUP_EC_ENSURE_OBJ_BLOCK_NOT_REFERENCED, 
     MSG_VIS_VUP_EC_ENSURE_OD_NOT_REFERENCED
+
 **VisClass** provides three messages you can use for special error checking. 
 These three messages are provided especially to make sure that all objects 
 being destroyed or removed will be destroyed cleanly. The default handlers 

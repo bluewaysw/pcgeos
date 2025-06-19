@@ -323,12 +323,15 @@ listed below:
 **Shared data**
 
     resource <name> data shared
+
 **Initialization code**
 
     resource <nm> code shared read-only preload no-swap
+
 **Common code used by several geodes (this is the default)**
 
     resource <name> code shared read-only
+
 **Self-modifying code (strongly discouraged)**
 
     resource <name> code

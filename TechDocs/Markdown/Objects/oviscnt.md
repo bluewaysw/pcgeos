@@ -389,6 +389,7 @@ has a large amount of functionality built into it to provide these features.
     VCNI_kbdGrab, MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT, 
     MSG_VIS_CONTENT_UNWANTED_KBD_EVENT, 
     MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN
+
 **VisContentClass**, as the head of the visible tree displayed in the view, keeps 
 track of which object in its tree has each different type of input grab. With 
 this information, the content can simply pass the input event directly to the 

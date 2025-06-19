@@ -5550,8 +5550,7 @@ CL_CENTERED_AROUND_SELECTION_START
 CL_SELECTED_WORD
 
 *numCharsToGet*  - Maximum number of characters to return.
-*
-replyObj* - Optr of the object to reply to via 
+*replyObj* - Optr of the object to reply to via 
 MSG_META_CONTEXT.
 
 **Interception:** You may intercept to alter the nature of the context request.

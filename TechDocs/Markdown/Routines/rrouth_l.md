@@ -91,6 +91,7 @@ the resultant optr to be zero.
 #### HandleV()
     void    HandleV(
             MemHandle       mh);        /* Handle of block to grab */
+
 **HandleV()** is part of a set of synchronization routines. If several different 
 threads will be accessing the same global memory block, they need to make 
 sure their activities will not conflict. The way they do that is to use 

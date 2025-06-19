@@ -706,6 +706,7 @@ application's geode handle or Process object's handle to a routine or message.
 #### GeodeGetUIData()
     word    GeodeGetUIData(
             GeodeHandle     gh);
+
 **Include:** geode.h
 
 ----------

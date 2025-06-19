@@ -795,8 +795,7 @@ Count up instances of various objects on the heap.
 + Output fields:
 
     **direct** - number of direct instances of this class  
-    **indirect** - number if indirect instance of this class (i.e object's superclass
-is this class)  
+    **indirect** - number if indirect instance of this class (i.e object's superclass is this class)  
     **size** - total size of instance data for this class (excludes instance data 
 inherited from superclass)
 

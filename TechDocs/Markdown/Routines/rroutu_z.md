@@ -1068,6 +1068,7 @@ This routine is part of the window closing mechanism.
 ----------
 #### WinEnsureChangeNotification()
     void    WinEnsureChangeNotification(void);
+
 **Include:** win.h
 
 ----------

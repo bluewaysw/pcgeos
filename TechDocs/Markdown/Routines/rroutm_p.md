@@ -248,6 +248,7 @@ try to free a bad handle, routine may fatal-error.
     word    MemGetInfo( /* return value depends on flag passed */
             MemHandle       mh,     /* Handle of block to get info about */
             MemGetInfoType  info);  /* Type of information to get */
+
 **MemGetInfo()** is a general-purpose routine for getting information about a 
 global memory block. It gets the information by looking in the block's handle 
 table entry; it does not need to access the actual block. It returns a single 
@@ -413,6 +414,7 @@ will designate them as virtual segments.
 #### MemLockShared()
     void    * MemLockShared(
             MemHandle       mh);            /* Handle of block to grab */
+
 **MemLockShared()** requests shared access to the passed block. If the block 
 is not being accessed, or if it is held for shared access and the queue is empty, 
 the routine gets access, locks the block, and returns the block's address. 
@@ -445,6 +447,7 @@ attempt to lock the block, and fixed blocks cannot be locked. Instead, use the
             MemHandle       mh,             /* Handle of block to modify */
             HeapFlags       bitsToSet,      /* HeapFlags to turn on */
             HeapFlags       bitsToClear);   /* HeapFlags to turn off */
+
 **MemModifyFlags()** changes the **HeapFlags** record of the global memory 
 block specified. Not all flags can be changed after the block is created; only 
 the flags HF_SHARABLE, HF_DISCARDABLE, HF_SWAPABLE, and HF_LMEM 
@@ -568,6 +571,7 @@ the synchronization routines.
 #### MemThreadGrab()
     void    * MemThreadGrab(
             MemHandle       mh);        /* Handle of block to grab */
+
 **MemThreadGrab()** is used in conjunction with **MemThreadGrabNB()** 
 and **MemThreadRelease()** to maintain data-access synchronization. If 
 several threads will all have access to the same global memory block, they 
@@ -2713,6 +2717,7 @@ the second entry point in the PCCom library.
     #define PCCRT_CANNOT_CREATE_THREAD 2
     #define PCCRT_CANNOT_ALLOC_STREAM 3
     #define PCCRT_ALREADY_INITIALIZED 4
+
 **Include:** pccom.goh 
 
 ----------
@@ -2762,6 +2767,7 @@ determine what sort of notifications will be sent.
         /* send notification when the remote machine shuts down the
          * serial line */
     #define PCCIF_NOTIFY_EXIT 0x4000
+
 **Include:** pccom.goh 
 
 ----------

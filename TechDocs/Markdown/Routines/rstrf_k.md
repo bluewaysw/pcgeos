@@ -231,6 +231,7 @@ Macros are provided to extract values from each of the fields of a
             FileDateAndTime fdat);
     byte FDATExtractSecond( /* returns number of seconds (2 * 2Second) */
             FileDateAndTime fdat);
+
 **Include:** file.h
 
 ----------
@@ -381,6 +382,7 @@ Section 17.5.3 of the Concepts book.
         #define FA_OUTLINE              0x10
         #define FA_FAMILY               0x0f
         #define FA_FAMILY_OFFSET        0
+
 **Include:** font.h
 
 ----------
@@ -393,6 +395,7 @@ Section 17.5.3 of the Concepts book.
         #define FEF_DOWNCASE        0x04    /* Returned font names will be lowercase */
         #define FEF_BITMAPS         0x02    /* Interested in bitmap fonts */
         #define FEF_OUTLINES        0x01    /* Interested in outline fonts */
+
 **Include:** font.h
 
 ----------
@@ -401,6 +404,7 @@ Section 17.5.3 of the Concepts book.
          FontIDs        FES_ID;
          char           FES_name[FID_NAME_LEN];
     } FontEnumStruct;
+
 **Include:** font.h
 
 ----------
@@ -414,6 +418,7 @@ Section 17.5.3 of the Concepts book.
         #define FF_SCRIPT               0x0002
         #define FF_SANS_SERIF           0x0001
         #define FF_SERIF                0x0000
+
 **Include:** fontID.h
 
 ----------
@@ -428,6 +433,7 @@ Section 17.5.3 of the Concepts book.
         #define FG_SANS_SERIF           0x0200
         #define FG_SERIF                0x0000
     } FontGroup;
+
 **Include:** fontID.h
 
 ----------
@@ -437,6 +443,7 @@ Section 17.5.3 of the Concepts book.
         #define FIDR_ID             0x0fff
         #define FIDR_maker_OFFSET                   12
         #define FIDR_ID_OFFSET                   0
+
 **Include:** font.h
 
 ----------
@@ -1628,6 +1635,7 @@ Fonts are normally referenced by FontID.
         #define FM_ADOBE                0x2000
         #define FM_NIMBUSQ              0x1000
         #define FM_BITMAP               0x0000
+
 **Include:** fontID.h
 
 ----------
@@ -1635,6 +1643,7 @@ Fonts are normally referenced by FontID.
     typedef byte FontMap;
         #define FM_DONT_USE             0x00ff
         #define FM_EXACT                0x0000
+
 **Include:** fontID.h
 
 ----------
@@ -1650,6 +1659,7 @@ Fonts are normally referenced by FontID.
         #define FW_EXTRA_BOLD               7
         #define FW_ULTRA_BOLD               8
         #define FW_BLACK                    9
+
 **Include:** font.h
 
 ----------
@@ -1660,6 +1670,7 @@ Fonts are normally referenced by FontID.
         #define FWI_MEDIUM                  2
         #define FWI_WIDE                    3
         #define FWI_EXPANDED                4
+
 **Include:** font.h
 
 ----------
@@ -2685,12 +2696,14 @@ graphics commands.
         #define IACPCF_CLIENT_OD_SPECIFIED          0x0010
         #define IACPCF_FIRST_ONLY                   0x0008
         #define IACPCF_SERVER_MODE                  0x0007
+
 **Include:** iacp.goh
 
 ----------
 #### IACPServerFlags
     typedef ByteFlags IACPServerFlags;
         #define IACPSF_MULTIPLE_INSTANCES                       0x80
+
 **Include:** iacp.goh
 
 ----------
@@ -2699,6 +2712,7 @@ graphics commands.
         #define IACPSM_NOT_USER_INTERACTIBLE        0
         #define IACPSM_IN_FLUX                      1
         #define IACPSM_USER_INTERACTIBLE            2
+
 **Include:** iacp.goh
 
 ----------
@@ -2707,6 +2721,7 @@ graphics commands.
         IACPS_CLIENT,
         IACPS_SERVER
     } IACPSide;
+
 **Include:** iacp.goh
 
 ----------

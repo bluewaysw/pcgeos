@@ -819,6 +819,7 @@ applications.
         #define MF_CAN_DISCARD_IF_DESPERATE 0x0004
         #define MF_RECORD                   0x0002      /* @record */
         #define MF_DISPATCH_DONT_FREE       0x0002
+
 **MessageFlags** are specified in the assembly version of **ObjMessage()**. Most 
 of these flags are set properly by Goc and the kernel in C. See the reference 
 entries for the Goc keywords **@call** and **@send**.
@@ -1643,6 +1644,7 @@ The callback routine, if any, should be declared _pascal.
         Point           RIP_delta;
         dword           RIP_cfp;
     } RangeInsertParams;
+
 **RangeInsert()** is passed the address of a **RangeInsertParams** structure. 
 This structure specifies three things:
 
@@ -3363,6 +3365,7 @@ values.
          VMSERV_CHANGES,
          VMSERV_TIMEOUT
     } VMStartExclusiveReturnValue;
+
 **VMGrabExclusive()** returns a member of this enumerated type. It may 
 have one of the following values:
 
