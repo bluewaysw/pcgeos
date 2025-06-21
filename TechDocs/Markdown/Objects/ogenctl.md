@@ -177,79 +177,79 @@ they are documented.
 ----------
 **Code Display 12-1 A Sample Controller Application (psctext.goc)**
 
-	@include <stdapp.goh>
-	@include <ui.goh>
-	@include <Objects/Text/tCtrlC.goh>
+    @include <stdapp.goh>
+    @include <ui.goh>
+    @include <Objects/Text/tCtrlC.goh>
 
-	/* The PSCText application's process class runs the application's primary
-	 * thread. For a description of GenProcessClass, see Hello World. */
+    /* The PSCText application's process class runs the application's primary
+     * thread. For a description of GenProcessClass, see Hello World. */
 
-	@class PSCTextProcessClass, GenProcessClass;
-	@endc
-	@classdecl PSCTextProcessClass;
+    @class PSCTextProcessClass, GenProcessClass;
+    @endc
+    @classdecl PSCTextProcessClass;
 
-	@start AppResource;
-	/* The PSCTextApp object defines the application object for the
-	 * application. For full information, see Hello World.
-	 * The controller is also placed on the application's self-load-options
-	 * GCN list to ensure that it loads its options properly when returning
-	 * from saved state. This is shown below in the second of the two
-	 * GCN list declarations. */
-	@object GenApplicationClass PSCTextApp = {
-		GI_visMoniker = "Point Size Control Sample Application";
-		GI_comp = @PSCTPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @2PSCTPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @PSCTSizeControl;
-	}
+    @start AppResource;
+    /* The PSCTextApp object defines the application object for the
+     * application. For full information, see Hello World.
+     * The controller is also placed on the application's self-load-options
+     * GCN list to ensure that it loads its options properly when returning
+     * from saved state. This is shown below in the second of the two
+     * GCN list declarations. */
+    @object GenApplicationClass PSCTextApp = {
+        GI_visMoniker = "Point Size Control Sample Application";
+        GI_comp = @PSCTPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @2PSCTPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) = @PSCTSizeControl;
+    }
 
-	@end AppResource
+    @end AppResource
 
-	@start Interface;
+    @start Interface;
 
-	/* The PSCTPrimary object serves as the primary window of this sample application.
-	 * Its children are the Point Size Control object and the two GenText objects. */
-	@object GenPrimaryClass PSCTPrimary = {
-		GI_comp = @PSCTSizeControl, @PSCTopTextObj, @PSCBotTextObj;
-		HINT_SIZE_WINDOW_AS_DESIRED;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-	}
+    /* The PSCTPrimary object serves as the primary window of this sample application.
+     * Its children are the Point Size Control object and the two GenText objects. */
+    @object GenPrimaryClass PSCTPrimary = {
+        GI_comp = @PSCTSizeControl, @PSCTopTextObj, @PSCBotTextObj;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
 
-	/* The PSCTSizeControl object is the controller that provides all the point size
-	 * functionality. It will automatically create a menu called "Sizes" (due to the
-	 * GI_visMoniker) and all the entries of that menu.
-	 * This controller will work on whichever of the two GenText objects
-	 * (PSCGTopTextObj and PSCBotTextObj) is set the target; the controller's UI
-	 * objects (the Sizes menu) send their messages directly to the target via the
-	 * TravelOption TO_TARGET. If a point size is selected as the user's first action,
-	 * it will work on PSCTopTextObj because that is set up as the default target. */
-	@object PointSizeControlClass PSCTSizeControl = {
-		GI_visMoniker = 'z', "Sizes";	/* Give the controller a name */
-		GII_visibility = GIV_POPUP;		/* Make the controller a menu */
-	}
+    /* The PSCTSizeControl object is the controller that provides all the point size
+     * functionality. It will automatically create a menu called "Sizes" (due to the
+     * GI_visMoniker) and all the entries of that menu.
+     * This controller will work on whichever of the two GenText objects
+     * (PSCGTopTextObj and PSCBotTextObj) is set the target; the controller's UI
+     * objects (the Sizes menu) send their messages directly to the target via the
+     * TravelOption TO_TARGET. If a point size is selected as the user's first action,
+     * it will work on PSCTopTextObj because that is set up as the default target. */
+    @object PointSizeControlClass PSCTSizeControl = {
+        GI_visMoniker = 'z', "Sizes";   /* Give the controller a name */
+        GII_visibility = GIV_POPUP;     /* Make the controller a menu */
+    }
 
-	/* These two GenText objects are simple; they use only the defaults plus the
-	 * items shown here. Both must be set targetable (GA_TARGETABLE) to be included
-	 * in the target hierarchy; this is necessary when using controllers because of
-	 * the note in the above comment. The PSCTopTextObj is made the default focus
-	 * (to get keyboard input) and the default target (for controller operation). */
-	@object GenTextClass PSCTopTextObj = {
-		GI_attrs = @default | GA_TARGETABLE;
-		/* Initially, this text object uses the VisTextDefaultSize VTDS_12
-		 * (12 pts) and the VisTextDefaultFont VTDF_URW_ROMAN. You can use
-		 * the PointSizeControl object to change this point size. */
-		ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
-										 VTDF_URW_ROMAN);
-		/* Set the font mapping to none to turn off the defaults. */
-		HINT_DEFAULT_FOCUS;
-		HINT_DEFAULT_TARGET;
-	}
+    /* These two GenText objects are simple; they use only the defaults plus the
+     * items shown here. Both must be set targetable (GA_TARGETABLE) to be included
+     * in the target hierarchy; this is necessary when using controllers because of
+     * the note in the above comment. The PSCTopTextObj is made the default focus
+     * (to get keyboard input) and the default target (for controller operation). */
+    @object GenTextClass PSCTopTextObj = {
+        GI_attrs = @default | GA_TARGETABLE;
+        /* Initially, this text object uses the VisTextDefaultSize VTDS_12
+         * (12 pts) and the VisTextDefaultFont VTDF_URW_ROMAN. You can use
+         * the PointSizeControl object to change this point size. */
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
+                                         VTDF_URW_ROMAN);
+        /* Set the font mapping to none to turn off the defaults. */
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET;
+    }
 
-	@object GenTextClass PSCBotTextObj = {
-		GI_attrs = @default | GA_TARGETABLE;
-		ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
-										 VTDF_URW_ROMAN);
-	}
-	@end Interface
+    @object GenTextClass PSCBotTextObj = {
+        GI_attrs = @default | GA_TARGETABLE;
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
+                                         VTDF_URW_ROMAN);
+    }
+    @end Interface
 
 ----------
 ## 12.2 Standard Controllers
@@ -407,7 +407,7 @@ can not, however, be in both a tool bar and a tool box at the same time because
 the set of tools can be grouped in only one location.
 
 #### 12.3.1.1 Using Normal Features
-	ATTR_GEN_CONTROL_REQUIRE_UI, ATTR_GEN_CONTROL_PROHIBIT_UI
+    ATTR_GEN_CONTROL_REQUIRE_UI, ATTR_GEN_CONTROL_PROHIBIT_UI
 
 **GenControlClass** has no controller features of its own; instead, each 
 controller class must define the features it supports in both the menu 
@@ -427,29 +427,29 @@ chapter to turn on only the 10-, 12-, and 24-point as well as the "Larger" and
 ----------
 **Code Display 12-2 Declaring a Controller's Features**
 
-	/* This example is based on that of Code Display 12-1. It shows what
-	 * would change in order to turn on only the 10-, 12-, and 24-point as well as the
-	 * "Larger" and "Smaller" features. Note that only the Controller object must
-	 * be altered. */
+    /* This example is based on that of Code Display 12-1. It shows what
+     * would change in order to turn on only the 10-, 12-, and 24-point as well as the
+     * "Larger" and "Smaller" features. Note that only the Controller object must
+     * be altered. */
 
-	@object PointSizeControlClass PSCTSizeControl = {
-		GI_visMoniker = 'z', "Sizes";		/* Give the controller a name */
-		GII_visibility = GIV_POPUP;			/* Make the controller a menu */
-		/* The following attribute defines which of the controller's
-		 * features are to be supported. These menu items will appear
-		 * in the controller's Size menu. */
-		ATTR_GEN_CONTROL_REQUIRE_UI = (PSCF_10 | PSCF_12 | PSCF_24 |
-				PSCF_SMALLER | PSCF_LARGER);
-		/* The following attribute defines which of the controller's
-		 * features will not be supported. These menu items will not
-		 * appear in the controller's Size menu. */
-		ATTR_GEN_CONTROL_PROHIBIT_UI = (PSCF_14 | PSCF_18 | PSCF_36 | PSCF_54 |
-				 PSCF_72 | PSCF_CUSTOM_SIZE);
-	}
+    @object PointSizeControlClass PSCTSizeControl = {
+        GI_visMoniker = 'z', "Sizes";       /* Give the controller a name */
+        GII_visibility = GIV_POPUP;         /* Make the controller a menu */
+        /* The following attribute defines which of the controller's
+         * features are to be supported. These menu items will appear
+         * in the controller's Size menu. */
+        ATTR_GEN_CONTROL_REQUIRE_UI = (PSCF_10 | PSCF_12 | PSCF_24 |
+                PSCF_SMALLER | PSCF_LARGER);
+        /* The following attribute defines which of the controller's
+         * features will not be supported. These menu items will not
+         * appear in the controller's Size menu. */
+        ATTR_GEN_CONTROL_PROHIBIT_UI = (PSCF_14 | PSCF_18 | PSCF_36 | PSCF_54 |
+                 PSCF_72 | PSCF_CUSTOM_SIZE);
+    }
 
 ----------
 #### 12.3.1.2 Adding Application-Specific UI Gadgetry
-	ATTR_GEN_CONTROL_APP_UI, ATTR_GEN_CONTROL_APP_TOOLBOX_UI
+    ATTR_GEN_CONTROL_APP_UI, ATTR_GEN_CONTROL_APP_TOOLBOX_UI
 
 Occasionally, an application will want to add its own UI gadgetry to a 
 controller. This is not the same as changing the controller's functionality - to 
@@ -476,56 +476,56 @@ ATTR_GEN_CONTROL_APP_TOOLBOX_UI.
 ----------
 **Code Display 12-3 Adding UI to a Controller**
 
-	/* This display shows the modified PointSizeControl object and the additional
-	 * UI gadgetry required to add two triggers to it. Although the triggers are
-	 * shown here in the same resource block as the controller, they do not have to
-	 * be. They do, however, have to be run by the same thread as the controller. */
+    /* This display shows the modified PointSizeControl object and the additional
+     * UI gadgetry required to add two triggers to it. Although the triggers are
+     * shown here in the same resource block as the controller, they do not have to
+     * be. They do, however, have to be run by the same thread as the controller. */
 
-	@object PointSizeControlClass PSCTSizeControl = {
-		GI_visMoniker = 'z', "Sizes";	/* Give the controller a name */
-		GII_visibility = GIV_POPUP;		/* Make the controller a menu */
-		/* The following attribute specifies the top object of a generic
-		 * tree to be included with the controller's UI. This attribute does
-		 * not affect the toolbar implementation of the controller. */
-		ATTR_GEN_CONTROL_APP_UI = (@PSCTSpecialTrigs);	/* must be an optr */
-	}
+    @object PointSizeControlClass PSCTSizeControl = {
+        GI_visMoniker = 'z', "Sizes";   /* Give the controller a name */
+        GII_visibility = GIV_POPUP;     /* Make the controller a menu */
+        /* The following attribute specifies the top object of a generic
+         * tree to be included with the controller's UI. This attribute does
+         * not affect the toolbar implementation of the controller. */
+        ATTR_GEN_CONTROL_APP_UI = (@PSCTSpecialTrigs);  /* must be an optr */
+    }
 
-	/* This GenInteraction and its children (the two GenTriggers) will be included in
-	 * the controller's default representation (typically a menu). The GenInteraction
-	 * will appear as a submenu in OSF/Motif. All of the objects must be set not
-	 * usable (~GS_USABLE); they will be made usable by the controller when it becomes
-	 * usable. */
-	@object GenInteractionClass PSCTSpecialTrigs = {
-		GI_comp = @PSCTEnableTrig, @PSCTDisableTrig;
-		GI_states = @default & ~GS_USABLE;
-		GII_visibility = GIV_POPUP;		/* Appear as a submenu-type item */
-	}
+    /* This GenInteraction and its children (the two GenTriggers) will be included in
+     * the controller's default representation (typically a menu). The GenInteraction
+     * will appear as a submenu in OSF/Motif. All of the objects must be set not
+     * usable (~GS_USABLE); they will be made usable by the controller when it becomes
+     * usable. */
+    @object GenInteractionClass PSCTSpecialTrigs = {
+        GI_comp = @PSCTEnableTrig, @PSCTDisableTrig;
+        GI_states = @default & ~GS_USABLE;
+        GII_visibility = GIV_POPUP;     /* Appear as a submenu-type item */
+    }
 
-	/* The triggers set the bottom GenText object usable or not usable. The instance
-	 * data of the triggers is unimportant for this example, but it is shown here
-	 * to complete the example. */
-	@object GenTriggerClass PSCTEnableTrig = {
-		GI_visMoniker = "Use Two Text Fields";
-		GI_states = @default & ~GS_USABLE;
-		GTI_actionMsg = MSG_GEN_SET_USABLE;
-		GTI_destination = PSCBotTextObj;
-		ATTR_GEN_TRIGGER_ACTION_DATA = (VUM_NOW);
-	}
+    /* The triggers set the bottom GenText object usable or not usable. The instance
+     * data of the triggers is unimportant for this example, but it is shown here
+     * to complete the example. */
+    @object GenTriggerClass PSCTEnableTrig = {
+        GI_visMoniker = "Use Two Text Fields";
+        GI_states = @default & ~GS_USABLE;
+        GTI_actionMsg = MSG_GEN_SET_USABLE;
+        GTI_destination = PSCBotTextObj;
+        ATTR_GEN_TRIGGER_ACTION_DATA = (VUM_NOW);
+    }
 
-	@object GenTriggerClass PSCTDisableTrig = {
-		GI_visMoniker = "Use One Text Field";
-		GI_states = @default & ~GS_USABLE;
-		GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
-		GTI_destination = PSCBotTextObj;
-		ATTR_GEN_TRIGGER_ACTION_DATA = (VUM_NOW);
-	}
+    @object GenTriggerClass PSCTDisableTrig = {
+        GI_visMoniker = "Use One Text Field";
+        GI_states = @default & ~GS_USABLE;
+        GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
+        GTI_destination = PSCBotTextObj;
+        ATTR_GEN_TRIGGER_ACTION_DATA = (VUM_NOW);
+    }
 
 ----------
 ### 12.3.2 Using Tools
-	HINT_GEN_CONTROL_TOOLBOX_ONLY, 
-	ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI, 
-	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI, 
-	ATTR_GEN_CONTROL_APP_TOOLBOX_UI
+    HINT_GEN_CONTROL_TOOLBOX_ONLY, 
+    ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI, 
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI, 
+    ATTR_GEN_CONTROL_APP_TOOLBOX_UI
 
 As stated earlier, any GenControl object can be manifested either as menus 
 and menu items or as a set of tools. In fact, the controller can potentially have 
@@ -621,12 +621,12 @@ which contains two optrs. The first is the optr of a tool location (typically a
 GenInteraction that may contain tools), and the second is the optr of the 
 associated name. The structure of **ToolboxInfo** is shown below:
 
-	typedef struct {
-		optr	TI_object;		/* A GenInteraction that
-								 * can contain tools */
-		optr	TI_name;		/* The name chunk of the
-								 * TI_object object */
-	} ToolboxInfo;
+    typedef struct {
+        optr    TI_object;      /* A GenInteraction that
+                                 * can contain tools */
+        optr    TI_name;        /* The name chunk of the
+                                 * TI_object object */
+    } ToolboxInfo;
 
 The table is defined as shown in Code Display 12-4. If you had other 
 controllers to be managed by the tool control, you would add other entries 
@@ -638,127 +638,127 @@ GenToolGroup. It is set up in a similar form to the tool box table.
 ----------
 **Code Display 12-4 Providing a Basic Tool Box**
 
-	/* This code display shows the entire psctext.goc file, with changes noted. All
-	 * unchanged code has had its comments stripped. For descriptions, see earlier
-	 * displays in this chapter. */
+    /* This code display shows the entire psctext.goc file, with changes noted. All
+     * unchanged code has had its comments stripped. For descriptions, see earlier
+     * displays in this chapter. */
 
-	@include <stdapp.goh>
-	@include <ui.goh>
-	@include <Objects/Text/tCtrlC.goh>
+    @include <stdapp.goh>
+    @include <ui.goh>
+    @include <Objects/Text/tCtrlC.goh>
 
-	@class	PSCTextProcessClass, GenProcessClass;
-	@endc
+    @class  PSCTextProcessClass, GenProcessClass;
+    @endc
 
-	@classdecl PSCTextProcessClass, neverSaved;
+    @classdecl PSCTextProcessClass, neverSaved;
 
-	@start	AppResource;
-	@object GenApplicationClass PSCTextApp = {
-		GI_visMoniker = "Point Size Control Sample Application";
-		GI_comp = @PSCTPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @PSCTPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
-					 @PSCTSizeControl, @PSCTToolControl;
-	}
+    @start  AppResource;
+    @object GenApplicationClass PSCTextApp = {
+        GI_visMoniker = "Point Size Control Sample Application";
+        GI_comp = @PSCTPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @PSCTPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+                     @PSCTSizeControl, @PSCTToolControl;
+    }
 
-	@end	AppResource
+    @end    AppResource
 
-	@start	Interface;
+    @start  Interface;
 
-	/*	GenPrimary Object
-	 * Typically, an Options menu will be set up as a child of the Primary and
-	 * the tool box and tool control will be children of that menu. */
-	@object GenPrimaryClass PSCTPrimary = {
-		GI_comp =		@PSCTSizeControl, @PSCTopTextObj, @PSCBotTextObj, @PSCTOptionsMenu;
-		HINT_SIZE_WINDOW_AS_DESIRED;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-	}
+    /*  GenPrimary Object
+     * Typically, an Options menu will be set up as a child of the Primary and
+     * the tool box and tool control will be children of that menu. */
+    @object GenPrimaryClass PSCTPrimary = {
+        GI_comp =       @PSCTSizeControl, @PSCTopTextObj, @PSCBotTextObj, @PSCTOptionsMenu;
+        HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
 
-	/*	Options Menu
-	 * This menu is the parent for both the Tool Box and the tool controller. */
-	@object GenInteractionClass PSCTOptMenu = {
-		GI_comp = @PSCTToolBox, @PSCTToolControl;
-		GII_visibility = GIV_POPUP;
-		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
-	}
+    /*  Options Menu
+     * This menu is the parent for both the Tool Box and the tool controller. */
+    @object GenInteractionClass PSCTOptMenu = {
+        GI_comp = @PSCTToolBox, @PSCTToolControl;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+    }
 
-	/*	Tool Box Location Table
-	 * The Tool Box Location Table is used by the GenToolControl object
-	 * to associate tool locations with their names. The table is an array
-	 * of ToolboxInfo structures. Multiple entries would be separated with
-	 * commas. */
-	@chunk ToolboxInfo PSCTToolboxList[] = {
-		{@PSCTToolBox, @PSCTToolBoxName}	/* The single tool location is the
-								 * floating tool box PSCTToolBox. */
-	};
+    /*  Tool Box Location Table
+     * The Tool Box Location Table is used by the GenToolControl object
+     * to associate tool locations with their names. The table is an array
+     * of ToolboxInfo structures. Multiple entries would be separated with
+     * commas. */
+    @chunk ToolboxInfo PSCTToolboxList[] = {
+        {@PSCTToolBox, @PSCTToolBoxName}    /* The single tool location is the
+                                 * floating tool box PSCTToolBox. */
+    };
 
-	/*	Tool Group Information Table
-	 * The Tool Group Information Table is used by the GenToolControl to associate
-	 * tool groups with their names. The table is an array of ToolGroupInfo structures.
-	 * Multiple entries would be separated with commas. */
-	@chunk ToolGroupInfo PSCTToolGroupTable[] = {
-		{@PSCTPointSizeToolGroup}
-	};
+    /*  Tool Group Information Table
+     * The Tool Group Information Table is used by the GenToolControl to associate
+     * tool groups with their names. The table is an array of ToolGroupInfo structures.
+     * Multiple entries would be separated with commas. */
+    @chunk ToolGroupInfo PSCTToolGroupTable[] = {
+        {@PSCTPointSizeToolGroup}
+    };
 
-	/*	Floating Tool Box
-	 * The Tool Box object is a GenInteraction dialog box. All toolboxes must
-	 * have HINT_TOOLBOX and may have any additional geometry hints you
-	 * deem necessary. Because every controller's GenToolGroup object must
-	 * be a child of some tool bar, the PSCTPointSizeToolGroup is set at
-	 * startup as a child of this floating toolbox. */
-	@object GenInteractionClass PSCTToolBox = {
-		GI_visMoniker = `T', "Tools";
-		GI_comp = @PSCTPointSizeToolGroup;
-		GII_visibility = GIV_DIALOG;
-		HINT_TOOLBOX;
-		HINT_ALLOW_CHILDREN_TO_WRAP;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-	}
+    /*  Floating Tool Box
+     * The Tool Box object is a GenInteraction dialog box. All toolboxes must
+     * have HINT_TOOLBOX and may have any additional geometry hints you
+     * deem necessary. Because every controller's GenToolGroup object must
+     * be a child of some tool bar, the PSCTPointSizeToolGroup is set at
+     * startup as a child of this floating toolbox. */
+    @object GenInteractionClass PSCTToolBox = {
+        GI_visMoniker = `T', "Tools";
+        GI_comp = @PSCTPointSizeToolGroup;
+        GII_visibility = GIV_DIALOG;
+        HINT_TOOLBOX;
+        HINT_ALLOW_CHILDREN_TO_WRAP;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    }
 
-	/* The Tool Box Name must be specified for the tool control object. It
-	 * must be a character string, and there must be one for each entry in
-	 * the Tool Location table. */
-	@chunk char PSCTToolBoxName[] = "Floating Tool Box";
+    /* The Tool Box Name must be specified for the tool control object. It
+     * must be a character string, and there must be one for each entry in
+     * the Tool Location table. */
+    @chunk char PSCTToolBoxName[] = "Floating Tool Box";
 
-	/*	GenToolControl Object
-	 * The Tool Control object must have just the GTCI_toolboxList and
-	 * GTCI_toolGroupList fields set; these contain lists of tool bars and
-	 * tool groups along with their names. */
-	@object GenToolControlClass PSCTToolControl = {
-		GTCI_toolboxList = @PSCTToolboxList;
-		GTCI_toolGroupList = @PSCTToolGroupTable;
-		HINT_SAME_CATEGORY_AS_PARENT;
-	}
+    /*  GenToolControl Object
+     * The Tool Control object must have just the GTCI_toolboxList and
+     * GTCI_toolGroupList fields set; these contain lists of tool bars and
+     * tool groups along with their names. */
+    @object GenToolControlClass PSCTToolControl = {
+        GTCI_toolboxList = @PSCTToolboxList;
+        GTCI_toolGroupList = @PSCTToolGroupTable;
+        HINT_SAME_CATEGORY_AS_PARENT;
+    }
 
-	/*	PointSizeControl			*/
-	@object PointSizeControlClass PSCTSizeControl = {
-		GI_visMoniker = `z', "Sizes";
-		GII_visibility = GIV_POPUP;
-	}
+    /*  PointSizeControl            */
+    @object PointSizeControlClass PSCTSizeControl = {
+        GI_visMoniker = `z', "Sizes";
+        GII_visibility = GIV_POPUP;
+    }
 
-	/*	GenToolGroup Object
-	 * Each controller object has exactly one GenToolGroup object for managing
-	 * its tools and for management by the GenToolControl. The Tool Group has
-	 * a single instance field specifying the controller for which it works. */
-	@object GenToolGroupClass PSCTPointSizeToolGroup = {
-		GTGI_controller = @PSCTSizeControl;
-	}
+    /*  GenToolGroup Object
+     * Each controller object has exactly one GenToolGroup object for managing
+     * its tools and for management by the GenToolControl. The Tool Group has
+     * a single instance field specifying the controller for which it works. */
+    @object GenToolGroupClass PSCTPointSizeToolGroup = {
+        GTGI_controller = @PSCTSizeControl;
+    }
 
-	/*	GenText Objects			*/
-	@object GenTextClass PSCTopTextObj = {
-		GI_attrs = @default | GA_TARGETABLE;
-		HINT_DEFAULT_FOCUS;
-		HINT_DEFAULT_TARGET;
-		ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
-							VTDF_URW_ROMAN);
-	}
+    /*  GenText Objects         */
+    @object GenTextClass PSCTopTextObj = {
+        GI_attrs = @default | GA_TARGETABLE;
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET;
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_12 << VTDCA_SIZE_OFFSET) |
+                            VTDF_URW_ROMAN);
+    }
 
-	@object GenTextClass PSCBotTextObj = {
-		GI_attrs = @default | GA_TARGETABLE;
-		ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
-					((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN);
-	}
-	@end Interface
+    @object GenTextClass PSCBotTextObj = {
+        GI_attrs = @default | GA_TARGETABLE;
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+                    ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN);
+    }
+    @end Interface
 
 ----------
 #### 12.3.2.3 Tool Placement
@@ -791,77 +791,77 @@ TextAndToolInteraction object groups the other objects vertically.*
 ----------
 **Code Display 12-5 Movable Tools**
 
-	/* This code display builds on Code Display 12-4 on page u 804 to show how tools
-	 * may be moved around your application's window by the user. Although this is
-	 * not difficult to do from scratch, it is quite involved; if you want this
-	 * functionality, it is best to include a GenToolControl object.
-	 * This code display only shows those objects that are additional to or altered
-	 * from the previous display. */
+    /* This code display builds on Code Display 12-4 on page u 804 to show how tools
+     * may be moved around your application's window by the user. Although this is
+     * not difficult to do from scratch, it is quite involved; if you want this
+     * functionality, it is best to include a GenToolControl object.
+     * This code display only shows those objects that are additional to or altered
+     * from the previous display. */
 
-	/*	GenPrimary Object
-	 * Two GenInteractions are made children of the Primary for geometry purposes.
-	 * The first, LeftToolBar, is actually a tool bar; the second,
-	 * TextAndToolInteraction, is a grouper interaction for geometry purposes. */
-	@object GenPrimaryClass PSCTPrimary = {
-	GI_comp = @LeftToolBar, @PSCTSizeControl, @PSCTOptionsMenu,
-					@TextAndToolInteraction;
-	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
-					@PSCTSizeControl, @PSCTToolControl;
-	HINT_SIZE_WINDOW_AS_DESIRED;
-	HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	}
+    /*  GenPrimary Object
+     * Two GenInteractions are made children of the Primary for geometry purposes.
+     * The first, LeftToolBar, is actually a tool bar; the second,
+     * TextAndToolInteraction, is a grouper interaction for geometry purposes. */
+    @object GenPrimaryClass PSCTPrimary = {
+    GI_comp = @LeftToolBar, @PSCTSizeControl, @PSCTOptionsMenu,
+                    @TextAndToolInteraction;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+                    @PSCTSizeControl, @PSCTToolControl;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
 
-	/*	Tool Location Table
-	 * The Tool Location Table is updated with the new tool box information. Each of
-	 * the new tool boxes is given a name, and each must appear in this table. 
-	 * Note that the ToolGroup Information Table does not change. */
-	@chunk ToolboxInfo PSCTToolboxList[] = {
-			{@PSCTToolBox, @PSCTToolBoxName},
-			{@LeftToolBar, @LeftToolBarName},
-			{@TopToolBar, @TopToolBarName},
-			{@MiddleToolBar, @MiddleToolBarName}
-	};
+    /*  Tool Location Table
+     * The Tool Location Table is updated with the new tool box information. Each of
+     * the new tool boxes is given a name, and each must appear in this table. 
+     * Note that the ToolGroup Information Table does not change. */
+    @chunk ToolboxInfo PSCTToolboxList[] = {
+            {@PSCTToolBox, @PSCTToolBoxName},
+            {@LeftToolBar, @LeftToolBarName},
+            {@TopToolBar, @TopToolBarName},
+            {@MiddleToolBar, @MiddleToolBarName}
+    };
 
-	/*	TextAndToolInteraction Interaction
-	 * This GenInteraction is used solely as a place holder grouping object to allow
-	 * the LeftToolBar object to extend the full height of the Primary window. */
-	@object GenInteractionClass TextAndToolInteraction = {
-		GI_comp = @TopToolBar, @PSCTopTextObj, @MiddleToolBar, @PSCBotTextObj;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-	}
+    /*  TextAndToolInteraction Interaction
+     * This GenInteraction is used solely as a place holder grouping object to allow
+     * the LeftToolBar object to extend the full height of the Primary window. */
+    @object GenInteractionClass TextAndToolInteraction = {
+        GI_comp = @TopToolBar, @PSCTopTextObj, @MiddleToolBar, @PSCBotTextObj;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
 
-	/*	New Tool Box Interactions
-	 * These GenInteraction objects are all tool boxes that appear in the Tool Location
-	 * Table. None actually has tools in it on startup; the tool controller allows the
-	 * user to place the tools of each active controller in any of these tool boxes. */
-	@object GenInteractionClass LeftToolBar = {
-		HINT_TOOLBOX;
-		HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-		HINT_ALLOW_CHILDREN_TO_WRAP;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-	}
-	@chunk char LeftToolBarName[] = "Left of Text";
+    /*  New Tool Box Interactions
+     * These GenInteraction objects are all tool boxes that appear in the Tool Location
+     * Table. None actually has tools in it on startup; the tool controller allows the
+     * user to place the tools of each active controller in any of these tool boxes. */
+    @object GenInteractionClass LeftToolBar = {
+        HINT_TOOLBOX;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_ALLOW_CHILDREN_TO_WRAP;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    @chunk char LeftToolBarName[] = "Left of Text";
 
-	@object GenInteractionClass TopToolBar = {
-		HINT_TOOLBOX;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_ALLOW_CHILDREN_TO_WRAP;
-	}
-	@chunk char TopToolBarName[] = "Above Text";
+    @object GenInteractionClass TopToolBar = {
+        HINT_TOOLBOX;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_ALLOW_CHILDREN_TO_WRAP;
+    }
+    @chunk char TopToolBarName[] = "Above Text";
 
-	@object GenInteractionClass MiddleToolBar = {
-		HINT_TOOLBOX;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_ALLOW_CHILDREN_TO_WRAP;
-	}
-	@chunk char MiddleToolBarName[] = "In Between Text";
+    @object GenInteractionClass MiddleToolBar = {
+        HINT_TOOLBOX;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_ALLOW_CHILDREN_TO_WRAP;
+    }
+    @chunk char MiddleToolBarName[] = "In Between Text";
 
 ----------
 #### 12.3.2.4 Adding Application-Specific UI to the Tool Box
-	ATTR_GEN_CONTROL_APP_TOOLBOX_UI
+    ATTR_GEN_CONTROL_APP_TOOLBOX_UI
 
 Occasionally an application may want to add some additional UI gadgetry to 
 a set of controller tools. ATTR_GEN_CONTROL_APP_TOOLBOX_UI is 
@@ -913,44 +913,44 @@ the messages defined for the class, are shown in Code Display 12-6.
 ----------
 **Code Display 12-6 GenControlClass Instance Data**
 
-	/* GenControlClass has one static instance data field and several dynamic (vardata)
-	 * fields. These are shown below. */
+    /* GenControlClass has one static instance data field and several dynamic (vardata)
+     * fields. These are shown below. */
 
-	/* The GCI_output field contains the optr of the object to which
-	 * the controller is currently sending its "apply" messages. This
-	 * field is typically set to a GenTravelOption (such as TO_APP_TARGET)
-	 * or a TravelOption (such as TO_OBJ_BLOCK_OUTPUT). */
-	@instance		optr	GCI_output;
+    /* The GCI_output field contains the optr of the object to which
+     * the controller is currently sending its "apply" messages. This
+     * field is typically set to a GenTravelOption (such as TO_APP_TARGET)
+     * or a TravelOption (such as TO_OBJ_BLOCK_OUTPUT). */
+    @instance       optr    GCI_output;
 
-	/* Controller class objects are set disabled by default. When the
-	 * controller is initialized, it will set itself enabled. */
-	@default		GI_states = (@default & ~GS_ENABLED);
+    /* Controller class objects are set disabled by default. When the
+     * controller is initialized, it will set itself enabled. */
+    @default        GI_states = (@default & ~GS_ENABLED);
 
-	/* the following attributes and hints determine the controller's
-	 * feature set. All of these hints and attributes are described in
-	 * "Using Controllers" on page 796. */
-    @vardata void			HINT_GEN_CONTROL_TOOLBOX_ONLY;
-    @vardata WordFlags		ATTR_GEN_CONTROL_REQUIRE_UI;
-    @vardata WordFlags		ATTR_GEN_CONTROL_PROHIBIT_UI;
-    @vardata WordFlags		ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI;
-    @vardata WordFlags		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI;
+    /* the following attributes and hints determine the controller's
+     * feature set. All of these hints and attributes are described in
+     * "Using Controllers" on page 796. */
+    @vardata void           HINT_GEN_CONTROL_TOOLBOX_ONLY;
+    @vardata WordFlags      ATTR_GEN_CONTROL_REQUIRE_UI;
+    @vardata WordFlags      ATTR_GEN_CONTROL_PROHIBIT_UI;
+    @vardata WordFlags      ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI;
+    @vardata WordFlags      ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI;
 
-	/* The following two attributes control additional UI gadgetry added to a
-	 * controller object. */
-	@vardata optr			ATTR_GEN_CONTROL_APP_UI;
-		@reloc	ATTR_GEN_CONTROL_APP_UI, 0, optr;
-	@vardata optr			ATTR_GEN_CONTROL_APP_TOOLBOX_UI;
-		@reloc	ATTR_GEN_CONTROL_APP_TOOLBOX_UI, 0, optr;
+    /* The following two attributes control additional UI gadgetry added to a
+     * controller object. */
+    @vardata optr           ATTR_GEN_CONTROL_APP_UI;
+        @reloc  ATTR_GEN_CONTROL_APP_UI, 0, optr;
+    @vardata optr           ATTR_GEN_CONTROL_APP_TOOLBOX_UI;
+        @reloc  ATTR_GEN_CONTROL_APP_TOOLBOX_UI, 0, optr;
 
-	/* The following two hints allow an application to specify the initial
-	 * state of a controller including its placement, features, and
-	 * additional UI objects. */
-	@vardata GenControlUserData HINT_GEN_CONTROL_MODIFY_INITIAL_UI;
-	@vardata GenControlUserData HINT_GEN_CONTROL_USER_MODIFIED_UI;
+    /* The following two hints allow an application to specify the initial
+     * state of a controller including its placement, features, and
+     * additional UI objects. */
+    @vardata GenControlUserData HINT_GEN_CONTROL_MODIFY_INITIAL_UI;
+    @vardata GenControlUserData HINT_GEN_CONTROL_USER_MODIFIED_UI;
 
-	/* The following temporary data field is used to determine the tool settings
-	 * for a controller's set of tools. */
-	@vardata TempGenControlInstance TEMP_GEN_CONTROL_INSTANCE;
+    /* The following temporary data field is used to determine the tool settings
+     * for a controller's set of tools. */
+    @vardata TempGenControlInstance TEMP_GEN_CONTROL_INSTANCE;
 
 ----------
 In general, a controller class will not have to worry about the instance data 
@@ -1014,18 +1014,18 @@ named anything; typically, however, its name will consist of the acronym of
 the controller class with the suffix "Features." For example, the features type 
 and flags of **PointSizeControlClass** are shown below:
 
-	typedef WordFlags PSCFeatures;
-	#define PSCF_10				0x0400
-	#define PSCF_12				0x0200
-	#define PSCF_14				0x0100
-	#define PSCF_18				0x0080
-	#define PSCF_24				0x0040
-	#define PSCF_36				0x0020
-	#define PSCF_54				0x0010
-	#define PSCF_72				0x0008
-	#define PSCF_SMALLER		0x0004
-	#define PSCF_LARGER			0x0002
-	#define PSCF_CUSTOM_SIZE	0x0001
+    typedef WordFlags PSCFeatures;
+    #define PSCF_10             0x0400
+    #define PSCF_12             0x0200
+    #define PSCF_14             0x0100
+    #define PSCF_18             0x0080
+    #define PSCF_24             0x0040
+    #define PSCF_36             0x0020
+    #define PSCF_54             0x0010
+    #define PSCF_72             0x0008
+    #define PSCF_SMALLER        0x0004
+    #define PSCF_LARGER         0x0002
+    #define PSCF_CUSTOM_SIZE    0x0001
 
 Each of the flags represents one feature of the controller. For example, the 
 PSCF_10 flag represents the "10 Point" trigger in the Sizes menu, and the 
@@ -1037,32 +1037,32 @@ set. Because the tools are independent of the default features, two different
 sets of flags must be defined. An example (the PSCToolboxFeatures record 
 of **PointSizeControlClass**) follows.
 
-	typedef WordFlags PSCToolboxFeatures;
-	#define PSCTF_9			0x0400
-	#define PSCTF_10		0x0200
-	#define PSCTF_12		0x0100
-	#define PSCTF_14		0x0080
-	#define PSCTF_18		0x0040
-	#define PSCTF_24		0x0020
-	#define PSCTF_36		0x0010
-	#define PSCTF_54		0x0008
-	#define PSCTF_72		0x0004
-	#define PSCTF_SMALLER	0x0002
-	#define PSCTF_LARGER	0x0001
+    typedef WordFlags PSCToolboxFeatures;
+    #define PSCTF_9         0x0400
+    #define PSCTF_10        0x0200
+    #define PSCTF_12        0x0100
+    #define PSCTF_14        0x0080
+    #define PSCTF_18        0x0040
+    #define PSCTF_24        0x0020
+    #define PSCTF_36        0x0010
+    #define PSCTF_54        0x0008
+    #define PSCTF_72        0x0004
+    #define PSCTF_SMALLER   0x0002
+    #define PSCTF_LARGER    0x0001
 
 After you have defined your controller class' feature and tool sets, you should 
 define the controller's default feature and tool sets. The definitions for 
 **PointSizeControlClass** are shown below:
 
-	#define PSC_DEFAULT_FEATURES	(PSCF_9 | PSCF_10 |
-			PSCF_12 | PSCF_14 | PSCF_18 | PSCF_24 |
-			PSCF_36 | PSCF_72 | PSCF_CUSTOM_SIZE |
-			PSCF_SMALLER | PSCF_LARGER)
+    #define PSC_DEFAULT_FEATURES    (PSCF_9 | PSCF_10 |
+            PSCF_12 | PSCF_14 | PSCF_18 | PSCF_24 |
+            PSCF_36 | PSCF_72 | PSCF_CUSTOM_SIZE |
+            PSCF_SMALLER | PSCF_LARGER)
 
-	#define PSC_DEFAULT_TOOLBOX_FEATURES (PSCTF_9 |
-			PSCTF_10 | PSCTF_12 | PSCTF_14 |
-			PSCTF_18 | PSCTF_24 | PSCTF_36 |
-			PSCTF_72 | PSCTF_SMALLER | PSCTF_LARGER)
+    #define PSC_DEFAULT_TOOLBOX_FEATURES (PSCTF_9 |
+            PSCTF_10 | PSCTF_12 | PSCTF_14 |
+            PSCTF_18 | PSCTF_24 | PSCTF_36 |
+            PSCTF_72 | PSCTF_SMALLER | PSCTF_LARGER)
 
 These values and flags will be used in your handler for the controller message 
 MSG_GEN_CONTROL_GET_INFO.
@@ -1079,9 +1079,9 @@ and tool objects will not be saved to a state file. In the global parameters fil
 for your controller, each resource must be declared with the *ui-object*, 
 *read-only*, and *shared* flags as below:
 
-	resource SIZECTRLUI ui-object read-only shared
-	resource SIZECTRLTOOLUI ui-object read-only shared
-	resource CONTROLSTRINGS lmem read-only shared
+    resource SIZECTRLUI ui-object read-only shared
+    resource SIZECTRLTOOLUI ui-object read-only shared
+    resource CONTROLSTRINGS lmem read-only shared
 
 The UI resources typically contain list objects and their corresponding items. 
 As an alternative, they can contain triggers and dialogs. These objects are 
@@ -1091,105 +1091,105 @@ Display 12-7. All these objects must be set not usable (~GS_USABLE).
 ----------
 **Code Display 12-7 Controller UI Resources**
 
-	/* This display contains only code that appears in the psCtrl.goc file. The first
-	 * elements of the file are other included files, followed by a class declaration
-	 * statement. The two UI resources are shown after that, simplified somewhat;
-	 * Only redundant objects are left out of the display. */
+    /* This display contains only code that appears in the psCtrl.goc file. The first
+     * elements of the file are other included files, followed by a class declaration
+     * statement. The two UI resources are shown after that, simplified somewhat;
+     * Only redundant objects are left out of the display. */
 
-	/* Include the controller class definition and declare the class structure. */
-	@include <psCtrl.goh>
-	@classdecl PointSizeControlClass;
+    /* Include the controller class definition and declare the class structure. */
+    @include <psCtrl.goh>
+    @classdecl PointSizeControlClass;
 
-	@start	SizeCtrlUI, notDetachable;
+    @start  SizeCtrlUI, notDetachable;
 
-	/* Define the features UI resource. This resource can contain any objects that may
-	 * typically appear in a menu (e.g. GenInteractions, GenTriggers, and list
-	 * objects). This example shows a single list object and a few of its entries. */
-	@object GenItemGroupClass SizesList = {
-		GI_states = @default & ~GS_USABLE;		/* Set the list not usable */
-		/* The children of the list are defined below. Each entry in the
-		 * list will appear as a single menu item. */
-		GI_comp = @Size10Entry, @Size12Entry, @Size14Entry, @Size18Entry,
-				@Size24Entry, @Size36Entry, @Size54Entry, @Size72Entry;
-		/* The "apply" message will be sent to the destination specified
-		 * in the GIGI_destination field. */
-		GIGI_applyMsg = MSG_PSC_SET_POINT_SIZE_FROM_LIST;
-		/* The destination is defined as the TravelOption TO_OBJ_BLOCK_OUTPUT.
-		 * This will send the apply message to the controller's output object. */
-		GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
-	}
+    /* Define the features UI resource. This resource can contain any objects that may
+     * typically appear in a menu (e.g. GenInteractions, GenTriggers, and list
+     * objects). This example shows a single list object and a few of its entries. */
+    @object GenItemGroupClass SizesList = {
+        GI_states = @default & ~GS_USABLE;      /* Set the list not usable */
+        /* The children of the list are defined below. Each entry in the
+         * list will appear as a single menu item. */
+        GI_comp = @Size10Entry, @Size12Entry, @Size14Entry, @Size18Entry,
+                @Size24Entry, @Size36Entry, @Size54Entry, @Size72Entry;
+        /* The "apply" message will be sent to the destination specified
+         * in the GIGI_destination field. */
+        GIGI_applyMsg = MSG_PSC_SET_POINT_SIZE_FROM_LIST;
+        /* The destination is defined as the TravelOption TO_OBJ_BLOCK_OUTPUT.
+         * This will send the apply message to the controller's output object. */
+        GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    }
 
-	/* An example of a GenItem for the above list. all the other children are similar
-	 * with different monikers and identifiers. The identifiers in this case are
-	 * equivalent to the point size setting for the feature. */
-	@object GenItemClass Size10Entry = {
-		GI_visMoniker = `1', "1. 10 point";
-		GII_identifier = 10;
-	}
+    /* An example of a GenItem for the above list. all the other children are similar
+     * with different monikers and identifiers. The identifiers in this case are
+     * equivalent to the point size setting for the feature. */
+    @object GenItemClass Size10Entry = {
+        GI_visMoniker = `1', "1. 10 point";
+        GII_identifier = 10;
+    }
 
-	/* A GenTrigger. Shown below is the "Smaller" menu entry of the Point Size
-	 * controller. Another trigger ("Larger") and a GenInteraction (the "Custom
-	 * Size" entry) are also declared. These objects do not have to be declared
-	 * as children of any object; they will automatically, like the list above,
-	 * be designated as children of the controller when it is initialized.
-	 * Note that all of these objects must also be set not usable. */
-	@object GenTriggerClass SmallerTrigger = {
-		GI_states = @default & ~GS_USABLE;
-		GI_visMoniker = `S', "Smaller";
-		GI_kbdAccelerator = control `9';
-		GTI_actionMsg = MSG_PSC_SMALLER_POINT_SIZE;
-		GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
-	}
+    /* A GenTrigger. Shown below is the "Smaller" menu entry of the Point Size
+     * controller. Another trigger ("Larger") and a GenInteraction (the "Custom
+     * Size" entry) are also declared. These objects do not have to be declared
+     * as children of any object; they will automatically, like the list above,
+     * be designated as children of the controller when it is initialized.
+     * Note that all of these objects must also be set not usable. */
+    @object GenTriggerClass SmallerTrigger = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = `S', "Smaller";
+        GI_kbdAccelerator = control `9';
+        GTI_actionMsg = MSG_PSC_SMALLER_POINT_SIZE;
+        GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    }
 
-	@end	SizeCtrlUI
+    @end    SizeCtrlUI
 
-	/* Define the Tools UI resource. This follows exactly the same rules as the
-	 * Features UI resource above, but it represents the UI gadgetry that will appear
-	 * in the controller's tool boxes rather than its default menus. */
+    /* Define the Tools UI resource. This follows exactly the same rules as the
+     * Features UI resource above, but it represents the UI gadgetry that will appear
+     * in the controller's tool boxes rather than its default menus. */
 
-	@start	SizeCtrlToolUI, notDetachable;
+    @start  SizeCtrlToolUI, notDetachable;
 
-	@object GenItemGroupClass SizesToolList = {
-		/* Same as SizesList above, but with the following hints applied: */
-		HINT_ITEM_GROUP_MINIMIZE_SIZE;
-		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
-	}
+    @object GenItemGroupClass SizesToolList = {
+        /* Same as SizesList above, but with the following hints applied: */
+        HINT_ITEM_GROUP_MINIMIZE_SIZE;
+        HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    }
 
-	/* The list entry items have the exact configuration as above but different
-	 * names that reflect their tool usage.
-	 * The only objects allowed as tools for the Point Size controller are the
-	 * point size list entries, the larger trigger, and the smaller trigger. The
-	 * "Custom Size" entry is not allowed in the tool box as a matter of style. */
-	@object GenTriggerClass SmallerToolTrigger = {
-		GI_states = @default & ~GS_USABLE;
-		GI_visMoniker = "S";
-		/* The moniker of a tool is typically a graphic. The moniker
-		 * specified here is text for simplicity. */
-		GTI_actionMsg = MSG_PSC_SMALLER_POINT_SIZE;
-		GTI_destination = TO_OBJ_BLOCK_OUTPUT;
-	}
+    /* The list entry items have the exact configuration as above but different
+     * names that reflect their tool usage.
+     * The only objects allowed as tools for the Point Size controller are the
+     * point size list entries, the larger trigger, and the smaller trigger. The
+     * "Custom Size" entry is not allowed in the tool box as a matter of style. */
+    @object GenTriggerClass SmallerToolTrigger = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = "S";
+        /* The moniker of a tool is typically a graphic. The moniker
+         * specified here is text for simplicity. */
+        GTI_actionMsg = MSG_PSC_SMALLER_POINT_SIZE;
+        GTI_destination = TO_OBJ_BLOCK_OUTPUT;
+    }
 
-	@end	SizeCtrlToolUI
+    @end    SizeCtrlToolUI
 
-	@start	ControlStrings;
+    @start  ControlStrings;
 
-	/* In addition to the above two resources, you must also create a third that
-	 * contains name strings for the various tools and features. These name strings
-	 * will be used by the GenToolControl to identify the feature type in its
-	 * dialog box. */
-	@chunk char		PSCName[] = "Point Size";
-	@chunk char		Size10Name[] = "10 Point";
-	@chunk char		Size12Name[] = "12 Point";
-	/* The rest of the point sizes are similar */
-	@chunk char		SmallerName[] = "Smaller Point Size";
-	@chunk char		LargerName[] = "Larger Point Size";
-	@chunk char		CustomSizeName[] = "Custom Point Size";
+    /* In addition to the above two resources, you must also create a third that
+     * contains name strings for the various tools and features. These name strings
+     * will be used by the GenToolControl to identify the feature type in its
+     * dialog box. */
+    @chunk char     PSCName[] = "Point Size";
+    @chunk char     Size10Name[] = "10 Point";
+    @chunk char     Size12Name[] = "12 Point";
+    /* The rest of the point sizes are similar */
+    @chunk char     SmallerName[] = "Smaller Point Size";
+    @chunk char     LargerName[] = "Larger Point Size";
+    @chunk char     CustomSizeName[] = "Custom Point Size";
 
-	@end	ControlStrings
+    @end    ControlStrings
 
 ----------
 #### 12.4.2.3 Mandatory Message Handling
-	MSG_GEN_CONTROL_GET_INFO, GenControlBuildInfo
+    MSG_GEN_CONTROL_GET_INFO, GenControlBuildInfo
 
 Every controller must handle MSG_GEN_CONTROL_GET_INFO. This 
 message is sent to the controller in several circumstances, and it must return 
@@ -1201,36 +1201,36 @@ Display 12-9 with a description of each of its fields following.
 ----------
 **Code Display 12-8 The GenControlBuildInfo Structure**
 
-	/* This structure must be filled and returned by the controller class. It details
-	 * general information as well as specific information about the controller, the
-	 * controller's features, and the controller's tools. */
+    /* This structure must be filled and returned by the controller class. It details
+     * general information as well as specific information about the controller, the
+     * controller's features, and the controller's tools. */
 
-	typedef struct {
-		GenControlBuildFlags			GCBI_flags;
-		const char						*GCBI_initFileKey;
-		const GCNListType				*GCBI_gcnList;
-		word							GCBI_gcnCount;
-		const NotificationType			*GCBI_notificationList;
-		word							GCBI_notificationCount;
-		optr							GCBI_controllerName;
+    typedef struct {
+        GenControlBuildFlags            GCBI_flags;
+        const char                      *GCBI_initFileKey;
+        const GCNListType               *GCBI_gcnList;
+        word                            GCBI_gcnCount;
+        const NotificationType          *GCBI_notificationList;
+        word                            GCBI_notificationCount;
+        optr                            GCBI_controllerName;
 
-		MemHandle						GCBI_dupBlock;
-		const GenControlChildInfo		*GCBI_childList;
-		word							GCBI_childCount;
-		const GenControlFeaturesInfo	*GCBI_featuresList;
-		word							GCBI_featuresCount;
-		WordFlags						GCBI_features;
+        MemHandle                       GCBI_dupBlock;
+        const GenControlChildInfo       *GCBI_childList;
+        word                            GCBI_childCount;
+        const GenControlFeaturesInfo    *GCBI_featuresList;
+        word                            GCBI_featuresCount;
+        WordFlags                       GCBI_features;
 
-		MemHandle						GCBI_toolBlock;
-		const GenControlChildInfo		*GCBI_toolList;
-		word							GCBI_toolCount;
-		const GenControlFeaturesInfo				*GCBI_toolFeaturesList;
-		word							GCBI_toolFeaturesCount;
-		WordFlags						GCBI_toolFeatures;
+        MemHandle                       GCBI_toolBlock;
+        const GenControlChildInfo       *GCBI_toolList;
+        word                            GCBI_toolCount;
+        const GenControlFeaturesInfo                *GCBI_toolFeaturesList;
+        word                            GCBI_toolFeaturesCount;
+        WordFlags                       GCBI_toolFeatures;
 
-		char							*GCBI_helpContext;
-		byte							GCBI_reserved[8];
-	} GenControlBuildInfo;
+        char                            *GCBI_helpContext;
+        byte                            GCBI_reserved[8];
+    } GenControlBuildInfo;
 
 ----------
 The following fields define general information about the controller.
@@ -1273,11 +1273,11 @@ these structures details which features are set and which
 should always be set for each of the controller's children. This 
 structure is shown below:
 
-	typedef struct {
-	    ChunkHandle			GCCI_object;
-	    WordFlags			GCCI_featureMask;
-	    GenControlChildFlags GCCI_flags;
-	} GenControlChildInfo;
+    typedef struct {
+        ChunkHandle         GCCI_object;
+        WordFlags           GCCI_featureMask;
+        GenControlChildFlags GCCI_flags;
+    } GenControlChildInfo;
 
 Each structure contains the chunk handle of the given child in 
 the resource block, a feature mask indicating which features 
@@ -1291,11 +1291,11 @@ is shown below.
 *GCBI_featuresList* - A pointer to a list of GenControlFeaturesInfo structures, 
 one for each child. These structures define the following:
 
-	typedef struct {
-	    ChunkHandle			GCFI_object;
-	    optr				GCFI_name;
-	    GenControlFeatureFlags GCFI_flags;
-	} GenControlFeaturesInfo;
+    typedef struct {
+        ChunkHandle         GCFI_object;
+        optr                GCFI_name;
+        GenControlFeatureFlags GCFI_flags;
+    } GenControlFeaturesInfo;
 
 The three fields are the chunk handle of the child; the optr of 
 the child's name string, as defined in the name string resource; 
@@ -1322,11 +1322,11 @@ these structures details which tools are set and which should
 always be set for each of the controller's children. This 
 structure is shown below:
 
-	typedef struct {
-	    ChunkHandle			GCCI_object;
-	    WordFlags			GCCI_featureMask;
-	    GenControlChildFlags GCCI_flags;
-	} GenControlChildInfo;
+    typedef struct {
+        ChunkHandle         GCCI_object;
+        WordFlags           GCCI_featureMask;
+        GenControlChildFlags GCCI_flags;
+    } GenControlChildInfo;
 
 Each structure contains the chunk handle of the given child in 
 the resource block, a feature mask indicating which tools are 
@@ -1340,12 +1340,12 @@ specific information is shown below.
 *GCBI_toolFeaturesList* - A pointer to a list of **GenControlFeaturesInfo** structures, 
 one for each child. These structures define the following:
 
-	typedef struct {
-	    ChunkHandle			GCFI_object;
-	    optr			GCFI_name;
-	    byte			GCFI_flags;
-				/* GenControlFeatureFlags */
-	} GenControlFeaturesInfo;
+    typedef struct {
+        ChunkHandle         GCFI_object;
+        optr            GCFI_name;
+        byte            GCFI_flags;
+                /* GenControlFeatureFlags */
+    } GenControlFeaturesInfo;
 
 The three fields are the chunk handle of the child; the optr of 
 the child's name string, as defined in the name string resource; 
@@ -1432,11 +1432,11 @@ The **GenControlChildInfo** structure defines the features or tools
 appropriate to each object in a controller's UI resources. It has the following 
 structure, and its fields are described below:
 
-	typedef struct {
-		ChunkHandle				GCCI_object;
-		WordFlags				GCCI_featureMask;
-		GenControlChildFlags	GCCI_flags;
-	} GenControlChildInfo;
+    typedef struct {
+        ChunkHandle             GCCI_object;
+        WordFlags               GCCI_featureMask;
+        GenControlChildFlags    GCCI_flags;
+    } GenControlChildInfo;
 
 *GCCI_object* - The chunk handle of the object in the appropriate resource.
 
@@ -1468,11 +1468,11 @@ The **GenControlFeaturesInfo** structure describes each UI feature's name
 and certain flags. The structure is defined below, and its fields are described 
 following:
 
-	typedef struct {
-		ChunkHandle				GCFI_object;
-		optr					GCFI_name;
-		GenControlFeatureFlags	GCFI_flags;
-	} GenControlFeaturesInfo;
+    typedef struct {
+        ChunkHandle             GCFI_object;
+        optr                    GCFI_name;
+        GenControlFeatureFlags  GCFI_flags;
+    } GenControlFeaturesInfo;
 
 *GCFI_object* - The chunk handle of the child in the appropriate resource 
 block.
@@ -1485,8 +1485,8 @@ feature or tool in its dialog box.
 
 ----------
 #### MSG_GEN_CONTROL_GET_INFO
-	void	MSG_GEN_CONTROL_GET_INFO(
-			GenControlBuildInfo *info);
+    void    MSG_GEN_CONTROL_GET_INFO(
+            GenControlBuildInfo *info);
 
 This message must be handled by all controllers. It takes an empty 
 **GenControlBuildInfo** structure and fills it; this message is called in 
@@ -1509,105 +1509,105 @@ call the superclass anywhere in the handler.
 ----------
 **Code Display 12-9 MSG_GEN_CONTROL_GET_INFO Handler**
 
-	/* This method is a sample of how to handle MSG_GEN_CONTROL_GET_INFO. It is
-	 * specific to UICTextStyleControlClass. To handle this message, it is easiest to
-	 * set up a number of static local variables with the base information and set
-	 * the structure to these variables. */
+    /* This method is a sample of how to handle MSG_GEN_CONTROL_GET_INFO. It is
+     * specific to UICTextStyleControlClass. To handle this message, it is easiest to
+     * set up a number of static local variables with the base information and set
+     * the structure to these variables. */
 
-	/* Handler for MSG_GEN_CONTROL_GET_INFO
-	 * void (GenControlBuildInfo *info);					*/
+    /* Handler for MSG_GEN_CONTROL_GET_INFO
+     * void (GenControlBuildInfo *info);                    */
 
-	@method UICTextStyleControlClass, MSG_GEN_CONTROL_GET_INFO {
+    @method UICTextStyleControlClass, MSG_GEN_CONTROL_GET_INFO {
 
-		/* General information constants */
-		static const char TSC_IniFileKey[] = "textStyleControl";
-		static const GCNListType TSC_gcnList[] = {
- 			{MANUFACTURER_ID_GEOWORKS, GAGCNLT_APP_TARGET_NOTIFY_TEXT_CHAR_ATTR_CHANGE}
-		}; 
+        /* General information constants */
+        static const char TSC_IniFileKey[] = "textStyleControl";
+        static const GCNListType TSC_gcnList[] = {
+            {MANUFACTURER_ID_GEOWORKS, GAGCNLT_APP_TARGET_NOTIFY_TEXT_CHAR_ATTR_CHANGE}
+        }; 
 
-		static const NotificationType TSC_notifyTypeList[] = {
- 			{MANUFACTURER_ID_GEOWORKS, GWNT_TEXT_CHAR_ATTR_CHANGE}
-		};
+        static const NotificationType TSC_notifyTypeList[] = {
+            {MANUFACTURER_ID_GEOWORKS, GWNT_TEXT_CHAR_ATTR_CHANGE}
+        };
 
-		/* Features information constants */
-		static const GenControlChildInfo TSC_childList[] = {
-		{@PlainTextList, TSCF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
-		{@TextStyleList, TSCF_BOLD|TSCF_ITALIC|TSCF_UNDERLINE|TSCF_STRIKE_THRU| 
-		TSCF_SUBSCRIPT|TSCF_SUPERSCRIPT, 0}
-		};
+        /* Features information constants */
+        static const GenControlChildInfo TSC_childList[] = {
+        {@PlainTextList, TSCF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
+        {@TextStyleList, TSCF_BOLD|TSCF_ITALIC|TSCF_UNDERLINE|TSCF_STRIKE_THRU| 
+        TSCF_SUBSCRIPT|TSCF_SUPERSCRIPT, 0}
+        };
 
-		/* The order of this list is actually backwards from the
-		 * record it reflects. */
-		static const GenControlFeaturesInfo TSC_featuresList[] = {
-			{@SuperscriptEntry, @SuperscriptName, 0},
- 			{@SubscriptEntry, @SubscriptName, 0},
- 			{@StrikeThruEntry, @StrikeThruName, 0},
- 			{@UnderlineEntry, @UnderlineName, 0},
- 			{@ItalicEntry, @ItalicName, 0},
- 			{@BoldEntry, @BoldName, 0},
- 			{@PlainTextList, @PlainTextName, 0}
-		};
+        /* The order of this list is actually backwards from the
+         * record it reflects. */
+        static const GenControlFeaturesInfo TSC_featuresList[] = {
+            {@SuperscriptEntry, @SuperscriptName, 0},
+            {@SubscriptEntry, @SubscriptName, 0},
+            {@StrikeThruEntry, @StrikeThruName, 0},
+            {@UnderlineEntry, @UnderlineName, 0},
+            {@ItalicEntry, @ItalicName, 0},
+            {@BoldEntry, @BoldName, 0},
+            {@PlainTextList, @PlainTextName, 0}
+        };
 
-		/* Tools information constants */
-		static const GenControlChildInfo TSC_toolList[] = {
- 			{@PlainTextToolList, TSCTF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
- 			{@TextStyleToolList, TSCTF_BOLD|TSCTF_ITALIC|TSCTF_UNDERLINE|
-	 		TSCTF_STRIKE_THRU|TSCTF_SUBSCRIPT|TSCTF_SUPERSCRIPT, 0} };
-		};
+        /* Tools information constants */
+        static const GenControlChildInfo TSC_toolList[] = {
+            {@PlainTextToolList, TSCTF_PLAIN, GCCF_IS_DIRECTLY_A_FEATURE},
+            {@TextStyleToolList, TSCTF_BOLD|TSCTF_ITALIC|TSCTF_UNDERLINE|
+            TSCTF_STRIKE_THRU|TSCTF_SUBSCRIPT|TSCTF_SUPERSCRIPT, 0} };
+        };
 
-		static const GenControlFeaturesInfo TSC_toolFeaturesList[] = {
- 			{@SuperscriptToolEntry, @SuperscriptName, 0},
- 			{@SubscriptToolEntry, @SubscriptName, 0},
- 			{@StrikeThruToolEntry, @StrikeThruName, 0},
- 			{@UnderlineToolEntry, @UnderlineName, 0},
- 			{@ItalicToolEntry, @ItalicName, 0},
- 			{@BoldToolEntry, @BoldName, 0},
- 			{@PlainTextToolList, @PlainTextName, 0}
-		};
+        static const GenControlFeaturesInfo TSC_toolFeaturesList[] = {
+            {@SuperscriptToolEntry, @SuperscriptName, 0},
+            {@SubscriptToolEntry, @SubscriptName, 0},
+            {@StrikeThruToolEntry, @StrikeThruName, 0},
+            {@UnderlineToolEntry, @UnderlineName, 0},
+            {@ItalicToolEntry, @ItalicName, 0},
+            {@BoldToolEntry, @BoldName, 0},
+            {@PlainTextToolList, @PlainTextName, 0}
+        };
 
-		/* Our constant for the GenControlBuildInfo structure.
-		 * Fields with a marker to the left of their names are
-		 * filled in dynamically by the handler following the
-		 * constant definition. */
-		static const GenControlBuildInfo TSC_dupInfo = {
-			GCBF_SUSPEND_ON_APPLY, 			/* GCBI_flags */
- 			TSC_IniFileKey, 				/* GCBI_initFileKey */
- 			TSC_gcnList, 					/* GCBI_gcnList */
- 			ARRAY_LEN(TSC_gcnList,GCNListType), /* GCBI_gcnCount */
- 			TSC_notifyTypeList, 			/* GCBI_notificationList */
- 			ARRAY_LEN(TSC_notifyTypeList, NotificationType), 
-											/* GCBI_notificationCount */
- 			@TSCName, 						/* GCBI_controllerName */ 
+        /* Our constant for the GenControlBuildInfo structure.
+         * Fields with a marker to the left of their names are
+         * filled in dynamically by the handler following the
+         * constant definition. */
+        static const GenControlBuildInfo TSC_dupInfo = {
+            GCBF_SUSPEND_ON_APPLY,          /* GCBI_flags */
+            TSC_IniFileKey,                 /* GCBI_initFileKey */
+            TSC_gcnList,                    /* GCBI_gcnList */
+            ARRAY_LEN(TSC_gcnList,GCNListType), /* GCBI_gcnCount */
+            TSC_notifyTypeList,             /* GCBI_notificationList */
+            ARRAY_LEN(TSC_notifyTypeList, NotificationType), 
+                                            /* GCBI_notificationCount */
+            @TSCName,                       /* GCBI_controllerName */ 
 
- 			/* ## */ NullHandle, 			/* GCBI_dupBlock */
- 			TSC_childList, 					/* GCBI_childList */
- 			ARRAY_LEN(TSC_childList, GenControlChildInfo),
- 							/* GCBI_childCount */
- 			TSC_featuresList, 				/* GCBI_featuresList */
- 			ARRAY_LEN(TSC_featuresList, GenControlFeaturesInfo),
- 							/* GCBI_featuresCount */
- 			TSC_DEFAULT_FEATURES, 			/* GCBI_features */
- 			/* ## */ NullHandle, 			/* GCBI_toolBlock */
- 			TSC_toolList, 					/* GCBI_toolList */
- 			ARRAY_LEN(TSC_toolList, GenControlChildInfo),
- 							/* GCBI_toolCount */
- 			TSC_toolFeaturesList, 			/* GCBI_toolFeaturesList */
- 			ARRAY_LEN(TSC_toolFeaturesList, GenControlFeaturesInfo),
- 							/* GCBI_toolFeaturesCount */
- 			TSC_DEFAULT_TOOLBOX_FEATURES 	/* GCBI_toolFeatures */
-		};
+            /* ## */ NullHandle,            /* GCBI_dupBlock */
+            TSC_childList,                  /* GCBI_childList */
+            ARRAY_LEN(TSC_childList, GenControlChildInfo),
+                            /* GCBI_childCount */
+            TSC_featuresList,               /* GCBI_featuresList */
+            ARRAY_LEN(TSC_featuresList, GenControlFeaturesInfo),
+                            /* GCBI_featuresCount */
+            TSC_DEFAULT_FEATURES,           /* GCBI_features */
+            /* ## */ NullHandle,            /* GCBI_toolBlock */
+            TSC_toolList,                   /* GCBI_toolList */
+            ARRAY_LEN(TSC_toolList, GenControlChildInfo),
+                            /* GCBI_toolCount */
+            TSC_toolFeaturesList,           /* GCBI_toolFeaturesList */
+            ARRAY_LEN(TSC_toolFeaturesList, GenControlFeaturesInfo),
+                            /* GCBI_toolFeaturesCount */
+            TSC_DEFAULT_TOOLBOX_FEATURES    /* GCBI_toolFeatures */
+        };
 
-		/* Here is the code that fills in the above missing fields and
-		 * returns the proper structure. */
+        /* Here is the code that fills in the above missing fields and
+         * returns the proper structure. */
 
-		/* Copy the structure containing most of the correct information. */
-		memcpy(info, MemLockFixedOrMovable(&TSC_dupInfo), sizeof(GenControlBuildInfo));
-		MemUnlockFixedOrMovable(&TSC_dupInfo);
+        /* Copy the structure containing most of the correct information. */
+        memcpy(info, MemLockFixedOrMovable(&TSC_dupInfo), sizeof(GenControlBuildInfo));
+        MemUnlockFixedOrMovable(&TSC_dupInfo);
 
-		/* Fill the remaining fields in manually. */
-		info->GCBI_dupBlock = HandleOf(@PlainTextList);
-		info->GCBI_toolBlock = HandleOf(@PlainTextToolList); 
-	}
+        /* Fill the remaining fields in manually. */
+        info->GCBI_dupBlock = HandleOf(@PlainTextList);
+        info->GCBI_toolBlock = HandleOf(@PlainTextToolList); 
+    }
 
 ----------
 ### 12.4.3 Advanced GenControlClass Usage
@@ -1617,15 +1617,15 @@ messages and structures that will be used by some subclasses, though this
 will be relatively rare. This section details these messages and structures.
 
 #### 12.4.3.1 Adding and Removing UI Gadgetry
-	MSG_GEN_CONTROL_GENERATE_UI, MSG_GEN_CONTROL_DESTROY_UI, 
-	MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI, 
-	MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI, 
-	MSG_GEN_CONTROL_UPDATE_UI, 
-	MSG_GEN_CONTROL_ENABLE_DISABLE, 
-	MSG_GEN_CONTROL_ADD_APP_UI, 
-	MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI, 
-	MSG_GEN_CONTROL_REBUILD_NORMAL_UI, 
-	MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI
+    MSG_GEN_CONTROL_GENERATE_UI, MSG_GEN_CONTROL_DESTROY_UI, 
+    MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI, 
+    MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI, 
+    MSG_GEN_CONTROL_UPDATE_UI, 
+    MSG_GEN_CONTROL_ENABLE_DISABLE, 
+    MSG_GEN_CONTROL_ADD_APP_UI, 
+    MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI, 
+    MSG_GEN_CONTROL_REBUILD_NORMAL_UI, 
+    MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI
 
 **GenControlClass** has several messages that add, remove, and manipulate 
 the controller UI gadgetry. Keep in mind also that, as a subclass of 
@@ -1635,7 +1635,7 @@ messages are detailed in the following list.
 
 ----------
 #### MSG_GEN_CONTROL_GENERATE_UI
-	void	MSG_GEN_CONTROL_GENERATE_UI();
+    void    MSG_GEN_CONTROL_GENERATE_UI();
 
 This message generates the UI gadgetry for the controller.
 
@@ -1651,7 +1651,7 @@ MSG_GEN_CONTROL_DESTROY_UI, below.
 
 ----------
 #### MSG_GEN_CONTROL_DESTROY_UI
-	void	MSG_GEN_CONTROL_DESTROY_UI();
+    void    MSG_GEN_CONTROL_DESTROY_UI();
 
 This message destroys the UI gadgetry for the controller.
 
@@ -1665,12 +1665,12 @@ the handler.
 
 ----------
 #### MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI
-	void	MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI(
-			optr	parent);
+    void    MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI(
+            optr    parent);
 
 This message generates the UI gadgetry for the controller's tool box.
 
-**Source:**	Sent by tool box object via the active list as part of its specific UI build 
+**Source:** Sent by tool box object via the active list as part of its specific UI build 
 mechanism.
 
 **Destination:** The GenControl object that owns the tool box.
@@ -1690,7 +1690,7 @@ MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI as well.
 
 ----------
 #### MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI
-	void	MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI();
+    void    MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI();
 
 This message destroys all toolbox UI associated with the controller.
 
@@ -1706,14 +1706,14 @@ handler.
 
 ----------
 #### MSG_GEN_CONTROL_UPDATE_UI
-	void	MSG_GEN_CONTROL_UPDATE_UI(@stack
-			MemHandle		toolBlock,
-			MemHandle		childBlock,
-			WordFlags		toolboxFeatures,
-			WordFlags		features,
-			MemHandle		data,
-			word			changeID,
-			ManufacturerID	manufID);
+    void    MSG_GEN_CONTROL_UPDATE_UI(@stack
+            MemHandle       toolBlock,
+            MemHandle       childBlock,
+            WordFlags       toolboxFeatures,
+            WordFlags       features,
+            MemHandle       data,
+            word            changeID,
+            ManufacturerID  manufID);
 
 This message updates all UI components for the recipient controller.
 
@@ -1756,17 +1756,17 @@ their UI gadgetry. There is no default handler for this message.
 **Structures:** The TEMP_GEN_CONTROL_INSTANCE vardata field is of type 
 *TempGenControlInstance*, which has the following structure:
 
-	typedef struct {
-		GenControlInteractableFlags
-							TGCI_interactableFlags;
-		MemHandle			TGCI_childBlock;
-		MemHandle			TGCI_toolBlock;
-		optr				TGCI_toolParent;
-		WordFlags			TGCI_features;
-		WordFlags			TGCI_toolboxFeatures;
-		GCNListType			TGCI_activeNotificationList;
-		GenControlInteractableFlags TGCI_upToDate;
-	} TempGenControlInstance;
+    typedef struct {
+        GenControlInteractableFlags
+                            TGCI_interactableFlags;
+        MemHandle           TGCI_childBlock;
+        MemHandle           TGCI_toolBlock;
+        optr                TGCI_toolParent;
+        WordFlags           TGCI_features;
+        WordFlags           TGCI_toolboxFeatures;
+        GCNListType         TGCI_activeNotificationList;
+        GenControlInteractableFlags TGCI_upToDate;
+    } TempGenControlInstance;
 
 *TGCI_interactableFlags*  
 This record describes which, if any, of a controller's UI parts is 
@@ -1816,9 +1816,9 @@ feature gadgetry is interactable.
 
 ----------
 #### MSG_GEN_CONTROL_ENABLE_DISABLE
-	void	MSG_GEN_CONTROL_ENABLE_DISABLE(
-			Message				msg;
-			VisUpdateMode		updateMode);
+    void    MSG_GEN_CONTROL_ENABLE_DISABLE(
+            Message             msg;
+            VisUpdateMode       updateMode);
 
 This message enables or disables the controller object as well as its default 
 and tool box UI gadgetry.
@@ -1839,8 +1839,8 @@ update should occur.
 
 ----------
 #### MSG_GEN_CONTROL_ADD_APP_UI
-	void	MSG_GEN_CONTROL_ADD_APP_UI(
-			optr	appUI);
+    void    MSG_GEN_CONTROL_ADD_APP_UI(
+            optr    appUI);
 
 This message adds the passed UI object to the controller's generic tree as if it 
 had been originally defined in the default child block. By default, the new 
@@ -1860,8 +1860,8 @@ somewhere other than as the last child.
 
 ----------
 #### MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI
-	void	MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI(
-			optr	appUI);
+    void    MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI(
+            optr    appUI);
 
 This message adds the passed UI object to the controller's tool UI gadgetry as 
 if it had been defined as a tool in the tool resource block. By default, the new 
@@ -1881,7 +1881,7 @@ somewhere other than as the last child.
 
 ----------
 #### MSG_GEN_CONTROL_REBUILD_NORMAL_UI
-	void	MSG_GEN_CONTROL_REBUILD_NORMAL_UI();
+    void    MSG_GEN_CONTROL_REBUILD_NORMAL_UI();
 
 This message forces the normal UI of the controller to be rebuilt; each 
 component will be visually destroyed and rebuilt.
@@ -1894,7 +1894,7 @@ component will be visually destroyed and rebuilt.
 
 ----------
 #### MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI
-	void	MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI();
+    void    MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI();
 
 This message forces the toolbox UI of the controller to be rebuilt; each 
 component will be visually destroyed and rebuilt.
@@ -1906,13 +1906,13 @@ component will be visually destroyed and rebuilt.
 **Interception:** Should not be intercepted.
 
 #### 12.4.3.2 Adding and Removing Features and Tools
-	MSG_GEN_CONTROL_SCAN_FEATURE_HINTS, 
-	MSG_GEN_CONTROL_ADD_FEATURE, 
-	MSG_GEN_CONTROL_REMOVE_FEATURE, 
-	MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE, 
-	MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE, 
-	MSG_GEN_CONTROL_GET_NORMAL_FEATURES, 
-	MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES
+    MSG_GEN_CONTROL_SCAN_FEATURE_HINTS, 
+    MSG_GEN_CONTROL_ADD_FEATURE, 
+    MSG_GEN_CONTROL_REMOVE_FEATURE, 
+    MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE, 
+    MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE, 
+    MSG_GEN_CONTROL_GET_NORMAL_FEATURES, 
+    MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES
 
 Besides being able to set and clear features of a given controller, both the 
 controller class and outside agents can dynamically alter the features of a 
@@ -1921,9 +1921,9 @@ can use for this purpose; these messages are detailed below.
 
 ----------
 #### MSG_GEN_CONTROL_SCAN_FEATURE_HINTS
-	void	MSG_GEN_CONTROL_SCAN_FEATURE_HINTS(
-			GenControlUIType		type,
-			GenControlScanInfo		*info);
+    void    MSG_GEN_CONTROL_SCAN_FEATURE_HINTS(
+            GenControlUIType        type,
+            GenControlScanInfo      *info);
 
 This message scans the feature hints set for the controller object to set the 
 required and prohibited features.
@@ -1952,12 +1952,12 @@ structure filled in by the method.
 
 **Structures:** The GenControlScanInfo structure has the following fields:
 
-	typedef struct {
-		WordFlags		GCSI_userAdded;
-		WordFlags		GCSI_userRemoved;
-		WordFlags		GCSI_appRequired;
-		WordFlags		GCSI_appProhibited;
-	} GenControlScanInfo;
+    typedef struct {
+        WordFlags       GCSI_userAdded;
+        WordFlags       GCSI_userRemoved;
+        WordFlags       GCSI_appRequired;
+        WordFlags       GCSI_appProhibited;
+    } GenControlScanInfo;
 
 *GCSI_userAdded*  
 A record of features added by the user through the use of the 
@@ -1980,8 +1980,8 @@ ATTR_GEN_CONTROL_PROHIBIT_UI.
 
 ----------
 #### MSG_GEN_CONTROL_ADD_FEATURE
-	void	MSG_GEN_CONTROL_ADD_FEATURE(
-			WordFlags featureToAdd);
+    void    MSG_GEN_CONTROL_ADD_FEATURE(
+            WordFlags featureToAdd);
 
 This message adds a feature to those currently supported by the controller. 
 This is used for the default settings only, not for tool box UI. The controller is 
@@ -2000,8 +2000,8 @@ added set.
 
 ----------
 #### MSG_GEN_CONTROL_REMOVE_FEATURE
-	void	MSG_GEN_CONTROL_REMOVE_FEATURE
-			WordFlags featureToRemove);
+    void    MSG_GEN_CONTROL_REMOVE_FEATURE
+            WordFlags featureToRemove);
 
 This message removes a feature from those currently supported by the 
 controller. It does not affect the active tools. The controller will be marked for 
@@ -2020,8 +2020,8 @@ removed set.
 
 ----------
 #### MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE
-	void	MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE(
-			WordFlags featureToAdd);
+    void    MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE(
+            WordFlags featureToAdd);
 
 This message adds a tool to those currently supported by the controller. This 
 is used for the tool box settings only, not for the default UI features. The 
@@ -2039,8 +2039,8 @@ marked for saving to the state file in the new configuration.
 
 ----------
 #### MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE
-	void	MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE(
-			WordFlags featureToRemove);
+    void    MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE(
+            WordFlags featureToRemove);
 
 This message removes a tool from those currently supported by the 
 controller. It does not affect the default active feature list. The controller will 
@@ -2059,8 +2059,8 @@ removed set.
 
 ----------
 #### MSG_GEN_CONTROL_GET_NORMAL_FEATURES
-	void MSG_GEN_CONTROL_GET_NORMAL_FEATURES(
-		GenControlGetFeaturesReturn *return);
+    void MSG_GEN_CONTROL_GET_NORMAL_FEATURES(
+        GenControlGetFeaturesReturn *return);
 
 This message returns a structure indicating which of the default features of 
 the controller are currently active, which are required, and which are 
@@ -2078,12 +2078,12 @@ prohibited.
 
 **Structures:** The **GenControlGetFeaturesReturn** structure is shown below:
 
-	typedef struct {
-		WordFlags		GCSR_features;
-		WordFlags		GCSR_required;
-		WordFlags		GCSR_prohibited;
-		WordFlags		GCSR_supported;
-	} GenControlGetFeaturesReturn;
+    typedef struct {
+        WordFlags       GCSR_features;
+        WordFlags       GCSR_required;
+        WordFlags       GCSR_prohibited;
+        WordFlags       GCSR_supported;
+    } GenControlGetFeaturesReturn;
 
 *GCSR_features*  
 A record of flags indicating which features are currently active.
@@ -2101,8 +2101,8 @@ A record of flags indicating the full range of supported features.
 
 ----------
 #### MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES
-	void MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES(
-			GenControlGetFeaturesReturn *return);
+    void MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES(
+            GenControlGetFeaturesReturn *return);
 
 This message returns a structure indicating which of the controller's tools 
 are currently active, which are required, and which are prohibited.
@@ -2121,8 +2121,8 @@ are currently active, which are required, and which are prohibited.
 MSG_GEN_CONTROL_GET_NORMAL_FEATURES, above.
 
 #### 12.4.3.3 Working with GCN Lists
-	MSG_GEN_CONTROL_ADD_TO_GCN_LISTS, 
-	MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS
+    MSG_GEN_CONTROL_ADD_TO_GCN_LISTS, 
+    MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS
 
 Because GenControlClass uses GCN lists, it has two messages that add 
 itself to and remove itself from the lists. You can intercept or send these if you 
@@ -2131,7 +2131,7 @@ detailed below.
 
 ----------
 #### MSG_GEN_CONTROL_ADD_TO_GCN_LISTS
-	void	MSG_GEN_CONTROL_ADD_TO_GCN_LISTS();
+    void    MSG_GEN_CONTROL_ADD_TO_GCN_LISTS();
 
 This message adds the controller object to the GCN lists specified by its 
 return value of MSG_GEN_CONTROL_GET_INFO. It will force a status update 
@@ -2147,7 +2147,7 @@ do the actual addition.
 
 ----------
 #### MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS
-	void	MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS();
+    void    MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS();
 
 This message removes the controller from all its GCN lists.
 
@@ -2160,9 +2160,9 @@ the controller is being removed from its lists; it should call the
 superclass to do the actual removal.
 
 #### 12.4.3.4 Working with Controller Visibility
-	MSG_GEN_CONTROL_NOTIFY_INTERACTABLE, 
-	MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE, 
-	MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE
+    MSG_GEN_CONTROL_NOTIFY_INTERACTABLE, 
+    MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE, 
+    MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE
 
 Because controllers are generic objects which may or may not be interactable, 
 GenControlClass has two messages to handle the interactable state. It has 
@@ -2171,8 +2171,8 @@ messages are detailed below.
 
 ----------
 #### MSG_GEN_CONTROL_NOTIFY_INTERACTABLE
-	void	MSG_GEN_CONTROL_NOTIFY_INTERACTABLE(
-			GenControlInteractableFlags flags);
+    void    MSG_GEN_CONTROL_NOTIFY_INTERACTABLE(
+            GenControlInteractableFlags flags);
 
 This message instructs the controller to take any actions necessary before 
 being put on the screen and made interactable. It causes the controller to add 
@@ -2191,8 +2191,8 @@ the controller will be made interactable.
 
 ----------
 #### MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE
-	void	MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE(
-			GenControlInteractableFlags flags);
+    void    MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE(
+            GenControlInteractableFlags flags);
 
 This message indicates that the UI has determined that the controller can no 
 longer be seen or interacted with by the user. The default behavior of the 
@@ -2210,7 +2210,7 @@ the controller are no longer interactable.
 
 ----------
 #### MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE
-	void	MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE();
+    void    MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE();
 
 This internal message requests that the normal default controller UI 
 gadgetry be removed and destroyed if they are not in use. This is an 
@@ -2242,9 +2242,9 @@ programmers will want to read the next section.
 **GenControlClass**. One field is the chunk handle of the Tool Location Table, 
 and the other is the chunk handle of the Tool Group List, both defined below:
 
-	@instance ChunkHandle				GTCI_toolboxList;
-	@instance ChunkHandle				GTCI_toolGroupList;
-		@default GI_states = @default | GS_ENABLED;
+    @instance ChunkHandle               GTCI_toolboxList;
+    @instance ChunkHandle               GTCI_toolGroupList;
+        @default GI_states = @default | GS_ENABLED;
 
 The Tool Location Table must be set up for any application that uses a 
 GenToolControl. The structure of this table is given in "Using Tools" above. The total number of allowable entries in the Tool Location Table is 
@@ -2264,15 +2264,15 @@ information when presenting the user with options of where the controller's
 features may be placed. This vardata field is shown below (both the definition 
 of the field and the structure it uses):
 
-	@vardata TempGenToolControlInstance
-				TEMP_GEN_TOOL_CONTROL_INSTANCE;
+    @vardata TempGenToolControlInstance
+                TEMP_GEN_TOOL_CONTROL_INSTANCE;
 
-	typedef struct {
-		optr		TGTCI_curController;
-		word		TGTCI_features;
-		word		TGTCI_required;
-		word		TGTCI_allowed;
-	} TempGenToolControlInstance;
+    typedef struct {
+        optr        TGTCI_curController;
+        word        TGTCI_features;
+        word        TGTCI_required;
+        word        TGTCI_allowed;
+    } TempGenToolControlInstance;
 
 The individual fields of the temporary structure are described below.
 
@@ -2318,8 +2318,8 @@ Group List of the GenToolControl.
 **GenToolGroupClass** has one instance data field in addition to those 
 inherited from **GenInteractionClass**:
 
-	@instance optr			GTGI_controller;
-		@default GI_states = (@default & ~GS_ENABLED);
+    @instance optr          GTGI_controller;
+        @default GI_states = (@default & ~GS_ENABLED);
 
 This field contains the optr of the GenControl object whose tools are managed 
 by this GenToolGroup. This field is nearly always set in your **.goc** file.
@@ -2329,7 +2329,7 @@ in which the tool group should be highlighted; this allows the user to better
 see which set of tools is being "discussed" (e.g. which set is currently being 
 manipulated by the GenToolControl).
 
-	@vardata Color TEMP_TOOL_GROUP_HIGHLIGHT;
+    @vardata Color TEMP_TOOL_GROUP_HIGHLIGHT;
 
 To set the highlight type, **GenToolGroupClass** has a single message. 
 MSG_GEN_TOOL_GROUP_SET_HIGHLIGHT sets the color of the group's 
@@ -2337,8 +2337,8 @@ highlight; if the group should not be highlighted, the color should be set to -1
 
 ----------
 #### MSG_GEN_TOOL_GROUP_SET_HIGHLIGHT
-	void	MSG_GEN_TOOL_GROUP_SET_HIGHLIGHT(
-			ToolGroupHighlightType			hlType);
+    void    MSG_GEN_TOOL_GROUP_SET_HIGHLIGHT(
+            ToolGroupHighlightType          hlType);
 
 This message sets the highlight color of the tool group. This is used almost 
 exclusively by the GenToolControl.
@@ -2372,52 +2372,52 @@ GenApplication's GAGCNLT_SELF_LOAD_OPTIONS GCN list.
 
 The ColorSelector has the following features:
 
-	typedef WordFlags CSFeatures;
-	#define CSF_FILLED_LIST			0x10
-	#define CSF_INDEX				0x08
-	#define CSF_RGB					0x04
-	#define CSF_DRAW_MASK			0x02
-	#define CSF_PATTERN				0x01
-	#define CS_DEFAULT_FEATURES		(CSF_FILLED_LIST |
-				CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
-				CSF_PATTERN)
+    typedef WordFlags CSFeatures;
+    #define CSF_FILLED_LIST         0x10
+    #define CSF_INDEX               0x08
+    #define CSF_RGB                 0x04
+    #define CSF_DRAW_MASK           0x02
+    #define CSF_PATTERN             0x01
+    #define CS_DEFAULT_FEATURES     (CSF_FILLED_LIST |
+                CSF_INDEX | CSF_RGB | CSF_DRAW_MASK |
+                CSF_PATTERN)
 
 In addition, the ColorSelector has several instance fields, all shown below:
 
-	@instance ColorQuad				CSI_color = {0, 0, 0, 0};
-		/* currently selected color */
-	@instance byte				CSI_colorIndeterminate;
-		/* true if color is indeterminate */
-	@instance SystemDrawMask CSI_drawMask = SDM_0;
-		/* draw mask in use by the color */
-	@instance byte				CSI_drawMaskIndeterminate;
-		/* true if mask is indeterminate */
-	@instance GraphicPattern CSI_pattern = {0, 0};
-		/* pattern in use by the color */
-	@instance byte				CSI_patternIndeterminate;
-		/* true if pattern indeterminate */
+    @instance ColorQuad             CSI_color = {0, 0, 0, 0};
+        /* currently selected color */
+    @instance byte              CSI_colorIndeterminate;
+        /* true if color is indeterminate */
+    @instance SystemDrawMask CSI_drawMask = SDM_0;
+        /* draw mask in use by the color */
+    @instance byte              CSI_drawMaskIndeterminate;
+        /* true if mask is indeterminate */
+    @instance GraphicPattern CSI_pattern = {0, 0};
+        /* pattern in use by the color */
+    @instance byte              CSI_patternIndeterminate;
+        /* true if pattern indeterminate */
 
-	@instance ColorModifiedStates CSI_states = 0;
-		/* indicates which aspects have changed:
-		 * CMS_COLOR_CHANGED
-		 * CMS_DRAW_MASK_CHANGED
-		 * CMS_PATTERN_CHANGED */
-	@instance ColorToolboxPreferences CSI_toolboxPrefs
-						= CTP_IS_POPUP;
-		/* preferences for color selector:
-		 * CTP_INDEX_ORIENTATION
-		 * CTP_DRAW_MASK_ORIENTATION
-		 * CTP_PATTERN_ORIENTATION
-		 * CTP_IS_POPUP */
+    @instance ColorModifiedStates CSI_states = 0;
+        /* indicates which aspects have changed:
+         * CMS_COLOR_CHANGED
+         * CMS_DRAW_MASK_CHANGED
+         * CMS_PATTERN_CHANGED */
+    @instance ColorToolboxPreferences CSI_toolboxPrefs
+                        = CTP_IS_POPUP;
+        /* preferences for color selector:
+         * CTP_INDEX_ORIENTATION
+         * CTP_DRAW_MASK_ORIENTATION
+         * CTP_PATTERN_ORIENTATION
+         * CTP_IS_POPUP */
 
-	@vardata optr ATTR_COLOR_SELECTOR_DISABLE_OBJECT;
-		/* when color selector is disabled, the
-		 * object named will also be disabled */
+    @vardata optr ATTR_COLOR_SELECTOR_DISABLE_OBJECT;
+        /* when color selector is disabled, the
+         * object named will also be disabled */
 
 #### 12.7.1.1 Messages Sent Out by the ColorSelector
-	MSG_META_COLORED_OBJECT_SET_COLOR, 
-	MSG_META_COLORED_OBJECT_SET_DRAW_MASK, 
-	MSG_META_COLORED_OBJECT_SET_PATTERN
+    MSG_META_COLORED_OBJECT_SET_COLOR, 
+    MSG_META_COLORED_OBJECT_SET_DRAW_MASK, 
+    MSG_META_COLORED_OBJECT_SET_PATTERN
 
 The ColorSelector sends out three messages to its data objects. These 
 messages each serve to set a particular attribute of the object it currently 
@@ -2426,8 +2426,8 @@ messages if it is to use the ColorSelector.
 
 ----------
 #### MSG_META_COLORED_OBJECT_SET_COLOR
-	void	MSG_META_COLORED_OBJECT_SET_COLOR(
-			ColorQuad color);
+    void    MSG_META_COLORED_OBJECT_SET_COLOR(
+            ColorQuad color);
 
 This message notifies the controlled object that it should set its color to the 
 passed value.
@@ -2447,8 +2447,8 @@ ColorSelector controller.
 
 ----------
 #### MSG_META_COLORED_OBJECT_SET_DRAW_MASK
-	void	MSG_META_COLORED_OBJECT_SET_DRAW_MASK(
-			SystemDrawMask mask);
+    void    MSG_META_COLORED_OBJECT_SET_DRAW_MASK(
+            SystemDrawMask mask);
 
 This message notifies the controlled object that it should set its draw mask 
 to the passed value.
@@ -2468,8 +2468,8 @@ ColorSelector controller.
 
 ----------
 #### MSG_META_COLORED_OBJECT_SET_PATTERN
-	void	MSG_META_COLORED_OBJECT_SET_PATTERN(
-			GraphicPattern pattern);
+    void    MSG_META_COLORED_OBJECT_SET_PATTERN(
+            GraphicPattern pattern);
 
 This message notifies the controlled object that it should sets its draw 
 pattern to that passed.
@@ -2488,12 +2488,12 @@ pattern.
 ColorSelector controller.
 
 #### 12.7.1.2 Messages Handled by ColorSelectorClass
-	MSG_COLOR_SELECTOR_GET_COLOR, 
-	MSG_COLOR_SELECTOR_SET_COLOR, 
-	MSG_COLOR_SELECTOR_GET_DRAW_MASK, 
-	MSG_COLOR_SELECTOR_SET_DRAW_MASK, 
-	MSG_COLOR_SELECTOR_GET_PATTERN, 
-	MSG_COLOR_SELECTOR_SET_PATTERN
+    MSG_COLOR_SELECTOR_GET_COLOR, 
+    MSG_COLOR_SELECTOR_SET_COLOR, 
+    MSG_COLOR_SELECTOR_GET_DRAW_MASK, 
+    MSG_COLOR_SELECTOR_SET_DRAW_MASK, 
+    MSG_COLOR_SELECTOR_GET_PATTERN, 
+    MSG_COLOR_SELECTOR_SET_PATTERN
 
 The ColorSelector handles a number of messages including the normal 
 **GenControlClass** messages it inherits. These messages allow the setting or 
@@ -2501,8 +2501,8 @@ retrieval of the instance data of the controller.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_COLOR
-	void	MSG_COLOR_SELECTOR_GET_COLOR(
-			ColorQuad		*retVal);
+    void    MSG_COLOR_SELECTOR_GET_COLOR(
+            ColorQuad       *retVal);
 
 This message retrieves the controller's *CSI_color* field.
 
@@ -2511,7 +2511,7 @@ This message retrieves the controller's *CSI_color* field.
 **Destination:** Any ColorSelector object.
 
 **Parameters:**  
-*retVal*	A pointer to an empty **ColorQuad** structure.
+*retVal*    A pointer to an empty **ColorQuad** structure.
 
 **Return:** The **ColorQuad** structure pointed to by *retVal* will be the color set in 
 *CSI_color*.
@@ -2520,8 +2520,8 @@ This message retrieves the controller's *CSI_color* field.
 
 ----------
 #### MSG_COLOR_SELECTOR_SET_COLOR
-	void	MSG_COLOR_SELECTOR_SET_COLOR(
-			ColorQuad color);
+    void    MSG_COLOR_SELECTOR_SET_COLOR(
+            ColorQuad color);
 
 This message sets the color in *CSI_color*.
 
@@ -2539,7 +2539,7 @@ color for the *CSI_color* field.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_DRAW_MASK
-	SystemDrawMask MSG_COLOR_SELECTOR_GET_DRAW_MASK();
+    SystemDrawMask MSG_COLOR_SELECTOR_GET_DRAW_MASK();
 
 This message retrieves the draw mask set in *CSI_drawMask*.
 
@@ -2555,8 +2555,8 @@ This message retrieves the draw mask set in *CSI_drawMask*.
 
 ----------
 #### MSG_COLOR_SELECTOR_SET_DRAW_MASK
-	void	MSG_COLOR_SELECTOR_SET_DRAW_MASK(
-			SystemDrawMask mask);
+    void    MSG_COLOR_SELECTOR_SET_DRAW_MASK(
+            SystemDrawMask mask);
 
 This message sets the draw mask stored in *CSI_drawMask*.
 
@@ -2575,7 +2575,7 @@ This message sets the draw mask stored in *CSI_drawMask*.
 ----------
 
 ####MSG_COLOR_SELECTOR_GET_PATTERN
-	GraphicPattern MSG_COLOR_SELECTOR_GET_PATTERN();
+    GraphicPattern MSG_COLOR_SELECTOR_GET_PATTERN();
 
 This message returns the pattern set in *CSI_pattern*.
 
@@ -2591,8 +2591,8 @@ This message returns the pattern set in *CSI_pattern*.
 
 ----------
 #### MSG_COLOR_SELECTOR_SET_PATTERN
-	void	MSG_COLOR_SELECTOR_SET_PATTERN(
-			GraphicPattern pattern);
+    void    MSG_COLOR_SELECTOR_SET_PATTERN(
+            GraphicPattern pattern);
 
 This message sets the drawing pattern stored in *CSI_pattern*.
 
@@ -2609,7 +2609,7 @@ This message sets the drawing pattern stored in *CSI_pattern*.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_COLOR
-	See colorC.goh
+    See colorC.goh
 
 Update the current color in the toolbox and normal UI. This message is 
 normally sent from within a MSG_GEN_CONTROL_UPDATE_UI handler.
@@ -2626,7 +2626,7 @@ normally sent from within a MSG_GEN_CONTROL_UPDATE_UI handler.
 
 ----------
 #### MSG_COLOR_SELECTOR_APPLY_COLOR
-	See colorC.goh
+    See colorC.goh
 
 Makes the color selector send MSG_META_COLORED_OBJECT_SET_COLOR.
 
@@ -2642,7 +2642,7 @@ Makes the color selector send MSG_META_COLORED_OBJECT_SET_COLOR.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_FILLED_STATUS
-	See colorC.goh
+    See colorC.goh
 
 Makes the color selector update the draw mask and associated UI.
 
@@ -2658,7 +2658,7 @@ Makes the color selector update the draw mask and associated UI.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_FILLED_MONIKER
-	See colorC.goh
+    See colorC.goh
 
 Returns the VisMoniker that should be used to represent the "do draw" item 
 in the color selector.
@@ -2675,7 +2675,7 @@ in the color selector.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_UNFILLED_MONIKER
-	See colorC.goh
+    See colorC.goh
 
 Returns the VisMoniker that should be used to represent the "don't draw" 
 item in the color selector.
@@ -2692,7 +2692,7 @@ item in the color selector.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_DRAW_MASK
-	See colorC.goh
+    See colorC.goh
 
 Update the current draw mask in the toolbox and the UI. This is often sent 
 from within a MSG_GEN_CONTROL_UPDATE_UI handler.
@@ -2709,7 +2709,7 @@ from within a MSG_GEN_CONTROL_UPDATE_UI handler.
 
 ----------
 #### MSG_COLOR_SELECTOR_APPLY_DRAW_MASK
-	See colorC.goh
+    See colorC.goh
 
 Generates MSG_META_COLORED_OBJECT_SET_DRAW_MASK.
 
@@ -2725,7 +2725,7 @@ Generates MSG_META_COLORED_OBJECT_SET_DRAW_MASK.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_PATTERN
-	See colorC.goh
+    See colorC.goh
 
 Update the current pattern in the toolbox and the UI. This is often sent from 
 within a MSG_GEN_CONTROL_UPDATE_UI handler.
@@ -2742,7 +2742,7 @@ within a MSG_GEN_CONTROL_UPDATE_UI handler.
 
 ----------
 #### MSG_COLOR_SELECTOR_APPLY_PATTERN
-	See colorC.goh
+    See colorC.goh
 
 Generates MSG_META_COLORED_OBJECT_SET_PATTERN.
 
@@ -2758,7 +2758,7 @@ Generates MSG_META_COLORED_OBJECT_SET_PATTERN.
 
 ----------
 #### MSG_CS_SET_FILLED_STATUS
-	See colorC.goh
+    See colorC.goh
 
 Tells the controller to disable itself and set the mask to zero or to re-enable 
 itself and set the mask to 100, based on the passed flag.
@@ -2775,7 +2775,7 @@ itself and set the mask to 100, based on the passed flag.
 
 ----------
 #### MSG_CS_SET_CF_INDEX
-	See colorC.goh
+    See colorC.goh
 
 Sent by the color list to set a color via an index.
 
@@ -2791,7 +2791,7 @@ Sent by the color list to set a color via an index.
 
 ----------
 #### MSG_CS_SET_CF_RGB_RED
-	See colorC.goh
+    See colorC.goh
 
 Sent by the color list to set a color's red value.
 
@@ -2807,7 +2807,7 @@ Sent by the color list to set a color's red value.
 
 ----------
 #### MSG_CS_SET_CF_RGB_GREEN
-	See colorC.goh
+    See colorC.goh
 
 Sent by the color list to set a color's green value.
 
@@ -2823,7 +2823,7 @@ Sent by the color list to set a color's green value.
 
 ----------
 #### MSG_CS_SET_CF_RGB_BLUE
-	See colorC.goh
+    See colorC.goh
 
 Sent by the color list to set a color's blue value.
 
@@ -2839,13 +2839,13 @@ Sent by the color list to set a color's blue value.
 
 ----------
 #### MSG_CS_SET_DRAW_MASK
-	See colorC.goh
+    See colorC.goh
 
 Sets the draw mask for the color selector.
 
 ----------
 #### MSG_CS_SET_PATTERN
-	See colorC.goh
+    See colorC.goh
 
 Sets the pattern for the color selector.
 
@@ -2863,32 +2863,32 @@ exported from **MetaClass**.
 **GenPageControlClass** is subclassed from **GenControlClass** and has the 
 features and tools shown below. It has none of its own instance data fields.
 
-	typedef WordFlags GPCFeatures;
-	#define GPCF_GOTO_PAGE					0x0004
-	#define GPCF_NEXT_PAGE					0x0002
-	#define GPCF_PREVIOUS_PAGE				0x0001
+    typedef WordFlags GPCFeatures;
+    #define GPCF_GOTO_PAGE                  0x0004
+    #define GPCF_NEXT_PAGE                  0x0002
+    #define GPCF_PREVIOUS_PAGE              0x0001
 
-	typedef WordFlags GPCToolboxFeatures;
-	#define GPCTF_PREVIOUS_PAGE				0x0004
-	#define GPCTF_GOTO_PAGE					0x0002
-	#define GPCTF_NEXT_PAGE					0x0001
+    typedef WordFlags GPCToolboxFeatures;
+    #define GPCTF_PREVIOUS_PAGE             0x0004
+    #define GPCTF_GOTO_PAGE                 0x0002
+    #define GPCTF_NEXT_PAGE                 0x0001
 
-	#define GPC_DEFAULT_FEATURES (GPCF_GOTO_PAGE |
-				GPCF_NEXT_PAGE | GPCF_PREVIOUS_PAGE)
+    #define GPC_DEFAULT_FEATURES (GPCF_GOTO_PAGE |
+                GPCF_NEXT_PAGE | GPCF_PREVIOUS_PAGE)
 
-	#define GPC_DEFAULT_TOOLBOX_FEATURES
-				(GPCTF_GOTO_PAGE | GPCTF_NEXT_PAGE |
-				 GPCTF_PREVIOUS_PAGE)
+    #define GPC_DEFAULT_TOOLBOX_FEATURES
+                (GPCTF_GOTO_PAGE | GPCTF_NEXT_PAGE |
+                 GPCTF_PREVIOUS_PAGE)
 
-	@default GCI_output = (TO_APP_TARGET);
+    @default GCI_output = (TO_APP_TARGET);
 
 The messages this controller sends out must be handled by any object 
 controlled by it.
 
 ----------
 #### MSG_META_PAGED_OBJECT_GOTO_PAGE
-	void	MSG_META_PAGED_OBJECT_GOTO_PAGE(
-			word	page);
+    void    MSG_META_PAGED_OBJECT_GOTO_PAGE(
+            word    page);
 
 This message causes the paged object to go to the specified page.
 
@@ -2906,7 +2906,7 @@ properly with the GenPageControl object.
 
 ----------
 #### MSG_META_PAGED_OBJECT_NEXT_PAGE
-	void	MSG_META_PAGED_OBJECT_NEXT_PAGE();
+    void    MSG_META_PAGED_OBJECT_NEXT_PAGE();
 
 This message indicates that the recipient should go to the next page.
 
@@ -2919,7 +2919,7 @@ properly with the GenPageControl object.
 
 ----------
 #### MSG_META_PAGED_OBJECT_PREVIOUS_PAGE
-	void	MSG_META_PAGED_OBJECT_PREVIOUS_PAGE();
+    void    MSG_META_PAGED_OBJECT_PREVIOUS_PAGE();
 
 This message indicates that the recipient should go to the previous page.
 
@@ -2932,7 +2932,7 @@ properly with the GenPageControl object.
 
 ----------
 #### MSG_PC_GOTO_PAGE
-	see gPageCC.goh
+    see gPageCC.goh
 
 Causes the page control object to go to the specified page.
 
@@ -2948,7 +2948,7 @@ Causes the page control object to go to the specified page.
 
 ----------
 #### MSG_PC_NEXT_PAGE
-	void	MSG_PC_NEXT_PAGE();
+    void    MSG_PC_NEXT_PAGE();
 
 Causes the page controller to go to the next page.
 
@@ -2960,7 +2960,7 @@ Causes the page controller to go to the next page.
 
 ----------
 #### MSG_PC_PREVIOUS_PAGE
-	void	MSG_PC_PREVIOUS_PAGE();
+    void    MSG_PC_PREVIOUS_PAGE();
 
 Causes the page controller to go to the previous page.
 
@@ -2981,9 +2981,9 @@ controller, you will need to intercept these messages and call many of these
 routines.
 
 #### 12.7.3.1 Retrieving Parameters of the Current Entry
-	FloatFormatGetFormatParamsWithListEntry(), 
-	FloatFormatGetFormatParamsWithToken(), 	
-	FloatFormatGetFormatTokenWithName()
+    FloatFormatGetFormatParamsWithListEntry(), 
+    FloatFormatGetFormatParamsWithToken(),  
+    FloatFormatGetFormatTokenWithName()
 
 The Float Format controller routines use a **FormatInfoStruc** structure to 
 hold information about a particular format. This structure is convenient to 
@@ -2994,47 +2994,47 @@ the current **FormatInfoStruc**, if one is being used by the controller.
 ----------
 **Code Display 12-10 FormatInfoStruc**
 
-	typedef struct {
+    typedef struct {
 
-	/*
-	 * FIS_signature is used internally for error-checking.
-	 */
-	word			FIS_signature;
+    /*
+     * FIS_signature is used internally for error-checking.
+     */
+    word            FIS_signature;
 
-	/*
-	 * These two entries store the user defined format array for the 
-	 * controller to work on. This array is created by FloatFormatInit().
-	 */
-	FileHandle		FIS_userDefFmtArrayFileHan;
-	VMBlockHandle 	FIS_userDefFmtArrayBlkHan;
+    /*
+     * These two entries store the user defined format array for the 
+     * controller to work on. This array is created by FloatFormatInit().
+     */
+    FileHandle      FIS_userDefFmtArrayFileHan;
+    VMBlockHandle   FIS_userDefFmtArrayBlkHan;
 
-	/*
-	 * These two entries store the object block and format list chunk that the 
-	 * controller resides in.
-	 */
-	word			FIS_childBlk;
-	word			FIS_chooseFmtListChunk;
+    /*
+     * These two entries store the object block and format list chunk that the 
+     * controller resides in.
+     */
+    word            FIS_childBlk;
+    word            FIS_chooseFmtListChunk;
 
-	/*
-	 * FIS_features stores the features list of the controller.
-	 */
-	word			FIS_features;
+    /*
+     * FIS_features stores the features list of the controller.
+     */
+    word            FIS_features;
 
-	/*
-	 * FIS_editFlag is -1 if we are editing a current user-defined entry and 0 
-	 * if we are creating a new user-defined entry.
-	 */
-	byte			FIS_editFlag;
+    /*
+     * FIS_editFlag is -1 if we are editing a current user-defined entry and 0 
+     * if we are creating a new user-defined entry.
+     */
+    byte            FIS_editFlag;
 
-	/* FIS_curSelection stores the current selection in the format list. */
-	word			FIS_curSelection;
+    /* FIS_curSelection stores the current selection in the format list. */
+    word            FIS_curSelection;
 
-	/* FIS_curToken stores the token of the selected item in the list. */
-	word			FIS_curToken;
+    /* FIS_curToken stores the token of the selected item in the list. */
+    word            FIS_curToken;
 
-	/* FIS_curParams stores the FormatParams of the selected item. */
-	FormatParams	FIS_curParams;
-	} FormatInfoStruc;
+    /* FIS_curParams stores the FormatParams of the selected item. */
+    FormatParams    FIS_curParams;
+    } FormatInfoStruc;
 
 ----------
 **FloatFormatGetFormatParamsWithListEntry()** fills in a 
@@ -3059,8 +3059,8 @@ already filled in. You must also have the *FIS_userDefFmtArrayFileHan* and
 particular format when passed its name (in a **FormatInfoStruc**).
 
 #### 12.7.3.2 Initializing the UI
-	MSG_FLOAT_CTRL_UPDATE_UI, MSG_FLOAT_CTRL_REQUEST_MONIKER, 
-	FloatFormatInit(), FloatFormatInitFormatList()
+    MSG_FLOAT_CTRL_UPDATE_UI, MSG_FLOAT_CTRL_REQUEST_MONIKER, 
+    FloatFormatInit(), FloatFormatInitFormatList()
 
 **FloatFormatInit()** initializes a format array to serve as the storage space 
 for user-defined formats. It must be passed the VM file handle to create the 
@@ -3085,8 +3085,8 @@ pass the format's textual name (from *FIS_curParams.FP_formatName*) to
 MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT.
 
 #### 12.7.3.3 Setting Up Selected Formats
-	MSG_FLOAT_CTRL_FORMAT_SELECTED, 
-	FloatFormatProcessFormatSelected()
+    MSG_FLOAT_CTRL_FORMAT_SELECTED, 
+    FloatFormatProcessFormatSelected()
 
 MSG_FLOAT_CTRL_FORMAT_SELECTED is sent to the Float Format 
 controller whenever the user makes a new selection. This message allows 
@@ -3095,9 +3095,9 @@ selection. Your handler for this message needs to call
 **FloatFormatProcessFormatSelected()**.
 
 #### 12.7.3.4 User Defined Format Creation
-	MSG_FLOAT_CTRL_USER_DEF_INVOKE, 
-	FloatFormatInvokeUserDefDB(), MSG_FLOAT_CTRL_USER_DEF_OK, 
-	FloatFormatUserDefOK()
+    MSG_FLOAT_CTRL_USER_DEF_INVOKE, 
+    FloatFormatInvokeUserDefDB(), MSG_FLOAT_CTRL_USER_DEF_OK, 
+    FloatFormatUserDefOK()
 
 MSG_FLOAT_CTRL_USER_DEF_INVOKE is sent to the Float Format 
 controller whenever the user has defined a new format and wishes to add it 
@@ -3113,14 +3113,14 @@ this check and apply the user-defined format to the list of format entries if it
 is successful.
 
 #### 12.7.3.5 Deleting Formats
-	MSG_FLOAT_CTRL_FORMAT_DELETE, FloatFormatDelete()
+    MSG_FLOAT_CTRL_FORMAT_DELETE, FloatFormatDelete()
 
 MSG_FLOAT_CTRL_FORMAT_DELETE is sent to the Float Format controller 
 when the user attempts to delete a user-defined entry. Your handler for this 
 message needs to call **FloatFormatDelete()**.
 
 #### 12.7.3.6 Applying Formats
-	MSG_FLOAT_CTRL_FORMAT_APPLY
+    MSG_FLOAT_CTRL_FORMAT_APPLY
 
 MSG_FLOAT_CTRL_FORMAT_APPLY is sent to the FloatFormat controller 
 when the user attempts to apply a format selected in the controller to the 

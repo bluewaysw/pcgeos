@@ -309,9 +309,9 @@ message may receive the modified GrObj's OD and a value specifying what
 sort of action has been performed. The action type is specified by a 
 **GrObjActionNotificationType** value.
 
-	@message void MSG_MY_NOTIFY (
-		optr grobj,
-		GrObjActionNotificationType action);
+    @message void MSG_MY_NOTIFY (
+        optr grobj,
+        GrObjActionNotificationType action);
 
 Though this notification message does not include a return value, because it 
 passes the GrObj's OD, the notification message's handler may send 
@@ -406,16 +406,16 @@ GODF_DRAW_WRAP_TEXT_AROUND_ONLY bit is set.
 To determine the bounding path of the region to be wrapped around, draw the 
 graphic layer (with a wrap only option) to a path:
 
-	GrBeginPath (MyGState, PCT_REPLACE); 
+    GrBeginPath (MyGState, PCT_REPLACE); 
 
-	@call MyGrObjBody::MSG_GB_DRAW(MyGState,
-		 0, GODF_DRAW_WRAP_TEXT_AROUND_ONLY);
+    @call MyGrObjBody::MSG_GB_DRAW(MyGState,
+         0, GODF_DRAW_WRAP_TEXT_AROUND_ONLY);
 
-	/* if the GrObjBody's GBI_drawFlags includes
-	 * GODF_DRAW_WRAP_TEXT_AROUND_ONLY, we could use
-	 * either the above or:
-	 * @call MyGrObjBody::MSG_VIS_DRAW(0, MyGState); */
-	GrEndPath (MyGState);
+    /* if the GrObjBody's GBI_drawFlags includes
+     * GODF_DRAW_WRAP_TEXT_AROUND_ONLY, we could use
+     * either the above or:
+     * @call MyGrObjBody::MSG_VIS_DRAW(0, MyGState); */
+    GrEndPath (MyGState);
 
 What the application does with this path is up to you.
 
@@ -478,36 +478,36 @@ should instead send all messages to the GrObjHead.
 ----------
 **Code Display 18-1 GrObjToolControl Features**
 
-	/* GrObjToolControlClass is a subclass of GenControlClass.
-	 * Add your GrobjToolControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjToolControlClass is a subclass of GenControlClass.
+     * Add your GrobjToolControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef WordFlags GOTCFeatures;
-	/* These flags may be combined with | and &:
-		GOTCF_PTR, 
-		GOTCF_ROTATE_PTR,
-		GOTCF_ZOOM,
-		GOTCF_TEXT,
-		GOTCF_LINE,
-		GOTCF_POLYLINE,
-		GOTCF_POLYCURVE,
-		GOTCF_SPLINE,
-		GOTCF_ARC,
-		GOTCF_RECT,
-		GOTCF_FOUNDED_RECT,
-		GOTCF_ELLIPSE */
+    typedef WordFlags GOTCFeatures;
+    /* These flags may be combined with | and &:
+        GOTCF_PTR, 
+        GOTCF_ROTATE_PTR,
+        GOTCF_ZOOM,
+        GOTCF_TEXT,
+        GOTCF_LINE,
+        GOTCF_POLYLINE,
+        GOTCF_POLYCURVE,
+        GOTCF_SPLINE,
+        GOTCF_ARC,
+        GOTCF_RECT,
+        GOTCF_FOUNDED_RECT,
+        GOTCF_ELLIPSE */
 
-	#define GOTC_DEFAULT_FEATURES (GOTCF_PTR | GOTCF_TEXT | GOTCF_LINE | GOTCF_ARC | \
-			GOTCF_POLYLINE | GOTCF_ROTATE_PTR | GOTCF_RECT | GOTCF_ZOOM | \
-			GOTCF_ROUNDED_RECT | GOTCF_ELLIPSE | GOTCF_POLYCURVE |GOTCF_SPLINE)
-	#define GOTC_DEFAULT_TOOLBOX_FEATURES (GOTC_DEFAULT_FEATURES)
+    #define GOTC_DEFAULT_FEATURES (GOTCF_PTR | GOTCF_TEXT | GOTCF_LINE | GOTCF_ARC | \
+            GOTCF_POLYLINE | GOTCF_ROTATE_PTR | GOTCF_RECT | GOTCF_ZOOM | \
+            GOTCF_ROUNDED_RECT | GOTCF_ELLIPSE | GOTCF_POLYCURVE |GOTCF_SPLINE)
+    #define GOTC_DEFAULT_TOOLBOX_FEATURES (GOTC_DEFAULT_FEATURES)
 
-	/* GrObjToolControlClass also includes a piece of vardata used to help 
-		applications that will include one or more extra tools. */
-	@vardata word ATTR_GROBJ_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS
+    /* GrObjToolControlClass also includes a piece of vardata used to help 
+        applications that will include one or more extra tools. */
+    @vardata word ATTR_GROBJ_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS
 
-	/*	The UI for this tool should be provided in an 
-	ATTR_GEN_CONTROL_APP_TOOLBOX_UI vardata field.
-	*/
+    /*  The UI for this tool should be provided in an 
+    ATTR_GEN_CONTROL_APP_TOOLBOX_UI vardata field.
+    */
 
 ----------
 ### 18.3.2 GrObjStyleSheetControl
@@ -524,11 +524,11 @@ selected graphic objects.
 ----------
 **Code Display 18-2 GrObjAreaColorSelector Features**
 
-	/* GrObjAreaColorSelector is a subclass of ColorSelectorClass and has the same 
-	 * feature set: CSF_FILLED_LIST, CSF_INDEX, CSF_RGB, CSF_DRAW_MASK, CSF_PATTERN).
-	 */
+    /* GrObjAreaColorSelector is a subclass of ColorSelectorClass and has the same 
+     * feature set: CSF_FILLED_LIST, CSF_INDEX, CSF_RGB, CSF_DRAW_MASK, CSF_PATTERN).
+     */
 
-	#define GOACS_DEFAULT_FEATURES (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK )
+    #define GOACS_DEFAULT_FEATURES (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK )
 
 ----------
 ### 18.3.4 GrObjAreaAttrControl
@@ -539,25 +539,25 @@ features correspond to **MixMode** values which will be used to draw the area.
 ----------
 **Code Display 18-3 GrObjAreaAttrControl Features**
 
-	/* GrObjAreaAttrControlClass is a subclass of GenControlClass. 
-	 * Add your GrObjAreaAttrControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjAreaAttrControlClass is a subclass of GenControlClass. 
+     * Add your GrObjAreaAttrControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef WordFlags GOAACFeatures;
-	/* The following flags may be combined using | and &:
-		GOAACF_MM_CLEAR,
-		GOAACF_MM_COPY,
-		GOAACF_MM_NOP,
-		GOAACF_MM_AND,
-		GOAACF_MM_INVERT,
-		GOAACF_MM_XOR,
-		GOAACF_MM_SET,
-		GOAACF_MM_OR,
-		GOAACF_TRANSPARENCY */
+    typedef WordFlags GOAACFeatures;
+    /* The following flags may be combined using | and &:
+        GOAACF_MM_CLEAR,
+        GOAACF_MM_COPY,
+        GOAACF_MM_NOP,
+        GOAACF_MM_AND,
+        GOAACF_MM_INVERT,
+        GOAACF_MM_XOR,
+        GOAACF_MM_SET,
+        GOAACF_MM_OR,
+        GOAACF_TRANSPARENCY */
 
-	#define GOAAC_DEFAULT_FEATURES 		(GOAACF_TRANSPARENCY | GOAACF_MM_COPY | \
-		 	GOAACF_MM_INVERT | GOAACF_MM_XOR | GOAACF_MM_AND | GOAACF_MM_OR)
+    #define GOAAC_DEFAULT_FEATURES      (GOAACF_TRANSPARENCY | GOAACF_MM_COPY | \
+            GOAACF_MM_INVERT | GOAACF_MM_XOR | GOAACF_MM_AND | GOAACF_MM_OR)
 
-	#define GOAAC_DEFAULT_TOOLBOX_FEATURES 						0
+    #define GOAAC_DEFAULT_TOOLBOX_FEATURES                      0
 
 ----------
 ### 18.3.5 GrObjLineColorSelector
@@ -568,12 +568,12 @@ to draw lines.
 ----------
 **Code Display 18-4 GrObjLineColorSelector Features**
 
-	/* GrObjLineColorSelector is a subclass of ColorSelectorClass and has the same 
-	 * feature set: CSF_INDEX, CSF_RGB, CSF_DRAW_MASK. Note that since Lines
-	 * may not draw with a pattern, the CSF_PATTERN feature is not used. 
-	 * Add your GrObjLineColorSelector to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjLineColorSelector is a subclass of ColorSelectorClass and has the same 
+     * feature set: CSF_INDEX, CSF_RGB, CSF_DRAW_MASK. Note that since Lines
+     * may not draw with a pattern, the CSF_PATTERN feature is not used. 
+     * Add your GrObjLineColorSelector to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	/* The GOLCS_DEFAULT_FEATURES contains the default feature set */
+    /* The GOLCS_DEFAULT_FEATURES contains the default feature set */
 
 ----------
 ### 18.3.6 GrObjLineAttrControl
@@ -584,24 +584,24 @@ and style.
 ----------
 **Code Display 18-5 GrObjLineAttrControl Features**
 
-	/* GrObjLineAttrControlClass is a subclass of GenControlClass. 
-	 * Add your GrObjLineAttrControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjLineAttrControlClass is a subclass of GenControlClass. 
+     * Add your GrObjLineAttrControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef WordFlags GOLACFeatures;
-	#define GOLACF_WIDTH_INDEX 0x0010
-	#define GOLACF_WIDTH_VALUE 0x0008
-	#define GOLACF_STYLE 0x0004
-	#define GOLACF_ARROWHEAD_TYPE 0x0002
-	#define GOLACF_ARROWHEAD_WHICH_END 0x0001 
+    typedef WordFlags GOLACFeatures;
+    #define GOLACF_WIDTH_INDEX 0x0010
+    #define GOLACF_WIDTH_VALUE 0x0008
+    #define GOLACF_STYLE 0x0004
+    #define GOLACF_ARROWHEAD_TYPE 0x0002
+    #define GOLACF_ARROWHEAD_WHICH_END 0x0001 
 
-	typedef WordFlags GOLACToolboxFeatures;
-	#define GOLACTF_WIDTH_INDEX 0x0002
-	#define GOLACTF_STYLE 0x0001 
+    typedef WordFlags GOLACToolboxFeatures;
+    #define GOLACTF_WIDTH_INDEX 0x0002
+    #define GOLACTF_STYLE 0x0001 
 
-	#define GOLAC_DEFAULT_FEATURES (GOLACF_WIDTH_INDEX | GOLACF_WIDTH_VALUE | \
- 				GOLACF_STYLE | GOLACF_ARROWHEAD_TYPE | GOLACF_ARROWHEAD_WHICH_END) 
+    #define GOLAC_DEFAULT_FEATURES (GOLACF_WIDTH_INDEX | GOLACF_WIDTH_VALUE | \
+                GOLACF_STYLE | GOLACF_ARROWHEAD_TYPE | GOLACF_ARROWHEAD_WHICH_END) 
 
-	#define GOLAC_DEFAULT_TOOLBOX_FEATURES 	(GOLACTF_WIDTH_INDEX | GOLACF_STYLE)
+    #define GOLAC_DEFAULT_TOOLBOX_FEATURES  (GOLACTF_WIDTH_INDEX | GOLACF_STYLE)
 
 ----------
 ### 18.3.7 GrObjNudgeControl
@@ -611,18 +611,18 @@ amounts.
 ----------
 **Code Display 18-6 GrObjNudgeControl Features**
 
-	/* GrObjNudgeControlClass is a subclass of GenControlClass.
-	 * Add your GrObjNudgeControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjNudgeControlClass is a subclass of GenControlClass.
+     * Add your GrObjNudgeControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GrObjNudgeControlFeatures;
-	#define GONCF_NUDGE_LEFT				(0x10)
-	#define GONCF_NUDGE_RIGHT				(0x08)
-	#define GONCF_NUDGE_UP				(0x04)
-	#define GONCF_NUDGE_DOWN				(0x02)
-	#define GONCF_CUSTOM_MOVE				(0x01)
+    typedef ByteFlags GrObjNudgeControlFeatures;
+    #define GONCF_NUDGE_LEFT                (0x10)
+    #define GONCF_NUDGE_RIGHT               (0x08)
+    #define GONCF_NUDGE_UP              (0x04)
+    #define GONCF_NUDGE_DOWN                (0x02)
+    #define GONCF_CUSTOM_MOVE               (0x01)
 
-	#define GONC_DEFAULT_FEATURES 					(GONCF_NUDGE_LEFT | GONCF_NUDGE_RIGHT | \
-						GONCF_NUDGE_UP | GONCF_NUDGE_DOWN | GONCF_CUSTOM_MOVE)
+    #define GONC_DEFAULT_FEATURES                   (GONCF_NUDGE_LEFT | GONCF_NUDGE_RIGHT | \
+                        GONCF_NUDGE_UP | GONCF_NUDGE_DOWN | GONCF_CUSTOM_MOVE)
 
 ----------
 ### 18.3.8 GrObjDepthControl
@@ -635,22 +635,22 @@ that does not affect the GrObj itself.
 ----------
 **Code Display 18-7 GrObjDepthControl Features**
 
-	/* GrObjDepthControlClass is a subclass of GenControlClass.
-	 * Add your GrObjDepthControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjDepthControlClass is a subclass of GenControlClass.
+     * Add your GrObjDepthControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GODepthCFeatures;
-	/* The following flags may be combined with | and &:
-		GODepthCF_BRING_TO_FRONT,
-		GODepthCF_SEND_TO_BACK,
-		GODepthCF_SHUFFLE_UP,
-		GODepthCF_SHUFFLE_DOWN */
+    typedef ByteFlags GODepthCFeatures;
+    /* The following flags may be combined with | and &:
+        GODepthCF_BRING_TO_FRONT,
+        GODepthCF_SEND_TO_BACK,
+        GODepthCF_SHUFFLE_UP,
+        GODepthCF_SHUFFLE_DOWN */
 
-	#define GODepthC_DEFAULT_FEATURES \	
-				(GODepthCF_BRING_TO_FRONT | GODepthCF_SEND_TO_BACK |\
-				 GODepthCF_SHUFFLE_UP | GODepthCF_SHUFFLE_DOWN )
-	#define GODepthC_DEFAULT_TOOLBOX_FEATURES (\
-				(GODepthCF_BRING_TO_FRONT | GODepthCF_SEND_TO_BACK |\
-				 GODepthCF_SHUFFLE_UP | GODepthCF_SHUFFLE_DOWN )
+    #define GODepthC_DEFAULT_FEATURES \ 
+                (GODepthCF_BRING_TO_FRONT | GODepthCF_SEND_TO_BACK |\
+                 GODepthCF_SHUFFLE_UP | GODepthCF_SHUFFLE_DOWN )
+    #define GODepthC_DEFAULT_TOOLBOX_FEATURES (\
+                (GODepthCF_BRING_TO_FRONT | GODepthCF_SEND_TO_BACK |\
+                 GODepthCF_SHUFFLE_UP | GODepthCF_SHUFFLE_DOWN )
 
 ----------
 ### 18.3.9 GrObjArcControl
@@ -660,20 +660,20 @@ characteristics of arc objects.
 ----------
 **Code Display 18-8 GrObjArcControlClass**
 
-	/* GrObjArcControlClass is a subclass of GenControlClass.
-	 * Add your GrObjDepthControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjArcControlClass is a subclass of GenControlClass.
+     * Add your GrObjDepthControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GOArcCFeatures;
-	/* The following flags may be combined using | and &:
-		GOACF_START_ANGLE,
-		GOACF_END_ANGLE,
-		GOACF_PIE_TYPE,
-		GOACF_CHORD_TYPE */
+    typedef ByteFlags GOArcCFeatures;
+    /* The following flags may be combined using | and &:
+        GOACF_START_ANGLE,
+        GOACF_END_ANGLE,
+        GOACF_PIE_TYPE,
+        GOACF_CHORD_TYPE */
 
-	#define GOArcC_DEFAULT_FEATURES (GOACF_START_ANGLE | GOACF_END_ANGLE | \
-				 GOACF_PIE_TYPE | GOACF_CHORD_TYPE)
+    #define GOArcC_DEFAULT_FEATURES (GOACF_START_ANGLE | GOACF_END_ANGLE | \
+                 GOACF_PIE_TYPE | GOACF_CHORD_TYPE)
 
-	#define GOArcC_DEFAULT_TOOLBOX_FEATURES 0
+    #define GOArcC_DEFAULT_TOOLBOX_FEATURES 0
 
 ----------
 ### 18.3.10 GrObjHandleControl
@@ -683,19 +683,19 @@ stretching handles smaller, larger, or invisible.
 ----------
 **Code Display 18-9 GrObjHandleControl Features**
 
-	/* GrObjHandleControlClass is a subclass of GenControlClass.
-	 * Add your GrObjHandleControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjHandleControlClass is a subclass of GenControlClass.
+     * Add your GrObjHandleControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GOHCFeatures;
-	/* The following flags may be combined with | and &:
-		GOHCF_SMALL_HANDLES,
-		GOHCF_MEDIUM_HANDLES,
-		GOHCF_LARGE_HANDLES,
-		GOHCF_INVISIBLE_HANDLES */
+    typedef ByteFlags GOHCFeatures;
+    /* The following flags may be combined with | and &:
+        GOHCF_SMALL_HANDLES,
+        GOHCF_MEDIUM_HANDLES,
+        GOHCF_LARGE_HANDLES,
+        GOHCF_INVISIBLE_HANDLES */
 
-	#define GOHC_DEFAULT_FEATURES (GOHCF_SMALL_HANDLES | GOHCF_MEDIUM_HANDLES |\
-				GOHCF_LARGE_HANDLES | GOHCF_INVISIBLE_HANDLES)
-	#define GOHC_DEFAULTD_TOOLBOX_FEATURES 					0
+    #define GOHC_DEFAULT_FEATURES (GOHCF_SMALL_HANDLES | GOHCF_MEDIUM_HANDLES |\
+                GOHCF_LARGE_HANDLES | GOHCF_INVISIBLE_HANDLES)
+    #define GOHC_DEFAULTD_TOOLBOX_FEATURES                  0
 
 ----------
 ### 18.3.11 GrObjRotateControl
@@ -705,19 +705,19 @@ normally affect's the object's coordinate transformation.
 ----------
 **Code Display 18-10 GrObjRotateControl Features**
 
-	/* GrObjRotateControlClass is a subclass of GenControlClass.
-	 * Add your GrObjRotateControl to GAGCNLT_SELF_LOAD_OPTIONS. */
-	typedef ByteFlags GORCFeatures;
-	#define GORCF_45_DEGREES_CW 0x0080
-	#define GORCF_90_DEGREES_CW 0x0040
-	#define GORCF_135_DEGREES_CW 0x0020
-	#define GORCF_180_DEGREES 0x0010
-	#define GORCF_135_DEGREES_CCW 0x0008
-	#define GORCF_90_DEGREES_CCW 0x0004
-	#define GORCF_45_DEGREES_CCW 0x0002
-	#define GORCF_CUSTOM_ROTATION 0x0001 
+    /* GrObjRotateControlClass is a subclass of GenControlClass.
+     * Add your GrObjRotateControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    typedef ByteFlags GORCFeatures;
+    #define GORCF_45_DEGREES_CW 0x0080
+    #define GORCF_90_DEGREES_CW 0x0040
+    #define GORCF_135_DEGREES_CW 0x0020
+    #define GORCF_180_DEGREES 0x0010
+    #define GORCF_135_DEGREES_CCW 0x0008
+    #define GORCF_90_DEGREES_CCW 0x0004
+    #define GORCF_45_DEGREES_CCW 0x0002
+    #define GORCF_CUSTOM_ROTATION 0x0001 
 
-	#define GORC_DEFAULT_FEATURES 0x00ff
+    #define GORC_DEFAULT_FEATURES 0x00ff
 
 ----------
 ### 18.3.12 GrObjFlipControl
@@ -727,13 +727,13 @@ axis.
 ----------
 **Code Display 18-11 GrObjFlipControl Features**
 
-	/* GrObjFlipControlClass is a subclass of GenControlClass.
-	 * Add your GrObjFlipControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjFlipControlClass is a subclass of GenControlClass.
+     * Add your GrObjFlipControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GOFCFeatures;
-	/* The following flags may be combined with | and &:
-		GOFCF_FLIP_HORIZONTALLY,
-		GOFCF_FLIP_VERTICALLY */
+    typedef ByteFlags GOFCFeatures;
+    /* The following flags may be combined with | and &:
+        GOFCF_FLIP_HORIZONTALLY,
+        GOFCF_FLIP_VERTICALLY */
 
 ----------
 ### 18.3.13 GrObjSkewControl
@@ -743,17 +743,17 @@ graphic objects. This normally affect's the object's coordinate transformation.
 ----------
 **Code Display 18-12 GrObjSkewControl Features**
 
-	/* GrObjFlipControlClass is a subclass of GenControlClass.
-	 * Add your GrObjFlipControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjFlipControlClass is a subclass of GenControlClass.
+     * Add your GrObjFlipControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GOSCFeatures;
-	#define GOSCF_LEFT 0x0010
-	#define GOSCF_RIGHT 0x0008
-	#define GOSCF_UP 0x0004
-	#define GOSCF_DOWN 0x0002
-	#define GOSCF_CUSTOM_SKEW 0x0001 
+    typedef ByteFlags GOSCFeatures;
+    #define GOSCF_LEFT 0x0010
+    #define GOSCF_RIGHT 0x0008
+    #define GOSCF_UP 0x0004
+    #define GOSCF_DOWN 0x0002
+    #define GOSCF_CUSTOM_SKEW 0x0001 
 
-	#define GROBJ_SKEW_CONTROL_DEFAULT_FEATURES 0x001f 
+    #define GROBJ_SKEW_CONTROL_DEFAULT_FEATURES 0x001f 
 
 ----------
 ### 18.3.14 GrObjAlignToGridControl
@@ -765,15 +765,15 @@ lines.
 ----------
 **Code Display 18-13 GrObjAlignToGridControl Features**
 
-	/* GrObjAlignToGridControlClass is a subclass of GenControlClass.
-	 * Add your GrObjAlignToGridControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjAlignToGridControlClass is a subclass of GenControlClass.
+     * Add your GrObjAlignToGridControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GOATGCFeatures;
-	/* There is only one GrObjAlignToGridControl feature:
-			GOATGCF_ALIGN_TO_GRID */
+    typedef ByteFlags GOATGCFeatures;
+    /* There is only one GrObjAlignToGridControl feature:
+            GOATGCF_ALIGN_TO_GRID */
 
-	#define GOATGC_DEFAULT_FEATURES (GOATGCF_ALIGN_TO_GRID)
-	#define GOATGC_DEFAULT_TOOLBOX_FEATURES 0
+    #define GOATGC_DEFAULT_FEATURES (GOATGCF_ALIGN_TO_GRID)
+    #define GOATGC_DEFAULT_TOOLBOX_FEATURES 0
 
 ----------
 ### 18.3.15 GrObjGroupControl
@@ -783,16 +783,16 @@ groups. These GrObjs may then be moved, resized, and skewed in common.
 ----------
 **Code Display 18-14 GrObjGroupControl**
 
-	/* GrObjGroupControlClass is a subclass of GenControlClass.
-	 * Add your GrObjGroupControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjGroupControlClass is a subclass of GenControlClass.
+     * Add your GrObjGroupControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags GOGCFeatures;
-	/* These flags may be combined using | and &:
-		GOGCF_GROUP,
-		GOGCF_UNGROUP */
+    typedef ByteFlags GOGCFeatures;
+    /* These flags may be combined using | and &:
+        GOGCF_GROUP,
+        GOGCF_UNGROUP */
 
-	#define GOGC_DEFAULT_FEATURES	(GOGCF_GROUP | GOGCF_UNGROUP)
-	#define GOGC_DEFAULT_TOOLBOX_FEATURES	(GOGCF_GROUP | GOGCF_UNGROUP)
+    #define GOGC_DEFAULT_FEATURES   (GOGCF_GROUP | GOGCF_UNGROUP)
+    #define GOGC_DEFAULT_TOOLBOX_FEATURES   (GOGCF_GROUP | GOGCF_UNGROUP)
 
 ----------
 ### 18.3.16 GrObjAlignDistributeControl
@@ -802,25 +802,25 @@ that their edges line up, or to distribute them evenly within a given space.
 ----------
 **Code Display 18-15 GrObjAlignDistrbuteControl Features**
 
-	typedef WordFlags GrObjAlignDistributeControlFeatures;
-	#define GOADCF_ALIGN_LEFT 0x8000
-	#define GOADCF_ALIGN_CENTER_HORIZONTALLY 0x4000
-	#define GOADCF_ALIGN_RIGHT 0x2000
-	#define GOADCF_ALIGN_WIDTH 0x1000
+    typedef WordFlags GrObjAlignDistributeControlFeatures;
+    #define GOADCF_ALIGN_LEFT 0x8000
+    #define GOADCF_ALIGN_CENTER_HORIZONTALLY 0x4000
+    #define GOADCF_ALIGN_RIGHT 0x2000
+    #define GOADCF_ALIGN_WIDTH 0x1000
  
-	#define GOADCF_ALIGN_TOP 0x800
-	#define GOADCF_ALIGN_CENTER_VERTICALLY 0x400
-	#define GOADCF_ALIGN_BOTTOM 0x200
-	#define GOADCF_ALIGN_HEIGHT 0x100
+    #define GOADCF_ALIGN_TOP 0x800
+    #define GOADCF_ALIGN_CENTER_VERTICALLY 0x400
+    #define GOADCF_ALIGN_BOTTOM 0x200
+    #define GOADCF_ALIGN_HEIGHT 0x100
  
-	#define GOADCF_DISTRIBUTE_LEFT 0x80
-	#define GOADCF_DISTRIBUTE_CENTER_HORIZONTALLY 0x40
-	#define GOADCF_DISTRIBUTE_RIGHT 0x20
-	#define GOADCF_DISTRIBUTE_WIDTH 0x10
-	#define GOADCF_DISTRIBUTE_TOP 0x8
-	#define GOADCF_DISTRIBUTE_CENTER_VERTICALLY 0x4
-	#define GOADCF_DISTRIBUTE_BOTTOM 0x2
-	#define GOADCF_DISTRIBUTE_HEIGHT 0x1 
+    #define GOADCF_DISTRIBUTE_LEFT 0x80
+    #define GOADCF_DISTRIBUTE_CENTER_HORIZONTALLY 0x40
+    #define GOADCF_DISTRIBUTE_RIGHT 0x20
+    #define GOADCF_DISTRIBUTE_WIDTH 0x10
+    #define GOADCF_DISTRIBUTE_TOP 0x8
+    #define GOADCF_DISTRIBUTE_CENTER_VERTICALLY 0x4
+    #define GOADCF_DISTRIBUTE_BOTTOM 0x2
+    #define GOADCF_DISTRIBUTE_HEIGHT 0x1 
 
 ----------
 ### 18.3.17 GrObjLocksControl
@@ -830,9 +830,9 @@ graphic object.
 ----------
 **Code Display 18-16 GrObjLocksControl Features**
 
-	/* GrObjLocksControlClass is a subclass of GenControlClass.
-	 * Add your GrObjLocksControl to GAGCNLT_SELF_LOAD_OPTIONS. */
-	/* GrObjLocksControl doesn't have a Features Type; just use the GrObjLocks type. */
+    /* GrObjLocksControlClass is a subclass of GenControlClass.
+     * Add your GrObjLocksControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjLocksControl doesn't have a Features Type; just use the GrObjLocks type. */
 
 ----------
 ### 18.3.18 GrObjConvertControl
@@ -843,19 +843,19 @@ into a bitmap or GString object.
 
 **Code Display 18-17 GrObjConvertControl Features**
 
-	/* GrObjConvertControlClass is a subclass of GenControlClass.
-	 * Add your GrObjConvertControl to GAGCNLT_SELF_LOAD_OPTIONS. */
+    /* GrObjConvertControlClass is a subclass of GenControlClass.
+     * Add your GrObjConvertControl to GAGCNLT_SELF_LOAD_OPTIONS. */
 
-	typedef ByteFlags 	GOCCFeatures;
-	/* The following flags may be combined using | and &:
-		GOCCF_CONVERT_TO_BITMAP,
-		GOCCF_CONVERT_TO_GRAPHIC,
-		GOCCF_CONVERT_FROM_GRAPHIC */
+    typedef ByteFlags   GOCCFeatures;
+    /* The following flags may be combined using | and &:
+        GOCCF_CONVERT_TO_BITMAP,
+        GOCCF_CONVERT_TO_GRAPHIC,
+        GOCCF_CONVERT_FROM_GRAPHIC */
 
-	#define GOCC_TOOLBOX_FEATURES 	(GOCCF_CONVERT_TO_BITMAP | GOCCF_CONVERT_TO_GRAPHIC \
-				| GOCCF_CONVERT_FROM_GRAPHIC)
-	#define GOCC_TOOLBOX_TOOLBOX_FEATURES 	(GOCCF_CONVERT_TO_BITMAP | \
-				GOCCF_CONVERT_TO_GRAPHIC | GOCCF_CONVERT_FROM_GRAPHIC)
+    #define GOCC_TOOLBOX_FEATURES   (GOCCF_CONVERT_TO_BITMAP | GOCCF_CONVERT_TO_GRAPHIC \
+                | GOCCF_CONVERT_FROM_GRAPHIC)
+    #define GOCC_TOOLBOX_TOOLBOX_FEATURES   (GOCCF_CONVERT_TO_BITMAP | \
+                GOCCF_CONVERT_TO_GRAPHIC | GOCCF_CONVERT_FROM_GRAPHIC)
 
 ----------
 ### 18.3.19 GrObjDefaultAttributesControl
@@ -877,24 +877,24 @@ deleted.
 ----------
 **Code Display 18-18 GrObjObscureAttrControl Features**
 
-	typedef ByteFlags GrObjObscureAttrControlFeatures;
-	#define GOOACF_INSTRUCTIONS 0x80
-	#define GOOACF_INSERT_OR_DELETE_MOVE 0x40
-	#define GOOACF_INSERT_OR_DELETE_RESIZE 0x20
-	#define GOOACF_INSERT_OR_DELETE_DELETE 0x10
-	#define GOOACF_DONT_WRAP 0x08
-	#define GOOACF_WRAP_INSIDE 0x04
-	#define GOOACF_WRAP_AROUND_RECT 0x02
-	#define GOOACF_WRAP_TIGHTLY 0x01
+    typedef ByteFlags GrObjObscureAttrControlFeatures;
+    #define GOOACF_INSTRUCTIONS 0x80
+    #define GOOACF_INSERT_OR_DELETE_MOVE 0x40
+    #define GOOACF_INSERT_OR_DELETE_RESIZE 0x20
+    #define GOOACF_INSERT_OR_DELETE_DELETE 0x10
+    #define GOOACF_DONT_WRAP 0x08
+    #define GOOACF_WRAP_INSIDE 0x04
+    #define GOOACF_WRAP_AROUND_RECT 0x02
+    #define GOOACF_WRAP_TIGHTLY 0x01
 
-	#define GOOAC_INSERT_OR_DELETE_FEATURES (GOOACF_INSERT_OR_DELETE_MOVE | \
-				GOOACF_INSERT_OR_DELETE_RESIZE | GOOACF_INSERT_OR_DELETE_DELETE) 
+    #define GOOAC_INSERT_OR_DELETE_FEATURES (GOOACF_INSERT_OR_DELETE_MOVE | \
+                GOOACF_INSERT_OR_DELETE_RESIZE | GOOACF_INSERT_OR_DELETE_DELETE) 
 
-	#define GOOAC_WRAP_FEATURES (GOOACF_DONT_WRAP | GOOACF_WRAP_INSIDE | \
-				GOOACF_WRAP_AROUND_RECT | GOOACF_WRAP_TIGHTLY) 
+    #define GOOAC_WRAP_FEATURES (GOOACF_DONT_WRAP | GOOACF_WRAP_INSIDE | \
+                GOOACF_WRAP_AROUND_RECT | GOOACF_WRAP_TIGHTLY) 
 
-	#define GOOAC_DEFAULT_FEATURES (GOOACF_INSTRUCTIONS | GOOAC_WRAP_FEATURES | \
-				 GOOAC_INSERT_OR_DELETE_FEATURES) 
+    #define GOOAC_DEFAULT_FEATURES (GOOACF_INSTRUCTIONS | GOOAC_WRAP_FEATURES | \
+                 GOOAC_INSERT_OR_DELETE_FEATURES) 
 
 ----------
 ### 18.3.21 GrObjInstructionControl
@@ -909,15 +909,15 @@ instruction object.
 ----------
 **Code Display 18-19 GrObjInstructionControl Features**
 
-	typedef ByteFlags GrObjInstructionControlFeatures;
-	#define GOICF_DRAW 0x8000
-	#define GOICF_PRINT 0x4000
-	#define GOICF_MAKE_EDITABLE 0x2000
-	#define GOICF_MAKE_UNEDITABLE 0x1000
-	#define GOICF_DELETE 0x0800
+    typedef ByteFlags GrObjInstructionControlFeatures;
+    #define GOICF_DRAW 0x8000
+    #define GOICF_PRINT 0x4000
+    #define GOICF_MAKE_EDITABLE 0x2000
+    #define GOICF_MAKE_UNEDITABLE 0x1000
+    #define GOICF_DELETE 0x0800
 
-	#define GOICF_DEFAULT_FEATURES (GOICF_DRAW | GOICF_PRINT | GOICF_MAKE_EDITABLE | \
-					GOICF_MAKE_UNEDITABLE | GOICF_DELETE) 
+    #define GOICF_DEFAULT_FEATURES (GOICF_DRAW | GOICF_PRINT | GOICF_MAKE_EDITABLE | \
+                    GOICF_MAKE_UNEDITABLE | GOICF_DELETE) 
 
 ----------
 ### 18.3.22 GrObjGradientFillControl
@@ -942,18 +942,18 @@ which has been pasted inside of another object.
 ----------
 **Code Display 18-20 GrObjPasteInsideControl Features**
 
-	typedef ByteFlags GOPICFeatures;
-	#define GOPICF_PASTE_INSIDE 0x0002
-	#define GOPICF_BREAKOUT_PASTE_INSIDE 0x0001 
+    typedef ByteFlags GOPICFeatures;
+    #define GOPICF_PASTE_INSIDE 0x0002
+    #define GOPICF_BREAKOUT_PASTE_INSIDE 0x0001 
 
-	typedef ByteFlags GOPICToolboxFeatures;
-	#define GOPICTF_PASTE_INSIDE 0x0002
-	#define GOPICTF_BREAKOUT_PASTE_INSIDE 0x0001 
+    typedef ByteFlags GOPICToolboxFeatures;
+    #define GOPICTF_PASTE_INSIDE 0x0002
+    #define GOPICTF_BREAKOUT_PASTE_INSIDE 0x0001 
 
-	#define GOPIC_DEFAULT_FEATURES (GOPICF_PASTE_INSIDE | GOPICF_BREAKOUT_PASTE_INSIDE)
+    #define GOPIC_DEFAULT_FEATURES (GOPICF_PASTE_INSIDE | GOPICF_BREAKOUT_PASTE_INSIDE)
 
-	#define GOPIC_DEFAULT_TOOLBOX_FEATURES (GOPICTF_PASTE_INSIDE | \
-						GOPICTF_BREAKOUT_PASTE_INSIDE) 
+    #define GOPIC_DEFAULT_TOOLBOX_FEATURES (GOPICTF_PASTE_INSIDE | \
+                        GOPICTF_BREAKOUT_PASTE_INSIDE) 
 
 ----------
 ### 18.3.26 Controls From Other Libraries
@@ -985,48 +985,48 @@ interacts with.
 ----------
 **Code Display 18-21 GrObjBody Instance Data**
 
-	@instance RectDWord 	GBI_bounds = {0,0,0,0};	
-	@instance CompPart 		GBI_drawComp = {NullOptr};		/* Internal */
-	@instance CompPart 		GBI_reverseComp = {NullOptr};	/* Internal */
-	@instance word 			GBI_childCount;					/* Internal */
-	@instance optr 			GBI_selectionArray;				/* Internal */
-	@instance HierarchicalGrab 	GBI_targetExcl = {NullOptr, 0};	/* Internal */
-	@instance HierarchicalGrab 	GBI_focusExcl = {NullOptr, 0};	/* Internal */
-	@instance BasicGrab 	GBI_curEdit = {NullOptr, 0};	/* Internal */
-	@instance optr 			GBI_mouseGrab;					/* Internal */
-	@instance word 			GBI_objBlockArray; 				/* Internal;*/
-	@instance GrObjFunctionsActive 	GBI_defaultOptions;
-	@instance GrObjFunctionsActive 	GBI_currentModifiers;
-	@instance GrObjFunctionsActive 	GBI_currentOptions;
-	@instance GrObjBodyFlags 		GBI_flags 	= (GBF_DEFAULT_TARGET | GBF_DEFUALT_FOCUS);
-	@instance GrObjDrawFlags 		GBI_drawFlags;
-	@instance GrObjFileStatus GBI_fileStatus;				/* Internal */
-	@instance GStateHandle 	GBI_graphicsState = 0; 			/* Internal */
-	@instance optr 			GBI_head;
-	@instance optr 			GBI_goam;
-	@instance optr 			GBI_ruler;
-	@instance word 			GBI_priorityList = 	0; 			/* Internal */
-	@instance byte 			GBI_desiredHandleSize = DEFAULT_DESIRED_HANDLE_SIZE;
-	@instance byte 			GBI_curHandleWidth = 0;			/* Internal */
-	@instance byte 			GBI_curHandleHeight = 0;		/* Internal */
-	@instance BBFixed 		GBI_curNudgeX;					/* Internal */
-	@instance BBFixed 		GBI_curNudgeY;					/* Internal */
-	@instance PointWWFixed 	GBI_curScaleFactor = {MakeWWFixed(1), MakeWWFixed(0)};
-	@instance PointDWFixed	GBI_interestingPoint = {{0, -30000}, {0, -30000}};
-	@instance PointDWFixed 	GBI_lastPtr = {0,0}; 
-	@instance word 			GBI_suspendCount = 0;			/* Internal */
-	@instance GrObjBodyUnsuspendOps GBI_unsuspendOps;		/* Internal */
-	instance VisTextNotificationFlags GBI_textUnsuspendOps = 0;	/* Internal */
-	@instance word GBI_reserved1 = 0;						/* Reserved for future use */
-	@instance word GBI_reserved2 = 0;						/* Reserved for future use */ 
-	
-	@vardata 	GrObjActionNotification 	ATTR_GB_ACTION_NOTIFICATION;
-	
-	@vardata GrObjBodyPasteCallBackStruct ATTR_GB_PASTE_CALL_BACK;
-	typedef struct {
-		word GOBPCBS_message;
-		optr GOBPCBS_optr;
-	} GrObjBodyPasteCallBackStruct; 
+    @instance RectDWord     GBI_bounds = {0,0,0,0}; 
+    @instance CompPart      GBI_drawComp = {NullOptr};      /* Internal */
+    @instance CompPart      GBI_reverseComp = {NullOptr};   /* Internal */
+    @instance word          GBI_childCount;                 /* Internal */
+    @instance optr          GBI_selectionArray;             /* Internal */
+    @instance HierarchicalGrab  GBI_targetExcl = {NullOptr, 0}; /* Internal */
+    @instance HierarchicalGrab  GBI_focusExcl = {NullOptr, 0};  /* Internal */
+    @instance BasicGrab     GBI_curEdit = {NullOptr, 0};    /* Internal */
+    @instance optr          GBI_mouseGrab;                  /* Internal */
+    @instance word          GBI_objBlockArray;              /* Internal;*/
+    @instance GrObjFunctionsActive  GBI_defaultOptions;
+    @instance GrObjFunctionsActive  GBI_currentModifiers;
+    @instance GrObjFunctionsActive  GBI_currentOptions;
+    @instance GrObjBodyFlags        GBI_flags   = (GBF_DEFAULT_TARGET | GBF_DEFUALT_FOCUS);
+    @instance GrObjDrawFlags        GBI_drawFlags;
+    @instance GrObjFileStatus GBI_fileStatus;               /* Internal */
+    @instance GStateHandle  GBI_graphicsState = 0;          /* Internal */
+    @instance optr          GBI_head;
+    @instance optr          GBI_goam;
+    @instance optr          GBI_ruler;
+    @instance word          GBI_priorityList =  0;          /* Internal */
+    @instance byte          GBI_desiredHandleSize = DEFAULT_DESIRED_HANDLE_SIZE;
+    @instance byte          GBI_curHandleWidth = 0;         /* Internal */
+    @instance byte          GBI_curHandleHeight = 0;        /* Internal */
+    @instance BBFixed       GBI_curNudgeX;                  /* Internal */
+    @instance BBFixed       GBI_curNudgeY;                  /* Internal */
+    @instance PointWWFixed  GBI_curScaleFactor = {MakeWWFixed(1), MakeWWFixed(0)};
+    @instance PointDWFixed  GBI_interestingPoint = {{0, -30000}, {0, -30000}};
+    @instance PointDWFixed  GBI_lastPtr = {0,0}; 
+    @instance word          GBI_suspendCount = 0;           /* Internal */
+    @instance GrObjBodyUnsuspendOps GBI_unsuspendOps;       /* Internal */
+    instance VisTextNotificationFlags GBI_textUnsuspendOps = 0; /* Internal */
+    @instance word GBI_reserved1 = 0;                       /* Reserved for future use */
+    @instance word GBI_reserved2 = 0;                       /* Reserved for future use */ 
+    
+    @vardata    GrObjActionNotification     ATTR_GB_ACTION_NOTIFICATION;
+    
+    @vardata GrObjBodyPasteCallBackStruct ATTR_GB_PASTE_CALL_BACK;
+    typedef struct {
+        word GOBPCBS_message;
+        optr GOBPCBS_optr;
+    } GrObjBodyPasteCallBackStruct; 
 
 ----------
 The *GBI_bounds* field acts as the bounds of the drawing area. Geodes using 
@@ -1043,25 +1043,25 @@ turn on other options, which are stored in *GBI_currentModifiers*. The
 *GBI_currentOptions* field contains the computed combination of these 
 options.
 
-	typedef WordFlags 	GrObjFunctionsActive;
-	/* These flags may be combined with | and &:
-		GOFA_HAS_SEEN_EVENT,
-		GOFA_VIEW_ZOOMED,
-		GOFA_SNAP_TO,
-		GOFA_FROM_CENTER,
-		GOFA_ABOUT_OPPOSITE,
-		GOFA_CONSTRAIN,
-		GOFA_ADJUST,
-		GOFA_EXTEND */
+    typedef WordFlags   GrObjFunctionsActive;
+    /* These flags may be combined with | and &:
+        GOFA_HAS_SEEN_EVENT,
+        GOFA_VIEW_ZOOMED,
+        GOFA_SNAP_TO,
+        GOFA_FROM_CENTER,
+        GOFA_ABOUT_OPPOSITE,
+        GOFA_CONSTRAIN,
+        GOFA_ADJUST,
+        GOFA_EXTEND */
 
 The *GBI_flags* field determines some of the GrObjBody's miscellaneous 
 behavior. 
 
-	typedef WordFlags GrObjBodyFlags;
-	/* These flags may be combined with | and &:
-		GBF_HAS_ACTION_NOTIFICATION,
-		GBF_DEFAULT_TARGET,
-		GBF_DEFAULT_FOCUS */
+    typedef WordFlags GrObjBodyFlags;
+    /* These flags may be combined with | and &:
+        GBF_HAS_ACTION_NOTIFICATION,
+        GBF_DEFAULT_TARGET,
+        GBF_DEFAULT_FOCUS */
 
 The *GBI_goam* field is the handle of the GrObjBody's attribute manager. The 
 *GBI_head* field is the handle of the GrObjHead. The *GBI_ruler* field may hold 
@@ -1075,8 +1075,8 @@ shuffling objects up and down in the drawing order.
 
 ----------
 #### MSG_GB_ATTACH_UI
-	void 	MSG_GB_ATTACH_UI (
-			optr 	GrObjHead);
+    void    MSG_GB_ATTACH_UI (
+            optr    GrObjHead);
 
 This message lets the GrObjBody know where its head is. The head's OD will 
 be set in the instance data. This message must be sent to the GrObjBody 
@@ -1096,7 +1096,7 @@ head* - The optr of the GrObjHead to use.
 
 ----------
 #### MSG_GB_DETACH_UI
-	void 	MSG_GB_DETACH_UI ();
+    void    MSG_GB_DETACH_UI ();
 
 This message must be sent to the GrObjBody before it has been removed from 
 a document, and should be in the document's 
@@ -1115,8 +1115,8 @@ MSG_GEN_DOCUMENT_DETACH_UI.
 
 ----------
 #### MSG_GB_ATTACH_GOAM
-	void 	MSG_GB_ATTACH_GOAM (
-			optr 	GrObjAttrManager);
+    void    MSG_GB_ATTACH_GOAM (
+            optr    GrObjAttrManager);
 
 This message lets the GrObjBody know where its attribute manager is. The 
 manager's optr will be set in the instance data.
@@ -1154,9 +1154,9 @@ MSG_GEN_DOCMENT_INITIALIZE_DOCUMENT_FILE.
 
 ----------
 #### MSG_GB_ADD_GROBJ
-	void 	MSG_GB_ADD_GROBJ (
-			optr 	object,
-			word 	flags);
+    void    MSG_GB_ADD_GROBJ (
+            optr    object,
+            word    flags);
 
 This message adds a graphic object to the GrObjBody. The object will be 
 notified by a MSG_GO_AFTER_ADDED_TO_BODY that it has been added to 
@@ -1178,26 +1178,26 @@ where in the list of objects to add the new GrObj.
 
 **Structures:** The flags field is a word with the following structure:
 
-	typedef WordFlags GrObjBodyAddGrObjFlags;
-		/* GOBAGOF_DRAW_LIST_POSITION: if this bit
-			is set, then other bits describe 
-			position in drawing-order list. If
-			this bit is clear, then other bits
-			describe position in reverse list */
-		#define GOBAGOF_DRAW_LIST_POSITION 0x8000
-		#define GOBAGOF_REFERENCE 0x7fff
-		#define GOBAGOR_FIRST CCO_FIRST
-		#define GOBAGOR_LAST CCO_LAST
-	/* To add a new object so it draws "on top", use
-		(GOBAGOF_DRAW_LIST_POSITION | GOBAGOR_LAST) */
+    typedef WordFlags GrObjBodyAddGrObjFlags;
+        /* GOBAGOF_DRAW_LIST_POSITION: if this bit
+            is set, then other bits describe 
+            position in drawing-order list. If
+            this bit is clear, then other bits
+            describe position in reverse list */
+        #define GOBAGOF_DRAW_LIST_POSITION 0x8000
+        #define GOBAGOF_REFERENCE 0x7fff
+        #define GOBAGOR_FIRST CCO_FIRST
+        #define GOBAGOR_LAST CCO_LAST
+    /* To add a new object so it draws "on top", use
+        (GOBAGOF_DRAW_LIST_POSITION | GOBAGOR_LAST) */
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_GB_ADD_GROBJ_THEN_DRAW
-	void 	MSG_GB_ADD_GROBJ_THEN_DRAW(
-			optr 	object,
-			word 	flags);
+    void    MSG_GB_ADD_GROBJ_THEN_DRAW(
+            optr    object,
+            word    flags);
 
 This message adds a graphic object to the GrObjBody. The object will be 
 notified by a MSG_GO_AFTER_ADDED_TO_BODY that it has been added to 
@@ -1218,25 +1218,25 @@ MSG_GEN_DOCMENT_INITIALIZE_DOCUMENT_FILE.
 
 **Structures:** The flags field is a word with the following structure:
 
-	typedef WordFlags GrObjBodyAddGrObjFlags;
-		/* GOBAGOF_DRAW_LIST_POSITION: if this bit
-			is set, then other bits describe 
-			position in drawing-order list. If
-			this bit is clear, then other bits
-			describe position in reverse list */
-		#define GOBAGOF_DRAW_LIST_POSITION 0x8000
-		#define GOBAGOF_REFERENCE 0x7fff
-		#define GOBAGOR_FIRST CCO_FIRST
-		#define GOBAGOR_LAST CCO_LAST
-	/* To add a new object so it draws "on top", use
-		(GOBAGOF_DRAW_LIST_POSITION | GOBAGOR_LAST) */
+    typedef WordFlags GrObjBodyAddGrObjFlags;
+        /* GOBAGOF_DRAW_LIST_POSITION: if this bit
+            is set, then other bits describe 
+            position in drawing-order list. If
+            this bit is clear, then other bits
+            describe position in reverse list */
+        #define GOBAGOF_DRAW_LIST_POSITION 0x8000
+        #define GOBAGOF_REFERENCE 0x7fff
+        #define GOBAGOR_FIRST CCO_FIRST
+        #define GOBAGOR_LAST CCO_LAST
+    /* To add a new object so it draws "on top", use
+        (GOBAGOF_DRAW_LIST_POSITION | GOBAGOR_LAST) */
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_GB_SET_BOUNDS
-	void 	MSG_GB_SET_BOUNDS(
-			RectDWord 	bounds);
+    void    MSG_GB_SET_BOUNDS(
+            RectDWord   bounds);
 
 This message sets the bounds of the GrObjBody.
 
@@ -1253,8 +1253,8 @@ This message sets the bounds of the GrObjBody.
 
 ----------
 #### MSG_GB_INSTANTIATE_GROBJ
-	optr 	MSG_GB_INSTANTIATE_GROBJ(
-			ClassStruct 	*class);
+    optr    MSG_GB_INSTANTIATE_GROBJ(
+            ClassStruct     *class);
 
 This message instantiates a GrObj of the passed class in a block managed by 
 the body.
@@ -1286,7 +1286,8 @@ default if they don't have their own action notification.
 ----------
 #### MSG_GB_SUSPEND_ACTION_NOTIFICATION
 
-	void 	MSG_GB_SUSPEND_ACTION_NOTIFICATION();
+    void    MSG_GB_SUSPEND_ACTION_NOTIFICATION();
+
 This message suspends action notification for all of a body's GrObjs. This 
 prevents all the GrObjs from sending out any action notification.
 
@@ -1302,7 +1303,7 @@ prevents all the GrObjs from sending out any action notification.
 
 ----------
 #### MSG_GB_UNSUSPEND_ACTION_NOTIFICATION
-	void 	MSG_GB_UNSUSPEND_ACTION_NOTIFICATION();
+    void    MSG_GB_UNSUSPEND_ACTION_NOTIFICATION();
 
 This message counteracts MSG_GB_SUSPEND_ACTION_NOTIFICATION. If all 
 suspends have been balanced, the body's GrObjs will be free to send out 
@@ -1321,10 +1322,10 @@ the suspend period will not be sent out.
 
 ----------
 #### MSG_GB_DRAW
-	void 	MSG_GB_DRAW(
-			GStateHandle 		gstate,
-			DrawFlags 			visDrawFlags,
-			GrObjDrawFlags 		GODrawFlags);
+    void    MSG_GB_DRAW(
+            GStateHandle        gstate,
+            DrawFlags           visDrawFlags,
+            GrObjDrawFlags      GODrawFlags);
 
 This message draws the graphic layer, allowing the caller some options. Since 
 the GrObjBody is a subclass of VisComp, of course it is normally drawn by 
@@ -1346,16 +1347,16 @@ Parameters:
 
 Structures:  
 
-	typedef ByteFlags 	GrObjDrawFlags;
-	#define GODF_DRAW_QUICK_VIEW 				0x100
-	#define GODF_DRAW_CLIP_ONLY 				 0x80
-	#define GODF_DRAW_WRAP_TEXT_INSIDE_ONLY	 	 0x40
-	#define GODF_DRAW_WRAP_TEXT_AROUND_ONLY 	 0x20
-	#define GODF_DRAW_WITH_INCREASED_RESOLUTION  0x10
-	#define GODF_DRAW_INSTRUCTIONS 				 0x08
-	#define GODF_DRAW_SELECTED_OBJECTS_ONLY 	 0x04
-	#define GODF_DRAW_OBJECTS_ONLY 				 0x02
-	#define GODF_PRINT_INSTRUCTIONS 			 0x01
+    typedef ByteFlags   GrObjDrawFlags;
+    #define GODF_DRAW_QUICK_VIEW                0x100
+    #define GODF_DRAW_CLIP_ONLY                  0x80
+    #define GODF_DRAW_WRAP_TEXT_INSIDE_ONLY      0x40
+    #define GODF_DRAW_WRAP_TEXT_AROUND_ONLY      0x20
+    #define GODF_DRAW_WITH_INCREASED_RESOLUTION  0x10
+    #define GODF_DRAW_INSTRUCTIONS               0x08
+    #define GODF_DRAW_SELECTED_OBJECTS_ONLY      0x04
+    #define GODF_DRAW_OBJECTS_ONLY               0x02
+    #define GODF_PRINT_INSTRUCTIONS              0x01
 
 **Interception:** Unlikely.
 
@@ -1375,8 +1376,8 @@ Structures:
 #### MSG_GB_SHUFFLE_SELECTED_GROBJS_DOWN
 ----------
 #### MSG_GB_SET_DESIRED_HANDLE_SIZE
-	void 	MSG_GB_SET_DESIRED_HANDLE_SIZE(
-			byte 	handleSize);
+    void    MSG_GB_SET_DESIRED_HANDLE_SIZE(
+            byte    handleSize);
 
 ----------
 #### MSG_GB_REMOVE_GROBJ
@@ -1432,8 +1433,8 @@ Structures:
 #### MSG_GB_GET_WINDOW
 ----------
 #### MSG_GB_GET_BOUNDS
-	void 	MSG_GB_GET_BOUNDS(
-			RectDWord *bounds);
+    void    MSG_GB_GET_BOUNDS(
+            RectDWord *bounds);
 
 ----------
 #### MSG_GB_SUBST_AREA_TOKEN 
@@ -1501,18 +1502,19 @@ of object, and will thus not include a tool selector control.
 ----------
 **Code Display 18-22 GrObjHead Instance Data**
 
-	@instance ClassStruct 	*GH_currentTool = NullClass;
-	@instance word 			GH_initializeFloaterData = 0;	/* Internal */
-	@instance optr 			GH_currentBody;
-	@instance optr 			GH_floater;			
+    @instance ClassStruct   *GH_currentTool = NullClass;
+    @instance word          GH_initializeFloaterData = 0;   /* Internal */
+    @instance optr          GH_currentBody;
+    @instance optr          GH_floater;         
 
 ----------
 GrObjHead messages are, concerned with the current tool. 
 
 ----------
 #### MSG_GH_GET_CURRENT_TOOL
-	void 	MSG_GH_GET_CURRENT_TOOL (
-			CurrentToolValues 	*retVal);
+    void    MSG_GH_GET_CURRENT_TOOL (
+            CurrentToolValues   *retVal);
+
 This message returns the value of the currently active tool.
 
 **Source:** Unrestricted.
@@ -1529,19 +1531,20 @@ return value.
 
 **Structures:** The **CurrentToolValues** structure is defined as follows:
 
-	typedef struct{
-		word 			CTV_grObjSpecificData;
-		word 			CTV_unused;
-		ClassStruct		*CTV_toolClass;
-	} CurrentToolValues;
+    typedef struct{
+        word            CTV_grObjSpecificData;
+        word            CTV_unused;
+        ClassStruct     *CTV_toolClass;
+    } CurrentToolValues;
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_GH_SET_CURRENT_TOOL
-	void 	MSG_GH_SET_CURRENT_TOOL (
-			ClassStruct 	*class,
-			word 			initData);
+    void    MSG_GH_SET_CURRENT_TOOL (
+            ClassStruct     *class,
+            word            initData);
+
 This message activates a tool.
 
 **Source:** Unrestricted.
@@ -1571,9 +1574,9 @@ This message activates a tool.
 #### MSG_GH_SEND_NOTIFY_CURRENT_TOOL 
 ----------
 #### MSG_GH_SET_CURRENT_TOOL_WITH_DATA_BLOCK
-	void MSG_GH_SET_CURRENT_TOOL_WITH_DATA_BLOCK(
-		ClassStruct 	*toolClass,
-		word 			initData); /* Handle of initialization block */
+    void MSG_GH_SET_CURRENT_TOOL_WITH_DATA_BLOCK(
+        ClassStruct     *toolClass,
+        word            initData); /* Handle of initialization block */
 
 ## 18.6 GrObjAttributeManager
 The GrObjAttributeManager keeps track of drawing properties to use, 
@@ -1591,7 +1594,7 @@ and updating the attribute data structures.
 
 ----------
 #### MSG_GOAM_CREATE_ALL_ARRAYS
-	void 	MSG_GOAM_CREATE_ALL_ARRAYS();
+    void    MSG_GOAM_CREATE_ALL_ARRAYS();
 
 This message initializes the data structures in which the GOAM will store all 
 attribute information.
@@ -1660,67 +1663,67 @@ disallow performing certain operations on the object. Thus, if your
 application provides an object which the user should not be able to resize, 
 then set the GOL_RESIZE lock.
 
-	typedef WordFlags GrObjLocks;
-	/* These fields may be combined with | and &:
-		GOL_COPY,
-		GOL_LOCK,
-		GOL_SHOW,
-		GOL_WRAP,
-		GOL_MOVE,
-		GOL_RESIZE,
-		GOL_ROTATE,
-		GOL_SKEW,
-		GOL_EDIT,
-		GOL_DELETE,
-		GOL_SELECT,
-		GOL_ATTRIBUTE,
-		GOL_GROUP,
-		GOL_UNGROUP,
-		GOL_DRAW,
-		GOL_PRINT,
-	Remember, these are locks: if the bit is SET,
-	then the action is FORBIDDEN! */
+    typedef WordFlags GrObjLocks;
+    /* These fields may be combined with | and &:
+        GOL_COPY,
+        GOL_LOCK,
+        GOL_SHOW,
+        GOL_WRAP,
+        GOL_MOVE,
+        GOL_RESIZE,
+        GOL_ROTATE,
+        GOL_SKEW,
+        GOL_EDIT,
+        GOL_DELETE,
+        GOL_SELECT,
+        GOL_ATTRIBUTE,
+        GOL_GROUP,
+        GOL_UNGROUP,
+        GOL_DRAW,
+        GOL_PRINT,
+    Remember, these are locks: if the bit is SET,
+    then the action is FORBIDDEN! */
 
 ----------
 **Code Display 18-23 GrObjClass Instance Data**
 
-	@instance LinkPart 			GOI_drawLink;		/* Internal */
-	@instance LinkPart 			GOI_reverseLink;	/* Internal */
-	@instance GrObjAttrFlags 	GOI_attrFlags = (GOAF_INSERT_DELETE_MOVE_ALLOWED |
-	GOAF_INSERT_DELETE_RESIZE_ALLOWED | GOAF_INSERT_DELETE_DELETE_ALLOWED );
-	/*
-	 *	typedef WordFlags GrObjAttrFlags;
-	 *	#define GOAF_DONT_COPY_LOCKS 0x0200
-	 *	#define GOAF_HAS_PASTE_INSIDE_CHILDREN 0x0100
-	 *	#define GOAF_PASTE_INSIDE 0x0080
-	 *	#define GOAF_INSERT_DELETE_MOVE_ALLOWED 0x0040
-	 *	#define GOAF_INSERT_DELETE_RESIZE_ALLOWED 0x0020
-	 *	#define GOAF_INSERT_DELETE_DELETE_ALLOWED 0x0010
-	 *	#define GOAF_INSTRUCTION 0x0008
-	 *	#define GOAF_MULTIPLICATIVE_RESIZE 0x0004
-	 *	#define GOAF_WRAP 0x0003 
-	 */
+    @instance LinkPart          GOI_drawLink;       /* Internal */
+    @instance LinkPart          GOI_reverseLink;    /* Internal */
+    @instance GrObjAttrFlags    GOI_attrFlags = (GOAF_INSERT_DELETE_MOVE_ALLOWED |
+    GOAF_INSERT_DELETE_RESIZE_ALLOWED | GOAF_INSERT_DELETE_DELETE_ALLOWED );
+    /*
+     *  typedef WordFlags GrObjAttrFlags;
+     *  #define GOAF_DONT_COPY_LOCKS 0x0200
+     *  #define GOAF_HAS_PASTE_INSIDE_CHILDREN 0x0100
+     *  #define GOAF_PASTE_INSIDE 0x0080
+     *  #define GOAF_INSERT_DELETE_MOVE_ALLOWED 0x0040
+     *  #define GOAF_INSERT_DELETE_RESIZE_ALLOWED 0x0020
+     *  #define GOAF_INSERT_DELETE_DELETE_ALLOWED 0x0010
+     *  #define GOAF_INSTRUCTION 0x0008
+     *  #define GOAF_MULTIPLICATIVE_RESIZE 0x0004
+     *  #define GOAF_WRAP 0x0003 
+     */
 
-	@instance LinkPart GOI_drawLink;				/* Internal */
+    @instance LinkPart GOI_drawLink;                /* Internal */
 
-	@instance LinkPart GOI_reverseLink;				/* Internal */
+    @instance LinkPart GOI_reverseLink;             /* Internal */
 
-	@instance GrObjAttrFlags GOI_attrFlags = (GOAF_INSERT_DELETE_MOVE_ALLOWED | \
-	GOAF_INSERT_DELETE_RESIZE_ALLOWED | GOAF_INSERT_DELETE_DELETE_ALLOWED );
-													/* Internal */
+    @instance GrObjAttrFlags GOI_attrFlags = (GOAF_INSERT_DELETE_MOVE_ALLOWED | \
+    GOAF_INSERT_DELETE_RESIZE_ALLOWED | GOAF_INSERT_DELETE_DELETE_ALLOWED );
+                                                    /* Internal */
 
-	@instance GrObjOptimizationFlags 		GOI_optFlags =(GOOF_GROBJ_INVALID); /* Internal */
-	@instance GrObjMessageOptimizationFlags GOI_msgOptFlags =(0); 	/* Internal */
-	@instance GrObjLocks 					GOI_locks = 0;
-	@instance GrObjActionModes 				GOI_actionModes = 0;	/* Internal */
-	@instance GrObjTempModes 				GOI_tempState = 0;		/* Internal */
-	@instance ChunkHandle 					GOI_normalTransform = NullChunk; /* Internal */
-	@instance ChunkHandle 					GOI_spriteTransform = NullChunk; /* Internal */
-	@instance word GOI_areaAttrToken = CA_NULL_ELEMENT;				/* Internal */
-	@instance word GOI_lineAttrToken = CA_NULL_ELEMENT; 			/* Internal */
+    @instance GrObjOptimizationFlags        GOI_optFlags =(GOOF_GROBJ_INVALID); /* Internal */
+    @instance GrObjMessageOptimizationFlags GOI_msgOptFlags =(0);   /* Internal */
+    @instance GrObjLocks                    GOI_locks = 0;
+    @instance GrObjActionModes              GOI_actionModes = 0;    /* Internal */
+    @instance GrObjTempModes                GOI_tempState = 0;      /* Internal */
+    @instance ChunkHandle                   GOI_normalTransform = NullChunk; /* Internal */
+    @instance ChunkHandle                   GOI_spriteTransform = NullChunk; /* Internal */
+    @instance word GOI_areaAttrToken = CA_NULL_ELEMENT;             /* Internal */
+    @instance word GOI_lineAttrToken = CA_NULL_ELEMENT;             /* Internal */
 
-	@vardata 	GrObjActionNotificationStruct ATTR_GO_ACTION_NOTIFICATION;
-	@vardata PointWWFixed ATTR_GO_PARENT_DIMENSIONS_OFFSET; 		/* Internal */
+    @vardata    GrObjActionNotificationStruct ATTR_GO_ACTION_NOTIFICATION;
+    @vardata PointWWFixed ATTR_GO_PARENT_DIMENSIONS_OFFSET;         /* Internal */
 
 ----------
 ### 18.7.2 GrObj Messages
@@ -1738,8 +1741,8 @@ initialize its data.
 
 ----------
 #### MSG_GO_INITIALIZE
-	void 	MSG_GO_INITIALIZE(
-			GrObjInitializeData *data)
+    void    MSG_GO_INITIALIZE(
+            GrObjInitializeData *data)
 
 This message initializes the object's size and position. It also causes the 
 object to take on the default drawing attributes and to do any other 
@@ -1756,18 +1759,18 @@ initialization necessary before the object is added to the GrObjBody.
 
 **Structures:** 
 
-	typedef struct {
-		PointDWFixed 			GOID_position;
-		WWFixed 			GOID_width;
-		WWFixed 			GOID_height;
-	} GrObjInitializeData
+    typedef struct {
+        PointDWFixed            GOID_position;
+        WWFixed             GOID_width;
+        WWFixed             GOID_height;
+    } GrObjInitializeData
 
 **Interception:** Possible. Objects with additional instance data should subclass this 
 message. 
 
 ----------
 #### MSG_GO_NOTIFY_GROBJ_VALID
-	void 	MSG_GO_NOTIFY_GROBJ_VALID();
+    void    MSG_GO_NOTIFY_GROBJ_VALID();
 
 This message notifies the GrObj that it's ready for action. The GrObj has all 
 attributes that it needs to draw, including a transformation. This message is 
@@ -1788,7 +1791,7 @@ message is then sent to the object.
 
 ----------
 #### MSG_GO_AFTER_ADDED_TO_BODY
-	void 	MSG_GO_AFTER_ADDED_TO_BODY ();
+    void    MSG_GO_AFTER_ADDED_TO_BODY ();
 
 This message is sent to an object just after it has been added to a GrObjBody.
 
@@ -1804,7 +1807,7 @@ This message is sent to an object just after it has been added to a GrObjBody.
 
 ----------
 #### MSG_GO_BEFORE_REMOVED_FROM_BODY
-	void 	MSG_GO_BEFORE_REMOVED_FROM_BODY ();
+    void    MSG_GO_BEFORE_REMOVED_FROM_BODY ();
 
 This message is sent to an object just before it is removed from a GrObjBody.
 
@@ -1824,9 +1827,9 @@ This message is sent to an object just before it is removed from a GrObjBody.
 
 ----------
 #### MSG_GO_CHANGE_LOCKS
-	dword 	MSG_GO_CHANGE_LOCKS (
-			GrObjLocks 	setBits,
-			GrObjLocks 	clearBits);
+    dword   MSG_GO_CHANGE_LOCKS (
+            GrObjLocks  setBits,
+            GrObjLocks  clearBits);
 
 This message changes the locks on an object. The object's instance data will 
 be changed accordingly.
@@ -1856,8 +1859,8 @@ values.
 
 ----------
 #### MSG_GO_SET_AREA_ATTR
-	void 	MSG_GO_SET_AREA_ATTR(
-			GrObjBaseAreaAttrElement 	*_far *attr);
+    void    MSG_GO_SET_AREA_ATTR(
+            GrObjBaseAreaAttrElement    *_far *attr);
 
 This message sets the area attributes of the object.
 
@@ -1872,42 +1875,42 @@ This message sets the area attributes of the object.
 
 **Structures:** 
 
-	typedef struct { 
-		StyleSheetElementHeader GOBAAE_styleElement;
-		byte 			GOBAAE_r;
-		byte 			GOBAAE_g;
-		byte 			GOBAAE_b;
-		SysDrawMask 	GOBAAE_mask;
-		MixMode 		GOBAAE_drawMode;
-		GraphicPattern 	GOBAEE_pattern;
-		byte 			GOBAEE_backR;
-		byte 			GOBAEE_backG;
-		byte 			GOBAEE_backB;
-		GrObjAreaAttrElementType GOBAEE_aaeType;
-		GrObjAreaAttrInfoRecord GOBAAE_areaInfo;
+    typedef struct { 
+        StyleSheetElementHeader GOBAAE_styleElement;
+        byte            GOBAAE_r;
+        byte            GOBAAE_g;
+        byte            GOBAAE_b;
+        SysDrawMask     GOBAAE_mask;
+        MixMode         GOBAAE_drawMode;
+        GraphicPattern  GOBAEE_pattern;
+        byte            GOBAEE_backR;
+        byte            GOBAEE_backG;
+        byte            GOBAEE_backB;
+        GrObjAreaAttrElementType GOBAEE_aaeType;
+        GrObjAreaAttrInfoRecord GOBAAE_areaInfo;
  
-	/* The following fields are unused, but must
-	 * be initialized to zero. */
-		byte 			GOBAAE_reservedByte;
-		word 			GOBAAE_reserved;
-	} GrObjBaseAreaAttrElement; 
+    /* The following fields are unused, but must
+     * be initialized to zero. */
+        byte            GOBAAE_reservedByte;
+        word            GOBAAE_reserved;
+    } GrObjBaseAreaAttrElement; 
 
-	typedef enum {
-		GOAAET_BASE,
-		GOAAET_GRADIENT
-	} GrObjAreaAttrElementType; 
+    typedef enum {
+        GOAAET_BASE,
+        GOAAET_GRADIENT
+    } GrObjAreaAttrElementType; 
 
-	typedef ByteFlags GrObjAreaAttrInfoRecord; 
-	#define GOAAIR_TRANSPARENCY 0x80 
+    typedef ByteFlags GrObjAreaAttrInfoRecord; 
+    #define GOAAIR_TRANSPARENCY 0x80 
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_GO_SET_AREA_COLOR
-	void 	MSG_GO_SET_AREA_COLOR(
-			byte	red,
-			byte	green,
-			byte 	blue);
+    void    MSG_GO_SET_AREA_COLOR(
+            byte    red,
+            byte    green,
+            byte    blue);
 
 This message sets a GrObj's area color.
 
@@ -1928,8 +1931,8 @@ This message sets a GrObj's area color.
 
 ----------
 #### MSG_GO_SET_AREA_MASK
-	void 	MSG_GO_SET_AREA_MASK(
-			SysDrawMask 		mask);
+    void    MSG_GO_SET_AREA_MASK(
+            SysDrawMask         mask);
 
 This message sets a GrObj's area mask.
 
@@ -1946,8 +1949,8 @@ This message sets a GrObj's area mask.
 
 ----------
 #### MSG_GO_SET_AREA_DRAW_MODE
-	void 	MSG_GO_SET_AREA_DRAW_MODE(
-			MixMode 		mode);
+    void    MSG_GO_SET_AREA_DRAW_MODE(
+            MixMode         mode);
 
 This message sets a GrObj's area mix mode.
 
@@ -1964,8 +1967,8 @@ This message sets a GrObj's area mix mode.
 
 ----------
 #### MSG_GO_SET_AREA_INFO
-	void 	MSG_GO_SET_TRANSPARENCY(
-			byte 	transparent); 
+    void    MSG_GO_SET_TRANSPARENCY(
+            byte    transparent); 
 
 This message sets a GrObj's area information flags, so that the object may 
 have a transparent area.
@@ -1985,8 +1988,8 @@ have a transparent area.
 
 ----------
 #### MSG_GO_SET_LINE_ATTR
-	void 	MSG_GO_SET_LINE_ATTR(
-			GrObjBaseLineAttrElement 	*attr);
+    void    MSG_GO_SET_LINE_ATTR(
+            GrObjBaseLineAttrElement    *attr);
 
 This message sets a GrObj's line attributes.
 
@@ -2001,43 +2004,43 @@ This message sets a GrObj's line attributes.
 
 **Structures:** 
 
-	typedef struct {
-		StyleSheetElementHeader 
-							GOBGOBLAE_styleElement;
-		byte 				GOBLAE_r;
-		byte 				GOBLAE_g;
-		byte 				GOBLAE_b;
-		LineEnd 			GOBLAE_end;
-		LineJoin 			GOBLAE_join;
-		WWFixed 			GOBLAE_width;
-		SystemDrawMask 		GOBLAE_mask;
-		LineStyle 			GOBLAE_style;
-		WWFixed 			GOBLAE_miterLimit;
-		GrObjLineAttrElementType GOBLAE_laeType;
-		GrObjLineAttrInfoRecord GOBLAE_lineInfo;
-		byte 				GOBLAE_arrowheadAngle;
-		byte 				GOBLAE_arrowheadLength;
-		word 				GOBLAE_reserved;
-	} GrObjBaseLineAttrElement; 
+    typedef struct {
+        StyleSheetElementHeader 
+                            GOBGOBLAE_styleElement;
+        byte                GOBLAE_r;
+        byte                GOBLAE_g;
+        byte                GOBLAE_b;
+        LineEnd             GOBLAE_end;
+        LineJoin            GOBLAE_join;
+        WWFixed             GOBLAE_width;
+        SystemDrawMask      GOBLAE_mask;
+        LineStyle           GOBLAE_style;
+        WWFixed             GOBLAE_miterLimit;
+        GrObjLineAttrElementType GOBLAE_laeType;
+        GrObjLineAttrInfoRecord GOBLAE_lineInfo;
+        byte                GOBLAE_arrowheadAngle;
+        byte                GOBLAE_arrowheadLength;
+        word                GOBLAE_reserved;
+    } GrObjBaseLineAttrElement; 
 
-	typedef enum {
-		GOLAET_BASE
-	} GrObjLineAttrElementType; 
+    typedef enum {
+        GOLAET_BASE
+    } GrObjLineAttrElementType; 
 
-	typedef ByteFlags GrObjLineAttrInfoRecord; 
-	#define GOLAIR_ARROWHEAD_ON_START 					0x80
-	#define GOLAIR_ARROWHEAD_ON_END 					0x40
-	#define GOLAIR_ARROWHEAD_FILLED 					0x20
-	#define GOLAIR_ARROWHEAD_FILL_WITH_AREA_ATTRIBUTES 	0x10 
+    typedef ByteFlags GrObjLineAttrInfoRecord; 
+    #define GOLAIR_ARROWHEAD_ON_START                   0x80
+    #define GOLAIR_ARROWHEAD_ON_END                     0x40
+    #define GOLAIR_ARROWHEAD_FILLED                     0x20
+    #define GOLAIR_ARROWHEAD_FILL_WITH_AREA_ATTRIBUTES  0x10 
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_GO_SET_LINE_COLOR
-	void 	MSG_GO_SET_LINE_COLOR(
-			byte	red,
-			byte 	green,
-			byte 	blue);
+    void    MSG_GO_SET_LINE_COLOR(
+            byte    red,
+            byte    green,
+            byte    blue);
 
 This message sets a GrObj's line color.
 
@@ -2058,8 +2061,8 @@ This message sets a GrObj's line color.
 
 ----------
 #### MSG_GO_SET_LINE_MASK
-	void 	MSG_GO_SET_LINE_MASK(
-			SystemDrawMask 	mask);
+    void    MSG_GO_SET_LINE_MASK(
+            SystemDrawMask  mask);
 
 This message sets a GrObj's line mask.
 
@@ -2076,8 +2079,8 @@ This message sets a GrObj's line mask.
 
 ----------
 #### MSG_GO_SET_LINE_END
-	void 	MSG_GO_SET_LINE_END(
-			LineEnd 	end);
+    void    MSG_GO_SET_LINE_END(
+            LineEnd     end);
 
 This message sets a GrObj's line end.
 
@@ -2094,8 +2097,8 @@ This message sets a GrObj's line end.
 
 ----------
 #### MSG_GO_SET_LINE_JOIN
-	void 	MSG_GO_SET_LINE_JOIN(
-			LineJoin 	join);
+    void    MSG_GO_SET_LINE_JOIN(
+            LineJoin    join);
 
 This message sets a GrObj's line join.
 
@@ -2112,8 +2115,8 @@ This message sets a GrObj's line join.
 
 ----------
 #### MSG_GO_SET_LINE_STYLE
-	void 	MSG_GO_SET_LINE_DRAW_STYLE(
-			MixMode 	mode);
+    void    MSG_GO_SET_LINE_DRAW_STYLE(
+            MixMode     mode);
 
 This message sets a GrObj's line style, or "dottedness."
 
@@ -2130,8 +2133,8 @@ This message sets a GrObj's line style, or "dottedness."
 
 ----------
 #### MSG_GO_SET_LINE_WIDTH
-	void 	MSG_GO_SET_LINE_WIDTH(
-			WWFixed 	width);
+    void    MSG_GO_SET_LINE_WIDTH(
+            WWFixed     width);
 
 This message sets a GrObj's line width.
 
@@ -2148,8 +2151,8 @@ This message sets a GrObj's line width.
 
 ----------
 #### MSG_GO_SET_LINE_MITER_LIMIIT
-	void 	MSG_GO_SET_LINE_MITER_LIMIT(
-			WWFixed 	miterLimit);
+    void    MSG_GO_SET_LINE_MITER_LIMIT(
+            WWFixed     miterLimit);
 
 This message sets a GrObj's line miter limit, used with mitered line joins.
 
@@ -2166,7 +2169,7 @@ This message sets a GrObj's line miter limit, used with mitered line joins.
 
 ----------
 #### MSG_GO_INIT_TO_DEFAULT_ATTRS
-	void 	MSG_GO_INIT_TO_DEFAULT_ATTRS ();
+    void    MSG_GO_INIT_TO_DEFAULT_ATTRS ();
 
 This message requests that the object initialize its attributes to the current 
 defaults.
@@ -2187,9 +2190,9 @@ notification should be sent out when the given GrObj is changed.
 
 ----------
 #### MSG_GO_SET_ACTION_NOTIFICATION_OUTPUT
-	void 	MSG_GO_SET_ACTION_NOTIFICATION_OUTPUT(
-			optr 		object,
-			Message	 	messageNumber);
+    void    MSG_GO_SET_ACTION_NOTIFICATION_OUTPUT(
+            optr        object,
+            Message     messageNumber);
 
 This message specifies the message and OD for the GrObj to send notification 
 to when an action is performed on it.
@@ -2210,7 +2213,7 @@ the output.
 
 ----------
 #### MSG_GO_SUSPEND_ACTION_NOTIFICATION
-	void 	MSG_GO_SUSPEND_ACTION_NOTIFICATION();
+    void    MSG_GO_SUSPEND_ACTION_NOTIFICATION();
 
 This message suspends action notification for a GrObj. This prevents the 
 GrObj from sending out any action notification.
@@ -2227,7 +2230,7 @@ GrObj from sending out any action notification.
 
 ----------
 #### MSG_GO_UNSUSPEND_ACTION_NOTIFICATION
-	void 	MSG_GO_UNSUSPEND_ACTION_NOTIFICATION();
+    void    MSG_GO_UNSUSPEND_ACTION_NOTIFICATION();
 
 This message counteracts MSG_GO_SUSPEND_ACTION_NOTIFICATION. If 
 all suspends have been balanced, the GrObj will be free to send out action 
@@ -2246,8 +2249,8 @@ suspend period will not be sent out.
 
 ----------
 #### MSG_GO_NOTIFY_ACTION
-	word 	MSG_GO_NOTIFY_ACTION (
-			GrObjActionNotificationType 	*action);
+    word    MSG_GO_NOTIFY_ACTION (
+            GrObjActionNotificationType     *action);
 
 This message is sent to an object after it has been added to a GrObjBody.
 
@@ -2266,7 +2269,7 @@ This message is sent to an object after it has been added to a GrObjBody.
 
 ----------
 #### MSG_GO_FLIP_HORIZ
-	void 	MSG_GO_FLIP_HORIZ ();
+    void    MSG_GO_FLIP_HORIZ ();
 
 This message flips the GrObj about its vertical axis.
 
@@ -2282,7 +2285,7 @@ This message flips the GrObj about its vertical axis.
 
 ----------
 #### MSG_GO_FLIP_VERT
-	void 	MSG_GO_FLIP_VERT ();
+    void    MSG_GO_FLIP_VERT ();
 
 This message flips the GrObj about its horizontal axis.
 
@@ -2298,9 +2301,9 @@ This message flips the GrObj about its horizontal axis.
 
 ----------
 #### MSG_GO_ROTATE
-	void 	MSG_GO_ROTATE (
-			WWFixed 					angle,
-			GrObjHandleSpecification 	center);
+    void    MSG_GO_ROTATE (
+            WWFixed                     angle,
+            GrObjHandleSpecification    center);
 
 This message rotates the GrObj about one of its handles.
 
@@ -2320,8 +2323,8 @@ rotation.
 
 ----------
 #### MSG_GO_MOVE
-	void 	MSG_GO_MOVE (
-			PointDWFixed 	*distance);
+    void    MSG_GO_MOVE (
+            PointDWFixed    *distance);
 
 This message moves a GrObj to a relative position.
 
@@ -2338,8 +2341,8 @@ This message moves a GrObj to a relative position.
 
 ----------
 #### MSG_GO_MOVE_CENTER_ABS
-	void 	MSG_GO_MOVE_CENTER_ABS (
-			PointDWFixed 	*location);
+    void    MSG_GO_MOVE_CENTER_ABS (
+            PointDWFixed    *location);
 
 This message moves a GrObj to an absolute position.
 
@@ -2356,9 +2359,9 @@ This message moves a GrObj to an absolute position.
 
 ----------
 #### MSG_GO_NUDGE
-	void 	MSG_GO_NUDGE (
-			sword 	xDistance.
-			sword 	yDistance);
+    void    MSG_GO_NUDGE (
+            sword   xDistance.
+            sword   yDistance);
 
 Move the GrObj by a number of device units.
 
@@ -2377,8 +2380,8 @@ Move the GrObj by a number of device units.
 
 ----------
 #### MSG_GO_SET_SIZE
-	void 	MSG_GO_SET_SIZE (
-			PointWWFixed 	*size);
+    void    MSG_GO_SET_SIZE (
+            PointWWFixed    *size);
 
 Set the object's width and height in points. The dimensions are calculated by 
 mapping the object's corners into document coordinates and calculating the 
@@ -2399,8 +2402,8 @@ is not included in this calculation.
 
 ----------
 #### MSG_GO_SET_POSITION
-	void 	MSG_GO_SET_POSITION (
-			PointDWFixed 	*location);
+    void    MSG_GO_SET_POSITION (
+            PointDWFixed    *location);
 
 Set the position of the upper left of a GrObj. The position set is in document 
 coordinates unless the GrObj is in a group, in which case the position is in 
@@ -2421,8 +2424,8 @@ selection handle that was originally at the upper left of the GrObj.
 
 ----------
 #### MSG_GO_SCALE
-	void 	MSG_GO_SCALE(
-			GrObjAnchoredScaleData 	*params);
+    void    MSG_GO_SCALE(
+            GrObjAnchoredScaleData  *params);
 
 This message scales a GrObj.
 
@@ -2438,22 +2441,22 @@ handle will act as the center of scaling.
 
 **Structures:** 
 
-	typedef struct {
-		WWFixed GOSD_xScale;
-		WWFixed GOSD_yScale;
-	} GrObjScaleData;
+    typedef struct {
+        WWFixed GOSD_xScale;
+        WWFixed GOSD_yScale;
+    } GrObjScaleData;
 
-	typedef struct {
-		GrObjScaleData GOASD_scale; 
-		GrObjHandleSpecification GOASD_scaleAnchor; 
-	} GrObjAnchoredScaleData;
+    typedef struct {
+        GrObjScaleData GOASD_scale; 
+        GrObjHandleSpecification GOASD_scaleAnchor; 
+    } GrObjAnchoredScaleData;
 
 **Interception:** Possible. Call superclass before doing own processing.
 
 ----------
 #### MSG_GO_SKEW
-	void 	MSG_GO_SKEW(
-			GrObjAnchoredSkeweData 	*params);
+    void    MSG_GO_SKEW(
+            GrObjAnchoredSkeweData  *params);
 
 This message skews a GrObj.
 
@@ -2469,22 +2472,22 @@ which handle will act as the center of scaling.
 
 **Structures:** 
 
-	typedef struct {
-		WWFixed GOSD_xDegrees; /* counter-clockwise */
-		WWFixed GOSD_yDegrees;
-	} GrObjSkewData;
+    typedef struct {
+        WWFixed GOSD_xDegrees; /* counter-clockwise */
+        WWFixed GOSD_yDegrees;
+    } GrObjSkewData;
 
-	typedef struct {
-		GrObjSkewData GOASD_degrees;
-		GrObjHandleSpecification GOASD_skewAnchor;
-	} GrObjAnchoredSkewData;
+    typedef struct {
+        GrObjSkewData GOASD_degrees;
+        GrObjHandleSpecification GOASD_skewAnchor;
+    } GrObjAnchoredSkewData;
 
 **Interception:** Possible. Call superclass before doing own processing.
 
 ----------
 #### MSG_GO_GET_SIZE
-	void 	MSG_GO_GET_SIZE (
-			GOGetSizeParams 	*retVal);
+    void    MSG_GO_GET_SIZE (
+            GOGetSizeParams     *retVal);
 
 Get the object's width and height in points. The dimensions are calculated by 
 mapping the object's corners into document coordinates and calculating the 
@@ -2507,15 +2510,15 @@ is not included in this calculation.
 
 Structures: 
 
-	typedef struct {
-		 WWFixed GOGSP_height;
-		 WWFixed GOGSP_width;
-	} GOGetSizeParams; 
+    typedef struct {
+         WWFixed GOGSP_height;
+         WWFixed GOGSP_width;
+    } GOGetSizeParams; 
 
 ----------
 #### MSG_GO_GET_POSITION
-	void 	MSG_GO_GET_POSITION (
-			PointDWFixed 	*retValue);
+    void    MSG_GO_GET_POSITION (
+            PointDWFixed    *retValue);
 
 Get the position of the upper left of a GrObj. The position is in document 
 coordinates unless the GrObj is in a group, in which case the position is 
@@ -2540,22 +2543,22 @@ handle that was originally at the upper left of the GrObj.
 The following messages deal with the structures used with GrObj transfer 
 items. You will also use the **GrObjTransferParams** structure:
 
-	typedef struct {
-		StyleSheetParams 	GTP_ssp;
-		VisTextSaveStyleSheetParams GTP_textSSP;
-		PointDWFixed 		GTP_selectionCenterDOCUMENT;
-		Handle 				GTP_optBlock;
-		Handle 				GTP_vmFile;
-		word 				GTP_curSlot;
-		dword				GTP_id;
-		word 				GTP_curSize;
-		word 				GTP_curPos;
-	} GrObjTransferParams;
+    typedef struct {
+        StyleSheetParams    GTP_ssp;
+        VisTextSaveStyleSheetParams GTP_textSSP;
+        PointDWFixed        GTP_selectionCenterDOCUMENT;
+        Handle              GTP_optBlock;
+        Handle              GTP_vmFile;
+        word                GTP_curSlot;
+        dword               GTP_id;
+        word                GTP_curSize;
+        word                GTP_curPos;
+    } GrObjTransferParams;
 
 ----------
 #### MSG_GO_CREATE_TRANSFER
-	void	MSG_GO_CREATE_TRANSFER(
-			GrObjTransferParams _far *params);
+    void    MSG_GO_CREATE_TRANSFER(
+            GrObjTransferParams _far *params);
 
 Any subclass that requires more than just instance data to reconstruct itself 
 will subclass this message to construct the **VMChain** necessary to do so.
@@ -2565,8 +2568,8 @@ specified by *GTP_treeBlock*.
 
 ----------
 #### MSG_GO_REPLACE_WITH_TRANSFER
-	void 	MSG_GO_REPLACE_WITH_TRANSFER(
-			GrObjTransferParams _far *params);
+    void    MSG_GO_REPLACE_WITH_TRANSFER(
+            GrObjTransferParams _far *params);
 
 This message causes an existing GrObj to read the passed transfer item and 
 recreate itself from that information. It is sent to an object during paste-type 
@@ -2582,8 +2585,8 @@ so.
 
 ----------
 #### MSG_GO_WRITE_INSTANCE_TO_TRANSFER
-	void	MSG_GO_WRITE_INSTANCE_TO_TRANSFER(
-			GrObjTransferParams _far *params);
+    void    MSG_GO_WRITE_INSTANCE_TO_TRANSFER(
+            GrObjTransferParams _far *params);
 
 This message causes the GrObj to write any data needed to create the GrObj 
 into a transfer item.
@@ -2597,8 +2600,8 @@ extra data.
 
 ----------
 #### MSG_GO_READ_INSTANCE_FROM_TRANSFER
-	void 	MSG_GO_READ_INSTANCE_FROM_TRANSFER(
-			GrObjTransferParams _far *params);
+    void    MSG_GO_READ_INSTANCE_FROM_TRANSFER(
+            GrObjTransferParams _far *params);
 
 This message causes an existing GrObj to read the passed transfer item and 
 recreate itself from that information. It is sent to an object during paste-type 
@@ -2621,16 +2624,16 @@ extra data.
 #### MSG_GO_GET_GROBJ_CLASS
 ----------
 #### MSG_GO_BECOME_SELECTED 
-	void 	MSG_GO_BECOME_SELECTED(
-			HandleUpdateMode hum);
+    void    MSG_GO_BECOME_SELECTED(
+            HandleUpdateMode hum);
 
 ----------
 #### MSG_GO_TOGGLE_SELECTION 
-	void 	MSG_GO_TOGGLE_SELECTION();
+    void    MSG_GO_TOGGLE_SELECTION();
 
 ----------
 #### MSG_GO_BECOME_UNSELECTED 
-	void 	MSG_GO_BECOME_UNSELECTED();
+    void    MSG_GO_BECOME_UNSELECTED();
 
 ----------
 #### MSG_GO_UNDRAW_SPRITE 
@@ -2706,8 +2709,8 @@ extra data.
 #### MSG_GO_ANOTHER_TOOL_ACTIVATED 
 ----------
 #### MSG_GO_SPECIAL_RESIZE_CONSTRAIN 
-	void 	MSG_GO_SPECIAL_RESIZE_CONSTRAIN(
-			GrObjHandleSpecification grObjHandleSpec);
+    void    MSG_GO_SPECIAL_RESIZE_CONSTRAIN(
+            GrObjHandleSpecification grObjHandleSpec);
 
 ----------
 #### MSG_GO_DUPLICATE_FLOATER 
@@ -2737,8 +2740,8 @@ extra data.
 #### MSG_GO_GET_WWF_PARENT_BOUNDS 
 ----------
 #### MSG_GO_GET_WWF_OBJECT_BOUNDS 
-	void 	MSG_GO_GET_WWF_OBJECT_BOUNDS(
-			RectWWFixed 		*retValue);
+    void    MSG_GO_GET_WWF_OBJECT_BOUNDS(
+            RectWWFixed         *retValue);
 
 ----------
 #### MSG_GO_BECOME_UNEDITABLE 
@@ -2748,8 +2751,8 @@ extra data.
 #### MSG_GO_EVALUATE_PARENT_POINT 
 ----------
 #### MSG_GO_GET_CENTER 
-	void 	MSG_GO_GET_CENTER(
-			PointDWFixed 		*center);
+    void    MSG_GO_GET_CENTER(
+            PointDWFixed        *center);
 
 ----------
 #### MSG_GO_DRAW 
@@ -2795,34 +2798,34 @@ extra data.
 #### MSG_GO_APPLY_ATTRIBUTES_TO_GSTATE 
 ----------
 #### MSG_GO_COMBINE_AREA_NOTIFICATION_DATA 
-	@message void MSG_GO_COMBINE_AREA_NOTIFICATION_DATA( 
-			 Handle /* GrObjNotifyAreaAttrChange */ change);
+    @message void MSG_GO_COMBINE_AREA_NOTIFICATION_DATA( 
+             Handle /* GrObjNotifyAreaAttrChange */ change);
 
 Combine this GrObj's attributes with the passed structure.
 
 **Structures:** 
 
-	typedef struct {
-	 	GrObjBaseAreaAttrElement GNAAC_areaAttr;
-	 	GrObjBaseAreaAttrDiffs GNAAC_areaAttrDiffs;
-	} GrObjNotifyAreaAttrChange;
+    typedef struct {
+        GrObjBaseAreaAttrElement GNAAC_areaAttr;
+        GrObjBaseAreaAttrDiffs GNAAC_areaAttrDiffs;
+    } GrObjNotifyAreaAttrChange;
 
-	typedef WordFlags GrObjBaseAreaAttrDiffs;
-	#define GOBAAD_MULTIPLE_ELEMENT_TYPES 0x8000
-	#define GOBAAD_MULTIPLE_STYLE_ELEMENTS 0x4000
-	#define GOBAAD_MULTIPLE_COLORS 0x2000
-	#define GOBAAD_MULTIPLE_BACKGROUND_COLORS 0x1000
-	#define GOBAAD_MULTIPLE_MASKS 0x0800
-	#define GOBAAD_MULTIPLE_PATTERNS 0x0400
-	#define GOBAAD_MULTIPLE_DRAW_MODES 0x0200
-	#define GOBAAD_MULTIPLE_INFOS 0x0100
-	#define GOBAAD_MULTIPLE_GRADIENT_END_COLORS 0x0080
-	#define GOBAAD_MULTIPLE_GRADIENT_TYPES 0x0040
-	#define GOBAAD_MULTIPLE_GRADIENT_INTERVALS 0x0020
-	#define GOBAAD_FIRST_RECIPIENT 0x0001
-		/* A grobj knows that it's the first one to
-		 * receive this data buffer if this flag is
-		 * set (and should clear it). */
+    typedef WordFlags GrObjBaseAreaAttrDiffs;
+    #define GOBAAD_MULTIPLE_ELEMENT_TYPES 0x8000
+    #define GOBAAD_MULTIPLE_STYLE_ELEMENTS 0x4000
+    #define GOBAAD_MULTIPLE_COLORS 0x2000
+    #define GOBAAD_MULTIPLE_BACKGROUND_COLORS 0x1000
+    #define GOBAAD_MULTIPLE_MASKS 0x0800
+    #define GOBAAD_MULTIPLE_PATTERNS 0x0400
+    #define GOBAAD_MULTIPLE_DRAW_MODES 0x0200
+    #define GOBAAD_MULTIPLE_INFOS 0x0100
+    #define GOBAAD_MULTIPLE_GRADIENT_END_COLORS 0x0080
+    #define GOBAAD_MULTIPLE_GRADIENT_TYPES 0x0040
+    #define GOBAAD_MULTIPLE_GRADIENT_INTERVALS 0x0020
+    #define GOBAAD_FIRST_RECIPIENT 0x0001
+        /* A grobj knows that it's the first one to
+         * receive this data buffer if this flag is
+         * set (and should clear it). */
 
 ----------
 #### MSG_GO_COMBINE_LINE_NOTIFICATION_DATA 
@@ -2832,13 +2835,13 @@ Combine this GrObj's attributes with the passed structure.
 #### MSG_GO_COMBINE_SELECTION_STATE_NOTIFICATION_DATA 
 ----------
 #### MSG_GO_COMBINE_STYLE_NOTIFICATION_DATA 
-	void 	MSG_GO_COMBINE_STYLE_NOTIFICATION_DATA(
-			Handle 	change);	/* handle of block containing NotifyStyleChange */
+    void    MSG_GO_COMBINE_STYLE_NOTIFICATION_DATA(
+            Handle  change);    /* handle of block containing NotifyStyleChange */
 
 ----------
 #### MSG_GO_COMBINE_STYLE_SHEET_NOTIFICATION_DATA 
-	void 	MSG_GO_COMBINE_STYLE_SHEET_NOTIFICATION_DATA(
-			Handle change );		/* handle of NotifyStyleSheetChange */
+    void    MSG_GO_COMBINE_STYLE_SHEET_NOTIFICATION_DATA(
+            Handle change );        /* handle of NotifyStyleSheetChange */
 
 ----------
 #### MSG_GO_SEND_UI_NOTIFICATION 
@@ -2889,12 +2892,12 @@ collectively.
 ----------
 **Code Display 18-24 GroupClass Instance Data**
 
-	@instance CompPart 				GI_drawHead;
-	@instance word 					GI_suspendCount;
-	@instance GroupUnsuspendOps 	GI_unsuspendOps; 
+    @instance CompPart              GI_drawHead;
+    @instance word                  GI_suspendCount;
+    @instance GroupUnsuspendOps     GI_unsuspendOps; 
 
-	typedef ByteFlags GroupUnsuspendOps;
-	#define GUO_EXPAND 0x01 
+    typedef ByteFlags GroupUnsuspendOps;
+    #define GUO_EXPAND 0x01 
 
 ----------
 ----------
@@ -2911,8 +2914,8 @@ collectively.
 #### MSG_GROUP_EXPAND 
 ----------
 #### MSG_GROUP_INSTANTIATE_GROBJ 
-	optr 	MSG_GROUP_INSTANTIATE_GROBJ(
-			ClassStruct 		*class);
+    optr    MSG_GROUP_INSTANTIATE_GROBJ(
+            ClassStruct         *class);
 
 ### 18.7.5 PointerClass
 **PointerClass** is a subclass of **GrObjClass**. GeoDraw's Arrow Pointer is a 
@@ -2927,7 +2930,7 @@ works with an object's handles, but it rotates instead of resizing. The
 ----------
 **Code Display 18-25 PointerClass Instance Data**
 
-	@instance PointerModes 					PTR_modes; /* Internal */
+    @instance PointerModes                  PTR_modes; /* Internal */
 
 ----------
 
@@ -2962,9 +2965,9 @@ data: *GVI_guardian*, which holds the optr of the ward's guardian object.
 ----------
 **Code Display 18-26 GrObjVisGuardianClass Instance Data**
 
-	@instance optr 						GOVGI_ward;	
-	@instance word 						*GOVGI_class;
-	@instance GrObjVisGuardianFlags 	GOVGI_flags;
+    @instance optr                      GOVGI_ward; 
+    @instance word                      *GOVGI_class;
+    @instance GrObjVisGuardianFlags     GOVGI_flags;
 
 ----------
 
@@ -2974,8 +2977,8 @@ data: *GVI_guardian*, which holds the optr of the ward's guardian object.
 #### MSG_GOVG_CONVERT_LARGE_MOUSE_DATA 
 ----------
 #### MSG_GOVG_CREATE_VIS_WARD 
-	optr 	MSG_GOVG_CREATE_VIS_WARD(
-			MemHandle 		wardBlock);
+    optr    MSG_GOVG_CREATE_VIS_WARD(
+            MemHandle       wardBlock);
 
 ----------
 #### MSG_GOVG_ADD_VIS_WARD 
@@ -2997,7 +3000,7 @@ data: *GVI_guardian*, which holds the optr of the ward's guardian object.
 #### MSG_GOVG_GET_EDIT_CLASS 
 ----------
 #### MSG_GOVG_GET_VIS_WARD_OD 
-	optr 	MSG_GOVG_GET_VIS_WARD_OD();
+    optr    MSG_GOVG_GET_VIS_WARD_OD();
 
 ----------
 #### MSG_GOVG_GET_TRANSFER_BLOCK_FROM_VIS_WARD 

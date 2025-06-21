@@ -52,72 +52,72 @@ by the application; these fields are listed in Code Display 4-1.
 ----------
 **Code Display 4-1 Instance Data of GenDisplayClass**
 
-	/* There are only two instance fields specifically defined for GenDisplayClass.
-	 * Also, an instance field for GenClass, GI_attrs, has different defaults in
-	 * GenDisplayClass. */
+    /* There are only two instance fields specifically defined for GenDisplayClass.
+     * Also, an instance field for GenClass, GI_attrs, has different defaults in
+     * GenDisplayClass. */
 
-	/* GDI_attributes is a one-byte field for attributes flags. There is only one flag
-	 * defined for this field, namely GDA_USER_DISMISSABLE, which is on by default.
-	 */
-	@instance GenDisplayAttrs	GDI_attributes = GDA_USER_DISMISSABLE;
+    /* GDI_attributes is a one-byte field for attributes flags. There is only one flag
+     * defined for this field, namely GDA_USER_DISMISSABLE, which is on by default.
+     */
+    @instance GenDisplayAttrs   GDI_attributes = GDA_USER_DISMISSABLE;
 
-	/* The GenDisplay object has a datum for a pointer to a document object. If a
-	 * Document Control is used to create display objects, it will associate each
-	 * display with a document object; each will have an optr to the other.
-	 */
-	@instance optr				GDI_document;
+    /* The GenDisplay object has a datum for a pointer to a document object. If a
+     * Document Control is used to create display objects, it will associate each
+     * display with a document object; each will have an optr to the other.
+     */
+    @instance optr              GDI_document;
 
-	/* The default setting of GI_attrs is different in GenDisplayClass than it is in 
-	 * GenClass: */
-	@default GI_attrs = (@default 
-						 | GA_TARGETABLE
-						 | GA_KBD_SEARCH_PATH);
+    /* The default setting of GI_attrs is different in GenDisplayClass than it is in 
+     * GenClass: */
+    @default GI_attrs = (@default 
+                         | GA_TARGETABLE
+                         | GA_KBD_SEARCH_PATH);
 
-	/* The following hints specify whether the display should be minimized or
-	 * maximized when it is built, and its appearance when minimized. */
-	@vardata void HINT_DISPLAY_MINIMIZED_ON_STARTUP;
-	@vardata void HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP;
-	@vardata void HINT_DISPLAY_MAXIMIZED_ON_STARTUP;
-	@vardata void HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP;
-	@vardata void HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MINIMIZED;
+    /* The following hints specify whether the display should be minimized or
+     * maximized when it is built, and its appearance when minimized. */
+    @vardata void HINT_DISPLAY_MINIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_MAXIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP;
+    @vardata void HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MINIMIZED;
 
-	/* The following hints and attributes indicate whether the user should be able to
-	 * minimize, maximize, or resize the window. */
-	@vardata void ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
-	@vardata void ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
-	@vardata void HINT_DISPLAY_NOT_RESIZABLE;
+    /* The following hints and attributes indicate whether the user should be able to
+     * minimize, maximize, or resize the window. */
+    @vardata void ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    @vardata void ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+    @vardata void HINT_DISPLAY_NOT_RESIZABLE;
 
-	/* ATTR_GEN_DISPLAY_NOT_RESTORABLE indicates that the user should not be able to
-	 * de-maximize the display once it is maximized. */
-	@vardata void ATTR_GEN_DISPLAY_NOT_RESTORABLE;
+    /* ATTR_GEN_DISPLAY_NOT_RESTORABLE indicates that the user should not be able to
+     * de-maximize the display once it is maximized. */
+    @vardata void ATTR_GEN_DISPLAY_NOT_RESTORABLE;
 
-	/* ATTR_GEN_DISPLAY_TRAVELING_OBJECTS is the ChunkHandle of a list of "traveling
-	 * objects;" these objects are made the children of whichever GenDisplay is on top
-	 * in a given display region (see section 4.3.3.4 below.*/
-	@vardata ChunkHandle ATTR_GEN_DISPLAY_TRAVELING_OBJECTS;
+    /* ATTR_GEN_DISPLAY_TRAVELING_OBJECTS is the ChunkHandle of a list of "traveling
+     * objects;" these objects are made the children of whichever GenDisplay is on top
+     * in a given display region (see section 4.3.3.4 below.*/
+    @vardata ChunkHandle ATTR_GEN_DISPLAY_TRAVELING_OBJECTS;
 
-	/* The following hints and attributes specify whether the display's menu bar 
-	 * appears and whether it appears as a "popped out" floating menu. */
-	@vardata void HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP;
-	@vardata void TEMP_GEN_DISPLAY_MENU_BAR_HIDDEN;
-	@vardata void ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT;
-	@vardata void HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MENU_BAR_POPPED_OUT;
+    /* The following hints and attributes specify whether the display's menu bar 
+     * appears and whether it appears as a "popped out" floating menu. */
+    @vardata void HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP;
+    @vardata void TEMP_GEN_DISPLAY_MENU_BAR_HIDDEN;
+    @vardata void ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT;
+    @vardata void HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MENU_BAR_POPPED_OUT;
 
-	/* The GenDisplay uses the following vardata fields to store its
-	 * minimized/maximized state across a shutdown. You should not access these
-	 * fields. If you want to find out if a GenDisplay is minimized or maximized, send
-	 * it MSG_GEN_DISPLAY_GET_MINIMIZED or MSG_GEN_DISPLAY_GET_MAXIMIZED. */
-	@vardata		void ATTR_GEN_DISPLAY_MINIMIZED_STATE;
-	@vardata		void ATTR_GEN_DISPLAY_MAXIMIZED_STATE;
+    /* The GenDisplay uses the following vardata fields to store its
+     * minimized/maximized state across a shutdown. You should not access these
+     * fields. If you want to find out if a GenDisplay is minimized or maximized, send
+     * it MSG_GEN_DISPLAY_GET_MINIMIZED or MSG_GEN_DISPLAY_GET_MAXIMIZED. */
+    @vardata        void ATTR_GEN_DISPLAY_MINIMIZED_STATE;
+    @vardata        void ATTR_GEN_DISPLAY_MAXIMIZED_STATE;
 
-	/* HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD specifies the default 
-	 * action for the GenDisplay. */
-	@vardata void HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD;
+    /* HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD specifies the default 
+     * action for the GenDisplay. */
+    @vardata void HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD;
 
 ----------
 #### 4.1.1.1 The GDI_attributes Field
 
-	MSG_GEN_DISPLAY_GET_ATTRS, MSG_GEN_DISPLAY_SET_ATTRS
+    MSG_GEN_DISPLAY_GET_ATTRS, MSG_GEN_DISPLAY_SET_ATTRS
 
 The GenDisplay object has a one-byte record called *GDI_attributes* to store 
 attribute flags. There is only one attribute flag, namely 
@@ -129,7 +129,7 @@ could dismiss a display by double-clicking the "Control button."
 ----------
 #### MSG_GEN_DISPLAY_GET_ATTRS
 
-	GenDisplayAttrs 	MSG_GEN_DISPLAY_GET_ATTRS();
+    GenDisplayAttrs     MSG_GEN_DISPLAY_GET_ATTRS();
 
 This message retrieves the *GDI_attributes* field from the destination object.
 
@@ -145,8 +145,8 @@ GDA_USER_DISMISSABLE.
 ----------
 #### MSG_GEN_DISPLAY_SET_ATTRS
 
-	void	MSG_GEN_DISPLAY_SET_ATTRS(
-			GenDisplayAttrs		attrs);
+    void    MSG_GEN_DISPLAY_SET_ATTRS(
+            GenDisplayAttrs     attrs);
 
 This message changes the **GenDisplayAttrs** field of the destination object. 
 
@@ -175,20 +175,20 @@ section 4.3.3.3 below).
 
 ### 4.1.2 Minimizing and Maximizing
 
-	MSG_GEN_DISPLAY_SET_MINIMIZED, 
-	MSG_GEN_DISPLAY_SET_NOT_MINIMIZED, 
-	MSG_GEN_DISPLAY_GET_MINIMIZED, 
-	MSG_GEN_DISPLAY_SET_MAXIMIZED, 
-	MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED, 
-	MSG_GEN_DISPLAY_GET_MAXIMIZED, 
-	HINT_DISPLAY_MINIMIZED_ON_STARTUP, 
-	HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP, 
-	HINT_DISPLAY_MAXIMIZED_ON_STARTUP, 
-	HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP, 
-	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, 
-	HINT_DISPLAY_NOT_MAXIMIZABLE, 
-	ATTR_GEN_DISPLAY_NOT_RESTORABLE,
-	HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD
+    MSG_GEN_DISPLAY_SET_MINIMIZED, 
+    MSG_GEN_DISPLAY_SET_NOT_MINIMIZED, 
+    MSG_GEN_DISPLAY_GET_MINIMIZED, 
+    MSG_GEN_DISPLAY_SET_MAXIMIZED, 
+    MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED, 
+    MSG_GEN_DISPLAY_GET_MAXIMIZED, 
+    HINT_DISPLAY_MINIMIZED_ON_STARTUP, 
+    HINT_DISPLAY_NOT_MINIMIZED_ON_STARTUP, 
+    HINT_DISPLAY_MAXIMIZED_ON_STARTUP, 
+    HINT_DISPLAY_NOT_MAXIMIZED_ON_STARTUP, 
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, 
+    HINT_DISPLAY_NOT_MAXIMIZABLE, 
+    ATTR_GEN_DISPLAY_NOT_RESTORABLE,
+    HINT_DISPLAY_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD
 
 Windows (i.e. displays and "primary" windows) can be resized by the user. 
 How resizing is done depends on the specific UI; for example, in OSF/Motif, a 
@@ -252,7 +252,7 @@ object's instance data.
 ----------
 #### MSG_GEN_DISPLAY_SET_MINIMIZED
 
-	void	MSG_GEN_DISPLAY_SET_MINIMIZED();
+    void    MSG_GEN_DISPLAY_SET_MINIMIZED();
 
 This message instructs a display or primary object to minimize itself. The 
 result depends on the specific UI. Primary windows are usually iconified; 
@@ -270,7 +270,7 @@ you should make sure to pass this message on to the superclass.
 ----------
 #### MSG_GEN_DISPLAY_SET_MAXIMIZED
 
-	void	MSG_GEN_DISPLAY_SET_MAXIMIZED();
+    void    MSG_GEN_DISPLAY_SET_MAXIMIZED();
 
 This message instructs a display or primary object to maximize itself. If the 
 window is already maximized, the message has no effect.
@@ -286,7 +286,7 @@ you should make sure to pass this message on to the superclass.
 ----------
 #### MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
 
-	void	MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+    void    MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
 
 This message instructs a display or primary object to de-minimize itself. It 
 will generally be restored to its position and configuration as of the time it 
@@ -304,7 +304,7 @@ superclass.
 ----------
 #### MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
 
-	void	MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED();
+    void    MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED();
 
 This message instructs a display or primary object to de-maximize itself. It 
 will generally be restored to its position and configuration as of the time it 
@@ -322,7 +322,7 @@ superclass.
 ----------
 #### MSG_GEN_DISPLAY_GET_MINIMIZED
 
-	Boolean	MSG_GEN_DISPLAY_GET_MINIMIZED();
+    Boolean MSG_GEN_DISPLAY_GET_MINIMIZED();
 
 This message indicates whether the recipient is minimized.
 
@@ -338,7 +338,7 @@ returns *false* (i.e. zero).
 ----------
 #### MSG_GEN_DISPLAY_GET_MAXIMIZED
 
-	Boolean	MSG_GEN_DISPLAY_GET_MAXIMIZED();
+    Boolean MSG_GEN_DISPLAY_GET_MAXIMIZED();
 
 This message indicates whether the recipient is maximized.
 
@@ -353,12 +353,12 @@ returns *false* (i.e. zero).
 
 ## 4.2 Using the GenPrimary
 
-	MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER, 
-	MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER, 
-	MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER, 
-	HINT_PRIMARY_FULL_SCREEN, HINT_PRIMARY_NO_FILE_MENU, 
-	HINT_PRIMARY_NO_EXPRESS_MENU, 
-	HINT_PRIMARY_OPEN_ICON_BOUNDS, HINT_PRIMARY_NO_HELP_BUTTON
+    MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER, 
+    MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER, 
+    MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER, 
+    HINT_PRIMARY_FULL_SCREEN, HINT_PRIMARY_NO_FILE_MENU, 
+    HINT_PRIMARY_NO_EXPRESS_MENU, 
+    HINT_PRIMARY_OPEN_ICON_BOUNDS, HINT_PRIMARY_NO_HELP_BUTTON
 
 
 Almost every application will have a single GenPrimary object. GEOS uses 
@@ -376,40 +376,40 @@ in Code Display 4-2 below.
 
 **Code Display 4-2 Instance data for GenPrimaryClass**
 
-	/* There is only one instance field specifically defined for GenPrimaryClass. */
+    /* There is only one instance field specifically defined for GenPrimaryClass. */
 
-	/* A GenPrimary object can have a long moniker, which is displayed at the top of
-	 * the window. The moniker is stored in a chunk in the object block containing the
-	 * GenPrimary; the attribute GPI_longTermMoniker contains the handle of this
-	 * chunk. The long-term moniker is described below.*/
-	@instance ChunkHandle				GPI_longTermMoniker;
+    /* A GenPrimary object can have a long moniker, which is displayed at the top of
+     * the window. The moniker is stored in a chunk in the object block containing the
+     * GenPrimary; the attribute GPI_longTermMoniker contains the handle of this
+     * chunk. The long-term moniker is described below.*/
+    @instance ChunkHandle               GPI_longTermMoniker;
 
-	/* GenPrimaryClass also modifies the default GI_attrs settings. */
-	@default GI_attrs = @default | GA_TARGETABLE;
+    /* GenPrimaryClass also modifies the default GI_attrs settings. */
+    @default GI_attrs = @default | GA_TARGETABLE;
 
-	/* HINT_PRIMARY_FULL_SCREEN indicates that the primary object should be sized to
-	 * fill a large portion of the screen. If this hint is not present, the Primary
-	 * will be just large enough to accommodate its children.*/
-	@vardata void 			HINT_PRIMARY_FULL_SCREEN;
+    /* HINT_PRIMARY_FULL_SCREEN indicates that the primary object should be sized to
+     * fill a large portion of the screen. If this hint is not present, the Primary
+     * will be just large enough to accommodate its children.*/
+    @vardata void           HINT_PRIMARY_FULL_SCREEN;
 
-	/* Ordinarily, every Primary window is created with a File menu. You can suppress
-	 * this by including HINT_PRIMARY_NO_FILE_MENU. */
-	@vardata void 			HINT_PRIMARY_NO_FILE_MENU;
+    /* Ordinarily, every Primary window is created with a File menu. You can suppress
+     * this by including HINT_PRIMARY_NO_FILE_MENU. */
+    @vardata void           HINT_PRIMARY_NO_FILE_MENU;
 
-	/* Also by default, any launched Primary window gets added to the Express Menu. If 
-	 * you wish to suppress this behavior, add HINT_PRIMARY_NO_EXPRESS_MENU. */
-	@vardata void			HINT_PRIMARY_NO_EXPRESS_MENU;
+    /* Also by default, any launched Primary window gets added to the Express Menu. If 
+     * you wish to suppress this behavior, add HINT_PRIMARY_NO_EXPRESS_MENU. */
+    @vardata void           HINT_PRIMARY_NO_EXPRESS_MENU;
 
-	/* If a primary object is minimizable, the location of the minimized primary is
-	 * stored in the vardata field HHINT_PRIMARY_OPEN_ICON_BOUNDS.
-	 */
-	@vardata Rectangle			HINT_PRIMARY_OPEN_ICON_BOUNDS
+    /* If a primary object is minimizable, the location of the minimized primary is
+     * stored in the vardata field HHINT_PRIMARY_OPEN_ICON_BOUNDS.
+     */
+    @vardata Rectangle          HINT_PRIMARY_OPEN_ICON_BOUNDS
 
-	/* By default, all primary windows have a "help" button; when the user clicks on
-	 * it, the window's help text is brought up. If you don't want the primary to
-	 * provide help text, you can use the hint HINT_PRIMARY_NO_HELP_BUTTON.
-	 */
-	@vardata void 		HINT_PRIMARY_NO_HELP_BUTTON;
+    /* By default, all primary windows have a "help" button; when the user clicks on
+     * it, the window's help text is brought up. If you don't want the primary to
+     * provide help text, you can use the hint HINT_PRIMARY_NO_HELP_BUTTON.
+     */
+    @vardata void       HINT_PRIMARY_NO_HELP_BUTTON;
 
 ----------
 When a Primary window is created, it is usually sized to contain all of its 
@@ -459,7 +459,7 @@ HINT_PRIMARY_NO_HELP_BUTTON.
 ----------
 #### MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER
 
-	ChunkHandle 	MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER();
+    ChunkHandle     MSG_GEN_PRIMARY_GET_LONG_TERM_MONIKER();
 
 Use this message to find out the moniker of a GenPrimary object. The 
 message returns the chunk handle of the moniker; the moniker is in the same 
@@ -477,9 +477,9 @@ chunk is in the same object block as the GenPrimary.
 ----------
 #### MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER
 
-	void 	MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER(
-			ChunkHandle		moniker);	/* must be in same object block as
-										 * primary */
+    void    MSG_GEN_PRIMARY_USE_LONG_TERM_MONIKER(
+            ChunkHandle     moniker);   /* must be in same object block as
+                                         * primary */
 
 This message instructs a primary window to change its long-term moniker. 
 The new long-term moniker must already be in a chunk in the same object 
@@ -500,14 +500,14 @@ long-term moniker.
 ----------
 #### MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER
 
-	void	MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(@stack
-			VisUpdateMode 			updateMode,
-			word 					height, 
-			word 					width, 
-			word 					length,
-			VisMonikerDataType 		dataType,
-			VisMonikerSourceType 	sourceType,
-			dword 					source);
+    void    MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(@stack
+            VisUpdateMode           updateMode,
+            word                    height, 
+            word                    width, 
+            word                    length,
+            VisMonikerDataType      dataType,
+            VisMonikerSourceType    sourceType,
+            dword                   source);
 
 This message is used to replace a primary's long term moniker with a new 
 one. This message's arguments are precisely like those to the message 
@@ -566,14 +566,14 @@ you may also include any of the hints described in the following sections.
 
 #### 4.3.1.1 The GenDisplayGroup Instance Data
 
-	HINT_DISPLAY_GROUP_SEPARATE_MENUS, 
-	HINT_DISPLAY_GROUP_ARRANGE_TILED, 
-	HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP, 
-	HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP, 
-	HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE,
-	HINT_DISPLAY_GROUP_TILE_HORIZONTALLY, 
-	HINT_DISPLAY_GROUP_TILE_VERTICALLY, 
-	HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS
+    HINT_DISPLAY_GROUP_SEPARATE_MENUS, 
+    HINT_DISPLAY_GROUP_ARRANGE_TILED, 
+    HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP, 
+    HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP, 
+    HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE,
+    HINT_DISPLAY_GROUP_TILE_HORIZONTALLY, 
+    HINT_DISPLAY_GROUP_TILE_VERTICALLY, 
+    HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS
 
 GenDisplayGroupClass is a subclass of GenClass. Other than vardata, this 
 class adds no other instance data. There are several hints defined for 
@@ -584,27 +584,27 @@ be arranged on startup.
 
 **Code Display 4-3 GenDisplayGroup Instance Data**
 
-	/* GenDisplayGroupClass adds no instance fields. It does modify the default 
-	 * GI_attrs settings, however. */
-	@default GI_attrs = @default | GA_TARGETABLE;
+    /* GenDisplayGroupClass adds no instance fields. It does modify the default 
+     * GI_attrs settings, however. */
+    @default GI_attrs = @default | GA_TARGETABLE;
 
-	/* This hint allows each GenDisplay to contain its own menu bar. */
-	@vardata void		HINT_DISPLAY_GROUP_SEPARATE_MENUS;
+    /* This hint allows each GenDisplay to contain its own menu bar. */
+    @vardata void       HINT_DISPLAY_GROUP_SEPARATE_MENUS;
 
-	/* These hints specify how a GenDisplayGroup will arrange its GenDisplays. */
-	@vardata void		HINT_DISPLAY_GROUP_ARRANGE_TILED;
-	@vardata void		HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP;
-	@vardata void		HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP;
-	@vardata void		HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE;
-	@vardata void		HINT_DISPLAY_GROUP_TILE_HORIZONTALLY;
-	@vardata void		HINT_DISPLAY_GROUP_TILE_VERTICALLY;
-	@vardata void		HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS;
+    /* These hints specify how a GenDisplayGroup will arrange its GenDisplays. */
+    @vardata void       HINT_DISPLAY_GROUP_ARRANGE_TILED;
+    @vardata void       HINT_DISPLAY_GROUP_FULL_SIZED_ON_STARTUP;
+    @vardata void       HINT_DISPLAY_GROUP_OVERLAPPING_ON_STARTUP;
+    @vardata void       HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE;
+    @vardata void       HINT_DISPLAY_GROUP_TILE_HORIZONTALLY;
+    @vardata void       HINT_DISPLAY_GROUP_TILE_VERTICALLY;
+    @vardata void       HINT_DISPLAY_GROUP_SIZE_INDEPENDENTLY_OF_DISPLAYS;
 
-	/* These attributes affect the availability of overlapping and 
-	 * full-sized states. */
-	@vardata void		ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED;
-	@vardata void		ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING;
-	@vardata void		ATTR_GEN_DISPLAY_OVERLAPPING_STATE;
+    /* These attributes affect the availability of overlapping and 
+     * full-sized states. */
+    @vardata void       ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED;
+    @vardata void       ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING;
+    @vardata void       ATTR_GEN_DISPLAY_OVERLAPPING_STATE;
 
 ----------
 In some specific UIs (such as OSF/Motif), menus which are children of a 
@@ -653,13 +653,13 @@ complex GenPrimary/GenDisplay combination.
 
 #### 4.3.1.2 Arranging Displays in the Display Group
 
-	MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING, 
-	MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED, 
-	MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED, 
-	MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS, 
-	ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED, 
-	ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING, 
-	ATTR_GEN_DISPLAY_GROUP_OVERLAPPING_STATE
+    MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING, 
+    MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED, 
+    MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED, 
+    MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS, 
+    ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED, 
+    ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING, 
+    ATTR_GEN_DISPLAY_GROUP_OVERLAPPING_STATE
 
 The GenDisplayGroup can be in "full-sized" or "overlapping" mode. If the 
 GenDisplayGroup is in "full-size" mode, all of its children are maximized 
@@ -713,7 +713,7 @@ Applications may not set or change this attribute directly.
 ----------
 #### MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED
 
-	void	MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED();
+    void    MSG_GEN_DISPLAY_GROUP_SET_FULL_SIZED();
 
 This message instructs a GenDisplayGroup to put itself in "full-sized" mode; 
 that is, all of its maximizable children will be maximized. This message is 
@@ -729,7 +729,7 @@ ATTR_GEN_DISPLAY_GROUP_NO_FULL_SIZED.
 ----------
 #### MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING
 
-	void	MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING();
+    void    MSG_GEN_DISPLAY_GROUP_SET_OVERLAPPING();
 
 This message instructs a GenDisplayGroup to put itself in "overlapping" 
 mode. This message is ignored if the GenDisplayGroup has the vardata 
@@ -744,7 +744,7 @@ attribute ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING.
 ----------
 #### MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED
 
-	Boolean	MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED();
+    Boolean MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED();
 
 This message finds out whether a GenDisplayGroup is in "full-sized" mode.
 
@@ -758,7 +758,7 @@ mode; otherwise, it returns *false* (i.e. zero).
 **Interception:** Not generally intercepted.
 #### MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS
 
-	void	MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS;
+    void    MSG_GEN_DISPLAY_GROUP_TILE_DISPLAYS;
 
 This message instructs a GenDisplayGroup to put itself in "tiled" mode. That 
 is, it should first put itself in "overlapping" mode; it should then arrange and 
@@ -774,7 +774,7 @@ ATTR_GEN_DISPLAY_GROUP_NO_OVERLAPPING.
 
 #### 4.3.1.3 Selecting a Display
 
-	MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY
+    MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY
 
 Ordinarily, the user switches from one display to another in one of two ways. 
 The user may use the specific UI's way of switching displays (e.g. clicking on 
@@ -788,8 +788,8 @@ GenDisplayControl.
 ----------
 #### MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY
 
-	void	MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY(
-			word	displayNum);
+    void    MSG_GEN_DISPLAY_GROUP_SELECT_DISPLAY(
+            word    displayNum);
 
 This message instructs a display group to select a certain display, bringing it 
 to the top and making it the focus. Applications should not ordinarily need to 
@@ -834,34 +834,34 @@ Display 4-4.
 
 **Code Display 4-4 Instance Data of GenDisplayControlClass**
 
-	/* GDCII_attrs is a byte-length flag field. There is currently only one flag,
-	 * namely GDCA_MAXIMIZED_NAME_ON_PRIMARY; this specifies that if the active
-	 * display is maximized, its name should be shown as the primary's long-term 
-	 * moniker. */
-	@instance 		GenDisplayControlAttributes		GDCII_attrs =
-						(GDCA_MAXIMIZED_NAME_ON_PRIMARY);
+    /* GDCII_attrs is a byte-length flag field. There is currently only one flag,
+     * namely GDCA_MAXIMIZED_NAME_ON_PRIMARY; this specifies that if the active
+     * display is maximized, its name should be shown as the primary's long-term 
+     * moniker. */
+    @instance       GenDisplayControlAttributes     GDCII_attrs =
+                        (GDCA_MAXIMIZED_NAME_ON_PRIMARY);
 
-	@default		GI_states = @default | GS_ENABLED;
-	@default 		GCI_output = {TO_APP_TARGET};
+    @default        GI_states = @default | GS_ENABLED;
+    @default        GCI_output = {TO_APP_TARGET};
 
-	typedef WordFlags GDCFeatures;
-	#define GDCF_OVERLAPPING_MAXIMIZED		0x0004
-	#define GDCF_TILE						0x0002
-	#define GDCF_DISPLAY_LIST				0x0001
+    typedef WordFlags GDCFeatures;
+    #define GDCF_OVERLAPPING_MAXIMIZED      0x0004
+    #define GDCF_TILE                       0x0002
+    #define GDCF_DISPLAY_LIST               0x0001
 
-	typedef WordFlags GDCToolboxFeatures;
-	#define GDCTF_OVERLAPPING_MAXIMIZED		0x0004
-	#define GDCTF_TILE						0x0002
-	#define GDCTF_DISPLAY_LIST				0x0001
+    typedef WordFlags GDCToolboxFeatures;
+    #define GDCTF_OVERLAPPING_MAXIMIZED     0x0004
+    #define GDCTF_TILE                      0x0002
+    #define GDCTF_DISPLAY_LIST              0x0001
 
-	#define GDC_DEFAULT_FEATURES 	(GDCF_OVERLAPPING_MAXIMIZED | GDCF_TILE 
-									| GDCF_DISPLAY_LIST)
+    #define GDC_DEFAULT_FEATURES    (GDCF_OVERLAPPING_MAXIMIZED | GDCF_TILE 
+                                    | GDCF_DISPLAY_LIST)
 
-	#define GDC_DEFAULT_TOOLBOX_FEATURES (GDCF_DISPLAY_LIST)
+    #define GDC_DEFAULT_TOOLBOX_FEATURES (GDCF_DISPLAY_LIST)
 
-	/* A GenDisplayControl also features a single hint which affects the display of 
-	 * the features list. */
-		@vardata void HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE;
+    /* A GenDisplayControl also features a single hint which affects the display of 
+     * the features list. */
+        @vardata void HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE;
 
 ----------
 
@@ -892,7 +892,7 @@ Control to create GenDisplay objects, see "GenDocument," Chapter 13.)
 
 #### 4.3.3.1 Closing GenDisplays
 
-	MSG_GEN_DISPLAY_CLOSE
+    MSG_GEN_DISPLAY_CLOSE
 
 Most specific UIs provide a way for the user to close windows. For example, 
 OSF/Motif lets a user close a window by double-clicking the control button. 
@@ -915,7 +915,7 @@ Primary subclass this message.
 ----------
 #### MSG_GEN_DISPLAY_CLOSE
 
-	void	MSG_GEN_DISPLAY_CLOSE();
+    void    MSG_GEN_DISPLAY_CLOSE();
 
 This message is sent to a Display to close it. The system sends it when the 
 user uses the specific UI's way of closing a window. The GenDisplayClass 
@@ -936,7 +936,7 @@ replace the default behavior (of closing the application).
 
 #### 4.3.3.2 Menu Bar PopOuts
 
-	ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT
+    ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT
 
 Some objects contain the ability to "pop out" of their sub-group locations and 
 become floating dialog boxes.The menu bar of a GenDisplay is one such 
@@ -946,8 +946,8 @@ ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT.
 
 #### 4.3.3.3 Messages sent to GenDisplays
 
-	MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT, 
-	MSG_GEN_DISPLAY_GET_DOCUMENT
+    MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT, 
+    MSG_GEN_DISPLAY_GET_DOCUMENT
 
 Many of the messages which can be sent to GenDisplay objects have already 
 been discussed above in section 4.1. However, there are a few messages which 
@@ -979,7 +979,7 @@ will return an optr to the corresponding Document object.
 ----------
 #### MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT
 
-	void	MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT();
+    void    MSG_GEN_DISPLAY_UPDATE_FROM_DOCUMENT();
 
 This message instructs a GenDisplay to update its instance data from its 
 associated GenDocument object (if any). This message is ordinarily sent by 
@@ -995,7 +995,7 @@ updating behavior, be sure to end with an @**callsuper**.
 ----------
 #### MSG_GEN_DISPLAY_GET_DOCUMENT
 
-	optr	MSG_GEN_DISPLAY_GET_DOCUMENT();
+    optr    MSG_GEN_DISPLAY_GET_DOCUMENT();
 
 This message returns the optr of the GenDocument associated with a given 
 GenDisplay. This is equal to the value of the GenDisplay's *GDI_document* 
@@ -1044,17 +1044,17 @@ the active display whenever the traveling objects are moved.
 
 **Code Display 4-5 TravelingObjectReference**
 
-	typedef struct {
-		optr		TIR_travelingObject;	/* optr to traveling object whose
-											 * reference this is */
+    typedef struct {
+        optr        TIR_travelingObject;    /* optr to traveling object whose
+                                             * reference this is */
 
-		ChunkHandle		TIR_parent;			/* Chunk Handle of object in Display's
-											 * block that will be the parent of this
-											 * object */
+        ChunkHandle     TIR_parent;         /* Chunk Handle of object in Display's
+                                             * block that will be the parent of this
+                                             * object */
 
-		word		TIR_compChildFlags;		/* CompChildFlags to use when
-											 * adding the traveling object */
-	} TravelingObjectReference;
+        word        TIR_compChildFlags;     /* CompChildFlags to use when
+                                             * adding the traveling object */
+    } TravelingObjectReference;
 
 ----------
 

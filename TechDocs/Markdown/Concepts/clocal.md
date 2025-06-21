@@ -138,10 +138,10 @@ Code Display 8-1 Storing Strings in Localizable Resources
 @start ErrorStrings, data;
 
 @chunk char NoMonkeyError[] = 
-	"FTPOOMM failed: No monkey present. Acquire a monkey and try again.";
+    "FTPOOMM failed: No monkey present. Acquire a monkey and try again.";
 
 @chunk char NoPeanutError[] = 
-	"FTPOOMM failed: No peanuts present. Please insert peanuts and try again.";
+    "FTPOOMM failed: No peanuts present. Please insert peanuts and try again.";
 
 @end ErrorStrings;
 ~~~
@@ -159,10 +159,10 @@ chunk it applies to.
 Remember the **@localize** syntax:
 
 ~~~
-	 @localize { <string> <min>-<max> };
-	 @localize { <string> <length> };
-	 @localize { <string> };
-	 @localize <string>; 
+     @localize { <string> <min>-<max> };
+     @localize { <string> <length> };
+     @localize { <string> };
+     @localize <string>; 
  @localize not;
 ~~~
 
@@ -172,7 +172,7 @@ Code Display 8-2 Storing Strings in Localizable Resources
 @start ErrorStrings, data
 
 @chunk char NoMonkeyError[] = 
-	"FTPOOMM failed: No monkey present. Acquire a monkey and try again";
+    "FTPOOMM failed: No monkey present. Acquire a monkey and try again";
 
 @localize "The phrase \"acquire a monkey\" appears in another string. Both should \
 be translated in the same way.";
@@ -180,8 +180,8 @@ be translated in the same way.";
 @end ErrorStrings
 
 @object GenGlyphClass BossMon = {
-	 GI_visMoniker = "Boss";
-	 @localize { "This means hide the game because a boss is coming" 3-6 }; } 
+     GI_visMoniker = "Boss";
+     @localize { "This means hide the game because a boss is coming" 3-6 }; } 
 ~~~
 
 Another thing to keep in mind is that when strings are translated, they are 
@@ -267,10 +267,10 @@ Table 8-1 DistanceUnit types
 |DU_POINTS          | 1.000      |###.### pt     |###.### pt         |
 |DU_INCHES          |72.000      |###.### in     |###.### in ###.###"|
 |DU_CENTIMETERS     |28.346      |###.### cm     |###.###cm          |
-|DU_MILLIMETERS     | 2.835      |###.### mm     |###.###mm	         |
+|DU_MILLIMETERS     | 2.835      |###.### mm     |###.###mm          |
 |DU_PICAS           |12.000      |###.### pi     |###.### pi         |
 |DU_EUR_POINTS      | 1.065      |###.### ep     |###.### ep         |
-|DU_CICEROS	        |12.787      |###,### ci     |###.### ci	     |
+|DU_CICEROS         |12.787      |###,### ci     |###.### ci         |
 
 DU_POINTS_OR_MILLIMETERS and DU_INCHES_OR_CENTIMETERS: special cases
 
@@ -354,7 +354,7 @@ Table 8-2 DateTimeFormat Types
 |DTF_SHORT                    |3/5/90                  |
 |DTF_ZERO_PADDED_SHORT        |03/05/90                |
 |DTF_MD_LONG                  |Sunday, March 5th       |
-|DTF_MD_LONG_NO_WEEKDAY	      |March 5th               |
+|DTF_MD_LONG_NO_WEEKDAY       |March 5th               |
 |DTF_MD_SHORT                 |3/5                     |
 |DTF_MY_LONG                  |March 1990              |
 |DTF_MY_SHORT                 |3/90                    |
