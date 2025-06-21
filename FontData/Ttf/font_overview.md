@@ -44,26 +44,26 @@ This document provides an overview of the TrueType fonts included in the PC/GEOS
 ## Sources
 The original font files were obtained from various sources. Below is a list of the sources for each font.
 
-S1. **URW++ base 35 fonts**: [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
-S2. **New York Times Community**: [https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin](https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin)
-S3. **Vogels Perspektive**: [https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html](https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html)
-S4. **Indestructibletype**: [https://indestructibletype.com/Cooper/index.html](https://indestructibletype.com/Cooper/index.html)
-S5. **Dieter Steffmann**: [https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm](https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm)
+- **S1:** **URW++ base 35 fonts**: [https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master](https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master)
+- **S2:** **New York Times Community**: [https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin](https://github.com/FrancesCoronel/nyt-comm/tree/master/fonts/franklin)
+- **S3:** **Vogels Perspektive**: [https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html](https://martinvogel.de/blog/index.php?/archives/131-Marvosym.ttf.html)
+- **S4:** **Indestructibletype**: [https://indestructibletype.com/Cooper/index.html](https://indestructibletype.com/Cooper/index.html)
+- **S5:** **Dieter Steffmann**: [https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm](https://moorstation.org/typoasis/designers/steffmann/samples/m/markerf.htm)
 
 ## Licenses
 The fonts included in this distribution are subject to their respective licenses. Please review the individual license terms for each font.
 
-L1. **GNU Aferro General Public License**: [https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING](https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING)
-L2. **MIT License**: [https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE](https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE)
-L3. **SIL Open Font License**: [https://openfontlicense.org/open-font-license-official-text/](https://openfontlicense.org/open-font-license-official-text/)
-L4: **Dieter Steffmann**: [https://www.1001fonts.com/users/steffmann/?page=2](https://www.1001fonts.com/users/steffmann/?page=2)
+- **L1:** **GNU Aferro General Public License**: [https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING](https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING)
+- **L2:** **MIT License**: [https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE](https://github.com/FrancesCoronel/nyt-comm/blob/master/LICENSE)
+- **L3:** **SIL Open Font License**: [https://openfontlicense.org/open-font-license-official-text/](https://openfontlicense.org/open-font-license-official-text/)
+- **L4:** **Dieter Steffmann**: [https://www.1001fonts.com/users/steffmann/?page=2](https://www.1001fonts.com/users/steffmann/?page=2)
 
 ## Changes
 If any modifications have been made to the fonts (e.g. renaming or hinting optimization), they are noted in the "Changes for PC/GEOS" column of the table.
 
-C1. **Character set**: The included characters have been reduced to the PC/GEOS character set. 
-C2. **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality.
-C3. **Subfamily changed**: Font subfamily changed to bold.
+- **C1:** **Character set**: The included characters have been reduced to the PC/GEOS character set. 
+- **C2:** **Automatic hinting**: Auto-hinting applied to improve on-screen readability and rendering quality.
+- **C3:** **Subfamily changed**: Font subfamily changed to bold.
 
 ## Mapping the GEOS Character Set to Unicode
 
@@ -93,7 +93,7 @@ The PC/GEOS distribution uses a custom character set that differs from standardi
 |**0x33**|&#x0033;| U+0033  |**0x73**|&#x0073;| U+0073  |**0xb3**|&#x2265;| U+2265  |**0xf3**|&#x00db;| U+00db  |
 |**0x34**|&#x0034;| U+0034  |**0x74**|&#x0074;| U+0074  |**0xb4**|&#x00a5;| U+00a5  |**0xf4**|&#x00d9;| U+00d9  |
 |**0x35**|&#x0035;| U+0035  |**0x75**|&#x0075;| U+0075  |**0xb5**|&#x00b5;| U+00b5  |**0xf5**|&#x0131;| U+0131  |
-|**0x36**|&#x0035;| U+0036  |**0x76**|&#x0076;| U+0076  |**0xb6**|&#x2202;| U+2202  |**0xf6**|&#x02c6;| U+02c6  |
+|**0x36**|&#x0036;| U+0036  |**0x76**|&#x0076;| U+0076  |**0xb6**|&#x2202;| U+2202  |**0xf6**|&#x02c6;| U+02c6  |
 |**0x37**|&#x0037;| U+0037  |**0x77**|&#x0077;| U+0077  |**0xb7**|&#x2211;| U+2211  |**0xf7**|&#x02dc;| U+02dc  |
 |**0x38**|&#x0038;| U+0038  |**0x78**|&#x0078;| U+0078  |**0xb8**|&#x220f;| U+220f  |**0xf8**|&#x00af;| U+00af  |
 |**0x39**|&#x0039;| U+0039  |**0x79**|&#x0079;| U+0079  |**0xb9**|&#x03c0;| U+03c0  |**0xf9**|&#x02d8;| U+02d8  |
