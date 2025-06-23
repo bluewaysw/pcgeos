@@ -510,7 +510,7 @@ or the callback will not be called.
 ax - Value for callback routine passed in bp to 
 **ElementArrayElementChanged**.  
 **Return:**  
-CF	Set if elements are equal, clear otherwise.  
+CF  Set if elements are equal, clear otherwise.  
 **May Destroy:** ax, bx, cx, dx
 
 **Library:** chunkarr.def
@@ -1583,7 +1583,7 @@ es:di - Address of the new null-terminated file name.
 
 **Returns:**  
 CF - Set if error, clear otherwise.  
-ax	Error code (**FileError**) if CF set:  
+ax  Error code (**FileError**) if CF set:  
 ERROR_FILE_NOT_FOUND  
 ERROR_PATH_NOT_FOUND  
 ERROR_ACCESS_DENIED  
@@ -1903,7 +1903,7 @@ ds - Floating point segment.
 **Returns:**  
 Flags are set by what may be considered the assembly instruction:
 
-	cmp	X1,X2
+    cmp X1,X2
 
 where X2 is the top FP number on the stack and X1 is the FP number 
 immediately beneath it.  
@@ -1924,7 +1924,7 @@ ds - Floating point segment.
 **Returns:**  
 Flags are set by what may be considered the assembly instruction:
 
-	cmp	X1,X2
+    cmp X1,X2
 
 where X2 is the top FP number on the stack and X1 is the FP number 
 immediately beneath it. 
@@ -1946,7 +1946,7 @@ ds - The floating point stack segment.
 **Returns:**  
 Flags are set by what may be considered the assembly instruction:
 
-	cmp	es:di, ds:si
+    cmp es:di, ds:si
 
 **Destroyed:**  
 ax
@@ -1964,7 +1964,7 @@ es:di - Address of second number.
 **Returns:**  
 Flags are set by what may be considered the assembly instruction:
 
-	cmp	es:di, ds:si
+    cmp es:di, ds:si
 
 **Destroyed:**  
 ax
@@ -2664,8 +2664,8 @@ di - Offset to BasicGrab structure.
 cx:dx - Number of bytes in the buffer to be written.
 
 **Returns:**  
-CF	Set if grab OD changed and messages were sent.  
-ds 	Updated to point at segment of same block as on entry.
+CF  Set if grab OD changed and messages were sent.  
+ds  Updated to point at segment of same block as on entry.
 
 **Destroyed:**  
 Nothing.

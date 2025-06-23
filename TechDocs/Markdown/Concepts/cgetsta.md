@@ -259,65 +259,65 @@ Code Display 4-1 The Hello World Parameters File
 ~~~
 ##############################################################################
 #
-#	     Copyright (c) GeoWorks 1991, 1993-- All Rights Reserved
+#            Copyright (c) GeoWorks 1991, 1993-- All Rights Reserved
 #
-# PROJECT:	GEOS V2.0
-# MODULE:	Hello World (Sample GEOS application)
-# FILE:		hello3.gp (Hello World Application Geode Parameters File)
+# PROJECT:      GEOS V2.0
+# MODULE:       Hello World (Sample GEOS application)
+# FILE:         hello3.gp (Hello World Application Geode Parameters File)
 #
-# DESCRIPTION:	This file contains Geode definitions for the "Hello World" sample
-#		application. This file is read by the Glue linker to
-#		build this application.
+# DESCRIPTION:  This file contains Geode definitions for the "Hello World" sample
+#               application. This file is read by the Glue linker to
+#               build this application.
 #
 ##############################################################################
 
 #
-#	Permanent name: This is required by Glue to set the permanent name
-#	and extension of the geode. The permanent name of a library is what
-#	goes in the imported library table of a client geode (along with the
-#	protocol number). It is also what Swat uses to name the patient.
+#       Permanent name: This is required by Glue to set the permanent name
+#       and extension of the geode. The permanent name of a library is what
+#       goes in the imported library table of a client geode (along with the
+#       protocol number). It is also what Swat uses to name the patient.
 #
 name hello3.app
 
 #
-#	Long filename: This name can be displayed by GeoManager.
+#       Long filename: This name can be displayed by GeoManager.
 #
 longname "Hello World"
 
 #
-#	Specify geode type: This geode is an application, will have its own
-#	process (thread), and is not multi-launchable.
+#       Specify geode type: This geode is an application, will have its own
+#       process (thread), and is not multi-launchable.
 #
-type	appl, process, single
+type    appl, process, single
 
 #
-#	Specify the class name of the application Process object: Messages
-#	sent to the application's Process object will be handled by
-#	HelloProcessClass, which is defined in hello3.goc.
+#       Specify the class name of the application Process object: Messages
+#       sent to the application's Process object will be handled by
+#       HelloProcessClass, which is defined in hello3.goc.
 #
-class	HelloProcessClass
+class   HelloProcessClass
 
 #
-#	Specify the application object: This is the object in the
-#	application's generic UI tree which serves as the top-level
-#	UI object for the application. See hello3.goc.
+#       Specify the application object: This is the object in the
+#       application's generic UI tree which serves as the top-level
+#       UI object for the application. See hello3.goc.
 #
-appobj	HelloApp
+appobj  HelloApp
 
 #
-#	Token: This four-letter name is used by GeoManager to locate the
-#	icon for this application in the token database. The tokenid
-#	number corresponds to the manufacturer ID of the program's author
-#	for uniqueness of the token. Eight is Geoworks' manufacturer ID for
-# 	sample applications.
+#       Token: This four-letter name is used by GeoManager to locate the
+#       icon for this application in the token database. The tokenid
+#       number corresponds to the manufacturer ID of the program's author
+#       for uniqueness of the token. Eight is Geoworks' manufacturer ID for
+#       sample applications.
 #
 tokenchars "HELO"
 tokenid 8
 
 #
-#	stack: This field designates the number of bytes to set aside for
-#	the process' stack. (The type of the geode must be process, above.)
-#	The default stack size is 2000 bytes.
+#       stack: This field designates the number of bytes to set aside for
+#       the process' stack. (The type of the geode must be process, above.)
+#       The default stack size is 2000 bytes.
 #
 stack 1500
 
@@ -332,23 +332,23 @@ heapspace 3644
 
 
 #
-#	Resources: List all resource blocks which are used by the application.
-#	(Standard discardable code resources do not need to be mentioned.)
+#       Resources: List all resource blocks which are used by the application.
+#       (Standard discardable code resources do not need to be mentioned.)
 #
 resource APPRESOURCE ui-object
 resource INTERFACE ui-object
 resource MENURESOURCE ui-object
 
 #
-#	Libraries: List which libraries are used by the application.
+#       Libraries: List which libraries are used by the application.
 #
-library	geos
-library	ui
+library geos
+library ui
 
 #
-#	User Notes: This field allows the geode to fill its usernotes field
-#	(available to the user through GeoManager's File/Get Info function)
-#	with meaningful text.
+#       User Notes: This field allows the geode to fill its usernotes field
+#       (available to the user through GeoManager's File/Get Info function)
+#       with meaningful text.
 #
 usernotes "Sample application for GEOS version 2.0."
 ~~~
@@ -429,36 +429,36 @@ Code Display 4-2 Inclusion Files and Global Variables
 This is the first portion of the hello3.goc file.
 
 /***********************************************************************
- *	     Copyright (c) GeoWorks 1991, 1993-- All Rights Reserved
+ *           Copyright (c) GeoWorks 1991, 1993-- All Rights Reserved
  *
- * PROJECT:		GEOS
- * MODULE:		Hello World (Sample GEOS application)
- * FILE:		hello3.goc (Code file for Hello World Sample Application)
+ * PROJECT:             GEOS
+ * MODULE:              Hello World (Sample GEOS application)
+ * FILE:                hello3.goc (Code file for Hello World Sample Application)
  *
  * DESCRIPTION:
- *	This file contains the source code for the Hello World application.
- *	This code will be processed by the goc C preprocessor and then
- *	compiled by a C compiler. After compilation, it will be linked
- *	by the Glue linker to produce a runnable .geo application file.
+ *      This file contains the source code for the Hello World application.
+ *      This code will be processed by the goc C preprocessor and then
+ *      compiled by a C compiler. After compilation, it will be linked
+ *      by the Glue linker to produce a runnable .geo application file.
  *
  ***********************************************************************/
 
 /***************************************************************************
  * Include files
- *	These files are the standard inclusion files to use the basics of
- *	the GEOS system and libraries. All applications should include
- *	at least the following files. Note that all inclusion files
- *	have the suffix .h or .goh indicating they are header files.
+ *      These files are the standard inclusion files to use the basics of
+ *      the GEOS system and libraries. All applications should include
+ *      at least the following files. Note that all inclusion files
+ *      have the suffix .h or .goh indicating they are header files.
  ***************************************************************************/
 
-@include <stdapp.goh>				/* Standard GEOS inclusion file */
+@include <stdapp.goh>                           /* Standard GEOS inclusion file */
 
 /***********************************************************************
  * Global Variables
  ***********************************************************************/
 
-word		helloTextColor = C_BLUE;
-WindowHandle	winHan;
+word            helloTextColor = C_BLUE;
+WindowHandle    winHan;
 ~~~
 
 
@@ -493,7 +493,7 @@ Code Display 4-3 Hello World's Process Object
 This code display is part of hello3.goc and follows the previous display directly.
 
 /***********************************************************************
- *			Class & Method Definitions
+ *                      Class & Method Definitions
  * This section contains the definition of the application's Process
  * class and its methods. Other classes can also be defined here,
  * along with the message each handles.
@@ -577,7 +577,7 @@ Code Display 4-4 Hello World's Application Object
 This display is part of hello3.goc and follows the previous display directly.
 
 /*
- *			Application Object
+ *                      Application Object
  * The very top-level generic object of an application MUST be a GenApplication
  * object. The hello3.gp file contains an "appobj" statement which indicates
  * that this "HelloApp" object is in fact the top-level UI object.
@@ -586,21 +586,21 @@ This display is part of hello3.goc and follows the previous display directly.
  * it does not have to be AppResource.
  */
 
-@start	AppResource;			/* Begin definition of objects in AppResource. */
+@start  AppResource;                    /* Begin definition of objects in AppResource. */
 
 @object GenApplicationClass HelloApp = {
     GI_comp = @HelloPrimary;
-			/* The GI_comp attribute lists the generic children
-			 * of the object. The HelloApp object has just one
-			 * child, the primary window of the application. */
+                        /* The GI_comp attribute lists the generic children
+                         * of the object. The HelloApp object has just one
+                         * child, the primary window of the application. */
 
     gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @HelloPrimary; 
-			/* This GCN list determines which of the application's
-			 * window objects must be made visible when the
-			 * application first starts up. */
+                        /* This GCN list determines which of the application's
+                         * window objects must be made visible when the
+                         * application first starts up. */
 }
 
-@end	AppResource			/* End definition of objects in AppResource. */
+@end    AppResource                     /* End definition of objects in AppResource. */
 ~~~
 
 ##### 4.4.3.2 The Primary Window and the View Window
@@ -637,16 +637,16 @@ Code Display 4-5 Hello World's Primary and View Objects
 ~~~
 This display is part of hello3.goc and directly follows the previous display.
 
-@start	Interface;		/* This resource is for miscellaneous UI objects. */
+@start  Interface;              /* This resource is for miscellaneous UI objects. */
 
 @object GenPrimaryClass HelloPrimary = {
     GI_visMoniker = "Hello World Sample Application";
-			/* This title will appear at the top of the primary
-			 * window as the name of the application. */
+                        /* This title will appear at the top of the primary
+                         * window as the name of the application. */
 
     GI_comp = @HelloView, @HelloMenu;
-			/* This window has two children, the GenView object
-			 * and the GenInteraction menu object. */
+                        /* This window has two children, the GenView object
+                         * and the GenInteraction menu object. */
 
     /* For simplicity, this application is not given an icon. Therefore, we must
      * prevent the user from being able to minimize the application. This is
@@ -670,7 +670,7 @@ This display is part of hello3.goc and directly follows the previous display.
     HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP;
 }
 
-/*		GenView object
+/*              GenView object
  * This GenView object creates a window where the application can display portions
  * of a document as necessary. We want it to be scrollable, so the specific UI
  * (OSF/Motif) will create scroll bars which the user can interact with. Whenever a
@@ -682,22 +682,22 @@ This display is part of hello3.goc and directly follows the previous display.
 
 @object GenViewClass HelloView = {
     GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
-				/* This makes the View scrollable in the
-				 * horizontal dimension and keeps it from
-				 * growing larger than our document. */
+                                /* This makes the View scrollable in the
+                                 * horizontal dimension and keeps it from
+                                 * growing larger than our document. */
 
     GVI_vertAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
-				/* This makes the View scrollable in the
-				 * vertical dimension and keeps it from
-				 * growing larger than our document. */
+                                /* This makes the View scrollable in the
+                                 * vertical dimension and keeps it from
+                                 * growing larger than our document. */
 
     GVI_docBounds = { 0, 0, 72*17/2, 72*11 };
-				/* This sets the document size (scrollable
-				 * bounds) of the GenView. */
+                                /* This sets the document size (scrollable
+                                 * bounds) of the GenView. */
 
-    GVI_content = process;	/* This sets the output of the View--where it will
-				 * send its MSG_META_EXPOSEDs--to be the
-				 * application's Process object. */
+    GVI_content = process;      /* This sets the output of the View--where it will
+                                 * send its MSG_META_EXPOSEDs--to be the
+                                 * application's Process object. */
 
  /*
   * This view will not take text input, so specify that no floating
@@ -707,7 +707,7 @@ This display is part of hello3.goc and directly follows the previous display.
  ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
 }
 
-@end	Interface		/* End definition of objects in this resource. */
+@end    Interface               /* End definition of objects in this resource. */
 ~~~
 
 ##### 4.4.3.3 The Hello World Menu
@@ -727,7 +727,7 @@ Code Display 4-6 The Hello World Menu
 ~~~
 This display is part of hello3.goc and follows the previous display directly.
 
-/*			HelloMenu Menu
+/*                      HelloMenu Menu
  * Menus are of GenInteractionClass. The moniker of a menu is used to show the menu
  * on the primary's menu bar (thus, "Menu" will show up in Hello World's menu bar).
  * Each of the menu's children (in the GI_comp field) will be an entry or a
@@ -736,14 +736,14 @@ This display is part of hello3.goc and follows the previous display directly.
  * have the visibility GIV_DIALOG. */
 
 @object GenInteractionClass HelloMenu = {
-    GI_visMoniker = 'M', "Menu";	/* The moniker of the menu is used in
-				 * the primary window's menu bar. */
+    GI_visMoniker = 'M', "Menu";        /* The moniker of the menu is used in
+                                 * the primary window's menu bar. */
 
-    GI_comp = @HelloColorBox;		/* The only child of the menu (the only
-				 * item in the menu) is the dialog box. */
+    GI_comp = @HelloColorBox;           /* The only child of the menu (the only
+                                 * item in the menu) is the dialog box. */
 
-    GII_visibility = GIV_POPUP;		/* This attribute designates the GenInteraction
-				 * as a menu or a submenu. */
+    GII_visibility = GIV_POPUP;         /* This attribute designates the GenInteraction
+                                 * as a menu or a submenu. */
 }
 ~~~
 
@@ -787,7 +787,7 @@ Code Display 4-7 The Hello World Dialog Box and Its Triggers
 ~~~
 This display is part of hello3.goc and follows the previous display directly.
 
-/*			HelloColorBox Dialog Box
+/*                      HelloColorBox Dialog Box
  * Dialog boxes are of GenInteractionClass. The moniker of the dialog box will
  * appear at the top as the box's title. Additionally, if the GenInteraction
  * is a child of a menu interaction, the moniker will also serve as the text that
@@ -797,19 +797,19 @@ This display is part of hello3.goc and follows the previous display directly.
  * moniker). */
 
 @object GenInteractionClass HelloColorBox = {
-    GI_visMoniker = 'C', "Color";	/* The moniker will be displayed both as the
-				 * dialog's title and as the menu item that
-				 * brings the dialog up. */
+    GI_visMoniker = 'C', "Color";       /* The moniker will be displayed both as the
+                                 * dialog's title and as the menu item that
+                                 * brings the dialog up. */
 
     GI_comp = @HelloBlueTrigger, @HelloGoldTrigger;
-				/* The two triggers are the only gadgets
-				 * in the dialog box. */
+                                /* The two triggers are the only gadgets
+                                 * in the dialog box. */
 
-    GII_visibility = GIV_DIALOG;	/* In order for this interaction to be
-				 * a dialog box, this attribute must be set. */
+    GII_visibility = GIV_DIALOG;        /* In order for this interaction to be
+                                 * a dialog box, this attribute must be set. */
 } 
 
-/*			GenTriggers
+/*                      GenTriggers
  * Buttons are implemented by GenTriggerClass. When a trigger is pushed by the user
  * (clicked on with the mouse), it will send the specified message to the specified
  * output object. In both cases below, the trigger will send an application-defined
@@ -819,17 +819,17 @@ This display is part of hello3.goc and follows the previous display directly.
  * rather than the words "Blue" and "Gold.") */
 
 @object GenTriggerClass HelloBlueTrigger = {
-    GI_visMoniker = 'B', "Blue";	/* The 'B' indicates the keyboard navigation
-				 * character for this trigger. */
-    GTI_destination = process;		/* Send the message to the Process object. */
-    GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;	/* Send this message. */
+    GI_visMoniker = 'B', "Blue";        /* The 'B' indicates the keyboard navigation
+                                 * character for this trigger. */
+    GTI_destination = process;          /* Send the message to the Process object. */
+    GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;   /* Send this message. */
 }
 
 @object GenTriggerClass HelloGoldTrigger = {
-    GI_visMoniker = 'G', "Gold";	/* The 'G' indicates the keyboard navigation
-				 * character for this trigger. */
-    GTI_destination = process;		/* Send the message to the Process object. */
-    GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;	/* Send this message. */
+    GI_visMoniker = 'G', "Gold";        /* The 'G' indicates the keyboard navigation
+                                 * character for this trigger. */
+    GTI_destination = process;          /* Send the message to the Process object. */
+    GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;   /* Send this message. */
 }
 ~~~
 
@@ -885,7 +885,7 @@ Code Display 4-8 Constant and Routine Definition
 /*This display is part of hello3.goc and follows the previous display directly.*/
 
 /*************************************************************************
- *			Code for HelloProcessClass
+ *                      Code for HelloProcessClass
  * Now that all the UI gadgetry has been defined, we must provide the
  * methods and routines used by the application. For simplicity, all
  * messages will be handled by the HelloProcessClass object.
@@ -894,8 +894,8 @@ Code Display 4-8 Constant and Routine Definition
 /* Define constants used by the color-setting methods. Each of these
  * is a document size parameter in points. Therefore, the document is
  * 8.5 inches wide by 11 inches tall (one point is 1/72 of an inch). */
-#define HORIZ_DOC_SIZE		(72*17/2)
-#define VERT_DOC_SIZE		(72*11)
+#define HORIZ_DOC_SIZE          (72*17/2)
+#define VERT_DOC_SIZE           (72*11)
 
 /* Declare that we will use the function HelloDrawText(), and define its
  * return and parameter values. It has no return value and has one parameter:
@@ -904,9 +904,9 @@ void HelloDrawText(GStateHandle gstate);
 
 /* The following constants are used by HelloDrawText(). */
 
-#define TEXT_POINT_SIZE		 48	/* point size */
-#define TEXT_X_POSITION		 30	/* x position, in document coords. */
-#define TEXT_Y_POSITION		100	/* y position, in document coords. */
+#define TEXT_POINT_SIZE          48     /* point size */
+#define TEXT_X_POSITION          30     /* x position, in document coords. */
+#define TEXT_Y_POSITION         100     /* y position, in document coords. */
 ~~~
 
 ##### 4.4.4.1 Handling the Window Messages
@@ -938,35 +938,35 @@ This display is part of hello3.goc and follows the previous display directly.
 /***********************************************************************
  * MSG_META_CONTENT_VIEW_WIN_OPENED for HelloProcessClass
  ***********************************************************************
- * SYNOPSIS:		Record the handle of the view window when the view
- *		creates it. This allows us to more-easily update the
- *		document when the user changes the text color.
- * PARAMETERS:		void (	word viewWidth,
- *			word viewHeight,
- *			WindowHandle viewWin)
+ * SYNOPSIS:            Record the handle of the view window when the view
+ *              creates it. This allows us to more-easily update the
+ *              document when the user changes the text color.
+ * PARAMETERS:          void (  word viewWidth,
+ *                      word viewHeight,
+ *                      WindowHandle viewWin)
  * SIDE EFFECTS: winHan is set to viewWindow
  ***********************************************************************/
 
 @method HelloProcessClass, MSG_META_CONTENT_VIEW_WIN_OPENED {
-	/* Get the window handle of the View. We need this handle in order to
-	 * force a window invalidation, causing the View to send a MSG_META_EXPOSED
-	 * to the Process object and thereby forcing a redraw of the window. */
+        /* Get the window handle of the View. We need this handle in order to
+         * force a window invalidation, causing the View to send a MSG_META_EXPOSED
+         * to the Process object and thereby forcing a redraw of the window. */
     winHan = viewWindow;
 }
 
 /***********************************************************************
  * MSG_META_CONTENT_VIEW_WIN_CLOSED for HelloProcessClass
  ***********************************************************************
- * SYNOPSIS:		Take note that the view is now closed, so we don't
- *		try and draw to it or invalidate it any more (at
- *		least until it reopens)
- * PARAMETERS:		void (WindowHandle viewWindow)
- * SIDE EFFECTS:		winHan is set to 0
+ * SYNOPSIS:            Take note that the view is now closed, so we don't
+ *              try and draw to it or invalidate it any more (at
+ *              least until it reopens)
+ * PARAMETERS:          void (WindowHandle viewWindow)
+ * SIDE EFFECTS:                winHan is set to 0
  *
  ***********************************************************************/
 
 @method HelloProcessClass, MSG_META_CONTENT_VIEW_WIN_CLOSED {
-	/* Set our window handle variable to zero. */
+        /* Set our window handle variable to zero. */
     winHan = 0;
 }
 ~~~
@@ -1012,18 +1012,18 @@ This display is part of hello3.goc and follows the previous display directly.
 /***********************************************************************
  * MSG_META_EXPOSED for HelloProcessClass
  ***********************************************************************
- * SYNOPSIS:		Redraw the recently-exposed portion of the View
- * PARAMETERS:		void (WindowHandle win)
- * SIDE EFFECTS:	The invalid region of the window is cleared out
+ * SYNOPSIS:            Redraw the recently-exposed portion of the View
+ * PARAMETERS:          void (WindowHandle win)
+ * SIDE EFFECTS:        The invalid region of the window is cleared out
  *
- * STRATEGY:		This message is sent by the windowing system when a
- *		portion of the GenView has become invalid, either
- *		because a window that was obscuring it has been moved,
- *		or because some called GrInvalRect.
+ * STRATEGY:            This message is sent by the windowing system when a
+ *              portion of the GenView has become invalid, either
+ *              because a window that was obscuring it has been moved,
+ *              or because some called GrInvalRect.
  *
- *		We redraw the entire document, after telling the
- *		graphics system we're drawing to the invalid portion
- *		of the window.
+ *              We redraw the entire document, after telling the
+ *              graphics system we're drawing to the invalid portion
+ *              of the window.
  *
  ***********************************************************************/
 
@@ -1064,26 +1064,26 @@ This display is part of hello3.goc and follows the previous display directly.
      * by calling the function HelloDrawText(), which knows how to draw
      * the appropriate document. (See below.) */
 
-    HelloDrawText(gstate);		/* Special Hello World routine (below). */
+    HelloDrawText(gstate);              /* Special Hello World routine (below). */
 
     /* Now end the window update (unlock the GState and its window)
      * with the routine GrEndUpdate(), and free the GState handle by calling
      * the kernel routine GrDestroyState(). */
 
-    GrEndUpdate(gstate);		/* Signal that we are done with 
-				 * the window update. */
-    GrDestroyState(gstate);		/* Destroy the temporary GState. */
+    GrEndUpdate(gstate);                /* Signal that we are done with 
+                                 * the window update. */
+    GrDestroyState(gstate);             /* Destroy the temporary GState. */
 }
 
 /***********************************************************************
  * MSG_HELLO_REDRAW_DOCUMENT for HelloProcessClass
  ***********************************************************************
- * SYNOPSIS:		Force the document to be redrawn by marking the
- *		entire document area in the view as invalid.
- * PARAMETERS:		void (void)
- * SIDE EFFECTS:		Any drawing to the document area between this
- *		message and the MSG_META_EXPOSED that it generates
- *		will not show up, as the entire window will be invalid.
+ * SYNOPSIS:            Force the document to be redrawn by marking the
+ *              entire document area in the view as invalid.
+ * PARAMETERS:          void (void)
+ * SIDE EFFECTS:                Any drawing to the document area between this
+ *              message and the MSG_META_EXPOSED that it generates
+ *              will not show up, as the entire window will be invalid.
  *
  ***********************************************************************/
 
@@ -1093,30 +1093,30 @@ This display is part of hello3.goc and follows the previous display directly.
     /* Now create a temporary GState to use for window invalidation
      * if the window handle is valid, then redraw the window. */
     if (winHan != 0) {
-	GStateHandle gstate = GrCreateState(winHan);
-	/* Call GrInvalRect using the GState. Invalidate the entire
-	 * document. This will cause the View to redraw itself and send
-	 * a MSG_META_EXPOSED to the Process object. */
-	GrInvalRect(gstate, 0, 0, HORIZ_DOC_SIZE, VERT_DOC_SIZE);
-	GrDestroyState(gstate);		/* Free the GState. */
+        GStateHandle gstate = GrCreateState(winHan);
+        /* Call GrInvalRect using the GState. Invalidate the entire
+         * document. This will cause the View to redraw itself and send
+         * a MSG_META_EXPOSED to the Process object. */
+        GrInvalRect(gstate, 0, 0, HORIZ_DOC_SIZE, VERT_DOC_SIZE);
+        GrDestroyState(gstate);         /* Free the GState. */
     }
 }
 
 /***********************************************************************
  * HelloDrawText
  ***********************************************************************
- * SYNOPSIS:		Draw a single line of text onto the document. Note
- *		that it has no concept of the screen or the view --
- *		it is given a graphics state and draws through it.
- * CALLED BY:		(INTERNAL) HelloProcess::MSG_META_EXPOSED
- * RETURN:		nothing
- * SIDE EFFECTS:		attributes in the gstate are altered
+ * SYNOPSIS:            Draw a single line of text onto the document. Note
+ *              that it has no concept of the screen or the view --
+ *              it is given a graphics state and draws through it.
+ * CALLED BY:           (INTERNAL) HelloProcess::MSG_META_EXPOSED
+ * RETURN:              nothing
+ * SIDE EFFECTS:                attributes in the gstate are altered
  *
- * STRATEGY:		We separate the drawing from the exposure handler
- *		so the same routine can be used for both window
- *		refresh and for printing.
+ * STRATEGY:            We separate the drawing from the exposure handler
+ *              so the same routine can be used for both window
+ *              refresh and for printing.
  *
- *		Set the font, point size and color, then draw the text.
+ *              Set the font, point size and color, then draw the text.
  *
  ***********************************************************************/
 
@@ -1137,7 +1137,7 @@ void HelloDrawText(GStateHandle gstate) {
 
     /* Draw the text onto the document by using the GrDrawText() routine. */
     GrDrawText(gstate, TEXT_X_POSITION, TEXT_Y_POSITION,
-			"Welcome to GEOS!", 0);
+                        "Welcome to GEOS!", 0);
 }
 ~~~
 
@@ -1163,23 +1163,23 @@ This display is part of hello3.goc and follows the previous display directly.
 /***********************************************************************
  * MSG_HELLO_CHANGE_TO_BLUE for HelloProcessClass
  ***********************************************************************
- * SYNOPSIS:		Set the text color to dark blue and redraw the text.
- * PARAMETERS:		void (void)
- * SIDE EFFECTS:		helloTextColor is set to C_BLUE
+ * SYNOPSIS:            Set the text color to dark blue and redraw the text.
+ * PARAMETERS:          void (void)
+ * SIDE EFFECTS:                helloTextColor is set to C_BLUE
  *
  ***********************************************************************/
 
 @method HelloProcessClass, MSG_HELLO_CHANGE_TO_BLUE {
-    helloTextColor = C_BLUE;	/* Set the helloTextColor variable to blue. */
+    helloTextColor = C_BLUE;    /* Set the helloTextColor variable to blue. */
     @call self::MSG_HELLO_REDRAW_DOCUMENT();
 }
 
 /***********************************************************************
  * MSG_HELLO_CHANGE_TO_GOLD for HelloProcessClass
  ***********************************************************************
- * SYNOPSIS:		Set the text color to yellow and redraw the text.
- * PARAMETERS:		void (void)
- * SIDE EFFECTS:		helloTextColor is set to C_YELLOW
+ * SYNOPSIS:            Set the text color to yellow and redraw the text.
+ * PARAMETERS:          void (void)
+ * SIDE EFFECTS:                helloTextColor is set to C_YELLOW
  *
  ***********************************************************************/
 

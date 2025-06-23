@@ -46,23 +46,23 @@ Even though the stream driver is loaded automatically when a stream is
 created, you will need to initialize, configure, and destroy any streams you 
 use. The specific steps involved in this process are
 
-1.	Get the handle of the stream driver.
+1.  Get the handle of the stream driver.
 You will need to get this handle to use most of the stream-library 
 routines. You can get this handle by calling **GeodeGetInfo()**.
 
-2.	Create the stream.
+2.  Create the stream.
 You must create each stream you plan on using. When a stream is 
 initialized, it is designated a token that is used when calling the stream 
 driver's strategy routine.
 
-3.	Configure the stream.
+3.  Configure the stream.
 Arrange how your geode will be notified by the stream driver when 
 certain situations (error received or buffer full/empty) arise, and make 
 sure that all geodes accessing the stream have been given the stream's token.
 
-4.	Use the stream.
+4.  Use the stream.
 
-5.	Shut down the stream.
+5.  Shut down the stream.
 Not a trivial task, shutting down a stream can involve several 
 synchronization issues.
 
@@ -480,23 +480,23 @@ control.
 which has the following members:
 
 ~~~
-typedef	enum
+typedef enum
 {
-	SERIAL_BAUD_115200 = 1,
-	SERIAL_BAUD_57600  = 2,
-	SERIAL_BAUD_38400  = 3,
-	SERIAL_BAUD_19200  = 6,
-	SERIAL_BAUD_14400  = 8,
-	SERIAL_BAUD_9600   = 12,
-	SERIAL_BAUD_7200   = 16,
-	SERIAL_BAUD_4800   = 24,
-	SERIAL_BAUD_3600   = 32,
-	SERIAL_BAUD_2400   = 48,
-	SERIAL_BAUD_2000   = 58,
-	SERIAL_BAUD_1800   = 64,
-	SERIAL_BAUD_1200   = 96,
-	SERIAL_BAUD_600    = 192,
-	SERIAL_BAUD_300    = 384
+    SERIAL_BAUD_115200 = 1,
+    SERIAL_BAUD_57600  = 2,
+    SERIAL_BAUD_38400  = 3,
+    SERIAL_BAUD_19200  = 6,
+    SERIAL_BAUD_14400  = 8,
+    SERIAL_BAUD_9600   = 12,
+    SERIAL_BAUD_7200   = 16,
+    SERIAL_BAUD_4800   = 24,
+    SERIAL_BAUD_3600   = 32,
+    SERIAL_BAUD_2400   = 48,
+    SERIAL_BAUD_2000   = 58,
+    SERIAL_BAUD_1800   = 64,
+    SERIAL_BAUD_1200   = 96,
+    SERIAL_BAUD_600    = 192,
+    SERIAL_BAUD_300    = 384
 } SerialBaud;
 ~~~
 
@@ -517,14 +517,14 @@ on transmit. It uses the **SerialParity** enumerated type, which
 has the following members:
 
 ~~~
-typedef		enum {
-	SERIAL_PARITY_NONE	= 0,
-	SERIAL_PARITY_ODD	= 1,
-	SERIAL_PARITY_EVEN	= 3,
-	SERIAL_PARITY_ONE	= 5,
-	SERIAL_PARITY_MARK	= 5,
-	SERIAL_PARITY_ZERO	= 7,
-	SERIAL_PARITY_SPACE	= 7
+typedef     enum {
+    SERIAL_PARITY_NONE  = 0,
+    SERIAL_PARITY_ODD   = 1,
+    SERIAL_PARITY_EVEN  = 3,
+    SERIAL_PARITY_ONE   = 5,
+    SERIAL_PARITY_MARK  = 5,
+    SERIAL_PARITY_ZERO  = 7,
+    SERIAL_PARITY_SPACE = 7
 } SerialParity;
 ~~~
 

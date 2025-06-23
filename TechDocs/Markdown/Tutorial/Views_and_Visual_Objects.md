@@ -98,13 +98,13 @@ There have been several changes made to the MCHRT.GOC file. Here we'll
 take a look at the new code and examine the changes.
 
 ~~~
-#define VIEW_RIGHT				360	/* Width of the Chart View */
-#define VIEW_BOTTOM				288	/* Height of Chart View */
-#define CHART_BOTTOM 				268	/* y = 0 line of Chart */
-#define CHART_LEFT 				20	/* Left bound of leftmost bar */
-#define BAR_WIDTH				30	/* Width of each bar */
-#define BAR_WIDTH_ALLOW				36	/* Distance between left edges of bars */
-#define BORDER_MARGIN				10	/* Arbitrary margin width at edges */ 
+#define VIEW_RIGHT                              360     /* Width of the Chart View */
+#define VIEW_BOTTOM                             288     /* Height of Chart View */
+#define CHART_BOTTOM                            268     /* y = 0 line of Chart */
+#define CHART_LEFT                              20      /* Left bound of leftmost bar */
+#define BAR_WIDTH                               30      /* Width of each bar */
+#define BAR_WIDTH_ALLOW                         36      /* Distance between left edges of bars */
+#define BORDER_MARGIN                           10      /* Arbitrary margin width at edges */ 
 ~~~
 
 These constants will be used later to compute the coordinates at which we 
@@ -115,11 +115,11 @@ seventy-second of an inch.
 ~~~
 @class MCChartClass, VisClass;
 
-@message void 	MSG_MCC_INSERT_BAR(word ordinal, word value);
-@message void 	MSG_MCC_DELETE_BAR(word ordinal);
-@message void 	MSG_MCC_RESIZE_BAR(word ordinal, word value);
-	@instance word MCCI_numBars = 0; /* The number of bars in the chart */
-	@instance ChunkHandle MCCI_barArray;
+@message void   MSG_MCC_INSERT_BAR(word ordinal, word value);
+@message void   MSG_MCC_DELETE_BAR(word ordinal);
+@message void   MSG_MCC_RESIZE_BAR(word ordinal, word value);
+        @instance word MCCI_numBars = 0; /* The number of bars in the chart */
+        @instance ChunkHandle MCCI_barArray;
 
 @endc
 ~~~
@@ -138,14 +138,14 @@ handle of an array in which we'll be storing a copy of the chart data for the
 chart itself.
 
 ~~~
-@classdecl 	MCChartClass;
+@classdecl      MCChartClass;
 
 We declare our new class using the @classdecl keyword.
 
 typedef struct {
-	LMemBlockHeader		DBH_standardHeader;
-	word 		DBH_numItems;
-	ChunkHandle		DBH_listHead;
+        LMemBlockHeader         DBH_standardHeader;
+        word            DBH_numItems;
+        ChunkHandle             DBH_listHead;
 } DataBlockHeader;
 ~~~
 
@@ -163,7 +163,7 @@ information stored in these fields to do initialization work when we're
 retrieving data from the data file.
 
 ~~~
-DataBlockHeader		*dataBlockHeader;			/* Header info of our data block */ 
+DataBlockHeader         *dataBlockHeader;                       /* Header info of our data block */ 
 ~~~
 
 We set up a global variable to store a pointer to the block header. 
@@ -172,8 +172,8 @@ We set up a global variable to store a pointer to the block header.
 
 ~~~
 @object GenPrimaryClass MCPrimary = {
-	GI_comp = @MCLeftClump, @MCChartView;
-	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        GI_comp = @MCLeftClump, @MCChartView;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
 } 
 ~~~
 
@@ -193,8 +193,8 @@ generic UI gadgetry. If you're interested in learning more on this topic, see
 
 ~~~
 @object GenInteractionClass MCLeftClump = {
-	GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
-						@MCChangeTrigger, @MCValue; 
+        GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
+                                                @MCChangeTrigger, @MCValue; 
 } 
 ~~~
 
@@ -208,13 +208,13 @@ user will interact to set some particular piece of information.
 
 ~~~
 @object GenViewClass MCChartView = {
-	GVI_content = MCContent; 
+        GVI_content = MCContent; 
 
-	GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT | 
-					 GVDA_NO_LARGER_THAN_CONTENT; 
+        GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT | 
+                                         GVDA_NO_LARGER_THAN_CONTENT; 
 
-	GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT |
-			 		GVDA_NO_LARGER_THAN_CONTENT; 
+        GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT |
+                                        GVDA_NO_LARGER_THAN_CONTENT; 
 } 
 ~~~
 
@@ -235,9 +235,9 @@ piece of the contents. For more examples of how to set up view/content
 combinations, see "VisContent," Chapter 25 of the Object Reference Book.
 
 ~~~
-@end	Interface;
+@end    Interface;
 
-@start 	Content; 
+@start  Content; 
 ~~~
 
 As mentioned in the commentary on the geode parameters file, the chart and 
@@ -250,7 +250,7 @@ declare should be placed in the CONTENT resource.
 
 ~~~
 @object VisContentClass MCContent = {
-	VCI_comp = @MCChart;
+        VCI_comp = @MCChart;
 }
 ~~~
 
@@ -263,8 +263,8 @@ means of the VCI_comp field, the visual equivalent of the GI_comp file.
 
 ~~~
 @object MCChartClass MCChart = {
-	VI_bounds = { 0, 0, VIEW_RIGHT, VIEW_BOTTOM };
-	MCCI_barArray = BarDataChunk
+        VI_bounds = { 0, 0, VIEW_RIGHT, VIEW_BOTTOM };
+        MCCI_barArray = BarDataChunk
 } 
 ~~~
 
@@ -297,9 +297,9 @@ way to store the data, and to illustrate how you can have a data structure
 reside in the same resource as an object using the @chunk keyword.
 
 ~~~
-@end 	Content;
+@end    Content;
 
-@start 	Interface; 
+@start  Interface; 
 ~~~
 
 We're done declaring the object we want in the CONTENT resource; 
@@ -319,17 +319,17 @@ leave things organized this way just to remind you that it's legal.
 ~~~
 @method MCListInsertDataItem, MCProcessClass, MSG_MCP_INSERT_DATA_ITEM {
 ...
-	@send MCChart::MSG_MCC_INSERT_BAR(ordinal, WWFixedToInt(value));
+        @send MCChart::MSG_MCC_INSERT_BAR(ordinal, WWFixedToInt(value));
 } 
 
 @method MCProcessClass, MSG_MCP_DELETE_DATA_ITEM {
 ...
-	@send MCChart::MSG_MCC_DELETE_BAR(ordinal-1);
+        @send MCChart::MSG_MCC_DELETE_BAR(ordinal-1);
 } 
 
 @method MCProcessClass, MSG_MCP_SET_DATA_ITEM { 
 ...
-	@send MCChart::MSG_MCC_RESIZE_BAR(ordinal-1, WWFixedToInt(value));
+        @send MCChart::MSG_MCC_RESIZE_BAR(ordinal-1, WWFixedToInt(value));
 } 
 ~~~
 
@@ -340,9 +340,9 @@ needs to update itself.
 ~~~
 @method MCProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
 
-	char fileName[] = "MChtDATA";
-	char dummyDir[] = ".";
-	word numItems;
+        char fileName[] = "MChtDATA";
+        char dummyDir[] = ".";
+        word numItems;
 ~~~
 
 This method has gone through some major changes, reflecting the 
@@ -352,7 +352,7 @@ when setting our directory. We'll use numItems to keep track of the number
 of data items stored in the data file.
 
 ~~~
-	FileSetCurrentPath(SP_DOCUMENT, dummyDir); 
+        FileSetCurrentPath(SP_DOCUMENT, dummyDir); 
 ~~~
 
 Because we were truncating our data file before, it didn't matter if the file we 
@@ -370,15 +370,15 @@ with directories and the file system, see "File System," Chapter 17 of the
 Concepts book.
 
 ~~~
-	dataFile=VMOpen(fileName,
-			VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
-			VMO_CREATE, 0);
+        dataFile=VMOpen(fileName,
+                        VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
+                        VMO_CREATE, 0);
 ~~~
 
 We're calling VMOpen() as before, except that now we don't truncate the file.
 
 ~~~
-	dataFileBlock = VMGetMapBlock(dataFile);
+        dataFileBlock = VMGetMapBlock(dataFile);
 ~~~
 
 Now that we've opened the file, our first step in extracting the data from the 
@@ -400,7 +400,7 @@ going to use that block of data as the map block; when we retrieve the map
 block, we're accessing the data. 
 
 ~~~
-	if (dataFileBlock == NULL)
+        if (dataFileBlock == NULL)
 ~~~
 
 The first thing we're going to do is see if our file has a map block yet. If it does, 
@@ -408,10 +408,10 @@ we'll open the file normally. If it doesn't then that means that this is a new
 file, and that we'll have to set up the block immediately.
 
 ~~~
-		dataFileBlock = VMAllocLMem(dataFile,
-					 LMEM_TYPE_GENERAL,
-					 sizeof(DataBlockHeader));
-		VMSetMapBlock(dataFile, dataFileBlock);
+                dataFileBlock = VMAllocLMem(dataFile,
+                                         LMEM_TYPE_GENERAL,
+                                         sizeof(DataBlockHeader));
+                VMSetMapBlock(dataFile, dataFileBlock);
 ~~~
 
 To set up the map block, we call VMAllocLMem() as we did in the earlier 
@@ -424,14 +424,14 @@ going to set up a structure in the header of our block in which we'll store some
 information about the data within.
 
 ~~~
-		dataBlockHeader = VMLock(dataFile, 
-					dataFileBlock, 
-					dataListBlockPtr);
-		dataBlockHeader->DBH_listHead = NULL;
-		dataBlockHeader->DBH_numItems = 1;
-		VMDirty(dataListBlock);
-		VMUnlock(dataListBlock);
-	}
+                dataBlockHeader = VMLock(dataFile, 
+                                        dataFileBlock, 
+                                        dataListBlockPtr);
+                dataBlockHeader->DBH_listHead = NULL;
+                dataBlockHeader->DBH_numItems = 1;
+                VMDirty(dataListBlock);
+                VMUnlock(dataListBlock);
+        }
 ~~~
 
 To work with our VM Block header, we lock the block down. The header 
@@ -450,10 +450,10 @@ discard it. If we had just read that block but hadn't actually changed any of
 its information then we would unlock the block but not bother to dirty it first.
 
 ~~~
-	dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	dataListHead = dataBlockHeader->DBH_listHead;
-	numItems = dataBlockHeader->DBH_numItems;
-	VMUnlock(dataListBlock);
+        dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        dataListHead = dataBlockHeader->DBH_listHead;
+        numItems = dataBlockHeader->DBH_numItems;
+        VMUnlock(dataListBlock);
 ~~~
 
 Whether there was already a block header or we've just now created it, we 
@@ -464,8 +464,8 @@ done, we will unlock the block. Note that we aren't changing the data, so we
 don't need to mark the block dirty.
 
 ~~~
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numItems);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numItems);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
 ~~~
 
 Instead of telling the list to start over with just one item, we're going to have 
@@ -473,7 +473,7 @@ it start with the proper number of items, as extracted from the file. We'll set
 the selection to the first item in the list.
 
 ~~~
-	@callsuper();
+        @callsuper();
 } 
 ~~~
 
@@ -482,8 +482,8 @@ calling the superclass.
 
 ~~~
 @method MCProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
-	word 	numItems;
-	numItems = @call MCDataList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+        word    numItems;
+        numItems = @call MCDataList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
 ~~~
 
 When closing the application, we're going to have to make sure that we set 
@@ -492,26 +492,26 @@ that file. The MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS message will
 return the number of items in the list object.
 
 ~~~
-	dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	dataBlockHeader->DBH_listHead = dataListHead;
-	dataBlockHeader->DBH_numItems = numItems;
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        dataBlockHeader->DBH_listHead = dataListHead;
+        dataBlockHeader->DBH_numItems = numItems;
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 ~~~
 
 Next, we lock the VM block and fill in the header with the appropriate 
 information. When we're done we mark the block dirty and unlock it.
 
 ~~~
-	VMSave(dataFile);
+        VMSave(dataFile);
 ~~~
 
 Next we save the file so that all of the blocks which have been marked dirty 
 will be saved to disk. In this case, "all of the blocks" means our data block, 
 since that's the only block in the file.
 
-	VMClose(dataFile, FALSE);
-	@callsuper();
+        VMClose(dataFile, FALSE);
+        @callsuper();
 }
 
 As we did in the previous version of the program, we now close the data file 
@@ -521,8 +521,8 @@ and call the superclass.
 
 ~~~
 @method MCChartClass, MSG_VIS_DRAW {
-	sword count;
-	word *barArray;
+        sword count;
+        word *barArray;
 ~~~
 
 Our next method is our chart's handler for MSG_VIS_DRAW. You may recall 
@@ -536,10 +536,10 @@ We want our handler for this message to draw a couple of lines and then relay
 the MSG_VIS_DRAW on to the bar objects so that they will draw themselves.
 
 ~~~
-	GrDrawVLine(gstate,
-			 CHART_LEFT-BORDER_MARGIN,
-			 BORDER_MARGIN,
-			 CHART_BOTTOM);
+        GrDrawVLine(gstate,
+                         CHART_LEFT-BORDER_MARGIN,
+                         BORDER_MARGIN,
+                         CHART_BOTTOM);
 ~~~
 
 The GrDrawVLine() routine draws a vertical line; here it is drawing the 
@@ -558,17 +558,17 @@ computing the coordinates to use by means of the constants defined earlier in
 the source code.
 
 ~~~
-	GrDrawHLine(gstate,
-		 CHART_LEFT,
-		 CHART_BOTTOM+BORDER_MARGIN,
-		 VIEW_RIGHT - BORDER_MARGIN);
+        GrDrawHLine(gstate,
+                 CHART_LEFT,
+                 CHART_BOTTOM+BORDER_MARGIN,
+                 VIEW_RIGHT - BORDER_MARGIN);
 ~~~
 
 Here we are drawing the horizontal line which appears towards the bottom 
 of the chart.
 
 ~~~
-	barArray = LMemDerefHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        barArray = LMemDerefHandles(OptrToHandle(oself), pself->MCCI_barArray);
 ~~~
 
 Next we get a pointer to the chart data we've been maintaining. We get a 
@@ -591,15 +591,15 @@ dereference other kinds of objects. For more information about working with
 pself and oself, see the Concepts book.
 
 ~~~
-	for (count = 0; count < pself->MCCI_numBars; count++)
-	 {
-	 	word top, bottom, left, right; 
-	 	bottom = CHART_BOTTOM;
-	 	top = bottom - barArray[count];
-	 	left = CHART_LEFT + (count * BAR_WIDTH_ALLOW);
-	 	right = left + BAR_WIDTH;
-	 	GrFillRect(gstate, left, top, right, bottom);
- 	 } 
+        for (count = 0; count < pself->MCCI_numBars; count++)
+         {
+                word top, bottom, left, right; 
+                bottom = CHART_BOTTOM;
+                top = bottom - barArray[count];
+                left = CHART_LEFT + (count * BAR_WIDTH_ALLOW);
+                right = left + BAR_WIDTH;
+                GrFillRect(gstate, left, top, right, bottom);
+         } 
 }
 ~~~
 
@@ -613,9 +613,9 @@ the Concepts book.
 
 ~~~
 @method MCChartClass, MSG_MCC_INSERT_BAR {
- 	word 		count;
-	word 		*barArray;
-	barArray = LMemDerefHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        word            count;
+        word            *barArray;
+        barArray = LMemDerefHandles(OptrToHandle(oself), pself->MCCI_barArray);
 ~~~
 
 We're storing the chart data in an array within a chunk. We get a pointer to 
@@ -623,11 +623,11 @@ the array by means of LMemDerefHandles(), as we did in our
 MSG_VIS_DRAW handler.
 
 ~~~
- 	for(count=pself->MCCI_numBars; count > ordinal; --count)
- 	 {
- 		barArray[count] = barArray[count-1];
- 	 }
- 	barArray[ordinal] = value;
+        for(count=pself->MCCI_numBars; count > ordinal; --count)
+         {
+                barArray[count] = barArray[count-1];
+         }
+        barArray[ordinal] = value;
 ~~~
 
 Once we have a pointer to the array, we manipulate its data pretty much as 
@@ -635,7 +635,7 @@ we would any array. Here we're moving over all of the data in the array to
 make room for a new element.
 
 ~~~
-	ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
 ~~~
 
 As with our VM block, we must mark our object block dirty so that our 
@@ -645,15 +645,15 @@ user shuts the system down). Instead of VMDirty(), we use
 ObjMarkDirtyHandles(), a routine useful for working with object blocks.
 
 ~~~
-	pself->MCCI_numBars++;
+        pself->MCCI_numBars++;
 ~~~
 
 Finally we update the chart object's instance data to reflect the addition of 
 the new bar.
 
 ~~~
-	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
-					 VUM_DELAYED_VIA_APP_QUEUE);
+        @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+                                         VUM_DELAYED_VIA_APP_QUEUE);
 }
 ~~~
 
@@ -668,31 +668,31 @@ waiting for the thread to handle all the previously-arrived messages.
 
 ~~~
 @method MCChartClass, MSG_MCC_DELETE_BAR {
-	word 	count;
-	word 	*barArray;
+        word    count;
+        word    *barArray;
 
-	pself->MCCI_numBars -=1;
- 	barArray = LMemDerefHandles(OptrToHandle(oself),
- 			pself->MCCI_barArray);
-	for(count=ordinal; count < pself->MCCI_numBars; count++)
-	 {
- 		barArray[count] = barArray[count+1];
-	 }
-	ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
-	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
-					 VUM_DELAYED_VIA_APP_QUEUE);
+        pself->MCCI_numBars -=1;
+        barArray = LMemDerefHandles(OptrToHandle(oself),
+                        pself->MCCI_barArray);
+        for(count=ordinal; count < pself->MCCI_numBars; count++)
+         {
+                barArray[count] = barArray[count+1];
+         }
+        ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+                                         VUM_DELAYED_VIA_APP_QUEUE);
 }
 
 @method MCChartClass, MSG_MCC_RESIZE_BAR {
- 	word *barArray;
+        word *barArray;
 
- 	barArray = LMemDerefHandles(OptrToHandle(oself),
- 	pself->MCCI_barArray);
- 	barArray[ordinal] = value;
-	ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        barArray = LMemDerefHandles(OptrToHandle(oself),
+        pself->MCCI_barArray);
+        barArray[ordinal] = value;
+        ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
 
- 	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
- 					VUM_DELAYED_VIA_APP_QUEUE);
+        @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+                                        VUM_DELAYED_VIA_APP_QUEUE);
 ~~~
 
 These message handlers work in much the same way as that for 
@@ -783,17 +783,17 @@ name mchrt.app
 
 longname "MyChart" 
 
-type	appl, process, single 
+type    appl, process, single 
 
-class	MCProcessClass 
+class   MCProcessClass 
 
-appobj	MCApp 
+appobj  MCApp 
 
 tokenchars "MCht" 
 tokenid 0 
 
-library	geos
-library	ui 
+library geos
+library ui 
 
 resource APPRESOURCE ui-object
 resource INTERFACE ui-object
@@ -841,26 +841,26 @@ Code Display 4-2 MCHRT.GOC
 /* For information about the messages listed below, see the
  * headers for their handlers, later in this file. 
  */
-	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_MCP_SET_DATA_ITEM_MONIKER;
-	@message void MSG_MCP_DELETE_DATA_ITEM();
-	@message void MSG_MCP_INSERT_DATA_ITEM();
-	@message void MSG_MCP_SET_DATA_ITEM();
+        @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_MCP_SET_DATA_ITEM_MONIKER;
+        @message void MSG_MCP_DELETE_DATA_ITEM();
+        @message void MSG_MCP_INSERT_DATA_ITEM();
+        @message void MSG_MCP_SET_DATA_ITEM();
 @endc /* end of MCProcessClass definition */
 
 @class MCChartClass, VisClass;
 /* For information about the messages listed below, see the
  * headers for their handlers, later in this file. 
  */
-	@message void MSG_MCC_INSERT_BAR(word ordinal, word value);
-	@message void MSG_MCC_DELETE_BAR(word ordinal);
-	@message void MSG_MCC_RESIZE_BAR(word ordinal, word value);
-	@message void MSG_MCC_NUKE_CHART();
-	@message void MSG_MCC_INIT_CHART(word numItems);
-/* MCCI_numBars:	The number of bars in the chart. Internal. */
-	@instance word MCCI_numBars = 0; 
-/* MCCI_barArray:	Chunk handle of array to hold bar info. Array
-			must be in same block as MCChart. */
-	@instance ChunkHandle MCCI_barArray;
+        @message void MSG_MCC_INSERT_BAR(word ordinal, word value);
+        @message void MSG_MCC_DELETE_BAR(word ordinal);
+        @message void MSG_MCC_RESIZE_BAR(word ordinal, word value);
+        @message void MSG_MCC_NUKE_CHART();
+        @message void MSG_MCC_INIT_CHART(word numItems);
+/* MCCI_numBars:        The number of bars in the chart. Internal. */
+        @instance word MCCI_numBars = 0; 
+/* MCCI_barArray:       Chunk handle of array to hold bar info. Array
+                        must be in same block as MCChart. */
+        @instance ChunkHandle MCCI_barArray;
 @endc /* end of MCChartClass definition */
 
 @classdecl MCProcessClass, neverSaved;
@@ -877,9 +877,9 @@ extern word _pascal MCListGetDataItem(word ordinal);
  * MUST be an LMemBlockHeader. 
  */
 typedef struct {
-	LMemBlockHeader DBH_standardHeader;	/* Number of data items */
-	word DBH_numItems;		/* Head of linked list */
-	ChunkHandle DBH_listHead;
+        LMemBlockHeader DBH_standardHeader;     /* Number of data items */
+        word DBH_numItems;              /* Head of linked list */
+        ChunkHandle DBH_listHead;
 } DataBlockHeader;
 
 /* The data points which are to be charted are stored in
@@ -888,30 +888,30 @@ typedef struct {
  * stored in a ListNode structure. 
  */
 typedef struct {
-	word LN_data;
-	ChunkHandle LN_next;
+        word LN_data;
+        ChunkHandle LN_next;
 } ListNode;
 
 /* A given piece of data is stored:
- *	In a ListNode						tempNode
- *	referenced by a ChunkHandle				tempListItem
- *	in a memory block referenced by a MemHandle		dataListBlock
- *	loaded from a VM block referenced by a VMBlockHandle	dataFileBlock
- *	in a file referenced by a VMFileHandle			dataFile
+ *      In a ListNode                                           tempNode
+ *      referenced by a ChunkHandle                             tempListItem
+ *      in a memory block referenced by a MemHandle             dataListBlock
+ *      loaded from a VM block referenced by a VMBlockHandle    dataFileBlock
+ *      in a file referenced by a VMFileHandle                  dataFile
  */
 
 VMFileHandle dataFile; /* File which will hold our data */
 VMBlockHandle dataFileBlock; /* Block within dataFile */
 DataBlockHeader *dataBlockHeader; /* Header info of our data block */
 MemHandle dataListBlock; /* Block of memory which will
-					 hold our linked list. */
+                                         hold our linked list. */
 MemHandle *dataListBlockPtr = &dataListBlock; /* Ptr to above Handle */
-ChunkHandle dataListHead; 	/* Chunk containing head of
-				 	 * linked list. */
+ChunkHandle dataListHead;       /* Chunk containing head of
+                                         * linked list. */
 ChunkHandle tempListItem; /* Chunk handle which we will
-					 * use when traversing lists. */
+                                         * use when traversing lists. */
 ListNode *tempNode; /* List item which we will use
-					 * when traversing lists. */
+                                         * when traversing lists. */
 
 /* OBJECT Resources */
 
@@ -934,21 +934,21 @@ ListNode *tempNode; /* List item which we will use
 @start Interface;
 
 @object GenPrimaryClass MCPrimary = {
-	GI_comp = @MCLeftClump, @MCChartView;
-	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        GI_comp = @MCLeftClump, @MCChartView;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
 }
 
 @object GenInteractionClass MCLeftClump = {
-	GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
-		 @MCChangeTrigger, @MCValue;
+        GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
+                 @MCChangeTrigger, @MCValue;
 }
 
 @object GenViewClass MCChartView = {
-	GVI_content = MCContent;
-	GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT |
-			 GVDA_NO_LARGER_THAN_CONTENT;
-	GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT |
-			GVDA_NO_LARGER_THAN_CONTENT;
+        GVI_content = MCContent;
+        GVI_horizAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT |
+                         GVDA_NO_LARGER_THAN_CONTENT;
+        GVI_vertAttrs = @default | GVDA_NO_SMALLER_THAN_CONTENT |
+                        GVDA_NO_LARGER_THAN_CONTENT;
 }
 
 @end Interface;
@@ -957,12 +957,12 @@ ListNode *tempNode; /* List item which we will use
 @start Content;
 
 @object VisContentClass MCContent = {
-	VCI_comp = @MCChart;
+        VCI_comp = @MCChart;
 }
 
 @object MCChartClass MCChart = {
-	VI_bounds = { 0, 0, VIEW_RIGHT, VIEW_BOTTOM };
-	MCCI_barArray = BarDataChunk;
+        VI_bounds = { 0, 0, VIEW_RIGHT, VIEW_BOTTOM };
+        MCCI_barArray = BarDataChunk;
 }
 
 /* BarDataChunk: The array in which the chart will store the values
@@ -977,40 +977,40 @@ ListNode *tempNode; /* List item which we will use
 @start Interface;
 
 @object GenDynamicListClass MCDataList = {
-	GIGI_selection = FAKE_LIST_ITEM;
-	GIGI_numSelections = 1;
-	GIGI_applyMsg = 0;
-	GIGI_destination = process;
-	GDLI_numItems = 1;
-	GDLI_queryMsg = MSG_MCP_SET_DATA_ITEM_MONIKER;
-	HINT_ITEM_GROUP_SCROLLABLE;
+        GIGI_selection = FAKE_LIST_ITEM;
+        GIGI_numSelections = 1;
+        GIGI_applyMsg = 0;
+        GIGI_destination = process;
+        GDLI_numItems = 1;
+        GDLI_queryMsg = MSG_MCP_SET_DATA_ITEM_MONIKER;
+        HINT_ITEM_GROUP_SCROLLABLE;
 }
 
 @visMoniker FakeItemMoniker = "Data:";
 @localize "This string will appear at the head of the list";
 
 @object GenTriggerClass MCAddTrigger = {
-	GI_visMoniker = "Add";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_INSERT_DATA_ITEM;
+        GI_visMoniker = "Add";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_INSERT_DATA_ITEM;
 }
 
 @object GenTriggerClass MCChangeTrigger = {
-	GI_visMoniker = "Change";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_SET_DATA_ITEM;
+        GI_visMoniker = "Change";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_SET_DATA_ITEM;
 }
 
 @object GenTriggerClass MCDeleteTrigger = {
-	GI_visMoniker = "Delete";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_DELETE_DATA_ITEM;
+        GI_visMoniker = "Delete";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_DELETE_DATA_ITEM;
 }
 
 @object GenValueClass MCValue = {
-	GVLI_minimum = MakeWWFixed(0);
-	GVLI_maximum = MakeWWFixed(0x7ffe);
-	GVLI_value = MakeWWFixed(123);
+        GVLI_minimum = MakeWWFixed(0);
+        GVLI_maximum = MakeWWFixed(0x7ffe);
+        GVLI_value = MakeWWFixed(123);
 }
 
 @end Interface;
@@ -1019,12 +1019,12 @@ ListNode *tempNode; /* List item which we will use
 
 /* MSG_MCP_SET_DATA_ITEM_MONIKER for MCProcessClass
  *
- *	SYNOPSIS: Set the moniker for one of our Data List's items.
- *	CONTEXT: The Data List will send this message to the process
- *		 whenever it needs to display the moniker of a given
- *		 item. We should respond with one of the
- *		 MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_... messages.
- *	PARAMS: void (optr list, word item)
+ *      SYNOPSIS: Set the moniker for one of our Data List's items.
+ *      CONTEXT: The Data List will send this message to the process
+ *               whenever it needs to display the moniker of a given
+ *               item. We should respond with one of the
+ *               MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_... messages.
+ *      PARAMS: void (optr list, word item)
  */
 @method MCProcessClass, MSG_MCP_SET_DATA_ITEM_MONIKER {
 
@@ -1032,416 +1032,416 @@ ListNode *tempNode; /* List item which we will use
  * just return that moniker. Otherwise, look up the
  * numerical value of the item as stored in the linked list. 
  */
-	if (item==FAKE_LIST_ITEM) {
-		optr moniker;
-		moniker = ConstructOptr(OptrToHandle(list),
-				OptrToChunk(@FakeItemMoniker));
-		@send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
-				FAKE_LIST_ITEM, moniker);}
-	else /* item > FAKE_LIST_ITEM */ {
-		char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
-		word data;
+        if (item==FAKE_LIST_ITEM) {
+                optr moniker;
+                moniker = ConstructOptr(OptrToHandle(list),
+                                OptrToChunk(@FakeItemMoniker));
+                @send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+                                FAKE_LIST_ITEM, moniker);}
+        else /* item > FAKE_LIST_ITEM */ {
+                char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
+                word data;
 
-		data = MCListGetDataItem(item);
+                data = MCListGetDataItem(item);
 
-		LocalFixedToAscii(monikerString, MakeWWFixed(data), 0);
-		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-						 item, monikerString);
-	}
+                LocalFixedToAscii(monikerString, MakeWWFixed(data), 0);
+                @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                                                 item, monikerString);
+        }
 } /* end of MSG_MCP_SET_DATA_ITEM_MONIKER */
 
 /* MCListGetDataItem()
  *
- *	SYNOPSIS: Return the Nth piece of data.
- *	CONTEXT: Utility routine.
- *	PARAMS: word (word ordinal)
+ *      SYNOPSIS: Return the Nth piece of data.
+ *      CONTEXT: Utility routine.
+ *      PARAMS: word (word ordinal)
  */
 extern word _pascal MCListGetDataItem(word ordinal) {
-	word 	data;
+        word    data;
 
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	for(tempNode = LMemDerefHandles(dataListBlock, dataListHead);
-	 ordinal > 1;
-	 --ordinal)
-		{
-		 tempListItem = tempNode->LN_next;
-		 tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-		}
-	data = tempNode->LN_data;
-	VMUnlock(dataListBlock);
-	return data;
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        for(tempNode = LMemDerefHandles(dataListBlock, dataListHead);
+         ordinal > 1;
+         --ordinal)
+                {
+                 tempListItem = tempNode->LN_next;
+                 tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+                }
+        data = tempNode->LN_data;
+        VMUnlock(dataListBlock);
+        return data;
 } /* end of MCListGetDataItem() */
 
 /* MSG_MCP_INSERT_DATA_ITEM for MCProcessClass
  *
- *	SYNOPSIS: Add a new number to our list of data.
- *	CONTEXT: User wants to add a new piece of data.
- *	PARAMS: void(void)
+ *      SYNOPSIS: Add a new number to our list of data.
+ *      CONTEXT: User wants to add a new piece of data.
+ *      PARAMS: void(void)
  */
 @method MCListInsertDataItem, MCProcessClass, MSG_MCP_INSERT_DATA_ITEM {
-	ChunkHandle newListItem;
-	ListNode *newNode;
-	WWFixedAsDWord value;
-	word ordinal;
+        ChunkHandle newListItem;
+        ListNode *newNode;
+        WWFixedAsDWord value;
+        word ordinal;
 
 /* Query list and data objects to find out where to insert item
  * and what value to insert there. 
  */
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
 
 /* Lock the data block so we can insert data into the linked list. */
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 
 /* Create a new linked list element. */
-	newListItem = LMemAlloc(dataListBlock, sizeof(ListNode));
-	newNode = LMemDerefHandles(dataListBlock, newListItem);
-	newNode->LN_data = WWFixedToInt(value);
+        newListItem = LMemAlloc(dataListBlock, sizeof(ListNode));
+        newNode = LMemDerefHandles(dataListBlock, newListItem);
+        newNode->LN_data = WWFixedToInt(value);
 
 /* Check to see if the item we're adding will be the
  * new head of the data list and handle that case. 
  */
-	if (ordinal==FAKE_LIST_ITEM)
-	 {
-		newNode->LN_next = dataListHead;
-		dataListHead = newListItem;
-	 }
-	else
+        if (ordinal==FAKE_LIST_ITEM)
+         {
+                newNode->LN_next = dataListHead;
+                dataListHead = newListItem;
+         }
+        else
 /* We're not adding to the head of the list. Traverse the
  * list using the tempListItem and tempNode variables, then
  * insert the new item. 
  */
-	 {
-		word count = ordinal;
-		for (tempNode = LMemDerefHandles(dataListBlock, dataListHead);
-		 count > 1;
-		 --count)
-		 {
-			tempListItem = tempNode->LN_next;
-			tempNode = LMemDerefHandles(dataListBlock,
-						 tempListItem);
-		 }
-		newNode->LN_next = tempNode->LN_next;
-		tempNode->LN_next = newListItem;
-	 }
+         {
+                word count = ordinal;
+                for (tempNode = LMemDerefHandles(dataListBlock, dataListHead);
+                 count > 1;
+                 --count)
+                 {
+                        tempListItem = tempNode->LN_next;
+                        tempNode = LMemDerefHandles(dataListBlock,
+                                                 tempListItem);
+                 }
+                newNode->LN_next = tempNode->LN_next;
+                tempNode->LN_next = newListItem;
+         }
 
 /* We've changed the data, so before we unlock the block, we mark
  * it dirty. 
  */
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
 /* Update the data list gadget. */
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(ordinal+1, 1);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal+1,
-								 FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(ordinal+1, 1);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal+1,
+                                                                 FALSE);
 /* Update the chart */
-	@send MCChart::MSG_MCC_INSERT_BAR(ordinal, WWFixedToInt(value));
+        @send MCChart::MSG_MCC_INSERT_BAR(ordinal, WWFixedToInt(value));
 }
 
 /* MSG_MCP_DELETE_DATA_ITEM for MCProcessClass
  *
- *	SYNOPSIS: Destroys one data item.
- *	CONTEXT: User has just clicked on the "Delete" trigger.
- *	PARAMS: void (void)
+ *      SYNOPSIS: Destroys one data item.
+ *      CONTEXT: User has just clicked on the "Delete" trigger.
+ *      PARAMS: void (void)
  */
 @method MCProcessClass, MSG_MCP_DELETE_DATA_ITEM {
-	word ordinal;
-	word count;
-	ChunkHandle oldItem;
-	ListNode *oldNode;
+        word ordinal;
+        word count;
+        ChunkHandle oldItem;
+        ListNode *oldNode;
 
 /* Find out which item the user wants to delete. */
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	if (ordinal==FAKE_LIST_ITEM) return;
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (ordinal==FAKE_LIST_ITEM) return;
 
 /* We're going to work with the data, so lock the data file. */
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 
 /* If we're deleting the first data item, we update the handle of the
  * head of the list. 
  */
-	if (ordinal == 1) 
-	 {
-		oldNode = LMemDerefHandles(dataListBlock, dataListHead);
-		tempListItem = oldNode->LN_next;
-		LMemFreeHandles(dataListBlock, dataListHead);
-		dataListHead = tempListItem;
-	 }
+        if (ordinal == 1) 
+         {
+                oldNode = LMemDerefHandles(dataListBlock, dataListHead);
+                tempListItem = oldNode->LN_next;
+                LMemFreeHandles(dataListBlock, dataListHead);
+                dataListHead = tempListItem;
+         }
 
 /* If we're deleting an element which isn't the first, we find the element
  * that's just before the one we want to delete, and change that element's
  * "next" handle. We also get rid of the item to be deleted. 
  */
-	else /* ordinal != 1 */
-	 {
-		for (tempNode=LMemDerefHandles(dataListBlock, dataListHead),
-		 count = ordinal;
-		 count > 2;
-		 --count)
-		 {
-			tempListItem = tempNode->LN_next;
-			tempNode = LMemDerefHandles(dataListBlock,
-						 tempListItem);
-		 }
-		oldItem = tempNode->LN_next;
-		oldNode = LMemDerefHandles(dataListBlock, oldItem);
+        else /* ordinal != 1 */
+         {
+                for (tempNode=LMemDerefHandles(dataListBlock, dataListHead),
+                 count = ordinal;
+                 count > 2;
+                 --count)
+                 {
+                        tempListItem = tempNode->LN_next;
+                        tempNode = LMemDerefHandles(dataListBlock,
+                                                 tempListItem);
+                 }
+                oldItem = tempNode->LN_next;
+                oldNode = LMemDerefHandles(dataListBlock, oldItem);
 
-		tempNode->LN_next = oldNode->LN_next;
-		LMemFreeHandles(dataListBlock, oldItem);
-	 }
+                tempNode->LN_next = oldNode->LN_next;
+                LMemFreeHandles(dataListBlock, oldItem);
+         }
 
 /* We've changed the data, so before we lock the block, we mark it dirty. */
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
 /* Update the list. */
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(ordinal, 1);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal-1,
-								 FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(ordinal, 1);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal-1,
+                                                                 FALSE);
 
-	@send MCChart::MSG_MCC_DELETE_BAR(ordinal-1);
+        @send MCChart::MSG_MCC_DELETE_BAR(ordinal-1);
 } /* end of MSG_MCP_DELETE_DATA_ITEM */
 
 /* MSG_MCP_SET_DATA_ITEM for MCProcessClass
  *
- *	SYNOPSIS: Change the data number of one item in the data list.
- *	CONTEXT: User has clicked the "Change" button.
- *	PARAMS: void(void)
+ *      SYNOPSIS: Change the data number of one item in the data list.
+ *      CONTEXT: User has clicked the "Change" button.
+ *      PARAMS: void(void)
  */
 @method MCProcessClass, MSG_MCP_SET_DATA_ITEM {
-	word ordinal;
-	WWFixedAsDWord value;
-	char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
-	word count;
+        word ordinal;
+        WWFixedAsDWord value;
+        char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
+        word count;
 
 /* Find out which item we're changing. */
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	if (ordinal == FAKE_LIST_ITEM) return;
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (ordinal == FAKE_LIST_ITEM) return;
 
 /* Find out what the item's new value should be. */
-	value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
+        value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
 
 /* Lock the data block so that we can change the data. */
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 
 /* Find the appropriate item in the linked list and change its value. */
-	for (tempNode = LMemDerefHandles(dataListBlock, dataListHead),
-	 count = ordinal-1;
-	 count > 0;
-	 --count)
-	 {
-		tempListItem = tempNode->LN_next;
-		tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-	 }
-	tempNode->LN_data = WWFixedToInt(value);
+        for (tempNode = LMemDerefHandles(dataListBlock, dataListHead),
+         count = ordinal-1;
+         count > 0;
+         --count)
+         {
+                tempListItem = tempNode->LN_next;
+                tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+         }
+        tempNode->LN_data = WWFixedToInt(value);
 
 /* We changed the data so mark it dirty before unlocking it. */
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
 /* Update the data list gadget. */
-	LocalFixedToAscii(monikerString, value, 0);
-	@call MCDataList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-							ordinal,
-							monikerString);
+        LocalFixedToAscii(monikerString, value, 0);
+        @call MCDataList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                                                        ordinal,
+                                                        monikerString);
 
 /* Update the chart. */
-	@send MCChart::MSG_MCC_RESIZE_BAR(ordinal-1, WWFixedToInt(value));
+        @send MCChart::MSG_MCC_RESIZE_BAR(ordinal-1, WWFixedToInt(value));
 } /* end of MSG_MCP_SET_DATA_ITEM */
 
 /* MSG_GEN_PROCESS_OPEN_APPLICATION
  *
- *	SYNOPSIS: Set up application's data structures.
- *	CONTEXT: Application is starting up, either because user
- *		 has started the application or because the whole
- *		 system is re-starting.
- *	PARAMS: void(AppAttachFlags 	attachFlags,
- *		 MemHandle		launchBlock,
- *		 MemHandle 		extraState);
+ *      SYNOPSIS: Set up application's data structures.
+ *      CONTEXT: Application is starting up, either because user
+ *               has started the application or because the whole
+ *               system is re-starting.
+ *      PARAMS: void(AppAttachFlags     attachFlags,
+ *               MemHandle              launchBlock,
+ *               MemHandle              extraState);
  */
 @method MCProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
-	char fileName[] = "MChtDATA";
-	char dummyDir[] = ".";
-	word numItems;
+        char fileName[] = "MChtDATA";
+        char dummyDir[] = ".";
+        word numItems;
 
 /* Open up the data file */
-	FileSetCurrentPath(SP_DOCUMENT, dummyDir);
-	dataFile=VMOpen(fileName,
-			VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
-			VMO_CREATE, 0);
+        FileSetCurrentPath(SP_DOCUMENT, dummyDir);
+        dataFile=VMOpen(fileName,
+                        VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
+                        VMO_CREATE, 0);
 
 /* We'll be storing the data in the file's map block */
-	dataFileBlock = VMGetMapBlock(dataFile);
+        dataFileBlock = VMGetMapBlock(dataFile);
 
 /* If there is no map block, that means we're just now creating the
  * file and need to do all of the creation work.
  */
-	if (dataFileBlock == NULL)
-	 {
+        if (dataFileBlock == NULL)
+         {
 /* Allocate a storage block within the file and make it the map block. */
-		dataFileBlock = VMAllocLMem(dataFile,
-					 LMEM_TYPE_GENERAL,
-					 sizeof(DataBlockHeader));
-		VMSetMapBlock(dataFile, dataFileBlock);
+                dataFileBlock = VMAllocLMem(dataFile,
+                                         LMEM_TYPE_GENERAL,
+                                         sizeof(DataBlockHeader));
+                VMSetMapBlock(dataFile, dataFileBlock);
 
 /* Fill in the storage block's header information. */
-		dataBlockHeader = VMLock(dataFile, dataFileBlock,
-						 dataListBlockPtr);
-		dataBlockHeader->DBH_listHead = NULL;
-		dataBlockHeader->DBH_numItems = 1;
-		VMDirty(dataListBlock);
-		VMUnlock(dataListBlock);
-	 }
+                dataBlockHeader = VMLock(dataFile, dataFileBlock,
+                                                 dataListBlockPtr);
+                dataBlockHeader->DBH_listHead = NULL;
+                dataBlockHeader->DBH_numItems = 1;
+                VMDirty(dataListBlock);
+                VMUnlock(dataListBlock);
+         }
 
 /* We're now sure that the file has a map block, and are pretty sure
  * that it's been set up correctly.
  */
 /* Extract the header information */
-	dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 dataListHead = dataBlockHeader->DBH_listHead;
-	numItems = dataBlockHeader->DBH_numItems;
-	VMUnlock(dataListBlock);
+        numItems = dataBlockHeader->DBH_numItems;
+        VMUnlock(dataListBlock);
 
 /* Initialize the data list gadget. */
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numItems);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numItems);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
 
-	@callsuper();
+        @callsuper();
 } /* end of MSG_GEN_PROCESS_OPEN_APPLICATION */
 
 /* MSG_GEN_PROCESS_CLOSE_APPLICATION
  *
- *	SYNOPSIS: Free up the memory we allocated. Actually, we could
- *		 probably rely on the system to do this for us.
- *	CONTEXT: Application is shutting down, either because of user
- *		 exit or because whole system is shutting down.
- *	PARAMS: MemHandle(void);
+ *      SYNOPSIS: Free up the memory we allocated. Actually, we could
+ *               probably rely on the system to do this for us.
+ *      CONTEXT: Application is shutting down, either because of user
+ *               exit or because whole system is shutting down.
+ *      PARAMS: MemHandle(void);
  */
 @method MCProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
-	word numItems;
+        word numItems;
 
 /* We want to save the number of items in the list gadget, so get it. */
-	numItems = @call MCDataList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+        numItems = @call MCDataList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
 
 /* Save the information we want in the block header. */
-	dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	dataBlockHeader->DBH_listHead = dataListHead;
-	dataBlockHeader->DBH_numItems = numItems;
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        dataBlockHeader = VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        dataBlockHeader->DBH_listHead = dataListHead;
+        dataBlockHeader->DBH_numItems = numItems;
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
-	VMSave(dataFile);
+        VMSave(dataFile);
 
-	VMClose(dataFile, FALSE);
+        VMClose(dataFile, FALSE);
 
-	@callsuper();
+        @callsuper();
 } /* end of MSG_GEN_PROCESS_CLOSE_APPLICATION */
 
 /* CODE for MCContentClass */
 /* MSG_VIS_DRAW for MCContentClass
  *
- *	SYNOPSIS: Draw the chart
- *	CONTEXT: System has asked the chart object to draw itself.
- *	PARAMS: void(DrawFlags drawFlags, GStateHandle gstate)
+ *      SYNOPSIS: Draw the chart
+ *      CONTEXT: System has asked the chart object to draw itself.
+ *      PARAMS: void(DrawFlags drawFlags, GStateHandle gstate)
  */
 @method MCChartClass, MSG_VIS_DRAW {
-	word count;
-	word *barArray;
+        word count;
+        word *barArray;
 /* Draw the axis markers */
-	GrDrawVLine(gstate,
-		 CHART_LEFT-BORDER_MARGIN,
-		 BORDER_MARGIN,
-		 CHART_BOTTOM);
-	GrDrawHLine(gstate,
-		 CHART_LEFT,
-		 CHART_BOTTOM+BORDER_MARGIN,
-		 VIEW_RIGHT - BORDER_MARGIN);
-	barArray = LMemDerefHandles(OptrToHandle(oself),
-				 pself->MCCI_barArray);
+        GrDrawVLine(gstate,
+                 CHART_LEFT-BORDER_MARGIN,
+                 BORDER_MARGIN,
+                 CHART_BOTTOM);
+        GrDrawHLine(gstate,
+                 CHART_LEFT,
+                 CHART_BOTTOM+BORDER_MARGIN,
+                 VIEW_RIGHT - BORDER_MARGIN);
+        barArray = LMemDerefHandles(OptrToHandle(oself),
+                                 pself->MCCI_barArray);
 
 /* Draw the bars */
-	for (count = 0; count < pself->MCCI_numBars; count++)
-	 {
-		word top, bottom, left, right;
+        for (count = 0; count < pself->MCCI_numBars; count++)
+         {
+                word top, bottom, left, right;
 
-		bottom = CHART_BOTTOM;
-		top = bottom - barArray[count];
-		left = CHART_LEFT + (count * BAR_WIDTH_ALLOW);
-		right = left + BAR_WIDTH;
-		GrFillRect(gstate, left, top, right, bottom);
-	 }
+                bottom = CHART_BOTTOM;
+                top = bottom - barArray[count];
+                left = CHART_LEFT + (count * BAR_WIDTH_ALLOW);
+                right = left + BAR_WIDTH;
+                GrFillRect(gstate, left, top, right, bottom);
+         }
 } /* end of MSG_VIS_DRAW */
 
 /* MSG_MCC_INSERT_BAR
  *
- *	SYNOPSIS: Add another bar to bar chart.
- *	CONTEXT: The user has added another data item to the list.
- *	PARAMS: void(word ordinal, word value);
+ *      SYNOPSIS: Add another bar to bar chart.
+ *      CONTEXT: The user has added another data item to the list.
+ *      PARAMS: void(word ordinal, word value);
  */
 @method MCChartClass, MSG_MCC_INSERT_BAR {
-	word count;
-	word *barArray;
+        word count;
+        word *barArray;
 
 /* Insert new bar into array, shifting other bars over */
-	barArray = LMemDerefHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        barArray = LMemDerefHandles(OptrToHandle(oself), pself->MCCI_barArray);
 
-	for(count=pself->MCCI_numBars; count > ordinal; --count)
-	 {
-		barArray[count] = barArray[count-1];
-	 }
-	barArray[ordinal] = value;
-	ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        for(count=pself->MCCI_numBars; count > ordinal; --count)
+         {
+                barArray[count] = barArray[count-1];
+         }
+        barArray[ordinal] = value;
+        ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
 
-	pself->MCCI_numBars++;
+        pself->MCCI_numBars++;
 
 /* Let our Content know that it will have to redraw itself */
-	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
-					 VUM_DELAYED_VIA_APP_QUEUE);
+        @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+                                         VUM_DELAYED_VIA_APP_QUEUE);
 } /* end of MSG_MCC_INSERT_BAR */
 
 /* MSG_MCC_DELETE_BAR
  *
- *	SYNOPSIS: Remove a bar from the bar chart.
- *	CONTEXT: User has deleted a data item from the list.
- *	PARAMS: void(word ordinal);
+ *      SYNOPSIS: Remove a bar from the bar chart.
+ *      CONTEXT: User has deleted a data item from the list.
+ *      PARAMS: void(word ordinal);
  */
 @method MCChartClass, MSG_MCC_DELETE_BAR {
-	word count;
-	word *barArray;
+        word count;
+        word *barArray;
 
 /* Update our instance data and data array */
-	pself->MCCI_numBars -=1;
-	barArray = LMemDerefHandles(OptrToHandle(oself),
-				 pself->MCCI_barArray);
-	for(count=ordinal; count < pself->MCCI_numBars; count++)
-	 {
-		barArray[count] = barArray[count+1];
-	 }
-	ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        pself->MCCI_numBars -=1;
+        barArray = LMemDerefHandles(OptrToHandle(oself),
+                                 pself->MCCI_barArray);
+        for(count=ordinal; count < pself->MCCI_numBars; count++)
+         {
+                barArray[count] = barArray[count+1];
+         }
+        ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
 
 /* Mark ourself as in need of a redraw. */
-	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
-					 VUM_DELAYED_VIA_APP_QUEUE);
+        @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+                                         VUM_DELAYED_VIA_APP_QUEUE);
 } /* end of MSG_MCC_DELETE_BAR */
 
 /* MSG_MCC_RESIZE_BAR
  *
- *	SYNOPSIS: Resize a bar.
- *	CONTEXT: User has changed the value of a data item.
- *	PARAMS: void(word ordinal, word value);
+ *      SYNOPSIS: Resize a bar.
+ *      CONTEXT: User has changed the value of a data item.
+ *      PARAMS: void(word ordinal, word value);
  */
 @method MCChartClass, MSG_MCC_RESIZE_BAR {
-	word *barArray;
+        word *barArray;
 /* Update the array */
-	barArray = LMemDerefHandles(OptrToHandle(oself),
-				 pself->MCCI_barArray);
-	barArray[ordinal] = value;
-	ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
+        barArray = LMemDerefHandles(OptrToHandle(oself),
+                                 pself->MCCI_barArray);
+        barArray[ordinal] = value;
+        ObjMarkDirtyHandles(OptrToHandle(oself), pself->MCCI_barArray);
 
 /* Mark the chart as in need of a re-draw. */
-	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
-					 VUM_DELAYED_VIA_APP_QUEUE);
+        @call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+                                         VUM_DELAYED_VIA_APP_QUEUE);
 } /* end of MSG_MCC_RESIZE_BAR */
 ~~~
 

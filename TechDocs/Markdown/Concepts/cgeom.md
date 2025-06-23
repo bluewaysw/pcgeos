@@ -315,13 +315,13 @@ shown in the following display._
 ---
 Code Display 12-1 Orienting a Composite
 ~~~
-	/* Composite oriented horizontally */
+        /* Composite oriented horizontally */
 @object GenInteractionClass MyInteraction = {
     GI_comp = @ApplyTrigger, @ResetTrigger, @CancelTrigger;
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
 }
 
-	/* Composite oriented vertically */
+        /* Composite oriented vertically */
 @object GenInteractionClass MyOtherInteraction = {
     GI_comp = @ApplyTrigger, @ResetTrigger, @CancelTrigger;
     HINT_ORIENT_CHILDREN_VERTICALLY;
@@ -692,9 +692,9 @@ to be half the screen's height and half the screen's width.
 
 ~~~
 HINT_INITIAL_SIZE = {
-	SST_PCT_OF_FIELD_WIDTH | PCT_50,
-	SST_PCT_OF_FIELD_HEIGHT | PCT_50,
-	0 };
+        SST_PCT_OF_FIELD_WIDTH | PCT_50,
+        SST_PCT_OF_FIELD_HEIGHT | PCT_50,
+        0 };
 ~~~
 
 This example sets the size of the composite to be 100 pixels high and 200 
@@ -702,9 +702,9 @@ pixels wide.
 
 ~~~
 HINT_FIXED_SIZE = {
-	SST_PIXELS | 200,
-	SST_PIXELS | 100,
-	0 };
+        SST_PIXELS | 200,
+        SST_PIXELS | 100,
+        0 };
 ~~~
 
 This example sets the composite's minimum size to be 10 average characters 
@@ -712,9 +712,9 @@ wide and 20 percent of the screen height tall.
 
 ~~~
 HINT_MINIMUM_SIZE = {
-	SST_AVG_CHAR_WIDTHS | 10,
-	SST_PCT_OF_FIELD_HEIGHT | PCT_20,
-	0 };
+        SST_AVG_CHAR_WIDTHS | 10,
+        SST_PCT_OF_FIELD_HEIGHT | PCT_20,
+        0 };
 ~~~
 
 #### 12.2.5 Outlining the Composite
@@ -1071,15 +1071,15 @@ points (remember that there are 72 points per inch), or by means of a ratio.
 
 ~~~
 typedef struct {
-	SpecWinSizeSpec			SWSP_x;
-	SpecWinSizeSpec			SWSP_y;
+        SpecWinSizeSpec                 SWSP_x;
+        SpecWinSizeSpec                 SWSP_y;
 } SpecWinSizePair;
 
 typedef WordFlags SpecWinSizeSpec;
-#define SWSS_RATIO 				0x8000
-#define SWSS_SIGN 				0x4000
-#define SWSS_MANTISSA 				0x3c00
-#define SWSS_FRACTION 				0x03ff
+#define SWSS_RATIO                              0x8000
+#define SWSS_SIGN                               0x4000
+#define SWSS_MANTISSA                           0x3c00
+#define SWSS_FRACTION                           0x03ff
 ~~~
 
 The **SpecSizeWinPair** structure allows you to set up separate parameters 
@@ -1091,27 +1091,27 @@ use one of the following pre-defined constants to specify a ratio between zero
 and one:
 
 ~~~
-#define PCT_0			0x000
-#define PCT_5			0x033
-#define PCT_10			0x066
-#define PCT_15			0x099
-#define PCT_20 			0x0cc
-#define PCT_25 			0x100
-#define PCT_30 			0x133
-#define PCT_35 			0x166
-#define PCT_40 			0x199
-#define PCT_45 			0x1cc
-#define PCT_50 			0x200
-#define PCT_55 			0x233
-#define PCT_60 			0x266
-#define PCT_65 			0x299
-#define PCT_70 			0x2cc
-#define PCT_75 			0x300
-#define PCT_80 			0x333
-#define PCT_85 			0x366
-#define PCT_90 			0x399
-#define PCT_95 			0x3cc
-#define PCT_100			0x3ff
+#define PCT_0                   0x000
+#define PCT_5                   0x033
+#define PCT_10                  0x066
+#define PCT_15                  0x099
+#define PCT_20                  0x0cc
+#define PCT_25                  0x100
+#define PCT_30                  0x133
+#define PCT_35                  0x166
+#define PCT_40                  0x199
+#define PCT_45                  0x1cc
+#define PCT_50                  0x200
+#define PCT_55                  0x233
+#define PCT_60                  0x266
+#define PCT_65                  0x299
+#define PCT_70                  0x2cc
+#define PCT_75                  0x300
+#define PCT_80                  0x333
+#define PCT_85                  0x366
+#define PCT_90                  0x399
+#define PCT_95                  0x3cc
+#define PCT_100                 0x3ff
 ~~~
 
 To specify a constant offset, just use that offset, not setting the SWSS_RATIO 

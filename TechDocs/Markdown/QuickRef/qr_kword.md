@@ -1,107 +1,107 @@
 # 1 GOC Keywords
 
-	@alias(<protoMsg>) <messageDef>;
-	<ret> = @call [,<flags>+] [{<cast>}]
-		<obj>::[{cast2}] <msg>(<params>*);
+    @alias(<protoMsg>) <messageDef>;
+    <ret> = @call [,<flags>+] [{<cast>}]
+        <obj>::[{cast2}] <msg>(<params>*);
 
-	@callsuper();
+    @callsuper();
 
-	@callsuper <obj>::<class>::<msg>(<params>*) [<flags>,];
+    @callsuper <obj>::<class>::<msg>(<params>*) [<flags>,];
 
-	@chunk <type> <name> [ = <init> ];
+    @chunk <type> <name> [ = <init> ];
 
-	@chunkArray <stype> <aname> [ = {<init>} ];
+    @chunkArray <stype> <aname> [ = {<init>} ];
 
-	@class	<cname>, <super> [, master [, variant]];
+    @class  <cname>, <super> [, master [, variant]];
 
-	@classdecl <cname> [, <cflags>];
+    @classdecl <cname> [, <cflags>];
 
-	@default
+    @default
 
-	@define <macro> <definition>
+    @define <macro> <definition>
 
-	@deflib <libname>
+    @deflib <libname>
 
-	@dispatch [noFree] <nObj>::<nMsg>::<event>;
-	<ret> = @dispatchCall [noFree] [(<cast>)]
-							<nobj>::<nMsg>::<event>;
+    @dispatch [noFree] <nObj>::<nMsg>::<event>;
+    <ret> = @dispatchCall [noFree] [(<cast>)]
+                            <nobj>::<nMsg>::<event>;
 
-	@elementArray <stype> <arrayname> [={<init}];
+    @elementArray <stype> <arrayname> [={<init}];
 
-	@end <segname>
+    @end <segname>
 
-	@endc
+    @endc
 
-	@endif
+    @endif
 
-	@endlib
+    @endlib
 
-	@exportMessages <expName>, <num>;
+    @exportMessages <expName>, <num>;
 
-	@extern method <class> <message>+;
+    @extern method <class> <message>+;
 
-	@extern [chunk|object|visMoniker] <name>;
+    @extern [chunk|object|visMoniker] <name>;
 
-	gcnList(<manufID>, <ltype>) = [<oname>, ]* <oname>
+    gcnList(<manufID>, <ltype>) = [<oname>, ]* <oname>
 
-	(@genChildren, @genParent) shortcuts for @call and @send
+    (@genChildren, @genParent) shortcuts for @call and @send
 
-	@gstring <sname> = { <gstringDef> };
+    @gstring <sname> = { <gstringDef> };
 
-	@header <type> [ = <init> ];
+    @header <type> [ = <init> ];
 
-	@if <condition>
+    @if <condition>
 
-	@ifdef <flag>
+    @ifdef <flag>
 
-	@ifndef <flag>
+    @ifndef <flag>
 
-	@importMessage <expName>, <messageDef>;
+    @importMessage <expName>, <messageDef>;
 
-	@include [<<headerfile>>| "<headerfile>"]
+    @include [<<headerfile>>| "<headerfile>"]
 
-	@instance <insType> <iname> [ = <default>];
+    @instance <insType> <iname> [ = <default>];
 
-	@instance @activeList <iname> [ = <default>];
+    @instance @activeList <iname> [ = <default>];
 
-	@instance @composite <iname> [ = <linkName>];
+    @instance @composite <iname> [ = <linkName>];
 
-	@instance @kbdAccelerator <iname> 
-							[ = [@specificUI] <default>];
+    @instance @kbdAccelerator <iname> 
+                            [ = [@specificUI] <default>];
 
-	@instance @link <iname> [ = <default>];
+    @instance @link <iname> [ = <default>];
 
-	@instance @visMoniker <iname> [ = <default>];
+    @instance @visMoniker <iname> [ = <default>];
 
-	@message <retType> <mname>([@stack] <param>*);
+    @message <retType> <mname>([@stack] <param>*);
 
-	@method [ <hname>, ] <cname>, <mname>+;
+    @method [ <hname>, ] <cname>, <mname>+;
 
-	@object <class> <name> <flags>* = {
-			<fieldName> = <init>;*
-			<varName> [ = <init> ];
-			}
+    @object <class> <name> <flags>* = {
+            <fieldName> = <init>;*
+            <varName> [ = <init> ];
+            }
 
-	@optimize
+    @optimize
 
-	@prototype <messageDef>;
+    @prototype <messageDef>;
 
-	<event> = @record <obj>::<msg>(<params>*);
+    <event> = @record <obj>::<msg>(<params>*);
 
-	@reloc <iname>, [ (<count>, <struct>), ] <ptrType>;
+    @reloc <iname>, [ (<count>, <struct>), ] <ptrType>;
 
-	@reloc <vname>, <fn>, [(<count>, <struct>),] <ptrType>;
+    @reloc <vname>, <fn>, [(<count>, <struct>),] <ptrType>;
 
-	@reserveMessages <num>;
+    @reserveMessages <num>;
 
-	@send [,<flags>+] <obj>::<msg>(<params>*);
+    @send [,<flags>+] <obj>::<msg>(<params>*);
 
-	@start <segname> [ , <flags> ];
+    @start <segname> [ , <flags> ];
 
-	@vardata <type> <vname>;
+    @vardata <type> <vname>;
 
-	@vardataAlias (<origName>) <newType> <newName>;
+    @vardataAlias (<origName>) <newType> <newName>;
 
-	(@visChildren, @visParent) shortcuts for @call and @send
+    (@visChildren, @visParent) shortcuts for @call and @send
 
 [Table of Contents](../quickref.md) &nbsp;&nbsp; --> [2 Classes: Arc - GenTrigger](qr_clas1.md)

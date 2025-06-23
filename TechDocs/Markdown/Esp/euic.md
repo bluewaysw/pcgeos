@@ -110,7 +110,7 @@ If the class is a master class or a variant class, you must specify that on this
 line, e.g.
 
 ~~~
-class	MyMasterVis = Vis, variant {
+class   MyMasterVis = Vis, variant {
 ~~~
 
 would be the first line in the specification for master class 
@@ -150,7 +150,7 @@ For example, in MASM code, the class **GenViewControlClass** has a field
 with the following definition:
 
 ~~~
-GVCI_scale			word	100
+GVCI_scale                      word    100
 ~~~
 
 The Espire definition of the class, in a .uih file, has this corresponding line:
@@ -169,7 +169,7 @@ If the field contains an enumerated type, the format is this:
 
 ~~~
 <fieldRoot> = enumComp <size> [(<first> [, <step>])]
-	{ <member>, <member>...} : <default;
+        { <member>, <member>...} : <default;
 ~~~
 
 **fieldRoot**  
@@ -204,8 +204,8 @@ If the field contains an record, the format is this:
 
 ~~~
 <fieldRoot> = bitFieldComp <size> 
-	{<field>, <field>...} 
-	: <default>, <default>...;
+        {<field>, <field>...} 
+        : <default>, <default>...;
 ~~~
 
 **fieldRoot**  
@@ -253,14 +253,14 @@ following definition:
 
 ~~~
 dcAttributes = bitFieldComp word {
-	multipleOpenFiles, 
-	mode:2 = {viewer, sharedSingle,
-		sharedMultiple},
-	dosFileDenyWrite, vmFile, native,
-	supportsSaveAsRevert, documentExists,
-	currentTask:4 = {none, new, open, 
-		useTemplate, saveAs, dialog},
-	doNotSaveFiles } 
+        multipleOpenFiles, 
+        mode:2 = {viewer, sharedSingle,
+                sharedMultiple},
+        dosFileDenyWrite, vmFile, native,
+        supportsSaveAsRevert, documentExists,
+        currentTask:4 = {none, new, open, 
+                useTemplate, saveAs, dialog},
+        doNotSaveFiles } 
 : mode sharedSingle, vmFile, supportsSaveAsRevert, 
 currentTask new;
 ~~~
@@ -276,7 +276,7 @@ When you create a class, you may wish to change the default values of
 instance fields inherited from a superclass. The format for doing this is:
 
 ~~~
-default <fieldRoot>				= <value>;
+default <fieldRoot>                             = <value>;
 ~~~
 
 **fieldRoot**  
@@ -289,7 +289,7 @@ want the default value to be interpreted by MASM, you should
 surround it in quotes, like so:
 
 ~~~
-default		superField = "6 * SOME_MASM_CONSTANT";
+default         superField = "6 * SOME_MASM_CONSTANT";
 ~~~
 
 If the field is a record, you may wish to turn on or off some of the flags, while 
@@ -409,7 +409,7 @@ The basic format of an object definition is:
 }
 ~~~
 
-**objName**	 
+**objName**      
 This is the name of the object.
 
 **className**  
@@ -430,7 +430,7 @@ specify a field, the field will have its default value.
 To initialize a field, put in a line like
 
 ~~~
-<fieldName> =			<value>;
+<fieldName> =                   <value>;
 ~~~
 
 **fieldName**  
@@ -445,7 +445,7 @@ field's value is a constant which is only known by the assembler
 surround the constant with double quotes:
 
 ~~~
-myField		= "MFC_CONSTANT_QUUX_FACTOR";
+myField         = "MFC_CONSTANT_QUUX_FACTOR";
 ~~~
 
 You can turn on or off certain bits in a record, while leaving the rest of the 
@@ -501,9 +501,9 @@ directive has the following format:
 
 ~~~
 hints = {
-	<hintOrVardataName> [{ <value> }]
+        <hintOrVardataName> [{ <value> }]
 
-	/* repeat as necessary... */
+        /* repeat as necessary... */
 }
 ~~~
 
@@ -524,7 +524,7 @@ and referenced by name. They may also be placed in LMem data blocks.
 To create a chunk which contains a string, use this format:
 
 ~~~
-chunk <chunkName>			= "Text...";
+chunk <chunkName>                       = "Text...";
 ~~~
 
 **chunkName**  
@@ -536,8 +536,8 @@ UIC will create a chunk containing the text as a null-terminated string.
 If a chunk contains some other kind of data, the format is this:
 
 ~~~
-chunk <chunkName>			= {
-	<dataType>		<value>
+chunk <chunkName>                       = {
+        <dataType>              <value>
 /* repeat as necessary */
 }
 ~~~
@@ -589,7 +589,7 @@ code
 AnObject = MyVis {
 
 chunkPtr = chunk {
-	dw	1, 2, 3, 4
+        dw      1, 2, 3, 4
 }
 
 }
@@ -603,7 +603,7 @@ chunkPtr = MyChunk;
 }
 
 chunk MyChunk = {
-	dw	1, 2, 3, 4
+        dw      1, 2, 3, 4
 }
 ~~~
 
@@ -632,8 +632,8 @@ special attributes, use this format:
 
 ~~~
 visMoniker <monikerName> = {
-	[<attr>		= <initializer>;]*
-	"Text moniker"; /* This is optional */
+        [<attr>         = <initializer>;]*
+        "Text moniker"; /* This is optional */
 }
 ~~~
 
@@ -662,7 +662,7 @@ or
 ~~~
 <fieldName> = {
 
-	/* Attributes & initializers */
+        /* Attributes & initializers */
 }
 ~~~
 
@@ -679,7 +679,7 @@ do so, initialize the instance data field like this:
 
 ~~~
 <fieldName> = list {
-	<monikerName> [, <monikerName>]*
+        <monikerName> [, <monikerName>]*
 }
 ~~~
 

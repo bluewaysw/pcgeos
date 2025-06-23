@@ -760,7 +760,7 @@ Nothing.
 Clear the variable that prohibits smart quotes.
 
 **Pass:**  
-*ds:si - Instance data of a VisText object (or subclass).	
+*ds:si - Instance data of a VisText object (or subclass).   
 
 **Returns:**  
 Nothing
@@ -914,7 +914,7 @@ moved across.
 
 **Pass:**  
 cx, dx - Screen location to traverse to.  
-bp - Window handle of tree to traverse to.	
+bp - Window handle of tree to traverse to.  
 
 **Returns:**  
 cx:dx - Enter/leave Output Descriptor for that window (zero if none).  
@@ -1331,7 +1331,7 @@ ax, cx, dx, si, bp
 Realize the palette for this window in hardware.
 
 **Pass:**  
-di - **WindowHandle** of window.	
+di - **WindowHandle** of window.    
 
 **Returns:**  
 Nothing.
@@ -1422,7 +1422,7 @@ WIT_STRATEGY
  - cx:dx - Address of strategy routine.
 
 **Returns:**  
-CF	Set if di is a GState or references a window that is closing.
+CF  Set if di is a GState or references a window that is closing.
 
 **Destroyed:**  
 Nothing.

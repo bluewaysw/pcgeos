@@ -6,7 +6,7 @@
       [1.1.2 What You Are Expected To Know](Concepts/cintro.md#112-what-you-are-expected-to-know)  
       [1.1.3 Roadmap to the Development Kit](Concepts/cintro.md#113-roadmap-to-the-development-kit)  
       [1.1.4 Typographical Cues](Concepts/cintro.md#114-typographical-cues)  
-	[1.2 Chapters in the Books](Concepts/cintro.md#12-chapters-in-the-books)  
+    [1.2 Chapters in the Books](Concepts/cintro.md#12-chapters-in-the-books)  
       [1.2.1 The Concepts Book](Concepts/cintro.md#121-the-conceps-book)  
       [1.2.2 The Object Reference Book](Concepts/cintro.md#122-the-objects-reference-book)  
       [1.2.3 The Tools Reference Manual](Concepts/cintro.md#123-the-tools-reference-book)  
@@ -15,7 +15,7 @@
 
 **[2 Building Your Application](Concepts/cbuild.md)**  
     [2.1 What Everyone Should Read](Concepts/cbuild.md#21-what-everyone-should-read)  
-	[2.2 Topics Listing](Concepts/cbuild.md#22-topics-listing)  
+    [2.2 Topics Listing](Concepts/cbuild.md#22-topics-listing)  
       [2.2.1 Defining Your User Interface](Concepts/cbuild.md#221-defining-your-user-interface)  
       [2.2.2 Providing Other User Interface](Concepts/cbuild.md#222-providing-other-user-interface)  
       [2.2.3 Documents and Data Structures](Concepts/cbuild.md#223-documents-and-data-structures)  
@@ -25,7 +25,7 @@
 
 **[3 System Architecture](Concepts/carch.md)**  
     [3.1 GEOS Overview](Concepts/carch.md#31-geos-overview)  
-	[3.2 The System Architecture](Concepts/carch.md#32-the-system-architecture)  
+    [3.2 The System Architecture](Concepts/carch.md#32-the-system-architecture)  
       [3.2.1 Applications](Concepts/carch.md#321-applications)  
       [3.2.2 Libraries](Concepts/carch.md#322-libraries)  
       [3.2.3 The Kernel](Concepts/carch.md#323-the-kernel)  
@@ -73,7 +73,7 @@
       [4.2.2 Strategy and Internals](Concepts/cgetsta.md#422-strategy-and-internals)  
       [4.2.3 Naming Conventions](Concepts/cgetsta.md#423-naming-conventions)  
     [4.3 Geode Parameters File](Concepts/cgetsta.md#43-geode-parameters-file)  
-	[4.4 The Source File and Source Code](Concepts/cgetsta.md#44-the-source-files-and-source-code)  
+    [4.4 The Source File and Source Code](Concepts/cgetsta.md#44-the-source-files-and-source-code)  
       [4.4.1 Inclusions and Global Variables](Concepts/cgetsta.md#441-inclusions-and-global-variables)  
       [4.4.2 The Process Object](Concepts/cgetsta.md#442-the-process-object)  
       [4.4.3 UI Objects](Concepts/cgetsta.md#443-ui-objects)  

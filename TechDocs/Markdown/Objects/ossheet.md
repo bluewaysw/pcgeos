@@ -181,156 +181,156 @@ Chapter 24.
 ----------
 **Code Display 20-1 SpreadsheetClass Instance Data**
 
-	/* This is the instance data for the SpreadsheetClass object. Some of these fields
-	 * must be initialized by the application; some are set and maintained entirely by
-	 * the object. */
+    /* This is the instance data for the SpreadsheetClass object. Some of these fields
+     * must be initialized by the application; some are set and maintained entirely by
+     * the object. */
 
-	/* The first field of the spreadsheet object is always the CellFunctionParameters
-	 * structure for the cell file. Therefore, a pointer to the instance data of a
-	 * Spreadsheet object can be used as a pointer to the CellFunctionParameters. */
-	@instance CellFunctionParameters		SSI_cellParams= {0, 0, {0}};
+    /* The first field of the spreadsheet object is always the CellFunctionParameters
+     * structure for the cell file. Therefore, a pointer to the instance data of a
+     * Spreadsheet object can be used as a pointer to the CellFunctionParameters. */
+    @instance CellFunctionParameters        SSI_cellParams= {0, 0, {0}};
 
-	/* SSI_maxRow and SSI_maxCol store the indices of the leftmost row and bottommost
-	 * column allowed in the spreadsheet. The application may set these; they must be
-	 * no larger than the spreadsheet library constants MAX_ROW (8191) and MAX_COLUMN
-	 * (255). */
-	@instance word			SSI_maxRow = MAX_ROW;
-	@instance word			SSI_maxColumn = MAX_COLUMN;
+    /* SSI_maxRow and SSI_maxCol store the indices of the leftmost row and bottommost
+     * column allowed in the spreadsheet. The application may set these; they must be
+     * no larger than the spreadsheet library constants MAX_ROW (8191) and MAX_COLUMN
+     * (255). */
+    @instance word          SSI_maxRow = MAX_ROW;
+    @instance word          SSI_maxColumn = MAX_COLUMN;
 
-	/* SSI_mapBlock is the VM handle of the attached file's spreadsheet map block. The
-	 * spreadsheet sets this when a spreadsheet file is initialized; applications must
-	 * provide this when they instruct a spreadsheet object to open a file. */
-	@instance VMBlockHandle 			SSI_mapBlock;
+    /* SSI_mapBlock is the VM handle of the attached file's spreadsheet map block. The
+     * spreadsheet sets this when a spreadsheet file is initialized; applications must
+     * provide this when they instruct a spreadsheet object to open a file. */
+    @instance VMBlockHandle             SSI_mapBlock;
 
-	/* SSI_flags is a word-length record of SpreadsheetFlags. Some of these flags are
-	 * set by the application; others are set automatically by the spreadsheet object.
-	 * The application can change some of these at run-time. The SpreadsheetFlags are
-	 * described at length in section 20.2.1.4 below. The following flags are
-	 * available:
-	 *		SF_MANUAL_RECALC				SF_ALLOW_ITERATION
-	 *		SF_SUPPRESS_REDRAW				SF_APPLICATION_FUNCTIONS
-	 *		SF_QUICK_DRAW_IN_PROGRESS		SF_DOING_FEEDBACK
-	 *		SF_IN_VIEW						SF_IS_TARGET
-	 *		SF_IS_FOCUS */
-	@instance SpreadsheetFlags		SSI_flags = 0;
+    /* SSI_flags is a word-length record of SpreadsheetFlags. Some of these flags are
+     * set by the application; others are set automatically by the spreadsheet object.
+     * The application can change some of these at run-time. The SpreadsheetFlags are
+     * described at length in section 20.2.1.4 below. The following flags are
+     * available:
+     *      SF_MANUAL_RECALC                SF_ALLOW_ITERATION
+     *      SF_SUPPRESS_REDRAW              SF_APPLICATION_FUNCTIONS
+     *      SF_QUICK_DRAW_IN_PROGRESS       SF_DOING_FEEDBACK
+     *      SF_IN_VIEW                      SF_IS_TARGET
+     *      SF_IS_FOCUS */
+    @instance SpreadsheetFlags      SSI_flags = 0;
 
-	/* SSI_drawFlags is a word-sized record of SpreadsheetDrawFlags. These flags
-	 * specify how the spreadsheet will draw itself on-screen. The application can
-	 * change some of these at run-time. The SpreadsheetDrawFlags are described at
-	 * length in section 20.2.1.5 on page 1221. The following flags are available:
-	 *		SDF_DRAW_GRAPHICS			SDF_DRAW_NOTE_BUTTON
-	 *		SDF_DRAW_GRID				SDF_SIDEWAYS
-	 *		SDF_SCALE_TO_FIT			SDF_DRAW_ROW_COLUMN_TITLES
-	 *		SDF_SKIP_DRAW				SDF_CENTER_VERTICALLY
-	 *		SDF_CENTER_HORIZONTALLY		SDF_CONTINUOUS
-	 *		SDF_DRAW_HEADER				SDF_DRAW_FOOTER
-	 *		SDF_PRINT_DOCUMENT			SDF_PRINT_NOTES
-	 *		SDF_DONE */
-	@instance SpreadsheetDrawFlags		SSI_drawFlags = 0;
+    /* SSI_drawFlags is a word-sized record of SpreadsheetDrawFlags. These flags
+     * specify how the spreadsheet will draw itself on-screen. The application can
+     * change some of these at run-time. The SpreadsheetDrawFlags are described at
+     * length in section 20.2.1.5 on page 1221. The following flags are available:
+     *      SDF_DRAW_GRAPHICS           SDF_DRAW_NOTE_BUTTON
+     *      SDF_DRAW_GRID               SDF_SIDEWAYS
+     *      SDF_SCALE_TO_FIT            SDF_DRAW_ROW_COLUMN_TITLES
+     *      SDF_SKIP_DRAW               SDF_CENTER_VERTICALLY
+     *      SDF_CENTER_HORIZONTALLY     SDF_CONTINUOUS
+     *      SDF_DRAW_HEADER             SDF_DRAW_FOOTER
+     *      SDF_PRINT_DOCUMENT          SDF_PRINT_NOTES
+     *      SDF_DONE */
+    @instance SpreadsheetDrawFlags      SSI_drawFlags = 0;
 
-	/* SSI_attributes is a byte-sized record of SpreadsheetAttributes flags. The flags
-	 * are discussed at length in section 20.2.1.6 below. The following flags
-	 * are available:
-	 *		SA_TARGETABLE			SA_ENGINE_MODE */
-	@instance SpreadsheetAttributes		SSI_attributes = 0;
+    /* SSI_attributes is a byte-sized record of SpreadsheetAttributes flags. The flags
+     * are discussed at length in section 20.2.1.6 below. The following flags
+     * are available:
+     *      SA_TARGETABLE           SA_ENGINE_MODE */
+    @instance SpreadsheetAttributes     SSI_attributes = 0;
 
-	/* SSI_circCount specifies how many times the Spreadsheet should follow circular
-	 * references to approximate the cells' values. This is ignored if the
-	 * SF_ALLOW_ITERATION bit is not set. If the count is set to zero, circular
-	 * references will be flagged as errors. */
-	@instance word			SSI_circCount = 0;
+    /* SSI_circCount specifies how many times the Spreadsheet should follow circular
+     * references to approximate the cells' values. This is ignored if the
+     * SF_ALLOW_ITERATION bit is not set. If the count is set to zero, circular
+     * references will be flagged as errors. */
+    @instance word          SSI_circCount = 0;
 
-	/* SSI_converge specifies how close an approximation we want with circular
-	 * references. If each of the cells in a circular reference changes its value by
-	 * less than the SSI_converge value, the spreadsheet will stop following the loop.
-	 * If the converge value is left at zero, the spreadsheet will make the full
-	 * SSI_circCount circuits. */
-	@instance FloatNum			SSI_converge = {0, 0, 0, 0, 0};
+    /* SSI_converge specifies how close an approximation we want with circular
+     * references. If each of the cells in a circular reference changes its value by
+     * less than the SSI_converge value, the spreadsheet will stop following the loop.
+     * If the converge value is left at zero, the spreadsheet will make the full
+     * SSI_circCount circuits. */
+    @instance FloatNum          SSI_converge = {0, 0, 0, 0, 0};
 
-	/* SSI_ruler must be set by the application when the objects are defined. This
-	 * field holds an optr to one of the two SpreadsheetRuler objects; the other ruler
-	 * should be a slave of this ruler. */
-	@instance optr			SSI_ruler;
+    /* SSI_ruler must be set by the application when the objects are defined. This
+     * field holds an optr to one of the two SpreadsheetRuler objects; the other ruler
+     * should be a slave of this ruler. */
+    @instance optr          SSI_ruler;
 
-	/* The following instance data fields are for internal use by the spreadsheet.
-	 * Applications should never set or change these fields, and should not count on 
-	 * values in these fields being consistent at any given time.*/
+    /* The following instance data fields are for internal use by the spreadsheet.
+     * Applications should never set or change these fields, and should not count on 
+     * values in these fields being consistent at any given time.*/
 
-	/* SSI_active contains a reference to the active cell. This field is automatically
-	 * set and maintained by the spreadsheet object. */
-	@instance CellReference				SSI_active;
+    /* SSI_active contains a reference to the active cell. This field is automatically
+     * set and maintained by the spreadsheet object. */
+    @instance CellReference             SSI_active;
 
-	/* SSI_header and SSI_footer specify "header" and "footer" ranges of cells. These
-	 * cells will automatically be printed at the top and bottom of each page (when
-	 * the spreadsheet is printed). Users will generally set these with the Header and 
-	 * Footer controllers. */
-	@instance CellRange			SSI_header = {0, 0, 0, 0};
-	@instance CellRange			SSI_footer = {0, 0, 0, 0};
+    /* SSI_header and SSI_footer specify "header" and "footer" ranges of cells. These
+     * cells will automatically be printed at the top and bottom of each page (when
+     * the spreadsheet is printed). Users will generally set these with the Header and 
+     * Footer controllers. */
+    @instance CellRange         SSI_header = {0, 0, 0, 0};
+    @instance CellRange         SSI_footer = {0, 0, 0, 0};
 
-	/* The spreadsheet object caches the CellFunctionParameters structure in its own
-	 * instance data, and writes it to the spreadsheet map block whenever the file is
-	 * saved or updated. The spreadsheet object initializes and updates this field
-	 * automatically. */
-	@instance CellFunctionParameters 	SSI_cellParams = {0, 0, {0}};
+    /* The spreadsheet object caches the CellFunctionParameters structure in its own
+     * instance data, and writes it to the spreadsheet map block whenever the file is
+     * saved or updated. The spreadsheet object initializes and updates this field
+     * automatically. */
+    @instance CellFunctionParameters    SSI_cellParams = {0, 0, {0}};
 
-	/*
-	 * The following fields are intended to be entirely transparent to the
-	 * application. Applications should not examine, set, or change these fields.
-	 */
+    /*
+     * The following fields are intended to be entirely transparent to the
+     * application. Applications should not examine, set, or change these fields.
+     */
 
-	/* SSI_chunk is the chunk handle of the spreadsheet object. This is set and
-	 * maintained by the object. */
-	@instance ChunkHandle 			SSI_chunk = NullHandle;
+    /* SSI_chunk is the chunk handle of the spreadsheet object. This is set and
+     * maintained by the object. */
+    @instance ChunkHandle           SSI_chunk = NullHandle;
 
-	/* SSI_styleArray, SSI_nameArray, SSI_formatArray, and SSI_nameArray store the
-	 * handles of VM blocks within the spreadsheet file. These blocks contain
-	 * information about the file. The handles are also stored in the spreadsheet map
-	 * block. The spreadsheet object sets and maintains these fields automatically. */
-	@instance VMBlockHandle 			SSI_styleArray;
-	@instance VMBlockHandle 			SSI_rowArray;
-	@instance VMBlockHandle 			SSI_formatArray;
-	@instance VMBlockHandle 			SSI_nameArray;
+    /* SSI_styleArray, SSI_nameArray, SSI_formatArray, and SSI_nameArray store the
+     * handles of VM blocks within the spreadsheet file. These blocks contain
+     * information about the file. The handles are also stored in the spreadsheet map
+     * block. The spreadsheet object sets and maintains these fields automatically. */
+    @instance VMBlockHandle             SSI_styleArray;
+    @instance VMBlockHandle             SSI_rowArray;
+    @instance VMBlockHandle             SSI_formatArray;
+    @instance VMBlockHandle             SSI_nameArray;
 
-	/* SSI_offset is the offset to the visible portion of the spreadsheet. This field
-	 * is maintained automatically by the spreadsheet object. */
-	@instance PointDWord 			SSI_offset;
+    /* SSI_offset is the offset to the visible portion of the spreadsheet. This field
+     * is maintained automatically by the spreadsheet object. */
+    @instance PointDWord            SSI_offset;
 
-	/* SSI_visible stores the row and column indices of the currently visible portion
-	 * of the spreadsheet. This field is maintained automatically by the spreadsheet
-	 * object. */
-	@instance CellRange 			SSI_visible;
+    /* SSI_visible stores the row and column indices of the currently visible portion
+     * of the spreadsheet. This field is maintained automatically by the spreadsheet
+     * object. */
+    @instance CellRange             SSI_visible;
 
-	/* SSI_quickSource is used for bookkeeping during a quick move/copy. During the
-	 * move, the row/column indices of the source area are stored here. */
-	@instance CellRange 			SSI_quickSource;
+    /* SSI_quickSource is used for bookkeeping during a quick move/copy. During the
+     * move, the row/column indices of the source area are stored here. */
+    @instance CellRange             SSI_quickSource;
 
-	/* SSI_selected contains the row/column indices of the currently selected region.
-	 * This field is automatically set and maintained by the spreadsheet object. */
-	@instance CellRange 		SSI_selected;
+    /* SSI_selected contains the row/column indices of the currently selected region.
+     * This field is automatically set and maintained by the spreadsheet object. */
+    @instance CellRange         SSI_selected;
 
-	/* SSI_curAttrs contains the token for the current style attributes. All text
-	 * entered will have this style. This field is automatically set and maintained by
-	 * the spreadsheet object. */
-	@instance word 			SSI_curAttrs;
+    /* SSI_curAttrs contains the token for the current style attributes. All text
+     * entered will have this style. This field is automatically set and maintained by
+     * the spreadsheet object. */
+    @instance word          SSI_curAttrs;
 
-	/* SSI_gstate is used to cache the gstate handle used for drawing to the screen.
-	 * This field is set and maintained by the spreadsheet object. */
-	@instance word			SSI_gstate;
+    /* SSI_gstate is used to cache the gstate handle used for drawing to the screen.
+     * This field is set and maintained by the spreadsheet object. */
+    @instance word          SSI_gstate;
 
-	/* SSI_gsRefCount is used to keep track of the number of references to the gstate;
-	 * this lets the spreadsheet object know when to free the gstate. This field is
-	 * set and maintained by the spreadsheet object. */
-	@instance byte			SSI_gsRefCount;
+    /* SSI_gsRefCount is used to keep track of the number of references to the gstate;
+     * this lets the spreadsheet object know when to free the gstate. This field is
+     * set and maintained by the spreadsheet object. */
+    @instance byte          SSI_gsRefCount;
 
-	/* SSI_ancestorList, SSI_childList, and SSI_finalList are cached in the instance
-	 * data for efficiency. Applications should ignore these fields. */
-	@instance word			SSI_ancestorList;
-	@instance word			SSI_childList;
-	@instance word			SSI_finalList;
+    /* SSI_ancestorList, SSI_childList, and SSI_finalList are cached in the instance
+     * data for efficiency. Applications should ignore these fields. */
+    @instance word          SSI_ancestorList;
+    @instance word          SSI_childList;
+    @instance word          SSI_finalList;
 
-	/* SSI_bounds holds the bounds of the portion of the spreadsheet which contains
-	 * data. This field is set and maintained by the spreadsheet. */
-	@instance RectDWord			SSI_bounds = {0, 0, 0, 0}
+    /* SSI_bounds holds the bounds of the portion of the spreadsheet which contains
+     * data. This field is set and maintained by the spreadsheet. */
+    @instance RectDWord         SSI_bounds = {0, 0, 0, 0}
 
 ----------
 #### 20.2.1.1 SSI_mapBlock
@@ -366,9 +366,9 @@ by sending the message MSG_SPREADSHEET_MOVE_ACTIVE_CELL.
 
 ----------
 #### MSG_SPREADSHEET_MOVE_ACTIVE_CELL
-	void	MSG_SPREADSHEET_MOVE_ACTIVE_CELL(
-			word	row,	/* Move to cell with this row index */
-			word	column);	/* and this column index */
+    void    MSG_SPREADSHEET_MOVE_ACTIVE_CELL(
+            word    row,    /* Move to cell with this row index */
+            word    column);    /* and this column index */
 
 This message instructs the spreadsheet to change the active cell. 
 Applications should not usually need to send this message; they can rely on 
@@ -390,9 +390,9 @@ column has an index of zero.
 **Interception:** This message is not ordinarily subclassed.
 
 #### 20.2.1.4 Recalculation and Iteration
-	SpreadsheetFlags, SpreadsheetRecalcParams, 
-	MSG_SPREADSHEET_CHANGE_RECALC_PARAMS, 
-	MSG_SPREADSHEET_GET_RECALC_PARAMS, MSG_SPREADSHEET_RECALC
+    SpreadsheetFlags, SpreadsheetRecalcParams, 
+    MSG_SPREADSHEET_CHANGE_RECALC_PARAMS, 
+    MSG_SPREADSHEET_GET_RECALC_PARAMS, MSG_SPREADSHEET_RECALC
 
 The Spreadsheet object uses the **SpreadsheetFlags** record to keep track of 
 details about the Spreadsheet's current state. Some of these fields are saved 
@@ -438,11 +438,11 @@ MSG_SPREADSHEET_CHANGE_RECALC_PARAMS to the spreadsheet object.
 This message takes one argument, a pointer to a 
 **SpreadsheetRecalcParams** structure:
 
-	typedef struct {
-		SpreadsheetFlags	SRP_flags;
-		word				SRP_circCount;
-		FloatNum			SRP_converge;
-	} SpreadsheetRecalcParams;
+    typedef struct {
+        SpreadsheetFlags    SRP_flags;
+        word                SRP_circCount;
+        FloatNum            SRP_converge;
+    } SpreadsheetRecalcParams;
 
 The spreadsheet object will set its *SSI_circCount* instance datum to equal the 
 setting of *SRP_circCount*, and will set *SSI_converge* to equal *SRP_converge*. It 
@@ -459,7 +459,7 @@ The spreadsheet object will copy its *SSI_flags*, *SSI_circCount*, and
 
 ----------
 #### MSG_SPREADSHEET_RECALC
-	void	MSG_SPREADSHEET_RECALC()
+    void    MSG_SPREADSHEET_RECALC()
 
 This message instructs the spreadsheet to recalculate the values of all of its 
 cells. This message is needed if the spreadsheet has had automatic 
@@ -478,8 +478,8 @@ recalculate cells as needed.
 
 ----------
 #### MSG_SPREADSHEET_GET_RECALC_PARAMS
-	void	MSG_SPREADSHEET_GET_RECALC_PARAMS(
-			SpreadsheetRecalcParams			*ssRecalcParams);
+    void    MSG_SPREADSHEET_GET_RECALC_PARAMS(
+            SpreadsheetRecalcParams         *ssRecalcParams);
 
 This message gets the current values of the Spreadsheet object's *SSI_flags*, 
 *SSI_circCount*, and *SSI_converge* fields. The fields are copied into the 
@@ -502,8 +502,8 @@ structure.
 
 ----------
 #### MSG_SPREADSHEET_CHANGE_RECALC_PARAMS
-	void	MSG_SPREADSHEET_CHANGE_RECALC_PARAMS(
-			const SpreadsheetRecalcParams*		ssRecalcParams);
+    void    MSG_SPREADSHEET_CHANGE_RECALC_PARAMS(
+            const SpreadsheetRecalcParams*      ssRecalcParams);
 
 This message changes the current values of the spreadsheet object's 
 *SSI_flags*, *SSI_circCount*, and *SSI_converge* fields. The spreadsheet object 
@@ -529,8 +529,8 @@ structure into the spreadsheet's instance data.
 **Interception:** This message is not ordinarily subclassed.
 
 #### 20.2.1.5 SpreadsheetDrawFlags
-	SpreadsheetDrawFlags, MSG_SPREADSHEET_GET_DRAW_FLAGS, 
-	MSG_SPREADSHEET_ALTER_DRAW_FLAGS
+    SpreadsheetDrawFlags, MSG_SPREADSHEET_GET_DRAW_FLAGS, 
+    MSG_SPREADSHEET_ALTER_DRAW_FLAGS
 
 The application can specify how the spreadsheet should draw itself by setting 
 the **SpreadsheetDrawFlags**. Many of these flags are relevant only when 
@@ -601,7 +601,7 @@ spreadsheet.
 
 ----------
 #### MSG_SPREADSHEET_GET_DRAW_FLAGS
-	SpreadsheetDrawFlags 	MSG_SPREADSHEET_GET_DRAW_FLAGS()
+    SpreadsheetDrawFlags    MSG_SPREADSHEET_GET_DRAW_FLAGS()
 
 This message returns the spreadsheet object's *SSI_drawFlags* instance data 
 field.
@@ -618,9 +618,9 @@ field.
 
 ----------
 #### MSG_SPREADSHEET_ALTER_DRAW_FLAGS
-	void 	MSG_SPREADSHEET_ALTER_DRAW_FLAGS(
-			SpreadsheetDrawFlags		bitsToSet,
-			SpreadsheetDrawFlags		bitsToClear);
+    void    MSG_SPREADSHEET_ALTER_DRAW_FLAGS(
+            SpreadsheetDrawFlags        bitsToSet,
+            SpreadsheetDrawFlags        bitsToClear);
 
 This message changes the settings of the spreadsheet object's *SSI_drawFlags* 
 field. If the same bit is set in *bitsToSet* and *bitsToClear*, the results are 
@@ -640,7 +640,7 @@ undefined.
 **Interception:** This message is not ordinarily subclassed.
 
 #### 20.2.1.6 Engine Mode
-	SpreadsheetAttributes
+    SpreadsheetAttributes
 
 Some applications will want to use the spreadsheet object to manage cell files 
 and to interact with the parser, but will not want to use its user-interface. 
@@ -732,173 +732,173 @@ how they are arranged.
 ----------
 **Code Display 20-2 Declaring the Spreadsheet Objects**
 
-	/* First, we declare the Generic UI objects. These will be run by the UI thread.
-	 * Not all of the application's objects are shown here. */
+    /* First, we declare the Generic UI objects. These will be run by the UI thread.
+     * Not all of the application's objects are shown here. */
 
-	@start Interface;
-	/* The SSEditBarControl is the child of an edit menu. It is declared just like any
-	 * other controller. */
-	@object SampleEditBarControl SSEditBarControl = {
-		GI_visMoniker = "Edit bar";
-		GI_visibility = dialog;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-		HINT_GEN_CONTROL_USE_DEFAULT_TOOLS;
-	}
-	@end Interface
+    @start Interface;
+    /* The SSEditBarControl is the child of an edit menu. It is declared just like any
+     * other controller. */
+    @object SampleEditBarControl SSEditBarControl = {
+        GI_visMoniker = "Edit bar";
+        GI_visibility = dialog;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_GEN_CONTROL_USE_DEFAULT_TOOLS;
+    }
+    @end Interface
 
-	/*****************************************************************************
-	 * 	View Objects
-	 *****************************************************************************/
+    /*****************************************************************************
+     *  View Objects
+     *****************************************************************************/
 
-	/* All of the views will be in a single resource. They will children of the
-	 * GenPrimary; GenInteraction objects are used to arrange the objects on the
-	 * screen. */
-	
-	@start ViewResource;
-	/* This constant is used for sizing. */
-	#define RULER_WIDTH 			40
-	#define DOCUMENT_WIDTH 			MAX_COORD
-	#define DOCUMENT_HEIGHT			MAX_COORD
-	
-	/* This GenInteraction contains all the Spreadsheet view objects. */
-	@object GenInteractionClass SampleOuterInteraction = {
-		GI_comp = TopInteraction, BottomInteraction;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-		HINT_MINIMIZE_CHILD_SPACING;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-		HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-	}
+    /* All of the views will be in a single resource. They will children of the
+     * GenPrimary; GenInteraction objects are used to arrange the objects on the
+     * screen. */
+    
+    @start ViewResource;
+    /* This constant is used for sizing. */
+    #define RULER_WIDTH             40
+    #define DOCUMENT_WIDTH          MAX_COORD
+    #define DOCUMENT_HEIGHT         MAX_COORD
+    
+    /* This GenInteraction contains all the Spreadsheet view objects. */
+    @object GenInteractionClass SampleOuterInteraction = {
+        GI_comp = TopInteraction, BottomInteraction;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_MINIMIZE_CHILD_SPACING;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
 
-	/* This GenInteraction contains the horizontal ruler view, as well as a
-	 * space-filling corner view. */
-	@object GenInteractionClass TopInteraction = {
-		GI_comp = CornerView, HorizRulerView;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_MINIMIZE_CHILD_SPACING;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-	}
+    /* This GenInteraction contains the horizontal ruler view, as well as a
+     * space-filling corner view. */
+    @object GenInteractionClass TopInteraction = {
+        GI_comp = CornerView, HorizRulerView;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_MINIMIZE_CHILD_SPACING;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
 
-	/* This GenInteraction contains the vertical ruler view and the Spreadsheet
-	 * object's view. */
-	@object GenInteractionClass BottomInteraction = {
-		GI_comp = VertRulerView, SpreadsheetView;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_MINIMIZE_CHILD_SPACING;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-		HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-	}
+    /* This GenInteraction contains the vertical ruler view and the Spreadsheet
+     * object's view. */
+    @object GenInteractionClass BottomInteraction = {
+        GI_comp = VertRulerView, SpreadsheetView;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_MINIMIZE_CHILD_SPACING;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    }
 
-	/* The CornerView is used to make the space where the horizontal and vertical
-	 * rulers meet. */
-	@object GenViewClass CornerView = {
-		GI_attrs = @default & ~GA_TARGETABLE;
-		GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
-		GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
-		GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
-		ATTR_GEN_VIEW_PAGE_SIZE = {RULER_WIDTH, RULER_WIDTH};
-		HINT_FIXED_SIZE = {HEADER_WIDTH, HEADER_WIDTH, 0};
-	}
+    /* The CornerView is used to make the space where the horizontal and vertical
+     * rulers meet. */
+    @object GenViewClass CornerView = {
+        GI_attrs = @default & ~GA_TARGETABLE;
+        GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
+        GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+        GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+        ATTR_GEN_VIEW_PAGE_SIZE = {RULER_WIDTH, RULER_WIDTH};
+        HINT_FIXED_SIZE = {HEADER_WIDTH, HEADER_WIDTH, 0};
+    }
 
-	/* These RulerViews are used to display the spreadsheet rulers. */
-	@object RulerViewClass HorizRulerView = {
-		ATTR_GEN_VIEW_PAGE_SIZE = {DOCUMENT_WIDTH, RULER_WIDTH};
-		HINT_FIXED_SIZE {0, HEADER_HEIGHT, 0};
-		GVI_content = HorizRulerContent;
-	}
+    /* These RulerViews are used to display the spreadsheet rulers. */
+    @object RulerViewClass HorizRulerView = {
+        ATTR_GEN_VIEW_PAGE_SIZE = {DOCUMENT_WIDTH, RULER_WIDTH};
+        HINT_FIXED_SIZE {0, HEADER_HEIGHT, 0};
+        GVI_content = HorizRulerContent;
+    }
 
-	@object RulerViewClass VertRulerView = {
-		ATTR_GEN_VIEW_PAGE_SIZE = {RULER_WIDTH, DOCUMENT_HEIGHT};
-		HINT_FIXED_SIZE {0, HEADER_HEIGHT, 0};
-		GVI_content = VertRulerContent;
-	}
+    @object RulerViewClass VertRulerView = {
+        ATTR_GEN_VIEW_PAGE_SIZE = {RULER_WIDTH, DOCUMENT_HEIGHT};
+        HINT_FIXED_SIZE {0, HEADER_HEIGHT, 0};
+        GVI_content = VertRulerContent;
+    }
 
-	/* The spreadsheet is displayed in its own view. The content of this view is the
-	 * spreadsheet object itself. As explained in section 20.3.3 on page 1234, this
-	 * view must have a special handler for MSG_META_KBD_CHAR; for this reason, we use
-	 * a subclass of GenViewClass. */
-	@object SampleSpreadsheetViewClass SpreadsheetView = {
-		GVI_attrs = @default | GVA_CONTROLLED | GVA_DONT_SEND_POINTER_RELEASES 
-					| GVA_DRAG_SCROLLING | GVA_WINDOW_COORDINATE_MOUSE_EVENTS;
-		GVI_horizAttrs = @default | GVDA_SCROLLABLE;
-		GVI_vertAttrs = @default | GVDA_SCROLLABLE;
-		ATTR_GEN_VIEW_PAGE_SIZE = {DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
-		HINT_DEFAULT_FOCUS;
-		HINT_DEFAULT_TARGET;
-		GVI_CONTENT = SampleSpreadsheet;
-	}
-	@end ViewResource
+    /* The spreadsheet is displayed in its own view. The content of this view is the
+     * spreadsheet object itself. As explained in section 20.3.3 on page 1234, this
+     * view must have a special handler for MSG_META_KBD_CHAR; for this reason, we use
+     * a subclass of GenViewClass. */
+    @object SampleSpreadsheetViewClass SpreadsheetView = {
+        GVI_attrs = @default | GVA_CONTROLLED | GVA_DONT_SEND_POINTER_RELEASES 
+                    | GVA_DRAG_SCROLLING | GVA_WINDOW_COORDINATE_MOUSE_EVENTS;
+        GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+        ATTR_GEN_VIEW_PAGE_SIZE = {DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
+        HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_TARGET;
+        GVI_CONTENT = SampleSpreadsheet;
+    }
+    @end ViewResource
 
-	/*****************************************************************************
-	 * 	Vis Objects
-	 *****************************************************************************/
+    /*****************************************************************************
+     *  Vis Objects
+     *****************************************************************************/
 
-	/* These are the actual spreadsheet objects, as well as the contents in which the
-	 * rulers are displayed. The spreadsheet object is itself a subclass of
-	 * VisContent, so it need not be a child of a content. This resource is generally
-	 * run by the application thread. */
+    /* These are the actual spreadsheet objects, as well as the contents in which the
+     * rulers are displayed. The spreadsheet object is itself a subclass of
+     * VisContent, so it need not be a child of a content. This resource is generally
+     * run by the application thread. */
 
-	@start VisResource;
-	/* The spreadsheet object can generally be left with its default settings. */
-	@object SpreadsheetClass SampleSpreadsheet = {
-		VI_bounds = {0,0,DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
-		VI_attrs = @default & ~VA_MANAGED;
-		VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
-		SSI_drawFlags = SDF_DRAW_GRID | SDF_DRAW_NOTE_BUTTON;
-		SSI_ruler = HorizRuler;
-	}
+    @start VisResource;
+    /* The spreadsheet object can generally be left with its default settings. */
+    @object SpreadsheetClass SampleSpreadsheet = {
+        VI_bounds = {0,0,DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
+        VI_attrs = @default & ~VA_MANAGED;
+        VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
+        SSI_drawFlags = SDF_DRAW_GRID | SDF_DRAW_NOTE_BUTTON;
+        SSI_ruler = HorizRuler;
+    }
 
-	/* Each ruler object is the child of a ruler content. */
-	@object RulerContentClass HorizRulerContent = {
-		VI_bounds = {0,0, DOCUMENT_WIDTH, RULER_WIDTH};
-		VI_attrs = @default & ~VA_MANAGED;
-		VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
-		VCI_comp = HorizRuler;
-		VCNI_attrs = VCNA_SAME_HEIGHT_AS_VIEW | VCNA_LARGE_DOCUMENT_MODEL \
-					| VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
-	}
+    /* Each ruler object is the child of a ruler content. */
+    @object RulerContentClass HorizRulerContent = {
+        VI_bounds = {0,0, DOCUMENT_WIDTH, RULER_WIDTH};
+        VI_attrs = @default & ~VA_MANAGED;
+        VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
+        VCI_comp = HorizRuler;
+        VCNI_attrs = VCNA_SAME_HEIGHT_AS_VIEW | VCNA_LARGE_DOCUMENT_MODEL \
+                    | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+    }
 
-	/* We declare the HorizRuler as the "master" ruler; the spreadsheet sends messages
-	 * to it, and it relays them to the "slave" VertRuler. (It could as easily have
-	 * been the other way around.) */
-	@object SpreadsheetRulerClass HorizRuler = {
-		VRI_type = VRT_CUSTOM;
-		VI_bounds = {0, 0, DOCUMENT_WIDTH, RULER_WIDTH};
-		VI_attrs = @default & ~ VA_MANAGED;
-		VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
-		SRI_spreadsheet = SampleSpreadsheet;
-		VRI_slave = VertRuler;
-		VRI_rulerAttrs = @default & ~(VRA_SHOW_GRID | VRA_SHOW_MOUSE | VRA_HORIZONTAL);
-	}
+    /* We declare the HorizRuler as the "master" ruler; the spreadsheet sends messages
+     * to it, and it relays them to the "slave" VertRuler. (It could as easily have
+     * been the other way around.) */
+    @object SpreadsheetRulerClass HorizRuler = {
+        VRI_type = VRT_CUSTOM;
+        VI_bounds = {0, 0, DOCUMENT_WIDTH, RULER_WIDTH};
+        VI_attrs = @default & ~ VA_MANAGED;
+        VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
+        SRI_spreadsheet = SampleSpreadsheet;
+        VRI_slave = VertRuler;
+        VRI_rulerAttrs = @default & ~(VRA_SHOW_GRID | VRA_SHOW_MOUSE | VRA_HORIZONTAL);
+    }
 
-	/* This is the content object for the vertical ruler. */
-	@object RulerContentClass VertRulerContent = {
-		VI_bounds = {0,0, RULER_WIDTH, DOCUMENT_HEIGHT};
-		VI_attrs = @default & ~VA_MANAGED;
-		VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
-		VCI_comp = HorizRuler;
-		VCNI_rulerAttrs = VCNA_SAME_WIDTH_AS_VIEW | VCNA_LARGE_DOCUMENT_MODEL \
-						 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
-	}
+    /* This is the content object for the vertical ruler. */
+    @object RulerContentClass VertRulerContent = {
+        VI_bounds = {0,0, RULER_WIDTH, DOCUMENT_HEIGHT};
+        VI_attrs = @default & ~VA_MANAGED;
+        VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
+        VCI_comp = HorizRuler;
+        VCNI_rulerAttrs = VCNA_SAME_WIDTH_AS_VIEW | VCNA_LARGE_DOCUMENT_MODEL \
+                         | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+    }
 
-	/* We declare the VertRuler as the "slave" ruler; it will get its messages from
-	 * the "master" HorizRuler. (It could as easily have been the other way around.) */
-	@object SpreadsheetRulerClass VertRuler = {
-		VRI_type = VRT_CUSTOM;
-		VI_bounds = {0, 0, RULER_WIDTH, DOCUMENT_HEIGHT};
-		VI_attrs = @default & ~ VA_MANAGED;
-		VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
-		SRI_spreadsheet = SampleSpreadsheet;
-		VRI_rulerAttrs = \
-				(@default & ~(VRA_SHOW_GRID | VRA_SHOW_MOUSE)) | VRA_HORIZONTAL;
-	}
-	@end VisResource
+    /* We declare the VertRuler as the "slave" ruler; it will get its messages from
+     * the "master" HorizRuler. (It could as easily have been the other way around.) */
+    @object SpreadsheetRulerClass VertRuler = {
+        VRI_type = VRT_CUSTOM;
+        VI_bounds = {0, 0, RULER_WIDTH, DOCUMENT_HEIGHT};
+        VI_attrs = @default & ~ VA_MANAGED;
+        VI_optFlags = @default & ~VOF_GEOMETRY_INVALID & ~VOF_GEO_UPDATE_PATH;
+        SRI_spreadsheet = SampleSpreadsheet;
+        VRI_rulerAttrs = \
+                (@default & ~(VRA_SHOW_GRID | VRA_SHOW_MOUSE)) | VRA_HORIZONTAL;
+    }
+    @end VisResource
 
 ----------
 ### 20.3.2 Working with Files
-	SpreadsheetInitFile(), SpreadsheetInitFileData, 
-	MSG_SPREADSHEET_ATTACH_FILE, MSG_SPREADSHEET_GET_FILE, 
-	MSG_SPREADSHEET_READ_CACHED_DATA, 
-	MSG_SPREADSHEET_WRITE_CACHED_DATA
+    SpreadsheetInitFile(), SpreadsheetInitFileData, 
+    MSG_SPREADSHEET_ATTACH_FILE, MSG_SPREADSHEET_GET_FILE, 
+    MSG_SPREADSHEET_READ_CACHED_DATA, 
+    MSG_SPREADSHEET_WRITE_CACHED_DATA
 
 The spreadsheet objects work with files almost transparently to the 
 application. The application need only take a few steps to set things up and 
@@ -914,11 +914,11 @@ need to pass it when they want to attach the file.
 **SpreadsheetInitFileData** structure. **SpreadsheetInitFileData** has the 
 following fields:
 
-	typedef struct {
-		VMFileHandle	SIFD_file;
-		word			SIFD_numRows;
-		word			SIFD_numCols;
-	} SpreadsheetInitFileData;
+    typedef struct {
+        VMFileHandle    SIFD_file;
+        word            SIFD_numRows;
+        word            SIFD_numCols;
+    } SpreadsheetInitFileData;
 
 *SIFD_file* - This is the VM handle of the spreadsheet file.
 
@@ -965,9 +965,9 @@ MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE.
 
 ----------
 #### MSG_SPREADSHEET_ATTACH_FILE
-	void	MSG_SPREADSHEET_ATTACH_FILE(
-			VMBlockHandle		mapBlockHandle,
-			VMFileHandle		fileHandle);
+    void    MSG_SPREADSHEET_ATTACH_FILE(
+            VMBlockHandle       mapBlockHandle,
+            VMFileHandle        fileHandle);
 
 This message instructs a spreadsheet object to attach itself to a spreadsheet 
 file. The spreadsheet object will copy the appropriate information from the 
@@ -988,7 +988,7 @@ pre-existing one.
 
 ----------
 #### MSG_SPREADSHEET_GET_FILE
-	VMFileHandle MSG_SPREADSHEET_GET_FILE()
+    VMFileHandle MSG_SPREADSHEET_GET_FILE()
 
 This message returns the VMFileHandle of the file attached to the recipient 
 Spreadsheet object.
@@ -1005,9 +1005,9 @@ Spreadsheet object.
 
 ----------
 #### MSG_SPREADSHEET_READ_CACHED_DATA
-	void	MSG_SPREADSHEET_READ_CACHED_DATA(
-			VMFileHandle		fileHandle,
-			VMBlockHandle		mapBlockHandle);
+    void    MSG_SPREADSHEET_READ_CACHED_DATA(
+            VMFileHandle        fileHandle,
+            VMBlockHandle       mapBlockHandle);
 
 This message instructs a spreadsheet object to read its cached data from the 
 specified file and block. The handles passed supersede the handles in the 
@@ -1028,8 +1028,8 @@ MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE.
 
 ----------
 #### MSG_SPREADSHEET_WRITE_CACHED_DATA
-	void	MSG_SPREADSHEET_WRITE_CACHED_DATA(
-			VMFileHandle		file);
+    void    MSG_SPREADSHEET_WRITE_CACHED_DATA(
+            VMFileHandle        file);
 
 This message instructs the spreadsheet object to write any cached data to the 
 spreadsheet file. The file handle passed supersedes any file handle in the 
@@ -1076,10 +1076,10 @@ is pressed. At that time, it will return the focus to the spreadsheet's view.
 
 ----------
 #### MSG_SSEBC_INITIAL_KEYPRESS
-	void	MSG_SSEBC_INITIAL_KEYPRESS(
-			word	character,
-			word	flags,
-			word	state);
+    void    MSG_SSEBC_INITIAL_KEYPRESS(
+            word    character,
+            word    flags,
+            word    state);
 
 Spreadsheet objects are put in a subclass of **GenViewClass**. When this 
 subclassed View receives a keypress (via MSG_META_KBD_CHAR), it must 
