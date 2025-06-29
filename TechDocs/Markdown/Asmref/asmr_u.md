@@ -287,7 +287,7 @@ si - Instrument number for note
 ax - Frequency  
 cx - Volume  
 dx - **SoundStreamDeltaTimeType**.  
-di - Duration (in **DeltaTimerType** units)	
+di - Duration (in **DeltaTimerType** units) 
 
 **Returns:**  
 CF - Clear on success; set on error.  
@@ -307,7 +307,7 @@ Allocate a stream to play FM sounds on.
 ax - **SoundStreamSize**  
 bx - Starting priority for sound  
 cx - Number of voices for sound  
-dx - Starting tempo for sound	
+dx - Starting tempo for sound   
 
 **Returns:**  
 CF - Clear on success; set on error.  
@@ -523,7 +523,7 @@ Nothing.
 Free up an allocated music note.
 
 **Pass:**  
-bx - Token of note.	
+bx - Token of note. 
 
 **Returns:**  
 Nothing.
@@ -538,7 +538,7 @@ Nothing.
 Free an FM sound stream.
 
 **Pass:**  
-bx - Handle for **SoundControl**.	
+bx - Handle for **SoundControl**.   
 
 **Returns:**  
 Nothing.
@@ -585,7 +585,7 @@ Nothing.
 Free up a simple FM sound stream.
 
 **Pass:**  
-bx - Handle for **SoundControl**.	
+bx - Handle for **SoundControl**.   
 
 **Returns:**  
 Nothing.
@@ -813,7 +813,7 @@ Play an FM sound to a stream.
 **Pass:**  
 bx - Handle for **SoundControl**  
 dx:si - Start of event buffer to write to sound stream  
-cx - Bytes in buffer (zero if unknown)	
+cx - Bytes in buffer (zero if unknown)  
 
 **Returns:**  
 CF - Clear on success; set on error.  
@@ -832,7 +832,7 @@ Play a given piece of DAC data to the DAC device.
 bx - Handle of **SoundControl**  
 dx:si - Buffer of DAC data to put on stream  
 cx - Length of buffer (in bytes)  
-ax:bp - **SampleFormatDescription** of buffer	
+ax:bp - **SampleFormatDescription** of buffer   
 
 **Returns:**  
 CF - Clear on success; set on error.  
@@ -849,7 +849,7 @@ Change the song setting for a simple stream.
 
 **Pass:**  
 bx - Handle for **SoundControl**  
-ds:si - New sound buffer	
+ds:si - New sound buffer    
 
 **Returns:**  
 CF - Clear on success; set on error.  
@@ -909,7 +909,7 @@ Change the song setting for a simple stream.
 
 **Pass:**  
 bx - Handle for **SoundControl**  
-ds:si - New sound buffer	
+ds:si - New sound buffer    
 
 **Returns:**  
 CF - Clear on success; set on error.  
@@ -2017,7 +2017,7 @@ Finish with an object created by TextAllocClipboardObject.
 ^lbx:si - Object  
 ax - **TextClipboardOption**  
 cx:dx - owner for clipboard item  
-es:di - Name for clipboard item (**di** = -1 for default)	
+es:di - Name for clipboard item (**di** = -1 for default)   
 
 **Returns:**  
 ax - Transfer item handle (if **ax** passed non-zero)
@@ -2712,7 +2712,7 @@ Add a disk to the disk array
 
 **Pass:**  
 ds:si - Full name of disk  
-cx:dx - **TocDiskStruct** structure	
+cx:dx - **TocDiskStruct** structure 
 
 **Returns:**  
 bx - Disk token (element number in array).
@@ -2728,7 +2728,7 @@ create a new TOC file in the current working directory. All subsequent TOC
 routines will operate on this new file.
 
 **Pass:**  
-Nothing.	
+Nothing.    
 
 **Returns:**  
 CF - Set on error; clear on success.  
@@ -2744,7 +2744,7 @@ Nothing.
 Lock a DB item in the config library's TOC file.
 
 **Pass:**  
-ax:di - **DBItem** to lock.	
+ax:di - **DBItem** to lock. 
 
 **Returns:**  
 *ds:si - Item.
@@ -2792,7 +2792,7 @@ Add an element to a TOC name array.
 ax:di - **DBItem** (nameArray) if **ax** = 0, then the map item will be 
 used.  
 cx:dx - buffer containing data to add  
-ds: - fptr to name to search for	
+ds: - fptr to name to search for    
 
 **Returns:**  
 bx - Element number.
@@ -2846,7 +2846,7 @@ Add an element to the name array, inserting it in the proper order.
 di - VM handle of name array  
 ds:si - name  
 cx:dx - data to add, pass **cx** = zero if no data  
-bx - **NameArrayAddFlags**	
+bx - **NameArrayAddFlags**  
 
 **Returns:**  
 **ax** New element number
@@ -2864,7 +2864,7 @@ Find a name in a sorted name array.
 di - VM handle of **SortedNameArray**  
 ds:si - name to find  
 cx:dx - buffer for data (**cx** = null to not store data)  
-bl - **SortedNameArrayFindFlags**	
+bl - **SortedNameArrayFindFlags**   
 
 **Returns:**  
 CF - Set if found; clear otherwise.  
@@ -2883,7 +2883,7 @@ the current directory for files.
 
 **Pass:**  
 ss:bp - **TocUpdateCategoryParams** structure  
-CWD - Current working directory is directory where files reside.	
+CWD - Current working directory is directory where files reside.    
 
 **Returns:**  
 Nothing.
@@ -2954,7 +2954,7 @@ shared token database appears in the .INI file, open that file shared-multiple
 read-only.
 
 **Pass:**  
-Nothing.	
+Nothing.    
 
 **Returns:**  
 CF - Set on error; clear on success.  
@@ -3000,11 +3000,11 @@ This routine loads a specified token's moniker.
 If you ask that this routine create an LMem block for you, and ds or es is 
 pointing to that LMem block, you must fix **ds** or **es** yourself. E.g.:
 
-	push ds:[LMBH_handle] ; save LMem block handle  
-	(set up params)  
-	call TokenLoadMoniker  
-	pop bx  
-	call MemDerefDS
+    push ds:[LMBH_handle] ; save LMem block handle  
+    (set up params)  
+    call TokenLoadMoniker  
+    pop bx  
+    call MemDerefDS
 
 **Pass:**  
 ax, bx, si - Six bytes of token.  
@@ -3042,10 +3042,10 @@ Load **TokenEntry** structure for a token into a buffer.
 If you ask that this routine create an LMem block for you, and **ds** or **es** is 
 pointing to that LMem block, you must fix **ds** or **es** yourself. E.g.:
 
-	push ds:[0] ; save LMem block handle
-	call TokenLoadToken
-	pop bx
-	call MemDerefDS
+    push ds:[0] ; save LMem block handle
+    call TokenLoadToken
+    pop bx
+    call MemDerefDS
 
 **Pass:**  
 ax, bx, si - Six bytes of token.  
@@ -3166,7 +3166,7 @@ Add a font GenItem to the list, set it usable and set its action/data
 \*ds:si - Parent  
 bx - Handle of parent block  
 dx - Chunk of font entry (i.e. ^lGenListEntry)  
-cx - Action/data for entry (**FontID**)	
+cx - Action/data for entry (**FontID**) 
 
 **Returns:**  
 ds - Updated to point at segment of same block as on entry.
@@ -3337,7 +3337,7 @@ bp - gstate for ink to be drawn through (or zero)
 ax - width/height of ink (or zero for default)  
 bx:di - virtual fptr of callback routine (to be passed to 
 **ProcCallFixedOrMovable**) to determine whether a stroke 
-is a gesture or not (BX:DI=0 if none)	
+is a gesture or not (BX:DI=0 if none)   
 
 **Returns:**  
 bp - handle of an **InkDestinationInfo** structure (or zero if 
@@ -3358,7 +3358,7 @@ es:di - ptr to font string (NULL terminated)
 bx - block of parent  
 ds - pointing to a "fixupable" block  
 dx - mask OCF_IGNORE_DIRTY if created entry should be marked 
-ignore dirty, 0 if not	
+ignore dirty, 0 if not  
 
 **Returns:**  
 dx - lmem handle of new list entry  
@@ -3453,7 +3453,7 @@ MSG_GEN_SCREEN_SET_VIDEO_DRIVER.
 
 **Pass:**  
 *ds:si - Object to get the display type for (for future expansion 
-possibilities)	
+possibilities)  
 
 **Returns:**  
 ah - **DisplayType**
@@ -3537,7 +3537,7 @@ MSG_PROCESS_COPY_CHUNK_IN to it.
 
 **Pass:**  
 dx - Number of bytes on stack  
-ss:bp - Pointer to **CopyChunkInFrame** structure.	
+ss:bp - Pointer to **CopyChunkInFrame** structure.  
 
 **Returns:**  
 ax - Chunk handle of created chunk  
@@ -3750,7 +3750,7 @@ through the owning application's process.
 *ds:si - Generic object whose application object we'd like to send a 
 method to delayed via stack  
 ax - Message to send to application object  
-cx, dx, bp - Message's arguments.	
+cx, dx, bp - Message's arguments.   
 
 **Returns:**  
 ds - Updated to point at same segment of same block as on entry.
@@ -3818,7 +3818,7 @@ di.
 Unregisters the passed object to receive context data.
 
 **Pass:**  
-^lcx:dx - Object to unregister.	
+^lcx:dx - Object to unregister. 
 
 **Returns:**  
 Nothing.

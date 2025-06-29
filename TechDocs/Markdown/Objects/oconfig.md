@@ -30,7 +30,7 @@ the preferences module is compatible with the standard GEOS 2.0
 Preferences Manager applications, the module will need a local.mk makefile 
 for compilation, and that local.mk file should include a line that reads:
 
-	_PROTO = 2.0
+    _PROTO = 2.0
 
 For information about local.mk files, see "Using Tools," Chapter 10 of the 
 Tools book.
@@ -164,35 +164,35 @@ interaction will be saving data to the .INI file.
 ----------
 **Code Display 22-1 Pref Module UI Framework**
 
-	@object MPMDialogClass MPMRoot = {
-		GI_states = @default & ~GS_USABLE;
-		GI_comp = @MPMTitleGroup, @MPMOtherStuff;
-		HINT_INTERACTION_SINGLE_USAGE;
-		HINT_INTERACTION_COMPLEX_PROPERTIES;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-		HINT_LEFT_JUSTIFY_CHILDREN;
-		ATTR_GEN_HELP_CONTEXT = "myPrefModule";
-		ATTR_GEN_INIT_FILE_CATEGORY = "myPref";
-	}
+    @object MPMDialogClass MPMRoot = {
+        GI_states = @default & ~GS_USABLE;
+        GI_comp = @MPMTitleGroup, @MPMOtherStuff;
+        HINT_INTERACTION_SINGLE_USAGE;
+        HINT_INTERACTION_COMPLEX_PROPERTIES;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_LEFT_JUSTIFY_CHILDREN;
+        ATTR_GEN_HELP_CONTEXT = "myPrefModule";
+        ATTR_GEN_INIT_FILE_CATEGORY = "myPref";
+    }
 
-	@object GenInteractionClass MPMTitleGroup = {
-		GI_comp = @MPMTitle, @MPMHelp;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-	}
+    @object GenInteractionClass MPMTitleGroup = {
+        GI_comp = @MPMTitle, @MPMHelp;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
 
-	@object TitledGlyphClass MPMTitle = {
-		GI_visMoniker = list {
-		@FontTextMoniker, @FontLCMoniker, @FontLMMoniker, @FontLCGAMoniker
-		}
-	}
+    @object TitledGlyphClass MPMTitle = {
+        GI_visMoniker = list {
+        @FontTextMoniker, @FontLCMoniker, @FontLMMoniker, @FontLCGAMoniker
+        }
+    }
 
-	@object GenTextClass MPMHelp = {
-		GI_attrs = @default | GA_READ_ONLY;
-		GTXI_text = "Do such and such to configure your so and so.";
-		HINT_EXPAND_WIDTH_TO_FIT_PARENT; 
-		/* Might want HINT_MINIMUM_SIZE */
-	}
+    @object GenTextClass MPMHelp = {
+        GI_attrs = @default | GA_READ_ONLY;
+        GTXI_text = "Do such and such to configure your so and so.";
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT; 
+        /* Might want HINT_MINIMUM_SIZE */
+    }
 
 ----------
 ### 22.1.2 UI Fetch Routine
@@ -203,14 +203,14 @@ needs the UI tree for a module.
 
 The routine should have the parameters
 
-	optr _pascal (void)
+    optr _pascal (void)
 
 For an example of such a routine, see Code Display 22-2.
 
 ----------
 **Code Display 22-2 UI Fetch Routine**
 
-	optr _pascal MPMGetPrefUITree(void) { return (@MPMRoot);}
+    optr _pascal MPMGetPrefUITree(void) { return (@MPMRoot);}
 
 ----------
 ## 22.2 Module Information Routine
@@ -228,25 +228,25 @@ the module; without the proper privileges, they won't see it.
 
 The Routine should have the parameters 
 
-	void _pascal (*PrefModuleInfo)
+    void _pascal (*PrefModuleInfo)
 
 For an example of such a routine, see Code Display 22-3.
 
 ----------
 **Code Display 22-3 Module Information Routine**
 
-	void _pascal MPMGetModuleInfo(PrefModuleInfo *info)
+    void _pascal MPMGetModuleInfo(PrefModuleInfo *info)
 
-	{	/* We'll set up this structure for both system and user information */
-	 	moduleInfo->PMI_requiredFeatures = 0;
-	 	moduleInfo->PMI_prohibitedFeatures = 0;
-	 	moduleInfo->PMI_minLevel = UIIL_ADVANCED;
-	 	moduleInfo->PMI_maxLevel = UIIL_MAX_LEVEL;
-	 	moduleInfo->PMI_monikerList = @MPMMonikerList;
-	 	moduleInfo->PMI_monikerToken = moduleToken;
-	}
+    {   /* We'll set up this structure for both system and user information */
+        moduleInfo->PMI_requiredFeatures = 0;
+        moduleInfo->PMI_prohibitedFeatures = 0;
+        moduleInfo->PMI_minLevel = UIIL_ADVANCED;
+        moduleInfo->PMI_maxLevel = UIIL_MAX_LEVEL;
+        moduleInfo->PMI_monikerList = @MPMMonikerList;
+        moduleInfo->PMI_monikerToken = moduleToken;
+    }
 
-	const GeodeToken moduleToken = { "MyPf", MANUFACTURER_ID_MINE };
+    const GeodeToken moduleToken = { "MyPf", MANUFACTURER_ID_MINE };
 
 ----------
 ![image info](Figures/Fig22-2.png)  
@@ -432,50 +432,50 @@ Preferences module information about your module.
 ----------
 **Code Display 22-4 PrefClass Instance Data**
 
-	@class PrefClass, GenClass, master, variant;
+    @class PrefClass, GenClass, master, variant;
 
-	@instance PrefAttributes PI_attrs = (PA_LOAD_IF_USABLE|PA_SAVE_IF_USABLE);
+    @instance PrefAttributes PI_attrs = (PA_LOAD_IF_USABLE|PA_SAVE_IF_USABLE);
 
-	typedef ByteFlags PrefAttributes;
-	#define PA_REBOOT_IF_CHANGED 0x80
-	/* This bit signals that changes in the state of 
-	 * this object requires a system reboot to take effect. */
+    typedef ByteFlags PrefAttributes;
+    #define PA_REBOOT_IF_CHANGED 0x80
+    /* This bit signals that changes in the state of 
+     * this object requires a system reboot to take effect. */
 
-	#define PA_LOAD_IF_USABLE 0x40
-	 /* Load options only if this object is usable (this is ON by default). */
+    #define PA_LOAD_IF_USABLE 0x40
+     /* Load options only if this object is usable (this is ON by default). */
 
-	#define PA_SAVE_IF_USABLE 0x20
-	 /* Save options only if this object is usable (this is ON by default) */
+    #define PA_SAVE_IF_USABLE 0x20
+     /* Save options only if this object is usable (this is ON by default) */
 
-	#define PA_SAVE_IF_ENABLED 0x10
-	 /* Save options only if this object is enabled */
+    #define PA_SAVE_IF_ENABLED 0x10
+     /* Save options only if this object is enabled */
 
-	#define PA_SAVE_IF_CHANGED 0x08
-	 /* Save options only if this object has changed. */
+    #define PA_SAVE_IF_CHANGED 0x08
+     /* Save options only if this object has changed. */
 
-	@vardata optr ATTR_PREF_REBOOT_STRING;
-	/* This is the string passed to MSG_PREF_MGR_DO_REBOOT_DIALOG -- the
-	 * string must be in a SHARABLE LMEM resource and is incorporated into the
-	 * middle of another sentence. In English, the sentence is "The system software
-	 * will shut down and restart to change the <reboot_string>. Do you wish
-	 * to proceed?"
-	 *
-	 * If an object has its PA_REBOOT_IF_CHANGED attribute set, it will scan for
-	 * this attribute, first in itself, then up the generic tree, until it
-	 * finds one. */
-	@reloc ATTR_PREF_REBOOT_STRING, 0, optr; 
+    @vardata optr ATTR_PREF_REBOOT_STRING;
+    /* This is the string passed to MSG_PREF_MGR_DO_REBOOT_DIALOG -- the
+     * string must be in a SHARABLE LMEM resource and is incorporated into the
+     * middle of another sentence. In English, the sentence is "The system software
+     * will shut down and restart to change the <reboot_string>. Do you wish
+     * to proceed?"
+     *
+     * If an object has its PA_REBOOT_IF_CHANGED attribute set, it will scan for
+     * this attribute, first in itself, then up the generic tree, until it
+     * finds one. */
+    @reloc ATTR_PREF_REBOOT_STRING, 0, optr; 
 
-	@vardata PrefMgrFeatures ATTR_PREF_REQUIRED_FEATURES;
-	/* features bits that must be set for this object to be usable. */
+    @vardata PrefMgrFeatures ATTR_PREF_REQUIRED_FEATURES;
+    /* features bits that must be set for this object to be usable. */
 
-	@vardata PrefMgrFeatures ATTR_PREF_PROHIBITED_FEATURES;
-	/* features bits that must not be set for this object to be usable. */
+    @vardata PrefMgrFeatures ATTR_PREF_PROHIBITED_FEATURES;
+    /* features bits that must not be set for this object to be usable. */
 
-	@vardata UIInterfaceLevel ATTR_PREF_MIN_LEVEL;
-	/* interface level below which this object will not be usable */
+    @vardata UIInterfaceLevel ATTR_PREF_MIN_LEVEL;
+    /* interface level below which this object will not be usable */
 
-	@vardata UIInterfaceLevel ATTR_PREF_MAX_LEVEL;
-	/* interface level above which this object will not be usable */
+    @vardata UIInterfaceLevel ATTR_PREF_MAX_LEVEL;
+    /* interface level above which this object will not be usable */
 
 ----------
 In addition to the instance data fields, there are messages which allow for the 
@@ -483,8 +483,8 @@ dynamic retrieval and updating of these fields.
 
 ----------
 #### MSG_PREF_SET_INIT_FILE_CATEGORY
-	void	MSG_PREF_SET_INIT_FILE_CATEGORY(
-			const char *category);
+    void    MSG_PREF_SET_INIT_FILE_CATEGORY(
+            const char *category);
 
 Pref objects automatically respond to this message by changing the value of 
 the ATTR_GEN_INIT_FILE_CATEGORY variable data field. This is a utility 
@@ -501,7 +501,7 @@ message; similar functionality is available via MSG_META_ADD_VAR_DATA.
 
 ----------
 #### MSG_PREF_HAS_STATE_CHANGED
-	Boolean	MSG_PREF_HAS_STATE_CHANGED();
+    Boolean MSG_PREF_HAS_STATE_CHANGED();
 
 This message determines whether the object or any of its children have 
 changed since the last time options were loaded. This is used in conjunction 
@@ -524,7 +524,7 @@ state against the "original" state, assuming one was stored.
 
 ----------
 #### MSG_PREF_GET_REBOOT_INFO
-	optr	MSG_PREF_GET_REBOOT_INFO();
+    optr    MSG_PREF_GET_REBOOT_INFO();
 
 This message asks whether the system will need to reboot as a result of 
 changes. If a reboot is necessary, the dialog will then notify the user of the 
@@ -556,7 +556,7 @@ use the value of ATTR_PREF_REBOOT_STRING.
 
 ----------
 #### MSG_PREF_GET_REBOOT_STRING
-	optr	MSG_PREF_GET_REBOOT_STRING();
+    optr    MSG_PREF_GET_REBOOT_STRING();
 
 This message should return the optr of a string in a sharable local memory 
 resource. This string will display in the dialog box which asks the user if it is 
@@ -575,9 +575,9 @@ ATTR_PREF_REBOOT_STRING.
 
 ----------
 #### MSG_PREF_INIT
-	void	MSG_PREF_INIT(
-			PrefMgrFeatures 		features,
-			UIInterfaceLevel 		level);
+    void    MSG_PREF_INIT(
+            PrefMgrFeatures         features,
+            UIInterfaceLevel        level);
 
 This message initializes the object. The object should perform any required 
 set-up to appear on-screen. The PrefDialog object will send this object to all 
@@ -602,8 +602,8 @@ different if the object is not usable,
 
 ----------
 #### MSG_PREF_NOTIFY_DIALOG_CHANGE
-	void	MSG_PREF_NOTIFY_DIALOG_CHANGE(
-			PrefDialogChangeType 			type);
+    void    MSG_PREF_NOTIFY_DIALOG_CHANGE(
+            PrefDialogChangeType            type);
 
 This message goes out via PDGCNLT_DIALOG_CHANGE list bound to 
 PrefDialog object telling interested parties of a change in the box's state. It is 
@@ -618,17 +618,17 @@ anything useful.
 
 **Structures:** 
 
-	typedef enum {
-		PDCT_OPEN,
-		PDCT_CLOSE,
-		PDCT_DESTROY,
-		PDCT_RESTART,
-		PDCT_SHUTDOWN
-	} PrefDialogChangeType;
+    typedef enum {
+        PDCT_OPEN,
+        PDCT_CLOSE,
+        PDCT_DESTROY,
+        PDCT_RESTART,
+        PDCT_SHUTDOWN
+    } PrefDialogChangeType;
 
 ----------
 #### MSG_PREF_SET_ORIGINAL_STATE
-	void	MSG_PREF_SET_ORIGINAL_STATE();
+    void    MSG_PREF_SET_ORIGINAL_STATE();
 
 This message copies the object's current state to the "original" value field, 
 which will be used on a MSG_GEN_RESET.
@@ -650,23 +650,23 @@ values.
 ----------
 **Code Display 22-5 PrefValueClass Instance Data**
 
-	@class PrefValueClass, PrefClass;
+    @class PrefValueClass, PrefClass;
 
-	@instance word PVI_originalValue = 0;
+    @instance word PVI_originalValue = 0;
 
-	@vardata void ATTR_PREF_VALUE_ORIG_IS_INDETERMINATE;
+    @vardata void ATTR_PREF_VALUE_ORIG_IS_INDETERMINATE;
 
-	@vardata word ATTR_PREF_VALUE_ROUND;
-	/* Specifies an integer value to which the value will be rounded on .INI file
-	 * reads/writes. For instance, with a value for 10 here, the value would always
-	 * round off to the nearest 10. Note that the user can still type in an illegal
-	 * value, but this value will be rounded before saving to the .INI file.*/
+    @vardata word ATTR_PREF_VALUE_ROUND;
+    /* Specifies an integer value to which the value will be rounded on .INI file
+     * reads/writes. For instance, with a value for 10 here, the value would always
+     * round off to the nearest 10. Note that the user can still type in an illegal
+     * value, but this value will be rounded before saving to the .INI file.*/
 
 ----------
 #### MSG_PREF_VALUE_SET_ORIGINAL_VALUE
-	void	MSG_PREF_VALUE_SET_ORIGINAL_VALUE(
-			word 		orig,
-			Boolean 	indeterminate);
+    void    MSG_PREF_VALUE_SET_ORIGINAL_VALUE(
+            word        orig,
+            Boolean     indeterminate);
 
 This message sets the "original" value of the object-it also sets the value 
 stored by the superclass.
@@ -689,92 +689,92 @@ identifier of the items as a basis for selection.
 ----------
 **Code Display 22-6 PrefItemGroupClass Instance Data**
 
-	@instance PrefInitFileFlags PIGI_initFileFlags = 0;
+    @instance PrefInitFileFlags PIGI_initFileFlags = 0;
 
-	typedef ByteFlags PrefInitFileFlags;
-	#define PIFF_USE_ITEM_STRINGS 0x80
-	/* 
-	 * If set, then the item group's children must be of class PrefStringItemClass,
-	 * and their strings will be used to interact with the .INI file. */
+    typedef ByteFlags PrefInitFileFlags;
+    #define PIFF_USE_ITEM_STRINGS 0x80
+    /* 
+     * If set, then the item group's children must be of class PrefStringItemClass,
+     * and their strings will be used to interact with the .INI file. */
 
-	#define PIFF_USE_ITEM_MONIKERS 0x40
-	/* If set, the monikers of the items are used to interact with the .INI file. */
+    #define PIFF_USE_ITEM_MONIKERS 0x40
+    /* If set, the monikers of the items are used to interact with the .INI file. */
 
-	#define PIFF_APPEND_TO_KEY 0x20
-	/* If set, the strings in this list will be ADDED 
-	 * to strings that may already exist for this key */
+    #define PIFF_APPEND_TO_KEY 0x20
+    /* If set, the strings in this list will be ADDED 
+     * to strings that may already exist for this key */
 
-	#define PIFF_ABSENT_KEY_OVERRIDES_DEFAULTS 0x10
-	/* If set, an absent key for the item group will cause it to
-	 * behave as if an empty key were in the .INI file, effectively
-	 * overriding any default values stored with the group when it was
-	 * compiled. Used primarily by those groups where one subclasses
-	 * MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY to determine the
-	 * initial setting, rather than looking in the .INI file. */
+    #define PIFF_ABSENT_KEY_OVERRIDES_DEFAULTS 0x10
+    /* If set, an absent key for the item group will cause it to
+     * behave as if an empty key were in the .INI file, effectively
+     * overriding any default values stored with the group when it was
+     * compiled. Used primarily by those groups where one subclasses
+     * MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY to determine the
+     * initial setting, rather than looking in the .INI file. */
 
-	@instance word PIGI_originalSelection = 0;
+    @instance word PIGI_originalSelection = 0;
 
-	@instance word PIGI_originalNumSelections = 0;
+    @instance word PIGI_originalNumSelections = 0;
 
-	@instance byte PIGI_suspendCount = 0;
-	/* When suspend count is nonzero, the item group won't update text objects, nor
-	 * will it enable/disable objects when the selection changes. */
+    @instance byte PIGI_suspendCount = 0;
+    /* When suspend count is nonzero, the item group won't update text objects, nor
+     * will it enable/disable objects when the selection changes. */
 
-	@vardata PrefEnableData ATTR_PREF_ITEM_GROUP_ENABLE;
-	/* allows setting up an object to be enabled/disabled when
-	 * settings are made in the item group */
+    @vardata PrefEnableData ATTR_PREF_ITEM_GROUP_ENABLE;
+    /* allows setting up an object to be enabled/disabled when
+     * settings are made in the item group */
 
-	typedef struct {
-		word 			PED_item; 	/* Identifier of the item that controls
-							 * enabling/disabling of object. If this
-							 * is GIGS_NONE, then the action will be
-							 * performed if no items are selected. */
-		ChunkHandle 	PED_lptr; 	/* Object to be enabled/disabled */
-		PrefEnableFlags PED_flags;
-	} PrefEnableData;
+    typedef struct {
+        word            PED_item;   /* Identifier of the item that controls
+                             * enabling/disabling of object. If this
+                             * is GIGS_NONE, then the action will be
+                             * performed if no items are selected. */
+        ChunkHandle     PED_lptr;   /* Object to be enabled/disabled */
+        PrefEnableFlags PED_flags;
+    } PrefEnableData;
 
-	typedef ByteFlags PrefEnableFlags;
+    typedef ByteFlags PrefEnableFlags;
 
-	#define PEF_DISABLE_IF_SELECTED 0x80
-	/* Disable the object if the associated item is selected,
-	 * otherwise do the opposite. */
+    #define PEF_DISABLE_IF_SELECTED 0x80
+    /* Disable the object if the associated item is selected,
+     * otherwise do the opposite. */
 
-	#define PEF_DISABLE_IF_NONE 0x40
-	/* If this flag is set, then the PED_item field is ignored.
-	 * Instead, the item group will disable the specified object if
-	 * no items are selected -- or if there are no items in the list. */
+    #define PEF_DISABLE_IF_NONE 0x40
+    /* If this flag is set, then the PED_item field is ignored.
+     * Instead, the item group will disable the specified object if
+     * no items are selected -- or if there are no items in the list. */
 
-	@vardata word ATTR_PREF_ITEM_GROUP_OVERRIDE;
-	/* This attribute is used to specify an item which will act
-	 * as an OVERRIDE for all other items (in a non-exclusive
-	 * item group).
-	 *
-	 * When the specified item is SELECTED, then all other items are DE-SELECTED.
-	 * When any other item is SELECTED, the override item is DE-SELECTED.
-	 * If all items are DE-SELECTED, the override item becomes SELECTED */
+    @vardata word ATTR_PREF_ITEM_GROUP_OVERRIDE;
+    /* This attribute is used to specify an item which will act
+     * as an OVERRIDE for all other items (in a non-exclusive
+     * item group).
+     *
+     * When the specified item is SELECTED, then all other items are DE-SELECTED.
+     * When any other item is SELECTED, the override item is DE-SELECTED.
+     * If all items are DE-SELECTED, the override item becomes SELECTED */
 
-	@vardata ChunkHandle ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY;
-	/* chunk handle of a GenText object that will be updated
-	 * with the moniker of the currently selected item on APPLY/RESET. */
+    @vardata ChunkHandle ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY;
+    /* chunk handle of a GenText object that will be updated
+     * with the moniker of the currently selected item on APPLY/RESET. */
 
-	@vardata ChunkHandle ATTR_PREF_ITEM_GROUP_STATUS_TEXT;
-	/* chunk handle of a GenText object that will be updated every
-	 * time this object receives a MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG. */
+    @vardata ChunkHandle ATTR_PREF_ITEM_GROUP_STATUS_TEXT;
+    /* chunk handle of a GenText object that will be updated every
+     * time this object receives a MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG. */
 
-	@vardata char ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION[];
-	/* If a string is given -- the string will always be written
-	 * out as the FIRST string section for the .INI file key. For
-	 * example, the "Memory" item group uses this to always insert
-	 * "disk.geo" whenever writing out the memory types. Note:
-	 * this item is only written if the item group has either the
-	 * PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS set. */
+    @vardata char ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION[];
+    /* If a string is given -- the string will always be written
+     * out as the FIRST string section for the .INI file key. For
+     * example, the "Memory" item group uses this to always insert
+     * "disk.geo" whenever writing out the memory types. Note:
+     * this item is only written if the item group has either the
+     * PIFF_USE_ITEM_MONIKERS or PIFF_USE_ITEM_STRINGS set. */
 
 ----------
 
 ----------
 #### MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION
-	void 	MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION(
-			word selection);
+    void    MSG_PREF_ITEM_GROUP_SET_ORIGINAL_SELECTION(
+            word selection);
 
 Set the "originalSelection" field of the item group. Also, sends 
 MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION to superclass. This 
@@ -795,9 +795,9 @@ MSG_PREF_SET_ORIGINAL_STATE.
 
 ----------
 #### MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT
-	word 	MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT(
-			char 	*buffer,
-			word 	bufSize);
+    word    MSG_PREF_ITEM_GROUP_GET_SELECTED_ITEM_TEXT(
+            char    *buffer,
+            word    bufSize);
 
 This message returns the text in the moniker of the selected item. The value 
 returned is the number of characters in the string. If nothing is selected, the 
@@ -805,10 +805,10 @@ value returned is zero.
 
 ----------
 #### MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER
-	word 	MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER(@stack 
-			char 	*buffer,
-			word 	bufSize,
-			word 	identifier);
+    word    MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER(@stack 
+            char    *buffer,
+            word    bufSize,
+            word    identifier);
 
 This message retrieves the text in the moniker of one of the items of a 
 PrefItemGroup. This works for dynamic list subclasses as well. The message 
@@ -826,8 +826,8 @@ returned.
 
 ----------
 #### MSG_PREF_ITEM_GROUP_UPDATE_TEXT
-	void	MSG_PREF_ITEM_GROUP_UPDATE_TEXT(
-			ChunkHandle 		textObject);
+    void    MSG_PREF_ITEM_GROUP_UPDATE_TEXT(
+            ChunkHandle         textObject);
 
 This message updates the specified text object with text of the currently 
 selected item. The PrefItemGroup sends this to itself in conjunction with 
@@ -850,16 +850,16 @@ but can write an arbitrary string out to the .INI file if the user selects them.
 ----------
 **Code Display 22-7 PrefStringItemClass Instance Data**
 
-	@class PrefStringItemClass, GenItemClass;
+    @class PrefStringItemClass, GenItemClass;
 
-	@instance ChunkHandle PSII_initFileString = 0;
+    @instance ChunkHandle PSII_initFileString = 0;
 
 ----------
 
 ----------
 #### MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING
-	void	MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING(
-			const char 		*str);
+    void    MSG_PREF_STRING_ITEM_SET_INIT_FILE_STRING(
+            const char      *str);
 
 This message sets the string that is read and written in the .INI file.
 
@@ -868,8 +868,8 @@ again with the .INI file to make sure item should be selected.
 
 ----------
 #### MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY
-	Boolean	MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY(
-			PrefItemGroupStringVars 				*vars);
+    Boolean MSG_PREF_STRING_ITEM_CHECK_IF_IN_INIT_FILE_KEY(
+            PrefItemGroupStringVars                 *vars);
 
 This message checks the passed string to see if the string bound to this item 
 is in one of its pieces. A PrefItemGroup will send this object when loading 
@@ -887,7 +887,7 @@ your own decision, as appropriate.
 **Parameters:**  
 *vars* - Information about the string.
 
-Return:	Returns *true* (i.e. non-zero) if bound string is within the string stored 
+Return: Returns *true* (i.e. non-zero) if bound string is within the string stored 
 in the local variable.
 
 ### 22.4.5 PrefBooleanGroupClass
@@ -898,16 +898,16 @@ strings or monikers when loading and saving options.
 ----------
 **Code Display 22-8 PrefBooleanGroupClass Instance Data**
 
-	@class PrefBooleanGroupClass, PrefClass;
-	@instance PrefInitFileFlags 	PBGI_initFileFlags = 0;
-	@instance word 					PBGI_originalState = 0;
+    @class PrefBooleanGroupClass, PrefClass;
+    @instance PrefInitFileFlags     PBGI_initFileFlags = 0;
+    @instance word                  PBGI_originalState = 0;
 
 ----------
 
 ----------
 #### MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE
-	void	MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE(
-			word state);
+    void    MSG_PREF_BOOLEAN_GROUP_SET_ORIGINAL_STATE(
+            word state);
 
 This message sets the "original" state of the Boolean group.
 
@@ -936,7 +936,7 @@ dynamic lists.
 
 ----------
 #### MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY
-	void MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY();
+    void MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY();
 
 The PrefDynamicList sends itself this message in response to 
 MSG_PREF_INIT.
@@ -949,10 +949,10 @@ MSG_PREF_INIT.
 
 ----------
 #### MSG_PREF_DYNAMIC_LIST_FIND_ITEM
-	 Boolean	MSG_PREF_DYNAMIC_LIST_FIND_ITEM(
-				word 			*itemPtr,
-				const char 		*str,
-				Boolean 		ignoreCase);
+     Boolean    MSG_PREF_DYNAMIC_LIST_FIND_ITEM(
+                word            *itemPtr,
+                const char      *str,
+                Boolean         ignoreCase);
 
 This message finds an item given a moniker. It is normally used in the 
 context of loading options.
@@ -1009,20 +1009,20 @@ from the first child that returns a non-null response.
 ----------
 **Code Display 22-9 PrefInteractionClass Instance Data**
 
-	@class PrefInteractionClass, PrefClass;
+    @class PrefInteractionClass, PrefClass;
 
-	@instance PrefInteractionAttrs PII_attrs = 0;
+    @instance PrefInteractionAttrs PII_attrs = 0;
 
-	typedef ByteFlags PrefInteractionAttrs;
+    typedef ByteFlags PrefInteractionAttrs;
 
-	#define PIA_LOAD_OPTIONS_ON_INITIATE 0x80
-	/* If set, then the dialog will send MSG_PREF_INIT, 
-	 * followed by MSG_META_LOAD_OPTIONS to itself when it 
-	 * receives a MSG_GEN_INTERACTION_INITIATE */ 
+    #define PIA_LOAD_OPTIONS_ON_INITIATE 0x80
+    /* If set, then the dialog will send MSG_PREF_INIT, 
+     * followed by MSG_META_LOAD_OPTIONS to itself when it 
+     * receives a MSG_GEN_INTERACTION_INITIATE */ 
 
-	#define PIA_SAVE_OPTIONS_ON_APPLY 0x40
-	/* This flag is normally OFF to allow non-dialog prefInteractions to reside inside
-	 * other interactions without duplicate SAVE_OPTIONS messages being sent. */
+    #define PIA_SAVE_OPTIONS_ON_APPLY 0x40
+    /* This flag is normally OFF to allow non-dialog prefInteractions to reside inside
+     * other interactions without duplicate SAVE_OPTIONS messages being sent. */
 
 ----------
 ### 22.4.9 PrefDialogClass
@@ -1043,20 +1043,20 @@ PIA_SAVE_OPTIONS_ON_APPLY flag is set).
 ----------
 Code Display 22-10 PrefDialogClass Instance Data
 
-	@class PrefDialogClass, PrefInteractionClass;
+    @class PrefDialogClass, PrefInteractionClass;
 
-	@default GII_visibility = GIV_DIALOG;
+    @default GII_visibility = GIV_DIALOG;
 
-	@default GII_type = GIT_PROPERTIES;
+    @default GII_type = GIT_PROPERTIES;
 
-	@default GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    @default GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
 
-	@default PII_attrs = @default | PIA_SAVE_OPTIONS_ON_APPLY;
+    @default PII_attrs = @default | PIA_SAVE_OPTIONS_ON_APPLY;
 
 ----------
 #### MSG_PREF_DIALOG_CONFIRM_REBOOT
-	@message	Boolean MSG_PREF_DIALOG_CONFIRM_REBOOT(
-				optr 		string);
+    @message    Boolean MSG_PREF_DIALOG_CONFIRM_REBOOT(
+                optr        string);
 
 By default, the PrefDialog will respond to this message by putting up a dialog 
 box asking the user if he wants to restart the system.
@@ -1071,7 +1071,7 @@ to deny the reboot.
 
 ----------
 #### MSG_PREF_DIALOG_REBOOT
-	void	MSG_PREF_DIALOG_REBOOT();
+    void    MSG_PREF_DIALOG_REBOOT();
 
 This message causes GEOS to restart. This message does not return.
 
@@ -1082,15 +1082,15 @@ their text string to the .INI file.
 ----------
 **Code Display 22-11 PrefTextClass Instance Data**
 
-	@class PrefTextClass, PrefClass;
+    @class PrefTextClass, PrefClass;
 
-	@instance ChunkHandle PTI_originalText = 0;
+    @instance ChunkHandle PTI_originalText = 0;
 
-	@vardata ChunkHandle ATTR_PREF_TEXT_INIT_FILE_CATEGORY_TARGET;
-	/* PrefTextClass has the wonderful ability that it can set another
-	 * object's .INI. file category from its text. Category gets updated
-	 * whenever the text object receives MSG_GEN_TEXT_SEND_STATUS_MSG.
-	 * To make this happen, put the ChunkHandle of the object in this field. */
+    @vardata ChunkHandle ATTR_PREF_TEXT_INIT_FILE_CATEGORY_TARGET;
+    /* PrefTextClass has the wonderful ability that it can set another
+     * object's .INI. file category from its text. Category gets updated
+     * whenever the text object receives MSG_GEN_TEXT_SEND_STATUS_MSG.
+     * To make this happen, put the ChunkHandle of the object in this field. */
 
 ----------
 ### 22.4.11 PrefControlClass
@@ -1114,14 +1114,14 @@ ATTR_PREF_TRIGGER_ACTION field.
 ----------
 **Code Display 22-12 PrefTriggerClass Instance Data**
 
-	@class PrefTriggerClass, GenTriggerClass;
+    @class PrefTriggerClass, GenTriggerClass;
 
-	@vardata PrefTriggerAction ATTR_PREF_TRIGGER_ACTION;
+    @vardata PrefTriggerAction ATTR_PREF_TRIGGER_ACTION;
 
-	typedef struct {
-		word PTA_message;
-		optr PTA_dest;
-	} PrefTriggerAction;
+    typedef struct {
+        word PTA_message;
+        optr PTA_dest;
+    } PrefTriggerAction;
 
 ----------
 ### 22.4.14 PrefTocListClass
@@ -1142,54 +1142,54 @@ same characters in their token.
 ----------
 **Code Display 22-13 PrefTocListClass Instance Data**
 
-	@class PrefTocListClass, PrefDynamicListClass; 
+    @class PrefTocListClass, PrefDynamicListClass; 
 
-	@instance TocUpdateCategoryFlags PTLI_flags = 0;
+    @instance TocUpdateCategoryFlags PTLI_flags = 0;
 
-	typedef WordFlags TocUpdateCategoryFlags;
-	#define TUCF_EXTENDED_DEVICE_DRIVERS 0x8000
-	/* Files being enumerated are assumed to be extended device drivers. */
+    typedef WordFlags TocUpdateCategoryFlags;
+    #define TUCF_EXTENDED_DEVICE_DRIVERS 0x8000
+    /* Files being enumerated are assumed to be extended device drivers. */
 
-	#define TUCF_CUSTOM_FILES 0x4000
-	/* The TUCP_fileArrayElementSize field will be used when creating the files array.
-	 * Otherwise, each element of the files array will be of size TocFileStruct. 
-	 * NOTE: If this flag is used, the data structure used for each file
-	 * element MUST contain TocFileStruct as its first element. */
+    #define TUCF_CUSTOM_FILES 0x4000
+    /* The TUCP_fileArrayElementSize field will be used when creating the files array.
+     * Otherwise, each element of the files array will be of size TocFileStruct. 
+     * NOTE: If this flag is used, the data structure used for each file
+     * element MUST contain TocFileStruct as its first element. */
 
-	#define TUCF_ADD_CALLBACK 0x2000
-	/* TUCP_addCallback contains a fptr to a callback
-	 * routine that will be called when a file is added to the files array. */
+    #define TUCF_ADD_CALLBACK 0x2000
+    /* TUCP_addCallback contains a fptr to a callback
+     * routine that will be called when a file is added to the files array. */
 
-	#define TUCF_DIRECTORY_NOT_FOUND 0x1000
-	/* Don't actually scan the directory, because it doesn't exist.
-	 * Just create the category, and leave it empty. */
+    #define TUCF_DIRECTORY_NOT_FOUND 0x1000
+    /* Don't actually scan the directory, because it doesn't exist.
+     * Just create the category, and leave it empty. */
 
-	@instance TocCategoryStruct PTLI_tocInfo = {"", 0, 0};
+    @instance TocCategoryStruct PTLI_tocInfo = {"", 0, 0};
 
-	typedef struct {
-		TokenChars 			TCS_tokenChars;
-		DBGroupAndItem 		TCS_files; 		/* file name array */
-		DBGroupAndItem 		TCS_devices; 		/* device name array--only if
-							 * TCF_EXTENDED_DEVICE_DRIVERS is set. */
-	} TocCategoryStruct;
+    typedef struct {
+        TokenChars          TCS_tokenChars;
+        DBGroupAndItem      TCS_files;      /* file name array */
+        DBGroupAndItem      TCS_devices;        /* device name array--only if
+                             * TCF_EXTENDED_DEVICE_DRIVERS is set. */
+    } TocCategoryStruct;
 
-	@vardata PrefTocExtraEntry ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1; 
-	@vardata PrefTocExtraEntry ATTR_PREF_TOC_LIST_EXTRA_ENTRY_2;
+    @vardata PrefTocExtraEntry ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1; 
+    @vardata PrefTocExtraEntry ATTR_PREF_TOC_LIST_EXTRA_ENTRY_2;
 
-	typedef struct {
-		ChunkHandle 		PTEE_item;
-		/* lptr of item name. For device lists, this is 
-		 * the device. For others, this is the file name */
+    typedef struct {
+        ChunkHandle         PTEE_item;
+        /* lptr of item name. For device lists, this is 
+         * the device. For others, this is the file name */
 
-		ChunkHandle 		PTEE_driver;
-		/* Driver name (for device lists ONLY) */
+        ChunkHandle         PTEE_driver;
+        /* Driver name (for device lists ONLY) */
 
-		word 				PTEE_info;
-		/* Extra word of information */
-	} PrefTocExtraEntry;
+        word                PTEE_info;
+        /* Extra word of information */
+    } PrefTocExtraEntry;
 
-	@vardata char ATTR_PREF_TOC_LIST_INFO_KEY[];
-	/* This key is used to write the "info" word for device lists */
+    @vardata char ATTR_PREF_TOC_LIST_INFO_KEY[];
+    /* This key is used to write the "info" word for device lists */
 
 ----------
 Use ATTR_GEN_PATH_DATA to tell the PrefTocList object in which directory 
@@ -1204,13 +1204,13 @@ up to work with them.
 ----------
 **Code Display 22-14 PrefTocList Framework**
 
-	@object PrefTocListClass MyPrefToc = {
-		PTLI_flags			= @default | TUCF_EXTENDED_DEVICE_DRIVERS;
-		PTLI_tocInfo		= {"TOKN", 0, 0};
-		HINT_ITEM_GROUP_SCROLLABLE;
-		ATTR_GEN_INIT_FILE_KEY = "keyName";
-		ATTR_GEN_PATH_DATA 	= { file path containing drivers };
-	}
+    @object PrefTocListClass MyPrefToc = {
+        PTLI_flags          = @default | TUCF_EXTENDED_DEVICE_DRIVERS;
+        PTLI_tocInfo        = {"TOKN", 0, 0};
+        HINT_ITEM_GROUP_SCROLLABLE;
+        ATTR_GEN_INIT_FILE_KEY = "keyName";
+        ATTR_GEN_PATH_DATA  = { file path containing drivers };
+    }
 
 ----------
 The following routines are rather esoteric. You should only use them if you 
@@ -1264,8 +1264,8 @@ device driver information is stored.
 
 ----------
 #### MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO
-	Boolean	MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO(
-			word 		*infoPtr);
+    Boolean MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_INFO(
+            word        *infoPtr);
 
 This message returns the info word about the currently selected item. This 
 message can only be used with PrefTocList objects that have the 
@@ -1279,9 +1279,9 @@ item was not found.
 
 ----------
 #### MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME
-	word	MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME(
-			char 		*buf,
-			word 		bufSize);
+    word    MSG_PREF_TOC_LIST_GET_SELECTED_DRIVER_NAME(
+            char        *buf,
+            word        bufSize);
 
 This message returns the name of the driver for the selected device. This 
 message may only be used if TCF_EXTENDED_DEVICE_DRIVERS is set. 
@@ -1297,25 +1297,25 @@ message will return zero.
 
 ----------
 #### MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH
-	void	MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH(
-			TocItemPath 		*data);
+    void    MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH(
+            TocItemPath         *data);
 
 This message returns the absolute path of the selected driver or file.
 
 **Structures:** 
 
-	typedef struct {
-		word 			TIP_disk; /* disk handle */
-		MemHandle 		TIP_pathBlock; 
-			/* Handle of block holding path (locked) */
-		char 			*TIP_path; 
-			/* Locked null-terminated absolute path */
-	} TocItemPath;
+    typedef struct {
+        word            TIP_disk; /* disk handle */
+        MemHandle       TIP_pathBlock; 
+            /* Handle of block holding path (locked) */
+        char            *TIP_path; 
+            /* Locked null-terminated absolute path */
+    } TocItemPath;
 
 ----------
 #### MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE
-	Boolean	MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE(
-			word 		*retvalPtr);
+    Boolean MSG_PREF_TOC_LIST_CHECK_DEVICE_AVAILABLE(
+            word        *retvalPtr);
 
 This message determines if the device selected by the list is available in the 
 machine. This message may only be called for PrefTocList objects that have 
@@ -1325,7 +1325,7 @@ the TCF_EXTENDED_DEVICE_DRIVERS flag set.
 *retValPtr* - Pointer to a word which will be filled with the 
 return value.
 
-Return:	Returns *true* (i.e. non-zero if the device is available; if the driver is a 
+Return: Returns *true* (i.e. non-zero if the device is available; if the driver is a 
 video driver, **retValPtr* is set to the device's **DisplayType**. If the device 
 is not available, returns false (i.e. zero); *retValPtr* is zero of the device 
 doesn't exist; otherwise it will be the value of the appropriate 

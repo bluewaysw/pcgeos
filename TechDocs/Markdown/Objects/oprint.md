@@ -82,105 +82,105 @@ simple manner to redirect the document drawing commands to a printer.
 ----------
 **Code Display 17-1 Printing Example**
 
-	@object GenApplicationClass MyApp = {
-		/* -Much other GenApplication instance data omitted- */
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = 
-	 		@MyPrintControl;
-		ATTR_GEN_APPLICATION_PRINT_CONTROL = @MyPrintControl; 
-	}
+    @object GenApplicationClass MyApp = {
+        /* -Much other GenApplication instance data omitted- */
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = 
+            @MyPrintControl;
+        ATTR_GEN_APPLICATION_PRINT_CONTROL = @MyPrintControl; 
+    }
 
-	@object PrintControlClass MyPrintControl = {
-	/* The PrintControlClass is a subclass of GenControlClass. Its "features"
-	 * correspond to the "Print" and "Fax" triggers in the File menu. Its instance
-	 * data contains information about the document to be printed, and links to
-	 * objects which will provide information. */
+    @object PrintControlClass MyPrintControl = {
+    /* The PrintControlClass is a subclass of GenControlClass. Its "features"
+     * correspond to the "Print" and "Fax" triggers in the File menu. Its instance
+     * data contains information about the document to be printed, and links to
+     * objects which will provide information. */
 
-	/* Single page documents would leave out page range UI from the Print dialog: 
-		PCI_attrs = 		(@default & ~(PCA_PAGE_CONTROLS| PCA_VERIFY_PRINT)); 
-		PCI_startUserPage = 1;
-		PCI_endUserPage = 1 */
+    /* Single page documents would leave out page range UI from the Print dialog: 
+        PCI_attrs =         (@default & ~(PCA_PAGE_CONTROLS| PCA_VERIFY_PRINT)); 
+        PCI_startUserPage = 1;
+        PCI_endUserPage = 1 */
 
-	/* The PCI_output, or Print Output object, is in charge of supplying the graphics
-	 * commands describing the print job whenever the user wants to print. This object
-	 * is expected to handle a MSG_PRINT_CONTROL_START_PRINTING. */	
+    /* The PCI_output, or Print Output object, is in charge of supplying the graphics
+     * commands describing the print job whenever the user wants to print. This object
+     * is expected to handle a MSG_PRINT_CONTROL_START_PRINTING. */ 
 
-	 * The print output object is normally either the model, target or process. */
-		PCI_output = 		TO_APP_TARGET;
+     * The print output object is normally either the model, target or process. */
+        PCI_output =        TO_APP_TARGET;
 
-	/* The PCI_docNameOutput object is supposed to provide the name of the document
-	 * on demand. This name is used to identify the document to the user in the Print
-	 * Control Panel. If this object is a GenDocumentGroup, it automatically does this.
-	 * If the object in the following field is not a GenDocumentGroup object, then
-	 * it must have a handler for MSG_PRINT_GET_DOC_NAME. */
-		PCI_docNameOutput = MyGenDocumentGroup;
+    /* The PCI_docNameOutput object is supposed to provide the name of the document
+     * on demand. This name is used to identify the document to the user in the Print
+     * Control Panel. If this object is a GenDocumentGroup, it automatically does this.
+     * If the object in the following field is not a GenDocumentGroup object, then
+     * it must have a handler for MSG_PRINT_GET_DOC_NAME. */
+        PCI_docNameOutput = MyGenDocumentGroup;
 
-	/* Many simple applications only support one document size,
-	 * and may specify it in the PrintControl and never bother with it again: */
-		PCI_docSizeInfo = {			(15/2*72), 
-						(19/2*72), 
-						0, 
-						{0, 0, 0, 0}}; */
+    /* Many simple applications only support one document size,
+     * and may specify it in the PrintControl and never bother with it again: */
+        PCI_docSizeInfo = {         (15/2*72), 
+                        (19/2*72), 
+                        0, 
+                        {0, 0, 0, 0}}; */
 
-	/* Many simple applications do not support multiple documents. These applications 
-	 * should set the GS_ENABLED flag of the PrintControl's GI_states field. */
-	}
+    /* Many simple applications do not support multiple documents. These applications 
+     * should set the GS_ENABLED flag of the PrintControl's GI_states field. */
+    }
 
-	@method MVTStartPrinting, MyVisTargetedClass, MSG_PRINT_START_PRINTING
-	/* We've set up our Print Control to send this message to the Target, so whatever
-	 * object will have the target when the user wants to print needs a handler for 
-	 * this message. We could have easily have put the Model or process in charge
-	 * of printing, changing PCI_output accordingly. It is often convenient to use
-	 * the same object to handle drawing to screen and to the printer. */
+    @method MVTStartPrinting, MyVisTargetedClass, MSG_PRINT_START_PRINTING
+    /* We've set up our Print Control to send this message to the Target, so whatever
+     * object will have the target when the user wants to print needs a handler for 
+     * this message. We could have easily have put the Model or process in charge
+     * of printing, changing PCI_output accordingly. It is often convenient to use
+     * the same object to handle drawing to screen and to the printer. */
 
-	/* Arguments:		optr 		printControlOD,
-						GStateHandle		gstate */
+    /* Arguments:       optr        printControlOD,
+                        GStateHandle        gstate */
 
-	{
-		PCMarginParams 	margins;
+    {
+        PCMarginParams  margins;
 
-	/*
-	 * 	Applications which allow the user to change the document size may handle
-	 *	the situation in more than one way. If the user has changed the page setup
-	 *	by working with a PageSizeControl, then the application has probably 
-	 * 	already been alerted to the page size. If the application has its own
-	 *	way of computing document size, it should use it. Such applications should
-	 * 	send MSG_PRINT_CONTROL_SET_DOC_SIZE and MSG_PRINT_CONTROL_SET_DOC_MARGINS 
-	 * 	to the PrintControl, either in this handler or else whenever the page size
-	 *	changes. Either time is fine, just so long as the document size is set
-	 * 	correctly by the time this MSG_PRINT_START_PRINTING handler is finished.
+    /*
+     *  Applications which allow the user to change the document size may handle
+     *  the situation in more than one way. If the user has changed the page setup
+     *  by working with a PageSizeControl, then the application has probably 
+     *  already been alerted to the page size. If the application has its own
+     *  way of computing document size, it should use it. Such applications should
+     *  send MSG_PRINT_CONTROL_SET_DOC_SIZE and MSG_PRINT_CONTROL_SET_DOC_MARGINS 
+     *  to the PrintControl, either in this handler or else whenever the page size
+     *  changes. Either time is fine, just so long as the document size is set
+     *  correctly by the time this MSG_PRINT_START_PRINTING handler is finished.
 
-	 *	Applications supporting only a single document size should probably set
-	 *	the size (and margins) in the PrintControl's instance data, as shown
-	 *	above. It is also possible to send a MSG_PRINT_CONTROL_SET_DOC_SIZE on
-	 *	every print, but if the size never changes, this is a bit wasteful.
+     *  Applications supporting only a single document size should probably set
+     *  the size (and margins) in the PrintControl's instance data, as shown
+     *  above. It is also possible to send a MSG_PRINT_CONTROL_SET_DOC_SIZE on
+     *  every print, but if the size never changes, this is a bit wasteful.
 
-	 *	This application supports only one size of document. If the document
-	 *	doesn't fit on the page, the spooler will tile it onto multiple pages
-	 *	as necessary. It uses the printer's margins as the document margins: */
+     *  This application supports only one size of document. If the document
+     *  doesn't fit on the page, the spooler will tile it onto multiple pages
+     *  as necessary. It uses the printer's margins as the document margins: */
 
-		@call 	MyPrintControl::MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(
-		&margins, 	/* Fill in structure with printer's margins */
-		TRUE);		/* ...and automatically use printer margins
-					 * as document margins */
+        @call   MyPrintControl::MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(
+        &margins,   /* Fill in structure with printer's margins */
+        TRUE);      /* ...and automatically use printer margins
+                     * as document margins */
 
-		@call 	self::MSG_VIS_DRAW(DF_PRINT, gstate);
+        @call   self::MSG_VIS_DRAW(DF_PRINT, gstate);
 
-		/* If the MSG_VIS_DRAW handler didn't end with a form feed, put one in: 
-		GrNewPage(gstate, PEC_FORM_FEED); */
+        /* If the MSG_VIS_DRAW handler didn't end with a form feed, put one in: 
+        GrNewPage(gstate, PEC_FORM_FEED); */
 
-		@send 	MyPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
-	}
+        @send   MyPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+    }
 
-	@method MVTDraw, MyVisTargetClass, MSG_VIS_DRAW
-	/* Chances are, whatever object this is has some sort of draw handler already.
-	 * However, if you're building up this class from scratch, you'll be glad to
-	 * know that commands of the following form work just as well drawing in
-	 * response to a print request as they do drawing anything else: */
+    @method MVTDraw, MyVisTargetClass, MSG_VIS_DRAW
+    /* Chances are, whatever object this is has some sort of draw handler already.
+     * However, if you're building up this class from scratch, you'll be glad to
+     * know that commands of the following form work just as well drawing in
+     * response to a print request as they do drawing anything else: */
 
-	{	GrSetLineColor(gstate, CF_INDEX, C_RED, 0, 0);
-		GrDrawLine(gstate, 144, 144, 288, 288);
-		GrNewPage(gstate, PEC_FORM_FEED);
-	}
+    {   GrSetLineColor(gstate, CF_INDEX, C_RED, 0, 0);
+        GrDrawLine(gstate, 144, 144, 288, 288);
+        GrNewPage(gstate, PEC_FORM_FEED);
+    }
 
 ----------
 ## 17.3 How Jobs Get Printed
@@ -309,81 +309,81 @@ are shown in Code Display 17-2.
 ----------
 **Code Display 17-2 Print Control Instance Data and Features**
 
-		/* The following bitfield contains the PrintControl's attributes */
-	@instance PrintControlAttrs 		PCI_attrs = 
-				(PCA_COPY_CONTROLS | PCA_PAGE_CONTROLS |
-				 PCA_QUALITY_CONTROLS | PCA_USES_DIALOG_BOX |
-				 PCA_GRAPHICS_MODE | PCA_TEXT_MODE );
-		/* Possible PCI_attrs flags (may be combined using | and &):
-		 * PCA_MARK_APP_BUSY, 				PCA_VERIFY_PRINT,
-		 * PCA_SHOW_PROGRESS, 				PCA_PROGRESS_PERCENT, 
-		 * PCA_PROGRESS_PAGE, 				PCA_FORCE_ROTATION 
-		 * PCA_COPY_CONTROLS,				PCA_PAGE_CONTROLS,
-		 * PCA_QUALITY_CONTROLS, 				PCA_USES_DIALOG_BOX,
-		 * PCA_GRAPHICS_MODE,				PCA_TEXT_MODE 
-		 * PCA_DEFAULT_QUALITY						*/
+        /* The following bitfield contains the PrintControl's attributes */
+    @instance PrintControlAttrs         PCI_attrs = 
+                (PCA_COPY_CONTROLS | PCA_PAGE_CONTROLS |
+                 PCA_QUALITY_CONTROLS | PCA_USES_DIALOG_BOX |
+                 PCA_GRAPHICS_MODE | PCA_TEXT_MODE );
+        /* Possible PCI_attrs flags (may be combined using | and &):
+         * PCA_MARK_APP_BUSY,               PCA_VERIFY_PRINT,
+         * PCA_SHOW_PROGRESS,               PCA_PROGRESS_PERCENT, 
+         * PCA_PROGRESS_PAGE,               PCA_FORCE_ROTATION 
+         * PCA_COPY_CONTROLS,               PCA_PAGE_CONTROLS,
+         * PCA_QUALITY_CONTROLS,                PCA_USES_DIALOG_BOX,
+         * PCA_GRAPHICS_MODE,               PCA_TEXT_MODE 
+         * PCA_DEFAULT_QUALITY                      */
 
-		/* The fields below are the complete and requested page ranges */
-	@instance word 		PCI_startPage = 1;
-	@instance word 		PCI_endPage = 1;
-	@instance word 		PCI_startUserPage = 0;
-	@instance word 		PCI_endUserPage = 0x7fff";
+        /* The fields below are the complete and requested page ranges */
+    @instance word      PCI_startPage = 1;
+    @instance word      PCI_endPage = 1;
+    @instance word      PCI_startUserPage = 0;
+    @instance word      PCI_endUserPage = 0x7fff";
 
-		/* The following field contains the default printer number */
-	@instance word 		PCI_defPrinter = -1;
+        /* The following field contains the default printer number */
+    @instance word      PCI_defPrinter = -1;
 
-		/* The following fields deal with document dimensions */
-	@instance PageSizeReport 		PCI_docSizeInfo = 0;
+        /* The following fields deal with document dimensions */
+    @instance PageSizeReport        PCI_docSizeInfo = 0;
 
-		/* Pointers to objects receiving vital messages */
-	@instance optr 		PCI_output;
-	@instance optr 		PCI_docNameOutput;
+        /* Pointers to objects receiving vital messages */
+    @instance optr      PCI_output;
+    @instance optr      PCI_docNameOutput;
 
-		/* The PrintControl's features determine whether to use standard
-		 * print and fax triggers to bring up the Print Dialog box. */
-	typedef ByteFlags PrintControlFeatures;
-	/* The following flags may be combined with | and &:
-		PRINTCF_PRINT_TRIGGER,
-		PRINTCF_FAX_TRIGGER */
-	/* To provide a non-standard print trigger, use the GenControl vardata
-	 * field ATTR_GEN_CONTROL_APP_UI. */
-	typedef ByteFlags PrintControlToolboxFeatures;
-	/* The following flags may be combined with | and &:
-		PRINTCTF_PRINT_TRIGGER 
-		PRINTCTF_FAX_TRIGGER */
+        /* The PrintControl's features determine whether to use standard
+         * print and fax triggers to bring up the Print Dialog box. */
+    typedef ByteFlags PrintControlFeatures;
+    /* The following flags may be combined with | and &:
+        PRINTCF_PRINT_TRIGGER,
+        PRINTCF_FAX_TRIGGER */
+    /* To provide a non-standard print trigger, use the GenControl vardata
+     * field ATTR_GEN_CONTROL_APP_UI. */
+    typedef ByteFlags PrintControlToolboxFeatures;
+    /* The following flags may be combined with | and &:
+        PRINTCTF_PRINT_TRIGGER 
+        PRINTCTF_FAX_TRIGGER */
 
-	/* To include application-specific UI in the print dialog box. */
-	@vardata optr ATTR_PRINT_CONTROL_APP_UI;
+    /* To include application-specific UI in the print dialog box. */
+    @vardata optr ATTR_PRINT_CONTROL_APP_UI;
 
-	/* This piece of temporary vardata is internal: */
-	@vardata TempPrintCtrlInstance TEMP_PRINT_CONTROL_INSTANCE;
+    /* This piece of temporary vardata is internal: */
+    @vardata TempPrintCtrlInstance TEMP_PRINT_CONTROL_INSTANCE;
 
-	/* Its structures are defined as follows:
-	typedef struct {
-		 optr 			TPCI_currentSummons; ( currently active summons )
-		 optr 			TPCI_progressBox; ( OD of progress dialog box */
-		 ChunkHandle 	TPCI_jobParHandle; ( handle to JobParamters )
-		 word 			TPCI_fileHandle; ( file handle (if printing) )
-		 word 			TPCI_gstringHandle; ( gstring handle if printing )
-		 word 			TPCI_printBlockHan; ( the printer block handle )
-		 PrintControlAttrs 			TPCI_attrs;
-		 PrintStatusFlags 			TPCI_status;
-		 byte 			TPCI_holdUpCompletionCount;
-	} TempPrintCtrlInstance;
-	typedef ByteFlags PrintStatusFlags;
-	#define PSF_FAX_AVAILABLE 0x80 ( set if a fax driver is available )
-	#define PSF_ABORT 0x08 ( user wants to abort printing )
-	#define PSF_RECEIVED_COMPLETED 0x04 ( MSG_-_PRINTING_COMPLETED received )
-	#define PSF_RECEIVED_NAME 0x02 ( MSG_PC_SET_DOC_NAME received )
-	#define PSF_VERIFIED 0x01 ( PSG_PC_VERIFY_? received ) */
+    /* Its structures are defined as follows:
+    typedef struct {
+         optr           TPCI_currentSummons; ( currently active summons )
+         optr           TPCI_progressBox; ( OD of progress dialog box */
+         ChunkHandle    TPCI_jobParHandle; ( handle to JobParamters )
+         word           TPCI_fileHandle; ( file handle (if printing) )
+         word           TPCI_gstringHandle; ( gstring handle if printing )
+         word           TPCI_printBlockHan; ( the printer block handle )
+         PrintControlAttrs          TPCI_attrs;
+         PrintStatusFlags           TPCI_status;
+         byte           TPCI_holdUpCompletionCount;
+    } TempPrintCtrlInstance;
+    typedef ByteFlags PrintStatusFlags;
+    #define PSF_FAX_AVAILABLE 0x80 ( set if a fax driver is available )
+    #define PSF_ABORT 0x08 ( user wants to abort printing )
+    #define PSF_RECEIVED_COMPLETED 0x04 ( MSG_-_PRINTING_COMPLETED received )
+    #define PSF_RECEIVED_NAME 0x02 ( MSG_PC_SET_DOC_NAME received )
+    #define PSF_VERIFIED 0x01 ( PSG_PC_VERIFY_? received ) */
 
-	@vardata TempPrintCompletionEventData TEMP_PRINT_COMPLETION_EVENT;
+    @vardata TempPrintCompletionEventData TEMP_PRINT_COMPLETION_EVENT;
 
-	/* The TempPrintCompletionEventData structure is defined:
-	typedef struct {
-		 MemHandle 		TPCED_event;
-		 MessageFlags 		TPCED_messageFlags;
-	} TempPrintCompletionEventData; 
+    /* The TempPrintCompletionEventData structure is defined:
+    typedef struct {
+         MemHandle      TPCED_event;
+         MessageFlags       TPCED_messageFlags;
+    } TempPrintCompletionEventData; 
 
 ----------
 ### 17.4.1 Alerting the GenApplication
@@ -395,8 +395,8 @@ should be specified in the GenApplication's
 ATTR_GEN_APPLICATION_PRINT_CONTROL field.
 
 ### 17.4.2 Attributes
-	PCI_attrs, MSG_PRINT_CONTROL_SET_ATTRS, 
-	MSG_PRINT_CONTROL_GET_ATTRS
+    PCI_attrs, MSG_PRINT_CONTROL_SET_ATTRS, 
+    MSG_PRINT_CONTROL_GET_ATTRS
 
 The Print Control includes several attributes which are grouped together 
 into a record of type **PrintControlAttrs**. These represent some choices 
@@ -481,8 +481,8 @@ There are messages to get and set these attributes.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_ATTRS
-	void	MSG_PRINT_CONTROL_SET_ATTRS(
-			PrintControlAttrs 	attributes);
+    void    MSG_PRINT_CONTROL_SET_ATTRS(
+            PrintControlAttrs   attributes);
 
 Use this message to change the values stored in the *PCI_attrs* structure. Pass 
 a record of type **PrintControlAttrs** containing the desired values.
@@ -500,7 +500,7 @@ a record of type **PrintControlAttrs** containing the desired values.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_ATTRS
-	PrintControlAttrs 	MSG_PRINT_CONTROL_GET_ATTRS();
+    PrintControlAttrs   MSG_PRINT_CONTROL_GET_ATTRS();
 
 Use this message to retrieve the values stored in the *PCI_attrs* structure. It 
 will return a record of type **PrintControlAttrs** containing the desired 
@@ -517,11 +517,11 @@ values.
 **Interception:** Unlikely.
 
 ### 17.4.3 Page Range Information
-	PCI_startPage, PCI_endPage, PCI_startUserPage, 
-	PCI_endUserPage, MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE, 
-	MSG_PRINT_CONTROL_GET_TOTAL_PAGE_RANGE, 
-	MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE, 
-	MSG_PRINT_CONTROL_GET_SELECTED_PAGE_RANGE
+    PCI_startPage, PCI_endPage, PCI_startUserPage, 
+    PCI_endUserPage, MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE, 
+    MSG_PRINT_CONTROL_GET_TOTAL_PAGE_RANGE, 
+    MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE, 
+    MSG_PRINT_CONTROL_GET_SELECTED_PAGE_RANGE
 
 The *PCI_startPage* and *PCI_endPage* fields should contain the page numbers 
 of the first and last pages possible to print, known as the total page range. 
@@ -539,9 +539,9 @@ sheets might want the cover sheet to be page zero.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE
-	void	MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE(
-			int 	firstPage,
-			int		lastPage);
+    void    MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE(
+            int     firstPage,
+            int     lastPage);
 
 The application should send this message to set the first and last page 
 numbers of the document. You might want to send this message every time 
@@ -564,7 +564,7 @@ latter event with a MSG_PRINT_NOTIFY_PRINT_DB.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_TOTAL_PAGE_RANGE
-	dword	MSG_PRINT_CONTROL_GET_TOTAL_PAGE_RANGE();
+    dword   MSG_PRINT_CONTROL_GET_TOTAL_PAGE_RANGE();
 
 This message returns two integers. These integers are the numbers of the 
 first and last pages of the range of possible pages. These values aren't 
@@ -584,9 +584,9 @@ page.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE
-	void	MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE(
-			int 	firstPage,
-			int		lastPage);
+    void    MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE(
+            int     firstPage,
+            int     lastPage);
 
 This message takes the passed values and uses them as the first and last 
 pages that the user wants to print.
@@ -606,7 +606,7 @@ pages that the user wants to print.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_SELECTED_PAGE_RANGE
-	dword	MSG_PRINT_CONTROL_GET_SELECTED_PAGE_RANGE();
+    dword   MSG_PRINT_CONTROL_GET_SELECTED_PAGE_RANGE();
 
 This message returns the user's selected range of pages to print. 
 
@@ -622,14 +622,14 @@ to print; the low word is the last page of this range.
 **Interception:** Unlikely.
 
 ### 17.4.4 Document Size
-	PCI_docSizeInfo, MSG_PRINT_CONTROL_SET_DOC_SIZE, 
-	MSG_PRINT_CONTROL_GET_DOC_SIZE, 
-	MSG_PRINT_CONTROL_SET_DOC_MARGINS, 
-	MSG_PRINT_CONTROL_GET_DOC_MARGINS, 
-	MSG_PRINT_CONTROL_SET_EXTENDED_DOC_SIZE, 
-	MSG_PRINT_CONTROL_GET_EXTENDED_DOC_SIZE, 
-	MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO, 
-	MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO
+    PCI_docSizeInfo, MSG_PRINT_CONTROL_SET_DOC_SIZE, 
+    MSG_PRINT_CONTROL_GET_DOC_SIZE, 
+    MSG_PRINT_CONTROL_SET_DOC_MARGINS, 
+    MSG_PRINT_CONTROL_GET_DOC_MARGINS, 
+    MSG_PRINT_CONTROL_SET_EXTENDED_DOC_SIZE, 
+    MSG_PRINT_CONTROL_GET_EXTENDED_DOC_SIZE, 
+    MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO, 
+    MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO
 
 It is possible to specify the size of the document when creating the Print 
 Control. Note that this is the size of the document, not the size of the piece of 
@@ -651,9 +651,9 @@ dimensions of 32-bit extended documents.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_DOC_SIZE
-	void	MSG_PRINT_CONTROL_SET_DOC_SIZE(
-			int 	width,
-			int		height);
+    void    MSG_PRINT_CONTROL_SET_DOC_SIZE(
+            int     width,
+            int     height);
 
 This message changes the values of the document size. It takes two integers, 
 representing the new width and height for the document to use. It can only 
@@ -677,7 +677,7 @@ Remember that the document size includes the document margins.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_DOC_SIZE
-	dword	MSG_PRINT_CONTROL_GET_DOC_SIZE();
+    dword   MSG_PRINT_CONTROL_GET_DOC_SIZE();
 
 Use this message to retrieve the present document size. The size is returned 
 as a width and height, each expressed in points. 
@@ -702,8 +702,8 @@ Remember that the document size includes the document margins.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_EXTENDED_DOC_SIZE
-	void	MSG_PRINT_CONTROL_SET_EXTENDED_DOC_SIZE(
-			PCDocSizeParams 	*ptr);
+    void    MSG_PRINT_CONTROL_SET_EXTENDED_DOC_SIZE(
+            PCDocSizeParams     *ptr);
 
 This message changes the values of the document size using the two passed 
 double integers as the new width and height to use. When working with 
@@ -726,15 +726,15 @@ containing the document size.
 
 **Structures:** The **PCDocSizeParams** structure has the following definition:
 
-	typedef struct {
-		dword		PCDSP_width;
-		dword		PCDSP_height;
-	} PCDocSizeParams;
+    typedef struct {
+        dword       PCDSP_width;
+        dword       PCDSP_height;
+    } PCDocSizeParams;
 
 ----------
 #### MSG_PRINT_CONTROL_GET_EXTENDED_DOC_SIZE
-	void	MSG_PRINT_CONTROL_GET_EXTENDED_DOC_SIZE(
-			PCDocSizeParams 	*ptr);
+    void    MSG_PRINT_CONTROL_GET_EXTENDED_DOC_SIZE(
+            PCDocSizeParams     *ptr);
 
 Use this message to retrieve the present document size. It returns two double 
 integers representing the width and height, expressed in points. If the size is 
@@ -758,15 +758,15 @@ document parameters.
 
 **Structures:** The PCDocSizeParams structure has the following definition:
 
-	typedef struct {
-		dword		PCDSP_width;
-		dword		PCDSP_height;
-	} PCDocSizeParams;
+    typedef struct {
+        dword       PCDSP_width;
+        dword       PCDSP_height;
+    } PCDocSizeParams;
 
 ----------
 #### MSG_PRINT_CONTROL_SET_DOC_MARGINS
-	void	MSG_PRINT_CONTROL_SET_DOC_MARGINS(
-			PCMarginParams 	*ptr);
+    void    MSG_PRINT_CONTROL_SET_DOC_MARGINS(
+            PCMarginParams  *ptr);
 
 Use this message to set new values for the document margins. It takes four 
 arguments, the point values to use for the left, top, right, and bottom 
@@ -786,17 +786,17 @@ new document margins.
 
 **Structures:** The **PCMarginParams** structure has the following definition:
 
-	typedef struct {
-		word		PCMP_left;
-		word		PCMP_top;
-		word		PCMP_right;
-		word		PCMP_bottom;
-	} PCMarginParams;
+    typedef struct {
+        word        PCMP_left;
+        word        PCMP_top;
+        word        PCMP_right;
+        word        PCMP_bottom;
+    } PCMarginParams;
 
 ----------
 #### MSG_PRINT_CONTROL_GET_DOC_MARGINS
-	void	MSG_PRINT_CONTROL_GET_DOC_MARGINS(
-			PCMarginParams 	*ptr);
+    void    MSG_PRINT_CONTROL_GET_DOC_MARGINS(
+            PCMarginParams  *ptr);
 
 Use this message to get the present values for the document margins. It 
 returns four integers. These integers represent the left, top, right, and 
@@ -818,17 +818,17 @@ will hold return value.
 
 **Structures:** The **PCMarginParams** structure has the following definition:
 
-	typedef struct {
-		word		PCMP_left;
-		word		PCMP_top;
-		word		PCMP_right;
-		word		PCMP_bottom;
-	} PCMarginParams;
+    typedef struct {
+        word        PCMP_left;
+        word        PCMP_top;
+        word        PCMP_right;
+        word        PCMP_bottom;
+    } PCMarginParams;
 
 ----------
 #### MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO
-	void	MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO(
-			PageSizeReport 	*ptr);
+    void    MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO(
+            PageSizeReport  *ptr);
 
 Use this message to set all of the information about the document size and 
 orientation.
@@ -846,17 +846,17 @@ orientation.
 
 **Structures:** The **PageSizeReport** structure has the following definition:
 
-	typedef struct {
-		dword			PSR_width;
-		dword			PSR_height;
-		PageLayout		PSR_layout;
-		PCMarginParams 	PSR_margins;
-	} PCMarginParams;
+    typedef struct {
+        dword           PSR_width;
+        dword           PSR_height;
+        PageLayout      PSR_layout;
+        PCMarginParams  PSR_margins;
+    } PCMarginParams;
 
 ----------
 #### MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO
-	void	MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO(
-			PageSizeReport 	*ptr);
+    void    MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO(
+            PageSizeReport  *ptr);
 
 Use this message to set all of the information about the document size and 
 orientation.
@@ -875,22 +875,22 @@ which the message handler will fill in.
 
 **Structures:** The **PageSizeReport** structure has the following definition:
 
-	typedef struct {
-		dword			PSR_width;
-		dword			PSR_height;
-		PageLayout		PSR_layout;
-		PCMarginParams 	PSR_margins;
-	} PCMarginParams;
+    typedef struct {
+        dword           PSR_width;
+        dword           PSR_height;
+        PageLayout      PSR_layout;
+        PCMarginParams  PSR_margins;
+    } PCMarginParams;
 
 ### 17.4.5 Print Output Object
-	PCI_output, MSG_PRINT_START_PRINTING, 
-	MSG_PRINT_VERIFY_PRINT_REQUEST, MSG_PRINT_NOTIFY_PRINT_DB
+    PCI_output, MSG_PRINT_START_PRINTING, 
+    MSG_PRINT_VERIFY_PRINT_REQUEST, MSG_PRINT_NOTIFY_PRINT_DB
 
 Some object is going to describe the print jobs to the Print Control. When 
 instantiating the Print Control, set the chosen object's name in the 
 *PCI_output* field:
 
-	PCI_output = <yourObject>;
+    PCI_output = <yourObject>;
 
 There are three messages the Print Control may send to its output: 
 MSG_PRINT_START_PRINTING, MSG_PRINT_VERIFY_PRINT_REQUEST, and 
@@ -965,9 +965,9 @@ MSG_PRINT_CONTROL_PRINTING_CANCELLED instead.
 
 ----------
 #### MSG_PRINT_START_PRINTING
-	void	MSG_PRINT_START_PRINTING(
-			optr			printControlOD,
-			GStateHandle	gstate);
+    void    MSG_PRINT_START_PRINTING(
+            optr            printControlOD,
+            GStateHandle    gstate);
 
 The handler for this message should call a number of graphics routines, 
 using the passed GState. When done with graphics routines, the handler 
@@ -1007,8 +1007,8 @@ whether it's okay to print.
 
 ----------
 #### MSG_PRINT_VERIFY_PRINT_REQUEST
-	void	MSG_PRINT_VERIFY_PRINT_REQUEST(
-			optr 	printControlOD);
+    void    MSG_PRINT_VERIFY_PRINT_REQUEST(
+            optr    printControlOD);
 
 The handler for this message should make whatever checks are necessary to 
 make sure that the user has made valid choices with the printing UI. The 
@@ -1043,9 +1043,9 @@ MSG_PRINT_CONTROL_SET_SELECTED_PAGE_RANGE.
 
 ----------
 #### MSG_PRINT_NOTIFY_PRINT_DB
-	void	MSG_PRINT_NOTIFY_PRINT_DB(
-			optr					printControlOD,
-			PrintControlStatus		pcs);
+    void    MSG_PRINT_NOTIFY_PRINT_DB(
+            optr                    printControlOD,
+            PrintControlStatus      pcs);
 
 The handler for this message can do any almost anything; this message 
 signals that the Print dialog box has just come up or gone away.
@@ -1067,7 +1067,7 @@ PCS_PRINT_BOX_NOT_VISIBLE.
 ranges.
 
 ### 17.4.6 Document Name Output
-	PCI_docNameOutput, MSG_PRINT_GET_DOC_NAME
+    PCI_docNameOutput, MSG_PRINT_GET_DOC_NAME
 
 The *PCI_docNameOutput* field must contain the optr of an object which can 
 tell the Spooler the document's name. The document name is displayed on 
@@ -1084,8 +1084,8 @@ string containing the name.
 
 ----------
 #### MSG_PRINT_GET_DOC_NAME
-	void	MSG_PRINT_GET_DOC_NAME(
-			optr	printControlOD);
+    void    MSG_PRINT_GET_DOC_NAME(
+            optr    printControlOD);
 
 If your *PCI_docNameOutput* object is not a GenDocumentGroup, then it must 
 have a handler for this message.
@@ -1104,8 +1104,8 @@ MSG_PRINT_CONTROL_SET_DOC_NAME back to the Print Control.
 is necessary.
 
 ### 17.4.7 The Default Printer
-	PCI_defPrinter, MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER, 
-	MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER
+    PCI_defPrinter, MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER, 
+    MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER
 
 As this documentation has already stressed, one of the printing system's 
 more important features is that it is device independent. However, certain 
@@ -1126,7 +1126,7 @@ type of printer is installed and, if so, what its printer number is. These
 routines are described in section 17.7.2.4 below.
 
 ### 17.4.8 Adding UI Gadgetry
-	ATTR_PRINT_CONTROL_APP_UI
+    ATTR_PRINT_CONTROL_APP_UI
 
 If the Print Control supplies UI that meets your geode's needs, feel free to 
 skip this section. On the other hand, if you've decided you want a 
@@ -1145,13 +1145,13 @@ appearance for the specific UI. To define your own trigger object, create the
 object(s), setting the correct instance data. Then, when instantiating your 
 Print Control, include an ATTR_GEN_CONTROL_APP_UI:
 
-	ATTR_GEN_CONTROL_APP_UI = {yourTrigger};
+    ATTR_GEN_CONTROL_APP_UI = {yourTrigger};
 
 When this option is used at all, normally the trigger object is a simple trigger. 
 The action descriptor of this application-defined trigger should be
 
-	GTI_output = <your_PrintControl>;
-	GTI_method = MSG_SPOOL_PRINT_CONTROL_INITIATE_PRINT;
+    GTI_output = <your_PrintControl>;
+    GTI_method = MSG_SPOOL_PRINT_CONTROL_INITIATE_PRINT;
 
 By working with the control's features, you may remove either or both of the 
 default triggers.
@@ -1162,7 +1162,7 @@ object(s) to be included and set their instance data, then use the
 ATTR_PRINT_CONTROL_APP_UI field to signal that the Print Control should 
 include the gadgetry. 
 
-	ATTR_PRINT_CONTROL_APP_UI = {yourPrintGroup};
+    ATTR_PRINT_CONTROL_APP_UI = {yourPrintGroup};
 
 When this option is used at all, usually a GenInteraction serves as the print 
 group object, with children appropriate to the task at hand. This generic tree 
@@ -1173,16 +1173,16 @@ Now you have a rather good idea of what's required to set up a Print Control.
 Once it's been set up, your geode may send the following messages to it.
 
 ### 17.5.1 Common Response Messages
-	MSG_PRINT_CONTROL_VERIFY_COMPLETED, 
-	MSG_PRINT_CONTROL_SET_DOC_NAME
+    MSG_PRINT_CONTROL_VERIFY_COMPLETED, 
+    MSG_PRINT_CONTROL_SET_DOC_NAME
 
 These messages are normally used only to respond to messages sent out by 
 the Print Control.
 
 ----------
 #### MSG_PRINT_CONTROL_VERIFY_COMPLETED
-	void	MSG_PRINT_CONTROL_VERIFY_COMPLETED(
-			Boolean 	continue);
+    void    MSG_PRINT_CONTROL_VERIFY_COMPLETED(
+            Boolean     continue);
 
 If you have decided to verify the user's Print dialog box choices, you must 
 send this message back to the Print Control in response to 
@@ -1205,8 +1205,8 @@ or be cancelled.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_DOC_NAME
-	void	MSG_PRINT_CONTROL_SET_DOC_NAME(
-			char	* string);
+    void    MSG_PRINT_CONTROL_SET_DOC_NAME(
+            char    * string);
 
 This message must be sent by the *PCI_docNameOutput* before the print job 
 can be spooled. It is sent in response to a MSG_PRINT_GET_DOC_NAME from 
@@ -1227,18 +1227,18 @@ FILE_LONGNAME_LENGTH+1.
 **Interception:** Unlikely.
 
 ### 17.5.2 Flow of Control Messages
-	MSG_PRINT_CONTROL_PRINTING_COMPLETED, 
-	MSG_PRINT_CONTROL_REPORT_PROGRESS, 
-	MSG_PRINT_CONTROL_PRINTING_CANCELLED, 
-	MSG_PRINT_CONTROL_REPORT_STRING, 
-	MSG_PRINT_CONTROL_INITIATE_PRINT, MSG_PRINT_CONTROL_PRINT
+    MSG_PRINT_CONTROL_PRINTING_COMPLETED, 
+    MSG_PRINT_CONTROL_REPORT_PROGRESS, 
+    MSG_PRINT_CONTROL_PRINTING_CANCELLED, 
+    MSG_PRINT_CONTROL_REPORT_STRING, 
+    MSG_PRINT_CONTROL_INITIATE_PRINT, MSG_PRINT_CONTROL_PRINT
 
 Sending these messages to the Print Control signals that a new stage of 
 printing is ready to begin.
 
 ----------
 #### MSG_PRINT_CONTROL_PRINTING_COMPLETED
-	void	MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+    void    MSG_PRINT_CONTROL_PRINTING_COMPLETED();
 
 This message signals the Print Control that the application is finished 
 describing the print job. The application must send this message (or a 
@@ -1257,9 +1257,9 @@ MSG_PRINT_START_PRINTING.
 
 ----------
 #### MSG_PRINT_CONTROL_REPORT_PROGRESS
-	Boolean	MSG_PRINT_CONTROL_REPORT_PROGRESS(
-			PCProgressType 	progress,
-			int 			pageOrPercent);
+    Boolean MSG_PRINT_CONTROL_REPORT_PROGRESS(
+            PCProgressType  progress,
+            int             pageOrPercent);
 
 This message may be sent between the time the Print Output receives a 
 MSG_PRINT_START_PRINTING and the time it sends a 
@@ -1299,20 +1299,20 @@ stop.
 
 **Structures:** The *PCProgressType* enumeration is defined:
 
-	typedef enum {
-	 	PCPT_PAGE,
-		 PCPT_UNUSED1, /* Unused type */
-		 PCPT_PERCENT,
-		 PCPT_UNUSED2, /* Unused type */
-		 PCPT_TEXT
-	} PCProgressType;
+    typedef enum {
+        PCPT_PAGE,
+         PCPT_UNUSED1, /* Unused type */
+         PCPT_PERCENT,
+         PCPT_UNUSED2, /* Unused type */
+         PCPT_TEXT
+    } PCProgressType;
 
 ----------
 #### MSG_PRINT_CONTROL_REPORT_PROGRESS_STRING
-	@alias(MSG_PRINT_CONTROL_REPORT_PROGRESS) \ 
-	Boolean	MSG_PRINT_CONTROL_REPORT_PROGRESS_STRING(
-			PCProgressType 	progress,
-			Chars 			*progressString);
+    @alias(MSG_PRINT_CONTROL_REPORT_PROGRESS) \ 
+    Boolean MSG_PRINT_CONTROL_REPORT_PROGRESS_STRING(
+            PCProgressType  progress,
+            Chars           *progressString);
 
 This message may be sent between the time the Print Output receives a 
 MSG_PRINT_START_PRINTING and the time it sends a 
@@ -1355,17 +1355,17 @@ stop.
 
 **Structures:** The *PCProgressType* enumeration is defined:
 
-	typedef enum {
-		 PCPT_PAGE,
-		 PCPT_UNUSED1, /* Unused type */
-		 PCPT_PERCENT,
-		 PCPT_UNUSED2, /* Unused type */
-		 PCPT_TEXT
-	} PCProgressType;
+    typedef enum {
+         PCPT_PAGE,
+         PCPT_UNUSED1, /* Unused type */
+         PCPT_PERCENT,
+         PCPT_UNUSED2, /* Unused type */
+         PCPT_TEXT
+    } PCProgressType;
 
 ----------
 #### MSG_PRINT_CONTROL_PRINTING_CANCELLED
-	void	MSG_PRINT_CONTROL_PRINTING_CANCELLED();
+    void    MSG_PRINT_CONTROL_PRINTING_CANCELLED();
 
 The application may send this message to the PrintControl after receiving a 
 MSG_PRINT_START_PRINTING. Do not send both this message and a 
@@ -1387,7 +1387,7 @@ MSG_PRINT_CONTROL_PRINTING_COMPLETED.
 
 ----------
 #### MSG_PRINT_CONTROL_INITIATE_PRINT
-	void	MSG_PRINT_CONTROL_INITIATE_PRINT();
+    void    MSG_PRINT_CONTROL_INITIATE_PRINT();
 
 This message, normally sent by the Print trigger in the File menu, is the 
 signal that the Print Control should display the Print dialog box. Geodes with 
@@ -1407,7 +1407,7 @@ need not send this message.
 
 ----------
 #### MSG_PRINT_CONTROL_PRINT
-	void	MSG_PRINT_CONTROL_PRINT();
+    void    MSG_PRINT_CONTROL_PRINT();
 
 This message, normally sent by the Print trigger in the Print dialog box, is 
 the signal that the user has made his printing choices and is ready for the 
@@ -1424,26 +1424,26 @@ Print Control to verify those choices and spool the job.
 **Interception:** Unlikely.
 
 ### 17.5.3 Working with Instance Data
-	MSG_PRINT_CONTROL_SET_OUTPUT, 
-	MSG_PRINT_CONTROL_GET_OUTPUT, 
-	MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT, 
-	MSG_PRINT_CONTROL_GET_DOC_NAME_OUTPUT, 
-	MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER, 
-	MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER, 
-	MSG_PRINT_CONTROL_GET_PRINT_MODE, 
-	MSG_PRINT_CONTROL_GET_PAPER_SIZE, 
-	MSG_PRINT_CONTROL_GET_PRINTER_MARGINS, 
-	MSG_PRINT_CONTROL_CALC_DOCUMENT_DIMENSIONS, 
-	MSG_PRINT_CONTROL_VERIFY_DOC_MARGINS, 
-	MSG_PRINT_CONTROL_VERIFY_DOC_SIZE
+    MSG_PRINT_CONTROL_SET_OUTPUT, 
+    MSG_PRINT_CONTROL_GET_OUTPUT, 
+    MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT, 
+    MSG_PRINT_CONTROL_GET_DOC_NAME_OUTPUT, 
+    MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER, 
+    MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER, 
+    MSG_PRINT_CONTROL_GET_PRINT_MODE, 
+    MSG_PRINT_CONTROL_GET_PAPER_SIZE, 
+    MSG_PRINT_CONTROL_GET_PRINTER_MARGINS, 
+    MSG_PRINT_CONTROL_CALC_DOCUMENT_DIMENSIONS, 
+    MSG_PRINT_CONTROL_VERIFY_DOC_MARGINS, 
+    MSG_PRINT_CONTROL_VERIFY_DOC_SIZE
 
 The Print Control handles many messages which allow the geode to retrieve 
 and alter the values of the instance data.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_OUTPUT
-	void 	MSG_PRINT_CONTROL_SET_OUTPUT(
-			optr 	objectPtr);
+    void    MSG_PRINT_CONTROL_SET_OUTPUT(
+            optr    objectPtr);
 
 This message, used very rarely, specifies that a different object should 
 become the Print Output. Pass the optr of the object to use.
@@ -1461,7 +1461,7 @@ become the Print Output. Pass the optr of the object to use.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_OUTPUT
-	optr 	MSG_PRINT_CONTROL_GET_OUTPUT();
+    optr    MSG_PRINT_CONTROL_GET_OUTPUT();
 
 This message returns the optr of the Print Output.
 
@@ -1477,8 +1477,8 @@ This message returns the optr of the Print Output.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT
-	void 	MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT(
-			optr 	document);
+    void    MSG_PRINT_CONTROL_SET_DOC_NAME_OUTPUT(
+            optr    document);
 
 This message, used very rarely, specifies that a different object should 
 become the Document Name Output object. Pass the optr of the object to use.
@@ -1496,7 +1496,7 @@ become the Document Name Output object. Pass the optr of the object to use.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_DOC_NAME_OUTPUT
-	optr 	MSG_PRINT_CONTROL_GET_DOC_NAME_OUTPUT();
+    optr    MSG_PRINT_CONTROL_GET_DOC_NAME_OUTPUT();
 
 This message returns the optr of the Document Name Output object.
 
@@ -1512,8 +1512,8 @@ This message returns the optr of the Document Name Output object.
 
 ----------
 #### MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER
-	void 	MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER(
-			int 	printerNum);		/* -1 for system's default printer */
+    void    MSG_PRINT_CONTROL_SET_DEFAULT_PRINTER(
+            int     printerNum);        /* -1 for system's default printer */
 
 This message sets the application default printer, to be used the next time 
 the print dialog box appears. Pass the printer number of the printer to use. 
@@ -1532,7 +1532,7 @@ Passing a value of -1 means that the system default printer should be used.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER
-	int 	MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER();
+    int     MSG_PRINT_CONTROL_GET_DEFAULT_PRINTER();
 
 Use this message to retrieve the number of the present application default 
 printer. You may not assume that this printer is the one the user is printing 
@@ -1551,7 +1551,7 @@ means that the application will use the system default printer.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_PRINT_MODE
-	byte 	MSG_PRINT_CONTROL_GET_PRINT_MODE(); 
+    byte    MSG_PRINT_CONTROL_GET_PRINT_MODE(); 
 
 This message retrieves the current user-selected print mode, if any. Its 
 possible return values include zero, meaning no mode has been selected; 
@@ -1564,26 +1564,26 @@ PM_GRAPHICS_HI_RES; PM_TEXT_DRAFT; and PM_TEXT_NLQ.
 
 **Parameters:** None.
 
-Return:	A **PrinterOutputModes** signalling the printer's quality.
+Return: A **PrinterOutputModes** signalling the printer's quality.
 
 **Interception:** Unlikely.
 
 **Structures:** The **PrinterOutputModes** structure has the following definition:
 
-	typedef ByteFlags PrinterOutputModes;
-	#define POM_GRAPHICS_LOW 0x10 
-	#define POM_GRAPHICS_MEDIUM 0x08 
-	#define POM_GRAPHICS_HIGH 0x04
-	#define POM_TEXT_DRAFT 0x02 
-	#define POM_TEXT_NLQ 0x01
+    typedef ByteFlags PrinterOutputModes;
+    #define POM_GRAPHICS_LOW 0x10 
+    #define POM_GRAPHICS_MEDIUM 0x08 
+    #define POM_GRAPHICS_HIGH 0x04
+    #define POM_TEXT_DRAFT 0x02 
+    #define POM_TEXT_NLQ 0x01
 
 Each flag indicates the specified quality is available. Two useful masks which 
 have been set up are PRINT_GRAPHICS and PRINT_TEXT.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_PAPER_SIZE
-	void 	MSG_PRINT_CONTROL_GET_PAPER_SIZE(
-			PCMargineParams 		*retVal); 
+    void    MSG_PRINT_CONTROL_GET_PAPER_SIZE(
+            PCMargineParams         *retVal); 
 
 Use this message to retrieve the Print Control's present paper size.
 
@@ -1601,8 +1601,8 @@ message handler will fill.
 
 ----------
 #### MSG_PRINT_CONTROL_GET_PAPER_SIZE_INFO
-	void	MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO(
-			PageSizeReport 	*ptr);
+    void    MSG_PRINT_CONTROL_GET_DOC_SIZE_INFO(
+            PageSizeReport  *ptr);
 
 Use this message to set all of the information about the document size and 
 orientation.
@@ -1621,18 +1621,18 @@ which the message handler will fill in.
 
 **Structures:** The **PageSizeReport** structure has the following definition:
 
-	typedef struct {
-		dword			PSR_width;
-		dword			PSR_height;
-		PageLayout			PSR_layout;
-		PCMarginParams 			PSR_margins;
-	} PCMarginParams;
+    typedef struct {
+        dword           PSR_width;
+        dword           PSR_height;
+        PageLayout          PSR_layout;
+        PCMarginParams          PSR_margins;
+    } PCMarginParams;
 
 ----------
 #### MSG_PRINT_CONTROL_GET_PRINTER_MARGINS
-	void 	MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(
-			MarginDimensions 		*retVal,
-			Boolean 		setMargins); 
+    void    MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(
+            MarginDimensions        *retVal,
+            Boolean         setMargins); 
 
 This message returns the margins enforced by the requested printer. If the 
 boolean argument is *true*, the document margins will be set to be the same as 
@@ -1654,19 +1654,19 @@ structure to be filled in by the handler.
 
 **Structures:** The following structure keeps track of all four of a document's margins.
 
-	typedef struct {
-		int 	leftMargin;		/* measured in points */
-		int 	topMargin;
-		int 	rightMargin;
-		int 	bottomMargin;
-	} MarginDimensions;
+    typedef struct {
+        int     leftMargin;     /* measured in points */
+        int     topMargin;
+        int     rightMargin;
+        int     bottomMargin;
+    } MarginDimensions;
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_PRINT_CONTROL_CALC_DOC_DIMENSIONS
-	void 	MSG_PRINT_CONTROL_CALC_DOCUMENT_DIMENSIONS(
-			PageSizeReport 	*ptr); 
+    void    MSG_PRINT_CONTROL_CALC_DOCUMENT_DIMENSIONS(
+            PageSizeReport  *ptr); 
 
 This message calculates the maximum printable area allowed by the 
 user-selected paper size and printer-mandated margins. This message 
@@ -1689,19 +1689,19 @@ return value.
 **Structures:** The following structure holds a document's size, and the margin 
 information used to place the top left point.
 
-	typedef struct {
-		int 	leftMargin;		/* measured in points */
-		int 	topMargin;
-		int 	width;
-		int 	height;
-	} DocumentSize;
+    typedef struct {
+        int     leftMargin;     /* measured in points */
+        int     topMargin;
+        int     width;
+        int     height;
+    } DocumentSize;
 
 **Interception:** Unlikely.
 
 ----------
 #### MSG_PRINT_CONTROL_CHECK_IF_DOC_WILL_FIT
-	Boolean 	MSG_PRINT_CONTROL_CHECK_IF_DOC_WILL_FIT(
-				Boolean 	warning); 
+    Boolean     MSG_PRINT_CONTROL_CHECK_IF_DOC_WILL_FIT(
+                Boolean     warning); 
 
 This message returns true if the passed document margins will fit on the 
 selected printer. 
@@ -1720,8 +1720,8 @@ user.
 **Interception:** Unlikely.
 
 ## 17.6 Page Size Control
-	MSG_PRINT_REPORT_PAGE_SIZE, SpoolSetDocSize(), 
-	MSG_PZC_GET_PAGE_SIZE, MSG_PZC_SET_PAGE_SIZE, 
+    MSG_PRINT_REPORT_PAGE_SIZE, SpoolSetDocSize(), 
+    MSG_PZC_GET_PAGE_SIZE, MSG_PZC_SET_PAGE_SIZE, 
 
 
 Thanks to the Spooler, applications don't need to worry about what page size 
@@ -1764,82 +1764,82 @@ PrintControl.
 No matter how an application interacts with its PageSizeControl, it will work 
 with the **PageSizeReport** structure.
 
-	typedef struct {
-		dword 				PSR_width;
-		dword 				PSR_height;
-		PageLayout 			PSR_layout;
-		PCMarginParams 		PSR_margins;
-	} PageSizeReport;
+    typedef struct {
+        dword               PSR_width;
+        dword               PSR_height;
+        PageLayout          PSR_layout;
+        PCMarginParams      PSR_margins;
+    } PageSizeReport;
 
-	typedef WordFlags PageLayout;
-	typedef enum {
-		PT_PAPER,
-		PT_UNUSED1, /* Unused type */
-		PT_ENVELOPE,
-		PT_UNUSED2, /* Unused type */
-		PT_LABEL
-	} PageType;
+    typedef WordFlags PageLayout;
+    typedef enum {
+        PT_PAPER,
+        PT_UNUSED1, /* Unused type */
+        PT_ENVELOPE,
+        PT_UNUSED2, /* Unused type */
+        PT_LABEL
+    } PageType;
 
-	/* Specifying a PageLayout is accomplished by 
-	 * OR-ing together the parts of the layout.
-	 * Exactly what those parts are depends on the 
-	 * PageType: */
+    /* Specifying a PageLayout is accomplished by 
+     * OR-ing together the parts of the layout.
+     * Exactly what those parts are depends on the 
+     * PageType: */
 
-	/* Paper Layouts: 
-	 * 	(PT_PAPER | (PO_orient << 3) ) */
-	typedef ByteEnum 				PaperOrientation;
-	#define PO_PORTRAIT 				0x00
-	#define PO_LANDSCAPE 				0x01
+    /* Paper Layouts: 
+     *  (PT_PAPER | (PO_orient << 3) ) */
+    typedef ByteEnum                PaperOrientation;
+    #define PO_PORTRAIT                 0x00
+    #define PO_LANDSCAPE                0x01
 
-	typedef WordFlags 				PageLayoutPaper;
-	#define PLP_ORIENTATION 			0x0008
-	#define PLP_TYPE 					0x0004 /* PT_PAPER */
+    typedef WordFlags               PageLayoutPaper;
+    #define PLP_ORIENTATION             0x0008
+    #define PLP_TYPE                    0x0004 /* PT_PAPER */
 
-	/* Envelope Layouts: 
-	 * (PT_ENVELOPE | (EP_path << 5) | (EO_ori << 3)) */
-	typedef ByteEnum 				EnvelopePath;
-	#define EP_LEFT 					0x00
-	#define EP_CENTER 					0x01
-	#define EP_RIGHT 					0x02
+    /* Envelope Layouts: 
+     * (PT_ENVELOPE | (EP_path << 5) | (EO_ori << 3)) */
+    typedef ByteEnum                EnvelopePath;
+    #define EP_LEFT                     0x00
+    #define EP_CENTER                   0x01
+    #define EP_RIGHT                    0x02
 
-	typedef ByteEnum 				EnvelopeOrientation;
-	#define EO_PORTAIT_LEFT 			0x00
-	#define EO_PORTAIT_RIGHT 			0x01
-	#define EO_LANDSCAPE_UP 			0x02
-	#define EO_LANDSCAPE_DOWN 			0x03
+    typedef ByteEnum                EnvelopeOrientation;
+    #define EO_PORTAIT_LEFT             0x00
+    #define EO_PORTAIT_RIGHT            0x01
+    #define EO_LANDSCAPE_UP             0x02
+    #define EO_LANDSCAPE_DOWN           0x03
 
-	typedef WordFlags 				PageLayoutEnvelope;
-	#define PLE_PATH 					0x0040
-	#define PLE_ORIENTATION 			0x0010
-	#define PLE_TYPE 					0x0004 /*PT_ENVELOPE*/
+    typedef WordFlags               PageLayoutEnvelope;
+    #define PLE_PATH                    0x0040
+    #define PLE_ORIENTATION             0x0010
+    #define PLE_TYPE                    0x0004 /*PT_ENVELOPE*/
 
-	/* Label Layouts:
-	 * 	(PT_LABEL | (rows <<8) | (cols << 3)) */
-	typedef WordFlags 				PageLayoutLabel;
-	#define PLL_ROWS 					0x7e00 /* # rows */
-	#define PLL_COLUMNS 				0x01f8 /* # cols */
-	#define PLL_TYPE 					0x0004 /* PT_LABEL */
+    /* Label Layouts:
+     *  (PT_LABEL | (rows <<8) | (cols << 3)) */
+    typedef WordFlags               PageLayoutLabel;
+    #define PLL_ROWS                    0x7e00 /* # rows */
+    #define PLL_COLUMNS                 0x01f8 /* # cols */
+    #define PLL_TYPE                    0x0004 /* PT_LABEL */
 
 ----------
 **Code Display 17-3 PageSizeControl Features**
 
-	typedef ByteFlags 	PageSizeControlFeatures;
-	/* The following flags may be combined with | and &:
-		PSIZECF_MARGINS, 			( Set margin sizes )
-		PSIZECF_CUSTOM_SIZE,		( Custom dimension ranges )
-		PSIZECF_LAYOUT,
-		PSIZECF_SIZE_LIST,
-		PSIZECF_PAGE_TYPE 			( Choice of standard dimensions ) */
+    typedef ByteFlags   PageSizeControlFeatures;
+    /* The following flags may be combined with | and &:
+        PSIZECF_MARGINS,            ( Set margin sizes )
+        PSIZECF_CUSTOM_SIZE,        ( Custom dimension ranges )
+        PSIZECF_LAYOUT,
+        PSIZECF_SIZE_LIST,
+        PSIZECF_PAGE_TYPE           ( Choice of standard dimensions ) */
 
-	#define PSIZEC_DEFAULT_FEATURES (PSIZECF_PAGE_TYPE | PSIZECF_SIZE_LIST | \
-		 							PSIZECF_LAYOUT | PSIZECF_CUSTOM_SIZE) 
+    #define PSIZEC_DEFAULT_FEATURES (PSIZECF_PAGE_TYPE | PSIZECF_SIZE_LIST | \
+                                    PSIZECF_LAYOUT | PSIZECF_CUSTOM_SIZE) 
 
 ----------
 
 ----------
 #### MSG_PRINT_REPORT_PAGE_SIZE
-	void	MSG_PRINT_REPORT_PAGE_SIZE(
-			PageSizeReport *psr);
+    void    MSG_PRINT_REPORT_PAGE_SIZE(
+            PageSizeReport *psr);
 
 The page size control's output object should have a handler for this message. 
 The control will send this message whenever the user has changed the page 
@@ -1879,43 +1879,43 @@ MAXIMUM_LABELS_DOWN.
 ----------
 **Code Display 17-4 Page Size Control Instance Data**
 
-	@instance PageSizeControlAttrs				PZCI_attrs = 0;
-		/* Possible attributes:
-		 * PZCA_ACT_LIKE_GADGET
-		 * PZCA_PAPER_SIZE
-		 * PZCA_INITIALIZE				*/
+    @instance PageSizeControlAttrs              PZCI_attrs = 0;
+        /* Possible attributes:
+         * PZCA_ACT_LIKE_GADGET
+         * PZCA_PAPER_SIZE
+         * PZCA_INITIALIZE              */
 
-		/* Current page dimensions and type/layout */
-	@instance dword 			PZCI_width = 0;
-	@instance dword 			PZCI_height = 0;
-	@instance PageLayout 		PZCI_layout = 0;
-	@instance PCMarginParams	PZCI_margins = { 0, 0, 0, 0 };
+        /* Current page dimensions and type/layout */
+    @instance dword             PZCI_width = 0;
+    @instance dword             PZCI_height = 0;
+    @instance PageLayout        PZCI_layout = 0;
+    @instance PCMarginParams    PZCI_margins = { 0, 0, 0, 0 };
 
-	/* The following vardata field is internal: */
-	@vardata PageSizeControlMaxDimensions TEMP_PAGE_SIZE_CONTROL_MAX_DIMENSIONS;
+    /* The following vardata field is internal: */
+    @vardata PageSizeControlMaxDimensions TEMP_PAGE_SIZE_CONTROL_MAX_DIMENSIONS;
 
-	/* Its structure is defined: 
-	typedef struct {
-	 	dword PZCMD_width; ( maximum width )
-	 	dword PZCMD_height; ( maximum height )
-	} PageSizeControlMaxDimensions; */
+    /* Its structure is defined: 
+    typedef struct {
+        dword PZCMD_width; ( maximum width )
+        dword PZCMD_height; ( maximum height )
+    } PageSizeControlMaxDimensions; */
 
 
-	/* Attribute to allow applications to be made aware of every change made
-	 * to gadgetry in the PageSizeControl. This is especially useful for applications
-	 * that want to add UI that will be dependent upon the state of this
-	 * controller. No effort is made to eliminate the redundant output of data. */
+    /* Attribute to allow applications to be made aware of every change made
+     * to gadgetry in the PageSizeControl. This is especially useful for applications
+     * that want to add UI that will be dependent upon the state of this
+     * controller. No effort is made to eliminate the redundant output of data. */
 
-	@vardata PageSizeControlChanges ATTR_PAGE_SIZE_CONTROL_UI_CHANGES;
+    @vardata PageSizeControlChanges ATTR_PAGE_SIZE_CONTROL_UI_CHANGES;
 
-	/* This field has structure:
-		typedef struct {
-		 optr PSCC_destination; ( destination for message )
-		 Message PSCC_message; ( message to be sent )
-		} PageSizeControlChanges; */
+    /* This field has structure:
+        typedef struct {
+         optr PSCC_destination; ( destination for message )
+         Message PSCC_message; ( message to be sent )
+        } PageSizeControlChanges; */
 
-	The message should follow the prototype: */
-	@prototype void PAGE_SIZE_UI_CHANGES_MSG(PageSizeReport _far *psr )
+    The message should follow the prototype: */
+    @prototype void PAGE_SIZE_UI_CHANGES_MSG(PageSizeReport _far *psr )
 
 ----------
 
@@ -1964,8 +1964,8 @@ Allow the controller to load and save the user's options.
 
 ----------
 #### MSG_PZC_GET_PAGE_SIZE
-	void	MSG_PZC_GET_PAGE_SIZE(
-			PageSizeReport		*psr);
+    void    MSG_PZC_GET_PAGE_SIZE(
+            PageSizeReport      *psr);
 
 This message returns the present page size in terms of width, height, and 
 layout, stored in a **PageSizeReport**. Note that the PageSizeControl will be 
@@ -1989,8 +1989,8 @@ page information.
 
 ----------
 #### MSG_PZC_SET_PAGE_SIZE
-	void 	MSG_PZC_SET_PAGE_SIZE(
-			PageSizeReport *	psr);		
+    void    MSG_PZC_SET_PAGE_SIZE(
+            PageSizeReport *    psr);       
 
 This message changes the current page size. It takes a **PageSizeReport** 
 data structure containing the new dimensions and layout. The Apply trigger 
@@ -2019,10 +2019,10 @@ of printer drivers, which handle interactions between the printing devices
 and the rest of the system.
 
 ### 17.7.1 Spooler and Scheduling
-	SpoolInfo(), SpoolHurryJob(), SpoolDelayJob(), 
-	SpoolModifyPriority(), SpoolVerifyPrinterPort(), 
-	SpoolCreateSpoolFile(), SpoolDelJob(), 
-	MSG_PRINT_NOTIFY_PRINT_JOB_CREATED
+    SpoolInfo(), SpoolHurryJob(), SpoolDelayJob(), 
+    SpoolModifyPriority(), SpoolVerifyPrinterPort(), 
+    SpoolCreateSpoolFile(), SpoolDelJob(), 
+    MSG_PRINT_NOTIFY_PRINT_JOB_CREATED
 
 Geodes may invoke certain routines that affect the Spooler, but for the most 
 part they should avoid this practice. These routines allow the geode to take 
@@ -2063,8 +2063,8 @@ print one thing and don't mind leaving around an extra spool file.
 
 ----------
 #### MSG_PRINT_NOTIFY_PRINT_JOB_CREATED
-	void 	MSG_PRINT_NOTIFY_PRINT_JOB_CREATED(
-			word jobID);		
+    void    MSG_PRINT_NOTIFY_PRINT_JOB_CREATED(
+            word jobID);        
 
 The PrintControl sends this message when it has sent the job to the print 
 queue. Applications may intercept this message to retrieve the new job's ID 
@@ -2131,10 +2131,10 @@ expecting. If you try to send PostScript commands to a printer that doesn't
 understand PostScript, probably the results won't be the desired output.
 
 #### 17.7.2.4 Printer Information and Manipulation
-	SpoolGetNumPrinters(), SpoolGetPrinterString(), 
-	SpoolGetPrinterInfo(), SpoolCreatePrinter(), 
-	SpoolDeletePrinter(), SpoolGetDefaultPrinter(), 
-	SpoolSetDefaultPrinter()
+    SpoolGetNumPrinters(), SpoolGetPrinterString(), 
+    SpoolGetPrinterInfo(), SpoolCreatePrinter(), 
+    SpoolDeletePrinter(), SpoolGetDefaultPrinter(), 
+    SpoolSetDefaultPrinter()
 
 If you want to find out something about a printer without accessing the 
 printer driver directly, the spool library provides a number of utility routines 
@@ -2176,10 +2176,10 @@ will be the default. Of course, the user will still be allowed to select any
 printer, ignoring the default.
 
 ### 17.7.3 Page Size Related Routines
-	SpoolGetNumPaperSizes(), SpoolGetPaperString(), 
-	SpoolConvertPaperSize(), SpoolCreatePaperSize(), 
-	SpoolDeletePaperSize(), SpoolGetPaperSizeOrder(), 
-	SpoolSetPaperSizeOrder()
+    SpoolGetNumPaperSizes(), SpoolGetPaperString(), 
+    SpoolConvertPaperSize(), SpoolCreatePaperSize(), 
+    SpoolDeletePaperSize(), SpoolGetPaperSizeOrder(), 
+    SpoolSetPaperSizeOrder()
 
 Most geodes won't be too concerned with what sort of page size choice the 
 user has made. If the document fits on the page, all's well. If the document 

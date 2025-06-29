@@ -106,45 +106,45 @@ File Selector.
 ----------
 Code Display 14-1 A Basic File Selector
 
-	/* Extra code for menus and other UI objects is left out. Only what is
-	 * required for these objects is included. */
+    /* Extra code for menus and other UI objects is left out. Only what is
+     * required for these objects is included. */
 
-	/* This dialog box provides the organization needed to contain the File
-	 * Selector, the name of the box, and the Reply Bar. */
-	@object GenInteractionClass MyDialogBox = {
-		GI_visMoniker = `I', "Insert From Text File";
-		GI_comp = MyGlyph, MyFileSel, MyInsertTrigger;
-		GII_visibility = (GIV_DIALOG);
-		GII_type = (GIT_COMMAND);
-	};
+    /* This dialog box provides the organization needed to contain the File
+     * Selector, the name of the box, and the Reply Bar. */
+    @object GenInteractionClass MyDialogBox = {
+        GI_visMoniker = `I', "Insert From Text File";
+        GI_comp = MyGlyph, MyFileSel, MyInsertTrigger;
+        GII_visibility = (GIV_DIALOG);
+        GII_type = (GIT_COMMAND);
+    };
 
-	/* The Glyph Display provides the label in the dialog box. Alternatively, the
-	 * moniker of the GenInteraction could be used for this functionality. */
-	@object GenGlyphClass MyGlyph = {
-		GI_visMoniker = "Insert From Text File";
-	}
+    /* The Glyph Display provides the label in the dialog box. Alternatively, the
+     * moniker of the GenInteraction could be used for this functionality. */
+    @object GenGlyphClass MyGlyph = {
+        GI_visMoniker = "Insert From Text File";
+    }
 
-	/* The File Selector is as basic as possible. */
-	@object GenFileSelectorClass MyFileSel = {
-		GFSI_destination = process;		/* The object receiving notification. */
-		GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
-							/* The message sent
-							 * upon selection. */
-	};
+    /* The File Selector is as basic as possible. */
+    @object GenFileSelectorClass MyFileSel = {
+        GFSI_destination = process;     /* The object receiving notification. */
+        GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+                            /* The message sent
+                             * upon selection. */
+    };
 
-	@object GenTriggerClass MyInsertTrigger = {
-		GI_visMoniker = "Insert";
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_APP_INSERT_TRIGGER_SELECTED;
-		HINT_SEEK_REPLY_BAR;
-	};
+    @object GenTriggerClass MyInsertTrigger = {
+        GI_visMoniker = "Insert";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_APP_INSERT_TRIGGER_SELECTED;
+        HINT_SEEK_REPLY_BAR;
+    };
 
-	/* Note that in most cases, this trigger will not be needed. Generally, the File
-	 * Selector will include an "OK" or "Use This File" trigger in its reply bar that
-	 * executes an IC_OK function. For your trigger above to demonstrate that
-	 * functionality, remove the GTI_- fields and add the line
-	 * ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_OK);
-	 */
+    /* Note that in most cases, this trigger will not be needed. Generally, the File
+     * Selector will include an "OK" or "Use This File" trigger in its reply bar that
+     * executes an IC_OK function. For your trigger above to demonstrate that
+     * functionality, remove the GTI_- fields and add the line
+     * ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_OK);
+     */
 
 ----------
 ### 14.2.2 Supporting the File Selector
@@ -248,9 +248,9 @@ entry in the file selector's list).
 
 ----------
 #### GEN_FILE_SELECTOR_NOTIFICATION_MSG
-	void	GEN_FILE_SELECTOR_NOTIFICATION_MSG(
-			word							entryNum,
-			GenFileSelectorEntryFlags		entryFlags);
+    void    GEN_FILE_SELECTOR_NOTIFICATION_MSG(
+            word                            entryNum,
+            GenFileSelectorEntryFlags       entryFlags);
 
 This prototype should be used for all notification messages sent out by the 
 File Selector; that is, any message you set in *GFSI_notificationMsg* should be 
@@ -272,26 +272,26 @@ described after this reference entry.
 
 **Structures:** **GenFileSelectorEntryFlags** is a record with the following flags:
 
-	typedef WordFlags GenFileSelectorEntryFlags;
-	#define GFSEF_TYPE					0xc000
-	#define GFSEF_OPEN					0x2000
-	#define GFSEF_NO_ENTRIES 			0x1000
-	#define GFSEF_ERROR 				0x0800
-	#define GFSEF_TEMPLATE 				0x0400
-	#define GFSEF_SHARED_MULTIPLE 		0x0200
-	#define GFSEF_SHARED_SINGLE 		0x0100
-	#define GFSEF_READ_ONLY 			0x0080
-	#define GFSEF_PARENT_DIR 			0x0040
-	#define GFSEF_TYPE_OFFSET 		14
+    typedef WordFlags GenFileSelectorEntryFlags;
+    #define GFSEF_TYPE                  0xc000
+    #define GFSEF_OPEN                  0x2000
+    #define GFSEF_NO_ENTRIES            0x1000
+    #define GFSEF_ERROR                 0x0800
+    #define GFSEF_TEMPLATE              0x0400
+    #define GFSEF_SHARED_MULTIPLE       0x0200
+    #define GFSEF_SHARED_SINGLE         0x0100
+    #define GFSEF_READ_ONLY             0x0080
+    #define GFSEF_PARENT_DIR            0x0040
+    #define GFSEF_TYPE_OFFSET       14
 
 The GFSEF_TYPE field is two bits defined by one of the following 
 **GenFileSelectorEntryType** constants. These two bits define the type of 
 entry selected.
 
-	typedef ByteEnum GenFileSelectorEntryType;
-	#define GFSET_FILE			0
-	#define GFSET_SUBDIR		1
-	#define GFSET_VOLUME		2
+    typedef ByteEnum GenFileSelectorEntryType;
+    #define GFSET_FILE          0
+    #define GFSET_SUBDIR        1
+    #define GFSET_VOLUME        2
 
 **Interception:** The notification message must be intercepted and handled for the 
 selection of a file to have any effect in your application. There is no 
@@ -300,8 +300,8 @@ their own File Selectors).
 
 ----------
 #### GFS_GET_ENTRY_TYPE
-	byte	GFS_GET_ENTRY_TYPE(flags)
-			word	flags;
+    byte    GFS_GET_ENTRY_TYPE(flags)
+            word    flags;
 
 This macro extracts the high two bits from a **GenFileSelectorEntryFlags** 
 record delivered as a parameter of a File Selector's notification message. 
@@ -310,92 +310,92 @@ Compare the value to GFSET_FILE, GFSET_SUBDIR, and GFSET_VOLUME.
 ----------
 **Code Display 14-2 Handling a File Selector Selection**
 
-	/*
-	 * C handler for MSG_MY_APP_FILE_SELECTED. The message is sent by the File Selector
-	 * object (MyFileSel) to the application's Process object (MyProcessClass) when the
-	 * user clicks on an entry in the displayed file list. This code display is per the
-	 * setup in Code Display 14-1.
-	 */
+    /*
+     * C handler for MSG_MY_APP_FILE_SELECTED. The message is sent by the File Selector
+     * object (MyFileSel) to the application's Process object (MyProcessClass) when the
+     * user clicks on an entry in the displayed file list. This code display is per the
+     * setup in Code Display 14-1.
+     */
 
-	/*
-	 * Format of the message:
-	 * void MSG_MY_APP_FILE_SELECTED(word entryNum,
-	 *					GenFileSelectorEntryFlags entryFlags)
-	 */
+    /*
+     * Format of the message:
+     * void MSG_MY_APP_FILE_SELECTED(word entryNum,
+     *                  GenFileSelectorEntryFlags entryFlags)
+     */
 
-	@method	MyProcessClass, MSG_MY_APP_FILE_SELECTED {
-		/* First check if this is an OPEN operation (double-click). If so,
-		 * then test whether the selection is a file. If so, simulate the "Insert"
-		 * trigger by sending the trigger's message to ourselves. If it is not a file,
-		 * or if the operation is not OPEN, we need do nothing. */
+    @method MyProcessClass, MSG_MY_APP_FILE_SELECTED {
+        /* First check if this is an OPEN operation (double-click). If so,
+         * then test whether the selection is a file. If so, simulate the "Insert"
+         * trigger by sending the trigger's message to ourselves. If it is not a file,
+         * or if the operation is not OPEN, we need do nothing. */
 
-		if (GFS_GET_ENTRY_TYPE(entryFlags) & GFSEF_OPEN) {    /* Is the operation
-						      * a double-click? */
-			if (GFS_GET_ENTRY_FLAGS(entryFlags) & GFSET_FILE) {
-							/* Is the selection a file? */
-				/* Execute application-specific code here. */
-			}
-		}
-	}
+        if (GFS_GET_ENTRY_TYPE(entryFlags) & GFSEF_OPEN) {    /* Is the operation
+                              * a double-click? */
+            if (GFS_GET_ENTRY_FLAGS(entryFlags) & GFSET_FILE) {
+                            /* Is the selection a file? */
+                /* Execute application-specific code here. */
+            }
+        }
+    }
 
-	/* Note that we do not necessarily have to handle double-click operations in this
-	 * way. Since a double-click automatically activates the GenInteraction's default
-	 * element (typically an "Ok" trigger), we can simply handle the press of the
-	 * "Ok" trigger as shown in Code Display 14-3. */
+    /* Note that we do not necessarily have to handle double-click operations in this
+     * way. Since a double-click automatically activates the GenInteraction's default
+     * element (typically an "Ok" trigger), we can simply handle the press of the
+     * "Ok" trigger as shown in Code Display 14-3. */
 
 ----------
 
 ----------
 **Code Display 14-3 Handling a File Selector "OK" Button**
 
-	/* C handler for MSG_MY_APP_INSERT_TRIGGER_SELECTED, the message sent by the Insert
-	 * trigger to the application's Process object when the user clicks on it.
-	 * Format of this message: void MSG_MY_APP_INSERT_TRIGGER_SELECTED().
-	 * This code display is per the setup shown in Code Display 14-1. */
+    /* C handler for MSG_MY_APP_INSERT_TRIGGER_SELECTED, the message sent by the Insert
+     * trigger to the application's Process object when the user clicks on it.
+     * Format of this message: void MSG_MY_APP_INSERT_TRIGGER_SELECTED().
+     * This code display is per the setup shown in Code Display 14-1. */
 
-	@method	MyProcessClass, MSG_MY_APP_INSERT_TRIGGER_SELECTED {
-		/* Declare a local dword of flags and entry number. */
-		dword selFlags;
+    @method MyProcessClass, MSG_MY_APP_INSERT_TRIGGER_SELECTED {
+        /* Declare a local dword of flags and entry number. */
+        dword selFlags;
 
-		/* First, retrieve the selection number and flags from the File Selector.
-		 * For now, we can ignore the selection name and path. To retrieve this
-		 * information, send the message MSG_GEN_FILE_SELECTOR_GET_SELECTION to the 
-		 * File Selector. This message will return a dword (selFlags) that contains the
-		 * selection's entry number and a GenFileSelectorEntryFlags record. (To ignore
-		 * the selection name, pass a null pointer with the message.) */
+        /* First, retrieve the selection number and flags from the File Selector.
+         * For now, we can ignore the selection name and path. To retrieve this
+         * information, send the message MSG_GEN_FILE_SELECTOR_GET_SELECTION to the 
+         * File Selector. This message will return a dword (selFlags) that contains the
+         * selection's entry number and a GenFileSelectorEntryFlags record. (To ignore
+         * the selection name, pass a null pointer with the message.) */
 
-		selFlags = @call MyFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(NULL);
+        selFlags = @call MyFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(NULL);
 
-		/* Next, determine whether the selection is a file. To do this, check the
-		 * returned GenFileSelectorEntryFlags record against GFSET_FILE. If the result
-		 * is true, the selection is a file. If false, it is a directory or volume. If
-		 * the selection is a file, we will operate on it appropriately (this is
-		 * specific to each application). If not, we will direct the File Selector to
-		 * open the entry. Note that we can assume an OPEN operation is in progress
-		 * because the only two ways to get to this point are through a double-click
-		 * on a selection and through a click on the "Insert" trigger.
-		 */
+        /* Next, determine whether the selection is a file. To do this, check the
+         * returned GenFileSelectorEntryFlags record against GFSET_FILE. If the result
+         * is true, the selection is a file. If false, it is a directory or volume. If
+         * the selection is a file, we will operate on it appropriately (this is
+         * specific to each application). If not, we will direct the File Selector to
+         * open the entry. Note that we can assume an OPEN operation is in progress
+         * because the only two ways to get to this point are through a double-click
+         * on a selection and through a click on the "Insert" trigger.
+         */
 
-		/* Note the use of the two macros GFS_GET_ENTRY_FLAGS and GFS_GET_ENTRY_NUMBER.
-		 * The first extracts the GenFileSelectorEntryFlags record from the dword
-		 * selFlags, and the second extracts the entry number from selFlags. */
+        /* Note the use of the two macros GFS_GET_ENTRY_FLAGS and GFS_GET_ENTRY_NUMBER.
+         * The first extracts the GenFileSelectorEntryFlags record from the dword
+         * selFlags, and the second extracts the entry number from selFlags. */
 
-		if (GFS_GET_ENTRY_FLAGS(selFlags) == GFSET_FILE) {	/* the selection is a file */
+        if (GFS_GET_ENTRY_FLAGS(selFlags) == GFSET_FILE) {  /* the selection is a file */
 
-			/* Execute application-specific code here. */
+            /* Execute application-specific code here. */
 
-		} else {		/* the selection is a volume or directory */
+        } else {        /* the selection is a volume or directory */
 
-			/* Now direct the File Selector to open the entry. Use the message
-			 * MSG_GEN_FILE_SELECTOR_OPEN_ENTRY, which returns a flag; if the flag is
-			 * set, then an error occurred. If the flag is clear, the operation
-			 * succeeded. */
+            /* Now direct the File Selector to open the entry. Use the message
+             * MSG_GEN_FILE_SELECTOR_OPEN_ENTRY, which returns a flag; if the flag is
+             * set, then an error occurred. If the flag is clear, the operation
+             * succeeded. */
 
-			if (@call MyFileSel::MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
-					GFS_GET_ENTRY_NUMBER(selFlags))) {
-			/* Provide a proper error message or beep sound. */
-		}
-	}
+            if (@call MyFileSel::MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+                    GFS_GET_ENTRY_NUMBER(selFlags))) {
+            /* Provide a proper error message or beep sound. */
+        }
+    }
 
 ----------
 ### 14.2.4 Some Common Customizations
@@ -439,65 +439,65 @@ in detail the different things you can do to the File Selector.
 ----------
 **Code Display 14-4 Display Only Directories**
 
-	@object GenFileSelectorClass DirectorySelector = {
-		GFSI_destination = process;
-		GFSI_notificationMsg = MSG_MY_APP_DIRECTORY_SELECTED;
-		GFSI_fileCriteria = FSFC_DIRS;
-	};
+    @object GenFileSelectorClass DirectorySelector = {
+        GFSI_destination = process;
+        GFSI_notificationMsg = MSG_MY_APP_DIRECTORY_SELECTED;
+        GFSI_fileCriteria = FSFC_DIRS;
+    };
 
 ----------
 
 ----------
 **Code Display 14-5 Limit the Search to a Single Directory**
 
-	@object GenFileSelectorClass SingleDirFileSelector = {
-		GFSI_destination = process;
-		GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
-		GFSI_attrs = 			FSA_HAS_FILE_LIST;
-		GFSI_fileCriteria =		FSFC_NON_GEOS_FILES | FSFC_GEOS_EXECUTABLES
-								| FSFC_GEOS_NON_EXECUTABLES;
-		ATTR_GEN_PATH_DATA = {0, DIRECTORY};
-			/* Limit the display to this standard directory.
-			 * Note that paths may be given; relative paths are taken as
-			 * relative to the specified standard path. This attribute
-			 * is defined in GenClass. */
-	};
+    @object GenFileSelectorClass SingleDirFileSelector = {
+        GFSI_destination = process;
+        GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+        GFSI_attrs =            FSA_HAS_FILE_LIST;
+        GFSI_fileCriteria =     FSFC_NON_GEOS_FILES | FSFC_GEOS_EXECUTABLES
+                                | FSFC_GEOS_NON_EXECUTABLES;
+        ATTR_GEN_PATH_DATA = {0, DIRECTORY};
+            /* Limit the display to this standard directory.
+             * Note that paths may be given; relative paths are taken as
+             * relative to the specified standard path. This attribute
+             * is defined in GenClass. */
+    };
 
 ----------
 
 ----------
 **Code Display 14-6 Show Hidden Files As Well As Normal Files**
 
-	@object GenFileSelectorClass HiddenFileSelector = {
-		GFSI_destination = process;
-		GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
-			/* Specify that FA_SYSTEM files are the only ones not to be displayed. */
-		ATTR_GEN_FILE_SELECTOR_FILE_ATTR = { 0, FA_SYSTEM};
-	};
+    @object GenFileSelectorClass HiddenFileSelector = {
+        GFSI_destination = process;
+        GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+            /* Specify that FA_SYSTEM files are the only ones not to be displayed. */
+        ATTR_GEN_FILE_SELECTOR_FILE_ATTR = { 0, FA_SYSTEM};
+    };
 
 ----------
 
 ----------
 **Code Display 14-7 Show Only Files Created by a Given Geode**
 
-	@object GenFileSelectorClass CreatorFileSelector = {
-		GFSI_destination = process;
-		GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
-		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = {{"CRTR"}, 0};
-	};
+    @object GenFileSelectorClass CreatorFileSelector = {
+        GFSI_destination = process;
+        GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+        ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = {{"CRTR"}, 0};
+    };
 
 ----------
 
 ----------
 **Code Display 14-8 Show Only Files with a Given Filename Extension**
 
-	@object GenFileSelectorClass ExtensionFileSelector = {
-		GFSI_destination = process;
-		GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
-		ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.BAT"};	/* Show files ending with BAT. */
-			/* Note that the mask is case sensitive. This means that the mask must be
-			 * in upper case to match DOS files. */
-	};
+    @object GenFileSelectorClass ExtensionFileSelector = {
+        GFSI_destination = process;
+        GFSI_notificationMsg = MSG_MY_APP_FILE_SELECTED;
+        ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.BAT"};   /* Show files ending with BAT. */
+            /* Note that the mask is case sensitive. This means that the mask must be
+             * in upper case to match DOS files. */
+    };
 
 ----------
 ## 14.3 File Selector Instance Data
@@ -514,145 +514,145 @@ comments and the defaults that are set.
 ----------
 **Code Display 14-9 File Selector Attributes**
 
-	/* Following are several type definitions used in the instance data. */
+    /* Following are several type definitions used in the instance data. */
 
-	typedef FileLongName		GenFileSelectorSelection;
-	typedef WordFlags			FileSelectorFileCriteria;
-	typedef WordFlags			FileSelectorAttrs;
-	typedef FileLongName		GenFileSelectorMask;
+    typedef FileLongName        GenFileSelectorSelection;
+    typedef WordFlags           FileSelectorFileCriteria;
+    typedef WordFlags           FileSelectorAttrs;
+    typedef FileLongName        GenFileSelectorMask;
 
-	typedef struct {
-		FileAttrs		GFSFA_match;
-		FileAttrs		GFSFA_mismatch;
-	} GenFileSelectorFileAttrs;
+    typedef struct {
+        FileAttrs       GFSFA_match;
+        FileAttrs       GFSFA_mismatch;
+    } GenFileSelectorFileAttrs;
 
-	typedef struct {
-		GeodeAttrs		GFSGA_match;
-		GeodeAttrs		GFSGA_mismatch;
-	} GenFileSelectorGeodeAttrs;
+    typedef struct {
+        GeodeAttrs      GFSGA_match;
+        GeodeAttrs      GFSGA_mismatch;
+    } GenFileSelectorGeodeAttrs;
 
-	/* GFSI_selection
-	 * The selection field contains the name of the current selection being
-	 * displayed by the File Selector. */
-    @instance GenFileSelectorSelection		GFSI_selection = {0};
+    /* GFSI_selection
+     * The selection field contains the name of the current selection being
+     * displayed by the File Selector. */
+    @instance GenFileSelectorSelection      GFSI_selection = {0};
 
-	/* GFSI_fileCriteria
-	 * The file criteria field contains flags that determine the search and
-	 * filter criteria used by the File Selector when scanning directories. */
-	@instance FileSelectorFileCriteria	GFSI_fileCriteria = 
-						FSFC_DIRS | FSFC_NON_GEOS_FILES |
-						FSFC_GEOS_EXECUTABLES |
-						FSFC_GEOS_NON_EXECTUTABLES;
-		/* Possible flags for GFSI_fileCriteria:
-		 * FSFC_DIRS					FSFC_NON_GEOS_FILES
-		 * FSFC_GEOS_EXECUTABLES		FSFC_GEOS_NON_EXECUTABLES
-		 * FSFC_MASK_CASE_INSENSITIVE	FSFC_FILE_FILTER
-		 * FSFC_FILTER_IS_C				FSFC_TOKEN_NO_ID
-		 * FSFC_USE_MASK_FOR_DIRS */
+    /* GFSI_fileCriteria
+     * The file criteria field contains flags that determine the search and
+     * filter criteria used by the File Selector when scanning directories. */
+    @instance FileSelectorFileCriteria  GFSI_fileCriteria = 
+                        FSFC_DIRS | FSFC_NON_GEOS_FILES |
+                        FSFC_GEOS_EXECUTABLES |
+                        FSFC_GEOS_NON_EXECTUTABLES;
+        /* Possible flags for GFSI_fileCriteria:
+         * FSFC_DIRS                    FSFC_NON_GEOS_FILES
+         * FSFC_GEOS_EXECUTABLES        FSFC_GEOS_NON_EXECUTABLES
+         * FSFC_MASK_CASE_INSENSITIVE   FSFC_FILE_FILTER
+         * FSFC_FILTER_IS_C             FSFC_TOKEN_NO_ID
+         * FSFC_USE_MASK_FOR_DIRS */
 
-	/* GFSI_attrs
-	 * The attributes field determines what features of the File Selector are
-	 * to be implemented. */
-    @instance FileSelectorAttrs		GFSI_attrs =	FSA_ALLOW_CHANGE_DIRS |
-						FSA_HAS_CLOSE_DIR_BUTTON |
-						FSA_HAS_OPEN_DIR_BUTTON |
-						FSA_HAS_DOCUMENT_BUTTON |
-						FSA_HAS_CHANGE_DIRECTORY_LIST |
-						FSA_HAS_CHANGE_DRIVE_LIST |
-						FSA_HAS_FILE_LIST;
-		/* Possible flags for GFSI_attrs:
-		 * FSA_ALLOW_CHANGE_DIRS		FSA_SHOW_FIXED_DISKS_ONLY
-		 * FSA_SHOW_FILES_DISABLED		FSA_HAS_CLOSE_DIR_BUTTON
-		 * FSA_HAS_OPEN_DIR_BUTTON		FSA_HAS_DOCUMENT_BUTTON
-		 * FSA_HAS_CHANGE_DIRECTORY_LIST FSA_HAS_CHANGE_DRIVE_LIST
-		 * FSA_HAS_FILE_LIST			FSA_USE_VIRTUAL_ROOT
+    /* GFSI_attrs
+     * The attributes field determines what features of the File Selector are
+     * to be implemented. */
+    @instance FileSelectorAttrs     GFSI_attrs =    FSA_ALLOW_CHANGE_DIRS |
+                        FSA_HAS_CLOSE_DIR_BUTTON |
+                        FSA_HAS_OPEN_DIR_BUTTON |
+                        FSA_HAS_DOCUMENT_BUTTON |
+                        FSA_HAS_CHANGE_DIRECTORY_LIST |
+                        FSA_HAS_CHANGE_DRIVE_LIST |
+                        FSA_HAS_FILE_LIST;
+        /* Possible flags for GFSI_attrs:
+         * FSA_ALLOW_CHANGE_DIRS        FSA_SHOW_FIXED_DISKS_ONLY
+         * FSA_SHOW_FILES_DISABLED      FSA_HAS_CLOSE_DIR_BUTTON
+         * FSA_HAS_OPEN_DIR_BUTTON      FSA_HAS_DOCUMENT_BUTTON
+         * FSA_HAS_CHANGE_DIRECTORY_LIST FSA_HAS_CHANGE_DRIVE_LIST
+         * FSA_HAS_FILE_LIST            FSA_USE_VIRTUAL_ROOT
 
-	/* GFSI_destination and GFSI_notificationMsg
-	 * When a user selects a file, the File Selector sends the message
-	 * specified in GFSI_notificationMsg to the object specified in
-	 * GFSI_destination. */
-	@instance optr				GFSI_destination;
-	@instance Message			GFSI_notificationMsg;
+    /* GFSI_destination and GFSI_notificationMsg
+     * When a user selects a file, the File Selector sends the message
+     * specified in GFSI_notificationMsg to the object specified in
+     * GFSI_destination. */
+    @instance optr              GFSI_destination;
+    @instance Message           GFSI_notificationMsg;
 
-	/* Token and creator matches
-	 * These two vardata fields filter files according to their tokens.
-	 * A file that has a token other than that set will not be displayed
-	 * by the File Selector. If you only want to match files with certain
-	 * token characters, you can set FSFC_TOKEN_NO_ID in GFSI_fileCriteria. */
-	@vardata GeodeToken		ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH;
-	@vardata GeodeToken		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH;
+    /* Token and creator matches
+     * These two vardata fields filter files according to their tokens.
+     * A file that has a token other than that set will not be displayed
+     * by the File Selector. If you only want to match files with certain
+     * token characters, you can set FSFC_TOKEN_NO_ID in GFSI_fileCriteria. */
+    @vardata GeodeToken     ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH;
+    @vardata GeodeToken     ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH;
 
-	/* File attributes
-	 * This vardata field filters files according to the files' native
-	 * attributes. If a file does not have the attributes specified in
-	 * GFSFA_match, or if it has an attribute specified in GFSFA_mismatch,
-	 * it will not be displayed. */
-	@vardata GenFileSelectorFileAttrs	ATTR_GEN_FILE_SELECTOR_FILE_ATTR;
+    /* File attributes
+     * This vardata field filters files according to the files' native
+     * attributes. If a file does not have the attributes specified in
+     * GFSFA_match, or if it has an attribute specified in GFSFA_mismatch,
+     * it will not be displayed. */
+    @vardata GenFileSelectorFileAttrs   ATTR_GEN_FILE_SELECTOR_FILE_ATTR;
 
-	/* Geode attributes
-	 * This vardata field filters files according to the files' geode
-	 * attributes. If a file does not have the attributes specified in
-	 * GFSGA_match, or if it has an attribute specified in GFSGA_mismatch,
-	 * it will not be displayed. */
-	@vardata GenFileSelectorGeodeAttrs	ATTR_GEN_FILE_SELECTOR_GEODE_ATTR;
+    /* Geode attributes
+     * This vardata field filters files according to the files' geode
+     * attributes. If a file does not have the attributes specified in
+     * GFSGA_match, or if it has an attribute specified in GFSGA_mismatch,
+     * it will not be displayed. */
+    @vardata GenFileSelectorGeodeAttrs  ATTR_GEN_FILE_SELECTOR_GEODE_ATTR;
 
-	/* Mask
-	 * This vardata field filters files based on their names. The mask is
-	 * a text string matched against file names. Files which coincide with the
-	 * mask string are displayed; others are not. The mask string will also
-	 * be applied to volumes and directories if FSFC_USE_MASK_FOR_DIRS is
-	 * set in GFSI_fileCriteria. */
-	@vardata GenFileSelectorMask	ATTR_GEN_FILE_SELECTOR_NAME_MASK;
+    /* Mask
+     * This vardata field filters files based on their names. The mask is
+     * a text string matched against file names. Files which coincide with the
+     * mask string are displayed; others are not. The mask string will also
+     * be applied to volumes and directories if FSFC_USE_MASK_FOR_DIRS is
+     * set in GFSI_fileCriteria. */
+    @vardata GenFileSelectorMask    ATTR_GEN_FILE_SELECTOR_NAME_MASK;
 
-	/* Virtual Root
-	 * This vardata field defines a "virtual root" for the file selector. The
-	 * user will not be allowed to navigate above the "virtual root" except
-	 * with the Change Drives popup list, if available. If the Change Drives
-	 * list is used, the virtual root is afterwards ignored. */
-	@vardata GenFilePath		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT;
+    /* Virtual Root
+     * This vardata field defines a "virtual root" for the file selector. The
+     * user will not be allowed to navigate above the "virtual root" except
+     * with the Change Drives popup list, if available. If the Change Drives
+     * list is used, the virtual root is afterwards ignored. */
+    @vardata GenFilePath        ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT;
 
-	/* Scalable UI Support
-	 * This hint is used to support scalable UI within the File Selector based
-	 * on the application's features (MSG_GEN_APPLICATION_GET_APP_FEATURES).
-	 * This hint takes an array of GenFileSelectorScalableUIEntry structures.
-	 * Typically, one element will have GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON,
-	 * and one element will have GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF.
-	 * The structures are defined below. */
-	@vardata GenFileSelectorScalableUIEntry HINT_FILE_SELECTOR_SCALABLE_UI_DATA;
+    /* Scalable UI Support
+     * This hint is used to support scalable UI within the File Selector based
+     * on the application's features (MSG_GEN_APPLICATION_GET_APP_FEATURES).
+     * This hint takes an array of GenFileSelectorScalableUIEntry structures.
+     * Typically, one element will have GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON,
+     * and one element will have GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF.
+     * The structures are defined below. */
+    @vardata GenFileSelectorScalableUIEntry HINT_FILE_SELECTOR_SCALABLE_UI_DATA;
 
-	/* The structures for the above hint are given below.
-	 * GenFileSelectorScalableUIEntry is a structure with three fields; each
-	 * element in the array is one of these structures.
-	 * GenFileSelectorScalableUICommand is the type of the first field.
-	 * If the data in GFSSUIE_appFeature is true according to the type in
-	 * GFSSUIE_command, then the features in GFSSUIE_fsFeatures will be set
-	 * accordingly. */
-	typedef ByteEnum GenFileSelectorScalableUICommand;
-	#define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON		0
-	#define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF		1
-	#define GFSSUIC_ADD_FEATURES_IF_APP_FEATURE_ON		2
-	#define GFSSUIC_SET_FEATURES_IF_APP_LEVEL			3
-	#define GFSSUIC_ADD_FEATURES_IF_APP_LEVEL			4
+    /* The structures for the above hint are given below.
+     * GenFileSelectorScalableUIEntry is a structure with three fields; each
+     * element in the array is one of these structures.
+     * GenFileSelectorScalableUICommand is the type of the first field.
+     * If the data in GFSSUIE_appFeature is true according to the type in
+     * GFSSUIE_command, then the features in GFSSUIE_fsFeatures will be set
+     * accordingly. */
+    typedef ByteEnum GenFileSelectorScalableUICommand;
+    #define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON      0
+    #define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF     1
+    #define GFSSUIC_ADD_FEATURES_IF_APP_FEATURE_ON      2
+    #define GFSSUIC_SET_FEATURES_IF_APP_LEVEL           3
+    #define GFSSUIC_ADD_FEATURES_IF_APP_LEVEL           4
 
-	typedef struct {
-		GenFileSelectorScalableUICommand	GFSSUIE_command;
-		WordFlags							GFSSUIE_appFeature;
-		FileSelectorAttrs					GFSSUIE_fsFeatures;
-	} GenFileSelectorScalableUIEntry;
+    typedef struct {
+        GenFileSelectorScalableUICommand    GFSSUIE_command;
+        WordFlags                           GFSSUIE_appFeature;
+        FileSelectorAttrs                   GFSSUIE_fsFeatures;
+    } GenFileSelectorScalableUIEntry;
 
-	/* Number of files
-	 * This hint determines the number of files that are visible at once. */
-	@vardata word		HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW;
+    /* Number of files
+     * This hint determines the number of files that are visible at once. */
+    @vardata word       HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW;
 
-	/* File List Width
-	 * This hint defines the width of the file list. The data is a number of
-	 * average-width characters, up to a maximum of 255.
-	@vardata word 		HINT_FILE_SELECTOR_FILE_LIST_WIDTH;
+    /* File List Width
+     * This hint defines the width of the file list. The data is a number of
+     * average-width characters, up to a maximum of 255.
+    @vardata word       HINT_FILE_SELECTOR_FILE_LIST_WIDTH;
 
 ----------
 ### 14.3.1 The GFSI_attrs Field
-	GFSI_attrs, MSG_GEN_FILE_SELECTOR_GET_ATTRS, 
-	MSG_GEN_FILE_SELECTOR_SET_ATTRS
+    GFSI_attrs, MSG_GEN_FILE_SELECTOR_GET_ATTRS, 
+    MSG_GEN_FILE_SELECTOR_SET_ATTRS
 
 The GenFileSelector has ten attributes in *GFSI_attrs*, shown below. They are 
 stored as a word-sized record of type **FileSelectorAttrs**; they may be 
@@ -705,8 +705,8 @@ allows changing the File Selector without altering the vardata.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_ATTRS
-	void	MSG_GEN_FILE_SELECTOR_SET_ATTRS(
-			FileSelectorAttrs attributes);
+    void    MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+            FileSelectorAttrs attributes);
 
 This message sets the File Selector's *GFSI_attrs* record to a new set of 
 attributes. The File Selector will rescan the current directory using the new 
@@ -727,7 +727,7 @@ Selector's *GFSI_attrs* record.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_ATTRS
-	FileSelectorAttrs MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+    FileSelectorAttrs MSG_GEN_FILE_SELECTOR_GET_ATTRS();
 
 This message returns the current attributes set in the File Selector's 
 *GFSI_attrs* instance data.
@@ -744,9 +744,9 @@ Selector's *GFSI_attrs* field.
 **Interception:** Generally not intercepted.
 
 ### 14.3.2 The GFSI_fileCriteria Field
-	GFSI_fileCriteria, 
-	MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA, 
-	MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA
+    GFSI_fileCriteria, 
+    MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA, 
+    MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA
 
 Each File Selector can limit or extend its searches in several different ways. 
 The File Selector's instance data contains information about which types of 
@@ -811,8 +811,8 @@ messages are detailed below.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA
-	void	MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
-			FileSelectorFileCriteria fileCriteria);
+    void    MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+            FileSelectorFileCriteria fileCriteria);
 
 This message sets the File Selector's *GFSI_fileCriteria* record to a new set of 
 flags. If the File Selector is visible when it receives this message, it will 
@@ -840,7 +840,7 @@ MSG_GEN_FILE_SELECTOR_SET_MASK
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA
-	FileSelectorFileCriteria MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+    FileSelectorFileCriteria MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
 
 This message returns the File Selector's current *GFSI_fileCriteria* record. 
 
@@ -863,9 +863,9 @@ MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS,
 MSG_GEN_FILE_SELECTOR_SET_MASK
 
 ### 14.3.3 Matching a File Token
-	ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH, 
-	MSG_GEN_FILE_SELECTOR_SET_TOKEN, 
-	MSG_GEN_FILE_SELECTOR_GET_TOKEN
+    ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH, 
+    MSG_GEN_FILE_SELECTOR_SET_TOKEN, 
+    MSG_GEN_FILE_SELECTOR_GET_TOKEN
 
 Since every GEOS file has a token associated with it, you can limit directory 
 scans to include only those files with a given token. (Note that directories and 
@@ -877,10 +877,10 @@ Both the match token ID and the match token characters are stored in the
 File Selector's ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH instance field. 
 This field is of type **GeodeToken**, the structure of which is shown below:
 
-	typedef struct {
-		TokenChars			GT_chars[TOKEN_CHARS_LENGTH];
-		ManufacturerID		GT_manufID;
-	} GeodeToken;
+    typedef struct {
+        TokenChars          GT_chars[TOKEN_CHARS_LENGTH];
+        ManufacturerID      GT_manufID;
+    } GeodeToken;
 
 The *GT_chars* field is four characters as defined in the geode's geode 
 parameters (**.gp**) file. The *GT_manufID* field is the manufacturer ID number 
@@ -897,9 +897,9 @@ MSG_GEN_FILE_SELECTOR_GET_TOKEN.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_TOKEN
-	void	MSG_GEN_FILE_SELECTOR_SET_TOKEN(
-			dword				tokenChars,
-			ManufacturerID		manufacturerID);
+    void    MSG_GEN_FILE_SELECTOR_SET_TOKEN(
+            dword               tokenChars,
+            ManufacturerID      manufacturerID);
 
 This message sets the ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH field to 
 the two passed values. The token set with this message will be used to filter 
@@ -931,8 +931,8 @@ MSG_GEN_FILE_SELECTOR_SET_CREATOR
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_TOKEN
-	void	MSG_GEN_FILE_SELECTOR_GET_TOKEN(
-			GetTokenCreatorParams *retValue);
+    void    MSG_GEN_FILE_SELECTOR_GET_TOKEN(
+            GetTokenCreatorParams *retValue);
 
 This message returns the current token match information set in the File 
 Selector's ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH field.
@@ -954,10 +954,10 @@ contain the token in ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH.
 and manufacturer ID fields, and a reserved word. Its structure is shown 
 below:
 
-	typedef struct {
-		GeodeToken   GTP_Token;
-		word         GTP_Unused;		/* reserved */
-	} GetTokenCreatorParams;
+    typedef struct {
+        GeodeToken   GTP_Token;
+        word         GTP_Unused;        /* reserved */
+    } GetTokenCreatorParams;
 
 **Interception:** Generally not intercepted.
 
@@ -967,8 +967,8 @@ MSG_GEN_FILE_SELECTOR_GET_CREATOR
 
 ----------
 #### SET_TOKEN_CHARS
-	dword	SET_TOKEN_CHARS(ch1, ch2, ch3, ch4);
-			char	ch1, ch2, ch3, ch4;
+    dword   SET_TOKEN_CHARS(ch1, ch2, ch3, ch4);
+            char    ch1, ch2, ch3, ch4;
 
 This macro creates a single dword containing the four given characters. Use 
 this macro to create the *tokenChars* parameter for 
@@ -976,9 +976,9 @@ MSG_GEN_FILE_SELECTOR_SET_TOKEN and
 MSG_GEN_FILE_SELECTOR_SET_CREATOR.
 
 ### 14.3.4 Matching a File Creator App
-	ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH, 
-	MSG_GEN_FILE_SELECTOR_SET_CREATOR, 
-	MSG_GEN_FILE_SELECTOR_GET_CREATOR
+    ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH, 
+    MSG_GEN_FILE_SELECTOR_SET_CREATOR, 
+    MSG_GEN_FILE_SELECTOR_GET_CREATOR
 
 Most applications will store their documents in a special type of file; each of 
 these files will include the token of the creator geode. (This is a function of 
@@ -999,9 +999,9 @@ retrieve the creator token, use MSG_GEN_FILE_SELECTOR_GET_CREATOR.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_CREATOR
-	void	MSG_GEN_FILE_SELECTOR_SET_CREATOR(
-			dword				tokenChars,
-			ManufacturerID		manufacturerID);
+    void    MSG_GEN_FILE_SELECTOR_SET_CREATOR(
+            dword               tokenChars,
+            ManufacturerID      manufacturerID);
 
 This message sets the ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH field 
 to the two passed values. This field is a vardata instance record of type 
@@ -1038,8 +1038,8 @@ MSG_GEN_FILE_SELECTOR_SET_TOKEN
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_CREATOR
-	void	MSG_GEN_FILE_SELECTOR_GET_CREATOR(
-			GetTokenCreatorParams *retValue);
+    void    MSG_GEN_FILE_SELECTOR_GET_CREATOR(
+            GetTokenCreatorParams *retValue);
 
 This message returns the current creator match information set in the File 
 Selector's ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH field.
@@ -1061,10 +1061,10 @@ contain the token in ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH.
 and manufacturer ID fields, and a reserved word. Its structure is shown 
 below:
 
-	typedef struct {
-		GeodeToken   GTP_token;
-		word         GTP_unused;		/* reserved */
-	} GetTokenCreatorParams;
+    typedef struct {
+        GeodeToken   GTP_token;
+        word         GTP_unused;        /* reserved */
+    } GetTokenCreatorParams;
 
 **Interception:** Generally not intercepted.
 
@@ -1073,9 +1073,9 @@ MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA,
 MSG_GEN_FILE_SELECTOR_GET_TOKEN 
 
 ### 14.3.5 Matching File Geode Attributes
-	ATTR_GEN_FILE_SELECTOR_GEODE_ATTR, 
-	MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS, 
-	MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS
+    ATTR_GEN_FILE_SELECTOR_GEODE_ATTR, 
+    MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS, 
+    MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS
 
 Every geode in GEOS has a structure of type **GeodeAttrs** stored in its file. 
 As a result, you can limit the File Selector's searches to include only a certain 
@@ -1088,10 +1088,10 @@ represents the geode attributes an acceptable file must have on, and
 *GFSGA_mismatch* represents the geode attributes an acceptable file must 
 have off. The structure's definition is shown below:
 
-	typedef struct {
-		GeodeAttrs    GFSGA_match;
-		GeodeAttrs    GFSGA_mismatch;
-	} GenFileSelectorGeodeAttrs;
+    typedef struct {
+        GeodeAttrs    GFSGA_match;
+        GeodeAttrs    GFSGA_mismatch;
+    } GenFileSelectorGeodeAttrs;
 
 To retrieve the current geode match information, send the message 
 MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS to the File Selector object. 
@@ -1156,9 +1156,9 @@ points in C.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS
-	void	MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS(
-			GeodeAttrs		matchGeodeAttrs,
-			GeodeAttrs		mismatchGeodeAttrs);
+    void    MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS(
+            GeodeAttrs      matchGeodeAttrs,
+            GeodeAttrs      mismatchGeodeAttrs);
 
 This message sets the File Selector's vardata instance field 
 ATTR_GEN_FILE_SELECTOR_GEODE_ATTR to the two passed values.
@@ -1189,7 +1189,7 @@ will be set into *GFSGA_mismatch*.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS
-	dword	 MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS();
+    dword    MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS();
 
 This message returns the File Selector's current geode attribute match 
 information.
@@ -1212,24 +1212,24 @@ GET_MATCH_ATTRS. To extract the mismatch attributes
 
 ----------
 #### GET_MATCH_ATTRS
-	word	GET_MATCH_ATTRS(attr);
-			dword	attr;
+    word    GET_MATCH_ATTRS(attr);
+            dword   attr;
 
 This macro extracts the *GFSGA_match* record (**GeodeAttrs**) from the given 
 dword (returned by MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS).
 
 ----------
 #### GET_MISMATCH_ATTRS
-	word	GET_MISMATCH_ATTRS(attr);
-			dword	attr;
+    word    GET_MISMATCH_ATTRS(attr);
+            dword   attr;
 
 This macro extracts the *GFSGA_match* record (**GeodeAttrs**) from the given 
 dword (returned by MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS).
 
 ### 14.3.6 Masking File Names
-	ATTR_GEN_FILE_SELECTOR_NAME_MASK, 
-	MSG_GEN_FILE_SELECTOR_SET_MASK, 
-	MSG_GEN_FILE_SELECTOR_GET_MASK
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK, 
+    MSG_GEN_FILE_SELECTOR_SET_MASK, 
+    MSG_GEN_FILE_SELECTOR_GET_MASK
 
 By setting up a filename mask, you can limit the File Selector's displays to 
 only those files that conform to the mask characters. For example, to show 
@@ -1267,8 +1267,8 @@ filename mask comparisons.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_MASK
-	void	MSG_GEN_FILE_SELECTOR_SET_MASK(
-			char	*mask);
+    void    MSG_GEN_FILE_SELECTOR_SET_MASK(
+            char    *mask);
 
 This message sets the ATTR_GEN_FILE_SELECTOR_NAME_MASK variable 
 instance field of the File Selector. This field contains a null-terminated 
@@ -1302,8 +1302,8 @@ null-terminated character string.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_MASK
-	void	MSG_GEN_FILE_SELECTOR_GET_MASK(
-			char	*mask);
+    void    MSG_GEN_FILE_SELECTOR_GET_MASK(
+            char    *mask);
 
 This message returns the mask string in the File Selector's 
 ATTR_GEN_FILE_SELECTOR_NAME_MASK field.
@@ -1327,9 +1327,9 @@ MSG_GEN_FILE_SELECTOR_SET_MASK,
 MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA
 
 ### 14.3.7 Matching File Attributes
-	ATTR_GEN_FILE_SELECTOR_FILE_ATTR, 
-	MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS, 
-	MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS
+    ATTR_GEN_FILE_SELECTOR_FILE_ATTR, 
+    MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS, 
+    MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS
 
 All files have a number of attributes stored in a record of type **FileAttrs**. (For 
 full information on **FileAttrs**, see "File System," Chapter 17 of the Concepts 
@@ -1342,10 +1342,10 @@ ATTR_GEN_FILE_SELECTOR_FILE_ATTR is a structure of type
 fields: *GFSFA_match* represents the attributes an acceptable file has on, and 
 *GFSFA_mismatch* represents the attributes an acceptable file has off.
 
-	typedef struct {
-		FileAttrs    GFSFA_match;
-		FileAttrs    GFSFA_mismatch;
-	} GenFileSelectorFileAttrs;
+    typedef struct {
+        FileAttrs    GFSFA_match;
+        FileAttrs    GFSFA_mismatch;
+    } GenFileSelectorFileAttrs;
 
 The allowable file attributes are listed below and are discussed fully in "File 
 System," Chapter 17 of the Concepts Book. If you don't explicitly set the file 
@@ -1369,10 +1369,10 @@ must mismatch FA_SYSTEM and FA_HIDDEN. That is, to show only those
 subdirectories which match your filter criteria, ensure FSFC_DIRS is not set, 
 and set mismatch attributes thus:
 
-	ATTR_GEN_FILE_SELECTOR_FILE_ATTR = {
-					0,
-					FA_HIDDEN | FA_SYSTEM
-	}
+    ATTR_GEN_FILE_SELECTOR_FILE_ATTR = {
+                    0,
+                    FA_HIDDEN | FA_SYSTEM
+    }
 
 You may retrieve the current file attributes by sending the message 
 MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS to the File Selector object. 
@@ -1381,9 +1381,9 @@ MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS
-	void	MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(
-			FileAttrs	setAttrs,
-			FileAttrs	clearAttrs);
+    void    MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(
+            FileAttrs   setAttrs,
+            FileAttrs   clearAttrs);
 
 This message sets the ATTR_GEN_FILE_SELECTOR_FILE_ATTR vardata 
 instance field of the File Selector. If the File Selector is visible on the screen 
@@ -1410,7 +1410,7 @@ filter.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS
-	word	MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS();
+    word    MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS();
 
 This message returns the ATTR_GEN_FILE_SELECTOR_FILE_ATTR of the 
 File Selector. This attribute contains two byte-sized fields which represent 
@@ -1433,8 +1433,8 @@ GET_MATCH_FILE_ATTRS and GET_MISMATCH_FILE_ATTRS (below).
 
 ----------
 #### GET_MATCH_FILE_ATTRS
-	byte	GET_MATCH_FILE_ATTRS(attr);
-			word	attr;
+    byte    GET_MATCH_FILE_ATTRS(attr);
+            word    attr;
 
 This macro extracts the *GFSFA_match* portion of the word value returned by 
 MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS. The extracted value is a 
@@ -1442,16 +1442,16 @@ record of **FileAttrs**.
 
 ----------
 #### GET_MISMATCH_FILE_ATTRS
-	byte	GET_MISMATCH_FILE_ATTRS(attr);
-			word	attr;
+    byte    GET_MISMATCH_FILE_ATTRS(attr);
+            word    attr;
 
 This macro extracts the *GFSFA_mismatch* portion of the word value returned 
 by MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS. The extracted value is a 
 record of **FileAttrs**.
 
 ### 14.3.8 Searching Via Callback Routine
-	MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE, 
-	GenFileSelectorFilterRoutine
+    MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE, 
+    GenFileSelectorFilterRoutine
 
 If the built-in search limitations do not provide the functionality you require, 
 you can set up a callback routine that the File Selector will call for each file 
@@ -1483,20 +1483,20 @@ that will be passed to the callback routine. This array contains a number of
 **FileExtAttrDesc** structures, each of which defines a certain attribute and 
 some extra data for the attribute. This structure is shown below:
 
-	typedef struct {
-		FileExtendedAttribute	FEAD_attr;
-					/* file attribute to
-					 * get or set */
-		void					* FEAD_value;
-					/* pointer to a buffer
-					 * or new value */
-    	word					FEAD_size;
-					/* size of buffer or
-					 * new value */
-		char					* FEAD_name;
-					/* if custom attribute,
-					 * pointer to name */
-	} FileExtAttrDesc;
+    typedef struct {
+        FileExtendedAttribute   FEAD_attr;
+                    /* file attribute to
+                     * get or set */
+        void                    * FEAD_value;
+                    /* pointer to a buffer
+                     * or new value */
+        word                    FEAD_size;
+                    /* size of buffer or
+                     * new value */
+        char                    * FEAD_name;
+                    /* if custom attribute,
+                     * pointer to name */
+    } FileExtAttrDesc;
 
 In the above context, *FEAD_value* is meaningless and *FEAD_size* is the 
 number of bytes required to hold the value of the attribute. Note that this 
@@ -1510,76 +1510,76 @@ Display 14-10. The **FileExtAttrDesc** structure is defined and detailed in
 ----------
 **Code Display 14-10 Filtering Files Via a Callback Routine**
 
-	/*******************************************************************************
-	 * This is a sample handler for MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE.
-	 * You should be able to use this code in your subclass. Note that the routine
-	 * name "FilterFileSelectorRoutine" is application-specific; it can be whatever
-	 * you want. It must be declared as static Boolean, however. See below.
-	 * PARAMETERS: 
-	 * void (GenFileSelectorGetFilterRoutineResults *filter) 
-	 *******************************************************************************/
+    /*******************************************************************************
+     * This is a sample handler for MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE.
+     * You should be able to use this code in your subclass. Note that the routine
+     * name "FilterFileSelectorRoutine" is application-specific; it can be whatever
+     * you want. It must be declared as static Boolean, however. See below.
+     * PARAMETERS: 
+     * void (GenFileSelectorGetFilterRoutineResults *filter) 
+     *******************************************************************************/
 
-	@method FilterFileSelectorClass, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE {
+    @method FilterFileSelectorClass, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE {
 
-		/* We need to return a virtual pointer to the filter routine so the
-		 * file selector can lock and unlock the routine's code resource as
-		 * appropriate. Unfortunately, the compiler optimizes the simple
-		 * implementation (just assigning filter->filterRoutine the address of
-		 * the routine) by storing CS for the segment, which is unhelpful. So
-		 * we need a static variable holding the routine's address instead. */
+        /* We need to return a virtual pointer to the filter routine so the
+         * file selector can lock and unlock the routine's code resource as
+         * appropriate. Unfortunately, the compiler optimizes the simple
+         * implementation (just assigning filter->filterRoutine the address of
+         * the routine) by storing CS for the segment, which is unhelpful. So
+         * we need a static variable holding the routine's address instead. */
 
-		static GenFileSelectorFilterRoutine *const filterRoutine =
-									&FilterFileSelectorRoutine;
+        static GenFileSelectorFilterRoutine *const filterRoutine =
+                                    &FilterFileSelectorRoutine;
 
-		/* Specify the address of the routine to call. It need not be locked into
-		 * memory, as the GenFileSelector will do that for us. */
+        /* Specify the address of the routine to call. It need not be locked into
+         * memory, as the GenFileSelector will do that for us. */
 
-		filter->filterRoutine = filterRoutine;
+        filter->filterRoutine = filterRoutine;
 
-		/* Specify the additional attributes we need to look at in our filter
-		 * routine. As with the filterRoutine, these need not be in fixed or
-		 * locked memory. */
+        /* Specify the additional attributes we need to look at in our filter
+         * routine. As with the filterRoutine, these need not be in fixed or
+         * locked memory. */
 
-		filter->filterAttrs = &filterFileSelectorFilterAttrs;
-	}
+        filter->filterAttrs = &filterFileSelectorFilterAttrs;
+    }
 
-	/*******************************************************************************
-	 * This is a sample File Selector callback routine. It may be called whatever
-	 * you want and must be declared static Boolean.
-	 * This routine is called once per file or directory that passes all other File
-	 * Selector filters. This routine is limited to examining the attributes of the
-	 * file. It may not do anything that could cause the File Selector's instance chunk
-	 * to move in memory.
-	 * Return: TRUE to reject the file, FALSE to accept the file.
-	 *******************************************************************************/
+    /*******************************************************************************
+     * This is a sample File Selector callback routine. It may be called whatever
+     * you want and must be declared static Boolean.
+     * This routine is called once per file or directory that passes all other File
+     * Selector filters. This routine is limited to examining the attributes of the
+     * file. It may not do anything that could cause the File Selector's instance chunk
+     * to move in memory.
+     * Return: TRUE to reject the file, FALSE to accept the file.
+     *******************************************************************************/
 
-	static Boolean FilterFileSelectorRoutine(optr oself,
-								FileEnumCallbackData *fecd, word frame)
+    static Boolean FilterFileSelectorRoutine(optr oself,
+                                FileEnumCallbackData *fecd, word frame)
 
-	/* The code of the routine is not included here; to see it, look at the FSFilter
-	 * sample application. */
+    /* The code of the routine is not included here; to see it, look at the FSFilter
+     * sample application. */
 
-		/* Following is the array of attributes examined by our filter routine.
-		 * This array contains an arbitrary number of elements, the last of which
-		 * has FEA_END_OF_LIST as its FEAD_attr field. FEAD_value is unused in this
-		 * context. FEAD_size is set to the total number of bytes needed for each
-		 * attribute. 
-		 * Each structure's fields are FEAD_attr, FEAD_value, FEAD_size,
-		 * and FEAD_name */
+        /* Following is the array of attributes examined by our filter routine.
+         * This array contains an arbitrary number of elements, the last of which
+         * has FEA_END_OF_LIST as its FEAD_attr field. FEAD_value is unused in this
+         * context. FEAD_size is set to the total number of bytes needed for each
+         * attribute. 
+         * Each structure's fields are FEAD_attr, FEAD_value, FEAD_size,
+         * and FEAD_name */
 
-	const FileExtAttrDesc filterFileSelectorFilterAttrs[] = {
-		{ FEA_NAME, 0, sizeof(FileLongName), NULL },
-		{ FEA_FILE_ATTR, 0, sizeof(FileAttrs), NULL },
-		{ FEA_FILE_TYPE, 0, sizeof(GeosFileType), NULL },
-		{ FEA_END_OF_LIST, 0, 0, NULL }
-	};
+    const FileExtAttrDesc filterFileSelectorFilterAttrs[] = {
+        { FEA_NAME, 0, sizeof(FileLongName), NULL },
+        { FEA_FILE_ATTR, 0, sizeof(FileAttrs), NULL },
+        { FEA_FILE_TYPE, 0, sizeof(GeosFileType), NULL },
+        { FEA_END_OF_LIST, 0, 0, NULL }
+    };
 
 ----------
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
-	void	MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE(
-			GenFileSelectorGetFilterRoutineResults *filter);
+    void    MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE(
+            GenFileSelectorGetFilterRoutineResults *filter);
 
 This message returns the address of the callback routine used by the File 
 Selector as well as the array of **FileExtAttrDesc** structures specifying the 
@@ -1609,10 +1609,10 @@ is a pointer to an array of **FileExtAttrDesc** structures. You must fill
 in this structure in your handler so the File Selector knows how to call 
 your callback routine. The structure is shown below:
 
-	typedef struct {
-		GenFileSelectorFilterRoutine		*filterRoutine;
-		const FileExtAttrDesc				*filterAttrs;
-	} GenFileSelectorGetFilterRoutineResults;
+    typedef struct {
+        GenFileSelectorFilterRoutine        *filterRoutine;
+        const FileExtAttrDesc               *filterAttrs;
+    } GenFileSelectorGetFilterRoutineResults;
 
 **Interception:** If a callback routine is to be used, you must subclass and handle this 
 message to return the proper structures.
@@ -1630,10 +1630,10 @@ FSFilter sample application).
 
 ----------
 #### GenFileSelectorFilterRoutine()
-	Boolean	GenFileSelectorFilterRoutine(
-			optr					oself,
-			FileEnumCallbackData	*fecd,
-			word					frame);
+    Boolean GenFileSelectorFilterRoutine(
+            optr                    oself,
+            FileEnumCallbackData    *fecd,
+            word                    frame);
 
 This routine is defined by your application and is called for each file in a 
 directory scan. It may be of any name of your choice as shown in Code 
@@ -1678,9 +1678,9 @@ several messages. You can also retrieve its current state with other
 messages. These functions are detailed in the following sections.
 
 ### 14.4.1 When a User Selects a File
-	GFSI_destination, GFSI_notificationMsg, 
-	MSG_GEN_FILE_SELECTOR_GET_ACTION, 
-	MSG_GEN_FILE_SELECTOR_SET_ACTION
+    GFSI_destination, GFSI_notificationMsg, 
+    MSG_GEN_FILE_SELECTOR_GET_ACTION, 
+    MSG_GEN_FILE_SELECTOR_SET_ACTION
 
 When a user selects an entry in the File Selector's displayed list, either by 
 double-clicking or by clicking on an "Open" button, the File Selector will 
@@ -1723,8 +1723,8 @@ GFSI_notificationMsg fields to new values.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_ACTION
-	void	MSG_GEN_FILE_SELECTOR_GET_ACTION(
-			GetActionParams *retValue);
+    void    MSG_GEN_FILE_SELECTOR_GET_ACTION(
+            GetActionParams *retValue);
 
 This message returns the File Selector's output object and notification 
 message.
@@ -1743,19 +1743,19 @@ the output optr and notification message set for the File Selector.
 
 **Structures:** The GetActionParams structure is shown below:
 
-	typedef struct {
-		Message		GAP_message;	/* GFSI_notificationMsg */
-		word		GAP_unused;		/* Internal field */
-		optr		GAP_output;		/* GFSI_destination */
-	} GetActionParams;
+    typedef struct {
+        Message     GAP_message;    /* GFSI_notificationMsg */
+        word        GAP_unused;     /* Internal field */
+        optr        GAP_output;     /* GFSI_destination */
+    } GetActionParams;
 
 **Interception:** Generally not intercepted.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_ACTION
-	void	MSG_GEN_FILE_SELECTOR_SET_ACTION(
-			optr		actionOD,
-			Message		actionMessage);
+    void    MSG_GEN_FILE_SELECTOR_SET_ACTION(
+            optr        actionOD,
+            Message     actionMessage);
 
 This message sets the File Selector's *GFSI_notificationMsg* field to 
 *actionMessage* and the *GFSI_destination* field to *actionOD*.
@@ -1774,7 +1774,7 @@ This message sets the File Selector's *GFSI_notificationMsg* field to
 **Interception:** Generally not intercepted.
 
 ### 14.4.2 The Current Selection
-	GFSI_selection
+    GFSI_selection
 
 Most directory and volume navigation is handled internally by the File 
 Selector, and the application has no need to know what is happening until a 
@@ -1796,10 +1796,10 @@ below. This structure stores both an absolute path and the handle of the disk
 on which the path resides. For the GenFileSelector, this structure represents 
 the currently-displayed directory.
 
-	typedef struct {
-		DiskHandle  GFP_disk;
-		PathName    GFP_path;
-	} GenFilePath;
+    typedef struct {
+        DiskHandle  GFP_disk;
+        PathName    GFP_path;
+    } GenFilePath;
 
 To retrieve the current path, send the File Selector a MSG_GEN_PATH_GET. 
 To set the path, send it MSG_GEN_PATH_SET. To retrieve just the disk handle, 
@@ -1807,8 +1807,8 @@ send MSG_GEN_PATH_GET_DISK_HANDLE. Each of these messages is
 detailed fully in "GenClass," Chapter 2.
 
 #### 14.4.2.1 Traversing the File System
-	MSG_GEN_FILE_SELECTOR_UP_DIRECTORY, 
-	MSG_GEN_FILE_SELECTOR_OPEN_ENTRY
+    MSG_GEN_FILE_SELECTOR_UP_DIRECTORY, 
+    MSG_GEN_FILE_SELECTOR_OPEN_ENTRY
 
 To set the currently-displayed directory, you can send one of the following 
 messages to the File Selector object (these are all, of course, subject to the 
@@ -1829,7 +1829,7 @@ File Selector's dialog box.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_UP_DIRECTORY
-	void	MSG_GEN_FILE_SELECTOR_UP_DIRECTORY();
+    void    MSG_GEN_FILE_SELECTOR_UP_DIRECTORY();
 
 This message causes the File Selector to go up one directory in the directory 
 tree. If the File Selector is already in the root directory, it will switch to the 
@@ -1844,8 +1844,8 @@ message is only valid when the File Selector is visible on the screen.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_OPEN_ENTRY
-	Boolean	MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
-			word	entryNumber);
+    Boolean MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(
+            word    entryNumber);
 
 This message causes the File Selector to open and display the contents of the 
 entry specified. It returns an error flag: if the entry opens successfully, the 
@@ -1871,10 +1871,10 @@ message is only valid when the File Selector is visible on the screen.
 **Interception:** Generally not intercepted.
 
 #### 14.4.2.2 The Current Selection
-	MSG_GEN_FILE_SELECTOR_SET_SELECTION, 
-	MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH, 
-	MSG_GEN_FILE_SELECTOR_GET_SELECTION, 
-	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
+    MSG_GEN_FILE_SELECTOR_SET_SELECTION, 
+    MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH, 
+    MSG_GEN_FILE_SELECTOR_GET_SELECTION, 
+    MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
 
 The File Selector keeps track of which item is currently designated as the 
 selection. The selection appears on the screen as the only highlighted entry 
@@ -1931,8 +1931,8 @@ Extracts the selection's flags record.
 
 ----------
 #### GFS_GET_ENTRY_NUMBER
-	word	GFS_GET_ENTRY_NUMBER(arg);
-			dword	arg;
+    word    GFS_GET_ENTRY_NUMBER(arg);
+            dword   arg;
 
 This takes the return value of MSG_GEN_FILE_SELECTOR_GET_SELECTION 
 and MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH and returns 
@@ -1940,8 +1940,8 @@ the entry number of the selection.
 
 ----------
 #### GFS_GET_ENTRY_FLAGS
-	word	GFS_GET_ENTRY_FLAGS(arg);
-			dword	arg;
+    word    GFS_GET_ENTRY_FLAGS(arg);
+            dword   arg;
 
 This takes the return value of MSG_GEN_FILE_SELECTOR_GET_SELECTION 
 and MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH and returns 
@@ -1949,8 +1949,8 @@ the **GenFileSelectorEntryFlags** for the selection.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_SELECTION
-	Boolean	MSG_GEN_FILE_SELECTOR_SET_SELECTION(
-			char	*selection);
+    Boolean MSG_GEN_FILE_SELECTOR_SET_SELECTION(
+            char    *selection);
 
 This message causes the File Selector to attempt to select a given file, 
 directory, or volume from the currently-displayed file list. It sets the selection 
@@ -1985,8 +1985,8 @@ currently be updated (it is not visible or is suspended).
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_SELECTION
-	dword	MSG_GEN_FILE_SELECTOR_GET_SELECTION(
-			char	*selection);
+    dword   MSG_GEN_FILE_SELECTOR_GET_SELECTION(
+            char    *selection);
 
 This message returns the name, the entry number, and the entry flags of the 
 file or directory currently selected.
@@ -2014,9 +2014,9 @@ null-terminated name of the current selection.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH
-	Boolean	MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
-			char			*selection,
-			DiskHandle		diskHandle);
+    Boolean MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+            char            *selection,
+            DiskHandle      diskHandle);
 
 This message causes the File Selector to set its path data and its 
 *GFSI_selection* field according to the string passed in *selection*. The string's 
@@ -2059,8 +2059,8 @@ made, the flag will be *false*. If an error occurs, the flag will be *true*.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH
-	dword	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
-			char	*selection);
+    dword   MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+            char    *selection);
 
 This message returns the disk handle and flags as well as the full pathname 
 of the current selection.
@@ -2090,17 +2090,17 @@ path and name of the current selection.
 
 ----------
 #### GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE
-	DiskHandle	GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(arg);
-				dword	arg;
+    DiskHandle  GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(arg);
+                dword   arg;
 
 This macro extracts the disk handle (the high word) from a dword argument 
 returned by MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH.
 
 ----------
 ### 14.4.3 Rescanning Directories
-	MSG_GEN_FILE_SELECTOR_RESCAN, 
-	MSG_GEN_FILE_SELECTOR_SUSPEND, 
-	MSG_GEN_FILE_SELECTOR_END_SUSPEND
+    MSG_GEN_FILE_SELECTOR_RESCAN, 
+    MSG_GEN_FILE_SELECTOR_SUSPEND, 
+    MSG_GEN_FILE_SELECTOR_END_SUSPEND
 
 Each time the File Selector changes directories, it scans that directory and 
 displays only the files it is supposed to. It looks into each file briefly to check 
@@ -2127,7 +2127,7 @@ rescanned and displayed.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_RESCAN
-	void	MSG_GEN_FILE_SELECTOR_RESCAN();
+    void    MSG_GEN_FILE_SELECTOR_RESCAN();
 
 This message causes the File Selector to rescan its current directory. The File 
 Selector will re-build and re-display its entire file list. This message will only 
@@ -2141,7 +2141,7 @@ work when the File Selector is visible on the screen.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_SUSPEND
-	Boolean	MSG_GEN_FILE_SELECTOR_SUSPEND();
+    Boolean MSG_GEN_FILE_SELECTOR_SUSPEND();
 
 This message causes the File Selector to suspend directory scans until a 
 MSG_GEN_FILE_SELECTOR_END_SUSPEND is received. This provides the 
@@ -2153,11 +2153,11 @@ attribute-setting messages will be affected (their normal automatic rescan
 will not happen). Note that all messages have the prefix 
 MSG_GEN_FILE_SELECTOR_:
 
-	SET_SELECTION				SET_FULL_SELECTION_PATH
-	SET_MASK					SET_FILE_ATTRS
-	SET_TOKEN					SET_CREATOR
-	SET_GEODE_ATTRS				SET_ATTRS
-	SET_FILE_CRITERIA
+    SET_SELECTION               SET_FULL_SELECTION_PATH
+    SET_MASK                    SET_FILE_ATTRS
+    SET_TOKEN                   SET_CREATOR
+    SET_GEODE_ATTRS             SET_ATTRS
+    SET_FILE_CRITERIA
 
 In addition to the above messages, the **GenClass** message 
 MSG_GEN_PATH_SET will also be suspended.
@@ -2178,7 +2178,7 @@ unsuspend it with MSG_GEN_FILE_SELECTOR_END_SUSPEND.
 
 ----------
 #### MSG_GEN_FILE_SELECTOR_END_SUSPEND
-	Boolean	MSG_GEN_FILE_SELECTOR_END_SUSPEND();
+    Boolean MSG_GEN_FILE_SELECTOR_END_SUSPEND();
 
 This message unsuspends a File Selector that had previously been 
 suspended with MSG_GEN_FILE_SELECTOR_SUSPEND. This message 
@@ -2198,7 +2198,7 @@ unsuspend the File Selector.
 **Interception:** Generally not intercepted.
 
 ### 14.4.4 Setting Scalable UI Data
-	HINT_FILE_SELECTOR_SCALABLE_UI_DATA
+    HINT_FILE_SELECTOR_SCALABLE_UI_DATA
 
 The File Selector lets you set which features you want based on the current 
 application features, using HINT_FILE_SELECTOR_SCALABLE_UI_DATA. 

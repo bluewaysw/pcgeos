@@ -1209,14 +1209,14 @@ Code Display 6-2 Saving Generic Object Options
 
 @object GenApplicationClass SampleApp = {
     GI_visMoniker = "Sample Application";
-    GI_comp = SamplePrimary;				/* Primary window object is the only child. */
+    GI_comp = SamplePrimary;                /* Primary window object is the only child. */
     gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = SamplePrimary;
-		/* The above list is to declare windowed objects that must appear
-		 * when the application is opened and made usable. */
+        /* The above list is to declare windowed objects that must appear
+         * when the application is opened and made usable. */
     gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
-					SampleController;
-		/* The above list is used for generic objects that save their
-		 * options but do not need their options loaded at startup. */
+                    SampleController;
+        /* The above list is used for generic objects that save their
+         * options but do not need their options loaded at startup. */
 }
 
 /* Some applications that have generic objects save their own options might not
@@ -1228,7 +1228,7 @@ Code Display 6-2 Saving Generic Object Options
 
 @object GenInteractionClass SampleOptionsMenu = {
     GI_comp = SampleToolbox, SampleToolControl, SampleSaveOptsTrigger;
-    GII_visibility = GIV_POPUP;					/* Make it a menu. */
+    GII_visibility = GIV_POPUP;                 /* Make it a menu. */
     ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
 }
 
@@ -1333,9 +1333,9 @@ myappBoolean = true
 ; The myappHiName is a text string that, in this case, contains carriage returns,
 ; backslash characters, and curly brace characters. The original text looked like
 ; this:
-;		this is a multi-line
-;		blob of text with curly
-;		brace ({,}) characters }} in it
+;       this is a multi-line
+;       blob of text with curly
+;       brace ({,}) characters }} in it
 ; It is automatically given backslashes in front of the closing braces, and it
 ; is automatically surrounded with curly braces.
 myappHiName = {this is a multi-line
@@ -1717,7 +1717,7 @@ Code Display 6-4 EC Macros
      EC_BOUNDS(myPointer)
 ~~~
 
-#### 6.5.2	Special EC Routines
+#### 6.5.2  Special EC Routines
 
 SysGetECLevel(), SysSetECLevel(), SysNotify(), EC-(), 
 CFatalError(), CWarningNotice()
@@ -2151,11 +2151,11 @@ specifies how the client expects the server to behave. Currently, only two
 types are supported:
 
     IACPSM_NOT_USER_INTERACTIBLE  
-	This is equal to zero. It indicates that the server object will not 
+    This is equal to zero. It indicates that the server object will not 
 interact directly with users.
 
     IACPSM_USER_INTERACTIBLE  
-	This is equal to two. It indicates that the server will be able to 
+    This is equal to two. It indicates that the server will be able to 
 interact with the user like any normal application.
 
 + A set of **IACPServerFlags**. Currently, only one flag is supported: 

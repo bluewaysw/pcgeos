@@ -24,28 +24,28 @@ shows a section of Hello World to illustrate the typical use of a
 ----------
 **Code Display 3-1 HelloApp from Hello World**
 
-	/*			Application Object
-	 * The hello.gp file contains an "appobj" statement which indicates that this
-	 * "HelloApp" object is the top-level UI object. Note that the name of the
-	 * resource you place the application object in may be whatever you choose;
-	 * it does not have to be AppResource. */
-	
-	@start AppResource;		/* Begin definition of objects in AppResource. */
-	
-	@object GenApplicationClass HelloApp = {
-		GI_comp = @HelloPrimary;
-			/* The GI_comp attribute lists the generic children
-			 * of the object. The HelloApp object has just one
-			 * child, the primary window of the application. */
+    /*          Application Object
+     * The hello.gp file contains an "appobj" statement which indicates that this
+     * "HelloApp" object is the top-level UI object. Note that the name of the
+     * resource you place the application object in may be whatever you choose;
+     * it does not have to be AppResource. */
+    
+    @start AppResource;     /* Begin definition of objects in AppResource. */
+    
+    @object GenApplicationClass HelloApp = {
+        GI_comp = @HelloPrimary;
+            /* The GI_comp attribute lists the generic children
+             * of the object. The HelloApp object has just one
+             * child, the primary window of the application. */
 
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = HelloPrimary; 
-			/* The window's application GCN list determines which
-			 * windowable children should be launched on
-			 * startup. The primary window in most cases should be
-			 * launched on startup.*/
-	}
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = HelloPrimary; 
+            /* The window's application GCN list determines which
+             * windowable children should be launched on
+             * startup. The primary window in most cases should be
+             * launched on startup.*/
+    }
 
-	@end AppResource		/* End definition of objects in AppResource. */
+    @end AppResource        /* End definition of objects in AppResource. */
 
 ----------
 Typically, you will not subclass **GenApplicationClass**. You may 
@@ -65,47 +65,47 @@ Display 3-2 for reference, however.
 ----------
 **Code Display 3-2 GenApplication Instance Fields**
 
-	/* These fields will not be used directly. They can be accessed dynamically,
-	 * however, with the various messages that set and retrieve the instance data. */
-	
-	@instance AppInstanceReference	GAI_appRef = {"","",NullHandle,{0}};
-	@instance word					GAI_appMode = 0;
-	@instance AppLaunchFlags		GAI_launchFlags = 0;
-	@instance byte					GAI_optFlags = 0;
-	@instance word					GAI_appFeatures = 0;
-	@instance Handle				GAI_specificUI = 0;
-	@instance ApplicationStates		GAI_states = AS_FOCUSABLE | AS_MODELABLE;
-	@instance AppAttachFlags		GAI_attachFlags = 0;
-	@instance UIInterfaceLevel		GAI_appLevel = UIIL_ADVANCED;
-	@instance ChunkHandle			GAI_iacpConnects = 0;
-	
-	/* ApplicationStates */
+    /* These fields will not be used directly. They can be accessed dynamically,
+     * however, with the various messages that set and retrieve the instance data. */
+    
+    @instance AppInstanceReference  GAI_appRef = {"","",NullHandle,{0}};
+    @instance word                  GAI_appMode = 0;
+    @instance AppLaunchFlags        GAI_launchFlags = 0;
+    @instance byte                  GAI_optFlags = 0;
+    @instance word                  GAI_appFeatures = 0;
+    @instance Handle                GAI_specificUI = 0;
+    @instance ApplicationStates     GAI_states = AS_FOCUSABLE | AS_MODELABLE;
+    @instance AppAttachFlags        GAI_attachFlags = 0;
+    @instance UIInterfaceLevel      GAI_appLevel = UIIL_ADVANCED;
+    @instance ChunkHandle           GAI_iacpConnects = 0;
+    
+    /* ApplicationStates */
 
-	typedef WordFlags ApplicationStates;
-	#define AS_HAS_FULL_SCREEN_EXCL			0x2000
-	#define AS_SINGLE_INSTANCE				0x1000
-	#define AS_QUIT_DETACHING				0x0800
-	#define AS_AVOID_TRANSPARENT_DETACH		0x0400
-	#define AS_TRANSPARENT_DETACHING		0x0200
-	#define AS_REAL_DETACHING				0x0100
-	#define AS_QUITTING						0x0080
-	#define AS_DETACHING					0x0040
-	#define AS_FOCUSABLE					0x0020
-	#define AS_MODELABLE					0x0010
-	#define AS_NOT_USER_INTERACTABLE		0x0008
-	#define AS_RECEIVED_APP_OBJECT_DETACH	0x0004
-	#define AS_ATTACHED_TO_STATE_FILE		0x0002
-	#define AS_ATTACHING					0x0001
+    typedef WordFlags ApplicationStates;
+    #define AS_HAS_FULL_SCREEN_EXCL         0x2000
+    #define AS_SINGLE_INSTANCE              0x1000
+    #define AS_QUIT_DETACHING               0x0800
+    #define AS_AVOID_TRANSPARENT_DETACH     0x0400
+    #define AS_TRANSPARENT_DETACHING        0x0200
+    #define AS_REAL_DETACHING               0x0100
+    #define AS_QUITTING                     0x0080
+    #define AS_DETACHING                    0x0040
+    #define AS_FOCUSABLE                    0x0020
+    #define AS_MODELABLE                    0x0010
+    #define AS_NOT_USER_INTERACTABLE        0x0008
+    #define AS_RECEIVED_APP_OBJECT_DETACH   0x0004
+    #define AS_ATTACHED_TO_STATE_FILE       0x0002
+    #define AS_ATTACHING                    0x0001
 
-	/* Optimization Flags */
+    /* Optimization Flags */
 
-	typedef ByteFlags AppOptFlags;
-	#define AOF_MULTIPLE_INIT_FILE_CATEGORIES	0x80
+    typedef ByteFlags AppOptFlags;
+    #define AOF_MULTIPLE_INIT_FILE_CATEGORIES   0x80
 
-	/* GenApplicationClass also modifies two GenClass instance fields. */
+    /* GenApplicationClass also modifies two GenClass instance fields. */
 
-	@default GI_states = @default & ~GS_USABLE;
-	@default GI_attrs = @default | GA_TARGETABLE;
+    @default GI_states = @default & ~GS_USABLE;
+    @default GI_attrs = @default | GA_TARGETABLE;
 
 ----------
 *GAI_appRef* is internal. It stores information needed to reload this 
@@ -138,21 +138,21 @@ application from a state file when attached.
 ----------
 **Code Display 3-3 GenApplication Vardata Fields**
 
-	@vardata void HINT_APP_IS_ENTERTAINING;
-	@vardata void HINT_APP_IS_EDUCATIONAL;
-	@vardata void HINT_APP_IS_PRODUCTIVITY_ORIENTED;
+    @vardata void HINT_APP_IS_ENTERTAINING;
+    @vardata void HINT_APP_IS_EDUCATIONAL;
+    @vardata void HINT_APP_IS_PRODUCTIVITY_ORIENTED;
 
-	@vardata optr ATTR_GEN_APPLICATION_PRINT_CONTROL;
-		@reloc ATTR_GEN_APPLICATION_PRINT_CONTROL, 0, optr;
-	@vardata optr ATTR_GEN_APPLICATION_KBD_OBJ;
-	@vardata optr ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER;
-		@reloc ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER, 0, optr;
+    @vardata optr ATTR_GEN_APPLICATION_PRINT_CONTROL;
+        @reloc ATTR_GEN_APPLICATION_PRINT_CONTROL, 0, optr;
+    @vardata optr ATTR_GEN_APPLICATION_KBD_OBJ;
+    @vardata optr ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER;
+        @reloc ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER, 0, optr;
 
-	/* GenApplication adds a TravelOption to communicate with the Print Control. */
+    /* GenApplication adds a TravelOption to communicate with the Print Control. */
 
-	typedef enum {
-		TO_PRINT_CONTROL=_FIRST_GenApplicationClass
-	} GenApplicationTravelOption;
+    typedef enum {
+        TO_PRINT_CONTROL=_FIRST_GenApplicationClass
+    } GenApplicationTravelOption;
 
 ----------
 GenApplication also provides several hints that indicate the type of 
@@ -225,34 +225,34 @@ MSG_META_LOAD_OPTIONS when they are first loaded.
 ----------
 **Code Display 3-4 Sample GenApplication with Controllers**
 
-	/* This application includes six controllers. One, the TabControl, must receive 
-	 * MSG_META_ATTACH to work properly and is placed on the GCN active list. Another
-	 * controller, the GenViewController, must receive MSG_META_LOAD_OPTIONS at
-	 * startup and is therefore placed on the STARTUP_LOAD_OPTIONS list. All other
-	 * controllers are placed on the SELF_LOAD_OPTIONS list. Note that controllers
-	 * placed on the active list still need to be placed on one options list. */
+    /* This application includes six controllers. One, the TabControl, must receive 
+     * MSG_META_ATTACH to work properly and is placed on the GCN active list. Another
+     * controller, the GenViewController, must receive MSG_META_LOAD_OPTIONS at
+     * startup and is therefore placed on the STARTUP_LOAD_OPTIONS list. All other
+     * controllers are placed on the SELF_LOAD_OPTIONS list. Note that controllers
+     * placed on the active list still need to be placed on one options list. */
 
-	@object GenApplicationClass MyApplication = {
-		GI_comp = @MyPrimary;
-		/* Windows GCN list. */
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @MyPrimary;
-		/* Active GCN list. All objects that should receive
-		 * MSG_META_ATTACH should be on this list. These controllers
-		 * should also be added to the appropriate LOAD_OPTIONS list. */
-		gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = @MyTabControl, 
-							@MyToolControl;
-		/* Startup Load Options GCN list. This list must include
-		 * all objects that should receive MSG_META_LOAD_OPTIONS
-		 * at attach time. */
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
-							@MyGenViewControl;
-		/* Self Load Options GCN list. All objects that save
-		 * options and are not on the Startup Load Options list
-		 * should appear here. */
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = @MyTabControl,
-							@MyToolControl, @MyEditControl, @MyCharControl, 
-							@MyParaControl;
-	}
+    @object GenApplicationClass MyApplication = {
+        GI_comp = @MyPrimary;
+        /* Windows GCN list. */
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @MyPrimary;
+        /* Active GCN list. All objects that should receive
+         * MSG_META_ATTACH should be on this list. These controllers
+         * should also be added to the appropriate LOAD_OPTIONS list. */
+        gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = @MyTabControl, 
+                            @MyToolControl;
+        /* Startup Load Options GCN list. This list must include
+         * all objects that should receive MSG_META_LOAD_OPTIONS
+         * at attach time. */
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+                            @MyGenViewControl;
+        /* Self Load Options GCN list. All objects that save
+         * options and are not on the Startup Load Options list
+         * should appear here. */
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = @MyTabControl,
+                            @MyToolControl, @MyEditControl, @MyCharControl, 
+                            @MyParaControl;
+    }
 
 ----------
 
@@ -561,12 +561,12 @@ Notifies floating keyboards when windows gain the focus on pen systems.
 
 ### 3.1.3 Application Instance Reference
 
-	GAI_appRef, GAI_appMode, GAI_optFlags, 
-	MSG_GEN_APPLICATION_SET_APP_MODE_MESSAGE, 
-	MSG_GEN_APPLICATION_GET_APP_MODE_MESSAGE, 
-	MSG_GEN_APPLICATION_SET_APP_INSTANCE_REFERENCE, 
-	MSG_GEN_APPLICATION_GET_APP_INSTANCE_REFERENCE, 
-	MSG_GEN_APPLICATION_SEND_APP_INSTANCE_REFERENCE_TO_FIELD
+    GAI_appRef, GAI_appMode, GAI_optFlags, 
+    MSG_GEN_APPLICATION_SET_APP_MODE_MESSAGE, 
+    MSG_GEN_APPLICATION_GET_APP_MODE_MESSAGE, 
+    MSG_GEN_APPLICATION_SET_APP_INSTANCE_REFERENCE, 
+    MSG_GEN_APPLICATION_GET_APP_INSTANCE_REFERENCE, 
+    MSG_GEN_APPLICATION_SEND_APP_INSTANCE_REFERENCE_TO_FIELD
 
 *GAI_appRef* stores information (within an **AppInstanceReference** 
 structure) that allows a GenApplication object to be reloaded from its former 
@@ -591,8 +591,8 @@ not found on an object, only the GenApplication object is queried.
 ----------
 #### MSG_GEN_APPLICATION_SET_APP_MODE_MESSAGE
 
-	void	MSG_GEN_APPLICATION_SET_APP_MODE_MESSAGE(
-			Message modeMessage);
+    void    MSG_GEN_APPLICATION_SET_APP_MODE_MESSAGE(
+            Message modeMessage);
 
 This message stores a message into the GenApplication's *GAI_appMode* field. 
 Generally, this message indicates the current mode of the application. Should 
@@ -613,7 +613,7 @@ Process object to restore the state to the same mode.
 ----------
 #### MSG_GEN_APPLICATION_GET_APP_MODE_MESSAGE
 
-	Message	MSG_GEN_APPLICATION_GET_APP_MODE_MESSAGE();
+    Message MSG_GEN_APPLICATION_GET_APP_MODE_MESSAGE();
 
 This message returns the message number stored in the GenApplication's 
 *GAI_appMode* field.
@@ -631,8 +631,8 @@ This message returns the message number stored in the GenApplication's
 ----------
 #### MSG_GEN_APPLICATION_SET_APP_INSTANCE_REFERENCE
 
-	void	MSG_GEN_APPLICATION_SET_APP_INSTANCE_REFERENCE(
-			Handle	appInstance);
+    void    MSG_GEN_APPLICATION_SET_APP_INSTANCE_REFERENCE(
+            Handle  appInstance);
 
 This message sets the *GAI_appRef* field to the passed structure.
 
@@ -650,7 +650,7 @@ This message sets the *GAI_appRef* field to the passed structure.
 ----------
 #### MSG_GEN_APPLICATION_GET_APP_INSTANCE_REFERENCE
 
-	Handle	MSG_GEN_APPLICATION_GET_APP_INSTANCE_REFERENCE();
+    Handle  MSG_GEN_APPLICATION_GET_APP_INSTANCE_REFERENCE();
 
 This message retrieves the values in *GAI_appRef*.
 
@@ -667,7 +667,7 @@ This message retrieves the values in *GAI_appRef*.
 ----------
 #### MSG_GEN_APPLICATION_SEND_APP_INSTANCE_REFERENCE_TO_FIELD
 
-	void  MSG_GEN_APPLICATION_SEND_APP_INSTANCE_REFERENCE_TO_FIELD();
+    void  MSG_GEN_APPLICATION_SEND_APP_INSTANCE_REFERENCE_TO_FIELD();
 
 This message causes the GenApplication to send the contents of its 
 *GAI_appRef* field off to its parent GenField object.
@@ -680,9 +680,9 @@ This message causes the GenApplication to send the contents of its
 
 ### 3.1.4 Attach and Launch Flags
 
-	GAI_launchFlags, GAI_attachFlags, 
-	MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS, 
-	MSG_GEN_APPLICATION_GET_ATTACH_FLAGS
+    GAI_launchFlags, GAI_attachFlags, 
+    MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS, 
+    MSG_GEN_APPLICATION_GET_ATTACH_FLAGS
 
 *GAI_launchFlags* stores flags that are passed when the application is first 
 launched. These flags are never set within your object declaration but may 
@@ -755,7 +755,7 @@ returns to its former state.
 ----------
 #### MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS
 
-	AppLaunchFlags MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS();
+    AppLaunchFlags MSG_GEN_APPLICATION_GET_LAUNCH_FLAGS();
 
 This message retrieves the contents of the GenApplication's 
 *GAI_launchFlags* field.
@@ -773,7 +773,7 @@ This message retrieves the contents of the GenApplication's
 ----------
 #### MSG_GEN_APPLICATION_GET_ATTACH_FLAGS
 
-	AppAttachFlags MSG_GEN_APPLICATION_GET_ATTACH_FLAGS();
+    AppAttachFlags MSG_GEN_APPLICATION_GET_ATTACH_FLAGS();
 
 This message retrieves the contents of the GenApplication's *GAI_attachFlags* 
 field.
@@ -790,13 +790,13 @@ field.
 
 ### 3.1.5 ApplicationStates
 
-	GAI_states, MSG_GEN_APPLICATION_GET_STATE, 
-	MSG_GEN_APPLICATION_SET_STATE, 
-	MSG_GEN_APPLICATION_SET_NOT_USER_INTERACTABLE, 
-	MSG_GEN_APPLICATION_SET_USER_INTERACTABLE, 
-	MSG_GEN_APPLICATION_SET_NOT_QUITTING, 
-	MSG_GEN_APPLICATION_SET_ATTACHED_TO_STATE_FILE, 
-	MSG_GEN_APPLICATION_SET_NOT_ATTACHED_TO_STATE_FILE
+    GAI_states, MSG_GEN_APPLICATION_GET_STATE, 
+    MSG_GEN_APPLICATION_SET_STATE, 
+    MSG_GEN_APPLICATION_SET_NOT_USER_INTERACTABLE, 
+    MSG_GEN_APPLICATION_SET_USER_INTERACTABLE, 
+    MSG_GEN_APPLICATION_SET_NOT_QUITTING, 
+    MSG_GEN_APPLICATION_SET_ATTACHED_TO_STATE_FILE, 
+    MSG_GEN_APPLICATION_SET_NOT_ATTACHED_TO_STATE_FILE
 
 *GAI_states* stores the **ApplicationStates** of the application. By default, a 
 GenApplication is both AS_FOCUSABLE and AS_MODELABLE, therefore 
@@ -877,7 +877,7 @@ MSG_META_ATTACH).
 ----------
 #### MSG_GEN_APPLICATION_GET_STATE
 
-	ApplicationStates MSG_GEN_APPLICATION_GET_STATE();
+    ApplicationStates MSG_GEN_APPLICATION_GET_STATE();
 
 This message retrieves the current application state, stored in *GAI_states*.
 
@@ -894,9 +894,9 @@ This message retrieves the current application state, stored in *GAI_states*.
 ----------
 #### MSG_GEN_APPLICATION_SET_STATE
 
-	void	MSG_GEN_APPLICATION_SET_STATE(
-			ApplicationStates			set,
-			ApplicationStates			clear);
+    void    MSG_GEN_APPLICATION_SET_STATE(
+            ApplicationStates           set,
+            ApplicationStates           clear);
 
 This message alters a GenApplication's *GAI_states* flags. This message 
 should only be used to set flags that aren't set internally by the UI. Flags that 
@@ -927,7 +927,7 @@ message.
 ----------
 #### MSG_GEN_APPLICATION_SET_NOT_QUITTING
 
-	void	MSG_GEN_APPLICATION_SET_NOT_QUITTING();
+    void    MSG_GEN_APPLICATION_SET_NOT_QUITTING();
 
 This message clears the AS_QUITTING bit in the application's *GAI_states* 
 bitfield.
@@ -941,7 +941,7 @@ bitfield.
 ----------
 #### MSG_GEN_APPLICATION_SET_NOT_USER_INTERACTABLE
 
-	void	MSG_GEN_APPLICATION_SET_NOT_USER_INTERACTABLE();
+    void    MSG_GEN_APPLICATION_SET_NOT_USER_INTERACTABLE();
 
 This message sets the AS_NOT_USER_INTERACTABLE flag in the 
 application's *GAI_states* field.
@@ -955,7 +955,7 @@ application's *GAI_states* field.
 ----------
 #### MSG_GEN_APPLICATION_SET_USER_INTERACTABLE
 
-	void	MSG_GEN_APPLICATION_SET_USER_INTERACTABLE();
+    void    MSG_GEN_APPLICATION_SET_USER_INTERACTABLE();
 
 This message clears the AS_NOT_USER_INTERACTABLE flag in the 
 application's *GAI_states* field.
@@ -969,7 +969,7 @@ application's *GAI_states* field.
 ----------
 #### MSG_GEN_APPLICATION_SET_ATTACHED_TO_STATE_FILE
 
-	void	MSG_GEN_APPLICATION_SET_ATTACHED_TO_STATE_FILE();
+    void    MSG_GEN_APPLICATION_SET_ATTACHED_TO_STATE_FILE();
 
 This message sets the AS_ATTACHED_TO_STATE_FILE in the 
 GenApplication's *GAI_states* field.
@@ -983,7 +983,7 @@ GenApplication's *GAI_states* field.
 ----------
 #### MSG_GEN_APPLICATION_SET_NOT_ATTACHED_TO_STATE_FILE
 
-	void	MSG_GEN_APPLICATION_SET_NOT_ATTACHED_TO_STATE_FILE();
+    void    MSG_GEN_APPLICATION_SET_NOT_ATTACHED_TO_STATE_FILE();
 
 This message clears the AS_ATTACHED_TO_STATE_FILE in the 
 GenApplication's *GAI_states* field.
@@ -996,14 +996,14 @@ GenApplication's *GAI_states* field.
 
 ### 3.1.6 Application Features and Levels
 
-	GAI_appFeatures, GAI_appLevel, 
-	MSG_GEN_APPLICATION_GET_APP_FEATURES, 
-	MSG_GEN_APPLICATION_SET_APP_FEATURES, 
-	MSG_GEN_APPLICATION_SET_APP_LEVEL, 
-	MSG_GEN_APPLICATION_UPDATE_APP_FEATURES, 
-	MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE, 
-	GenAppUsabilityTupleFlags, GenAppUsabilityTuple, 
-	GenAppUsabilityCommands
+    GAI_appFeatures, GAI_appLevel, 
+    MSG_GEN_APPLICATION_GET_APP_FEATURES, 
+    MSG_GEN_APPLICATION_SET_APP_FEATURES, 
+    MSG_GEN_APPLICATION_SET_APP_LEVEL, 
+    MSG_GEN_APPLICATION_UPDATE_APP_FEATURES, 
+    MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE, 
+    GenAppUsabilityTupleFlags, GenAppUsabilityTuple, 
+    GenAppUsabilityCommands
 
 A GenApplication may store a word of features (*GAI_appFeatures*); these 
 features correspond to groups of UI objects. Depending on a certain feature 
@@ -1033,25 +1033,25 @@ specified in this record.
 ----------
 **Code Display 3-5 Setting Up Features**
 
-	/* Features are stored in a word-length bitfield. */
+    /* Features are stored in a word-length bitfield. */
 
-	typedef WordFlags MyFeatures;
+    typedef WordFlags MyFeatures;
 
-	@define MF_EDIT_FEATURES				(0x8000)
-	@define MF_PASTE_FEATURES				(0x4000)
-	@define MF_FORMAT_FEATURES				(0x2000)
+    @define MF_EDIT_FEATURES                (0x8000)
+    @define MF_PASTE_FEATURES               (0x4000)
+    @define MF_FORMAT_FEATURES              (0x2000)
 
-	/* We might want to group certain features together based on the level of 
-	 * expertise of the user. In this example, if the user level is "intermediate" 
-	 * (which we will define later), we allow features for editing and pasting to the 
-	 * UI. If the user level is "advanced" we allow the intermediate features and also 
-	 * allow formatting features. */
+    /* We might want to group certain features together based on the level of 
+     * expertise of the user. In this example, if the user level is "intermediate" 
+     * (which we will define later), we allow features for editing and pasting to the 
+     * UI. If the user level is "advanced" we allow the intermediate features and also 
+     * allow formatting features. */
 
-	@define INTRODUCTORY_FEATURES	(0)
+    @define INTRODUCTORY_FEATURES   (0)
 
-	@define INTERMEDIATE_FEATURES	(@MF_EDIT_FEATURES | @MF_PASTE_FEATURES)
+    @define INTERMEDIATE_FEATURES   (@MF_EDIT_FEATURES | @MF_PASTE_FEATURES)
 
-	@define ADVANCED_FEATURES		(@INTERMEDIATE_FEATURES | @MF_FORMAT_FEATURES)
+    @define ADVANCED_FEATURES       (@INTERMEDIATE_FEATURES | @MF_FORMAT_FEATURES)
 
 ----------
 
@@ -1119,81 +1119,81 @@ not added.)
 ----------
 **Code Display 3-6 Setting Up the GenAppUsabilityTuple Tables**
 
-	/* Each GenAppUsabilityTuple will refer to a specific set of features. */
+    /* Each GenAppUsabilityTuple will refer to a specific set of features. */
 
-	/* 
-	 * Since GUAC_USABILITY is the default setting (and is zero) setting any other 
-	 * flags either supersedes or complements this behavior. In this case, setting the 
-	 * EditToolEntry as a GUAC_TOOLBAR command supersedes the GUAC_USABILITY command. 
-	 * Setting the GUATF_END_OF_LIST flag for the EditTrigger does not alter the 
-	 * GUAC_USABILITY command, which is still implicit.
-	 */
+    /* 
+     * Since GUAC_USABILITY is the default setting (and is zero) setting any other 
+     * flags either supersedes or complements this behavior. In this case, setting the 
+     * EditToolEntry as a GUAC_TOOLBAR command supersedes the GUAC_USABILITY command. 
+     * Setting the GUATF_END_OF_LIST flag for the EditTrigger does not alter the 
+     * GUAC_USABILITY command, which is still implicit.
+     */
 
-	static const GenAppUsabilityTuple editFeaturesList [] =
-	{
-			{GUAC_TOOLBAR,			@EditToolEntry 		},
-			{GUATF_END_OF_LIST		@EditTrigger		}
-	};
+    static const GenAppUsabilityTuple editFeaturesList [] =
+    {
+            {GUAC_TOOLBAR,          @EditToolEntry      },
+            {GUATF_END_OF_LIST      @EditTrigger        }
+    };
 
-	static const GenAppUsabilityTuple pasteFeaturesList [] =
-	{
-			{GUAC_END_OF_LIST,		@PasteTrigger		}
-	};
+    static const GenAppUsabilityTuple pasteFeaturesList [] =
+    {
+            {GUAC_END_OF_LIST,      @PasteTrigger       }
+    };
 
-	static const GenAppUsabilityTuple formatFeaturesList [] =
-	{
-			{
-			GAUTF_END_OF_LIST | GUAC_RECALC_CONTROLLER,
-			@FeatureController
-			}
-	};
+    static const GenAppUsabilityTuple formatFeaturesList [] =
+    {
+            {
+            GAUTF_END_OF_LIST | GUAC_RECALC_CONTROLLER,
+            @FeatureController
+            }
+    };
 
-	/* After each feature's GenAppUsabilityTuple is set up, you should set up a table 
-	 * of these structures to pass to relevant messages. */
+    /* After each feature's GenAppUsabilityTuple is set up, you should set up a table 
+     * of these structures to pass to relevant messages. */
 
-	static const GenAppUsabilityTuple * const usabilityTable [] =
-	{
-			editFeaturesList,
-			pasteFeaturesList,
-			formatFeaturesList
-	};
+    static const GenAppUsabilityTuple * const usabilityTable [] =
+    {
+            editFeaturesList,
+            pasteFeaturesList,
+            formatFeaturesList
+    };
 
-	/* 
-	 * Within your code, decide where you wish to set the application features 
-	 * (usually within some sort of User level dialog box that passes a selection of 
-	 * feature bits) and send either MSG_GEN_APPLICATION_SET_APP_FEATURES or
-	 * MSG_GEN_APPLICATION_SET_APP_LEVEL with the proper feature bits set.
-	 */
+    /* 
+     * Within your code, decide where you wish to set the application features 
+     * (usually within some sort of User level dialog box that passes a selection of 
+     * feature bits) and send either MSG_GEN_APPLICATION_SET_APP_FEATURES or
+     * MSG_GEN_APPLICATION_SET_APP_LEVEL with the proper feature bits set.
+     */
 
-	@method MyLevelApplicationClass, MSG_MY_APPLICATION_SET_USER_LEVEL
-	{
-		@call oself::MSG_GEN_APPLICATION_SET_APP_FEATURES(selection);
-	}
+    @method MyLevelApplicationClass, MSG_MY_APPLICATION_SET_USER_LEVEL
+    {
+        @call oself::MSG_GEN_APPLICATION_SET_APP_FEATURES(selection);
+    }
 
-	/* 
-	 * Then intercept MSG_GEN_APPLICATION_UPDATE_APP_FEATURES and set up the correct 
-	 * parameters for MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE. 
-	 */
+    /* 
+     * Then intercept MSG_GEN_APPLICATION_UPDATE_APP_FEATURES and set up the correct 
+     * parameters for MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE. 
+     */
 
-	@method MyLevelApplicationClass, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
-	{
-		@call oself::MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE(
-			NullOptr,
-			@ObjectToReparent,		/* if any */
-			levelTable,				/* if any */
-			sizeof(usabilityTable) / sizeof(usabilityTable [0]),
-			usabilityTable,
-			appOpeningFlag,
-			oldLevel,
-			level,
-			featuresChanged,
-			featuresOn);
-	}
+    @method MyLevelApplicationClass, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+    {
+        @call oself::MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE(
+            NullOptr,
+            @ObjectToReparent,      /* if any */
+            levelTable,             /* if any */
+            sizeof(usabilityTable) / sizeof(usabilityTable [0]),
+            usabilityTable,
+            appOpeningFlag,
+            oldLevel,
+            level,
+            featuresChanged,
+            featuresOn);
+    }
 
 ----------
 #### MSG_GEN_APPLICATION_GET_APP_FEATURES
 
-	dword	MSG_GEN_APPLICATION_GET_APP_FEATURES();
+    dword   MSG_GEN_APPLICATION_GET_APP_FEATURES();
 
 This message retrieves the set of features set for the application.
 
@@ -1213,8 +1213,8 @@ in the high word; the interface level is stored in the low word.
 ----------
 #### MSG_GEN_APPLICATION_SET_APP_FEATURES
 
-	void	MSG_GEN_APPLICATION_SET_APP_FEATURES(
-			word	features);
+    void    MSG_GEN_APPLICATION_SET_APP_FEATURES(
+            word    features);
 
 This message sets a new set of features into the GenApplication's 
 *GAI_appFeatures* record. This message in turn generates a 
@@ -1238,17 +1238,17 @@ to set.
 ----------
 #### MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
 
-	void	MSG_GEN_APPLICATION_UPDATE_APP_FEATURES(@stack
-			optr					unReparentObject,
-			optr					reparentObject,
-			GenAppUsabilityTuple	*levelTable,
-			word					tableLength,
-			void					*table,
-			word					appOpeningFlag,
-			UIInterfaceLevel		oldLevel,
-			UIInterfaceLevel		level,
-			word					featuresChanged,
-			word					featuresOn);
+    void    MSG_GEN_APPLICATION_UPDATE_APP_FEATURES(@stack
+            optr                    unReparentObject,
+            optr                    reparentObject,
+            GenAppUsabilityTuple    *levelTable,
+            word                    tableLength,
+            void                    *table,
+            word                    appOpeningFlag,
+            UIInterfaceLevel        oldLevel,
+            UIInterfaceLevel        level,
+            word                    featuresChanged,
+            word                    featuresOn);
 
 This message is sent by the application to itself when it is told to change 
 either its features or its **UIInterfacelevel**. This message is passed a number 
@@ -1306,17 +1306,17 @@ changes.
 ----------
 #### MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE
 
-	void	MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE(
-			optr					unReparentObject,
-			optr					reparentObject,
-			GenAppUsabilityTuple	*levelTable,
-			word					tableLength,
-			void					*table,
-			word					appOpeningFlag,
-			UIInterfaceLevel		oldLevel,
-			UIInterfaceLevel		level,
-			word					featuresChanged,
-			word					featuresOn);
+    void    MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE(
+            optr                    unReparentObject,
+            optr                    reparentObject,
+            GenAppUsabilityTuple    *levelTable,
+            word                    tableLength,
+            void                    *table,
+            word                    appOpeningFlag,
+            UIInterfaceLevel        oldLevel,
+            UIInterfaceLevel        level,
+            word                    featuresChanged,
+            word                    featuresOn);
 
 This message is called to update the application's features to reflect a new set 
 of features to 
@@ -1366,14 +1366,14 @@ MSG_GEN_APPLICATION_UPDATE_APP_FEATURES instead.
 
 ### 3.1.7 IACP
 
-	GAI_iacpConnects, MSG_GEN_APPLICATION_IACP_REGISTER, 
-	MSG_GEN_APPLICATION_IACP_UNREGISTER, 
-	MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS, 
-	MSG_GEN_APPLICATION_IACP_
-	GET_NUMBER_OF_APP_MODE_CONNECTIONS, 
-	MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS, 
-	MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS, 
-	MSG_GEN_APPLICATION_APP_MODE_COMPLETE
+    GAI_iacpConnects, MSG_GEN_APPLICATION_IACP_REGISTER, 
+    MSG_GEN_APPLICATION_IACP_UNREGISTER, 
+    MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS, 
+    MSG_GEN_APPLICATION_IACP_
+    GET_NUMBER_OF_APP_MODE_CONNECTIONS, 
+    MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS, 
+    MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS, 
+    MSG_GEN_APPLICATION_APP_MODE_COMPLETE
 
 IACP (the GEOS *I*nter *A*pplication *C*ommunication *P*rotocol) allows 
 applications to communicate with each other. IACP is flexible enough to let 
@@ -1447,7 +1447,7 @@ other server objects the application might have.
 ----------
 #### MSG_GEN_APPLICATION_IACP_REGISTER
 
-	void	MSG_GEN_APPLICATION_IACP_REGISTER();
+    void    MSG_GEN_APPLICATION_IACP_REGISTER();
 
 This message is sent by a GenApplication object to itself when it registers for 
 IACP. It is not a message meant to be sent externally to an application to 
@@ -1465,7 +1465,7 @@ call the superclass, however.
 ----------
 #### MSG_GEN_APPLICATION_IACP_UNREGISTER
 
-	void	MSG_GEN_APPLICATION_IACP_UNREGISTER();
+    void    MSG_GEN_APPLICATION_IACP_UNREGISTER();
 
 This message is sent by a GenApplication object to itself when it unregisters 
 for IACP. It is not a message meant to be sent externally to an application to 
@@ -1483,7 +1483,7 @@ to call the superclass, however.
 ----------
 #### MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS
 
-	word	MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS();
+    word    MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_CONNECTIONS();
 
 This message returns the number of active engine or app-mode IACP 
 connections for a given application. This message is used to check whether 
@@ -1506,7 +1506,7 @@ returned by **GenApplicationClass**.
 ----------
 #### MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_APP_MODE_CONNECTIONS
 
-	void  MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_APP_MODE_CONNECTIONS();
+    void  MSG_GEN_APPLICATION_IACP_GET_NUMBER_OF_APP_MODE_CONNECTIONS();
 
 This message retrieves the number of connections which require that the 
 application be open in app-mode (as opposed to engine mode). This message 
@@ -1527,7 +1527,7 @@ by **GenApplicationClass**.
 ----------
 #### MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS
 
-	void	MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS();
+    void    MSG_GEN_APPLICATION_IACP_SHUTDOWN_ALL_CONNECTIONS();
 
 This message shuts down all IACP connections for a given application, either 
 on the server or the client side of the connection.
@@ -1543,7 +1543,7 @@ application connections are shut down as well.
 ----------
 #### MSG_GEN_APPLICATION_APP_MODE_COMPLETE
 
-	void	MSG_GEN_APPLICATION_APP_MODE_COMPLETE();
+    void    MSG_GEN_APPLICATION_APP_MODE_COMPLETE();
 
 This message is sent to the application when its life as a user-interactable 
 app is complete. The default behavior is to continue shutting down the 
@@ -1563,7 +1563,7 @@ instead.
 ----------
 #### MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS
 
-	void	MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS();
+    void    MSG_GEN_APPLICATION_IACP_COMPLETE_CONNECTIONS();
 
 This message completes all pending IACP connections, accepting any queued 
 messages that have been waiting to be handled. If you subclass it, be sure to 
@@ -1594,14 +1594,14 @@ For information on how an application is launched and closed, see
 
 ### 3.2.2 Application Busy States
 
-	MSG_GEN_APPLICATION_MARK_BUSY, 
-	MSG_GEN_APPLICATION_MARK_NOT_BUSY, 
-	MSG_GEN_APPLICATION_HOLD_UP_INPUT, 
-	MSG_GEN_APPLICATION_RESUME_INPUT, 
-	MSG_GEN_APPLICATION_IGNORE_INPUT, 
-	MSG_GEN_APPLICATION_ACCEPT_INPUT, 
-	MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY, 
-	MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY
+    MSG_GEN_APPLICATION_MARK_BUSY, 
+    MSG_GEN_APPLICATION_MARK_NOT_BUSY, 
+    MSG_GEN_APPLICATION_HOLD_UP_INPUT, 
+    MSG_GEN_APPLICATION_RESUME_INPUT, 
+    MSG_GEN_APPLICATION_IGNORE_INPUT, 
+    MSG_GEN_APPLICATION_ACCEPT_INPUT, 
+    MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY, 
+    MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY
 
 An application's busy state is reflected by its cursor. An application may have 
 several busy states, set appropriately for the action going on at the time. The 
@@ -1652,7 +1652,7 @@ busy state is removed.
 ----------
 #### MSG_GEN_APPLICATION_MARK_BUSY
 
-	void	MSG_GEN_APPLICATION_MARK_BUSY();
+    void    MSG_GEN_APPLICATION_MARK_BUSY();
 
 This message marks the application busy and changes the cursor image.
 
@@ -1665,7 +1665,7 @@ This message marks the application busy and changes the cursor image.
 ----------
 #### MSG_GEN_APPLICATION_MARK_NOT_BUSY
 
-	void	MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    void    MSG_GEN_APPLICATION_MARK_NOT_BUSY();
 
 This message marks the application not busy, removing the effect of a 
 previous MSG_GEN_APPLICATION_MARK_BUSY.
@@ -1680,7 +1680,7 @@ previous MSG_GEN_APPLICATION_MARK_BUSY.
 
 #### MSG_GEN_APPLICATION_HOLD_UP_INPUT
 
-	void	MSG_GEN_APPLICATION_HOLD_UP_INPUT();
+    void    MSG_GEN_APPLICATION_HOLD_UP_INPUT();
 
 This message causes the GenApplication to mark itself busy and redirect 
 input events to a special "hold-up" queue. When the application is ready to 
@@ -1696,7 +1696,7 @@ before handling new input messages.
 ----------
 #### MSG_GEN_APPLICATION_RESUME_INPUT
 
-	void	MSG_GEN_APPLICATION_RESUME_INPUT();
+    void    MSG_GEN_APPLICATION_RESUME_INPUT();
 
 This message causes a GenApplication to resume normal input handling 
 after it has been held up with MSG_GEN_APPLICATION_HOLD_UP_INPUT.
@@ -1710,7 +1710,7 @@ after it has been held up with MSG_GEN_APPLICATION_HOLD_UP_INPUT.
 ----------
 #### MSG_GEN_APPLICATION_IGNORE_INPUT
 
-	void	MSG_GEN_APPLICATION_IGNORE_INPUT();
+    void    MSG_GEN_APPLICATION_IGNORE_INPUT();
 
 This message causes the GenApplication to consume all input events it 
 receives rather than handle them. This message may be used during 
@@ -1725,7 +1725,7 @@ debugging as a last resort to help find synchronization problems.
 ----------
 #### MSG_GEN_APPLICATION_ACCEPT_INPUT
 
-	void	MSG_GEN_APPLICATION_ACCEPT_INPUT();
+    void    MSG_GEN_APPLICATION_ACCEPT_INPUT();
 
 This message undoes a previous MSG_GEN_APPLICATION_IGNORE_INPUT, 
 allowing the GenApplication to once again handle input events normally.
@@ -1739,7 +1739,7 @@ allowing the GenApplication to once again handle input events normally.
 ----------
 #### MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY
 
-	void	MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY();
+    void    MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY();
 
 This message is rarely used and forces a busy state over the application 
 regardless of other states. It should be used only when a time-intensive task 
@@ -1754,7 +1754,7 @@ is going on in the UI and the program can not handle input during that time.
 ----------
 #### MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY
 
-	void	MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY();
+    void    MSG_GEN_APPLICATION_MARK_APP_NOT_COMPLETELY_BUSY();
 
 This message undoes MSG_GEN_APPLICATION_MARK_COMPLETELY_BUSY, 
 allowing the application to once again handle user input.
@@ -1767,8 +1767,8 @@ allowing the application to once again handle user input.
 
 ### 3.2.3 The GenApplication's Moniker
 
-	MSG_GEN_APPLICATION_FIND_MONIKER, 
-	MSG_GEN_APPLICATION_SET_TASK_ENTRY_MONIKER
+    MSG_GEN_APPLICATION_FIND_MONIKER, 
+    MSG_GEN_APPLICATION_SET_TASK_ENTRY_MONIKER
 
 Every GenApplication object should be given a moniker; this moniker is 
 displayed by the UI in its task list. (In OSF/Motif, the task list is manifested 
@@ -1779,10 +1779,10 @@ get or set the moniker used in the task list.
 ----------
 #### MSG_GEN_APPLICATION_FIND_MONIKER
 
-	optr	MSG_GEN_APPLICATION_FIND_MONIKER(
-			MemHandle		destBlock,
-			word			searchFlags,
-			DisplayType		displayType);
+    optr    MSG_GEN_APPLICATION_FIND_MONIKER(
+            MemHandle       destBlock,
+            word            searchFlags,
+            DisplayType     displayType);
 
 This message finds the specified moniker in the GenApplication's 
 **VisMonikerList** and optionally copies it into a specified destination block.
@@ -1809,8 +1809,8 @@ what to do with it when it is found.
 ----------
 #### MSG_GEN_APPLICATION_SET_TASK_ENTRY_MONIKER
 
-	void	MSG_GEN_APPLICATION_SET_TASK_ENTRY_MONIKER(
-			optr	entryMoniker);
+    void    MSG_GEN_APPLICATION_SET_TASK_ENTRY_MONIKER(
+            optr    entryMoniker);
 
 This message changes the moniker which is used in the GenField's task list. 
 The task list menu will be updated if currently visible.
@@ -1829,9 +1829,9 @@ will be set into the task list.
 
 ### 3.2.4 Measurement Type
 
-	MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE, 
-	MSG_GEN_APPLICATION_GET_MEASUREMENT_TYPE, 
-	GET_APP_MEASUREMENT_TYPE
+    MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE, 
+    MSG_GEN_APPLICATION_GET_MEASUREMENT_TYPE, 
+    GET_APP_MEASUREMENT_TYPE
 
 Each application has a "measurement type" associated with it. The 
 measurement type indicates whether measurements should default to metric 
@@ -1840,8 +1840,8 @@ or standard US measurements.
 ----------
 #### MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE
 
-	void	MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE(
-			byte	measurementType);
+    void    MSG_GEN_APPLICATION_SET_MEASUREMENT_TYPE(
+            byte    measurementType);
 
 This message sets the measurement type used by the application.
 
@@ -1861,7 +1861,7 @@ AMT_DEFAULT.
 ----------
 #### MSG_GEN_APPLICATION_GET_MEASUREMENT_TYPE
 
-	word	MSG_GEN_APPLICATION_GET_MEASUREMENT_TYPE();
+    word    MSG_GEN_APPLICATION_GET_MEASUREMENT_TYPE();
 
 This message gets the measurement currently used by the application.
 
@@ -1887,16 +1887,16 @@ find them useful.
 
 #### 3.2.5.1 Attaching and Detaching
 
-	MSG_GEN_APPLICATION_INITIATE_UI_QUIT, 
-	MSG_GEN_APPLICATION_INSTALL_TOKEN, 
-	MSG_GEN_APPLICATION_DETACH_PENDING, 
-	MSG_GEN_APPLICATION_OPEN_COMPLETE, 
-	MSG_GEN_APPLICATION_QUIT_AFTER_UI
+    MSG_GEN_APPLICATION_INITIATE_UI_QUIT, 
+    MSG_GEN_APPLICATION_INSTALL_TOKEN, 
+    MSG_GEN_APPLICATION_DETACH_PENDING, 
+    MSG_GEN_APPLICATION_OPEN_COMPLETE, 
+    MSG_GEN_APPLICATION_QUIT_AFTER_UI
 
 ----------
 #### MSG_GEN_APPLICATION_INITIATE_UI_QUIT
 
-	void	MSG_GEN_APPLICATION_INITIATE_UI_QUIT();
+    void    MSG_GEN_APPLICATION_INITIATE_UI_QUIT();
 
 This message causes the GenApplication to begin quitting. The application 
 will automatically go through the entire quit sequence.
@@ -1910,7 +1910,7 @@ will automatically go through the entire quit sequence.
 ----------
 #### MSG_GEN_APPLICATION_INSTALL_TOKEN
 
-	void	MSG_GEN_APPLICATION_INSTALL_TOKEN();
+    void    MSG_GEN_APPLICATION_INSTALL_TOKEN();
 
 This message instructs the GenApplication object to set its token into the 
 token database file.
@@ -1924,7 +1924,7 @@ token database file.
 ----------
 #### MSG_GEN_APPLICATION_DETACH_PENDING
 
-	void	MSG_GEN_APPLICATION_DETACH_PENDING();
+    void    MSG_GEN_APPLICATION_DETACH_PENDING();
 
 This message is sent to the specific UI library through the GenApplication to 
 notify it that the application is about to be shut down. It is used to abort any 
@@ -1940,7 +1940,7 @@ to detach.
 ----------
 #### MSG_GEN_APPLICATION_OPEN_COMPLETE
 
-	void	MSG_GEN_APPLICATION_OPEN_COMPLETE();
+    void    MSG_GEN_APPLICATION_OPEN_COMPLETE();
 
 This message is sent by the GenApplication object to itself when it has 
 finished opening (after it has set itself usable). It is sent via the queue and 
@@ -1955,7 +1955,7 @@ indicates that the application's UI is fully usable.
 ----------
 #### MSG_GEN_APPLICATION_QUIT_AFTER_UI
 
-	void	MSG_GEN_APPLICATION_QUIT_AFTER_UI();
+    void    MSG_GEN_APPLICATION_QUIT_AFTER_UI();
 
 This message is called from the MSG_META_QUIT handler in 
 GenProcessClass, after the UI has finished its 
@@ -1973,21 +1973,21 @@ connection remains that requires the application to remain open.
 
 #### 3.2.5.2 Queries of the UI
 
-	MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME, 
-	MSG_GEN_APPLICATION_QUERY_UI, 
-	MSG_GEN_APPLICATION_NOTIFY_MODAL_WIN_CHANGE, 
-	MSG_GEN_APPLICATION_INK_QUERY_REPLY, 
-	MSG_GEN_APPLICATION_GET_GCN_LIST_OF_LISTS, 
-	MSG_GEN_APPLICATION_TEST_WIN_INTERACTABILITY, 
-	MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION, 
-	MSG_GEN_APPLICATION_GET_MODAL_WIN, 
-	MSG_GEN_APPLICATION_CHECK_IF_ALWAYS_INTERACTABLE_OBJECT
+    MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME, 
+    MSG_GEN_APPLICATION_QUERY_UI, 
+    MSG_GEN_APPLICATION_NOTIFY_MODAL_WIN_CHANGE, 
+    MSG_GEN_APPLICATION_INK_QUERY_REPLY, 
+    MSG_GEN_APPLICATION_GET_GCN_LIST_OF_LISTS, 
+    MSG_GEN_APPLICATION_TEST_WIN_INTERACTABILITY, 
+    MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION, 
+    MSG_GEN_APPLICATION_GET_MODAL_WIN, 
+    MSG_GEN_APPLICATION_CHECK_IF_ALWAYS_INTERACTABLE_OBJECT
 
 ----------
 #### MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME
 
-	void	MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(
-			DisplayScheme	* displayScheme);
+    void    MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(
+            DisplayScheme   * displayScheme);
 
 This message gets the current display scheme used by the application.
 
@@ -2010,7 +2010,7 @@ filled upon return.
 ----------
 #### MSG_GEN_APPLICATION_QUERY_UI
 
-	Handle	MSG_GEN_APPLICATION_QUERY_UI();
+    Handle  MSG_GEN_APPLICATION_QUERY_UI();
 
 This message is used to determine which UI should be used at a given point 
 in the generic tree for a certain type of object.
@@ -2028,7 +2028,7 @@ in the generic tree for a certain type of object.
 ----------
 #### MSG_GEN_APPLICATION_NOTIFY_MODAL_WIN_CHANGE
 
-	void	MSG_GEN_APPLICATION_NOTIFY_MODAL_WIN_CHANGE();
+    void    MSG_GEN_APPLICATION_NOTIFY_MODAL_WIN_CHANGE();
 
 This message is called on a GenApplication object by the UI whenever the 
 application should check to see if there is a change in modal status. The 
@@ -2047,9 +2047,9 @@ GenApplication's *GAI_states* field.
 ----------
 #### MSG_GEN_APPLICATION_INK_QUERY_REPLY
 
-	void	MSG_GEN_APPLICATION_INK_QUERY_REPLY(
-			InkReturnValue		inkReturnValue,
-			word				inkGstate);
+    void    MSG_GEN_APPLICATION_INK_QUERY_REPLY(
+            InkReturnValue      inkReturnValue,
+            word                inkGstate);
 
 This message is sent to an Application object in reply to a 
 MSG_META_QUERY_IF_PRESS_IS_INK. It indicates whether the object that 
@@ -2075,7 +2075,7 @@ IRV_DESIRES_INK, or IRV_WAIT.
 ----------
 #### MSG_GEN_APPLICATION_GET_GCN_LIST_OF_LISTS
 
-	ChunkHandle MSG_GEN_APPLICATION_GET_GCN_LIST_OF_LISTS();
+    ChunkHandle MSG_GEN_APPLICATION_GET_GCN_LIST_OF_LISTS();
 
 This message retrieves the GenApplication's GCN list of lists chunk handle. 
 This chunk handle may then be used with a number of kernel routines for 
@@ -2095,9 +2095,9 @@ will be returned if the chunk does not exist.
 ----------
 #### MSG_GEN_APPLICATION_TEST_WIN_INTERACTABILITY
 
-	Boolean	MSG_GEN_APPLICATION_TEST_WIN_INTERACTABILITY(
-			optr	inputOD,
-			Handle	window);
+    Boolean MSG_GEN_APPLICATION_TEST_WIN_INTERACTABILITY(
+            optr    inputOD,
+            Handle  window);
 
 This message tests whether the passed window object is interactable.
 
@@ -2122,9 +2122,9 @@ there is no modal window but the GenApplication is ignoring input.
 ----------
 #### MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION
 
-	void	MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION(
-			optr		obj,
-			Boolean 	opening);
+    void    MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION(
+            optr        obj,
+            Boolean     opening);
 
 Notifies the GenApplication object that it has become visible or not visible.
 
@@ -2146,7 +2146,7 @@ open, *false* if closed.
 ----------
 #### MSG_GEN_APPLICATION_GET_MODAL_WIN
 
-	optr	MSG_GEN_APPLICATION_GET_MODAL_WIN();
+    optr    MSG_GEN_APPLICATION_GET_MODAL_WIN();
 
 This message returns the current top modal window for the application, if 
 any is present.
@@ -2160,8 +2160,8 @@ any is present.
 ----------
 #### MSG_GEN_APPLICATION_CHECK_IF_ALWAYS_INTERACTABLE_OBJECT
 
-	Boolean  MSG_GEN_APPLICATION_CHECK_IF_ALWAYS_INTERACTABLE_OBJECT(
-			optr		objToCheck);
+    Boolean  MSG_GEN_APPLICATION_CHECK_IF_ALWAYS_INTERACTABLE_OBJECT(
+            optr        objToCheck);
 
 This message checks if the passed object should always remain interactable. 
 
@@ -2189,8 +2189,8 @@ MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU
 ----------
 #### MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP
 
-	void	MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP(
-			optr	window);
+    void    MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP(
+            optr    window);
 
 This message brings the passed window to the front of the screen.
 
@@ -2209,8 +2209,8 @@ front of the screen.
 ----------
 #### MSG_GEN_APPLICATION_LOWER_WINDOW_TO_BOTTOM
 
-	void	MSG_GEN_APPLICATION_LOWER_WINDOW_TO_BOTTOM(
-			optr	window);
+    void    MSG_GEN_APPLICATION_LOWER_WINDOW_TO_BOTTOM(
+            optr    window);
 
 This message sends the specified window to the back of the screen, behind 
 other window objects.
@@ -2230,12 +2230,12 @@ of the screen.
 ----------
 #### MSG_GEN_APPLICATION_BUILD_STANDARD_DIALOG
 
-	optr	MSG_GEN_APPLICATION_BUILD_STANDARD_DIALOG(
-			char				* customTriggers,
-			char				* arg2,
-			char				* arg1,
-			char				* string,
-			CustomDialogBoxFlags dialogFlags);
+    optr    MSG_GEN_APPLICATION_BUILD_STANDARD_DIALOG(
+            char                * customTriggers,
+            char                * arg2,
+            char                * arg1,
+            char                * string,
+            CustomDialogBoxFlags dialogFlags);
 
 This message builds a standard dialog box for the application.
 
@@ -2269,15 +2269,15 @@ what type of dialog box is to be created.
 ----------
 #### MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
 
-	void	MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(@stack
-			word			dialogMethod,
-			optr			dialogOD,
-			char			*helpContext,
-			char			* customTriggers,
-			char			* arg2,
-			char			* arg1,
-			char			* string,
-			CustomDialogBoxFlags dialogFlags);
+    void    MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(@stack
+            word            dialogMethod,
+            optr            dialogOD,
+            char            *helpContext,
+            char            * customTriggers,
+            char            * arg2,
+            char            * arg1,
+            char            * string,
+            CustomDialogBoxFlags dialogFlags);
 
 This message executes a standard dialog box and returns immediately. When 
 the dialog box is shut down, the message passed in the *dialogMethod* 
@@ -2324,7 +2324,7 @@ what type of dialog box is to be created.
 ----------
 #### MSG_GEN_APPLICATION_TOGGLE_CURSOR
 
-	void	MSG_GEN_APPLICATION_TOGGLE_CURSOR();
+    void    MSG_GEN_APPLICATION_TOGGLE_CURSOR();
 
 This message toggles the cursor for a text object.
 
@@ -2337,7 +2337,7 @@ This message toggles the cursor for a text object.
 ----------
 #### MSG_GEN_APPLICATION_BRING_UP_HELP
 
-	void	MSG_GEN_APPLICATION_BRING_UP_HELP();
+    void    MSG_GEN_APPLICATION_BRING_UP_HELP();
 
 This message brings up help for an application. Normally, this is 
 accomplished by sending a message to the focus object telling it to bring up a 
@@ -2354,7 +2354,7 @@ application).
 ----------
 #### MSG_GEN_APPLICATION_TOGGLE_CURRENT_MENU_BAR
 
-	void	MSG_GEN_APPLICATION_TOGGLE_CURRENT_MENU_BAR();
+    void    MSG_GEN_APPLICATION_TOGGLE_CURRENT_MENU_BAR();
 
 This message toggles the GIV_POPOUT state of the current GenPrimary's 
 menu bar. This message only takes effect if the menu bar is toggleable (i.e. if 
@@ -2367,7 +2367,7 @@ UIWO_POPOUT_MENU_BAR is set).
 ----------
 #### MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD
 
-	void	MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD();
+    void    MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD();
 
 This message toggles the state of the floating keyboard within the current 
 application. Applications may subclass this to bring up their own 
@@ -2384,7 +2384,7 @@ object.
 ----------
 #### MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU
 
-	void	MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU();
+    void    MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU();
 
 This message toggles (opens or closes) the parent field's express menu.
 
