@@ -997,14 +997,14 @@ static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* windowM
                 return;
 
         /* set horizontal and vertical resolution based on 72 dpi */
-        transMatrix->TM_resX = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), windowMatrix->FM_11 ) );
-        transMatrix->TM_resY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), windowMatrix->FM_22 ) );
+        transMatrix->TM_resX = transMatrix->TM_resY = 
+                INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), windowMatrix->FM_11 ) );
 
         /* normalize transformation matrix values */
         transMatrix->TM_matrix.xx = GrSDivWWFixed( transMatrix->TM_matrix.xx, windowMatrix->FM_11 );
         transMatrix->TM_matrix.yx = GrSDivWWFixed( transMatrix->TM_matrix.yx, windowMatrix->FM_11 );
-        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, windowMatrix->FM_22 );
-        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, windowMatrix->FM_22 );
+        transMatrix->TM_matrix.xy = GrSDivWWFixed( transMatrix->TM_matrix.xy, windowMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = GrSDivWWFixed( transMatrix->TM_matrix.yy, windowMatrix->FM_11 );
 }
 
 

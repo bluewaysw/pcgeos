@@ -381,7 +381,7 @@ resources.
 The next set of fields contains the application object's instance data.
 
 ~~~
-	 GI_visMoniker = list { @MCTextMoniker }
+     GI_visMoniker = list { @MCTextMoniker }
 ~~~
 
 This line specifies the name of the object, which will in turn be used as the 
@@ -399,7 +399,7 @@ GenApplicationClass instance field names would begin "GAI_". The
 parlance, a "visual moniker" is a name used to identify an object to the user. 
 
 ~~~
-	 GI_comp = @MCPrimary;
+     GI_comp = @MCPrimary;
 ~~~
 
 We are setting the value of another instance data field. From the field name, 
@@ -408,7 +408,7 @@ field is used to list the children of a generic UI object. In this case, our
 application has only one child object, the primary window MCPrimary.
 
 ~~~
-	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =@MCPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =@MCPrimary;
 }
 ~~~
 
@@ -576,7 +576,7 @@ machine:
 ~~~
 PC Halted
 Stopped in 0214h:0000h, address 0214h:0000h
-102140h: 		CMP 	AH, 16 (10h) 		;16h
+102140h:        CMP     AH, 16 (10h)        ;16h
 (geos:0) 2 =>
 ~~~
 
@@ -680,7 +680,7 @@ master part: Gen_offset(164) -- ui::GenPrimaryInstance
   void _lptr GPI_longTermMoniker = null
 }
 Variable Data:
-	*** No Variable Data ***
+    *** No Variable Data ***
 [mchrt:0] 6 =>
 ~~~
 
@@ -727,7 +727,7 @@ master part: Gen_offset(164) -- ui::GenPrimaryInstance
   void _lptr GPI_longTermMoniker = null
 }
 Variable Data:
-	*** No Variable Data ***
+    *** No Variable Data ***
 [mchrt:0] 6 =>
 ~~~
 
@@ -923,7 +923,7 @@ placed on that thread's event queue. Right now, there are no messages
 queued for either of our threads.
 
 ~~~
-3b10h 607eh    896 3560h 1b70h  s SL a       0 	    mchrt 0:49 4320h R#4 (APPRESOURCE)
+3b10h 607eh    896 3560h 1b70h  s SL a       0      mchrt 0:49 4320h R#4 (APPRESOURCE)
 4530h 425fh   2080 4bd0h 4b50h  FIXED n/a           mchrt n/a 1h     R#1 (dgroup) 
 4aa0h 0000h     16 0000h 0000h  sDS d        0      mchrt 0:51 1h    R#2 (MCHRT_TEXT)
 4c10h 5bb5h    928 3710h 4140h  s SL a       0      mchrt 0:49 4320h R#3 (INTERFACE)
@@ -1037,9 +1037,9 @@ Code Display 3-2 MCHRT.GOC
 
 @start AppResource; 
 @object GenApplicationClass MCApp = {
-	GI_visMoniker = list { @MCTextMoniker }
-	GI_comp = @MCPrimary;
-	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @MCPrimary; 
+    GI_visMoniker = list { @MCTextMoniker }
+    GI_comp = @MCPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @MCPrimary; 
 } /* end of MCApp */
 
 @visMoniker MCTextMoniker = "MyChart Application";

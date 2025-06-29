@@ -541,28 +541,28 @@ Code Display 15-1 Allocating and Using a Block
  * Variable Declarations
  */
 
-MemHandle 	myBlockHandle;
-char 	charArray[50], *blockBaseAddress;
+MemHandle   myBlockHandle;
+char    charArray[50], *blockBaseAddress;
 
 /* First, we allocate a block of the desired size. Since we'll use the block right
  * away, we allocate the block already locked.
  */
 myBlockhandle = MemAlloc(        /* MemAlloc returns the block handle */
-		2048,                    /* Allocate 2K of memory */
-		HF_SWAPABLE,             /* HeapFlags: Make block swapable */
-		HAF_ZERO_INIT|HAF_LOCK); /* HeapAllocFlags: Initialize
-						 * the memory to zero & lock it */
+        2048,                    /* Allocate 2K of memory */
+        HF_SWAPABLE,             /* HeapFlags: Make block swapable */
+        HAF_ZERO_INIT|HAF_LOCK); /* HeapAllocFlags: Initialize
+                         * the memory to zero & lock it */
 
 
 /* The block is already locked on the global heap. However, we do not have the
  * block's address; we just have its handle. Therefore, we need to call a routine
  * to dereference the handle. */
 blockBaseAddress = (char *) MemDeref(myBlockHandle); /* Returns a ptr to base of
-						 * block */
+                         * block */
 
 /* Enter some data in the block */
 strcpy(blockBaseAddress,
-	"I can resist anything except temptation.\n   --Wilde"
+    "I can resist anything except temptation.\n   --Wilde"
 
 /* We're done with the block for the moment, so we unlock it. */
 MemUnlock(myBlockHandle); /* blockBaseAddress is now meaningless */
@@ -570,8 +570,8 @@ MemUnlock(myBlockHandle); /* blockBaseAddress is now meaningless */
 /* Here we do some other stuff . . . */
 
 /* Now we want to use the block again. First we have to lock it. */
-blockBaseAddress = (byte *) MemLock(myBlockHandle);			/* Returns a ptr to locked 
-						 * block */
+blockBaseAddress = (byte *) MemLock(myBlockHandle);         /* Returns a ptr to locked 
+                         * block */
 
 /* Read a string from the block: */
 strcpy(charArray, blockBaseAddress);

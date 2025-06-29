@@ -415,14 +415,14 @@ is the constant ERROR_INVALID_VOLUME.
 Code Display 17-1 The DiskInfoStruct Structure
 ~~~
 typedef struct {
-	word		DIS_blockSize;		/* # of bytes in a block; smallest size
-					 * file system can allocate at once */
-	sdword		DIS_freeSpace;		/* # of bytes free on disk */
-	sdword		DIS_totalSpace;		/* Total size of the disk in bytes */
-	char		DIS_name[VOLUME_BUFFER_SIZE];
-					/* Volume name; if disk is unnamed, this
-					 * is the temporary name. String is
-					 * null-terminated. */
+    word        DIS_blockSize;      /* # of bytes in a block; smallest size
+                     * file system can allocate at once */
+    sdword      DIS_freeSpace;      /* # of bytes free on disk */
+    sdword      DIS_totalSpace;     /* Total size of the disk in bytes */
+    char        DIS_name[VOLUME_BUFFER_SIZE];
+                    /* Volume name; if disk is unnamed, this
+                     * is the temporary name. String is
+                     * null-terminated. */
 } DiskInfoStruct;
 ~~~
 
@@ -915,7 +915,7 @@ decide where each of these directories is, so make no assumptions about their
 locations. These paths will always be supported; future versions of GEOS may 
 add new paths.
 
-SP_TOP	The top level directory. This is the directory which contains 
+SP_TOP  The top level directory. This is the directory which contains 
 GEOS.INI. This is often C:\GEOWORKS.
 
 SP_APPLICATION  
@@ -1016,7 +1016,7 @@ SP_POWER_DRIVERS
 This directory contains power-management drivers. It is 
 commonly SYSTEM\POWER.
 
-SP_HWR	This directory contains the handwriting recognition libraries. 
+SP_HWR  This directory contains the handwriting recognition libraries. 
 It is commonly SYSTEM\HWR.
 
 SP_WASTE_BASKET  
@@ -1888,20 +1888,20 @@ follows; for full details, see the reference entry for **FileEnum()**.
 
 ~~~
 typedef struct _FileEnumParams {
-	FileEnumSearchFlags  FEP_searchFlags;
-	FileExtAttrDesc *    FEP_returnAttrs;
-	word                 FEP_returnSize;
-	FileExtAttrDesc *    FEP_matchAttrs;
-	word                 FEP_bufSize;
-	word                 FEP_skipCount;
-	word _pascal (*FEP_callback) 
-		(struct _FileEnumParams * params,
-		 FileEnumCallbackData * fecd,
-		 word frame);
-	FileExtAttrDesc *    FEP_callbackAttrs;
-	dword                FEP_cbData1;
-	dword                FEP_cbData2;
-	word                 FEP_headerSize;
+    FileEnumSearchFlags  FEP_searchFlags;
+    FileExtAttrDesc *    FEP_returnAttrs;
+    word                 FEP_returnSize;
+    FileExtAttrDesc *    FEP_matchAttrs;
+    word                 FEP_bufSize;
+    word                 FEP_skipCount;
+    word _pascal (*FEP_callback) 
+        (struct _FileEnumParams * params,
+         FileEnumCallbackData * fecd,
+         word frame);
+    FileExtAttrDesc *    FEP_callbackAttrs;
+    dword                FEP_cbData1;
+    dword                FEP_cbData2;
+    word                 FEP_headerSize;
 } FileEnumParams;
 ~~~
 
@@ -1941,7 +1941,7 @@ enumerated. If you do not want to filter out any files in the working
 directory, or if you will use the callback routine to filter the files, 
 pass a null pointer in this field.
 
-FEP_bufsize	This field specifies the maximum number of entries to be 
+FEP_bufsize This field specifies the maximum number of entries to be 
 returned in the buffer. If you do not want to set a limit, pass the 
 constant FEP_BUFSIZE_UNLIMITED. The buffer will be grown 
 as necessary.

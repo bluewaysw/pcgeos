@@ -286,7 +286,7 @@ should give you the necessary information to use all of the features.
 #### 8.5.1 File Menu
 
 **New/Open:**  
-brings up the New/Open dialog box, allowing you to open a new 			
+brings up the New/Open dialog box, allowing you to open a new           
 translation file or an existing one.
 
 **Close:**  
@@ -299,12 +299,12 @@ saves the open translation file.
 saves the open translation file under a different name.
 
 **Backup:**  
-makes a backup of the open translation file or restores from a backup 			file.
+makes a backup of the open translation file or restores from a backup           file.
 
 **Other:**
 
 + **Copy To:**  
-creates a copy of the translation file and places it in a user 				
+creates a copy of the translation file and places it in a user              
 selected directory.
 
 + **Discard Changes:**  
@@ -385,8 +385,8 @@ Reset the path of the source geode if it moves to a different subdirectory.
 
 #### 8.5.4 Filter Menu
 
-Each of these menu items is a radio button, which allows you to turn on or 		
-off as many of these filters as you like. These options can be helpful when 		
+Each of these menu items is a radio button, which allows you to turn on or      
+off as many of these filters as you like. These options can be helpful when         
 editing updated translation files.
 
 **Don't show Text:**
@@ -422,7 +422,7 @@ These menu items allow for quick movement between chunks and resources.
 
 #### 8.5.6 Window Menu
 
-These menu items make manipulation of multiple translation files easy, by 		
+These menu items make manipulation of multiple translation files easy, by       
 opening overlapping windows or tiling active windows.
 
 **Overlapping:**

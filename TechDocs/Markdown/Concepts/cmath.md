@@ -104,7 +104,7 @@ function names and the operations they perform.
 |FloatDivide()    |/           |division                         |
 |FloatDIV()       |(int) (X/Y) |division returning integer result|
 |FloatMod()       |X % Y       |modulo                           |
-|FloatFactorial() |		       |factorial                        |
+|FloatFactorial() |            |factorial                        |
 |FloatNegate()    |-X          |negation                         |
 |FloatInverse()   |1/X         |inversion                        |
 |FloatAbs()       |abs(X)      |absolute value                   |
@@ -139,7 +139,7 @@ Code Display D-2 Adding Two FP Numbers
  */
 
 @method MyProcessClass, MSG_SUM_FLOATS {
-    long double			number1, number2, number3;
+    long double         number1, number2, number3;
 
     number1 = 1.0;
     number2 = 2.0;
@@ -149,16 +149,16 @@ Code Display D-2 Adding Two FP Numbers
 }
 
 @method MyProcessClass, MSG_SUM_FLOATS_MANUALLY {
-    long double			number1, number2, number3;
+    long double         number1, number2, number3;
 
     number1 = 1.0;
     number2 = 2.0;
 
-    FloatPushNumber(&number1);		/* Push number1 onto the FP stack. */
-    FloatPushNumber(&number2);		/* Push number2 onto the FP stack. */
-    FloatAdd();				/* Add the top two numbers on the FP stack. The
-				 * result will be placed on top of the FP stack.*/
-    FloatPopNumber(&number3);		/* Pop the result into the number3 variable. */
+    FloatPushNumber(&number1);      /* Push number1 onto the FP stack. */
+    FloatPushNumber(&number2);      /* Push number2 onto the FP stack. */
+    FloatAdd();             /* Add the top two numbers on the FP stack. The
+                 * result will be placed on top of the FP stack.*/
+    FloatPopNumber(&number3);       /* Pop the result into the number3 variable. */
     return(number3);
 }
 ~~~
@@ -240,8 +240,8 @@ Code Display D-3 Creating a Random Number
  */
 
 @method MyProcessClass, MSG_GET_RANDOM_FLOAT {
-    long double			randomX;
-	/* Prime the random number generator. */
+    long double         randomX;
+    /* Prime the random number generator. */
     FloatRandomize(RGIF_USE_SEED, passedSeed);
     randomX = 100;
     FloatPushNumber(&randomX);
@@ -320,35 +320,35 @@ typedef struct {
 /*
  * FFA_params stores the entries that the caller must set up.
  */
-	FloatFloatToAsciiParams			FFA_params;
+    FloatFloatToAsciiParams         FFA_params;
 
 /*
  * These entries store information returned by FloatFloatToAscii() that may be 
  * examined.
  */
-	word			FFA_startNumber;
-	word			FFA_decimalPoint;
-	word			FFA_endNumber;
-	word			FFA_numChars;
-	word			FFA_startExponent;
+    word            FFA_startNumber;
+    word            FFA_decimalPoint;
+    word            FFA_endNumber;
+    word            FFA_numChars;
+    word            FFA_startExponent;
 
 /*
  * The rest of the entries are for internal use only.
  */
-	word			FFA_bufSize;
-	word			FFA_saveDI;
-	word			FFA_numSign;
-	byte			FFA_startSigCount;
-	byte			FFA_sigCount;
-	byte			FFA_noMoreSigInfo;
-	byte			FFA_startDecCount;
-	byte			FFA_decCount;
-	word			FFA_decExponent;
-	word			FFA_curExponent;
-	byte			FFA_useCommas;
-	byte			FFA_charsToComma;
-	char			FFA_commaChar;
-	char			FFA_decimalChar;
+    word            FFA_bufSize;
+    word            FFA_saveDI;
+    word            FFA_numSign;
+    byte            FFA_startSigCount;
+    byte            FFA_sigCount;
+    byte            FFA_noMoreSigInfo;
+    byte            FFA_startDecCount;
+    byte            FFA_decCount;
+    word            FFA_decExponent;
+    word            FFA_curExponent;
+    byte            FFA_useCommas;
+    byte            FFA_charsToComma;
+    char            FFA_commaChar;
+    char            FFA_decimalChar;
 } FloatFloatToAsciiData;
 ~~~
 
@@ -487,18 +487,18 @@ minute and second of the day.
 Code Display D-5 DateTime Parameters
 ~~~
 typedef struct {
-	FloatFloatToDateTimeFlags				FFA_dateTimeFlags;
-	word				FFA_year;
-	byte				FFA_month;
-	byte				FFA_day;
-	byte				FFA_weekday;
-	byte				FFA_hours;
-	byte				FFA_minutes;
-	byte				FFA_seconds;
+    FloatFloatToDateTimeFlags               FFA_dateTimeFlags;
+    word                FFA_year;
+    byte                FFA_month;
+    byte                FFA_day;
+    byte                FFA_weekday;
+    byte                FFA_hours;
+    byte                FFA_minutes;
+    byte                FFA_seconds;
 } FloatFloatToDateTimeParams;
 
 /*
- *	FloatFloatToDateTimeFlags record
+ *  FloatFloatToDateTimeFlags record
  */
 
 typedef WordFlags FloatFloatToDateTimeFlags;
@@ -644,36 +644,36 @@ Code Display D-6 System-defined Float Formats
  */
 
 typedef struct {
-	/*
-	 * The FloatFloatToAsciiParams_Union stores either a
-	 * FloatFloatToAsciiParams structure if the number is a `pure' FP number,
-	 * or a FloatFloatToDateTimeParams structure if the number is a date-time. 
-	 * In this way, it is essentially the same as the FFA_stackFrame discussed
-	 * earlier.
-	 */
-	FloatFloatToAsciiParams_Union		FP_params;
+    /*
+     * The FloatFloatToAsciiParams_Union stores either a
+     * FloatFloatToAsciiParams structure if the number is a `pure' FP number,
+     * or a FloatFloatToDateTimeParams structure if the number is a date-time. 
+     * In this way, it is essentially the same as the FFA_stackFrame discussed
+     * earlier.
+     */
+    FloatFloatToAsciiParams_Union       FP_params;
 
-	/*
-	 * FP_formatName stores the name of this formatting option that will be 
-	 * displayed in the float controller's dynamic list. This name is loaded 
-	 * from the optr given in FP_nameHan and FP_nameOff.(The table where these 
-	 * strings are kept is within a localizable resource and therefore will
-	 * have different text under different country setups.)
-	 */
-	char				FP_formatName[FORMAT_NAME_LENGTH+1];
-	word				FP_nameHan;		/* MemHandle */
-	word				FP_nameOff;		/* ChunkHandle */
+    /*
+     * FP_formatName stores the name of this formatting option that will be 
+     * displayed in the float controller's dynamic list. This name is loaded 
+     * from the optr given in FP_nameHan and FP_nameOff.(The table where these 
+     * strings are kept is within a localizable resource and therefore will
+     * have different text under different country setups.)
+     */
+    char                FP_formatName[FORMAT_NAME_LENGTH+1];
+    word                FP_nameHan;     /* MemHandle */
+    word                FP_nameOff;     /* ChunkHandle */
 
-	/*
-	 * FP_listEntryNum stores the zero-based position of this FormatParams 
-	 * entry within the table.
-	 */
-	word				FP_listEntryNum;
+    /*
+     * FP_listEntryNum stores the zero-based position of this FormatParams 
+     * entry within the table.
+     */
+    word                FP_listEntryNum;
 
-	/*
-	 * FP_signature is an internal field used for error-checking.
-	 */
-	word				FP_signature;
+    /*
+     * FP_signature is an internal field used for error-checking.
+     */
+    word                FP_signature;
 } FormatParams;
 ~~~
 
@@ -703,43 +703,43 @@ appear as £12.00 in Great Britain.
 ---
 Code Display D-7 Float Format IDs
 ~~~
-typedef	enum {
-	FORMAT_ID_GENERAL                       = 0x8000,
-	FORMAT_ID_FIXED                         = 0x8061,
-	FORMAT_ID_FIXED_WITH_COMMAS             = 0x80c2,
-	FORMAT_ID_FIXED_INTEGER                 = 0x8123,
-	FORMAT_ID_CURRENCY                      = 0x8184,
-	FORMAT_ID_CURRENCY_WITH_COMMAS          = 0x81e5,
-	FORMAT_ID_CURRENCY_INTEGER              = 0x8246,
-	FORMAT_ID_PERCENTAGE                    = 0x82a7,
-	FORMAT_ID_PERCENTAGE_INTEGER            = 0x8308,
-	FORMAT_ID_THOUSANDS                     = 0x8369,
-	FORMAT_ID_MILLIONS                      = 0x83ca,
-	FORMAT_ID_SCIENTIFIC                    = 0x842b,
+typedef enum {
+    FORMAT_ID_GENERAL                       = 0x8000,
+    FORMAT_ID_FIXED                         = 0x8061,
+    FORMAT_ID_FIXED_WITH_COMMAS             = 0x80c2,
+    FORMAT_ID_FIXED_INTEGER                 = 0x8123,
+    FORMAT_ID_CURRENCY                      = 0x8184,
+    FORMAT_ID_CURRENCY_WITH_COMMAS          = 0x81e5,
+    FORMAT_ID_CURRENCY_INTEGER              = 0x8246,
+    FORMAT_ID_PERCENTAGE                    = 0x82a7,
+    FORMAT_ID_PERCENTAGE_INTEGER            = 0x8308,
+    FORMAT_ID_THOUSANDS                     = 0x8369,
+    FORMAT_ID_MILLIONS                      = 0x83ca,
+    FORMAT_ID_SCIENTIFIC                    = 0x842b,
 
-	FORMAT_ID_DATE_LONG                     = 0x848c,
-	FORMAT_ID_DATE_LONG_CONDENSED           = 0x84ed,
-	FORMAT_ID_DATE_LONG_NO_WKDAY            = 0x854e,
-	FORMAT_ID_DATE_LONG_NO_WKDAY_CONDENSED  = 0x85af,
-	FORMAT_ID_DATE_SHORT                    = 0x8610,
-	FORMAT_ID_DATE_SHORT_ZERO_PADDED        = 0x8671,
-	FORMAT_ID_DATE_LONG_MD                  = 0x86d2,
-	FORMAT_ID_DATE_LONG_MD_NO_WKDAY         = 0x8733,
-	FORMAT_ID_DATE_SHORT_MD                 = 0x8794,
-	FORMAT_ID_DATE_LONG_MY                  = 0x87f5,
-	FORMAT_ID_DATE_SHORT_MY                 = 0x8856,
-	FORMAT_ID_DATE_YEAR                     = 0x88b7,
-	FORMAT_ID_DATE_MONTH                    = 0x8918,
-	FORMAT_ID_DATE_DAY                      = 0x8979,
-	FORMAT_ID_DATE_WEEKDAY                  = 0x89da,
-	FORMAT_ID_TIME_HMS                      = 0x8a3b,
-	FORMAT_ID_TIME_HM                       = 0x8a9c,
-	FORMAT_ID_TIME_H                        = 0x8afd,
-	FORMAT_ID_TIME_MS                       = 0x8b5e,
-	FORMAT_ID_TIME_HMS_24HR                 = 0x8bbf,
-	FORMAT_ID_TIME_HM_24HR                  = 0x8c20,
+    FORMAT_ID_DATE_LONG                     = 0x848c,
+    FORMAT_ID_DATE_LONG_CONDENSED           = 0x84ed,
+    FORMAT_ID_DATE_LONG_NO_WKDAY            = 0x854e,
+    FORMAT_ID_DATE_LONG_NO_WKDAY_CONDENSED  = 0x85af,
+    FORMAT_ID_DATE_SHORT                    = 0x8610,
+    FORMAT_ID_DATE_SHORT_ZERO_PADDED        = 0x8671,
+    FORMAT_ID_DATE_LONG_MD                  = 0x86d2,
+    FORMAT_ID_DATE_LONG_MD_NO_WKDAY         = 0x8733,
+    FORMAT_ID_DATE_SHORT_MD                 = 0x8794,
+    FORMAT_ID_DATE_LONG_MY                  = 0x87f5,
+    FORMAT_ID_DATE_SHORT_MY                 = 0x8856,
+    FORMAT_ID_DATE_YEAR                     = 0x88b7,
+    FORMAT_ID_DATE_MONTH                    = 0x8918,
+    FORMAT_ID_DATE_DAY                      = 0x8979,
+    FORMAT_ID_DATE_WEEKDAY                  = 0x89da,
+    FORMAT_ID_TIME_HMS                      = 0x8a3b,
+    FORMAT_ID_TIME_HM                       = 0x8a9c,
+    FORMAT_ID_TIME_H                        = 0x8afd,
+    FORMAT_ID_TIME_MS                       = 0x8b5e,
+    FORMAT_ID_TIME_HMS_24HR                 = 0x8bbf,
+    FORMAT_ID_TIME_HM_24HR                  = 0x8c20,
 
-	FORMAT_ID_INDETERMINATE                 = 0xffff
+    FORMAT_ID_INDETERMINATE                 = 0xffff
 } FormatIdType;
 ~~~
 
@@ -765,32 +765,32 @@ Code Display D-8 User-defined Formats
 
 typedef struct {
 
-	/*
-	 * Each FormatEntry contains a corresponding FormatParams structure.
-	 */
-	FormatParams 		FE_params;
+    /*
+     * Each FormatEntry contains a corresponding FormatParams structure.
+     */
+    FormatParams        FE_params;
 
-	/*
-	 * FE_listEntryNumber is the zero-based position of the format counting 
-	 * both previous user-defined formats and system-defined formats. For 
-	 * example, if there are 10 system-defined formats, the first user-defined
-	 * format will have a FE_listEntryNumber of 10 (because positions are 
-	 * zero-based).
-	 */
-	word		FE_listEntryNumber;
+    /*
+     * FE_listEntryNumber is the zero-based position of the format counting 
+     * both previous user-defined formats and system-defined formats. For 
+     * example, if there are 10 system-defined formats, the first user-defined
+     * format will have a FE_listEntryNumber of 10 (because positions are 
+     * zero-based).
+     */
+    word        FE_listEntryNumber;
 
-	/*
-	 * FE_used, if non-zero, indicates that this entry within the user-defined 
-	 * list is currently in use. If FE_used is zero, then this entry position 
-	 * may be used to add a new user-defined entry without increasing the size
-	 * of the VM block.
-	 */
-	byte		FE_used;
+    /*
+     * FE_used, if non-zero, indicates that this entry within the user-defined 
+     * list is currently in use. If FE_used is zero, then this entry position 
+     * may be used to add a new user-defined entry without increasing the size
+     * of the VM block.
+     */
+    byte        FE_used;
 
-	/*
-	 * FE_sig is an error-checking field used internally.
-	 */
-	word		FE_sig;
+    /*
+     * FE_sig is an error-checking field used internally.
+     */
+    word        FE_sig;
 } FormatEntry;
 ~~~
 

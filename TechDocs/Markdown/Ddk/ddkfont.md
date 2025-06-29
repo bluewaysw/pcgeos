@@ -427,6 +427,7 @@ the Font Manager, there are a number of useful TCL commands available:
 * pfontinfo - print the FontInfo structure for a font
 * pfont - print the FontBuf structure for a font and any bitmaps that
         have been built for it
+
 * pchar - print the bitmap for a character in a font, if it has been
         built
 * pusage - print the usage values for all characters that have been

@@ -2,85 +2,85 @@
 
 ----------
 #### Tab
-	Tab		struct
-		T_position		word			; Position of tab (pixels * 8)
-		T_attr			TabAttributes	; Tab attributes.
-		T_grayScreen	SysDrawMask		; Gray screen for tab lines
-		T_lineWidth		byte			; Width of line before (after) tab
-										; 0 = none, units are pixels * 8
-		T_lineSpacing	byte			; Space between tab and line
-										; 0 = none, units are pixels * 8
-		T_anchor		word			; Anchor character.
-	Tab		ends
+    Tab     struct
+        T_position      word            ; Position of tab (pixels * 8)
+        T_attr          TabAttributes   ; Tab attributes.
+        T_grayScreen    SysDrawMask     ; Gray screen for tab lines
+        T_lineWidth     byte            ; Width of line before (after) tab
+                                        ; 0 = none, units are pixels * 8
+        T_lineSpacing   byte            ; Space between tab and line
+                                        ; 0 = none, units are pixels * 8
+        T_anchor        word            ; Anchor character.
+    Tab     ends
 
 **Library:** text.def
 
 ----------
 #### TabAttributes
-	TabAttributes			record
-						:3
-		TA_LEADER		TabLeader:3
-		TA_TYPE			TabType:2
-	TabAttributes			end
+    TabAttributes           record
+                        :3
+        TA_LEADER       TabLeader:3
+        TA_TYPE         TabType:2
+    TabAttributes           end
 
 **Library:** text.def
 
 ----------
 #### TabLeader
-	TabLeader			etype byte
-		TL_NONE		enum TabLeader
-		TL_DOT		enum TabLeader
-		TL_LINE		enum TabLeader
-		TL_BULLET	enum TabLeader
+    TabLeader           etype byte
+        TL_NONE     enum TabLeader
+        TL_DOT      enum TabLeader
+        TL_LINE     enum TabLeader
+        TL_BULLET   enum TabLeader
 
 **Library:** text.def
 
 ----------
 #### TabReference
-	TabReference		record
-		TR_TYPE				TabReferenceType:1	; Type of reference.
-		TR_REF_NUMBER		:7					; Reference number
-	TabReference		end
+    TabReference        record
+        TR_TYPE             TabReferenceType:1  ; Type of reference.
+        TR_REF_NUMBER       :7                  ; Reference number
+    TabReference        end
 
 **Library:** text.def
 
 ----------
 #### TabReferenceType
-	TabReferenceType		etype byte
-		TRT_RULER	enum TabReferenceType	; Reference is into the ruler.
-		TRT_OTHER	enum TabReferenceType
+    TabReferenceType        etype byte
+        TRT_RULER   enum TabReferenceType   ; Reference is into the ruler.
+        TRT_OTHER   enum TabReferenceType
 
 **Library:** text.def
 
 ----------
 #### TabType
-	TabType	etype byte
-		TT_LEFT				enum TabType
-		TT_CENTER			enum TabType
-		TT_RIGHT			enum TabType
-		TT_ANCHORED			enum TabType
+    TabType etype byte
+        TT_LEFT             enum TabType
+        TT_CENTER           enum TabType
+        TT_RIGHT            enum TabType
+        TT_ANCHORED         enum TabType
 
 **Library:** text.def
 
 ----------
 #### TargetLevel
-	TargetLevel		etype word
-		TL_TARGET					enum TargetLevel, 0
-		TL_CONTENT					enum TargetLevel
-		TL_GENERIC_OBJECTS			enum TargetLevel, 1000
-		TL_GEN_SYSTEM		 		enum TargetLevel
-		TL_GEN_FIELD				enum TargetLevel
-		TL_GEN_APPLICATION			enum TargetLevel
-		TL_GEN_PRIMARY 				enum TargetLevel
-		TL_GEN_DISPLAY_CTRL	 		enum TargetLevel
-		TL_GEN_DISPLAY		 		enum TargetLevel
-		TL_GEN_VIEW					enum TargetLevel
-		;
-		; Place PC/GEOS library extensions here 
-		TL_LIBRARY_LEVELS	enum TargetLevel, 2000
-		
-		; EXPORTED FOR INDIVIDUAL APPLICATIONS
-		TL_APPLICATION_OBJECTS	enum TargetLevel, 3000
+    TargetLevel     etype word
+        TL_TARGET                   enum TargetLevel, 0
+        TL_CONTENT                  enum TargetLevel
+        TL_GENERIC_OBJECTS          enum TargetLevel, 1000
+        TL_GEN_SYSTEM               enum TargetLevel
+        TL_GEN_FIELD                enum TargetLevel
+        TL_GEN_APPLICATION          enum TargetLevel
+        TL_GEN_PRIMARY              enum TargetLevel
+        TL_GEN_DISPLAY_CTRL         enum TargetLevel
+        TL_GEN_DISPLAY              enum TargetLevel
+        TL_GEN_VIEW                 enum TargetLevel
+        ;
+        ; Place PC/GEOS library extensions here 
+        TL_LIBRARY_LEVELS   enum TargetLevel, 2000
+        
+        ; EXPORTED FOR INDIVIDUAL APPLICATIONS
+        TL_APPLICATION_OBJECTS  enum TargetLevel, 3000
 
 TL_TARGET  
 Final target object. (Currently, just text objects, such as 
@@ -116,66 +116,66 @@ View within display.
 
 ----------
 #### TargetReference
-	TargetReference			struct
-		TR_object		optr	; OD of node/leaf in target hierarchy
-		TR_class		fptr	; class of above object
-	TargetReference			ends
+    TargetReference         struct
+        TR_object       optr    ; OD of node/leaf in target hierarchy
+        TR_class        fptr    ; class of above object
+    TargetReference         ends
 
 **Library:** Objects/gViewC.def
 
 ----------
 #### TCCFeatures
-	TCCFeatures		record
-		TCCF_CHARACTER		:1
-		TCCF_WORD			:1
-		TCCF_LINE			:1
-		TCCF_PARAGRAPH		:1
-		TCCF_RECALC			:1
-	TCCFeatures		end
+    TCCFeatures     record
+        TCCF_CHARACTER      :1
+        TCCF_WORD           :1
+        TCCF_LINE           :1
+        TCCF_PARAGRAPH      :1
+        TCCF_RECALC         :1
+    TCCFeatures     end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TCCToolboxFeatures
-	TCCToolboxFeatures		record
-	TCCToolboxFeatures		end
+    TCCToolboxFeatures      record
+    TCCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TCFeatures
-	TCFeatures		record
-		TCF_LIST			:1
-		TCF_POSITION		:1
-		TCF_GRAY_SCREEN		:1
-		TCF_TYPE			:1
-		TCF_LEADER			:1
-		TCF_LINE			:1
-		TCF_CLEAR			:1
-		TCF_CLEAR_ALL		:1
-	TCFeatures		end
+    TCFeatures      record
+        TCF_LIST            :1
+        TCF_POSITION        :1
+        TCF_GRAY_SCREEN     :1
+        TCF_TYPE            :1
+        TCF_LEADER          :1
+        TCF_LINE            :1
+        TCF_CLEAR           :1
+        TCF_CLEAR_ALL       :1
+    TCFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TCToolboxFeatures
-	TCToolboxFeatures		record
-	TCToolboxFeatures		end
+    TCToolboxFeatures       record
+    TCToolboxFeatures       end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TempGenControlInstance
-	TempGenControlInstance			struct
-		TGCI_interactibleFlags			GenControlInteractibleFlags
-		TGCI_childBlock					hptr
-		TGCI_toolBlock					hptr
-		TGCI_toolParent					optr
-		TGCI_features					word
-		TGCI_toolboxFeatures			word
-		TGCI_activeNotificationList		GCNListType
-		TGCI_upToDate					GenControlInteractibleFlags
-	TempGenControlInstance			ends
+    TempGenControlInstance          struct
+        TGCI_interactibleFlags          GenControlInteractibleFlags
+        TGCI_childBlock                 hptr
+        TGCI_toolBlock                  hptr
+        TGCI_toolParent                 optr
+        TGCI_features                   word
+        TGCI_toolboxFeatures            word
+        TGCI_activeNotificationList     GCNListType
+        TGCI_upToDate                   GenControlInteractibleFlags
+    TempGenControlInstance          ends
 
 *TGCI_interactableFlags* holds the current status of various portions of the 
 controller (the entire controller object itself, its associated toolbox, or its 
@@ -202,14 +202,14 @@ and avoid a redundant update.
 
 ----------
 #### TempGenToolControlInstance
-	TempGenToolControlInstance				struct
-		TGTCI_curController			optr
-		TGTCI_features				word
-		TGTCI_required				word
-		TGTCI_allowed				word
-		TGTCI_curToolGroup			optr
-		TGTCI_toolGroupVisible		byte
-	TempGenToolControlInstance				ends
+    TempGenToolControlInstance              struct
+        TGTCI_curController         optr
+        TGTCI_features              word
+        TGTCI_required              word
+        TGTCI_allowed               word
+        TGTCI_curToolGroup          optr
+        TGTCI_toolGroupVisible      byte
+    TempGenToolControlInstance              ends
 
 *TGTCI_curController* stores the optr of the controller whose tool options and 
 placement location are currently being displayed for editing by the user.
@@ -233,19 +233,19 @@ bring it to the attention of the user.
 
 ----------
 #### TempImportExportData
-	TempImportExportData			struct
-		TIED_formatUI			optr	; OD of duplicated format UI
-		TIED_formatLibrary		hptr	; handle of library for above
-	TempImportExportData			ends
+    TempImportExportData            struct
+        TIED_formatUI           optr    ; OD of duplicated format UI
+        TIED_formatLibrary      hptr    ; handle of library for above
+    TempImportExportData            ends
 
 **Library:** impex.def
 
 ----------
 #### TempMetaGCNData
-	TempMetaGCNData		struct
-		TMGCND_listOfLists		lptr.GCNListOfListsHeader
-		TMGCND_flags			TempMetaGCNFlags
-	TempMetaGCNData		ends
+    TempMetaGCNData     struct
+        TMGCND_listOfLists      lptr.GCNListOfListsHeader
+        TMGCND_flags            TempMetaGCNFlags
+    TempMetaGCNData     ends
 
 *TMGCND_listOfLists* stores the chunk handle holding the GCN list of lists.
 
@@ -253,68 +253,68 @@ bring it to the attention of the user.
 
 ----------
 #### TempMetaGCNFlags
-	TempMetaGCNFlags		record
-		TMGCNF_RELOCATED		:1		; set if relocated
-								:7
-	TempMetaGCNFlags		end
+    TempMetaGCNFlags        record
+        TMGCNF_RELOCATED        :1      ; set if relocated
+                                :7
+    TempMetaGCNFlags        end
 
 **Library:** Objects/metaC.def
 
 ----------
 #### TempPrintCtrlInstance
-	TempPrintCtrlInstance			struct
-		TPCI_currentSummons			optr	; currently active summons
-		TPCI_progressBox			optr	; OD of progress dialog box
-		TPCI_jobParHandle			hptr	; memory handle to JobParamters
-		TPCI_fileHandle				word	; file handle (if printing)
-		TPCI_gstringHandle			word	; gstring handle (if printing)
-		TPCI_printBlockHan			word	; the printer block handle
-		TPCI_attrs					PrintControlAttrs
-		TPCI_status					PrintStatusFlags
-		TPCI_holdUpCompletionCount 	byte	; Number of things not wanting the message 
-											; stored in TEMP_PRINT_COMPLETION_EVENT to 
-											; be sent out just yet.
-TempPrintCtrlInstance			ends
+    TempPrintCtrlInstance           struct
+        TPCI_currentSummons         optr    ; currently active summons
+        TPCI_progressBox            optr    ; OD of progress dialog box
+        TPCI_jobParHandle           hptr    ; memory handle to JobParamters
+        TPCI_fileHandle             word    ; file handle (if printing)
+        TPCI_gstringHandle          word    ; gstring handle (if printing)
+        TPCI_printBlockHan          word    ; the printer block handle
+        TPCI_attrs                  PrintControlAttrs
+        TPCI_status                 PrintStatusFlags
+        TPCI_holdUpCompletionCount  byte    ; Number of things not wanting the message 
+                                            ; stored in TEMP_PRINT_COMPLETION_EVENT to 
+                                            ; be sent out just yet.
+    TempPrintCtrlInstance           ends
 
 **Library:** spool.def
 
 ----------
 #### TestRectReturnType
-	TestRectReturnType			etype byte
-		TRRT_OUT			enum TestRectReturnType
-		TRRT_PARTIAL		enum TestRectReturnType
-		TRRT_IN				enum TestRectReturnType
+    TestRectReturnType          etype byte
+        TRRT_OUT            enum TestRectReturnType
+        TRRT_PARTIAL        enum TestRectReturnType
+        TRRT_IN             enum TestRectReturnType
 
 **Library:** graphics.def
 
 ----------
 #### TextArrayType
-	TextArrayType		etype byte
-		TAT_CHAR_ATTRS			enum TextArrayType
-		TAT_PARA_ATTRS			enum TextArrayType
-		TAT_GRAPHICS			enum TextArrayType
-		TAT_TYPES				enum TextArrayType
+    TextArrayType       etype byte
+        TAT_CHAR_ATTRS          enum TextArrayType
+        TAT_PARA_ATTRS          enum TextArrayType
+        TAT_GRAPHICS            enum TextArrayType
+        TAT_TYPES               enum TextArrayType
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextAttr
-	TextAttr		struct
-		TA_color		ColorQuad			; RGB values or index
-		TA_mask			SystemDrawMask		; draw mask
-		TA_pattern		GraphicPattern		; pattern
-		TA_styleSet		TextStyle			; text style bits to set
-		TA_styleClear	TextStyle			; text style bits to clear
-		TA_modeSet		TextMode			; text mode bits to set
-		TA_modeClear	TextMode			; text mode bits to clear
-		TA_spacePad		WBFixed				; space padding
-		TA_font			FontID 				; typeface
-		TA_size			WBFixed				; point size
-		TA_trackKern	sword				; track kerning
-		TA_fontWeight	FontWeight			; weight of font
-		TA_fontWidth	FontWidth			; width of font
-		align			word
-	TextAttr		ends
+    TextAttr        struct
+        TA_color        ColorQuad           ; RGB values or index
+        TA_mask         SystemDrawMask      ; draw mask
+        TA_pattern      GraphicPattern      ; pattern
+        TA_styleSet     TextStyle           ; text style bits to set
+        TA_styleClear   TextStyle           ; text style bits to clear
+        TA_modeSet      TextMode            ; text mode bits to set
+        TA_modeClear    TextMode            ; text mode bits to clear
+        TA_spacePad     WBFixed             ; space padding
+        TA_font         FontID              ; typeface
+        TA_size         WBFixed             ; point size
+        TA_trackKern    sword               ; track kerning
+        TA_fontWeight   FontWeight          ; weight of font
+        TA_fontWidth    FontWidth           ; width of font
+        align           word
+    TextAttr        ends
 
 This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 
@@ -322,54 +322,54 @@ This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 
 ----------
 #### TextClipboardOption
-	TextClipboardOption			etype word
-		TCO_COPY						enum TextClipboardOption
-		TCO_RETURN_TRANSFER_FORMAT		enum TextClipboardOption
-		TCO_RETURN_TRANSFER_ITEM		enum TextClipboardOption
-		TCO_RETURN_NOTHING				enum TextClipboardOption
+    TextClipboardOption         etype word
+        TCO_COPY                        enum TextClipboardOption
+        TCO_RETURN_TRANSFER_FORMAT      enum TextClipboardOption
+        TCO_RETURN_TRANSFER_ITEM        enum TextClipboardOption
+        TCO_RETURN_NOTHING              enum TextClipboardOption
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextColors
-	TextColors		struc
-		TC_unselectedColor		byte
-		TC_selectedColor		byte
-	TextColors		ends
+    TextColors      struc
+        TC_unselectedColor      byte
+        TC_selectedColor        byte
+    TextColors      ends
 
 **Library:** genC.def
 
 ----------
 #### TextElementArrayHeader
-	TextElementArrayHeader		struct
-		TEAH_meta			ElementArrayHeader
-		TEAH_arrayType		TextArrayType
-		TEAH_unused			byte
-	TextElementArrayHeader		ends
+    TextElementArrayHeader      struct
+        TEAH_meta           ElementArrayHeader
+        TEAH_arrayType      TextArrayType
+        TEAH_unused         byte
+    TextElementArrayHeader      ends
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextFocusFlags
-	TextFocusFlags	record		;Record passed in BP
-		TFF_EDITABLE_TEXT_OBJECT_HAS_FOCUS		:1
-								; Set if an editable text object has the focus
-		TFF_OBJECT_RUN_BY_UI_THREAD				:1
-								; Set if the object is run by the UI thread
-												:14
-	TextFocusFlags end
+    TextFocusFlags  record      ;Record passed in BP
+        TFF_EDITABLE_TEXT_OBJECT_HAS_FOCUS      :1
+                                ; Set if an editable text object has the focus
+        TFF_OBJECT_RUN_BY_UI_THREAD             :1
+                                ; Set if the object is run by the UI thread
+                                                :14
+    TextFocusFlags end
 
 **Library:** vTextC.def
 
 ----------
 #### TextGuardianFlags
-	TextGuardianFlags		record
-		TGF_ENFORCE_DESIRED_MIN_HEIGHT							:1
-		TGF_ENFORCE_DESIRED_MAX_HEIGHT							:1
-		TGF_DISABLE_ENFORCED_DESIRED_MAX_HEIGHT_WHILE_EDITING	:1
-		TGF_ENFORCE_MIN_DISPLAY_SIZE							:1
-		TGF_SHRINK_WIDTH_TO_MIN_AFTER_EDIT						:1
-	TextGuardianFlags		end
+    TextGuardianFlags       record
+        TGF_ENFORCE_DESIRED_MIN_HEIGHT                          :1
+        TGF_ENFORCE_DESIRED_MAX_HEIGHT                          :1
+        TGF_DISABLE_ENFORCED_DESIRED_MAX_HEIGHT_WHILE_EDITING   :1
+        TGF_ENFORCE_MIN_DISPLAY_SIZE                            :1
+        TGF_SHRINK_WIDTH_TO_MIN_AFTER_EDIT                      :1
+    TextGuardianFlags       end
 
 TGF_ENFORCE_DESIRED_MIN_HEIGHT  
 If true then text object will not shrink below the 
@@ -400,10 +400,10 @@ clicks and releases in the same spot to create.
 
 ----------
 #### TextLargeRunArrayHeader
-	TextLargeRunArrayHeader			struct
-		TLRAH_meta				HugeArrayDirectory
-		TLRAH_elementVMBlock	word		; Element block (or null)
-	TextLargeRunArrayHeader			ends
+    TextLargeRunArrayHeader         struct
+        TLRAH_meta              HugeArrayDirectory
+        TLRAH_elementVMBlock    word        ; Element block (or null)
+    TextLargeRunArrayHeader         ends
 
 This structure stores a generic array of runs in the large text format.
 
@@ -411,77 +411,77 @@ This structure stores a generic array of runs in the large text format.
 
 ----------
 #### TextMetricStyles
-	TextMetricStyles		struct
-		TMS_styleCallBack		fptr.far		;style callback routine
-		;
-		;	PASS:		ss:bx	= TOC_vars
-		;				di		= Offset into the field
-		;				ds		= Segment address of old text pointer
-		;	RETURN:		TMS_textAttr set
-		;				ds:si	= Pointer to the text
-		;				cx		= Number of characters in this style
-		;	DESTROYED:			nothing
-		;
-		TMS_graphicCallBack		fptr.far		;graphic callback routine
-		;
-		;	PASS:		ss:bx	= LICL_vars
-		;				di		= Offset into field
-		;				ds		= Segment address of text pointer
-		;	RETURN:		cx		= Height of the graphic of graphic
-		;							at current position
-		;				dx		= Width of the graphic
-		;	DESTROYED:			nothing
-		;
-		TMS_fieldStart			dword
-		TMS_sizeSoFar			WBFixed
-		TMS_lastCharWidth		WBFixed
-		TMS_textAttr			TextAttr
-		TMS_fontHandle			hptr.FontBuf
-		TMS_trackKernValue		BBFixed
-		TMS_flags				TMSFlags
-		TMS_gstateHandle		hptr.GState
-		TMS_gstateSegment		word
-		TMS_styleHeight			WBFixed
-		TMS_styleBaseline		WBFixed
-	TextMetricStyles		ends
+    TextMetricStyles        struct
+        TMS_styleCallBack       fptr.far        ;style callback routine
+        ;
+        ;   PASS:       ss:bx   = TOC_vars
+        ;               di      = Offset into the field
+        ;               ds      = Segment address of old text pointer
+        ;   RETURN:     TMS_textAttr set
+        ;               ds:si   = Pointer to the text
+        ;               cx      = Number of characters in this style
+        ;   DESTROYED:          nothing
+        ;
+        TMS_graphicCallBack     fptr.far        ;graphic callback routine
+        ;
+        ;   PASS:       ss:bx   = LICL_vars
+        ;               di      = Offset into field
+        ;               ds      = Segment address of text pointer
+        ;   RETURN:     cx      = Height of the graphic of graphic
+        ;                           at current position
+        ;               dx      = Width of the graphic
+        ;   DESTROYED:          nothing
+        ;
+        TMS_fieldStart          dword
+        TMS_sizeSoFar           WBFixed
+        TMS_lastCharWidth       WBFixed
+        TMS_textAttr            TextAttr
+        TMS_fontHandle          hptr.FontBuf
+        TMS_trackKernValue      BBFixed
+        TMS_flags               TMSFlags
+        TMS_gstateHandle        hptr.GState
+        TMS_gstateSegment       word
+        TMS_styleHeight         WBFixed
+        TMS_styleBaseline       WBFixed
+    TextMetricStyles        ends
 
 **Library:** text.def
 
 ----------
 #### TextMode
-	TextMode		record
-		TM_DRAW_CONTROL_CHARS		:1	; Does the following mapping when drawing
-										; text:
-										; C_SPACE		 -> C_CNTR_DOT
-										; C_NONBRKSPACE	 -> C_CNTR_DOT
-										; C_CR			 -> C_PARAGRAPH
-										; C_TAB			 -> C_LOGICAL_NOT
-										;
-		TM_TRACK_KERN				:1	;internal only - not settable
-		TM_PAIR_KERN				:1	;internal only - not settable
-		TM_PAD_SPACES				:1	;internal only - not settable
-		TM_DRAW_BASE				:1
-		TM_DRAW_BOTTOM				:1
-		TM_DRAW_ACCENT				:1
-		TM_DRAW_OPTIONAL_HYPHENS	:1
-	TextMode		end
+    TextMode        record
+        TM_DRAW_CONTROL_CHARS       :1  ; Does the following mapping when drawing
+                                        ; text:
+                                        ; C_SPACE        -> C_CNTR_DOT
+                                        ; C_NONBRKSPACE  -> C_CNTR_DOT
+                                        ; C_CR           -> C_PARAGRAPH
+                                        ; C_TAB          -> C_LOGICAL_NOT
+                                        ;
+        TM_TRACK_KERN               :1  ;internal only - not settable
+        TM_PAIR_KERN                :1  ;internal only - not settable
+        TM_PAD_SPACES               :1  ;internal only - not settable
+        TM_DRAW_BASE                :1
+        TM_DRAW_BOTTOM              :1
+        TM_DRAW_ACCENT              :1
+        TM_DRAW_OPTIONAL_HYPHENS    :1
+    TextMode        end
 
 **Library:** graphics.def
 
 ----------
 #### TextReference
-	TextReference		struct
-		TR_type		TextReferenceType
-		TR_ref		TextReferenceUnion
-	TextReference		ends
+    TextReference       struct
+        TR_type     TextReferenceType
+        TR_ref      TextReferenceUnion
+    TextReference       ends
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextReferenceBlock
-	TextReferenceBlock			struct
-		TRB_handle			hptr.char
-	TextReferenceBlock			ends
+    TextReferenceBlock          struct
+        TRB_handle          hptr.char
+    TextReferenceBlock          ends
 
 This structure corresponds to a **TextReferenceType** of TRT_BLOCK. It is 
 used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -496,9 +496,9 @@ passed block or the allocated block will be resized to accommodate the text.
 
 ----------
 #### TextReferenceBlockChunk
-	TextReferenceBlockChunk			struct
-		TRBC_ref		optr.char
-	TextReferenceBlockChunk			ends
+    TextReferenceBlockChunk         struct
+        TRBC_ref        optr.char
+    TextReferenceBlockChunk         ends
 
 This structure corresponds to a **TextReferenceType** of TRT_OPTR. It is 
 used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -517,11 +517,11 @@ block will be resized to accommodate the text.
 
 ----------
 #### TextReferenceDBItem
-	TextReferenceDBItem			struct
-		TRDBI_file		hptr
-		TRDBI_item		word
-		TRDBI_group		word
-	TextReferenceDBItem			ends
+    TextReferenceDBItem         struct
+        TRDBI_file      hptr
+        TRDBI_item      word
+        TRDBI_group     word
+    TextReferenceDBItem         ends
 
 This structure corresponds to a **TextReferenceType** of TRT_DB_ITEM. It is 
 used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -547,10 +547,10 @@ block will be resized to accommodate the text.
 
 ----------
 #### TextReferenceHugeArray
-	TextReferenceHugeArray			struct
-		TRHA_file			hptr
-		TRHA_array			word
-	TextReferenceHugeArray			ends
+    TextReferenceHugeArray          struct
+        TRHA_file           hptr
+        TRHA_array          word
+    TextReferenceHugeArray          ends
 
 This structure corresponds to a **TextReferenceType** of TRT_HUGE_ARRAY. 
 It is used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -569,9 +569,9 @@ block will be resized to accommodate the text.
 
 ----------
 #### TextReferencePointer
-	TextReferencePointer			struct
-		TRP_pointer			fptr.char
-	TextReferencePointer			ends
+    TextReferencePointer            struct
+        TRP_pointer         fptr.char
+    TextReferencePointer            ends
 
 This structure corresponds to a **TextReferenceType** of TRT_POINTER. It is 
 used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -590,10 +590,10 @@ caller allocates the block it can also handle errors in the allocation.
 
 ----------
 #### TextReferenceSegmentChunk
-	TextReferenceSegmentChunk				struct
-		TRSC_chunk				word
-		TRSC_segment			word
-	TextReferenceSegmentChunk				ends
+    TextReferenceSegmentChunk               struct
+        TRSC_chunk              word
+        TRSC_segment            word
+    TextReferenceSegmentChunk               ends
 
 This structure corresponds to a **TextReferenceType** of 
 TRT_SEGMENT_CHUNK. It is used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -612,37 +612,37 @@ block will be resized to accommodate the text.
 
 ----------
 #### TextReferenceType
-	TextReferenceType		etype word, 0, 2
-		TRT_POINTER				enum	TextReferenceType
-		TRT_SEGMENT_CHUNK		enum	TextReferenceType
-		TRT_OPTR				enum	TextReferenceType
-		TRT_BLOCK				enum	TextReferenceType
-		TRT_VM_BLOCK			enum	TextReferenceType
-		TRT_DB_ITEM				enum	TextReferenceType
-		TRT_HUGE_ARRAY			enum	TextReferenceType
+    TextReferenceType       etype word, 0, 2
+        TRT_POINTER             enum    TextReferenceType
+        TRT_SEGMENT_CHUNK       enum    TextReferenceType
+        TRT_OPTR                enum    TextReferenceType
+        TRT_BLOCK               enum    TextReferenceType
+        TRT_VM_BLOCK            enum    TextReferenceType
+        TRT_DB_ITEM             enum    TextReferenceType
+        TRT_HUGE_ARRAY          enum    TextReferenceType
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextReferenceUnion
-	TextReferenceUnion			union
-		TRU_pointer			TextReferencePointer
-		TRU_segChunk		TextReferenceSegmentChunk
-		TRU_blockChunk		TextReferenceBlockChunk
-		TRU_block			TextReferenceBlock
-		TRU_vmBlock			TextReferenceVMBlock
-		TRU_dbItem			TextReferenceDBItem
-		TRU_hugeArray		TextReferenceHugeArray
-	TextReferenceUnion			end
+    TextReferenceUnion          union
+        TRU_pointer         TextReferencePointer
+        TRU_segChunk        TextReferenceSegmentChunk
+        TRU_blockChunk      TextReferenceBlockChunk
+        TRU_block           TextReferenceBlock
+        TRU_vmBlock         TextReferenceVMBlock
+        TRU_dbItem          TextReferenceDBItem
+        TRU_hugeArray       TextReferenceHugeArray
+    TextReferenceUnion          end
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextReferenceVMBlock
-	TextReferenceVMBlock			struct
-		TRVMB_file			hptr
-		TRVMB_block			word
-	TextReferenceVMBlock			ends
+    TextReferenceVMBlock            struct
+        TRVMB_file          hptr
+        TRVMB_block         word
+    TextReferenceVMBlock            ends
 
 This structure corresponds to a **TextReferenceType** of TRT_VM_BLOCK. It 
 is used with MSG_VIS_TEXT_REPLACE_TEXT and 
@@ -660,43 +660,43 @@ block will be resized to accommodate the text.
 
 ----------
 #### TextRulerAction
-	TextRulerAction		etype byte
-		TRA_NULL				enum TextRulerAction
-		TRA_MOVE_TAB			enum TextRulerAction
-		TRA_COPY_TAB			enum TextRulerAction
-		TRA_MOVE_MARGIN			enum TextRulerAction
+    TextRulerAction     etype byte
+        TRA_NULL                enum TextRulerAction
+        TRA_MOVE_TAB            enum TextRulerAction
+        TRA_COPY_TAB            enum TextRulerAction
+        TRA_MOVE_MARGIN         enum TextRulerAction
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TextRulerControlAttributes
-	TextRulerControlAttributes		record
-		TRCA_ROUND				:1
-		TRCA_IGNORE_ORIGIN		:1
-								:14
-	TextRulerControlAttributes		end
+    TextRulerControlAttributes      record
+        TRCA_ROUND              :1
+        TRCA_IGNORE_ORIGIN      :1
+                                :14
+    TextRulerControlAttributes      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TextRulerFlags
-	TextRulerFlags		record
-										:3
-		TRF_ALWAYS_MOVE_BOTH_MARGINS	:1
-		TRF_ROUND_COORDINATES			:1
-		TRF_OBJECT_SELECTED				:1
-		TRF_SELECTING					:1
-		TRF_DRAGGING					:1
-	TextRulerFlags		end
+    TextRulerFlags      record
+                                        :3
+        TRF_ALWAYS_MOVE_BOTH_MARGINS    :1
+        TRF_ROUND_COORDINATES           :1
+        TRF_OBJECT_SELECTED             :1
+        TRF_SELECTING                   :1
+        TRF_DRAGGING                    :1
+    TextRulerFlags      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TextRunArrayElement
-	TextRunArrayElement			struct
-		TRAE_position	WordAndAHalf <>		; Position for start of run
-		TRAE_token		word				; Token for run
-	TextRunArrayElement			ends
+    TextRunArrayElement         struct
+        TRAE_position   WordAndAHalf <>     ; Position for start of run
+        TRAE_token      word                ; Token for run
+    TextRunArrayElement         ends
 
 This structure stores an element in an array of text runs.
 
@@ -704,11 +704,11 @@ This structure stores an element in an array of text runs.
 
 ----------
 #### TextRunArrayHeader
-	TextRunArrayHeader		struct
-		TRAH_meta				ChunkArrayHeader
-		TRAH_elementVMBlock		word		; Element block
-		TRAH_elmentArray		lptr		; ChunkHandle of element array
-	TextRunArrayHeader		ends
+    TextRunArrayHeader      struct
+        TRAH_meta               ChunkArrayHeader
+        TRAH_elementVMBlock     word        ; Element block
+        TRAH_elmentArray        lptr        ; ChunkHandle of element array
+    TextRunArrayHeader      ends
 
 This structure stores the header of an array of runs (for non-LARGE text 
 objects).
@@ -717,15 +717,15 @@ objects).
 
 ----------
 #### TextSearchInHugeArrayFrame
-	TextSearchInHugeArrayFrame				struct
-		TSIHAF_str1Size				dword (?)
-		TSIHAF_curOffset			dword (?)
-		TSIHAF_endOffset			dword (?)
-		TSIHAF_searchFlags			SearchOptions
-		TSIHAF_hugeArrayVMFile		hptr
-		TSIHAF_hugeArrayVMBlock		hptr
-		even
-	TextSearchInHugeArrayFrame				ends
+    TextSearchInHugeArrayFrame              struct
+        TSIHAF_str1Size             dword (?)
+        TSIHAF_curOffset            dword (?)
+        TSIHAF_endOffset            dword (?)
+        TSIHAF_searchFlags          SearchOptions
+        TSIHAF_hugeArrayVMFile      hptr
+        TSIHAF_hugeArrayVMBlock     hptr
+        even
+    TextSearchInHugeArrayFrame              ends
 
 *TSIHAF_str1Size* stores the total length of the string to search (str1).
 
@@ -745,80 +745,80 @@ and block handles for the huge array we will be extracting text from.
 
 ----------
 #### TextStyle
-	TextStyle		record
-							:1	; Do not use this bit.
-		TS_OUTLINE			:1
-		TS_BOLD				:1
-		TS_ITALIC			:1
-		TS_SUPERSCRIPT		:1
-		TS_SUBSCRIPT		:1
-		TS_STRIKE_THRU		:1
-		TS_UNDERLINE		:1
-	TextStyle		end
+    TextStyle       record
+                            :1  ; Do not use this bit.
+        TS_OUTLINE          :1
+        TS_BOLD             :1
+        TS_ITALIC           :1
+        TS_SUPERSCRIPT      :1
+        TS_SUBSCRIPT        :1
+        TS_STRIKE_THRU      :1
+        TS_UNDERLINE        :1
+    TextStyle       end
 
 **Library:** graphics.def
 
 ----------
 #### TextStyleElementHeader
-	TextStyleElementHeader			struct
-		TSEH_meta				NameArrayElement
-		TSEH_baseStyle			word
-		TSEH_flags				StyleElementFlags
-		TSEH_reserved			byte 6 dup (?)
-		TSEH_privateData		TextStylePrivateData
-		TSEH_charAttrToken		word
-		TSEH_paraAttrToken		word
-		TSEH_name				label char
-	TextStyleElementHeader			ends
+    TextStyleElementHeader          struct
+        TSEH_meta               NameArrayElement
+        TSEH_baseStyle          word
+        TSEH_flags              StyleElementFlags
+        TSEH_reserved           byte 6 dup (?)
+        TSEH_privateData        TextStylePrivateData
+        TSEH_charAttrToken      word
+        TSEH_paraAttrToken      word
+        TSEH_name               label char
+    TextStyleElementHeader          ends
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextStyleFlags
-	TextStyleFlags		record
-		TSF_APPLY_TO_SELECTION_ONLY		:1
-		TSF_POINT_SIZE_RELATIVE			:1
-		TSF_MARGINS_RELATIVE			:1
-		TSF_LEADING_RELATIVE			:1
-										:12
-	TextStyleFlags		end
+    TextStyleFlags      record
+        TSF_APPLY_TO_SELECTION_ONLY     :1
+        TSF_POINT_SIZE_RELATIVE         :1
+        TSF_MARGINS_RELATIVE            :1
+        TSF_LEADING_RELATIVE            :1
+                                        :12
+    TextStyleFlags      end
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextStylePrivateData
-	TextStylePrivateData			struct
-		TSPD_flags			TextStyleFlags
-		TSPD_unused			byte 2 dup (0)
-	TextStylePrivateData			ends
+    TextStylePrivateData            struct
+        TSPD_flags          TextStyleFlags
+        TSPD_unused         byte 2 dup (0)
+    TextStylePrivateData            ends
 
 **Library:** Objects/vTextC.def
 
 ----------
 #### TextTransferBlockHeader
-	TextTransferBlockHeader				struct
-		TTBH_meta						VMChainTree
-		TTBH_reservedOther				word 20 dup (0)
+    TextTransferBlockHeader             struct
+        TTBH_meta                       VMChainTree
+        TTBH_reservedOther              word 20 dup (0)
 
-		TTBH_firstVM		label word
-		TTBH_text						dword		;huge array ID
-		TTBH_charAttrRuns				dword		;huge array ID
-		TTBH_paraAttrRuns				dword		;huge array ID
-		TTBH_typeRuns					dword		;huge array ID
-		TTBH_graphicRuns				dword		;huge array ID
+        TTBH_firstVM        label word
+        TTBH_text                       dword       ;huge array ID
+        TTBH_charAttrRuns               dword       ;huge array ID
+        TTBH_paraAttrRuns               dword       ;huge array ID
+        TTBH_typeRuns                   dword       ;huge array ID
+        TTBH_graphicRuns                dword       ;huge array ID
 
-		TTBH_firstLMem		label word
-		TTBH_charAttrElements			dword		;VM block handle
-		TTBH_paraAttrElements			dword		;VM block handle
-		TTBH_typeElements				dword		;VM block handle
-		TTBH_graphicElements 			dword		;VM block handle
-		TTBH_styles						dword		;VM block handle
-		TTBH_names						dword		;VM block handle
-		TTBH_pageSetup					dword		;VM block handle
-		TTBH_lastLMem		label word
+        TTBH_firstLMem      label word
+        TTBH_charAttrElements           dword       ;VM block handle
+        TTBH_paraAttrElements           dword       ;VM block handle
+        TTBH_typeElements               dword       ;VM block handle
+        TTBH_graphicElements            dword       ;VM block handle
+        TTBH_styles                     dword       ;VM block handle
+        TTBH_names                      dword       ;VM block handle
+        TTBH_pageSetup                  dword       ;VM block handle
+        TTBH_lastLMem       label word
 
-		TTBH_reservedVM					dword 10 dup (0)
-	TextTransferBlockHeader				ends
+        TTBH_reservedVM                 dword 10 dup (0)
+    TextTransferBlockHeader             ends
 
 
 
@@ -826,147 +826,147 @@ and block handles for the huge array we will be extracting text from.
 
 ----------
 #### TFStyleRun
-	TFStyleRun		struct
-		TFSR_count			word	?		; character count
-		TFSR_attr			TextAttr <>		; text attributes
-	TFStyleRun		ends
+    TFStyleRun      struct
+        TFSR_count          word    ?       ; character count
+        TFSR_attr           TextAttr <>     ; text attributes
+    TFStyleRun      ends
 
 **Library:** gstring.def
 
 ----------
 #### THCFeatures
-	THCFeatures		record
-		THCF_FOLLOW_HYPERLINK			:1
-		THCF_SET_HYPERLINK				:1
-		THCF_SET_CONTEXT				:1
-		THCF_DEFINE_FILE				:1
-		THCF_DEFINE_CONTEXT				:1
-	THCFeatures		end
+    THCFeatures     record
+        THCF_FOLLOW_HYPERLINK           :1
+        THCF_SET_HYPERLINK              :1
+        THCF_SET_CONTEXT                :1
+        THCF_DEFINE_FILE                :1
+        THCF_DEFINE_CONTEXT             :1
+    THCFeatures     end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### THCToolboxFeatures
-	THCToolboxFeatures		record
-	THCToolboxFeatures		end
+    THCToolboxFeatures      record
+    THCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### ThreadException
-	ThreadException		etype word, 0, 4
-		TE_DIVIDE_BY_ZERO		enum ThreadException
-		TE_OVERFLOW				enum ThreadException
-		TE_BOUND				enum ThreadException
-		TE_FPU_EXCEPTION		enum ThreadException
-		TE_SINGLE_STEP			enum ThreadException
-		TE_BREAKPOINT			enum ThreadException
+    ThreadException     etype word, 0, 4
+        TE_DIVIDE_BY_ZERO       enum ThreadException
+        TE_OVERFLOW             enum ThreadException
+        TE_BOUND                enum ThreadException
+        TE_FPU_EXCEPTION        enum ThreadException
+        TE_SINGLE_STEP          enum ThreadException
+        TE_BREAKPOINT           enum ThreadException
 
 **Library:** thread.def
 
 ----------
 #### ThreadGetInfoType
-	ThreadGetInfoType		etype word, 0, 2
-		TGIT_PRIORITY_AND_USAGE			enum ThreadGetInfoType
-		TGIT_THREAD_HANDLE				enum ThreadGetInfoType
-		TGIT_QUEUE_HANDLE				enum ThreadGetInfoType
+    ThreadGetInfoType       etype word, 0, 2
+        TGIT_PRIORITY_AND_USAGE         enum ThreadGetInfoType
+        TGIT_THREAD_HANDLE              enum ThreadGetInfoType
+        TGIT_QUEUE_HANDLE               enum ThreadGetInfoType
 
 **Library:** thread.def
 
 ----------
 #### ThreadModifyFlags
-	ThreadModifyFlags		record
-		TMF_BASE_PRIO			:1
-		TMF_ZERO_USAGE			:1
-								:6
-	ThreadModifyFlags		end
+    ThreadModifyFlags       record
+        TMF_BASE_PRIO           :1
+        TMF_ZERO_USAGE          :1
+                                :6
+    ThreadModifyFlags       end
 
 **Library:** thread.def
 
 ----------
 #### ThreadPriority
-	ThreadPriority		etype byte
-		PRIORITY_TIME_CRITICAL		enum ThreadPriority, 0
-		PRIORITY_HIGH				enum ThreadPriority, 64		;IM
-		PRIORITY_UI					enum ThreadPriority, 96		;UI
-		PRIORITY_FOCUS				enum ThreadPriority, 128	;FOCUS
-		PRIORITY_STANDARD			enum ThreadPriority, 160	;STD
-		PRIORITY_LOW				enum ThreadPriority, 192	;BACKGROUND
-		PRIORITY_LOWEST				enum ThreadPriority, 255	;Used by kernel
+    ThreadPriority      etype byte
+        PRIORITY_TIME_CRITICAL      enum ThreadPriority, 0
+        PRIORITY_HIGH               enum ThreadPriority, 64     ;IM
+        PRIORITY_UI                 enum ThreadPriority, 96     ;UI
+        PRIORITY_FOCUS              enum ThreadPriority, 128    ;FOCUS
+        PRIORITY_STANDARD           enum ThreadPriority, 160    ;STD
+        PRIORITY_LOW                enum ThreadPriority, 192    ;BACKGROUND
+        PRIORITY_LOWEST             enum ThreadPriority, 255    ;Used by kernel
 
 **Library:** thread.def
 
 ----------
 #### ThreePointArcParams
-	ThreePointArcParams				struct
-		TPAP_close			ArcCloseType	; how the arc should be closed
-		TPAP_point1			PointWWFixed	; Point #1 (start of arc)
-		TPAP_point2			PointWWFixed	; Point #2 (a non-terminal point on the 
-											; arc)
-		TPAP_point3			PointWWFixed	; Point #3 (end of arc)
-	ThreePointArcParams				ends
+    ThreePointArcParams             struct
+        TPAP_close          ArcCloseType    ; how the arc should be closed
+        TPAP_point1         PointWWFixed    ; Point #1 (start of arc)
+        TPAP_point2         PointWWFixed    ; Point #2 (a non-terminal point on the 
+                                            ; arc)
+        TPAP_point3         PointWWFixed    ; Point #3 (end of arc)
+    ThreePointArcParams             ends
 
 **Library:** graphics.def
 
 ----------
 #### ThreePointArcToParams
-	ThreePointArcToParams			struct
-		TPATP_close			ArcCloseType	; how the arc should be closed
-		TPATP_point2		PointWWFixed	; Point #2 (a non-terminal point on the 
-											; arc)
-		TPATP_point3		 PointWWFixed	; Point #3 (end of arc)
-	ThreePointArcToParams			ends
+    ThreePointArcToParams           struct
+        TPATP_close         ArcCloseType    ; how the arc should be closed
+        TPATP_point2        PointWWFixed    ; Point #2 (a non-terminal point on the 
+                                            ; arc)
+        TPATP_point3         PointWWFixed   ; Point #3 (end of arc)
+    ThreePointArcToParams           ends
 
 **Library:** graphics.def
 
 ----------
 #### ThreePointRelArcToParams
-	ThreePointRelArcToParams			struct
-		TPRATP_close 		ArcCloseType	; how the arc should be closed
-		TPRATP_delta2 		PointWWFixed	; delta to Point #2 
-		TPRATP_delta3 		PointWWFixed	; delta to Point #3 
-	ThreePointRelArcToParams			ends
+    ThreePointRelArcToParams            struct
+        TPRATP_close        ArcCloseType    ; how the arc should be closed
+        TPRATP_delta2       PointWWFixed    ; delta to Point #2 
+        TPRATP_delta3       PointWWFixed    ; delta to Point #3 
+    ThreePointRelArcToParams            ends
 
 **Library:** graphics.def
 
 ----------
 #### TimerType
-	TimerType		etype word, 0, 2
-		TIMER_ROUTINE_ONE_SHOT 				enum TimerType
-		TIMER_ROUTINE_CONTINUAL 			enum TimerType
-		TIMER_EVENT_ONE_SHOT 				enum TimerType
-		TIMER_EVENT_CONTINUAL 				enum TimerType
-		TIMER_MS_ROUTINE_ONE_SHOT 			enum TimerType
-		TIMER_EVENT_REAL_TIME				enum TimerType
+    TimerType       etype word, 0, 2
+        TIMER_ROUTINE_ONE_SHOT              enum TimerType
+        TIMER_ROUTINE_CONTINUAL             enum TimerType
+        TIMER_EVENT_ONE_SHOT                enum TimerType
+        TIMER_EVENT_CONTINUAL               enum TimerType
+        TIMER_MS_ROUTINE_ONE_SHOT           enum TimerType
+        TIMER_EVENT_REAL_TIME               enum TimerType
 
 **Library:** timer.def
 
 ----------
 #### TMSFlags
-	TMSFlags		record
-		TMSF_IS_BREAK_CHARACTER		:1	;TRUE: Last char was a break character.
-		TMSF_IS_OPTIONAL_HYPHEN		:1	;TRUE: Break is an optional hyphen.
-		TMSF_PAD_SPACES				:1	;TRUE: AddWidth should pad spaces.
-		TMSF_UPDATE_SIZE_ONLY		:1	;TRUE: AddWidth only updates size.
-		TMSF_OPT_HYPHENS			1	;TRUE: deal with optional hyphens.
-		TMSF_NEGATIVE_KERNING		:1	;TRUE: last char on line was negatively 
-										;kerned.
-		TMSF_EXTENDS_ABOVE			:1	;TRUE: last char on line has tall accent.
-		TMSF_EXTENDS_BELOW			:1	;TRUE: last char on line has large 
-										;descender.
-		TMSF_STYLE_CHANGED			:1	;TRUE: style changed, update line height.
-									:7	;Yes, I want an entire word...
-	TMSFlags		end
+    TMSFlags        record
+        TMSF_IS_BREAK_CHARACTER     :1  ;TRUE: Last char was a break character.
+        TMSF_IS_OPTIONAL_HYPHEN     :1  ;TRUE: Break is an optional hyphen.
+        TMSF_PAD_SPACES             :1  ;TRUE: AddWidth should pad spaces.
+        TMSF_UPDATE_SIZE_ONLY       :1  ;TRUE: AddWidth only updates size.
+        TMSF_OPT_HYPHENS            1   ;TRUE: deal with optional hyphens.
+        TMSF_NEGATIVE_KERNING       :1  ;TRUE: last char on line was negatively 
+                                        ;kerned.
+        TMSF_EXTENDS_ABOVE          :1  ;TRUE: last char on line has tall accent.
+        TMSF_EXTENDS_BELOW          :1  ;TRUE: last char on line has large 
+                                        ;descender.
+        TMSF_STYLE_CHANGED          :1  ;TRUE: style changed, update line height.
+                                    :7  ;Yes, I want an entire word...
+    TMSFlags        end
 
 **Library:** text.def
 
 ----------
 #### TocCategoryStruct
-	TocCategoryStruct			struct
-		TCS_tokenChars		TokenChars <>
-		TCS_files			dbptr <>		; file name array
-		TCS_devices			dbptr <>
-	TocCategoryStruct			ends
+    TocCategoryStruct           struct
+        TCS_tokenChars      TokenChars <>
+        TCS_files           dbptr <>        ; file name array
+        TCS_devices         dbptr <>
+    TocCategoryStruct           ends
 
 This is the element structure for each element in the categories array.
 
@@ -977,93 +977,93 @@ TCF_EXTENDED_DEVICE_DRIVERS is set).
 
 ----------
 #### TocDeviceStruct
-	TocDeviceStruct			struct
-		TDS_driver		word		; element in driver array
-		TDS_info		word		; extra word of info (depends on device type).
-		TDS_name		label char
-	TocDeviceStruct			ends
+    TocDeviceStruct         struct
+        TDS_driver      word        ; element in driver array
+        TDS_info        word        ; extra word of info (depends on device type).
+        TDS_name        label char
+    TocDeviceStruct         ends
 
 **Library:** config.def
 
 ----------
 #### TocDiskStruct
-	TocDiskStruct		struct
-		TDSS_volumeName			VolumeName
-		TDSS_mediaType			MediaType
-		TDSS_name				label char
-	TocDiskStruct		ends
+    TocDiskStruct       struct
+        TDSS_volumeName         VolumeName
+        TDSS_mediaType          MediaType
+        TDSS_name               label char
+    TocDiskStruct       ends
 
 **Library:** config.def
 
 ----------
 #### TOC_ext
-	TOC_ext	struct
-		;
-		; Entries that are passed
-		;
-		TOCE_areaToFill			sword
-		TOCE_hyphenCallback		dword
-		;PASS:		ss:bp		= pointer to TOC_vars structure on stack.
-		;			di			= Offset to the position where we would split the 
-		;						word
-		;			TOCI_lastWordStart =
-		;						Offset in the text where the word to break starts
-		;			TOCI_lastWordPos =
-		;						Position (distance from left edge of the field) 
-		;						where the word to break starts
-		;
-		;RETURN:	TOCI_suggestedHyphen =
-		;						The offset to the character to break the word at.				
-		;						Zero to break at the start of the word.
-		;			TOCI_suggestedHyphenPos =
-		;						The position (distance from left edge of the 
-		;						field) where the hyphen starts.
-		;			TOCE_hyphenWidth =
-		;						Width of the hyphen that was placed at the end of
-		;						the line.
-		;
-		;DESTROYED:	nothing
-		;
-		TOCE_tabCallback		dword
-		;PASS:		ds:si		= pointer to text
-		;			ss:bp		= TOC_vars
-		;			ss:bx		= LICL_vars
-		;
-		;RETURN:	carry set if there is no tabstop within the margins.
-		;			TOCE_areaToFill set correctly.
-		;
-		;DESTROYED:	nothing
-		;
-		TOCE_heightCallback		dword
-		;PASSED:	ss:bp		= TOC_vars
-		;			ax.bl		= Line height for new characters (WBFixed)
-		;
-		;RETURN:	nothing
-		;
-		;DESTROYED:	nothing
-		;
-		TOCE_passBack			word
-		TOCE_anchorChar			word
-		;
-		; Entries that are passed and returned
-		;
-		TOCE_flags				TOCFlags
-		TOCE_lineHeight			WBFixed
-		TOCE_lineBLO			WBFixed
-		TOCE_lineFlags			LineFlags
-		;
-		; Entries that are returned
-		;
-		TOCE_otherFlags			TOCOtherFlags
-		TOCE_nSpaces			sword
-		TOCE_nExtraSpaces		sword
-		TOCE_widthToAnchor		sword
-		TOCE_nChars				sword
-		TOCE_break				sword
-		TOCE_hyphenWidth		WBFixed
-		TOCE_fieldWidth			BFixed
-		TOCE_justWidth			sword
-	TOC_ext	ends
+    TOC_ext struct
+        ;
+        ; Entries that are passed
+        ;
+        TOCE_areaToFill         sword
+        TOCE_hyphenCallback     dword
+        ;PASS:      ss:bp       = pointer to TOC_vars structure on stack.
+        ;           di          = Offset to the position where we would split the 
+        ;                       word
+        ;           TOCI_lastWordStart =
+        ;                       Offset in the text where the word to break starts
+        ;           TOCI_lastWordPos =
+        ;                       Position (distance from left edge of the field) 
+        ;                       where the word to break starts
+        ;
+        ;RETURN:    TOCI_suggestedHyphen =
+        ;                       The offset to the character to break the word at.               
+        ;                       Zero to break at the start of the word.
+        ;           TOCI_suggestedHyphenPos =
+        ;                       The position (distance from left edge of the 
+        ;                       field) where the hyphen starts.
+        ;           TOCE_hyphenWidth =
+        ;                       Width of the hyphen that was placed at the end of
+        ;                       the line.
+        ;
+        ;DESTROYED: nothing
+        ;
+        TOCE_tabCallback        dword
+        ;PASS:      ds:si       = pointer to text
+        ;           ss:bp       = TOC_vars
+        ;           ss:bx       = LICL_vars
+        ;
+        ;RETURN:    carry set if there is no tabstop within the margins.
+        ;           TOCE_areaToFill set correctly.
+        ;
+        ;DESTROYED: nothing
+        ;
+        TOCE_heightCallback     dword
+        ;PASSED:    ss:bp       = TOC_vars
+        ;           ax.bl       = Line height for new characters (WBFixed)
+        ;
+        ;RETURN:    nothing
+        ;
+        ;DESTROYED: nothing
+        ;
+        TOCE_passBack           word
+        TOCE_anchorChar         word
+        ;
+        ; Entries that are passed and returned
+        ;
+        TOCE_flags              TOCFlags
+        TOCE_lineHeight         WBFixed
+        TOCE_lineBLO            WBFixed
+        TOCE_lineFlags          LineFlags
+        ;
+        ; Entries that are returned
+        ;
+        TOCE_otherFlags         TOCOtherFlags
+        TOCE_nSpaces            sword
+        TOCE_nExtraSpaces       sword
+        TOCE_widthToAnchor      sword
+        TOCE_nChars             sword
+        TOCE_break              sword
+        TOCE_hyphenWidth        WBFixed
+        TOCE_fieldWidth         BFixed
+        TOCE_justWidth          sword
+    TOC_ext ends
 
 This structure contains some fields which are passed to **GrTextObjCalc** by 
 the application along with some fields which are returned.
@@ -1130,53 +1130,53 @@ justification. This value doesn't include the spaces at the end of the line.
 
 ----------
 #### TocFileStruct
-	TocFileStruct		struct
-		TFS_sourceDisk		word			; Disk token
-		TFS_release			ReleaseNumber <>
-		TFS_name			label char
-	TocFileStruct		ends
+    TocFileStruct       struct
+        TFS_sourceDisk      word            ; Disk token
+        TFS_release         ReleaseNumber <>
+        TFS_name            label char
+    TocFileStruct       ends
 
 **Library:** config.def
 
 ----------
 #### TOCFlags
-	TOCFlags		record
-		TOCF_NO_WORD_WRAP			:1	; PASS: Set - word-wrap should be done
-		TOCF_AUTO_HYPHENATE			:1	; PASS: Set - attempt auto hyphenation
+    TOCFlags        record
+        TOCF_NO_WORD_WRAP           :1  ; PASS: Set - word-wrap should be done
+        TOCF_AUTO_HYPHENATE         :1  ; PASS: Set - attempt auto hyphenation
 
-		TOCF_FOUND_ANCHOR			:1	; RET: Set - an anchor character was found
-		TOCF_IS_HARD_HYPHEN			:1	; RET: Set - break is a hard or opt hyphen
-		TOCF_FOUND_BREAK			:1	; RET: Set - an auto-hyphen position was 
-										; found
-		TOCF_LINE_TERMINATED		:1	; RET: Set - last field on line
-		TOCF_ONE_TAB_TOO_LARGE		:1	; RET: Set - tab couldn't be handled
-		TOCF_OPT_HYPHEN_TOO_WIDE	:1	; RET: Set - optional hyphen too wide to 
-										; fit
-	TOCFlags		end
+        TOCF_FOUND_ANCHOR           :1  ; RET: Set - an anchor character was found
+        TOCF_IS_HARD_HYPHEN         :1  ; RET: Set - break is a hard or opt hyphen
+        TOCF_FOUND_BREAK            :1  ; RET: Set - an auto-hyphen position was 
+                                        ; found
+        TOCF_LINE_TERMINATED        :1  ; RET: Set - last field on line
+        TOCF_ONE_TAB_TOO_LARGE      :1  ; RET: Set - tab couldn't be handled
+        TOCF_OPT_HYPHEN_TOO_WIDE    :1  ; RET: Set - optional hyphen too wide to 
+                                        ; fit
+    TOCFlags        end
 
 **Library:** text.def
 
 ----------
 #### TOC_int
-	TOC_int	struct
-		TOCI_style					TextMetricStyles
-		TOCI_currentHgt				WBFixed		; Height of the field
-		TOCI_currentBlo				WBFixed		; Baseline of the field
-		TOCI_lastWordStart			word		; Position in text of last word start.
-		TOCI_lastWordPos			WBFixed		; Position of last word start.
-		TOCI_lastWordEndPos			word		; Position of last word end.
-		TOCI_lastHyphen				word		; Position of last usable hyphen.
-		TOCI_lastHyphenPos			WBFixed		; Position of last soft/hard hyphen.
-		TOCI_tallCharHeightPos 		word		; Position of tall character with an
-												; important height value.
-		TOCI_tallCharHeight			WBFixed		; Height of tall char.
-		TOCI_tallCharBaselinePos	word		; Position of tall character with an
-												; important baseline value.
-		TOCI_tallCharBaseline		WBFixed		; Baseline of tall char.
-		TOCI_suggestedHyphen 		word		; Position of suggested hyphen in text
-		TOCI_suggestedHyphenPos 	WBFixed		; Position of suggested hyphen on line
-		align						word
-	TOC_int	ends
+    TOC_int struct
+        TOCI_style                  TextMetricStyles
+        TOCI_currentHgt             WBFixed     ; Height of the field
+        TOCI_currentBlo             WBFixed     ; Baseline of the field
+        TOCI_lastWordStart          word        ; Position in text of last word start.
+        TOCI_lastWordPos            WBFixed     ; Position of last word start.
+        TOCI_lastWordEndPos         word        ; Position of last word end.
+        TOCI_lastHyphen             word        ; Position of last usable hyphen.
+        TOCI_lastHyphenPos          WBFixed     ; Position of last soft/hard hyphen.
+        TOCI_tallCharHeightPos      word        ; Position of tall character with an
+                                                ; important height value.
+        TOCI_tallCharHeight         WBFixed     ; Height of tall char.
+        TOCI_tallCharBaselinePos    word        ; Position of tall character with an
+                                                ; important baseline value.
+        TOCI_tallCharBaseline       WBFixed     ; Baseline of tall char.
+        TOCI_suggestedHyphen        word        ; Position of suggested hyphen in text
+        TOCI_suggestedHyphenPos     WBFixed     ; Position of suggested hyphen on line
+        align                       word
+    TOC_int ends
 
 This structure stores fields which are internal to **GrTextObjCalc**. All fields 
 are initialized and used inside **GrTextObjCalc**.
@@ -1185,10 +1185,10 @@ are initialized and used inside **GrTextObjCalc**.
 
 ----------
 #### TocMap
-	TocMap	struct
-		TM_disks			dbptr
-		TM_categories		dbptr
-	TocMap	ends
+    TocMap  struct
+        TM_disks            dbptr
+        TM_categories       dbptr
+    TocMap  ends
 
 This structure is the map item of the TOC file.
 
@@ -1196,75 +1196,75 @@ This structure is the map item of the TOC file.
 
 ----------
 #### TOCOtherFlags
-	TOCOtherFlags		record
-		TOCOF_IS_FIRST_FIELD	:1	; PASS: Set - This is the first field on the 
-									; line
-		TOCOF_PREV_CHAR_KERNED	:1	; HACK added by jim 4/27/92 so kernel will 
-									; make
-		TOCOF_LAST_BREAK_KERNED	:1	; HACK added by jim 4/27/92 so kernel will 
-									; make
-								:5
-	TOCOtherFlags		end
+    TOCOtherFlags       record
+        TOCOF_IS_FIRST_FIELD    :1  ; PASS: Set - This is the first field on the 
+                                    ; line
+        TOCOF_PREV_CHAR_KERNED  :1  ; HACK added by jim 4/27/92 so kernel will 
+                                    ; make
+        TOCOF_LAST_BREAK_KERNED :1  ; HACK added by jim 4/27/92 so kernel will 
+                                    ; make
+                                :5
+    TOCOtherFlags       end
 
 **Library:** text.def
 
 ----------
 #### TocUpdateCategoryFlags
-	TocUpdateCategoryFlags record
-		TUCF_EXTENDED_DEVICE_DRIVERS		:1
-		; Files being enumerated are assumed to be extended device drivers.
+    TocUpdateCategoryFlags record
+        TUCF_EXTENDED_DEVICE_DRIVERS        :1
+        ; Files being enumerated are assumed to be extended device drivers.
 
-		TUCF_CUSTOM_FILES					:1
-		; The TUCP_fileArrayElementSize field will be
-		; used when creating the files array. Otherwise, each element
-		; of the files array will be of size TocFileStruct. NOTE: If
-		; this flag is used, the data structure used for each file
-		; element MUST contain TocFileStruct as its first element.
+        TUCF_CUSTOM_FILES                   :1
+        ; The TUCP_fileArrayElementSize field will be
+        ; used when creating the files array. Otherwise, each element
+        ; of the files array will be of size TocFileStruct. NOTE: If
+        ; this flag is used, the data structure used for each file
+        ; element MUST contain TocFileStruct as its first element.
 
-		TUCF_ADD_CALLBACK					:1
-		; TUCP_addCallback contains a fptr to a callback
-		; routine that will be called when a file is added to the
-		; files array.
+        TUCF_ADD_CALLBACK                   :1
+        ; TUCP_addCallback contains a fptr to a callback
+        ; routine that will be called when a file is added to the
+        ; files array.
 
-		TUCF_DIRECTORY_NOT_FOUND			:1
-		; Don't actually scan the directory, because it doesn't exist.
-		; Just create the category, and leave it empty.
+        TUCF_DIRECTORY_NOT_FOUND            :1
+        ; Don't actually scan the directory, because it doesn't exist.
+        ; Just create the category, and leave it empty.
 
-											:12
-	TocUpdateCategoryFlags end
+                                            :12
+    TocUpdateCategoryFlags end
 
 **Library:** config.def
 
 ----------
 #### TocUpdateCategoryParams
-	TocUpdateCategoryParams struct
-		TUCP_flags						TocUpdateCategoryFlags
-		TUCP_tokenChars					TokenChars
-		TUCP_fileArrayElementSize		byte
-		TUCP_addCallback				fptr.far
-		; CALLBACK:
-		;		PASS:		ds:si - filename to add
-		;					di - VM handle of SortedNameArray
-		;							(pass to TocSortedNameArrayAdd)
-		;
-		;		RETURN:		carry CLEAR if new element added,
-		;					ax - element number
-		;					carry SET if add aborted
-		;
-		;		CAN DESTROY: bx,cx,dx
-		;
-		align   word
-	TocUpdateCategoryParams ends
+    TocUpdateCategoryParams struct
+        TUCP_flags                      TocUpdateCategoryFlags
+        TUCP_tokenChars                 TokenChars
+        TUCP_fileArrayElementSize       byte
+        TUCP_addCallback                fptr.far
+        ; CALLBACK:
+        ;       PASS:       ds:si - filename to add
+        ;                   di - VM handle of SortedNameArray
+        ;                           (pass to TocSortedNameArrayAdd)
+        ;
+        ;       RETURN:     carry CLEAR if new element added,
+        ;                   ax - element number
+        ;                   carry SET if add aborted
+        ;
+        ;       CAN DESTROY: bx,cx,dx
+        ;
+        align   word
+    TocUpdateCategoryParams ends
 
 **Library:** 
 
 ----------
 #### TOC_vars
-	TOC_vars		struct
-		TOCV_int		TOC_int
-		TOCV_ext		TOC_ext
-		align			word
-	TOC_vars		ends
+    TOC_vars        struct
+        TOCV_int        TOC_int
+        TOCV_ext        TOC_ext
+        align           word
+    TOC_vars        ends
 
 This structure is passed to **GrTextObjCalc** and consists of external 
 parameters (*TOC_ext*) and internal variables (*TOC_int*).
@@ -1273,20 +1273,20 @@ parameters (*TOC_ext*) and internal variables (*TOC_int*).
 
 ----------
 #### ToggleState
-	ToggleState		record
-		TS_CAPSLOCK			:1
-		TS_NUMLOCK			:1
-		TS_SCROLLLOCK		:1
-	ToggleState		end
+    ToggleState     record
+        TS_CAPSLOCK         :1
+        TS_NUMLOCK          :1
+        TS_SCROLLLOCK       :1
+    ToggleState     end
 
 **Library:** 
 
 ----------
 #### TokenDBItem
-	TokenDBItem		struct
-		TDBI_group		word
-		TDBI_item		word
-	TokenDBItem		ends
+    TokenDBItem     struct
+        TDBI_group      word
+        TDBI_item       word
+    TokenDBItem     ends
 
 This structure defines the identifier for a token database item.
 
@@ -1294,14 +1294,14 @@ This structure defines the identifier for a token database item.
 
 ----------
 #### TokenEntry
-	TokenEntry		struct
-		TE_type				TokenIndexType
-		TE_token			GeodeToken <>
-		TE_monikerList		TokenDBItem <>
-		TE_flags			TokenFlags
-		TE_release			ReleaseNumber <>
-		TE_protocol			ProtocolNumber <>
-	TokenEntry		ends
+    TokenEntry      struct
+        TE_type             TokenIndexType
+        TE_token            GeodeToken <>
+        TE_monikerList      TokenDBItem <>
+        TE_flags            TokenFlags
+        TE_release          ReleaseNumber <>
+        TE_protocol         ProtocolNumber <>
+    TokenEntry      ends
 
 This structure stores a token entry, which is used in the index (map item) of 
 the token database.
@@ -1324,30 +1324,30 @@ relocation status.
 
 ----------
 #### TokenError
-	TokenError				etype	word, 1
-		BAD_PROTOCOL_IN_SHARED_TOKEN_DATABASE_FILE		enum    TokenError
-		ERROR_OPENING_SHARED_TOKEN_DATABASE_FILE		enum    TokenError
-		ERROR_OPENING_LOCAL_TOKEN_DATABASE_FILE			enum    TokenError
+    TokenError              etype   word, 1
+        BAD_PROTOCOL_IN_SHARED_TOKEN_DATABASE_FILE      enum    TokenError
+        ERROR_OPENING_SHARED_TOKEN_DATABASE_FILE        enum    TokenError
+        ERROR_OPENING_LOCAL_TOKEN_DATABASE_FILE         enum    TokenError
 
 **Library:** token.def
 
 ----------
 #### TokenFlags
-	TokenFlags		record
-		TF_NEED_RELOCATION		:1
-		TF_UNUSED				:15
-	TokenFlags		end
+    TokenFlags      record
+        TF_NEED_RELOCATION      :1
+        TF_UNUSED               :15
+    TokenFlags      end
 
 **Library:** token.def
 
 ----------
 #### TokenMonikerInfo
-	TokenMonikerInfo		struct
-		TMI_moniker		TokenDBItem <>
-		TMI_fileFlag	word			; 0 if token is in shared
-										; token DB file
-										; non-0 if it's in local file
-	TokenMonikerInfo		ends
+    TokenMonikerInfo        struct
+        TMI_moniker     TokenDBItem <>
+        TMI_fileFlag    word            ; 0 if token is in shared
+                                        ; token DB file
+                                        ; non-0 if it's in local file
+    TokenMonikerInfo        ends
 
 The **TokenMonikerInfo** structure is used by applications which call 
 **TokenLookupMoniker**, store the information returned, and later use it to 
@@ -1357,20 +1357,20 @@ call **TokenLockTokenMoniker**.
 
 ----------
 #### TokenRangeFlags
-	TokenRangeFlags record
-		TRF_ONLY_GSTRING			:1
-		TRF_ONLY_PASSED_MANUFID		:1
-									:14
-	TokenRangeFlags end
+    TokenRangeFlags record
+        TRF_ONLY_GSTRING            :1
+        TRF_ONLY_PASSED_MANUFID     :1
+                                    :14
+    TokenRangeFlags end
 
 **Library:** token.def
 
 ----------
 #### ToolboxInfo
-	ToolboxInfo		struct
-		TI_object		optr
-		TI_name			optr
-	ToolboxInfo		ends
+    ToolboxInfo     struct
+        TI_object       optr
+        TI_name         optr
+    ToolboxInfo     ends
 
 *TI_object* stores the optr of the GenInteraction under which tools may be 
 placed (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
@@ -1382,18 +1382,18 @@ placed (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
 
 ----------
 #### ToolGroupHighlightType
-	ToolGroupHighlightType				etype byte
-		TGHT_INACTIVE_HIGHLIGHT		enum ToolGroupHighlightType
-		TGHT_ACTIVE_HIGHLIGHT		enum ToolGroupHighlightType
-		TGHT_NO_HIGHLIGHT			enum ToolGroupHighlightType
+    ToolGroupHighlightType              etype byte
+        TGHT_INACTIVE_HIGHLIGHT     enum ToolGroupHighlightType
+        TGHT_ACTIVE_HIGHLIGHT       enum ToolGroupHighlightType
+        TGHT_NO_HIGHLIGHT           enum ToolGroupHighlightType
 
 **Library:** Objects/gToolGC.def
 
 ----------
 #### ToolGroupInfo
-	ToolGroupInfo		struct
-		TGI_object			optr
-	ToolGroupInfo		ends
+    ToolGroupInfo       struct
+        TGI_object          optr
+    ToolGroupInfo       ends
 
 *TGI_object* stores the GenToolGroup that this tool control will operate on. 
 (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
@@ -1402,29 +1402,29 @@ placed (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
 
 ----------
 #### TrackScrollingParams
-	TrackScrollingParams			struct
-		TSP_action				ScrollAction
-		TSP_flags				ScrollFlags		;scroll flags
-		TSP_caller				optr 			;object to return args to
-		;
-		; Only one set of these are sent via a MSG_META_CONTENT_TRACK_SCROLLING. The
-		; relative values (xChange, yChange) are sent on the relative scrolls --
-		; SA_SCROLL, SA_INC_FWD, SA_INC_BACK, SA_PAGE_FWD, SA_PAGE_BACK, SA_PAN. The
-		; absolute values (newOriginX, newOriginY) are sent on the absolute scrolls.
-		; To play it safe, your handler should call GenSetupTrackingArgs, which will
-		; fill in all of these.
-		;
-		TSP_change				PointDWord		;proposed change
-		TSP_newOrigin			PointDWord		;proposed new origin
-		;
-		; These arguments are NOT sent via MSG_META_CONTENT_TRACK_SCROLLING. If you 
-		; want to have these (and you probably will), your handler should call 
-		; GenSetupTrackingArgs, which will fill in all of these.
-		;
-		TSP_oldOrigin			PointDWord		;old origin
-		TSP_viewWidth			sword			;view width
-		TSP_viewHeight			sword			;view height
-	TrackScrollingParams			ends
+    TrackScrollingParams            struct
+        TSP_action              ScrollAction
+        TSP_flags               ScrollFlags     ;scroll flags
+        TSP_caller              optr            ;object to return args to
+        ;
+        ; Only one set of these are sent via a MSG_META_CONTENT_TRACK_SCROLLING. The
+        ; relative values (xChange, yChange) are sent on the relative scrolls --
+        ; SA_SCROLL, SA_INC_FWD, SA_INC_BACK, SA_PAGE_FWD, SA_PAGE_BACK, SA_PAN. The
+        ; absolute values (newOriginX, newOriginY) are sent on the absolute scrolls.
+        ; To play it safe, your handler should call GenSetupTrackingArgs, which will
+        ; fill in all of these.
+        ;
+        TSP_change              PointDWord      ;proposed change
+        TSP_newOrigin           PointDWord      ;proposed new origin
+        ;
+        ; These arguments are NOT sent via MSG_META_CONTENT_TRACK_SCROLLING. If you 
+        ; want to have these (and you probably will), your handler should call 
+        ; GenSetupTrackingArgs, which will fill in all of these.
+        ;
+        TSP_oldOrigin           PointDWord      ;old origin
+        TSP_viewWidth           sword           ;view width
+        TSP_viewHeight          sword           ;view height
+    TrackScrollingParams            ends
 
 *TSP_action* stores the action taking place. Drags don't require the return 
 message; in fact, return methods will be ignored for drags.
@@ -1433,9 +1433,9 @@ message; in fact, return methods will be ignored for drags.
 
 ----------
 #### TransferFileHeader
-	TransferFileHeader			struct
-		TFH_normalItem		word	; VM block handle of normal transfer item
-	TransferFileHeader			ends
+    TransferFileHeader          struct
+        TFH_normalItem      word    ; VM block handle of normal transfer item
+    TransferFileHeader          ends
 
 This structure defines the map block of the transfer VM file, this is saved out 
 in the UI's transfer VM file when the system is shutdown. The VM block 
@@ -1445,25 +1445,25 @@ handles must be valid handles for this VM transfer file.
 
 ----------
 #### TransFlags
-	TransFlags		record
-		TF_INV_VALID		:1
-		TF_ROTATED			:1
-		TF_SCALED			:1
-		TF_TRANSLATED		:1
-	TransFlags		end
+    TransFlags      record
+        TF_INV_VALID        :1
+        TF_ROTATED          :1
+        TF_SCALED           :1
+        TF_TRANSLATED       :1
+    TransFlags      end
 
 **Library:** tmatrix.def
 
 ----------
 #### TransMatrix
-	TransMatrix			struct
-		TM_e11		WWFixed <0,1>
-		TM_e12		WWFixed <0,0>
-		TM_e21		WWFixed <0,0>
-		TM_e22		WWFixed <0,1>
-		TM_e31		DWFixed <0,0>
-		TM_e32		DWFixed <0,0>
-	TransMatrix			ends
+    TransMatrix         struct
+        TM_e11      WWFixed <0,1>
+        TM_e12      WWFixed <0,0>
+        TM_e21      WWFixed <0,0>
+        TM_e22      WWFixed <0,1>
+        TM_e31      DWFixed <0,0>
+        TM_e32      DWFixed <0,0>
+    TransMatrix         ends
 
 This structure stores the transformation matrix used within the GEOS 
 graphics system. This matrix has six variable elements. (The last column of 
@@ -1487,11 +1487,11 @@ This **TransMatrix** is initially set to the identity matrix.
 
 ----------
 #### TravelingObjectReference
-	TravelingObjectReference			struct
-		TIR_travelingObject			optr
-		TIR_parent					lptr
-		TIR_compChildFlags			CompChildFlags
-	TravelingObjectReference			ends
+    TravelingObjectReference            struct
+        TIR_travelingObject         optr
+        TIR_parent                  lptr
+        TIR_compChildFlags          CompChildFlags
+    TravelingObjectReference            ends
 
 *TIR_travelingObject* stores the optr of the object which should be kept moving 
 to the top GenDisplay. This optr should be stored in unrelocated for. (e.g. in 
@@ -1508,11 +1508,11 @@ traveling object below the parent.
 
 ----------
 #### TravelOption
-	TravelOption		etype word, 0
-		TO_NULL					enum TravelOption
-		TO_SELF					enum TravelOption
-		TO_OBJ_BLOCK_OUTPUT		enum TravelOption
-		TO_PROCESS				enum TravelOption
+    TravelOption        etype word, 0
+        TO_NULL                 enum TravelOption
+        TO_SELF                 enum TravelOption
+        TO_OBJ_BLOCK_OUTPUT     enum TravelOption
+        TO_PROCESS              enum TravelOption
 
 TO_NULL  
 No object to deliver message to, the event should be destroyed. 
@@ -1532,88 +1532,88 @@ Sends event to the process owning the UI block.
 
 ----------
 #### TRCCFeatures
-	TRCCFeatures		record
-		TRCCF_ROUND				:1
-		TRCCF_IGNORE_ORIGIN		:1
-	TRCCFeatures		end
+    TRCCFeatures        record
+        TRCCF_ROUND             :1
+        TRCCF_IGNORE_ORIGIN     :1
+    TRCCFeatures        end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TRCCToolboxFeatures
-	TRCCToolboxFeatures			record
-	TRCCToolboxFeatures			end
+    TRCCToolboxFeatures         record
+    TRCCToolboxFeatures         end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TSCFeatures
-	TSCFeatures		record
-		TSCF_PLAIN				:1
-		TSCF_BOLD				:1
-		TSCF_ITALIC				:1
-		TSCF_UNDERLINE			:1
-		TSCF_STRIKE_THRU		:1
-		TSCF_SUBSCRIPT			:1
-		TSCF_SUPERSCRIPT		:1
-		TSCF_BOXED				:1
-		TSCF_BUTTON				:1
-		TSCF_INDEX				:1
-		TSCF_ALL_CAP			:1
-		TSCF_SMALL_CAP			:1
-	TSCFeatures		end
+    TSCFeatures     record
+        TSCF_PLAIN              :1
+        TSCF_BOLD               :1
+        TSCF_ITALIC             :1
+        TSCF_UNDERLINE          :1
+        TSCF_STRIKE_THRU        :1
+        TSCF_SUBSCRIPT          :1
+        TSCF_SUPERSCRIPT        :1
+        TSCF_BOXED              :1
+        TSCF_BUTTON             :1
+        TSCF_INDEX              :1
+        TSCF_ALL_CAP            :1
+        TSCF_SMALL_CAP          :1
+    TSCFeatures     end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TSCToolboxFeatures
-	TSCToolboxFeatures		record
-		TSCTF_PLAIN				:1
-		TSCTF_BOLD				:1
-		TSCTF_ITALIC			:1
-		TSCTF_UNDERLINE			:1
-		TSCTF_STRIKE_THRU		:1
-		TSCTF_SUBSCRIPT			:1
-		TSCTF_SUPERSCRIPT		:1
-		TSCTF_BOXED				:1
-		TSCTF_BUTTON			:1
-		TSCTF_INDEX				:1
-		TSCTF_ALL_CAP			:1
-		TSCTF_SMALL_CAP			:1
-	TSCToolboxFeatures		end
+    TSCToolboxFeatures      record
+        TSCTF_PLAIN             :1
+        TSCTF_BOLD              :1
+        TSCTF_ITALIC            :1
+        TSCTF_UNDERLINE         :1
+        TSCTF_STRIKE_THRU       :1
+        TSCTF_SUBSCRIPT         :1
+        TSCTF_SUPERSCRIPT       :1
+        TSCTF_BOXED             :1
+        TSCTF_BUTTON            :1
+        TSCTF_INDEX             :1
+        TSCTF_ALL_CAP           :1
+        TSCTF_SMALL_CAP         :1
+    TSCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
 #### TVTNCPIData
-	TVTNCPIData			struct
-		TVTNCPID_handle		word
-		TVTNCPID_id			word
-	TVTNCPIData			ends
+    TVTNCPIData         struct
+        TVTNCPID_handle     word
+        TVTNCPID_id         word
+    TVTNCPIData         ends
 
 **Library:** vTextC.def
 
 ----------
 #### UChar
-	UChar	etype byte
-		UC_NULL				enum UChar, 0x0		;NULL
-		UC_QUICK_COPY		enum UChar, 0x1		;unnecessary -- should remove!
-		UC_BUTTON_EVENT		enum UChar, 0x2		;send on a button event
+    UChar   etype byte
+        UC_NULL             enum UChar, 0x0     ;NULL
+        UC_QUICK_COPY       enum UChar, 0x1     ;unnecessary -- should remove!
+        UC_BUTTON_EVENT     enum UChar, 0x2     ;send on a button event
 
 **Library:** uiInputC.def
 
 ----------
 #### UIButtonFlags
-	UIButtonFlags		record
-		UIBF_NO_KEYBOARD				:1
-		UIBF_CLICK_TO_TYPE				:1
-		UIBF_SELECT_ALWAYS_RAISES		:1
-		UIBF_SELECT_DISPLAYS_MENU		:1
-		UIBF_KEYBOARD_ONLY				:1
-		UIBF_CLICK_GOES_THRU			:1
-		UIBF_SPECIFIC_UI_COMPATIBLE		:1
-		UIBF_BLINKING_CURSOR			:1
-	UIButtonFlags		end
+    UIButtonFlags       record
+        UIBF_NO_KEYBOARD                :1
+        UIBF_CLICK_TO_TYPE              :1
+        UIBF_SELECT_ALWAYS_RAISES       :1
+        UIBF_SELECT_DISPLAYS_MENU       :1
+        UIBF_KEYBOARD_ONLY              :1
+        UIBF_CLICK_GOES_THRU            :1
+        UIBF_SPECIFIC_UI_COMPATIBLE     :1
+        UIBF_BLINKING_CURSOR            :1
+    UIButtonFlags       end
 
 UIBF_NO_KEYBOARD  
 Set if working in no-keyboard mode (i.e. pen system). Can be 
@@ -1661,79 +1661,79 @@ Set if the text cursor should blink.
 
 ----------
 #### UIExpressOptions
-	UIExpressOptions		record
-									:4
-		UIEO_RETURN_TO_DEFAULT_LAUNCHER :1	; Set to have a "Return to <default
-											; launcher>" button in the Express Menu
-		UIEO_GEOS_TASKS_LIST		:1		; Set for list of currently running GEOS 
-											; applications
-		UIEO_DESK_ACCESSORY_LIST	:1		; Set for list of desk accessories 
-											; (applications in World/Desk Accessories
-											; directory)
-		UIEO_MAIN_APPS_LIST			:1		; Set for list of applications in World 
-											; directory
-		UIEO_OTHER_APPS_LIST		:1		; Set for hierarchial list of applications 
-											; in subdirectories below World directory.
-		UIEO_CONTROL_PANEL			:1		; Set for control panel area.
-		UIEO_DOS_TASKS_LIST			:1		; Set for list of available DOS tasks.
-		UIEO_UTILITIES_PANEL		:1		; Set for utilities panel area.
-		UIEO_EXIT_TO_DOS			:1		; Set for Exit to DOS trigger.
-		UIEO_POSITION				UIExpressPositions:3
-											; Position of Express menu.
-	UIExpressOptions		end
+    UIExpressOptions        record
+                                    :4
+        UIEO_RETURN_TO_DEFAULT_LAUNCHER :1  ; Set to have a "Return to <default
+                                            ; launcher>" button in the Express Menu
+        UIEO_GEOS_TASKS_LIST        :1      ; Set for list of currently running GEOS 
+                                            ; applications
+        UIEO_DESK_ACCESSORY_LIST    :1      ; Set for list of desk accessories 
+                                            ; (applications in World/Desk Accessories
+                                            ; directory)
+        UIEO_MAIN_APPS_LIST         :1      ; Set for list of applications in World 
+                                            ; directory
+        UIEO_OTHER_APPS_LIST        :1      ; Set for hierarchial list of applications 
+                                            ; in subdirectories below World directory.
+        UIEO_CONTROL_PANEL          :1      ; Set for control panel area.
+        UIEO_DOS_TASKS_LIST         :1      ; Set for list of available DOS tasks.
+        UIEO_UTILITIES_PANEL        :1      ; Set for utilities panel area.
+        UIEO_EXIT_TO_DOS            :1      ; Set for Exit to DOS trigger.
+        UIEO_POSITION               UIExpressPositions:3
+                                            ; Position of Express menu.
+    UIExpressOptions        end
 
 **Library:** ui.def
 
 ----------
 #### UIExpressPositions
-	UIExpressPositions		etype word
-		UIEP_NONE				enum UIExpressPositions
-		UIEP_TOP_PRIMARY		enum UIExpressPositions
-		UIEP_LOWER_LEFT			enum UIExpressPositions
+    UIExpressPositions      etype word
+        UIEP_NONE               enum UIExpressPositions
+        UIEP_TOP_PRIMARY        enum UIExpressPositions
+        UIEP_LOWER_LEFT         enum UIExpressPositions
 
 **Library:** ui.def
 
 ----------
-	#### UIFunctionsActive
-		UIFunctionsActive		record
-		UIFA_SELECT		:1	; Basic mouse function
-		UIFA_MOVE_COPY	:1	; Direct action (move/copy, "quick transfer" if 
-							; between applications)
-		UIFA_FEATURES	:1	; Popup menu, special UI capabilities.
-		UIFA_CONSTRAIN	:1	; Set if modifier(s) designated as "constrain" 
-							; are pressed. This flag will change with the 
-							; state of the modifier. Note that it may 
-							; generally NOT be used when the target object 
-							; can infer a meaning to "Extend" or "Toggle" 
-							; selection. (i.e. should only be used w/SELECT 
-							; function on things like object control points).
-		UIFA_PREF_A		:1
-		UIFA_PREF_B		:1
-		UIFA_PREF_C		:1
-		; User "preferences" Meaning varies with active function. NOTE:
-		; 1) requests followed by (D) are updated every event holding this
-		; info (Dynamic)
-		;
-		;					A			B		C
-		; SELECT:			Toggle		Extend
-		;
-		; MOVE_COPY:		Move(D)		Copy(D)
-		;
-		; FEATURES:			Popup		Pan
-		;					menu		View
-		;
-		UIFA_IN			:1	; Set if point (cx, dx) is inside the visual 
-							; bounds of the object
-	UIFunctionsActive		end
+    #### UIFunctionsActive
+        UIFunctionsActive       record
+        UIFA_SELECT     :1  ; Basic mouse function
+        UIFA_MOVE_COPY  :1  ; Direct action (move/copy, "quick transfer" if 
+                            ; between applications)
+        UIFA_FEATURES   :1  ; Popup menu, special UI capabilities.
+        UIFA_CONSTRAIN  :1  ; Set if modifier(s) designated as "constrain" 
+                            ; are pressed. This flag will change with the 
+                            ; state of the modifier. Note that it may 
+                            ; generally NOT be used when the target object 
+                            ; can infer a meaning to "Extend" or "Toggle" 
+                            ; selection. (i.e. should only be used w/SELECT 
+                            ; function on things like object control points).
+        UIFA_PREF_A     :1
+        UIFA_PREF_B     :1
+        UIFA_PREF_C     :1
+        ; User "preferences" Meaning varies with active function. NOTE:
+        ; 1) requests followed by (D) are updated every event holding this
+        ; info (Dynamic)
+        ;
+        ;                   A           B       C
+        ; SELECT:           Toggle      Extend
+        ;
+        ; MOVE_COPY:        Move(D)     Copy(D)
+        ;
+        ; FEATURES:         Popup       Pan
+        ;                   menu        View
+        ;
+        UIFA_IN         :1  ; Set if point (cx, dx) is inside the visual 
+                            ; bounds of the object
+    UIFunctionsActive       end
 
 **Library:** Objects/uiInput.def
 
 ----------
 #### UIHelpOptions
-	UIHelpOptions		record
-									:15
-		UIHO_HIDE_HELP_BUTTONS		:1
-	UIHelpOptions		end
+    UIHelpOptions       record
+                                    :15
+        UIHO_HIDE_HELP_BUTTONS      :1
+    UIHelpOptions       end
 
 UIHO_HIDE_HELP_BUTTONS  
 Set to not add help buttons to various dialog boxes. Usually used on small 
@@ -1745,12 +1745,12 @@ Default interpretation: false (i.e., help buttons appear).
 
 ----------
 #### UIInterfaceLevel
-	UIInterfaceLevel		etype word
-		UIIL_INTRODUCTORY		enum UIInterfaceLevel
-		UIIL_BEGINNING			enum UIInterfaceLevel
-		UIIL_INTERMEDIATE		enum UIInterfaceLevel
-		UIIL_ADVANCED			enum UIInterfaceLevel
-		UIIL_GURU				enum UIInterfaceLevel
+    UIInterfaceLevel        etype word
+        UIIL_INTRODUCTORY       enum UIInterfaceLevel
+        UIIL_BEGINNING          enum UIInterfaceLevel
+        UIIL_INTERMEDIATE       enum UIInterfaceLevel
+        UIIL_ADVANCED           enum UIInterfaceLevel
+        UIIL_GURU               enum UIInterfaceLevel
 
 UIIL_INTRODUCTORY  
 This level is designed for the first-time user, or those who just 
@@ -1864,12 +1864,12 @@ safety or recoverability are tilted towards performance.
 
 ----------
 #### UIInterfaceOptions
-	UIInterfaceOptions		record
-		UIIO_OPTIONS_MENU						:1
-		UIIO_DISABLE_POPOUTS					:1
-		UIIO_ALLOW_INITIALLY_HIDDEN_MENU_BARS	:1
-												:13
-	UIInterfaceOptions		end
+    UIInterfaceOptions      record
+        UIIO_OPTIONS_MENU                       :1
+        UIIO_DISABLE_POPOUTS                    :1
+        UIIO_ALLOW_INITIALLY_HIDDEN_MENU_BARS   :1
+                                                :13
+    UIInterfaceOptions      end
 
 UIIO_OPTIONS_MENU  
 Set if the options menu should exist.
@@ -1882,11 +1882,11 @@ out. False to allow pop in and pop out behavior.
 
 ----------
 #### UILaunchModel
-	UILaunchModel		etype word
-		UILM_TRANSPARENT				enum UILaunchModel
-		UILM_SINGLE_INSTANCE			enum UILaunchModel
-		UILM_MULTIPLE_INSTANCES			enum UILaunchModel
-		UILM_GURU						enum UILaunchModel
+    UILaunchModel       etype word
+        UILM_TRANSPARENT                enum UILaunchModel
+        UILM_SINGLE_INSTANCE            enum UILaunchModel
+        UILM_MULTIPLE_INSTANCES         enum UILaunchModel
+        UILM_GURU                       enum UILaunchModel
 
 UILM_TRANSPARENT  
 "Transparent" application launch mode is one in which the user 
@@ -1956,28 +1956,28 @@ instance.
 
 ----------
 #### UILaunchOptions
-	UILaunchOptions record
-		UILO_DESK_ACCESSORIES	:1 	;TRUE if the desk accessory mode is
-					 				; supported (default = TRUE)
-		UILO_CLOSABLE_APPS		:1 	;Set if all apps should be closable.
-									; This allows the user to close apps
-									; even when in transparent mode.
-								:14
-	UILaunchOptions end
+    UILaunchOptions record
+        UILO_DESK_ACCESSORIES   :1  ;TRUE if the desk accessory mode is
+                                    ; supported (default = TRUE)
+        UILO_CLOSABLE_APPS      :1  ;Set if all apps should be closable.
+                                    ; This allows the user to close apps
+                                    ; even when in transparent mode.
+                                :14
+    UILaunchOptions end
 
 **Library:** ui.def
 
 ----------
 #### UIWindowOptions
-	UIWindowOptions		record
-		UIWO_MAXIMIZE_ON_STARTUP							:1
-		UIWO_COMBINE_HEADER_AND_MENU_IN_MAXIMIZED_WINDOWS	:1
-		UIWO_PRIMARY_MIN_MAX_RESTORE_CONTROLS				:1
-		UIWO_WINDOW_MENU									:1
-		UIWO_PINNABLE_MENUS									:1
-		UIWO_KBD_NAVIGATION									:1
-		UIWO_POPOUT_MENU_BAR								:1
-	UIWindowOptions		end
+    UIWindowOptions     record
+        UIWO_MAXIMIZE_ON_STARTUP                            :1
+        UIWO_COMBINE_HEADER_AND_MENU_IN_MAXIMIZED_WINDOWS   :1
+        UIWO_PRIMARY_MIN_MAX_RESTORE_CONTROLS               :1
+        UIWO_WINDOW_MENU                                    :1
+        UIWO_PINNABLE_MENUS                                 :1
+        UIWO_KBD_NAVIGATION                                 :1
+        UIWO_POPOUT_MENU_BAR                                :1
+    UIWindowOptions     end
 
 UIWO_MAXIMIZE_ON_STARTUP  
 If set, applications by default would come up maximized. 
@@ -2031,10 +2031,10 @@ pixels in y).
 
 ----------
 #### UIWindowOptionsInteger
-	UIWindowOptionsInteger			record
-		UIWOI_MASK				UIWindowOptions:8
-		UIWOI_OPTIONS			UIWindowOptions:8
-	UIWindowOptionsInteger			end
+    UIWindowOptionsInteger          record
+        UIWOI_MASK              UIWindowOptions:8
+        UIWOI_OPTIONS           UIWindowOptions:8
+    UIWindowOptionsInteger          end
 
 UIWOI_MASK
 Mask of which **UIWindowOptions** in *UIWOI_value* have 
@@ -2049,37 +2049,37 @@ any given bit).
 
 ----------
 #### UndoActionDataFlags
-	UndoActionDataFlags			struct
-		UADF_flags			dword
-		UADF_extraFlags		word
-	UndoActionDataFlags			ends
+    UndoActionDataFlags         struct
+        UADF_flags          dword
+        UADF_extraFlags     word
+    UndoActionDataFlags         ends
 
 **Library:** Objects/gProcC.def
 
 ----------
 #### UndoActionDataOptr
-	UndoActionDataOptr			struct
-		UADO_optr			optr
-	UndoActionDataOptr			ends
+    UndoActionDataOptr          struct
+        UADO_optr           optr
+    UndoActionDataOptr          ends
 
 **Library:** Objects/gProcC.def
 
 ----------
 #### UndoActionDataPtr
-	UndoActionDataPtr		struct
-		UADP_ptr		fptr
-		UADP_size		word
-	UndoActionDataPtr		ends
+    UndoActionDataPtr       struct
+        UADP_ptr        fptr
+        UADP_size       word
+    UndoActionDataPtr       ends
 
 **Library:** Objects/gProcC.def
 
 ----------
 #### UndoActionDataType
-	UndoActionDataType		etype word, 0, 2
-		UADT_FLAGS			enum UndoActionDataType
-		UADT_PTR			enum UndoActionDataType
-		UADT_VM_CHAIN			enum UndoActionDataType
-		UADT_OPTR			enum UndoActionDataType
+    UndoActionDataType      etype word, 0, 2
+        UADT_FLAGS          enum UndoActionDataType
+        UADT_PTR            enum UndoActionDataType
+        UADT_VM_CHAIN           enum UndoActionDataType
+        UADT_OPTR           enum UndoActionDataType
 
 UADT_FLAGS  
 The passed data is of type **UndoActionFlags**.
@@ -2105,21 +2105,21 @@ move, so the optr should be re-dereferenced after sending this message.
 
 ----------
 #### UndoActionDataUnion
-	UndoActionDataUnion			union
-		UADU_flags			UndoActionDataFlags
-		UADU_ptr			UndoActionDataPtr
-		UADU_vmChain		UndoActionDataVMChain
-		UADU_optr			UndoActionDataOptr
-	UndoActionDataUnion			ends
+    UndoActionDataUnion         union
+        UADU_flags          UndoActionDataFlags
+        UADU_ptr            UndoActionDataPtr
+        UADU_vmChain        UndoActionDataVMChain
+        UADU_optr           UndoActionDataOptr
+    UndoActionDataUnion         ends
 
 **Library:** Object/gProcC.def
 
 ----------
 #### UndoActionDataVMChain
-	UndoActionDataVMChain			struct
-		UADVMC_vmChain			dword
-		UADVMC_file				hptr
-	UndoActionDataVMChain			ends
+    UndoActionDataVMChain           struct
+        UADVMC_vmChain          dword
+        UADVMC_file             hptr
+    UndoActionDataVMChain           ends
 
 This structure is filled in by the undo code for MSG_META_UNDO. VM Chains 
 passed to MSG_GEN_PROCESS_UNDO_ADD_ACTION should lie in the undo 
@@ -2130,11 +2130,11 @@ MSG_GEN_PROCESS_UNDO_GET_FILE).
 
 ----------
 #### UndoActionStruct
-	UndoActionStruct		struct
-		UAS_dataType			UndoActionDataType
-		UAS_data				UndoActionDataUnion
-		UAS_appType				dword
-	UndoActionStruct		ends
+    UndoActionStruct        struct
+        UAS_dataType            UndoActionDataType
+        UAS_data                UndoActionDataUnion
+        UAS_appType             dword
+    UndoActionStruct        ends
 
 *UAS_dataType* stores the type of data passed in **UndoActionDataUnion**.
 
@@ -2148,10 +2148,10 @@ undoing.
 
 ----------
 #### UndoDescription
-	UndoDescription		etype byte
-		UD_UNDO				enum UndoDescription
-		UD_REDO				enum UndoDescription
-		UD_NOT_UNDOABLE		enum UndoDescription
+    UndoDescription     etype byte
+        UD_UNDO             enum UndoDescription
+        UD_REDO             enum UndoDescription
+        UD_NOT_UNDOABLE     enum UndoDescription
 
 UD_UNDO  
 Passed in **NotifyUndoStateChange** if there is an active undo 
@@ -2169,23 +2169,23 @@ undoable. Must pass 0:0 as title.
 
 ----------
 #### UpdateUIDataBlk
-	UpdateUIDataBlk		struct
-		UUIDB_formatDataVMFileHan	word
-		UUIDB_formatDataVMBlkHan	word
-		UUIDB_curFormatToken		FormatIdType	;Current format token
-	UpdateUIDataBlk		ends
+    UpdateUIDataBlk     struct
+        UUIDB_formatDataVMFileHan   word
+        UUIDB_formatDataVMBlkHan    word
+        UUIDB_curFormatToken        FormatIdType    ;Current format token
+    UpdateUIDataBlk     ends
 
 **Library:** math.def
 
 ----------
 #### UpdateWindowFlags
-	UpdateWindowFlags		record
-		UWF_ATTACHING				:1
-		UWF_DETACHING				:1
-		UWF_RESTORING_FROM_STATE	:1
-		UWF_FROM_WINDOWS_LIST		:1
-									:12
-	UpdateWindowFlags		end
+    UpdateWindowFlags       record
+        UWF_ATTACHING               :1
+        UWF_DETACHING               :1
+        UWF_RESTORING_FROM_STATE    :1
+        UWF_FROM_WINDOWS_LIST       :1
+                                    :12
+    UpdateWindowFlags       end
 
 UWF_ATTACHING  
 Set if MSG_META_UPDATE_WINDOW is being sent because 
@@ -2210,15 +2210,15 @@ UWF_ATTACHING is also set, i.e. application is attaching)
 
 ----------
 #### UserDoDialogStruct
-	UserDoDialogStruct			struct
-		UDDS_callingThread				hptr
-		UDDS_semaphore					hptr
-		UUDS_response					word
-		UUDS_complete					word
-		UUDS_boxRunByCurrentThread		word
-		UUDS_dialog						optr
-		UUDS_queue						hptr
-	UserDoDialogStruct			ends
+    UserDoDialogStruct          struct
+        UDDS_callingThread              hptr
+        UDDS_semaphore                  hptr
+        UUDS_response                   word
+        UUDS_complete                   word
+        UUDS_boxRunByCurrentThread      word
+        UUDS_dialog                     optr
+        UUDS_queue                      hptr
+    UserDoDialogStruct          ends
 
 This structure is passed to 
 MSG_GEN_INTERACTION_INITIATE_BLOCKING_THREAD_ON_RESPONSE.
@@ -2253,22 +2253,22 @@ the dialog.
 
 ----------
 #### UtilAsciiToHexError
-	UtilAsciiToHexError			etype word
-		UATH_NON_NUMERIC_DIGIT_IN_STRING	enum UtilAsciiToHexError
-		UATH_CONVERT_OVERFLOW				enum UtilAsciiToHexError
+    UtilAsciiToHexError         etype word
+        UATH_NON_NUMERIC_DIGIT_IN_STRING    enum UtilAsciiToHexError
+        UATH_CONVERT_OVERFLOW               enum UtilAsciiToHexError
 
 **Library:** system.def
 
 ----------
 #### UtilHexToAsciiFlags
-	UtilHexToAsciiFlags			record
-										:11
-		UHTAF_SBCS_STRING				:1
-		UHTAF_THOUSANDS_SEPARATORS		:1 
-		UHTAF_SIGNED_VALUE				:1
-		UHTAF_INCLUDE_LEADING_ZEROS		:1
-		UHTAF_NULL_TERMINATE			:1
-	UtilHexToAsciiFlags			end
+    UtilHexToAsciiFlags         record
+                                        :11
+        UHTAF_SBCS_STRING               :1
+        UHTAF_THOUSANDS_SEPARATORS      :1 
+        UHTAF_SIGNED_VALUE              :1
+        UHTAF_INCLUDE_LEADING_ZEROS     :1
+        UHTAF_NULL_TERMINATE            :1
+    UtilHexToAsciiFlags         end
 
 **Library:** system.def
 

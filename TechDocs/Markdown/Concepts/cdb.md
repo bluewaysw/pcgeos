@@ -600,12 +600,12 @@ shown below.
 ---
 Code Display 19-1 CellFunctionParameters
 ~~~
-typedef	struct {
-	CellFunctionParameterFlags 	CFP_flags;	/* Initialize this to zero. */
-	VMFileHandle		CFP_file;	/* The handle of the VM file containing
-						 * the cell file. Reinitialize this each
-						 * time you open the file. */
-	VMBlockHandle		CFP_rowBlocks[N_ROW_BLOCKS];	/* Initialize these to zero. */
+typedef struct {
+        CellFunctionParameterFlags      CFP_flags;      /* Initialize this to zero. */
+        VMFileHandle            CFP_file;       /* The handle of the VM file containing
+                                                 * the cell file. Reinitialize this each
+                                                 * time you open the file. */
+        VMBlockHandle           CFP_rowBlocks[N_ROW_BLOCKS];    /* Initialize these to zero. */
 } CellFunctionParameters;
 ~~~
 
@@ -740,11 +740,11 @@ cells, all four fields will be set to -1.
 ---
 Code Display 19-2 Rectangle
 ~~~
-typedef	struct {
-	sword		R_left;		/* Index of first column written here. */
-	sword		R_top;		/* Index of first row written here. */
-	sword		R_right;		/* Index of last column written here. */
-	sword		R_bottom;		/* Index of last row written here. */
+typedef struct {
+        sword           R_left;         /* Index of first column written here. */
+        sword           R_top;          /* Index of first row written here. */
+        sword           R_right;                /* Index of last column written here. */
+        sword           R_bottom;               /* Index of last row written here. */
 } Rectangle;
 ~~~
 
@@ -792,15 +792,15 @@ geode should allocate it and initialize it before calling **RangeInsert()**.
 ---
 Code Display 19-3 The RangeInsertParams and Point structures
 ~~~
-typedef	struct {		/* defined in cell.h */
-	Rectangle			RIP_bounds;		/* Range of cells to shift */
-	Point			RIP_delta;		/* Specify which way to shift */
-	CellFunctionParameters			*RIP_cfp;
+typedef struct {                /* defined in cell.h */
+        Rectangle                       RIP_bounds;             /* Range of cells to shift */
+        Point                   RIP_delta;              /* Specify which way to shift */
+        CellFunctionParameters                  *RIP_cfp;
 } RangeInsertParams;
 
-typedef	struct {		/* defined in graphics.h */
-	sword		P_x;	/* Distance to shift horizontally */
-	sword		P_y;	/* Distance to shift vertically */
+typedef struct {                /* defined in graphics.h */
+        sword           P_x;    /* Distance to shift horizontally */
+        sword           P_y;    /* Distance to shift vertically */
 } Point;
 ~~~
 

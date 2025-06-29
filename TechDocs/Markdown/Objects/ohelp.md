@@ -104,7 +104,7 @@ you don't need a HelpControl object; the system provides one. You do,
 however, have to know how to declare help contexts and work with help files.
 
 ### 15.2.1 Help Contexts and Help Triggers
-	ATTR_GEN_HELP_CONTEXT, HINT_PRIMARY_NO_HELP_BUTTON
+    ATTR_GEN_HELP_CONTEXT, HINT_PRIMARY_NO_HELP_BUTTON
 
 The help controller displays help pages based on an object's context. An object 
 sets its context with ATTR_GEN_HELP_CONTEXT, which holds the name of 
@@ -135,8 +135,8 @@ help triggers will be suppressed: First, on small-screen devices or other
 situations wherein help triggers are not desired. In this situation, the .INI file 
 will have a certain help option turned off. The simplest way to do this is to set
 
-	[uiFeatures]
-	helpOptions = 1
+    [uiFeatures]
+    helpOptions = 1
 
 in the .INI file. This corresponds to the single help option 
 UIHO_HIDE_HELP_BUTTONS and will suppress the help triggers. Both the 
@@ -181,53 +181,53 @@ Nearly all GenPrimary objects should have the context "TOC" set for them.
 ----------
 **Code Display 15-1 Objects with Help Contexts**
 
-	/*     The TypeDialog box has its own help context: Help Types. This will cause
-	 * the UI to put a help trigger in the dialog's reply bar and, when that trigger
-	 * is clicked, will cause the system's help object to bring up the normal help
-	 * viewer on the "Help Types" page in the current help file.
-	 *     Each item in the GenItemGroup has its own help context. The list itself
-	 * does not have a context because if the user presses the F1 key, the help system
-	 * will bring up the selected item's help. If it were a list in which there could
-	 * be zero items selected, then the list might have its own context as well. */
+    /*     The TypeDialog box has its own help context: Help Types. This will cause
+     * the UI to put a help trigger in the dialog's reply bar and, when that trigger
+     * is clicked, will cause the system's help object to bring up the normal help
+     * viewer on the "Help Types" page in the current help file.
+     *     Each item in the GenItemGroup has its own help context. The list itself
+     * does not have a context because if the user presses the F1 key, the help system
+     * will bring up the selected item's help. If it were a list in which there could
+     * be zero items selected, then the list might have its own context as well. */
 
-	@object GenInteractionClass TypeDialog = {
-		GI_visMoniker = 'T', "Change Help Type";
-		GI_comp = @TypeList;
-		GII_visibility = GIV_DIALOG;
-		GII_type = GIT_PROPERTIES;
-		ATTR_GEN_HELP_CONTEXT = "Help Types";
-	}
+    @object GenInteractionClass TypeDialog = {
+        GI_visMoniker = 'T', "Change Help Type";
+        GI_comp = @TypeList;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_PROPERTIES;
+        ATTR_GEN_HELP_CONTEXT = "Help Types";
+    }
 
-	@object GenItemGroupClass TypeList = {
-		GI_comp = @NormalItem, @FirstAidItem, @SimpleItem;
-		GIGI_numSelections = 1;
-		GIGI_selection = HT_NORMAL_HELP;
-		GIGI_applyMsg = MSG_HELPSAMP_SET_TYPE;
-		GIGI_destination = process;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-	}
+    @object GenItemGroupClass TypeList = {
+        GI_comp = @NormalItem, @FirstAidItem, @SimpleItem;
+        GIGI_numSelections = 1;
+        GIGI_selection = HT_NORMAL_HELP;
+        GIGI_applyMsg = MSG_HELPSAMP_SET_TYPE;
+        GIGI_destination = process;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
 
-	@object GenItemClass NormalItem = {
-		GI_visMoniker = "Normal Help";
-		GII_identifier = HT_NORMAL_HELP;
-		ATTR_GEN_HELP_CONTEXT = "Normal Help";
-	}
+    @object GenItemClass NormalItem = {
+        GI_visMoniker = "Normal Help";
+        GII_identifier = HT_NORMAL_HELP;
+        ATTR_GEN_HELP_CONTEXT = "Normal Help";
+    }
 
-	@object GenItemClass FirstAidItem = {
-		GI_visMoniker = "First Aid";
-		GII_identifier = HT_FIRST_AID;
-		ATTR_GEN_HELP_CONTEXT = "First Aid";
-	}
+    @object GenItemClass FirstAidItem = {
+        GI_visMoniker = "First Aid";
+        GII_identifier = HT_FIRST_AID;
+        ATTR_GEN_HELP_CONTEXT = "First Aid";
+    }
 
-	@object GenItemClass SimpleItem = {
-		GI_visMoniker = "Simple Help";
-		GII_identifier = HT_SIMPLE_HELP;
-		ATTR_GEN_HELP_CONTEXT = "Simple Help";
-	}
+    @object GenItemClass SimpleItem = {
+        GI_visMoniker = "Simple Help";
+        GII_identifier = HT_SIMPLE_HELP;
+        ATTR_GEN_HELP_CONTEXT = "Simple Help";
+    }
 
 ----------
 ### 15.2.3 Bringing Up Help on the Fly
-	HelpSendHelpNotification()
+    HelpSendHelpNotification()
 
 The Help Controller library provides a routine to bring up a help context, or 
 to switch to a help context, at any time. This routine, 
@@ -278,7 +278,7 @@ make any of the above customizations, however, you must add one or more
 HelpControl objects to your application.
 
 ### 15.3.1 Bringing Up Initial Help
-	ATTR_HELP_INITIAL_HELP_FILE, ATTR_HELP_INITIAL_HELP
+    ATTR_HELP_INITIAL_HELP_FILE, ATTR_HELP_INITIAL_HELP
 
 An object may use ATTR_HELP_INITIAL_HELP_FILE and 
 ATTR_HELP_INITIAL_HELP to bring up a help context when the object 
@@ -325,42 +325,42 @@ the help files, but the code difference is simple.
 ----------
 **Code Display 15-2 Adding Help Controllers**
 
-	/*    The GenApplication has two help controllers as its children.
-	 * FirstAidHelpControl manages First Aid help, and SimpleHelpControl manages
-	 * Simple Help. In addition, the Normal Help controller-provided by the
-	 * system-manages Normal Help. Both custom help controllers must be put both on
-	 * the active list and on the GAGCNLT_NOTIFY_HELP_CONTEXT_CHANGE list.
-	 *    Normally, the GenApplication would have ATTR_GEN_HELP_TYPE declaring the
-	 * help type used. This application, however, defaults to HT_SYSTEM_HELP and
-	 * therefore does not need the attribute. */
+    /*    The GenApplication has two help controllers as its children.
+     * FirstAidHelpControl manages First Aid help, and SimpleHelpControl manages
+     * Simple Help. In addition, the Normal Help controller-provided by the
+     * system-manages Normal Help. Both custom help controllers must be put both on
+     * the active list and on the GAGCNLT_NOTIFY_HELP_CONTEXT_CHANGE list.
+     *    Normally, the GenApplication would have ATTR_GEN_HELP_TYPE declaring the
+     * help type used. This application, however, defaults to HT_SYSTEM_HELP and
+     * therefore does not need the attribute. */
 
-	@object GenApplicationClass HelpSampApp = {
-		GI_visMoniker = list { @HelpSampTextMoniker };
-		GI_comp = @HelpSampPrimary, @FirstAidHelpControl, @SimpleHelpControl;
-		gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @HelpSampPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
-								@FirstAidHelpControl, @SimpleHelpControl;
-	}
+    @object GenApplicationClass HelpSampApp = {
+        GI_visMoniker = list { @HelpSampTextMoniker };
+        GI_comp = @HelpSampPrimary, @FirstAidHelpControl, @SimpleHelpControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @HelpSampPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+                                @FirstAidHelpControl, @SimpleHelpControl;
+    }
 
-	@visMoniker HelpSampTextMoniker = "C Sample App with Help";
+    @visMoniker HelpSampTextMoniker = "C Sample App with Help";
 
-	/*    The help controllers may manage at most one HelpType each. Thus, you must
-	 * set the HCI_helpType field so the controller knows what type of help it
-	 * manages. */
+    /*    The help controllers may manage at most one HelpType each. Thus, you must
+     * set the HCI_helpType field so the controller knows what type of help it
+     * manages. */
 
-	@object HelpControlClass FirstAidHelpControl = {
-		GI_states = @default | GS_ENABLED;
-		HCI_helpType = HT_FIRST_AID;
-	}
+    @object HelpControlClass FirstAidHelpControl = {
+        GI_states = @default | GS_ENABLED;
+        HCI_helpType = HT_FIRST_AID;
+    }
 
-	@object HelpControlClass SimpleHelpControl = {
-		GI_states = @default | GS_ENABLED;
-		HCI_helpType = HT_SIMPLE_HELP;
-	}
+    @object HelpControlClass SimpleHelpControl = {
+        GI_states = @default | GS_ENABLED;
+        HCI_helpType = HT_SIMPLE_HELP;
+    }
 
 ----------
 ### 15.3.3 Sizing the Help Dialog Box
-	HINT_HELP_TEXT_FIXED_SIZE, HINT_HELP_NOT_RESIZABLE
+    HINT_HELP_TEXT_FIXED_SIZE, HINT_HELP_NOT_RESIZABLE
 
 Depending on what you're using help for, you may want to keep the help 
 dialog box a fixed size, or you may wish to make it not resizable. For both 
@@ -378,7 +378,7 @@ This hint will counteract that behavior and make the window
 not resizable.
 
 ### 15.3.4 Managing Help Types
-	HelpType, ATTR_GEN_HELP_TYPE, MSG_META_GET_HELP_TYPE
+    HelpType, ATTR_GEN_HELP_TYPE, MSG_META_GET_HELP_TYPE
 
 The type of help your application provides is defined by its **HelpType**. This 
 value is set in the HelpControl object's *HCI_helpType* instance field. For 
@@ -418,9 +418,9 @@ ATTR_GEN_HELP_TYPE. You can retrieve the current help type of an object
 by sending it MSG_META_GET_HELP_TYPE.
 
 ### 15.3.5 Managing Help Files
-	ATTR_GEN_HELP_FILE, ATTR_GEN_HELP_FILE_FROM_INIT_FILE, 
-	MSG_META_GET_HELP_FILE, MSG_META_SET_HELP_FILE, 
-	ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+    ATTR_GEN_HELP_FILE, ATTR_GEN_HELP_FILE_FROM_INIT_FILE, 
+    MSG_META_GET_HELP_FILE, MSG_META_SET_HELP_FILE, 
+    ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
 
 The help controller gets the text it displays from help files. Help files are 
 generated by the help editor (a modified GeoWrite) from GeoWrite documents 
@@ -450,8 +450,8 @@ same name as the application and a key named "helpfile." Thus, to set the
 help file to "My Own Help File" for the HelpSamp application, you could add 
 the following to your GEOS.INI file:
 
-	[HelpSamp]
-	helpfile = My Own Help File
+    [HelpSamp]
+    helpfile = My Own Help File
 
 If, however, no object has ATTR_GEN_HELP_FILE_FROM_INIT_FILE, this 
 entry will not be noticed by the help controller.
@@ -473,8 +473,8 @@ message returns the name of the file being used by the recipient generic
 object.
 
 ### 15.3.6 Customizing the Pointer Image
-	ATTR_HELP_CUSTOM_POINTER_IMAGE, 
-	MSG_HELP_CONTROL_GET_POINTER_IMAGE
+    ATTR_HELP_CUSTOM_POINTER_IMAGE, 
+    MSG_HELP_CONTROL_GET_POINTER_IMAGE
 
 The help controller changes the pointer image when the pointer is over a link 
 in the help text. This is so the user knows where to click and expects a link 
@@ -532,8 +532,8 @@ The Help Editor is GeoWrite with the Help Editor option turned on. To turn
 on this option, manually edit your .INI file to add the category and key as 
 follow:
 
-	[configure]
-	helpEditor = true
+    [configure]
+    helpEditor = true
 
 Without the above lines, you can't access the Help Editor. After adding them, 
 start up GeoWrite and change the user level. Choose "Customize" and turn 
@@ -729,32 +729,32 @@ Code Display 15-3).
 ----------
 **Code Display 15-3 HelpControlClass**
 
-		@instance HelpType		HCI_helpType;			/* See HelpType, below */
-		@instance MemHandle		HCI_curFile;			/* Internal */
-		@instance MemHandle		HCI_historyBuf;			/* Internal */
-		@instance word			HCI_nameArrayVM;		/* Internal */
-		@instance GeodeHandle		HCI_compressLib;	/* Internal */
-			@default GII_attrs = (@default | GIA_NOT_USER_INITIATABLE);
-			@default GII_visibility = GIV_DIALOG;
+        @instance HelpType      HCI_helpType;           /* See HelpType, below */
+        @instance MemHandle     HCI_curFile;            /* Internal */
+        @instance MemHandle     HCI_historyBuf;         /* Internal */
+        @instance word          HCI_nameArrayVM;        /* Internal */
+        @instance GeodeHandle       HCI_compressLib;    /* Internal */
+            @default GII_attrs = (@default | GIA_NOT_USER_INITIATABLE);
+            @default GII_visibility = GIV_DIALOG;
 
-		@vardata void				ATTR_HELP_SUPPRESS_INITIATE;
-		@vardata char[]				ATTR_HELP_INITIAL_HELP;
-		@vardata optr				ATTR_HELP_CUSTOM_POINTER_IMAGE;
-		@vardata CompSizeHintArgs 	HINT_HELP_TEXT_FIXED_SIZE;
-		@vardata void				HINT_HELP_NOT_RESIZABLE;
-		@vardata char[]				ATTR_HELP_INITIAL_HELP_FILE;
+        @vardata void               ATTR_HELP_SUPPRESS_INITIATE;
+        @vardata char[]             ATTR_HELP_INITIAL_HELP;
+        @vardata optr               ATTR_HELP_CUSTOM_POINTER_IMAGE;
+        @vardata CompSizeHintArgs   HINT_HELP_TEXT_FIXED_SIZE;
+        @vardata void               HINT_HELP_NOT_RESIZABLE;
+        @vardata char[]             ATTR_HELP_INITIAL_HELP_FILE;
 
-	typedef ByteEnum HelpType;
-		#define HT_NORMAL_HELP				0
-		#define HT_FIRST_AID				1
-		#define HT_STATUS_HELP				2
-		#define HT_SIMPLE_HELP				3
-		#define HT_SYSTEM_HELP				4	/* Reserved for system use */
+    typedef ByteEnum HelpType;
+        #define HT_NORMAL_HELP              0
+        #define HT_FIRST_AID                1
+        #define HT_STATUS_HELP              2
+        #define HT_SIMPLE_HELP              3
+        #define HT_SYSTEM_HELP              4   /* Reserved for system use */
 
-	/* Internal Vardata fields-do not use these. */
-		@vardata char[]			TEMP_HELP_ERROR_FILENAME;
-		@vardata char[]			TEMP_HELP_TOC_FILENAME;
-		@vardata void			TEMP_HELP_DETACH_RECEIVED;
+    /* Internal Vardata fields-do not use these. */
+        @vardata char[]         TEMP_HELP_ERROR_FILENAME;
+        @vardata char[]         TEMP_HELP_TOC_FILENAME;
+        @vardata void           TEMP_HELP_DETACH_RECEIVED;
 
 ----------
 **HelpControlClass** is a subclass of **GenControlClass** and, as such, inherits 
@@ -766,21 +766,21 @@ HelpControl object has features but no tools. The feature set of
 ----------
 **Code Display 15-4 HelpControl Features**
 
-	/* These features can be turned on or off with ATTR_GEN_CONTROL_REQUIRE_UI and
-	 * ATTR_GEN_CONTROL_PROHIBIT_UI. They can be turned on or off dynamically with
-	 * MSG_GEN_CONTROL_ADD_FEATURE and MSG_GEN_CONTROL_REMOVE_FEATURE. */
+    /* These features can be turned on or off with ATTR_GEN_CONTROL_REQUIRE_UI and
+     * ATTR_GEN_CONTROL_PROHIBIT_UI. They can be turned on or off dynamically with
+     * MSG_GEN_CONTROL_ADD_FEATURE and MSG_GEN_CONTROL_REMOVE_FEATURE. */
 
-	typedef WordFlags HPCFeatures;
-		#define HPCF_HELP				0x0100	/* has a "help on help" trigger */
-		#define HPCF_TEXT				0x0080	/* has text */
-		#define HPCF_CONTENTS			0x0040	/* has "Contents" button */
-		#define HPCF_HISTORY			0x0020	/* has "History" button */
-		#define HPCF_GO_BACK			0x0010	/* has "Go Back" button */
-		#define HPCF_CLOSE				0x0008	/* has "Close" button */
-		#define HPCF_INSTRUCTIONS		0x0004	/* has "Instructions" button */
-		#define HPCF_FIRST_AID_GO_BACK	0x0002	/* has "Go Back" button for
-												 * First Aid */
-		#define HPCF_FIRST_AID			0x0001	/* has First Aid configuration */
+    typedef WordFlags HPCFeatures;
+        #define HPCF_HELP               0x0100  /* has a "help on help" trigger */
+        #define HPCF_TEXT               0x0080  /* has text */
+        #define HPCF_CONTENTS           0x0040  /* has "Contents" button */
+        #define HPCF_HISTORY            0x0020  /* has "History" button */
+        #define HPCF_GO_BACK            0x0010  /* has "Go Back" button */
+        #define HPCF_CLOSE              0x0008  /* has "Close" button */
+        #define HPCF_INSTRUCTIONS       0x0004  /* has "Instructions" button */
+        #define HPCF_FIRST_AID_GO_BACK  0x0002  /* has "Go Back" button for
+                                                 * First Aid */
+        #define HPCF_FIRST_AID          0x0001  /* has First Aid configuration */
 
 ----------
 **HelpControlClass**, as a GenControl subclass, receives notification when 
@@ -795,21 +795,21 @@ containing a **NotifyHelpContextChange** structure, which is shown below.
 ----------
 **Code Display 15-5 Help Notification Structure**
 
-	/* This data structure is passed in MSG_META_NOTIFY_WITH_DATA_BLOCK to the help
-	 * controller when a change in the help context occurs. This structure can be
-	 * generated by calling HelpSendHelpNotification(). This structure uses the
-	 * following constant and type. */
+    /* This data structure is passed in MSG_META_NOTIFY_WITH_DATA_BLOCK to the help
+     * controller when a change in the help context occurs. This structure can be
+     * generated by calling HelpSendHelpNotification(). This structure uses the
+     * following constant and type. */
 
-	#define MAX_CONTEXT_NAME_SIZE				20
+    #define MAX_CONTEXT_NAME_SIZE               20
 
-	typedef char		ContextName[MAX_CONTEXT_NAME_SIZE];
+    typedef char        ContextName[MAX_CONTEXT_NAME_SIZE];
 
-	typedef struct {
-		HelpType			NHCC_type;			/* HelpType involved in change */
-		ContextName			NHCC_context;		/* New context to link to */
-		FileLongName		NHCC_filename;		/* New file name to link to */
-		FileLongName		NHCC_filenameTOC;	/* File name to get TOC from */
-	} NotifyHelpContextChange;
+    typedef struct {
+        HelpType            NHCC_type;          /* HelpType involved in change */
+        ContextName         NHCC_context;       /* New context to link to */
+        FileLongName        NHCC_filename;      /* New file name to link to */
+        FileLongName        NHCC_filenameTOC;   /* File name to get TOC from */
+    } NotifyHelpContextChange;
 
 ----------
 **HelpControlClass** has two exported messages that subclasses may 

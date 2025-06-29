@@ -80,26 +80,26 @@ Code Display 5-1 Flag Records and ByteEnums
  * flag record. */
 
 typedef ByteFlags MyFlag;
-#define MF_FIRST_FLAG			0x01
-#define MF_SECOND_FLAG			0x02
-#define MF_THIRD_FLAG			0x04
-#define MF_FOURTH_FLAG			0x08
-#define MF_FIFTH_FLAG			0x10
-#define MF_SIXTH_FLAG			0x20
+#define MF_FIRST_FLAG           0x01
+#define MF_SECOND_FLAG          0x02
+#define MF_THIRD_FLAG           0x04
+#define MF_FOURTH_FLAG          0x08
+#define MF_FIFTH_FLAG           0x10
+#define MF_SIXTH_FLAG           0x20
 
 /* In a section of code, to set a flag, bitwise OR it with the record. To clear the
  * flag, bitwise AND its inverse with the record. You can set any number of flags
  * at a time as shown in the following examples. */
 
     ...
-    MyFlag	myFlagsRecord;	/* Set up a variable of the flag record type */
+    MyFlag  myFlagsRecord;  /* Set up a variable of the flag record type */
 
-	/* Set the second and fourth flag. */
+    /* Set the second and fourth flag. */
     myFlagsRecord = MF_SECOND_FLAG | MF_FOURTH_FLAG;
 
-	/* Set the first flag and then clear the fifth and sixth flags. */
+    /* Set the first flag and then clear the fifth and sixth flags. */
     myFlagsRecord = (myFlagsRecord | MF_FIRST_FLAG) & ~(MF_FIFTH_FLAG |
-						    MF_SIXTH_FLAG);
+                            MF_SIXTH_FLAG);
 
 /* The ByteEnum type can be used instead of the standard enumerated type, which
  * is implemented by most compilers as a word type. To define a ByteEnum, define
@@ -107,11 +107,11 @@ typedef ByteFlags MyFlag;
  * following example. */
 
 typedef ByteEnum USCity;
-#define USC_HARTFORD			0x00
-#define USC_CHARLOTTE			0x01
-#define USC_WICHITA			0x02
-#define USC_PIERRE			0x03
-#define USC_ORLANDO			0x04
+#define USC_HARTFORD            0x00
+#define USC_CHARLOTTE           0x01
+#define USC_WICHITA         0x02
+#define USC_PIERRE          0x03
+#define USC_ORLANDO         0x04
 ~~~
 
 #### 5.1.2 Handles and Pointers
@@ -269,42 +269,42 @@ GEOS math routines.
  *    number of bits for the parts of the number. Choose whichever is most
  *    appropriate (for optimization). */
 
-	/* BBFixed
-	 * One byte integer, one byte fraction */
+    /* BBFixed
+     * One byte integer, one byte fraction */
 typedef struct {
-    byte		BBF_frac;	/* fractional portion */
-    byte		BBF_int;	/* integral portion */
+    byte        BBF_frac;   /* fractional portion */
+    byte        BBF_int;    /* integral portion */
 } BBFixed;
 
-	/* BBFixedAsWord
-	 * Sometimes it is convenient to refer to a BBFixed value as type word.
-	 * The BBFixedAsWord type is used for this purpose. */
-typedef word		BBFixedAsWord;
+    /* BBFixedAsWord
+     * Sometimes it is convenient to refer to a BBFixed value as type word.
+     * The BBFixedAsWord type is used for this purpose. */
+typedef word        BBFixedAsWord;
 
-	/* WBFixed
-	 * One word integer, one byte fraction */
+    /* WBFixed
+     * One word integer, one byte fraction */
 typedef struct {
-    byte		WBF_frac;	/* fractional portion */
-    word		WBF_int;	/* integral portion */
+    byte        WBF_frac;   /* fractional portion */
+    word        WBF_int;    /* integral portion */
 } WBFixed;
 
-	/* WWFixed
-	 * One word integer, one word fraction */
+    /* WWFixed
+     * One word integer, one word fraction */
 typedef struct {
-    word		WWF_frac;	/* fractional portion */
-    word		WWF_int;	/* integral portion */
+    word        WWF_frac;   /* fractional portion */
+    word        WWF_int;    /* integral portion */
 } WWFixed;
 
-	/* WWFixedAsDWord
-	 * Sometimes it is convenient to refer to a WWFixed value as type dword.
-	 * The WWFixedAsDWord type is used for this purpose. */
-typedef dword		WWFixedAsDWord;
+    /* WWFixedAsDWord
+     * Sometimes it is convenient to refer to a WWFixed value as type dword.
+     * The WWFixedAsDWord type is used for this purpose. */
+typedef dword       WWFixedAsDWord;
 
-	/* DWFixed
-	 * two words (one dword) integer, one word fraction */
+    /* DWFixed
+     * two words (one dword) integer, one word fraction */
 typedef struct {
-    word		DWF_frac;	/* fractional portion */
-    sdword		DWF_int;	/* integral portion */
+    word        DWF_frac;   /* fractional portion */
+    sdword      DWF_int;    /* integral portion */
 } DWFixed;
 
 /* Three-byte structure
@@ -312,8 +312,8 @@ typedef struct {
  * optimize and avoid using a 32-bit value. */
 
 typedef struct {
-    word		WAAH_low;	/* the low 16 bits */
-    byte		WAAH_high;	/* the high 8 bits */
+    word        WAAH_low;   /* the low 16 bits */
+    byte        WAAH_high;  /* the high 8 bits */
 } WordAndAHalf;
 ~~~
 
@@ -419,20 +419,20 @@ expressions are shown below:
 
 ~~~
 @ifdef (MyMacro)
-	/* code compiled if MyMacro is defined */
+    /* code compiled if MyMacro is defined */
 @endif
 
 @if 0
-	/* code that will not be compiled at all */
+    /* code that will not be compiled at all */
 @endif
 
 @if defined(MyMacro) || MY_CONSTANT
-	/* code compiled if either MyMacro is
-	 * defined or MY_CONSTANT is not zero */
+    /* code compiled if either MyMacro is
+     * defined or MY_CONSTANT is not zero */
 @endif
 
 @ifndef 0
-	/* code always compiled */
+    /* code always compiled */
 @endif
 ~~~
 
@@ -455,8 +455,8 @@ though they are very similar. Some examples of simple Goc macros follow
 below:
 
 ~~~
-@define mlply(val1,val2)		val1 * val2
-@define defChunk(a)			@chunk char a[] = "text"
+@define mlply(val1,val2)        val1 * val2
+@define defChunk(a)         @chunk char a[] = "text"
 ~~~
 
 When using Goc macros in your code, you must preface them with the "@" Goc 
@@ -527,18 +527,18 @@ routines are declared with Pascal's calling conventions.
 extern int
 SomeRoutineCalledViaAPointer(int anArg, int anotherArg, const char *someText);
 
-int (*funcPtr) (int, int, const char *);	/* A function pointer */
+int (*funcPtr) (int, int, const char *);    /* A function pointer */
 
 funcPtr = SomeRoutineCalledViaAPointer;
 
 /* We want to do
- *	SomeRoutineCalledViaAPointer(1, 2, "Franklin T. Poomm");
+ *  SomeRoutineCalledViaAPointer(1, 2, "Franklin T. Poomm");
  * but we want to call it through the pointer, even though it's in another 
  * resource:
  */
 
-ProcCallFixedOrMovable_cdecl(funcPtr,		/* The pointer to the routine */
-			1, 2, "Franklin T. Poomm");
+ProcCallFixedOrMovable_cdecl(funcPtr,       /* The pointer to the routine */
+            1, 2, "Franklin T. Poomm");
 ~~~
 
 ### 5.3 The GEOS Object System
@@ -710,7 +710,7 @@ state saving by managing the state file.
 
 ##### 5.3.1.4 Messaging Terms
 
-blocking	A thread "blocks" when it must wait for resources or return 
+blocking    A thread "blocks" when it must wait for resources or return 
 values from messages sent to objects in another thread. 
 Specifically, a thread blocks when one of its objects sends a 
 message to another thread with the "call" command; if the 
@@ -1281,9 +1281,9 @@ Code Display 5-4 TicTac's New Game Trigger
 
 @object GenTriggerClass TicTacNewTrigger = {
     GI_visMoniker = "New Game";
-    GTI_destination = TicTacBoard;			/* Send the action message to the
-					 * TicTac game board object. */
-    GTI_actionMsg = MSG_TICTAC_NEW_GAME; 	/* The action message. */
+    GTI_destination = TicTacBoard;          /* Send the action message to the
+                     * TicTac game board object. */
+    GTI_actionMsg = MSG_TICTAC_NEW_GAME;    /* The action message. */
 }
 ~~~
 
@@ -1509,17 +1509,17 @@ the following sections of this chapter and in the Routines Book.
 ---
 Code Display 5-5 Goc Keywords
 ~~~
-	/* Including .goh files */
+    /* Including .goh files */
 @include <fname>;
 
-	/* Defining New Classes and Subclasses */
-@class	<cname>, <super> [, master [, variant]];
+    /* Defining New Classes and Subclasses */
+@class  <cname>, <super> [, master [, variant]];
 @endc
 
-	/* Declaring a class */
+    /* Declaring a class */
 @classdecl <cname> [, <cflags>];
 
-	/* Defining messages for a class */
+    /* Defining messages for a class */
 @message <retType> <mname>([@stack] <param>*);
 @reserveMessages <num>;
 @exportMessages <expName>, <num>;
@@ -1527,7 +1527,7 @@ Code Display 5-5 Goc Keywords
 @alias(<protoMsg>) <messageDef>;
 @prototype <messageDef>;
 
-	/* Defining instance data fields for a class */
+    /* Defining instance data fields for a class */
 @instance <insType> <iname> [ = <default>];
 gcnList(<manufID>, <ltype>) = <oname> [, <oname>]*;
 @instance @composite <iname> [ = <linkName>];
@@ -1538,16 +1538,16 @@ gcnList(<manufID>, <ltype>) = <oname> [, <oname>]*;
 @noreloc <iname>;
 @default <iname> = <default>;
 
-	/* Defining vardata fields for a class */
+    /* Defining vardata fields for a class */
 @vardata <type> <vname>;
 @vardataAlias (<origName>) <newType> <newName>;
 @reloc <vname>, <fn>, [ (<count>, <struct>), ] <ptrType>;
 
-	/* Defining methods (message handlers) */
+    /* Defining methods (message handlers) */
 @method [ <hname>, ] <cname> [, <mname>]+;
 @method [ <hname>, ] <cname> _reloc;
 
-	/* Defining library code and resources */
+    /* Defining library code and resources */
 @optimize
 @deflib <libname>
 @endlib
@@ -1560,13 +1560,13 @@ gcnList(<manufID>, <ltype>) = <oname> [, <oname>]*;
 @extern <type> <name>;
 @gstring;
 
-	/* Declaring an object */
+    /* Declaring an object */
 @object <class> <name> <flags>* = {
     [<fieldName> = <init>];*
     [<varName> [ = <init> ]]*;
 }
 
-	/* Sending and calling messages */
+    /* Sending and calling messages */
 @send [<flags>,+] <obj>::[{<cast>}] <msg>(<params>*);
 <ret> = @call [<flags>,+] [{<cast>}] <obj>::[{<cast2>}]<msg>(<params>*);
 @callsuper();
@@ -1575,13 +1575,13 @@ gcnList(<manufID>, <ltype>) = <oname> [, <oname>]*;
 @dispatch [noFree] <nObj>::<nMsg>::<event>;
 <ret> = @dispatchCall [noFree] [{<cast>}] <nobj>::<nMsg>::<event>;
 
-	/* Using conditional code */
+    /* Using conditional code */
 @if <cond>
 @if defined(<item>)
 @ifdef <cond>
 @ifndef <cond>
 
-	/* Creating Goc macros */
+    /* Creating Goc macros */
 @define <mname> <macro>
 ~~~
 
@@ -1681,14 +1681,14 @@ Code Display 5-6 Defining Classes
  * definition, and @classdecl must be put somewhere in the code to make sure Glue
  * will link the class structure into the compiled geode.*/
 
-@class	MyNewClass, VisClass;
+@class  MyNewClass, VisClass;
     /* Message declarations would go here. See @message.
      * Instance data field declarations would go here. See @instance
-     * 						and @vardata. */
+     *                      and @vardata. */
 @endc
 @classdecl MyNewClass, neverSaved;
 
-@class	MyTriggerClass, GenTriggerClass;
+@class  MyTriggerClass, GenTriggerClass;
     /* New messages for this subclass are defined here. */
     /* New instance data fields for this subclass are defined here. */
 @endc
@@ -1697,9 +1697,9 @@ Code Display 5-6 Defining Classes
 /* When defining a variant class (which must also be a master class), you can
  * set a superclass for the variant at compile-time using @default. */
 
-@class	MyNewVariantClass, MetaClass, master, variant;
-    @default		MyNewVariant = VisClass;
-@endc	MyNewVariantClass
+@class  MyNewVariantClass, MetaClass, master, variant;
+    @default        MyNewVariant = VisClass;
+@endc   MyNewVariantClass
 @classdecl MyNewVariantClass;
 ~~~
 
@@ -1779,13 +1779,13 @@ All the parameters shown in the formats are the same as in the normal
 ---
 Code Display 5-7 Defining Messages
 ~~~
-	/* Each message is defined for a class within the class definition. */
-@class	MyTriggerClass, GenTriggerClass;
-	/* All the new messages MyTriggerClass can handle are defined here. */
+    /* Each message is defined for a class within the class definition. */
+@class  MyTriggerClass, GenTriggerClass;
+    /* All the new messages MyTriggerClass can handle are defined here. */
 @message void MSG_MYTRIG_SET_COLOR(colors colorIndex);
 @message optr MSG_MYTRIG_RETURN_OPTR( void );
 @message void MSG_MYTRIG_COLLECT_PARAMS(byte bParam, word wParam, char * string);
-	/* Instance data fields would be defined here. */
+    /* Instance data fields would be defined here. */
 
 @endc
 @classdecl MyTriggerClass;
@@ -1834,10 +1834,10 @@ of any size. The parameters of these three keywords are shown below:
 ~~~
 @reserveMessages  <num>;
 @exportMessages   <expName>, <num>;
-@importMessage	  <expName>, <messageDef>;
+@importMessage    <expName>, <messageDef>;
 ~~~
 
-**num**	This is the number of messages in the exported range.
+**num** This is the number of messages in the exported range.
 
 **expName** This is the name of the exported range. This is used when 
 importing messages to ensure that the proper numbers are used.
@@ -1897,26 +1897,26 @@ declared with **@message** (with **@message** left off).
 ---
 Code Display 5-8 Aliasing Messages
 ~~~
-	/* MyClass in this example uses both prototype and aliased messages. */
+    /* MyClass in this example uses both prototype and aliased messages. */
 @class MyClass, MetaClass;
-	/* The following is a normal message declaration. The register that this
-	 * parameter uses is specified because the handler (method) is written in
-	 * assembly language. */
+    /* The following is a normal message declaration. The register that this
+     * parameter uses is specified because the handler (method) is written in
+     * assembly language. */
 @message void MSG_MESSAGE_WITH_WORD(byte flag = cl, word value = dx);
 
-	/* The following message invokes the same method as the alias above.
-	 * It has the same message number but passes a different sized parameter
-	 * in different registers. */
+    /* The following message invokes the same method as the alias above.
+     * It has the same message number but passes a different sized parameter
+     * in different registers. */
 @alias(MSG_MESSAGE_WITH_WORD) void MSG_MESSAGE_WITH_DWORD(byte flag = cl,
-							dword value = dx:bp);
+                            dword value = dx:bp);
 
-	/* The following message is not used. Its pass and return values can
-	 * be used elsewhere, however, to ensure that all handlers of this message
-	 * type are given the same format. */
+    /* The following message is not used. Its pass and return values can
+     * be used elsewhere, however, to ensure that all handlers of this message
+     * type are given the same format. */
 @prototype int MSG_MYCLASS_PROTO(int a, int b);
 
-	/* The following have the same return values and parameters
-	 * as the prototype above. */
+    /* The following have the same return values and parameters
+     * as the prototype above. */
 @message(MSG_MYCLASS_PROTO) MSG_MY_CLASS_ADD;
 @message(MSG_MYCLASS_PROTO) MSG_MY_CLASS_SUBTRACT;
 @message(MSG_MYCLASS_PROTO) MSG_MY_CLASS_MULTIPLY;
@@ -2023,9 +2023,9 @@ Code Display 5-9 Declaring Instance Data Fields
 ~~~
 /* GenClass is a good example of many of the different types of fields. */
 
-@class	GenClass, VisClass, master, variant;
+@class  GenClass, VisClass, master, variant;
 
-	/* The GenClass messages are defined here. */
+    /* The GenClass messages are defined here. */
 
     @instance @link GI_link;
     @instance @composite GI_comp = GI_link;
@@ -2034,7 +2034,7 @@ Code Display 5-9 Declaring Instance Data Fields
     @instance byte GI_attrs = 0;
     @instance byte GI_states = (GS_USABLE|GS_ENABLED);
 
-	/* Hints and other variable data fields are defined with @vardata. */
+    /* Hints and other variable data fields are defined with @vardata. */
 
 @endc
 ~~~
@@ -2163,9 +2163,9 @@ Code Display 5-10 Examples of Instance Data Declarations
 /* These are some data fields for MyDataClass.
  */
 
-    @instance		ChunkHandle		MDI_aChunk;
-    @instance		HelloInfoFlags		MDI_flags;
-    @instance		byte		MDI_lotsOfNumbers[32];
+    @instance       ChunkHandle     MDI_aChunk;
+    @instance       HelloInfoFlags      MDI_flags;
+    @instance       byte        MDI_lotsOfNumbers[32];
 ~~~
 
 Some vardata types may have varying amounts of extra data. For example, 
@@ -2183,7 +2183,7 @@ defined with **@vardata**.
 **newType** This is the data type of the new variable data field, a standard 
 C or GEOS data type.
 
-newName	This is the name of the new variable data field. In essence, the 
+newName This is the name of the new variable data field. In essence, the 
 original and new fields will have the same data type word but 
 will have different extra data size.
 
@@ -2212,19 +2212,19 @@ Code Display 5-11 Defining Variable Data
  * or data types (not "void") have extra data fields associated with them. */
 
 @class GenClass, VisClass, master, variant;
-	/* Messages are defined here. */
-	/* Followed by instance data defined with @instance. */
+    /* Messages are defined here. */
+    /* Followed by instance data defined with @instance. */
     @vardata void HINT_CENTER_MONIKER;
     @vardata SpecSizeSpec HINT_CUSTOM_CHILD_SPACING;
     @vardata char[] ATTR_GEN_INIT_FILE_KEY;
 
-	/* Relocatable instance fields (see the next section) are defined with
-	 * @reloc. This field contains an object pointer that must be resolved
-	 * when the GenClass object is loaded. */
+    /* Relocatable instance fields (see the next section) are defined with
+     * @reloc. This field contains an object pointer that must be resolved
+     * when the GenClass object is loaded. */
     @instance @link GI_link;
-	@reloc GI_link, optr;
+    @reloc GI_link, optr;
     @vardata DestinationClassArgs ATTR_GEN_DESTINATION_CLASS;
-	@reloc ATTR_GEN_DESTINATION_CLASS, 0, optr;
+    @reloc ATTR_GEN_DESTINATION_CLASS, 0, optr;
 @endc
 ~~~
 
@@ -2341,17 +2341,17 @@ Code Display 5-12 Variable Data Handlers
  * VarDataCHandler structure, must be declared _pascal. */
 
 void _pascal VarDataInteractionHintHandler(MemHandle mh, ChunkHandle chnk, 
-		void *data, word dataType, HandlerData *handlerData) {
+        void *data, word dataType, HandlerData *handlerData) {
 
     if (dataType == HINT_ORIENT_CHILDREN_HORIZONTALLY) {
-	handlerData->HD_flags.has_horiz = 1;
+    handlerData->HD_flags.has_horiz = 1;
     } else if (dataType == HINT_ORIENT_CHILDREN_VERTICALLY) {
-	handlerData->HD_flags.has_vert = 1;
+    handlerData->HD_flags.has_vert = 1;
     } else if (dataType == HINT_ALLOW_CHILDREN_TO_WRAP) {
-	handlerData->HD_flags.has_allow_wrap = 1;
+    handlerData->HD_flags.has_allow_wrap = 1;
     } else if ((dataType == HINT_WRAP_AFTER_CHILD_COUNT) &&
-		(((WrapAfterChildCountData *) data)->WACCE_childCount == 2)) {
-	handlerData->HD_flags.has_wrap_after = 1;
+        (((WrapAfterChildCountData *) data)->WACCE_childCount == 2)) {
+    handlerData->HD_flags.has_wrap_after = 1;
     }
 }
 
@@ -2435,8 +2435,8 @@ after defining the instance field itself as shown in Code Display 5-13.
 ---
 Code Display 5-13 Use of the @noreloc Keyword
 ~~~
-	@instance optr MCI_ruler;  /* Normally MCI_ruler would be reloc- */
-	@noreloc MCI_ruler;        /* -but now it isn't. */
+    @instance optr MCI_ruler;  /* Normally MCI_ruler would be reloc- */
+    @noreloc MCI_ruler;        /* -but now it isn't. */
 ~~~
 
 #### 5.4.3 Defining Methods
@@ -2498,8 +2498,8 @@ and your **@method** declaration looks like
 Then your protoype should look like
 
 extern word _pascal DoSomething(optr oself,
-			MyMessages message,
-			word thing);
+            MyMessages message,
+            word thing);
 ~~~
 
 The name of the type MyMessages is constructed automatically by taking 
@@ -2573,42 +2573,42 @@ Code Display 5-14 A Class Definition
 
 @class ValClass, MetaClass;
 
-@instance int value;			/* instance data value: an uninitialized integer */
+@instance int value;            /* instance data value: an uninitialized integer */
 
-	/* message declarations 
-	 * All four messages will be handled by this class. They return
-	 * the types shown and take the parameters defined. */
+    /* message declarations 
+     * All four messages will be handled by this class. They return
+     * the types shown and take the parameters defined. */
 @message int MSG_VAL_GET_VALUE();
 @message void MSG_VAL_SET_VALUE(int newValue);
 @message void MSG_VAL_NEGATE_VALUE();
 @message Boolean MSG_VAL_IS_VALUE_BIGGER_THAN(int newValue);
 
 @endc
-@classdecl ValClass;			/* the class structure must be put in memory */
+@classdecl ValClass;            /* the class structure must be put in memory */
 
-	/* Method Declarations
-	 * Each of the four methods is a single line of code. Note that the
-	 * parameters are automatically defined in the message definition and do
-	 * not need to be restated in the method definition. The same is true of
-	 * the return type. Note also that the class and message names appear in
-	 * the @method line. */
+    /* Method Declarations
+     * Each of the four methods is a single line of code. Note that the
+     * parameters are automatically defined in the message definition and do
+     * not need to be restated in the method definition. The same is true of
+     * the return type. Note also that the class and message names appear in
+     * the @method line. */
 
-@method	ValGetValue, MyClass, MSG_VAL_GET_VALUE {
+@method ValGetValue, MyClass, MSG_VAL_GET_VALUE {
     return(pself->value);
 }
 
-@method	ValSetValue, MyClass, MSG_VAL_SET_VALUE {
+@method ValSetValue, MyClass, MSG_VAL_SET_VALUE {
     pself->value = newValue;
 }
 
-@method	ValNegateVal, MyClass, MSG_VAL_NEGATE_VALUE {
+@method ValNegateVal, MyClass, MSG_VAL_NEGATE_VALUE {
     pself->value *= -1;
 }
 
-@method	 ValClass, MSG_VAL_IS_VALUE_BIGGER_THAN {
-	/* This handler's name will automatically be created to be
-	 * ValVAL_IS_VALUE_BIGGER_THAN. You can use this name as a
-	 * C function call from within the same thread. */
+@method  ValClass, MSG_VAL_IS_VALUE_BIGGER_THAN {
+    /* This handler's name will automatically be created to be
+     * ValVAL_IS_VALUE_BIGGER_THAN. You can use this name as a
+     * C function call from within the same thread. */
     return(pself->value > newValue);
 }
 ~~~
@@ -2620,10 +2620,10 @@ have the following format:
 
 ~~~
 extern <type> _pascal <MethodName>(
-	optr				oself,
-	<TruncatedClassName>Messages	message,
-	<type1>				<arg1>,
-	<type2>				<arg2>)
+    optr                oself,
+    <TruncatedClassName>Messages    message,
+    <type1>             <arg1>,
+    <type2>             <arg2>)
 ~~~
 
 **type**  
@@ -2650,21 +2650,21 @@ the same order, as in the message declaration.
 Code Display 5-15 Declaring a Method As a Routine
 ~~~
 @message int MSG_HELLO_COUNTER_RECALCULATE_VALUE(
-		HelloPriority 	priority, 
-		word 		randomDatum, 
-		char 		aLetter);
+        HelloPriority   priority, 
+        word        randomDatum, 
+        char        aLetter);
 
 extern int _pascal HelloCounterRecalculateValue(
-		optr			oself,
-		HelloCounterMessages	message,
-		HelloPriority		priority,
-		word			randomDatum,
-		char			aLetter);
+        optr            oself,
+        HelloCounterMessages    message,
+        HelloPriority       priority,
+        word            randomDatum,
+        char            aLetter);
 
-@method	HelloCounterRecalculate, HelloCounterClass, 
-		MSG_HELLO_COUNTER_RECALCULATE_VALUE {
+@method HelloCounterRecalculate, HelloCounterClass, 
+        MSG_HELLO_COUNTER_RECALCULATE_VALUE {
 
-	/* method code goes here... */
+    /* method code goes here... */
 }
 ~~~
 
@@ -2815,23 +2815,23 @@ Code Display 5-16 Declaring Data Resources
  * its own header type. */
 
 typedef struct {
-    LMemBlockHeader			MLMBH_meta;       /* basic header structure */
-    int			MLMBH_numEntries;  /* the number of entries in the block 
+    LMemBlockHeader         MLMBH_meta;       /* basic header structure */
+    int         MLMBH_numEntries;  /* the number of entries in the block 
 */
 } StudentBlockHeader;
 
-@start StudentBlock, data;					/* data flag indicates LMem block */
-@header StudentBlockHeader = 1;					/* initialize new header fields */
+@start StudentBlock, data;                  /* data flag indicates LMem block */
+@header StudentBlockHeader = 1;                 /* initialize new header fields */
 
 /* The three chunks are defined below. Each represents a single field associated
  * with a single student; that is why the header's MLMBH_numEntries field contains
  * one (rather than three). */
 
-@chunk	char	firstName[] = "John";
-@chunk	char	lastName[] = "Student";
-@chunk	int	grade = 6;
+@chunk  char    firstName[] = "John";
+@chunk  char    lastName[] = "Student";
+@chunk  int grade = 6;
 
-@end StudentBlock					/* end of resource block */
+@end StudentBlock                   /* end of resource block */
 ~~~
 
 ##### 5.4.4.3 Declaring an Object
@@ -2949,7 +2949,7 @@ GI_comp = @TicTacPrimary;
 GI_comp = @TicTacView, @TicTacGameMenu;
 
 VCI_comp = @TTX1, @TTX2, @TTX3, @TTX4, @TTX5, @TTO1,
-		 @TTO2, @TTO3, @TTO4, @TTO5;
+         @TTO2, @TTO3, @TTO4, @TTO5;
 ~~~
 
 **Declaring Visual Monikers**
@@ -3121,12 +3121,12 @@ in front of the attribute.
 ---
 Code Display 5-17 Declaring Objects with @object
 ~~~
-	/* This example shows the use of @start, @object, @visMoniker, and @end.
-	 * It is taken from the TicTac sample application. */
+    /* This example shows the use of @start, @object, @visMoniker, and @end.
+     * It is taken from the TicTac sample application. */
 
 @start AppResource;
-	/* The AppResource resource block contains the TicTacApp
-	 * object and its visual moniker chunk. */
+    /* The AppResource resource block contains the TicTacApp
+     * object and its visual moniker chunk. */
 
 @object GenApplicationClass TicTacApp = {
     GI_visMoniker = list { @TicTacTextMoniker };
@@ -3138,22 +3138,22 @@ Code Display 5-17 Declaring Objects with @object
 @end AppResource
 
 @start Interface;
-	/* The Interface resource declares TicTac's primary window and other UI
-	 * gadgetry. Only the GenView from this application is shown. */
+    /* The Interface resource declares TicTac's primary window and other UI
+     * gadgetry. Only the GenView from this application is shown. */
 @object GenViewClass TicTacView = {
-    GVI_content = @TicTacBoard;					/* A relocatable optr field */
+    GVI_content = @TicTacBoard;                 /* A relocatable optr field */
     GVI_docBounds = {0, 0, BOARD_WIDTH, BOARD_HEIGHT};
-					/* A Rectangle structure */
-    GVI_color = { C_BLUE, 0, 0, 0 };					/* A ColorQuad structure */
+                    /* A Rectangle structure */
+    GVI_color = { C_BLUE, 0, 0, 0 };                    /* A ColorQuad structure */
     GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT
-			    | GVDA_NO_SMALLER_THAN_CONTENT
-			    & ~GVDA_SCROLLABLE;
-		/* The NO_LARGER and NO_SMALLER attributes are set in the
-		 * field, and SCROLLABLE is cleared. The SCROLLABLE attribute
-		 * is not set by default for the GenView; it is shown here
-		 * for illustration. */
+                | GVDA_NO_SMALLER_THAN_CONTENT
+                & ~GVDA_SCROLLABLE;
+        /* The NO_LARGER and NO_SMALLER attributes are set in the
+         * field, and SCROLLABLE is cleared. The SCROLLABLE attribute
+         * is not set by default for the GenView; it is shown here
+         * for illustration. */
     GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT
-			   | GVDA_NO_SMALLER_THAN_CONTENT;
+               | GVDA_NO_SMALLER_THAN_CONTENT;
 }
 
 @end Interface
@@ -3192,10 +3192,10 @@ Their format is given below:
 
 ~~~
 @send [,<flags>]+ \
-		<obj>::[{<cast2>}]<msg>(<params>*);
+        <obj>::[{<cast2>}]<msg>(<params>*);
 
 <ret> = @call [,<flags>]+ [{<cast>}] <obj>::\
-			[{<cast2>}]<msg>(<params>*);
+            [{<cast2>}]<msg>(<params>*);
 ~~~
 
 **flags** This is a list of flags separated by the commas. The allowed 
@@ -3271,7 +3271,7 @@ messages on a single line. For example, this call is illegal:
 
 ~~~
 @send Obj1::MSG_THATS_PASSED_AN_INT(\
-		@call Obj2::MSG_THAT_RETURNS_INT());
+        @call Obj2::MSG_THAT_RETURNS_INT());
 ~~~
 
 Any such call will generate a compile-time error. Instead, you should use 
@@ -3650,35 +3650,35 @@ Code Display 5-18 Instantiating an Object
 ~~~
 /* This sample of code belongs to a sample GenInteraction object (the object would
  * have to be a subclass of GenInteractionClass). It does several things:
- *	1.	It instantiates a new GenTrigger object. The new
- *		GenTrigger will be added to the same object block
- *		containing the GenInteraction handling the message.
- *	2.	It adds the new GenTrigger as a child of the
- *		SampInteraction (the handling object).
- *	3.	It sets the GenTrigger usable and enabled. */
+ *  1.  It instantiates a new GenTrigger object. The new
+ *      GenTrigger will be added to the same object block
+ *      containing the GenInteraction handling the message.
+ *  2.  It adds the new GenTrigger as a child of the
+ *      SampInteraction (the handling object).
+ *  3.  It sets the GenTrigger usable and enabled. */
 
 @method SampInteractionClass, MSG_SAMP_INTERACTION_CREATE_TRIGGER {
-    optr 		newTrig;
+    optr        newTrig;
 
     newTrig = ObjInstantiate(OptrToHandle(oself),
-				(ClassStruct *)&GenTriggerClass);
-	/* The two parameters are the handle of an object block and the
-	 * pointer to a class definition. The object block is the same
-	 * one containing the GenInteraction, whose optr is contained in
-	 * the standard oself parameter. The class structure pointer points
-	 * to the class definition of GenTriggerClass. */
+                (ClassStruct *)&GenTriggerClass);
+    /* The two parameters are the handle of an object block and the
+     * pointer to a class definition. The object block is the same
+     * one containing the GenInteraction, whose optr is contained in
+     * the standard oself parameter. The class structure pointer points
+     * to the class definition of GenTriggerClass. */
 
-	/* Now it is necessary to dereference our pself parameter. Because
-	 * the ObjInstantiate() call could move this object block (it must
-	 * allocate new space in the block, and this can cause the block to
-	 * move), we have to reset our pointer based on our optr. This is
-	 * done with one of the dereference routines. */
+    /* Now it is necessary to dereference our pself parameter. Because
+     * the ObjInstantiate() call could move this object block (it must
+     * allocate new space in the block, and this can cause the block to
+     * move), we have to reset our pointer based on our optr. This is
+     * done with one of the dereference routines. */
     pself = ObjDerefGen(oself);
 
-	/* Now set the trigger as the last child of the GenInteraction. */
+    /* Now set the trigger as the last child of the GenInteraction. */
     @call self::MSG_GEN_ADD_CHILD(newTrig, (CCO_MARK_DIRTY | CCF_LAST);
 
-	/* Now set the trigger usable and enabled. */
+    /* Now set the trigger usable and enabled. */
     @call newTrig::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
     @call newTrig::MSG_GEN_SET_ENABLED(VUM_NOW);
 }

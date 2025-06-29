@@ -4,15 +4,15 @@ This chapter is intended to provide documentation for the majority of useful
 Swat commands. The general structure of the descriptions in this chapter 
 will be as follows:
 
-**Usage:**	Shows the command and its various arguments and subcommands (if any).
+**Usage:**  Shows the command and its various arguments and subcommands (if any).
 
-**Examples:**	Examples of the command as it could be used.
+**Examples:**   Examples of the command as it could be used.
 
-**Synopsis:**	Summary of the command and its functions and results.
+**Synopsis:**   Summary of the command and its functions and results.
 
-**Notes:**	Details about the subcommands, arguments, and other command features.
+**Notes:**  Details about the subcommands, arguments, and other command features.
 
-**See Also:**	Other related commands.
+**See Also:**   Other related commands.
 
 ### 4.1 Notation
 
@@ -85,11 +85,11 @@ print, addr-parse.
 `abort [<function>]`
 
 **Examples:**  
-`abort`	 abort executing the current frame.  
-`abort 3` 	abort executing up through the third frame.  
+`abort`  abort executing the current frame.  
+`abort 3`   abort executing up through the third frame.  
 `abort ObjMessage` abort executing up through first ObjMessage.
 
-**Synopsis:**	 Abort code execution up through a given frame or routine. By "abort", we me 
+**Synopsis:**    Abort code execution up through a given frame or routine. By "abort", we me 
 "do not execute". This can be quite dangerous, as semaphores may not be 
 ungrabbed, blocks not unlocked, flags not cleared, etc., leaving the state of 
 objects, and if executing system code, possibly the system itself in a bad state. 
@@ -122,7 +122,7 @@ $cur.
 Aborts code execution up through a particular stack frame. As no code is 
 executed, the registers may be in a garbaged state.
 
-**Notes:**	
+**Notes:**  
 
 + The argument is a frame token, as returned by the "frame" command.
 
@@ -155,7 +155,7 @@ Figures the value for the enumerated constant
 This command parses the address expression into its components, returning 
 a list `{<handle> <offset> <type> }` as its value.
 
-**Notes:**	
+**Notes:**  
 
 + This will generate an error if there's an error parsing the `<addr>` 
 
@@ -216,7 +216,7 @@ portion in $s and the offset portion in $o in the current scope.
 Preprocesses an address expression into a form that is easier to manipulate 
 and faster to reparse.
 
-**Notes:**	
+**Notes:**  
 
 + `<seg-var>` is the name of a variable in the caller's scope in which the 
 segment of the address is stored. It should be treated as opaque, as it may 
@@ -249,7 +249,7 @@ one of the hierarchies, or the windowed object under the mouse. It can be
 given one of a set of flags that indicate where to find the address of the object 
 on which to operate.
 
-**Notes:**	
+**Notes:**  
 
 + Special values accepted for `<address>`:
 
@@ -277,7 +277,7 @@ impliedgrab, content, focusobj, targetobj, modelobj, keyboardobj, mouseobj.
 
 ### alias
 
-**Usage:**	`alias [<name> [<body>]]`
+**Usage:**  `alias [<name> [<body>]]`
 
 **Examples:**  
 `alias p print` 
@@ -290,7 +290,7 @@ Executes an appropriate "for" loop when the "while" command
 is executed with its two arguments: a test expression and a 
 body of commands to execute. 
 
-`alias` 	Prints all the defined aliases.
+`alias`     Prints all the defined aliases.
 
 `alias while` 
 Prints what the "while" command is aliased to.
@@ -299,7 +299,7 @@ Prints what the "while" command is aliased to.
 This is a short-cut to allow you to make commands you commonly type easier 
 to use, and to define simple new commands quickly.
 
-**Notes:**	
+**Notes:**  
 
 + If you give no arguments the current aliases are all displayed.
 
@@ -351,7 +351,7 @@ Determines whether structure-field values follow immediately after the field
 name or if all values are indented to the same level. The "print" command 
 and other display commands use this variable when formatting their output.
 
-**Notes:**	
+**Notes:**  
 
 + Having all values indented to the same level makes it easier for some 
 people to locate a particular field in a structure. It is not without cost, 
@@ -384,7 +384,7 @@ Does likewise for thread #1 of the current patient
 `antifreeze 16c0h` 
 Does likewise the thread whose handle is 16c0h
 
-`antifreeze`	Promotes the current thread to be the "most-runnable."
+`antifreeze`    Promotes the current thread to be the "most-runnable."
 
 **See Also:**  
 freeze 
@@ -476,7 +476,7 @@ in the variable foo to $n.
 Allows you to treat a list stored in a variable as an array, setting arbitrary 
 elements of that array to arbitrary values.
 
-**Notes:**	
+**Notes:**  
 
 + `<array-name>` is the name of the variable, not the value of the variable 
 to be altered.
@@ -505,7 +505,7 @@ whose first element is the string GenPrimaryClass.
 Searches an associative list to find an element with a particular key. The list 
 is itself made up of lists, each of whose first element is a key.
 
-**Notes:**	
+**Notes:**  
 
 + A typical associative list is made of key/value pairs, like this:
  `{{<key> <value>} {<key> <value>} ...}`
@@ -523,7 +523,7 @@ car, cdr, range, list, delassoc.
 `assign <addr> <value>`
 
 **Examples:**  
-`assign ip ip+2` 	
+`assign ip ip+2`    
 Add 2 to the value of IP in the current frame.
 
 `assign {word ds:si} 63h` 
@@ -536,7 +536,7 @@ to be assigned and the second argument is the value to assign to it (which
 may be a regular address expression). If the first expression doesn't indicate 
 a type, "word" is assumed. Only **byte**, **word** or **dword** types are supported.
 
-**Notes:**	
+**Notes:**  
 
 + When assigning to an sptr, the value assigned will be the segment of the 
 block indicated by the `<value>`, unless `<value>` is an absolute address (or 
@@ -558,7 +558,7 @@ imem, value
 `att [<args>]`
 
 **Examples:**  
-`att`	attach Swat to GEOS.
+`att`   attach Swat to GEOS.
 
 **Synopsis:**  
 Attach Swat to GEOS.
@@ -720,7 +720,7 @@ Shows all current key bindings
 **Usage:**  
 `bind-key <ascii_value> <function>`
 
-**Examples:**	
+**Examples:**   
 `bind-key \321 scroll_srcwin_down`  
 Binds scroll-down key to the `scroll_srcwin_down` Tcl routine.
 
@@ -821,7 +821,7 @@ Print byte variables as characters.
 Determines how unsigned character variables are printed: if set non-zero, 
 they are displayed as characters, else they are treated as unsigned integers.
 
-**Notes:**	
+**Notes:**  
 
 + If $byteAsChar is 0, $intFormat is used. 
 
@@ -881,7 +881,7 @@ This is a Tcl primitive. See "Tool Command Language," Chapter 5.
 **Synopsis:**  
 Call a function in the current thread.
 
-**Notes:**	
+**Notes:**  
 
 + The `<function>` argument is the function to call. If it is a NEAR function, 
 the thread must already be executing in the function's segment.
@@ -925,7 +925,7 @@ Locks down the block whose handle ID is in $h.
 This is a utility routine, not intended for use from the command line, that will 
 call a routine in the PC after setting registers to or pushing certain values. 
 
-**Notes:**	
+**Notes:**  
 
 + Returns non-zero if the call completed successfully. 
 
@@ -956,7 +956,7 @@ call
 `car $args`  
 Returns the first element of $args.
 
-**Synopsis:**	Returns the first element of a list.
+**Synopsis:**   Returns the first element of a list.
 
 **Notes:**  
 This is a lisp-ism for those most comfortable with that language. It can be 
@@ -1159,7 +1159,7 @@ print, condenseSpecial.
 Turns off the special formatting of various types of structures 
 by "print".
 
-**Synopsis:**	Controls the formatting of certain structures in more-intuitive ways than the 
+**Synopsis:**   Controls the formatting of certain structures in more-intuitive ways than the 
 bare structure fields.
 
 **Notes:**
@@ -1485,7 +1485,7 @@ showcalls, mwatch.
 `debug <proc-name>*`
 
 **Examples:**  
-"debug"	Enter the Tcl debugger immediately.
+"debug" Enter the Tcl debugger immediately.
 
 `debug fooproc`  
 Enter the Tcl debuffer when the interpreter is about to execute 
@@ -2354,11 +2354,11 @@ quit.
 
 ### explain
 
-**Usage:**	explain
+**Usage:**  explain
 
-**Examples:**	"explain"
+**Examples:**   "explain"
 
-**Synopsis:**	Print a more detailed description of why the system crashed, if possible.
+**Synopsis:**   Print a more detailed description of why the system crashed, if possible.
 
 **Notes:**
 
@@ -2627,7 +2627,7 @@ finish executing up to the third frame
 **Synopsis:**  
 Finish the execution of a frame.
 
-**Notes:**	
+**Notes:**  
 
 + The `<frame num>` argument is the number of the frame to finish. If none 
 is specified then the current frame is finished up. The number to use is 
@@ -2654,7 +2654,7 @@ particular stack frame.
 Allows the machine to continue until it has returned from a particular stack 
 frame.
 
-**Notes:**	
+**Notes:**  
 
 + No FULLSTOP event is dispatched when the machine actually finishes 
 executing in the given frame. The caller must dispatch it itself, using the 
@@ -2733,7 +2733,7 @@ Prints a description of the object whose address is ^l3160h:0
 Takes a global and a local handle and prints a description of the object 
 described by that optr.
 
-**Notes:**	
+**Notes:**  
 
 + If the global handle is a thread or a process, the thread's name (process 
 thread for a process handle) and the chunk handle (as an additional word 
@@ -2768,7 +2768,7 @@ Swat. It is used by both the "print" and "_print" commands and is helpful if
 you want to print the value of a variable without entering anything into the 
 value history.
 
-**Notes:**	
+**Notes:**  
 
 + `<value-list>` is the return value from "value fetch". You can, of course, 
 construct one of these if you feel so inclined.
@@ -2788,7 +2788,8 @@ recursive calls. It indicates if the value being formatted is expected to fit
 on a single line, and so "fmtval" should not force a newline to be output 
 at the end of the value. The value should be 0 or 1.
 
-**See Also:**  +print, _print, fmtoptr, threadname.
+**See Also:**  
+print, _print, fmtoptr, threadname.
 
 ----------
 
@@ -2813,7 +2814,7 @@ print focus hierarchy from content under mouse.
 **Synopsis:**  
 Prints the focus hierarchy below an object.
 
-**Notes:**	
+**Notes:**  
 
 + If no argument is specified, the system object is used. 
 + The special object flags may be used to specify `<object>`.  For a list of these 
@@ -2866,7 +2867,7 @@ list fonts currently in use
 **Synopsis:**  
 Print various font info.
 
-**Notes:**	
+**Notes:**  
 
 + The <args> argument may be any of the following:
 
@@ -2908,7 +2909,7 @@ This is a Tcl primitive. See "Tool Command Language," Chapter 5.
 
 ----------
 
-n	fpstack
+n   fpstack
 
 **Usage:**  
 `fpstack`
@@ -3576,7 +3577,7 @@ Examples:
 **Synopsis:**  
 Print all handles in-use.
 
-**Notes:**	
+**Notes:**  
 
 + The flags argument is a collection of flags, beginning with `-', from the 
 following set:
@@ -3681,7 +3682,7 @@ Break when the word at OLScrollButton+3 is destroyed.
 **Synopsis:**  
 Break when a memory location changes.
 
-**Notes:**	
+**Notes:**  
 
 + The `<address>` argument is the address to watch for a change.
 
@@ -4045,7 +4046,7 @@ controlled by the global variable ibrkPageLen. It defaults to 10.
 **b** - Set an unconditional breakpoint at the current instruction and 
 go back to command level.  
 **a** - Like 'b', but the breakpoint is set for all patients.  
-**t** - Like 'b', except the breakpoint is temporary and will be	 
+**t** - Like 'b', except the breakpoint is temporary and will be     
 removed the next time the machine stops.  
 **B** - Like 'b', but can be followed by a command to execute when the 
 breakpoint is hit.  
@@ -4126,14 +4127,14 @@ appropriate formats. The modes are:
 
 
 ----------
-	Table 4-1 Memory Modes
+    Table 4-1 Memory Modes
 
-	Mode	Size	1st column		2nd column		3rd column
+    Mode    Size    1st column      2nd column      3rd column
 
-	b		byte	hex byte		signed dec		ASCII character
-	w		word	hex word		unsigned dec	signed decimal
-	d		dword	segment:offset	signed dec		symbol
-	i		???		hex bytes		assembler instr.
+    b       byte    hex byte        signed dec      ASCII character
+    w       word    hex word        unsigned dec    signed decimal
+    d       dword   segment:offset  signed dec      symbol
+    i       ???     hex bytes       assembler instr.
 
 + The default mode is swat's best guess of what type of object is at the 
 address.
@@ -4440,7 +4441,7 @@ enter instruction step mode, `<ret>` does a next command
 Step through the execution of the current patient. This is THE command for 
 stepping through assembly code.
 
-**Notes:**	
+**Notes:**  
 
 + The default command argument determines what pressing the `<Return>` 
 key does. By default, `<Return`> executes a step command. Any other 
@@ -4458,7 +4459,7 @@ is executing.
     `q, <Esc>, " "` - Stops istep and returns to command level.  
     `b` - Toggles a breakpoint at the current location.  
     `c` - Stops istep and continues execution.  
-    `n` - 	Continues to the next instruction, skipping procedure calls, 
+    `n` -   Continues to the next instruction, skipping procedure calls, 
 repeated string instructions, and software interrupts. Using 
 this procedure, istep only stops when the machine returns to 
 the right context (i.e. the stack pointer and current thread are 

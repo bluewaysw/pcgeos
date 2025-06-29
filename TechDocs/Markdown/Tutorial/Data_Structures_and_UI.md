@@ -112,10 +112,10 @@ language, making your code easy to read is a good thing.
 
 ~~~
 @class MCProcessClass, GenProcessClass; 
-	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_MCP_SET_DATA_ITEM_MONIKER;
-	@message void MSG_MCP_DELETE_DATA_ITEM();
-	@message void MSG_MCP_INSERT_DATA_ITEM();
-	@message void MSG_MCP_SET_DATA_ITEM();
+        @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_MCP_SET_DATA_ITEM_MONIKER;
+        @message void MSG_MCP_DELETE_DATA_ITEM();
+        @message void MSG_MCP_INSERT_DATA_ITEM();
+        @message void MSG_MCP_SET_DATA_ITEM();
 @endc /* end of MCProcessClass definition */ 
 ~~~
 
@@ -147,8 +147,8 @@ INCLUDE\OBJECTS\GDLISTC.GOH include file:
 
 ~~~
 @prototype void GEN_DYNAMIC_LIST_QUERY_MSG(
-						optr list,
-						word item);
+                                                optr list,
+                                                word item);
 ~~~
 
 From this we know that our message definition is equivalent to having 
@@ -156,8 +156,8 @@ defined it as follows
 
 ~~~
 @message void MSG_MCP_SET_DATA_ITEM_MONIKER(
-						optr list,
-						word item);
+                                                optr list,
+                                                word item);
 ~~~
 
 Using the message prototype makes the message's purpose clearer. For more 
@@ -179,13 +179,13 @@ program.
 
 ~~~
 typedef struct {
-	word		LN_data;
-	ChunkHandle 		LN_next;
+        word            LN_data;
+        ChunkHandle             LN_next;
 } ListNode; 
 
-VMFileHandle 	dataFile; 	/* File which will hold our data */
-VMBlockHandle 	dataFileBlock; /* Block within dataFile */
-MemHandle dataListBlock; 			 /* Block of memory which will hold our linked list. */
+VMFileHandle    dataFile;       /* File which will hold our data */
+VMBlockHandle   dataFileBlock; /* Block within dataFile */
+MemHandle dataListBlock;                         /* Block of memory which will hold our linked list. */
 MemHandle *dataListBlockPtr = &dataListBlock; /* Pointer to above handle */
 ChunkHandle dataListHead = 0; /* Chunk containing head of linked list. */
 ChunkHandle tempListItem; /*Chunk handle we will use when traversing lists */
@@ -211,9 +211,9 @@ loaded into memory.
 ### 5.5 MCHRT.GOC: New Objects
 
 ~~~
-@object GenPrimaryClass MCPrimary = { 	
-	GI_comp = @MCDataList, @MCAddTrigger,
-				 @MCDeleteTrigger, @MCChangeTrigger, @MCValue; 
+@object GenPrimaryClass MCPrimary = {   
+        GI_comp = @MCDataList, @MCAddTrigger,
+                                 @MCDeleteTrigger, @MCChangeTrigger, @MCValue; 
 } 
 ~~~
 
@@ -222,12 +222,12 @@ which we have added.
 
 ~~~
 @object GenDynamicListClass MCDataList = {
-	GIGI_selection = FAKE_LIST_ITEM; 
-	GIGI_numSelections = 1; 
-	GIGI_destination = process;
-	GDLI_numItems = 1;
-	GDLI_queryMsg = MSG_MCP_SET_DATA_ITEM_MONIKER;
-	HINT_ITEM_GROUP_SCROLLABLE;
+        GIGI_selection = FAKE_LIST_ITEM; 
+        GIGI_numSelections = 1; 
+        GIGI_destination = process;
+        GDLI_numItems = 1;
+        GDLI_queryMsg = MSG_MCP_SET_DATA_ITEM_MONIKER;
+        HINT_ITEM_GROUP_SCROLLABLE;
 } 
 ~~~
 
@@ -290,19 +290,19 @@ ResEdit translation utility, providing some contextual information.
 
 ~~~
 @object GenTriggerClass MCAddTrigger = {
-	GI_visMoniker = "Add";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_INSERT_DATA_ITEM;
+        GI_visMoniker = "Add";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_INSERT_DATA_ITEM;
 } 
 @object GenTriggerClass MCChangeTrigger = {
-	GI_visMoniker = "Change";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_SET_DATA_ITEM;
+        GI_visMoniker = "Change";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_SET_DATA_ITEM;
 } 
 @object GenTriggerClass MCDeleteTrigger = {
-	GI_visMoniker = "Delete";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_DELETE_DATA_ITEM;
+        GI_visMoniker = "Delete";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_DELETE_DATA_ITEM;
 }
 ~~~
 
@@ -326,9 +326,9 @@ we're just providing a simple string for each object.
 
 ~~~
 @object GenValueClass MCValue = {
-	GVLI_minimum = MakeWWFixed(0);
-	GVLI_maximum = MakeWWFixed(0x7fff);
-	GVLI_value = MakeWWFixed(123);
+        GVLI_minimum = MakeWWFixed(0);
+        GVLI_maximum = MakeWWFixed(0x7fff);
+        GVLI_value = MakeWWFixed(123);
 } 
 ~~~
 
@@ -374,12 +374,12 @@ supposed to reply to the message by sending a message back which will
 supply a moniker to draw.
 
 ~~~
-	if (item==FAKE_LIST_ITEM) {
-		optr moniker;
-		moniker = ConstructOptr(OptrToHandle(list),
-				OptrToChunk(@FakeItemMoniker));
-		@send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
-				FAKE_LIST_ITEM, moniker);}
+        if (item==FAKE_LIST_ITEM) {
+                optr moniker;
+                moniker = ConstructOptr(OptrToHandle(list),
+                                OptrToChunk(@FakeItemMoniker));
+                @send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+                                FAKE_LIST_ITEM, moniker);}
 ~~~
 
 We begin by handling the special case in which the list is asking for the 
@@ -406,9 +406,9 @@ have read
 
 ~~~
 if (item==FAKE_LIST_ITEM) {
- 	@send 
+        @send 
 list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
-		 FAKE_LIST_ITEM, @FakeItemMoniker);
+                 FAKE_LIST_ITEM, @FakeItemMoniker);
 ~~~
 
 The only reason we went to all of this trouble of constructing an object pointer 
@@ -431,23 +431,23 @@ Objects," Chapter 11 of the Object Reference Book or its entry in
 ~~~
 @message void \
 MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
-	word item, optr moniker);
+        word item, optr moniker);
 ~~~
 
 The arguments we're passing with the message specify that we are setting 
 the moniker of the zeroth item of the list and supply the moniker to use.
 
 ~~~
-	else /* item > FAKE_LIST_ITEM */ {
-		char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
-		word data;
+        else /* item > FAKE_LIST_ITEM */ {
+                char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
+                word data;
 
-		data = MCListGetDataItem(item);
+                data = MCListGetDataItem(item);
 
-		LocalFixedToAscii(monikerString, MakeWWFixed(data), 0);
-		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-						 item, monikerString);
-	}
+                LocalFixedToAscii(monikerString, MakeWWFixed(data), 0);
+                @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                                                 item, monikerString);
+        }
 } /* end of MSG_MCP_SET_DATA_ITEM_MONIKER */
 ~~~
 
@@ -471,9 +471,9 @@ Concepts book, its entry in the Routines reference, and/or the file
 
 ~~~
 extern void _pascal LocalFixedToAscii(
-	char *buffer,
-	WWFixedAsDWord value,
-	word fracDig);
+        char *buffer,
+        WWFixedAsDWord value,
+        word fracDig);
 ~~~
 
 The final thing we do when handling this message is send a 
@@ -499,14 +499,14 @@ will still be there at the vital time.
 
 ~~~
 extern word _pascal MCListGetDataItem(word ordinal) {
-	word data;
+        word data;
 ~~~
 
 Next we'll provide the code for the MCListGetDataItem() routine. We begin 
 with a fairly ordinary C header for the routine.
 
 ~~~
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 ~~~
 
 Next we lock a block of our VM file into memory. This is the block which we 
@@ -518,9 +518,9 @@ Concepts book, its entry in the appropriate reference book, and/or its entry
 in \PCGEOS\INCLUDE\VM.h:
 
 ~~~
-extern void * _pascal VMLock(					VMFileHandle file,
-	 				VMBlockHandle block, 
-	 				MemHandle *mh);
+extern void * _pascal VMLock(                                   VMFileHandle file,
+                                        VMBlockHandle block, 
+                                        MemHandle *mh);
 ~~~
 
 Now that our block of memory is locked into place on the heap, we'll be able 
@@ -529,13 +529,13 @@ ChunkHandle which references the first item in our list (we will see this in
 a later message handler).
 
 ~~~
-	for(tempNode = LMemDerefHandles(dataListBlock, dataListHead);
-			 ordinal > 1;
-			 --ordinal)
-	 {
-		tempListItem = tempNode->LN_next;
-		tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-	 }
+        for(tempNode = LMemDerefHandles(dataListBlock, dataListHead);
+                         ordinal > 1;
+                         --ordinal)
+         {
+                tempListItem = tempNode->LN_next;
+                tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+         }
 ~~~
 
 Here we traverse the linked list until we reach the Nth item, where N is 
@@ -548,9 +548,9 @@ about this and other local memory routines and macros, see the Concepts
 manual and the appropriate reference.
 
 ~~~
-	data = tempNode->LN_data;
-	VMUnlock(dataListBlock);
-	return data;
+        data = tempNode->LN_data;
+        VMUnlock(dataListBlock);
+        return data;
 } 
 ~~~
 
@@ -596,8 +596,8 @@ other parts of the program. There was a routine prototype:
 
 ~~~
 extern void _pascal MCListInsertDataItem(
-				optr oself,
-				MCProcessMessages message)
+                                optr oself,
+                                MCProcessMessages message)
 ~~~
 
 The oself and message arguments are arguments that all methods expect, 
@@ -614,10 +614,10 @@ consistent with the others. Actually, we only left it in as an excuse to
 demonstrate how you might call a message handler as a routine.
 
 ~~~
-	ChunkHandle 		newListItem;
-	ListNode 		*newNode;
-	WWFixedAsDWord		value;
-	word 		ordinal;
+        ChunkHandle             newListItem;
+        ListNode                *newNode;
+        WWFixedAsDWord          value;
+        word            ordinal;
 ~~~
 
 The WWFixedAsDWord structure is a 32-bit field which contains 
@@ -625,7 +625,7 @@ the same information as a WWFixed structure: a number with 16
 bits of integer and 16 bits of fraction.
 
 ~~~
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 ~~~
 
 The first thing we're doing in this message handler is send another message. 
@@ -649,7 +649,7 @@ special kernel routine to get the handle of the memory block containing the
 correct resource.
 
 ~~~
-	value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
+        value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
 ~~~
 
 Next we use @call to send another message. Again we're using @call because 
@@ -657,8 +657,8 @@ we need a return value. This time that return value will be the number that
 the user wants to use as the data for the new data item.
 
 ~~~
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	newListItem = LMemAlloc(dataListBlock, sizeof(ListNode));
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        newListItem = LMemAlloc(dataListBlock, sizeof(ListNode));
 ~~~
 
 After locking down the VM block as we did in MCListGetDataItem(), we 
@@ -667,49 +667,49 @@ learn more about the LMemAlloc() routine, see its entry in the Concepts
 book or the Routines reference.
 
 ~~~
-	newNode = LMemDerefHandles(dataListBlock, newListItem);
-	newNode->LN_data = WWFixedToInt(value);
+        newNode = LMemDerefHandles(dataListBlock, newListItem);
+        newNode->LN_data = WWFixedToInt(value);
 ~~~
 
 Having dereferenced the new chunk's handle, we use the pointer so that we 
 can access its LN_data field and fill it in with a number.
 
 ~~~
-	if (ordinal==FAKE_LIST_ITEM)
-	 {
-		newNode->LN_next = dataListHead;
-		dataListHead = newListItem;
-	 }
+        if (ordinal==FAKE_LIST_ITEM)
+         {
+                newNode->LN_next = dataListHead;
+                dataListHead = newListItem;
+         }
 ~~~
 
 If we're inserting the new item at the head of the list, we only have to update 
 the dataListHead global variable and the new node's LN_next field.
 
 ~~~
-	else
-		 {
-		word count = ordinal;
-		for (tempNode = LMemDerefHandles(dataListBlock, dataListHead);
-			 count > 1;
-			 --count)
-		 {
-			tempListItem = tempNode->LN_next;
-			tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-		 }
-		newNode->LN_next = tempNode->LN_next;
-		tempNode->LN_next = newListItem; 
-	 }
+        else
+                 {
+                word count = ordinal;
+                for (tempNode = LMemDerefHandles(dataListBlock, dataListHead);
+                         count > 1;
+                         --count)
+                 {
+                        tempListItem = tempNode->LN_next;
+                        tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+                 }
+                newNode->LN_next = tempNode->LN_next;
+                tempNode->LN_next = newListItem; 
+         }
 ~~~
 
 Otherwise, we'll traverse the list as before and then insert the new item by 
 filling in the LN_next fields of the appropriate nodes.
 
 ~~~
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(ordinal+1, 1);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal+1, 
-									FALSE);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(ordinal+1, 1);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal+1, 
+                                                                        FALSE);
 } 
 ~~~
 
@@ -724,20 +724,20 @@ MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION message.
 
 ~~~
 @method MCProcessClass, MSG_MCP_DELETE_DATA_ITEM {
-	word 		ordinal;
-	word 		count;
-	ChunkHandle 		oldItem;
-	ListNode		*oldNode;
+        word            ordinal;
+        word            count;
+        ChunkHandle             oldItem;
+        ListNode                *oldNode;
 
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	if (ordinal==FAKE_LIST_ITEM) return;
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	if (ordinal == 1) {
-		oldNode = LMemDerefHandles(dataListBlock, dataListHead);
-		tempListItem = oldNode->LN_next;
-		LMemFreeHandles(dataListBlock, dataListHead);
-		dataListHead = tempListItem;
-	 }
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (ordinal==FAKE_LIST_ITEM) return;
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        if (ordinal == 1) {
+                oldNode = LMemDerefHandles(dataListBlock, dataListHead);
+                tempListItem = oldNode->LN_next;
+                LMemFreeHandles(dataListBlock, dataListHead);
+                dataListHead = tempListItem;
+         }
 ~~~
 
 By this time, you can probably understand most of what this message 
@@ -751,22 +751,22 @@ will free up the memory which was associated with the chunk which we are
 deleting.
 
 ~~~
-	else {
-		for (tempNode=LMemDerefHandles(dataListBlock, dataListHead),
-			 count= ordinal;
-			 count > 2;
-			 --count)
-		 {
-			tempListItem = tempNode->LN_next;
-			tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-		 }
-		oldItem = tempNode->LN_next;
-		oldNode = LMemDerefHandles(dataListBlock, oldItem);
-		tempNode->LN_next = oldNode->LN_next;
-		LMemFreeHandles(dataListBlock, oldItem);
-	 }
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        else {
+                for (tempNode=LMemDerefHandles(dataListBlock, dataListHead),
+                         count= ordinal;
+                         count > 2;
+                         --count)
+                 {
+                        tempListItem = tempNode->LN_next;
+                        tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+                 }
+                oldItem = tempNode->LN_next;
+                oldNode = LMemDerefHandles(dataListBlock, oldItem);
+                tempNode->LN_next = oldNode->LN_next;
+                LMemFreeHandles(dataListBlock, oldItem);
+         }
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 ~~~
 
 Again, you should be able to figure out what is going on here. We are 
@@ -776,9 +776,9 @@ soon-to-be-deleted node. Again, we use the LMemFreeHandles() macro to
 free up the memory we had allocated for the chunk.
 
 ~~~
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(ordinal, 1);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal-1, 
-									FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(ordinal, 1);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal-1, 
+                                                                        FALSE);
 } 
 ~~~
 
@@ -787,29 +787,29 @@ then tell it to update its selection.
 
 ~~~
 @method MCProcessClass, MSG_MCP_SET_DATA_ITEM {
-	word 		ordinal;
-	WWFixedAsDWord 		value;
-	char 		monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
-	word 		count;
+        word            ordinal;
+        WWFixedAsDWord          value;
+        char            monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
+        word            count;
 
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	if (ordinal == FAKE_LIST_ITEM) return;
-	value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	for (tempNode = LMemDerefHandles(dataListBlock, dataListHead),
-		 count = ordinal - 1;
-		 count > 0;
-		 --count)
-	 {
-		tempListItem = tempNode->LN_next;
-		tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-	 }
-	tempNode->LN_data = WWFixedToInt(value);
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
-	LocalFixedToAscii(monikerString, value, 0);
-	@call MCDataList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-							ordinal, monikerString);
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (ordinal == FAKE_LIST_ITEM) return;
+        value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        for (tempNode = LMemDerefHandles(dataListBlock, dataListHead),
+                 count = ordinal - 1;
+                 count > 0;
+                 --count)
+         {
+                tempListItem = tempNode->LN_next;
+                tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+         }
+        tempNode->LN_data = WWFixedToInt(value);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
+        LocalFixedToAscii(monikerString, value, 0);
+        @call MCDataList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                                                        ordinal, monikerString);
 } 
 ~~~
 
@@ -831,9 +831,9 @@ INCLUDE\GPROCC.GOH:
 
 ~~~
 @message void MSG_GEN_PROCESS_OPEN_APPLICATION(
-			AppAttachFlags			attachFlags,
-			MemHandle			launchBlock,
-			MemHandle			extraState);
+                        AppAttachFlags                  attachFlags,
+                        MemHandle                       launchBlock,
+                        MemHandle                       extraState);
 ~~~
 
 As it happens, we won't be using the parameters to this message, but you 
@@ -847,10 +847,10 @@ Handling a message defined by a superclass in this manner is often referred
 to as "intercepting" the message.
 
 ~~~
-	char fileName[] = "MchtDATA"
-	dataFile=VMOpen(fileName, 
-			VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
-			VMO_CREATE_TRUNCATE, 0);
+        char fileName[] = "MchtDATA"
+        dataFile=VMOpen(fileName, 
+                        VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
+                        VMO_CREATE_TRUNCATE, 0);
 ~~~
 
 Since our data structure will reside within a VM file, the first thing we must 
@@ -872,7 +872,7 @@ safely ignore the contents of the VM file. Eventually, we should probably stop
 erasing the file's contents so that this file can save something.
 
 ~~~
-	dataFileBlock = VMAllocLMem(dataFile, LMEM_TYPE_GENERAL, 0);
+        dataFileBlock = VMAllocLMem(dataFile, LMEM_TYPE_GENERAL, 0);
 ~~~
 
 The VMAllocLMem() routine allocates a VM block within our VM file and 
@@ -886,7 +886,7 @@ start of the block to act as a header. Since we don't have any header
 information to store, we pass zero here.
 
 ~~~
-	@callsuper();
+        @callsuper();
 } 
 ~~~
 
@@ -902,9 +902,9 @@ superclass' handler.
 
 ~~~
 @method MCProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
-	VMClose(dataFile, FALSE);
-	@callsuper();
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
+        VMClose(dataFile, FALSE);
+        @callsuper();
 }
 ~~~
 
@@ -980,33 +980,33 @@ commands to enter, so we will continue.
 
 ~~~
 (loader:0) 1 => c
-Looking for "geos 					Eker"...C:/PCGEOS/Library/Kernel/geosec.geo
-Looking for "ms4 					Eifs"...C:/PCGEOS/Driver/IFS/DOS/MS4/ms4ec.geo
+Looking for "geos                                       Eker"...C:/PCGEOS/Library/Kernel/geosec.geo
+Looking for "ms4                                        Eifs"...C:/PCGEOS/Driver/IFS/DOS/MS4/ms4ec.geo
 Thread 1 created for patient geos
 Thread 2 created for patient geos
-Looking for "vidmem 					Edrv"...C:/PCGEOS/Driver/Video/Dumb/VidMem/vidmemec.geo
-Looking for "swap 					Elib"...C:/PCGEOS/Library/Swap/swapec.geo
-Looking for "xms 					Edrv"...C:/PCGEOS/Driver/Swap/XMS/xmsec.geo
-Looking for "disk 					Edrv"...C:/PCGEOS/Driver/Swap/Disk/diskec.geo
-Looking for "kbd 					drvr"...C:/PCGEOS/Driver/Keyboard/kbd.geo
-Looking for "nimbus 					Edrv"...C:/PCGEOS/Driver/Font/Nimbus/nimbusec.geo
-Looking for "stream 					Edrv"...C:\PCGEOS/Driver/Stream/streamec.GEO
-Looking for "sound 					Elib"...C:/PCGEOS/Library/Sound/soundec.geo
-Looking for "standard					Edrv"...C:/PCGEOS/Driver/Sound/Standard/standard.geo
-Looking for "ui 					Elib"...C:/PCGEOS/Library/User/uiec.geo
+Looking for "vidmem                                     Edrv"...C:/PCGEOS/Driver/Video/Dumb/VidMem/vidmemec.geo
+Looking for "swap                                       Elib"...C:/PCGEOS/Library/Swap/swapec.geo
+Looking for "xms                                        Edrv"...C:/PCGEOS/Driver/Swap/XMS/xmsec.geo
+Looking for "disk                                       Edrv"...C:/PCGEOS/Driver/Swap/Disk/diskec.geo
+Looking for "kbd                                        drvr"...C:/PCGEOS/Driver/Keyboard/kbd.geo
+Looking for "nimbus                                     Edrv"...C:/PCGEOS/Driver/Font/Nimbus/nimbusec.geo
+Looking for "stream                                     Edrv"...C:\PCGEOS/Driver/Stream/streamec.GEO
+Looking for "sound                                      Elib"...C:/PCGEOS/Library/Sound/soundec.geo
+Looking for "standard                                   Edrv"...C:/PCGEOS/Driver/Sound/Standard/standard.geo
+Looking for "ui                                         Elib"...C:/PCGEOS/Library/User/uiec.geo
 Thread 0 created for patient ui
-Looking for "styles 					Elib"...C:\PCGEOS/Library/Styles/stylesec.GEO
-Looking for "color 					Elib"...C:\PCGEOS/Library/Color/colorec.GEO
-Looking for "ruler 					Elib"...C:\PCGEOS/Library/Ruler/rulerec.GEO
-Looking for "text 					Elib"...C:/PCGEOS/Library/Text/textec.geo
-Looking for "motif 					Espu"...C:\PCGEOS/Library/Motif/motifec.GEO
-Looking for "vga 					Edrv"...C:/PCGEOS/Driver/Video/VGAlike/VGA/vgaec.geo
-Looking for "nonts 					Edrv"...C:/PCGEOS/Driver/Task/NonTS/nontsec.geo
-Looking for "spool 					Elib"...C:\PCGEOS/Library/Spool/spoolec.GEO
+Looking for "styles                                     Elib"...C:\PCGEOS/Library/Styles/stylesec.GEO
+Looking for "color                                      Elib"...C:\PCGEOS/Library/Color/colorec.GEO
+Looking for "ruler                                      Elib"...C:\PCGEOS/Library/Ruler/rulerec.GEO
+Looking for "text                                       Elib"...C:/PCGEOS/Library/Text/textec.geo
+Looking for "motif                                      Espu"...C:\PCGEOS/Library/Motif/motifec.GEO
+Looking for "vga                                        Edrv"...C:/PCGEOS/Driver/Video/VGAlike/VGA/vgaec.geo
+Looking for "nonts                                      Edrv"...C:/PCGEOS/Driver/Task/NonTS/nontsec.geo
+Looking for "spool                                      Elib"...C:\PCGEOS/Library/Spool/spoolec.GEO
 Thread 0 created for patient spool
-Looking for "serial 					Edrv"...C:/PCGEOS/Driver/Stream/Serial/serialec.geo
-Looking for "msSer 					Edrv"...C:/PCGEOS/Driver/Mouse/MSSer/msserec.geo
-Looking for "welcome					Eapp"...C:/PCGEOS/Appl/Startup/Welcome/welcomee.geo
+Looking for "serial                                     Edrv"...C:/PCGEOS/Driver/Stream/Serial/serialec.geo
+Looking for "msSer                                      Edrv"...C:/PCGEOS/Driver/Mouse/MSSer/msserec.geo
+Looking for "welcome                                    Eapp"...C:/PCGEOS/Appl/Startup/Welcome/welcomee.geo
 Thread 0 created for patient welcome
 ~~~
 
@@ -1014,13 +1014,13 @@ When faced with the Welcome screen on the target, click on the "Advanced"
 trigger, and start up our application, which should be in the OTHER directory.
 
 ~~~
-Looking for "shell 					Elib"...C:/PCGEOS/Library/Shell/shellec.geo
-Looking for "manager				Eapp"...C:/PCGEOS/Appl/FileMgrs/GeoManag/managere.geo
+Looking for "shell                                      Elib"...C:/PCGEOS/Library/Shell/shellec.geo
+Looking for "manager                            Eapp"...C:/PCGEOS/Appl/FileMgrs/GeoManag/managere.geo
 Thread 0 created for patient manager
 Thread 1 created for patient manager
-Looking for "math 					Elib"...C:\PCGEOS/Library/Math/mathec.GEO
-Looking for "borlandcE					lib"...C:\PCGEOS/Library/MATH/COMPILER/BORLANDC/BORLANDC.GEO
-Looking for "mchrt 					Eapp"...C:\PCGEOS/Appl/Mchrt/mchrtec.GEO
+Looking for "math                                       Elib"...C:\PCGEOS/Library/Math/mathec.GEO
+Looking for "borlandcE                                  lib"...C:\PCGEOS/Library/MATH/COMPILER/BORLANDC/BORLANDC.GEO
+Looking for "mchrt                                      Eapp"...C:\PCGEOS/Appl/Mchrt/mchrtec.GEO
 Thread 0 created for patient mchrt
 Thread 1 created for patient mchrt
 ~~~
@@ -1295,7 +1295,7 @@ Use the brk list command to list the current breakpoints.
 
 ~~~
 (mchrt:0) 16 => brk list
-Num S   Address 	                    Patient  Command/Condition
+Num S   Address                             Patient  Command/Condition
 1   E loader::kcode::LoaderError        all      echo Loader death due to [penum
 LoaderStrings [read-reg ax]]
                                                  expr 1
@@ -1506,21 +1506,21 @@ machine and watch messages sent to our value object. When done, hit ctrl-c.
 ~~~
 [mchrt:0] 37 => c
 MSG_GEN_VALUE_GET_VALUE, ^l48a0h:0030h, GenValueClass
- 	cx = cccch, dx = cccch, bp = cccch
+        cx = cccch, dx = cccch, bp = cccch
 MSG_GEN_VALUE_GET_VALUE, ^l48a0h:0030h, GenValueClass
- 	cx = cccch, dx = cccch, bp = cccch
+        cx = cccch, dx = cccch, bp = cccch
 MSG_VIS_POSITION_BRANCH, ^l48a0h:0030h, GenValueClass
- 	cx = 0009h, dx = 00bdh, bp = 0612h
+        cx = 0009h, dx = 00bdh, bp = 0612h
 MSG_VIS_COMP_GET_MARGINS, ^l48a0h:0030h, GenValueClass
- 	cx = 0023h, dx = 000ch, bp = 0612h
+        cx = 0023h, dx = 000ch, bp = 0612h
 MSG_VIS_VUP_CREATE_GSTATE, ^l48a0h:0030h, GenValueClass
- 	cx = 000dh, dx = 00bfh, bp = 000ch
+        cx = 000dh, dx = 00bfh, bp = 000ch
 MSG_VIS_COMP_GET_CHILD_SPACING, ^l48a0h:0030h, GenValueClass
- 	cx = 0000h, dx = 00bdh, bp = 0576h
+        cx = 0000h, dx = 00bdh, bp = 0576h
 MSG_VIS_COMP_GET_MARGINS, ^l48a0h:0030h, GenValueClass
- 	cx = 0005h, dx = 0000h, bp = 0576h
+        cx = 0005h, dx = 0000h, bp = 0576h
 MSG_VIS_COMP_GET_MARGINS, ^l48a0h:0030h, GenValueClass
- 	cx = 0005h, dx = 0000h, bp = 0576h
+        cx = 0005h, dx = 0000h, bp = 0576h
 PC Halted
 Stopped in Idle, address 15e8h:bab7h
 Idle+31: ADD DI, 4 (04h) ;dceh
@@ -1550,8 +1550,8 @@ appobj MCApp
 tokenchars "MCht"
 tokenid 0
 
-library 	geos
-library 	ui
+library         geos
+library         ui
 
 resource APPRESOURCE ui-object
 resource INTERFACE ui-object 
@@ -1561,7 +1561,7 @@ resource INTERFACE ui-object
 Code Display 4-2 MCHRT.GOC
 ~~~
 /**************************************************************
- *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+ *      Copyright (c) GeoWorks 1993 -- All Rights Reserved
  *
  * MChrt is a charting application. It maintains a list of
  * numbers and constructs a bar chart to display them.
@@ -1584,10 +1584,10 @@ Code Display 4-2 MCHRT.GOC
 @class MCProcessClass, GenProcessClass;
 /* For information about the messages listed below, see the
  * headers for their handlers, later in this file. */
-	@message (GEN_DYNAMIC_LIST_QUERY_MSG) 					MSG_MCP_SET_DATA_ITEM_MONIKER;
-	@message void 					MSG_MCP_DELETE_DATA_ITEM();
-	@message void 					MSG_MCP_INSERT_DATA_ITEM();
-	@message void					MSG_MCP_SET_DATA_ITEM();
+        @message (GEN_DYNAMIC_LIST_QUERY_MSG)                                   MSG_MCP_SET_DATA_ITEM_MONIKER;
+        @message void                                   MSG_MCP_DELETE_DATA_ITEM();
+        @message void                                   MSG_MCP_INSERT_DATA_ITEM();
+        @message void                                   MSG_MCP_SET_DATA_ITEM();
 @endc /* end of MCProcessClass definition */
 
 @classdecl MCProcessClass, neverSaved;
@@ -1605,35 +1605,35 @@ extern word _pascal MCListGetDataItem(word ordinal);
  * stored in a ListNode structure. 
  */
 typedef struct {
-	word 		LN_data;
-	ChunkHandle 		LN_next;
+        word            LN_data;
+        ChunkHandle             LN_next;
 } ListNode;
 
 /* A given piece of data is stored:
- *	In a ListNode							tempNode
- *	referenced by a ChunkHandle							tempListItem
- *	in a memory block referenced by a MemHandle 							dataListBlock
- *	loaded from a VM block referenced by a VMBlockHandle							dataFileBlock
- *	in a file referenced by a VMFileHandle			 				dataFile
+ *      In a ListNode                                                   tempNode
+ *      referenced by a ChunkHandle                                                     tempListItem
+ *      in a memory block referenced by a MemHandle                                                     dataListBlock
+ *      loaded from a VM block referenced by a VMBlockHandle                                                    dataFileBlock
+ *      in a file referenced by a VMFileHandle                                                  dataFile
  */
 
-VMFileHandle 	dataFile;				/* File which will hold our data */
-VMBlockHandle 	dataFileBlock;				/* Block within dataFile */
-MemHandle 	dataListBlock;				/* Block of memory holding our data */
-MemHandle 	*dataListBlockPtr = &dataListBlock; /* Ptr to above Handle */
-ChunkHandle	dataListHead = 0;				/* Chunk containing head of
-					 * linked list. */
-ChunkHandle	tempListItem; 				/* Chunk handle which we will
-					 * use when traversing lists. */
-ListNode 	*tempNode;				/* List item which we will use
-					 * when traversing lists. */
+VMFileHandle    dataFile;                               /* File which will hold our data */
+VMBlockHandle   dataFileBlock;                          /* Block within dataFile */
+MemHandle       dataListBlock;                          /* Block of memory holding our data */
+MemHandle       *dataListBlockPtr = &dataListBlock; /* Ptr to above Handle */
+ChunkHandle     dataListHead = 0;                               /* Chunk containing head of
+                                         * linked list. */
+ChunkHandle     tempListItem;                           /* Chunk handle which we will
+                                         * use when traversing lists. */
+ListNode        *tempNode;                              /* List item which we will use
+                                         * when traversing lists. */
 
 /* OBJECT Resources */
 /* APPRESOURCE will hold the application object and other information
  * which the system will want to load when it wants to find out about
  * the application but doesn't need to run the application. 
  */
-@start	AppResource;
+@start  AppResource;
 
 @object GenApplicationClass MCApp = {
  GI_visMoniker = list { @MCTextMoniker }
@@ -1643,51 +1643,51 @@ ListNode 	*tempNode;				/* List item which we will use
 
 @visMoniker MCTextMoniker = "MyChart Application";
 
-@end	AppResource;
+@end    AppResource;
 
 /* The INTERFACE resource holds the bulk of our Generic UI gadgetry. */
-@start	Interface;
+@start  Interface;
 
 @object GenPrimaryClass MCPrimary = {
-	GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
- 		  @MCChangeTrigger, @MCValue;
+        GI_comp = @MCDataList, @MCAddTrigger, @MCDeleteTrigger,
+                  @MCChangeTrigger, @MCValue;
 }
 
 @object GenDynamicListClass MCDataList = {
-	GIGI_selection = FAKE_LIST_ITEM;
-	GIGI_numSelections = 1;
-	GIGI_applyMsg = 0;
-	GIGI_destination = process;
-	GDLI_numItems = 1;
-	GDLI_queryMsg = MSG_MCP_SET_DATA_ITEM_MONIKER;
-	HINT_ITEM_GROUP_SCROLLABLE;
+        GIGI_selection = FAKE_LIST_ITEM;
+        GIGI_numSelections = 1;
+        GIGI_applyMsg = 0;
+        GIGI_destination = process;
+        GDLI_numItems = 1;
+        GDLI_queryMsg = MSG_MCP_SET_DATA_ITEM_MONIKER;
+        HINT_ITEM_GROUP_SCROLLABLE;
 }
 
 @visMoniker FakeItemMoniker = "Data:";
 @localize "This string will appear at the head of the list";
 
 @object GenTriggerClass MCAddTrigger = {
-	GI_visMoniker = "Add";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_INSERT_DATA_ITEM;
+        GI_visMoniker = "Add";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_INSERT_DATA_ITEM;
 }
 
 @object GenTriggerClass MCChangeTrigger = {
-	GI_visMoniker = "Change";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_SET_DATA_ITEM;
+        GI_visMoniker = "Change";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_SET_DATA_ITEM;
 }
 
 @object GenTriggerClass MCDeleteTrigger = {
-	GI_visMoniker = "Delete";
-	GTI_destination = process;
-	GTI_actionMsg = MSG_MCP_DELETE_DATA_ITEM;
+        GI_visMoniker = "Delete";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MCP_DELETE_DATA_ITEM;
 }
 
 @object GenValueClass MCValue = {
-	GVLI_minimum = MakeWWFixed(0);
-	GVLI_maximum = MakeWWFixed(0x7ffe);
-	GVLI_value = MakeWWFixed(123);
+        GVLI_minimum = MakeWWFixed(0);
+        GVLI_maximum = MakeWWFixed(0x7ffe);
+        GVLI_value = MakeWWFixed(123);
 }
 
 @end Interface;
@@ -1696,12 +1696,12 @@ ListNode 	*tempNode;				/* List item which we will use
 
 /* MSG_MCP_SET_DATA_ITEM_MONIKER
  *
- *	SYNOPSIS: Set the moniker for one of our Data List's items.
- *	CONTEXT: The Data List will send this message to the process
- *		 whenever it needs to display the moniker of a given
- *		 item. We should respond with one of the
- *		 MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_... messages.
- *	PARAMS: void (optr list, word item)
+ *      SYNOPSIS: Set the moniker for one of our Data List's items.
+ *      CONTEXT: The Data List will send this message to the process
+ *               whenever it needs to display the moniker of a given
+ *               item. We should respond with one of the
+ *               MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_... messages.
+ *      PARAMS: void (optr list, word item)
  */
 @method MCProcessClass, MSG_MCP_SET_DATA_ITEM_MONIKER {
 
@@ -1709,256 +1709,256 @@ ListNode 	*tempNode;				/* List item which we will use
  * just return that moniker. Otherwise, look up the
  * numerical value of the item as stored in the linked list. 
  */
-	if (item==FAKE_LIST_ITEM) {
-		optr moniker;
-		moniker = ConstructOptr(OptrToHandle(list),
-				OptrToChunk(@FakeItemMoniker));
-		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
-				FAKE_LIST_ITEM, moniker);}
-	else /* item > FAKE_LIST_ITEM */ {
-		char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
-		word data;
+        if (item==FAKE_LIST_ITEM) {
+                optr moniker;
+                moniker = ConstructOptr(OptrToHandle(list),
+                                OptrToChunk(@FakeItemMoniker));
+                @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+                                FAKE_LIST_ITEM, moniker);}
+        else /* item > FAKE_LIST_ITEM */ {
+                char monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
+                word data;
 
-		data = MCListGetDataItem(item);
+                data = MCListGetDataItem(item);
 
-		LocalFixedToAscii(monikerString, MakeWWFixed(data), 0);
-		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-						 item, monikerString);
-	}
+                LocalFixedToAscii(monikerString, MakeWWFixed(data), 0);
+                @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                                                 item, monikerString);
+        }
 } /* end of MSG_MCP_SET_DATA_ITEM_MONIKER */
 
 /* MCListGetDataItem()
  *
- *	SYNOPSIS: Return the Nth piece of data.
- *	CONTEXT: Utility routine.
- *	PARAMS: word (word ordinal)
+ *      SYNOPSIS: Return the Nth piece of data.
+ *      CONTEXT: Utility routine.
+ *      PARAMS: word (word ordinal)
  */
 extern word _pascal MCListGetDataItem(word ordinal) {
-	word data;
+        word data;
 
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
-	for(tempNode = LMemDerefHandles(dataListBlock, dataListHead);
-	 ordinal > 1;
-	 --ordinal)
-		{
-		 tempListItem = tempNode->LN_next;
-		 tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-		}
-	data = tempNode->LN_data;
-	VMUnlock(dataListBlock);
-	return data;
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        for(tempNode = LMemDerefHandles(dataListBlock, dataListHead);
+         ordinal > 1;
+         --ordinal)
+                {
+                 tempListItem = tempNode->LN_next;
+                 tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+                }
+        data = tempNode->LN_data;
+        VMUnlock(dataListBlock);
+        return data;
 } /* end of MCListGetDataItem() */
 
 /* MSG_MCP_INSERT_DATA_ITEM
  *
- *	SYNOPSIS: Add a new number to our list of data.
- *	CONTEXT: User wants to add a new piece of data.
- *	PARAMS: void(void)
+ *      SYNOPSIS: Add a new number to our list of data.
+ *      CONTEXT: User wants to add a new piece of data.
+ *      PARAMS: void(void)
  */
 @method MCListInsertDataItem, MCProcessClass, MSG_MCP_INSERT_DATA_ITEM {
-	ChunkHandle 		newListItem;
-	ListNode 		*newNode;
-	WWFixedAsDWord 		value;
-	word 		ordinal;
+        ChunkHandle             newListItem;
+        ListNode                *newNode;
+        WWFixedAsDWord          value;
+        word            ordinal;
 
 /* Query list and data objects to find out where to insert item
  * and what value to insert there. 
  */
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
 
 /* Lock the data block so we can insert data into the linked list. */
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 
 /* Create a new linked list element. */
-	newListItem = LMemAlloc(dataListBlock, sizeof(ListNode));
-	newNode = LMemDerefHandles(dataListBlock, newListItem);
-	newNode->LN_data = WWFixedToInt(value);
+        newListItem = LMemAlloc(dataListBlock, sizeof(ListNode));
+        newNode = LMemDerefHandles(dataListBlock, newListItem);
+        newNode->LN_data = WWFixedToInt(value);
 
 /* Check to see if the item we're adding will be the
  * new head of the data list and handle that case. 
  */
-	if (ordinal==FAKE_LIST_ITEM)
-	 {
-		newNode->LN_next = dataListHead;
-		dataListHead = newListItem;
-	 }
-	else
+        if (ordinal==FAKE_LIST_ITEM)
+         {
+                newNode->LN_next = dataListHead;
+                dataListHead = newListItem;
+         }
+        else
 /* We're not adding to the head of the list. Traverse the
  * list using the tempListItem and tempNode variables, then
  * insert the new item. 
  */
-	 {
-		word count = ordinal;
-		for (tempNode = LMemDerefHandles(dataListBlock, dataListHead);
-		 count > 1;
-		 --count)
-		 {
-			tempListItem = tempNode->LN_next;
-			tempNode = LMemDerefHandles(dataListBlock,
-						 tempListItem);
-		 }
-		newNode->LN_next = tempNode->LN_next;
-		tempNode->LN_next = newListItem;
-	 }
+         {
+                word count = ordinal;
+                for (tempNode = LMemDerefHandles(dataListBlock, dataListHead);
+                 count > 1;
+                 --count)
+                 {
+                        tempListItem = tempNode->LN_next;
+                        tempNode = LMemDerefHandles(dataListBlock,
+                                                 tempListItem);
+                 }
+                newNode->LN_next = tempNode->LN_next;
+                tempNode->LN_next = newListItem;
+         }
 
 /* We've changed the data, so before we unlock the block, we mark
  * it dirty. 
  */
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
 /* Update the data list gadget. */
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(ordinal+1, 1);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal+1,
-								 FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(ordinal+1, 1);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal+1,
+                                                                 FALSE);
 } /* end of MSG_MCP_INSERT_DATA_ITEM */
 
 /* MSG_MCP_DELETE_DATA_ITEM for MCProcessClass
  *
- *	SYNOPSIS: Destroys one data item.
- *	CONTEXT: User has just clicked on the "Delete" trigger.
- *	PARAMS: void (void)
+ *      SYNOPSIS: Destroys one data item.
+ *      CONTEXT: User has just clicked on the "Delete" trigger.
+ *      PARAMS: void (void)
  */
 @method MCProcessClass, MSG_MCP_DELETE_DATA_ITEM {
-	word 		ordinal;
-	word 		count;
-	ChunkHandle 		oldItem;
-	ListNode 		*oldNode;
+        word            ordinal;
+        word            count;
+        ChunkHandle             oldItem;
+        ListNode                *oldNode;
 
 /* Find out which item the user wants to delete. */
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	if (ordinal==FAKE_LIST_ITEM) return;
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (ordinal==FAKE_LIST_ITEM) return;
 
 /* We're going to work with the data, so lock the data file. */
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 
 /* If we're deleting the first data item, we update the handle of the
  * head of the list. 
  */
-	if (ordinal == 1) 
-	 {
-		oldNode = LMemDerefHandles(dataListBlock, dataListHead);
-		tempListItem = oldNode->LN_next;
-		LMemFreeHandles(dataListBlock, dataListHead);
-		dataListHead = tempListItem;
-	 }
+        if (ordinal == 1) 
+         {
+                oldNode = LMemDerefHandles(dataListBlock, dataListHead);
+                tempListItem = oldNode->LN_next;
+                LMemFreeHandles(dataListBlock, dataListHead);
+                dataListHead = tempListItem;
+         }
 
 /* If we're deleting an element which isn't the first, we find the element
  * that's just before the one we want to delete, and change that element's
  * "next" handle. We also get rid of the item to be deleted. 
  */
-	else /* ordinal != 1 */ 
-	 {
-		for (tempNode=LMemDerefHandles(dataListBlock, dataListHead),
-		 count=ordinal;
-		 count > 2;
-		 --count)
-		 {
-			tempListItem = tempNode->LN_next;
-			tempNode = LMemDerefHandles(dataListBlock,
-						 tempListItem);
-		 }
-		oldItem = tempNode->LN_next;
-		oldNode = LMemDerefHandles(dataListBlock, oldItem);
+        else /* ordinal != 1 */ 
+         {
+                for (tempNode=LMemDerefHandles(dataListBlock, dataListHead),
+                 count=ordinal;
+                 count > 2;
+                 --count)
+                 {
+                        tempListItem = tempNode->LN_next;
+                        tempNode = LMemDerefHandles(dataListBlock,
+                                                 tempListItem);
+                 }
+                oldItem = tempNode->LN_next;
+                oldNode = LMemDerefHandles(dataListBlock, oldItem);
 
-		tempNode->LN_next = oldNode->LN_next;
-		LMemFreeHandles(dataListBlock, oldItem);
-	 }
+                tempNode->LN_next = oldNode->LN_next;
+                LMemFreeHandles(dataListBlock, oldItem);
+         }
 
 /* We've changed the data, so before we lock the block, we mark it dirty. */
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
 /* Update the list. */
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(ordinal, 1);
-	@send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal-1,
-								 FALSE);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(ordinal, 1);
+        @send MCDataList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ordinal-1,
+                                                                 FALSE);
 } /* end of MSG_MCP_DELETE_DATA_ITEM */
 
 /* MSG_MCP_SET_DATA_ITEM for MCProcessClass
  *
- *	SYNOPSIS: Change the data number of one item in the data list.
- *	CONTEXT: User has clicked the "Change" button.
- *	PARAMS: void(void)
+ *      SYNOPSIS: Change the data number of one item in the data list.
+ *      CONTEXT: User has clicked the "Change" button.
+ *      PARAMS: void(void)
  */
 @method MCProcessClass, MSG_MCP_SET_DATA_ITEM {
-	word 		ordinal;
-	WWFixedAsDWord 	value;
-	char 		monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
-	word 		count;
+        word            ordinal;
+        WWFixedAsDWord  value;
+        char            monikerString[LOCAL_DISTANCE_BUFFER_SIZE];
+        word            count;
 
 /* Find out which item we're changing. */
-	ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-	if (ordinal == FAKE_LIST_ITEM) return;
+        ordinal = @call MCDataList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (ordinal == FAKE_LIST_ITEM) return;
 
 /* Find out what the item's new value should be. */
-	value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
+        value = @call MCValue::MSG_GEN_VALUE_GET_VALUE();
 
 /* Lock the data block so that we can change the data. */
-	VMLock(dataFile, dataFileBlock, dataListBlockPtr);
+        VMLock(dataFile, dataFileBlock, dataListBlockPtr);
 
 /* Find the appropriate item in the linked list and change its value. */
-	for (tempNode = LMemDerefHandles(dataListBlock, dataListHead),
-	 count = ordinal -1;
-	 count > 0;
-	 --count)
-	 {
-		tempListItem = tempNode->LN_next;
-		tempNode = LMemDerefHandles(dataListBlock, tempListItem);
-	 }
-	tempNode->LN_data = WWFixedToInt(value);
+        for (tempNode = LMemDerefHandles(dataListBlock, dataListHead),
+         count = ordinal -1;
+         count > 0;
+         --count)
+         {
+                tempListItem = tempNode->LN_next;
+                tempNode = LMemDerefHandles(dataListBlock, tempListItem);
+         }
+        tempNode->LN_data = WWFixedToInt(value);
 
 /* We changed the data so mark it dirty before unlocking it. */
-	VMDirty(dataListBlock);
-	VMUnlock(dataListBlock);
+        VMDirty(dataListBlock);
+        VMUnlock(dataListBlock);
 
 /* Update the data list gadget. */
-	LocalFixedToAscii(monikerString, value, 0);
-	@call MCDataList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(ordinal,
-								 monikerString);
+        LocalFixedToAscii(monikerString, value, 0);
+        @call MCDataList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(ordinal,
+                                                                 monikerString);
 } /* end of MSG_MCP_SET_DATA_ITEM */
 
 /* MSG_GEN_PROCESS_OPEN_APPLICATION
  *
- *	SYNOPSIS: Set up application's data structures.
- *	CONTEXT: Application is starting up, either because user
- *		 has started the application or because the whole
- *		 system is re-starting.
- *	PARAMS: void(AppAttachFlags 	attachFlags,
- *		 MemHandle		launchBlock,
- *		 MemHandle 		extraState);
+ *      SYNOPSIS: Set up application's data structures.
+ *      CONTEXT: Application is starting up, either because user
+ *               has started the application or because the whole
+ *               system is re-starting.
+ *      PARAMS: void(AppAttachFlags     attachFlags,
+ *               MemHandle              launchBlock,
+ *               MemHandle              extraState);
  */
 @method MCProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
-	char fileName[] = "MChtDATA.vm";
+        char fileName[] = "MChtDATA.vm";
 
 /* Open a temporary file, clearing out the old data. */
-	dataFile=VMOpen(fileName,
-			VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
-			VMO_CREATE_TRUNCATE, 0);
+        dataFile=VMOpen(fileName,
+                        VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE,
+                        VMO_CREATE_TRUNCATE, 0);
 
 /* Allocate a storage block within the file. */
-	dataFileBlock = VMAllocLMem(dataFile, LMEM_TYPE_GENERAL, 0);
+        dataFileBlock = VMAllocLMem(dataFile, LMEM_TYPE_GENERAL, 0);
 
-	@callsuper();
+        @callsuper();
 } /* end of MSG_GEN_PROCESS_OPEN_APPLICATION */
 
 /* MSG_GEN_PROCESS_CLOSE_APPLICATION
  *
- *	SYNOPSIS: Free up the memory we allocated. Actually, we could
- *		 probably rely on the system to do this for us.
- *	CONTEXT: Application is shutting down, either because of user
- *		 exit or because whole system is shutting down.
- *	PARAMS: MemHandle(void);
+ *      SYNOPSIS: Free up the memory we allocated. Actually, we could
+ *               probably rely on the system to do this for us.
+ *      CONTEXT: Application is shutting down, either because of user
+ *               exit or because whole system is shutting down.
+ *      PARAMS: MemHandle(void);
  */
 @method MCProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
 /* Tell the data list gadget that it should only have one item */
-	@send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
+        @send MCDataList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
 
 /* Close the data file. */
-	VMClose(dataFile, FALSE);
+        VMClose(dataFile, FALSE);
 
-	@callsuper();
+        @callsuper();
 } /* end of MSG_GEN_PROCESS_CLOSE_APPLICATION */ 
 ~~~
 otype makes the message's purpose clearer. For more information about message prototypes, see "GEOS Programming," Chapter 5 of the Concepts book.
@@ -1973,13 +1973,13 @@ This is the prototype for a routine. This is as it would be in a normal C progra
 
 ~~~
 typedef struct {
-	word		LN_data;
-	ChunkHandle 		LN_next;
+        word            LN_data;
+        ChunkHandle             LN_next;
 } ListNode;
 
-VMFileHandle 	dataFile; 	/* File which will hold our data */
-VMBlockHandle 	dataFileBlock; /* Block within dataFile */
-MemHandle dataListBlock; 			 /* Block of memory which will hold our linked list. */
+VMFileHandle    dataFile;       /* File which will hold our data */
+VMBlockHandle   dataFileBlock; /* Block within dataFile */
+MemHandle dataListBlock;                         /* Block of memory which will hold our linked list. */
 MemHandle *dataListBlockPtr = &dataListBlock; /* Pointer to above handle */
 ChunkHandle dataListHead = 0; /* Chunk containing head of linked list. */
 ChunkHandle tempListItem; /*Chunk handle we will use when traversing lists */

@@ -202,35 +202,35 @@ instance fields, along with the instance fields of **GenClass**.
 ----------
 **Code Display 11-1 GenItemGroup Instance Data**
 
-	@instance GenItemGroupBehaviorType	GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    @instance GenItemGroupBehaviorType  GIGI_behaviorType = GIGBT_EXCLUSIVE;
 
-	/* The GenItemGroupBehaviorType enumerations are used in the GIGI_behaviorType
-	 * instance field. */
+    /* The GenItemGroupBehaviorType enumerations are used in the GIGI_behaviorType
+     * instance field. */
 
-	typedef ByteEnum GenItemGroupBehaviorType;
-	#define GIGBT_EXCLUSIVE 0
-	#define GIGBT_EXCLUSIVE_NONE 1
-	#define GIGBT_EXTENDED_SELECTION 2
-	#define GIGBT_NON_EXCLUSIVE 3
+    typedef ByteEnum GenItemGroupBehaviorType;
+    #define GIGBT_EXCLUSIVE 0
+    #define GIGBT_EXCLUSIVE_NONE 1
+    #define GIGBT_EXTENDED_SELECTION 2
+    #define GIGBT_NON_EXCLUSIVE 3
 
-		@instance GenItemGroupStateFlags		GIGI_stateFlags = 0;
+        @instance GenItemGroupStateFlags        GIGI_stateFlags = 0;
 
-	/* The GenItemGroupStateFlags are used in the GIGI_stateFlags instance field. */
+    /* The GenItemGroupStateFlags are used in the GIGI_stateFlags instance field. */
 
-	typedef ByteFlags GenItemGroupStateFlags;
-	#define GIGSF_INDETERMINATE 		0x80
-	#define GIGSF_MODIFIED				0x40
+    typedef ByteFlags GenItemGroupStateFlags;
+    #define GIGSF_INDETERMINATE         0x80
+    #define GIGSF_MODIFIED              0x40
 
-		@instance word					GIGI_selection = GIGS_NONE;
+        @instance word                  GIGI_selection = GIGS_NONE;
 
-	/* The GIGS_NONE constant is used with the GIGI_selection instance field and may
-	 * also be returned by MSG_GEN_ITEM_GROUP_GET_SELECTION. */
+    /* The GIGS_NONE constant is used with the GIGI_selection instance field and may
+     * also be returned by MSG_GEN_ITEM_GROUP_GET_SELECTION. */
 
-	#define GIGS_NONE (0xffff)
+    #define GIGS_NONE (0xffff)
 
-		@instance word					GIGI_numSelections = 0;
-		@instance optr					GIGI_destination;
-		@instance Message				GIGI_applyMsg = 0;
+        @instance word                  GIGI_numSelections = 0;
+        @instance optr                  GIGI_destination;
+        @instance Message               GIGI_applyMsg = 0;
 
 ----------
 *GIGI_behaviorType* describes the selection behavior of the list. The default 
@@ -268,20 +268,20 @@ The GenItemGroup also has several vardata fields.
 ----------
 **Code Display 11-2 GenItemGroup Vardata Instance Fields** 
 
-	@vardata Message 		ATTR_GEN_ITEM_GROUP_STATUS_MSG;
-	@vardata void			ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
-	@vardata Message		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS;
-	@vardata optr			ATTR_GEN_ITEM_GROUP_LINK;
-		@reloc ATTR_GEN_ITEM_GROUP_LINK, 0, optr;
-	@vardata void			ATTR_GEN_ITEM_GROUP_INIT_FILE_BOOLEAN;
+    @vardata Message        ATTR_GEN_ITEM_GROUP_STATUS_MSG;
+    @vardata void           ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+    @vardata Message        ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS;
+    @vardata optr           ATTR_GEN_ITEM_GROUP_LINK;
+        @reloc ATTR_GEN_ITEM_GROUP_LINK, 0, optr;
+    @vardata void           ATTR_GEN_ITEM_GROUP_INIT_FILE_BOOLEAN;
 
-	/* Hints */
-	@vardata void		HINT_ITEM_GROUP_RADIO_BUTTON_STYLE;
-	@vardata void		HINT_ITEM_GROUP_TOOLBOX_STYLE;
-	@vardata void		HINT_ITEM_GROUP_SCROLLABLE;
-	@vardata void		HINT_ITEM_GROUP_MINIMIZE_SIZE;
-	@vardata void		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
-	@vardata void		HINT_ITEM_GROUP_MINIMIZE_SIZE_IF_VERTICAL_SCREEN;
+    /* Hints */
+    @vardata void       HINT_ITEM_GROUP_RADIO_BUTTON_STYLE;
+    @vardata void       HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    @vardata void       HINT_ITEM_GROUP_SCROLLABLE;
+    @vardata void       HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    @vardata void       HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    @vardata void       HINT_ITEM_GROUP_MINIMIZE_SIZE_IF_VERTICAL_SCREEN;
 
 ----------
 ATTR_GEN_ITEM_GROUP_STATUS_MSG assigns a status message to your 
@@ -332,7 +332,7 @@ hints takes effect only on screens that are taller than they are wide.
 ### 11.3.2 GenItem Instance Data
 **GenItemClass** is a subclass of **GenClass**. It has one new instance field:
 
-	@instance word GII_identifier;
+    @instance word GII_identifier;
 
 *GII_identifier* sets the indentifying keyword (usually an enumerated type) 
 that uniquely identifies this GenItem. This identifier is used by the 
@@ -349,8 +349,8 @@ conditions (items selected, whether the list is indeterminate or modified, etc.)
 for the list.
 
 #### 11.3.3.1 GenItemGroup Behavior
-	GIGI_behaviorType, MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE, 
-	MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE
+    GIGI_behaviorType, MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE, 
+    MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE
 
 There are several types of user selection behavior for a GenItemGroup. Items 
 can be set up so that only one is selected at a time, one or none is selected at 
@@ -472,7 +472,7 @@ type, send the list a MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE
-	GenItemGroupBehaviorType MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE();
+    GenItemGroupBehaviorType MSG_GEN_ITEM_GROUP_GET_BEHAVIOR_TYPE();
 
 This message returns the current behavior type of a GenItemGroup (stored 
 in the *GIGI_behaviorType* instance field).
@@ -489,8 +489,8 @@ in the *GIGI_behaviorType* instance field).
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE
-	void	MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE(
-			GenItemGroupBehaviorType		behaviorType);
+    void    MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE(
+            GenItemGroupBehaviorType        behaviorType);
 
 This message sets a new behavior type for a GenItemGroup by changing the 
 object's *GIGI_behaviorType* instance field. This message should only be sent 
@@ -508,13 +508,13 @@ while the object is not usable.
 **Interception:** Generally not intercepted.
 
 #### 11.3.3.2 GenItemGroup Selections
-	GIGI_selection, GII_identifier, GIGI_numSelections, 
-	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED, 
-	MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION, 
-	MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS, 
-	MSG_GEN_ITEM_GROUP_GET_SELECTION, 
-	MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS, 
-	MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS
+    GIGI_selection, GII_identifier, GIGI_numSelections, 
+    MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED, 
+    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION, 
+    MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS, 
+    MSG_GEN_ITEM_GROUP_GET_SELECTION, 
+    MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS, 
+    MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS
 
 Within a GenItemGroup, each GenItem must contain an identifier, often an 
 enumerated value, to uniquely identify that item. The GenItemGroup will 
@@ -548,41 +548,41 @@ GenItem.
 ----------
 **Code Display 11-3 Setting Enumerated Types As Identifiers**
 
-	/* In most cases, each GenItemGroup should have a single set of enumerated types
-	 * to name its children. In this case, MyCityGroup will have settings all related
-	 * to the enumerated type USCities, and San Francisco will be the initial
-	 * selection. */
+    /* In most cases, each GenItemGroup should have a single set of enumerated types
+     * to name its children. In this case, MyCityGroup will have settings all related
+     * to the enumerated type USCities, and San Francisco will be the initial
+     * selection. */
 
-	typedef ByteEnum USCitiesEnum;
-	#define CITY_CHICAGO 1
-	#define CITY_NEW_YORK 2
-	#define CITY_SAN_FRANCISCO 3
-	#define CITY_LOS_ANGELES 4
+    typedef ByteEnum USCitiesEnum;
+    #define CITY_CHICAGO 1
+    #define CITY_NEW_YORK 2
+    #define CITY_SAN_FRANCISCO 3
+    #define CITY_LOS_ANGELES 4
 
-	@object GenItemGroupClass MyCityGroup = {
-		GI_comp = @Chicago, @NewYork, @SanFrancisco, @LosAngeles;
-		GIGI_selection = CITY_SAN_FRANCISCO;
-	}
+    @object GenItemGroupClass MyCityGroup = {
+        GI_comp = @Chicago, @NewYork, @SanFrancisco, @LosAngeles;
+        GIGI_selection = CITY_SAN_FRANCISCO;
+    }
 
-	@object GenItemClass Chicago = {
-		GI_visMoniker = `C', "Chicago";
-		GII_identifier = CITY_CHICAGO;
-	}
+    @object GenItemClass Chicago = {
+        GI_visMoniker = `C', "Chicago";
+        GII_identifier = CITY_CHICAGO;
+    }
 
-	@object GenItemClass NewYork = {
-		GI_visMoniker = `N', "New York";
-	GII_identifier = CITY_NEW_YORK;
-	}
+    @object GenItemClass NewYork = {
+        GI_visMoniker = `N', "New York";
+    GII_identifier = CITY_NEW_YORK;
+    }
 
-	@object GenItemClass SanFrancisco = {
-		GI_visMoniker = `S', "San Francisco";
-		GII_identifier = CITY_SAN_FRANCISCO;
-	}
+    @object GenItemClass SanFrancisco = {
+        GI_visMoniker = `S', "San Francisco";
+        GII_identifier = CITY_SAN_FRANCISCO;
+    }
 
-	@object GenItemClass LosAngeles = {
-		GI_visMoniker = `L', "Los Angeles";
-		GII_identifier = CITY_LOS_ANGELES;
-	}
+    @object GenItemClass LosAngeles = {
+        GI_visMoniker = `L', "Los Angeles";
+        GII_identifier = CITY_LOS_ANGELES;
+    }
 
 ----------
 In an extended-selection or non-exclusive list, more than one item may be 
@@ -605,21 +605,21 @@ ChunkHandle to a list of identifiers instead of a single identifier.
 ----------
 **Code Display 11-4 Setting Multiple Initial Selections**
 
-	/* To set a GenItemGroup to appear initially with multiple selections, set up a
-	 * chunk containing the identifiers and a ChunkHandle in the GIGI_selection
-	 * instance field. Only the new list chunk and the GenItemGroup are shown; other
-	 * information is in the previous code display. */
+    /* To set a GenItemGroup to appear initially with multiple selections, set up a
+     * chunk containing the identifiers and a ChunkHandle in the GIGI_selection
+     * instance field. Only the new list chunk and the GenItemGroup are shown; other
+     * information is in the previous code display. */
 
-	@object GenItemGroupClass MyCityGroup = {
-		GI_comp = @Chicago, @NewYork, @SanFrancisco, @LosAngeles;
-		GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
-		GIGI_numSelections = 2;
-		GIGI_selection = (ChunkHandle) ChunkOf(@SelectionList);
-	}
+    @object GenItemGroupClass MyCityGroup = {
+        GI_comp = @Chicago, @NewYork, @SanFrancisco, @LosAngeles;
+        GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+        GIGI_numSelections = 2;
+        GIGI_selection = (ChunkHandle) ChunkOf(@SelectionList);
+    }
 
-	@chunk word SelectionList[2] = {
-		CITY_CHICAGO, CITY_SAN_FRANCISCO
-	};
+    @chunk word SelectionList[2] = {
+        CITY_CHICAGO, CITY_SAN_FRANCISCO
+    };
 
 ----------
 In most cases, the user will change the selections of the GenItemGroup by 
@@ -674,7 +674,7 @@ modified flag.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_SELECTION
-	word	MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    word    MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
 This message returns the current selection identifier for the GenItemGroup. 
 If there is no selection, this message returns GIGS_NONE. If there are 
@@ -698,9 +698,9 @@ instance field (or GIGS_NONE if there are no selections).
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS
-	word	MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
-			word	*selectionList,
-			word	maxSelections);
+    word    MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+            word    *selectionList,
+            word    maxSelections);
 
 This message returns the current list of selections for non-exclusive and 
 extended-selection GenItemGroups. The caller must allocate a buffer for the 
@@ -723,7 +723,7 @@ MSG_GEN_ITEM_GROUP_GET_SELECTION instead.
 **Parameters:**  
 *selectionList* - A pointer to the buffer to store the selection entries. 
 
-*maxSelections*	 - The maximum number of selections that may be 
+*maxSelections*  - The maximum number of selections that may be 
 returned by the message.
 
 **Return:** The total number of selections returned in the buffer.
@@ -735,7 +735,7 @@ of the selections.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS
-	word	MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+    word    MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
 
 This message returns the GenItemGroup's current number of selections 
 (stored in *GIGI_numSelections*), or zero if there is no selection. 
@@ -750,8 +750,8 @@ This message returns the GenItemGroup's current number of selections
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED
-	void	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(
-			Boolean		indeterminate);
+    void    MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(
+            Boolean     indeterminate);
 
 This message sets a GenItemGroup to show no selections; it should not be 
 sent to an exclusive GenItemGroup. This message will also clear the 
@@ -772,9 +772,9 @@ indeterminate, FALSE otherwise.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
-	void	MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
-			word		identifier,
-			Boolean		indeterminate);
+    void    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+            word        identifier,
+            Boolean     indeterminate);
 
 This message sets exactly one selection for a GenItemGroup. Any 
 previously-selected items will be deselected, regardless of the 
@@ -811,9 +811,9 @@ several "linked" GenItemGroups, each with only one selection. (See
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS
-	void	MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
-			word	*selectionList,
-			word	numSelections);
+    void    MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
+            word    *selectionList,
+            word    numSelections);
 
 This message sets multiple selections for a GenItemGroup. The caller must 
 pass a pointer to a list of identifiers that should be selected, along with the 
@@ -836,12 +836,12 @@ identifiers.
 **Interception:** Generally not intercepted.
 
 #### 11.3.3.3 GenItemGroup States
-	GIGI_stateFlags, 
-	ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION, 
-	MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE, 
-	MSG_GEN_ITEM_GROUP_IS_INDETERMINATE, 
-	MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE, 
-	MSG_GEN_ITEM_GROUP_IS_MODIFIED
+    GIGI_stateFlags, 
+    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION, 
+    MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE, 
+    MSG_GEN_ITEM_GROUP_IS_INDETERMINATE, 
+    MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE, 
+    MSG_GEN_ITEM_GROUP_IS_MODIFIED
 
 The *GIGI_stateFlags* contains flags relating to the state of the entire 
 GenItemGroup. The two flags possible are
@@ -910,8 +910,8 @@ MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE
-	void	MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE(
-			Boolean		indeterminateState);
+    void    MSG_GEN_ITEM_GROUP_SET_INDETERMINATE_STATE(
+            Boolean     indeterminateState);
 
 This message sets the GenItemGroup's GIGSF_INDETERMINATE flag in its 
 *GIGI_stateFlags* instance field. Usually this message is used in conjunction 
@@ -934,7 +934,7 @@ FALSE to set the group not indeterminate.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_IS_INDETERMINATE
-	Boolean	MSG_GEN_ITEM_GROUP_IS_INDETERMINATE();
+    Boolean MSG_GEN_ITEM_GROUP_IS_INDETERMINATE();
 
 This message checks whether a GenItemGroup is in the indeterminate state; 
 it checks the GIGSF_INDETERMINATE flag in the GenItemGroup's 
@@ -950,8 +950,8 @@ it checks the GIGSF_INDETERMINATE flag in the GenItemGroup's
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
-	void	MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(
-			Boolean		modifiedState);
+    void    MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(
+            Boolean     modifiedState);
 
 This message marks a GenItemGroup modified by setting the 
 GIGSF_MODIFIED flag in its *GIGI_stateFlags* instance field.
@@ -969,7 +969,7 @@ GIGSF_MODIFIED flag in its *GIGI_stateFlags* instance field.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_IS_MODIFIED
-	Boolean	MSG_GEN_ITEM_GROUP_IS_MODIFIED();
+    Boolean MSG_GEN_ITEM_GROUP_IS_MODIFIED();
 
 This message checks whether a GenItemGroup has been modified by 
 checking the GIGSF_MODIFIED flag in the GenItemGroup's *GIGI_stateFlags*. 
@@ -985,12 +985,12 @@ checking the GIGSF_MODIFIED flag in the GenItemGroup's *GIGI_stateFlags*.
 **Interception:** Generally not intercepted.
 
 #### 11.3.3.4 Sending the Event
-	GIGI_applyMsg, GIGI_destination, GEN_ITEM_GROUP_APPLY_MSG, 
-	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED, 
-	MSG_GEN_ITEM_GROUP_GET_DESTINATION, 
-	MSG_GEN_ITEM_GROUP_SET_DESTINATION, 
-	MSG_GEN_ITEM_GROUP_GET_APPLY_MSG, 
-	MSG_GEN_ITEM_GROUP_SET_APPLY_MSG
+    GIGI_applyMsg, GIGI_destination, GEN_ITEM_GROUP_APPLY_MSG, 
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED, 
+    MSG_GEN_ITEM_GROUP_GET_DESTINATION, 
+    MSG_GEN_ITEM_GROUP_SET_DESTINATION, 
+    MSG_GEN_ITEM_GROUP_GET_APPLY_MSG, 
+    MSG_GEN_ITEM_GROUP_SET_APPLY_MSG
 
 When the GenItemGroup receives notice to apply any changes to its state, it 
 will first check its GIGSF_MODIFIED flag. If the list has been modified, the 
@@ -1025,10 +1025,10 @@ MSG_GEN_ITEM_GROUP_SET_APPLY_MSG, passing it the message to use.
 
 ----------
 #### GEN_ITEM_GROUP_APPLY_MSG
-	void	GEN_ITEM_GROUP_APPLY_MSG(
-			word	selection,
-			word	numSelections
-			byte	stateFlags);
+    void    GEN_ITEM_GROUP_APPLY_MSG(
+            word    selection,
+            word    numSelections
+            byte    stateFlags);
 
 Use this prototype to define the apply message for your GenItemGroup 
 (stored in the *GIGI_applyMsg* instance field). This prototype ensures that the 
@@ -1050,7 +1050,7 @@ GenItemGroup.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_DESTINATION
-	optr	MSG_GEN_ITEM_GROUP_GET_DESTINATION();
+    optr    MSG_GEN_ITEM_GROUP_GET_DESTINATION();
 
 This message returns the optr of the current destination object as specified 
 in the *GIGI_destination* instance field.
@@ -1067,8 +1067,8 @@ in the *GIGI_destination* instance field.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_DESTINATION
-	void	MSG_GEN_ITEM_GROUP_SET_DESTINATION(
-			optr	dest);
+    void    MSG_GEN_ITEM_GROUP_SET_DESTINATION(
+            optr    dest);
 
 This message sets a new destination object for the list, stored in the list's 
 *GIGI_destination* field. The apply and status messages of this GenItemGroup 
@@ -1088,7 +1088,7 @@ will be sent to this new destination.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_APPLY_MSG
-	Message	MSG_GEN_ITEM_GROUP_GET_APPLY_MSG();
+    Message MSG_GEN_ITEM_GROUP_GET_APPLY_MSG();
 
 This message returns the current apply message in the GenItemGroup's 
 *GIGI_applyMsg* instance field.
@@ -1105,8 +1105,8 @@ This message returns the current apply message in the GenItemGroup's
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_APPLY_MSG
-	void	MSG_GEN_ITEM_GROUP_SET_APPLY_MSG(
-			Message		message);
+    void    MSG_GEN_ITEM_GROUP_SET_APPLY_MSG(
+            Message     message);
 
 This message sets a new apply message in the GenItemGroup's 
 *GIGI_applyMsg* instance field.
@@ -1123,9 +1123,9 @@ message* - The new notification message.
 **Interception:** Generally not intercepted.
 
 #### 11.3.3.5 Sending Status Messages
-	GEN_ITEM_GROUP_STATUS_MSG, 
-	ATTR_GEN_ITEM_GROUP_STATUS_MSG, 
-	MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG
+    GEN_ITEM_GROUP_STATUS_MSG, 
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG, 
+    MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG
 
 If you wish your application to receive notice whenever the list's state 
 changes, even if those changes will not be immediately applied, you may set 
@@ -1150,40 +1150,40 @@ message.
 ----------
 **Code Display 11-5 Status Message in GenItemGroup**
 
-	/* Use the prototype GEN_ITEM_GROUP_STATUS_MSG to set up a status message. The
-	 * prototype takes three arguments: selection (the contents of GIGI_selection),
-	 * numSelections (the contents of GIGI_numSelections), and stateFlags (the contents
-	 * of GIGI_stateFlags). */
+    /* Use the prototype GEN_ITEM_GROUP_STATUS_MSG to set up a status message. The
+     * prototype takes three arguments: selection (the contents of GIGI_selection),
+     * numSelections (the contents of GIGI_numSelections), and stateFlags (the contents
+     * of GIGI_stateFlags). */
 
-	/* In the destination's class definition: */
-	@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_COLOR_STATUS_CHANGE;
+    /* In the destination's class definition: */
+    @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_COLOR_STATUS_CHANGE;
 
-	/* In the GenItemGroup's object declaration, set
-	 * ATTR_GEN_ITEM_GROUP_STATUS_MSG to the message you declared. */
-	@object GenItemGroupClass MyColorGroup = {
-		GIGI_applyMsg = MSG_COLOR_CHANGE;
-		GIGI_destination = process;
-		ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_COLOR_STATUS_CHANGE;
-	}
+    /* In the GenItemGroup's object declaration, set
+     * ATTR_GEN_ITEM_GROUP_STATUS_MSG to the message you declared. */
+    @object GenItemGroupClass MyColorGroup = {
+        GIGI_applyMsg = MSG_COLOR_CHANGE;
+        GIGI_destination = process;
+        ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_COLOR_STATUS_CHANGE;
+    }
 
-	/* Finally, in your handler for this status message, do required work. */
-	@method MyProcessClass, MSG_COLOR_STATUS_CHANGE {
-		switch (selection) {
-		case C_BLACK:
-			/* ...(code)... */
-		case C_WHITE:
-			/* ...(code)... */
-		}
-	}
+    /* Finally, in your handler for this status message, do required work. */
+    @method MyProcessClass, MSG_COLOR_STATUS_CHANGE {
+        switch (selection) {
+        case C_BLACK:
+            /* ...(code)... */
+        case C_WHITE:
+            /* ...(code)... */
+        }
+    }
 
 ----------
 
 ----------
 #### GEN_ITEM_GROUP_STATUS_MSG
-	void	GEN_ITEM_GROUP_STATUS_MSG(
-			word	selection,
-			word	numSelections,
-			byte	stateFlags);
+    void    GEN_ITEM_GROUP_STATUS_MSG(
+            word    selection,
+            word    numSelections,
+            byte    stateFlags);
 
 Use this prototype to define a status message for your GenItemGroup (stored 
 in the ATTR_GEN_ITEM_GROUP_STATUS_MSG vardata). This prototype 
@@ -1210,8 +1210,8 @@ enumerated value of the selection passed in this message handler.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG
-	void	MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(
-			Boolean	modifiedState);
+    void    MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(
+            Boolean modifiedState);
 
 This message causes the GenItemGroup to send out the status message to 
 the destination object. This status message is stored in 
@@ -1234,8 +1234,8 @@ With several GenItem and GenItemGroup messages, you can work with
 individual items. The following sections detail these messages.
 
 #### 11.3.4.1 Altering the Identifiers
-	MSG_GEN_ITEM_GET_IDENTIFIER, MSG_GEN_ITEM_SET_IDENTIFIER, 
-	MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER
+    MSG_GEN_ITEM_GET_IDENTIFIER, MSG_GEN_ITEM_SET_IDENTIFIER, 
+    MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER
 
 You may change the identifiers of GenItems dynamically. To retrieve a 
 GenItem's identifier, send the GenItem MSG_GEN_ITEM_GET_IDENTIFIER. 
@@ -1249,7 +1249,7 @@ may use MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER.
 
 ----------
 #### MSG_GEN_ITEM_GET_IDENTIFIER
-	word	MSG_GEN_ITEM_GET_IDENTIFIER();
+    word    MSG_GEN_ITEM_GET_IDENTIFIER();
 
 This message returns the identifier stored in the item's GII_identifier 
 instance field.
@@ -1264,8 +1264,8 @@ instance field.
 
 ----------
 #### MSG_GEN_ITEM_SET_IDENTIFIER
-	void	MSG_GEN_ITEM_SET_IDENTIFIER(
-			word	identifier);
+    void    MSG_GEN_ITEM_SET_IDENTIFIER(
+            word    identifier);
 
 This message sets a GenItem's *GII_identifier* instance field to a new value. 
 There is no effect on the list itself. The item whose identifier is changed must 
@@ -1285,7 +1285,7 @@ the list. Use MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER
-	word	MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER();
+    word    MSG_GEN_ITEM_GROUP_GET_UNIQUE_IDENTIFIER();
 
 This message returns an identifier that is unique among the items in the 
 GenItemGroup's group. It does not check across links, however.
@@ -1301,9 +1301,9 @@ GenItemGroup's group. It does not check across links, however.
 **Interception:** Generally not intercepted.
 
 #### 11.3.4.2 Altering the Item's State
-	MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR, 
-	MSG_GEN_ITEM_GROUP_SET_ITEM_STATE, 
-	MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED
+    MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR, 
+    MSG_GEN_ITEM_GROUP_SET_ITEM_STATE, 
+    MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED
 
 You can retrieve the optr of a selection by sending the GenItemGroup a 
 MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR, passing the identifier of the 
@@ -1328,8 +1328,8 @@ requested item. This message has no effect on non-scrolling lists.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR
-	optr	MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(
-			word	identifier);
+    optr    MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(
+            word    identifier);
 
 This message returns the optr of a GenItem within a GenItemGroup. You 
 may then use this optr for directly manipulating the GenItem. If an item with 
@@ -1351,9 +1351,9 @@ none is found).
 
 ----------
 #### MSG_GEN_ITEM_GROUP_SET_ITEM_STATE
-	void	MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(
-			word		identifier,
-			Boolean		state);
+    void    MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(
+            word        identifier,
+            Boolean     state);
 
 This message sets the state (selected or unselected) of a particular GenItem 
 within a GenItemGroup. Other items will be unaffected by the new state. 
@@ -1382,8 +1382,8 @@ several "linked" GenItemGroups, each with only one selection. (See
 
 ----------
 #### MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED
-	Boolean	MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(
-			word	identifier);
+    Boolean MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(
+            word    identifier);
 
 This message checks whether an item within a GenItemGroup is selected, 
 even if that item is not usable, not enabled, or not within the GenItemGroup. 
@@ -1401,8 +1401,8 @@ The message returns *true* if the item is selected, *false* if it is not selecte
 **Interception:** Generally not intercepted.
 
 ### 11.3.5 Scrolling GenItemGroups
-	HINT_ITEM_GROUP_SCROLLABLE, 
-	MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE
+    HINT_ITEM_GROUP_SCROLLABLE, 
+    MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE
 
 A scrolling list is a special version of a GenItemGroup that allows the user to 
 scroll through a list of items which are not all visible at one time. Scrolling 
@@ -1434,8 +1434,8 @@ updated, you should consider using a GenDynamicList instead.
 
 ----------
 #### MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE
-	void	MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(
-			word	identifier);
+    void    MSG_GEN_ITEM_GROUP_MAKE_ITEM_VISIBLE(
+            word    identifier);
 
 This message ensures that an item within a scrolling GenItemGroup is 
 visible, by scrolling the list if necessary. This message has no effect if the 
@@ -1453,7 +1453,7 @@ GenItemGroup is not scrollable or is not usable.
 **Interception:** Generally not intercepted.
 
 ### 11.3.6 GenItemGroup Links
-	ATTR_GEN_ITEM_GROUP_LINK
+    ATTR_GEN_ITEM_GROUP_LINK
 
 In some cases, geometry constraints interfere with functionality. For 
 example, you may wish for "nested" GenItemGroup behavior. Each main 
@@ -1540,8 +1540,8 @@ deselect items depending on the behavior type, etc.
 **GenItemGroupClass**. The GenDynamicList object provides two additional 
 instance fields:
 
-	@instance word GDLI_numItems = 0;
-	@instance word GDLI_queryMsg = 0;
+    @instance word GDLI_numItems = 0;
+    @instance word GDLI_queryMsg = 0;
 
 *GDLI_numItems* stores the number of items in the dynamic list. This field 
 should be set to the initial number of monikers needed within your 
@@ -1566,9 +1566,9 @@ prototype GEN_DYNAMIC_LIST_QUERY_MSG.
 
 ----------
 #### GEN_DYNAMIC_LIST_QUERY_MSG
-	void	GEN_DYNAMIC_LIST_QUERY_MSG(
-			optr	list,
-			word	item);
+    void    GEN_DYNAMIC_LIST_QUERY_MSG(
+            optr    list,
+            word    item);
 
 Use this prototype to define the query message for your GenDynamicList 
 (stored in *GDLI_queryMsg*). This prototype ensures that the message passes 
@@ -1586,9 +1586,9 @@ the correct parameters to your message handler.
 **Return:** Nothing.
 
 ### 11.4.2 DynamicList Basics
-	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER, 
-	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR, 
-	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
+    MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER, 
+    MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR, 
+    MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
 
 You will need to perform several preparatory steps in order to use a 
 GenDynamicList object, even in its most basic form. The following steps are 
@@ -1615,37 +1615,37 @@ dynamic list.
 ----------
 **Code Display 11-6 Creating a GenDynamicList object**
 
-	/* In the definition of your destination object's class, define a message based
-	 * on the prototype GEN_DYNAMIC_LIST_QUERY. This prototype passes two arguments:
-	 * list (the optr of the list sending info) and item (the selection enum). */
+    /* In the definition of your destination object's class, define a message based
+     * on the prototype GEN_DYNAMIC_LIST_QUERY. This prototype passes two arguments:
+     * list (the optr of the list sending info) and item (the selection enum). */
 
-	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_QUERY_COLOR_MONIKER;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_QUERY_COLOR_MONIKER;
 
-	/* Set up the selections, just as you would in a normal GenItemGroup. */
-	typedef enum {
-		MC_RED, MC_YELLOW, MC_BLUE, MC_GREEN
-	} MyColors;
-	#define NUM_COLORS MC_GREEN+1
+    /* Set up the selections, just as you would in a normal GenItemGroup. */
+    typedef enum {
+        MC_RED, MC_YELLOW, MC_BLUE, MC_GREEN
+    } MyColors;
+    #define NUM_COLORS MC_GREEN+1
 
-	/* In the object declaration, include normal instance data for a GenItemGroup,
-	 * making sure to also fill in GDLI_numItems and GDLI_queryMsg with the proper
-	 * information. Note that there are no generic children provided for this object.
-	 * The list will retrieve and display monikers automatically through the query
-	 * message as they are needed. */
+    /* In the object declaration, include normal instance data for a GenItemGroup,
+     * making sure to also fill in GDLI_numItems and GDLI_queryMsg with the proper
+     * information. Note that there are no generic children provided for this object.
+     * The list will retrieve and display monikers automatically through the query
+     * message as they are needed. */
 
-	@object GenDynamicListClass MyList = {
-		/* Set the initial selection MC_BLUE (and the number of items selected to 1).*/
-	GIGI_selection = MC_BLUE;
-		GIGI_applyMsg = MSG_NOTIFY_COLOR_CHANGE;
-		GIGI_destination = process;
+    @object GenDynamicListClass MyList = {
+        /* Set the initial selection MC_BLUE (and the number of items selected to 1).*/
+    GIGI_selection = MC_BLUE;
+        GIGI_applyMsg = MSG_NOTIFY_COLOR_CHANGE;
+        GIGI_destination = process;
 
-		/* Set numItems to the total number of items to appear in this list. If you
-		 * will not know this initially, make sure to set this instance data when you
-		 * do know (with MSG_GEN_DYNAMIC_LIST_INITIALIZE). */
-		GDLI_numItems = NUM_COLORS;
-		GDLI_queryMsg = MSG_QUERY_COLOR_MONIKER;
-		HINT_ITEM_GROUP_SCROLLABLE;
-	}
+        /* Set numItems to the total number of items to appear in this list. If you
+         * will not know this initially, make sure to set this instance data when you
+         * do know (with MSG_GEN_DYNAMIC_LIST_INITIALIZE). */
+        GDLI_numItems = NUM_COLORS;
+        GDLI_queryMsg = MSG_QUERY_COLOR_MONIKER;
+        HINT_ITEM_GROUP_SCROLLABLE;
+    }
 
 ----------
 When a dynamic list is first built, the specific UI will decide how many items 
@@ -1698,52 +1698,52 @@ using the data.
 ----------
 **Code Display 11-7 Creating the List of Data**
 
-	/* Create the list of data (in this case within its own data block). This list of
-	 * data will be in form of text strings. */
+    /* Create the list of data (in this case within its own data block). This list of
+     * data will be in form of text strings. */
 
-	@start ItemText, data;
+    @start ItemText, data;
 
-	@chunk char *listMonikers[NUM_COLORS] = {
-		"Red", "Yellow", "Blue", "Green"
-	};
+    @chunk char *listMonikers[NUM_COLORS] = {
+        "Red", "Yellow", "Blue", "Green"
+    };
 
-	@end ItemText
+    @end ItemText
 
-	/* Create the query message handler. Each time the GenDynamicList needs to display
-	 * an item, it will call this querying message with the number (position) of the
-	 * item it needs to display. In this case, since the monikers are already in the
-	 * form of text strings, you can use MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
-	 * to set the moniker of the list item using the text string.
-	 * DEFINITION: void MSG_QUERY_COLOR_MONIKER(optr list, word item) */
+    /* Create the query message handler. Each time the GenDynamicList needs to display
+     * an item, it will call this querying message with the number (position) of the
+     * item it needs to display. In this case, since the monikers are already in the
+     * form of text strings, you can use MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
+     * to set the moniker of the list item using the text string.
+     * DEFINITION: void MSG_QUERY_COLOR_MONIKER(optr list, word item) */
 
-	@method MyProcessClass, MSG_QUERY_COLOR_MONIKER {
-	char *listString;
-		/* The method will retrieve the entry's text moniker from the array of
-		 * text monikers in listMonikers. It locks itemText, extracts the
-		 * text string, and uses the REPLACE_ITEM message to set the dynamic list
-		 * entry. */
-		MemLock(HandleOf(@listMonikers));
-		listString = listMonikers[item];
+    @method MyProcessClass, MSG_QUERY_COLOR_MONIKER {
+    char *listString;
+        /* The method will retrieve the entry's text moniker from the array of
+         * text monikers in listMonikers. It locks itemText, extracts the
+         * text string, and uses the REPLACE_ITEM message to set the dynamic list
+         * entry. */
+        MemLock(HandleOf(@listMonikers));
+        listString = listMonikers[item];
 
-		/* Then send off the item string to the dynamic list
-		 * and unlock the data block. */
-		@call listObject::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, listString);
-		MemUnlock(HandleOf(@listMonikers));
-	}
+        /* Then send off the item string to the dynamic list
+         * and unlock the data block. */
+        @call listObject::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, listString);
+        MemUnlock(HandleOf(@listMonikers));
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
-	void	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(@stack
-			word					item,
-			word					flags,
-			word					height,
-			word					width,
-			word					length,
-			VisMonikerDataType		dataType,
-			VisMonikerSourceType	sourceType,
-			dword					source);
+    void    MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(@stack
+            word                    item,
+            word                    flags,
+            word                    height,
+            word                    width,
+            word                    length,
+            VisMonikerDataType      dataType,
+            VisMonikerSourceType    sourceType,
+            dword                   source);
 
 This message sends a moniker to use for a particular list item and is usually 
 sent in response to a moniker query by a dynamic list object. Within your 
@@ -1793,17 +1793,17 @@ GR_END_GSTRING element.
 **Structures:** The **VisMonikerDataType** and **VisMonikerSourcetype** are defined 
 by **VisClass**. Their values are shown here for easy reference.
 
-	typedef ByteEnum VisMonikerDataType;
-	/*	VMDT_NULL
-	 *	VMDT_VIS_MONIKER
-	 *	VMDT_TEXT
-	 *	VMDT_GSTRING
-	 *	VMDT_TOKEN */
+    typedef ByteEnum VisMonikerDataType;
+    /*  VMDT_NULL
+     *  VMDT_VIS_MONIKER
+     *  VMDT_TEXT
+     *  VMDT_GSTRING
+     *  VMDT_TOKEN */
 
-	typedef ByteEnum VisMonikerSourceType;
-	/*	VMST_FPTR
-	 *	VMST_OPTR
-	 *	VMST_HPTR */
+    typedef ByteEnum VisMonikerSourceType;
+    /*  VMST_FPTR
+     *  VMST_OPTR
+     *  VMST_HPTR */
 
 **Return:** Nothing.
 
@@ -1811,9 +1811,9 @@ by **VisClass**. Their values are shown here for easy reference.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR
-	void	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
-			word	item,
-			optr	moniker);
+    void    MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(
+            word    item,
+            optr    moniker);
 
 This message is a simplified version of 
 MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER. The moniker must 
@@ -1836,9 +1836,9 @@ cases, use MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT
-	void	MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-		word	item,
-		char	*text);
+    void    MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+        word    item,
+        char    *text);
 
 This message is a simplified version of 
 MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER. The moniker passed 
@@ -1865,8 +1865,8 @@ the appropriate GenItemGroup messages are valid for a GenDynamicList
 object except for MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR.
 
 #### 11.4.3.1 Altering the Number of Items
-	MSG_GEN_DYNAMIC_LIST_INITIALIZE, 
-	MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS
+    MSG_GEN_DYNAMIC_LIST_INITIALIZE, 
+    MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS
 
 In order to ensure the proper display of monikers in a dynamic list, the list 
 object must know the total number of items that may be displayed. In most 
@@ -1883,8 +1883,8 @@ with MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_INITIALIZE
-	void	MSG_GEN_DYNAMIC_LIST_INITIALIZE(
-			word	numItems);
+    void    MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+            word    numItems);
 
 This message initializes a dynamic list, updating the display to reflect a new 
 number of items or new data within the moniker list. If the list is already 
@@ -1912,7 +1912,7 @@ selections.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS
-	word	MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+    word    MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
 
 This message returns the current number of items for a dynamic list. If no 
 items are within the list, this message returns zero. 
@@ -1926,9 +1926,9 @@ items are within the list, this message returns zero.
 **Return:** The number of items in the GenDynamicList (*GDLI_numItems*).
 
 #### 11.4.3.2 Adding and Removing Items Dynamically
-	MSG_GEN_DYNAMIC_LIST_ADD_ITEMS, 
-	MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS, 
-	MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST
+    MSG_GEN_DYNAMIC_LIST_ADD_ITEMS, 
+    MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS, 
+    MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST
 
 Part of the strength of a dynamic list is its ability to be easily updated with 
 new data. MSG_GEN_DYNAMIC_LIST_ADD_ITEMS adds one or more new 
@@ -1946,9 +1946,9 @@ will have their positions decreased by one.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_ADD_ITEMS
-	void	MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
-			word	item,
-			word	numItems);
+    void    MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
+            word    item,
+            word    numItems);
 
 This message adds an item after the position passed. All items that 
 previously appeared at or after the position specified will have their positions 
@@ -1977,9 +1977,9 @@ the end.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS
-	void	MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(
-			word	item,
-			word	numItems);
+    void    MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(
+            word    item,
+            word    numItems);
 
 This message removes the specified item(s) from a dynamic list at the 
 position passed. All items that previously appeared after those deleted will 
@@ -2008,9 +2008,9 @@ position in the list.
 
 ----------
 #### MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST
-	void	MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST(
-			word	*deletionList,
-			word	numItems);
+    void    MSG_GEN_DYNAMIC_LIST_REMOVE_ITEM_LIST(
+            word    *deletionList,
+            word    numItems);
 
 This message removes a list of items from a dynamic list. Therefore, unlike 
 MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS, this message can remove 
@@ -2063,23 +2063,23 @@ individual children. These instance fields are listed in Code Display 11-8.
 ----------
 **Code Display 11-8 GenBooleanGroup Instance Fields**
 
-	@instance word			GBGI_selectedBooleans = 0;
-	@instance word			GBGI_indeterminateBooleans = 0;
-	@instance word			GBGI_modifiedBooleans = 0;
-	@instance optr			GBGI_destination;
-	@instance Message		GBGI_applyMsg = 0;
+    @instance word          GBGI_selectedBooleans = 0;
+    @instance word          GBGI_indeterminateBooleans = 0;
+    @instance word          GBGI_modifiedBooleans = 0;
+    @instance optr          GBGI_destination;
+    @instance Message       GBGI_applyMsg = 0;
 
-	@vardata Message		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG;
-	@vardata optr			ATTR_GEN_BOOLEAN_GROUP_LINK;
-		@reloc ATTR_GEN_BOOLEAN_GROUP_LINK, 0, optr;
-	@vardata void			ATTR_GEN_BOOLEAN_GROUP_INIT_FILE_BOOLEAN;
+    @vardata Message        ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG;
+    @vardata optr           ATTR_GEN_BOOLEAN_GROUP_LINK;
+        @reloc ATTR_GEN_BOOLEAN_GROUP_LINK, 0, optr;
+    @vardata void           ATTR_GEN_BOOLEAN_GROUP_INIT_FILE_BOOLEAN;
 
-	/* Hints */
+    /* Hints */
 
-	@vardata void			HINT_BOOLEAN_GROUP_SCROLLABLE;
-	@vardata void			HINT_BOOLEAN_GROUP_MINIMIZE_SIZE;
-	@vardata void			HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
-	@vardata void			HINT_BOOLEAN_GROUP_TOOLBOX_STYLE;
+    @vardata void           HINT_BOOLEAN_GROUP_SCROLLABLE;
+    @vardata void           HINT_BOOLEAN_GROUP_MINIMIZE_SIZE;
+    @vardata void           HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+    @vardata void           HINT_BOOLEAN_GROUP_TOOLBOX_STYLE;
 
 ----------
 *GBGI_selectedBooleans* is a record representing the selection state of the 
@@ -2142,7 +2142,7 @@ OSF/Motif, but not for other Booleans.
 #### 11.5.1.2 GenBoolean Instance Data
 **GenBooleanClass** contains one additional instance field:
 
-	@instance word			GBI_identifier;
+    @instance word          GBI_identifier;
 
 *GBI_identifier* sets the identifying keyword (a 16-bit mask representing a 
 specific bit-or bits-within a word-length bitfield) that uniquely identifies 
@@ -2163,7 +2163,7 @@ such records: *GBGI_selectedBooleans*, *GBGI_indeterminateBooleans*, and
 state, and the modified state of each GenBoolean.
 
 #### 11.5.2.1 Selected Booleans
-	GBI_identifier, GBGI_selectedBooleans
+    GBI_identifier, GBGI_selectedBooleans
 
 *GBI_identifier* stores the identifying keyword for a GenBoolean item. The 
 BooleanGroup object will always use this identifier when referring to 
@@ -2173,35 +2173,35 @@ GenBooleans. These identifiers are set up as constants representing bits in a
 ----------
 **Code Display 11-9 Setting Up a GenBooleanGroup**
 
-	/* The identifiers for any particular GenBooleanGroup are
-	 * constant bits within a word-length bitfield. */
+    /* The identifiers for any particular GenBooleanGroup are
+     * constant bits within a word-length bitfield. */
 
-	typedef WordFlags USCities;
-	#define USC_CHICAGO 			0x0001		/* The first bit */
-	#define USC_NEW_YORK			0x0002		/* The second bit */
-	#define USC_SAN_FRANCISCO		0x0004		/* The third bit */
+    typedef WordFlags USCities;
+    #define USC_CHICAGO             0x0001      /* The first bit */
+    #define USC_NEW_YORK            0x0002      /* The second bit */
+    #define USC_SAN_FRANCISCO       0x0004      /* The third bit */
 
-	@object GenBooleanGroupClass CityList = {
-		GI_comp = @Chicago, @NewYork, @SanFrancisco;
-		/* The first and second bit in the selectedBooleans record are set to
-		 * indicate that Chicago and New York are initially selected. */
-		GBGI_selectedBooleans = USC_CHICAGO | USC_NEW_YORK;
-	}
+    @object GenBooleanGroupClass CityList = {
+        GI_comp = @Chicago, @NewYork, @SanFrancisco;
+        /* The first and second bit in the selectedBooleans record are set to
+         * indicate that Chicago and New York are initially selected. */
+        GBGI_selectedBooleans = USC_CHICAGO | USC_NEW_YORK;
+    }
 
-	@object GenBooleanClass Chicago = {
-		GI_visMoniker = "Chicago";
-		GBI_identifier = USC_CHICAGO;
-	}
+    @object GenBooleanClass Chicago = {
+        GI_visMoniker = "Chicago";
+        GBI_identifier = USC_CHICAGO;
+    }
 
-	@object GenBooleanClass NewYork = {
-		GI_visMoniker = "New York";
-		GBI_identifier = USC_NEW_YORK;
-	}
+    @object GenBooleanClass NewYork = {
+        GI_visMoniker = "New York";
+        GBI_identifier = USC_NEW_YORK;
+    }
 
-	@object GenBooleanClass SanFrancisco = {
-		GI_visMoniker = "San Francisco";
-		GBI_identifier = USC_SAN_FRANCISCO;
-	}
+    @object GenBooleanClass SanFrancisco = {
+        GI_visMoniker = "San Francisco";
+        GBI_identifier = USC_SAN_FRANCISCO;
+    }
 
 ----------
 *GBGI_selectedBooleans* stores a 16-bit record corresponding to the selection 
@@ -2211,7 +2211,7 @@ setting selections in this field, you can specify initial selections for the
 GenBooleanGroup to initially appear set.
 
 #### 11.5.2.2 Indeterminate and Modified Booleans
-	GBGI_indeterminateBooleans, GBGI_modifiedBooleans
+    GBGI_indeterminateBooleans, GBGI_modifiedBooleans
 
 *GBGI_indeterminateBooleans* stores a 16-bit record corresponding to the 
 indeterminate state of a GenBooleanGroup's children. Your BooleanGroup 
@@ -2245,9 +2245,9 @@ clicking on an "apply" trigger) or when the application forces it (with
 MSG_GEN_APPLY).
 
 #### 11.5.2.3 Destination
-	GBGI_applyMsg, GBGI_destination, 
-	GEN_BOOLEAN_GROUP_APPLY_MSG, 
-	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
+    GBGI_applyMsg, GBGI_destination, 
+    GEN_BOOLEAN_GROUP_APPLY_MSG, 
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
 
 When the GenBooleanGroup receives notice to apply any changes made in 
 the list, it will first determine whether the group has been modified (by 
@@ -2270,10 +2270,10 @@ object's instance data.
 
 ----------
 #### GEN_BOOLEAN_GROUP_APPLY_MSG
-	void	GEN_BOOLEAN_GROUP_APPLY_MSG(
-			word	selectedBooleans,
-			word	indeterminateBooleans,
-			word	modifiedBooleans);
+    void    GEN_BOOLEAN_GROUP_APPLY_MSG(
+            word    selectedBooleans,
+            word    indeterminateBooleans,
+            word    modifiedBooleans);
 
 Use this prototype to define the apply message for your GenBooleanGroup 
 (stored in **GBGI_applyMsg**). This prototype ensures that the message passes 
@@ -2297,9 +2297,9 @@ the *GBGI_modifiedBooleans* instance field).
 **Return:** Nothing.
 
 #### 11.5.2.4 Sending the Status Messages
-	GEN_BOOLEAN_GROUP_STATUS_MSG, 
-	ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG, 
-	MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG
+    GEN_BOOLEAN_GROUP_STATUS_MSG, 
+    ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG, 
+    MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG
 
 In delayed mode, GenBooleanGroups will only send out their apply action if 
 an apply occurs. If you wish your application to receive notice whenever any 
@@ -2312,10 +2312,10 @@ object declaration, and provide a handler for this message in the class.
 
 ----------
 #### GEN_BOOLEAN_GROUP_STATUS_MSG
-	void	GEN_BOOLEAN_GROUP_STATUS_MSG(
-			word	selectedBooleans,
-			word	indeterminateBooleans,
-			word	changedBooleans);
+    void    GEN_BOOLEAN_GROUP_STATUS_MSG(
+            word    selectedBooleans,
+            word    indeterminateBooleans,
+            word    changedBooleans);
 
 Use this prototype to define a status message for your GenBooleanGroup 
 (stored in the ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG vardata). This 
@@ -2342,8 +2342,8 @@ to be sent out (not necessarily the contents of the
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG
-	void	MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG(
-			word	changedBooleans);
+    void    MSG_GEN_BOOLEAN_GROUP_SEND_STATUS_MSG(
+            word    changedBooleans);
 
 This message causes the GenBooleanGroup to send out its status message 
 stored in ATTR_GEN_ITEM_GROUP_STATUS_MSG. The message should 
@@ -2381,8 +2381,8 @@ the second to the third, and the third to the first. The three linked
 BooleanGroups will act as one entity.
 
 #### 11.5.2.6 Scrolling Boolean Groups
-	HINT_BOOLEAN_GROUP_SCROLLABLE, 
-	MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE
+    HINT_BOOLEAN_GROUP_SCROLLABLE, 
+    MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE
 
 Boolean group lists, like item group lists, can be scrollable. To make a 
 Boolean list scrollable, set HINT_BOOLEAN_GROUP_SCROLLABLE. To make 
@@ -2391,8 +2391,8 @@ MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE
-	void	MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE(
-			word	identifier);
+    void    MSG_GEN_BOOLEAN_GROUP_MAKE_BOOLEAN_VISIBLE(
+            word    identifier);
 
 This message, when sent to a scrollable BooleanGroup object, will make the 
 specified GenBoolean visible in the list. If the passed identifier is unknown 
@@ -2415,8 +2415,8 @@ Both the BooleanGroups and the Booleans themselves may be dynamically
 changed to alter the behavior of the list objects. 
 
 #### 11.5.3.1 Altering the Identifiers
-	MSG_GEN_BOOLEAN_GET_IDENTIFIER, 
-	MSG_GEN_BOOLEAN_SET_IDENTIFIER
+    MSG_GEN_BOOLEAN_GET_IDENTIFIER, 
+    MSG_GEN_BOOLEAN_SET_IDENTIFIER
 
 Each GenBoolean object contains an instance field to store the identifier of 
 that object. It is this identifier that the parent GenBooleanGroup object uses 
@@ -2431,7 +2431,7 @@ while the item is still GS_USABLE would be unusual.
 
 ----------
 #### MSG_GEN_BOOLEAN_GET_IDENTIFIER
-	word	MSG_GEN_BOOLEAN_GET_IDENTIFIER();
+    word    MSG_GEN_BOOLEAN_GET_IDENTIFIER();
 
 This message returns the identifier for the GenBoolean item.
 
@@ -2447,8 +2447,8 @@ This message returns the identifier for the GenBoolean item.
 
 ----------
 #### MSG_GEN_BOOLEAN_SET_IDENTIFIER
-	void	MSG_GEN_BOOLEAN_SET_IDENTIFIER(
-			word	identifier);
+    void    MSG_GEN_BOOLEAN_SET_IDENTIFIER(
+            word    identifier);
 
 This message sets a new identifier for a GenBoolean object. No change is 
 made to the GenBooleanGroup object. You must make sure that you are not 
@@ -2480,12 +2480,12 @@ GenBooleanGroup's instance data. Second, you may set individual bits
 representing an item's state individually. 
 
 ##### Setting the State Collectively
-	MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS, 
-	MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE, 
-	MSG_GEN_BOOLEAN_GROUP_GET_INDETERMINATE_BOOLEANS, 
-	MSG_GEN_BOOLEAN_GROUP_SET_GROUP_INDETERMINATE_STATE, 
-	MSG_GEN_BOOLEAN_GROUP_GET_MODIFIED_BOOLEANS, 
-	MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
+    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS, 
+    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE, 
+    MSG_GEN_BOOLEAN_GROUP_GET_INDETERMINATE_BOOLEANS, 
+    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_INDETERMINATE_STATE, 
+    MSG_GEN_BOOLEAN_GROUP_GET_MODIFIED_BOOLEANS, 
+    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
 
 To retrieve the contents of the *GBGI_selectedBooleans* instance field, send the 
 BooleanGroup a MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS. 
@@ -2505,7 +2505,7 @@ MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS
-	word	MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    word    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
 
 This message returns the current state of all GenBooleans in a 
 GenBooleanGroup (selected or unselected) by returning the contents of the 
@@ -2523,7 +2523,7 @@ GenBooleanGroup (selected or unselected) by returning the contents of the
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_GET_INDETERMINATE_BOOLEANS
-	word	MSG_GEN_BOOLEAN_GROUP_GET_INDETERMINATE_BOOLEANS();
+    word    MSG_GEN_BOOLEAN_GROUP_GET_INDETERMINATE_BOOLEANS();
 
 This message returns the indeterminate items of a GenBooleanGroup by 
 returning the contents of the *GBDI_indeterminateBooleans* instance field.
@@ -2540,9 +2540,9 @@ returning the contents of the *GBDI_indeterminateBooleans* instance field.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
-	void	MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
-			word	selectedBooleans,
-			word	indeterminateBooleans);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+            word    selectedBooleans,
+            word    indeterminateBooleans);
 
 This message sets new selections and indeterminate states for a 
 GenBooleanGroup (altering the contents of the *GBGI_selectedBooleans* and 
@@ -2566,7 +2566,7 @@ indeterminate.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_GET_MODIFIED_BOOLEANS
-	word	MSG_GEN_BOOLEAN_GROUP_GET_MODIFIED_BOOLEANS();
+    word    MSG_GEN_BOOLEAN_GROUP_GET_MODIFIED_BOOLEANS();
 
 This message returns selections marked modified within a 
 GenBooleanGroup since the last apply (by returning the contents of the 
@@ -2584,9 +2584,9 @@ GenBooleanGroup since the last apply (by returning the contents of the
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
-	void	MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(
-			word	setBooleans,
-			word	clearBooleans);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(
+            word    setBooleans,
+            word    clearBooleans);
 
 GenBooleans are normally marked modified any time their state is altered, 
 and they are marked not modified after these changes have been applied. You 
@@ -2611,13 +2611,13 @@ set not modified (cleared) in
 **Interception:** Generally not intercepted.
 
 ##### Setting the Booleans Individually
-	MSG_GEN_BOOLEAN_GROUP_GET_BOOLEAN_OPTR, 
-	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED, 
-	MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE, 
-	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_INDETERMINATE, 
-	MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE, 
-	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_MODIFIED, 
-	MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_MODIFIED_STATE
+    MSG_GEN_BOOLEAN_GROUP_GET_BOOLEAN_OPTR, 
+    MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED, 
+    MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE, 
+    MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_INDETERMINATE, 
+    MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE, 
+    MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_MODIFIED, 
+    MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_MODIFIED_STATE
 
 You can retrieve the optr of a particular GenBoolean object by sending the 
 BooleanGroup MSG_GEN_BOOLEAN_GROUP_GET_ITEM_OPTR, passing it 
@@ -2645,8 +2645,8 @@ the identifier and the modified state.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_GET_BOOLEAN_OPTR
-	optr	MSG_GEN_BOOLEAN_GROUP_GET_BOOLEAN_OPTR(
-			word	identifier);
+    optr    MSG_GEN_BOOLEAN_GROUP_GET_BOOLEAN_OPTR(
+            word    identifier);
 
 This message returns the optr of the requested GenBoolean. You may then 
 use this optr to alter that Boolean's state individually. If the GenBoolean with 
@@ -2666,8 +2666,8 @@ found).
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED
-	Boolean	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
-			word	identifier);
+    Boolean MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+            word    identifier);
 
 This message checks whether the GenBoolean with the passed identifier is 
 selected.
@@ -2686,9 +2686,9 @@ unselected.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
-	void	MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
-			word		identifier,
-			Boolean		state);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+            word        identifier,
+            Boolean     state);
 
 This message sets an individual GenBoolean's selection state, leaving other 
 GenBooleans unaffected. You may alter the selection state of individual 
@@ -2710,8 +2710,8 @@ BooleanGroup. (This is useful for linked BooleanGroups.)
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_INDETERMINATE
-	Boolean	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_INDETERMINATE(
-			word	identifier);
+    Boolean MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_INDETERMINATE(
+            word    identifier);
 
 This message checks whether the GenBoolean with the passed identifier is 
 indeterminate (by examining the *GBDI_indeterminateBooleans* instance 
@@ -2730,9 +2730,9 @@ field).
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE
-	void	MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE(
-			word		identifier,
-			Boolean		indeterminateState);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_INDETERMINATE_STATE(
+            word        identifier,
+            Boolean     indeterminateState);
 
 This message sets the indeterminate state of an individual GenBoolean 
 without affecting any other GenBooleans. You may mark GenBooleans 
@@ -2755,8 +2755,8 @@ FALSE to mark it not indeterminate.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_MODIFIED
-	Boolean	MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_MODIFIED(
-			word	identifier);
+    Boolean MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_MODIFIED(
+            word    identifier);
 
 This message checks whether the GenBoolean with the passed identifier has 
 been modified (by examining the *GBGI_modifiedBooleans* instance field).
@@ -2774,9 +2774,9 @@ been modified (by examining the *GBGI_modifiedBooleans* instance field).
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_MODIFIED_STATE
-	void	MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_MODIFIED_STATE(
-			word		identifier,
-			Boolean		modifiedState);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_MODIFIED_STATE(
+            word        identifier,
+            Boolean     modifiedState);
 
 This message sets the modified state of an individual GenBoolean without 
 affecting any other GenBooleans. You may mark GenBooleans modified even 
@@ -2798,10 +2798,10 @@ mark it not modified.
 **Interception:** Generally not intercepted.
 
 #### 11.5.3.3 Altering the Destination
-	MSG_GEN_BOOLEAN_GROUP_GET_DESTINATION, 
-	MSG_GEN_BOOLEAN_GROUP_SET_DESTINATION, 
-	MSG_GEN_BOOLEAN_GROUP_GET_APPLY_MSG, 
-	MSG_GEN_BOOLEAN_GROUP_SET_APPLY_MSG
+    MSG_GEN_BOOLEAN_GROUP_GET_DESTINATION, 
+    MSG_GEN_BOOLEAN_GROUP_SET_DESTINATION, 
+    MSG_GEN_BOOLEAN_GROUP_GET_APPLY_MSG, 
+    MSG_GEN_BOOLEAN_GROUP_SET_APPLY_MSG
 
 To retrieve the GenBooleanGroup's destination stored in its 
 *GBGI_destination* instance field or the message stored in its *GBGI_applyMsg* 
@@ -2819,7 +2819,7 @@ use.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_GET_DESTINATION
-	optr	MSG_GEN_BOOLEAN_GROUP_GET_DESTINATION();
+    optr    MSG_GEN_BOOLEAN_GROUP_GET_DESTINATION();
 
 This message returns the current destination object for the BooleanGroup, as 
 specified in the *GBGI_destination* instance field.
@@ -2836,8 +2836,8 @@ specified in the *GBGI_destination* instance field.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_DESTINATION
-	void	MSG_GEN_BOOLEAN_GROUP_SET_DESTINATION(
-			optr	dest);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_DESTINATION(
+            optr    dest);
 
 This message sets a new destination object for a BooleanGroup. The apply 
 and status messages of this BooleanGroup will be sent to this new 
@@ -2857,7 +2857,7 @@ put into *GBGI_destination*.
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_GET_APPLY_MSG
-	Message	MSG_GEN_BOOLEAN_GROUP_GET_APPLY_MSG();
+    Message MSG_GEN_BOOLEAN_GROUP_GET_APPLY_MSG();
 
 This message returns the current apply action in the GenBooleanGroup's 
 *GBGI_applyMsg* instance field.
@@ -2874,8 +2874,8 @@ This message returns the current apply action in the GenBooleanGroup's
 
 ----------
 #### MSG_GEN_BOOLEAN_GROUP_SET_APPLY_MSG
-	void	MSG_GEN_BOOLEAN_GROUP_SET_APPLY_MSG(
-			Message		message);
+    void    MSG_GEN_BOOLEAN_GROUP_SET_APPLY_MSG(
+            Message     message);
 
 This message sets a new apply message in the GenBooleanGroup's 
 *GBGI_applyMsg* instance field.
