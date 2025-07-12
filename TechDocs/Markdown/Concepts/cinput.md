@@ -383,7 +383,7 @@ Each mouse event passes three items of data and one pointer to a return
 structure. The three parameters are listed below; the fourth, the return 
 structure, is detailed in the next section.
 
-xPosition  	
+xPosition       
 The horizontal position of the pointer in document coordinates 
 in the window when the event was generated.
 
@@ -663,12 +663,12 @@ it at run-time.
 
 ~~~
 typedef struct {
-	byte	   PD_width;
-	byte	   PD_height;
-	sbyte	   PD_hotX;
-	sbyte	   PD_hotY;
-	byte	   PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
-	byte	   PD_image[STANDARD_CURSOR_IMAGE_SIZE];
+        byte       PD_width;
+        byte       PD_height;
+        sbyte      PD_hotX;
+        sbyte      PD_hotY;
+        byte       PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
+        byte       PD_image[STANDARD_CURSOR_IMAGE_SIZE];
 } PointerDef16;
 ~~~
 
@@ -934,30 +934,30 @@ Code Display 11-1 Sample MSG_META_KBD_CHAR Handler
 
 @method MyVisObjClass, MSG_META_KBD_CHAR {
 
-	/* First, check if the character is the one we want. */
+        /* First, check if the character is the one we want. */
     if (character == `>') {
 
-	/* If it is, make sure the user is not holding the key down and
-	 * that this is not a release event. Check that CF_REPEAT_PRESS and
-	 * CF_RELEASE are not set in the low byte of the flags parameter.
-	 * If either is set, ignore the character and send MSG_META_FUP_KBD_CHAR
-	 * so the UI may provide default keyboard navigation. */
+        /* If it is, make sure the user is not holding the key down and
+         * that this is not a release event. Check that CF_REPEAT_PRESS and
+         * CF_RELEASE are not set in the low byte of the flags parameter.
+         * If either is set, ignore the character and send MSG_META_FUP_KBD_CHAR
+         * so the UI may provide default keyboard navigation. */
 
-	if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE)) {
-	    @call self::MSG_META_FUP_KBD_CHAR(character, flags, state);
-	} else {
-	    /* If we get here, we know the character is what we want. Increment
-	     * the instance field and return. */
+        if ((flags & CF_REPEAT_PRESS) || (flags & CF_RELEASE)) {
+            @call self::MSG_META_FUP_KBD_CHAR(character, flags, state);
+        } else {
+            /* If we get here, we know the character is what we want. Increment
+             * the instance field and return. */
 
-	    (pself->MVOCI_data)++;
-	}
+            (pself->MVOCI_data)++;
+        }
 
-	/* If the character is not a greater-than, we must send it on to the UI
-	 * with MSG_META_FUP_KBD_CHAR. If we do not, all other keyboard presses
-	 * we receive will never be handled; this will cause keyboard
-	 * accelerators and menu navigation not to work. */
+        /* If the character is not a greater-than, we must send it on to the UI
+         * with MSG_META_FUP_KBD_CHAR. If we do not, all other keyboard presses
+         * we receive will never be handled; this will cause keyboard
+         * accelerators and menu navigation not to work. */
     } else {
-	@call self::MSG_META_FUP_KBD_CHAR(character, flags, state);
+        @call self::MSG_META_FUP_KBD_CHAR(character, flags, state);
     }
 }
 ~~~
@@ -1498,13 +1498,13 @@ Code Display 11-2 Delivering Messages to the Focus
 @method MyProcessClass, MSG_SEND_MESSAGE_TO_FOCUS_INTERACTION {
     EventHandle event;
 
-	/* The classed event is recorded to be handled by the first object of class
-	 * GenInteractionClass. */
+        /* The classed event is recorded to be handled by the first object of class
+         * GenInteractionClass. */
     event = @record GenInteractionClass::MSG_TEST_MESSAGE();
 
-	/* This message is then sent to the GenApplication object, from which it 
-	 * will travel down the focus hierarchy until handled at the
-	 * GenInteraction level. */
+        /* This message is then sent to the GenApplication object, from which it 
+         * will travel down the focus hierarchy until handled at the
+         * GenInteraction level. */
     @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_FOCUS);
 }
 
@@ -1522,11 +1522,11 @@ Code Display 11-2 Delivering Messages to the Focus
 @method MyProcessClass, MSG_SEND_TEST_TO_FOCUS_LEAF {
     EventHandle event;
 
-	/* A classed event with the class of null is recorded. */
+        /* A classed event with the class of null is recorded. */
     event = @record null::MSG_TEST_MESSAGE();
 
-	/* This event is sent to the GenApplication, where it will travel down the
-	 * focus hierarchy to the leaf object, where it will be handled. */
+        /* This event is sent to the GenApplication, where it will travel down the
+         * focus hierarchy to the leaf object, where it will be handled. */
     @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_FOCUS);
 }
 
@@ -1639,13 +1639,13 @@ Code Display 11-3 Delivering Messages to the Target
 @method MyProcessClass, MSG_SEND_MESSAGE_TO_TARGET_INTERACTION {
     EventHandle event;
 
-	/* The classed event is recorded to be handled by the first object of class
-	 * GenInteractionClass. */
+        /* The classed event is recorded to be handled by the first object of class
+         * GenInteractionClass. */
     event = @record GenTextClass::MSG_TEST_MESSAGE();
 
-	/* This message is then sent to the GenApplication object, from which it 
-	 * will travel down the target hierarchy until handled at the
-	 * GenInteraction level. */
+        /* This message is then sent to the GenApplication object, from which it 
+         * will travel down the target hierarchy until handled at the
+         * GenInteraction level. */
     @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
 }
 
@@ -1665,11 +1665,11 @@ Code Display 11-3 Delivering Messages to the Target
 @method MyProcessClass, MSG_SEND_TEST_TO_TARGET_LEAF {
     EventHandle event;
 
-	/* A classed event with the class of null is recorded. */
+        /* A classed event with the class of null is recorded. */
     event = @record null::MSG_TEST_MESSAGE();
 
-	/* This event is sent to the GenApplication, where it will travel down the
-	 * target hierarchy to the leaf object, where it will be handled. */
+        /* This event is sent to the GenApplication, where it will travel down the
+         * target hierarchy to the leaf object, where it will be handled. */
     @call MyApplication::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
 }
 

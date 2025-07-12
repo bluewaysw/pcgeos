@@ -77,7 +77,7 @@ MyFunc proc far firstVar:word, secondVar:byte, thirdVar:dword
 
 .leave
 
-	ret
+        ret
 
 MyFunc endp
 ~~~
