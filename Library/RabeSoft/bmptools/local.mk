@@ -4,7 +4,7 @@
 #	Adapted for free PC/GEOS project 01/2024 - 07/2025
 #
 
-NO_EC = 1
+# NO_EC = 1
 
 
 #include <$(SYSMAKEFILE)>
