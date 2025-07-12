@@ -1,0 +1,926 @@
+/***************************************************************************
+ *
+ *  File-Tool-Library
+ *  Module: Main tool routines
+ *  (c) by RABE-Soft 12/99
+ *
+ *  Note: The comments were translated from German to English with AI support
+ *  and were not checked in detail. Therefore, they may sometimes sound a bit strange.
+ *
+ ***************************************************************************/
+@include <stdapp.goh>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fileEnum.h>
+#include <file.h>
+@include <localize.h>
+
+@include "rsftool.goh"
+@include "UI/toolui.goh"
+@include "Main/ftlocals.goh"
+@include "Main/macros.goh"
+
+
+/*****************************************************************************
+ *  $ID New Copy/Move/Delete API since version 1.8
+ *****************************************************************************/
+
+/*--------------------- FileDeleteAskOrNot ---------------------
+ *  Task:       Prompt whether a file should be deleted or not
+ *          "Yes, all" is currently not supported, must
+ *          be added in a new library version if needed
+ *  Strategy:      Flags control the behavior
+ *  Return:     Error flag:
+ *          FALSE (==0) OK
+ *          if:
+ *                - ECDF_NOT_OVERWRITE_IS_ERROR
+ *                  --> ERROR_ACCESS_DENIED, error
+ *                - ECDF_NOT_OVERWRITE_ASK
+ *                      and user answers NO to prompt
+ *                  --> special value (-701), OK
+ *                - ECDF_NOT_OVERWRITE_ASK_ERROR
+ *                      and user answers NO to prompt
+ *                  ERROR_CANCELED_BY_USER --> error
+ ---------------------------------------------------------------------------*/
+int FileDeleteAskOrNot(word flags, Boolean calledFormMoveCopy,
+	optr overwriteWarning, optr deleteWarning, char *fileName, char *fileName2) {
+int retVal;
+
+	/* Note: the relevant flags for this routine take 2 bits
+	 * on --> query via switch */
+	flags &= ECDF_NOT_OVERWRITE_MASK;
+	switch (flags) {
+		case ECDF_NOT_OVERWRITE_IS_ERROR:
+			return ERROR_ACCESS_DENIED;
+		case ECDF_NOT_OVERWRITE_ASK:
+		case ECDF_NOT_OVERWRITE_ASK_ERROR:
+			if (calledFormMoveCopy)
+				retVal = WarningOverwriteBox(overwriteWarning, fileName, fileName2, 0, 0);
+			   else retVal = WarningOverwriteBox(deleteWarning, fileName, fileName2, 0, 0);
+
+			// If YES : Delete file
+			if ( retVal == IC_YES ) return FALSE; // OK
+
+			// Otherwise: depending on the flags: error or not
+			if ( flags == (word)ECDF_NOT_OVERWRITE_ASK ) {
+				return (-701); // OK
+				}
+			//  remains: ECDF_NOT_OVERWRITE_ASK_ERROR
+			return ERROR_CANCELED_BY_USER;
+		}
+
+	return ERROR_ACCESS_DENIED;	// I never end up here, but the compiler sees it differently.
+}
+
+/*--------------------- FileCheckForOverwriteEasy ---------------------
+ *  Task:       Check via flags whether a file can be deleted
+ *              or overwritten or not.
+ *              If necessary: ask all required questions
+ *  Strategy:   Flags control the behavior
+ *              calledFormMoveCopy is TRUE if the routine was called
+ *                  to check during move/copy whether an
+ *                  existing target can be deleted/overwritten
+ *                  (error messages are designed for this)
+ *  Return:     Error flag:
+ *              FALSE (==0) OK
+ *                  ERROR_FILE_NOT_FOUND is also OK
+ *              Error code if not overwriting/deleting
+ *              Special value (-701), not overwriting/deleting
+ *                  But it should not be an error
+ *                  (i.e. not ERROR_CANCELED_BY_USER)
+ ---------------------------------------------------------------------------*/
+int FileCheckForOverwriteEasy(char * fileName, EasyCopyDeleteFlags flags, Boolean calledFormMoveCopy) {
+int err;
+word attrs;
+GeosFileType	fileType;
+
+  attrs = FileGetAttributes(fileName);
+  err = ThreadGetError();
+  if ( err ) attrs = 0;	/* should be: File not found */
+			/* safe programming: query separately. */
+  if ( err == ERROR_FILE_NOT_FOUND ) return FALSE;		// Nothing there to delete
+
+  /* Force errors for system and read-only files */
+  if ( attrs & (FA_SYSTEM | FA_HIDDEN) ) {
+	if ( flags & ECDF_HIDDEN_SYS_FORCES_ERROR ) {
+		if (flags & ECDF_MSG_ON_ERROR ) {
+			ErrorMsgCodeBox(@ErrorFileDelete,fileName, ERROR_ACCESS_DENIED);
+			}
+		return ERROR_ACCESS_DENIED;
+		}
+	}
+  if ( attrs & (FA_RDONLY) ) {
+	if ( flags & ECDF_RO_FORCES_ERROR ) {
+		if (flags & ECDF_MSG_ON_ERROR ) {
+			ErrorMsgCodeBox(@ErrorFileDelete,fileName, ERROR_ACCESS_DENIED);
+			}
+		return ERROR_ACCESS_DENIED;
+		}
+	}
+
+  /* All links are treated equally, regardless of type */
+  if ( attrs & (FA_LINK) ) {
+      if (flags & (word)ECDF_OVERWRITE_LINK) return FALSE;
+      err = FileDeleteAskOrNot(flags, calledFormMoveCopy, @WarningOverwriteLink, @WarningDeleteLink, fileName, 0);
+      if ( err ) return err;		// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special value (-701)
+      return FALSE;
+      }
+
+
+  /* Ask depending on the type of file. Directories can never be deleted */
+  fileType = GFT_NOT_GEOS_FILE;
+  FileGetPathExtAttributes(fileName, FEA_FILE_TYPE, &fileType, sizeof(GeosFileType));
+
+  /* I make the distinction of the file type via a switch, so that I get a
+   * default branch in case of anyone decides to implement further file types.
+   */
+  switch ( fileType ) {
+  case GFT_DIRECTORY:
+	if (flags & ECDF_MSG_ON_ERROR ) {
+		if (calledFormMoveCopy)
+			{ ErrorMsgBox(@ErrorOverwriteFolder, fileName, 0); }
+		   else { ErrorMsgBox(@ErrorDeleteFolder, fileName, 0); }
+		}
+	if (calledFormMoveCopy) return ERROR_FILE_CANNOT_REPLACE_FOLDER;	/* file replaces folder */
+	return ERROR_CANNOT_DELETE_FOLDERS;	/* Cannot delete folder */
+
+  case GFT_EXECUTABLE:
+      if (flags & (word)ECDF_OVERWRITE_EXEC) break;
+      err = FileDeleteAskOrNot(flags, calledFormMoveCopy,@WarningOverwriteExec, @WarningDeleteExec, fileName, 0);
+      if ( err ) return err;		// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special (-701)
+      break;
+
+  case GFT_LINK:	/* According to the documentation, these are not yet implemented
+			 * --> I think it's well placed here */
+  case GFT_VM:
+      if (flags & (word)ECDF_OVERWRITE_VM) break;
+      err = FileDeleteAskOrNot(flags, calledFormMoveCopy,@WarningOverwriteGeosFile, @WarningDeleteGeosFile, fileName, 0);
+      if ( err ) return err;		// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special value (-701)
+      break;
+
+  case GFT_NOT_GEOS_FILE:
+      if (flags & (word)ECDF_OVERWRITE_DOS) break;
+      err = FileDeleteAskOrNot(flags, calledFormMoveCopy,@WarningOverwriteDOSFile, @WarningDeleteDOSFile, fileName, 0);
+      if ( err ) return err;		// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special value (-701)
+      break;
+
+  case GFT_DATA:
+  default:              /* Falls Breadbox weitere Dateitype einfhrt, behandle ich sie
+			 * hier - das kann ich aber bei Bedarf auch „ndern */
+      if (flags & (word)ECDF_OVERWRITE_DATA) break;
+      err = FileDeleteAskOrNot(flags, calledFormMoveCopy,@WarningOverwriteGeosFile, @WarningDeleteGeosFile, fileName, 0);
+      if ( err ) return err;		// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special value (-701)
+      break;
+
+  }
+
+    /* File should be deleted.
+     * For system and read-only files, ask if necessary */
+  do {
+     if ( attrs & (FA_RDONLY) ) {
+	if ( !(flags & (word)ECDF_OVERWRITE_RO) ) {
+	      err = FileDeleteAskOrNot(flags, calledFormMoveCopy, @QuestionOverwriteRO, @QuestionRO, fileName, 0);
+	      if ( err ) return err;	// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special value (-701)
+	      }
+	}
+
+     if ( attrs & (FA_SYSTEM | FA_HIDDEN) ) {
+	if ( !(flags & (word)ECDF_OVERWRITE_HIDDEN_SYS) ) {
+	      err = FileDeleteAskOrNot(flags, calledFormMoveCopy,@WarningOverwriteSystem, @WarningDeleteSystem, fileName, 0);
+	      if ( err ) return err;	// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+					// or special value (-701)
+	      }
+	}
+
+     } while (0);
+
+     return FALSE;		/* everything OK. Deleting / overwriting allowed */
+}
+
+/*--------------------- FileToolDeleteFileEasy ---------------------
+ *  Task:       Conveniently delete a file with a simple API
+ *          	"Yes, all" is currently not supported, must
+ *          	be added in a new library version if needed
+ *  Strategy:      Flags control the behavior
+ *  Return:     Error flag:
+ *          FALSE (==0) OK
+ *          TRUE  ( >0) Error code from FileRead() or FileWrite()
+ *          TRUE (-1)   ERROR_CANCELED_BY_USER
+ *                  ECDF_NOT_OVERWRITE_ASK_ERROR is set
+ *                  and user answers NO to prompt
+ *               (-2)   Not returned: ERROR_RO_SKIPPED
+ *                  (compatibility with the old routine)
+ *               (-3)   Not returned: ERROR_CANNOT_COPY_FOLDERS
+ *               (-4)   Not returned: ERROR_FILE_CANNOT_REPLACE_FOLDER
+ *               (-5)   ERROR_CANNOT_DELETE_FOLDERS
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolDeleteFileEasy(char * fileName, EasyCopyDeleteFlags flags) {
+	return FileToolDeleteFileEasyInternal(fileName, flags, FALSE);
+	}
+
+/*--------------------- FileToolDeleteFileEasyInternal ---------------------
+ * Task: Core routine deletes a file conveniently with simple API
+ ---------------------------------------------------------------------------*/
+int FileToolDeleteFileEasyInternal(char * fileName, EasyCopyDeleteFlags flags, Boolean calledFormMoveCopy) {
+int err;
+word attrs, newAttrs;
+
+  attrs = FileGetAttributes(fileName);
+  err = ThreadGetError();
+  if ( err ) attrs = 0;	/* should be: File not found */
+			/* safe programming: ask separately. */
+  if ( err == ERROR_FILE_NOT_FOUND ) {
+	if ( flags & ECDF_NOT_FOUND_IS_ERROR ) {
+		if (flags & ECDF_MSG_ON_ERROR ) {
+			ErrorMsgCodeBox(@ErrorFileDelete,fileName, err);
+			}
+		return err;
+		}
+	return FALSE;		// nothing to delete
+	}
+
+  err = FileCheckForOverwriteEasy(fileName, flags, calledFormMoveCopy);
+  if ( err ) {
+	// Special value (-701) means: do not delete, but do not report an error
+	// because abort by user in ECDF_NOT_OVERWRITE_ASK mode
+	if ( err == (-701) ) return FALSE;
+	return err;		// Fehler melden
+	}
+
+  /* remove any system, Hiden and RO status and delete file. */
+  newAttrs = 0;
+  FileSetPathExtAttributes(fileName, FEA_FILE_ATTR, &newAttrs, 1);
+  err = FileDelete(fileName);
+  if (!err) return FALSE;		// L”schen erfolgreich
+
+  // Crap! Reset attributes and report
+  FileSetPathExtAttributes(fileName,FEA_FILE_ATTR,&attrs,1);
+  if (flags & ECDF_MSG_ON_ERROR ) {
+	ErrorMsgCodeBox(@ErrorFileDelete,fileName, err);
+	}
+
+  return err;
+}
+
+/*--------------------- InternalCopyFileEasy ---------------------
+ *	Task:          Core routine. Performs the work for
+ *	               FileToolCopyFileEasy and FileToolMoveFileEasy.
+ *	               "Yes to All" is currently not supported,
+ *	               and must be implemented in a future library version if needed.
+ *	Strategy:      Flags control the behavior.
+ *	Return:        See main routines.
+ ---------------------------------------------------------------------------*/
+
+word InternalCopyFileEasy(FileCopyStruct *fcs,  EasyCopyDeleteFlags flags) {
+int errCode, retVal, formatMismatch, err;
+char	driveStr[] = "A:";
+word	sourceAttrs, destAttrs, sourceErr, destErr, newAttrs;
+//DiskHandle realDestHandle;
+GeosFileType srcType, destType;
+
+     /* Get source and target attributes */
+	FilePushDir();
+
+	InternalEnterFolder(fcs->srcDisk, fcs->srcPath);
+
+	sourceAttrs = FileGetAttributes(fcs->srcFile);
+
+//	FileGetPathExtAttributes(fcs->srcFile, FEA_FILE_ATTR, &sourceAttrs, sizeof(word));
+	sourceErr = ThreadGetError();
+	FileGetPathExtAttributes(fcs->srcFile, FEA_FILE_TYPE, &srcType, sizeof(GeosFileType));
+//	FileGetPathExtAttributes(fcs->srcFile,FEA_SIZE,&fileSize,4);
+
+	InternalEnterFolder(fcs->destDisk, fcs->destPath);
+	destAttrs = FileGetAttributes(fcs->destFile);
+//	FileGetPathExtAttributes(fcs->destFile, FEA_FILE_ATTR, &destAttrs, sizeof(word));
+	destErr = ThreadGetError();
+	FileGetPathExtAttributes(fcs->destFile, FEA_FILE_TYPE, &destType, sizeof(GeosFileType));
+
+	FilePopDir();
+
+     /* Source or destination do not exist -> xxErr != 0 */
+	if ( sourceErr )
+		{
+		if ( flags & ECDF_MSG_ON_ERROR )
+				ErrorMsgBox(@CopyFileNotFound,fcs->srcFile,0);
+		return sourceErr;
+		}
+
+	/* check source */
+	if ( srcType == GFT_DIRECTORY ) {
+		if ( flags & ECDF_MSG_ON_ERROR )
+			ErrorMsgBox(@CannotCopyFolders,fcs->srcFile,0);
+		return ERROR_CANNOT_COPY_FOLDERS;
+		}
+	if ( sourceAttrs & FA_LINK ) {
+		if ( flags & ECDF_MSG_ON_ERROR )
+			ErrorMsgCodeBox(@CommonCopyError2, fcs->srcFile, ERROR_CANNOT_COPY_MOVE_LINK);
+		return ERROR_CANNOT_COPY_MOVE_LINK;
+		}
+
+
+
+	if ( destErr )	goto DoCopy;	// Target does not exist
+					// -> Lots of tests superfluous
+
+	if ( destType == GFT_DIRECTORY ) {
+		if ( flags & ECDF_MSG_ON_ERROR )
+			ErrorMsgBox(@ErrorCopyFileToFolder, fcs->srcFile, fcs->destFile);
+		return ERROR_FILE_CANNOT_REPLACE_FOLDER;
+		}
+
+	/* Ask for overwrite DOS <--> GEOS file (format mismatch error) */
+	formatMismatch = FALSE;
+	if ( srcType != destType ) {
+		if ( srcType == GFT_NOT_GEOS_FILE ) formatMismatch = TRUE;
+		if ( destType == GFT_NOT_GEOS_FILE ) formatMismatch = TRUE;
+		}
+	if ( formatMismatch ) {
+		if  ( flags & (word)ECDF_TYPE_MISMATCH_FORCES_ERROR ) {
+			if (flags & ECDF_MSG_ON_ERROR ) {
+				ErrorMsgBox(@FormatMismatchCopyError2, fcs->srcFile, fcs->destFile);
+				}
+			return ERROR_FILE_FORMAT_MISMATCH;
+			}
+		if ( !(flags & (word)ECDF_OVERWRITE_TYPE_MISMATCH) ) {
+			err = FileDeleteAskOrNot(flags, TRUE, @FormatMismatchCopyError,
+				@FormatMismatchCopyError, fcs->srcFile, fcs->destFile);
+			if ( err ) return err;	// ACCESS_DENIED or ERROR_CANCELED_BY_USER
+						// or sepecial value (-701)
+			}
+		}
+
+     /* Check ( if necessary ask) whether destination can be overwritten */
+	FilePushDir();
+	InternalEnterFolder(fcs->destDisk, fcs->destPath);
+	err = FileCheckForOverwriteEasy(fcs->destFile, flags, TRUE);
+	FilePopDir();
+	if ( err ) {	// -> no
+		// Special value (-701) means: do not delete, but also do not report an error
+		// because the operation was canceled by the user in ECDF_NOT_OVERWRITE_ASK mode
+		if ( err == (-701) ) return FALSE;
+		return err;		// Fehler melden
+		}
+
+	/* All queries have been processed. Now it should begin
+	 * --> Reset destination attributes
+	 * --> Possibly delete the file if:
+	 *      a) the destination is a link
+	 *      b) the source is a link
+	 *         (replacing a file with a link requires deleting the file)
+	 *      c) formatMismach is set
+	 * Any potential errors will be ignored so that I can perform a good
+	 * error evaluation below.
+	 */
+
+	FilePushDir();
+	InternalEnterFolder(fcs->destDisk, fcs->destPath);
+	newAttrs = 0;
+	FileSetPathExtAttributes(fcs->destFile, FEA_FILE_ATTR, &newAttrs, 1);
+	if ( (destAttrs & FA_LINK) || (sourceAttrs & FA_LINK)
+		|| formatMismatch ) {
+			//  ignore error: Message appears at the bottom when trying to copy
+			FileToolDeleteFileEasyInternal(	fcs->destFile,
+				ECDF_DELETE_ALL | ECDF_NOT_OVERWRITE_IS_ERROR,
+				TRUE);		// ^- bei DELETE_ALL ist der Wert egal, aber: savety
+		}
+	FilePopDir();
+
+DoCopy:
+
+	do {
+	   errCode = InternalFileCopy(fcs, destErr==0, 0);
+	   if (!errCode) break;		// copy successfull
+	   if ( !(flags & ECDF_MSG_ON_ERROR) ) break;	// error, but no report
+
+	   retVal = IC_NO;	// Standard: do not try again
+	   switch (errCode) {
+		case ERROR_WRITE_PROTECTED:
+				driveStr[0] = 'A' + DiskGetDrive(fcs->destDisk);
+				retVal = ToolErrorCancelBox(
+					@WriteProtectedCopyError,driveStr,0);
+				fcs->destDisk = DiskRegisterDiskSilently(driveStr[0] - 'A');
+				if ( !(fcs->destDisk) ) {
+					errCode = ERROR_DISK_STALE;
+					retVal = IC_NO;
+					}
+				break;
+		case ERROR_SHORT_READ_WRITE:
+				driveStr[0] = 'A' + DiskGetDrive(fcs->destDisk);
+				ErrorMsgBox(@NoSpaceCopyError,
+						fcs->srcFile,driveStr);
+				break;
+		case ERROR_FILE_IN_USE:
+		case ERROR_SHARING_VIOLATION:  /* == write to an open file */
+				ErrorMsgBox(@FileIsOpenCopyError2,fcs->destFile,fcs->srcFile);
+				break;
+		case ERROR_ACCESS_DENIED:
+				ErrorMsgBox(@AccessDeniedCopyError2, fcs->destFile, fcs->srcFile);
+				break;
+		default:        ErrorMsgCodeBox(@CommonCopyError2, fcs->srcFile, errCode);
+				ErrorMsgBox(@AccessDeniedCopyError2, fcs->destFile, fcs->srcFile);
+		}
+	   } while (retVal == IC_YES);	// try again
+
+     return errCode;
+     }
+
+/*--------------------- FileToolCopyFileEasy ---------------------
+ *	Task:	Conveniently copies a file with a simple API
+ *			"Yes, All" is currently not supported and must be
+ *			implemented in a new library version if needed
+ *	Strategy:	Flags control the behavior
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileRead() or FileWrite()
+ *			TRUE (-1)   ERROR_CANCELED_BY_USER
+ *					ECDF_NOT_OVERWRITE_ASK_ERROR is set
+ *					and user answers NO when prompted
+ *			     (-2)   Not returned: ERROR_RO_SKIPPED
+ *					(Compatibility with old routine)
+ *			     (-3)   ERROR_CANNOT_COPY_FOLDERS
+ *			     (-4)   ERROR_FILE_CANNOT_REPLACE_FOLDER
+ *			     (-5)   Not returned: ERROR_CANNOT_DELETE_FOLDERS
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCopyFileEasy(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, EasyCopyDeleteFlags flags) {
+int errCode;
+FileCopyStruct fcs;
+
+	flags &= ~ECDF_NOT_FOUND_IS_ERROR;	// must not be set
+	CreateFileCopyStruct(sourceFile, destFile, sdh, ddh, &fcs);
+	if ( (!fcs.srcDisk) || (!fcs.destDisk) ) {
+		if ( flags & ECDF_MSG_ON_ERROR )
+			ErrorMsgCodeBox(@CommonCopyError2, fcs.srcFile, ERROR_PATH_NOT_FOUND);
+		DestroyFileCopyStruct(&fcs);
+		return ERROR_PATH_NOT_FOUND;
+		}
+
+	errCode = InternalCopyFileEasy(&fcs, flags);
+
+	DestroyFileCopyStruct(&fcs);
+	return errCode;
+}
+
+
+
+/*--------------------- FileToolMoveFileEasy ---------------------
+ *	Task:	Conveniently moves a file with a simple API
+ *			"Yes, All" is currently not supported and must
+ *			be implemented in a new library version if needed
+ *	Strategy:	Flags control the behavior
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileRead() or FileWrite()
+ *			TRUE (-1)   ERROR_CANCELED_BY_USER
+ *					ECDF_NOT_OVERWRITE_ASK_ERROR is set
+ *					and user answers NO when prompted
+ *			     (-2)   never returned: ERROR_RO_SKIPPED
+ *					(Compatibility with old routine)
+ *			     (-3)   ERROR_CANNOT_COPY_FOLDERS
+ *			     (-4)   ERROR_FILE_CANNOT_REPLACE_FOLDER
+ *			     (-5)   Never returned: ERROR_CANNOT_DELETE_FOLDERS
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolMoveFileEasy(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, EasyCopyDeleteFlags flags) {
+int errCode;
+FileCopyStruct fcs;
+word notOverwriteBits, newAttrs, delFlags;
+
+	flags &= ~ECDF_NOT_FOUND_IS_ERROR;	// must not be set
+	CreateFileCopyStruct(sourceFile, destFile, sdh, ddh, &fcs);
+	if ( (!fcs.srcDisk) || (!fcs.destDisk) ) {
+		if ( flags & ECDF_MSG_ON_ERROR )
+			ErrorMsgCodeBox(@CommonCopyError2, fcs.srcFile, ERROR_PATH_NOT_FOUND);
+		DestroyFileCopyStruct(&fcs);
+		return ERROR_PATH_NOT_FOUND;
+		}
+
+	/* InternalCopyFileEasy must also return an error code
+	 * if the user clicks on “Cancel” (or “No”) */
+	notOverwriteBits = flags & ECDF_NOT_OVERWRITE_MASK;
+	if ( notOverwriteBits == (word)ECDF_NOT_OVERWRITE_ASK ) {
+		flags &= ~ECDF_NOT_OVERWRITE_MASK;
+		flags |= ECDF_NOT_OVERWRITE_ASK_ERROR;
+		}
+	errCode = InternalCopyFileEasy(&fcs, flags);
+
+	/* If copying successful: Delete source */
+	if ( !errCode ) {
+	      FilePushDir();
+	      InternalEnterFolder(fcs.srcDisk, fcs.srcPath);
+	      newAttrs = 0;
+	      FileSetPathExtAttributes(fcs.srcFile, FEA_FILE_ATTR, &newAttrs, 1);
+	      delFlags = ECDF_DELETE_ALL | ECDF_NOT_OVERWRITE_IS_ERROR;
+						// ^- bei DELETE_ALL ist der Wert egal, aber: savety
+	      if ( flags & ECDF_MSG_ON_ERROR ) delFlags |= ECDF_MSG_ON_ERROR;
+	      FileToolDeleteFileEasyInternal(fcs.srcFile, delFlags, TRUE);
+	      FilePopDir();
+	      }
+
+	/* ERROR_CANCELED_BY_USER may not be returned to calling routine */
+	if ( (errCode == ERROR_CANCELED_BY_USER)
+	     && (notOverwriteBits == (word)ECDF_NOT_OVERWRITE_ASK) ) errCode = 0;
+
+	DestroyFileCopyStruct(&fcs);
+	return errCode;
+}
+
+/*###########################################################################
+  #	- Error handling boxes
+/*########################################################################### */
+
+/* Display error boxes with cancel trigger */
+/* Return IC_YES for OK, IC_NO for Cancel */
+
+
+int LocalToolAskCancelBox(optr iText, char * param1, char *param2, int dbt) {
+char *p;
+word ret;
+StandardDialog2ResponseTriggerTable okAndCancelResponseTable[] =
+	{ 2,		// number of triggers
+	{@ConfirmOkMoniker, IC_YES},
+	{@ConfirmCancelMoniker, IC_NO} };
+
+	MemLock(OptrToHandle(iText));
+	p = LMemDeref(iText);
+	ret = UserStandardDialog(0, (char*)&okAndCancelResponseTable,param2,param1,p,
+		( (dbt << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(iText));
+	return ret;
+	}
+
+/*--------------------- WarningOverwriteBox ---------------------
+ *	Universalbox zum nachfragen, ob eine Datei berschireben werden
+ *	soll. Mit Unterstützung des Schalter "Ja, alle"
+ *	Return:		IC_YES:	   Ja, berschreiben / l”schen
+ *                                 Auch wenn "Ja, alle" gedrckt
+ *				   Unterscheidung ber yas-Struct m”glich
+ *			sonstiges  Nein, nicht berschreiben
+ *				   Auch wenn Abbruch gedrckt
+ *				   Unterscheidung ber yas-Struct m”glich
+ ---------------------------------------------------------------------------*/
+int WarningOverwriteBox(optr warnText, char * param1, char *param2,
+	FTYesAllStruct	*yas, word flagToModify) {
+/* The buttons are arranged in the reply bar in the following order:
+	IC_OK - IC_YES - IC_STOP - IC_NO
+   Since I want the order to be "Yes", "Yes, All", "No", "Cancel"
+   this results in a somewhat odd assignment of the IC_xx values
+	IC_OK - IC_YES - IC_STOP - IC_NO
+	  |      |        |         |
+	  Yes   Yes, All  No      Cancel
+   */
+
+/* wiothout "yes, all" */
+StandardDialog2ResponseTriggerTable JaNeinResponseTable[] =
+	{ 2,		// number of triggers
+	{@ConfirmYesMoniker, IC_OK},
+	{@ConfirmNoMoniker, IC_STOP} };
+StandardDialog3ResponseTriggerTable JaNeinCancelResponseTable[] =
+	{ 3,		// number of triggers
+	{@ConfirmYesMoniker, IC_OK},
+	{@ConfirmNoMoniker, IC_STOP},
+	{@ConfirmCancelMoniker, IC_NO} };
+
+/* Mit Ja,alle */
+StandardDialog3ResponseTriggerTable JaNeinAllResponseTable[] =
+	{ 3,		// number of triggers
+	{@ConfirmYesMoniker, IC_OK},
+	{@ConfirmNoMoniker, IC_STOP},
+	{@ConfirmYesAllMoniker, IC_YES} };
+StandardDialog4ResponseTriggerTable JaNeinAllCancelResponseTable[] =
+	{ 4,		// number of triggers
+	{@ConfirmYesMoniker, IC_OK},
+	{@ConfirmNoMoniker, IC_STOP},
+	{@ConfirmYesAllMoniker, IC_YES},
+	{@ConfirmCancelMoniker, IC_NO}   };
+void *responseTable;
+char *p;
+word ret;
+
+   do {
+	/* If no YesAllStruct is passed: Only YES and NO triggers */
+	if (  !yas ) {
+		responseTable = &JaNeinResponseTable;
+		break;
+		}
+
+	/* Andernfalls: flagToModify gibt an, weswegen die Nachfrage erfolgt
+	 * yas->supportedYesAllTrigger legt fest, ob dort ein "Ja,alle"
+	 * eingeblendet werden soll. */
+
+	if ( yas->supportedYesAllTrigger & flagToModify ) {
+		/* There is a "Yes, all" trigger */
+		if ( yas->hasCancelTrigger )
+			responseTable = &JaNeinAllCancelResponseTable;
+		  else	responseTable = &JaNeinAllResponseTable;
+		}
+	  else  {
+		/* There is no "Yes, all" trigger */
+		if ( yas->hasCancelTrigger )
+			responseTable = &JaNeinCancelResponseTable;
+		  else	responseTable = &JaNeinResponseTable;
+		}
+
+
+	} while (FALSE);
+
+   /* call dialog */
+	MemLock(OptrToHandle(warnText));
+	p = LMemDeref(warnText);
+	ret = UserStandardDialog(0, responseTable,param2,param1,p,
+		( (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(warnText));
+
+   /* The return values must be modified because the system arranges the triggers
+    * according to their IC_ values, and I wanted a specific order
+    * --> the IC_ values are "shuffled". */
+
+	switch (ret) {
+		case IC_OK:	/* "Yes" */
+			ret = IC_YES;
+			break;
+		case IC_STOP:    /* "No" */
+			ret = IC_NO;
+			break;
+
+		/* Die Folgenden IC's kommen nur, wenn yas auch belegt ist .. */
+		case IC_YES:   /* "Ja, alle" */
+			ret = IC_YES;	/* "Ja, alle" entspricht "Ja" */
+			/* Info zurckliefern, dass Ja,alle gedrckt wurde */
+			yas->pressedYesAllTrigger |= flagToModify;
+
+			/* bergebene Flags modifiziren, so dass diese Frage
+			 * n„chsten Mal nicht mehr erscheint */
+			if ( flagToModify == FT_YES_ALL_FORMAT_MISMATCH ) {
+				/* Das entsprechende Flas ist ein NO-ERROR-Flag
+				 * und muss gesetzt werden */
+				yas->flagsModified |= FT_CF_FORMAT_MISM_IS_NO_ERR;
+				}
+			else 	{
+				/* Alle anderen mssen zurckgesetzt werden */
+				yas->flagsModified &= ~flagToModify;
+				}
+			break;
+
+		case IC_NO:	/* "Abbrechen" */
+			ret = IC_NO;	/* "Abbrechen" entspricht "Nein" */
+			/* Medung zurck, das Abbrechen gew„hlt wurde */
+			yas->cancelTriggerPressed = TRUE;
+			break;
+		default:
+			break;		/* IC_NULL (System shutdown) usw.. */
+		}
+
+	return ret;
+
+	}
+
+
+/*---------------------	GetErrorText -------------------------------*
+ * 	Aufgabe:        Beschreibung zu einem Fehler-Code holen
+ * 	Parameter:
+ *----------------------------------------------------------------------*/
+void GetErrorText(int code, char *errText) {
+
+   switch ( code ) {
+	/* interne Fehlercode sind negativ */
+	case ERROR_CANCELED_BY_USER:		// -1
+		strcpy(errText, "CANCELED_BY_USER");
+		break;
+	case ERROR_RO_SKIPPED:                  // -2
+		strcpy(errText, "RO_SKIPPED");
+		break;
+	case ERROR_CANNOT_COPY_FOLDERS:		// -3
+		strcpy(errText, "CANNOT_COPY_FOLDERS");
+		break;
+	case ERROR_FILE_CANNOT_REPLACE_FOLDER:	// -4
+		strcpy(errText, "FILE_CANNOT_REPLACE_FOLDER");
+		break;
+	case ERROR_CANNOT_DELETE_FOLDERS:	// -5
+		strcpy(errText, "CANNOT_DELETE_FOLDERS");
+		break;
+	case ERROR_CANNOT_COPY_MOVE_LINK:	// -6
+		strcpy(errText, "CANNOT_COPY_MOVE_LINK");
+		break;
+
+/*      incomplete:
+	case -10: // R-BASIC-error: ERROR_FILE_NOT_OPEN:
+		strcpy(errText, "FILE_NOT_OPEN");
+		break;
+*/
+	case 0:
+		strcpy(errText, "NO_ERROR");
+		break;
+	case ERROR_UNSUPPORTED_FUNCTION:
+		strcpy(errText, "UNSUPPORTED_FUNCTION");
+		break;
+	case ERROR_FILE_NOT_FOUND:
+		strcpy(errText, "FILE_NOT_FOUND");
+		break;
+	case ERROR_PATH_NOT_FOUND:
+		strcpy(errText, "PATH_NOT_FOUND");
+		break;
+	case ERROR_TOO_MANY_OPEN_FILES:
+		strcpy(errText, "TOO_MANY_OPEN_FILES");
+		break;
+	case ERROR_ACCESS_DENIED:
+		strcpy(errText, "ACCESS_DENIED");
+		break;
+	case ERROR_INSUFFICIENT_MEMORY:
+		strcpy(errText, "INSUFFICIENT_MEMORY");
+		break;
+	case ERROR_INVALID_VOLUME:
+		strcpy(errText, "INVALID_VOLUME");
+		break;
+	case ERROR_IS_CURRENT_DIRECTORY:
+		strcpy(errText, "IS_CURRENT_DIRECTORY");
+		break;
+	case ERROR_DIFFERENT_DEVICE:
+		strcpy(errText, "DIFFERENT_DEVICE");
+		break;
+	case ERROR_NO_MORE_FILES:
+		strcpy(errText, "NO_MORE_FILES");
+		break;
+	case ERROR_WRITE_PROTECTED:
+		strcpy(errText, "WRITE_PROTECTED");
+		break;
+	case ERROR_UNKNOWN_VOLUME:
+		strcpy(errText, "UNKNOWN_VOLUME");
+		break;
+	case ERROR_DRIVE_NOT_READY:
+		strcpy(errText, "DRIVE_NOT_READY");
+		break;
+	case ERROR_CRC_ERROR:
+		strcpy(errText, "CRC_ERROR");
+		break;
+	case ERROR_SEEK_ERROR:
+		strcpy(errText, "SEEK_ERROR");
+		break;
+	case ERROR_UNKNOWN_MEDIA:
+		strcpy(errText, "UNKNOWN_MEDIA");
+		break;
+	case ERROR_SECTOR_NOT_FOUND:
+		strcpy(errText, "SECTOR_NOT_FOUND");
+		break;
+	case ERROR_WRITE_FAULT:
+		strcpy(errText, "WRITE_FAULT");
+		break;
+	case ERROR_READ_FAULT:
+		strcpy(errText, "READ_FAULT");
+		break;
+	case ERROR_GENERAL_FAILURE:
+		strcpy(errText, "GENERAL_FAILURE");
+		break;
+	case ERROR_SHARING_VIOLATION:
+		strcpy(errText, "SHARING_VIOLATION");
+		break;
+	case ERROR_ALREADY_LOCKED:
+		strcpy(errText, "ALREADY_LOCKED");
+		break;
+	case ERROR_SHARING_OVERFLOW:
+		strcpy(errText, "SHARING_OVERFLOW");
+		break;
+	case ERROR_SHORT_READ_WRITE:
+		strcpy(errText, "SHORT_READ_WRITE");
+		break;
+	case ERROR_INVALID_LONGNAME:
+		strcpy(errText, "INVALID_LONGNAME");
+		break;
+	case ERROR_FILE_EXISTS:
+		strcpy(errText, "FILE_EXISTS");
+		break;
+	case ERROR_DOS_EXEC_IN_PROGRESS:
+		strcpy(errText, "DOS_EXEC_IN_PROGRESS");
+		break;
+	case ERROR_FILE_IN_USE:
+		strcpy(errText, "FILE_IN_USE");
+		break;
+	case ERROR_ARGS_TOO_LONG:
+		strcpy(errText, "ARGS_TOO_LONG");
+		break;
+	case ERROR_DISK_UNAVAILABLE:
+		strcpy(errText, "DISK_UNAVAILABLE");
+		break;
+	case ERROR_DISK_STALE:
+		strcpy(errText, "DISK_STALE");
+		break;
+	case ERROR_FILE_FORMAT_MISMATCH:
+		strcpy(errText, "FILE_FORMAT_MISMATCH");
+		break;
+	case ERROR_CANNOT_MAP_NAME:
+		strcpy(errText, "CANNOT_MAP_NAME");
+		break;
+	case ERROR_DIRECTORY_NOT_EMPTY:
+		strcpy(errText, "DIRECTORY_NOT_EMPTY");
+		break;
+	case ERROR_ATTR_NOT_SUPPORTED:
+		strcpy(errText, "ATTR_NOT_SUPPORTED");
+		break;
+	case ERROR_ATTR_NOT_FOUND:
+		strcpy(errText, "ATTR_NOT_FOUND");
+		break;
+	case ERROR_ATTR_SIZE_MISMATCH:
+		strcpy(errText, "ATTR_SIZE_MISMATCH");
+		break;
+	case ERROR_ATTR_CANNOT_BE_SET:
+		strcpy(errText, "ATTR_CANNOT_BE_SET");
+		break;
+	case ERROR_CANNOT_MOVE_DIRECTORY:
+		strcpy(errText, "CANNOT_MOVE_DIRECTORY");
+		break;
+	case ERROR_PATH_TOO_LONG:
+		strcpy(errText, "PATH_TOO_LONG");
+		break;
+	case ERROR_ARGS_INVALID:
+		strcpy(errText, "ARGS_INVALID");
+		break;
+	case ERROR_CANNOT_FIND_COMMAND_INTERPRETER:
+		strcpy(errText, "CANNOT_FIND_COMMAND_INTERPRETER");
+		break;
+	case ERROR_NO_TASK_DRIVER_LOADED:
+		strcpy(errText, "NO_TASK_DRIVER_LOADED");
+		break;
+
+	/* VM-error-codes */
+	case VM_FILE_EXISTS:
+		strcpy(errText, "VM_FILE_EXISTS");
+		break;
+	case VM_FILE_NOT_FOUND:
+		strcpy(errText, "VM_FILE_NOT_FOUND");
+		break;
+	case VM_SHARING_DENIED:
+		strcpy(errText, "VM_SHARING_DENIED");
+		break;
+	case VM_OPEN_INVALID_VM_FILE:
+		strcpy(errText, "VM_OPEN_INVALID_VM_FILE");
+		break;
+	case VM_CANNOT_CREATE:
+		strcpy(errText, "VM_CANNOT_CREATE");
+		break;
+	case VM_TRUNCATE_FAILED:
+		strcpy(errText, "VM_TRUNCATE_FAILED");
+		break;
+	case VM_WRITE_PROTECTED:
+		strcpy(errText, "VM_WRITE_PROTECTED");
+		break;
+	case VM_CANNOT_OPEN_SHARED_MULTIPLE:
+		strcpy(errText, "VM_CANNOT_OPEN_SHARED_MULTIPLE");
+		break;
+	case VM_FILE_FORMAT_MISMATCH:
+		strcpy(errText, "VM_FILE_FORMAT_MISMATCH");
+		break;
+
+/* VMUpdate status codes */
+
+	case VM_UPDATE_NOTHING_DIRTY:
+		strcpy(errText, "VM_UPDATE_NOTHING_DIRTY");
+		break;
+	case VM_UPDATE_INSUFFICIENT_DISK_SPACE:
+		strcpy(errText, "VM_UPDATE_INSUFFICIENT_DISK_SPACE");
+		break;
+	case VM_UPDATE_BLOCK_WAS_LOCKED:
+		strcpy(errText, "VM_UPDATE_BLOCK_WAS_LOCKED");
+		break;
+
+/* VMDiscardDirtyBlock status codes */
+	case VM_DISCARD_CANNOT_DISCARD_BLOCK:
+		strcpy(errText, "VM_DISCARD_CANNOT_DISCARD_BLOCK");
+		break;
+
+	default: sprintf(errText, "<CODE: %d>", code);
+	}
+
+   }
+
+
+/*--------------------- ErrorMsgCodeBox ---------------------
+ *	Task:	Display an error message with a somewhat clear code
+ *			(e.g., FILE_NOT_FOUND, etc.)
+ ---------------------------------------------------------------------------*/
+word ErrorMsgCodeBox(optr info, char *param1, int errorCode)	{
+char *p, param2[64];
+word ret;
+
+	GetErrorText(errorCode, param2);
+
+	MemLock(OptrToHandle(info));
+	p = LMemDeref(info);
+	ret = UserStandardDialog(0,0, param2, param1,p,
+		( ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));
+	return ret;
+	}
+
+
+

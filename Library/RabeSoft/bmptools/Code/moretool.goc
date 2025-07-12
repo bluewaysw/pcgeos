@@ -1,0 +1,501 @@
+/***********************************************************************
+ *
+ *	Code-File for Bitmap Tool Library
+ *
+ *      Made by RABE-Soft 10/2002 - 07/2025
+ *	Adapted for free PC/GEOS project 01/2024
+ *
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <stdlib.h>
+
+#include <string.h>
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+/*
+ ***************************************************************************
+ *		Bitmap Tools: Clipboard Operations
+ ***************************************************************************
+ */
+
+@start DataResource, data;
+
+/* Currently DataResource contains no translatable text. If this changes,
+ * user notes must be updated and a translation file must be created.
+ */
+
+
+@chunk ClipboardItemHeader clpHeader = {0, TIF_NORMAL, "GraphicData", 1, 0 };
+@chunk ClipboardItemFormatInfo gsFormatInfo = {FormatIDFromManufacturerAndType(0,CIF_GRAPHICS_STRING),
+					0, 0, 0, {'B','m','p','T', RABE_SOFT_ID} };
+@chunk ClipboardItemFormatInfo bmpFormatInfo = {FormatIDFromManufacturerAndType(0,CIF_BITMAP),
+					0, 0, 0, {'B','m','p','T', RABE_SOFT_ID} };
+@end DataResource;
+
+/*--------------------- BTCopyBitmapToClipboard ---------------------
+ *	Purpose:         Copy a HugeBitmap to the clipboard
+ *	Parameters:	fh:	VM file containing the HugeBitmap
+ *			bmpBlock: VM block handle of the bitmap
+ *			copyMode: Determines whether a GString should be created
+ *				  and whether the bitmap needs to be compressed.
+ *				  Large bitmaps must be compressed; otherwise,
+ *				  the bitmap format and the GString format
+ *				  will not both fit into the VM file.
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void EXPORT BTCopyBitmapToClipboard(VMFileHandle fh,	// file with the bitmap
+		VMBlockHandle bmpBlock,		// handle of the bitmap
+		BmpClipCopyMode copyMode)	// create an additional GString?
+{
+TransferBlockID transferItem;
+VMFileHandle	clipboardFile;
+VMBlockHandle 	header;
+ClipboardItemHeader	ciHeader, *hPtr;
+ClipboardItemFormatInfo	*formatInfo;
+MemHandle mh;
+int width, height;
+Boolean addGString, compact;
+
+GStateHandle 	gs;
+VMBlockHandle	gString;
+VMChain		bmpChain;
+VMFileHandle	bmpFile;
+#define 	HandleToVMChain(han) ( ((dword)han) << 16 )
+
+    clipboardFile = ClipboardGetClipboardFile();
+    BTGetMoreBitmapInfos(fh, bmpBlock, &width, &height, (int*)&compact);
+
+    if ( compact ) {
+	/* doppeltes Komprimieren vermeiden */
+	copyMode &= ~BT_CLIP_COPYFLAG_COMPRESS;
+	copyMode &= ~BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS;
+	}
+
+    if ( copyMode & BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS ) {
+	if ( (width > BT_CLIP_MAX_UNCOMPRESSED_X_SIZE)
+	     || (height > BT_CLIP_MAX_UNCOMPRESSED_Y_SIZE) )
+		{
+		copyMode |= BT_CLIP_COPYFLAG_COMPRESS;
+		}
+	}
+
+    addGString = copyMode & BT_CLIP_COPYFLAG_ADD_GSTRING;
+
+    /* Copy bitmap to clipboard, if requested */
+    if ( copyMode & BT_CLIP_COPYFLAG_COPY_BITMAP ) {
+	if ( copyMode & BT_CLIP_COPYFLAG_COMPRESS ) {
+		/* Compress bitmap */
+		bmpChain = GrCompactBitmap(fh, bmpBlock, clipboardFile);
+		bmpChain <<= 16;
+		bmpFile = clipboardFile;
+		}
+	else	{	    /* Do not compress bitmap */
+		bmpChain = VMCopyVMChain(fh,HandleToVMChain(bmpBlock),
+			clipboardFile);
+		bmpFile = clipboardFile;
+		}
+	}
+    else {
+	/* Bitmap soll nicht kopiert werden: Quelle fr Zeichnen in den
+	 * GString ist die Original-Datei */
+	 bmpChain = HandleToVMChain(bmpBlock);
+	 bmpFile = fh;
+	 }
+
+    if ( addGString) {
+
+	gs =  GrCreateGString(clipboardFile,GST_VMEM,&gString);
+
+	GrSaveState(gs);
+	GrSaveTransform(gs);
+	GrSetGStringBounds(gs, 0, 0, width, height);
+	GrSetClipRect(gs, PCT_REPLACE, 0, 0, width, height);
+
+	GrDrawHugeBitmap(gs,0,0, bmpFile ,bmpChain >> 16);
+	GrRestoreTransform(gs);
+	GrRestoreState(gs);
+	GrEndGString(gs);
+
+	// Destroy GState, keep the GString data
+	GrDestroyGString(gs, 0, GSKT_LEAVE_DATA);
+	}
+
+// Fill in ItemHeader
+    MemLock(HandleOf(@clpHeader));
+    hPtr = LMemDeref(@clpHeader);
+    ciHeader = *hPtr;
+    ciHeader.CIH_owner = 0;
+    ciHeader.CIH_sourceID = 0;
+
+    if ( copyMode & BT_CLIP_COPYFLAG_COPY_BITMAP)
+	{
+	formatInfo = LMemDeref(@bmpFormatInfo);
+	ciHeader.CIH_formats[0] = *formatInfo;
+	ciHeader.CIH_formats[0].CIFI_vmChain = bmpChain;
+
+	if ( addGString ) {
+	    formatInfo = LMemDeref(@gsFormatInfo);
+	    ciHeader.CIH_formats[1] = *formatInfo;
+	    ciHeader.CIH_formats[1].CIFI_vmChain = HandleToVMChain(gString);
+	    ciHeader.CIH_formats[1].CIFI_extra1 = width;
+	    ciHeader.CIH_formats[1].CIFI_extra2 = height;
+	    ciHeader.CIH_formatCount = 2;
+	    }
+	}
+
+    else {  /* only the GString, no bitmap */
+	formatInfo = LMemDeref(@gsFormatInfo);
+	ciHeader.CIH_formats[0] = *formatInfo;
+	ciHeader.CIH_formats[0].CIFI_vmChain = HandleToVMChain(gString);
+	ciHeader.CIH_formats[1].CIFI_extra1 = width;
+	ciHeader.CIH_formats[1].CIFI_extra2 = height;
+	}
+
+    MemUnlock(HandleOf(@clpHeader));
+
+    header = VMAlloc(clipboardFile,sizeof(ClipboardItemHeader),RABE_SOFT_ID);
+    hPtr = VMLock(clipboardFile,header,&mh);
+    *hPtr = ciHeader;
+    VMDirty(mh);
+    VMUnlock(mh);
+
+// register entry
+    transferItem=BlockIDFromFileAndBlock(clipboardFile, header);
+    ClipboardRegisterItem(transferItem, TIF_NORMAL);
+
+    }
+
+
+/*--------------------- BTCopyGStringToClipboard ---------------------
+ *	Purpose:        Copy a GString into the clipboard
+ *	Parameters:	fh: Handle of the VM file containing the GString
+ *			gsBlock: Handle of the GString
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void EXPORT BTCopyGStringToClipboard(VMFileHandle fh,   // file containing the graphic
+		VMBlockHandle gsBlock)        // handle of the GString
+{
+TransferBlockID transferItem;
+VMFileHandle	clipboardFile;
+VMBlockHandle 	header;
+ClipboardItemHeader	ciHeader, *hPtr;
+ClipboardItemFormatInfo	*formatInfo;
+VMChain		gsChain;
+int width, height;
+MemHandle mh;
+Rectangle bounds;
+Handle		gstr;
+
+#define 	HandleToVMChain(han) ( ((dword)han) << 16 )
+
+    clipboardFile = ClipboardGetClipboardFile();
+
+// Copy GString into the clipboard, determine size
+    gsChain = VMCopyVMChain(fh,HandleToVMChain(gsBlock),
+			clipboardFile);
+
+    gstr = GrLoadGString(fh, GST_VMEM, gsBlock);
+    GrGetGStringBounds(gstr, 0, 0, &bounds);
+    GrDestroyGString(gstr,NULL,GSKT_LEAVE_DATA);
+    width = bounds.R_right - bounds.R_left;
+    height = bounds.R_bottom - bounds.R_top;
+
+// Fill in the Item Header
+    MemLock(HandleOf(@clpHeader));
+    hPtr = LMemDeref(@clpHeader);
+    ciHeader = *hPtr;
+    ciHeader.CIH_owner = 0;
+    ciHeader.CIH_sourceID = 0;
+
+    formatInfo = LMemDeref(@gsFormatInfo);
+    ciHeader.CIH_formats[0] = *formatInfo;
+    ciHeader.CIH_formats[0].CIFI_vmChain = gsChain;
+    ciHeader.CIH_formats[0].CIFI_extra1 = width;
+    ciHeader.CIH_formats[0].CIFI_extra2 = height;
+
+    MemUnlock(HandleOf(@clpHeader));
+
+    header = VMAlloc(clipboardFile,sizeof(ClipboardItemHeader),RABE_SOFT_ID);
+    hPtr = VMLock(clipboardFile,header,&mh);
+    *hPtr = ciHeader;
+    VMDirty(mh);
+    VMUnlock(mh);
+
+// Register the entry
+    transferItem=BlockIDFromFileAndBlock(clipboardFile, header);
+    ClipboardRegisterItem(transferItem, TIF_NORMAL);
+
+    }
+
+/*--------------------- BTTestClipboardItem ---------------------
+ * Purpose:         Check whether a specific format is present in the clipboard
+ * Parameters:      manufID:    Manufacturer ID of the format (0 == GEOWORKS)
+ *                  format:     Format type (e.g., CIF_BITMAP)
+ * Return:          TRUE if found, FALSE otherwise
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT BTTestClipboardItem(word manufID, word format) {
+
+    dword formatID = FormatIDFromManufacturerAndType(manufID, format);
+    ClipboardQueryArgs query;              // Result of the query
+    Boolean found = FALSE;
+
+    /*
+     * Retrieve clipboard information
+     */
+    ClipboardQueryItem(TIF_NORMAL, &query);
+
+    if ( query.CQA_numFormats ) {
+        /* Search for the format in the clipboard */
+      if  ( ClipboardTestItemFormat(query.CQA_header, formatID ) )
+	{
+	found = TRUE;
+	}
+      }
+
+    ClipboardDoneWithItem(query.CQA_header);
+
+    return found;
+    }
+
+/*--------------------- BTGetClipboardItem ---------------------
+ * Purpose:         Copy the data of a specific entry from the clipboard
+ *                  into a VM file
+ * Parameters:      manufID:    Manufacturer ID of the format (0 == GEOWORKS)
+ *                  format:     Format type (e.g. CIF_BITMAP)
+ *                  vmFile:     Destination file for the data
+ * Return:          VMBlockHandle of the copied format data,
+ *                  Null handle if the format is not available
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTGetClipboardItem(word manufID, word format, VMFileHandle vmFile) {
+
+    dword formatID = FormatIDFromManufacturerAndType(manufID, format);
+    ClipboardQueryArgs query;              // Result of the query
+    ClipboardRequestArgs request;
+    VMBlockHandle bmpBlock = 0;
+    dword newChain;
+
+    /*
+     * Retrieve clipboard information
+     */
+    ClipboardQueryItem(TIF_NORMAL, &query);
+
+    if ( query.CQA_numFormats ) {
+        /* Search for the format in the clipboard */
+
+      if  ( ClipboardTestItemFormat(query.CQA_header, formatID ) )
+	{
+	ClipboardRequestItemFormat( formatID, query.CQA_header, &request);
+	newChain = VMCopyVMChain(request.CRA_file, request.CRA_data, vmFile);
+	bmpBlock = (newChain)>>16;	// VMChain to VMBlock
+
+	}
+      }
+
+    ClipboardDoneWithItem(query.CQA_header);
+
+    return bmpBlock;
+    }
+
+
+/*
+ ***************************************************************************
+ *
+ *      Drawing GStrings and Bitmaps using GStates
+ *
+ ***************************************************************************
+ */
+
+/*--------------------- BTDrawBitmapWithMasks ---------------------
+ * Purpose:      Draw a HugeBitmap into another using the system function
+ *               GrDrawHugeBitmap().
+ *               Workaround: Takes mask layers into account.
+ *               Workaround: Fixes a bug when drawing masked bitmaps with
+ *               negative offset.
+ * Strategy:     If the destination bitmap contains a mask, draw the mask
+ *               first, then the image.
+ *               If the source bitmap contains a mask and a negative
+ *               x-offset is used, this causes problems.
+ *               -> In that case, the masked bitmap is copied into a
+ *                  non-masked bitmap in the clipboard and drawn from there.
+ *               Drawback: This is slow and memory-hungry. For very large
+ *               bitmaps it can crash. If the destination already has content,
+ *               it may appear corrupted.
+ *               -> Negative x-offsets should be avoided.
+ * Note:         It is probably better to use direct-access routines anyway.
+ * Parameters:   gstate:         Handle to destination bitmap
+ *               destIsMasked:   TRUE if destination bitmap is masked
+ *               xPos, yPos:     Drawing position
+ *               bmpFile:        VM file of the source bitmap
+ *               bmpBlock:       Handle of the source bitmap
+ * Return:       -
+ ---------------------------------------------------------------------------*/
+extern void EXPORT BTDrawBitmapWithMasks(
+    GStateHandle gstate,       // Handle to destination bitmap
+    Boolean destIsMasked,      // destination uses a mask?
+    int xPos, int yPos,        // x- and y-offset for placing the bitmap
+    VMFileHandle bmpFile,      // bitmap to draw into the GState
+    VMBlockHandle bmpBlock) {
+
+    VMBlockHandle newBmp;
+    GStateHandle newState = 0;
+    dword xySize;
+
+    GrSaveState(gstate);
+    if (destIsMasked) {
+        // Write mask
+		int mode = GrGetBitmapMode(gstate);
+		GrSetBitmapMode(gstate,BM_EDIT_MASK,0);
+		GrSetMixMode(gstate,MM_SET);
+		GrDrawHugeBitmap(gstate,xPos,yPos,bmpFile,bmpBlock );
+		GrSetBitmapMode(gstate,mode,0);
+		}
+
+   if ( xPos < 0 )
+     {
+     int bmpType = BTGetMoreBitmapInfos(bmpFile, bmpBlock, 0, 0, 0);
+     if ( bmpType & BMT_MASK )
+	{
+	/* if the source is masked, we have a problem... */
+	/* Create an unmasked copy of it in the clipboard file */
+	xySize = GrGetHugeBitmapSize(bmpFile,bmpBlock);
+	bmpType &= ~BMT_MASK;
+	newBmp = GrCreateBitmap(bmpType,xySize&0xFFFF,xySize>>16,
+		ClipboardGetClipboardFile(), 0, &newState);
+	GrDrawHugeBitmap(newState,0,0,bmpFile,bmpBlock);
+	}
+     }
+
+   if ( newState ) {
+	/* if an unmasked copy exist, use it and destroy it afterwards */
+	GrDrawHugeBitmap(gstate,xPos,yPos,
+			ClipboardGetClipboardFile(),newBmp);
+	GrDestroyBitmap(newState,BMD_KILL_DATA);
+	}
+   else /* this is the normal case */
+	GrDrawHugeBitmap(gstate,xPos,yPos,bmpFile,bmpBlock);
+
+   GrRestoreState(gstate);
+   }
+
+
+/*--------------------- BTDrawGString ---------------------
+ * Purpose:      Draws a GString into a GState, taking the GString's bounds
+ *               into account.
+ *               -> Only the desired coordinates need to be specified.
+ *
+ *               Masked bitmaps are supported if destIsMasked is set to TRUE.
+ *               In that case, the mask level is selected first and the GString
+ *               is drawn into it. Special features such as dithering and
+ *               mix mode changes are suppressed.
+ *               Afterwards, the GString is drawn normally into the bitmap.
+ *
+ * Note:         The GString must already be loaded.
+ * Example:      Draw a GString in the upper left corner of a bitmap
+ *               Handle gstr = GrLoadGString(vmFile, GST_VMEM, gsDataBlock);
+ *               BTDrawGString(bitmapGState, TRUE, 0, 0, gstr);
+ *               GrDestroyGString(gstr, NULL, GSKT_LEAVE_DATA);
+ *
+ * Parameters:   gstate:         Target GState
+ *               destIsMasked:   TRUE if the target GState is a masked bitmap,
+ *                               and the mask should be set according to the GString
+ *                               FALSE if the target is any generic GState
+ *               xPos, yPos:     Position where the GString should appear.
+ *                               The routine will take care of adjusting for
+ *                               the GString's own bounds.
+ *               gstr:           Handle to the loaded GString
+ * Return:       -
+ ---------------------------------------------------------------------------*/
+extern void EXPORT BTDrawGString(GStateHandle gstate, Boolean destIsMasked,
+        int xPos, int yPos, Handle gstr) {
+
+    int x0, y0;
+    Rectangle bounds;
+    word elem;  /* BUG!!! GStringElement is defined as byte,
+                 * but GrLoadGString() writes a word ->
+                 * GrDrawGString() may do so too (I'm not sure),
+                 * so declaring 'elem' as GStringElement may cause data
+                 * to be overwritten! */
+
+    GrSaveState(gstate);
+
+    /* Because a GString may not be placed in the upper left corner of a
+     * Window, we have to use its bounds */
+
+    GrGetGStringBounds(gstr,0,0,&bounds);
+    x0 = xPos - bounds.R_left;
+    y0 = yPos - bounds.R_top;
+
+    if ( destIsMasked )
+	{
+	// Write Mask
+	int mode = GrGetBitmapMode(gstate);
+	GrSaveState(gstate);
+
+	/* In order to avoid dithering the mask,
+	 * we have to set the MixMode to MM_SET */
+	GrSetBitmapMode(gstate,BM_EDIT_MASK,0);
+	GrSetMixMode(gstate,MM_SET);
+
+	/* A GString may contain commands to modify the MixMode.
+	 * Therefore, we have to filter it out while drawing to the mask. */
+	do {
+	  int retVal;
+	  retVal = GrDrawGString(gstate,gstr,x0, y0, GSC_ATTR,&elem);
+	  if ( retVal == GSRT_COMPLETE) break;
+	  if ( elem == GR_SET_MIX_MODE )
+		{
+		GrSetGStringPos(gstr, GSSPT_SKIP_1, 0);
+		}
+	  } while ( elem != GR_END_GSTRING );
+
+	GrSetBitmapMode(gstate,mode,0);
+	GrRestoreState(gstate);
+	}
+
+    /* Draw the GString to the Bitmap */
+    GrDrawGString(gstate, gstr, x0, y0, 0, &elem);
+    GrRestoreState(gstate);
+
+}
+
+/*--------------------- BTLoadAndDrawGString ---------------------
+ * Purpose:      Loads a GString, draws it at the specified position
+ *               (taking the GString’s bounds into account automatically),
+ *               and unloads the GString afterwards.
+ * Strategy:     Internally calls BTDrawGString()
+ *
+ * Parameters:   gstate:         Target GState
+ *               destIsMasked:   TRUE if the target GState is a masked bitmap
+ *                               and the mask should be set according to the GString
+ *                               FALSE if the target is any generic GState
+ *               xPos, yPos:     Coordinates at which the GString should appear.
+ *                               The routine handles the GString's bounds internally.
+ *               vmFile:         VM file containing the unloaded GString
+ *               gsBlock:        Handle to the unloaded GString
+ * Return:       -
+ ---------------------------------------------------------------------------*/
+
+extern void EXPORT BTLoadAndDrawGString(GStateHandle gstate, Boolean destIsMasked,
+		int xPos, int yPos, VMFileHandle vmFile, VMBlockHandle gsBlock) {
+
+Handle  gstr = GrLoadGString(vmFile, GST_VMEM, gsBlock);
+	BTDrawGString(gstate, destIsMasked, xPos, yPos, gstr);
+	GrDestroyGString(gstr, NULL, GSKT_LEAVE_DATA);
+	}
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* -------------------------- end of file ------------------------- */

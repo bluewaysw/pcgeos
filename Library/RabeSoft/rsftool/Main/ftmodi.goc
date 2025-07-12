@@ -1,0 +1,826 @@
+/******************************************************************************
+ *
+ *	File-Tool-Library
+ *	Module: Reading and writing files
+ *	(c) by RABE-Soft 12/99
+ *
+ * 	Note: The comments were translated from German into English
+ *	with AI assistance and have not been checked in detail.
+ *	They may therefore sometimes sound a bit odd.
+ *
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <string.h>
+@include "rsftool.goh"
+@include "UI/toolui.goh"
+@include "Main/ftlocals.goh"
+@include "Main/macros.goh"
+
+/**************************************************************************
+	Local Headers
+ **************************************************************************/
+
+
+Boolean FileToolRenameFileInternal( char * oldName,char *newName,
+		Boolean msgOnError, Boolean userMayRetry);
+Boolean FileToolModifyDosNameInternal( char * oldName,char *newName,
+		Boolean msgOnError, Boolean userMayRetry);
+
+/*--------------------- FileWriteNZ ---------------------
+ *	Task:           FileWrite Non Zero
+ *	                BugFix: FileWrite cannot handle zero as count
+ *	                (The file is truncated!!!!)
+ *	Parameters:    	word FileWriteNZ(FileHandle fh, const void *buf, word count, Boolean noErrorFlag);
+ ---------------------------------------------------------------------------*/
+word FileWriteNZ(FileHandle fh, const void *buf, word count, Boolean noErrorFlag) {
+	if ( count == 0 ) return 0;
+	return FileWrite(fh, buf, count, noErrorFlag);
+	}
+
+/*--------------------- LocalHandleWriteError ---------------------
+ *	Task:           Output an appropriate error message for the
+ *	                routines ..DeleteRange, ..InsertBuffer, ..ReplaceBuffer
+ *	Context:
+ *	Parameters:    	void ( char * fileName, int err )
+ ---------------------------------------------------------------------------*/
+void LocalHandleWriteError( char * fileName, int err ) {
+
+   if ( !fileName ) return;	// Null pointer (== no message)
+   switch ( err ) {
+	case (-1):
+		{
+		optr op = @ErrorAccessMemory;
+		ErrorMsgBox(op,fileName,0);
+		// For any unknown reason compiling ErrorMsgBox(@ErrorAccessMemory,fileName,0); fails here
+		}
+		break;
+	case ERROR_SHARING_VIOLATION:
+	case ERROR_FILE_IN_USE:
+	case ERROR_WRITE_PROTECTED:
+	case ERROR_ACCESS_DENIED:
+		ErrorMsgBox(@ErrorAccessFile,fileName,0);
+		break;
+	default: ErrorMsgCodeBox(@ErrorWriteFile,fileName,err);
+	}
+   }
+
+
+/*--------------------- LocalCheckSystemDir ---------------------
+ *	Task:           Check whether the given name represents a system directory.
+ *	                This must not be renamed.
+ *	Return:         Error flag:
+ *	                FALSE (==0) OK
+ *	                TRUE  (>0) System directory
+ *	                TRUE  (-1) No memory left (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+Boolean LocalCheckSystemDir(char * fileName, Boolean msgOnError) {
+char * path, *pptr;
+int len;
+MemHandle mh;
+DiskHandle dh,ndh;
+
+	mh = MemAlloc(1024,HF_SWAPABLE,HAF_ZERO_INIT | HAF_LOCK);
+	if ( !mh ) {
+		if ( msgOnError ) ErrorMsgBox(@ErrorAccessMemoryCommon,0,0);
+		return (-1);
+		}
+	path = MemDeref(mh);
+	dh = FileGetCurrentPath(path,500);
+	FileToolAddPathElement(path, fileName);
+	pptr = (char*)MemDeref(mh) + 512;
+	dh = FileConstructFullPath(&pptr,512,dh,path,FALSE);
+	pptr = (char*)MemDeref(mh) + 512;
+	ndh = FileParseStandardPath(dh, (const char **) &pptr); //µµ
+	len =strlen(pptr);
+	MemFree(mh);
+
+	if ( (ndh == 0) || (len>0) ) return FALSE;
+	if ( msgOnError ) ErrorMsgBox(@ErrorIsSystemDir,fileName,0);
+	return TRUE;
+	}
+
+
+/*--------------------- LocalModifyDosName ---------------------
+ *	Task:           Change the DOS name of a file. Without error handling.
+ *	Strategy:       DOS files or directories without a dirname are
+ *	                renamed; Geos files keep their old name
+ *	                by explicitly reading it out.
+ *	Return:         Error flag:
+ *	                FALSE (==0) OK
+ *	                TRUE  (>0) Error code from FileRead() or FileWrite()
+ *	                TRUE  (-1) No memory left (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+typedef struct {
+	dword kennung;
+	char name[34];
+	} GeosIDAndName;
+
+@define FTSetAttrDesc(ad,attr,value,size) ad.FEAD_attr = attr; \
+	ad.FEAD_value = value; ad.FEAD_size  = size;	ad.FEAD_name  = NULL;
+
+extern char dirnameFile[] = "@DIRNAME.000";
+
+
+
+int    LocalModifyDosName(char * oldName, char * newName) {
+word	fileType, err=0, nullword = 0,nameModifier = 0xFEFF;
+FileHandle	fh;
+GeosIDAndName	info;
+FileExtAttrDesc	attrDesc[2];	/* Array 0..1 */
+FileLongName	dosName;
+
+	@FTSetAttrDesc(attrDesc[0],FEA_FILE_TYPE,&fileType,2);
+	@FTSetAttrDesc(attrDesc[1],FEA_DOS_NAME,&dosName,sizeof(FileLongName));
+	err = FileGetPathExtAttributes(oldName,FEA_MULTIPLE,attrDesc,2);
+	if ( err ) return err;
+
+	if ( fileType == GFT_NOT_GEOS_FILE )
+		return FileRename(oldName,newName);
+
+	if ( fileType == GFT_DIRECTORY ) {
+	    /* open dirname */
+		FileSetCurrentPath(0,oldName);
+		fh = FileOpen(dirnameFile, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+		FileSetCurrentPath(0,"..");
+		if (!fh) {	// DOS-Folder
+			return FileRename(oldName,newName);
+			}
+	    /* Dirname found: Read ID and name, rename */
+		FileRead(fh,&info,sizeof(GeosIDAndName),FALSE);
+		FilePos(fh,5,FILE_POS_START);
+		FileWrite(fh,&nameModifier,2,FALSE);
+		FileWrite(fh,&nullword,2,FALSE);
+		FileClose(fh,FALSE);
+	    /* rename */
+		err = FileRename(dosName,newName);
+	    /* Restore old GEOS name */
+		if ( err ) FileSetCurrentPath(0,dosName);
+		     else FileSetCurrentPath(0,newName);
+		fh = FileOpen(dirnameFile, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+		if ( !fh ) return ThreadGetError();	// Groáe Kacke!
+		FilePos(fh,0,FILE_POS_START);
+		FileWrite(fh,&info,sizeof(GeosIDAndName),FALSE);
+		FileClose(fh,FALSE);
+		FileSetCurrentPath(0,"..");
+		return err;
+		}
+
+/* It is a GEOS file */
+	fh = FileOpen(oldName, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+	if ( !fh ) return ThreadGetError();
+/* Read GEOS name and remove ID */
+	FileRead(fh, &info, sizeof(GeosIDAndName), FALSE);
+	FilePos(fh, 0, FILE_POS_START);
+	FileWrite(fh, &nullword, 2, FALSE);
+	FileClose(fh, FALSE);
+/* Rename, reopen, and write back ID and name */
+
+	err = FileRename(dosName,newName);
+	if ( err ) fh = FileOpen(dosName, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+	     else  fh = FileOpen(newName, FILE_DENY_RW | FILE_ACCESS_RW | 0x80);
+	if ( !fh ) return ThreadGetError();	// Groáe Kacke!!
+	FileWrite(fh,&info,sizeof(GeosIDAndName),FALSE);
+	FileClose(fh,FALSE);
+
+	return err;
+      }
+
+/*--------------------- LocalGetAttrTextOptr ---------------------
+ *	Task:           Get optr for the textual description of an
+ *                  extended attribute (FEA_xxx)
+ ---------------------------------------------------------------------------*/
+ optr LocalGetAttrTextOptr(word extAttr) {
+	switch ( extAttr ) {
+		case FEA_MODIFICATION:
+			return	@TxtModification;
+		case FEA_FILE_ATTR:
+			return	@TxtFileAttr;
+		case FEA_SIZE:
+			return	@TxtSize;
+		case FEA_FILE_TYPE:
+			return	@TxtFileType;
+		case FEA_FLAGS:
+			return	@TxtFlags;
+		case FEA_RELEASE:
+			return	@TxtRelease;
+		case FEA_PROTOCOL:
+			return	@TxtProtocol;
+		case FEA_TOKEN:
+			return	@TxtFileToken;
+		case FEA_CREATOR:
+			return	@TxtCreatorToken;
+		case FEA_USER_NOTES:
+			return	@TxtUserNotes;
+		case FEA_NOTICE:
+			return	@TxtCopyrightNotice;
+		case FEA_CREATION:
+			return	@TxtErstellung;
+		case FEA_PASSWORD:
+			return	@TxtPassword;
+		case FEA_CUSTOM:
+			return	@TxtUserDefined;
+		case FEA_NAME:
+			return	@TxtName;
+		case FEA_GEODE_ATTR:
+			return	@TxtGeodeAttr;
+		case FEA_PATH_INFO:
+			return	@TxtPathInfo;
+		case FEA_FILE_ID:
+			return	@TxtFileID;
+		case FEA_DESKTOP_INFO:
+			return	@TxtDesktopInfo;
+		case FEA_DRIVE_STATUS:
+			return	@TxtDirveStaus;
+		case FEA_DOS_NAME:
+			return	@TxtDosName;
+		case FEA_OWNER:
+			return	@TxtOwner;
+		case FEA_RIGHTS:
+			return	@TxtRights;
+	}
+	return @TxtUnknown;
+}
+
+
+/*--------------------- FileToolInsertBuffer ---------------------
+ *	Task:           Inserts a buffer at the current position in a file
+ *	Strategy:       The file is first extended by the size of the buffer,
+ *                  then the old file content is shifted "from end to start",
+ *                  and finally the buffer is written
+ *	Parameters:     int (FileHandle fh, void *buf, word bufSize,
+ *                      char *fileNameForErrorMsg)
+ *	     fh         Handle of the file
+ *	     buf        Pointer to the buffer to be inserted
+ *	     bufSize    Size of the buffer
+ *	     fileNameForErrorMsg
+ *                  Pointer to the file name, used for displaying an error
+ *                  message in case of failure.
+ *                  Null pointer if no error message should be shown
+ *	     msgOnError TRUE if an error message box should appear
+ *                  ("Error writing to ...")
+ *	Side effect:    The file pointer is moved to the position
+ *                  after the inserted buffer
+ *	Return:         Error flag:
+ *                  FALSE (==0) OK
+ *                  TRUE  (>0) Error code from FileRead() or FileWrite()
+ *                  TRUE (-1) Out of memory (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolInsertBuffer(FileHandle fh, void *buf, word bufSize,
+			char *fileNameForErrorMsg) {
+sdword	startPos,	// position where buffer should be inserted
+			// sdword limits dirname to 2 GB ;-),
+			// but computes correctly
+	endPos,		// end of file before any modifications
+	writePos,	// write position during copy process
+	readPos;	// read position during copy process
+int	readBufferSize = 8 * 1024;	// buffer size for copy process
+					// here: initial value 8 KB
+// Note: The strategy to request the largest possible block,
+// and on failure take less, seems to work; MemAlloc
+// returns the null handle. To be safe, I’ll stick with 8 KB
+word	bytesWritten;
+MemHandle	mh;	// handle of the copy buffer
+void	*p;		// pointer to the copy buffer
+int	err = 0;	// general error variable
+
+
+/* Set initial values and extend the file */
+	startPos = FilePos(fh, 0, FILE_POS_RELATIVE);	// current position
+	endPos = FilePos(fh, 0, FILE_POS_END);		// end of file (+ remember)
+	bytesWritten = FileWriteNZ(fh, buf, bufSize, FALSE);
+	if (bytesWritten != bufSize) {
+		err = ThreadGetError();
+		FileTruncate(fh, endPos, FALSE);	// restore original file length
+		LocalHandleWriteError(fileNameForErrorMsg, err);
+		return err;
+	}
+
+/* Request copy buffer, at least 2 kB, starting with initial value */
+	do {
+		mh = MemAlloc(readBufferSize, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+		if (mh) break;		// success
+		readBufferSize -= 2048; // try next smaller size
+	} while (readBufferSize > 0);
+	if (!mh) {
+		// no memory available -> major failure
+		LocalHandleWriteError(fileNameForErrorMsg, (-1));
+		return (-1);
+	}
+	p = MemDeref(mh);       	// copy buffer
+
+/* Start copy process */
+	err = FALSE;
+	readPos = endPos - readBufferSize;	// will be shifted backwards
+	writePos = FilePos(fh, 0, FILE_POS_END);	// current end of file
+			// Strategy: writePos is always changed before FileWrite
+
+	while (readPos >= startPos) {
+		// Read buffer
+		FilePos(fh, readPos, FILE_POS_START);
+		FileRead(fh, p, readBufferSize, FALSE);
+		readPos -= readBufferSize;	// previous block
+		err = ThreadGetError();
+		if (err) break;
+		// Write to end of file
+		writePos -= readBufferSize;
+		FilePos(fh, writePos, FILE_POS_START);
+		FileWriteNZ(fh, p, readBufferSize, FALSE);
+		err = ThreadGetError();
+		if (err) break;
+	}
+
+	if (err) {			// major failure!!!
+		LocalHandleWriteError(fileNameForErrorMsg, err);
+		MemFree(mh);
+		return err;
+	}
+
+	readBufferSize -= startPos - readPos;
+	while (readBufferSize > 0) {
+		// Move remaining bytes, less than buffer size
+		// readBufferSize contains how many bytes
+		FilePos(fh, startPos, FILE_POS_START);
+		FileRead(fh, p, readBufferSize, FALSE);
+		err = ThreadGetError();
+		if (err) break;
+		// Write to end of file
+		writePos -= readBufferSize;
+		FilePos(fh, writePos, FILE_POS_START);
+		FileWriteNZ(fh, p, readBufferSize, FALSE);
+		err = ThreadGetError();
+		break;			// hack: exit while()
+	}
+
+	if (err) {			// major failure!!!
+		LocalHandleWriteError(fileNameForErrorMsg, err);
+		MemFree(mh);
+		return err;
+	}
+
+/* Now there is space to write the buffer */
+	FilePos(fh, startPos, FILE_POS_START);
+	FileWriteNZ(fh, buf, bufSize, FALSE);
+	err = ThreadGetError();
+	if (err) {			// major failure!!!
+		LocalHandleWriteError(fileNameForErrorMsg, err);
+		MemFree(mh);
+		return err;
+	}
+
+	MemFree(mh);
+	return FALSE;
+}
+
+
+/*--------------------- FileToolDeleteRange ---------------------
+ *	Task:		Delete a section from a file at the current file pointer position.
+ *			The file pointer is not changed.
+ *	Strategy:	Sections are copied block-wise from front to back,
+ *			then the file is truncated.
+ *	Parameters:	Boolean (FileHandle fh, dword range,
+ *					char *fileNameForErrorMsg)
+ *	     fh		Handle of the file
+ *	     range	Number of bytes to delete from the file
+ *	     fileNameForErrorMsg
+ *			Pointer to the filename, if an error message should be shown.
+ *			Null pointer if no error messages should be shown.
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  (>0)  Error code from FileRead() or FileWrite()
+ *			TRUE (-1)  No memory left (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolDeleteRange (FileHandle fh, dword range,
+					char *fileNameForErrorMsg) {
+
+sdword	readPos, writePos, bytesRead, bytesWritten, curPos;
+byte 	*p;
+int 	err = 0;
+MemHandle mh;
+int	readBufferSize = 8*1024;	// Buffer size for copy process
+					// Start value: 8 kB
+
+	if (range == 0) return FALSE;
+	curPos = FilePos(fh, 0, FILE_POS_RELATIVE);
+	writePos = curPos;
+	readPos = curPos + range;
+	if (readPos >= FilePos(fh, 0, FILE_POS_END)) {
+		// Deleting up to (or beyond) the end of the file
+		FileTruncate(fh, writePos, FALSE);
+		FilePos(fh, curPos, FILE_POS_START);
+		return FALSE;
+	}
+
+/* Request copy buffer, at least 2 kB, start with initial value */
+	do {
+	  mh = MemAlloc(readBufferSize,HF_SWAPABLE,HAF_ZERO_INIT | HAF_LOCK);
+	  if ( mh ) break;		// erfolgreich
+	  readBufferSize -= 2048;       // n„chster Versuch
+	  } while ( readBufferSize > 0 );
+	if ( !mh ) {
+		// kein Speicher mehr frei -> groáe Kacke
+		LocalHandleWriteError(fileNameForErrorMsg,(-1));
+		FilePos(fh,curPos,FILE_POS_START);
+		return (-1);
+		}
+	p = MemDeref(mh);       	// Copy buffer
+
+/* do copy */
+	do {
+	    FilePos(fh,readPos,FILE_POS_START);
+	    bytesRead = FileRead(fh,p,readBufferSize,FALSE);
+	    readPos = FilePos(fh,0,FILE_POS_RELATIVE);
+	    if (bytesRead == (-1) ) break;
+	    FilePos(fh,writePos,FILE_POS_START);
+	    writePos += bytesRead;
+	    bytesWritten = FileWriteNZ(fh,p,bytesRead,FALSE);
+	    if ( bytesWritten != bytesRead ) break;
+
+	    } while ( bytesRead == readBufferSize);
+
+	MemFree(mh);
+	if ( (bytesRead == (-1) ) || (bytesWritten != bytesRead) )
+	   {
+	   err = ThreadGetError();
+	   LocalHandleWriteError(fileNameForErrorMsg,err);
+	   }
+	else FileTruncate(fh,writePos,FALSE);
+
+	FilePos(fh,curPos,FILE_POS_START);
+	return err;
+	}
+
+
+/*--------------------- FileToolReplaceBuffer ---------------------
+ *	Task:		Replaces a section at the current file position with a new buffer.
+ *	Parameters:	Boolean (fh, *buffer, oldSize, bufSize, fileNameForErrorMsg)
+ *	     fh		File handle
+ *	     buffer	Pointer to the buffer to be inserted
+ *	     oldSize	Size of the section to be overwritten
+ *	     bufSize	Size of the new buffer
+ *	     fileNameForErrorMsg
+ *			Pointer to the filename (used for error messages).
+ *			Pass NULL if no error messages should be displayed.
+ *	Side effect:	The file pointer is moved to the position *after* the inserted buffer.
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  (>0)  Error code from FileRead() or FileWrite()
+ *			TRUE (-1)  No memory left (MemAlloc failed)
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolReplaceBuffer(FileHandle fh, void * buffer,
+			 word oldSize, word bufSize, char * fileNameForErrorMsg) {
+word bytesWritten;
+int	err = 0;	// Let's hope for the best
+byte * newPtr;
+Boolean msgOnError;
+
+   if ( fileNameForErrorMsg ) msgOnError = TRUE;
+	else	msgOnError = FALSE;
+
+   do {		// Ensure possible error handling
+	if (oldSize == bufSize) {	// Simplest case
+
+		bytesWritten = FileWriteNZ(fh,buffer,bufSize,FALSE);
+		if ( bytesWritten != bufSize )	err = ThreadGetError();
+		break;
+		}
+	if ( bufSize < oldSize ) {	// write an delete
+		bytesWritten = FileWriteNZ(fh,buffer,bufSize,FALSE);
+		if ( bytesWritten != bufSize )	{
+			err = ThreadGetError();
+			break;
+			}
+		err = FileToolDeleteRange(fh, oldSize-bufSize, fileNameForErrorMsg);
+		msgOnError = FALSE;	// Error message has already been shown
+		break;
+		}
+	// now it can only be the other case:
+	//	make space first by inserting, then write the rest
+	err = FileToolInsertBuffer(fh,buffer,bufSize-oldSize,fileNameForErrorMsg);
+	if ( err ) {
+		msgOnError = FALSE;	// Error message has already been shown
+		break;
+		}
+	newPtr = buffer;
+	newPtr += bufSize-oldSize;
+	bytesWritten = FileWriteNZ(fh,newPtr,oldSize,FALSE);
+	if ( bytesWritten != oldSize )	err = ThreadGetError();
+	break;
+	} while (FALSE);
+
+   if ( err && msgOnError) {
+	LocalHandleWriteError(fileNameForErrorMsg,err);
+	}
+   return err;
+   }
+
+
+/*--------------------- WarningMsgCodeBox ---------------------
+ *	Purpose:	Display an error message with a reasonably understandable code
+ *			(e.g., FILE_NOT_FOUND etc.)
+ ---------------------------------------------------------------------------*/
+word WarningMsgCodeBox(optr info, char *param1, int errorCode)	{
+char *p, param2[64];	// Error message
+word ret;
+
+	GetErrorText(errorCode, param2);
+
+	MemLock(OptrToHandle(info));		/* Pin resource */
+	p = LMemDeref(info);			/* Get pointer */
+	ret = UserStandardDialog(0,0, param2, param1,p,
+		( ( CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));		/* Release resource */
+	return ret;
+	}
+
+
+/*--------------------- FileToolRenameFile ---------------------
+ *	Purpose:	Rename a file
+ *			with error message, if desired
+ *	Parameters:     Boolean ( char *oldName, *newName, Boolean msgOnError)
+ *	Side effects:   The directory may be changed
+ *			File selectors might be triggered to rescan
+ *			and potentially lose their selection
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileRename();
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolRenameFile( char * oldName,char *newName, Boolean msgOnError) {
+/* The user may attempt to fix potential problems */
+return FileToolRenameFileInternal( oldName, newName, msgOnError, TRUE);
+}
+
+/*--------------------- FileToolRenameFileNoRetry ---------------------
+ *	Purpose:	Rename a file
+ *			with error message, if desired
+ *	Parameters:     Boolean ( char *oldName, *newName, Boolean msgOnError)
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileRename();
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolRenameFileNoRetry( char * oldName,char *newName, Boolean msgOnError) {
+/* The user is NOT allowed to fix potential problems (except write protection errors on disk) */
+return FileToolRenameFileInternal( oldName, newName, msgOnError, FALSE);
+}
+
+Boolean FileToolRenameFileInternal( char * oldName,char *newName,
+		Boolean msgOnError, Boolean userMayRetry) {
+int	err=0, attrs, aerr=0, ret;
+Boolean	retry;
+
+     if ( LocalCheckSystemDir(oldName, msgOnError) ) return ERROR_ACCESS_DENIED;
+     do {
+	retry = FALSE;
+	err = FileRename(oldName,newName);
+	if ( !err ) return 0;	// no error
+
+	attrs = FileGetAttributes(oldName);
+	if ( attrs & FA_RDONLY )	{
+		aerr = FileSetAttributes(oldName,attrs & ~FA_RDONLY);
+		if ( !aerr ) {
+			err = FileRename(oldName,newName);
+			if ( ! err )	FileSetAttributes(newName,attrs);
+				else	FileSetAttributes(oldName,attrs);
+			}
+		}
+
+	if ( !err ) return 0;		// no error
+	if ( !msgOnError ) return err;  // error, but no message
+
+	switch ( err ) {
+		case 0: break;		// OK
+		case ERROR_INVALID_LONGNAME:
+			ErrorMsgBox(@RenameInvalidName,newName,oldName);
+			break;
+		case ERROR_FILE_EXISTS:
+			ErrorMsgBox(@RenameFileExits,newName,oldName);
+			break;
+		case ERROR_FILE_NOT_FOUND:
+			if ( userMayRetry ) {
+			   ret = WarningMsgBox(@RenameNotFound,newName,oldName);
+			   if ( ret == IC_YES ) {
+				ret = FileToolRequestChangeDir(
+				@FileToolFileRenameInfoText,oldName,0,TRUE);
+				if ( ret == IC_OK ) retry = TRUE;
+				}
+			   }
+			else ErrorMsgBox(@RenameNotFound2, oldName, 0);
+			break;
+		case ERROR_SHARING_VIOLATION:
+		case ERROR_FILE_IN_USE:
+			if ( userMayRetry ) {
+				ret = WarningMsgBox(@RenameAccessDenied,newName,oldName);
+				if ( ret == IC_YES ) retry = TRUE;
+				}
+			else ErrorMsgBox(@RenameAccessDenied2, newName, oldName);
+			break;
+		case ERROR_WRITE_PROTECTED:
+			ret = WarningMsgBox(@RenameDiskWriteProtected,oldName,0);
+			if ( ret == IC_YES ) retry = TRUE;
+			break;
+		case ERROR_ACCESS_DENIED:
+		default:
+			if ( userMayRetry ) {
+				ret = WarningMsgCodeBox(@RenameError,oldName,err);
+				if ( ret == IC_YES ) retry = TRUE;
+				}
+			else ErrorMsgCodeBox(@RenameError2, oldName, err);
+		}
+	} while (retry);
+
+     return err;
+}
+
+/*--------------------- FileToolModifyDosName ---------------------
+ *	Purpose:	Change the DOS name of a file
+ *			GEOS files get a different DOS name
+ *			DOS files are renamed
+ *			with error message, if desired
+ *	Warning:	The new DOS name of the GEOS file is NOT checked
+ *			for validity
+ *	Parameters:     Boolean ( char *oldName, *newName, Boolean msgOnError)
+ *			oldName can be either the GEOS or DOS name for GEOS files
+ *	Side effects:   The directory may be changed
+ *			File selectors might be triggered to rescan
+ *			and potentially lose their selection
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileRename();
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolModifyDosName( char * oldName,char *newName, Boolean msgOnError) {
+/* The user may search for the file, fix errors, etc. */
+return FileToolModifyDosNameInternal(oldName, newName, msgOnError, TRUE);
+}
+
+/*--------------------- FileToolModifyDosNameNoRetry ---------------------
+ *	Purpose:	Change the DOS name of a file, but the user may NOT
+ *			search for the file or fix access problems
+ *			with error message, if desired
+ *	Warning:	The new DOS name of the GEOS file is NOT checked
+ *			for validity
+ *	Parameters:     Boolean ( char *oldName, *newName, Boolean msgOnError)
+ *			oldName can be either the GEOS or DOS name for GEOS files
+ *	Side effects:
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileRename();
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolModifyDosNameNoRetry( char * oldName,char *newName, Boolean msgOnError) {
+/* The user may NOT search for the file, fix errors, etc. */
+return FileToolModifyDosNameInternal(oldName, newName, msgOnError, FALSE);
+}
+
+Boolean FileToolModifyDosNameInternal( char * oldName,char *newName,
+		Boolean msgOnError, Boolean userMayRetry) {
+int	err=0, attrs, aerr=0, ret;
+Boolean	retry;
+
+     if (LocalCheckSystemDir(oldName, msgOnError) ) return ERROR_ACCESS_DENIED;
+     if (!strcmp(oldName,".") ) {
+		if (msgOnError) ErrorMsgBox(@ErrorModiDosIsCurrentDir,0,0);
+		return ERROR_ACCESS_DENIED;
+		}
+     do {
+	retry = FALSE;
+	err = LocalModifyDosName(oldName,newName);
+	if ( !err ) return 0;	// no error
+
+	attrs = FileGetAttributes(oldName);
+	if ( attrs & FA_RDONLY )	{
+		aerr = FileSetAttributes(oldName,attrs & ~FA_RDONLY);
+		if ( !aerr ) {
+			err = LocalModifyDosName(oldName,newName);
+			if ( ! err )	FileSetAttributes(newName,attrs);
+				else	FileSetAttributes(oldName,attrs);
+			}
+		}
+
+	if ( !err ) return 0;		// no error
+	if ( !msgOnError ) return err;  // error, but no message
+
+	switch ( err ) {
+		case 0: break;		// OK
+		case ERROR_INVALID_LONGNAME:
+			ErrorMsgBox(@ModifyDosInvalidName,newName,oldName);
+			break;
+		case ERROR_FILE_EXISTS:
+			ErrorMsgBox(@ModifyDosFileExits,newName,oldName);
+			break;
+		case ERROR_FILE_NOT_FOUND:
+			if ( userMayRetry ) {
+			   ret = WarningMsgBox(@ModifyDosNotFound,newName,oldName);
+			   if ( ret == IC_YES ) {
+				ret = FileToolRequestChangeDir(
+				@FileToolModifyDosNameInfoText,oldName,0,TRUE);
+				if ( ret == IC_OK ) retry = TRUE;
+				}
+			   }
+			else ErrorMsgBox(@ModifyDosNotFound2,newName,oldName);
+			break;
+		case ERROR_SHARING_VIOLATION:
+		case ERROR_FILE_IN_USE:
+			if ( userMayRetry ) {
+				ret = WarningMsgBox(@ModifyDosAccessDenied,newName,oldName);
+				if ( ret == IC_YES ) retry = TRUE;
+				}
+			else ErrorMsgBox(@ModifyDosAccessDenied2,newName,oldName);
+			break;
+		case ERROR_WRITE_PROTECTED:
+			ret = WarningMsgBox(@ModifyDosDiskWriteProtected,oldName,0);
+			if ( ret == IC_YES ) retry = TRUE;
+			break;
+		case ERROR_ACCESS_DENIED:
+		default:
+			if ( userMayRetry ) {
+				ret = WarningMsgCodeBox(@ModifyDosError,oldName,err);
+				if ( ret == IC_YES ) retry = TRUE;
+				}
+			else ErrorMsgCodeBox(@ModifyDosError2,oldName,err);
+		}
+	} while (retry);
+
+     return err;
+}
+
+/*--------------------- FileToolSetExtAttr ---------------------
+ *	Purpose:	Change an extended attribute via
+ *			FileSetPathExtAttributes with error handling
+ *			Read-only files can also be handled
+ *	Parameters:      Boolean ( char * fileName,	// File name
+ *				word feaToSet,		// FEA_xx constant
+ *				void * buffer,		// Value of the attribute
+ *				word attrSize,		// Size of the attribute
+ *				Boolean msgOnError)	// TRUE if an automatic
+ *							// error message
+ *							// should be shown
+ *	Return: 	Error flag:
+ *			FALSE (==0) OK
+ *			TRUE  ( >0) Error code from FileSetPathExtAttributes();
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolSetExtAttr( char * fileName,word feaToSet, void * buffer, word attrSize, Boolean msgOnError) {
+int	err=0, attrs, aerr=0, ret;
+Boolean	retry;
+char *attrText;
+optr attrOptr;
+
+     do {
+	retry = FALSE;
+	err = FileSetPathExtAttributes(fileName,feaToSet,buffer,attrSize);
+	if ( !err ) return 0;	// no error
+
+	attrs = FileGetAttributes(fileName);
+	if ( attrs & FA_RDONLY )	{
+		aerr = FileSetAttributes(fileName,attrs & ~FA_RDONLY);
+		if ( !aerr ) {
+			err = FileSetPathExtAttributes(fileName,feaToSet,buffer,attrSize);
+			FileSetAttributes(fileName,attrs);
+			}
+		}
+
+	if ( !err ) return 0;		// no error
+	if ( !msgOnError ) return err;  // error, but no message
+
+	attrOptr = LocalGetAttrTextOptr(feaToSet);
+	MemLock(HandleOf(attrOptr));
+	attrText = LMemDeref(attrOptr);
+
+	switch ( err ) {
+		case 0: break;		// OK
+		case ERROR_ATTR_NOT_SUPPORTED:
+		case ERROR_ATTR_NOT_FOUND:
+			ErrorMsgBox(@NewAttrNotSupported,fileName,attrText);
+			break;
+		case ERROR_ATTR_SIZE_MISMATCH:
+			ErrorMsgBox(@NewAttrInvalidSize,fileName,attrText);
+			break;
+		case ERROR_ATTR_CANNOT_BE_SET:
+			ErrorMsgBox(@NewAttrNotToSet,fileName,attrText);
+			break;
+		case ERROR_SHARING_VIOLATION:
+		case ERROR_FILE_IN_USE:
+			ret = WarningMsgBox(@NewAttrAccessDenied,fileName,attrText);
+			if ( ret == IC_YES ) retry = TRUE;
+			break;
+		case ERROR_WRITE_PROTECTED:
+			ret = WarningMsgBox(@NewAttrDiskWriteProtected,fileName,0);
+			if ( ret == IC_YES ) retry = TRUE;
+			break;
+		case ERROR_ACCESS_DENIED:
+		default: ret = WarningMsgBox(@NewAttrCommonError,fileName,attrText);
+			if ( ret == IC_YES ) retry = TRUE;
+		}
+
+	MemUnlock(HandleOf(attrOptr));
+	} while (retry);
+
+     return err;
+}
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Context:
+ *	Parameters:
+ ---------------------------------------------------------------------------*/
+
