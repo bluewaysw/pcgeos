@@ -244,6 +244,7 @@ __EDS	proc	far
 	call	pushIEEE64essi
 	call	FloatSub
 	call	retIEEE64
+	ret
 __EDS	endp
 	public	__EDS
 

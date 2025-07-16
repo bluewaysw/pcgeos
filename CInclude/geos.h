@@ -357,7 +357,7 @@ typedef struct {
     sword	WWF_int;
 } WWFixed;
 
-#define MakeWWFixed(fl) ((dword) ((fl)*65536L))
+#define MakeWWFixed(fl) ((sdword) ((fl)*65536L))
 
 /* These are for getting portions of a WWFixedAsDWord value. */
 #define IntegerOf(op) ((word) (((WWFixedAsDWord) (op)) >> 16))
