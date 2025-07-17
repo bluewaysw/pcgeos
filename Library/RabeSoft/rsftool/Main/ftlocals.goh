@@ -1,0 +1,137 @@
+/***************************************************************************
+ *
+ *	File Tool Library
+ *	Header: Locally defined classes or data structures
+ *	(c) by RABE-Soft 12/99
+ *
+ * 	Note: The comments were translated from German to English with AI support
+ *	and have not been reviewed in detail. They may therefore sometimes sound a bit odd.
+ *
+ ***************************************************************************/
+
+#define FTGetMem( size ) 	MemAlloc( size, HF_SWAPABLE, HAF_ZERO_INIT)
+
+#define FT_TC_2_DW(chars)	( ( (dword)chars[0] << 16) \
+				| ( (dword)chars[1] << 24) \
+				| ( (dword)chars[2] << 0) \
+				| ( (dword)chars[3] << 8) )
+
+word	LocalUpcaseChar(word ch); // C-Header for LocalUpcaseChar is missing in localize.h
+
+
+/*---------------------------------------------------------------------------
+ *	FileCopyStruct: simplifies FileCopy and FileMove
+ ---------------------------------------------------------------------------*/
+typedef struct {
+	DiskHandle srcDisk;     /* Handle of the disk, no SP_xxx, not null */
+	char	*srcPath;	/* always "\path\path" etc., without file name! */
+				/* always starts with "\", if necessary just "\" */
+	char	*srcFile;	/* The file name */
+
+	DiskHandle destDisk;	/* see src... */
+	char	*destPath;
+	char	*destFile;
+	char	*destFullPath;  	/* Path + file */
+} FileCopyStruct;
+
+/*---------------------------------------------------------------------------
+ *	Local definded classs
+ ---------------------------------------------------------------------------
+ *	SelectDirOrFileDialogClass
+ ---------------------------------------------------------------------------*/
+
+@class SelectDirOrFileDialogClass, GenInteractionClass;
+/* Management of the other UI objects */
+	@instance Boolean SDI_customFileOnly = FALSE;
+	@message void	MSG_SDOF_SET_INFO_TEXT(void *text, Boolean isOptr);
+	@message void	MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+	@message void	MSG_SDOF_ENABLE_CUSTOM_TRIGGER(char * moniker,
+				Boolean enableOnlyIfFileSelected);
+	@message void   MSG_SDOF_SET_FSEL_TO_PATH(char *path, DiskHandle dh);
+	@message optr	MSG_SDOF_GET_FILE_SELECTOR();
+
+// Handler for the file selector
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_SDOF_SEL_DIR_NOTIFICATION;
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_SDOF_SEL_FILE_NOTIFICATION;
+
+	@message void	MSG_SDOF_CONFIGURE_INPUT_FILENAME_TEXT(char *startText,
+				FTInputFileNameInputFlags inputFlags,
+				Boolean visMonikerNewFileName);
+	@message void	MSG_SDOF_GET_INPUT_TEXT(char *text);
+/*	@message void	MSG_SDOF_*/
+
+@endc;
+
+/* Constants that define the order of the children in SelectDirOrFileDialogClass
+   objects. Important! If changes are made, *ALL* object definitions
+   must be updated accordingly!!!!! */
+#define DIALOG_CHILD_INFO_TEXT		0
+#define DIALOG_CHILD_FILE_SELECTOR	1
+#define DIALOG_CHILD_STATUS_TEXT	2
+#define DIALOG_CHILD_PATH_TEXT		3
+#define DIALOG_CHILD_CANCEL_TRIGGER	4
+#define DIALOG_CHILD_CUSTOM_TRIGGER	5
+#define DIALOG_CHILD_OK_TRIGGER		6
+// Fr SaveFile:
+#define DIALOG_CHILD_INPUT_TEXT		7
+#define DIALOG_CHILD_DOS_FILE_INFO	8
+
+// Zugriff auf die Children des Dialogs
+@define GetChildOptr(childNr) @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(childNr);
+
+/* Child-Nummer des GenValue-Objekts im Sortieren-Info-Box */
+#define CHILD_NR_IVALUE		1
+
+
+/*---------------------	GetErrorText -------------------------------*
+ * 	Task:          Retrieve a description for an error code
+ * 	Parameters:
+ *----------------------------------------------------------------------*/
+void GetErrorText(int code, char *errText);
+
+/*--------------------- ErrorMsgCodeBox ---------------------
+ *	Task:	Display an error message with a somewhat clear code
+ *			(e.g., FILE_NOT_FOUND, etc.)
+ ---------------------------------------------------------------------------*/
+word ErrorMsgCodeBox(optr info, char *param1, int errorCode);
+
+/*--------------------- WarningMsgCodeBox ---------------------
+ *	Task:	Display a warning message with a somewhat clear code
+ *			(e.g., FILE_NOT_FOUND, etc.)
+ ---------------------------------------------------------------------------*/
+word WarningMsgCodeBox(optr info, char *param1, int errorCode);
+
+#define ToolErrorCancelBox(info,p1,p2) LocalToolAskCancelBox(info,p1,p2,CDT_ERROR)
+#define ToolInfoCancelBox(info,p1,p2) LocalToolAskCancelBox(info,p1,p2,CDT_NOTIFICATION)
+
+int LocalToolAskCancelBox(optr iText, char * param1, char *param2, int dbt);
+
+int WarningOverwriteBox(optr warnText, char * param1, char *param2,
+	FTYesAllStruct	*yas, word flagToModify);
+
+/*---------------------	GetErrorText -------------------------------*
+ * 	Task:          Retrieve a description for an error code
+ * 	Parameters:
+ *----------------------------------------------------------------------*/
+void GetErrorText(int code, char *errText);
+
+
+/*---------------------------------------------------------------------------
+ *	$ID Prototypes of various routines
+ ---------------------------------------------------------------------------*/
+int FileToolCopyFileMain(FileCopyStruct *fcs, word flags, FTYesAllStruct *yas);
+int FileToolDeleteFileMain(char * fileName,
+		FileToolDeleteFlags flags, FTYesAllStruct *yas);
+int FileToolDeleteFileEasyInternal(char * fileName, EasyCopyDeleteFlags flags, Boolean calledFormMoveCopy);
+Boolean InternalEnterFolder(DiskHandle dh, char *path);
+word InternalFileCopy(FileCopyStruct *fcs,
+		Boolean destFileExist, FTYesAllStruct *yas);
+extern void EXPORT CreateFileCopyStruct(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, FileCopyStruct *fcs);
+extern void EXPORT DestroyFileCopyStruct(FileCopyStruct *fcs);
+
+
+/*---------------------------------------------------------------------------*/
+
+
+

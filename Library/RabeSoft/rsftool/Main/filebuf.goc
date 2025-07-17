@@ -1,0 +1,177 @@
+/***************************************************************************
+ *
+ *	File-Tool-Library
+ *	Module: Buffered File Access
+ *	(c) by RABE-Soft 10/2002
+ *
+ * 	Note: Comments were translated from German into English using AI support
+ *	and were not checked in detail. They may therefore sometimes sound a bit odd.
+ *
+ ***************************************************************************/
+@include <stdapp.goh>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+@include "rsftool.goh"
+@include "Main/macros.goh"
+
+/****************************************************************************
+ *
+ *	Support for files where data should only be read in small chunks.
+ *	For performance reasons, a larger amount of data is read in at once
+ *	and temporarily buffered. Most requests can then be served from the buffer.
+ *
+ *****************************************************************************/
+
+/*--------------------- FTCreateFileBuffer ---------------------
+ *	Purpose:	Create a buffer structure to enable more efficient
+ *			reading of data from a file
+ *	Parameters:     fh : handle of the open file
+ *			fbPtr: pointer to the buffer structure
+ *			extraSize: size of the extra buffer, which can be used
+ *				as workspace e.g. for decompression
+ *	Return:		Error flag: TRUE if the buffer could not be created (-1)
+ *					or read error from file (-2)
+ *			FALSE: everything OK
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FTCreateFileBuffer(FileHandle fh, FileBufferStruct *fbPtr, int extraSize) {
+#define BUF_FILE_BUF_SIZE	2*1024
+			// must be even, otherwise some optimizations won't work!
+
+   memset(fbPtr, 0, sizeof(FileBufferStruct));
+   fbPtr->buffer = malloc(BUF_FILE_BUF_SIZE + extraSize);
+   if ( !(fbPtr->buffer) ) return (-1);
+
+   fbPtr->file = fh;
+   fbPtr->nextByte = fbPtr->buffer;
+   fbPtr->bufferSize = BUF_FILE_BUF_SIZE;
+
+   if ( extraSize ) fbPtr->extraBuffer = fbPtr->buffer + BUF_FILE_BUF_SIZE;
+		else fbPtr->extraBuffer = 0;
+
+   fbPtr->bytesLeft = FileRead(fh, fbPtr->buffer, BUF_FILE_BUF_SIZE, FALSE);
+   if ( fbPtr->bytesLeft ) return FALSE;
+   else return (-2);
+   }
+
+
+
+/*--------------------- FTReadBufferedFile ---------------------
+ *	Purpose:	Read data from a buffered file.
+ *			Refill the buffer if necessary
+ *	Parameters:	fbPtr: pointer to the buffer structure
+ *			dest: pointer to destination for the data
+ *			count: number of bytes
+ *	Return:		Number of bytes copied
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FTReadBufferedFile(FileBufferStruct *fbPtr, byte *dest, int count) {
+int copied = 0;
+byte *src;
+
+   do {
+      if ( fbPtr->bytesLeft <= 0 ) return 0;	// end of file
+
+      if ( fbPtr->bytesLeft > count )		// standard case, buffer is sufficient
+	{
+	src = fbPtr->nextByte;
+	memcpy(dest, src, count);
+
+	fbPtr->nextByte += count;
+	fbPtr->bytesLeft -=count;
+	copied += count;
+	return copied;
+	}
+
+      // copy remaining buffer & read new data
+      memcpy(dest, fbPtr->nextByte, fbPtr->bytesLeft);
+
+      copied += fbPtr->bytesLeft;	// return value
+      dest += fbPtr->bytesLeft;		// this much was just copied in
+      count -= fbPtr->bytesLeft;	// calculate the remainder
+
+      // refill buffer
+      fbPtr->bytesLeft = FileRead(fbPtr->file, fbPtr->buffer, fbPtr->bufferSize, FALSE);
+      fbPtr->nextByte = fbPtr->buffer;
+
+      if ( fbPtr->bytesLeft <= 0 ) count = 0;	// error -- abort!
+
+      } while ( count > 0);		// as long as some data remains
+
+   return copied;
+   }
+
+/*--------------------- FTGetFilePosAtBufferedPosition ---------------------
+ *	Purpose:	Calculate the file position corresponding to the current
+ *			pointer position fbPtr->nextByte
+ *	Parameters:	fbPtr: pointer to the buffer structure
+ *	Return:
+ ---------------------------------------------------------------------------*/
+extern dword EXPORT FTGetFilePosAtBufferedPosition(FileBufferStruct *fbPtr) {
+dword position;
+
+     position = FilePos(fbPtr->file, 0, FILE_POS_RELATIVE);
+     position -= fbPtr->bytesLeft;
+
+     return position;
+}
+
+/*--------------------- FTBufferedFileSkip ---------------------
+ *	Purpose:	Skip a number of bytes without copying them anywhere
+ *	Parameters:	fbPtr: pointer to the buffer structure
+ *			count: number of bytes to skip
+ *	Return:		Error flag: FALSE: everything OK, data skipped
+ *					Condition: fbPtr->bytesLeft >= 0
+ *					The case == 0 occurs if the skipped
+ *					data ends exactly at the end of the file.
+ *				TRUE: end of file: remaining data is too short
+ *					Condition: fbPtr->bytesLeft == 0
+ *					          fbPtr->nextByte is invalid.
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FTBufferedFileSkip(FileBufferStruct *fbPtr, word count) {
+dword	currentPos, newPos;
+
+   if ( count > fbPtr->bytesLeft ) {
+	/* completely refill buffer */
+	currentPos = FTGetFilePosAtBufferedPosition(fbPtr);
+	newPos = currentPos + count;
+	if ( newPos > FileSize(fbPtr->file) ) {
+		// positioning error: file too short
+		fbPtr->bytesLeft = 0;
+		fbPtr->nextByte = fbPtr->buffer;
+		return TRUE;
+		}
+
+	FilePos(fbPtr->file, newPos, FILE_POS_START);
+	FTBufferedFileRefill(fbPtr);
+	return FALSE;	// OK done.
+	}
+
+   /* skip data in buffer */
+   fbPtr->bytesLeft -= count;
+   fbPtr->nextByte += count;
+   if ( !fbPtr->bytesLeft ) FTBufferedFileRefill(fbPtr);
+
+   return FALSE;
+}
+
+/*--------------------- FTDestroyFileBuffer ---------------------
+ *	Purpose:	Destroy buffer structure. The file will not be closed.
+ *	Parameters:     fbPtr: pointer to the buffer structure
+ ---------------------------------------------------------------------------*/
+extern void EXPORT FTDestroyFileBuffer(FileBufferStruct *fbPtr) {
+
+   if (fbPtr->buffer) free(fbPtr->buffer);
+
+   /* In case of programming error: make maximum trouble! */
+   memset(fbPtr, 0, sizeof(FileBufferStruct));
+   }
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* -------------------- end of file ------------------ */

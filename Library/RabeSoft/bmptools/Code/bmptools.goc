@@ -1,0 +1,366 @@
+/***********************************************************************
+ *
+ *	Code-File for Bitmap Tool Library
+ *
+ *      Made by RABE-Soft 10/2002 - 07/2025
+ *	Adapted for free PC/GEOS project 01/2024
+ *
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <stdlib.h>
+
+#include <string.h>
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+/*
+ ***************************************************************************
+ *		Bitmap-Tools: Anlegen und Verwalten von OffsceenBitmaps
+ *			Zugriff auf den Header
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *		Bitmap tools: Creating and managing offscreen bitmaps
+ *			Accessing the header
+ ***************************************************************************
+ */
+
+
+/*--------------------- BTCreateOffscreenBitmap ---------------------
+ *	Purpose:	Create a HugeBitmap without relying on system graphics
+ *			routines. Does not create a GState. The bitmap is
+ *			intended for writing via direct access, but it can also
+ *			be edited normally using GrEditBitmap().
+ *
+ *	Internal structure of a HugeBitmap
+ *	Source: Source of GrCreateBitmapRaw(), Swat of GrCreateBitmap(),
+ *		VideoDr.def
+ *
+ *	+------>+-------------------------------+
+ *    	| E  B	| HugeArrayDirectory		|	sizeof(HugeArrayDirectory)
+ *	| d  i	+-------------------------------+       sizeof(CBitmap)
+ *    	| i  t	| Complex Bitmap Header		|       -> total 46 bytes
+ *	| t  m	+-------------------------------+
+ *   	| a  a	| BitmapMode flags 		|	1 word
+ *	| b  p	+-------------------------------+
+ *   	| l  	| hptr.ColorTransfer 		|	apparently 1 word
+ *	| e    	+-------------------------------+
+ *    	| 	| Device Info Block		|	sizeof(VideoDriverInfo), 32 bytes
+ *	+------>+-------------------------------+	->defined in VideoDr.def
+ *  		| 1-scan-line buff for vidmem	|	size depends on bitmap
+ *		+-------------------------------+
+ *		| [optional palette space]	|	either 16 or 256
+ *		+-------------------------------+	3-byte entries
+ *
+ *	EditableBitmap (total size: 82 bytes)
+ *	------------------------------------------
+ *	is an internal structure used for accessing the data in the
+ *	HugeArrayHeader. According to Swat, its size is 82 bytes (0x52h)
+ *
+ *	1-scan-line buff for vidmem
+ *	------------------------------------------
+ *	Used by system routines for editing the bitmap.
+ *	Size: the larger of the two values:
+ *		- BytesPerLine: width * bytesPerPixel + mask length
+ *		- Double height (2 * height)
+ *
+ * ----------------------------------------------------------------------------
+ *
+ *	Parameters:	fh:	Handle to the file for the bitmap
+ *			format:	Bitmap format. Must be one of the values
+ *				BMF_MONO, BMF_4BIT, BMF_8BIT, BMF_24BIT,
+ *				combined with the type flags
+ *				BMT_PALETTE, BMT_MASK
+ *                              The flags BMT_HUGE and BMT_COMPLEX are set automatically.
+ *			width:	Width of the bitmap (in pixels)
+ *			height: Height of the bitmap (in pixels, == number of lines)
+ *				Height zero is allowed; in this case, the HugeArray
+ *				contains no elements (yet). They can be added later.
+ *			palette: if the BMT_PALETTE bit is set in format,
+ *				a pointer to the palette values can be passed here.
+ *				There must be as many entries as required by the
+ *				color depth.
+ *				A null pointer is allowed, in which case
+ *				the palette values remain uninitialized.
+ *	Return:		Handle of the newly created bitmap
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTCreateOffscreenBitmap(VMFileHandle fh, BMFormat format,
+	word width, word height, PaletteEntry *palette) {
+
+CBitmap	defaultHeader = { { 0, 0, 0, 0 },	// CB_simple: uninitialized
+	0, 0, 0x18, 0,                          // CB_startScan, CB_numScans,
+						// CB_devInfo, CB_data:
+						// probably internal.
+	0, 0x48, 0x48 };			// CB_palette: uninitialized
+						// CB_xres, CB_yRes: 72 dpi
+int	numColors, paletteDataSize, maskLen, bytesPerLine;
+VMBlockHandle	bmpHandle;
+byte 	*rawData;
+MemHandle  mh;
+CBitmap    *cBmp;
+word       *wPtr;
+int	   headerSpaceSize, offsetToPalette;
+
+/* Hardcode 82-byte EditableBitmap structure size. Determined via Swat. */
+#define SIZE_OF_EDITABALE_BITMAP	82
+
+   /* Calculate sizes required for creation */
+   switch ( format & BMT_FORMAT ) {
+   case BMF_MONO:
+	numColors = 2;
+	bytesPerLine = (width + 7) >> 3;
+	break;
+   case BMF_4BIT:
+	numColors = 16;
+	bytesPerLine = (width+1) >> 1;
+	break;
+   case BMF_8BIT:
+	numColors = 256;
+	bytesPerLine = width;
+	break;
+   case BMF_24BIT:
+	numColors = 0;
+	bytesPerLine = 3*width;
+	break;
+	}
+
+   if ( format & BMT_MASK ) maskLen = (width + 7) >> 3;
+	else maskLen = 0;
+   if ( format & BMT_PALETTE ) paletteDataSize = numColors * sizeof(PaletteEntry);
+	else paletteDataSize = 0;
+
+   /* The HugeArrayHeader requires a certain amount of space: */
+      // Scanline buffer for vidmem: max_of(SumBytesPerLine, 2 * height)
+	headerSpaceSize = bytesPerLine + maskLen;
+	if ( headerSpaceSize < ( 2*height) ) headerSpaceSize = 2*height;
+      // EditableBitmap structure
+	headerSpaceSize += SIZE_OF_EDITABALE_BITMAP; 	/* see above */
+      // Space for palette
+	headerSpaceSize += paletteDataSize + 2;	/* palette data */
+      // Safety margin. Since I stepped through the assembler code,
+      // and am therefore quite confident, this is actually not needed.
+      // But I feel more comfortable this way.
+//	headerSpaceSize += 64;
+
+   /* Create HugeArray */
+   bmpHandle = HugeArrayCreate( fh,
+	bytesPerLine + maskLen,		// size of a single line
+	headerSpaceSize);		// size for HugeArrayHeader
+
+   /* Initialize ComplexBitmap header */
+   rawData = VMLock(fh, bmpHandle , &mh);
+   cBmp = (CBitmap *)(rawData + sizeof(HugeArrayDirectory));
+   memset(cBmp, 0, headerSpaceSize - sizeof(HugeArrayDirectory));
+   *cBmp = defaultHeader;
+   cBmp->CB_simple.B_width = width;
+   cBmp->CB_simple.B_height = height;
+   cBmp->CB_simple.B_type = format | BMT_HUGE | BMT_COMPLEX;
+
+   /* if needed: copy palette */
+   if ( paletteDataSize ) {
+      offsetToPalette = headerSpaceSize - paletteDataSize - 2;
+
+      // Set number of colors
+      cBmp->CB_palette = offsetToPalette - sizeof(HugeArrayDirectory);
+      wPtr = (word*)(rawData + offsetToPalette);
+      *wPtr = numColors;
+
+      if (palette) {
+	     // Copy palette
+	     wPtr++;
+	     memcpy(wPtr, palette, numColors * sizeof(PaletteEntry));
+	     }         	// end of if (palette)
+
+      }                 // end of if (paletteDataSize)
+
+   VMDirty(mh);
+   VMUnlock(mh);
+   /* if height is not zero: create HugeArray elements */
+   if ( height ) {
+	byte *p;
+
+	p = malloc(bytesPerLine + maskLen);
+@if 1
+	memset( p, 0xFF, bytesPerLine + maskLen);
+	HugeArrayAppend( fh, bmpHandle, height, p);
+@elseif
+	memset( p, 0x00, bytesPerLine + maskLen);
+
+		{
+		int k;
+		for (k = 0; k < height; k++ ) HugeArrayAppend( fh, bmpHandle, 1, p);
+		}	/**/
+@endif
+	free(p);
+	}
+
+   return bmpHandle;
+   }
+
+/*--------------------- BTSetBitmapHeight ---------------------
+ *	Purpose:        Change the height of the bitmap in the bitmap header.
+ *			Used to adjust the bitmap height when, for example,
+ *			a bitmap created via BTCreateOffscreenBitmap() has had
+ *			its height changed by appending or deleting lines
+ *			(HugeArray elements).
+ *	Parameters:	fh:	Handle of the file containing the bitmap
+ *			bmpHandle: handle of the bitmap
+ *			height: new height of the bitmap. It should match the
+ *				actual number of elements in the HugeArray.
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void EXPORT BTSetBitmapHeight(VMFileHandle vmFile, VMBlockHandle bmpHandle, word height) {
+byte * rawData;
+MemHandle   mh;
+CBitmap * cBmp;
+
+     rawData = VMLock(vmFile, bmpHandle , &mh);
+     cBmp = (CBitmap *)(rawData + sizeof(HugeArrayDirectory));
+     cBmp->CB_simple.B_height = height;
+     VMDirty(mh);
+     VMUnlock(mh);
+
+     }
+
+/* ------------------------------------------------------------------------
+ * 	BTGetMoreBitmapInfos
+ *      Retrieve bitmap type information (color depth and more)
+ *	Return: 	BMType (e.g., (BMT_MASK | BMF_8BIT) )
+ * ------------------------------------------------------------------------*/
+extern int EXPORT BTGetMoreBitmapInfos(VMFileHandle fh, VMBlockHandle vmBlock,
+	int *width, int *height, int *compact ) {
+byte * rawData;
+MemHandle   mh;
+CBitmap * cBmp;
+int 	retVal;
+
+	rawData = VMLock(fh,vmBlock, &mh);
+	cBmp = (CBitmap *)(rawData + sizeof(HugeArrayDirectory));
+	retVal = cBmp->CB_simple.B_type;
+	if ( compact ) *compact = cBmp->CB_simple.B_compact;
+	if ( width ) *width = cBmp->CB_simple.B_width;
+	if ( height ) *height = cBmp->CB_simple.B_height;
+	VMUnlock(mh);
+	return retVal;
+	}
+
+/*--------------------- BTBitmapToolLockHeader ---------------------
+ *	Purpose:        Lock the HugeBitmap header. This is a low-level
+ *			routine and should be used with care.
+ *			Unlock is done with VMUnlock(), possibly preceded by VMDirty().
+ *	Parameters:	fh:	Handle of the VM file
+ *			bmpHandle: VM handle of the bitmap
+ *			*mh: 	Pointer to a MemHandle used for VMDirty() and
+ *				VMUnlock()
+ *	Return:		Pointer to the locked CBitmap header
+ ---------------------------------------------------------------------------*/
+extern CBitmap* EXPORT BTBitmapToolLockHeader(VMFileHandle fh, VMBlockHandle bmpHandle,
+			MemHandle  *mh) {
+byte 	*rawData;
+CBitmap    *cBmp;
+
+   rawData = VMLock(fh, bmpHandle , mh);
+   cBmp = (CBitmap *)(rawData + sizeof(HugeArrayDirectory));
+   return cBmp;
+   }
+
+
+/*--------------------- BTGetBitmapPalette ---------------------
+ *	Purpose:        Copy the bitmap palette into a buffer
+ *	Parameters:	fh:	Handle of the VM file
+ *			bmpHandle: VM handle of the bitmap
+ *			*palette:  Pointer to the buffer into which the palette
+ *				   should be copied
+ *			numEntries: number of palette entries
+ *	Return:		Error flag: FALSE == OK
+ *				TRUE == error (bitmap has no palette)
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT BTGetBitmapPalette(VMFileHandle fh, VMBlockHandle bmpHandle,
+		PaletteEntry *palette, int numEntries) {
+byte 	*palPtr, *bPtr;
+MemHandle  mh;
+CBitmap    *cBmp;
+Boolean    err;
+
+   /* Lock ComplexBitmap header, copy palette */
+   cBmp = BTBitmapToolLockHeader(fh, bmpHandle, &mh);
+   bPtr = (byte *)cBmp;
+   if ( cBmp->CB_simple.B_type & BMT_PALETTE ) {
+	   palPtr = bPtr + cBmp->CB_palette + 2;
+	   memcpy(palette, palPtr, sizeof(PaletteEntry) * numEntries);
+	   err = FALSE;
+	   }
+   else err = TRUE;
+
+   VMUnlock(mh);
+   return err;
+   }
+
+
+/*--------------------- BTSetBitmapPalette ---------------------
+ *	Purpose:        Set the bitmap palette of a HugeBitmap
+ *	Parameters:	fh:	Handle of the VM file
+ *			bmpHandle: VM handle of the bitmap
+ *			*palette:  Pointer to the buffer from which the palette
+ *				   should be copied
+ *			firstEntry: first entry to write (zero-based)
+ *			numEntries: number of palette entries to write.
+ *				If numEntries + firstEntry is too large, only the
+ *				possible entries are written, the rest are ignored
+ *	Return:		Error flag: FALSE == OK
+ *				TRUE == error – bitmap has no palette
+ *						– firstEntry is too large
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT BTSetBitmapPalette(VMFileHandle fh, VMBlockHandle bmpHandle,
+		PaletteEntry *palette, int firstEntry, int numEntries) {
+byte 	*palPtr, *bPtr;
+word 	*numPtr;
+int numPalEntries;
+MemHandle  mh;
+CBitmap    *cBmp;
+Boolean    err;
+
+   /* Lock ComplexBitmap header, copy palette */
+
+   cBmp = BTBitmapToolLockHeader(fh, bmpHandle, &mh);
+   bPtr = (byte *)cBmp;
+   err = TRUE;	// worst Case
+   if ( cBmp->CB_simple.B_type & BMT_PALETTE ) {
+	   palPtr = bPtr + cBmp->CB_palette + 2;
+	   numPtr = (word*)(palPtr - 2);
+	   numPalEntries = *numPtr;
+	   if ( firstEntry < numPalEntries ) {	// otherwise initial value too large
+		if ( firstEntry + numEntries > numPalEntries )
+			// Final value too large -> limit
+			numEntries = numPalEntries - firstEntry;
+
+		// Now it's time to copy
+		palPtr += sizeof(PaletteEntry) * firstEntry;
+		memcpy(palPtr, palette, sizeof(PaletteEntry) * numEntries);
+		err = FALSE;
+		}
+	   }
+
+   VMDirty(mh);
+   VMUnlock(mh);
+   return err;
+   }
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* -------------------------- end of file ------------------------- */
