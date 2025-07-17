@@ -1131,8 +1131,13 @@ Pass1MS_CountRels(const char   	*file,	    /* Object file being read */
 	    {
 		if (MSObj_IsFloatingPointExtDef(target.external) != FPED_FALSE)
 		{
-			printf("borlandc\r\n");
-		    //Library_Link("borlandc", LLT_ON_STARTUP, GA_LIBRARY);
+		    //printf("borlandc\r\n");
+		    Library_Link("borlandc", LLT_ON_STARTUP, GA_LIBRARY);
+		}
+		else if (MSObj_IsWatcomFloatingPoint(target.external))
+		{
+		    //printf("watcomc\r\n");
+		    Library_Link("watcomc", LLT_ON_STARTUP, GA_LIBRARY);
 		}
 	    }
 	    /*

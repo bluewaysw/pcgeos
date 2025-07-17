@@ -765,6 +765,32 @@ INTEL80X87DWORDTOFLOAT	proc	far
 	ret
 INTEL80X87DWORDTOFLOAT	endp
 
+
+COMMENT @----------------------------------------------------------------------
+
+C FUNCTION:	FloatDwordToFloat
+
+C DECLARATION:	extern void
+			_far FloatUnsigedToFloat(dword num);
+
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+		convert the long number passed in to an 80 bit floating point 
+		number on the top of the stack
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	8/92		Initial version
+
+------------------------------------------------------------------------------@
+global INTEL80X87UNSIGNEDTOFLOAT:far
+INTEL80X87UNSIGNEDTOFLOAT	proc	far
+	C_GetOneDWordArg	dx, ax,	bx, cx	; dxax <- num
+	call	FloatUnsignedToFloat
+	ret
+INTEL80X87UNSIGNEDTOFLOAT	endp
+
 COMMENT @----------------------------------------------------------------------
 
 C FUNCTION:	FloatGetDaysInMonth
