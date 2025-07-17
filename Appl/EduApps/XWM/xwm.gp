@@ -16,7 +16,7 @@ resource XWMAPPMONIKERRESOURCE lmem read-only shared
 resource XWMDOCMONIKERRESOURCE lmem read-only shared
 
 # platform
-platform geos201
+#platform geos201
 
 library geos
 library ui
@@ -24,7 +24,7 @@ library ansic
 library spool
 library compress
 #library text
-exempt compress
+#exempt compress
 
 export XWMDocumentControlClass
 

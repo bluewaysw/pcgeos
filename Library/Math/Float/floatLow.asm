@@ -280,29 +280,49 @@ REVISION HISTORY:
 
 FloatWordToFloat	proc	near
 	cwd				; dx <- sign extended ax
-	FALL_THRU	FloatDwordToFloat
+	clc
+	GOTO		FloatDwordToFloatCommon
 FloatWordToFloat	endp
 
-FloatDwordToFloat	proc	near	uses	cx,di,si
+FloatDwordToFloat	proc	near
+	clc
+	GOTO		FloatDwordToFloatCommon
+FloatDwordToFloat	endp
+
+FloatUnsignedToFloat	proc	near
+	stc
+	FALL_THRU	FloatDwordToFloatCommon
+FloatUnsignedToFloat	endp
+
+FloatDwordToFloatCommon	proc	near	uses	cx,di,si
 	.enter
-	call	FloatDecSP_FPSIZE	; prepare to push
+
+	mov	di, 0
+	jnc	2$
+	dec	di
+2$:
+	call	FloatDecSP_FPSIZE		; prepare to push
 	FloatGetSP_DSSI
 
-	clr	di
 	mov	cx, 401eh		; bias - binary point has been shifted
 					; right 31 bits (dx:ax)
+	or	di, di
+	js	1$			; carry  set if no signs
+
 	or	dx, dx			; check sign
 	jns	1$			; branch if positive
 
 	;
 	; negative number
 	;
+
 	neg	ax
 	adc	dx, di				; incorporate carry
 	neg	dx
 	or	ch, 80h				; negate exponent
 
 1$:
+	clr	di
 	mov	ds:[si].F_exponent, cx		; store exponent
 	mov	ds:[si].F_mantissa_wd3, dx
 	mov	ds:[si].F_mantissa_wd2, ax
@@ -311,7 +331,8 @@ FloatDwordToFloat	proc	near	uses	cx,di,si
 	call	FloatNormalize			; destroys ax,dx
 	.leave
 	ret
-FloatDwordToFloat	endp
+
+FloatDwordToFloatCommon	endp
 
 
 COMMENT @-----------------------------------------------------------------------
@@ -350,6 +371,7 @@ REVISION HISTORY:
 
 FloatFloatToDword	proc	near
 	.enter
+	clc
 	call	FloatFloatToDwordNoPop
 
 	pushf
@@ -358,6 +380,52 @@ FloatFloatToDword	proc	near
 	.leave
 	ret
 FloatFloatToDword	endp
+
+
+COMMENT @-----------------------------------------------------------------------
+
+FUNCTION:	FloatFloatToUnsigned (originally F->D)
+
+DESCRIPTION:	Pops the number from the top of the fp stack and
+		converts it into a unsigned dword.
+		( --- D ) ( fp: X --- )
+
+CALLED BY:	Watcom Float Stub
+
+PASS:		number on fp stack
+		ds - fp stack seg
+
+RETURN:		carry clear if successful
+		    dx:ax - dbl
+		carry set otherwise
+		    dx:ax = -80000000 if X is out of range
+
+DESTROYED:	ax,dx
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Cheng	1/91		Initial version
+
+-------------------------------------------------------------------------------@
+
+FloatFloatToUnsigned	proc	near
+	.enter
+	stc
+	call	FloatFloatToDwordNoPop
+
+	pushf
+	call	FloatIncSP_FPSIZE	; drop fp num
+	popf
+	.leave
+	ret
+FloatFloatToUnsigned	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -386,8 +454,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 FloatFloatToDwordNoPop	proc	far
-	uses	bx,cx,si
+	uses	bx,cx,si,di
 	.enter
+	mov	di, 0
+	jnc	1$
+	dec	di
+1$:
 EC<	call	FloatCheck1Arg >
 
 	FloatGetSP_DSSI			; ds:si <- top of fp stack
@@ -451,6 +523,7 @@ nonZero:
 	loop	4$
 
 5$:
+
 	test	dh, 80h			; round smaller
 	jz	setSign			; branch if high bit = 0
 
@@ -465,6 +538,9 @@ nonZero:
 	adc	bx, 0
 
 setSign:
+	or	di, di
+	js	done
+
 	;
 	; account for sign
 	;
@@ -509,8 +585,8 @@ exit:
 	.leave
 	ret
 FloatFloatToDwordNoPop	endp
-
 
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 FUNCTION:      FloatGeos80ToFloat32

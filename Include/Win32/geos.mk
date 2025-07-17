@@ -612,7 +612,7 @@ CCOM_MODEL	?= -ml
 # -of+ -> The above but more agressive
 # -fpi87 -> generate x87 instructions
 
-CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -w4 -fpi87\
+CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -w4 -fpc \
 		   -zu -of -of+ -ol -ol+ -s -ecc -zp1 -ei -zdp -d2 -hc\
 		   $(CCOM_MODEL)
 

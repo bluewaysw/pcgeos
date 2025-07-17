@@ -493,6 +493,8 @@ extern void _pascal FloatIEEE32ToGeos80(float *num);
 extern void _pascal FloatDwordToFloat(long num);
 extern void _pascal FloatWordToFloat(word num);
 extern long _pascal FloatFloatToDword(void);
+extern void _pascal FloatUnsigedToFloat(dword num);
+extern dword _pascal FloatFloatToUnsiged(void);
 
 
 /******************************************************
