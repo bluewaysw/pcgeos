@@ -5349,10 +5349,15 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 Intel80X87UnsignedToFloat	proc	far
-int32b	local	dword	push	0, 0
-int32	local	dword	push	dx, ax
+int32b	local	dword
+int32	local	dword
 	uses	dx
 	.enter
+	mov	int32b.low, 0
+	mov	int32b.high, 0
+	mov	int32.low, ax
+	mov	int32.high, dx
+
 	mov	ax, 1
 	call	FloatHardwareEnter
 	jc	done
