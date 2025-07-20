@@ -1,0 +1,957 @@
+/***************************************************************************
+ *
+ *	File-Tool-Library
+ *	Module: FileSelector Tools and Dialogs
+ *	(c) by RABE-Soft 12/99
+ *
+ *  Note: The comments were translated from German into English with AI support
+ *	and were not checked in detail. They may therefore sound a bit odd at times.
+ *
+ ***************************************************************************/
+@include <stdapp.goh>
+#include <fileEnum.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fileEnum.h>
+#include <file.h>
+
+@include "rsftool.goh"
+@include "UI/toolui.goh"
+@include "Main/ftlocals.goh"
+@include "Main/macros.goh"
+
+
+
+/*###########################################################################
+ #	Editing path strings
+ ###########################################################################*/
+
+
+/*--------------------- FileToolDropBackslash ---------------------
+   FileToolDropBackslash: Cuts off the trailing
+   backslash (or slash, if requested). But only if there
+   actually is one.
+   Return: New path length
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolDropBackslash(char * path, Boolean slashAlso )
+  {
+  int n;
+
+  n = strlen(path);
+  if ( n==0) return 0;
+  n--;
+
+  if ( path[n] == '\\' )
+	{
+	path[n] = 0;
+	return (n);
+	}
+  if ( !slashAlso) return (n+1);
+
+  if ( path[n] == '/' )
+	{
+	path[n] = 0;
+	return (n);
+	}
+  return (n+1);
+  }
+
+/*--------------------- FileToolMakeParentPath ---------------------
+   Shortens a path to its parent path.
+   Return: TRUE if no parent is possible (e.g. empty string or "\\")
+	   FALSE if OK
+   "PAUL" or "PAUL\\" returns empty string and OK (FALSE)
+   "C:" and "C:\\" also return empty string and OK (FALSE)
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolMakeParentPath(char * path, Boolean slashAlso )
+  {
+  int n, k;
+  char c;
+
+  n = FileToolDropBackslash(path,slashAlso);
+  if ( n==0) return TRUE;
+
+  for ( n=0, k=0; n<strlen(path); n++)
+	{
+	c = path[n];
+	if ( (c=='\\') || ( slashAlso && (c=='/') ) ) k=n;
+	}
+  path[k] = 0;
+  return FALSE;
+  }
+
+/*--------------------- FileToolAddPathElement ---------------------
+ *	Task:  Appending a new element to a directory path
+ *		A backslash is added in between if needed.
+ *		No backslash is appended at the end
+ *	Return: Previous path length
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolAddPathElement(char * path, char *tail) {
+int n;
+    n = strlen(path);
+    if ( n>0 ) if (path[n-1] != '\\' ) {  /* Append backslash */
+		path[n] ='\\';
+		path[n+1] = 0;
+		}
+    strcat(path,tail);
+    return n;
+    }
+
+/*--------------------- FileToolParseNameFromPath ---------------------
+	-> in RSFTOOL.GOC, because it's needed there. */
+
+/*###########################################################################
+ #	Comparison and Conversion
+ ###########################################################################*/
+
+/*--------------------- FileToolCompareProtocol ---------------------
+ *	Task:        Compare two protocol numbers
+ *	Return:     CRP_FILE_SAME   : numbers are equal
+ *			CRP_FILE_OLDER  : fileProtocol is older than compProtocol
+ *			CRP_FILE_NEWER  : fileProtocol is newer than compProtocol
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCompareProtocol
+		(ProtocolNumber fileProtocol,ProtocolNumber compProtocol) {
+
+	if ( fileProtocol.PN_major > compProtocol.PN_major ) return CRP_FILE_NEWER;
+	if ( fileProtocol.PN_major < compProtocol.PN_major ) return CRP_FILE_OLDER;
+
+	if ( fileProtocol.PN_minor > compProtocol.PN_minor ) return CRP_FILE_NEWER;
+	if ( fileProtocol.PN_minor < compProtocol.PN_minor ) return CRP_FILE_OLDER;
+
+	return  CRP_FILE_SAME;
+	}
+
+/*--------------------- FileToolCompareRelease ---------------------
+ *	Task:        Compare two release numbers
+ *	Return:     CRP_FILE_SAME   : numbers are equal
+ *			CRP_FILE_OLDER  : fileRelease is older than compRelease
+ *			CRP_FILE_NEWER  : fileRelease is newer than compRelease
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCompareRelease
+		(ReleaseNumber fileRelease,ReleaseNumber compRelease) {
+
+	if ( fileRelease.RN_major > compRelease.RN_major ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_major < compRelease.RN_major ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_minor > compRelease.RN_minor ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_minor < compRelease.RN_minor ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_change > compRelease.RN_change ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_change < compRelease.RN_change ) return CRP_FILE_OLDER;
+
+	if ( fileRelease.RN_engineering > compRelease.RN_engineering ) return CRP_FILE_NEWER;
+	if ( fileRelease.RN_engineering < compRelease.RN_engineering ) return CRP_FILE_OLDER;
+
+	return  CRP_FILE_SAME;
+	}
+
+/*--------------------- FileToolCompareFileDateAndTime ---------------------
+   Date and time comparison of two FileDateAndTime structures
+   return    fdat1 < fdat2   (-1):
+		fdat1 = fdat2   (0):
+		fdat1 > fdat2   ( 1):
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCompareFileDateAndTime(FileDateAndTime fdat1, FileDateAndTime fdat2) {
+int v1, v2;
+
+	v1 = FDATExtractYear(fdat1);
+	v2 = FDATExtractYear(fdat2);
+	if ( v1<v2 ) return (-1);
+	if ( v1>v2 ) return (1);
+
+	v1 = FDATExtractMonth(fdat1);
+	v2 = FDATExtractMonth(fdat2);
+	if ( v1<v2 ) return (-1);
+	if ( v1>v2 ) return (1);
+
+	v1 = FDATExtractDay(fdat1);
+	v2 = FDATExtractDay(fdat2);
+	if ( v1<v2 ) return (-1);
+	if ( v1>v2 ) return (1);
+
+	v1 = FDATExtractHour(fdat1);
+	v2 = FDATExtractHour(fdat2);
+	if ( v1<v2 ) return (-1);
+	if ( v1>v2 ) return (1);
+
+	v1 = FDATExtractMinute(fdat1);
+	v2 = FDATExtractMinute(fdat2);
+	if ( v1<v2 ) return (-1);
+	if ( v1>v2 ) return (1);
+
+	v1 = FDATExtractSecond(fdat1);
+	v2 = FDATExtractSecond(fdat2);
+	if ( v1<v2 ) return (-1);
+	if ( v1>v2 ) return (1);
+
+	return 0;  // Dates are equal
+}
+/*--------------------- FileToolFileDateToTimeDate ---------------------
+ *      Purpose:        Convert GEOS date structures
+ *      Params/Return:  void ( destination structure, source structure)
+ ---------------------------------------------------------------------------*/
+extern void EXPORT FileToolFileDateToTimeDate( TimerDateAndTime *tdat, FileDateAndTime fdat) {
+  tdat->TDAT_year = FDATExtractYearAD(fdat);
+  tdat->TDAT_month = FDATExtractMonth(fdat);
+  tdat->TDAT_day = FDATExtractDay(fdat);
+  tdat->TDAT_hours = FDATExtractHour(fdat);
+  tdat->TDAT_minutes= FDATExtractMinute(fdat);
+  tdat->TDAT_seconds = FDATExtractSecond(fdat);
+}
+
+/*###########################################################################
+ #	Support for FileSelectors and Tool Dialogs
+ ###########################################################################*/
+
+/*--------------------- FileToolPrintDateAndSize ---------------------
+ *	Purpose:	Output of the file date, file size, and file attributes
+ *			into a buffer.
+ *			The file is passed by name and not opened.
+ *			- The buffer must be at least 40 bytes in size
+ *			- GEOS headers are (probably) not included in the size
+ ---------------------------------------------------------------------------*/
+
+extern void EXPORT FileToolPrintDateAndSize(char *buffer, char * fileName) {
+
+FileDateAndTime fdat;
+TimerDateAndTime tdat;
+dword	fSize;
+int 	attrs, len;
+char *p, zahl[12], *z;
+LocalNumericFormat	numFormat;
+
+// File Date
+	FileGetPathExtAttributes(fileName, FEA_MODIFICATION,
+			&fdat,sizeof(FileDateAndTime));
+	FileToolFileDateToTimeDate( &tdat, fdat);
+	LocalFormatDateTime(buffer, DTF_ZERO_PADDED_SHORT, &tdat);
+// File Size
+	LocalGetNumericFormat(&numFormat);
+	FileGetPathExtAttributes(fileName, FEA_SIZE,
+			&fSize,sizeof(dword));
+//	sprintf(strchr(buffer,0)," - %lu Bytes, ",fSize);
+	MemLock(HandleOf(@FileAttrTextSpace1));
+	strcat(buffer,LMemDeref(@FileAttrTextSpace1));
+	UtilHex32ToAscii(zahl, fSize, UHTAF_NULL_TERMINATE);
+	z = zahl;
+	p = strchr(buffer,0);
+	do {
+	   *p = *z;    		// Copy digit
+	   z++; p++;
+	   // If length of remaining digits divisible by 3: insert separator
+	   len = strlen(z);
+	   if ( (len>0) && (len == (3*(len/3)) ) ) {
+					*p = numFormat.thousandsSeparator;
+					p++;
+					}
+	   } while ( strlen(z) );
+	*p = 0;		// Terminator
+
+	strcat(buffer,LMemDeref(@FileAttrTextBytes));
+	MemUnlock(HandleOf(@FileAttrTextSpace1));
+
+
+// Attributes
+	attrs = FileGetAttributes(fileName);
+	p =strchr(buffer,0);
+	FTSetAttrText(attrs,p);
+	}
+
+
+/*--------------------- FileToolGetFileSelectorFullPath ---------------------
+ *	Purpose:	Get full path string (including selection) from
+ *			the FileSelector
+ *	Parameters:	void ( char * fullPath, // return: path
+ *						// must be at least PATH_BUFFER_SIZE
+ *			optr fsel,		// GenFileSelector
+ *			Boolean addDriveLetter)	// Include drive letter?
+ ---------------------------------------------------------------------------*/
+extern void EXPORT FileToolGetFileSelectorFullPath(char *fullPath,
+			optr fsel,Boolean addDriveLetter) {
+DiskHandle	dh;
+MemHandle 	mh;
+char * path, *p;
+
+	mh = FTGetMem(PATH_BUFFER_SIZE);
+	path = MemLock(mh);
+
+	dh = @call fsel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call fsel::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path);
+	p= fullPath;    /* p will point to the end of the string afterwards */
+	FileConstructFullPath(&p,PATH_BUFFER_SIZE,dh,path,addDriveLetter);
+	MemFree(mh);
+	}
+
+
+/*--------------------- FileToolGetFileSelectorDirectoryPath ---------------------
+ *	Purpose:	Get full directory path string from the
+ *			FileSelector. Any selected files are ignored.
+ *	Parameters:	void ( char * fullPath, // return: path
+ *						// must be at least PATH_BUFFER_SIZE
+ *			optr fsel,		// GenFileSelector
+ *			Boolean addDriveLetter)	// Include drive letter?
+ ---------------------------------------------------------------------------*/
+extern void EXPORT FileToolGetFileSelectorDirectoryPath(char *fullPath,
+			optr fsel,Boolean addDriveLetter) {
+DiskHandle dh;
+MemHandle mh;
+char *path, *selection, *p;
+dword	selFlags;
+word 	entryFlags, entryType;
+
+	mh = FTGetMem(PATH_BUFFER_SIZE + 100);
+	path = MemLock(mh);
+	selection = path + PATH_BUFFER_SIZE + 50;	// enough space between
+
+	dh = @call fsel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call fsel::MSG_GEN_PATH_GET(path,PATH_BUFFER_SIZE);
+	selFlags = @call fsel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(selection);
+	entryFlags = GFS_GET_ENTRY_FLAGS(selFlags);
+	entryType = GFS_GET_ENTRY_TYPE(entryFlags);
+	if ( !(entryFlags & GFSEF_PARENT_DIR) )	{
+		// it is not the parent dir -> possibly extend selection
+		if ( entryType == GFSET_SUBDIR)
+			{
+			FileToolAddPathElement(path, selection);
+			}
+		}
+
+	p= fullPath;    /* p will point to the end of the string afterwards */
+	FileConstructFullPath(&p,PATH_BUFFER_SIZE,dh,path,addDriveLetter);
+	MemFree(mh);
+	}
+
+
+/*--------------------- FileToolSetCurrentPathFromFileSelector ---------------------
+ *	Purpose:	Change to a directory selected by the FileSelector.
+ *			The current selection will be considered if it's a directory.
+ * 	Return:		TRUE if a file was selected, otherwise FALSE
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolSetCurrentPathFromFileSelector(optr fsel) {
+DiskHandle dh;
+char *path, *selection;
+MemHandle mh;
+dword	selFlags;
+word 	entryFlags, entryType;
+
+	mh = FTGetMem(PATH_BUFFER_SIZE + 100);
+	path = MemLock(mh);
+	selection = path + PATH_BUFFER_SIZE + 50;	// enough space between
+
+	dh = @call fsel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	@call fsel::MSG_GEN_PATH_GET(path,PATH_BUFFER_SIZE);
+	selFlags = @call fsel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(selection);
+	entryFlags = GFS_GET_ENTRY_FLAGS(selFlags);
+	entryType = GFS_GET_ENTRY_TYPE(entryFlags);
+	if ( !(entryFlags & GFSEF_PARENT_DIR) )	{
+		// it is not the parent dir -> possibly extend selection
+		if ( entryType == GFSET_SUBDIR)
+			{
+			FileToolAddPathElement(path, selection);
+			}
+		}
+
+	if ( !FileSetCurrentPath(dh, path) ) {
+		ErrorMsgBox(@ErrorOpenDir,path, 0);
+		}
+	MemFree(mh);
+	return (entryType == GFSET_FILE);
+	}
+
+
+/*--------------------- FileToolGetTextOptr ---------------------
+ *	Purpose:        Returns the optr of one of the predefined texts
+ ---------------------------------------------------------------------------*/
+extern optr  EXPORT FileToolGetTextOptr(FileToolDefaultTexte txt) {
+optr	objPtr;
+
+	switch ( txt ) {
+		case 	FT_TXT_DELETE_FILE:	objPtr = @FileToolFileDeleteInfoText;
+			break;
+		default:	objPtr = 0;
+		}
+        return objPtr;
+	}
+
+
+/*--------------------- FileToolRequestChangeDir ---------------------
+ *	Purpose:        Request a directory via a dialog box
+ *			The starting point is the current directory.
+ *	Side effect:	The path will be changed to the selected directory,
+ *			if OK or custom trigger was pressed,
+ *			but not if Cancel trigger was pressed.
+ *	Parameters:	infoText:	optr to an info text, NULL if none
+ *			title:		dialog box title,
+ *					NULL for "Select directory"
+ *			customTriggerMoniker: moniker for an extra trigger
+ *					returning IC_YES, NULL if none
+ *			hasCancelTrigger: TRUE if Cancel trigger should be shown
+ *	Return:		IC_OK 		if OK trigger was pressed
+ *			IC_NO       	if Cancel trigger was pressed
+ *			IC_YES      	if Custom trigger was pressed
+ *			IC_NULL		system shutdown or similar
+ ---------------------------------------------------------------------------*/
+
+extern int EXPORT FileToolRequestChangeDir(optr infoText, char *titel,
+			char *customTriggerMoniker, Boolean hasCancelTrigger) {
+optr	dialog, fsel;
+int	ret;
+DiskHandle dh;
+char *path;
+MemHandle mh;
+
+
+	dialog = UserCreateDialog(@SelectDirDialog);
+
+	mh = FTGetMem(PATH_BUFFER_SIZE);
+	path = MemLock(mh);
+	dh = FileGetCurrentPath(path,PATH_BUFFER_SIZE);
+	@call dialog::MSG_SDOF_SET_FSEL_TO_PATH(path,dh);
+	MemFree(mh);
+
+
+	if ( titel ) @call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(titel,VUM_NOW);
+	if ( infoText )	@call dialog::MSG_SDOF_SET_INFO_TEXT((void*)infoText, TRUE);
+	if ( hasCancelTrigger) @call dialog::MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+	if ( customTriggerMoniker ) @call dialog::MSG_SDOF_ENABLE_CUSTOM_TRIGGER
+				(customTriggerMoniker,FALSE);
+
+	FilePushDir();
+	ret = UserDoDialog(dialog);
+	FilePopDir();
+
+	if ( (ret == IC_YES) || (ret == IC_OK) ) {
+		fsel = @call dialog::MSG_SDOF_GET_FILE_SELECTOR();
+		FileToolSetCurrentPathFromFileSelector(fsel);
+		}
+
+	UserDestroyDialog(dialog);
+
+	return ret;
+	}
+
+/*--------------------- FileToolRequestSelectFile ---------------------
+ *  Task:           Request a file via a dialog box in which all
+ *                  files are offered.
+ *                  Starting point is the current directory.
+ */
+
+/*--------------------- FileToolExtendedRequestSelectFile ---------------------
+ *  Task:           Request a file via a dialog box in which only
+ *                  files that match the selection criteria are offered.
+ *                  Starting point is the current directory.
+ *---------------------------------------------------------------------------
+ *  Side effect:    The directory will be changed if OK or
+ *                  Custom Trigger is activated,
+ *                  but not if Cancel Trigger was pressed.
+ *
+ *  Parameters for both routines:
+ *      fileName:               Selected file. Empty string if no
+ *                              file was selected (e.g., because
+ *                              cancel was chosen).
+ *      infoText:               optr of an info text, null for none.
+ *      titel:                  Dialog box title,
+ *                              null for “Select file”.
+ *      customTriggerMoniker:   Moniker of an additional button that
+ *                              returns IC_YES.
+ *                              - NULL for no such button.
+ *                              - If the moniker starts with '~', it will
+ *                                *not* be displayed, but the button
+ *                                will only be enabled if a file is
+ *                                selected (otherwise it's always
+ *                                enabled).
+ *      hasCancelTrigger:       TRUE if a cancel trigger should be present.
+ *
+ *  Parameters only for Extended... :
+ *      fileAttrsMatch:         Attributes that *must* be set.
+ *                              0 to not hide any files.
+ *      fileAttrsMismatch:      Attributes that *must not* be set.
+ *                              0 to not hide any files.
+ *      fileCriteria:           FileSelectorFileCriteria value,
+ *                              GFSFC_xxx constants.
+ *      creatorToken:           GeodeToken* of the creator,
+ *                              NULL for no filtering.
+ *      fileToken:              GeodeToken* of the file,
+ *                              NULL for no filtering.
+ *      fileMask:               File mask, case-sensitive.
+ *                              -> Uppercase letters for DOS files.
+ *                              NULL for no filtering.
+ *
+ *  Return:         IC_OK       if OK trigger was pressed
+ *                  IC_NO       if Cancel trigger was pressed
+ *                  IC_YES      if Custom trigger was pressed
+ *                  IC_NULL     System shutdown or similar
+ ---------------------------------------------------------------------------*/
+//FileToolRequestSelectFile(fileName,infoText,titel,
+//				customTriggerMoniker,hasCancelTrigger)
+extern int EXPORT FileToolExtendedRequestSelectFile(char * fileName,
+			optr infoText, char *titel,
+			char *customTriggerMoniker, Boolean hasCancelTrigger,
+			word fileAttrsMatch, word fileAttrsMismatch,
+			FileSelectorFileCriteria fileCriteria,
+			GeodeToken *creatorToken,
+			GeodeToken *fileToken,
+			char *fileMask ) {
+	optr	dialog, fsel;
+	int	ret;
+	DiskHandle dh;
+	char *path;
+	MemHandle mh;
+
+	dialog = UserCreateDialog(@SelectFileDialog);
+
+	mh = FTGetMem(PATH_BUFFER_SIZE);
+	path = MemLock(mh);
+	dh = FileGetCurrentPath(path, PATH_BUFFER_SIZE);
+	@call dialog::MSG_SDOF_SET_FSEL_TO_PATH(path, dh);
+	MemFree(mh);
+
+	if (titel)
+		@call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(titel, VUM_NOW);
+	if (infoText)
+		@call dialog::MSG_SDOF_SET_INFO_TEXT((void*)infoText, TRUE);
+	if (hasCancelTrigger)
+		@call dialog::MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+	if (customTriggerMoniker) {
+		if (*customTriggerMoniker == '~') {
+			customTriggerMoniker++;
+			@call dialog::MSG_SDOF_ENABLE_CUSTOM_TRIGGER(customTriggerMoniker, TRUE);
+		} else {
+			@call dialog::MSG_SDOF_ENABLE_CUSTOM_TRIGGER(customTriggerMoniker, FALSE);
+		}
+	}
+
+	fsel = @call dialog::MSG_SDOF_GET_FILE_SELECTOR();
+	@call fsel::MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(fileAttrsMatch, fileAttrsMismatch);
+	@call fsel::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(fileCriteria);
+
+	if (creatorToken) {
+		@call fsel::MSG_GEN_FILE_SELECTOR_SET_CREATOR(
+			FT_TC_2_DW(creatorToken->GT_chars),
+			creatorToken->GT_manufID);
+	}
+	if (fileToken) {
+		@call fsel::MSG_GEN_FILE_SELECTOR_SET_TOKEN(
+			FT_TC_2_DW(fileToken->GT_chars),
+			fileToken->GT_manufID);
+	}
+	if (fileMask) {
+		@call fsel::MSG_GEN_FILE_SELECTOR_SET_MASK(fileMask);
+	}
+
+	FilePushDir();
+	ret = UserDoDialog(dialog);
+	FilePopDir();
+
+	*fileName = 0;
+	if ((ret == IC_YES) || (ret == IC_OK)) {
+		if (FileToolSetCurrentPathFromFileSelector(fsel)) {
+			@call fsel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fileName);
+		}
+	}
+
+	UserDestroyDialog(dialog);
+
+	return ret;
+}
+
+/*--------------------- FileToolExtendedRequestInputFileName --------------------
+ *	Task:           Universal customizable dialog box to open for saving a file.
+ *	                If needed, the directory and the file name can be selected.
+ *	Side effect:    The directory will be changed if OK or Custom Trigger is activated,
+ *	                but not if Cancel Trigger was pressed.
+ *	Parameters:     fileName: Return: name of the file. Must contain
+ *	                         a default value or an empty string.
+ *	                         Unchanged if cancel was chosen.
+ *	                infoText: Info text above the input line
+ *	                          char* or optr. NULL -> "Save file"
+ *	                titel:    Title line
+ *	                          char* or optr. NULL: none
+ *	                customTriggerMoniker: Label for an extra button
+ *	                                    NULL: no extra button available
+ *	                inputFlags: Properties of the input text
+ *	                            IFNIF_DOS_FILE | IFNIF_AUTO_RENAME
+ *	                            | IFNIF_SELECT_ALL | IFNIF_SELECT_DOS_BODY
+ *	                uiFlags:   Properties of the dialog UI
+ *	                            IFNUIF_HAS_CANCEL_TRIGGER
+ *	                            | IFNUIF_HAS_FILE_SELECTOR
+ *	                            | IFNUIF_TITEL_IS_OPTR
+ *	                            | IFNUIF_INFO_TEXT_IS_OPTR
+ *	                            | IFNUIF_INPUT_TEXT_MONIKER_NEW
+ *	                            | IFNUIF_HIDE_OK_TRIGGER
+ *	                            | IFNUIF_AUTO_SHOW_DOS_FILENAME_INFO
+ *	Return:         Interaction command of the dialog box:
+ *	                IC_OK:  OK trigger pressed
+ *	                IC_NO:  Cancel trigger pressed
+ *	                IC_YES: Custom trigger pressed
+ *	                IC_NULL:System shutdown or similar
+ *-----------------------------------------------------------------------*/
+extern InteractionCommand EXPORT FileToolExtendedRequestInputFileName(
+	char *fileName,
+	void *infoText,		/* char* or optr. NULL -> "Save file" */
+	void *titel,   		/* char* or optr. NULL: none */
+	char *customTriggerMoniker,
+	FTInputFileNameInputFlags	inputFlags,
+	FTInputFileNameUIFlags		uiFlags) {
+
+optr	dialog, fsel;
+int	retVal;
+DiskHandle dh;
+char *path;
+MemHandle mh;
+
+    dialog = UserCreateDialog(@SaveFileDialog);
+    fsel = @call dialog::MSG_SDOF_GET_FILE_SELECTOR();
+
+   // Set the correct path if the file selector is active
+   if ( uiFlags & IFNUIF_HAS_FILE_SELECTOR ) {
+	mh = FTGetMem(PATH_BUFFER_SIZE);
+	path = MemLock(mh);
+	dh = FileGetCurrentPath(path,PATH_BUFFER_SIZE);
+	@call dialog::MSG_SDOF_SET_FSEL_TO_PATH(path,dh);
+	MemFree(mh);
+	}
+   else {
+	optr pathText = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(DIALOG_CHILD_PATH_TEXT);
+	@send pathText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send fsel::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	}
+
+   // update other UI
+   if ( titel ) {
+	if ( uiFlags & IFNUIF_TITEL_IS_OPTR ) {
+		optr moniker = (optr)titel;
+		MemLock(HandleOf(moniker));
+		@call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(moniker),VUM_NOW);
+		MemUnlock(HandleOf(moniker));
+		}
+	   else @call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(titel,VUM_NOW);
+	}
+
+   if ( infoText ) {
+	if ( uiFlags & IFNUIF_INFO_TEXT_IS_OPTR )
+		@call dialog::MSG_SDOF_SET_INFO_TEXT(infoText, TRUE);
+	   else @call dialog::MSG_SDOF_SET_INFO_TEXT(infoText, FALSE);
+	}
+   if ( (inputFlags & IFNIF_DOS_FILE) && (uiFlags & IFNUIF_AUTO_SHOW_DOS_FILENAME_INFO) ) {
+		optr child = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(DIALOG_CHILD_DOS_FILE_INFO);
+		@call child::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+   if ( uiFlags & IFNUIF_HAS_CANCEL_TRIGGER)
+		@call dialog::MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+
+   if ( uiFlags & IFNUIF_HIDE_OK_TRIGGER ) {
+		optr child = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(DIALOG_CHILD_OK_TRIGGER);
+		@call child::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+
+   if ( customTriggerMoniker )
+	@call dialog::MSG_SDOF_ENABLE_CUSTOM_TRIGGER(customTriggerMoniker,FALSE);
+
+   @call dialog::MSG_SDOF_CONFIGURE_INPUT_FILENAME_TEXT(
+		fileName, inputFlags, uiFlags & IFNUIF_INPUT_TEXT_MONIKER_NEW);
+
+doDialog:
+   FilePushDir();
+   retVal = UserDoDialog(dialog);
+   FilePopDir();
+
+   if ( (retVal == IC_YES) || (retVal == IC_OK) ) {
+	@call dialog::MSG_SDOF_GET_INPUT_TEXT(fileName);
+	if ( strlen(fileName) == 0 ) {
+		ErrorMsgBox(@ErrorEmptyFileName, 0, 0);
+		goto doDialog;
+		}
+	// Safety check whether DOS body and extension are valid
+	if ( inputFlags & IFNIF_DOS_FILE ) {
+		char extension[5], *dotPtr;
+		FileToolGetDOSExtension(fileName, extension, 4);
+		dotPtr = FileToolFindLastDotChar(fileName);
+		if ( (strlen(extension) > 3) ||	(fileName == dotPtr)
+			/* == Dot at the beginning */) {
+			ErrorMsgBox(@InvalidDOSName,fileName,0);
+			goto doDialog;
+			}
+		if ( dotPtr) if ( (dotPtr - fileName) > 8 ) {
+			// Body before extension longer than 8 characters
+			ErrorMsgBox(@InvalidDOSName,fileName,0);
+			goto doDialog;
+			}
+		if ( !dotPtr ) if (strlen(fileName) > 8 ) {
+			// Body without extension longer than 8 characters
+			ErrorMsgBox(@InvalidDOSName,fileName,0);
+			goto doDialog;
+			}
+		}
+
+	if ( uiFlags & IFNUIF_HAS_FILE_SELECTOR )
+		FileToolSetCurrentPathFromFileSelector(fsel);
+	}
+
+   UserDestroyDialog(dialog);
+
+
+   return retVal;
+
+}
+
+/*--------------------- FileToolRequestInputFileName --------------------
+ *	Task:           Dialog for entering a file name during
+ *	                file operations. A cancel trigger is always
+ *	                present, a file selector mostly (depending
+ *	                on dialogType).
+ *	Parameters:     fileName:   Return: name of the file. Must contain
+ *	                              a default value or an empty string.
+ *	                              Unchanged if cancel was chosen.
+ *	                dialogType: Type of input dialog
+ *	                            IFNDT_SAVE, IFNDT_SAVE_AS
+ *	                            IFNDT_COPY_NEW_NAME,
+ *	                            IFNDT_DUPLICATE, IFNDT_RENAME
+ *	                inputFlags: Properties of the input text
+ *	                            IFNIF_DOS_FILE | IFNIF_AUTO_RENAME
+ *	                            | IFNIF_SELECT_ALL | IFNIF_SELECT_DOS_BODY
+ *	                customTriggerMoniker: Label for an extra button
+ *	                                    NULL: no extra button available
+ *	Return:         Interaction command of the dialog box:
+ *	                IC_OK:  OK trigger pressed
+ *	                IC_NO:  Cancel trigger pressed
+ *	                IC_YES: Custom trigger pressed
+ *	                IC_NULL:System shutdown or similar
+ *-----------------------------------------------------------------------*/
+extern InteractionCommand EXPORT FileToolRequestInputFileName(
+	char *fileName,
+	FTInputFileNameDialogType	dialogType,
+	FTInputFileNameInputFlags	inputFlags,
+	char *customTriggerMoniker) {
+
+FTInputFileNameUIFlags	uiFlags = IFNUIF_HAS_CANCEL_TRIGGER
+				| IFNUIF_HAS_FILE_SELECTOR
+				| IFNUIF_INFO_TEXT_IS_OPTR
+				| IFNUIF_AUTO_SHOW_DOS_FILENAME_INFO
+				| IFNUIF_TITEL_IS_OPTR;
+				//
+optr titel, infoText;
+char *oldFileNameInfo = 0;
+InteractionCommand retVal;
+
+   titel = infoText = 0;	// Default values
+   switch (dialogType) {
+	case IFNDT_SAVE:
+		infoText = @FileEnterFilenameInfo;
+		break;	// use default
+	case IFNDT_SAVE_AS:
+		titel = @FileNameDialogTitleSaveAs;
+		infoText = @FileCopyNewNameInfo;
+		uiFlags |= IFNUIF_INPUT_TEXT_MONIKER_NEW;
+		break;
+	case IFNDT_COPY_NEW_NAME:
+		titel = @FileNameDialogTitleCopyNewName;
+		infoText = @FileCopyNewNameInfo;
+		uiFlags |= IFNUIF_INPUT_TEXT_MONIKER_NEW;
+		break;
+	case IFNDT_DUPLICATE:
+		titel = @FileNameDialogTitleDuplicate;
+		infoText = @FileDuplicateInfo;
+		uiFlags |= IFNUIF_INPUT_TEXT_MONIKER_NEW;
+		uiFlags &= ~IFNUIF_HAS_FILE_SELECTOR;
+		break;
+	case IFNDT_RENAME:
+		MemLock(HandleOf(@OldFileNameInfo));
+		titel = @FileNameDialogTitleRename;
+		oldFileNameInfo = malloc( sizeof(FileLongName)
+			+ strlen(LMemDeref(@OldFileNameInfo)) + 1);
+		strcpy(oldFileNameInfo,LMemDeref(@OldFileNameInfo));
+		strcat(oldFileNameInfo, fileName);
+		infoText = (optr)oldFileNameInfo;
+		MemUnlock(HandleOf(@OldFileNameInfo));
+		uiFlags |= IFNUIF_INPUT_TEXT_MONIKER_NEW;
+		uiFlags &= ~(IFNUIF_HAS_FILE_SELECTOR | IFNUIF_INFO_TEXT_IS_OPTR);
+		break;
+	}
+
+    retVal = FileToolExtendedRequestInputFileName(
+	fileName,
+	(void*)infoText,		/* char* or optr. NULL -> "Save File" */
+	(void*)titel,   		/* char* or optr. NULL: none */
+	customTriggerMoniker,
+	inputFlags,
+	uiFlags);
+
+    if ( oldFileNameInfo ) free(oldFileNameInfo);
+    return retVal;
+}
+
+/*--------------------- FileToolRequestInputCommonName --------------------
+ *	Task:           Universal dialog for entering a name for
+ *	                various purposes (e.g., folder name)
+ *	Parameters:     name:         Return: name to be entered. Must contain
+ *	                              a default value or an empty string.
+ *	                              Unchanged if cancel was chosen.
+ *	                bufferSize:   max length for name (including null)
+ *	                infoText:     Info text above the input line
+ *	                              char* or optr. NULL: no info text
+ *	                titel:        Title line
+ *	                              char* or optr. NULL -> "Enter name"
+ *	                customTriggerMoniker: Label for extra button
+ *	                                    NULL: no extra button available
+ *	                allowEmptyText: TRUE: input field may remain empty
+ *	                               FALSE: error message if text field
+ *	                                      is empty and OK or CustomTrigger
+ *	                                      is pressed (dialog reappears)
+ *	                uiFlags:      FTInputFileNameUIFlags
+ *	                Accepted UI flags:
+ *	                              IFNUIF_HAS_CANCEL_TRIGGER
+ *	                              IFNUIF_TITEL_IS_OPTR
+ *	                              IFNUIF_INFO_TEXT_IS_OPTR
+ *	                              IFNUIF_HIDE_OK_TRIGGER
+ *	                Unsupported flags:
+ *	                              IFNUIF_HAS_FILE_SELECTOR | IFNUIF_INPUT_TEXT_MONIKER_NEW
+ *	                              IFNUIF_AUTO_SHOW_DOS_FILENAME_INFO
+ *
+ *	Return:         Interaction command of the dialog box:
+ *	                IC_OK:  OK trigger pressed
+ *	                IC_NO:  Cancel trigger pressed
+ *	                IC_YES: Custom trigger pressed
+ *	                IC_NULL:System shutdown or similar
+ *-----------------------------------------------------------------------*/
+extern InteractionCommand EXPORT FileToolRequestInputCommonName(
+	char *name,		/* name to be entered */
+	int  bufferSize,	/* max length for name (including null) */
+	void *infoText,		/* char* or optr. NULL: none */
+	void *titel,   		/* char* or optr. NULL -> "Enter name" */
+	char *customTriggerMoniker,
+	Boolean allowEmptyText,
+	FTInputFileNameUIFlags		uiFlags) {
+
+optr	dialog, textObj;
+int	retVal;
+//MemHandle mh;
+
+    dialog = UserCreateDialog(@InputCommonDialog);
+
+   // update other UI
+   if ( titel ) {
+	if ( uiFlags & IFNUIF_TITEL_IS_OPTR ) {
+		optr moniker = (optr)titel;
+		MemLock(HandleOf(moniker));
+		@call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(LMemDeref(moniker),VUM_NOW);
+		MemUnlock(HandleOf(moniker));
+		}
+	   else @call dialog::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(titel,VUM_NOW);
+	}
+
+   if ( infoText ) {
+	if ( uiFlags & IFNUIF_INFO_TEXT_IS_OPTR )
+		@call dialog::MSG_SDOF_SET_INFO_TEXT(infoText, TRUE);
+	   else @call dialog::MSG_SDOF_SET_INFO_TEXT(infoText, FALSE);
+	}
+
+   if ( uiFlags & IFNUIF_HAS_CANCEL_TRIGGER)
+		@call dialog::MSG_SDOF_ENABLE_CANCEL_TRIGGER();
+
+   if ( uiFlags & IFNUIF_HIDE_OK_TRIGGER ) {
+		optr child = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(DIALOG_CHILD_OK_TRIGGER);
+		@call child::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+
+   if ( customTriggerMoniker )
+	@call dialog::MSG_SDOF_ENABLE_CUSTOM_TRIGGER(customTriggerMoniker,FALSE);
+
+   textObj = @call dialog::MSG_GEN_FIND_CHILD_AT_POSITION(DIALOG_CHILD_INPUT_TEXT);
+   @call textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+   @call textObj::MSG_VIS_TEXT_SET_MAX_LENGTH(bufferSize-1);
+
+
+doDialog:
+   retVal = UserDoDialog(dialog);
+
+   if ( (retVal == IC_YES) || (retVal == IC_OK) ) {
+	@call dialog::MSG_SDOF_GET_INPUT_TEXT(name);
+	if ( (strlen(name) == 0) && !allowEmptyText ) {
+		ErrorMsgBox(@ErrorEmptyText, 0, 0);
+		goto doDialog;
+		}
+	}
+
+   UserDestroyDialog(dialog);
+
+
+   return retVal;
+
+}
+
+/*--------------------- FileToolRequestInputFolderName --------------------
+ *	Task:           Customized dialog for entering a name for
+ *	                a new folder.
+ *	                Cancel button is present.
+ *	                There is NO file selector.
+ *	Parameters:     folderName:   Return: name to be entered. Must contain
+ *	                              a default value or an empty string.
+ *	                              Unchanged if cancel was chosen.
+ *	                customTriggerMoniker: Label for an extra button
+ *	                                    NULL: no extra button available.
+ *	                hideOKTrigger:    Whether to hide the OK button or not.
+ *	Return:         Interaction command of the dialog box:
+ *	                IC_OK:  OK trigger pressed
+ *	                IC_NO:  Cancel trigger pressed
+ *	                IC_YES: Custom trigger pressed
+ *	                IC_NULL:System shutdown or similar
+ *-----------------------------------------------------------------------*/
+extern InteractionCommand EXPORT FileToolRequestInputFolderName(
+	char *folderName,		/* Name to enter */
+	char *customTriggerMoniker,
+	Boolean hideOKTrigger) {
+int cmd, flags;
+
+	flags = IFNUIF_HAS_CANCEL_TRIGGER | IFNUIF_TITEL_IS_OPTR
+			| IFNUIF_INFO_TEXT_IS_OPTR;
+	if (hideOKTrigger ) flags |= IFNUIF_HIDE_OK_TRIGGER;
+
+	cmd = FileToolRequestInputCommonName(folderName, 32,
+		(void*)@InfoInputFolder, (void*)@TitleInputFolder,
+		customTriggerMoniker, TRUE, flags);
+
+	return cmd;
+	}
+
+/*###########################################################################
+ #	DOS Long Filename Support: Multiple dots in the file name
+ ###########################################################################*/
+
+extern char* EXPORT FileToolFindLastDotChar(char *text) {
+char *pPtr, *sikPtr, *p;
+
+     p = text;
+     pPtr = 0;
+     do {
+	sikPtr = pPtr;
+	pPtr = strchr(p,'.');
+	if ( !pPtr ) break;
+	p = pPtr + 1;
+	} while (TRUE);
+
+     return sikPtr;
+     }
+
+extern int EXPORT FileToolGetDOSExtension(char *fileName, char *extension, int maxChars) {
+char *ext;
+int len;
+
+      ext =  FileToolFindLastDotChar(fileName);	// Pointer to last '.'
+      if ( !ext ) {
+	*extension = 0;
+	return 0;
+	}
+
+      ext++;	//	Pointer to extension string
+      len = min(strlen(ext), maxChars);
+      if (len) memcpy(extension, ext, len);	// Copy string
+      extension[len] = 0;		// Terminator
+      return len;
+}
+
+
+
