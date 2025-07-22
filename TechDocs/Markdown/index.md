@@ -14,5 +14,7 @@
   - [ESP Assembly Language](esp.md)
   - [Assembly Reference](asmref.md)
   - [Driver Development Kit](ddk.md)
-
-Official project repository: [GitHub](https://github.com/bluewaysw/pcgeos)
+- [Device Specifics](devices.md) - information about various "historic" PDAs and smartphones that were shipped with GEOS.
+  - Casio Z-7000 ("Zoomer")
+  - more to come...
+- Original [credits](credits.md) of the GEOS Software Development Kit Library 2.0
