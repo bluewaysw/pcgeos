@@ -469,6 +469,36 @@
       [24.3.4 Masks](Concepts/cshapes.md#2436-masks)  
       [24.3.5 Line-Specific Attributes](Concepts/cshapes.md#2435-line-specific-attributes)  
 
+**[25 Socket Library](Concepts/csocket.md)**  
+  [25.1 Introduction](Concepts/csocket.md#251-introduction)  
+  [25.2 Simple Example](Concepts/csocket.md#252-simple-example)  
+  [25.3 Addresses](Concepts/csocket.md#253-addresses)  
+    [25.3.1 Letting the User Choose an Address](Concepts/csocket.md#2531-letting-the-user-choose-an-address)  
+    [25.3.2 Managing Addresses](Concepts/csocket.md#2532-managing-addresses)  
+    [25.3.3 Hardware Ports](Concepts/csocket.md#2533-hardware-ports)  
+  [25.4 Making a Connection](Concepts/csocket.md#254-making-a-connection)  
+  [25.5 Accepting a Connection](Concepts/csocket.md#255-accepting-a-connection)  
+  [25.6 Loading on Connection](Concepts/csocket.md#256-loading-on-connection)  
+  [25.7 Sending and Receiving Data](Concepts/csocket.md#257-sending-and-receiving-data)  
+    [25.7.1 Urgent Data](Concepts/csocket.md#2571-urgent-data)  
+    [25.7.2 SocketSend() and SocketRecv()](Concepts/csocket.md#2572-socketsend-and-socketrecv)  
+    [25.7.3 Options](Concepts/csocket.md#2573-options)  
+  [25.8 Closing the Connection](Concepts/csocket.md#258-closing-the-connection)  
+  [25.9 Checking the Connection](Concepts/csocket.md#259-checking-the-connection)  
+  [25.10 Domain-Specific Information](Concepts/csocket.md#2510-domain-specific-information)  
+    [25.10.1 TCP/IP--GEOS Specific](Concepts/csocket.md#25101-tcpip--geos-specific)  
+    [25.10.2 TCP/IP--Standard](Concepts/csocket.md#25102-tcpip--standard)  
+    [25.10.3 Loopback](Concepts/csocket.md#25103-loopback)   
+
+**[26 Access Point Library](Concepts/caccpnt.md)**  
+  [26.1 Access Points](Concepts/caccpnt.md#261-access-pointers)  
+  [26.2 Letting The User Choose](Concepts/caccpnt.md#262-letting-the-user-choose)  
+      [26.2.1 Multiple-Selection Access Point Controllers](Concepts/caccpnt.md#2621-multiple-selection-access-point-controllers)  
+  [26.3 Searching For an Access Point](Concepts/caccpnt.md#263-searching-for-an-access-point)  
+  [26.4 Locking and Unlocking](Concepts/caccpnt.md#264-locking-and-unlocking)  
+  [26.5 Adding an Access Point](Concepts/caccpnt.md#265-adding-an-access-point)  
+  [26.6 Deleting an Access Point](Concepts/caccpnt.md#266-deleting-an-access-point)
+
 **[A Machine Architecture](Concepts/chardw.md)**  
     [A.1 History of the 80x86](Concepts/chardw.md#a1-history-of-the-80x86)  
     [A.2 8086 Architecture Overview](Concepts/chardw.md#a2-8086-architecture-overview)  
