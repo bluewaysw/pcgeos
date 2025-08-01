@@ -1,4 +1,9 @@
+---
+nav_order: 11
+---
 ### Credits
+
+Original credits of the GEOS Software Development Kit Library 2.0:
 
 #### Technical Writers
 
