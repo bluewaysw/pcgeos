@@ -1002,14 +1002,14 @@ es - Segment of class called.
 ds:bx - Instance data of object called (= ***ds:si**).  
 ds:di - If class of message handler is in a master 
 part, this is the data for master part of 
-message. 	Otherwise, **ds:di** = ***ds:si**.  
+message.    Otherwise, **ds:di** = ***ds:si**.  
 cx, dx, bp - Other data.  
 ax - Message.  
 **Return:**  
 ax, cx, dx, bp - Return values of message. If message does 
 not return some or all of these registers, 
 those not returned may be destroyed.  
-**May Destroy:** 	bx, si, di, ds, es (and unused return registers above).
+**May Destroy:**    bx, si, di, ds, es (and unused return registers above).
 
 **Destroyed:**  
 Nothing.
@@ -1047,7 +1047,7 @@ es - Segment of class called.
 ds:bx - Instance data of object called (= ***ds:si**).  
 ds:di - If class of message handler is in a master 
 part, this is the data for master part of 
-message. 	Otherwise, **ds:di** = ***ds:si**.  
+message.    Otherwise, **ds:di** = ***ds:si**.  
 cx, dx, bp - Other data useful to message.  
 ax - Message.  
 **Return:**  
@@ -1360,7 +1360,7 @@ ui-driven. If source is run by anything else, that same thread
 will run the new thread.)
 
 **Returns:**  
-bx	Handle of duplicated block.
+bx  Handle of duplicated block.
 
 **Destroyed:**  
 Nothing.
@@ -1574,7 +1574,7 @@ MSG_META_APP_SHUTDOWN).
 cx - Caller ID; an identifier token for the caller.
 
 **Returns:**  
-ds	Updated to point at segment of same block as on entry.
+ds  Updated to point at segment of same block as on entry.
 
 **Destroyed:**  
 Nothing.
@@ -1923,7 +1923,7 @@ bx - Offset to master part to expand.
 ax - New size for master part.
 
 **Returns:**  
-ds	Possibly changed.
+ds  Possibly changed.
 
 **Destroyed:**  
 ax
@@ -2346,7 +2346,7 @@ es:bx - Pointer to argument on the stack.
 cx - Argument number (zero-based).  
 **Return:**  
 CF - Set on error.  
- - (If CF is set):	**al** = error code.
+ - (If CF is set):  **al** = error code.
 
 **Library:** parse.def
 
@@ -2781,7 +2781,7 @@ ax - **FunctionType** to match.
 es:di - Buffer to place string.
 
 **Returns:**  
-cx	Number of characters (not including null terminator).
+cx  Number of characters (not including null terminator).
 
 **Destroyed:**  
 Nothing.

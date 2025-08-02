@@ -50,46 +50,46 @@ The radio buttons (A:, B:) are GenItems within GenItemGroups.*
 ----------
 **Code Display 6-1 Using Hints to Manage GenGlyphs**
 
-	/* This code will duplicate the display shown in Figure 6-2 */
+    /* This code will duplicate the display shown in Figure 6-2 */
 
-	@object GenInteractionClass DiskCopyBox = {
-		GI_comp = @DiskCopyHeader, @SourceSelection, @DestinationSelection;
-		GII_visibility = GIV_DIALOG;
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-	}
+    @object GenInteractionClass DiskCopyBox = {
+        GI_comp = @DiskCopyHeader, @SourceSelection, @DestinationSelection;
+        GII_visibility = GIV_DIALOG;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
 
-	/* The DiskCopyHeader will be the line of instructional text. */
+    /* The DiskCopyHeader will be the line of instructional text. */
 
-	@object GenGlyphClass DiskCopyHeader = {
-		GI_visMoniker = "Select source and destination for disk copy:";
-		HINT_CENTER_MONIKER;		/* Centers the moniker horizontally. */
-	}
+    @object GenGlyphClass DiskCopyHeader = {
+        GI_visMoniker = "Select source and destination for disk copy:";
+        HINT_CENTER_MONIKER;        /* Centers the moniker horizontally. */
+    }
 
-	/* These objects will form the "Source" line. */
+    /* These objects will form the "Source" line. */
 
-	@object GenInteractionClass SourceSelection = {
-		GI_comp = @SourceText, @SourceList;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_CENTER_MONIKER;
-	}
+    @object GenInteractionClass SourceSelection = {
+        GI_comp = @SourceText, @SourceList;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_MONIKER;
+    }
 
-	/* This group of objects will form the "Destination" line. */
+    /* This group of objects will form the "Destination" line. */
 
-	@object GenInteractionClass DestinationSelection = {
-		GI_comp = @DestinationText, @DestinationList;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_CENTER_MONIKER;
-	}
+    @object GenInteractionClass DestinationSelection = {
+        GI_comp = @DestinationText, @DestinationList;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_MONIKER;
+    }
 
-	/* For simplicity, the List objects are not shown. */
+    /* For simplicity, the List objects are not shown. */
 
-	@object GenGlyphClass SourceText = {
-		GI_visMoniker = "Source:";
-	}
+    @object GenGlyphClass SourceText = {
+        GI_visMoniker = "Source:";
+    }
 
-	@object GenInteractionClass DestinationText = {
-		GI_visMoniker = "Destination:";
-	}
+    @object GenInteractionClass DestinationText = {
+        GI_visMoniker = "Destination:";
+    }
 
 ----------
 ## 6.3 Modifying a GenGlyph
@@ -111,57 +111,57 @@ visually rebuilt with the new moniker.
 
 **Code Display 6-2 A Toggle On/Off Switch Dialog Box**
 
-	@object GenInteractionClass MyDialogBox = {
-		GI_comp = @DialogText, @DialogButton;
-		GII_visibility = GIV_DIALOG;
-	}
-	
-	/* Monikers for the Instructions (the GenGlyphs). */
+    @object GenInteractionClass MyDialogBox = {
+        GI_comp = @DialogText, @DialogButton;
+        GII_visibility = GIV_DIALOG;
+    }
+    
+    /* Monikers for the Instructions (the GenGlyphs). */
 
-	@visMoniker OnTextMoniker = "Click the `ON' button";
-	@visMoniker OffTextMoniker = "Click the `OFF' button";
+    @visMoniker OnTextMoniker = "Click the `ON' button";
+    @visMoniker OffTextMoniker = "Click the `OFF' button";
 
-	/* Monikers for the triggers. */
+    /* Monikers for the triggers. */
 
-	@visMoniker OnButtonMoniker = "ON";
-	@visMoniker OffButtonMoniker = "OFF";
+    @visMoniker OnButtonMoniker = "ON";
+    @visMoniker OffButtonMoniker = "OFF";
 
-	/* The object begins in the "On" state. */
+    /* The object begins in the "On" state. */
 
-	@object GenGlyphClass DialogText = {
-		GI_vismoniker = @OnTextMoniker;
-	}
+    @object GenGlyphClass DialogText = {
+        GI_vismoniker = @OnTextMoniker;
+    }
 
-	/* Whenever the button is pressed, MSG_FLIP_THE_SWITCH will change both the glyph
-	 * and the trigger monikers. */
+    /* Whenever the button is pressed, MSG_FLIP_THE_SWITCH will change both the glyph
+     * and the trigger monikers. */
 
-	@object GenTriggerClass DialogButton = {
-		GI_visMoniker = @OnButtonMoniker;
-		GTI_actionMsg = MSG_FLIP_THE_SWITCH;
-		GTI_destination = process;
-	}
+    @object GenTriggerClass DialogButton = {
+        GI_visMoniker = @OnButtonMoniker;
+        GTI_actionMsg = MSG_FLIP_THE_SWITCH;
+        GTI_destination = process;
+    }
 
-	@method MyProcessClass, MSG_FLIP_THE_SWITCH {
-		ChunkHandle testMoniker;		/* Stores the temporary moniker. */
-		testMoniker = @call DialogButton::MSG_GEN_GET_VIS_MONIKER;
+    @method MyProcessClass, MSG_FLIP_THE_SWITCH {
+        ChunkHandle testMoniker;        /* Stores the temporary moniker. */
+        testMoniker = @call DialogButton::MSG_GEN_GET_VIS_MONIKER;
 
-	/* If the moniker is "ON", turn both it and the glyph to the Off monikers.
-	 * Otherwise (the moniker is "OFF"), turn both it and the glyph to the On
-	 * monikers. Both visual updates are delayed via the UI queue (and will therefore
-	 * be updated at the same time rather than separately) to avoid flashing. */
+    /* If the moniker is "ON", turn both it and the glyph to the Off monikers.
+     * Otherwise (the moniker is "OFF"), turn both it and the glyph to the On
+     * monikers. Both visual updates are delayed via the UI queue (and will therefore
+     * be updated at the same time rather than separately) to avoid flashing. */
 
-		if (testMoniker == "ON") {
-			@call DialogButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OffButtonMoniker),
-						VUM_DELAYED_VIA_UI_QUEUE);
-			@call DialogText::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OffTextMoniker),
-								VUM_DELAYED_VIA_UI_QUEUE);
-		}
-		else {
-			@call DialogButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OnButtonMoniker),
-						VUM_DELAYED_VIA_UI_QUEUE);
-			@call DialogText::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OnTextMoniker),
-						VUM_DELAYED_VIA_UI_QUEUE);
-		}
-	}
+        if (testMoniker == "ON") {
+            @call DialogButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OffButtonMoniker),
+                        VUM_DELAYED_VIA_UI_QUEUE);
+            @call DialogText::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OffTextMoniker),
+                                VUM_DELAYED_VIA_UI_QUEUE);
+        }
+        else {
+            @call DialogButton::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OnButtonMoniker),
+                        VUM_DELAYED_VIA_UI_QUEUE);
+            @call DialogText::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@OnTextMoniker),
+                        VUM_DELAYED_VIA_UI_QUEUE);
+        }
+    }
 
 [GenTrigger](ogentrg.md) <-- [Table of Contents](../objects.md) &nbsp;&nbsp; --> [GenInteraction](ogenint.md)

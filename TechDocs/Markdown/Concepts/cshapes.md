@@ -931,45 +931,45 @@ The data structure used to store color information is known as the
 Code Display 24-1 Color Data Structures
 ~~~
 typedef struct {
-	/* The ColorQuad data structure is used to represents a color. There are
-	 * many ways to describe a color. The CQ_info field determines how the
-	 * color is being specified, and the other fields will be interpreted
-	 * based on CQ_info's value. Colors may be referenced by palette index,
-	 * RGB value, or grey scale value. */
-		/* CQ_redOrIndex
-		 * If CQ_info is CF_INDEX, then this is the palette index.
-		 * If CQ_info is CF_RGB, then this is the Red component.
-		 * If CQ_info is CF_GRAY, then this is the Gray scale */
-	byte 	CQ_redOrIndex;
+    /* The ColorQuad data structure is used to represents a color. There are
+     * many ways to describe a color. The CQ_info field determines how the
+     * color is being specified, and the other fields will be interpreted
+     * based on CQ_info's value. Colors may be referenced by palette index,
+     * RGB value, or grey scale value. */
+        /* CQ_redOrIndex
+         * If CQ_info is CF_INDEX, then this is the palette index.
+         * If CQ_info is CF_RGB, then this is the Red component.
+         * If CQ_info is CF_GRAY, then this is the Gray scale */
+    byte    CQ_redOrIndex;
 
-		/* CQ_info:
-		 * This ColorFlag determines how the other three fields of the
-		 * ColorQuad will be interpreted. The ColorFlag type is shown 
-		 * below. */
-	ColorFlag 	CQ_info;
+        /* CQ_info:
+         * This ColorFlag determines how the other three fields of the
+         * ColorQuad will be interpreted. The ColorFlag type is shown 
+         * below. */
+    ColorFlag   CQ_info;
 
-		/* CQ_green:
-		 * If CF_RGB, then these fields are the Green and Blue components.
-		 * Otherwise, these fields are ignored. */
-	byte 	CQ_green;
-	byte 	CQ_blue;
+        /* CQ_green:
+         * If CF_RGB, then these fields are the Green and Blue components.
+         * Otherwise, these fields are ignored. */
+    byte    CQ_green;
+    byte    CQ_blue;
 } ColorQuad;
 
 typedef dword ColorQuadAsDWord;
 
-typedef ByteEnum 	ColorFlag;
-	CF_INDEX,	
-		/* Color specified by palette index. The values of the first
-		 * 16 entries of the system palette are listed in Table 24-1 */
-	CF_GRAY,
-		/* Color specified by gray value; this is like CF_RGB, but the
-		 * value in CQ_redOrIndex will be used for the Green and Blue 
-		 * fields as well. */
-	CF_SAME,
-		/* Used with hatch patterns, if this flag is set, hatches will draw
-		 * using the default color (the one set using GrSetXXXXColor()) */
-	CF_RGB
-		/* Color Set using RGB values */
+typedef ByteEnum    ColorFlag;
+    CF_INDEX,   
+        /* Color specified by palette index. The values of the first
+         * 16 entries of the system palette are listed in Table 24-1 */
+    CF_GRAY,
+        /* Color specified by gray value; this is like CF_RGB, but the
+         * value in CQ_redOrIndex will be used for the Green and Blue 
+         * fields as well. */
+    CF_SAME,
+        /* Used with hatch patterns, if this flag is set, hatches will draw
+         * using the default color (the one set using GrSetXXXXColor()) */
+    CF_RGB
+        /* Color Set using RGB values */
 
 /* Sample Colors:
  * To use the system palette's light green:    { C_LIGHT_GREEN, CF_INDEX, 0, 0}
@@ -1014,7 +1014,8 @@ the color values and flags stored with the GState.
 |C_LIGHT_VIOLET|0x0D  |0xFF  |0x55  |0xFF  |
 |C_YELLOW      |0x0E  |0xFF  |0xFF  |0x55  |
 |C_WHITE       |0x0F  |0xFF  |0xFF  |0xFF  |
-**Table 24-1** Convenient Color Indexes
+
+**Table 24-1** Convenient Color Indexes  
 _These are the first 16 members of the Color enumerated type. For a full list 
 of available Color values, see the Routines reference or color.h._
 
@@ -1239,7 +1240,7 @@ Code Display 24-2 Hatch Pattern Data
     GrSetPatternCustom(myGState, gp, hexHatchPatt);
     /* ... */
 
-GraphicPattern 	gp = {PT_CUSTOM_HATCH, 0};
+GraphicPattern  gp = {PT_CUSTOM_HATCH, 0};
 
 static HatchPattern hexHatchPatt = { 3 }; /* Three HatchLine structures must follow */
 
@@ -1459,8 +1460,9 @@ whole is stored in a **DashPairArray**. Dash lengths will scale with the line wi
 |:-----------|:------|:------------|
 |LS_DASHED   |1      |4 4          |
 |LS_DOTTED   |1      |1 2          |
-|LS_DASHDOT	 |2      |4 4 1 4      |
+|LS_DASHDOT  |2      |4 4 1 4      |
 |LS_DASHDDOT |3      |4 4 1 4 1 4  |
+
 **Table 24-2** Arrays for System Line Styles
 
 Line joins govern the behavior of angles and corners. Using the appropriate 

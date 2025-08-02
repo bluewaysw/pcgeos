@@ -91,40 +91,40 @@ instance fields inherited from the GenValue's superclass, **GenClass**.
 ----------
 **Code Display 8-1 GenValue Instance Data**
 
-	/* The instance data fields for GenValue are shown below. Those that are records
-	 * of flags have their default flags shown with other possible flags listed below.
-	 * Other fields are shown with their default values. */
+    /* The instance data fields for GenValue are shown below. Those that are records
+     * of flags have their default flags shown with other possible flags listed below.
+     * Other fields are shown with their default values. */
 
-		@instance WWFixedAsDWord		GVLI_value = MakeWWFixed(0.0);
-		@instance WWFixedAsDWord		GVLI_minimum = MakwWWFixed(0.0);
-		@instance WWFixedAsDWord		GVLI_maximum = MakeWWFixed(32766);
-		@instance WWFixedAsDword		GVLI_increment = MakeWWFixed(1.0);
-		@instance GenValueStateFlags	GVLI_stateFlags = 0;
+        @instance WWFixedAsDWord        GVLI_value = MakeWWFixed(0.0);
+        @instance WWFixedAsDWord        GVLI_minimum = MakwWWFixed(0.0);
+        @instance WWFixedAsDWord        GVLI_maximum = MakeWWFixed(32766);
+        @instance WWFixedAsDword        GVLI_increment = MakeWWFixed(1.0);
+        @instance GenValueStateFlags    GVLI_stateFlags = 0;
 
-	/* GenValueStateFlags */
-		typedef ByteFlags GenValueStateFlags;
-		#define GVSF_INDETERMINATE		0x80
-		#define GVSF_MODIFIED			0x40
-		#define GVSF_OUT_OF_DATE		0x20
+    /* GenValueStateFlags */
+        typedef ByteFlags GenValueStateFlags;
+        #define GVSF_INDETERMINATE      0x80
+        #define GVSF_MODIFIED           0x40
+        #define GVSF_OUT_OF_DATE        0x20
 
-		@instance GenValueDisplayFormat		GVLI_displayFormat = GVDF_INTEGER;
+        @instance GenValueDisplayFormat     GVLI_displayFormat = GVDF_INTEGER;
 
-	/* GenValueDisplayFormat */
-		typedef ByteEnum GenValueDisplayFormat;
-		#define GVDF_INTEGER 0
-		#define GVDF_DECIMAL 1
-		#define GVDF_POINTS 2
-		#define GVDF_INCHES 3
-		#define GVDF_CENTIMETERS 4
-		#define GVDF_MILLIMETERS 5
-		#define GVDF_PICAS 6
-		#define GVDF_EUR_POINTS 7
-		#define GVDF_CICEROS 8
-		#define GVDF_POINTS_OR_MILLIMETERS 9
-		#define GVDF_POINTS_OR_CENTIMETERS 10
+    /* GenValueDisplayFormat */
+        typedef ByteEnum GenValueDisplayFormat;
+        #define GVDF_INTEGER 0
+        #define GVDF_DECIMAL 1
+        #define GVDF_POINTS 2
+        #define GVDF_INCHES 3
+        #define GVDF_CENTIMETERS 4
+        #define GVDF_MILLIMETERS 5
+        #define GVDF_PICAS 6
+        #define GVDF_EUR_POINTS 7
+        #define GVDF_CICEROS 8
+        #define GVDF_POINTS_OR_MILLIMETERS 9
+        #define GVDF_POINTS_OR_CENTIMETERS 10
 
-		@instance optr				GVLI_destination;
-		@instance Message			GVLI_applyMsg = 0;
+        @instance optr              GVLI_destination;
+        @instance Message           GVLI_applyMsg = 0;
 
 ----------
 *GVLI_value* is the current numerical value of the GenValue. By default, it is 
@@ -162,12 +162,12 @@ changes. This can be an optr to an object or a valid **TravelOption**. See
 ----------
 **Code Display 8-2 GenValue Optional Attribute Fields**
 
-	@vardata Message	ATTR_GEN_VALUE_STATUS_MSG;
-	@vardata word		TTR_GEN_VALUE_DECIMAL_PLACES;
-	@vardata WWFixed	ATTR_GEN_VALUE_METRIC_INCREMENT;
-	@vardata optr		ATTR_GEN_VALUE_RUNS_ITEM_GROUP;
-		@reloc ATTR_GEN_VALUE_RUNS_ITEM_GROUP, 0 optr;
-	@vardata void		ATTR_GEN_VALUE_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+    @vardata Message    ATTR_GEN_VALUE_STATUS_MSG;
+    @vardata word       TTR_GEN_VALUE_DECIMAL_PLACES;
+    @vardata WWFixed    ATTR_GEN_VALUE_METRIC_INCREMENT;
+    @vardata optr       ATTR_GEN_VALUE_RUNS_ITEM_GROUP;
+        @reloc ATTR_GEN_VALUE_RUNS_ITEM_GROUP, 0 optr;
+    @vardata void       ATTR_GEN_VALUE_SET_MODIFIED_ON_REDUNDANT_SELECTION;
 
 ----------
 ATTR_GEN_VALUE_STATUS_MSG sets a status message for a GenValue. A 
@@ -194,33 +194,33 @@ state occurs, no message will be sent out.)
 ----------
 **Code Display 8-3 GenValue Hints**
 
-	@vardata void 		HINT_VALUE_INCREMENTABLE;
-	@vardata void 		HINT_VALUE_NOT_INCREMENTABLE;
+    @vardata void       HINT_VALUE_INCREMENTABLE;
+    @vardata void       HINT_VALUE_NOT_INCREMENTABLE;
 
-	@vardata void		HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
-	@vardata Message	HINT_VALUE_CUSTOM_RETURN_PRESS;
+    @vardata void       HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS;
+    @vardata Message    HINT_VALUE_CUSTOM_RETURN_PRESS;
 
-	@vardata WWFixedAsDWord 	HINT_VALUE_DISPLAYS_RANGE;
-	@vardata GenValueIntervals	HINT_VALUE_DISPLAY_INTERVALS;
-	@vardata void		HINT_VALUE_CONSTRAIN_TO_INTERVALS;
+    @vardata WWFixedAsDWord     HINT_VALUE_DISPLAYS_RANGE;
+    @vardata GenValueIntervals  HINT_VALUE_DISPLAY_INTERVALS;
+    @vardata void       HINT_VALUE_CONSTRAIN_TO_INTERVALS;
 
-	typedef struct {
-		word	GVI_numMajorIntervals;
-		word	GVI_numMinorIntervals;
-	} GenValueIntervals;
+    typedef struct {
+        word    GVI_numMajorIntervals;
+        word    GVI_numMinorIntervals;
+    } GenValueIntervals;
 
-	@vardata void		HINT_VALUE_SHOW_MIN_AND_MAX;
-	@vardata void		HINT_VALUE_IMMEDIATE_DRAG_NOTIFICATION;
-	@vardata void		HINT_VALUE_DELAYED_DRAG_NOTIFICATION;
-	@vardata void		HINT_VALUE_ORIENT_HORIZONTALLY;
-	@vardata void		HINT_VALUE_ORIENT_VERTICALLY;
+    @vardata void       HINT_VALUE_SHOW_MIN_AND_MAX;
+    @vardata void       HINT_VALUE_IMMEDIATE_DRAG_NOTIFICATION;
+    @vardata void       HINT_VALUE_DELAYED_DRAG_NOTIFICATION;
+    @vardata void       HINT_VALUE_ORIENT_HORIZONTALLY;
+    @vardata void       HINT_VALUE_ORIENT_VERTICALLY;
 
-	@vardata void		HINT_VALUE_ANALOG_DISPLAY;
-	@vardata void		HINT_VALUE_DIGITAL_DISPLAY;
-	@vardata void		HINT_VALUE_NO_DIGITAL_DISPLAY;
-	@vardata void		HINT_VALUE_NO_ANALOG_DISPLAY;
-	@vardata void		HINT_VALUE_NOT_DIGITALLY_EDITABLE;
-	@vardata void		HINT_VALUE_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+    @vardata void       HINT_VALUE_ANALOG_DISPLAY;
+    @vardata void       HINT_VALUE_DIGITAL_DISPLAY;
+    @vardata void       HINT_VALUE_NO_DIGITAL_DISPLAY;
+    @vardata void       HINT_VALUE_NO_ANALOG_DISPLAY;
+    @vardata void       HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+    @vardata void       HINT_VALUE_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
 
 ----------
 HINT_VALUE_INCREMENTABLE and HINT_VALUE_NOT_INCREMENTABLE 
@@ -248,10 +248,10 @@ GenValue's display at the intervals specified by **GenValueIntervals**. This
 structure stores entries for both major intervals and minor intervals. In 
 general, minor intervals will have smaller tick marks than major intervals.
 
-	typedef struct {
-		word GVI_numMajorIntervals;
-		word GVI_numMinorIntervals;
-	} GenValueIntervals;
+    typedef struct {
+        word GVI_numMajorIntervals;
+        word GVI_numMinorIntervals;
+    } GenValueIntervals;
 
 If either *GVI_numMajorIntervals* or *GVI_numMinorIntervals* is zero, only one 
 set of marks will appear.
@@ -306,8 +306,8 @@ describes how to set and modify these fields in your Goc file.
 
 ### 8.3.1 The Value
 
-	GVLI_value, MSG_GEN_VALUE_SET_VALUE, 
-	MSG_GEN_VALUE_SET_INTEGER_VALUE, MSG_GEN_VALUE_GET_VALUE
+    GVLI_value, MSG_GEN_VALUE_SET_VALUE, 
+    MSG_GEN_VALUE_SET_INTEGER_VALUE, MSG_GEN_VALUE_GET_VALUE
 
 The GVLI_value instance field stores the current numerical value of the 
 GenValue. You may set an initial value for the GenValue to appear with by 
@@ -324,13 +324,13 @@ immediate mode, which will result in an immediate change in *GVLI_value*.
 ----------
 **Code Display 8-4 Setting an Initial Value**
 
-	/* This GenValue will appear with the initial integer value of two. MakeWWFixed
-	 * creates a fixed point value. */
+    /* This GenValue will appear with the initial integer value of two. MakeWWFixed
+     * creates a fixed point value. */
 
-	@object GenValueClass MyValue = {
-		GI_visMoniker = "My Value";
-		GVLI_value = MakeWWFixed(2.0);
-	}
+    @object GenValueClass MyValue = {
+        GI_visMoniker = "My Value";
+        GVLI_value = MakeWWFixed(2.0);
+    }
 
 ----------
 **GenValueClass** provides several messages to change the value without user 
@@ -344,9 +344,9 @@ MSG_GEN_VALUE_SET_MODIFIED_STATE.
 ----------
 #### MSG_GEN_VALUE_SET_VALUE
 
-	void	MSG_GEN_VALUE_SET_VALUE(
-			WWFixedAsDWord		value,
-			Boolean				indeterminate);
+    void    MSG_GEN_VALUE_SET_VALUE(
+            WWFixedAsDWord      value,
+            Boolean             indeterminate);
 
 This message sets the *GVLI_value* field of the GenValue to the passed value. 
 This message clears a GenValue's modified state in its *GVLI_stateFlags*. To 
@@ -373,9 +373,9 @@ to mark it non indeterminate.
 ----------
 #### MSG_GEN_VALUE_SET_INTEGER_VALUE
 
-	void	MSG_GEN_VALUE_SET_INTEGER_VALUE(
-			word		value,
-			Boolean		indeterminate);
+    void    MSG_GEN_VALUE_SET_INTEGER_VALUE(
+            word        value,
+            Boolean     indeterminate);
 
 This message sets the *GVLI_value* to the passed integer (word-sized) value. 
 *GVLI_value* will then contain this value in its high (integral) word and zero 
@@ -400,12 +400,12 @@ to mark it non indeterminate.
 ----------
 #### MSG_GEN_VALUE_GET_VALUE
 
-	WWFixedAsDword MSG_GEN_VALUE_GET_VALUE();
+    WWFixedAsDword MSG_GEN_VALUE_GET_VALUE();
 
 This message returns the value stored in the GenValue's *GVLI_value* 
 instance field. This returned value will be a fixed point number.
 
-**Source:**	Unrestricted.
+**Source:** Unrestricted.
 
 **Destination:** Any GenValue object.
 
@@ -418,8 +418,8 @@ instance field. This returned value will be a fixed point number.
 ----------
 #### MSG_GEN_VALUE_GET_INTEGER_VALUE
 
-	@alias (MSG_GEN_VALUE_GET_VALUE) 
-				word MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @alias (MSG_GEN_VALUE_GET_VALUE) 
+                word MSG_GEN_VALUE_GET_INTEGER_VALUE();
 
 This message returns the integral portion of the GenValue's value.
 
@@ -435,9 +435,9 @@ This message returns the integral portion of the GenValue's value.
 
 ### 8.3.2 The Minimum and Maximum
 
-	GVLI_minimum, GVLI_maximum, MSG_GEN_VALUE_GET_MAXIMUM, 
-	MSG_GEN_VALUE_SET_MAXIMUM, MSG_GEN_VALUE_GET_MINIMUM, 
-	MSG_GEN_VALUE_SET_MINIMUM
+    GVLI_minimum, GVLI_maximum, MSG_GEN_VALUE_GET_MAXIMUM, 
+    MSG_GEN_VALUE_SET_MAXIMUM, MSG_GEN_VALUE_GET_MINIMUM, 
+    MSG_GEN_VALUE_SET_MINIMUM
 
 The maximum (*GVLI_maximum*) and minimum (*GVLI_minimum*) values of a 
 GenValue constrain the value of *GVLI_value*. The maximum is the greatest 
@@ -466,7 +466,7 @@ value range, the value will be adjusted to fall within the current range.
 ----------
 #### MSG_GEN_VALUE_GET_MAXIMUM
 
-	WWFixedAsDWord MSG_GEN_VALUE_GET_MAXIMUM()
+    WWFixedAsDWord MSG_GEN_VALUE_GET_MAXIMUM()
 
 This message returns the fixed point value within the *GVLI_maximum* 
 instance field of the GenValue.
@@ -484,8 +484,8 @@ instance field of the GenValue.
 ----------
 #### MSG_GEN_VALUE_SET_MAXIMUM
 
-	void	MSG_GEN_VALUE_SET_MAXIMUM(
-			WWFixedAsDWord 		value);
+    void    MSG_GEN_VALUE_SET_MAXIMUM(
+            WWFixedAsDWord      value);
 
 This message sets the *GVLI_maximum* field of the GenValue to the passed 
 fixed point value. If you set a new maximum that places the current value (in 
@@ -507,7 +507,7 @@ is being built.
 ----------
 #### MSG_GEN_VALUE_GET_MINIMUM
 
-	WWFixedAsDWord MSG_GEN_VALUE_GET_MINIMUM()
+    WWFixedAsDWord MSG_GEN_VALUE_GET_MINIMUM()
 
 This message returns the fixed point value within the *GVLI_minimum* 
 instance field of the GenValue.
@@ -525,8 +525,8 @@ instance field of the GenValue.
 ----------
 #### MSG_GEN_VALUE_SET_MINIMUM
 
-	void	MSG_GEN_VALUE_SET_MINIMUM(
-			WWFixedAsDword		value);
+    void    MSG_GEN_VALUE_SET_MINIMUM(
+            WWFixedAsDword      value);
 
 This message sets the *GVLI_minimum* instance field of the GenValue to the 
 passed fixed point value. If you set a new minimum that places the current 
@@ -547,9 +547,9 @@ value* - fixed point value to set GVLI_minimum to.
 
 ### 8.3.3 The Increment
 
-	GVLI_increment, MSG_GEN_VALUE_GET_INCREMENT, 
-	MSG_GEN_VALUE_SET_INCREMENT, HINT_VALUE_INCREMENTABLE, 
-	HINT_VALUE_NOT_INCREMENTABLE
+    GVLI_increment, MSG_GEN_VALUE_GET_INCREMENT, 
+    MSG_GEN_VALUE_SET_INCREMENT, HINT_VALUE_INCREMENTABLE, 
+    HINT_VALUE_NOT_INCREMENTABLE
 
 The *GVLI_increment* instance field stores the fixed point increment value for 
 a GenValue. The increment value is the amount by which the current value 
@@ -565,13 +565,13 @@ and minimum.
 ----------
 **Code Display 8-5 Setting Minimum, Maximum, Increment Values**
 
-	@object GenValueClass MyValue = {
-		GI_visMoniker = "My Value";
-		GVLI_value = MakeWWFixed(1.0);
-		GVLI_minimum = MakeWWFixed(-100.0);
-		GVLI_maximum= MakeWWFixed(100.0);
-		GVLI_increment = MakeWWFixed(5.0);
-	}
+    @object GenValueClass MyValue = {
+        GI_visMoniker = "My Value";
+        GVLI_value = MakeWWFixed(1.0);
+        GVLI_minimum = MakeWWFixed(-100.0);
+        GVLI_maximum= MakeWWFixed(100.0);
+        GVLI_increment = MakeWWFixed(5.0);
+    }
 
 ----------
 You may change the fixed point value of this increment with 
@@ -591,8 +591,8 @@ MSG_GEN_VALUE_INCREMENT or MSG_GEN_VALUE_DECREMENT.)
 ----------
 #### MSG_GEN_VALUE_SET_INCREMENT
 
-	void	MSG_GEN_VALUE_SET_INCREMENT (
-			WWFixedAsDWord 		value);
+    void    MSG_GEN_VALUE_SET_INCREMENT (
+            WWFixedAsDWord      value);
 
 This message sets the *GVLI_increment* field to the passed value.
 
@@ -611,7 +611,7 @@ is being built.
 ----------
 #### MSG_GEN_VALUE_GET_INCREMENT
 
-	WWFixedAsDWord MSG_GEN_VALUE_GET_INCREMENT();
+    WWFixedAsDWord MSG_GEN_VALUE_GET_INCREMENT();
 
 This message returns the value of the *GVLI_increment* field of the GenValue.
 
@@ -627,11 +627,11 @@ This message returns the value of the *GVLI_increment* field of the GenValue.
 
 ### 8.3.4 GenValue States
 
-	GVLI_stateFlags, MSG_GEN_VALUE_SET_INDETERMINATE_STATE, 
-	MSG_GEN_VALUE_IS_INDETERMINATE, 
-	MSG_GEN_VALUE_SET_MODIFIED_STATE, 
-	MSG_GEN_VALUE_IS_MODIFIED, 
-	ATTR_GEN_SET_MODIFIED_ON_REDUNDANT_SELECTION
+    GVLI_stateFlags, MSG_GEN_VALUE_SET_INDETERMINATE_STATE, 
+    MSG_GEN_VALUE_IS_INDETERMINATE, 
+    MSG_GEN_VALUE_SET_MODIFIED_STATE, 
+    MSG_GEN_VALUE_IS_MODIFIED, 
+    ATTR_GEN_SET_MODIFIED_ON_REDUNDANT_SELECTION
 
 *GVLI_stateFlags* stores the current state of the GenValue. There are two 
 **GenValueStateFlags**:
@@ -676,8 +676,8 @@ MSG_GEN_VALUE_SET_OUT_OF_DATE.
 ----------
 #### MSG_GEN_VALUE_SET_INDETERMINATE_STATE
 
-	void	MSG_GEN_VALUE_SET_INDETERMINATE_STATE(
-			Boolean		indeterminateState);
+    void    MSG_GEN_VALUE_SET_INDETERMINATE_STATE(
+            Boolean     indeterminateState);
 
 This message sets the indeterminate state for a GenValue. Pass TRUE to 
 mark the GenValue indeterminate, FALSE to mark it not indeterminate. The 
@@ -697,7 +697,7 @@ FALSE to clear the GVSF_INDETERMINATE flag.
 ----------
 #### MSG_GEN_VALUE_IS_INDETERMINATE
 
-	Boolean	MSG_GEN_VALUE_IS_INDETERMINATE();
+    Boolean MSG_GEN_VALUE_IS_INDETERMINATE();
 
 This message checks whether a GenValue is indeterminate. 
 
@@ -712,8 +712,8 @@ This message checks whether a GenValue is indeterminate.
 ----------
 #### MSG_GEN_VALUE_SET_MODIFIED_STATE
 
-	void	MSG_GEN_VALUE_SET_MODIFIED_STATE(
-			Boolean		modifiedState);
+    void    MSG_GEN_VALUE_SET_MODIFIED_STATE(
+            Boolean     modifiedState);
 
 This message sets the modified state for a GenValue. Pass TRUE to mark the 
 GenValue modified, FALSE to mark it not modified.
@@ -733,7 +733,7 @@ FALSE to clear the GVSF_MODIFIED flag.
 ----------
 #### MSG_GEN_VALUE_IS_MODIFIED
 
-	Boolean	MSG_GEN_VALUE_IS_MODIFIED();
+    Boolean MSG_GEN_VALUE_IS_MODIFIED();
 
 This message checks whether a GenValue has been modified since the last 
 MSG_GEN_APPLY. 
@@ -749,7 +749,7 @@ MSG_GEN_APPLY.
 ----------
 #### MSG_GEN_VALUE_SET_OUT_OF_DATE
 
-	void	MSG_GEN_VALUE_SET_OUT_OF_DATE();
+    void    MSG_GEN_VALUE_SET_OUT_OF_DATE();
 
 This message sets a GenValue's GVSF_OUT_OF_DATE flag.
 
@@ -761,10 +761,10 @@ This message sets a GenValue's GVSF_OUT_OF_DATE flag.
 
 ### 8.3.5 Display Formats
 
-	GVLI_displayFormat, MSG_GEN_VALUE_SET_DISPLAY_FORMAT, 
-	MSG_GEN_VALUE_GET_DISPLAY_FORMAT, 
-	ATTR_GEN_VALUE_METRIC_EQUIVALENT, 
-	ATTR_GEN_VALUE_DECIMAL_PLACES
+    GVLI_displayFormat, MSG_GEN_VALUE_SET_DISPLAY_FORMAT, 
+    MSG_GEN_VALUE_GET_DISPLAY_FORMAT, 
+    ATTR_GEN_VALUE_METRIC_EQUIVALENT, 
+    ATTR_GEN_VALUE_DECIMAL_PLACES
 
 In addition to displaying an integer numerical value, a GenValue may also 
 display numerical values of several other formats. These formats may be any 
@@ -772,17 +772,17 @@ one of the **GenValueDisplayFormat** enumerations provided in
 **GenValueClass**. The allowed enumerations of type 
 **GenValueDisplayFormat** are:
 
-	GVDF_INTEGER
-	GVDF_DECIMAL
-	GVDF_POINTS
-	GVDF_INCHES
-	GVDF_CENTIMETERS
-	GVDF_MILLIMETERS
-	GVDF_PICAS
-	GVDF_EUR_POINTS
-	GVDF_CICEROS
-	GVDF_POINTS_OR_MILLIMETERS
-	GVDF_INCHES_OR_CENTIMETERS
+    GVDF_INTEGER
+    GVDF_DECIMAL
+    GVDF_POINTS
+    GVDF_INCHES
+    GVDF_CENTIMETERS
+    GVDF_MILLIMETERS
+    GVDF_PICAS
+    GVDF_EUR_POINTS
+    GVDF_CICEROS
+    GVDF_POINTS_OR_MILLIMETERS
+    GVDF_INCHES_OR_CENTIMETERS
 
 *GVLI_displayFormat* controls how the values of the GenValue will be 
 represented. For example, if the display format is in centimeters, the display 
@@ -842,16 +842,16 @@ it displays the numerical value within the textual display.
 ----------
 **Code Display 8-6 Setting a Distance Display Format**
 
-	@object GenValueClass MyValue = {
-		GI_visMoniker = "My Value";
-		GVLI_displayFormat = GVDF_INCHES;
+    @object GenValueClass MyValue = {
+        GI_visMoniker = "My Value";
+        GVLI_displayFormat = GVDF_INCHES;
 
-	/* For an initial value of 1 inch, the equivalent value in Points is 72. */
-		GVLI_value = MakeWWFixed(72.0);
+    /* For an initial value of 1 inch, the equivalent value in Points is 72. */
+        GVLI_value = MakeWWFixed(72.0);
 
-	/* For an initial value of 1/2 inch, the equivalent value in Points is 36. */
-		GVLI_increment = MakeWWFixed(36.0);
-	}
+    /* For an initial value of 1/2 inch, the equivalent value in Points is 36. */
+        GVLI_increment = MakeWWFixed(36.0);
+    }
 
 ----------
  For example, if your display format is GVDF_INCHES and you wish to set an 
@@ -861,15 +861,15 @@ inch) respectively. This is necessary because the system expects these values
 to be in Points for other system operations. A conversion table is provided in 
 Table 8-1 for setting up these initial values.
 
-**Table 8-1** *Conversions to US Points*
+**Table 8-1** Conversions to US Points
 
-	Distance Unit		Multiplier  
-	Inches				72  
-	Centimeters			28.3465  
-	Millimeters			2.8346  
-	Picas				12  
-	European Points		1.0656  
-	Ciceros				12.7872
+    Distance Unit       Multiplier  
+    Inches              72  
+    Centimeters         28.3465  
+    Millimeters         2.8346  
+    Picas               12  
+    European Points     1.0656  
+    Ciceros             12.7872
 
 Any increments for GVDF_POINTS_OR_MILLIMETERS or 
 GVDF_INCHES_OR_CENTIMETERS are assumed to be in US units. If the 
@@ -890,20 +890,20 @@ the increment used if the application is metric.
 ----------
 Code Display 8-7 ATTR_GEN_VALUE_METRIC_INCREMENT
 
-	/* If the application is US, the initial value will be 1 inch and the increment 
-	 * will be 1 inch. If the application is metric, the initial value will be 2.54 cm
-	 * (1 inch or 72 points) but the increment will be 2.0 cm (56.692 points). If
-	 * ATTR_GEN_VALUE_METRIC_INCREMENT were not included, the system would have chosen
-	 * an increment of 2.5 cm (70.866 points) which is the closest "nice" value to the
-	 * original increment of 72 points (1 inch). */
+    /* If the application is US, the initial value will be 1 inch and the increment 
+     * will be 1 inch. If the application is metric, the initial value will be 2.54 cm
+     * (1 inch or 72 points) but the increment will be 2.0 cm (56.692 points). If
+     * ATTR_GEN_VALUE_METRIC_INCREMENT were not included, the system would have chosen
+     * an increment of 2.5 cm (70.866 points) which is the closest "nice" value to the
+     * original increment of 72 points (1 inch). */
 
-	@object GenValueClass MyValue = {
-		GI_visMoniker = "My Value";
-		GVLI_displayFormat = GVDF_INCHES_OR_CENTIMETERS;
-		GVLI_value = MakeWWFixed(72.0);
-		GVLI_increment = MakeWWFixed(72.0);
-		ATTR_GEN_VALUE_METRIC_INCREMENT = MakeWWFixed(56.692);
-	}
+    @object GenValueClass MyValue = {
+        GI_visMoniker = "My Value";
+        GVLI_displayFormat = GVDF_INCHES_OR_CENTIMETERS;
+        GVLI_value = MakeWWFixed(72.0);
+        GVLI_increment = MakeWWFixed(72.0);
+        ATTR_GEN_VALUE_METRIC_INCREMENT = MakeWWFixed(56.692);
+    }
 
 ----------
 To set a new display format, send MSG_GEN_VALUE_SET_DISPLAY_FORMAT. 
@@ -914,7 +914,7 @@ the display format changes from decimal to integer, the GenValue will round
 the number down and display only the integer portion of the value.
 #### MSG_GEN_VALUE_GET_DISPLAY_FORMAT
 
-	GenValueDisplayFormat MSG_GEN_VALUE_GET_DISPLAY_FORMAT();
+    GenValueDisplayFormat MSG_GEN_VALUE_GET_DISPLAY_FORMAT();
 
 This message returns the *GVLI_displayFormat* field of the GenValue.
 
@@ -931,8 +931,8 @@ This message returns the *GVLI_displayFormat* field of the GenValue.
 ----------
 #### MSG_GEN_VALUE_SET_DISPLAY_FORMAT
 
-	void	MSG_GEN_VALUE_SET_DISPLAY_FORMAT(
-			GenValueDisplayFormat			format);
+    void    MSG_GEN_VALUE_SET_DISPLAY_FORMAT(
+            GenValueDisplayFormat           format);
 
 This message sets the *GVLI_displayFormat* of the GenValue to the given 
 format. The current value in *GVLI_value* is unaffected, but the display will be 
@@ -952,12 +952,12 @@ is being built.
 
 ### 8.3.6 Sending an Action
 
-	GVLI_applyMsg, GVLI_destination, 
-	HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS, 
-	HINT_VALUE_CUSTOM_RETURN_PRESS, 
-	MSG_GEN_VALUE_GET_APPLY_MSG, MSG_GEN_VALUE_SET_APPLY_MSG, 
-	MSG_GEN_VALUE_GET_DESTINATION, 
-	MSG_GEN_VALUE_SET_DESTINATION
+    GVLI_applyMsg, GVLI_destination, 
+    HINT_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS, 
+    HINT_VALUE_CUSTOM_RETURN_PRESS, 
+    MSG_GEN_VALUE_GET_APPLY_MSG, MSG_GEN_VALUE_SET_APPLY_MSG, 
+    MSG_GEN_VALUE_GET_DESTINATION, 
+    MSG_GEN_VALUE_SET_DESTINATION
 
 *GVLI_applyMsg* sets the message for the GenValue to send out whenever it 
 has been modified and needs to apply its changes. Whenever a GenValue 
@@ -974,22 +974,22 @@ TO_APP_TARGET.)
 
 **Code Display 8-8 Sending an Apply Message**
 
-	@object GenValueClass MyValue = {
-		GI_visMoniker = "My Value";
-		GVLI_value = MakeWWFixed(1.0);
-		GVLI_applyMsg = MSG_MY_VALUE_DOUBLE_VALUE;
-		GVLI_destination = process;
-	}
+    @object GenValueClass MyValue = {
+        GI_visMoniker = "My Value";
+        GVLI_value = MakeWWFixed(1.0);
+        GVLI_applyMsg = MSG_MY_VALUE_DOUBLE_VALUE;
+        GVLI_destination = process;
+    }
 
-	/* Retrieve the current value. This value will be a fixed point dword. */
+    /* Retrieve the current value. This value will be a fixed point dword. */
 
-	@method MyValueProcessClass, MSG_MY_VALUE_DOUBLE_VALUE {
-		WWFixedAsDWord	curValue;
+    @method MyValueProcessClass, MSG_MY_VALUE_DOUBLE_VALUE {
+        WWFixedAsDWord  curValue;
 
-		curValue = @call MyValue::MSG_GEN_VALUE_GET_VALUE();
-		curValue = curValue*2;
-		@call MyValue::MSG_GEN_VALUE_SET_VALUE(curValue, 0);
-	}
+        curValue = @call MyValue::MSG_GEN_VALUE_GET_VALUE();
+        curValue = curValue*2;
+        @call MyValue::MSG_GEN_VALUE_SET_VALUE(curValue, 0);
+    }
 
 ----------
 
@@ -1017,9 +1017,9 @@ GEN_VALUE_APPLY_MSG, whose values are shown below.
 ----------
 #### GEN_VALUE_APPLY_MSG
 
-	void	GEN_VALUE_APPLY_MSG(
-			WWFixedAsDWord		value,
-			word		stateFlags);
+    void    GEN_VALUE_APPLY_MSG(
+            WWFixedAsDWord      value,
+            word        stateFlags);
 
 This prototype defines the message sent out when the GenValue is "applied." 
 The output of the GenValue should handle a message with these parameters.
@@ -1042,7 +1042,7 @@ format.
 ----------
 #### MSG_GEN_VALUE_GET_APPLY_MSG
 
-	Message	MSG_GEN_VALUE_GET_APPLY_MSG();
+    Message MSG_GEN_VALUE_GET_APPLY_MSG();
 
 This message returns the GenValue's *GVLI_applyMsg*. 
 
@@ -1059,8 +1059,8 @@ This message returns the GenValue's *GVLI_applyMsg*.
 ----------
 #### MSG_GEN_VALUE_SET_APPLY_MSG
 
-	void	MSG_GEN_VALUE_SET_APPLY_MSG(
-			Message		message);
+    void    MSG_GEN_VALUE_SET_APPLY_MSG(
+            Message     message);
 
 This message sets the apply message (in *GVLI_applyMsg*) for a GenValue.
 
@@ -1068,7 +1068,7 @@ This message sets the apply message (in *GVLI_applyMsg*) for a GenValue.
 
 **Destination:** Any GenValue object.
 
-**Parameters:** message	The apply message to set for the GenValue.
+**Parameters:** message The apply message to set for the GenValue.
 
 **Return:** Nothing.
 
@@ -1077,7 +1077,7 @@ This message sets the apply message (in *GVLI_applyMsg*) for a GenValue.
 ----------
 #### MSG_GEN_VALUE_GET_DESTINATION
 
-	optr	MSG_GEN_VALUE_GET_DESTINATION();
+    optr    MSG_GEN_VALUE_GET_DESTINATION();
 
 This message returns the current destination object (or process) that the 
 GenValue sends its apply messages to.
@@ -1095,8 +1095,8 @@ GenValue sends its apply messages to.
 ----------
 #### MSG_GEN_VALUE_SET_DESTINATION
 
-	void	MSG_GEN_VALUE_SET_DESTINATION(
-			optr	dest);
+    void    MSG_GEN_VALUE_SET_DESTINATION(
+            optr    dest);
 
 This message sets the *GVLI_destination* field of the range to the passed optr. 
 The object can be a pointer to a specific object in the system (i.e. the 
@@ -1121,9 +1121,9 @@ mechanisms for your use in **GenValueClass**.
 
 ### 8.4.1 Adjusting the Value Indirectly
 
-	MSG_GEN_VALUE_INCREMENT, MSG_GEN_VALUE_DECREMENT, 
-	MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM, 
-	MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM
+    MSG_GEN_VALUE_INCREMENT, MSG_GEN_VALUE_DECREMENT, 
+    MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM, 
+    MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM
 
 To increase the value of *GVLI_value* by the increment in *GVLI_increment*, 
 send the GenValue MSG_GEN_VALUE_INCREMENT. To decrease the value of 
@@ -1146,7 +1146,7 @@ decrementing a value.
 ----------
 #### MSG_GEN_VALUE_INCREMENT
 
-	void	MSG_GEN_VALUE_INCREMENT();
+    void    MSG_GEN_VALUE_INCREMENT();
 
 This message increases the value of *GVLI_value* within the GenValue by the 
 increment in *GVLI_increment*. This message will clear the indeterminate flag 
@@ -1167,7 +1167,7 @@ increasing the value would push it over the maximum).
 ----------
 #### MSG_GEN_VALUE_DECREMENT
 
-	void	MSG_GEN_VALUE_DECREMENT();
+    void    MSG_GEN_VALUE_DECREMENT();
 
 This message decreases the value of *GVLI_value* within the GenValue by the 
 increment in *GVLI_increment*. This message will clear the indeterminate flag 
@@ -1188,7 +1188,7 @@ decreasing the value would push it below the minimum).
 ----------
 #### MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM
 
-	void	MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM();
+    void    MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM();
 
 This message sets the value of *GVLI_value* to the minimum value in 
 *GVLI_minimum*. This message will clear the indeterminate flag of the 
@@ -1207,7 +1207,7 @@ GenValue but will not affect its modified flag.
 ----------
 #### MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM
 
-	void	MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM();
+    void    MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM();
 
 This message sets the value of *GVLI_value* to the maximum value in 
 *GVLI_maximum*. This message will clear the indeterminate flag of the 
@@ -1225,7 +1225,7 @@ GenValue but will not affect its modified flag.
 
 ###8.4.2 Status Messages
 
-	ATTR_GEN_VALUE_STATUS_MSG, MSG_GEN_VALUE_SEND_STATUS_MSG
+    ATTR_GEN_VALUE_STATUS_MSG, MSG_GEN_VALUE_SEND_STATUS_MSG
 
 If your GenValue is operating in delayed mode, there usually occur times 
 when your GenValue's state may not reflect the most recent changes. In most 
@@ -1255,9 +1255,9 @@ MSG_GEN_VALUE_SEND_STATUS_MSG.
 ----------
 #### GEN_VALUE_STATUS_MSG
 
-	void	GEN_VALUE_STATUS_MSG(
-			WWFixedAsDWord		value,
-			word				stateFlags);
+    void    GEN_VALUE_STATUS_MSG(
+            WWFixedAsDWord      value,
+            word                stateFlags);
 
 This prototype should be used to define the status message of the GenValue.
 
@@ -1278,8 +1278,8 @@ any effect.
 ----------
 #### MSG_GEN_VALUE_SEND_STATUS_MSG
 
-	void	MSG_GEN_VALUE_SEND_STATUS_MSG(
-			Boolean		modifiedState);
+    void    MSG_GEN_VALUE_SEND_STATUS_MSG(
+            Boolean     modifiedState);
 
 This message sends the status message stored in the object's 
 ATTR_GEN_VALUE_STATUS_MSG instance field. You should pass this 
@@ -1291,7 +1291,7 @@ reflect the GVSF_MODIFIED flag in the GenValue's *GVLI_stateFlags*.
 **Destination:** Any GenValue object.
 
 **Parameters:**  
-*modifiedState*	TRUE if this message should pass the modified bit 
+*modifiedState* TRUE if this message should pass the modified bit 
 (GVSF_MODIFIED) set, FALSE if it should pass 
 GVSF_MODIFIED cleared.
 
@@ -1301,10 +1301,10 @@ GVSF_MODIFIED cleared.
 
 ### 8.4.3 Retrieving Text
 
-	MSG_GEN_VALUE_GET_VALUE_TEXT, 
-	MSG_GEN_VALUE_SET_VALUE_FROM_TEXT, 
-	MSG_GEN_VALUE_GET_MAX_TEXT_LEN, 
-	MSG_GEN_VALUE_SET_MAX_TEXT_LEN, MSG_GEN_VALUE_SELECT_TEXT
+    MSG_GEN_VALUE_GET_VALUE_TEXT, 
+    MSG_GEN_VALUE_SET_VALUE_FROM_TEXT, 
+    MSG_GEN_VALUE_GET_MAX_TEXT_LEN, 
+    MSG_GEN_VALUE_SET_MAX_TEXT_LEN, MSG_GEN_VALUE_SELECT_TEXT
 
 The GenValue's numeric values are displayed within a special text field. In 
 addition to retrieving the numeric value of the GenValue, you may also 
@@ -1317,21 +1317,21 @@ You must pass these messages a **GenValueType** which specifies the
 instance data field you are wishing to set or get. The **GenValueType** types 
 are:
 
-	typedef enum /* word */ {
-		GVT_VALUE,			/* GVLI_value */
-		GVT_MINIMUM,		/* GVLI_minimum */
-		GVT_MAXIMUM,		/* GVLI_maximum */
-		GVT_INCREMENT,		/* GVLI_increment */
-		GVT_LONG,			/* Longest value we can
-							 * create. */
-		GVT_RANGE_LENGTH,	/* End of the displayed
-							 * range, if applicable. */
-		GVT_RANGE_END,		/* Last value in the range,
-							 * if applicable. */
-		GVT_VALUE_AS_RATIO_OF_AVAILABLE_RANGE
-							/* The current value, 
-							 * relative to minimum. */
-	} GenValueType;
+    typedef enum /* word */ {
+        GVT_VALUE,          /* GVLI_value */
+        GVT_MINIMUM,        /* GVLI_minimum */
+        GVT_MAXIMUM,        /* GVLI_maximum */
+        GVT_INCREMENT,      /* GVLI_increment */
+        GVT_LONG,           /* Longest value we can
+                             * create. */
+        GVT_RANGE_LENGTH,   /* End of the displayed
+                             * range, if applicable. */
+        GVT_RANGE_END,      /* Last value in the range,
+                             * if applicable. */
+        GVT_VALUE_AS_RATIO_OF_AVAILABLE_RANGE
+                            /* The current value, 
+                             * relative to minimum. */
+    } GenValueType;
 
 Some special subclasses of the GenValue will want to calculate how many 
 characters it will allow the user to type into its text field. By default, the 
@@ -1348,9 +1348,9 @@ allows a GenValue to exhibit selectable text.
 ----------
 #### MSG_GEN_VALUE_GET_VALUE_TEXT
 
-	void	MSG_GEN_VALUE_GET_VALUE_TEXT(
-			char				*buffer,
-			GenValueType		valueType);
+    void    MSG_GEN_VALUE_GET_VALUE_TEXT(
+            char                *buffer,
+            GenValueType        valueType);
 
 This message retrieves a fixed point value (either *GVLI_value*, 
 *GVLI_minimum*, *GVLI_maximum*, or *GVLI_increment*) from the GenValue 
@@ -1379,9 +1379,9 @@ subclass MSG_GEN_VALUE_SET_VALUE_FROM_TEXT.
 ----------
 #### MSG_GEN_VALUE_SET_VALUE_FROM_TEXT
 
-	void	MSG_GEN_VALUE_SET_VALUE_FROM_TEXT(
-			char				*text,
-			GenValueType		valueType);
+    void    MSG_GEN_VALUE_SET_VALUE_FROM_TEXT(
+            char                *text,
+            GenValueType        valueType);
 
 This message sets a fixed point value (either *GVLI_value*, *GVLI_minimum*, 
 *GVLI_maximum*, or *GVLI_increment*) of the GenValue from a textual 
@@ -1396,8 +1396,7 @@ its modified state.
 **Parameters:**  
 *text* * The pointer to a null-terminated text string to set 
 the GenValue's text to.
-*
-valueType* - The **GenValueType**, specifying the instance data 
+*valueType* - The **GenValueType**, specifying the instance data 
 to convert into a fixed point value from the passed 
 text.
 
@@ -1410,7 +1409,7 @@ subclass MSG_GEN_VALUE_GET_VALUE_TEXT.
 ----------
 #### MSG_GEN_VALUE_GET_TEXT_LEN
 
-	byte	MSG_GEN_VALUE_GET_TEXT_LEN();
+    byte    MSG_GEN_VALUE_GET_TEXT_LEN();
 
 This message may be used by subclasses to determine the number of 
 characters the user is allowed to type into the GenValue's text field.
@@ -1430,7 +1429,7 @@ characters; there is no need to call the superclass.
 ----------
 #### MSG_GEN_VALUE_GET_MAX_TEXT_LEN
 
-	byte	MSG_GEN_VALUE_GET_MAX_TEXT_LEN();
+    byte    MSG_GEN_VALUE_GET_MAX_TEXT_LEN();
 
 This message retrieves the maximum number of characters allowed to be 
 typed into a textual GenValue. By default, this number is calculated from the 
@@ -1450,7 +1449,7 @@ maximum text length.
 ----------
 #### MSG_GEN_VALUE_SELECT_TEXT
 
-	void	MSG_GEN_VALUE_SELECT_TEXT();
+    void    MSG_GEN_VALUE_SELECT_TEXT();
 
 This message selects a GenValue's text, if allowed by the specific UI.
 
@@ -1462,8 +1461,8 @@ This message selects a GenValue's text, if allowed by the specific UI.
 
 ### 8.4.4 Using Value Ratios
 
-	MSG_GEN_VALUE_GET_VALUE_RATIO, 
-	MSG_GEN_VALUE_SET_VALUE_FROM_RATIO
+    MSG_GEN_VALUE_GET_VALUE_RATIO, 
+    MSG_GEN_VALUE_SET_VALUE_FROM_RATIO
 
 Instead of setting or getting a specific value, you may want in some cases to 
 set or get a value as a ratio; this ratio is determined as the percentage of the 
@@ -1484,8 +1483,8 @@ computed and set within your GenValue's instance data.
 ----------
 #### MSG_GEN_VALUE_GET_VALUE_RATIO
 
-	WWFixedAsDword MSG_GEN_VALUE_GET_VALUE_RATIO(
-		GenValueType		valueType);
+    WWFixedAsDword MSG_GEN_VALUE_GET_VALUE_RATIO(
+        GenValueType        valueType);
 
 This message gets the value of a GenValue (*GVLI_value*) as a ratio of its 
 distance between the minimum value and the maximum value. It returns 
@@ -1510,9 +1509,9 @@ yield a new value.
 ----------
 #### MSG_GEN_VALUE_SET_VALUE_RATIO
 
-	void	MSG_GEN_VALUE_SET_VALUE_RATIO(
-			WWFixed				ratio,
-			GenValueType		valueType);
+    void    MSG_GEN_VALUE_SET_VALUE_RATIO(
+            WWFixed             ratio,
+            GenValueType        valueType);
 
 This message sets the value (*GVLI_value*) of a GenValue as a ratio of the 
 distance between its minimum and the maximum values. This ratio should 
@@ -1534,7 +1533,7 @@ a ratio.
 
 ### 8.4.5 Text Filters for the GenValue
 
-	MSG_GEN_VALUE_GET_TEXT_FILTER
+    MSG_GEN_VALUE_GET_TEXT_FILTER
 
 One of the GenValue's components is a text field to enter values into. When 
 this visual component is being built, the GenValue will send 
@@ -1550,7 +1549,7 @@ You may set up your own filter by intercepting this message and returning a
 ----------
 #### MSG_GEN_VALUE_GET_TEXT_FILTER
 
-	VisTextFilter MSG_GEN_VALUE_GET_TEXT_FILTER();
+    VisTextFilter MSG_GEN_VALUE_GET_TEXT_FILTER();
 
 This message retrieves the text filtering in use on a GenValue object. By 
 default, GenValues use numeric-only filtering with no spaces and no tabs for 
@@ -1570,11 +1569,11 @@ when building its textual component.
 
 ### 8.4.6 Using Ranges in GenValues
 
-	HINT_VALUE_DISPLAYS_RANGE, 
-	MSG_GEN_VALUE_SET_RANGE_LENGTH, 
-	MSG_GEN_VALUE_GET_RANGE_LENGTH, 
-	MSG_GEN_VALUE_ADD_RANGE_LENGTH, 
-	MSG_GEN_VALUE_SUBTRACT_RANGE_LENGTH
+    HINT_VALUE_DISPLAYS_RANGE, 
+    MSG_GEN_VALUE_SET_RANGE_LENGTH, 
+    MSG_GEN_VALUE_GET_RANGE_LENGTH, 
+    MSG_GEN_VALUE_ADD_RANGE_LENGTH, 
+    MSG_GEN_VALUE_SUBTRACT_RANGE_LENGTH
 
 Special GenValue objects may actually display ranges rather than individual 
 values within a range-for example, the GEOS scrollbars in OSF/Motif 
@@ -1594,7 +1593,7 @@ the GenValue by the range length.
 ----------
 #### MSG_GEN_VALUE_GET_RANGE_LENGTH
 
-	WWFixedAsDWord MSG_GEN_VALUE_GET_RANGE_LENGTH();
+    WWFixedAsDWord MSG_GEN_VALUE_GET_RANGE_LENGTH();
 
 This message returns the value stored in HINT_VALUE_DISPLAYS_RANGE.
 
@@ -1612,8 +1611,8 @@ set, the return value will be zero.
 ----------
 #### MSG_GEN_VALUE_SET_RANGE_LENGTH
 
-	void	MSG_GEN_VALUE_SET_RANGE_LENGTH(
-			WWFixedAsDWord value);
+    void    MSG_GEN_VALUE_SET_RANGE_LENGTH(
+            WWFixedAsDWord value);
 
 This message has the effect of adding or changing the hint 
 HINT_VALUE_DISPLAYS_RANGE for the GenValue. Setting a value of zero 
@@ -1633,7 +1632,7 @@ will cause the GenValue to act as if it did not have this hint.
 ----------
 #### MSG_GEN_VALUE_ADD_RANGE_LENGTH
 
-	void	MSG_GEN_VALUE_ADD_RANGE_LENGTH();
+    void    MSG_GEN_VALUE_ADD_RANGE_LENGTH();
 
 This message adds the range length to the current value of the GenValue 
 object. It has the effect of incrementing the *GVLI_value* field by the range 
@@ -1648,7 +1647,7 @@ length.
 ----------
 #### MSG_GEN_VALUE_SUBTRACT_RANGE_LENGTH
 
-	void	MSG_GEN_VALUE_SUBTRACT_RANGE_LENGTH();
+    void    MSG_GEN_VALUE_SUBTRACT_RANGE_LENGTH();
 
 This message subtracts the range length from the current value of the 
 GenValue object. It has the effect of decrementing the *GVLI_value* field by the 

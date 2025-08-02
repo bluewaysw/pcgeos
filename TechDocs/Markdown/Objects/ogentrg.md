@@ -49,32 +49,32 @@ listed in Code Display 5-1.
 ----------
 **Code Display 5-1 GenTrigger Instance Fields**
 
-	/* GenTrigger inherits all the instance fields of GenClass. */
+    /* GenTrigger inherits all the instance fields of GenClass. */
 
-		@instance optr GTI_destination = 0;
-		@instance Message GTI_actionMsg = 0;
+        @instance optr GTI_destination = 0;
+        @instance Message GTI_actionMsg = 0;
 
-	@vardata void HINT_TRIGGER_BRINGS_UP_WINDOW;
-	@vardata void ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;
-	@vardata void HINT_TRIGGER_DESTRUCTIVE_ACTION;
-	@vardata word ATTR_GEN_TRIGGER_ACTION_DATA;
-	@vardata word ATTR_GEN_TRIGGER_INTERACTION_COMMAND;
-	@vardata Message ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS;
+    @vardata void HINT_TRIGGER_BRINGS_UP_WINDOW;
+    @vardata void ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;
+    @vardata void HINT_TRIGGER_DESTRUCTIVE_ACTION;
+    @vardata word ATTR_GEN_TRIGGER_ACTION_DATA;
+    @vardata word ATTR_GEN_TRIGGER_INTERACTION_COMMAND;
+    @vardata Message ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS;
 
-	/* Alias for messages with "void (word a, word b)" */
-	typedef struct { word a, b; } TwoWordArgs;
-	@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
-				TwoWordArgs ATTR_GEN_TRIGGER_ACTION_TWO_WORDS;
+    /* Alias for messages with "void (word a, word b)" */
+    typedef struct { word a, b; } TwoWordArgs;
+    @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+                TwoWordArgs ATTR_GEN_TRIGGER_ACTION_TWO_WORDS;
 
-	/* Alias for messages with "void (word a, word b, word c)" */
-	typedef struct { word a, b, c; } ThreeWordArgs;
-	@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
-				ThreeWordArgs ATTR_GEN_TRIGGER_ACTION_THREE_WORDS;
+    /* Alias for messages with "void (word a, word b, word c)" */
+    typedef struct { word a, b, c; } ThreeWordArgs;
+    @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+                ThreeWordArgs ATTR_GEN_TRIGGER_ACTION_THREE_WORDS;
 
-	/* Alias for messages with "void (optr output, word a)" */
-	typedef struct { optr output; word a; } OptrWordArgs;
-	@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
-				OptrWordArgs ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD;
+    /* Alias for messages with "void (optr output, word a)" */
+    typedef struct { optr output; word a; } OptrWordArgs;
+    @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+                OptrWordArgs ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD;
 
 ----------
 The *GTI_actionMsg* instance field sets the message for the trigger to send out 
@@ -110,42 +110,42 @@ Figure 5-2).
 ----------
 **Code Display 5-2 Code for Basic GenTriggers**
 
-	/* Use the prototype GEN_TRIGGER_ACTION to define a GenTrigger's action message. 
-	 * Within a method, you can retrieve this optr with the variable name `trigger.' */
+    /* Use the prototype GEN_TRIGGER_ACTION to define a GenTrigger's action message. 
+     * Within a method, you can retrieve this optr with the variable name `trigger.' */
 
-	@message (GEN_TRIGGER_ACTION) MSG_HELLO_CHANGE_TO_BLUE();
-	@message (GEN_TRIGGER_ACTION) MSG_HELLO_CHANGE_TO_GOLD();
+    @message (GEN_TRIGGER_ACTION) MSG_HELLO_CHANGE_TO_BLUE();
+    @message (GEN_TRIGGER_ACTION) MSG_HELLO_CHANGE_TO_GOLD();
 
-	/* The GenInteraction object will contain the child GenTriggers. */
+    /* The GenInteraction object will contain the child GenTriggers. */
 
-	@object GenInteractionClass HelloColorBox = {
-		GI_comp = @HelloBlueTrigger, @HelloGoldTrigger;
-		GI_visMoniker = 'C', "Color";
-		GII_visibility = GIV_DIALOG;
-	}
+    @object GenInteractionClass HelloColorBox = {
+        GI_comp = @HelloBlueTrigger, @HelloGoldTrigger;
+        GI_visMoniker = 'C', "Color";
+        GII_visibility = GIV_DIALOG;
+    }
 
-	/* GenTriggers
-	 * Buttons are implemented by GenTriggerClass. When the trigger is pushed by
-	 * the user (clicked on with the mouse), it will send the specified message
-	 * to the specified destination object. In both cases below, the trigger will
-	 * send an application-defined message to the application's Process
-	 * object. A trigger's moniker is displayed within the trigger. In this
-	 * case both are text, but any graphics string could also be used to create
-	 * graphical triggers. */
+    /* GenTriggers
+     * Buttons are implemented by GenTriggerClass. When the trigger is pushed by
+     * the user (clicked on with the mouse), it will send the specified message
+     * to the specified destination object. In both cases below, the trigger will
+     * send an application-defined message to the application's Process
+     * object. A trigger's moniker is displayed within the trigger. In this
+     * case both are text, but any graphics string could also be used to create
+     * graphical triggers. */
 
-	@object GenTriggerClass HelloBlueTrigger = {
-		GI_visMoniker = 'B', "Blue";
-		/* Send MSG_HELLO_CHANGE_TO_BLUE to the Process object. */
-		GTI_destination = process;
-		GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;
-	}
+    @object GenTriggerClass HelloBlueTrigger = {
+        GI_visMoniker = 'B', "Blue";
+        /* Send MSG_HELLO_CHANGE_TO_BLUE to the Process object. */
+        GTI_destination = process;
+        GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;
+    }
 
-	@object GenTriggerClass HelloGoldTrigger = {
-		GI_visMoniker = 'G', "Gold";
-		/* Send MSG_HELLO_CHANGE_TO_GOLD to the Process object. */
-		GTI_destination = process;
-		GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;
-	}
+    @object GenTriggerClass HelloGoldTrigger = {
+        GI_visMoniker = 'G', "Gold";
+        /* Send MSG_HELLO_CHANGE_TO_GOLD to the Process object. */
+        GTI_destination = process;
+        GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;
+    }
 
 ----------
 ## 5.3 Supplemental GenTrigger Usage
@@ -165,10 +165,10 @@ destination.
 
 ### 5.3.1 Passing Data with a GenTrigger
 
-	ATTR_GEN_TRIGGER_ACTION_DATA, 
-	ATTR_GEN_TRIGGER_ACTION_TWO_WORDS, 
-	ATTR_GEN_TRIGGER_ACTION_THREE_WORDS, 
-	ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD
+    ATTR_GEN_TRIGGER_ACTION_DATA, 
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS, 
+    ATTR_GEN_TRIGGER_ACTION_THREE_WORDS, 
+    ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD
 
 A GenTrigger may pass data along with its message. Use 
 ATTR_GEN_TRIGGER_ACTION_DATA to assign a word of data that you wish 
@@ -192,64 +192,64 @@ make sure to set up your structure to pass its arguments *in reverse order*.
 ----------
 **Code Display 5-3 Passing Data from a GenTrigger**
 
-	/* In a class declaration, you should define a message that passes data. */
+    /* In a class declaration, you should define a message that passes data. */
 
-	@class MyProcessClass, GenProcessClass;
-	@message void MSG_SET_MY_DATA(int myData);
-	@endc;
+    @class MyProcessClass, GenProcessClass;
+    @message void MSG_SET_MY_DATA(int myData);
+    @endc;
 
-	@object GenTriggerClass MyHundredTrigger = {
-		/* This trigger will pass 100 to the method for MSG_SET_MY_DATA. */
-		GI_visMoniker = "Set My Data to 100";
-		GTI_actionMsg = MSG_SET_MY_DATA;
-		GTI_destination = process;
-		ATTR_GEN_TRIGGER_ACTION_DATA = 100;		/* This object's data is 100. */
-	}
+    @object GenTriggerClass MyHundredTrigger = {
+        /* This trigger will pass 100 to the method for MSG_SET_MY_DATA. */
+        GI_visMoniker = "Set My Data to 100";
+        GTI_actionMsg = MSG_SET_MY_DATA;
+        GTI_destination = process;
+        ATTR_GEN_TRIGGER_ACTION_DATA = 100;     /* This object's data is 100. */
+    }
 
-	@object GenTriggerClass MyTenTrigger = {
-		/* This trigger will pass `10' to the method for MSG_SET_MY_DATA.*/
-	GI_visMoniker = "Set My Data to 10";
-	GTI_actionMsg = MSG_SET_MY_DATA;
-	GTI_destination = process;
-	ATTR_GEN_TRIGGER_ACTION_DATA = 10;		/* This object's data is 10. */
-	}
+    @object GenTriggerClass MyTenTrigger = {
+        /* This trigger will pass `10' to the method for MSG_SET_MY_DATA.*/
+    GI_visMoniker = "Set My Data to 10";
+    GTI_actionMsg = MSG_SET_MY_DATA;
+    GTI_destination = process;
+    ATTR_GEN_TRIGGER_ACTION_DATA = 10;      /* This object's data is 10. */
+    }
 
-	@method MyProcessClass, MSG_SET_MY_DATA {
-		/* This message passes one parameter (the integer myData). Goc knows
-		 * that the data is located within the ATTR_GEN_TRIGGER_ACTION_DATA
-		 * field. */
-		UpdateDisplay(myData);		/* Use that data for your own purposes. */
-	}
+    @method MyProcessClass, MSG_SET_MY_DATA {
+        /* This message passes one parameter (the integer myData). Goc knows
+         * that the data is located within the ATTR_GEN_TRIGGER_ACTION_DATA
+         * field. */
+        UpdateDisplay(myData);      /* Use that data for your own purposes. */
+    }
 
-	/* The following examples show how to pass longer structures than the above. */
+    /* The following examples show how to pass longer structures than the above. */
 
-	/* Define the message. */
-	@message void MSG_CUSTOM_MESSAGE(@stack char name[10], optr arg1, int arg2);
-	/* Define the structure you wish to pass with the message. If the
-	 * message will pass parameters on the stack (as in this case), you
-	 * must define your structure to pass its elements in reverse order. */
-	typedef struct { 
-		int			MS_arg2;
-		optr		MS_arg1;
-		char		MS_name[10]
-	} MyStruct;
+    /* Define the message. */
+    @message void MSG_CUSTOM_MESSAGE(@stack char name[10], optr arg1, int arg2);
+    /* Define the structure you wish to pass with the message. If the
+     * message will pass parameters on the stack (as in this case), you
+     * must define your structure to pass its elements in reverse order. */
+    typedef struct { 
+        int         MS_arg2;
+        optr        MS_arg1;
+        char        MS_name[10]
+    } MyStruct;
 
-	/* Use @vardataAlias to define your own attribute (ATTR_MY_STRUCT_TO_PASS)
-	 * to store the custom structure. */
-	@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA) MyStruct ATTR_MY_STRUCT_TO_PASS;
+    /* Use @vardataAlias to define your own attribute (ATTR_MY_STRUCT_TO_PASS)
+     * to store the custom structure. */
+    @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA) MyStruct ATTR_MY_STRUCT_TO_PASS;
 
-	/* Declare your object and set the arguments to pass. */
-	@object GenTriggerClass MyTrigger = {
-		GI_visMoniker = "Custom Trigger";
-		GTI_actionMsg = MSG_CUSTOM_MESSAGE;
-		GTI_destination = process;
-		ATTR_MY_STRUCT_TO_PASS = { 100, @ListObject, "Zow!" }
-	}
+    /* Declare your object and set the arguments to pass. */
+    @object GenTriggerClass MyTrigger = {
+        GI_visMoniker = "Custom Trigger";
+        GTI_actionMsg = MSG_CUSTOM_MESSAGE;
+        GTI_destination = process;
+        ATTR_MY_STRUCT_TO_PASS = { 100, @ListObject, "Zow!" }
+    }
 
 ----------
 ### 5.3.2 Interaction Commands
 
-	ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND
 
 A GenTrigger may perform special actions within a GenInteraction object. 
 The ATTR_GEN_TRIGGER_INTERACTION_COMMAND attribute sets the 
@@ -348,7 +348,7 @@ GenInteraction object, see "GenInteraction," Chapter 7.
 
 ### 5.3.3 Interpreting Double Clicks
 
-	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS
+    ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS
 
 Your trigger sends out the message in the *GTI_actionMsg* field and data in the 
 ATTR_GEN_TRIGGER_ACTION_DATA field whenever the user clicks on the 
@@ -364,22 +364,22 @@ messages: one for a single click action and another for a double-click action.
 
 @object GenTriggerClass DoubleClickTrigger = {
 
-	/* If the user single-clicks on this trigger, MSG_MY_ACTION will be sent along
-	 * with data1 to the process. If the user double-clicks,
-	 * MSG_MY_DOUBLE_PRESS_ACTION will be sent instead. */
+    /* If the user single-clicks on this trigger, MSG_MY_ACTION will be sent along
+     * with data1 to the process. If the user double-clicks,
+     * MSG_MY_DOUBLE_PRESS_ACTION will be sent instead. */
 
-		GTI_actionMsg = MSG_MY_ACTION;
-		GTI_destination = process;
-		GI_visMoniker = "Single or Double Click!";
-		ATTR_GEN_TRIGGER_ACTION_DATA = data1;
-		ATTR_GEN_CUSTOM_DOUBLE_PRESS = MSG_MY_DOUBLE_PRESS_ACTION;
-	}
+        GTI_actionMsg = MSG_MY_ACTION;
+        GTI_destination = process;
+        GI_visMoniker = "Single or Double Click!";
+        ATTR_GEN_TRIGGER_ACTION_DATA = data1;
+        ATTR_GEN_CUSTOM_DOUBLE_PRESS = MSG_MY_DOUBLE_PRESS_ACTION;
+    }
 
 ----------
 
 ### 5.3.4 Initiating an Action
 
-	MSG_GEN_TRIGGER_SEND_ACTION, MSG_GEN_ACTIVATE 
+    MSG_GEN_TRIGGER_SEND_ACTION, MSG_GEN_ACTIVATE 
 
 In almost all cases, the specific UI initiates the action of the GenTrigger. Once 
 the specific UI determines that a trigger is activated, it will send a 
@@ -404,8 +404,8 @@ an object and then call MSG_GEN_TRIGGER_SEND_ACTION.
 ----------
 #### MSG_GEN_TRIGGER_SEND_ACTION
 
-	void	MSG_GEN_TRIGGER_SEND_ACTION(
-			Boolean doublePressFlag);
+    void    MSG_GEN_TRIGGER_SEND_ACTION(
+            Boolean doublePressFlag);
 
 This message causes a GenTrigger to send its action message specified in 
 *GTI_actionMsg* to the output specified in *GTI_destination* if the object is 
@@ -438,7 +438,7 @@ rather than message in GTI_actionMsg.
 
 ### 5.3.5 Setting a Trigger As the Default
 
-	MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION
+    MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION
 
 Often, a dialog box or other windowed generic object will have several 
 triggers. You will likely want one of these triggers to be the default 
@@ -454,7 +454,7 @@ MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION.
 ----------
 #### MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION
 
-	void	MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION();
+    void    MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION();
 
 This message sets the trigger to be the default action in its windowed parent. 
 It is the message equivalent of HINT_DEFAULT_DEFAULT_ACTION, defined 
@@ -468,10 +468,10 @@ in **GenClass**.
 
 ### 5.3.6 Manipulating Instance Data
 
-	MSG_GEN_TRIGGER_GET_ACTION_MSG, 
-	MSG_GEN_TRIGGER_SET_ACTION_MSG, 
-	MSG_GEN_TRIGGER_GET_DESTINATION, 
-	MSG_GEN_TRIGGER_SET_DESTINATION 
+    MSG_GEN_TRIGGER_GET_ACTION_MSG, 
+    MSG_GEN_TRIGGER_SET_ACTION_MSG, 
+    MSG_GEN_TRIGGER_GET_DESTINATION, 
+    MSG_GEN_TRIGGER_SET_DESTINATION 
 
 A GenTrigger's instance data need not be static. The instance data can be 
 altered dynamically using the following messages of **GenTriggerClass**.
@@ -479,7 +479,7 @@ altered dynamically using the following messages of **GenTriggerClass**.
 ----------
 #### MSG_GEN_TRIGGER_GET_ACTION_MSG
 
-	Message MSG_GEN_TRIGGER_GET_ACTION_MSG();
+    Message MSG_GEN_TRIGGER_GET_ACTION_MSG();
 
 This message retrieves the *GTI_actionMsg* instance data of the trigger.
 
@@ -496,8 +496,8 @@ This message retrieves the *GTI_actionMsg* instance data of the trigger.
 ----------
 #### MSG_GEN_TRIGGER_SET_ACTION_MSG
 
-	void	MSG_GEN_TRIGGER_SET_ACTION_MSG(
-			Message message);
+    void    MSG_GEN_TRIGGER_SET_ACTION_MSG(
+            Message message);
 
 This message sets the *GTI_actionMsg* instance field of a GenTrigger to the 
 message passed.
@@ -516,7 +516,7 @@ message passed.
 ----------
 #### MSG_GEN_TRIGGER_GET_DESTINATION
 
-	optr	MSG_GEN_TRIGGER_GET_DESTINATION();
+    optr    MSG_GEN_TRIGGER_GET_DESTINATION();
 
 This message returns the *GTI_destination* instance data field of the 
 GenTrigger. 
@@ -534,8 +534,8 @@ GenTrigger.
 ----------
 #### MSG_GEN_TRIGGER_SET_DESTINATION
 
-	void	MSG_GEN_TRIGGER_SET_DESTINATION(
-			optr dest);
+    void    MSG_GEN_TRIGGER_SET_DESTINATION(
+            optr dest);
 
 This message sets the *GTI_destination* instance field of the GenTrigger to 
 the optr passed.
@@ -553,9 +553,9 @@ the optr passed.
 
 ### 5.3.7 Other Hints
 
-	HINT_TRIGGER_BRINGS_UP_WINDOW, 
-	ATTR_GEN_TRIGGER_IMMEDIATE_ACTION, 
-	HINT_TRIGGER_DESTRUCTIVE_ACTION 
+    HINT_TRIGGER_BRINGS_UP_WINDOW, 
+    ATTR_GEN_TRIGGER_IMMEDIATE_ACTION, 
+    HINT_TRIGGER_DESTRUCTIVE_ACTION 
 
 Besides the hints discussed in earlier sections and the hints inherited from 
 **GenClass**, **GenTriggerClass** provides two others, as well as one additional 
@@ -594,35 +594,35 @@ DOS room icon. The moniker should have as its argument a GString. (See
 ----------
 **Code Display 5-5 Code for a "Graphic Button" GenTrigger**
 
-	@start TriggerGraphicsMonikerResource, notDetachable;
+    @start TriggerGraphicsMonikerResource, notDetachable;
 
-	@visMoniker TriggerGraphicsMoniker = {
-		size = standard;
-		color = color4;
-		aspectRatio = normal;
-		cachedSize = 95, 70;
-		gstring {
-			GSBeginString
-			GSDrawBitmapAtCP <(EndTriggerGraphicsIcon-
-						StartTriggerGraphicsIcon)>
-			StartTriggerGraphicsIcon label byte
-			<...Bitmap here...>
-			EndTriggerGraphicsIcon label byte
-			GSEndString
-		}
-	}
+    @visMoniker TriggerGraphicsMoniker = {
+        size = standard;
+        color = color4;
+        aspectRatio = normal;
+        cachedSize = 95, 70;
+        gstring {
+            GSBeginString
+            GSDrawBitmapAtCP <(EndTriggerGraphicsIcon-
+                        StartTriggerGraphicsIcon)>
+            StartTriggerGraphicsIcon label byte
+            <...Bitmap here...>
+            EndTriggerGraphicsIcon label byte
+            GSEndString
+        }
+    }
 
-	@end	TriggerGraphicsMonikerResource;
+    @end    TriggerGraphicsMonikerResource;
 
-	@object GenTriggerClass GraphicTrigger = {
-		GI_visMoniker = list
-			{
-			TriggerGraphicsMoniker
-			}
-		GTI_actionMsg = MSG_CUSTOM_MESSAGE;
-		GTI_destination = process;
-		ATTR_GEN_TRIGGER_ACTION_DATA = {DataToPass};
-	}
+    @object GenTriggerClass GraphicTrigger = {
+        GI_visMoniker = list
+            {
+            TriggerGraphicsMoniker
+            }
+        GTI_actionMsg = MSG_CUSTOM_MESSAGE;
+        GTI_destination = process;
+        ATTR_GEN_TRIGGER_ACTION_DATA = {DataToPass};
+    }
 
 ----------
 

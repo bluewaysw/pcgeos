@@ -5237,6 +5237,51 @@ Intel80X87FloatToDword	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Intel80X87FloatToDword
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	pop off st and put it into dx:ax
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		dx:ax = top of stack which is then popped off
+
+DESTROYED:	ax.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	5/ 1/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+Intel80X87FloatToUnsigned	proc	far
+int32b	local	dword
+int32	local	dword
+	.enter
+	mov	ax, 0
+	call	FloatHardwareEnter
+	jc	done
+EC <	call	Intel80X87Check1Arg				>
+	fistp	{qword} int32
+	fwait
+	dec	ax	; (ax still 0)
+	call	FloatHardwareLeave
+	movdw	dxax, int32
+done:	
+	.leave
+	ret
+Intel80X87FloatToUnsigned	endp
+	public	Intel80X87FloatToUnsigned
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		Intel80X87DwordToFloat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -5277,6 +5322,49 @@ done:
 	ret
 Intel80X87DwordToFloat	endp
 	public	Intel80X87DwordToFloat
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Intel80X87UnsignedToFloat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	put a dword integer on the fp stack
+
+CALLED BY:	GLOBAL
+
+PASS:		dx:ax dword integer
+
+RETURN:		integer on top of fp stack
+
+DESTROYED:	ax.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	4/20/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+Intel80X87UnsignedToFloat	proc	far
+int32b	local	dword	push	0, 0
+int32	local	dword	push	dx, ax
+	uses	dx
+	.enter
+	mov	ax, 1
+	call	FloatHardwareEnter
+	jc	done
+	fild	{qword} int32
+	fwait
+	clr	ax
+	call	Intel80X87CheckNormalNumberAndLeave
+done:
+	.leave
+	ret
+Intel80X87UnsignedToFloat	endp
+	public	Intel80X87UnsignedToFloat
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		Intel80X87WordToFloat

@@ -33,7 +33,7 @@ definitions for terms that will be used throughout.
 This chapter is divided into sections. Which sections you'll want to read 
 depend on what you're interested in.
 
-1. **Road Map	  
+1. **Road Map     
 You're reading the road map now.
 
 2. **Goals**  
@@ -1214,13 +1214,13 @@ Code Display 23-1 Multi-Page Printing Loop
  * To display page #X, we would scroll down X page lengths. */
 
 for (curPage=0; curPage < numberOfPages; curPage++) {
-	GrSaveState(gstate);
-	GrApplyTranslation(gstate, 0,MakeWWFixed(curPage*pageHeight));
+    GrSaveState(gstate);
+    GrApplyTranslation(gstate, 0,MakeWWFixed(curPage*pageHeight));
 
-	/* -Draw current page- */
+    /* -Draw current page- */
 
-	GrRestoreState(gstate);
-	GrNewPage(gstate, PEC_NO_FORM_FEED );}
+    GrRestoreState(gstate);
+    GrNewPage(gstate, PEC_NO_FORM_FEED );}
 ~~~
 
 The **GrLabel()** routine inserts a special element into the GString. This 
@@ -1241,10 +1241,10 @@ blank bytes which could act as a sort of placeholder in memory.
 Code Display 23-2 GSComment Example
 ~~~
 static const byte MyGString[] = {
-	GSComment(20), 'C','o','p','y','l','e','f','t',' ','1','9','9','3',
-	' ','P','K','i','t','t','y', 
-	GSDrawEllipse(72, 72, 144, 108), 
-	GSEndString()};
+    GSComment(20), 'C','o','p','y','l','e','f','t',' ','1','9','9','3',
+    ' ','P','K','i','t','t','y', 
+    GSDrawEllipse(72, 72, 144, 108), 
+    GSEndString()};
 ~~~
 
 The **GrNullOp()** routine draws nothing and does nothing other than take up 
@@ -1287,13 +1287,13 @@ Code Display 23-3 GString in Visual Monikers
  * supplied if the specific UI desires a textual moniker. */
 
  GI_visMoniker = list {
-	AppIconTextMoniker, /* simple text moniker */
-	appLCMoniker, /* Large Color displays */
-	appLMMoniker, /* Large Monochrome displays */
-	appSCMoniker, /* Small Color displays */
-	appSMMoniker, /* Small Monochrome displays */
-	appLCGAMoniker, /* Large CGA displays */
-	appSCGAMoniker /* Small CGA displays */ }
+    AppIconTextMoniker, /* simple text moniker */
+    appLCMoniker, /* Large Color displays */
+    appLMMoniker, /* Large Monochrome displays */
+    appSCMoniker, /* Small Color displays */
+    appSMMoniker, /* Small Monochrome displays */
+    appLCGAMoniker, /* Large CGA displays */
+    appSCGAMoniker /* Small CGA displays */ }
 } 
 
 @visMoniker AppIconTextMoniker = "C AppIcon Sample Application";
@@ -1301,46 +1301,46 @@ Code Display 23-3 GString in Visual Monikers
 
 @start SAMPLEAPPICONAREASMMONIKERRESOURCE, data;
 @visMoniker appSMMoniker = {
-	style = icon;
+    style = icon;
 /* Small monochrome icons use the standard size and 1 bit/pixel gray coloring. */
-	size = standard; color = gray1; aspectRatio = normal; cachedSize = 48, 30;
+    size = standard; color = gray1; aspectRatio = normal; cachedSize = 48, 30;
 
 /* The following lines hold GString data: */
  @gstring {
-		/* GSFillBitmapAtCP:
-		 * This macro signals that we want to fill a bitmap. The next few
-		 * bytes should consist of information about the bitmap; the data
-		 * after that holds the bitmap data. The GString reader will know
-		 * when it's done reading the bitmap data based on the size stated
-		 * in the bitmap's info-it will thus know where to look for the 
-		 * next command (in this case a GSEndString() macro. */
- 	GSFillBitmapAtCP(186),
-		/* Bitmap():
-		 * This macro is used to write basic information about the bitmap
-		 * to the GString. In this case, that information consists of:
-		 * The bitmap is 48x30. It is compressed using PackBits. It is 
-		 * monochrome. */
-	Bitmap (48, 30, 0, BMF_MONO),
-		/* 0x3f, 0xff, 0xff, -:
-		 * These numbers are the bitmap data itself. */
-	0x3f, 0xff, 0xff, 0xff, 0xff, 0x80, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xc0,
-	0x60, 0x00, 0x00, 0x00, 0x00, 0x60, 0x60, 0x00, 0x00, 0x00, 0x00, 0x60,
-	0x60, 0x00, 0x00, 0x80, 0x00, 0x60, 0x60, 0x00, 0x01, 0xc0, 0x00, 0x60,
-	0x60, 0x00, 0x03, 0xe0, 0x00, 0x60, 0x60, 0x00, 0x07, 0xf0, 0x00, 0x60,
-	0x60, 0x00, 0x03, 0xf8, 0x03, 0xfe, 0x60, 0x00, 0x01, 0xfc, 0x00, 0xf9,
-	0x60, 0x06, 0x04, 0xfe, 0x01, 0xfd, 0x60, 0x38, 0x06, 0x1f, 0x01, 0xfd,
-	0x60, 0x40, 0x03, 0x63, 0x81, 0x05, 0x60, 0x80, 0x01, 0xa3, 0xc1, 0x04,
-	0x60, 0x40, 0x00, 0xc3, 0x81, 0x04, 0x60, 0x38, 0x00, 0x6f, 0x01, 0x04,
-	0x60, 0x07, 0xfe, 0xf6, 0x00, 0x88, 0x60, 0x00, 0x01, 0xfc, 0x01, 0x8c,
-	0x60, 0x00, 0x03, 0xfe, 0x03, 0xde, 0x60, 0x00, 0x07, 0xf5, 0x07, 0x77,
-	0x60, 0x00, 0x03, 0xe2, 0x8f, 0xaf, 0x60, 0x00, 0x01, 0xc3, 0xdf, 0xdf,
-	0x60, 0x00, 0x00, 0x81, 0xff, 0xff, 0x60, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x60, 0x00, 0x00, 0x00, 0x7b, 0xff, 0x60, 0x00, 0x00, 0x00, 0x03, 0xff,
-	0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff,
-	0x00, 0x00, 0x00, 0x00, 0x03, 0xff, 0x00, 0x00, 0x00, 0x00, 0x03, 0xff,
-		/* GSEndString():
-		 * This macro lets the GString interpreter know we're done. */
-	GSEndString() } }
+        /* GSFillBitmapAtCP:
+         * This macro signals that we want to fill a bitmap. The next few
+         * bytes should consist of information about the bitmap; the data
+         * after that holds the bitmap data. The GString reader will know
+         * when it's done reading the bitmap data based on the size stated
+         * in the bitmap's info-it will thus know where to look for the 
+         * next command (in this case a GSEndString() macro. */
+    GSFillBitmapAtCP(186),
+        /* Bitmap():
+         * This macro is used to write basic information about the bitmap
+         * to the GString. In this case, that information consists of:
+         * The bitmap is 48x30. It is compressed using PackBits. It is 
+         * monochrome. */
+    Bitmap (48, 30, 0, BMF_MONO),
+        /* 0x3f, 0xff, 0xff, -:
+         * These numbers are the bitmap data itself. */
+    0x3f, 0xff, 0xff, 0xff, 0xff, 0x80, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xc0,
+    0x60, 0x00, 0x00, 0x00, 0x00, 0x60, 0x60, 0x00, 0x00, 0x00, 0x00, 0x60,
+    0x60, 0x00, 0x00, 0x80, 0x00, 0x60, 0x60, 0x00, 0x01, 0xc0, 0x00, 0x60,
+    0x60, 0x00, 0x03, 0xe0, 0x00, 0x60, 0x60, 0x00, 0x07, 0xf0, 0x00, 0x60,
+    0x60, 0x00, 0x03, 0xf8, 0x03, 0xfe, 0x60, 0x00, 0x01, 0xfc, 0x00, 0xf9,
+    0x60, 0x06, 0x04, 0xfe, 0x01, 0xfd, 0x60, 0x38, 0x06, 0x1f, 0x01, 0xfd,
+    0x60, 0x40, 0x03, 0x63, 0x81, 0x05, 0x60, 0x80, 0x01, 0xa3, 0xc1, 0x04,
+    0x60, 0x40, 0x00, 0xc3, 0x81, 0x04, 0x60, 0x38, 0x00, 0x6f, 0x01, 0x04,
+    0x60, 0x07, 0xfe, 0xf6, 0x00, 0x88, 0x60, 0x00, 0x01, 0xfc, 0x01, 0x8c,
+    0x60, 0x00, 0x03, 0xfe, 0x03, 0xde, 0x60, 0x00, 0x07, 0xf5, 0x07, 0x77,
+    0x60, 0x00, 0x03, 0xe2, 0x8f, 0xaf, 0x60, 0x00, 0x01, 0xc3, 0xdf, 0xdf,
+    0x60, 0x00, 0x00, 0x81, 0xff, 0xff, 0x60, 0x00, 0x00, 0x00, 0xff, 0xff,
+    0x60, 0x00, 0x00, 0x00, 0x7b, 0xff, 0x60, 0x00, 0x00, 0x00, 0x03, 0xff,
+    0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0x00, 0x00, 0x00, 0x00, 0x03, 0xff, 0x00, 0x00, 0x00, 0x00, 0x03, 0xff,
+        /* GSEndString():
+         * This macro lets the GString interpreter know we're done. */
+    GSEndString() } }
 
 @end SAMPLEAPPICONAREASMMONIKERRESOURCE;
 ~~~
@@ -1358,17 +1358,17 @@ information.
 Code Display 23-4 GString Declared Without Macros
 ~~~
 const char byte myGString[] = {
-	GR_SET_LINE_STYLE,			/* First we set the line style. */
-	LS_DASHED,			/* 	We want a dashed line. */
-	0, 			/* 	Draw dashes starting with index 0 */
+    GR_SET_LINE_STYLE,          /* First we set the line style. */
+    LS_DASHED,          /*  We want a dashed line. */
+    0,          /*  Draw dashes starting with index 0 */
 
-	GR_DRAW_RECT_TO,			/* Next we draw a rectangle from our current 
-				 * position to... */
-	0, 72, 0, 72, 			/*	...the point (72, 72). (We need the zeroes
-				 * 	because GStrings are arrays of bytes, but
-				 * 	we need a word to describe each 
-				 * 	coordinate. */
-	GR_END_GSTRING
+    GR_DRAW_RECT_TO,            /* Next we draw a rectangle from our current 
+                 * position to... */
+    0, 72, 0, 72,           /*  ...the point (72, 72). (We need the zeroes
+                 *  because GStrings are arrays of bytes, but
+                 *  we need a word to describe each 
+                 *  coordinate. */
+    GR_END_GSTRING
 }; /* myGString */
 ~~~
 
@@ -1381,26 +1381,26 @@ passed to **GrDrawGString()** and drawn to an arbitrary graphics space.
 ---
 Code Display 23-5 Statically Declared GString
 ~~~
-static void _near			SetPreDefinedGStringMoniker(void)
+static void _near           SetPreDefinedGStringMoniker(void)
 {
 /*
  * A predefined graphics string that draws a 
  * MONIKER_WIDTH by MONIKER_HEIGHT * light-blue rectangle at 0, 0.
  */ 
 static const byte gstring[] = {
-	GSSetAreaColorIndex(C_LIGHT_BLUE),
-	GSFillRect(0, 0, MONIKER_WIDTH, MONIKER_HEIGHT),
-	GSEndString() };
+    GSSetAreaColorIndex(C_LIGHT_BLUE),
+    GSFillRect(0, 0, MONIKER_WIDTH, MONIKER_HEIGHT),
+    GSEndString() };
 
 @call CycleMonikerTrigger::MSG_GEN_REPLACE_VIS_MONIKER(
-	VUM_NOW, 				/* Update appearance immediately */
-	MONIKER_HEIGHT, MONIKER_WIDTH, 				/* Since source is a GString, we need to 
-					 * pass the height and width of the 
-					 * GString. */
-	sizeof(gstring), 				/* Pass the size of sourceGString. */
- 	VMDT_GSTRING, 				/* Source is a gstring.... */
-	VMST_FPTR, 				/* ...referenced by a far pointer */
-	(dword) gstring); 				/* Pointer to gstring */
+    VUM_NOW,                /* Update appearance immediately */
+    MONIKER_HEIGHT, MONIKER_WIDTH,              /* Since source is a GString, we need to 
+                     * pass the height and width of the 
+                     * GString. */
+    sizeof(gstring),                /* Pass the size of sourceGString. */
+    VMDT_GSTRING,               /* Source is a gstring.... */
+    VMST_FPTR,              /* ...referenced by a far pointer */
+    (dword) gstring);               /* Pointer to gstring */
 } /* End of SetPreDefinedGStringMoniker() */
 ~~~
 
@@ -1464,10 +1464,10 @@ tempting to include constructions like the following:
 
 ~~~
 if (redFlag)
-	{GrSetAreaColor(
-		gstate, C_RED, CF_INDEX, 0, 0);}
+    {GrSetAreaColor(
+        gstate, C_RED, CF_INDEX, 0, 0);}
 else  {GrSetAreaColor(
-		gstate, C_BLUE,CF_INDEX, 0, 0);}
+        gstate, C_BLUE,CF_INDEX, 0, 0);}
 GrFillRect(gstate, 0, 0, 72, 72);
 ~~~
 
@@ -1476,13 +1476,13 @@ fragments both drew rectangles which were the same color:
 
 ~~~
 redFlag = FALSE; 
-GrDrawGString(			screenGState, 
-			myGString, 
-			0, 0, 0, elem);
+GrDrawGString(          screenGState, 
+            myGString, 
+            0, 0, 0, elem);
 redFlag = TRUE; 
-GrDrawGString(			screenGState, 
-			myGString, 
-			0, 0, 0, elem);
+GrDrawGString(          screenGState, 
+            myGString, 
+            0, 0, 0, elem);
 ~~~
 
 The factor which would determine the color of the drawing in this 
@@ -1533,7 +1533,7 @@ for(curPage=0;curPage < numberOfPages; curPage++) {
  GrNewPage();
  GrApplyTranslation(0, pageHeight); }
 
-	The following pseudocode provides a "better" way to do the same thing:
+    The following pseudocode provides a "better" way to do the same thing:
 
 for (curPage=0; curPage < numberOfPages; curPage++) 
 { GrSaveState();
@@ -1568,39 +1568,39 @@ the GString since you last called **GrLoadGString()**).
 Code Display 23-7 GrDrawGString() in Action
 ~~~
 @method StaticContentClass, MSG_VIS_DRAW {
-	word 	lElem;
-	static const byte gstringData[] = {
-		GSSetAreaColorIndex(C_RED), GSFillRect(0, 0, 72, 72),
-		GSEndString() };
-	@callsuper();
-	gstring = GrLoadGString 			(PtrToSegment(gstringData), GST_PTR,
-				 PtrToOffset(gstringData));
-	GrDrawGString(gstate, gstring, 0, 0, 0, &lElem); }
+    word    lElem;
+    static const byte gstringData[] = {
+        GSSetAreaColorIndex(C_RED), GSFillRect(0, 0, 72, 72),
+        GSEndString() };
+    @callsuper();
+    gstring = GrLoadGString             (PtrToSegment(gstringData), GST_PTR,
+                 PtrToOffset(gstringData));
+    GrDrawGString(gstate, gstring, 0, 0, 0, &lElem); }
 
 @method DynamicContentClass, MSG_VIS_DRAW{
-	Handle 		gstring;
-	VMFileHandle		file;
-	char 		fileString[] = ".", 0;
-	VMBlockHandle		gstringData;
-	GStringElement		lElem;
+    Handle      gstring;
+    VMFileHandle        file;
+    char        fileString[] = ".", 0;
+    VMBlockHandle       gstringData;
+    GStringElement      lElem;
 
-	@callsuper();
-	file = VMOpen(fileString, 
-		   (VMAF_FORCE_READ_WRITE | VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION),
-		   VMO_CREATE_TRUNCATE, 
-		   0);
+    @callsuper();
+    file = VMOpen(fileString, 
+           (VMAF_FORCE_READ_WRITE | VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION),
+           VMO_CREATE_TRUNCATE, 
+           0);
 
-	gstring = GrCreateGString(file, GST_VMEM, &gstringData);
-	GrSetAreaColor(gstring, CF_INDEX, C_RED, 0, 0);
-	GrFillRect(gstring, 0, 0, 72, 72);
-	GrEndGString(gstring);
-	GrDestroyGString(gstring, NULL, GSKT_LEAVE_DATA);
+    gstring = GrCreateGString(file, GST_VMEM, &gstringData);
+    GrSetAreaColor(gstring, CF_INDEX, C_RED, 0, 0);
+    GrFillRect(gstring, 0, 0, 72, 72);
+    GrEndGString(gstring);
+    GrDestroyGString(gstring, NULL, GSKT_LEAVE_DATA);
 
-	gstring = GrLoadGString(file, GST_VMEM, gstringData);
-	GrDrawGString(gstate, gstring, 0, 0, 0, &lElem);
-	GrDestroyGString(gstring, NULL, GSKT_DESTROY_DATA);
+    gstring = GrLoadGString(file, GST_VMEM, gstringData);
+    GrDrawGString(gstate, gstring, 0, 0, 0, &lElem);
+    GrDestroyGString(gstring, NULL, GSKT_DESTROY_DATA);
 
-	FileDelete(fileString);
+    FileDelete(fileString);
 ~~~
 
 The **GrDrawGString()** routine has several arguments. A simple usage of 
@@ -1669,10 +1669,10 @@ Code Display 23-8 GrSetGStringPos() In Action
  * skipping those elements. The result will be a single page in which all the pages
  * of the original GString are drawn on top of each other. */
 
-	for (	gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_NEW_PAGE, gse);
-		gsr == GSR_FORM_FEED;
-		gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_NEW_PAGE, gse) )
-			{GrSetGStringPos(gstring, GSSPT_SKIP_1, 0); }
+    for (   gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_NEW_PAGE, gse);
+        gsr == GSR_FORM_FEED;
+        gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_NEW_PAGE, gse) )
+            {GrSetGStringPos(gstring, GSSPT_SKIP_1, 0); }
 ~~~
 
 Because a GString remembers its place when you stop drawing partway 
@@ -1743,38 +1743,38 @@ Code Display 23-9 GrGetGStringElement() In Action
  * mostly correctly. However, all B-spline elements will be preceded by a 
  * GString comment 'B''s''p''l'.:
 
- *	GSComment(4), 'B','s','p','l',
- *	GSDrawSpline(-), -
+ *  GSComment(4), 'B','s','p','l',
+ *  GSDrawSpline(-), -
 
  * The following snippet of code will be used when this application draws a 
  * GString. It will look for the significant comments. When it finds them, it will
  * know that the following GR_DRAW_SPLINE element should actually be treated 
  * differently. */
 
-	for (	gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_MISC, gse);
-		gsr == GSRT_MISC;
-		gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_MISC, gse) )
-			{byte canonicalBuffer[] = {GR_COMMENT,'B','s','p','l'};
-			 byte buffer[20];
-			 int eSize;
+    for (   gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_MISC, gse);
+        gsr == GSRT_MISC;
+        gsr = GrDrawGString(gstate, gstring, 0, 0, GSC_MISC, gse) )
+            {byte canonicalBuffer[] = {GR_COMMENT,'B','s','p','l'};
+             byte buffer[20];
+             int eSize;
 
-			  GrGetGStringElement(gstate, gstring, 
-				sizeof(buffer),&buffer, &eSize);
+              GrGetGStringElement(gstate, gstring, 
+                sizeof(buffer),&buffer, &eSize);
 
-			 /* First check to see if this is the 
-			  * comment we're looking for: */
-			if (strncmp(buffer, canonicalBuffer, 5)) {
-				 /* Skip ahead to the GrDrawSpline element */
-				GrSetGStringPos(gstring, GSSPT_SKIP_1, 0);
-				GrGetGStringElement(gstate, gstring, 
-					sizeof(buffer), &buffer, &eSize);
-				 /* Draw spline using our routine */
-				MyDrawBSpline(gstate, buffer+3, 
-					(eSize-3)/sizeof(Point))
-				 /* Advance GString so kernel won't draw a
-				  * Bézier spline over our B-spline. */
-				GrSetGStringPos(gstring, GSSPT_SKIP_1, 0) }
-		}
+             /* First check to see if this is the 
+              * comment we're looking for: */
+            if (strncmp(buffer, canonicalBuffer, 5)) {
+                 /* Skip ahead to the GrDrawSpline element */
+                GrSetGStringPos(gstring, GSSPT_SKIP_1, 0);
+                GrGetGStringElement(gstate, gstring, 
+                    sizeof(buffer), &buffer, &eSize);
+                 /* Draw spline using our routine */
+                MyDrawBSpline(gstate, buffer+3, 
+                    (eSize-3)/sizeof(Point))
+                 /* Advance GString so kernel won't draw a
+                  * Bézier spline over our B-spline. */
+                GrSetGStringPos(gstring, GSSPT_SKIP_1, 0) }
+        }
 ~~~
 
 The **GrParseGString()** command calls a callback routine on all elements of 

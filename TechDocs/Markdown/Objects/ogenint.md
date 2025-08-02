@@ -168,34 +168,34 @@ these instance fields, along with the instance fields of **GenClass**.
 ----------
 **Code Display 7-1 GenInteraction Instance Fields**
 
-	@instance GenInteractionType GII_type = GIT_ORGANIZATIONAL;
-	
-	typedef ByteEnum GenInteractionType;
-	#define GIT_ORGANIZATIONAL 0
-	#define GIT_PROPERTIES 1
-	#define GIT_PROGRESS 2
-	#define GIT_COMMAND 3
-	#define GIT_NOTIFICATION 4
-	#define GIT_AFFIRMATION 5
-	#define GIT_MULTIPLE_RESPONSE 6
+    @instance GenInteractionType GII_type = GIT_ORGANIZATIONAL;
+    
+    typedef ByteEnum GenInteractionType;
+    #define GIT_ORGANIZATIONAL 0
+    #define GIT_PROPERTIES 1
+    #define GIT_PROGRESS 2
+    #define GIT_COMMAND 3
+    #define GIT_NOTIFICATION 4
+    #define GIT_AFFIRMATION 5
+    #define GIT_MULTIPLE_RESPONSE 6
 
-	@instance GenInteractionVisibility GII_visibility = GIV_SUB_GROUP;
+    @instance GenInteractionVisibility GII_visibility = GIV_SUB_GROUP;
 
-	typedef ByteEnum GenInteractionVisibility;
-	#define GIV_NO_PREFERENCE 0
-	#define GIV_POPUP 1
-	#define GIV_SUB_GROUP 2
-	#define GIV_CONTROL_GROUP 3
-	#define GIV_DIALOG 4
-	#define GIV_POPOUT 5
+    typedef ByteEnum GenInteractionVisibility;
+    #define GIV_NO_PREFERENCE 0
+    #define GIV_POPUP 1
+    #define GIV_SUB_GROUP 2
+    #define GIV_CONTROL_GROUP 3
+    #define GIV_DIALOG 4
+    #define GIV_POPOUT 5
 
-	@instance GenInteractionAttrs GII_attrs = 0;
+    @instance GenInteractionAttrs GII_attrs = 0;
 
-	typedef ByteFlags GenInteractionAttrs;
-	#define GIA_NOT_USER_INITIATABLE			0x80
-	#define GIA_INITIATED_VIA_USER_DO_DIALOG	0x40
-	#define GIA_MODAL							0x20
-	#define GIA_SYS_MODAL						0x10
+    typedef ByteFlags GenInteractionAttrs;
+    #define GIA_NOT_USER_INITIATABLE            0x80
+    #define GIA_INITIATED_VIA_USER_DO_DIALOG    0x40
+    #define GIA_MODAL                           0x20
+    #define GIA_SYS_MODAL                       0x10
 
 ----------
 *GII_type* describes the function of the GenInteraction. 
@@ -211,32 +211,32 @@ whether input to other parts of the application (or system) is affected.
 ----------
 **Code Display 7-2 GenInteraction Hints**
 
-	/* 
-	 * Hints that affect Properties GenInteractions. These hints are described in the 
-	 * GIT_PROPERTIES GenInteraction section.
-	 */
+    /* 
+     * Hints that affect Properties GenInteractions. These hints are described in the 
+     * GIT_PROPERTIES GenInteraction section.
+     */
 
-	@vardata void HINT_INTERACTION_SINGLE_USAGE;
-	@vardata void HINT_INTERACTION_COMPLEX_PROPERTIES;
-	@vardata void HINT_INTERACTION_SIMPLE_PROPERTIES;
-	@vardata void HINT_INTERACTION_RELATED_PROPERTIES;
-	@vardata void HINT_INTERACTION_UNRELATED_PROPERTIES;
-	@vardata void HINT_INTERACTION_SLOW_RESPONSE_PROPERTIES;
-	@vardata void HINT_INTERACTION_FAST_RESPONSE_PROPERTIES;
-	@vardata void HINT_INTERACTION_REQUIRES_VALIDATION;
+    @vardata void HINT_INTERACTION_SINGLE_USAGE;
+    @vardata void HINT_INTERACTION_COMPLEX_PROPERTIES;
+    @vardata void HINT_INTERACTION_SIMPLE_PROPERTIES;
+    @vardata void HINT_INTERACTION_RELATED_PROPERTIES;
+    @vardata void HINT_INTERACTION_UNRELATED_PROPERTIES;
+    @vardata void HINT_INTERACTION_SLOW_RESPONSE_PROPERTIES;
+    @vardata void HINT_INTERACTION_FAST_RESPONSE_PROPERTIES;
+    @vardata void HINT_INTERACTION_REQUIRES_VALIDATION;
 
-	/* Hints that affect all types of GenInteractions. */
+    /* Hints that affect all types of GenInteractions. */
 
-	@vardata void HINT_INTERACTION_FREQUENT_USAGE;
-	@vardata void HINT_INTERACTION_INFREQUENT_USAGE;
-	@vardata void HINT_INTERACTION_MAKE_RESIZABLE;
-	@vardata void HINT_INTERACTION_CANNOT_BE_DEFAULT;
-	@vardata void HINT_INTERACTION_MODAL;
-	@vardata void HINT_INTERACTION_NO_DISTURB;
-	@vardata void HINT_INTERACTION_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD;
-	@vardata void HINT_CUSTOM_SYS_MENU;
-	@vardata void HINT_INTERACTION_MAXIMIZABLE;
-	@vardata void HINT_INTERACTION_POPOUT_HIDDEN_ON_STARTUP;
+    @vardata void HINT_INTERACTION_FREQUENT_USAGE;
+    @vardata void HINT_INTERACTION_INFREQUENT_USAGE;
+    @vardata void HINT_INTERACTION_MAKE_RESIZABLE;
+    @vardata void HINT_INTERACTION_CANNOT_BE_DEFAULT;
+    @vardata void HINT_INTERACTION_MODAL;
+    @vardata void HINT_INTERACTION_NO_DISTURB;
+    @vardata void HINT_INTERACTION_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD;
+    @vardata void HINT_CUSTOM_SYS_MENU;
+    @vardata void HINT_INTERACTION_MAXIMIZABLE;
+    @vardata void HINT_INTERACTION_POPOUT_HIDDEN_ON_STARTUP;
 
 ----------
 
@@ -296,23 +296,23 @@ GIV_POPOUT GenInteraction should be initially off-screen.
 ----------
 **Code Display 7-3 GenInteraction Optional Attributes**
 
-	/* Optional Attributes. */
+    /* Optional Attributes. */
 
-	@vardata byte ATTR_GEN_INTERACTION_GROUP_TYPE;						/* GenInteractionGroupType */
+    @vardata byte ATTR_GEN_INTERACTION_GROUP_TYPE;                      /* GenInteractionGroupType */
 
-	typedef ByteEnum GenInteractionGroupType;
-	#define GIGT_FILE_MENU 0
-	#define GIGT_EDIT_MENU 1
-	#define GIGT_VIEW_MENU 2
-	#define GIGT_OPTIONS_MENU 3
-	#define GIGT_WINDOW_MENU 4
-	#define GIGT_HELP_MENU 5
-	#define GIGT_PRINT_GROUP 6
+    typedef ByteEnum GenInteractionGroupType;
+    #define GIGT_FILE_MENU 0
+    #define GIGT_EDIT_MENU 1
+    #define GIGT_VIEW_MENU 2
+    #define GIGT_OPTIONS_MENU 3
+    #define GIGT_WINDOW_MENU 4
+    #define GIGT_HELP_MENU 5
+    #define GIGT_PRINT_GROUP 6
 
-	@vardata void ATTR_GEN_INTERACTION_OVERRIDE_INPUT_RESTRICTIONS;
-	@vardata void ATTR_GEN_INTERACTION_ABIDE_BY_INPUT_RESTRICTIONS;
-	@vardata void ATTR_GEN_INTERACTION_POPPED_OUT;
-	@vardata void ATTR_GEN_INTERACTION_POPOUT_NOT_CLOSABLE;
+    @vardata void ATTR_GEN_INTERACTION_OVERRIDE_INPUT_RESTRICTIONS;
+    @vardata void ATTR_GEN_INTERACTION_ABIDE_BY_INPUT_RESTRICTIONS;
+    @vardata void ATTR_GEN_INTERACTION_POPPED_OUT;
+    @vardata void ATTR_GEN_INTERACTION_POPOUT_NOT_CLOSABLE;
 
 ----------
 ATTR_GEN_INTERACTION_GROUP_TYPE indicates that this GenInteraction 
@@ -346,8 +346,8 @@ you will only be able to pop it back into its sub-group state.
 
 ### 7.2.1 GenInteraction Visibility
 
-	GII_visibility, MSG_GEN_INTERACTION_GET_VISIBILITY, 
-	MSG_GEN_INTERACTION_SET_VISIBILITY
+    GII_visibility, MSG_GEN_INTERACTION_GET_VISIBILITY, 
+    MSG_GEN_INTERACTION_SET_VISIBILITY
 
 The *GII_visibility* instance field describes in what manner the user interface 
 will display the Interaction. This is important for GenInteractions because of 
@@ -416,12 +416,12 @@ you set the visibility for is not currently GS_USABLE or an error will result.
 ----------
 #### MSG_GEN_INTERACTION_GET_VISIBILITY
 
-	byte	MSG_GEN_INTERACTION_GET_VISIBILITY();
+    byte    MSG_GEN_INTERACTION_GET_VISIBILITY();
 
 This message retrieves the current **GenInteractionVisibility** stored in the 
 *GII_visibility* instance field of an Interaction.
 
-Source:	Unrestricted.
+Source: Unrestricted.
 
 **Destination:** Any GenInteraction object.
 
@@ -434,8 +434,8 @@ Source:	Unrestricted.
 ----------
 #### MSG_GEN_INTERACTION_SET_VISIBILITY
 
-	void	MSG_GEN_INTERACTION_SET_VISIBILITY(
-			byte	visibility);
+    void    MSG_GEN_INTERACTION_SET_VISIBILITY(
+            byte    visibility);
 
 This message sets the *GII_visibility* instance data for the GenInteraction. 
 This message must pass a valid **GenInteractionVisibility** type to the 
@@ -457,7 +457,7 @@ made GS_USABLE.
 **Warnings:** Make sure that the object sent this message is not GS_USABLE.
 
 #### 7.2.2 Standard Interactions (Menus)
-	ATTR_GEN_INTERACTION_GROUP_TYPE, GenInteractionGroupType
+    ATTR_GEN_INTERACTION_GROUP_TYPE, GenInteractionGroupType
 
 Often you will set up standard menus such as the File menu, the Window 
 menu, the Edit menu, and the View menu. You can set these menus up very 
@@ -499,12 +499,12 @@ Each of the above types will set up the proper GenInteraction attributes and
 other generic objects to complete the interactions. Thus, by setting up a 
 GenInteraction like this:
 
-	@object GenInteractionClass MyEditMenu = {
-		GI_comp = MyEditControl;
-		GII_visibility = GIV_POPUP;
-		ATTR_GEN_INTERACTION_GROUP_TYPE =
-				(GIGT_EDIT_MENU);
-	}
+    @object GenInteractionClass MyEditMenu = {
+        GI_comp = MyEditControl;
+        GII_visibility = GIV_POPUP;
+        ATTR_GEN_INTERACTION_GROUP_TYPE =
+                (GIGT_EDIT_MENU);
+    }
 
 you can have a complete Edit menu in your program. (Of course, you must 
 also supply the GenEditControl object that would be MyEditControl in the 
@@ -512,8 +512,8 @@ example.)
 
 ### 7.2.3 GenInteraction Types
 
-	GII_type, MSG_GEN_INTERACTION_GET_TYPE, 
-	MSG_GEN_INTERACTION_SET_TYPE
+    GII_type, MSG_GEN_INTERACTION_GET_TYPE, 
+    MSG_GEN_INTERACTION_SET_TYPE
 
 The *GII_type* instance field describes the contents of the Interaction. This 
 attribute depends on the makeup of the children within the Interaction. 
@@ -598,7 +598,7 @@ result.
 ----------
 #### MSG_GEN_INTERACTION_GET_TYPE
 
-	byte	MSG_GEN_INTERACTION_GET_TYPE();
+    byte    MSG_GEN_INTERACTION_GET_TYPE();
 
 This message returns the current **GenInteractionType** stored in the 
 *GII_type* instance field for the Interaction.
@@ -616,8 +616,8 @@ This message returns the current **GenInteractionType** stored in the
 ----------
 #### MSG_GEN_INTERACTION_SET_TYPE
 
-	void	MSG_GEN_INTERACTION_SET_TYPE(
-			byte	type);
+    void    MSG_GEN_INTERACTION_SET_TYPE(
+            byte    type);
 
 This message sets the *GII_type* instance data for the GenInteraction. This 
 message must pass a valid **GenInteractionType** enumerated type to the 
@@ -641,8 +641,8 @@ message.
 
 ### 7.2.4 GenInteraction Attributes
 
-	GII_attrs, MSG_GEN_INTERACTION_GET_ATTRS, 
-	MSG_GEN_INTERACTION_SET_ATTRS
+    GII_attrs, MSG_GEN_INTERACTION_GET_ATTRS, 
+    MSG_GEN_INTERACTION_SET_ATTRS
 
 The *GII_attrs* instance field describes how the Interaction behaves under 
 various circumstances. These attributes only affect the behavior of dialog 
@@ -713,7 +713,7 @@ MSG_GEN_SEND_TO_CHILDREN on the one Interaction.
 ----------
 #### MSG_GEN_INTERACTION_GET_ATTRS
 
-	byte	MSG_GEN_INTERACTION_GET_ATTRS();
+    byte    MSG_GEN_INTERACTION_GET_ATTRS();
 
 This message retrieves the current *GII_attrs* instance field from the 
 Interaction sent the message.
@@ -731,9 +731,9 @@ Interaction sent the message.
 ----------
 #### MSG_GEN_INTERACTION_SET_ATTRS
 
-	void	MSG_GEN_INTERACTION_SET_ATTRS(
-			byte	setAttrs,
-			byte	clearAttrs);
+    void    MSG_GEN_INTERACTION_SET_ATTRS(
+            byte    setAttrs,
+            byte    clearAttrs);
 
 This message sets the *GII_attrs* instance data for the GenInteraction sent the 
 message. The Interaction must not be GS_USABLE when receiving this 
@@ -793,40 +793,40 @@ window as it is not itself independently displayable.
 ----------
 **Code Display 7-4 Arranging a Group of Children**
 
-	/* This Interaction creates a typical number keypad arrangement. */
+    /* This Interaction creates a typical number keypad arrangement. */
 
-	@object GenInteractionClass MyKeyPad = {
-		/* The Interaction by default is GIV_SUB_GROUP and 	GIT_ORGANIZATIONAL,
-		 * so there is no need to set these types. */
-		GI_comp = Row789, Row456, Row123;
-		/* The Interaction's three children will be arranged vertically. The
-		 * UI will also draw a border around the Interaction itself. */
-		HINT_ORIENT_CHILDREN_VERTICALLY;
-		HINT_DRAW_IN_BOX;
-	}
+    @object GenInteractionClass MyKeyPad = {
+        /* The Interaction by default is GIV_SUB_GROUP and  GIT_ORGANIZATIONAL,
+         * so there is no need to set these types. */
+        GI_comp = Row789, Row456, Row123;
+        /* The Interaction's three children will be arranged vertically. The
+         * UI will also draw a border around the Interaction itself. */
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_DRAW_IN_BOX;
+    }
 
-	@object GenInteractionClass Row789= {
-		GI_comp = Key7, Key8, Key9;
-		/* Each row is then arranged horizontally to gain three rows
-		 * of three items each. */
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	}
+    @object GenInteractionClass Row789= {
+        GI_comp = Key7, Key8, Key9;
+        /* Each row is then arranged horizontally to gain three rows
+         * of three items each. */
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
 
-	@object GenInteractionClass Row456= {
-		GI_comp = Key4, Key5, Key6;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	}
+    @object GenInteractionClass Row456= {
+        GI_comp = Key4, Key5, Key6;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
 
-	@object GenInteractionClass Row123= {
-		GI_comp = Key1, Key2, Key3;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	}
+    @object GenInteractionClass Row123= {
+        GI_comp = Key1, Key2, Key3;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
 
-	/* Each of the child `keys' will be a GenTrigger with appropriate visual
-	 * moniker. (For simplicity, only one trigger is shown here.) */
-	@object GenTriggerClass Key9 = {
-		GI_visMoniker = "9";
-	}
+    /* Each of the child `keys' will be a GenTrigger with appropriate visual
+     * moniker. (For simplicity, only one trigger is shown here.) */
+    @object GenTriggerClass Key9 = {
+        GI_visMoniker = "9";
+    }
 
 ----------
 Many hints from **GenClass** may affect the appearance of GIV_SUB_GROUP 
@@ -870,37 +870,37 @@ children will be GenTriggers or GenItems within GenItemGroups.
 ----------
 **Code Display 7-5 Using a GenInteraction to Create a Menu**
 
-	/* This example is taken from the Hello World sample application. */
+    /* This example is taken from the Hello World sample application. */
 
-	@object GenInteractionClass HelloMenu = {
-		GI_visMoniker = 'M', "Menu";	/* The moniker of the menu is used in
-					 * the primary window's menu bar (if the
-					 * specific UI employs a menu bar). */
-		GI_comp = HelloColorBox;		/* The only child of the menu (the only
-					 * item in the menu) is the dialog box. */
-		GII_visibility = GIV_POPUP;		/* This attribute designates the
-					 * interaction as a menu or a sub-menu. */
-	}
+    @object GenInteractionClass HelloMenu = {
+        GI_visMoniker = 'M', "Menu";    /* The moniker of the menu is used in
+                     * the primary window's menu bar (if the
+                     * specific UI employs a menu bar). */
+        GI_comp = HelloColorBox;        /* The only child of the menu (the only
+                     * item in the menu) is the dialog box. */
+        GII_visibility = GIV_POPUP;     /* This attribute designates the
+                     * interaction as a menu or a sub-menu. */
+    }
 
-	@object GenInteractionClass HelloColorBox = {
-		GI_comp = HelloBlueTrigger, HelloGoldTrigger;
-		GI_visMoniker = 'C', "Color";
-		GII_visibility = GIV_DIALOG;
-	}
+    @object GenInteractionClass HelloColorBox = {
+        GI_comp = HelloBlueTrigger, HelloGoldTrigger;
+        GI_visMoniker = 'C', "Color";
+        GII_visibility = GIV_DIALOG;
+    }
 
-	@object GenTriggerClass HelloBlueTrigger = {
-		GI_visMoniker = 'B', "Blue";	/* The 'B' indicates the keyboard navigation
-				 * character for this trigger. */
-		GTI_destination = process;		/* Send the message to the Process object. */
-		GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;	/* Send this message. */
-	}
+    @object GenTriggerClass HelloBlueTrigger = {
+        GI_visMoniker = 'B', "Blue";    /* The 'B' indicates the keyboard navigation
+                 * character for this trigger. */
+        GTI_destination = process;      /* Send the message to the Process object. */
+        GTI_actionMsg = MSG_HELLO_CHANGE_TO_BLUE;   /* Send this message. */
+    }
 
-	@object GenTriggerClass HelloGoldTrigger = {
-		GI_visMoniker = 'G', "Gold";	/* The 'G' indicates the keyboard navigation
-				 * character for this trigger. */
-		GTI_destination = process;		/* Send the message to the Process object. */
-		GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;	/* Send this message. */
-	}
+    @object GenTriggerClass HelloGoldTrigger = {
+        GI_visMoniker = 'G', "Gold";    /* The 'G' indicates the keyboard navigation
+                 * character for this trigger. */
+        GTI_destination = process;      /* Send the message to the Process object. */
+        GTI_actionMsg = MSG_HELLO_CHANGE_TO_GOLD;   /* Send this message. */
+    }
 
 ----------
 
@@ -945,22 +945,22 @@ OSF/Motif supplies an arrow leading to the sub-menu.*
 
 **Code Display 7-6 Nested Menus**
 
-	@object GenInteractionClass TextMenu = {
-		GI_comp = JustificationSubMenu;
-		GI_visMoniker = `T', "Text";
-		GII_visibility = GIV_POPUP;
-	}
+    @object GenInteractionClass TextMenu = {
+        GI_comp = JustificationSubMenu;
+        GI_visMoniker = `T', "Text";
+        GII_visibility = GIV_POPUP;
+    }
 
-	@object GenInteractionClass JustificationMenu = {
-		GI_comp = JustificationList;
-		GI_visMoniker = `J', "Justification";
-		GII_visibility = GIV_POPUP;
-	}
+    @object GenInteractionClass JustificationMenu = {
+        GI_comp = JustificationList;
+        GI_visMoniker = `J', "Justification";
+        GII_visibility = GIV_POPUP;
+    }
 
-	@object GenItemGroupClass JustificationList = {
-		GI_comp = LeftEntry, RightEntry, CenterEntry, FullEntry;
-		/* These children are not shown. */
-	}
+    @object GenItemGroupClass JustificationList = {
+        GI_comp = LeftEntry, RightEntry, CenterEntry, FullEntry;
+        /* These children are not shown. */
+    }
 
 ----------
 
@@ -1018,8 +1018,8 @@ their visible dimensions.
 
 #### 7.3.1.4 GenInteractions as Popouts (GIV_POPOUTS)
 
-	MSG_GEN_INTERACTION_POP_IN, MSG_GEN_INTERACTION_POP_OUT, 
-	MSG_GEN_INTERACTION_TOGGLE_POPOUT
+    MSG_GEN_INTERACTION_POP_IN, MSG_GEN_INTERACTION_POP_OUT, 
+    MSG_GEN_INTERACTION_TOGGLE_POPOUT
 
 Popouts are special GenInteractions that may act as either sub-group 
 Interactions and as dialog boxes, depending on what state they are in. 
@@ -1141,35 +1141,35 @@ own. See "Standard Response Triggers" below.
 ----------
 **Code Display 7-7 Organizational Interactions**
 
-	/* This properties dialog box will group a collection of GIT_ORGANIZATIONAL 
-	 * Interactions. */
+    /* This properties dialog box will group a collection of GIT_ORGANIZATIONAL 
+     * Interactions. */
 
-	@object GenInteractionClass MyMasterInteraction = {
-		GI_comp = FirstOrganizational, SecondOrganizational;
-		GII_visibility = GIV_DIALOG;
-		GII_type = GIT_PROPERTIES;
-	}
+    @object GenInteractionClass MyMasterInteraction = {
+        GI_comp = FirstOrganizational, SecondOrganizational;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_PROPERTIES;
+    }
 
-	@object GenInteractionClass FirstOrganizational = {
-	/* GenInteractions are GIT_ORGANIZATIONAL by default. */
-		GI_comp = One, Two, Three;
-	}
+    @object GenInteractionClass FirstOrganizational = {
+    /* GenInteractions are GIT_ORGANIZATIONAL by default. */
+        GI_comp = One, Two, Three;
+    }
 
-	@object GenInteractionClass SecondOrganizational = {
-		GI_comp = Four, Five, Six;
-	}
+    @object GenInteractionClass SecondOrganizational = {
+        GI_comp = Four, Five, Six;
+    }
 
-	@object GenTriggerClass One = {
-	/* This trigger, after sending out MY_SPECIAL_MESSAGE to the process, will send a
-	 * MSG_GEN_GUP_INTERACTION_COMMAND with IC_INTERACTION_COMPLETE to the first
-	 * non-GIT_ORGANIZATIONAL Interaction it encounters up the tree
-	 * (MyMasterInteraction). This behavior is due to the GenAttribute
-	 * GA_SIGNAL_INTERACTION_COMPLETE. (See GenClass.) */
+    @object GenTriggerClass One = {
+    /* This trigger, after sending out MY_SPECIAL_MESSAGE to the process, will send a
+     * MSG_GEN_GUP_INTERACTION_COMMAND with IC_INTERACTION_COMPLETE to the first
+     * non-GIT_ORGANIZATIONAL Interaction it encounters up the tree
+     * (MyMasterInteraction). This behavior is due to the GenAttribute
+     * GA_SIGNAL_INTERACTION_COMPLETE. (See GenClass.) */
 
-		GTI_actionMsg = MY_SPECIAL_MESSAGE;
-		GTI_destination = process;
-		GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
-	}
+        GTI_actionMsg = MY_SPECIAL_MESSAGE;
+        GTI_destination = process;
+        GI_attrs = GA_SIGNAL_INTERACTION_COMPLETE;
+    }
 
 ----------
 #### 7.3.2.2 Properties Interactions
@@ -1203,32 +1203,32 @@ dialog, respectively. In OSF/Motif these triggers are labeled "Apply" or "OK,"
 
 **Code Display 7-8 GenInteraction as Properties Dialog Box**
 
-	@object GenInteractionClass MyInteraction = {
-		GI_visMoniker = "Dialog Box";
-		GI_comp = PropertiesList;
-		GII_visibility = GIV_DIALOG;
-		GII_type = GIT_PROPERTIES;
-	}
+    @object GenInteractionClass MyInteraction = {
+        GI_visMoniker = "Dialog Box";
+        GI_comp = PropertiesList;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_PROPERTIES;
+    }
 
-	/* The GenItemGroup below is a list of three properties. */
+    /* The GenItemGroup below is a list of three properties. */
 
-	@object GenItemGroupClass PropertiesList = {
-		GI_visMoniker = "Properties List";
-		GI_comp = PropOne, PropTwo, PropThree;
-		GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
-	}
+    @object GenItemGroupClass PropertiesList = {
+        GI_visMoniker = "Properties List";
+        GI_comp = PropOne, PropTwo, PropThree;
+        GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    }
 
-	@object GenItemClass PropOne = {
-		GI_visMoniker = "A";
-	}
+    @object GenItemClass PropOne = {
+        GI_visMoniker = "A";
+    }
 
-	@object GenItemClass PropTwo = {
-		GI_visMoniker = "B";
-	}
+    @object GenItemClass PropTwo = {
+        GI_visMoniker = "B";
+    }
 
-	@object GenItemClass PropThree = {
-		GI_visMoniker = "C";
-	}
+    @object GenItemClass PropThree = {
+        GI_visMoniker = "C";
+    }
 
 ----------
 There are two ways that an application can deal with UI gadgetry in a 
@@ -1324,7 +1324,7 @@ OSF/Motif supplies both an "Apply" and a "Close" trigger.*
 
 #### Modifying Triggers for Custom Properties
 
-	HINT_INTERACTION_REQUIRES_VALIDATION
+    HINT_INTERACTION_REQUIRES_VALIDATION
 
 If an application needs to do additional work on a properties dialog box, such 
 as validation of the attributes, you should define a "custom" properties dialog 
@@ -1370,33 +1370,33 @@ may send IC_DISMISS to unconditionally dismiss the Interaction.
 ----------
 **Code Display 7-9 Replacing the Default IC_APPLY Trigger**
 
-	@object GenInteraction LineProperties = {
-		GI_visMoniker = "Line Properties";
-		GI_comp = LineWidth, LineStyle, LinePropertiesApply;
-		GII_type = GIT_PROPERTIES;
-		GII_visibility = GIV_DIALOG;
-		HINT_INTERACTION_REQUIRES_VALIDATION;	/* Forces delayed mode. */
-	}
+    @object GenInteraction LineProperties = {
+        GI_visMoniker = "Line Properties";
+        GI_comp = LineWidth, LineStyle, LinePropertiesApply;
+        GII_type = GIT_PROPERTIES;
+        GII_visibility = GIV_DIALOG;
+        HINT_INTERACTION_REQUIRES_VALIDATION;   /* Forces delayed mode. */
+    }
 
-	@object GenItemGroupClass LineWidth = {
-		/* ... */
-	}
+    @object GenItemGroupClass LineWidth = {
+        /* ... */
+    }
 
-	@object GenItemGroupClass LineStyle = {
-		/* ... */
-	}
+    @object GenItemGroupClass LineStyle = {
+        /* ... */
+    }
 
-	@object GenTriggerClass LinePropertiesApply = {
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_PROPERTIES_APPLY;
-		/* Setting GA_SIGNAL_INTERACTION_COMPLETE will dismiss the dialog
-		 * after applying the properties. */
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		/* Setting this attribute to IC_APPLY tells the specific UI to replace
-		* the standard response trigger with this one. */
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass LinePropertiesApply = {
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_PROPERTIES_APPLY;
+        /* Setting GA_SIGNAL_INTERACTION_COMPLETE will dismiss the dialog
+         * after applying the properties. */
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        /* Setting this attribute to IC_APPLY tells the specific UI to replace
+        * the standard response trigger with this one. */
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 The moniker for an application-supplied apply trigger may be set by the 
@@ -1420,12 +1420,12 @@ trigger is activated. (See Code Display 7-10.)
 ----------
 **Code Display 7-10 Replacing the Default IC_APPLY moniker**
 
-	@object GenTriggerClass LinePropertiesApply = {
-		GI_visMoniker = "Set Line Properties";
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass LinePropertiesApply = {
+        GI_visMoniker = "Set Line Properties";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 An alternate way to supplement an apply trigger's default behavior is to 
@@ -1490,31 +1490,31 @@ custom response triggers yourself.
 
 **Code Display 7-11 Using a Command Dialog Box**
 
-	/* The Command Dialog created below contains one command trigger (RenameTrigger)
-	 * which sends MSG_MY_PROCESS_RENAME to the process object. */
+    /* The Command Dialog created below contains one command trigger (RenameTrigger)
+     * which sends MSG_MY_PROCESS_RENAME to the process object. */
 
-	@object GenInteractionClass RenameBox = {
-		GI_visMoniker = "Rename";
-		GI_comp = RenameSource, RenameDest, RenameTrigger;
-		GII_type = GIT_COMMAND;
-		GII_visibility = GIV_DIALOG;
-	}
+    @object GenInteractionClass RenameBox = {
+        GI_visMoniker = "Rename";
+        GI_comp = RenameSource, RenameDest, RenameTrigger;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG;
+    }
 
-	@object GenTextClass RenameSource = {
-		/* Single-line text entry object */
-	}
+    @object GenTextClass RenameSource = {
+        /* Single-line text entry object */
+    }
 
-	@object GenTextClass RenameDest = {
-		/* Single-line text entry object */
-	}
+    @object GenTextClass RenameDest = {
+        /* Single-line text entry object */
+    }
 
-	@object GenTriggerClass RenameTrigger = {
-		GI_visMoniker = "Rename";
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_RENAME;
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass RenameTrigger = {
+        GI_visMoniker = "Rename";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_RENAME;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 
@@ -1552,35 +1552,35 @@ bar.
 ----------
 **Code Display 7-12 Replacing the Default Close Trigger**
 
-	@object GenInteractionClass RenameBox = {
-		GI_visMoniker = "Rename";
-		GI_comp = RenameSource, RenameDest, RenameTrigger, RenameClose;
-		GII_type = GIT_COMMAND;
-		GII_visibility = GIV_DIALOG;
-	}
+    @object GenInteractionClass RenameBox = {
+        GI_visMoniker = "Rename";
+        GI_comp = RenameSource, RenameDest, RenameTrigger, RenameClose;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG;
+    }
 
-	@object GenTextClass RenameSource = {
-		/* Single-line text entry object */
-	}
+    @object GenTextClass RenameSource = {
+        /* Single-line text entry object */
+    }
 
-	@object GenTextClass RenameDest = {
-		/* Single-line text entry object */
-	}
+    @object GenTextClass RenameDest = {
+        /* Single-line text entry object */
+    }
 
-	@object GenTriggerClass RenameTrigger = {
-		GI_visMoniker = "Rename";
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_RENAME;
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass RenameTrigger = {
+        GI_visMoniker = "Rename";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_RENAME;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+    }
 
-	@object GenTriggerClass RenameClose = {
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_CLOSE_RENAME;
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass RenameClose = {
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_CLOSE_RENAME;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 #### 7.3.2.4 Progress Interactions
@@ -1628,44 +1628,44 @@ Providing a replacement IC_STOP trigger is the easiest method.
 ----------
 **Code Display 7-13 Replacing the Default IC_STOP Trigger**
 
-	/* This Progress Dialog shows the progress of a data transfer. Its first child
-	 * shows the number of packets sent in the operation, and the second child is an
-	 * IC_STOP trigger to halt the transfer operation. */ 
+    /* This Progress Dialog shows the progress of a data transfer. Its first child
+     * shows the number of packets sent in the operation, and the second child is an
+     * IC_STOP trigger to halt the transfer operation. */ 
 
-	@object GenInteractionClass FileTransferProgress = {
-		GI_visMoniker = "File Transfer Status";
-		GI_comp = FileTransferPktCount, FileTransferStop;
-		GII_visibility = GIV_DIALOG;
-		GII_type = GIT_PROGRESS;
-	}
+    @object GenInteractionClass FileTransferProgress = {
+        GI_visMoniker = "File Transfer Status";
+        GI_comp = FileTransferPktCount, FileTransferStop;
+        GII_visibility = GIV_DIALOG;
+        GII_type = GIT_PROGRESS;
+    }
 
-	/* The GenText object shows the title "Packets Sent" and updates the GTI_text field
-	 * with the current number of packets sent. */
+    /* The GenText object shows the title "Packets Sent" and updates the GTI_text field
+     * with the current number of packets sent. */
 
-	@object GenTextClass FileTransferPktCount = {
-		GI_visMoniker = "Packets sent:";
-		GTXI_text = "0";
-	}
+    @object GenTextClass FileTransferPktCount = {
+        GI_visMoniker = "Packets sent:";
+        GTXI_text = "0";
+    }
 
-	/* When the user activates the "Abort File Transfer" trigger, the trigger sends out
-	 * MSG_MY_PROCESS_ABORT_FILE_TRANSFER to the process. This action should also
-	 * close the dialog box. Since this trigger may initiate a destructive action,
-	 * HINT_TRIGGER_DESTRUCTIVE_ACTION makes sure that the focus does not lie on the
-	 * dialog box (and therefore the trigger cannot be activated by a default
-	 * activation method such as hitting RETURN). */
+    /* When the user activates the "Abort File Transfer" trigger, the trigger sends out
+     * MSG_MY_PROCESS_ABORT_FILE_TRANSFER to the process. This action should also
+     * close the dialog box. Since this trigger may initiate a destructive action,
+     * HINT_TRIGGER_DESTRUCTIVE_ACTION makes sure that the focus does not lie on the
+     * dialog box (and therefore the trigger cannot be activated by a default
+     * activation method such as hitting RETURN). */
 
-	@object GenTriggerClass FileTransferStop = {
-		GI_visMoniker = "Abort File Transfer";
-		/* OSF/Motif will dismiss this dialog box if marked
-		 * GA_SIGNAL_INTERACTION_COMPLETE because it is GIT_PROGRESS. */
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		GTI_destination = process;
-		/* The handler for MSG_MY_PROCESS_ABORT_FILE_TRANSFER must stop the
-		 * operation. You may also dismiss the dialog at that time. */
-		GTI_actionMsg = MSG_MY_PROCESS_ABORT_FILE_TRANSFER;
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_STOP };
-		HINT_SEEK_REPLY_BAR;
-		HINT_TRIGGER_DESTRUCTIVE_ACTION;		/* Don't place focus here. */
+    @object GenTriggerClass FileTransferStop = {
+        GI_visMoniker = "Abort File Transfer";
+        /* OSF/Motif will dismiss this dialog box if marked
+         * GA_SIGNAL_INTERACTION_COMPLETE because it is GIT_PROGRESS. */
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = process;
+        /* The handler for MSG_MY_PROCESS_ABORT_FILE_TRANSFER must stop the
+         * operation. You may also dismiss the dialog at that time. */
+        GTI_actionMsg = MSG_MY_PROCESS_ABORT_FILE_TRANSFER;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_STOP };
+        HINT_SEEK_REPLY_BAR;
+        HINT_TRIGGER_DESTRUCTIVE_ACTION;        /* Don't place focus here. */
 }
 
 ----------
@@ -1710,22 +1710,22 @@ irritating to the user.
 ----------
 **Code Display 7-14 An E-mail Notification Dialog**
 
-	/* The Notification dialog is marked HINT_INTERACTION_NO_DISTURB so that it
-	 * will not grab the focus and target. The notification itself has only one child:
-	 * the text to display to the user. The Specific UI will also create an IC_OK
-	 * trigger that is used to acknowledge and dismiss the notification. */
+    /* The Notification dialog is marked HINT_INTERACTION_NO_DISTURB so that it
+     * will not grab the focus and target. The notification itself has only one child:
+     * the text to display to the user. The Specific UI will also create an IC_OK
+     * trigger that is used to acknowledge and dismiss the notification. */
 
-	@object GenInteractionClass NewMailNotice = {
-		GI_visMoniker = "Mailbox";
-		GI_comp = NewMailText;
-		GII_type = GIT_NOTIFICATION;
-		GII_visibility = GIV_DIALOG;
-		HINT_INTERACTION_NO_DISTURB;
-	}
+    @object GenInteractionClass NewMailNotice = {
+        GI_visMoniker = "Mailbox";
+        GI_comp = NewMailText;
+        GII_type = GIT_NOTIFICATION;
+        GII_visibility = GIV_DIALOG;
+        HINT_INTERACTION_NO_DISTURB;
+    }
 
-	@object GenGlyphClass NewMailText = {
-		GI_visMoniker = "New mail has arrived";
-	}
+    @object GenGlyphClass NewMailText = {
+        GI_visMoniker = "New mail has arrived";
+    }
 
 ----------
 By default the IC_OK trigger will just dismiss the dialog. If some other action 
@@ -1735,33 +1735,33 @@ should provide a custom IC_OK trigger to replace the specific UI supplied one.
 ----------
 **Code Display 7-15 Replacing the IC_OK Trigger**
 
-	/* This Notification dialog now contains two explicit children: the text to
-	 * display to the user and a custom trigger to acknowledge the notification. */
+    /* This Notification dialog now contains two explicit children: the text to
+     * display to the user and a custom trigger to acknowledge the notification. */
 
-	@object GenInteractionClass NewMailNotice = {
-		GI_visMoniker = "Mailbox";
-		GI_comp = NewMailText, NewMailAcknowledge;
-		GII_type = GIT_NOTIFICATION;
-		GII_visibility = GIV_DIALOG;
-		HINT_INTERACTION_NO_DISTURB;
-	}
+    @object GenInteractionClass NewMailNotice = {
+        GI_visMoniker = "Mailbox";
+        GI_comp = NewMailText, NewMailAcknowledge;
+        GII_type = GIT_NOTIFICATION;
+        GII_visibility = GIV_DIALOG;
+        HINT_INTERACTION_NO_DISTURB;
+    }
 
-	@object GenGlyphClass NewMailText = {
-		GI_visMoniker = "New mail has arrived";
-	}
+    @object GenGlyphClass NewMailText = {
+        GI_visMoniker = "New mail has arrived";
+    }
 
-	/* When the user clicks on the Acknowledge Trigger, MSG_MY_PROCESS_NEW_MAIL_ACK is
-	 * sent to the process class. Marking the trigger as IC_OK replaces the default
-	 * trigger. Note that the Specific UI is still allowed to pick the visual moniker
-	 * for this trigger as its GI_visMoniker field is left blank. */
+    /* When the user clicks on the Acknowledge Trigger, MSG_MY_PROCESS_NEW_MAIL_ACK is
+     * sent to the process class. Marking the trigger as IC_OK replaces the default
+     * trigger. Note that the Specific UI is still allowed to pick the visual moniker
+     * for this trigger as its GI_visMoniker field is left blank. */
 
-	@object GenTriggerClass NewMailAcknowledge = {
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_NEW_MAIL_ACK;
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass NewMailAcknowledge = {
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_NEW_MAIL_ACK;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 #### 7.3.2.6 Affirmation Interactions
@@ -1796,33 +1796,33 @@ which send out custom messages when activated.
 ----------
 **Code Display 7-16 An Affirmation Dialog for Deleting a File**
 
-	/* Rather than using UserDoDialog(), this dialog is simply marked GIA_MODAL.
-	 * This approach has the advantage of allowing any views that are run by the
-	 * process thread to be updated if they are exposed by the application. */
+    /* Rather than using UserDoDialog(), this dialog is simply marked GIA_MODAL.
+     * This approach has the advantage of allowing any views that are run by the
+     * process thread to be updated if they are exposed by the application. */
 
-	/* This dialog keeps the default IC_NO trigger to dismiss the dialog but
-	 * replaces the default IC_YES trigger. */
+    /* This dialog keeps the default IC_NO trigger to dismiss the dialog but
+     * replaces the default IC_YES trigger. */
 
-	@object GenInteractionClass DeleteAffirmation = {
-		GI_comp = DeleteAffirmationText, DeleteAffirmationYes;
-		GII_type = GIT_AFFIRMATION;
-		GII_visibility = GIV_DIALOG;
-		GII_attrs = @default | GIA_MODAL;
-	}
+    @object GenInteractionClass DeleteAffirmation = {
+        GI_comp = DeleteAffirmationText, DeleteAffirmationYes;
+        GII_type = GIT_AFFIRMATION;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL;
+    }
 
-	@object GenGlyphClass DeleteAffirmationText = {
-		GI_visMoniker = "Are you sure you want to delete this file?";
-	}
+    @object GenGlyphClass DeleteAffirmationText = {
+        GI_visMoniker = "Are you sure you want to delete this file?";
+    }
 
-	/* This trigger replaces the default IC_YES trigger. */
+    /* This trigger replaces the default IC_YES trigger. */
 
-	@object GenTriggerClass DeleteAffirmationYes = {
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_DELETE_FILE;
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES};
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass DeleteAffirmationYes = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_DELETE_FILE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_YES};
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 #### 7.3.2.7 Multiple Response Interactions
@@ -1855,35 +1855,35 @@ responding to one of the choices.*
 ----------
 **Code Display 7-17 A Fragmentation Warning Dialog Box**
 
-	@object GenInteractionClass DatabaseFragmentWarning = {
-		GI_comp = DBFragmentText, DBFragmentCompact, DBFragmentContinue;
-		GII_type = GIT_MULTIPLE_RESPONSE;
-		GII_visibility = GIV_DIALOG;
-		GII_attrs = @default | GIA_MODAL;
-	}
+    @object GenInteractionClass DatabaseFragmentWarning = {
+        GI_comp = DBFragmentText, DBFragmentCompact, DBFragmentContinue;
+        GII_type = GIT_MULTIPLE_RESPONSE;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_MODAL;
+    }
 
-	@object GenGlyphClass DBFragmentText = {
-		GI_visMoniker = "Database is getting fragmented."
-	}
+    @object GenGlyphClass DBFragmentText = {
+        GI_visMoniker = "Database is getting fragmented."
+    }
 
-	/* As none of the following triggers are standard trigger replacements, there is no
-	 * need to use ATTR_GEN_TRIGGER_INTERACTION_COMMAND. */
+    /* As none of the following triggers are standard trigger replacements, there is no
+     * need to use ATTR_GEN_TRIGGER_INTERACTION_COMMAND. */
 
-	@object GenTriggerClass DBFragmentCompact = {
-		GI_visMoniker = "Run Compaction utility.";
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_DB_COMPACT;
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass DBFragmentCompact = {
+        GI_visMoniker = "Run Compaction utility.";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_DB_COMPACT;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+    }
 
-	@object GenTriggerClass DBFragmentContinue = {
-		GI_visMoniker = "Continue without Compacting.";
-		GTI_destination = process;
-		GTI_actionMsg = MSG_MY_PROCESS_DB_CONTINUE;
-		GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass DBFragmentContinue = {
+        GI_visMoniker = "Continue without Compacting.";
+        GTI_destination = process;
+        GTI_actionMsg = MSG_MY_PROCESS_DB_CONTINUE;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 #### 7.3.2.8 Toolboxes
@@ -1913,8 +1913,8 @@ details several ways in which you can alter these defaults.
 
 ### 7.4.1 Initiating Interactions
 
-	MSG_GEN_INTERACTION_INITIATE, 
-	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB
+    MSG_GEN_INTERACTION_INITIATE, 
+    MSG_GEN_INTERACTION_INITIATE_NO_DISTURB
 
 For the most part, the Specific UI decides in what way Interactions should be 
 initiated. For example, a popup built as a menu will create a menu title 
@@ -1982,7 +1982,7 @@ but there is little need to intercept it.
 ----------
 #### MSG_GEN_INTERACTION_INITIATE
 
-	void	MSG_GEN_INTERACTION_INITIATE();
+    void    MSG_GEN_INTERACTION_INITIATE();
 
 This message brings an Interaction on-screen, giving it focus and target if 
 possible. The Interaction must be both within the generic tree and set 
@@ -2014,7 +2014,7 @@ once the interaction is on-screen.
 ----------
 #### MSG_GEN_INTERACTION_INITIATE_NO_DISTURB
 
-	void	MSG_GEN_INTERACTION_INITIATE_NO_DISTURB();
+    void    MSG_GEN_INTERACTION_INITIATE_NO_DISTURB();
 
 This message brings an Interaction on-screen but does not give the dialog the 
 focus or target. This message may place the dialog behind other windows. 
@@ -2061,7 +2061,7 @@ depending on what behavior the handler is adding.
 
 ### 7.4.3 Modality for Dialogs
 
-	MSG_GEN_INTERACTION_TEST_INPUT_RESTRICTABILITY
+    MSG_GEN_INTERACTION_TEST_INPUT_RESTRICTABILITY
 
 By default, GIV_DIALOG GenInteractions appear as non-modal windows. You 
 may specify a dialog Interaction to appear as modal by setting either the 
@@ -2115,8 +2115,8 @@ its interactability in these cases; it uses two messages, described below.
 ----------
 #### MSG_GEN_INTERACTION_TEST_INPUT_RESTRICTABILITY
 
-	Boolean	MSG_GEN_INTERACTION_TEST_INPUT_RESTRICTABILITY(
-			optr	obj);
+    Boolean MSG_GEN_INTERACTION_TEST_INPUT_RESTRICTABILITY(
+            optr    obj);
 
 This message is called on a modal window by a GenApplication object to find 
 out whether or not the various input restricting mechanisms (input hold-up, 
@@ -2141,9 +2141,9 @@ input restrictions in certain cases.
 
 ### 7.4.4 Managing Input
 
-	ATTR_GEN_INTERACTION_OVERRIDE_INPUT_RESTRICTIONS, 
-	ATTR_GEN_INTERACTION_ABIDE_BY_INPUT_RESTRICTIONS, 
-	HINT_INTERACTION_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD
+    ATTR_GEN_INTERACTION_OVERRIDE_INPUT_RESTRICTIONS, 
+    ATTR_GEN_INTERACTION_ABIDE_BY_INPUT_RESTRICTIONS, 
+    HINT_INTERACTION_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD
 
 Typically, specific UIs will determine how input (primarily keyboard input) 
 affects GenInteractions and their components. For example, many UIs will 
@@ -2174,7 +2174,7 @@ routines **UserDoDialog()**, **UserStandardDialog()**, and
 
 #### 7.4.5.1 UserDoDialog()
 
-	UserDoDialog(), UserCreateDialog(), UserDestroyDialog()
+    UserDoDialog(), UserCreateDialog(), UserDestroyDialog()
 
 You may bring dialog boxes on-screen with several routines. The most 
 common and easiest to use of these routines is **UserDoDialog()**. 
@@ -2212,29 +2212,29 @@ thread will not be updated when exposed.
 ----------
 **Code Display 7-18 Using UserDoDialog()**
 
-	/* This dialog box asks for confirmation before beginning a delete file operation.
-	 * Therefore, it is advisable to block threads before beginning this operation. The
-	 * dialog using UserDoDialog() should be marked both GIA_MODAL and
-	 * GIA_INITIATED_VIA_USER_DO_DIALOG. */
+    /* This dialog box asks for confirmation before beginning a delete file operation.
+     * Therefore, it is advisable to block threads before beginning this operation. The
+     * dialog using UserDoDialog() should be marked both GIA_MODAL and
+     * GIA_INITIATED_VIA_USER_DO_DIALOG. */
 
-	@object GenInteractionClass ConfirmDeleteBox = {
-		GI_comp = ConfirmDeleteText;
-		GII_type = GIT_AFFIRMATION;
-		GII_visibility = GIV_DIALOG;
-		GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
-	}
+    @object GenInteractionClass ConfirmDeleteBox = {
+        GI_comp = ConfirmDeleteText;
+        GII_type = GIT_AFFIRMATION;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+    }
 
-	@object GenTextClass ConfirmDeleteText = {
-		GTI_text = "Are you sure you want to delete this file?";
-	}
+    @object GenTextClass ConfirmDeleteText = {
+        GTI_text = "Are you sure you want to delete this file?";
+    }
 
-	/* This dialog box is displayed through a normal routine call with
-	 * the optr of the dialog box as its one argument. */
+    /* This dialog box is displayed through a normal routine call with
+     * the optr of the dialog box as its one argument. */
 
-	/* Check for positive response. */
-	if (UserDoDialog(ConfirmDeleteBox) == IC_YES) {
-		/* delete file. */
-	}
+    /* Check for positive response. */
+    if (UserDoDialog(ConfirmDeleteBox) == IC_YES) {
+        /* delete file. */
+    }
 
 ----------
 **UserDoDialog()** may also return IC_NULL to indicate that the modal dialog 
@@ -2263,40 +2263,40 @@ of the dialog box template.
 ----------
 **Code Display 7-19 Using UserCreateDialog(), UserDestroyDialog()**
 
-	/* 
-	 * The template dialog box must not be GS_USABLE. The object must also be marked 
-	 * GIA_INITIATED_VIA_USER_DO_DIALOG. The block must be sharable, read-only, and 
-	 * the top GenInteraction must not be linked into the generic tree.
-	 */
+    /* 
+     * The template dialog box must not be GS_USABLE. The object must also be marked 
+     * GIA_INITIATED_VIA_USER_DO_DIALOG. The block must be sharable, read-only, and 
+     * the top GenInteraction must not be linked into the generic tree.
+     */
 
-	@object GenInteractionClass MyDialogTemplate = {
-		GI_visMoniker = "Template";
-		GI_states = @default & ~GS_USABLE;
-		GII_visibility = GIV_DIALOG;
-		GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | 
-				GIA_NOT_USER_INITIATABLE | GIA_MODAL;
-		GII_type = GIT_NOTIFICATION;
-		GI_comp = @NotificationGlyph;
-	}
+    @object GenInteractionClass MyDialogTemplate = {
+        GI_visMoniker = "Template";
+        GI_states = @default & ~GS_USABLE;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | 
+                GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+        GII_type = GIT_NOTIFICATION;
+        GI_comp = @NotificationGlyph;
+    }
 
-	@method SomeProcessClass, MSG_BRING_UP_DUPLICATED_DIALOG
-	{
-		optr		newDialog;
+    @method SomeProcessClass, MSG_BRING_UP_DUPLICATED_DIALOG
+    {
+        optr        newDialog;
 
-		newDialog = UserCreateDialog(@MyDialogTemplate);
+        newDialog = UserCreateDialog(@MyDialogTemplate);
 
-		if (UserDoDialog(@newDialog) == IC_OK) {
-			/*** code ***/
-		}
+        if (UserDoDialog(@newDialog) == IC_OK) {
+            /*** code ***/
+        }
 
-		UserDestroyDialog(@newDialog);
-	}
+        UserDestroyDialog(@newDialog);
+    }
 
 ----------
 #### 7.4.5.2 UserStandardDialog()
 
-	UserStandardDialog(), UserStandardDialogOptr(), 
-	CustomDialogBoxFlags
+    UserStandardDialog(), UserStandardDialogOptr(), 
+    CustomDialogBoxFlags
 
 **UserStandardDialog()** displays standardized dialog boxes. The dialog is 
 standardized in that it has a text area, an icon glyph representing the type 
@@ -2387,23 +2387,23 @@ warning.*
 ----------
 **Code Display 7-20 Using UserStandardDialog()**
 
-	/* 
-	 * This simple example uses no help context, custom triggers, or string arguments. 
-	 */
+    /* 
+     * This simple example uses no help context, custom triggers, or string arguments. 
+     */
 
-	if ((UserStandardDialog((char *)0,
-					(char *)0,
-					(char *)0,
-					(char *)0,
-					"Do you wish to continue?",
-					((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
-					(GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
-					) == IC_YES)) {
-		/* code to perform on a positive response. */
-	}
-	else {
-		/* code to perform on a negative response. */
-	}
+    if ((UserStandardDialog((char *)0,
+                    (char *)0,
+                    (char *)0,
+                    (char *)0,
+                    "Do you wish to continue?",
+                    ((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+                    ) == IC_YES)) {
+        /* code to perform on a positive response. */
+    }
+    else {
+        /* code to perform on a negative response. */
+    }
 
 ----------
 You may also use **UserStandardDialogOptr()** for cases in which the 
@@ -2412,90 +2412,90 @@ strings are referenced through optrs rather than pointers.
 ----------
 **Code Display 7-21 A ConfirmDeleteBox with explicit monikers**
 
-	/* For this case, since we want to provide explicit monikers, we must use the
-	 * GIT_MULTIPLE_RESPONSE interaction type. Using this allows us to pass in the
-	 * monikers and response values for the response triggers for the dialog. This is
-	 * done by passing a pointer to a table consisting of the number of triggers in the
-	 * dialog and a StandardDialogResponseTriggerEntry for each trigger. Each entry
-	 * contains an optr of the moniker to use and the response value for the trigger.
-	 * The moniker may be simple text or a graphics string. The response value may be
-	 * one of the predefined InteractionCommands or an application-defined value based
-	 * on IC_CUSTOM_START. */
+    /* For this case, since we want to provide explicit monikers, we must use the
+     * GIT_MULTIPLE_RESPONSE interaction type. Using this allows us to pass in the
+     * monikers and response values for the response triggers for the dialog. This is
+     * done by passing a pointer to a table consisting of the number of triggers in the
+     * dialog and a StandardDialogResponseTriggerEntry for each trigger. Each entry
+     * contains an optr of the moniker to use and the response value for the trigger.
+     * The moniker may be simple text or a graphics string. The response value may be
+     * one of the predefined InteractionCommands or an application-defined value based
+     * on IC_CUSTOM_START. */
 
-	@visMoniker ConfirmYesMoniker = "Delete this file";
+    @visMoniker ConfirmYesMoniker = "Delete this file";
 
-	@visMoniker ConfirmNoMoniker = "Skip this file";
+    @visMoniker ConfirmNoMoniker = "Skip this file";
 
-	/* Create a table to hold the trigger data. */
+    /* Create a table to hold the trigger data. */
 
-	static const StandardDialog2ResponseTriggerTable confirmResponseTable [] = {
-		2,						/* SD2RTT_numTriggers */
-		/* WRT_trigger1 */
-		{ConfirmYesMoniker,		/* SDRTE_moniker */
-			IC_YES}, 			/* SDRTE_responseValue */
-		/* WRT_trigger2 */
-		{ConfirmNoMoniker,		/* SDRTE_moniker */
-			IC_NO}				/* SDRTE_responseValue */
-	};
+    static const StandardDialog2ResponseTriggerTable confirmResponseTable [] = {
+        2,                      /* SD2RTT_numTriggers */
+        /* WRT_trigger1 */
+        {ConfirmYesMoniker,     /* SDRTE_moniker */
+            IC_YES},            /* SDRTE_responseValue */
+        /* WRT_trigger2 */
+        {ConfirmNoMoniker,      /* SDRTE_moniker */
+            IC_NO}              /* SDRTE_responseValue */
+    };
 
-	/* Display the dialog with UserStandardDialog(). */
+    /* Display the dialog with UserStandardDialog(). */
 
-	if (UserStandardDialog((char *)0,
-				(char *)&confirmResponseTable,
-				(char *)0,
-				(char *)0,
-				"Are you sure you want to delete this file?",
-				((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
-				/* interaction type - application supplied trigger */
-				(GIT_MULTIPLE_RESPONSE << CBDF_INTERACTION_TYPE_OFFSET)))
-			== IC_YES) {
-		/* delete file */
-	}
+    if (UserStandardDialog((char *)0,
+                (char *)&confirmResponseTable,
+                (char *)0,
+                (char *)0,
+                "Are you sure you want to delete this file?",
+                ((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                /* interaction type - application supplied trigger */
+                (GIT_MULTIPLE_RESPONSE << CBDF_INTERACTION_TYPE_OFFSET)))
+            == IC_YES) {
+        /* delete file */
+    }
 
 ----------
 **Code Display 7-22 A IC_CUSTOM_START Interaction**
 
-	#define SAVE_CHANGES				IC_CUSTOM_START+0
-	#define ABORT_CHANGES				IC_CUSTOM_START+1
-	#define CANCEL_CLOSE				IC_CUSTOM_START+2
+    #define SAVE_CHANGES                IC_CUSTOM_START+0
+    #define ABORT_CHANGES               IC_CUSTOM_START+1
+    #define CANCEL_CLOSE                IC_CUSTOM_START+2
 
-	@visMoniker CloseSaveMoniker = "Save Changes";
-	@visMoniker CloseAbortMoniker = "Abort Changes":
-	@visMoniker CloseCancelMoniker = "Cancel Close";
+    @visMoniker CloseSaveMoniker = "Save Changes";
+    @visMoniker CloseAbortMoniker = "Abort Changes":
+    @visMoniker CloseCancelMoniker = "Cancel Close";
 
-	static const StandardDialog3ResponseTriggerTable closeResponseTable [] = {
-		3, 							/* SD2RTT_numTriggers */
-		/* WRT_trigger1 */
-		{CloseSaveMoniker,			/* SDRTE_moniker */
-		IC_YES},					/* SDRTE_responseValue */
-		/* WRT_trigger2 */
-		{CloseAbortMoniker,			/* SDRTE_moniker */
-		IC_YES},					/* SDRTE_responseValue */
-		/* WRT_trigger3 */
-		{CloseCancelMoniker,		/* SDRTE_moniker */
-		IC_NO}						/* SDRTE_responseValue */
-	};
+    static const StandardDialog3ResponseTriggerTable closeResponseTable [] = {
+        3,                          /* SD2RTT_numTriggers */
+        /* WRT_trigger1 */
+        {CloseSaveMoniker,          /* SDRTE_moniker */
+        IC_YES},                    /* SDRTE_responseValue */
+        /* WRT_trigger2 */
+        {CloseAbortMoniker,         /* SDRTE_moniker */
+        IC_YES},                    /* SDRTE_responseValue */
+        /* WRT_trigger3 */
+        {CloseCancelMoniker,        /* SDRTE_moniker */
+        IC_NO}                      /* SDRTE_responseValue */
+    };
 
-	closeWithChangesResponse = 
-		(UserStandardDialog(
-				(char *)0,
-				(char *)&closeResponseTable),
-				(char *)0,
-				(char *)0,
-				((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
-				/* interaction type - application supplied triggers */
-				(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)));
+    closeWithChangesResponse = 
+        (UserStandardDialog(
+                (char *)0,
+                (char *)&closeResponseTable),
+                (char *)0,
+                (char *)0,
+                ((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+                /* interaction type - application supplied triggers */
+                (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)));
 
-	switch (closeWithChangesResponse) {
-		case SAVE_CHANGES:
-		/* save changes */
-		case ABORT_CHANGES:
-		/* abort changes */
-		case IC_CANCEL_CLOSE:
-		/* cancel close */
-		case IC_NULL:
-		/* IC_NULL is always a potential response */
-	}
+    switch (closeWithChangesResponse) {
+        case SAVE_CHANGES:
+        /* save changes */
+        case ABORT_CHANGES:
+        /* abort changes */
+        case IC_CANCEL_CLOSE:
+        /* cancel close */
+        case IC_NULL:
+        /* IC_NULL is always a potential response */
+    }
 
 ----------
 ## 7.5 Interaction Commands
@@ -2617,35 +2617,35 @@ predefined values, which still have their usual meaning to the dialog.
 ----------
 **Code Display 7-23 Using IC_CUSTOM_START**
 
-	/* You may define values directly. */
+    /* You may define values directly. */
 
-	#define IC_SAVE_FILE IC_CUSTOM_START+1;
-	#define IC_KILL_FILE IC_CUSTOM_START+2;
+    #define IC_SAVE_FILE IC_CUSTOM_START+1;
+    #define IC_KILL_FILE IC_CUSTOM_START+2;
 
-	/* You may also use typedef to enumerate those values. */
+    /* You may also use typedef to enumerate those values. */
 
-	typedef enum {
-		IC_SAVE_FILE = IC_CUSTOM_START+1,
-		IC_KILL_FILE = IC_CUSTOM_START+2
-	} MyInteractionCommand;
+    typedef enum {
+        IC_SAVE_FILE = IC_CUSTOM_START+1,
+        IC_KILL_FILE = IC_CUSTOM_START+2
+    } MyInteractionCommand;
 
-	/* Any triggers set up with these InteractionCommands would appear like so: */
+    /* Any triggers set up with these InteractionCommands would appear like so: */
 
-	@object GenTriggerClass MyTrigger = {
-		GI_visMoniker = "Save File";
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_SAVE_FILE };
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass MyTrigger = {
+        GI_visMoniker = "Save File";
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_SAVE_FILE };
+        HINT_SEEK_REPLY_BAR;
+    }
 
-	/* An Interaction invoked with UserDoDialog() (with MyTrigger as one of its
-	 * children) will return IC_SAVE_FILE when that trigger is activated. Your
-	 * application can then perform any required actions. */
+    /* An Interaction invoked with UserDoDialog() (with MyTrigger as one of its
+     * children) will return IC_SAVE_FILE when that trigger is activated. Your
+     * application can then perform any required actions. */
 
 ----------
 ### 7.5.2 Dialog Control
 
-	MSG_GEN_GUP_INTERACTION_COMMAND, 
-	MSG_GEN_INTERACTION_ACTIVATE_COMMAND
+    MSG_GEN_GUP_INTERACTION_COMMAND, 
+    MSG_GEN_INTERACTION_ACTIVATE_COMMAND
 
 There are two ways of delivering an **InteractionCommand** to an 
 Interaction. The first is through the **GenClass** message 
@@ -2705,8 +2705,8 @@ Interactions.
 ----------
 #### MSG_GEN_INTERACTION_ACTIVATE_COMMAND
 
-	void	MSG_GEN_INTERACTION_ACTIVATE_COMMAND(
-			word	command);
+    void    MSG_GEN_INTERACTION_ACTIVATE_COMMAND(
+            word    command);
 
 This message activates a GenTrigger having the passed command in its 
 ATTR_GEN_TRIGGER_INTERACTION_COMMAND; if no such trigger exists, 
@@ -2741,18 +2741,18 @@ moniker chosen by the Specific UI.
 The standard response triggers (and their visual monikers under OSF/Motif) 
 for each *GII_type* are shown in Table 7-1.
 
-**Table 7-1** *Standard Response Triggers*
+**Table 7-1** Standard Response Triggers
 
-	Interaction Type	Trigger Type	Moniker
+    Interaction Type    Trigger Type    Moniker
 
-	GIT_NOTIFICATION	IC_OK			"OK"  
-	GIT_AFFIRMATION		IC_YES			"Yes"  
-						IC_NO			"No"  
-	GIT_PROGRESS		IC_STOP			"Stop"  
-	GIT_COMMAND			IC_DISMISS		"Close" or "Cancel"  
-	GIT_PROPERTIES		IC_APPLY		"Apply" or "OK"  
-						IC_RESET		"Reset"  
-						IC_DISMISS		"Close" or "Cancel"  
+    GIT_NOTIFICATION    IC_OK           "OK"  
+    GIT_AFFIRMATION     IC_YES          "Yes"  
+                        IC_NO           "No"  
+    GIT_PROGRESS        IC_STOP         "Stop"  
+    GIT_COMMAND         IC_DISMISS      "Close" or "Cancel"  
+    GIT_PROPERTIES      IC_APPLY        "Apply" or "OK"  
+                        IC_RESET        "Reset"  
+                        IC_DISMISS      "Close" or "Cancel"  
 
 
 The Specific UI automatically places these standard response triggers in a 
@@ -2824,34 +2824,34 @@ the default behavior of the replaced trigger.
 ----------
 **Code Display 7-24 Replacing a Standard Response Trigger**
 
-	/* The GenInteractionType GIT_NOTIFICATION, when built as a dialog, automatically
-	 * contains a standard response trigger to send out the InteractionCommand IC_OK.
-	 * You can replace this trigger with one of your own by adding a trigger with that
-	 * InteractionCommand. Your trigger will override the system default. */
+    /* The GenInteractionType GIT_NOTIFICATION, when built as a dialog, automatically
+     * contains a standard response trigger to send out the InteractionCommand IC_OK.
+     * You can replace this trigger with one of your own by adding a trigger with that
+     * InteractionCommand. Your trigger will override the system default. */
 
-	@object GenInteractionClass MyInteraction = {
-		GII_type = GIT_NOTIFICATION;
-		GII_visibility = GIV_DIALOG;
-		GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
-		GI_comp = MyGlyph, MyResponseTrigger;
-	}
+    @object GenInteractionClass MyInteraction = {
+        GII_type = GIT_NOTIFICATION;
+        GII_visibility = GIV_DIALOG;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+        GI_comp = MyGlyph, MyResponseTrigger;
+    }
 
-	@object GenGlyphClass MyGlyph = {
-		GI_visMoniker = "New Mail has arrived";
-	}
+    @object GenGlyphClass MyGlyph = {
+        GI_visMoniker = "New Mail has arrived";
+    }
 
-	/* MyResponseTrigger replaces the IC_OK default trigger for the Notification dialog
-	 * box. In this case, we will only change the visual moniker of the trigger. By
-	 * leaving the output fields blank, we cause the system to send
-	 * MSG_GEN_GUP_INTERACTION_COMMAND with IC_OK. (This is the default behavior.)
-	 * HINT_SEEK_REPLY_BAR is used to place this trigger within the reply bar of the
-	 * notification dialog. */
+    /* MyResponseTrigger replaces the IC_OK default trigger for the Notification dialog
+     * box. In this case, we will only change the visual moniker of the trigger. By
+     * leaving the output fields blank, we cause the system to send
+     * MSG_GEN_GUP_INTERACTION_COMMAND with IC_OK. (This is the default behavior.)
+     * HINT_SEEK_REPLY_BAR is used to place this trigger within the reply bar of the
+     * notification dialog. */
 
-	@object GenTriggerClass MyResponseTrigger = {
-		GI_visMoniker = "OK, I acknowledge";
-		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
-		HINT_SEEK_REPLY_BAR;
-	}
+    @object GenTriggerClass MyResponseTrigger = {
+        GI_visMoniker = "OK, I acknowledge";
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+        HINT_SEEK_REPLY_BAR;
+    }
 
 ----------
 ATTR_GEN_TRIGGER_INTERACTION_COMMAND also performs a special 

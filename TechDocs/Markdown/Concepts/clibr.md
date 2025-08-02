@@ -119,8 +119,8 @@ point is shown in Code Display C-1.
 Code Display C-1 A Library Entry Point
 ~~~
 Boolean _pascal
-	LibraryEntry(LibraryCallType ty,
-			GeodeHandle client);
+        LibraryEntry(LibraryCallType ty,
+                        GeodeHandle client);
 ~~~
 
 When the kernel calls the entry point routine, it passes the following 

@@ -231,3 +231,8 @@ export INTEL80X87PICK
 export INTEL80X87FSTSW
 export INTEL80X87RANDOMIZE
 
+# second table part to be integrated with math libraries reloc table
+export Intel80X87UnsignedToFloat
+export Intel80X87FloatToUnsigned
+export INTEL80X87UNSIGNEDTOFLOAT
+

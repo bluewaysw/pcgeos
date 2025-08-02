@@ -88,7 +88,7 @@ Installed/Tools/swat/Stub/WinCom:	MAKESTUB
 #
 minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  genpc ansic cdaudio cell chart color compress config hash impex \
-		  borlandc math pen resolver spline ssmeta styles \
+		  borlandc watcomc math pen resolver spline ssmeta styles \
 		  wav game cards spreadsheet parse spell convert \
 		  saver prefLibs accpnt netutils \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
@@ -97,7 +97,8 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  jpeg giflib gif png htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
-		  basicdb gridlib gsol treplib hostif ascii
+		  basicdb gridlib gsol treplib hostif ascii \
+		  rsftool bmptools
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
@@ -255,7 +256,7 @@ shell	: Installed/Library/Shell
 Installed/Library/Shell: 	ui MAKELIB
 
 ansic	: Installed/Library/AnsiC
-Installed/Library/AnsiC: kernel math borlandc MAKELIB
+Installed/Library/AnsiC: kernel math borlandc watcomc MAKELIB
 
 cell	: Installed/Library/Cell
 Installed/Library/Cell: 	kernel MAKELIB
@@ -330,6 +331,9 @@ borlandrtl	:
 
 borlandc	: Installed/Library/Math/Compiler/BorlandC
 Installed/Library/Math/Compiler/BorlandC: kernel math MAKELIB
+
+watcomc	: Installed/Library/Math/Compiler/WatcomC
+Installed/Library/Math/Compiler/WatcomC: kernel math MAKELIB
 
 math	: Installed/Library/Math
 Installed/Library/Math:	ui MAKELIB
@@ -939,7 +943,7 @@ Installed/Appl/Clock:		ui color MAKEAPPL
 # email: ui text ansic socket spell spool mailtool stacache borlandc
 #
 
-email: ui text ansic socket spell spool  borlandc
+email: ui text ansic socket spell spool  borlandc watcomc
 #	No need to do this because this is sync'ed by morning make script.
 #	p4 sync -f //depot/pcgeos/Installed/Appl/Email/...
 
@@ -1437,7 +1441,7 @@ impdoc	: 	Installed/Library/Breadbox/ImpDoc
 Installed/Library/Breadbox/ImpDoc:		ui ansic MAKELIB
 
 pdfvu	: 	Installed/Appl/PDFViewer
-Installed/Appl/PDFViewer:			ui ansic spool borlandc \
+Installed/Appl/PDFViewer:			ui ansic spool borlandc watcomc \
 						MAKEAPPL
 
 #wavplay	: Installed/Appl/WavPlay
@@ -1823,3 +1827,11 @@ Installed/Library/Breadbox/Impex/VCImpex:	ui impex ansic math meta MAKELIB
 
 vconvert: Installed/Appl/Breadbox/VConvert
 Installed/Appl/Breadbox/VConvert:		ui ansic grobj text math meta MAKEAPPL
+
+# RabeSoft Libraries
+
+rsftool	: Installed/Library/RabeSoft/rsftool
+Installed/Library/RabeSoft/rsftool:		ansic ui MAKELIB
+
+bmptools	: Installed/Library/RabeSoft/bmptools
+Installed/Library/RabeSoft/bmptools:		ansic ui MAKELIB

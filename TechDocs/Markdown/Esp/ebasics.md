@@ -59,8 +59,8 @@ you want it to stay on the stack. The canonical way to do this would be the
 following:
 
 ~~~
-pop	cx	; Read the value . . .
-push	cx	; . . . and push it back.
+pop     cx      ; Read the value . . .
+push    cx      ; . . . and push it back.
 ~~~
 
 This takes only two bytes and 27 cycles; this is fairly good for a memory 
@@ -69,8 +69,8 @@ there above the stack, so we don't have to push it back, do we?" He might
 write the following bad code:
 
 ~~~
-pop	cx
-sub	sp, 2	; THIS IS VERY BAD
+pop     cx
+sub     sp, 2   ; THIS IS VERY BAD
 ~~~
 
 "Aha," he might think, "This takes only 16 cycles!" Unfortunately, the code is 
@@ -199,13 +199,13 @@ A single character surrounded by double quotes is parsed as the ASCII value
 of that character; for example,
 
 ~~~
-LETTER_A		= "a"
+LETTER_A                = "a"
 ~~~
 
 is identical to 
 
 ~~~
-LETTER_A		= 61h
+LETTER_A                = 61h
 ~~~
 
 You may use any of the standard C character escapes; these are listed in 
@@ -234,6 +234,7 @@ structures. The types are listed in Table 2-1.
 |lptr      |2    |Chunk handle (i.e. near pointer to a near pointer)     |
 |optr      |4    |object descriptor; high word is hptr, low word is lptr |
 |sptr      |2    |Segment address (or descriptor).                       |
+
 **Table 2-1** Major Esp Data Types  
 _These are the main Esp data types, with their size in bytes._
 
@@ -308,13 +309,13 @@ might do this:
 ---
 Code Display 2-1 Declaring an Enumerated Type
 ~~~
-HelloMonth		etype byte, 1 		; One byte is enough to hold the twelve months.
-				; We specify that the first month should have a
-				; value of one, as is conventional.
+HelloMonth              etype byte, 1           ; One byte is enough to hold the twelve months.
+                                ; We specify that the first month should have a
+                                ; value of one, as is conventional.
 
-HM_JANUARY		enum HelloMonth
-HM_FEBRUARY		enum HelloMonth
-HM_MARCH		enum HelloMonth		; and so on . . .
+HM_JANUARY              enum HelloMonth
+HM_FEBRUARY             enum HelloMonth
+HM_MARCH                enum HelloMonth         ; and so on . . .
 ~~~
 
 Note that members of the enumerated type need not be declared all at once. 
@@ -327,11 +328,11 @@ to verify that a value is in bounds for an enumerated type. For example,
 suppose you had the following enumerated type:
 
 ~~~
-MyColor		etype byte 0, 2
+MyColor         etype byte 0, 2
 
-MC_BLUE		enum MyColor ; MC_BLUE = 0
-MC_RED		enum MyColor ; MC_RED = 2
-MC_GREEN		enum MyColor ; MC_GREEN = 4
+MC_BLUE         enum MyColor ; MC_BLUE = 0
+MC_RED          enum MyColor ; MC_RED = 2
+MC_GREEN                enum MyColor ; MC_GREEN = 4
 ~~~
 
 At this point, the name MyColor would evaluate to 6, i.e. MC_GREEN plus 
@@ -345,11 +346,11 @@ Esp lets you define structures. Structure declarations have the following
 format:
 
 ~~~
-<StructureType>    	struct
+<StructureType>         struct
     <FieldName>     <FieldType> [<DefaultValue>]
                     ;any number of these
 
-<StructureType>			ends
+<StructureType>                 ends
 ~~~
 
 **StructureType**  
@@ -397,19 +398,19 @@ aStructure        MyDataStructure    <>
 is equivalent to
 
 ~~~
-aStructure		MyDataStructure			<0, -1, 0>
+aStructure              MyDataStructure                 <0, -1, 0>
 ~~~
 
 One of the fields of a structure may be another structure. For example, you 
 might make the following declaration:
 
 ~~~
-MyOtherStructure			struct
-	MOS_char1			char
-	MOS_char2			char
-	MOS_dataStruct			MyDataStructure
-	MOS_signedLong			sdword
-MyOtherStructure			ends
+MyOtherStructure                        struct
+        MOS_char1                       char
+        MOS_char2                       char
+        MOS_dataStruct                  MyDataStructure
+        MOS_signedLong                  sdword
+MyOtherStructure                        ends
 ~~~
 
 You might initialize the structure like this:
@@ -432,7 +433,7 @@ that structure into ax. If es:[di] was the address of the bigStruct
 variable, we could do the following:
 
 ~~~
-mov	ax, es:[di].MOS_dataStruct.MDS_anotherField
+mov     ax, es:[di].MOS_dataStruct.MDS_anotherField
 ~~~
 
 Esp would figure out the displacement from the start of a 
@@ -442,7 +443,7 @@ and use the combined displacement in the instruction, producing an
 equivalent machine instruction, e.g. 
 
 ~~~
-mov	ax, es:[di].3
+mov     ax, es:[di].3
 ~~~
 
 You can use the dot operator this way in any effective-address instruction.
@@ -455,11 +456,11 @@ at different times, have values of different sizes or types.
 A union is declared much like a structure. The basic format is:
 
 ~~~
-<UnionType>			union
-	<FieldName>		<FieldType> [<DefaultValue>]
-				;any number of these
+<UnionType>                     union
+        <FieldName>             <FieldType> [<DefaultValue>]
+                                ;any number of these
 
-<UnionType>			ends
+<UnionType>                     ends
 ~~~
 
 **UnionType**  
@@ -480,8 +481,8 @@ large as its largest component field. For example,
 
 ~~~
 MyUnion  union
-	MU_sbyte    sbyte		-2
-	MU_word     word		1234
+        MU_sbyte    sbyte               -2
+        MU_word     word                1234
 MyUnion  ends
 ~~~
 
@@ -491,7 +492,7 @@ Unions are initialized slightly differently from structures. You can initialize
 a union to all zeros by putting nothing between the angle brackets, e.g.
 
 ~~~
-aVariable		MyUnion		<>
+aVariable               MyUnion         <>
 ~~~
 
 You can initialize the union to contain the default value for one of its 
@@ -499,7 +500,7 @@ components by putting the component's name between the angle brackets,
 e.g.
 
 ~~~
-aVariable		MyUnion		<MU_sbyte>
+aVariable               MyUnion         <MU_sbyte>
 ~~~
 
 would initialize the first byte of the union to 0xfd (i.e. -2), and clear the 
@@ -507,7 +508,7 @@ second byte. If you wish to override the default value, simply put the new
 value after the field name, like so:
 
 ~~~
-aVariable		MyUnion		<MU_sbyte 12>
+aVariable               MyUnion         <MU_sbyte 12>
 ~~~
 
 ##### 2.3.1.6 Records
@@ -524,11 +525,11 @@ appropriately-sized enumerated type. A record declaration has the following
 format:
 
 ~~~
-<recordname>			record
-	[<fieldname> [<type>]] :<size> [= <value>]
-	;...there may be many such lines
+<recordname>                    record
+        [<fieldname> [<type>]] :<size> [= <value>]
+        ;...there may be many such lines
 
-<recordname>			ends
+<recordname>                    ends
 ~~~
 
 **recordname**  
@@ -576,11 +577,11 @@ bits.
 For example, suppose you define the record HelloRecord thus:
 
 ~~~
-HelloRecord			record
-	HR_A_FLAG:1
-	HR_ZERO_TO_SEVEN:3
-	HR_ANOTHER_FLAG:1
-HelloRecord			ends
+HelloRecord                     record
+        HR_A_FLAG:1
+        HR_ZERO_TO_SEVEN:3
+        HR_ANOTHER_FLAG:1
+HelloRecord                     ends
 ~~~
 
 In this case, "mask HR_ZERO_TO_SEVEN" would assemble to 0eh, 
@@ -590,17 +591,17 @@ would assemble to 1Fh. If you wanted to load HR_zeroToSeven into ax, you
 would do the following (assuming es:[di] pointed to the record):
 
 ~~~
-mov	ax, es:[di]		;load the record into ax
-and	ax, mask HR_ZERO_TO_SEVEN
-				; Clear the other fields
-mov	cl, offset HR_ZERO_TO_SEVEN
-shr	ax, cl
+mov     ax, es:[di]             ;load the record into ax
+and     ax, mask HR_ZERO_TO_SEVEN
+                                ; Clear the other fields
+mov     cl, offset HR_ZERO_TO_SEVEN
+shr     ax, cl
 ~~~
 
 To test if a given flag (e.g. HR_aFlag) was set, you would simply do this:
 
 ~~~
-test	es:[di], mask HR_zero
+test    es:[di], mask HR_zero
 ~~~
 
 Note that in Esp, unlike MASM, you must use either mask or offset to 
@@ -616,18 +617,18 @@ automatically initialized to zero. For example, suppose you declared
 GapRecord thus:
 
 ~~~
-GapRecord		record
-	GR_A_BIT:1
-	GR_A_NYBBLE:4
-	:2
-	GR_ANOTHER_BIT:3
+GapRecord               record
+        GR_A_BIT:1
+        GR_A_NYBBLE:4
+        :2
+        GR_ANOTHER_BIT:3
 GapRecord ends
 ~~~
 
 And then declared a variable thus:
 
 ~~~
-instanceOfGR			GapRecord		<0x1,0xF,0x7>
+instanceOfGR                    GapRecord               <0x1,0xF,0x7>
 ~~~
 
 instanceOfGR will be initialized to 0x03E7; the two bits between 
@@ -637,13 +638,13 @@ You can also use the name of the record, combined with the initializer, as an
 immediate value. For example, the instruction
 
 ~~~
-move	ax, GapRecord <0x1, 0xF, 0x3>
+move    ax, GapRecord <0x1, 0xF, 0x3>
 ~~~
 
 assembles equivalently to 
 
 ~~~
-move	ax, 0x03E7
+move    ax, 0x03E7
 ~~~
 
 ##### 2.3.1.7 Creating New Types
@@ -652,7 +653,7 @@ Esp overloads the TYPE operator as a type-creation directive. It is useful if
 you will be creating many arrays of exactly the same size. This is the format:
 
 ~~~
-<TypeName>		TYPE	<n> dup(<BaseType>)
+<TypeName>              TYPE    <n> dup(<BaseType>)
 ~~~
 
 **TypeName**  
@@ -672,60 +673,60 @@ nine bytes long (with one byte per digit). In this case, you could make the
 following declaration:
 
 ~~~
-SocSecNum		TYPE 9 dup(byte)
+SocSecNum               TYPE 9 dup(byte)
 ~~~
 
 You could declare one of these variables and initialize it like this:
 
 ~~~
-FranksSSN		SocSecNum <1,2,3,4,5,6,7,8,9>
+FranksSSN               SocSecNum <1,2,3,4,5,6,7,8,9>
 ~~~
 
 ---
 Code Display 2-2 Data Structure Declaration Examples
 ~~~
 COMMENT@-------------------------------------------------------------------
-	This shows how you might combine various Esp types, and how you
-	might use those declarations in code.
+        This shows how you might combine various Esp types, and how you
+        might use those declarations in code.
 ---------------------------------------------------------------------------@
 
 ;
 ; Types
 ;
 
-MyColor		etype byte
+MyColor         etype byte
 
-MC_CLEAR		enum MyColor		; This defaults to zero
-MC_BLACK		enum MyColor		; This is MC_CLEAR + 1, or one
-MC_WHITE		enum MyColor		; 2...
-MC_RED		enum MyColor
-MC_BLUE		enum MyColor
-MC_GREEN		enum MyColor
+MC_CLEAR                enum MyColor            ; This defaults to zero
+MC_BLACK                enum MyColor            ; This is MC_CLEAR + 1, or one
+MC_WHITE                enum MyColor            ; 2...
+MC_RED          enum MyColor
+MC_BLUE         enum MyColor
+MC_GREEN                enum MyColor
 
-MyRecord		record
-	MR_BIG:1
-	MR_COLOR MyColor:8
-	MR_POINTY:1
-MyRecord		end
+MyRecord                record
+        MR_BIG:1
+        MR_COLOR MyColor:8
+        MR_POINTY:1
+MyRecord                end
 
-ShortString		TYPE	9 dup(char)
+ShortString             TYPE    9 dup(char)
 
-MyStructure		struct
-	MS_number		sword
-	MS_label		ShortString
-	MS_record		MyRecord
-MyStructure		ends
+MyStructure             struct
+        MS_number               sword
+        MS_label                ShortString
+        MS_record               MyRecord
+MyStructure             ends
 
 ;
 ; Initialized Variables
 ;
 
-idata	segment
+idata   segment
 
-AStructure		MyStructure		<-123, <"Foo!", 0>,
-				(mask MR_BIG OR (MC_RED SHL offset MR_COLOR))>
+AStructure              MyStructure             <-123, <"Foo!", 0>,
+                                (mask MR_BIG OR (MC_RED SHL offset MR_COLOR))>
 
-idata	ends
+idata   ends
 ~~~
 
 #### 2.3.2 Symbols and Labels
@@ -755,13 +756,13 @@ You must also mark the beginning and end of each segment in the assembly
 source file. At the beginning of the segment, put a line like
 
 ~~~
-<segmentName>	segment resource
+<segmentName>   segment resource
 ~~~
 
 At the end of the resource, put a line like 
 
 ~~~
-<segmentName>	ends
+<segmentName>   ends
 ~~~
 
 You can enter and leave a segment multiple times. You can even do so in 
@@ -804,25 +805,25 @@ Code Display 2-3 Declaring Global Variables
 ; pseudo-segments, and are combined into dgroup by the assembler.
 
 ;---------------------------------------------------------------------------
-;	Initialized Variables
+;       Initialized Variables
 ;---------------------------------------------------------------------------
 
 idata segment
-	MyAppProcessClass	mask	CLASSF_NEVER_SAVED
+        MyAppProcessClass       mask    CLASSF_NEVER_SAVED
 
-	MyGlobalString		char	"Franklin Tiberius Poomm, Esq.",0
+        MyGlobalString          char    "Franklin Tiberius Poomm, Esq.",0
 
-idata	ends
+idata   ends
 
 ;---------------------------------------------------------------------------
-;	Uninitialized Variables
+;       Uninitialized Variables
 ;---------------------------------------------------------------------------
 
-udata	segment
+udata   segment
 
-	MyEmptyArray		sword	20 dup (?)
+        MyEmptyArray            sword   20 dup (?)
 
-udata	ends
+udata   ends
 ~~~
 
 ##### 2.3.3.2 Accessing Segments
@@ -864,7 +865,7 @@ resource, use the Esp directive handle. For example, to load the handle of
 the HelloInitCode resource into bx, you would use
 
 ~~~
-mov	bx, handle HelloInitCode
+mov     bx, handle HelloInitCode
 ~~~
 
 If you know that such a segment is locked or fixed in memory, you can get its 
@@ -872,7 +873,7 @@ segment address with the segment directive. For example, to load the
 segment address of the HelloInitCode resource into bx, you would use
 
 ~~~
-mov	bx, segment HelloInitCode
+mov     bx, segment HelloInitCode
 ~~~
 
 If you know the resource ID of a segment, you can find out the segment's 
@@ -891,8 +892,8 @@ means that the dgroup segment address must be in ss. Thus, to load to
 segment address of [dgroup](#2331-the-dgroup-segment) into ds, you could just use
 
 ~~~
-push	ss	; The segmov macro can also do this;
-pop	ds	; see "segmov"
+push    ss      ; The segmov macro can also do this;
+pop     ds      ; see "segmov"
 ~~~
 
 Remember, this only works if the code is being run by the process thread.
@@ -955,7 +956,7 @@ simply use one of Esp's predefined data types, or define one of your own. The
 Esp syntax for declaring a variable is
 
 ~~~
-[<variableName>]	<dataType>[.<typePointedTo>] [<initValue>]
+[<variableName>]        <dataType>[.<typePointedTo>] [<initValue>]
 ~~~
 
 **variableName**  
@@ -977,7 +978,7 @@ This may be any value appropriate for the data type.
 To declare an array of any data type, simply use the following format:
 
 ~~~
-[<variableName>]	<dataType>[.<typePointedTo>] <n>dup(<init>)
+[<variableName>]        <dataType>[.<typePointedTo>] <n>dup(<init>)
 ~~~
 
 **variableName**  
@@ -995,7 +996,7 @@ If you want to give each element a different initial value, you can use the
 following format:
 
 ~~~
-[<variableName>]	<dataType> <initValue>, <initValue>...
+[<variableName>]        <dataType> <initValue>, <initValue>...
 ~~~
 
 In this case, each comma can be followed by any amount of whitespace or 
@@ -1005,7 +1006,7 @@ comma.
 For example, to declare an array of words, one might use
 
 ~~~
-myByteArray			word	1, 2, 3, 4
+myByteArray                     word    1, 2, 3, 4
 ~~~
 
 Note that if the variable is in the [udata](#2331-the-dgroup-segment) pseudo-segment, any specified 
@@ -1019,14 +1020,14 @@ treated like a comma-separated sequence of the ASCII values. (No null
 terminator is added.) For example, 
 
 ~~~
-myString char			"abc"
+myString char                   "abc"
 ~~~
 
 is functionally equivalent to 
 
 ~~~
-myString char 			61h, 62h, 63h 
-			; ASCII values of a,b,c
+myString char                   61h, 62h, 63h 
+                        ; ASCII values of a,b,c
 ~~~
 
 This is only valid if the data type is byte-sized (db, sb, or a synonym). If the 
@@ -1036,7 +1037,7 @@ You can mix the two formats. For example, to declare a null-terminated
 string, you can use
 
 ~~~
-myString char 		"abc", 0
+myString char           "abc", 0
 ~~~
 
 Characters within a string are translated into their ASCII counterparts, with 
@@ -1046,14 +1047,14 @@ that case, it represents the delimiter character itself. For example, the
 declaration
 
 ~~~
-myString char			"ab""cd"
+myString char                   "ab""cd"
 ~~~
 
 is equivalent to
 
 ~~~
-myString char			61h, 62h, 22h, 63h, 64h
-			; 22h is ASCII for "
+myString char                   61h, 62h, 22h, 63h, 64h
+                        ; 22h is ASCII for "
 ~~~
 
 If the string is bound by double-quotes, single-quote characters are treated 
@@ -1061,13 +1062,13 @@ literally. If it is bound by single-quotes, double-quote characters are treated
 literally. For example,
 
 ~~~
-myString char			"ab""cd'ef"
+myString char                   "ab""cd'ef"
 ~~~
 
 is equivalent to 
 
 ~~~
-myString char			'ab"cd''ef'
+myString char                   'ab"cd''ef'
 ~~~
 
 Both of these describe strings which contain the following characters:
@@ -1102,6 +1103,7 @@ passing the "-m" flag to Esp.
 |\"                 |Double-quote             |
 |\000               |ASCII code in octal      |
 |\x00               |ASCII code in hexadecimal|
+
 **Table 2-2** Esp Escape Sequences
 
 ##### 2.3.4.1 Pseudo-Ops and Directives
@@ -1141,9 +1143,9 @@ The operands to pop are popped from right to left. This means that you can
 pass arguments to push and pop in the same order, e.g.
 
 ~~~
-push	ax, bx, cx, dx
-call	MessyProcedure		; this trashes ax-dx
-pop	ax, bx, cx, dx		; this restores them
+push    ax, bx, cx, dx
+call    MessyProcedure          ; this trashes ax-dx
+pop     ax, bx, cx, dx          ; this restores them
 ~~~
 
 **The TYPE Operator**
@@ -1170,6 +1172,7 @@ If you use .TYPE with a code-related expression, the high byte is set thus:
 |13       |Procedure is a private static method    |
 |14       |Procedure is a dynamic method           |
 |15       |Procedure is a method                   |
+
 **Table 2-3** .TYPE high-byte return values
 
 **LENGTH and SIZE**
@@ -1182,7 +1185,7 @@ on a single line after a label, they are treated as an array. For example,
 suppose you have the declaration
 
 ~~~
-SomeNums		dw	1,2,3
+SomeNums                dw      1,2,3
 ~~~
 
 MASM would not recognize that this is an array; it would therefore say that 
@@ -1198,7 +1201,7 @@ assumption is true, assembly continues normally, and the object code is not
 affected. .assert has the following format:
 
 ~~~
-.assert		<expression> [, <errorString>]
+.assert         <expression> [, <errorString>]
 ~~~
 
 **expression**  
@@ -1214,8 +1217,8 @@ For example, suppose you need to check whether al contains a certain value,
 such as MY_COLOR_WHITE. The canonical way to do this would be
 
 ~~~
-cmp	al, MY_COLOR_WHITE
-jz	itsWhite
+cmp     al, MY_COLOR_WHITE
+jz      itsWhite
 ~~~
 
 You might know, however, that MY_COLOR_WHITE is the first member of the 
@@ -1226,13 +1229,13 @@ fragile, since the enumerated type could be changed in the future. The
 solution is to use the .assert macro:
 
 ~~~
-.assert		(MY_COLOR_WHITE EQ 0),				\
-	<MY_COLOR_WHITE does not equal zero>
+.assert         (MY_COLOR_WHITE EQ 0),                          \
+        <MY_COLOR_WHITE does not equal zero>
 
-test	al, al		; Test if al = MY_COLOR_WHITE
-			; (i.e. zero)
+test    al, al          ; Test if al = MY_COLOR_WHITE
+                        ; (i.e. zero)
 
-jz	itsWhite
+jz      itsWhite
 ~~~
 
 You can also use the macro [CheckHack](#checkhack), described below, which 
@@ -1247,13 +1250,13 @@ xornf. Esp can take advantage of the fact that you don't care about the flags
 to optimize the instructions. For example, the instruction
 
 ~~~
-ornf	cx, 0x0100
+ornf    cx, 0x0100
 ~~~
 
 is assembled as
 
 ~~~
-or	ch, 0x01
+or      ch, 0x01
 ~~~
 
 which is one byte shorter, but sets the flags differently than 
@@ -1299,7 +1302,7 @@ program might use an inefficient, brute-force technique to do something. You
 might then put in a reminder to yourself to improve the algorithm later:
 
 ~~~
-call	MyStupidAndSlowSearchRoutine
+call    MyStupidAndSlowSearchRoutine
 PrintMessage <Remember to improve this algorithm!>
 ~~~
 
@@ -1319,12 +1322,12 @@ For example, the code might be rewritten this way with the
 [CheckHack](#checkhack) macro:
 
 ~~~
-CheckHack		<MY_COLOR_WHITE EQ 0>
+CheckHack               <MY_COLOR_WHITE EQ 0>
 
-test	al, al		; Test if al = MY_COLOR_WHITE
-			; (i.e. zero)
+test    al, al          ; Test if al = MY_COLOR_WHITE
+                        ; (i.e. zero)
 
-jz	itsWhite
+jz      itsWhite
 ~~~
 
 [ForceRef](#forceref) makes sure that there is a reference to a symbol. If you declare 
@@ -1376,7 +1379,7 @@ This macro forces a reference to a symbol. This prevents Esp from generating
 a "symbol not referenced" warning.
 
 **Pass:**  
-_symbol_	Any global or local symbol.
+_symbol_        Any global or local symbol.
 
 **Include:**  
 geos.def
@@ -1391,7 +1394,7 @@ PrintE prints the value of an expression to **stderr**. It does not affect the
 assembled object code in any way.
 
 **Pass:**  
-_string_	A string to print to **stderr**. The string is surrounded by angle-brackets, not by quotation marks.
+_string_        A string to print to **stderr**. The string is surrounded by angle-brackets, not by quotation marks.
 _expr_ An expression.
 
 **Include:**  
@@ -1400,7 +1403,7 @@ geos.def
 #### CheckHack
 ---
 ~~~
-CheckHack 	<expr>
+CheckHack       <expr>
 ~~~
 
 This macro checks to see if an expression is true. If the expression is false (i.e. 
@@ -1488,7 +1491,7 @@ This macro sets all of its arguments to zero, using the most efficient
 technique for each location.
 
 **Pass:**  
-_location_	A byte- or word-sized memory location or general-purpose register.
+_location_      A byte- or word-sized memory location or general-purpose register.
 
 **Destroyed:**  
 flags
@@ -1520,9 +1523,9 @@ relies on CF being cleared.
 #### tst, tst_clc
 ---
 ~~~
-tst	<location>
+tst     <location>
 
-tst_clc	<location>
+tst_clc <location>
 ~~~
 
 This macro tests a byte- or word-sized location to see if it is equal to zero.
@@ -1567,7 +1570,7 @@ contents.
 #### segmov
 ---
 ~~~
-segmov	<destSeg>, <sourceSeg> [, <useReg>]
+segmov  <destSeg>, <sourceSeg> [, <useReg>]
 ~~~
 
 This macro copies a value from one segment register to another. If a 
@@ -1591,7 +1594,7 @@ geos.def
 #### segxchg
 ---
 ~~~
-segxchg	<seg1>, <seg2>
+segxchg <seg1>, <seg2>
 ~~~
 
 This routine exchanges the contents of two segment registers. It does not 
@@ -1620,13 +1623,13 @@ record and the name of the field to set (without the mask operator). It sets the
 bit by or'ing the two values. For example,
 
 ~~~
-BitSet		myRecord, MR_A_FLAG
+BitSet          myRecord, MR_A_FLAG
 ~~~
 
 is equivalent to
 
 ~~~
-ornf		myRecord, mask MR_A_FLAG
+ornf            myRecord, mask MR_A_FLAG
 ~~~
 
 To clear a bit in a record, use the [BitClr](#bitclr) macro. This macro is passed the 
@@ -1637,7 +1640,7 @@ the flag.
 #### BitSet
 ---
 ~~~
-BitSet	<location>, <fieldName>
+BitSet  <location>, <fieldName>
 ~~~
 
 This macro turns on all the bits in the specified field of a record.
@@ -1654,7 +1657,7 @@ Flags are destroyed.
 #### BitClr
 ---
 ~~~
-BitClr	<location>, <fieldName>
+BitClr  <location>, <fieldName>
 ~~~
 
 This macro turns off all the bits in the specified field of a record.
@@ -1713,12 +1716,12 @@ class definition high in the application's .asm file, or (if there are several
 A class's definition has this basic format:
 
 ~~~
-<className>			class <superClassName> \
-			[, master [, variant]]
-	; class's messages...
-	; class's instance data fields...
-	; class's vardata fields...
-<className>			endc
+<className>                     class <superClassName> \
+                        [, master [, variant]]
+        ; class's messages...
+        ; class's instance data fields...
+        ; class's vardata fields...
+<className>                     endc
 ~~~
 
 **className**  
@@ -1735,7 +1738,7 @@ In Esp, you specify very little when you define a class's messages. You simply
 specify the message name, without arguments or other information, like this:
 
 ~~~
-<msgName>		message
+<msgName>               message
 ~~~
 
 **msgName**  
@@ -1750,7 +1753,7 @@ described in [section 5.4.1.1 of "GEOS Programming," Chapter 5 of the Concepts B
 of message numbers, to be used by subclasses, you use this directive:
 
 ~~~
-<messageRangeName>				export <numToExport>
+<messageRangeName>                              export <numToExport>
 ~~~
 
 **messageRangeName**  
@@ -1765,7 +1768,7 @@ To "import" a message, i.e. define a message in a message range which was
 exported by your class's superclass, define the message like this:
 
 ~~~
-<messageName>			message <exportedRangeName>
+<messageName>                   message <exportedRangeName>
 ~~~
 
 **exportedRangeName**  
@@ -1778,7 +1781,7 @@ To define a class's instance data fields, put lines with this format in your cla
 definition:
 
 ~~~
-<fieldName>			<fieldType> [<defaultValue>]
+<fieldName>                     <fieldType> [<defaultValue>]
 ~~~
 
 **fieldName**  
@@ -1798,7 +1801,7 @@ To define a hint or vardata field for a class, put lines with this format in you
 class definition:
 
 ~~~
-<varFieldName>		vardata		[<fieldType>]
+<varFieldName>          vardata         [<fieldType>]
 ~~~
 
 **varFieldName**  
@@ -1819,7 +1822,7 @@ application's [idata](#2331-the-dgroup-segment) "resource", which means it will 
 To create a class structure, put the following line in your application's [idata](#2331-the-dgroup-segment):
 
 ~~~
-<className>			[mask <ClassFlag> [or mask <ClassFlag>]*]
+<className>                     [mask <ClassFlag> [or mask <ClassFlag>]*]
 ~~~
 
 **className**  
@@ -1836,36 +1839,36 @@ Code Display 2-4 Creating a Class
 ; any of these objects at startup, we would have to put a corresponding definition 
 ; in the application's .ui file.
 
-MyTriggerClass 		class GenTriggerClass
+MyTriggerClass          class GenTriggerClass
 
 ; Here are the class's messages:
 
-MSG_MT_DO_SOMETHING_CLEVER				message
+MSG_MT_DO_SOMETHING_CLEVER                              message
 ;
-;	Pass:		cx = freeble factor
-;			dx = coefficient of quux
-;	Return:		ax = # of roads a man must walk down
-;	Destroyed:		cx, dx
+;       Pass:           cx = freeble factor
+;                       dx = coefficient of quux
+;       Return:         ax = # of roads a man must walk down
+;       Destroyed:              cx, dx
 
 ; Here are the class's new instance fields:
 
-	MTI_fieldOne		byte
-	MTI_fieldTwo		MyStruct		<0, 17, "Frank T. Poomm">
+        MTI_fieldOne            byte
+        MTI_fieldTwo            MyStruct                <0, 17, "Frank T. Poomm">
 
 ; Here are the object's vardata fields:
 
-GT_MY_VARDATA_FIELD			vardata	lptr
+GT_MY_VARDATA_FIELD                     vardata lptr
 
-MyTriggerClass		endc
+MyTriggerClass          endc
 
 ; We also have to create the class's class structure. We do this in the idata 
 ; resource:
 
-idata	segment
+idata   segment
 
 MyTriggerClass
 
-idata	ends
+idata   ends
 ~~~
 
 #### 2.4.3 Defining your Process Class
@@ -1896,7 +1899,7 @@ declare a single line as "error-checking," you should bracket the line with
 "EC<...>", like this:
 
 ~~~
-EC<	call	MyECValidationRoutine>
+EC<     call    MyECValidationRoutine>
 ~~~
 
 In the error-checking version of the code, this line will be included as an 
@@ -1909,15 +1912,15 @@ ERROR_CHECK to non-zero. You can use this to designate several lines as
 error-checking code:
 
 ~~~
-if	ERROR_CHECK
-	; bx should be non-zero; is it?
-	pushf
-	tst	bx
-	jnz	noError
+if      ERROR_CHECK
+        ; bx should be non-zero; is it?
+        pushf
+        tst     bx
+        jnz     noError
 ; if we reach this, it's an error
-	ERROR MY_FATAL_ERROR_CODE
-noError:		; not an error condition
-	popf
+        ERROR MY_FATAL_ERROR_CODE
+noError:                ; not an error condition
+        popf
 endif
 ~~~
 
@@ -1937,12 +1940,12 @@ ERROR if CF is not set. For example, the code sample on page 56 could be
 written more clearly like this:
 
 ~~~
-if	ERROR_CHECK
-	; bx should be non-zero; is it?
-	pushf
-	tst	bx
-	ERROR_Z MY_FATAL_ERROR_CODE
-	popf
+if      ERROR_CHECK
+        ; bx should be non-zero; is it?
+        pushf
+        tst     bx
+        ERROR_Z MY_FATAL_ERROR_CODE
+        popf
 endif
 ~~~
 
@@ -1953,7 +1956,7 @@ instruction except jcxz. For example, there is an ERROR_GE; this macro calls
 #### ERROR
 ---
 ~~~
-ERROR	<errorNumber>
+ERROR   <errorNumber>
 ~~~
 
 This macro generates a fatal error.
@@ -1973,7 +1976,7 @@ ec.def
 #### ERROR_C, ERROR_NC, ERROR_Z, ERROR_NZ...
 ---
 ~~~
-ERROR_x	<errorNumber>
+ERROR_x <errorNumber>
 ~~~
 
 These macros call ERROR if the status flags are set in a particular way. Each 

@@ -80,22 +80,22 @@ To use Swat, you must have the pccom tool running on the target machine.
 You may then invoke Swat on the development machine. Swat takes the 
 following command-line flags:
 
-**-e**	Start up the non-error-checking version of the loader on the 
+**-e**  Start up the non-error-checking version of the loader on the 
 target machine.
 
-**-h**	Displays a usage line.
+**-h**  Displays a usage line.
 
-**-k**	Use a non-standard kernel file. 
+**-k**  Use a non-standard kernel file. 
 
-**-n** 	Start up the non-error-checking version of GEOS on the target 
+**-n**  Start up the non-error-checking version of GEOS on the target 
 machine.
 
-**-r**	Start up the error-checking version of GEOS on the target 
+**-r**  Start up the error-checking version of GEOS on the target 
 machine.
 
-**-s**	Start up the error-checking loader on the target machine.
+**-s**  Start up the error-checking loader on the target machine.
 
-**-D**	You will only need to use this flag if debugging Swat.
+**-D**  You will only need to use this flag if debugging Swat.
 
 If you have set up your communications incorrectly, Swat will have problems. 
 (Often these problems don't show up when sending or receiving files; Swat 
@@ -179,14 +179,14 @@ Another important way of representing the symbol is as a *segment:offset* pair. 
 Some examples of address expressions are shown in Table 3-1.
 
 ----------
-**Table 3-1 Address Expressions**
+**Table 3-1** Address Expressions
 
-	Type							Example
+    Type                            Example
 
-	name of object					Icon1
-	field of structure				applVars.Core
-	number/register combination		0x1ef0:si
-	number/register combination		1ef0h:si
+    name of object                  Icon1
+    field of structure              applVars.Core
+    number/register combination     0x1ef0:si
+    number/register combination     1ef0h:si
 
 ----------
 
@@ -198,14 +198,14 @@ of highest precedence to lowest):
 The *carat-h* is used to dereference a memory handle when representing 
 an address as a *handle:offset* pair (this is also known as a "heap pointer" representation) or when accessing a particular block of memory. It is often used in the situation when a memory handle is in one register (such as BX) and the offset is in another register (such as SI). This is similar to the ^l operator (below), but it requires an offset into the block rather than a chunk handle. The *^h* operator is used thus (the two commands will give the same information if the specified registers contain the specified values):
 
-		[hello3:0] 6 => pobj ^h43d0h:0022h
-		[hello3:0] 7 => pobj ^hBX:SI
+        [hello3:0] 6 => pobj ^h43d0h:0022h
+        [hello3:0] 7 => pobj ^hBX:SI
 
 
 + `.`  
 The *period* is used to access a field in a structure. For example, if a visible object is located at `^hBX:SI`, you could retrieve its top bound with the following command:
 
-		[hello3:0] 8 => print ^h43d0h:0022h.VI_bounds.R_top
+        [hello3:0] 8 => print ^h43d0h:0022h.VI_bounds.R_top
 
 + `+ -`  
 The addition and subtraction operators are used to add and subtract 
@@ -217,38 +217,38 @@ The *carat-l* is used to dereference an optr, a pointer in the form
 *handle:chunk-handl*e (this is also known as a "local memory pointer"). 
 This is similar to the `^h` operator, but `^`l requires a chunk handle rather than an offset. If an optr is stored in CX:DX, for example, the `^l` operator could be used to dereference it as follows:
 
-		[hello3:0] 11 => pobj ^lCX:DX
-		[hello3:0] 12 => pobj ^l0x43d0:0x022
+        [hello3:0] 11 => pobj ^lCX:DX
+        [hello3:0] 12 => pobj ^l0x43d0:0x022
 
 + `:`
 The *colon* is the segment/offset operator, used to separate the segment 
 and offset in a *segment:offset pair*.
 
-		[hello3:0] 13 => pobj ^lCX:DX
-		[hello3:0] 14 => pobj ^l0x43d0:0x022
-		[hello3:0] 15 => pobj INTERFACE:HelloView
+        [hello3:0] 13 => pobj ^lCX:DX
+        [hello3:0] 14 => pobj ^l0x43d0:0x022
+        [hello3:0] 15 => pobj INTERFACE:HelloView
 
 + `*`
 The *asterisk* is a pointer-dereferencing operator, as in the C programming 
 language:
 
-		[hello3:0] 16 => print SubliminalTone
-		@5: SubliminalTone = 7246h
+        [hello3:0] 16 => print SubliminalTone
+        @5: SubliminalTone = 7246h
 
-		[hello3:0] 17 => print *(&SubliminalTone)
+        [hello3:0] 17 => print *(&SubliminalTone)
 
-		@6: *(&SubliminalTone) = 7246h
+        @6: *(&SubliminalTone) = 7246h
 
 + `^v`
 The *carat-v* is the virtual memory operator, used to get to the base of a 
 block that is in a Virtual Memory file given the file handle and VM block 
 handle. The correct usage of the `^v` operator is:
 
-		^v<file>:<VM_block>
+        ^v<file>:<VM_block>
 
 Much of the time the type of data stored at the address given by the address expression is implicit in the expression. Sometimes in ambiguous situations (using code as data), however, the type of data must be explicitly stated in the address expression. This is done by indicating the type of the data followed by a space and then a normal address expression. For example, in the expression
 
-	dword ds:14h
+    dword ds:14h
 
 the data at `ds:14h` will be treated as a double word.
 
@@ -277,16 +277,16 @@ To get information about a GEOS topic, use the doc functions.
 ----------
 #### apropos
 
-	apropos [<string>]
+    apropos [<string>]
 
 The **apropos** command searches the list of commands and command help for 
 all entries containing `<string>`. It lists each command and its synopsis. The string may actually be a partial word.
 
 ----------
 #### doc, doc-next, doc-previous
-	doc [<keyword>]
-	doc-next
-	doc-previous
+    doc [<keyword>]
+    doc-next
+    doc-previous
 
 The **doc** command looks for information in the technical documentation 
 relevant to the passed keyword. The keyword may be any GEOS symbol. The 
@@ -298,7 +298,7 @@ arrow keys.
 ----------
 #### help
 
-	help [<command>]
+    help [<command>]
 
 There are two different ways to use the **help** command. The first is to enter the interactive help mode using the **help** command with no arguments, and the second is to use the help command with a particular command as an argument.
 
@@ -316,26 +316,27 @@ Display 3-1).
 
 **Swat Display 3-1 The Help Tree**  
 
-		(geos:0) 198 => help
+        (geos:0) 198 => help
 
-		top-most level of the help tree:
+        top-most level of the help tree:
  
- 		0 FINISH 			6 memory... 			12 step...
- 		1 advanced... 		7 object... 			13 support...
- 		2 breakpoint... 	8 print... 				14 swat_navigation...
- 		3 crash... 			9 running... 			15 window...
- 		4 file... 			10 source...
- 		5 heap... 			11 stack...
+        0 FINISH            6 memory...             12 step...
+        1 advanced...       7 object...             13 support...
+        2 breakpoint...     8 print...              14 swat_navigation...
+        3 crash...          9 running...            15 window...
+        4 file...           10 source...
+        5 heap...           11 stack...
 
-		Type "help" for help, "menu" to redisplay the menu, "0" to exit.
-		Type a topic (or its number) to display it.
-		help:top>
+        Type "help" for help, "menu" to redisplay the menu, "0" to exit.
+        Type a topic (or its number) to display it.
+        help:top>
 
 ----------
 
 
 
-	help <command>
+    help <command>
+
 When **help** is typed with another command as an argument, information 
 about that command is displayed (the same information as in the 
 interactive help mode). This command is frequently used in order to get 
@@ -344,18 +345,18 @@ fast help on a particular command. (See Swat Display 3-2.)
 ----------
 **Swat Display 3-2 The help Command**
 
-		(geos:0) 200 => help help
-		Help for help:
-		Functions for manipulating/accessing the help tree
-		==============================================================================
-		This is the user-level access to the on-line help facilities for Swat. If
-		given a topic (e.g. "brk") as its argument, it will print all help strings
-		defined for the given topic (there could be more than one if the same name is
-		used for both a variable and a procedure, for instance). If invoked without
-		arguments, it will enter a browsing mode, allowing the user to work his/her
-		way up and down the documentation tree
-		==============================================================================
-		(geos:0) 201 =>
+        (geos:0) 200 => help help
+        Help for help:
+        Functions for manipulating/accessing the help tree
+        ==============================================================================
+        This is the user-level access to the on-line help facilities for Swat. If
+        given a topic (e.g. "brk") as its argument, it will print all help strings
+        defined for the given topic (there could be more than one if the same name is
+        used for both a variable and a procedure, for instance). If invoked without
+        arguments, it will enter a browsing mode, allowing the user to work his/her
+        way up and down the documentation tree
+        ==============================================================================
+        (geos:0) 201 =>
 
 
 ----------
@@ -390,7 +391,7 @@ A complete list of the Swat commands is contained in the Reference chapter.
 
 #### 3.5.1 Cycle of Development
 
-	send, run, exit, patient-default
+    send, run, exit, patient-default
 
 These commands come in handy whenever you've edited and recompiled your 
 application. You'll want to exit the application on the target machine. Use the 
@@ -400,7 +401,7 @@ Then use the **run** command to start up the program.
 ----------
 **send**
 
-	send [<geode-name>]
+    send [<geode-name>]
 
 To send the latest compiled version of your program, type "send" followed by 
 the application's patient name (the first part of the field on the "name" line of 
@@ -409,7 +410,7 @@ the .gp file).
 ----------
 **run**  
 
-	run [<geode-name>]
+    run [<geode-name>]
 
 To run your geode on the target machine, type "run" followed by the 
 application's patient name (the first part of the field on the "name" line of the 
@@ -418,7 +419,7 @@ application's patient name (the first part of the field on the "name" line of th
 ---------
 **exit**  
 
-	exit <geode-name>
+    exit <geode-name>
 
 To exit a running application, type "exit" followed by the application's patient 
 name. The exit command won't work if your application has encountered a 
@@ -427,7 +428,7 @@ fatal error.
 ----------
 **patient-default**  
 
-	patient-default [<geode-name>]
+    patient-default [<geode-name>]
 
 Use this command to set a default patient to use with the **send** and **run** 
 commands. The send and run commands will operate on this patient if they 
@@ -435,7 +436,7 @@ are not passed arguments.
 
 #### 3.5.2 Attaching and Detaching
 
-	attach, att, detach, quit, cont, Ctrl-C
+    attach, att, detach, quit, cont, Ctrl-C
 
 This group of commands controls the state of the connection between Swat 
 and GEOS when Swat is running. The **attach** and **att** commands are used to 
@@ -469,67 +470,67 @@ actual debugging.
 ----------
 **Swat Display 3-3 Detaching and Attaching**
 
-	(geos:0) 202 => det cont
-	PC detached
-	(loader:0) 203 => att
-	Re-using patient geos
-	Re-using patient ms4
-	Re-using patient vidmem
-	Re-using patient swap
-	Re-using patient xms
-	Re-using patient disk
-	Re-using patient kbd
-	Re-using patient nimbus
-	Re-using patient stream
-	Re-using patient sound
-	Re-using patient standard
-	Re-using patient ui
-	Re-using patient styles
-	Re-using patient color
-	Re-using patient ruler
-	Re-using patient text
-	Re-using patient motif
-	Re-using patient vga
-	Re-using patient spool
-	Re-using patient serial
-	Re-using patient msSer
-	Re-using patient nonts
-	Re-using patient welcome
-	Re-using patient shell
-	Re-using patient manager
-	Re-using patient math
-	Re-using patient borlandc
-	Re-using patient mess1
-	Thread 1 created for patient geos
-	Thread 2 created for patient geos
-	Thread 0 created for patient ui
-	Thread 0 created for patient spool
-	Thread 0 created for patient welcome
-	Thread 0 created for patient manager
-	Thread 1 created for patient manager
-	Thread 0 created for patient mess1
-	Attached to PC
-	Stopped in 0070h:0005h, address 0070h:0005h
-	DOS+773: JMP DOS+2963
-	(geos:0) 204 =>
+    (geos:0) 202 => det cont
+    PC detached
+    (loader:0) 203 => att
+    Re-using patient geos
+    Re-using patient ms4
+    Re-using patient vidmem
+    Re-using patient swap
+    Re-using patient xms
+    Re-using patient disk
+    Re-using patient kbd
+    Re-using patient nimbus
+    Re-using patient stream
+    Re-using patient sound
+    Re-using patient standard
+    Re-using patient ui
+    Re-using patient styles
+    Re-using patient color
+    Re-using patient ruler
+    Re-using patient text
+    Re-using patient motif
+    Re-using patient vga
+    Re-using patient spool
+    Re-using patient serial
+    Re-using patient msSer
+    Re-using patient nonts
+    Re-using patient welcome
+    Re-using patient shell
+    Re-using patient manager
+    Re-using patient math
+    Re-using patient borlandc
+    Re-using patient mess1
+    Thread 1 created for patient geos
+    Thread 2 created for patient geos
+    Thread 0 created for patient ui
+    Thread 0 created for patient spool
+    Thread 0 created for patient welcome
+    Thread 0 created for patient manager
+    Thread 1 created for patient manager
+    Thread 0 created for patient mess1
+    Attached to PC
+    Stopped in 0070h:0005h, address 0070h:0005h
+    DOS+773: JMP DOS+2963
+    (geos:0) 204 =>
 
-	In this example, we use the det cont command so that GEOS will keep running. We then re-attach 
-	with att. In the intervening time, the two machines are independent, and the serial line is unused. 
-	We could have taken advantage of this to send down a new copy of some application (as long as that 
-	application was not running on the target machine).
+    In this example, we use the det cont command so that GEOS will keep running. We then re-attach 
+    with att. In the intervening time, the two machines are independent, and the serial line is unused. 
+    We could have taken advantage of this to send down a new copy of some application (as long as that 
+    application was not running on the target machine).
 
 
 
 ----------
 **att**  
-	att 
+    att 
 
 The **att** command is similar to the **attach** command, but has no bootstrap 
 argument (as explained below).
 
 ----------
 **attach**  
-	attach [(+b|-b)]
+    attach [(+b|-b)]
 
 This command is used to attach Swat to the target PC when the Swat stub is 
 already invoked. The -b argument is to bootstrap and the **+b** argument is not 
@@ -541,7 +542,7 @@ the most recent bootstrap setting is used. The default bootstrap setting is **+b
 
 ----------
 **cont**  
-	cont
+    cont
 
 The **cont** command continues the execution of GEOS after it has been 
 stopped for some reason such as at a breakpoint or fatal error or by control-C. 
@@ -549,7 +550,7 @@ This command is often aliased as the letter **c**.
 
 ----------
 **detach**  
-	detach [(cont|leave)]
+    detach [(cont|leave)]
 
 The **detach** command will detach Swat from the target PC. By itself, the 
 **detach** command will detach Swat and exit GEOS. This command is usually 
@@ -568,7 +569,7 @@ workstation or when Swat can not continue for some reason.
 
 ----------
 **quit**  
-	quit [(cont|leave)]
+    quit [(cont|leave)]
 
 The **quit** command is only used when Swat needs to be exited for good. It will 
 detach Swat (if necessary), exit from Swat on the development station, and 
@@ -584,7 +585,7 @@ was when the quit leave command was given.
 
 ----------
 **Ctrl-C**  
-	Ctrl-C
+    Ctrl-C
 
 The **Control-C** command is the command used to stop the execution of GEOS 
 at any point. This command is executed by holding down the Ctrl key and 
@@ -599,9 +600,9 @@ application's code and then step through the code line by line if necessary.
 These commands are often used with each other to examine critical areas in 
 the application source code.
 
-**3.5.3.1	Breakpoints**
+**3.5.3.1   Breakpoints**
 
-	stop, brk, go, cbrk, spawn
+    stop, brk, go, cbrk, spawn
 
 The **stop**, **brk** and **cbrk** commands are used to set breakpoints. The 
 breakpoint commands have many subcommands controlling the actions and 
@@ -616,11 +617,11 @@ compare registers when the breakpoint is hit with a given set of criteria.
 ----------
 **stop**
 
-	stop in <class>::<message> [if <expr>]
-	stop in <procedure> [if <expr>]
-	stop in <address-history-token> [if <expr>]
-	stop at [<file:]<line> [if <expr>]
-	stop <address> [if <expr>]
+    stop in <class>::<message> [if <expr>]
+    stop in <procedure> [if <expr>]
+    stop in <address-history-token> [if <expr>]
+    stop at [<file:]<line> [if <expr>]
+    stop <address> [if <expr>]
 
 This is the main command to use when setting breakpoints in C programs. 
 The "stop in" command will set a breakpoint at the beginning of a procedure, 
@@ -634,7 +635,7 @@ as a "value fetch" command, from being evaluated until the breakpoint is hit.
 ----------
 **brk***
 
-	brk [<sub-command>]
+    brk [<sub-command>]
 
 The **brk** (breakpoint) command is used for setting nearly all breakpoints in 
 an application's code. The simplest way to use it is to type **brk** with a single 
@@ -645,26 +646,31 @@ conditional breakpoints which will only be taken if certain conditions are
 satisfied. Once set, a breakpoint is given an integer number which can be 
 obtained using the **list** subcommand (see Swat Display 3-4).
 
-	brk <addr> [<command>]
+    brk <addr> [<command>]
+
 The **brk** command without any subcommands sets an unconditional 
 breakpoint at the address specified in *addr*. If the *command* argument is 
 passed, the given swat command will be carried out when the breakpoint 
 is hit.
 
-	brk delete <break>*
+    brk delete <break>*
+
 Deletes the given breakpoint(s), just as **clear**, above.
 
-	brk enable <break>*
+    brk enable <break>*
+
 Enables the given breakpoint(s). Has no effect on previously enabled 
 breakpoints. If no breakpoint is given, all breakpoints for the current 
 patient are enabled.
 
-	brk disable <break>*
+    brk disable <break>*
+
 Disables the given breakpoint(s). It has no effect on previously disabled 
 breakpoints. If no breakpoint is given, it disables all breakpoints for the 
 current patient.
 
-	brk list [<addr>]
+    brk list [<addr>]
+
 Lists all the breakpoints, whether they are enabled, where they are set, 
 their conditions, and what actions they will take if encountered. If *addr* 
 is given, it returns the breakpoint numbers of all breakpoints set at the 
@@ -676,12 +682,12 @@ given address.
     (geos:0) 4 => brk list
     Num S Address Patient Command/Condition
     1   E loader::kcode::LoaderError all echo Loader death due to [penum
-    					LoaderStrings [read-reg ax]]
-    					expr 1
+                        LoaderStrings [read-reg ax]]
+                        expr 1
     2   E kcode::FatalError all
-     					why
-     					assign kdata::errorFlag 0
-     					expr 1
+                        why
+                        assign kdata::errorFlag 0
+                        expr 1
     3   E kcode::WarningNotice all why-warning
     4   E kcode::CWARNINGNOTICE all why-warning
     (geos:0) 5 => stop in Mess1Draw
@@ -689,12 +695,12 @@ given address.
     (geos:0) 6 => brk list
     Num S Address Patient Command/Condition
     1   E loader::kcode::LoaderError all echo Loader death due to [penum
-    					LoaderStrings [read-reg ax]]
-     					expr 1
+                        LoaderStrings [read-reg ax]]
+                        expr 1
     2   E kcode::FatalError all
-     					why
-     					assign kdata::errorFlag 0
-     					expr 1
+                        why
+                        assign kdata::errorFlag 0
+                        expr 1
     3   E kcode::WarningNotice all why-warning
     4   E kcode::CWARNINGNOTICE all why-warning
     5   E <ss1::MESS1_TEXT::Mess1Draw+10 all halt
@@ -702,12 +708,12 @@ given address.
     (geos:0) 8 => brk list
     Num S Address Patient Command/Condition
     1   E loader::kcode::LoaderError all echo Loader death due to [penum
-    					LoaderStrings [read-reg ax]]
-     					expr 1
+                        LoaderStrings [read-reg ax]]
+                        expr 1
     2   E kcode::FatalError all
-     					why
-     					assign kdata::errorFlag 0
-     					expr 1
+                        why
+                        assign kdata::errorFlag 0
+                        expr 1
     3   E kcode::WarningNotice all why-warning
     4   D kcode::CWARNINGNOTICE all why-warning
     5   E <ss1::MESS1_TEXT::Mess1Draw+10 all halt
@@ -716,7 +722,7 @@ given address.
 ----------
 
 **go**  
-	go [<address-expressions>]
+    go [<address-expressions>]
 
 The go command sets a one-time breakpoint and resumes execution on the 
 target PC. The net effect of this is to let the target go until it hits a given 
@@ -724,7 +730,7 @@ address, then stop.
 
 ----------
 **cbrk**  
-	cbrk [<sub-command>]
+    cbrk [<sub-command>]
 
 The **cbrk** (conditional breakpoint) command is used to set fast conditional 
 breakpoints. This command is very similar to the **brk** command above, 
@@ -737,7 +743,7 @@ word of memory) to a given set of values.
 In the following descriptions, **criteria** stands for a series of one or more 
 arguments of the form:
 
-	<register> <op> <value>
+    <register> <op> <value>
 
 *register*  
 One of the machine's registers or "thread," which corresponds 
@@ -757,17 +763,19 @@ A standard Swat address expression. The resulting offset is the
 value with which the register will be compared when the 
 breakpoint is hit.
 
-	cbrk <addr> <criteria>*
+    cbrk <addr> <criteria>*
+
 The basic cbrk command sets a fast conditional breakpoint at the address 
 specified in *addr*.
 
-	cbrk cond <break> <criteria>*
+    cbrk cond <break> <criteria>*
+
 Changes the criteria for the breakpoint. If no *criteria* is given the 
 breakpoint becomes a standard, unconditional breakpoint.
 
 ----------
 **spawn**  
-	spawn <patient-name> [<addr>]
+    spawn <patient-name> [<addr>]
 
 The **spawn** command is used to set a temporary breakpoint in a process or 
 thread which has not yet been created. The arguments are
@@ -800,14 +808,14 @@ the threads being used by an application (see Swat Display 3-5).
     Thread 0 created for patient mess1
     Interrupt 3: Breakpoint trap
     Stopped in Mess1Draw, line 211, "C:\PCGEOS/Appl/SDK_C/MESS1/MESS1.GOC"
-    Mess1Draw(GStateHandle gstate) 				/* GState to draw to */
+    Mess1Draw(GStateHandle gstate)              /* GState to draw to */
     (mess1:0) 13 =>
     
 
 
-**3.5.3.2	Code Stepping**
+**3.5.3.2   Code Stepping**
 
-	srcwin, istep, sstep
+    srcwin, istep, sstep
 
 Once an application is stopped at a breakpoint and you want to examine the 
 code line by line, you can use the commands **istep** (instruction step) and 
@@ -824,7 +832,7 @@ and **sstep** is used for stepping through C source code.
 ----------
 **srcwin**
 
-	srcwin <numlines> [view]
+    srcwin <numlines> [view]
 
 The srcwin command will display the source code surrounding the presently 
 executing code any time execution is stopped. The presently executing line 
@@ -835,15 +843,15 @@ arrow keys, the <PgUp> key, and the <PgDn> key.
 ----------
 **istep, sstep**
 
-	istep [<default subcommand>]
-	sstep [<default subcommand>]
+    istep [<default subcommand>]
+    sstep [<default subcommand>]
 
 These two commands are used to single-step through code, executing one or 
 more instructions at a time. The *default subcommand* argument determines 
 the action taken by Swat when the Return key is pressed. For example, the 
 command
 
-	[hello3:0] 7 => istep n
+    [hello3:0] 7 => istep n
 
 will enter instruction step mode, and subsequently pressing the Return key 
 will have the same effect as pressing **n**. If no default command is given, 
@@ -925,9 +933,9 @@ Some related commands defined in the Reference chapter are **down**, **func**,
 **handles**, **hgwalk**, **impliedgrab**, **penum**, **phandle**, **pinst**, **piv**, **precord**, 
 **skip**, **systemobj**, **up**, and **where.**
 
-**3.5.4.1	Simple Memory Examination**
+**3.5.4.1   Simple Memory Examination**
 
-	bytes, words, dwords, frame, backtrace, why, listi
+    bytes, words, dwords, frame, backtrace, why, listi
 
 The commands in this group are used to look at simple blocks of memory 
 without modification. They are defined fully in the entries below.
@@ -935,9 +943,9 @@ without modification. They are defined fully in the entries below.
 ----------
 **bytes, words, dwords**
 
-	bytes [<addr>] [<length>]
-	words [<addr>] [<length>]
-	dwords [<addr>] [<length>]
+    bytes [<addr>] [<length>]
+    words [<addr>] [<length>]
+    dwords [<addr>] [<length>]
 
 The **bytes**, **words**, and **dwords** commands are essentially the same except 
 that each looks at a different sized piece of memory. These commands will 
@@ -951,7 +959,7 @@ words, or dwords should or should not be and so can spot any problems. For
 example, if a certain character string such as "Application" is supposed to be 
 stored at the address given by *fileType* and the command
 
-	[hello3:0] 11 => bytes fileType
+    [hello3:0] 11 => bytes fileType
 
 dumps the characters "noitacilppA", then there is most likely a problem.
 
@@ -963,20 +971,20 @@ be to examine adjacent pieces of memory. (See Swat Display 3-6.)
 
 **Swat Display 3-6 The words Command**
 
-	(mess1:0) 15 => words themeSongBuf
-	Addr: +0 +2 +4 +6 +8 +a +c +e
-	0040h: 0004 0000 0049 0000 0004 0001 0083 0000
-	(mess1:0) 16 => words
-	Addr: +0 +2 +4 +6 +8 +a +c +e
-	004eh: 0000 0006 0004 0028 0000 0001 020b b800
-	(mess1:0) 17 => !!
-	words
-	Addr: +0 +2 +4 +6 +8 +a +c +e
-	005ch: b800 000c 0020 0002 0001 0000 0001 020b
-	(mess1:0) 18 => !!
-	words
-	Addr: +0 +2 +4 +6 +8 +a +c +e
-	006ah: 020b b800 000c 0010 0002 0001 000a 0010 
+    (mess1:0) 15 => words themeSongBuf
+    Addr: +0 +2 +4 +6 +8 +a +c +e
+    0040h: 0004 0000 0049 0000 0004 0001 0083 0000
+    (mess1:0) 16 => words
+    Addr: +0 +2 +4 +6 +8 +a +c +e
+    004eh: 0000 0006 0004 0028 0000 0001 020b b800
+    (mess1:0) 17 => !!
+    words
+    Addr: +0 +2 +4 +6 +8 +a +c +e
+    005ch: b800 000c 0020 0002 0001 0000 0001 020b
+    (mess1:0) 18 => !!
+    words
+    Addr: +0 +2 +4 +6 +8 +a +c +e
+    006ah: 020b b800 000c 0010 0002 0001 000a 0010 
 
 *Here the **words** command examines a buffer in memory. When this command is repeated without 
 arguments, it will display memory continuing where the last command left off. Note the use of the 
@@ -987,8 +995,8 @@ arguments, it will display memory continuing where the last command left off. No
 
 **backtrace, frame**
 
-	backtrace [<frames to list>]
-	frame <subcommand>
+    backtrace [<frames to list>]
+    frame <subcommand>
 
 The **backtrace** and **frame** commands are used to examine data that has 
 been pushed onto the stack. An application may crash in a routine that is 
@@ -1014,48 +1022,48 @@ the **frame** command.
 
 **Swat Display 3-7 Backtrace and Frame commands**
 
-	Death due to SOUND_BAD_EVENT_COMMAND
-	Execution died in patient sound:
-	SoundHandleTimerEvent+63: MOV AX, 7 (0007h)
-	*** No explanation available ***
-	Interrupt 3: Breakpoint trap
-	Stopped in FatalError, address 1844h:0163h
-	SoundHandleTimerEvent+63: MOV AX, 7 (0007h)
-	(mess1:0) 2 => backtrace
-	  1: near FatalError(), 1844h:0163h
-	  2: far AppFatalError(), 1844h:0163h
-	* 3: far SoundHandleTimerEvent(), 2cb2h:003fh
-	  4: far SoundLibDriverPlaySimpleFM(), 6247h:0062h
-	  5: far ResourceCallInt(), 1844h:1492h
-	  6: far SoundLibDriverStrategy(), 2cb2h:0ab2h
-	  7: near SoundCallLibraryDriverRoutine(), 629ch:00feh
-	  8: far SoundPlayMusic(), 629ch:0028h
-	  9: far ResourceCallInt(), 1844h:1492h
-	  10: far SOUNDPLAYMUSICNOTE(mh = ^h42b0h (at 753ch), priority = 1eh, tempo = 4h
-	, flags = 80h), 62d6h:00f3h
-	  11: far ResourceCallInt(), 1844h:1492h
-	  12: far Mess1Draw(), MESS1.GOC:307
-	  13: far MESS1PROCESSMETA_EXPOSED(win = 3a60h, message = 69 (invalid), oself =
-	3ee0h:0000h), MESS1.GOC:362
-	  14: far ResourceCallInt(), 1844h:1492h
-	MSG_META_EXPOSED (3a60h 0000h 0000h) sent to Mess1ProcessClass (^l20f0h:0h)
-	  16: near ObjCallMethodTableSaveBXSI(), 1844h:9ea5h
-	  17: far SendMessage(), 1844h:9d9bh
-	  18: far ObjMessage(), 1844h:1d9ch
-	  19: far MessageDispatchDefaultCallBack(), 1844h:1c72h
-	  20: far MessageProcess(callBack = 1844h:1c68h (geos::kcode::MessageDispatchDef
-	aultCallBack)), 1844h:1c15h
-	  21: far MessageDispatch(), 1844h:1b31h
-	  22: far ThreadAttachToQueue(), 1844h:bd2ch
-	(mess1:0) 3 => frame 12
-	Mess1Draw+302: MOV AX, 100 (0064h) 
+    Death due to SOUND_BAD_EVENT_COMMAND
+    Execution died in patient sound:
+    SoundHandleTimerEvent+63: MOV AX, 7 (0007h)
+    *** No explanation available ***
+    Interrupt 3: Breakpoint trap
+    Stopped in FatalError, address 1844h:0163h
+    SoundHandleTimerEvent+63: MOV AX, 7 (0007h)
+    (mess1:0) 2 => backtrace
+      1: near FatalError(), 1844h:0163h
+      2: far AppFatalError(), 1844h:0163h
+    * 3: far SoundHandleTimerEvent(), 2cb2h:003fh
+      4: far SoundLibDriverPlaySimpleFM(), 6247h:0062h
+      5: far ResourceCallInt(), 1844h:1492h
+      6: far SoundLibDriverStrategy(), 2cb2h:0ab2h
+      7: near SoundCallLibraryDriverRoutine(), 629ch:00feh
+      8: far SoundPlayMusic(), 629ch:0028h
+      9: far ResourceCallInt(), 1844h:1492h
+      10: far SOUNDPLAYMUSICNOTE(mh = ^h42b0h (at 753ch), priority = 1eh, tempo = 4h
+    , flags = 80h), 62d6h:00f3h
+      11: far ResourceCallInt(), 1844h:1492h
+      12: far Mess1Draw(), MESS1.GOC:307
+      13: far MESS1PROCESSMETA_EXPOSED(win = 3a60h, message = 69 (invalid), oself =
+    3ee0h:0000h), MESS1.GOC:362
+      14: far ResourceCallInt(), 1844h:1492h
+    MSG_META_EXPOSED (3a60h 0000h 0000h) sent to Mess1ProcessClass (^l20f0h:0h)
+      16: near ObjCallMethodTableSaveBXSI(), 1844h:9ea5h
+      17: far SendMessage(), 1844h:9d9bh
+      18: far ObjMessage(), 1844h:1d9ch
+      19: far MessageDispatchDefaultCallBack(), 1844h:1c72h
+      20: far MessageProcess(callBack = 1844h:1c68h (geos::kcode::MessageDispatchDef
+    aultCallBack)), 1844h:1c15h
+      21: far MessageDispatch(), 1844h:1b31h
+      22: far ThreadAttachToQueue(), 1844h:bd2ch
+    (mess1:0) 3 => frame 12
+    Mess1Draw+302: MOV AX, 100 (0064h) 
 
 ----------
 
-**3.5.4.2	Complex Memory Examination**
+**3.5.4.2   Complex Memory Examination**
 
-	print, hwalk, lhwalk, objwalk, pobject, gentree, vistree, 
-	vup, gup
+    print, hwalk, lhwalk, objwalk, pobject, gentree, vistree, 
+    vup, gup
 
 The commands in this group are used to examine complex data structures in 
 GEOS.
@@ -1064,7 +1072,7 @@ GEOS.
 
 **print**
 
-	print <expression>
+    print <expression>
 
 The **print** command is used to print out the value of the given *expression* 
 argument. The *expression* argument is normally some sort of typed address. 
@@ -1081,7 +1089,7 @@ information on the flags for the **print** command.
 
 **hwalk**
 
-	hwalk [<patient>]
+    hwalk [<patient>]
 
 Use the **hwalk** (heap walk) command to display blocks on the global heap. 
 Its output can be tailored in various ways according to how the **flags** are set. 
@@ -1095,31 +1103,31 @@ Display 3-8.)
 ----------
 **Swat Display 3-8 The hwalk Command**
 
-	(mess1:0) 6 => hwalk mess1
-	HANDLE ADDR SIZE FLAGS LOCK OWNER IDLE  OINFO 						TYPE
-	----------------------------------------------------------------
-	20f0h 41ebh 2272 FIXED  n/a mess1  n/a     1h 						R#1 (dgroup)
-	4160h 58eah  448 sDS  a   1 mess1 105eh    1h 						R#2 (MESS1_TEXT)
-	3a60h 59adh  784 s SL     0 mess1  0:03    1h 						WINDOW
-	4bb0h 6176h  560 s SL     0 mess1  0:05    1h 						WINDOW
-	3970h 6232h  336 s SL     0 mess1  0:03    1h 						GSTATE
-	3ee0h 633ch  160 s S  a   0 mess1  0:05 49c0h 						Geode
-	4950h 63beh 1280 s SL     0 mess1  0:05 49c0h 						OBJ(mess1:0)
-	4340h 640eh 1328   SL     0 mess1  0:05 49c0h 						R#3 (INTERFACE)
-	42b0h 753ch   96 s S      4 mess1 1249h    1h 					  
-	4bd0h 7542h   96 s S      0 mess1  0:01    1h   
-	41b0h 89d4h  896   SL     0 mess1  0:05 49c0h 						R#4 (APPRESOURCE)
-	4270h 99e1h   32 s S      0 mess1  0:05     1h
-	
-	Total bytes allocated: 8288
-	(mess1:0) 7 =>
+    (mess1:0) 6 => hwalk mess1
+    HANDLE ADDR SIZE FLAGS LOCK OWNER IDLE  OINFO                       TYPE
+    ----------------------------------------------------------------
+    20f0h 41ebh 2272 FIXED  n/a mess1  n/a     1h                       R#1 (dgroup)
+    4160h 58eah  448 sDS  a   1 mess1 105eh    1h                       R#2 (MESS1_TEXT)
+    3a60h 59adh  784 s SL     0 mess1  0:03    1h                       WINDOW
+    4bb0h 6176h  560 s SL     0 mess1  0:05    1h                       WINDOW
+    3970h 6232h  336 s SL     0 mess1  0:03    1h                       GSTATE
+    3ee0h 633ch  160 s S  a   0 mess1  0:05 49c0h                       Geode
+    4950h 63beh 1280 s SL     0 mess1  0:05 49c0h                       OBJ(mess1:0)
+    4340h 640eh 1328   SL     0 mess1  0:05 49c0h                       R#3 (INTERFACE)
+    42b0h 753ch   96 s S      4 mess1 1249h    1h                     
+    4bd0h 7542h   96 s S      0 mess1  0:01    1h   
+    41b0h 89d4h  896   SL     0 mess1  0:05 49c0h                       R#4 (APPRESOURCE)
+    4270h 99e1h   32 s S      0 mess1  0:05     1h
+    
+    Total bytes allocated: 8288
+    (mess1:0) 7 =>
 
 ----------
 
 **lhwalk, objwalk**
 
-	lhwalk [<addr>]
-	objwalk [<addr>]
+    lhwalk [<addr>]
+    objwalk [<addr>]
 
 The **lhwalk** (local heap walk) command is used to display information about 
 a local memory heap, and the **objwalk** command is used to print out 
@@ -1134,42 +1142,42 @@ Reference chapter for more information on the fields printed by **lhwalk** and
 
 **Swat Display 3-9 The objwalk Command**
 
-	(mess1:0) 11 => objwalk ^h4340h
-	 
-	Heap at 640eh:0 (^h4340h), Type = LMEM_TYPE_OBJ_BLOCK
-	In use count = 3, Block size = 1328, Resource size = 59647 para (192 bytes)
-	 
-	HANDLE ADDRESS 	SIZE FLAGS CLASS (NAME)
-	------ ------- 	---- ----- ------------
-	 001ch     56h 		1eh  ---  *flags*
-	 001eh     76h 		c1h  D RO GenPrimaryClass (Mess1Primary)
-	 0020h    1aah 		ceh  D RO GenViewClass (Mess1View)
-	 0022h    166h 		32h ID  O OLGadgetAreaClass
-	 0024h    19ah 		 eh  I
-	 0026h    492h 		6bh  D  O GenValueClass
-	 0028h    2deh 		6bh  D  O GenValueClass
-	 002ah    37eh 		a6h ID  O GenInteractionClass
-	 002ch    44ah 		46h ID  O OLMenuBarClass
-	 002eh    13ah 		 bh ID
-	 0030h    426h 		22h ID  O OLMenuButtonClass
-	 
-	Free handles = 17, null handles = 0
-	Objects = 8, 4 of them marked ignoreDirty
-	 
-	(mess1:0) 12 =>
+    (mess1:0) 11 => objwalk ^h4340h
+     
+    Heap at 640eh:0 (^h4340h), Type = LMEM_TYPE_OBJ_BLOCK
+    In use count = 3, Block size = 1328, Resource size = 59647 para (192 bytes)
+     
+    HANDLE ADDRESS  SIZE FLAGS CLASS (NAME)
+    ------ -------  ---- ----- ------------
+     001ch     56h      1eh  ---  *flags*
+     001eh     76h      c1h  D RO GenPrimaryClass (Mess1Primary)
+     0020h    1aah      ceh  D RO GenViewClass (Mess1View)
+     0022h    166h      32h ID  O OLGadgetAreaClass
+     0024h    19ah       eh  I
+     0026h    492h      6bh  D  O GenValueClass
+     0028h    2deh      6bh  D  O GenValueClass
+     002ah    37eh      a6h ID  O GenInteractionClass
+     002ch    44ah      46h ID  O OLMenuBarClass
+     002eh    13ah       bh ID
+     0030h    426h      22h ID  O OLMenuButtonClass
+     
+    Free handles = 17, null handles = 0
+    Objects = 8, 4 of them marked ignoreDirty
+     
+    (mess1:0) 12 =>
 
 
 ----------
 **pobject**
 
-	pobject [<addr>] [<print level>]
+    pobject [<addr>] [<print level>]
 
 The **pobject** (print object) command (often abbreviated **pobj**) is used to print 
 out the entire instance data chunk of an object. You can use **gentree**, 
 **vistree**, or **hwalk** and **objwalk** to get the handles for an object; once you 
 have them, use **pobj** with the handles, as follows:
 
-	[hello3:0] 7 => pobj ^l0x43d0:0x0022
+    [hello3:0] 7 => pobj ^l0x43d0:0x0022
 
 will print out the instance data chunk specified by that optr.
 
@@ -1183,55 +1191,55 @@ that its instance variables (if any) are correct. (See Swat Display 3-10.)
 
 **Swat Display 3-10 The pobject Command**
 
-	[lesink:0] 10 => pobj ^l4710h:0020h
-	*UpTextView::UpTextViewClass (@7, ^l4710h:0020h)
-	master part: Gen_offset(123) -- UpTextViewInstance
-	@8: {UpTextViewInstance (^h18192:622)+123} = {
-	    MetaBase Gen = {
-	        ClassStruct _far *MB_class = 360ah:162fh (motif::dgroup::OLPaneClass)
-	    }
-	    LinkPart GI_link = {
-	        dword LP_next = 4710h:001fh
-	    }
-	    CompPart GI_comp = {
-	        dword CP_firstChild = 4710h:002ah
-	    }
-	    word GI_visMoniker = 0h
-	    word GI_kbdAccelerator = 0h
-	    byte GI_attrs = 2h
-	    byte GI_states = c0h
-	    PointDWFixed GVI_origin = {
-	        DWFixed PDF_x = {0.000000}
-	        DWFixed PDF_y = {0.000000}
-	    }
-	    RectDWord GVI_docBounds = {
-	        long RD_left = 0
-	        long RD_top = 0
-	        long RD_right = +480
-	        long RD_bottom = +480
-	    }
-	    PointDWord GVI_increment = {
-	        long PD_x = +20
-	        long PD_y = +15
-	    }
-	    PointWWFixed GVI_scaleFactor = {
-	        WWFixed PF_x = {1.000000}
-	        WWFixed PF_y = {1.000000}
-	    }
-	    ColorQuad GVI_color = {
-	        CQ_redOrIndex = fh, CQ_info = 0h, CQ_green = 0h, CQ_blue = 0h
-	    }
-	    word GVI_attrs = 10h
-	    byte GVI_horizAttrs = 88h
-	    byte GVI_vertAttrs = 88h
-	    byte GVI_inkType = 0h
-	    dword GVI_content = 4710h:0024h
-	    dword GVI_horizLink = 0000h:0000h
-	    dword GVI_vertLink = 0000h:0000h
-	}
-	Variable Data:
-	         *** No Variable Data ***
-	[lesink:0] 11 =>
+    [lesink:0] 10 => pobj ^l4710h:0020h
+    *UpTextView::UpTextViewClass (@7, ^l4710h:0020h)
+    master part: Gen_offset(123) -- UpTextViewInstance
+    @8: {UpTextViewInstance (^h18192:622)+123} = {
+        MetaBase Gen = {
+            ClassStruct _far *MB_class = 360ah:162fh (motif::dgroup::OLPaneClass)
+        }
+        LinkPart GI_link = {
+            dword LP_next = 4710h:001fh
+        }
+        CompPart GI_comp = {
+            dword CP_firstChild = 4710h:002ah
+        }
+        word GI_visMoniker = 0h
+        word GI_kbdAccelerator = 0h
+        byte GI_attrs = 2h
+        byte GI_states = c0h
+        PointDWFixed GVI_origin = {
+            DWFixed PDF_x = {0.000000}
+            DWFixed PDF_y = {0.000000}
+        }
+        RectDWord GVI_docBounds = {
+            long RD_left = 0
+            long RD_top = 0
+            long RD_right = +480
+            long RD_bottom = +480
+        }
+        PointDWord GVI_increment = {
+            long PD_x = +20
+            long PD_y = +15
+        }
+        PointWWFixed GVI_scaleFactor = {
+            WWFixed PF_x = {1.000000}
+            WWFixed PF_y = {1.000000}
+        }
+        ColorQuad GVI_color = {
+            CQ_redOrIndex = fh, CQ_info = 0h, CQ_green = 0h, CQ_blue = 0h
+        }
+        word GVI_attrs = 10h
+        byte GVI_horizAttrs = 88h
+        byte GVI_vertAttrs = 88h
+        byte GVI_inkType = 0h
+        dword GVI_content = 4710h:0024h
+        dword GVI_horizLink = 0000h:0000h
+        dword GVI_vertLink = 0000h:0000h
+    }
+    Variable Data:
+             *** No Variable Data ***
+    [lesink:0] 11 =>
 
 
 
@@ -1239,10 +1247,10 @@ In addition to printing information about the object at a given address,
 pobject can print information about certain objects in the application if 
 passed certain flags:
 
-**pobject -i**	Prints information about the windowed object under the mouse 
+**pobject -i**  Prints information about the windowed object under the mouse 
 pointer.
 
-**pobject -c**	Prints information about the content for the view over which 
+**pobject -c**  Prints information about the content for the view over which 
 the mouse is located.
 
 There are more flags available, and it is also possible to ask for more or less 
@@ -1253,7 +1261,7 @@ details.
 
 **gentree**
 
-	gentree [<addr>] [<instance field>]
+    gentree [<addr>] [<instance field>]
 
 The **gentree** (generic tree) command prints out a generic tree from the given 
 *addr* and *instance field*. The *addr* must be the address of an object in the 
@@ -1265,7 +1273,7 @@ in the generic tree.The **-i** (implied grab) option is used to find an object b
 placing the mouse over the window in which the object resides and typing the 
 following:
 
-	[hello3:0] 7 => gentree -i
+    [hello3:0] 7 => gentree -i
 
 The default address that **gentree** examines is contained in *DS:SI. (See Swat 
 Display 3-11.) To examine objects more closely, pass the handles displayed by 
@@ -1274,7 +1282,7 @@ Display 3-11.) To examine objects more closely, pass the handles displayed by
 ----------
 **vistree**
 
-	vistree [<addr>] [<instance field>]
+    vistree [<addr>] [<instance field>]
 
 The **vistree** (visual tree) command prints out a visual tree from the given 
 *addr* and *instance field*. The *addr* must be the address of an object in the 
@@ -1290,7 +1298,7 @@ more closely, pass the handles displayed by **vistree** to the **pobject** comma
 ----------
 **gup**
 
-	gup [<addr>] [<instance field>]
+    gup [<addr>] [<instance field>]
 
 The **gup** (Generic UPward query) command is used to go up the generic tree 
 from a particular object specified by the *addr* argument, the default *DS:SI, 
@@ -1303,26 +1311,26 @@ the field of the given object.
 
 **Swat Display 3-11 Gentree and Gup**
 
-	(mess1:0) 19 => gentree -i
-	 
-	GenViewClass (@5, ^l4340h:0020h)
-	 GenValueClass (@6, ^l4340h:0026h)
-	 GenValueClass (@7, ^l4340h:0028h)
-	 
-	(mess1:0) 20 => gup @5
-	 
-	GenViewClass (@11, ^l4340h:0020h)
-	GenPrimaryClass (@12, ^l4340h:001eh) "MESS #1"
-	GenApplicationClass (@13, ^l41b0h:0024h) *** Is Moniker List ***
-	GenFieldClass (@14, ^l4080h:001eh)
-	GenSystemClass (@15, ^l2460h:0020h)
-	 
-	(mess1:0) 21 => gentree ^l4340h:001eh
-	 
-	GenPrimaryClass (@16, ^l4340h:001eh) "MESS #1"
-	 GenViewClass (@17, ^l4340h:0020h)
-	 GenValueClass (@18, ^l4340h:0026h)
-	 GenValueClass (@19, ^l4340h:0028h) 
+    (mess1:0) 19 => gentree -i
+     
+    GenViewClass (@5, ^l4340h:0020h)
+     GenValueClass (@6, ^l4340h:0026h)
+     GenValueClass (@7, ^l4340h:0028h)
+     
+    (mess1:0) 20 => gup @5
+     
+    GenViewClass (@11, ^l4340h:0020h)
+    GenPrimaryClass (@12, ^l4340h:001eh) "MESS #1"
+    GenApplicationClass (@13, ^l41b0h:0024h) *** Is Moniker List ***
+    GenFieldClass (@14, ^l4080h:001eh)
+    GenSystemClass (@15, ^l2460h:0020h)
+     
+    (mess1:0) 21 => gentree ^l4340h:001eh
+     
+    GenPrimaryClass (@16, ^l4340h:001eh) "MESS #1"
+     GenViewClass (@17, ^l4340h:0020h)
+     GenValueClass (@18, ^l4340h:0026h)
+     GenValueClass (@19, ^l4340h:0028h) 
 
 
 
@@ -1330,7 +1338,7 @@ the field of the given object.
 
 **vup**
 
-	vup [<addr>] [<instance field>]
+    vup [<addr>] [<instance field>]
 
 The **vup** (Visual UPward query) command is used to examine the visual 
 ancestors of a particular object given by the *addr* argument, the default 
@@ -1339,9 +1347,9 @@ ancestors of a particular object given by the *addr* argument, the default
 which to start the upward query. This command is used primarily to ensure 
 correct visual class hierarchy and to determine the field of the given object.
 
-**3.5.4.3	Memory Examination with Modification**
+**3.5.4.3   Memory Examination with Modification**
 
-	assign, imem
+    assign, imem
 
 The commands in this group are used to modify memory without detaching 
 Swat and editing the application code. They are often used in conjunction 
@@ -1354,7 +1362,7 @@ real bug fixes.
 
 **assign**
 
-	assign <addr> <value>
+    assign <addr> <value>
 
 The **assign** command will assign the given *value* to the given *addr*, which can 
 only have type **byte**, **word**, or **dword**. Both memory locations and registers 
@@ -1365,7 +1373,7 @@ mistakes or test differing values at run-time without having to recompile.
 
 **imem**
 
-	imem [<addr>] [<mode>]
+    imem [<addr>] [<mode>]
 
 The **imem** (inspect memory) command combines examination and 
 modification of memory into one command. It can be used to search through 
@@ -1373,9 +1381,9 @@ areas of memory and modify problem areas selectively. The command is used
 to print out memory starting at either the given *addr* or at the default DS:SI 
 in one of the following modes:
 
-**b** (bytes)	Displays the memory in terms of bytes.
+**b** (bytes)   Displays the memory in terms of bytes.
 
-**w** (words)	Displays the memory in terms of words.
+**w** (words)   Displays the memory in terms of words.
 
 **d** (double words) Displays the memory in terms of double words.
 
@@ -1384,7 +1392,7 @@ in one of the following modes:
 There are many subcommands to **imem** which are executed in the same 
 manner as those for **istep** and **sstep**. These subcommands are as follows:
 
-**b, w, d, i**	These will reset the mode to the given letter and redisplay the data in 
+**b, w, d, i**  These will reset the mode to the given letter and redisplay the data in 
 that mode.
 
 **n, j, `<return>`** (next, jump)
@@ -1396,7 +1404,7 @@ This will retreat to the preceding piece of data. While in instruction
 mode, if the displayed instruction is wrong, try again with the **P** 
 subcommand.
 
-**`<space>`**	This will clear the data being displayed and allow you to enter a new 
+**`<space>`**   This will clear the data being displayed and allow you to enter a new 
 value in accordance with the current mode. This is exactly like the 
 **assign** command except for singly and doubly quoted strings. A singly 
 quoted string such as `hello' will have its characters entered into memory 
@@ -1405,17 +1413,17 @@ quoted string such as "good-bye" will be entered into memory at the
 current address with the addition of a null byte at the end of the string. 
 This subcommand may not be used in instruction mode.
 
-**q** (quit)	Quits the **imem** mode and returns to the command level.
+**q** (quit)    Quits the **imem** mode and returns to the command level.
 
-**Ctrl-d**	Control-d (down) displays ten successive memory elements in the current 
+**Ctrl-d**  Control-d (down) displays ten successive memory elements in the current 
 display mode.
 
-**Ctrl-u**	Control-u (up) displays ten of the preceding memory elements in the 
+**Ctrl-u**  Control-u (up) displays ten of the preceding memory elements in the 
 current display mode.
 
 ### 3.5.5 Other Important Commands
 
-	alias, mwatch, objwatch, save, switch, sym-default, why
+    alias, mwatch, objwatch, save, switch, sym-default, why
 
 These commands are important to know but do not readily fall into any of the 
 previous categories. This section will discuss each of these commands in 
@@ -1425,7 +1433,7 @@ relation to the debugging process.
 
 **alias**
 
-	alias [<name> [<body>]]
+    alias [<name> [<body>]]
 
 This command is normally used to abbreviate a long command or series of 
 commands with one single, descriptive command. If no arguments are given, 
@@ -1440,7 +1448,7 @@ then **alias** will cause *argument1* to be allowed as an alternative to typing
 *argument2*. For example, if the command **print** were to be aliased as **p**, the 
 **alias** command would be used as below:
 
-	[hello:0] 5 => alias p print
+    [hello:0] 5 => alias p print
 
 Typing **p** will now have the same effect in Swat as typing **print**.
 
@@ -1448,7 +1456,7 @@ Typing **p** will now have the same effect in Swat as typing **print**.
 
 **mwatch**
 
-	mwatch [<message>+]
+    mwatch [<message>+]
 
 The **mwatch** (message watch) command watches a particular message and 
 displays all deliveries of that message without stopping GEOS. This 
@@ -1464,30 +1472,30 @@ Display 3-12.)
 
 **Swat Display 3-12 The mwatch Command**
 
-	(ui:0) 30 => mwatch MSG_VIS_DRAW MSG_META_EXPOSED
-	(ui:0) 31 => c
-	MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
-	 cx = 3f80h, dx = 0000h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
-	 cx = 3f80h, dx = 0000h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
-	 cx = 3f80h, dx = 0016h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
-	 cx = 3f80h, dx = 0016h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
-	 cx = 3f80h, dx = 3950h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
-	 cx = 3f80h, dx = 3950h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
-	 cx = 3f80h, dx = 007ch, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
-	 cx = 3f80h, dx = 007ch, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:0020h, GenTextClass
-	 cx = 3f80h, dx = 3950h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:0020h, GenTextClass
-	 cx = 3f80h, dx = 3950h, bp = 3950h
-	MSG_VIS_DRAW, ^l2860h:0020h, GenTextClass
-	 cx = 3f80h, dx = 3950h, bp = 3950h
+    (ui:0) 30 => mwatch MSG_VIS_DRAW MSG_META_EXPOSED
+    (ui:0) 31 => c
+    MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
+     cx = 3f80h, dx = 0000h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
+     cx = 3f80h, dx = 0000h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
+     cx = 3f80h, dx = 0016h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:001eh, GenInteractionClass
+     cx = 3f80h, dx = 0016h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
+     cx = 3f80h, dx = 3950h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
+     cx = 3f80h, dx = 3950h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
+     cx = 3f80h, dx = 007ch, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:002ch, OLGadgetAreaClass
+     cx = 3f80h, dx = 007ch, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:0020h, GenTextClass
+     cx = 3f80h, dx = 3950h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:0020h, GenTextClass
+     cx = 3f80h, dx = 3950h, bp = 3950h
+    MSG_VIS_DRAW, ^l2860h:0020h, GenTextClass
+     cx = 3f80h, dx = 3950h, bp = 3950h
 
 
 
@@ -1495,7 +1503,7 @@ Display 3-12.)
 
 **objwatch**
 
-	objwatch [<addr>]
+    objwatch [<addr>]
 
 The **objwatch** (object watch) command is used for displaying the messages 
 that have reached a particular object. It is useful for verifying that messages 
@@ -1506,27 +1514,27 @@ are being sent to the object at addr. If no argument is given, then any current
 
 **Swat Display 3-13 The objwatch Command**
 
-	(mess1:0) 2 => objwatch Mess1View
-	brk5
-	(mess1:0) 3 => c
-	MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
-	 cx = 00afh, dx = 0013h, bp = 0000h
-	MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
-	 cx = 00afh, dx = 0013h, bp = 0000h
-	MSG_META_WIN_UPDATE_COMPLETE, ^l44a0h:0020h, GenViewClass
-	 cx = 4b90h, dx = 0000h, bp = 0000h
-	MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
-	 cx = 00b0h, dx = 0013h, bp = 0000h
-	MSG_META_RAW_UNIV_LEAVE, ^l44a0h:0020h, GenViewClass
-	 cx = 44a0h, dx = 0020h, bp = 4b90h
-	MSG_VIS_DRAW, ^l44a0h:0020h, GenViewClass
-	 cx = 4b80h, dx = 23c0h, bp = 23c0h
-	MSG_VIS_COMP_GET_MARGINS, ^l44a0h:0020h, GenViewClass
-	 cx = 4b80h, dx = 23c0h, bp = 0000h
-	MSG_VIS_DRAW, ^l44a0h:0020h, GenViewClass
-	 cx = 4b80h, dx = 0163h, bp = 23c0h
-	MSG_META_WIN_UPDATE_COMPLETE, ^l44a0h:0020h, GenViewClass
-	 cx = 4b90h, dx = 0000h, bp = 0000h
+    (mess1:0) 2 => objwatch Mess1View
+    brk5
+    (mess1:0) 3 => c
+    MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
+     cx = 00afh, dx = 0013h, bp = 0000h
+    MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
+     cx = 00afh, dx = 0013h, bp = 0000h
+    MSG_META_WIN_UPDATE_COMPLETE, ^l44a0h:0020h, GenViewClass
+     cx = 4b90h, dx = 0000h, bp = 0000h
+    MSG_META_MOUSE_PTR, ^l44a0h:0020h, GenViewClass
+     cx = 00b0h, dx = 0013h, bp = 0000h
+    MSG_META_RAW_UNIV_LEAVE, ^l44a0h:0020h, GenViewClass
+     cx = 44a0h, dx = 0020h, bp = 4b90h
+    MSG_VIS_DRAW, ^l44a0h:0020h, GenViewClass
+     cx = 4b80h, dx = 23c0h, bp = 23c0h
+    MSG_VIS_COMP_GET_MARGINS, ^l44a0h:0020h, GenViewClass
+     cx = 4b80h, dx = 23c0h, bp = 0000h
+    MSG_VIS_DRAW, ^l44a0h:0020h, GenViewClass
+     cx = 4b80h, dx = 0163h, bp = 23c0h
+    MSG_META_WIN_UPDATE_COMPLETE, ^l44a0h:0020h, GenViewClass
+     cx = 4b90h, dx = 0000h, bp = 0000h
 
 
 
@@ -1534,7 +1542,7 @@ are being sent to the object at addr. If no argument is given, then any current
 
 **save**
 
-	save <filename>
+    save <filename>
 
 The **save** command, when passed a file name, saves the contents of Swat's 
 main buffer to that file. Thus this command dumps Swat output to a file.
@@ -1543,7 +1551,7 @@ main buffer to that file. Thus this command dumps Swat output to a file.
 
 **switch**
 
-	switch [(<patient>:<thread-num>|<threadID>)]
+    switch [(<patient>:<thread-num>|<threadID>)]
 
 The **switch** command is used to switch between applications or threads in 
 Swat but does not physically change threads on the target PC. This allows the 
@@ -1559,7 +1567,7 @@ change to (e.g. ":1")
 
 **sym-default**
 
-	sym-default [<patient>]
+    sym-default [<patient>]
 
 The **sym-default** (symbol default) command is used to set the default 
 patient to use when parsing an address expression which is not defined in the 
@@ -1574,7 +1582,7 @@ This command is normally aliased to **sd**.
 ----------
 **why**
 
-	why
+    why
 
 The **why** command prints the error code for an occurrence of a fatal error. 
 This command is useful because it can give a good idea of why GEOS crashed.
@@ -1619,21 +1627,21 @@ the previous command.
 
 **Swat Display 3-14 Command Correction Using ^**
 
-	(geos:0) 185 => wurds
-	Error: invoked "wurds", which isn't a valid command name
-	
-	(geos:0) 186 => ^u^o
-	words
-	Addr:	 	 +0   +2   +4   +6   +8   +a   +c   +e
-	4b4bh: e800 01b1 0e00 60f6 0016 9800 6e02 a900
-	
-	(geos:0) 187 => ddwords
-	Error: invoked "ddwords", which isn't a valid command name
-	
-	(geos:0) 188 => ^d
-	dwords
-	Addr:  +0       +4       +8       +c
-	4b59h: 1d0aa900 001c400d 294bd000 6c0a8000
+    (geos:0) 185 => wurds
+    Error: invoked "wurds", which isn't a valid command name
+    
+    (geos:0) 186 => ^u^o
+    words
+    Addr:        +0   +2   +4   +6   +8   +a   +c   +e
+    4b4bh: e800 01b1 0e00 60f6 0016 9800 6e02 a900
+    
+    (geos:0) 187 => ddwords
+    Error: invoked "ddwords", which isn't a valid command name
+    
+    (geos:0) 188 => ^d
+    dwords
+    Addr:  +0       +4       +8       +c
+    4b59h: 1d0aa900 001c400d 294bd000 6c0a8000
 
 
 
@@ -1651,49 +1659,49 @@ Display 3-15.)
 
 **Swat Display 3-15  The Address History**
 
-	(geos:0) 8 => gentree -i
-	
-	GenPrimaryClass (@1, ^l44a0h:001eh) "MESS #1"
-	 GenViewClass (@2, ^l44a0h:0020h)
-	 GenValueClass (@3, ^l44a0h:0026h)
-	 GenValueClass (@4, ^l44a0h:0028h)
-	
-	(geos:0) 9 => pinst @3
-	class = ui::dgroup::GenValueClass
-	master part: Gen_offset(53) -- ui::GenValueInstance
-	@5: {ui::GenValueInstance (^h17568:1170)+53} = {
-	 GenInstance GenValue_metaInstance = {
-	 MetaBase Gen_metaInstance = {
-	 ClassStruct _far *MB_class = 3573h:1867h (motif::dgroup::OLScrollbarClass)
-	 }
-	 LinkPart GI_link = {
-	 void _optr LP_next = ^l44a0h:0028h (ui::dgroup::GenValueClass@6244h:02deh)
-	 }
-	 CompPart GI_comp = {
-	 void _optr CP_firstChild = null
-	 }
-	 void _lptr GI_visMoniker = null
-	 KeyboardShortcut GI_kbdAccelerator = {
-	 KS_PHYSICAL = 0
-	 KS_ALT = 0
-	 KS_CTRL = 0
-	 KS_SHIFT = 0
-	 KS_CHAR_SET = 0
-	 KS_CHAR = C_NULL
-	 }
-	 GenAttrs GI_attrs = {}
-	 GenStates GI_states = {GS_USABLE, GS_ENABLED}
-	 }
-	 WWFixed GVLI_value = {0.000000}
-	 WWFixed GVLI_minimum = {0.000000}
-	 WWFixed GVLI_maximum = {0.007324}
-	 WWFixed GVLI_increment = {0.000229}
-	 GenValueStateFlags GVLI_stateFlags = {GVSF_INDETERMINATE}
-	 GenValueDisplayFormat GVLI_displayFormat = GVDF_INTEGER
-	 void _optr GVLI_destination = ^l44a0h:0020h (ui::dgroup::GenViewClass@6244h:01aah)
-	 word GVLI_applyMsg = 681ah
-	} 
-	(geos:0) 10 =>
+    (geos:0) 8 => gentree -i
+    
+    GenPrimaryClass (@1, ^l44a0h:001eh) "MESS #1"
+     GenViewClass (@2, ^l44a0h:0020h)
+     GenValueClass (@3, ^l44a0h:0026h)
+     GenValueClass (@4, ^l44a0h:0028h)
+    
+    (geos:0) 9 => pinst @3
+    class = ui::dgroup::GenValueClass
+    master part: Gen_offset(53) -- ui::GenValueInstance
+    @5: {ui::GenValueInstance (^h17568:1170)+53} = {
+     GenInstance GenValue_metaInstance = {
+     MetaBase Gen_metaInstance = {
+     ClassStruct _far *MB_class = 3573h:1867h (motif::dgroup::OLScrollbarClass)
+     }
+     LinkPart GI_link = {
+     void _optr LP_next = ^l44a0h:0028h (ui::dgroup::GenValueClass@6244h:02deh)
+     }
+     CompPart GI_comp = {
+     void _optr CP_firstChild = null
+     }
+     void _lptr GI_visMoniker = null
+     KeyboardShortcut GI_kbdAccelerator = {
+     KS_PHYSICAL = 0
+     KS_ALT = 0
+     KS_CTRL = 0
+     KS_SHIFT = 0
+     KS_CHAR_SET = 0
+     KS_CHAR = C_NULL
+     }
+     GenAttrs GI_attrs = {}
+     GenStates GI_states = {GS_USABLE, GS_ENABLED}
+     }
+     WWFixed GVLI_value = {0.000000}
+     WWFixed GVLI_minimum = {0.000000}
+     WWFixed GVLI_maximum = {0.007324}
+     WWFixed GVLI_increment = {0.000229}
+     GenValueStateFlags GVLI_stateFlags = {GVSF_INDETERMINATE}
+     GenValueDisplayFormat GVLI_displayFormat = GVDF_INTEGER
+     void _optr GVLI_destination = ^l44a0h:0020h (ui::dgroup::GenViewClass@6244h:01aah)
+     word GVLI_applyMsg = 681ah
+    } 
+    (geos:0) 10 =>
 
 
 
@@ -1723,12 +1731,12 @@ HOME environment variable
 
 **Swat Display 3-16 An Initialization File**
 
-	srcwin 15
-	regwin
-	save 500
-	patient-default mess1
-	run
-	
+    srcwin 15
+    regwin
+    save 500
+    patient-default mess1
+    run
+    
 This example shows a sample initialization file which sets up windows to display the source code 
 and current register values, set the length of the save buffer to 500 lines, and continue running swat 
 until the mess1 application has been loaded, at which point execution will automatically stop.

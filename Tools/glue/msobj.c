@@ -1483,6 +1483,38 @@ static char *SpecialStringsFromBorland[] =
     NULL
 };
 
+static char *SpecialStringsFromWatcom[] =
+{
+    "__FDFS",
+    "__FDU4",
+    "__EDM",
+    "__EDA",
+    "__EDS",
+    "__EDC",
+    "__FDM",
+    "__FDA",
+    "__FDS",
+    "__FDC",
+    "__EDD",
+    "__FDD",
+    "__FDN",
+    "__I4FD",
+    "__U4FD",
+    "__FDI4",
+    "__FSU4",
+    "__FSI4",
+    "__FSM",
+    "__FSA",
+    "__FSS",
+    "__FSD",
+    "__U4FS",
+    "__I4FS",
+    "__FSN",
+    "__FSFD",
+    "__FSC",
+    NULL
+};
+
 /* a table of values corresponding to the strings in the previous table */
 static char SpecialTokensFromBorland[] =
 {
@@ -1540,6 +1572,38 @@ MSObj_IsFloatingPointExtDef(ID name)
 	    i++;
 	    ptr = SpecialStringsFromBorland[i];
     	}
+    }
+
+    ST_Unlock(symbols, name);
+    return f;
+}
+
+Boolean
+MSObj_IsWatcomFloatingPoint(ID name)
+{
+    char    *str;
+    Boolean	f;
+    char    *ptr;
+    int	    i=0;
+
+    f = FALSE;
+    str = ST_Lock(symbols, name);
+
+    /* since these are very rare do a little optimization */
+    if ( str[0] == '_' && str[1] == '_' &&
+	( str[2] == 'F' || str[2] == 'E' || str[2] == 'I' || str[2] == 'U' ) )	
+    {
+	ptr = SpecialStringsFromWatcom[0];
+	while (ptr != NULL)
+	{
+	    if (!strcmp(str, ptr))
+	    {
+		f = TRUE;
+		break;
+	    }
+	    i++;
+	    ptr = SpecialStringsFromWatcom[i];
+	}
     }
 
     ST_Unlock(symbols, name);

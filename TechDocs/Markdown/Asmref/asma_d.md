@@ -410,7 +410,7 @@ Return the element number of the element pointed to.
 ds:di - Address of the element to be checked.
 
 **Returns:**  
-ax	Zero-based element number.
+ax  Zero-based element number.
 
 **Destroyed:**  
 Nothing.
@@ -898,15 +898,15 @@ ss:bp - If CQTF_USE_REGION set, values will be passed on stack.
 
 **Pass on stack:** The following structure will only be passed if CQTF_USE_REGION is set:
 
-	ClipboardQuickTransferRegionInfo struct
-		 CQTRI_paramAX word
-		 CQTRI_paramBX word
-		 CQTRI_paramCX word
-		 CQTRI_paramDX word
-		 CQTRI_regionPos Point
-		 CQTRI_strategy dword
-		 CQTRI_region dword			; pointer to region
-	ClipboardQuickTransferRegionInfo ends
+    ClipboardQuickTransferRegionInfo struct
+         CQTRI_paramAX word
+         CQTRI_paramBX word
+         CQTRI_paramCX word
+         CQTRI_paramDX word
+         CQTRI_regionPos Point
+         CQTRI_strategy dword
+         CQTRI_region dword         ; pointer to region
+    ClipboardQuickTransferRegionInfo ends
 
 *CQTRI_region* must be in a block that is in memory already.
 
@@ -1315,7 +1315,7 @@ al - **DiskCopyFlags**
 cx:bp - callback routine
 
 **Returns:**  
-ax	DiskCopyError/FormatError; Zero if successful.
+ax  DiskCopyError/FormatError; Zero if successful.
 
 **Callback Routine Specifications:**  
 **Passed:**  
@@ -1387,14 +1387,14 @@ di, si
 **Callback Routine Specifications:**  
 **Passed:**  
 bx - Disk handle of current disk.  
-ax, cx, dx, bp	Data set by caller and callback.  
+ax, cx, dx, bp  Data set by caller and callback.  
 **Return:**  
 ax, cx, dx, bp - May be modified or preserved.  
 CF - et if processing should be aborted.  
 **May Destroy:**  
 ax, cx, dx, bp
 
-**Library:** 	disk.def
+**Library:**    disk.def
 
 ----------
 #### DiskFormat
