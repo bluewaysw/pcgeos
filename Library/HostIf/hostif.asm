@@ -113,7 +113,7 @@ EC <	call	ECCheckStack						>
 	call	MemOwner
 	;mov_trash	ax, bx
 	mov	ax, MSG_HOSTIF_PROCESS_EVENTS
-	mov	di, 0
+	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
 
 	call	SysExitInterrupt

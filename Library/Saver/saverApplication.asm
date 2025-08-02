@@ -796,6 +796,13 @@ setPrio:
 		call	ThreadModify
 
 	;
+	; Re-set parent window to get latest bounds (in case of dynamic 
+	; screen size mode).
+	; 
+		mov	bp, ds:[di].SAI_parentWin
+		mov	ax, MSG_SAVER_APP_SET_PARENT_WIN
+		call	ObjCallInstanceNoLock
+	;
 	; Open the window for saving the screen.
 	; 
 		mov	di, ds:[di].SAI_parentWin

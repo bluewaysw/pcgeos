@@ -3182,7 +3182,6 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
 OLFieldSendToGenApplications	method dynamic OLFieldClass,
 					MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 
@@ -3213,6 +3212,5 @@ genAppLoop:
 done:
 	ret
 OLFieldSendToGenApplications	endm
-endif
 
 HighUncommon	ends

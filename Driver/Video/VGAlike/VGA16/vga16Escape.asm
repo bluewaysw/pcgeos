@@ -68,10 +68,12 @@ VidEscSetDeviceAgain 	proc	near
 		; do any device-specific initialization
 
 		;call	VidSetVESAFar
+		mov	al, ds:[cursorCount]
+		push	ax
 		mov	dx, cs
 		mov	si, 0
 		mov	di, DRE_SET_DEVICE
-		call	VidCallModNoSem
+		call	VidCallMod
 
 		; now that device-specific initialization is out of the way,
 		; do some common stuff, like showing the cursor
@@ -80,6 +82,8 @@ VidEscSetDeviceAgain 	proc	near
 		;mov	si, -1			; start with default cursor
 		;call	VidSetPtrFar
 		;mov	ds:[videoEnabled], 1	; video is ON
+		pop	ax
+		mov	ds:[cursorCount], al
 done:
 		.leave
 		mov	di, 0		; function executed

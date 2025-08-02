@@ -3187,4 +3187,31 @@ done:
 OLAppUpdateWindowsForTaskBar	endm
 endif
 
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLAppApplyFieldSizeChange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Send message to GFI_genApplications
+
+CALLED BY:	MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
+
+PASS:		*ds:si	= OLApplicationClass object
+		es 	= segment of OLApplicationClass
+		ax	= message #
+		cx	= new field width
+		dx	= new field height
+RETURN:		nothing
+DESTROYED:	ax, cx, dx, bp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OLAppApplyFieldSizeChange	method dynamic OLApplicationClass,
+					MSG_OL_APP_APPLY_FIELD_SIZE_CHANGE
+
+				ret
+
+OLAppApplyFieldSizeChange	endm
+
+
 ActionObscure	ends

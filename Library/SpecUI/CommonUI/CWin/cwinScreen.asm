@@ -279,6 +279,11 @@ REVISION HISTORY:
 	brianc	3/22/93  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+idata	segment
+global screenWidth:word
+global screenHeight:word
+idata	ends
+
 OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	;
 	; make sure we've got what we're looking for
@@ -314,6 +319,13 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	mov	cx, ds:[si].VDI_pageW	; x size
 	mov	dx, ds:[si].VDI_pageH	; y size
 
+	push	ds
+	mov	ax, segment screenWidth
+	mov	ds, ax
+	mov	ds:[screenWidth], cx
+	mov	ds:[screenHeight], dx
+	pop	ds
+
 	pop	ds
 	pop	si
 
@@ -321,30 +333,27 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	call	ObjCallInstanceNoLock
 
 	push	ds, es, si
-	push	cx
+	push	cx, dx
 	mov	cx, 1
 	mov	ax, MSG_VIS_FIND_CHILD_AT_POSITION
 	call	ObjCallInstanceNoLock
 	mov	bx, cx
 	mov	si, dx
-	pop	cx
-	mov	ax, MSG_VIS_SET_SIZE
+	pop	cx, dx
+	;mov	ax, MSG_VIS_SET_SIZE
 
 	push	ax, di
 	mov	ax, MSG_VIS_SET_SIZE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	;call	ObjMessage
+	pop	ax, di
+
+	push	ax, di
+	mov	ax, MSG_VIS_MARK_INVALID
+	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH or mask VOF_GEOMETRY_INVALID or mask VOF_GEO_UPDATE_PATH
+	mov	dl, VUM_NOW
 	mov	di, mask MF_CALL
 	call	ObjMessage
-
-	mov	ax, MSG_GEN_SET_NOT_USABLE
-	mov	dl, VUM_NOW
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-
-	mov	ax, MSG_GEN_SET_USABLE
-	mov	dl, VUM_NOW
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-
 	pop	ax, di
 
 	pop	ds, es, si
@@ -352,11 +361,51 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	mov	ax, MSG_VIS_MARK_INVALID
 	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH
 	mov	dl, VUM_NOW
-
-
+	call	ObjCallInstanceNoLock
 
 	mov	ax, MSG_VIS_INVAL_TREE
+	mov	dl, VUM_NOW
 	call	ObjCallInstanceNoLock
+
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	mov	ax, ds:[di].GSCI_videoDriver	
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	bx, ds:[di].VCI_window
+	mov	cx, 0
+	mov	dx, 0
+	;ax	- handle of driver for window
+	;bx	- handle of window on which mouse moves
+	;cx	- x coordinate of pointer in window
+	;dx	- y coordinate of pointer in window
+	call	ImSetPtrWin
+
+	;
+	; if there is a mouse driver, make the pointer visible
+	;
+	mov	ax, GDDT_MOUSE
+	call	GeodeGetDefaultDriver
+	tst	ax
+	jz	done				; no mouse driver, no pointer
+
+
+	push 	si, ds, di
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	mov	bx, ds:[di].GSCI_videoDriver	
+
+	; get driver strategy
+	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
+
+	push	bp		; Let the ptr become visible now
+	mov	di, DR_VID_SHOWPTR
+	call	ds:[si].DIS_strategy
+	pop	bp
+	pop 	si, ds, di
+
+done:
+
 
 callSuper:
 	mov	di, offset OLScreenClass
