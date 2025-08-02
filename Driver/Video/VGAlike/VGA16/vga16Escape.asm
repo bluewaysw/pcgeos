@@ -27,8 +27,7 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		VidEscSetDeviceAgain
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -67,10 +66,14 @@ VidEscSetDeviceAgain 	proc	near
 		je	done
 
 		; do any device-specific initialization
+		mov	al, ds:[cursorCount]
+		push	ax
 		mov	dx, cs
 		mov	si, 0
 		mov	di, DRE_SET_DEVICE
 		call	VidCallMod
+		pop	ax
+		mov	ds:[cursorCount], al
 done:
 		.leave
 		mov	di, 0		; function executed

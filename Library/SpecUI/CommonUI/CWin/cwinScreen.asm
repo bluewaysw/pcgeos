@@ -243,8 +243,7 @@ OLScreenSpecUnbuild	method dynamic OLScreenClass,
 
 OLScreenSpecUnbuild	endm
 
-
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLScreenNotify
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -353,7 +352,7 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	;
 	; send it to all our children
 	;
-	push	cx
+	push	cx, dx
 	mov	cx, di				;cx <- recorded message
 	mov	ax, MSG_VIS_SEND_TO_CHILDREN
 	call	ObjCallInstanceNoLock
@@ -387,7 +386,6 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	mov	dx, GWNT_HOST_SCREEN_FIELD_SIZE_CHANGE
 	mov	di, mask MF_RECORD
 	call	ObjMessage
-
 	; Send it to the GCN list
 	mov	bx, MANUFACTURER_ID_GEOWORKS
 	mov	ax, GCNSLT_HOST_NOTIFICATIONS
@@ -450,8 +448,7 @@ callSuper:
 
 OLScreenNotify	endm
 
-
-
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLScreenOpenWin -- MSG_VIS_OPEN_WIN for OLScreenClass
