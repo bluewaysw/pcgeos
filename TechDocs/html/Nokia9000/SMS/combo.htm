@@ -183,7 +183,9 @@ When a message is placed in the outbox, the mailbox calls the appropriate data d
 <A NAME="SMS_6.htm_87102">
  </A>
 Using the SMS Mailbox API</H3>
-<PRE><STRONG CLASS="fileName">mailbox.goh</STRONG></PRE>
+<PRE><STRONG>library mailbox
+library foam
+library ansic</STRONG></PRE>
 <P>
 To send an SMS message to the outside world, an application will need to perform the following steps:</P>
 <OL>
@@ -222,7 +224,7 @@ These steps are detailed in the sections following.</P>
 Setting Up the Text Message</H4>
 <P>
 <STRONG CLASS="fileName">
-foam.goh</STRONG>
+foam.goh, Ansi/string.h</STRONG>
 </P>
 <P>
 The Short Message Service protocol is able to handle a &quot;short message&quot; of up to 160 characters. The Foam library defines this character limit:</P>
@@ -286,7 +288,8 @@ if ( strlen( smsMessage ) + strlen( smsText ) &lt;= FOAM_MAX_SMS_TEXT_SIZE )
 <A NAME="SMS_6.htm_87685">
  </A>
 Storing the Text Within a VM File</H4>
-<PRE>MailboxGetVMFile(), <STRONG CLASS="fileName">Mailbox\vmtree.goh</STRONG></PRE>
+<PRE>
+<STRONG CLASS="fileName">mailbox.goh</STRONG>, <STRONG CLASS="fileName">Mailbox\vmtree.h</STRONG>, MailboxGetVMFile()</PRE>
 <P>
 Text within an SMS message needs to be stored by the Mailbox until it connects with a cellular service provider. When you register a message with the Mailbox library, you indicate what storage format you have selected. The Mailbox uses a<EM>
  data driver</EM>
@@ -369,7 +372,7 @@ vmFile = MailboxGetVMFile(1, &amp;vmStatus);</PRE>
  * to fit a header (VMChainLink), the SMS message itself, and a null terminator.
  */
 vmBlock = VMAlloc(vmFile, (sizeof(VMChainLink) + strlen(smsMessage) +1), 0);
-charPtr = VMLock(vmFile, vmBlock, &amp;mh);</PRE>
+textPtr = VMLock(vmFile, vmBlock, &amp;mh);</PRE>
 <PRE>/*
  * We advance past the VMChainLink contained at the beginning of the VM
  * block and copy the text to that location.
@@ -393,7 +396,7 @@ vmRef.VMTAR_vmFile = vmFile;</PRE>
 <A NAME="SMS_6.htm_51857">
  </A>
 Setting Up the SMSending Options</H4>
-<PRE>MailboxGetAdminFile(),<STRONG CLASS="fileName"> smdefine.goh</STRONG>, SMSendingOptions, ReadCSNumberFromIniFile()</PRE>
+<PRE><STRONG CLASS="fileName">internal\resp\smdefine.goh</STRONG>, MailboxGetAdminFile(), SMSendingOptions, ReadCSNumberFromIniFile()</PRE>
 <P>
 When registering a mailbox message, the application must specify a data driver to use when storing the message. It will also need to specify which transport driver to use when the message is to be delivered. The GEOS SMS transport driver expects a number of parameters indicating how the SMS message should be sent. These parameters are passed as a <CODE>
 SMSendingOptions</CODE>
@@ -463,13 +466,21 @@ SMSO<CODE>
 _validityPeriod</CODE>
  contains an <CODE>
 SMValidityPeriod</CODE>
- value which indicates the length of time that the message is considered valid for delivery. The cellular provider should interpret this value and if it is unable to connect with the recipient, drop the message and inform the sender that the message was not delivered. Possible values are:</DT>
-<DT>
-	SMVP_1_HOUR</DT><DD>
+ value which indicates the length of time that the message is considered valid for delivery. The cellular provider should interpret this value and if it is unable to connect with the recipient, drop the message and inform the sender that the message was not delivered. Possible values on pre-N9110 devices are:</DT>
+<DD>
+SMVP_1_HOUR
 SMVP_6_HOURS<BR>
 SMVP_24_HOURS<BR>
 SMVP_1_WEEK<BR>
-SMVP_MAX (The actual value of SMVP_MAX will vary by service provider.) </DD>
+SMVP_MAX (The actual value of SMVP_MAX will vary by service provider.) <P>
+<EM>On the N9110 Communicator these values are:</EM><BR>
+SMVP_ONE_HOUR<BR>
+SMVP_SIX_HOURS<BR>
+SMVP_ONE_DAY<BR>
+SMVP_ONE_WEEK<BR>
+SMVP_MAX       
+</DD>
+
 <DT>
 SMSO_<CODE>
 messageConversion</CODE>
@@ -520,7 +531,7 @@ InitFileReadStringBuffer()</CODE>
 . Pass &quot;SMS&quot; as the category and &quot;scNumber&quot; as the key. The routine will read the entry into a buffer passed to the routine. It will also read the size of the string into another buffer.</P>
 <P CLASS="figTitle">
 Code Display 3-3 Setting the SMSendingOptions Parameters</P>
-<PRE>SMSendingOptions			*ptrSendingOptions
+<PRE>SMSendingOptions			*ptrSendingOptions;
 VMFileHandle			adminFile;
 DBGroupAndItem			smsParams;
 word			sizeOfBuffer;</PRE>
@@ -529,7 +540,7 @@ word			sizeOfBuffer;</PRE>
 <PRE>ptrSendingOptions = (SMSendingOptions *) DBLockUngrouped(adminFile, smsParams);</PRE>
 <PRE>/* set desired sending options */
 ptrSendingOptions-&gt;SMSO_replyPath = SMRP_NO;
-ptrSendingOptions-&gt;SMSO_validityPeriod = SMVP_24_HOURS;
+ptrSendingOptions-&gt;SMSO_validityPeriod = SMVP_ONE_HOUR;
 ptrSendingOptions-&gt;SMSO_messageConversion = SMMC_NORMAL;</PRE>
 <PRE>/* be sure to initialize these fields as well, otherwise the app will crash! */
 ptrSendingOptions-&gt;SMSO_dataCodingScheme = 0;
@@ -541,7 +552,7 @@ ptrSendingOptions-&gt;SMSO_userDataLength = 0;</PRE>
 			0,
 			&amp;sizeOfBuffer);</PRE>
 <PRE>DBDirty(ptrSendingOptions);
-DBNUnlock(ptrSendingOptions);</PRE>
+DBUnlock(ptrSendingOptions);</PRE>
 
 
 
@@ -772,7 +783,7 @@ FileDateAndTime</CODE>
 Code Display 3-4 Setting Up the Mailbox Registration Arguments</P>
 <PRE>MailboxRegisterMessageArgs				registerArgs;
 MailboxTransAddr				addressList;
-TCHAR				number[MAX_ADDRESS_SIZE]</PRE>
+TCHAR				number[MAX_ADDRESS_SIZE];</PRE>
 <PRE>/*
  * We tell the mailbox that the data is stored within a VMTreeAppRef.
  */
@@ -786,7 +797,7 @@ registerArgs.MRA_bodyFormat.MDF_manuf = MANUFACTURER_ID_GEOWORKS;</PRE>
 <PRE>/*
  * We tell the mailbox where the body text is stored.
  */
-MRA_bodyRef = &amp;vmRef;
+registerArgs.MRA_bodyRef = &amp;vmRef;
 registerArgs.MRA_bodyRefLen = sizeof(VMTreeAppRef);</PRE>
 <PRE>/*
  * We tell the mailbox to use the SM transport driver when sending the message. 
@@ -798,7 +809,7 @@ registerArgs.MRA_transport.MT_manuf = MANUFACTURER_ID_GEOWORKS;</PRE>
  * Normally, we would retrieve the phone number from an outside source (such as 
  * the contact database). Here, we just set it to a specific value.
  */</PRE>
-<PRE>number = &quot;13125551212&quot;;</PRE>
+<PRE>strcpy(number, &quot;13125551212&quot);</PRE>
 <PRE>/*
  * We need to stuff each address (in this case, a phone number) into a
  * MailboxTransAddr structure.
@@ -807,7 +818,7 @@ registerArgs.MRA_transport.MT_manuf = MANUFACTURER_ID_GEOWORKS;</PRE>
 addressList.MTA_transAddrLen = strlen(number);
 addressList.MTA_userTransAddr = &amp;number;</PRE>
 <PRE>registerArgs.MRA_transAddrs = &amp;addressList;
-registerArgs.MRA_numTransAddr = 1;</PRE>
+registerArgs.MRA_numTransAddrs = 1;</PRE>
 <PRE>/*
  * We pass the previously set up SMSendingOptions in the DBGroupItem to the 
  * transport driver.
@@ -837,7 +848,7 @@ MailboxMessage</CODE>
 ) as a second parameter. The routine will write a token value into this address so that future mailbox routines can refer to this message by its token. </P>
 <P>
 Do not confuse this token with the actual message (which is sent through the <CODE>
-MailboxRegisterMessageArgs</CODE>
+MailboxRegisterMessageArg</CODE>
 ).</P>
 <P>
 After you have successfully registered the message, call <CODE>
@@ -845,10 +856,12 @@ MailboxDoneWithVMFile() </CODE>
 to tell the mailbox to get rid of the temporary VM file it had created.</P>
 <P CLASS="figTitle">
 Code Display 3-5 Using MailboxRegisterMessage</P>
-<PRE>MailboxRegisterMessageArgs				registerArgs;
-MailboxMessage				msgToken;
+<PRE>MailboxMessage				msgToken;
 MailboxError				mailboxError;
-VMFileHandle				vmFile;</PRE>
+/* registerArgs and vmFile have been declared previously as:
+ *    MailboxRegisterMessageArgs		registerArgs;
+ *    VMFileHandle				vmFile;
+ */</PRE>
 <PRE>mailboxError = MailboxRegisterMessage(&amp;registerArgs, &amp;msgToken);</PRE>
 <PRE>if (mailboxError == ME_SUCCESS) {</PRE>
 <PRE>    /* If we want to do anything special upon success, here it would reside ... */</PRE>
@@ -1029,7 +1042,7 @@ MailboxGetBodyRef()</CODE>
 <P CLASS="figTitle">
 Code Display 3-7 Retrieving the Text</P>
 <PRE>    MailboxError 			errorCode;
-    VMAppTreeRef			vmRef;
+    VMTreeAppRef			vmRef;
     word 			refSize;
     MemHandle			handleToText;
     TCHAR			smsText[FOAM_MAX_SMS_TEXT_SIZE+1];
@@ -1051,9 +1064,9 @@ Code Display 3-7 Retrieving the Text</P>
 	 * Advance the pointer beyond the carriage return to get beyond the 
 	 * prefix. 
 	 */</PRE>
-<PRE>	while ( *ptrToText != `\r')
+<PRE>	while ( *ptrToText != '\r')
 	    ptrToText++;</PRE>
-<PRE>	/* Advance over the `\r' ...*/
+<PRE>	/* Advance over the '\r' ...*/
 	    ptrToText++;</PRE>
 <PRE>	strcpy(smsText, ptrToText);</PRE>
 <PRE>	VMUnlock(handleToText);</PRE>
@@ -1074,7 +1087,7 @@ MailboxDeleteMessage()</CODE>
 <P CLASS="figTitle">
 Code Display 3-8 Cleaning Up the Mailbox</P>
 <PRE>	/* Now remove the external text and the reference to that text. */</PRE>
-<PRE>	MailboxDoneWithBody(msg, &amp;vmRef, refSize)</PRE>
+<PRE>	MailboxDoneWithBody(msg, &amp;vmRef, refSize);</PRE>
 <PRE>	/* 
 	 * Finally, delete the &quot;message&quot; including the message token and any 
 	 * information included with it.

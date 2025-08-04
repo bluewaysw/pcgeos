@@ -51,6 +51,7 @@ may be manipulated; this API does not support repeating events.
 &nbsp;&nbsp;<A HREF="#CalOverview.htm">1 Overview</A><BR>
 &nbsp;&nbsp;<A HREF="#CalSamplesTop.htm">2 Examples</A><BR>
 &nbsp;&nbsp;<A HREF="#CalReference.htm">3 Reference</A><BR>
+&nbsp;&nbsp;<A HREF="#calendar.htm">Appendix: Calendar File Format</A><BR>
 </STRONG>
 </P> <!-- end of sectionlinks blob -->
 
@@ -1632,6 +1633,1049 @@ an event repeating every day for 3 days set for 12/15 would have events on
 <P>
 <HR>
 
+<A NAME="calendar.htm"></A>
+<H2 CLASS="sectionTitle">
+Calendar File Format</H2>
+
+<UL>
+<LI><A HREF="#Normal events and To-do list items">Normal events and To-do list items</A>
+<LI><A HREF="#Organization of normal events">Organization of normal events</A>
+<LI><A HREF="#Multiple Day Events">Multiple Day Events</A>
+<LI><A HREF="#Organization of To-do list items">Organization of To-do list items</A>
+<LI><A HREF="#Repeat Events">Repeat Events</A>
+<LI><A HREF="#Organization of repeat events">Organization of repeat events</A>
+<LI><A HREF="#Memos">Memos</A>
+<LI><A HREF="#Unique ID info">Unique ID info</A>
+<LI><A HREF="#Event ID array info">Event ID array info</A>
+<LI><A HREF="#Event Sent-To info">Event Sent-To info</A>
+<LI><A HREF="#Server Destination Info (N9110 Communicator)">Server Destination Info (N9110 Communicator)</A>
+<LI><A HREF="#Pending event info (N9110 Communicator)">Pending event info (N9110 Communicator)</A>
+<LI><A HREF="#Text file syntax update">Text file syntax update</A>
+</UL>
+
+
+<P>Data for the events, to-do list items, and memos associated with events are stored in a file called &quot;Calendar".  Its DOS name is &quot;calendar.000", and it is located in the <CODE>privdata\calendar</CODE> 
+directory.
+</P>
+
+<A NAME="calendar.htm_Normal events and To-do list items"></A>
+<P><H4>Normal events and To-do list items</H4></P>
+
+<P>	Normal events refer to events which are not repeated.  In other words, normal events only happen once.  Repeated events occur at a regular frequency (e.g. daily, weekly).  Normal events and To-do list items (as well as repeated events) are stored in database items.  A <CODE>DBGroup/DBItem</CODE> pair uniquely identify an event or item, and Database library routines are used to manipulate or access these database items.  The data structure for these events/items is called <CODE>EventStruct</CODE>, and it has the following structure:
+</P>
+
+<PRE>
+EventStruct			struct
+    ES_flags                  EventInfoFlags
+    ES_parentMap              word	(?)
+    ES_timeYear               word	(?)
+    ES_timeDay                byte	(?)
+    ES_timeMonth              byte	(?)
+    ES_timeMinute             byte	(?)
+    ES_timeHour               byte	(?)
+    ES_endYear                word  (?)
+    ES_endDay                 byte	(?)
+    ES_endMonth               byte	(?)
+    ES_reservedDays           word	(?)
+    ES_endTimeMinute          byte	(?)
+    ES_endTimeHour            byte	(?)
+    ES_varFlags               VariableLengthFlags
+    ES_memoToken              word	(?)
+    ES_uniqueID               dword (?)
+    ES_alarmYear              word	(?)
+    ES_alarmDay               byte	(?)
+    ES_alarmMonth             byte	(?)
+    ES_alarmMinute            byte	(?)
+    ES_alarmHour              byte	(?)
+    ES_alarmPrevGr            word	(?)
+    ES_alarmPrevIt            word	(?) 
+    ES_alarmNextGr            word	(?) 
+    ES_alarmNextIt            word	(?) 
+    ES_repeatID               word	(?)
+    ES_sentToArrayBlock       word (?)
+    ES_sentToArrayChunk       word (?)
+    ES_nextBookID             word (?)
+    ES_dataLength             word	(?)
+    ES_data                   byte	(?)
+EventStruct		ends
+</PRE>	
+
+<P>
+Normal events are distinguished from To-do list items in the <CODE>EventInfoFlags</CODE>.  The <CODE>EventInfoFlags</CODE> are a byte record:
+</P>
+
+<PRE>
+EventInfoFlags		record
+    EIF_ALARM_ON:1		; most significant bit
+    EIF_NORMAL:1
+    EIF_HEADER:1
+    EIF_REPEAT:1
+    EIF_TODO:1
+    EIF_INK:1
+    EIF_ALARM_SOUND	AlarmSound:2
+EventInfoFlags		end
+</PRE>
+
+<P><CODE>EventInfoFlags</CODE> are used in the <CODE>DayEvent</CODE> object (a UI object that is not in the database), so there is a flag for repeat events.  But in the <CODE>EventStruct</CODE>, <CODE>EIF_REPEAT</CODE> will never be set since a different data structure is used for repeated events.
+</P>
+
+<P>
+The member <CODE>ES_parentMap</CODE> is the <CODE>DBItem</CODE> number for the structure which organizes all events for a day.  More on this in 
+<A HREF="#Organization of normal events"><STRONG>Organization of normal events.</STRONG></A>
+</P>
+
+<P>
+<CODE>ES_timeYear</CODE>, <CODE>ES_timeDay</CODE>, <CODE>ES_timeMonth</CODE>, <CODE>ES_timeMinute</CODE>, and <CODE>ES_timeHour</CODE> all specify the date and time of the event.  The date is <EM>NOT</EM> 0-based.  For example, Jan 1st, 1996 would translate to:
+</P>
+	<PRE>
+		ES_timeYear		1996
+		ES_timeDay		1
+		ES_timeMonth	1
+</PRE>
+<P>
+Time for an event can range from 00:00(midnight) to 23.59(11:59pm).  For example 1:34pm would be:
+</P>
+
+<PRE>
+		ES_timeMinute	34
+		ES_timeHour		13
+</PRE>
+
+<P>
+An event can be specified over an interval (e.g. 9:00-10:00).  In order to specify this interval, an event has an end date and end time.  The <CODE>VariableLengthFlags</CODE> in the <CODE>EventStruct</CODE> are used to specify if an event has an end time.  Since the <CODE>VariableLengthFlags</CODE> record is used in the <CODE>DayEvent</CODE> object, it has two flags to denote if the start or end times have been modified.
+</P>
+
+<PRE>
+VariableLengthFlags	record
+   VLF_START_TIME:1		     ; does event have start time?	
+   VLF_END_TIME:1			; does event have an endtime?
+   VLF_START_DIRTY:1		; start time/date dirty?
+   VLF_END_DIRTY:1			; end time/date dirty?
+   VLF_END_DATE:1			; does event have an enddate?
+   VLF_WHOLE_DAY_RES:1		; whole day reservation
+   VLF_REPEAT_UNTIL:1		; we have a repeat until date
+   :1
+VariableLengthFlags	end
+</PRE>
+
+<P>
+The names of event memos are stored in an array.  The members of this array are memo name/memo token pairs.  The memo token in the <CODE>EventStruct</CODE> is used to find the memo name for an event memo.   If  an event has no memo, then this field is -1 (ffffh).  Zero is a valid memo token.  Memos will be discussed more in the section 
+<A HREF="#Memos"><STRONG>Memos</STRONG></A>.
+</P>
+
+<P>
+All events have unique IDs associated with them (ES_uniqueID). See 
+<A HREF="#Unique ID info"><STRONG>Unique ID info</STRONG></A>.
+</P>
+
+<P>Each event(normal or repeat) can have an alarm associated with the event.  
+The <CODE>EIF_ALARM_ON</CODE> flag in the <CODE>EventInfoFlags</CODE> tell if the alarm is set.  The members <CODE>ES_alarmYear</CODE>, <CODE>ES_alarmDay</CODE>, <CODE>ES_alarmMonth</CODE>, <CODE>ES_alarmMinute</CODE>, and <CODE>ES_alarmHour</CODE> all tell the date and time of the alarm.  The alarm date/time is the same format as the event date/time(i.e. NOT 0-based).  If the alarm flag is not set, then this alarm time is the same as the event time.  It is important that the alarm time be valid even if there is no alarm.
+</P>
+
+<P>
+<CODE>ES_sentToArrayBlock</CODE> and <CODE>ES_sentToArrayChunk</CODE> is a chunk array block and chunk handle that identifies the Sent-To information of the event. <CODE>ES_nextBookID</CODE> is the ID to be assigned to the next booking appointment on the event. See 
+<A HREF="#Event Sent-To info"><STRONG>Sent-To info</STRONG></A>.
+</P>
+
+<P>
+All events are in a doubly-linked list, sorted by alarm time.  The structure members 
+<CODE>ES_alarmPrevGr</CODE>, <CODE>ES_alarmPrevIt</CODE>, <CODE>ES_alarmNextGr</CODE>, 
+and <CODE>ES_alarmNextIt</CODE> are the &quot;pointers&quot; to the previous and next 
+events respectively.  As mentioned before, if an event doesn't have its alarm set, 
+then its alarm time is the same as its event time.  To-do list items are not linked in a 
+list. <CODE>ES_alarmPrevGr</CODE> and <CODE>ES_alarmPrevIt</CODE> constitute the <CODE>DBGroup/DBItem</CODE> pair which identify the previous event.  There are two dummy events in this list--one at the beginning and one at the end.  The first dummy event has the following values:
+</P>
+
+<PRE>
+    ES_flags			(?) - uninitialized
+    ES_parentMap		0
+    ES_timeYear		1900
+    ES_timeDay			0
+    ES_timeMonth		0
+    <CODE>ES_timeMinute</CODE> 		0
+    ES_timeHour		0
+    ES_endYear			(?)
+    ES_endDay			(?)
+    ES_endMonth		(?)
+    ES_reservedDays		(?)
+    ES_endTimeMinute	(?)
+    ES_endTimeHour		(?)
+    ES_varFlags		(?)
+    ES_memoToken		(?)
+    ES_alarmYear		1900
+    ES_alarmDay		0
+    ES_alarmMonth		0
+    ES_alarmMinute		0
+    ES_alarmHour		0
+    ES_alarmPrevGr		0
+    ES_alarmPrevIt		0 
+    ES_alarmNextGr		depends on 1st event by alarm time
+    ES_alarmNextIt		depends on 1st event by alarm time
+    ES_repeatID		(?)
+    ES_sentToArrayBlock	(?)
+    ES_sentToArayChunk	(?)
+    ES_nextBookID		(?)
+    ES_dataLength		(?)
+    ES_data			(?)
+</PRE>
+
+<P>
+The values for the end dummy event are:
+</P>
+
+<PRE>
+    ES_flags			(?) - uninitialized
+    ES_parentMap		0
+    ES_timeYear		9999
+    ES_timeDay			33
+    ES_timeMonth		12
+    <CODE>ES_timeMinute</CODE> 		0
+    ES_timeHour		0
+    ES_endYear			(?)
+    ES_endDay			(?)
+    ES_endMonth		(?)
+    ES_reservedDays		(?)
+    ES_endTimeMinute	(?)
+    ES_endTimeHour		(?)
+    ES_varFlags		(?)
+    ES_memoToken		(?)
+    ES_alarmYear		1999
+    ES_alarmDay		33
+    ES_alarmMonth		12
+    ES_alarmMinute		0
+    ES_alarmHour		0
+    ES_alarmPrevGr		depends on last event by alarm time
+    ES_alarmPrevIt		depends on last event by alarm time
+    ES_alarmNextGr		0
+    ES_alarmNextIt		0
+    ES_repeatID		(?)
+    ES_sentToArrayBlock	(?)
+    ES_sentToArayChunk	(?)
+    ES_nextBookID		(?)
+    ES_dataLength		(?)
+    ES_dataLength		(?)
+    ES_data			(?)
+ </PRE>
+
+<A NAME="calendar.htm_Organization of normal events"></A>
+<P>
+<H4>Organization of normal events</H4>
+</PRE>
+
+<P>Please refer to figure-1 for graphical represenation of calendar file structure during the following discussion.</P>
+
+<CENTER>
+<IMG SRC="figure1.gif" ALT="Figure 1">
+<P>
+<EM>Figure 1. Normal Event Data Structures</EM>
+</CENTER>
+
+<P>
+At the top of the hierarchy for all Calendar data is the database map block.  This map block contains the structures <CODE>YearMapHeader</CODE> followed directly by a <CODE>YearMapStruct</CODE> for each year in which there is an event.  The map block looks like:
+</P>
+
+<PRE>
+YearMapHeader		struct
+    YMH_secure1			byte	(?)
+    YMH_numYears			word	(?)
+    YMH_nextAlarmGr			word	(?)
+    YMH_nextAlarmIt			word	(?)
+    YMH_repeatMapGr			word	(?)
+    YMH_repeatMapIt			word	(?)
+    YMH_multDayTableGr		word	(?)
+    YMH_multDayTableIt		word	(?)
+    YMH_undoBufGr			word	(?)
+    YMH_undoBufIt			word	(?)
+    YMH_undoRmGroup			byte	(?)
+    YMH_secure2			byte	(?)
+    YMH_toDoListGr			word (?)		
+    YMH_toDoListIt			word	(?)
+    YMH_memoNameArrayBlock	word	(?)
+    YMH_memoNameArrayChunk	word	(?)
+    YMH_nextMemoToken		word	(?)
+    YMH_RTCMAlarmGr			word	(?)
+    YMH_RTCMAlarmIt			word	(?)
+    YMH_alarmToken			word (?)
+    YMH_alarmID			word (?)
+    YMH_alarmYear			word	(?)
+    YMH_alarmMonthDay		word	(?)
+    YMH_alarmHourMinute		word	(?)
+    YMH_nextEventID			dword (?)
+    YMH_eventIDArray		word (?)
+    YMH_pendingApptArrayBlock word (?)	; N9110 Communicator
+    YMH_pendingApptArrayChunk word (?)	; N9110 Communicator
+    YMH_serverDestinationArray word (?)	; N9110 Communicator
+YearMapHeader		ends
+</PRE>
+
+<P>
+The <CODE>YearMapHeader</CODE> has two bytes to ensure that it hasn't been corrupted. <CODE>YMH_secure1</CODE> contains <EM>SECURITY1</EM>, while <CODE>YMH_secure2</CODE> contains <EM>SECURITY2</EM>.
+</P>
+
+<PRE>
+SECURITY1		equ		10111010b
+SECURITY2		equ		01001101b
+</PRE>
+
+
+<P>
+The number of years denotes the number of years that have events, and therefore, the number of 
+<CODE>YearMapStruct</CODE>s which follow the <CODE>YearMapHeader</CODE> in the map block.
+</P>
+
+<P>The <CODE>YMH_nextAlarmGr/It</CODE> is a <CODE>DBGroup/DBItem</CODE> pair denoting the next event by alarm time.  The naming is misleading because even though it says next alarm, this event may not have its alarm on.  It is easier to think of this event as the next event in the linked list of events, since this list is sorted by alarm time. <CODE>YMH_RTCMAlarmGr/It</CODE>, however, is the next event whose alarm is on.  These fields are zero if there is no event registered with the RTCM(Real-time clock) library.  
+</P>
+
+<P>
+<CODE>YMH_repeatMapGr/It</CODE> is the database item which organizes the repeated events.  This will be detailed in 
+<A HREF="#Organization of repeat events"><STRONG>Organization of repeat events</STRONG></A>.
+</P> 
+<UL>
+<LI><CODE>YMH_undoBufGr/It</CODE> and <CODE>YMH_undoRmGroup</CODE> are unused since the undo facility is not used in Responder Calendar.
+<LI><CODE>YMH_toDoListGr/It</CODE> is the database item which organizes the To-do list items.  
+More on this in <A HREF="#Organization of repeat events"><STRONG>Organization of To-do list items</STRONG></A>.
+<LI><CODE>YMH_memoNameArrayBlock</CODE> and <CODE>YMH_memoNameArrayChunk</CODE>  are the <CODE>VMBlock</CODE> and chunk handle for 
+the <CODE>ChunkArray</CODE> containing the memo name/memo token pairs for event memos.  More on 
+this in <A HREF="#Memos"><STRONG>Memos</STRONG></A>.
+<LI><CODE>YMH_nextMemoToken</CODE> is the next token to be assigned when the next memo is created.  It must be larger than any memo token in existence.
+<LI><CODE>YMH_alarmToken</CODE> and  <CODE>YMH_alarmID</CODE> are information given by the RTCM library to identify an alarm.  They are created when an alarm is registered for an event with the RTCM library.  We must use these when we want to specify our registered alarm (e.g. to unregister the alarm, to change the alarm time) to the RTCM library.  When importing, these values should be zeroed.
+<LI><CODE>YMH_alarmYear/MonthDay/HourMinute</CODE> specify the date and time for the alarm registered with the RTCM library.
+<LI><CODE>YMH_nextEventID</CODE> specifies the next event ID to be used.
+<LI><CODE>YMH_eventIDArray</CODE> specifies a huge array in the same file that stores the mapping of unique IDs and DB Group:Item of the corresponding event. See <STRONG>Event ID array info</STRONG> for more details.
+<LI>(N9110 Communicator) <CODE>YMH_pendingApptArrayBlock</CODE> and 
+<CODE>YMH_pendingApptArrayChunk</CODE> are the <CODE>VMBlock</CODE> and chunk array 
+handle storing the list of holding events with SMS number and versit text. More 
+information can be found in <A HREF="#Pending event info (N9110 Communicator)"><STRONG>Pending event info</STRONG></A>.
+<LI>(N9110 Communicator) <CODE>YMH_serverDestinationArray</CODE> is the vm handle of the huge array holding the server destination (attendee) information for each UID used in remote booking.
+</UL>
+
+<P>
+Following the <CODE>YearMapHeader</CODE> are the <CODE>YearMapStruct</CODE>s which lead us to the normal events for that year.  The <CODE>YearMapStruct</CODE> looks like:
+</P>
+
+<PRE>
+YearMapStruct		struct
+    YMS_year		word	(?)		; the year
+    YMS_group		word	(?)		; group for this year
+    YMS_yearMap	word	(?)		; item # for year map
+YearMapStruct		ends
+</PRE>
+
+<P>
+The <CODE>YMS_yearMap</CODE> is a <CODE>DBItem</CODE> which holds an array of <CODE>DBItem</CODE> numbers for the days in the year where there are events.  This &quot;YearMap&quot; is the following size:
+</P>
+<PRE>
+	YearMapSize		equ (12 * 32 * 2)   	; twelve months, 32 days, 2 bytes 
+</PRE>
+
+<P>
+By translating the day into a position in this year map, we find the <CODE>DBItem</CODE> number for the database item which organizes all events for that day.  Conceptually, it works as follows:
+</P>
+<PRE>
+	year	->	DBGroup
+	month/day  ->	DBItem		Event organizing block for a single day 
+</PRE>
+
+<P>
+The date is translated to an index into the array as follows:
+</P>
+<PRE>
+	index =  ((month -1) * 64) + (2 * day) 
+</PRE>
+
+<P>
+For example:
+</P>
+
+<PRE>
+	Jan 1 index = ((1-1) * 64) + (1 * 2) = 2
+	March 5 index =  ((3-1) * 64)  +(5 * 2) = 138
+</PRE>
+
+<P>
+The array would have some members not used (marked empty), while those days without events will have zeros.  Those days with events will have the <CODE>DBItem</CODE> number for the event organizing block.
+</P>
+
+<TABLE BORDER = 0 WIDTH = "100%">
+<TR>
+<TD>&nbsp;</TD>
+<TD>Jan 1</TD>
+<TD>Jan 2</TD>
+<TD>Jan 3</TD>
+<TD>…</TD>
+<TD>Jan 31</TD>
+<TD>&nbsp;</TD>
+<TD>Feb 1</TD>
+<TD>…</TD>
+<TD>&nbsp;</TD>
+</TR>
+<TR>
+<TD BGCOLOR="#CCCCCC">empty</TD>
+<TD BGCOLOR="#CCCCCC">0</TD>
+<TD BGCOLOR="#CCCCCC">0</TD>
+<TD BGCOLOR="#CCCCCC">68h</TD>
+<TD BGCOLOR="#CCCCCC">…</TD>
+<TD BGCOLOR="#CCCCCC">0</TD>
+<TD BGCOLOR="#CCCCCC">empty</TD>
+<TD BGCOLOR="#CCCCCC">36h</TD>
+<TD BGCOLOR="#CCCCCC">…</TD>
+<TD BGCOLOR="#CCCCCC">0</TD>
+</TR>
+</TABLE>
+
+<P>The event organizing block contains two structures: <CODE>EventMapHeader</CODE> and <CODE>EventMapStruct</CODE>.    The <CODE>EventMapHeader</CODE> looks like:
+
+<UL>
+<LI> <CODE>DBItem</CODE> number for this block
+<LI> Number of events for this day
+<LI> Day
+<LI> Month
+</UL>
+
+<PRE>
+	EventMapHeader		struct
+		EMH_item		word
+		EMH_numEvents	word
+		EMH_day		byte
+		EMH_month		byte
+	EventMapHeader		ends
+</PRE>
+
+<P>
+Directly following the <CODE>EventMapHeader</CODE> is an <CODE>EventMapStruct</CODE> for every event in that day.  Consequently, <CODE>EMH_numEvents</CODE> tells you how many <CODE>EventMapStruct</CODE>s there are following the <CODE>EventMapHeader</CODE>.  
+</P>
+
+<UL>
+<LI> Time for event
+<LI> <CODE>DBItem</CODE> number for event
+</UL>
+
+<PRE>
+      EventMapStruct		struct
+		EMS_time		word
+		EMS_event		word
+	EventMapStruct		ends
+</PRE>
+
+<P>
+Finally, we've reached the <CODE>DBItem</CODE> number for the event (<CODE>EMS_event</CODE>).  
+Combining the <CODE>DBGroup</CODE> number for the year with the <CODE>DBItem</CODE> 
+number in the <CODE>EventMapStruct</CODE> gives us the &quot;pointer&quot; to the event
+(<CODE>EventStruct</CODE>) itself.
+</P>
+
+<A NAME="calendar.htm_Multiple Day Events"></A>
+<H4>Multiple Day Events</H4>
+
+<P>
+If <CODE>VLF_END_DATE</CODE> flag set in a normal event, it is a multiple day event and 
+it has valid <CODE>ES_endDay/Month/Year</CODE> values. If <CODE>VLF_WHOLE_DAY_RES</CODE> flag 
+is set in an event, it is a special multiple day event which reserves a certain number of days 
+from the start date. <CODE>ES_reservedDays</CODE> field as well as <CODE>ES_endDay/Month/Year</CODE> 
+are filled in this case.  An extra data structure (<CODE>MultipleDayTableHeader</CODE> and 
+<CODE>MultipleDayTableEntry</CODE>'s )  is used to record all multiple day events.  This table 
+can be traversed to tell whether a given date is included within the range of a multiple day 
+event (figure-2.
+</P>
+
+<CENTER>
+<TABLE><TR><TD>
+<PRE>
+MultipleDayTableHeader	struct
+   MDTH_available	word		; number of available entries
+   MDTH_validCount	word		; number of valid entries
+   MDTH_totalSize	word		; table block size in bytes
+   MDTH_data		label	MultipleDayTableEntry
+MultipleDayTableHeader	ends
+</PRE>
+
+<PRE>
+MultipleDayTableEntry	struct
+   MDTE_groupItem	dword	; group#:item# pair
+						; 0 if invalid
+   MDTE_startDate	dword	; high word - year
+						; low word hi byte - month
+						; low word low byte - day
+   MDTE_endDate	dword	; high word - year
+						; low word hi byte - month
+						; low word low byte - day
+   align word
+MultipleDayTableEntry	ends
+ </PRE>
+</TD></TR><TR><TD>
+<CENTER>
+<EM>Figure 2. Multiple Day Event Table</EM>
+</CENTER>
+</TD></TR></TABLE>
+</CENTER>
+
+<P>
+In order to determine whether a date falls within the range of a multiple day event, one has to look through entire table comparing dates. <CODE>MDTE_groupItem</CODE> contains 0 if the entry is an empty entry. <CODE>MDTH_validCount</CODE> is provided so that you can stop traversing the table as soon as you've looked at all valid entries( that is, you should keep track of how many valid entries have been examined ).  Valid entries tend to group at the front of the table.
+</P>
+
+<A NAME="calendar.htm_Organization of To-do list items"></A>
+<H4>Organization of To-do list items</H4>
+
+<P>
+As mentioned before, the <CODE>YearMapHeader</CODE> has the <CODE>DBGroup/It</CODE> numbers for the database item which organizes the To-do list.  Conceptually, the To-do list is organized as one day.  The <CODE>DBGroup/It</CODE> numbers for the To-do list point to a database item which has the same structures as that for organizing a day of events--<CODE>EventMapHeader</CODE> and <CODE>EventMapStruct</CODE>s.  The <CODE>EMH_numEvents</CODE> is actually the number of To-do list items, while the day and month are special values:  
+</P>
+
+<PRE>
+		TODO_DUMMY_MONTH_DAY 	equ	259.
+</PRE>
+
+<P>
+Each <CODE>EventMapStruct</CODE> holds the <CODE>DBItem</CODE> number for the <CODE>EventStruct</CODE> which is the To-do list item.  To-do items, however, are not sorted by time like events.  Instead they are sorted by priority:
+</P>
+
+<PRE>
+		TODO_DUMMY_HOUR		equ	1
+		TODO_HIGH_PRIORITY		equ	1
+		TODO_NORMAL_PRIORITY	equ	2
+</PRE>
+
+The priority information is stored in the minute field of the <CODE>EventStruct</CODE> (<CODE>ES_timeMinute</CODE>) , while all To-do items will have the same year/month/day/hour.  The To-do items are also distinguished by their year (<CODE>TODO_DUMMY_YEAR</CODE>	equ	1), which is an invalid year for normal events(<CODE>HIGH_YEAR</CODE> equ	9999, <CODE>LOW_YEAR</CODE> 	equ	1900).  Finally, a To-do list item can be marked completed.  This information is stored in the <CODE>ES_alarmMinute</CODE> field of <CODE>EventStruct</CODE>.  
+</P>
+
+<PRE>
+	TODO_COMPLETED	equ		3
+	TODO_NOT_COMPLETED	equ		4
+</PRE>
+<A NAME="calendar.htm_Repeat Events"></A>
+<P><H4>Repeat Events</H4></P>
+
+<P>
+Repeated events have a different structure than <CODE>EventStruct</CODE>.  Their data structure is called <CODE>RepeatStruct</CODE>:
+</P>
+
+<PRE>
+RepeatStruct		struct
+    RES_flags				EventInfoFlags
+    RES_type				RepeatEventType
+    RES_ID				word	(?)
+    RES_startYear			word	(?)
+    RES_startDay			byte	(?)
+    RES_startMonth			byte	(?)
+    RES_endYear			word	(?)
+    RES_endDay				byte	(?)
+    RES_endMonth			byte	(?)
+    RES_minute				byte	(?)
+    RES_hour				byte	(?)
+    RES_alarmPrecedeMinute	word 	(?)
+    RES_memoToken			word 	(?)
+    RES_endMinute			byte	(?)
+    RES_endHour			byte	(?)
+    RES_varFlags			VariableLengthFlags
+    RES_padding			byte	(?)
+    RES_uniqueID			dword (?)
+    RES_sentToArrayBlock		word (?)
+    RES_sentToArrayChunk		word (?)
+    RES_nextBookID			word (?)
+    RES_DOWFlags			DOWFlags (?)
+    RES_day				byte	(?)
+    RES_month				byte	(?)
+    RES_DOW				byte	(?)
+    RES_occur				byte	(?)
+    RES_dataLength			word	(?)
+    RES_data				byte	(?)
+RepeatStruct		ends
+</PRE>
+
+<P>
+<CODE>RES_Flags</CODE> is a byte record of <CODE>EventInfoFlags</CODE>.  It is the same as <CODE>ES_flags</CODE> in <CODE>EventStruct</CODE>.
+</P>
+
+<P><CODE>RES_type</CODE> is of type <CODE>RepeatEventType</CODE>.  
+<CODE>RepeatEventType</CODE> is an enumerated byte:
+</P>
+
+<PRE>
+RepeatEventType		etype byte, 1
+    RET_WEEKLY			enum RepeatEventType
+    RET_MONTHLY_DATE	enum RepeatEventType
+    RET_MONTHLY_DOW		enum RepeatEventType(unused)
+    RET_YEARLY_DATE		enum RepeatEventType
+    RET_YEARLY_DOW		enum RepeatEventType(unused)
+    RET_BIWEEKLY		enum	RepeatEventType
+</PRE>
+
+<P>
+The <CODE>RepeatEventType</CODE> field describes the frequency, or what kind of repeat event this is.  For daily, we use <CODE>RET_WEEKLY</CODE> and then in the <CODE>DOWFlags</CODE>, we set every day. As for working days events, we use <CODE>RET_WEEKLY</CODE> and only set Mon-Fri in <CODE>DOWFlags</CODE>. (See below)
+<UL>	
+<LI><CODE>RES_ID</CODE> is the <CODE>RepeatID</CODE>.  This is the unique number which identifies each repeat event.
+<LI><CODE>RES_startYear, RES_startDay</CODE>, and <CODE>RES_startMonth</CODE> are the date that this repeat event should start.
+<LI><CODE>RES_endYear</CODE>, <CODE>RES_endDay</CODE>, and <CODE>RES_endMonth</CODE> are the date that this repeat event should end.  When this field is valid, <CODE>VLF_REPEAT_UNTIL</CODE> bit is set in <CODE>RES_varFlags</CODE>.
+<LI><CODE>RES_hour</CODE> and <CODE>RES_minute</CODE> are the time for the repeat event.
+<LI><CODE>RES_alarmPrecedeMinute</CODE> is the number of minutes before the event that the alarm is scheduled to go off.  The maximum allowed for Responder is 60 minutes.  The normal events specify their alarm time explicitly (<CODE>ES_alarmYear</CODE>, <CODE>ES_alarmHour</CODE>, etc), but the repeated events cannot do that, since they represent many events.  So if we had a daily event at 8am, and it has its alarm set to go off at 7:45am, then the <CODE>RES_alarmPrecedeMinute</CODE> for this event would be 15.
+<LI><CODE>RES_memoToken</CODE> is the same as <CODE>ES_memoToken</CODE>.  More on this in Memos.
+<LI><CODE>RES_endMinute</CODE> and <CODE>RES_endHour</CODE> are the same as <CODE>ES_endTimeMinute</CODE> and <CODE>ES_endTimeHour</CODE>.   <CODE>RES_varFlags</CODE> is a byte record of type <CODE>VariableLengthFlags</CODE>.  This is the same as <CODE>ES_varFlags</CODE>.
+<LI><CODE>RES_padding</CODE> is a wasted byte.
+</UL>
+<P>
+Events have unique IDs associated with them (RES_uniqueID). See 
+<A HREF="#Unique ID info"><STRONG>Unique ID info.</STRONG></A>
+</P>
+
+<P>
+<CODE>RES_sentToArrayBlock</CODE> and <CODE>RES_sentToArrayChunk</CODE> is a 
+chunk array block and chunk handle that identifies the Sent-To information of the 
+event. <CODE>RES_nextBookID</CODE> is the ID to be assigned to the next booking 
+appointment on the event. See <A HREF="#Sent-To info"><STRONG>Sent-To info</STRONG></A>.
+</P>
+
+<P>
+<CODE>RES_DOWFlags</CODE> is a byte record of type <CODE>DOWFlags</CODE>.
+</P>
+<PRE>
+DOWFlags		record
+	DOWF_unused:1,
+	DOWF_Sunday:1,
+	DOWF_Saturday:1,
+	DOWF_Friday:1,
+	DOWF_Thursday:1,
+	DOWF_Wednesday:1,
+	DOWF_Tuesday:1,
+	DOWF_Monday:1
+DOWFlags		end
+</PRE>
+
+<P>
+For weekly events, this record tells which day of the week we repeat on.  For daily events, all the flags are set except <CODE>DOWF_unused</CODE>. For working day events, only <CODE>DOWF_Monday</CODE>, <CODE>DOWF_Tuesday</CODE>, <CODE>DOWF_Wednesday</CODE>, <CODE>DOWF_Thursday</CODE> and <CODE>DOWF_Friday</CODE> flags are set.
+</P>
+
+<UL>
+	<LI><CODE>RES_day</CODE> is used for events which repeat monthly or yearly.  It is the number of the day (e.g. June 15th = 15).
+	<LI><CODE>RES_month</CODE> is the number for the month if this event repeats yearly (e.g. Feb = 2).
+	<LI><CODE>RES_DOW</CODE> and <CODE>RES_occur</CODE> are both unused in the 9000I communcator.
+	<LI><CODE>RES_dataLength</CODE> is the length of the null-terminated string which is the event string.
+	<LI><CODE>RES_data</CODE> is the first byte of the null-terminated string which is the event string.
+</UL>
+
+<P>
+<CODE>RepeatEvents</CODE> can also have exception dates.  These are dates in which the repeated event is not displayed.  For instance, a daily event could be displayed every day after April 15th except May 1st and May 2nd.  May 1st and May 2nd would be the exception days.  These dates come after the null-terminated string.  These dates are of type <CODE>RepeatDateException</CODE>.
+</P>
+
+<PRE>
+RepeatDateException		struct
+	RDE_day		byte
+	RDE_month		byte
+	RDE_year		word
+RepeatDateException
+</PRE>
+
+<P>
+In order to find out how many of these exception dates there are, we need to find out the size of the <CODE>DBItem</CODE> and subtract the size of the <CODE>RepeatStruct</CODE> and the size of the string.  Since <CODE>RepeatDateException</CODE> structures are four bytes, we divide the result by four to determine how many exception dates there are for this repeat event.
+</P>
+
+<A NAME="calendar.htm_Organization of repeat events"></A>
+<P>
+<H4>Organization of repeat events</H4>
+</P>
+
+<P>Figure-3 represents repeat event  data structure.</P>
+
+<CENTER>
+<IMG SRC = "figure3.gif" ALT="Figure 3">
+<P>
+<EM>Figure 3. Repeat Event Data Structures</EM>
+</CENTER>
+
+<P>
+As mentioned before, the <CODE>YearMapHeader</CODE> has the <CODE>DBGroup/It</CODE> numbers for the repeat event organizing block.  This repeat event organizing block has two structures in it:
+ <CODE>RepeatMapHeader</CODE> followed by a <CODE>RepeatMapStruct</CODE> for each repeat event.
+</P>
+
+<PRE>
+RepeatMapHeader		struct
+ 	RMH_item		word
+	RMH_size		word
+	RMH_numItems	word
+	RMH_nextValue	word
+RepeatMapHeader		ends
+</PRE>
+
+<UL>
+	<LI><CODE>RMH_item</CODE> is the <CODE>DBItem</CODE> number for this organizing block.
+	<LI><CODE>RMH_size</CODE> is the size of a repeat table created dynamically.  It would not be needed for translating the file to the repeat events.  
+	<LI><CODE>RMH_numItems</CODE> is the number of repeat events, therefore, this is also the number of <CODE>RepeatMapStruct</CODE> structures which follow the <CODE>RepeatMapHeader</CODE>.
+	<LI><CODE>RMH_nextValue</CODE> is the <CODE>RepeatID</CODE> given to the next created repeat event.  It must be larger than any <CODE>RepeatID</CODE> currently in existence.
+</UL>
+
+<PRE>
+RepeatMapStruct		struct
+	RMS_indexValue		word
+	RMS_item			word
+RepeatMapStruct		ends
+</PRE>
+
+<P> <CODE>RMS_indexValue</CODE> is the unique <CODE>RepeatID</CODE> for this repeat event.  If we're looking for a repeat event, we search for the <CODE>RepeatMapStruct</CODE> which matches our <CODE>RepeatID</CODE>.  Once we match this <CODE>RepeatID</CODE>, we can get the <CODE>DBItem</CODE> number in the <CODE>RMS_item</CODE> field of the <CODE>RepeatMapStruct</CODE>.  The <CODE>DBGroup</CODE> number comes from <CODE>YMH_repeatMapGr</CODE>.
+
+<A NAME="calendar.htm_Memos"></A>
+<P>
+<H4>Memos</H4>
+</P>
+
+<P>
+Any normal or repeat event can have a memo attached to it.  These memos are not kept in the Calendar file.  Calendar keeps the names of memos in an array, and references these memos by their name.  The <CODE>YearMapHeader</CODE> contains the <CODE>VMBlock</CODE> handle as well as the <CODE>ChunkHandle</CODE> within this <CODE>VMBlock</CODE> for the <CODE>ChunkArray</CODE> which contains the memo names. <CODE>YMH_memoNameArrayBlock</CODE> is the <CODE>VMBlock</CODE> handle, and <CODE>YMH_memoNameArrayChunk</CODE> is the <CODE>ChunkHandle</CODE> of the <CODE>ChunkArray</CODE>.  This <CODE>ChunkArray</CODE> contains members of type <CODE>MemoNameStruct</CODE>.
+</P>
+
+<PRE>
+	MemoNameStruct			MemoNameStruct	   struct
+		MNS_memoName	FileLongName   ; Name of the memo
+		MNS_memoToken	word    ; Token to identify the memo name
+	MemoNameStruct	ends
+</PRE>
+
+<P>
+Each event with a memo (either repeat event or normal event), has a memo token to reference the name of the memo.  The memo name is of type <CODE>FileLongName</CODE>.
+</P>
+
+<PRE>
+	FileLongName	type	FILE_LONGNAME_BUFFER_SIZE dup (char)
+	FILE_LONGNAME_BUFFER_SIZE 	equ	36
+</PRE>
+
+<P>
+In order to find the name of a memo for an event, then, we first get the block from the <CODE>YearMapHeader</CODE> with the array of memo name/memo token pairs.  Then we search the chunk array for the matching memo token.  Once found, we get the memo name from the <CODE>MNS_memoName</CODE> field of the <CODE>MemoNameStruct</CODE> in the array.  The documents themselves are in the \document\own_text.000 directory.  If a memo name is &quot;Memo #5&quot;in the array, then it corresponds to \document\own_text.000\memo_#5.000  .
+</P>
+
+<A NAME="calendar.htm_Unique ID info"></A>
+<P><H4>Unique ID info</H4>
+</P>
+
+<P>All events now have unique ID (<CODE>dword</CODE>) associated with them. The ID will not be reused on one device, and the first event ID is <CODE>FIRST_EVENT_ID</CODE> (00020001h). If the user uses data removal to remove all calendar event, the calendar app still will not reuse old IDs.
+</P>
+
+<P>
+<CODE>INVALID_EVENT_ID</CODE> (00020000h) is a dummy value to represent invalid ID. It should not appear in the file.
+</P>
+
+<P>The <CODE>YearMapHeader</CODE> has the next event ID to be used. (<CODE>YMH_nextEventID</CODE>). All events have their own unique ID (<CODE>ES_uniqueID</CODE> for normal events, <CODE>RES_uniqueID</CODE> for repeated events). All three fields should be exported and imported accordingly. See 
+<A HREF="#Text file syntax update"><STRONG>Text file syntax update</STRONG></A>.
+</P>
+
+<P>
+	If a text file from an old device is to be converted into a binary calendar file, all the events created should have unique ID, starting from <CODE>FIRST_EVENT_ID</CODE>.
+</P>
+
+<A NAME="calendar.htm_Event ID array info"></A>
+<P><H4>Event ID array info</H4></P>
+
+<P>The <CODE>YearMapHeader</CODE> has a field called <CODE>YMH_eventIDArray</CODE>. It is a <CODE>VMBlockHandle</CODE> that points to a huge array in the same file. This huge array stores structures of event ID and corresponding event DB Group:Item of <CODE>EventStruct</CODE>. The purpose of this array is to allow easy look-up of event DB Group:Item given a unique ID, and then, one can dereference that Group:Item pair to access its <CODE>EventStruct</CODE>. The structure of each element is as follows:
+</P>
+
+<PRE>
+EventIDArrayElemStruct		struct
+	EIDAES_eventID			dword		; unique ID
+	EIDAES_eventGr			word			; DB group
+	EIDAES_eventIt			word			; DB item
+EventIDArrayElemStruct		ends
+</PRE>
+
+<P>These huge array elements are fixed-sized and they are <EM>unsorted</EM>. There should NOT be any elements with duplicate event IDs nor Group:Item at any time. These elements should always be kept updated to reflect the correct mapping of event ID and Group:Item of the corresponding event's <CODE>EventStruct</CODE>. So, whenever an event is inserted, deleted or when the <CODE>EventStruct</CODE> DB Group:Item is changed, this huge array has to be updated. 
+</P>
+
+<P>
+It is not necessary to export this huge array. However, it is important to reconstruct this huge array for import. So, during calendar import, one has to call <CODE>HugeArrayCreate()</CODE> to create the huge array and <CODE>HugeArrayAppend()</CODE> to insert a huge array element for each event.
+</P>
+
+<A NAME="calendar.htm_Event Sent-To info"></A>
+<P><H4>Event Sent-To info</H4></P>
+
+<P>Some events might have Sent-To information. e.g. Alice creates an event in her calendar (&quot;Lunch&quot;) and uses the app to send an appointment to Bob. Bob's name and SMS number is already entered in contact database, and Alice picks Bob's name from a contact directory.</P>
+
+<P>Now the app has to keep track of a few things, because Bob may reply Alice to accept / deny the appointment. This struct contains one Sent-To information:</P>
+
+<PRE>
+EventSentToStruct
+
+	ESTS_bookID	word
+					; the number that identifies the 						; current appointment from others 						; (for the same event)
+	ESTS_yearSent	word
+					; the date the appointment is sent
+	ESTS_monthSent	byte
+	ESTS_daySent	byte
+	ESTS_hourSent	byte
+					; the time the appointment is sent
+	ESTS_minuteSent byte
+	ESTS_name		SENT_TO_NAME_FIELD_MAX_LEN_WITH_NULL (byte)
+					; name of recipient
+	ESTS_smsNum	MAX_NUMBER_FIELD_DATA_LEN+1 (byte)
+	ESTS_status	EventRecipientStatus
+					; what does the recipient say?
+	ESTS_remoteEventID dword
+					; ID of created event in
+					; recipient's device
+</PRE>
+<P>where:</P>
+
+<PRE>
+EventRecipientStatus:
+
+	ERS_ILLEGAL	= 0	; illegal status
+	ERS_ACCEPTED	= 2	; the appointment accepted 
+	ERS_DISCARDED	= 4	; denied
+	ERS_NO_REPLY	= 6	; no reply yet
+	ERS_FORCED	= 8	; forced
+	ERS_FORCED_AND_ACCEPTED	= 10	; forced and accepted
+
+SENT_TO_NAME_FIELD_MAX_LEN_WITH_NULL = 21
+MAX_NUMBER_FIELD_DATA_LEN = 30
+</PRE>
+
+<P>
+When an event has new sent-to information, a chunk array of <CODE>EventSentToStruct</CODE> is created for the event if none exists; then a new element of <CODE>EventSentToStruct</CODE> is created at the end of the array. The block and chunk of the chunk array is stored at <CODE>ES_sentToArrayBlock / ES_sentToArrayChunk / RES_sentToArrayBlock / RES_sentToArrayChunk</CODE>.
+</P>
+
+<P>
+When an event is created (on Bob's calendar) through an SMS (from Alice), the event needs to store the sender's information in the event struct. This is so that we can do update on event (e.g. Alice decides there will be no lunch after all, and cancel the event.)
+</P>
+<P>
+We decided to keep three pieces of information in the event. (SMS number, event ID and book ID) An appropriate place to store these would be the usual {<CODE>Repeat|Event</CODE>}Struct; however, that would increase the size of all the ordinary events. So we will keep them in the sent-to chunk array header.
+</P>
+
+<PRE>
+	EventSentToHeader	struct
+		ESTH_chunkArrayHd		ChunkArrayHeader	; chunk array header
+    		ESTH_senderSMS		SMSNumberType	; SMS number of sender
+		ESTH_senderEventID	dword			; ID of sender's event in
+									;  sender's device
+		ESTH_senderBookID	word			; Book ID of sender's event
+	EventSentToHeader	ends
+
+	SMSNumberType	TYPE 23 dup (char)
+</PRE>
+<P>
+To summarize: {<CODE>Repeat|Event</CODE>}Struct stores the block handle and chunk handle of sent-to array. The array header type is <CODE>EventSentToHeader</CODE> struct; the array has elements of type <CODE>EventSentToStruct</CODE>. If the event is created from SMS, the header stores the sender information. (Otherwise, the <CODE>ESTH_senderSMS</CODE> is null; <CODE>ESTH_senderEventID</CODE> is <CODE>INVALID_EVENT_ID</CODE>; <CODE>ESTH_senderBookID</CODE> is 0) If the event has been sent to other recipients, each appointment would have a corresponding element (of type <CODE>EventSentToStruct</CODE>) in the chunk array.
+</P>
+
+<P>
+To identify the first appointment Alice made to Bob from the second one, the <CODE> (R)ES_bookID</CODE> is used. The first booking of the event has ID = 0, the next one 1, and so on.
+</P>
+
+<P>
+All of the fields in the <CODE>EventSentToStruct</CODE> have to be exported. Same goes for the <CODE> (R)ES_sentToArrayBlock, (R)ES_sentToArrayChunk</CODE>, and <CODE> (R)ES_nextBookID</CODE>. 
+See <A HREF="#Text file syntax update"><strong>Text file syntax update</strong></A>.
+</P>
+
+<A NAME="calendar.htm_Server Destination Info (N9110 Communicator)"></A>
+<P><H4>Server Destination Info (N9110 Communicator)</H4></P>
+
+<P>Remote calendar booking requires sending and receiving booking events through a centralized server. So, it requires a bit more information in addition to the sent-to information found in the <CODE>EventSentToHeader</CODE>. The <CODE>YMH_serverDestinationArray</CODE> is an unsorted huge array with variable sized elements.  Each element holds a header followed by a number of Attendee fields.  The header is defined by the <CODE>SentToSubDestinationEntry</CODE> structure: 
+</P>
+
+<PRE>
+
+	SentToSubDestinationEntry	struct
+		STSDE_UID		dword			; unique id
+		STSDE_count    word			; number of booking ids, 
+								; excluding sender 
+								; attendee field
+		STSDE_reserved	word			; should be 0 if not used
+		STSDE_null	word				; should always be 0
+		STSDE_destinations label TCHAR
+								;
+								; followed by:
+								;   1. Sender attendee field, null-terminated string 
+								;      (It can just be NULL).
+								;   2. 0 or more attendee fields, null-terminated 
+								;      strings. (Each can be NULL by itself.)
+								;
+		SentToSubDestinationEntry	ends
+</PRE>
+
+<P>
+<CODE>STSDE_UID</CODE> is the unique event ID specified in <CODE>ES_uniqueID</CODE> or <CODE>RES_uniqueID</CODE>. <CODE>STSDE_count</CODE> contains the number of booking ID's in <CODE>STSDE_destinations</CODE>, excluding send attendee field. <CODE>STSDE_null</CODE> is always 0 for searching purpose. <CODE>STSDE_destinations</CODE> is a series of null-terminated strings.  The first such string is the sender Attendee field.  This will be a null string if the event is not created by a booking request.  After the sender field are the Attendee fields used to send booking requests for this event.  If this event has been sent to 3 destinations, then <CODE>STSDE_count</CODE> will be 3, and three strings will follow the sender field.  Any of the strings may be null.
+Note that <CODE>STSDE_count</CODE> does <EM>not</EM> include the sender field. 
+</P>
+
+<P>
+For example, for an event booked to other people, <CODE>STSDE_destinations</CODE> is &quot;\0engr1@geoworks.com\0\0engr2@geoworks.com\07&quot; and <CODE>STSDE_count</CODE> is 3 (excluding the first NULL character). (\0 denotes NULL character.) It has no sender Attendee field as the first character is NULL. The first recipient's ID is &quot;engr1@geoworks.com/&quot;, the second has no ID (thus just NULL character) and the third is &quot;engr2@geoworks.com&quot;. 
+</P>
+
+<P>
+For another example of an event booked <EM> by </EM> other people, <CODE>STSDE_destinations</CODE> is &quot;server1@geoworks.com\0mgr1@geoworks.com\0mgr2@geoworks.com\0\0\0&quot; and <CODE>STSDE_count</CODE> is 4. The sender attendee field becomes &quot;server1@geoworks.com&quot;. The first recipient's ID is &quot;mgr1@geoworks.com&quot;, the second &quot;mgr2@geoworks.com&quot;, while the third and fourth ones have no ID's.
+</P>
+
+<P>Please note that the strings in <CODE>STSDE_destinations</CODE> should <EM>not</EM> have any prevailing and trailing white space. White space is only allowed within the string. 
+</P>
+
+<P>
+The exported file syntax for the sub destinations is explained in 
+<A HREF="#Text file syntax update"><STRONG>Text file syntax update.</STRONG></a>
+</P>
+
+<A NAME="calendar.htm_Pending event info (N9110 Communicator)"></A>
+<P><H4>Pending event info (N9110 Communicator)</H4></P>
+
+<P>When Calendar receives booking requests, the user can postpone replies to sender whether to accept or deny the requests by selecting option "Hold". The events being held are stored in an unsorted chunk array referenced by <CODE>VMBlock YMH_pendingApptArrayBlock</CODE> and <CODE>ChunkHandle YMH_pendingApptArrayChunk</CODE>. Each chunk array element is a variable-size structure:
+<PRE>
+
+PendingEventStruct	struct
+    PES_smsNum		SMSNumberType	; SMS number of recipient
+    PES_versitText	label TCHAR	; start of versit text
+PendingEventStruct	ends
+</PRE>
+
+<P>
+where <CODE>PES_smsNum</CODE> is the sender SMS number and <CODE>PES_versitText</CODE> is the null-terminated versit text originally sent with the SMS message. 
+</P>
+
+<P>The exported file syntax for pending events is explained in 
+<A HREF="#Text file syntax update"><STRONG>Text file syntax update.</STRONG></P></a>
+
+<A NAME="calendar.htm_Text file syntax update"></A>
+<P>
+<H4>Text file syntax update</H4></P>
+<P>
+<STRONG>
+1. 	File protocol
+</STRONG>
+</P>
+<P>
+File protocol has been changed from 2.0 to 3.0 so there will be a new field in each exported file.
+<PRE>
+
+	[FILE-PROTOCOL]
+	3.0
+</PRE>
+<P>
+In the N9110 Communicator, the file protocol is 4.0:
+</P>
+<PRE>
+	[FILE-PROTOCOL]
+	4.0
+</PRE>
+<P>
+If the protocol is not specified, it is assumed the text file comes from a responder device (2.0)</P>
+<P>
+<STRONG>
+2. 	Next Event ID
+
+</STRONG>
+</P>
+
+<P>
+This is a new field in each exported file indicating the next event ID to be assigned to a new event. It is <CODE>YMH_nextEventID</CODE> of <CODE>YearMapHeader</CODE>. This ID has to be preserved during import and export. See 
+<A HREF="#Unique ID info"><STRONG>Unique ID info</strong></a> for more details.
+<PRE>
+	[NEXT-EVENT-ID]
+	131074
+</PRE>
+
+<P>
+<STRONG>
+3. 	New fields for all events
+
+</STRONG>
+</P>
+
+<P>
+A few important fields are added to the data file, and they must be exported / imported so that the user can continue to receive appointment reply if s/he exports and imports the data file.
+</P>
+<PRE>
+	[EVENT-ID]		Unique ID of the event in the file
+	138751
+
+	[BOOK-ID]		Count of appointments made on a single event.
+	3
+
+	[SENDER-SMS]	If the event is created from smart SMS,
+	+555-33545		the sms number of sender...
+
+	[SENDER-EVENT-ID]	and event ID...
+	150003
+
+	[SENDER-BOOK-ID]	and book ID...
+	6
+</PRE>
+
+<P>
+<STRONG>
+4. 	Sent-to information
+</STRONG></P>
+
+<P>For each sent-to information, the exported fields look like this:</P>
+<PRE>
+
+	[SENT-TO]
+	Princess Lizzy		Name of recipient, at most 20 chars long
+	+555-9898 			SMS of recipient
+	13.02.1997 13:05		Date and time
+	4				Book-id of this appointment for the 
+					current event
+	ACCEPTED | DISCARDED | 
+	 FORCED | NO-REPLY | 
+	 FORCED-AND-ACCEPTED
+	100033			If the event is accepted: the event-ID 
+					on the recipient's device
+</PRE>
+
+<P>If there are multiple sent-to information for an event, they are listed one after the other.</P>
+<P>
+<STRONG>
+5. 	Pending event information
+</STRONG></P>
+<P>
+Each pending event is independent of to-do event and other calendar events. The exported field of each pending event starts with <CODE> [HOLD] </CODE>, and then sender SMS on the next line, followed by multiple lines of pending event versit text, which looks like:
+</P>
+<PRE>
+[HOLD]
++555-9898			Sender SMS
+//SCKE4E4 
+BEGIN:VCALENDAR 
+VERSION:1.0 
+BEGIN:VEVENT 
+CATEGORIES:APPOINTMENT 
+STATUS:NEEDS ACTION 
+DTSTART:19970903T080000 
+SUMMARY:Event appointment 
+DESCRIPTION:test test 
+UID:0 
+END:VEVENT 
+END:VCALENDAR
+[HOLD-END]
+</PRE>
+<P>
+The end of versit text is marked by <CODE> [HOLD-END] </CODE>.
+</P>
+<P><STRONG>
+6. 	Server Destination Info
+</STRONG></P>
+<P>
+Each piece of server destination info is contained in an element <CODE>SentToSubDestinationEntry</CODE> of the huge array in <CODE>YMH_serverDestinationArray</CODE>. Its format in exported file looks like:
+</P>
+<PRE>
+
+[SENT-TO-DEST]
+138751	; Unique ID of the event
+4	; count of booking IDs
+0:server1@geoworks.com		; sender attendee info, always start 
+; with 0
+1:mgr1@geoworks.com		; first recipient ID
+3:mgr2@geoworks.com		; second recipient has no ID, but 
+; the third has ID
+[SENT-TO-DEST-END]
+</PRE>
+
+<P>
+To convert the above structure, <CODE>STSDE_destinations</CODE> will become &quot;server1@geoworks.com\0mgr1@geoworks.com\0\0mgr2@geoworks.com\0\0&quot;. There are 4 booking IDs, but only 2 of them have real IDs. So the other two are simply empty null strings.</P>
+<PRE>
+
+[SENT-TO-DEST]
+138752	; Unique ID of the event
+4	; count of booking IDs
+2:mgr1@geoworks.com		; first recipient ID, no sender info
+3:mgr2@geoworks.com		; second recipient has no ID, but 
+; the third has ID
+[SENT-TO-DEST-END]
+</PRE>
+
+<P>
+This example will yield <CODE>STSDE_destinations</CODE> as &quot;\0\0mgr1@geoworks.com\0mgr2@geoworks.com\0\0&quot;. The first NULL indicates no sender attendee info, while the last NULL indicates that the fourth recipient has no booking ID.
+</P>
+
+<HR>
 This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
 </BODY>
 </HTML>

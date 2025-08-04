@@ -19,7 +19,7 @@ This document is a single-page version of a <A HREF="index.htm">a multi-page doc
 
 </H1>
 <P>
-This chapter discusses various new API features that have been added in recent versions of the Nokia 9000i Communicator. </P>
+This chapter discusses various new API features that have been added in recent versions of the Nokia 9000i and Nokia 9110 Communicators. </P>
 
 <P CLASS="sectionlinks">
 <STRONG>
@@ -29,11 +29,16 @@ This chapter discusses various new API features that have been added in recent v
 &nbsp;&nbsp;<A HREF="#Update_4.htm">4 New SMS Header</A><BR>
 &nbsp;&nbsp;<A HREF="#Update_5.htm">5 New Standard Monikers, Bitmaps</A><BR>
 &nbsp;&nbsp;<A HREF="#Update_6.htm">6 Non-exclusive Lists</A><BR>
-&nbsp;&nbsp;<A HREF="#Update_7.htm">7 Incremental Searches</A><BR>
-&nbsp;&nbsp;<A HREF="#Update_8.htm">8 Contact's URL and Password</A><BR>
-&nbsp;&nbsp;<A HREF="#Update_9.htm">9 ContactList Searches</A><BR>
-&nbsp;&nbsp;<A HREF="#Update_a.htm">10 Unknown Phone Numbers</A><BR>
-<!-- &nbsp;&nbsp;<A HREF="#Update_b.htm">11 Detecting Hardware Type</A><BR> -->
+&nbsp;&nbsp;<A HREF="#Update_filter.htm">7 Filter Lists/Filter Text</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_7.htm">8 Incremental Searches</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_8.htm">9 Contact's URL and Password</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_9.htm">10 ContactList Searches</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_a.htm">11 Unknown Phone Numbers</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_b.htm">12 Detecting Hardware Type</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_menu_trigger.htm">13 Menu Trigger</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_zoom.htm">14 Zoom Level</A><BR>
+&nbsp;&nbsp;<A HREF="#Update_mmc.htm">15 Memory Cards</A><BR>
+
 </STRONG>
 </P> <!-- end of sectionlinks blob -->
 
@@ -121,10 +126,15 @@ Code Display 13-1 Getting the Software Version Number</P>
     category = (TCHAR *) LMemDeref( @UICategory );
     key = (TCHAR *) LMemDeref( @SWSerialNumber );</PRE>
 <PRE>    /*
+     * Use one of the InitFileReadString...() routines.
      * Extract the information you want from version string.
      */</PRE>
 <PRE>    MemUnlock( OptrToHandle( @UICategory ) );
 }</PRE>
+<P>Further complicating matters, the <EM>swSerialNumber</EM> does not follow 
+the format described above in the PC Emulator.  On the PC emulator, the 
+version string will look something like "Build X.X", where the <EM>X</EM>s 
+are numbers.  These correspond to the build's major number.
 <HR>
 <A NAME="Update_2.htm"></A>
 
@@ -274,31 +284,90 @@ CMB_SEARCH</LI>
  </A>
 Non-exclusive Lists</H2>
 <P>
-GenItemGroups may now be of type GIGBT_NON_EXCLUSIVE, allowing the user to select more than one item at a time. </P>
-<P>
-<CODE>
-GenItemGroupClass</CODE>
- now has two new messages which allow you to get and set which item has the &quot;focus&quot;--which single item the user currently has highlighted, as opposed to the selected items: </P>
+GenItemGroups may now be of type GIGBT_NON_EXCLUSIVE, allowing the user
+to select more than one item at a time (available in software versions
+4.8.8 or later). For a complete discussion of non-exclusive lists, refer
+to <A HREF="../../UI/Lists/Lists_8.htm#IX_Non-exclusive lists">GenItemGroup
+basics</A>.
+
+<P><CODE>GenItemGroupClass</CODE> now supports two messages which allow you
+to get and set which item has the &quot;focus&quot;--which single item the user currently
+has highlighted, as opposed to the selected items:
 <UL>
 <LI>
-MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM</LI>
+<CODE><A HREF="../../UI/Lists/Lists_8.htm#IX_MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM">MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM</A></CODE></LI>
+
 <LI>
-MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM</LI>
+<CODE><A HREF="../../UI/Lists/Lists_8.htm#IX_MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM">MSG_GEN_ITEM_GROUP_SET_FOCUS_ITEM</A></CODE></LI>
 </UL>
+
+
+<P CLASS="figTitle">
+Code Display 13-5 Using MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM</P>
+<PRE>
+@chunk TCHAR NoteSanFrancisoFocus[] = "San Franciso has the city list focus.";
+@method TestProcessClass, MSG_TEST_PROCESS_GET_CITY_GROUP_FOCUS
+{
+	word city_selected;
+	city_selected = @call CityGroup::MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM();
+	if (city_selected == CG_san_francisco)
+	{
+		FoamDisplayNote(@NoteSanFrancisoFocus);
+	}
+} 
+</PRE>
+
 
 <H5 CLASS="HeadingD">
 ContactLists:</H5>
 <P>
-If you are using a ContactList (from the Contact DB library), youmay set it up for multiple selections by giving it a ATTR_CONTACT_LIST_NON_EXCLUSIVE_LIST variable data field.  To find out which records are selected in such a list, use <CODE>
+If you are using a ContactList (from the Contact DB library), you may set it up for multiple selections by giving it a ATTR_CONTACT_LIST_NON_EXCLUSIVE_LIST variable data field.  To find out which records are selected in such a list, use <CODE>
 MSG_CONTACT_LIST_GET_IDS_OF_SELECTED_RECORDS.</CODE>
 </P>
 
+<HR>
+<A NAME="Update_filter.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 7
+Filter List/Filter Text</H2>
+
+<P>
+Responder Versions 4.8.8 and later support Filter List and Filter Text objects which together provide the UI for interactive searches on lists of objects. The Filer List object is
+a modified GenDynamicList and the filter text object is a modified TextWithList. When the user types a string into a <CODE>FilterTextClass</CODE> object, 
+the <CODE>FilterTextClass</CODE> object calls a method that uses this text to create a filter for the <CODE>FilterListClass</CODE> object. 
+This filter controls which monikers the FilterList displays, and in what
+order.
+</P>
+
+<P>
+For example, the <I>Composer</I> application has a <CODE>FilterListClass</CODE> object that displays a long list of songs, and a
+<CODE>FilterTextClass</CODE> "Search" field. When the user types a string in the "Search" field, the FilterList displays only items that
+start with that string.
+</P>
+
+<CENTER>
+<IMG SRC="../UI/composer.gif" WIDTH = "646" HEIGHT = "271"> 
+</CENTER>
+
+<P>
+To create FilterList/FilterText pair:
+<UL>
+<LI>Create a <CODE>FilterListClass</CODE> object.
+<LI>Create a query message handler for the filter list. The Filter List calls this message to retrieve every item on the list.
+<LI>Create a <CODE>FilterTextClass</CODE> object.
+<LI>Create a Filter Text message handler that uses the text in the Filter Text object to create a filter. This filter determines which
+        items in the Filter List will be displayed.
+</UL>
+
+<P>
+For more details, refer to the <A HREF="../UI/filter.htm">Filter List, Filter Text</A> section of the <A HREF="../UI/index.htm">Communicator UI</A> chapter.
+</P>
 <HR>
 <A NAME="Update_7.htm"></A>
 
 
 <H2 CLASS="sectionTitle">
-<A HREF="#index.htm">Versions</A>: 7 
+<A HREF="#index.htm">Versions</A>: 8 
 <A NAME="Update_7.htm_84077">
  </A>
 Incremental Searches</H2>
@@ -313,7 +382,7 @@ F</CODE>
 
 
 <H2 CLASS="sectionTitle">
-<A HREF="#index.htm">Versions</A>: 8 
+<A HREF="#index.htm">Versions</A>: 9
 <A NAME="Update_8.htm_99749">
  </A>
 Contact's URL and Password</H2>
@@ -331,7 +400,7 @@ F</CODE>
 
 
 <H2 CLASS="sectionTitle">
-<A HREF="#index.htm">Versions</A>: 9 
+<A HREF="#index.htm">Versions</A>: 10
 <A NAME="Update_9.htm_36246">
  </A>
 ContactList Searches</H2>
@@ -346,7 +415,7 @@ F</CODE>
 
 
 <H2 CLASS="sectionTitle">
-<A HREF="#index.htm">Versions</A>: 10 
+<A HREF="#index.htm">Versions</A>: 11
 <A NAME="Update_a.htm_25122">
  </A>
 Unknown Phone Numbers</H2>
@@ -366,6 +435,64 @@ to specify that this call's number should match any phone number.</P>
 <P>
 &nbsp;</P>
 <HR>
+<A NAME="Update_b.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 12 Detecting Hardware Type</H2>
+<P>
+
+The Responder Library has a new routine <CODE>RespGetPDAHardware()</CODE> that lets an application determine the type of hardware it is running on, specifically the type of PDA and whether or not it has a backlight. This routine returns a <CODE>PDAHardwareInfo</CODE> byte flag. The bit <CODE>PDAHI_BACKLIGHT_AVAILABLE</CODE>       (0x04) is zero if there is no backlight, or one if there is. The bits <CODE>PDAHI_PDA_TYPE</CODE>        (0x02 | 0x01)   are set to the type of PDA. These enumerated values may be <CODE>PDAT_PC_EMULATOR</CODE>                     (0x0), <CODE>PDAT_N9000</CODE>                           (0x1), or <CODE>PDAT_N9000i</CODE>             (0x2), corresponding to, respectively, the PC emulator, the Nokia 9000 released in 1996, and the Nokia 9000 released in the second half of 1997.
+
+<HR>
+<A NAME="Update_menu_trigger.htm"></A>
+
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 13 Menu Trigger
+</H2>
+
+<P>
+
+Software versions 4.8 or later of the Communicator allow for a fifth &quot;Menu&quot; trigger that behaves just like a regular trigger except that it is invisible and does not take up a slot at the right side of the screen. It is activated whenever the user pushes the &quot;Menu&quot; button present on newer versions of the Communicator. 
+<P>
+A &quot;Menu&quot; command trigger is defined just like any other command trigger, except it lacks a HINT_SEEK_SLOT and you must set <CODE>CMI_topText = CMT_MENU;</CODE>. The &quot;Menu&quot; button on the Communicator maps to Ctrl-F2 on the emulator.
+<P>
+For more information, refer to the <A HREF = "../../Nokia9000/GrabBag/index.htm#menu_trigger">Communicator Fact Sheet</A> and <A HREF = "../../Nokia9000/UI/9000UI_trigger.htm">ComplexMoniker Triggers</A>.
+
+
+</P>
+
+<HR>
+<A NAME="Update_zoom.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 14 Zoom Level</H2>
+<P>
+
+
+Versions 4.8.8 or later of the 9000i Communicator allow the user to press an off-screen &quot;Zoom&quot; button to toggle between three text size settings -- &quot;Zoom levels&quot;  -- and adjust the text size for more comfortable reading. 
+
+<P>
+
+If you want a UI component to increase font size when the user increases the zoom level, then pass it <CODE>HINT_MAXIMUM_ZOOM_LEVEL = ZL_ZOOM_3;</CODE> (or ...<CODE>ZL_ZOOM_2;</CODE> if you want it be limited to medium-size).
+
+<P>
+
+The higher the zoom level, the larger the font size, and the fewer the number of characters that will fit into a fixed pixel length field. Thus, if you use a <CODE>CreateVisMoniker...()</CODE> routine, you will need to know how to size the VisMoniker appropriately for the current zoom level. For more details, refer to the <A HREF = "../../Nokia9000/UI/9000UI_zoom.htm">Zoom Level UI</A> chapter.
+
+<HR>
+<A NAME="Update_mmc.htm"></A>
+<H2 CLASS="sectionTitle">
+<A HREF="#index.htm">Versions</A>: 15
+Memory Cards</H2>
+<P>
+The Nokia 9110 Communicator has a slot for an optional memory card. 
+The card is about the size of a postage stamp and provides up to 4 MB of extra Flash memory or ROM.
+</P>
+
+<P>
+New API lets you read and write to a memory card. For more details, refer to  the <A HREF="../MMC/index.htm">Memory Cards chapter</A>.
+</P>
+
+<HR>
+<A NAME=""></A>
 This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
 </BODY>
 </HTML>
