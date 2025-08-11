@@ -583,11 +583,12 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
         case PNG_COLOR_TYPE_GREY_ALPHA:
             switch (bitDepth)
             {
-                case 8: // Processing 8-bit Greyscale + Alpha
-                case 16: // Processing 16-bit Greyscale + Alpha
-                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                case 8:
+                case 16:
+                    /* Paletted GREY plus a 1-bit mask */
+                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE | BMT_MASK;
                     break;
-                default: // Invalid BitDepth for Greyscale with Alpha
+                default:
                     break;
             }
             break;
@@ -597,7 +598,7 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
             {
                 case 8: // Processing 8-bit Truecolor + Alpha
                 case 16: // Processing 16-bit Truecolor + Alpha
-                    output = BMF_24BIT | BMT_COMPLEX;
+                    output = BMF_24BIT | BMT_MASK | BMT_COMPLEX;
                     break;
                 default: // Invalid BitDepth for Truecolor with Alpha
                     break;
@@ -654,7 +655,10 @@ void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state
     pngConvert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
     // Remove any alpha channel
-    pngRemoveAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngBlendColor);
+    // pngRemoveAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngBlendColor);
+
+    pngConvertAlphaChannelToMask(state->currentRow, state->ihdr.width, state->ihdr.colorType, 192);
+
 
     // add "padding" to 1- and 2-bitted paletted data bytes or to 2-bitted grayscale values
     pngPad1BitTo4Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
@@ -929,6 +933,116 @@ void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long wi
         }
     }
     // If any other colorType with alpha is introduced in the future, handle it here
+}
+
+/* Build [mask][RGB or GRAY] from RGBA or GREY+ALPHA using a 1-bit mask.
+ * Input  'data':
+ *   RGBA: 4*width bytes  (R,G,B,A)
+ *   GA:   2*width bytes  (Gray,Alpha)
+ * Output back into 'data':
+ *   RGBA -> [ (W+7)/8 mask ][ 3*W RGB ]
+ *   GA   -> [ (W+7)/8 mask ][   W GRAY ]
+ * Opaque if (alpha >= alphaThreshold), otherwise transparent.
+ * (Mask bit order: MSB-first in each byte)
+ */
+void _pascal _export pngConvertAlphaChannelToMask(
+    unsigned char *data,
+    unsigned long  width,
+    int            colorType,
+    byte           alphaThreshold)
+{
+    MemHandle       tmpHan;
+    unsigned char  *tmp;
+    unsigned long   maskBytes;
+    unsigned long   outBytes;
+    unsigned char  *dstMask;
+    unsigned char  *dstPix;
+    unsigned long   x;
+
+    /* Only RGBA and GREY+ALPHA have alpha to convert. */
+    if (!((colorType == PNG_COLOR_TYPE_RGBA) ||
+          (colorType == PNG_COLOR_TYPE_GREY_ALPHA)))
+    {
+        return;
+    }
+
+    maskBytes = (width + 7) / 8;
+    outBytes  = (colorType == PNG_COLOR_TYPE_RGBA)
+                ? (maskBytes + 3 * width)     /* RGB */
+                : (maskBytes + 1 * width);    /* GRAY */
+
+    /* Temp row for [mask][payload] */
+    tmpHan = MemAlloc((word)outBytes, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (tmpHan == NullHandle) { return; }
+
+    tmp = (unsigned char*) MemLock(tmpHan);
+    if (tmp == NULL)
+    {
+        MemFree(tmpHan);
+        return;
+    }
+
+    dstMask = tmp;
+    dstPix  = tmp + maskBytes;
+
+    if (colorType == PNG_COLOR_TYPE_RGBA)
+    {
+        const unsigned char *src = data;   /* R G B A */
+        unsigned long  mIdx = 0;
+        unsigned char  bit  = 0x80;
+
+        /* mask is zeroed by HAF_ZERO_INIT */
+        for (x = 0; x < width; x++)
+        {
+            unsigned char r = src[0];
+            unsigned char g = src[1];
+            unsigned char b = src[2];
+            unsigned char a = src[3];
+
+            if (a >= alphaThreshold) { dstMask[mIdx] |= bit; } /* opaque=1 */
+
+            dstPix[0] = r; dstPix[1] = g; dstPix[2] = b;
+
+            src   += 4;
+            dstPix+= 3;
+
+            bit >>= 1;
+            if (bit == 0) { bit = 0x80; mIdx++; }
+        }
+    }
+    else /* PNG_COLOR_TYPE_GREY_ALPHA */
+    {
+        const unsigned char *src = data;   /* Gray, Alpha */
+        unsigned long  mIdx = 0;
+        unsigned char  bit  = 0x80;
+
+        for (x = 0; x < width; x++)
+        {
+            unsigned char gray = src[0];
+            unsigned char a    = src[1];
+
+            if (a >= alphaThreshold) { dstMask[mIdx] |= bit; } /* opaque=1 */
+
+            dstPix[0] = gray;  /* keep grayscale sample; palette already handled */
+
+            src   += 2;
+            dstPix+= 1;
+
+            bit >>= 1;
+            if (bit == 0) { bit = 0x80; mIdx++; }
+        }
+    }
+
+    /* Clear padding bits in the last mask byte if width%8 != 0 */
+    if ((width & 7) != 0)
+    {
+        dstMask[maskBytes - 1] &= (unsigned char)(0xFF << (8 - (width & 7)));
+    }
+
+    /* Copy result back to caller’s buffer */
+    memcpy(data, tmp, (word)outBytes);
+
+    MemFree(tmpHan);
 }
 
 // Function to convert 1-bit packed values to 4-bit padded values

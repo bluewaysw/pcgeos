@@ -143,6 +143,11 @@ unsigned long   _pascal _export pngCalcBytesPerRow(unsigned long width, unsigned
 unsigned long   _pascal _export pngCalcBytesPerPixel(unsigned char colorType, unsigned char bitDepth);
 unsigned long   _pascal _export pngCalcLineAllocSize(unsigned long width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor);
+
+
+void            _pascal _export pngConvertAlphaChannelToMask(unsigned char *data, unsigned long  width, int colorType, byte alphaThreshold);
+
+
 void            _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
