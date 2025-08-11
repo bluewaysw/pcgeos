@@ -22,5 +22,5 @@ Here are some entry points to the main volumes:
 - _Third Party software_: this could become a place in the future to document add-on software in this repository that was developed by people/companies other than Geoworks (e.g. Breadbox, New Deal)
 - [Device Specifics](devices.md): developer information about various "historic" PDAs and smartphones that were shipped with GEOS.
   - Casio Z-7000 ("Zoomer")
-  - more to come...
+  - Nokia 9000/9110 Communicator
 - Original [credits](credits.md) of the GEOS Software Development Kit Library 2.0

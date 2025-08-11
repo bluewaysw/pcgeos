@@ -35,3 +35,20 @@ nav_order: 10
 - [Fonts](Devices/zoomer1.md#fonts)  
 - [Debugging & pccom](Devices/zoomer1.md#debugging--pccom)
 
+**[Nokia 9000/9000i/9110 Communicator Fact Sheet](Devices/Nokia9000/ngrabbag.md)**
+
+- [Hardware](Devices/Nokia9000/ngrabbag.md#hardware)
+- [Text](Devices/Nokia9000/ngrabbag.md#text)
+- [Icons](Devices/Nokia9000/ngrabbag.md#icons)
+- [Communicator Grays](Devices/Nokia9000/ngrabbag.md#communicator-grays)
+- [Disk Space Warnings](Devices/Nokia9000/ngrabbag.md#disk-space-warnings)
+- [UI Conventions: Triggers](Devices/Nokia9000/ngrabbag.md#ui-conventions-triggers)
+- [Zoom Levels](Devices/Nokia9000/ngrabbag.md#zoom-levels)
+- [Nokia 9000i Emulator Keyboard Mapping](Devices/Nokia9000/ngrabbag.md#nokia-9000i-emulator-keyboard-mapping)
+- [Sounds](Devices/Nokia9000/ngrabbag.md#sounds)
+- [The Installer](Devices/Nokia9000/ngrabbag.md#the-installer)
+- [To Clear All RAM](Devices/Nokia9000/ngrabbag.md#to-clear-all-ram)
+- [Version Information](Devices/Nokia9000/ngrabbag.md#version-information)
+- [Lid-Closing Event](Devices/Nokia9000/ngrabbag.md#lid-closing-event)
+- [Debugging on an Actual Communicator](Devices/Nokia9000/ngrabbag.md#debugging-on-an-actual-communicator)
+
