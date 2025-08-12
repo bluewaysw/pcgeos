@@ -21,7 +21,6 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
     pngPLTEChunkEntry plteChunk = {0};
     pngIDATState state = {0};
     BMFormat fmt = 0;
-    RGBValue blendColor = {255, 255, 255};
 
     if (pngImportCheckHeader(fileHan))
     {
@@ -45,7 +44,7 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
                 {
                     pngImportIDATProcessingUnlockHandles(&state);
 
-                    pngImportApplyGEOSFormatTransformations(&state, blendColor);
+                    pngImportApplyGEOSFormatTransformations(&state, (void*) 0);
 
                     // Write the processed scanline (without the filter byte) to the VMFile
                     pngImportWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
@@ -649,16 +648,29 @@ VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile,
 }
 
 // transform the original bitmap data for the target GEOS format
-void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, RGBValue pngBlendColor)
+void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, pngAlphaTransformData* pngAlphaTransform)
 {
+    pngAlphaTransformData defaults = {0};
+
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
     pngConvert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
-    // Remove any alpha channel
-    // pngRemoveAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngBlendColor);
+    if (pngAlphaTransform == (void*) 0) {
+        defaults.method = PNG_AT_TRESHOLD;
+        defaults.alphaThreshold = 192;
+        pngAlphaTransform = &defaults;
+    }
 
-    pngConvertAlphaChannelToMask(state->currentRow, state->ihdr.width, state->ihdr.colorType, 192);
-
+    if (pngAlphaTransform->method == PNG_AT_TRESHOLD)
+    {
+        // remove alpha channel by converting to mask
+        pngAlphaChannelToMask(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngAlphaTransform->alphaThreshold);
+    }
+    else
+    {
+        // Blend alpha channel with color
+        pngAlphaChannelBlend(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngAlphaTransform->blendColor);
+    }
 
     // add "padding" to 1- and 2-bitted paletted data bytes or to 2-bitted grayscale values
     pngPad1BitTo4Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
@@ -886,7 +898,7 @@ void _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, unsigned lon
 }
 
 // remove the alpha channel, for now. blend it with a blendColor
-void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
+void _pascal _export pngAlphaChannelBlend(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
 {
     unsigned long j;
     unsigned char *src = data; // Start at the first pixel
@@ -945,7 +957,7 @@ void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long wi
  * Opaque if (alpha >= alphaThreshold), otherwise transparent.
  * (Mask bit order: MSB-first in each byte)
  */
-void _pascal _export pngConvertAlphaChannelToMask(
+void _pascal _export pngAlphaChannelToMask(
     unsigned char *data,
     unsigned long  width,
     int            colorType,

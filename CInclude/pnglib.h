@@ -110,15 +110,27 @@ typedef struct {
 #define PNG_COLOR_TYPE_GREY_ALPHA  4   /* Grayscale with alpha */
 #define PNG_COLOR_TYPE_RGBA        6   /* Truecolor with alpha */
 
+
+typedef enum {
+    PNG_AT_TRESHOLD = 0,
+    PNG_AT_BLEND
+} pngAlphaTransformMethod;
+
+typedef struct {
+    pngAlphaTransformMethod method;
+    byte alphaThreshold;
+    RGBValue blendColor;
+} pngAlphaTransformData;
+
 // Errors when exporting
 typedef enum {
-    PE_NO_ERROR,                        // used
-    PE_INVALID_BITMAP,                  // used
-    PE_OUT_OF_MEMORY,                   // used
-    PE_BLOCK_LOCK_FAILURE,              // used
-    PE_WRITE_PROBLEM,                   // used
-    PE_PALETTE_RETRIEVAL_FAILURE,       // used
-    PE_OTHER_ERROR                      // used
+    PE_NO_ERROR,
+    PE_INVALID_BITMAP,
+    PE_OUT_OF_MEMORY,
+    PE_BLOCK_LOCK_FAILURE,
+    PE_WRITE_PROBLEM,
+    PE_PALETTE_RETRIEVAL_FAILURE,
+    PE_OTHER_ERROR
 } PngError;
 
 
@@ -133,7 +145,7 @@ void            _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEC
 void            _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, pngIHDRData ihdr);
 int             _pascal _export pngImportGetNextIDATScanline(pngIDATState* state);
 void            _pascal _export pngImportIDATProcessingUnlockHandles(pngIDATState* state);
-void            _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, RGBValue pngBlendColor);
+void            _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, pngAlphaTransformData* pngAlphaTransform);
 void            _pascal _export pngImportWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle bitmapHandle, unsigned long lineNo, unsigned char* rowData);
 void            _pascal _export pngImportIDATProcessingLockHandles(pngIDATState* state);
 void            _pascal _export pngImportCleanupIDATProcessingState(pngIDATState* state);
@@ -142,12 +154,8 @@ void            _pascal _export pngImportCleanupIDATProcessingState(pngIDATState
 unsigned long   _pascal _export pngCalcBytesPerRow(unsigned long width, unsigned char colorType, unsigned char bitDepth);
 unsigned long   _pascal _export pngCalcBytesPerPixel(unsigned char colorType, unsigned char bitDepth);
 unsigned long   _pascal _export pngCalcLineAllocSize(unsigned long width, unsigned char colorType, unsigned char bitDepth);
-void            _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor);
-
-
-void            _pascal _export pngConvertAlphaChannelToMask(unsigned char *data, unsigned long  width, int colorType, byte alphaThreshold);
-
-
+void            _pascal _export pngAlphaChannelBlend(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor);
+void            _pascal _export pngAlphaChannelToMask(unsigned char *data, unsigned long  width, int colorType, byte alphaThreshold);
 void            _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth);
