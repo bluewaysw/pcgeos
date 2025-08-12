@@ -32,6 +32,10 @@
 #include <graphics.h>
 @include "bvdirmon.goh"
 
+/* identifiers for the item group */
+#define ACM_BLEND_COLOR         0
+#define ACM_ALPHA_TO_MASK       1
+
 @ifndef OLD_THUMBNAIL_DB
 @include <thumbdb.h>
 @endif
@@ -186,6 +190,8 @@ FileHandle BVThumbnailDB = 0;
 
 @message void MSG_BV_SAVE_PATH();
 @message void MSG_BV_RESET_PATH();
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE;
+@message void MSG_BV_ALPHA_TRANSFORM_APPLY();
 @endc;
 @classdecl BVProcessClass, neverSaved;
 
@@ -658,7 +664,8 @@ FileHandle BVThumbnailDB = 0;
 @object GenInteractionClass BVOptionMenu = {
 		GII_visibility = GIV_POPUP;
 		GI_comp = 	@BVOptionGroup,
-		  		@BlendColorControl,
+				@BVAlphaConvSubgroup,
+		  		//@BlendColorControl,
 				@BVDialogsGroup,
 				@BVOptionSaveGroup;
 		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
@@ -679,6 +686,122 @@ FileHandle BVThumbnailDB = 0;
 	HINT_DRAW_IN_BOX;
     	HINT_PLACE_MONIKER_ABOVE;
 };
+
+/*----------------------------------------------------------------------
+ * Alpha Conversion Dialog
+ *----------------------------------------------------------------------*/
+
+@object GenInteractionClass BVAlphaConvSubgroup = {
+		GII_visibility = GIV_SUB_GROUP;
+		GI_comp = @AlphaConvDialog;
+};
+
+@object GenInteractionClass AlphaConvDialog = {
+    GI_visMoniker = "Alpha Channel Conversion";
+    GI_states = @default;
+    GI_comp = @AlphaMethodGroup, @AlphaBlendBox, @AlphaMaskBox,
+              @AlphaOK, @AlphaCancel;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_MODAL;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+/* ----- method chooser (radio group) ----- */
+@object GenItemGroupClass AlphaMethodGroup = {
+    GI_visMoniker = "Method:";
+    GI_comp = @AlphaItemBlend, @AlphaItemMask;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GIGI_selection = ACM_BLEND_COLOR;            /* default */
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE;
+
+    HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    HINT_LEFT_JUSTIFY_CHILDREN;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenItemClass AlphaItemBlend = {
+    GI_visMoniker = "Blend color";
+    GII_identifier = ACM_BLEND_COLOR;
+
+    //HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_MONIKER;
+}
+
+@object GenItemClass AlphaItemMask = {
+    GI_visMoniker = "Alpha to mask";
+    GII_identifier = ACM_ALPHA_TO_MASK;
+
+    //HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_MONIKER;
+}
+
+/* ----- blend settings (enabled by default) ----- */
+@object GenInteractionClass AlphaBlendBox = {
+    GI_visMoniker = "Blend Settings";
+    GI_comp = @AlphaBlendColor;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object ColorSelectorClass AlphaBlendColor = {
+	GI_visMoniker = "Blend color";
+
+	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
+	GI_states = @default | GS_USABLE | GS_ENABLED;
+	GCI_output = process;
+	GII_type = GIT_PROPERTIES;
+
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_RGB | CSF_INDEX | CSF_OTHER);
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
+}
+
+/* ----- mask settings (disabled until method changes) ----- */
+@object GenInteractionClass AlphaMaskBox = {
+    GI_visMoniker = "Mask Settings";
+    //GI_states = @default & ~GS_USABLE;           /* start grayed out */
+    GI_comp = @AlphaThresholdValue;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenValueClass AlphaThresholdValue = {
+    GI_visMoniker = "Alpha threshold";
+    GVLI_minimum = 0;
+    GVLI_maximum = 255;
+    GVLI_increment = 1;
+    GVLI_value = 128;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/* ----- reply-bar buttons ----- */
+@object GenTriggerClass AlphaOK = {
+    GI_visMoniker = "OK";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_BV_ALPHA_TRANSFORM_APPLY;
+    GI_attrs = @default;
+
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass AlphaCancel = {
+    GI_visMoniker = "Cancel";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    HINT_SEEK_REPLY_BAR;
+}
+
 
 /**************************************************************************/
 
@@ -1974,6 +2097,26 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 	@send BlendColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 }
+
+@method BVProcessClass, MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE
+{
+	if (selection == ACM_ALPHA_TO_MASK)
+	{
+		@call AlphaBlendBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+		@call AlphaMaskBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	}
+	else // ACM_BLEND_COLOR
+	{
+		@call AlphaBlendBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+		@call AlphaMaskBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	}
+}
+
+@method BVProcessClass, MSG_BV_ALPHA_TRANSFORM_APPLY
+{
+	@send AlphaConvDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
 
 /**************************************************************************/
 
