@@ -176,7 +176,9 @@ bmpview.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/imp_bmp.h \
                 IMPBMP/ibcommon.h Ansi/string.h GRAPH/quant.h initfile.h \
-                library.h sem.h
+                pnglib.h Ansi/stdio.h Ansi/stdlib.h zlib.h zconf.h \
+                htmldrv.h product.h math.h htmlfstr.h awatcher.h \
+                htmlprog.h library.h sem.h
 quant.obj \
 quant.eobj: Ansi/string.h geos.h GRAPH/quant.h color.h heap.h
 

@@ -31,6 +31,7 @@
 #include <initfile.h>
 #include <graphics.h>
 @include "bvdirmon.goh"
+#include "pnglib.h"
 
 /* identifiers for the item group */
 #define ACM_BLEND_COLOR         0
@@ -1768,6 +1769,61 @@ getPngBlendColor(RGBValue* blendColor)
 	}
 
 }
+
+static void getAlphaHandlingFromUI(pngAlphaTransformData* patd)
+{
+	ColorAndFlagReturn cafr = {0};
+
+	patd->method = (pngAlphaTransformMethod) @call AlphaMethodGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	@call AlphaBlendColor::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+
+	// convert INDEX to RGB
+	if(cafr.CAFR_color.CQ_info == CF_INDEX)
+	{
+		RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
+		patd->blendColor.RGB_red = RGB_RED(c);
+		patd->blendColor.RGB_green = RGB_GREEN(c);
+		patd->blendColor.RGB_blue = RGB_BLUE(c);
+	}
+	else if (cafr.CAFR_color.CQ_info == CF_RGB)
+	{
+		patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+		patd->blendColor.RGB_green = cafr.CAFR_color.CQ_green;
+		patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
+	}
+	else if (cafr.CAFR_color.CQ_info == CF_GRAY)
+	{
+		patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+		patd->blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
+		patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
+	}
+
+    patd->alphaThreshold = (byte) @call AlphaThresholdValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+}
+
+static void getAlphaHandlingFromIni(pngAlphaTransformData* patd)
+{
+	word stat;
+
+	(void) InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", patd->blendColor, sizeof(RGBColor), 0);
+	(void) InitFileReadDataBuffer("GraphicsViewer", "alphaTreshold", patd->alphaThreshold, sizeof(byte), 0);
+	(void) InitFileReadDataBuffer("GraphicsViewer", "pngAlphaTransformMethod", patd->method, sizeof(pngAlphaTransformMethod), 0);
+
+}
+
+static void writeAlphaHandlingToIni(pngAlphaTransformData* patd)
+{
+	InitFileWriteData("GraphicsViewer", "pngBlendColor", patd->blendColor, sizeof(RGBColor));
+	InitFileWriteData("GraphicsViewer", "alphaTreshold", patd->alphaThreshold, sizeof(byte));
+	InitFileWriteData("GraphicsViewer", "pngAlphaTransformMethod", patd->method, sizeof(pngAlphaTransformMethod));
+}
+
+
+
+
+
 
 
 /**************************************************************************/
