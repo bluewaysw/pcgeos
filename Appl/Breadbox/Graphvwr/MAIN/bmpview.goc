@@ -32,6 +32,7 @@
 #include <graphics.h>
 @include "bvdirmon.goh"
 #include "pnglib.h"
+#include "color.h"
 
 /* identifiers for the item group */
 #define ACM_BLEND_COLOR         0
@@ -771,10 +772,11 @@ FileHandle BVThumbnailDB = 0;
 
 @object GenValueClass AlphaThresholdValue = {
     GI_visMoniker = "Alpha threshold";
-    GVLI_minimum = 0;
-    GVLI_maximum = 255;
-    GVLI_increment = 1;
-    GVLI_value = 128;
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_maximum = MakeWWFixed(255);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_value = MakeWWFixed(192);
+    GVLI_displayFormat = GVDF_INTEGER;
 
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
@@ -1803,21 +1805,49 @@ static void getAlphaHandlingFromUI(pngAlphaTransformData* patd)
 
 }
 
+static void updateAlphaHandlingUI(pngAlphaTransformData* patd)
+{
+    ColorQuad cq = {0};
+
+    // Set method
+    @call AlphaMethodGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((word)patd->method, FALSE);
+
+    // Convert RGB to ColorQuad (assume RGB, no alpha or CF_INDEX handling here)
+    cq.CQ_info = CF_RGB;
+    cq.CQ_redOrIndex = patd->blendColor.RGB_red;
+    cq.CQ_green = patd->blendColor.RGB_green;
+    cq.CQ_blue = patd->blendColor.RGB_blue;
+
+    // Set blend color
+    @call AlphaBlendColor::MSG_COLOR_SELECTOR_SET_COLOR(cq, FALSE);
+
+    // Set threshold
+    @call AlphaThresholdValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((sword)patd->alphaThreshold, FALSE);
+
+    if (patd->method == ACM_ALPHA_TO_MASK)
+    {
+    	@call AlphaBlendBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    	@call AlphaMaskBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else // ACM_BLEND_COLOR
+    {
+    	@call AlphaBlendBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    	@call AlphaMaskBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+}
+
 static void getAlphaHandlingFromIni(pngAlphaTransformData* patd)
 {
-	word stat;
-
-	(void) InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", patd->blendColor, sizeof(RGBColor), 0);
-	(void) InitFileReadDataBuffer("GraphicsViewer", "alphaTreshold", patd->alphaThreshold, sizeof(byte), 0);
-	(void) InitFileReadDataBuffer("GraphicsViewer", "pngAlphaTransformMethod", patd->method, sizeof(pngAlphaTransformMethod), 0);
-
+	(void) InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", &patd->blendColor, sizeof(RGBValue), 0);
+	(void) InitFileReadDataBuffer("GraphicsViewer", "alphaTreshold", &patd->alphaThreshold, sizeof(byte), 0);
+	(void) InitFileReadDataBuffer("GraphicsViewer", "pngAlphaTransformMethod", &patd->method, sizeof(pngAlphaTransformMethod), 0);
 }
 
 static void writeAlphaHandlingToIni(pngAlphaTransformData* patd)
 {
-	InitFileWriteData("GraphicsViewer", "pngBlendColor", patd->blendColor, sizeof(RGBColor));
-	InitFileWriteData("GraphicsViewer", "alphaTreshold", patd->alphaThreshold, sizeof(byte));
-	InitFileWriteData("GraphicsViewer", "pngAlphaTransformMethod", patd->method, sizeof(pngAlphaTransformMethod));
+	InitFileWriteData("GraphicsViewer", "pngBlendColor", &patd->blendColor, sizeof(RGBValue));
+	InitFileWriteData("GraphicsViewer", "alphaTreshold", &patd->alphaThreshold, sizeof(byte));
+	InitFileWriteData("GraphicsViewer", "pngAlphaTransformMethod", &patd->method, sizeof(pngAlphaTransformMethod));
 }
 
 
@@ -1951,6 +1981,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   char path2[256];
   char path3[256];
   ColorQuad pngBlendColor = {0};
+  pngAlphaTransformData patd = {0};
 
   if((extraState != 0) &&
 	((attachFlags & AAF_RESTORING_FROM_STATE)!=0))
@@ -2093,6 +2124,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 		@send BlendColorControl::MSG_COLOR_SELECTOR_SET_COLOR(pngBlendColor, FALSE);
 	}
 
+	getAlphaHandlingFromIni(&patd);
+	updateAlphaHandlingUI(&patd);
+
   @callsuper();
 }
 
@@ -2165,6 +2199,11 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 @method BVProcessClass, MSG_BV_ALPHA_TRANSFORM_APPLY
 {
+	pngAlphaTransformData patd = {0};
+
+	getAlphaHandlingFromUI(&patd);
+	writeAlphaHandlingToIni(&patd);
+
 	@send AlphaConvDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 }
 
