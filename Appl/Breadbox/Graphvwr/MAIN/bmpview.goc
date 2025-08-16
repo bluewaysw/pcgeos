@@ -34,10 +34,6 @@
 #include "pnglib.h"
 #include "color.h"
 
-/* identifiers for the item group */
-#define ACM_BLEND_COLOR         0
-#define ACM_ALPHA_TO_MASK       1
-
 @ifndef OLD_THUMBNAIL_DB
 @include <thumbdb.h>
 @endif
@@ -375,20 +371,17 @@ FileHandle BVThumbnailDB = 0;
 		@BVViewControl,
 		@BVEditControl,
 		@BVDocumentControl,
-		@BVDisplayControl,
-		@BlendColorControl;
+		@BVDisplayControl;
 
 	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
 		@BVOptionGroup,
 		@BVViewOptGroup,
-		@BVImpFileShowTools,
-		@BlendColorControl;
+		@BVImpFileShowTools;
 
 	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
 		@BVViewControl,
 		@BVDocumentControl,
-		@BVDisplayControl,
-		@BlendColorControl;
+		@BVDisplayControl;
 
 
 @ifdef NEWDEAL_MEDIA_VIEWER
@@ -667,27 +660,11 @@ FileHandle BVThumbnailDB = 0;
 		GII_visibility = GIV_POPUP;
 		GI_comp = 	@BVOptionGroup,
 				@BVAlphaConvSubgroup,
-		  		//@BlendColorControl,
 				@BVDialogsGroup,
 				@BVOptionSaveGroup;
 		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
 };
 
-/**************************************************************************/
-@object ColorSelectorClass BlendColorControl = {
-	GI_visMoniker = "Set PNG Blend Color";
-	GI_states = @default | GS_USABLE | GS_ENABLED;
-	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
-
-	GCI_output = process;
-	GII_visibility = GIV_DIALOG;
-	GII_type = GIT_PROPERTIES;
-
-	ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_RGB | CSF_INDEX | CSF_OTHER);
-	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
-	HINT_DRAW_IN_BOX;
-    	HINT_PLACE_MONIKER_ABOVE;
-};
 
 /*----------------------------------------------------------------------
  * Alpha Conversion Dialog
@@ -714,7 +691,7 @@ FileHandle BVThumbnailDB = 0;
     GI_visMoniker = "Method:";
     GI_comp = @AlphaItemBlend, @AlphaItemMask;
     GIGI_behaviorType = GIGBT_EXCLUSIVE;
-    GIGI_selection = ACM_BLEND_COLOR;
+    GIGI_selection = PNG_AT_TRESHOLD;
     GIGI_destination = process;
     GIGI_applyMsg = MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE;
 
@@ -726,14 +703,14 @@ FileHandle BVThumbnailDB = 0;
 
 @object GenItemClass AlphaItemBlend = {
     GI_visMoniker = "Blend color";
-    GII_identifier = ACM_BLEND_COLOR;
+    GII_identifier = PNG_AT_BLEND;
 
     HINT_CENTER_MONIKER;
 }
 
 @object GenItemClass AlphaItemMask = {
     GI_visMoniker = "Alpha to mask";
-    GII_identifier = ACM_ALPHA_TO_MASK;
+    GII_identifier = PNG_AT_TRESHOLD;
 
     HINT_CENTER_MONIKER;
 }
@@ -1742,36 +1719,6 @@ CopyCommon(ClipboardItemFlags transferFlags, FileHandle bmpfile,
   }
 }
 
-static void
-getPngBlendColor(RGBValue* blendColor)
-{
-	ColorAndFlagReturn cafr = {0};
-
-	@call BlendColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
-
-	// convert INDEX to RGB
-	if(cafr.CAFR_color.CQ_info == CF_INDEX)
-	{
-		RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
-		blendColor->RGB_red = RGB_RED(c);
-		blendColor->RGB_green = RGB_GREEN(c);
-		blendColor->RGB_blue = RGB_BLUE(c);
-	}
-	else if (cafr.CAFR_color.CQ_info == CF_RGB)
-	{
-		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-		blendColor->RGB_green = cafr.CAFR_color.CQ_green;
-		blendColor->RGB_blue = cafr.CAFR_color.CQ_blue;
-	}
-	else if (cafr.CAFR_color.CQ_info == CF_GRAY)
-	{
-		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-		blendColor->RGB_green = cafr.CAFR_color.CQ_redOrIndex;
-		blendColor->RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
-	}
-
-}
-
 static void getAlphaHandlingFromUI(pngAlphaTransformData* patd)
 {
 	ColorAndFlagReturn cafr = {0};
@@ -1824,12 +1771,12 @@ static void updateAlphaHandlingUI(pngAlphaTransformData* patd)
     // Set threshold
     @call AlphaThresholdValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((sword)patd->alphaThreshold, FALSE);
 
-    if (patd->method == ACM_ALPHA_TO_MASK)
+    if (patd->method == PNG_AT_TRESHOLD)
     {
     	@call AlphaBlendBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     	@call AlphaMaskBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     }
-    else // ACM_BLEND_COLOR
+    else // PNG_AT_BLEND
     {
     	@call AlphaBlendBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
     	@call AlphaMaskBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
@@ -1975,7 +1922,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   char *path;
   char path2[256];
   char path3[256];
-  ColorQuad pngBlendColor = {0};
   pngAlphaTransformData patd = {0};
 
   if((extraState != 0) &&
@@ -2108,17 +2054,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   @send BVImpFileDirDrive::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drives - count1, FALSE);
 
-@ifdef NEWDEAL_MEDIA_VIEWER
-	stat = InitFileReadDataBuffer("MediaViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
-@else
-	stat = InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
-@endif
-
-	if (!stat)
-	{
-		@send BlendColorControl::MSG_COLOR_SELECTOR_SET_COLOR(pngBlendColor, FALSE);
-	}
-
 	getAlphaHandlingFromIni(&patd);
 	updateAlphaHandlingUI(&patd);
 
@@ -2163,29 +2098,14 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   return(extramem);
 }
 
-/**************************************************************************/
-@method BVProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
-{
-
-@ifdef NEWDEAL_MEDIA_VIEWER
-	InitFileWriteData("MediaViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
-@else
-	InitFileWriteData("GraphicsViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
-@endif
-
-  	InitFileCommit();
-
-	@send BlendColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
-}
-
 @method BVProcessClass, MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE
 {
-	if (selection == ACM_ALPHA_TO_MASK)
+	if (selection == PNG_AT_TRESHOLD)
 	{
 		@call AlphaBlendBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 		@call AlphaMaskBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 	}
-	else // ACM_BLEND_COLOR
+	else // PNG_AT_BLEND
 	{
 		@call AlphaBlendBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
 		@call AlphaMaskBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
@@ -2583,7 +2503,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	char string[255];
 	VMBlockHandle bmpblock;
 	word count;
-	RGBValue blendColor = {0};
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2611,8 +2530,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
 
-	getPngBlendColor(&blendColor);
-	para.IBP_pngBlendColor = blendColor;
+	getAlphaHandlingFromIni(&para.IBP_pngAlphaTransform);
 
 	// start importing
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
@@ -4046,7 +3964,6 @@ BVCalcDriveName(char *text, word item)
   ImpBmpStatus status;
   ImpBmpParams para;
   char string[255];
-  RGBValue blendColor = {0};
 
   if(BVFileList != 0)
   {
@@ -4114,8 +4031,7 @@ BVCalcDriveName(char *text, word item)
 			FileSetCurrentPath(SP_WASTE_BASKET, ".");
 			para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
 
-			getPngBlendColor(&blendColor);
-			para.IBP_pngBlendColor = blendColor;
+			getAlphaHandlingFromIni(&para.IBP_pngAlphaTransform);
 
 			FilePopDir();
 

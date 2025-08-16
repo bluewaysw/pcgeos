@@ -21,13 +21,20 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
     pngPLTEChunkEntry plteChunk = {0};
     pngIDATState state = {0};
     BMFormat fmt = 0;
+    pngAlphaTransformData pngAlphaTransform = {0};
+
+    pngAlphaTransform.method = PNG_AT_TRESHOLD;
+    pngAlphaTransform.alphaThreshold = 192;
+    pngAlphaTransform.blendColor.RGB_red = 255;
+    pngAlphaTransform.blendColor.RGB_green = 255;
+    pngAlphaTransform.blendColor.RGB_blue = 255;
 
     if (pngImportCheckHeader(fileHan))
     {
         // Read PNG Chunks, get overview
         if (pngImportProcessChunks(fileHan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
         {
-            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth, &pngAlphaTransform);
             if (fmt != 0)
             {
                 // Initialize output bitmap
@@ -44,7 +51,7 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
                 {
                     pngImportIDATProcessingUnlockHandles(&state);
 
-                    pngImportApplyGEOSFormatTransformations(&state, (void*) 0);
+                    pngImportApplyGEOSFormatTransformations(&state, &pngAlphaTransform);
 
                     // Write the processed scanline (without the filter byte) to the VMFile
                     pngImportWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
@@ -542,7 +549,7 @@ void _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry p
 }
 
 // determine which GEOS bitmap format to create
-BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth)
+BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth, pngAlphaTransformData* pngAlphaTransform)
 {
     BMFormat output = 0;
 
@@ -585,7 +592,11 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
                 case 8:
                 case 16:
                     /* Paletted GREY plus a 1-bit mask */
-                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE | BMT_MASK;
+                    if (pngAlphaTransform->method == PNG_AT_TRESHOLD) {
+                        output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE | BMT_MASK;
+                    } else {
+                        output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    }
                     break;
                 default:
                     break;
@@ -597,7 +608,11 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
             {
                 case 8: // Processing 8-bit Truecolor + Alpha
                 case 16: // Processing 16-bit Truecolor + Alpha
-                    output = BMF_24BIT | BMT_MASK | BMT_COMPLEX;
+                    if (pngAlphaTransform->method == PNG_AT_TRESHOLD) {
+                        output = BMF_24BIT | BMT_COMPLEX | BMT_MASK;
+                    } else {
+                        output = BMF_24BIT | BMT_COMPLEX;
+                    }
                     break;
                 default: // Invalid BitDepth for Truecolor with Alpha
                     break;
@@ -658,6 +673,9 @@ void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state
     if (pngAlphaTransform == (void*) 0) {
         defaults.method = PNG_AT_TRESHOLD;
         defaults.alphaThreshold = 192;
+        defaults.blendColor.RGB_red = 255;
+        defaults.blendColor.RGB_green = 255;
+        defaults.blendColor.RGB_blue = 255;
         pngAlphaTransform = &defaults;
     }
 

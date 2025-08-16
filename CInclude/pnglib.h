@@ -139,7 +139,7 @@ VMBlockHandle   _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileH
 
 int             _pascal _export pngImportCheckHeader(FileHandle file);
 int             _pascal _export pngImportProcessChunks(FileHandle file, pngIHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, pngPLTEChunkEntry* plteChunk);
-BMFormat        _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth);
+BMFormat        _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth, pngAlphaTransformData* pngAlphaTransform);
 VMBlockHandle   _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, pngIHDRData ihdrData, BMFormat fmt);
 void            _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth);
 void            _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, pngIHDRData ihdr);
