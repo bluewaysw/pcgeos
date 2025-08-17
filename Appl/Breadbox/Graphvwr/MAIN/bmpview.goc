@@ -1806,9 +1806,18 @@ static void updateAlphaHandlingUI(alphaTransformData* patd)
 
 static void getAlphaHandlingFromIni(alphaTransformData* patd)
 {
-    (void) InitFileReadDataBuffer("GraphicsViewer", "alphaBlendColor", &patd->blendColor, sizeof(RGBValue), 0);
-    (void) InitFileReadDataBuffer("GraphicsViewer", "alphaTreshold", &patd->alphaThreshold, sizeof(byte), 0);
-    (void) InitFileReadDataBuffer("GraphicsViewer", "alphaTransformMethod", &patd->method, sizeof(alphaTransformMethod), 0);
+    if (
+       (InitFileReadDataBuffer("GraphicsViewer", "alphaBlendColor", &patd->blendColor, sizeof(RGBValue), 0)) ||
+       (InitFileReadDataBuffer("GraphicsViewer", "alphaTreshold", &patd->alphaThreshold, sizeof(byte), 0)) ||
+       (InitFileReadDataBuffer("GraphicsViewer", "alphaTransformMethod", &patd->method, sizeof(alphaTransformMethod), 0))
+    )
+    { // if one or more of the ini keys returned true (== error), reset the whole thing to use defaults
+        patd->method = AT_BLEND;
+        patd->blendColor.RGB_red = 255;
+        patd->blendColor.RGB_green = 255;
+        patd->blendColor.RGB_blue = 255;
+        patd->alphaThreshold = 192;
+    }
 }
 
 static void writeAlphaHandlingToIni(alphaTransformData* patd)
