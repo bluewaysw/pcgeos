@@ -135,7 +135,7 @@ typedef enum {
 
 
 /* Public API */
-VMBlockHandle   _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile);
+VMBlockHandle   _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile, pngAlphaTransformData* pngAlphaTransform);
 
 int             _pascal _export pngImportCheckHeader(FileHandle file);
 int             _pascal _export pngImportProcessChunks(FileHandle file, pngIHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, pngPLTEChunkEntry* plteChunk);
