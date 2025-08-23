@@ -1067,7 +1067,7 @@ CMYK <		call	CMYKColorBitmapInit				>
 
 		segmov	ds, es, dx		; ds -> Window structure
 		SetBuffer es, dx		; es -> screen memory
-		call	PutBitsSimple		; draw the bitmap
+		call	PutBitsSimple		; draw the bitmap 
 		segmov	es, ds, dx		; restore window seg
 
 		; cleanup after CMYK stuff
@@ -1239,7 +1239,7 @@ else
 		PrevScan	di
 endif
 MEM <		tst	ss:[bm_scansPrev]	; if zero, we're done	>
-MEM <		LONG js	afterLoop					>
+MEM <		LONG jz	afterLoop					>
 		jmp	bumpSourcePtr
 downLoop:
 		inc	bx			; bump scan line #
@@ -1253,7 +1253,7 @@ else
 		NextScan	di
 endif
 MEM <		tst	ss:[bm_scansNext]	; if zero, we're done	>
-MEM <		LONG js	afterLoop					>
+MEM <		LONG jz	afterLoop					>
 
 		; bump bitmap data pointer to the next scan line
 bumpSourcePtr:

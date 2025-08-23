@@ -968,7 +968,9 @@ getNew:
 	jc	noCompact
 
 	call	CheckHugeArrayBitmapCompaction
-	je	compactBitmap			;uncompacted, so compact it now
+	jne	noCompact			;compacted, just copy
+	jc	compactBitmap			;uncompacted, so compact it now
+	; just copy anyhow
 
 noCompact:
 	clr	bp
@@ -1065,6 +1067,7 @@ CALLED BY:	GLOBAL
 PASS:		BX:AX	= Bitmap VM file:block handles
 
 RETURN:		ZF	= Set if uncompacted
+                CF	= Set if should be compacted
 
 DESTROYED:	Nothing
 
@@ -1089,7 +1092,7 @@ CheckHugeArrayBitmapCompaction	proc	far
 	mov	es, ax
 	cmp	es:[(size HugeArrayDirectory)].CB_simple.B_compact, \
 								BMC_UNCOMPACTED
-	jne	done				; if compacted, we're done
+	pushf
 
 	; OK, we're not compacted. If we're mono, 4-bit, or 8-bit, then
 	; we are excellent compaction candidates. Anything else, we're not
@@ -1097,10 +1100,17 @@ CheckHugeArrayBitmapCompaction	proc	far
 	mov	al, es:[(size HugeArrayDirectory)].CB_simple.B_type
 	and	al, mask BMT_FORMAT
 	cmp	al, BMF_MONO
-	je	done				; mono - ZF set
+	je	doneCompact				; mono - ZF set
 	cmp	al, BMF_4BIT
-	je	done				; 4-bit - ZF set
+	je	doneCompact				; 4-bit - ZF set
 	cmp	al, BMF_8BIT			; if 8-bit, ZF set, else not
+	je	doneCompact
+	popf
+	clc	; recomment not to compact
+	jmp	done
+doneCompact:
+	popf
+	stc
 done:
 	call	VMUnlock
 
@@ -2482,7 +2492,7 @@ createNew:
 
 	movdw	bxax, cxdx
 	call	CheckHugeArrayBitmapCompaction
-	je	editBitmap			;uncompacted, so compact it now
+	je	editBitmap			;uncompacted, ready for edit
 
 	mov_tr	ax, dx
 	mov	dx, cx				;dx <- vm file
@@ -2583,7 +2593,7 @@ getBitmap:
 
 	movdw	bxax, cxdx
 	call	CheckHugeArrayBitmapCompaction
-	je	editBitmap			;uncompacted, so compact it now
+	je	editBitmap			;uncompacted, ready for edit
 
 	mov_tr	ax, dx
 	mov	dx, cx				;dx <- vm file
@@ -5806,6 +5816,7 @@ endif
 
 	call	CheckHugeArrayBitmapCompaction
 	jne	done				;already compacted
+	jnc	done				;dont compact
 
 	mov	dx, cx				;dx <- destination VM file
 	call	GrCompactBitmap			;dx:cx <- compacted bitmap
