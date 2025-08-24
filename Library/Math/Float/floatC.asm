@@ -778,6 +778,32 @@ FLOATDWORDTOFLOAT	proc	far	num:dword
 	ret
 FLOATDWORDTOFLOAT	endp
 
+COMMENT @----------------------------------------------------------------------
+
+C FUNCTION:	FloatUnsigedToFloat
+
+C DECLARATION:	extern void
+			_far FloatUnsigedToFloat(dword num)
+
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+		convert the long number passed in to an 80 bit floating point 
+		number on the top of the stack
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	8/92		Initial version
+
+------------------------------------------------------------------------------@
+FLOATUNSIGNEDTOFLOAT	proc	far	num:dword
+	.enter
+	mov	dx, num.high
+	mov	ax, num.low
+	call	FloatUnsignedToFloatFar	
+	.leave
+	ret
+FLOATUNSIGNEDTOFLOAT	endp
 
 COMMENT @----------------------------------------------------------------------
 

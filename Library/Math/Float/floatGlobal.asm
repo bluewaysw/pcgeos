@@ -192,6 +192,12 @@ FloatDwordToFloatFar	proc	far
 	GOTO	FloatDispatch, bp
 FloatDwordToFloatFar	endp
 
+FloatUnsignedToFloatFar	proc	far
+	push	bp
+	mov	bp, FLOAT_UNSIGNED_INT_TO_FLOAT
+	GOTO	FloatDispatch, bp
+FloatUnsignedToFloatFar	endp
+
 FLOATEPSILON	proc	far
 	push	bp
 	mov	bp, FLOAT_EPSILON
@@ -608,6 +614,7 @@ FLOAT_SQRT			enum    FloatGlobals
 FLOAT_SQRT2			enum    FloatGlobals
 FLOAT_TAN			enum    FloatGlobals
 FLOAT_TANH			enum    FloatGlobals
+FLOAT_UNSIGNED_INT_TO_FLOAT	enum    FloatGlobals
 
 tableGlobals	label	word
 	word	offset FloatMinus1
@@ -682,6 +689,7 @@ tableGlobals	label	word
 	word	offset FloatSqrt2
 	word	offset FloatTan
 	word	offset FloatTanh
+	word	offset FloatUnsignedToFloat
 
 
 COMMENT @-----------------------------------------------------------------------
@@ -804,6 +812,53 @@ done:
 	.leave
 	ret
 FLOATFLOATTODWORD	endp
+
+
+COMMENT @-----------------------------------------------------------------------
+
+FUNCTION:	FloatFloatToUnsignedFar
+
+DESCRIPTION:	
+
+CALLED BY:	GLOBAL ()
+
+PASS:		nothing
+
+RETURN:		carry clear if successful
+		    dx:ax - dword
+		set otherwise
+		    al - error code
+
+DESTROYED:	nothing
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+	Can't use the dispatch routine because a result is returned in dx:ax.
+	Also, don't want FloatDispatch to call FloatIsNoNAN1 on what remains.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Cheng	3/91		Initial version
+
+-------------------------------------------------------------------------------@
+
+FLOATFLOATTOUNSIGNED	proc	far	uses	ds
+	.enter
+	call	FloatEnter
+	call	FloatFloatToUnsigned		; dx:ax <- dword
+	jnc	done
+
+	mov	al, FLOAT_GEN_ERR
+
+done:
+	call	FloatOpDone
+	.leave
+	ret
+FLOATFLOATTOUNSIGNED	endp
 
 
 COMMENT @-----------------------------------------------------------------------

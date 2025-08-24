@@ -302,3 +302,10 @@ publish FLOATFLOATTOASCII
 incminor GetModifiedFormat
 export FloatFormatGetModifiedFormat
 export FLOATFORMATGETMODIFIEDFORMAT
+
+incminor
+# second table for relocation (10 entries max)
+export FloatUnsignedToFloatFar as FloatUnsignedToFloat
+export FLOATFLOATTOUNSIGNED
+export FLOATUNSIGNEDTOFLOAT
+skip 7
