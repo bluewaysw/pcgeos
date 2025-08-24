@@ -1,3 +1,6 @@
+---
+nav_order: 5
+---
 ### Objects
 **[1 System Classes](Objects/osyscla.md)**  
 [1.1 MetaClass](Objects/osyscla.md#11-metaclass)  

@@ -322,7 +322,7 @@ PutColor8ScanMask	proc	near
 		shr	dx, 1
 		shr	dx, 1			; bx = index into mask
 		add	bx, dx			; ds:bx -> into mask data
-		add	di, ax			; es:di -> dest bytes
+		add	di, ss:[bmLeft]		; es:di -> dest bytes
 		and	cl, 7
 		mov	dh, 0x80		; test bit for mask data
 		shr	dh, cl			; dh = starting mask bit

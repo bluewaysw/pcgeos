@@ -438,7 +438,7 @@ MSG_GEN_PROCESS_CLOSE_ENGINE</CODE>
 MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
  is used.</P>
 <P>
-When the system shuts down or task-switches, a different type of shutdown occurs. Applications (or other objects interested in this event) must register for notification on the notification list GCNSLT_SHUTDOWN_CONTROL (notification lists are described in <A HREF="../../Kernel/GCN/index.htm">the General Change Notification chapter</A>). When the system shuts down or task-switches, the object will then receive a <CODE>MSG_META_CONFIRM_SHUTDOWN</CODE>
+When the system shuts down or task-switches, a different type of shutdown occurs. Applications (or other objects interested in this event) must register for notification on the notification list GCNSLT_SHUTDOWN_CONTROL (notification lists are described in <A HREF="../../Kernel/GCN/combo.htm">the General Change Notification chapter</A>). When the system shuts down or task-switches, the object will then receive a <CODE>MSG_META_CONFIRM_SHUTDOWN</CODE>
 , at which time the object must call <CODE>
 SysShutdown()</CODE>
 .</P>
@@ -463,7 +463,7 @@ The state file for an application is a VM file containing object blocks. Only ob
 MemAllocLMem()</CODE>
 , passing type LMEM_TYPE_OBJ_BLOCK, then simply use <CODE>
 LMemAlloc()</CODE>
- to allocate data chunks.) For more information about managing LMem and data chunks, see <A HREF="../../Memory/LMem/index.htm">the Local Memory chapter</A>. You can also save an extra data block to the state file using <CODE>MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
+ to allocate data chunks.) For more information about managing LMem and data chunks, see <A HREF="../../Memory/LMem/combo.htm">the Local Memory chapter</A>. You can also save an extra data block to the state file using <CODE>MSG_GEN_PROCESS_CLOSE_APPLICATION</CODE>
  and <CODE>
 MSG_GEN_PROCESS_OPEN_APPLICATION</CODE>
 . In the close message, you can return the handle of an extra block to be saved to the state file; in the open message, the handle of the extra block is given to you, and you can restore this data as necessary. See the reference information for these messages under <CODE>
@@ -512,7 +512,7 @@ VMAttributes</CODE>
 VMUpdate()</CODE>
  on the document file. (Note--do not use <CODE>
 VMSave()</CODE>
- instead; it will erase the backup and lock in the user's changes to the document.) If you are not using GEOS VM files, it is up to you how and if you will save the document's state. For more information about GEOS VM files, see <A HREF="../../Memory/VM/index.htm">the VM chapter</A>.</P><HR>
+ instead; it will erase the backup and lock in the user's changes to the document.) If you are not using GEOS VM files, it is up to you how and if you will save the document's state. For more information about GEOS VM files, see <A HREF="../../Memory/VM/combo.htm">the VM chapter</A>.</P><HR>
 <A NAME="Geodes_6.htm"></A>
 
 
@@ -1008,7 +1008,7 @@ If a change to a library is upward-compatible, only the minor protocol needs to 
 <P>
 An application's protocol must be increased whenever a change will affect the application's state files. If you make a change to an application, for example, and the user has old state files, either the changes in the application can be replaced with the old information, or the state file will cause an incompatibility with unpredictable results. If the change to the application is simply functional, increment the minor protocol. If the change is to any part of a UI resource or to any other item saved to a state file, increment the major protocol. State files will be loaded if minor protocols are different and will be ignored if major protocols are different.</P>
 <P>
-If an application's document format changes, you should make sure the new documents are not loaded by old applications or vice versa (unless you take the necessary conversion steps). When opening a document, you can check its protocol by checking the document file's extended attribute FEA_PROTOCOL. If the protocol level needs to be changed (after conversions have been done, of course), you can change them by setting FEA_PROTOCOL. (See <A HREF="../../Files/FileSys/index.htm">the File System chapter</A>.)</P><P>
+If an application's document format changes, you should make sure the new documents are not loaded by old applications or vice versa (unless you take the necessary conversion steps). When opening a document, you can check its protocol by checking the document file's extended attribute FEA_PROTOCOL. If the protocol level needs to be changed (after conversions have been done, of course), you can change them by setting FEA_PROTOCOL. (See <A HREF="../../Files/FileSys/combo.htm">the File System chapter</A>.)</P><P>
 A few examples of when minor and major protocols should be incremented follow. Keep in mind that this list is by no means exhaustive.</P>
 <UL>
 <LI>
@@ -1409,7 +1409,7 @@ A key is any setting that the system or an application can recognize and assign 
 <P>
 Both category names and key fields are called &quot;entries.&quot; Each entry may exist on a single line or may cover several lines. An entry that contains carriage returns is technically known as a &quot;blob.&quot; Each blob will automatically be enclosed in curly braces when it is written into the file. Any blob that contains curly braces will automatically have backslashes inserted before the closing braces so GEOS doesn't mistake them for the blob delimiters.</P>
 <P>
-Comments may be added to the INI file by putting a semicolon at the beginning of the line. The file has several standard categories and keys that can be set within them. These are detailed in <A HREF="../../Tools/Ini/index.htm">the INI File chapter</A>
+Comments may be added to the INI file by putting a semicolon at the beginning of the line. The file has several standard categories and keys that can be set within them. These are detailed in <A HREF="../../Tools/Ini/combo.htm">the INI File chapter</A>
 .</P>
 <P CLASS="figTitle">
 Code Display 7-3 <A NAME="Geodes_10.htm_80559">
@@ -1461,15 +1461,14 @@ Managing the INI File</H4>
 <P>
 Because the INI file is common to all geodes and to all threads in the system, only one thread at a time may access it. This synchronization is handled by the kernel whenever a routine to read from or write to the INI file is used. Additionally, the INI file is loaded into a buffer when the system is first run; all operations on the INI file actually work on this buffer, and the buffer may be flushed to disk only by the kernel.</P>
 <P>
-There are, however, four routines that work directly on the INI file. One saves the file, another reverts it from the last save, the third checks the time the file was last modified, and the fourth commits any pending INI file changes to disk.</P>
+There are some general utility routines useful for managing the INI file. One saves a backup of the file, another reverts it from the last backup, the third checks the time the file was last modified, and the fourth commits any pending INI file changes to disk.</P>
 <P>
 <A NAME="Geodes_10.htm_IX_InitFileRevert()">
  </A>
 <A NAME="Geodes_10.htm_IX_InitFileSave()">
  </A>
-To save the local GEOS.INI, use the routine <CODE>
-InitFileSave()</CODE>
-; this saves the changes to the backup file. It requires no parameters and returns an error flag if the file could not be saved. <CODE>
+To update the backup copy of GEOS.INI, use the routine <CODE>
+InitFileSave()</CODE>. It requires no parameters and returns an error flag if the file could not be saved. <CODE>
 InitFileRevert()</CODE>
  reverts the GEOS.INI file to its state the last time it was backed up. This routine takes no parameters, and it returns an error flag if the revert can not be accomplished.</P>
 <P>
