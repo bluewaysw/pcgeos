@@ -166,8 +166,14 @@ CV32LocatePublic(ID   	name,	    	/* Name to find */
 	     *
 	     * 12/4/18: need to bring case-insensitve comparison back
 	     * due to upper casing of some names by Watcom C -- mgroeber
+	     *
+	     * 9/5/25: back to previous, seems to still work for bulding
+	     * all ensemble.
  	     */
-	    if (((*bp == namelen) && (ustrncmp((char *)bp+1, namestr, namelen) == 0)) ||
+	    if (((*bp == namelen) &&
+		 (geosRelease >= 2 ?
+		  (strncmp((char *)bp+1, namestr, namelen) == 0) :
+		  (ustrncmp((char *)bp+1, namestr, namelen) == 0))) ||
 		((aliasPtr != NULL) &&
 		 (bp[1] == '_') && (*bp == namelen+1) &&
 		 (strncmp(namestr, (char *)bp+2, namelen) == 0))) {
