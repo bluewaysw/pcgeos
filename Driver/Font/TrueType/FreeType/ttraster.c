@@ -2003,7 +2003,11 @@ extern TEngine_Instance engineInstance;
 
     PProfile  P, Q, P_Left, P_Right;
 
-    Short  min_Y, max_Y, top, bottom, dropouts;
+    Short  min_Y, bottom, dropouts;
+
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
+    Short  max_Y, top;
+#endif
 
     Long  x1, x2, xs;
     Short e1, e2;
@@ -2016,7 +2020,9 @@ extern TEngine_Instance engineInstance;
     /* first, compute min and max Y */
 
     P     = ras.fProfile;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     max_Y = (short)TRUNC( ras.minY );
+#endif
     min_Y = (short)TRUNC( ras.maxY );
 
     while ( P )
@@ -2024,10 +2030,14 @@ extern TEngine_Instance engineInstance;
       Q = P->link;
 
       bottom = P->start;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
       top    = P->start + P->height-1;
+#endif
 
       if ( min_Y > bottom ) min_Y = bottom;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
       if ( max_Y < top    ) max_Y = top;
+#endif
 
       P->X = 0;
       InsNew( &wait, P );
