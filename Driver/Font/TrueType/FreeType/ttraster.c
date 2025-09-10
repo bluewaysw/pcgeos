@@ -983,7 +983,7 @@ extern TEngine_Instance engineInstance;
                                    Long  cx,
                                    Long  cy )
   {
-    Long     y1, y2, y3, x3;
+    Long     y1, y2, y3;
     TStates  state_bez;
 
 
@@ -997,7 +997,6 @@ extern TEngine_Instance engineInstance;
       y1 = ras.arc[2].y;
       y2 = ras.arc[1].y;
       y3 = ras.arc[0].y;
-      x3 = ras.arc[0].x;
 
       /* first, categorize the bezier arc */
 
@@ -1064,8 +1063,8 @@ extern TEngine_Instance engineInstance;
       }
     } while ( ras.arc >= ras.arcs );
 
-    ras.lastX = x3;
-    ras.lastY = y3;
+    ras.lastX = x;
+    ras.lastY = y;
 
     return SUCCESS;
   }
