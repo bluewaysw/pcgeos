@@ -729,7 +729,7 @@ extern TEngine_Instance engineInstance;
     Bool  fresh  = ras.fresh;
     Bool  result = Line_Up( RAS_VARS x1, -y1, x2, -y2, -maxy, -miny );
 
-    if ( fresh && !ras.fresh )
+    if ( fresh ^ ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
 
     return result;
@@ -887,7 +887,7 @@ extern TEngine_Instance engineInstance;
 
     result = Bezier_Up( RAS_VARS -maxy, -miny );
 
-    if ( fresh && !ras.fresh )
+    if ( fresh ^ ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
 
     arc[0].y = -arc[0].y;
