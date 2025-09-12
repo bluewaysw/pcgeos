@@ -121,10 +121,15 @@
     limit = face->numTables;
     entry = face->dirTables;
 
+    /* loop through the tables and get all entries */
     for ( n = 0; n < limit; ++n )
-    {                      /* loop through the tables and get all entries */
+    {
       entry->Tag      = GET_Tag4();
+#ifdef TT_CONFIG_OPTION_SUPPORT_CHECKSUM
       entry->CheckSum = GET_ULong();
+#else
+      SKIP( 4 );
+#endif
       entry->Offset   = GET_Long();
       entry->Length   = GET_Long();
 
