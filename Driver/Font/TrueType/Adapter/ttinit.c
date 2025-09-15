@@ -553,7 +553,7 @@ static Boolean isFontResourceIntensive( TRUETYPE_VARS )
         if( FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS )
                 return FALSE;
 
-        return FACE_PROPERTIES.os2->version < MIN_OS2_TABLE_VERSION;
+        return FACE_PROPERTIES.os2->version >= MIN_OS2_TABLE_VERSION;
 }
 
 
