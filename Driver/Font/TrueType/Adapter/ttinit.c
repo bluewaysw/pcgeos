@@ -548,10 +548,12 @@ Fin:
  *******************************************************************/
 static Boolean isFontResourceIntensive( TRUETYPE_VARS )
 {
-        /* At the moment we are only checking the number of glyphs */
-        /* in the font. Further checks can be implemented here.    */
+        /* Further checks can be implemented here. */
 
-        return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;
+        if( FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS )
+                return FALSE;
+
+        return FACE_PROPERTIES.os2->version < MIN_OS2_TABLE_VERSION;
 }
 
 
