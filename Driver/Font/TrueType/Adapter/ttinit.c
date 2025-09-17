@@ -39,7 +39,7 @@ static void ProcessFont(        TRUETYPE_VARS,
                                 const char*  file, 
                                 MemHandle    fontInfoBlock );
 
-static Boolean isFontResourceIntensive( TRUETYPE_VARS );
+static Boolean isFontUnacceptable( TRUETYPE_VARS );
 
 static sword getFontIDAvailIndex( 
                                 FontID     fontID, 
@@ -355,7 +355,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
-        if ( isFontResourceIntensive( trueTypeVars ) )
+        if ( isFontUnacceptable( trueTypeVars ) )
                 goto Fail;
 
         if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
@@ -521,39 +521,41 @@ Fin:
 
 
 /********************************************************************
- *                      isFontResourceIntensive
+ *                      isFontUnacceptable
  ********************************************************************
- * SYNOPSIS:       Determines whether the given font is considered
- *                 resource-intensive based on certain criteria.
+ * SYNOPSIS:       Checks whether the given TrueType font is
+ *                 unacceptable for use with this driver.
  * 
  * PARAMETERS:     TRUETYPE_VARS
  *                    Cached variables needed by the driver.
  * 
  * RETURNS:        Boolean
- *                    TRUE if the font is considered resource-intensive.
- *                    FALSE otherwise.
+ *                    TRUE  if the font does not meet the driver's
+ *                          requirements (unacceptable).
+ *                    FALSE if the font is acceptable.
  * 
- * STRATEGY:       - Currently, this function evaluates the resource 
- *                   intensity of a font based solely on the number 
- *                   of glyphs it contains.
- *                 - If the number of glyphs exceeds a defined threshold 
- *                   (MAX_NUM_GLYPHS), it returns TRUE.
- *                 - The function is designed to be extensible, allowing 
- *                   additional criteria to be added in the future.
+ * STRATEGY:       - Currently, the validation is based on two criteria:
+ *                      1. The OS/2 table version must be at least 
+ *                         MIN_OS2_TABLE_VERSION.
+ *                      2. The number of glyphs must not exceed 
+ *                         MAX_NUM_GLYPHS.
+ *                 - The function is designed to be extensible so that 
+ *                   further rejection criteria can be added later.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      19.12.23  JK        Initial Revision
+ *      17.09.25  JK        Renamed and improved docs
  *******************************************************************/
-static Boolean isFontResourceIntensive( TRUETYPE_VARS )
+static Boolean isFontUnacceptable( TRUETYPE_VARS )
 {
-        /* Further checks can be implemented here. */
+        /* Additional rejection checks can be added here. */
+        
+        if ( FACE_PROPERTIES.os2->version < MIN_OS2_TABLE_VERSION )
+                return TRUE;
 
-        if( FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS )
-                return FALSE;
-
-        return FACE_PROPERTIES.os2->version >= MIN_OS2_TABLE_VERSION;
+        return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;
 }
 
 
