@@ -536,7 +536,11 @@
     TT_ULong   ulCodePageRange1;       /* Bits 0-31   */
     TT_ULong   ulCodePageRange2;       /* Bits 32-63  */
 #endif
-  };
+
+    /* only version 2 tables: */
+    TT_Short   sxHeight;
+    TT_Short   sCapHeight;  
+  };  
 
   typedef struct TT_OS2_  TT_OS2;
 

@@ -1074,25 +1074,26 @@
 
     FORGET_Frame();
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
-    if ( os2->version >= 0x0001 )
+    if ( os2->version >= 0x0002 )
     {
-      /* only version 1 tables */
 
-      if ( ACCESS_Frame( 8 ) )  /* read into frame */
+      /* only version 2 tables */
+      if ( ACCESS_Frame( 12 ) )  /* read into frame */
         return error;
 
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       os2->ulCodePageRange1 = GET_ULong();
       os2->ulCodePageRange2 = GET_ULong();
+#else
+      SKIP( 8 );
+#endif
+
+      os2->sxHeight = GET_Short();
+      os2->sCapHeight = GET_Short();   
 
       FORGET_Frame();
     }
-    else
-    {
-      os2->ulCodePageRange1 = 0;
-      os2->ulCodePageRange2 = 0;
-    }
-#endif
     
     return TT_Err_Ok;
   }
