@@ -1,0 +1,420 @@
+/***********************************************************************
+ *
+ *	Code-File for Bitmap Tool Library
+ *
+ *      Made by RABE-Soft for free PC/GEOS project 09/2025
+ *
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ *	File: 	transform.goc
+ *
+ *	Simple tranfomations such as flipping
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <stdlib.h>
+
+#include <string.h>
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+
+
+/*
+ * Local header
+ */
+void FlipMonoLineH(byte *srcData, byte *workBuf, int width);
+void Flip4BitLineH(byte *srcData, byte *workBuf, int width);
+
+/*
+ ***************************************************************************
+ *	Flip bitmap horizontally and vertically
+ ***************************************************************************
+ */
+
+
+/*--------------------- BTFlipBitmap ---------------------
+ *	Purpose:	Flip an bitmap vertically (top to bottom)
+ *			Old Routine. Please use BTFlipBitmap() which has more options
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *	Return: 	VMHandle of the new bitmap
+ *			Null handle on error (e.g., bitmap is compressed)
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTFlipBitmap(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile) {
+    return BTFlipBitmapV(srcFile, bmpBlock, destFile, 0);
+}
+
+/*--------------------- BTFlipBitmapV ---------------------
+ *	Purpose:	Flip an  bitmap vertically (top to bottom)
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTFlipBitmapV(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
+Boolean	compact, hasPalette;
+int width, height, type, line;
+VMBlockHandle	newBitmap;
+BitmapAccessRecord	srcBar, destBar;
+byte	*palPtr;
+
+     if ( !(srcFile && bmpBlock && destFile) ) return 0;	// Parameter error
+
+     /* Informationen ber die Quell-Bitmap ermittelm */
+     type = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, (int*)&compact);
+
+//     masked = type & BMT_MASK;
+     hasPalette = type & BMT_PALETTE;
+//     format = type & BMT_FORMAT;
+
+     /* If present: retrieve palette */
+     if ( hasPalette )	{
+	int numColors;
+	switch ( type & BMT_FORMAT ) {
+		case BMF_MONO: numColors = 2; break;
+		case BMF_4BIT: numColors = 16; break;
+		case BMF_8BIT: numColors = 256; break;
+		default: numColors = 0;
+		}
+	palPtr = malloc( sizeof(PaletteEntry) * 256 );
+	BTGetBitmapPalette(srcFile, bmpBlock, (PaletteEntry *)palPtr, numColors);
+	}
+     else palPtr = 0;
+
+     /*
+      * If the bitmap is compacted, uncompact it first
+      * The uncomapcted bitmap will be stored in destFile
+      * --> "souceFile" must be switched to this file
+      */
+     if ( compact ) {
+     	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, srcFile);
+     	destFile = srcFile;
+     }
+
+
+     /* Create new bitmap, release palette if necessary */
+     newBitmap = BTCreateOffscreenBitmap(destFile,
+			type, width, height, (PaletteEntry *)palPtr);
+     if ( palPtr )  free(palPtr);
+     if (!newBitmap) return 0;
+
+
+     /* Copy graphic data – */
+     BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
+     BTBitmapLock(destFile, newBitmap, &destBar, height-1);
+
+     for ( line = 0; line < height; line++) {
+	if ( progressText) {
+	    if ( (line & 0x0F) == 0 ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+	// copy data line by line
+	memcpy(destBar.linePtr, srcBar.linePtr, destBar.lineLen);
+	BTBitmapPrev(&destBar, TRUE);
+	BTBitmapNext(&srcBar, FALSE);
+	}
+
+     BTBitmapUnlock(&srcBar, FALSE);
+     BTBitmapUnlock(&destBar, TRUE);
+
+     /*
+      * Finaly, if the bitmap was compacted, free the uncompacted copy
+      */
+     if ( compact ) {
+     	HugeArrayDestroy(srcFile, bmpBlock);
+     }
+
+
+     return newBitmap;
+}
+
+/*--------------------- BTFlipBitmapH ---------------------
+ *	Purpose:	Flip an  bitmap horizontally (left to right)
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *			Null handle on error (e.g., bitmap is compressed)
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTFlipBitmapH(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
+int format, width, height;
+int line, i, tmp;
+byte *pixel, *tmpBuffer;
+PaletteEntry rgbTmp, *rgb;
+BitmapAccessRecord bar;
+int compress;
+int	maskLen = 0; 	// zero if there is no mask present
+
+    if ( (!srcFile) || (!bmpBlock) || (!destFile) ) return 0;
+
+    /*
+     * Collect information about the bitmap to flip
+     */
+    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compress);
+
+DebugInfo("\rFlip! ");
+
+EC(    switch ( format & BMT_FORMAT ) { \
+    	case BMF_MONO: DebugInfo("\rFlip Mono"); break; \
+    	case BMF_4BIT: DebugInfo("\rFlip 4 Bit"); break; \
+    	case BMF_8BIT: DebugInfo("\rFlip 8 Bit"); break; \
+    	case BMF_24BIT: DebugInfo("\rFlip 24 Bit"); break; \
+	} )
+
+    if (format & BMT_MASK ) maskLen = (width+7)/8;
+    tmpBuffer = malloc(width + 2);			// 2 byte savety buffer
+
+    /*
+     * Copy bitmap. If compressed, decompress it instead
+     * The copy will be flipped horizontally
+     */
+    if (compress ) {
+    	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, destFile);
+    }else {
+    	bmpBlock  = BTCopyBitmap(srcFile, destFile, bmpBlock);
+    }
+
+    /*
+     * Progress line-by-line
+     */
+    pixel = BTBitmapLock(destFile, bmpBlock, &bar, 0);
+    for ( line = 0; line < height; line++ )
+    {
+	if ( progressText && ((line & 0x0F) == 0) ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+
+	/* process mask, if any */
+	if ( maskLen ) {
+	   FlipMonoLineH(pixel, tmpBuffer, width);
+	   pixel += maskLen;
+	}
+
+	/* process image data, depending in the color depth */
+
+    	switch ( format & BMT_FORMAT ) {
+
+    	case BMF_MONO:
+    		FlipMonoLineH(pixel, tmpBuffer, width);
+    		break;
+
+    	case BMF_4BIT:
+    		Flip4BitLineH(pixel, tmpBuffer, width);
+    		break;
+
+    	case BMF_8BIT:
+    	    for ( i = 0; i < width/2; i++ ) {
+		tmp = pixel[i];
+		pixel[i] = pixel[width-i-1];
+		pixel[width-i-1] = tmp;
+	    }
+	    break;
+
+    	case BMF_24BIT:
+    	    rgb = (PaletteEntry*) pixel;
+    	    for ( i = 0; i < width/2; i++ ) {
+		rgbTmp = rgb[i];
+		rgb[i] = rgb[width-i-1];
+		rgb[width-i-1] = rgbTmp;
+	    }
+	    break;
+
+
+	}
+
+	/* next line */
+	pixel = BTBitmapNext(&bar, TRUE);
+	if ( !pixel ) break;
+    }
+
+    /* clean up */
+    BTBitmapUnlock(&bar, TRUE);
+    free(tmpBuffer);
+
+    return bmpBlock;
+
+}
+
+
+/*--------------------- FlipMonoLineH ---------------------
+ * Purpose:	Flip mask data or a monochrome pixel line horizontally
+ 		Result will be copied back to srcData buffer
+ * Parameters:	srcData: Pointer to source line
+ *		workBuf: Pointer to working buffer. Must be at least “width” bytes in size.
+ *		width:	bitmap width in pixel
+ * Strategy to avoid extensive bit operations and make the code more understandable
+ *	- Copy every monochrome bit to a byte buffer
+ *	- flip this buffer
+ *	- copy result back to monochrome buffer
+ * Return:
+ ---------------------------------------------------------------------------*/
+void FlipMonoLineH(byte *srcData, byte *workBuf, int width) {
+word n, mask;
+byte curByte, *curPtr, *bufPtr;
+int tmp;
+
+    /*
+     * Copy source data to workBuf
+     */
+    memset(workBuf, 0, width);
+    mask = 0x80;
+    curPtr = srcData;
+    curByte = *curPtr;		/* byte to work with */
+    bufPtr = workBuf;		/* destination pointer */
+
+    for ( n = 0; n < width; n++ ) {
+
+    	/* set byte in workBuf to a value other than zero if the current pixel is set */
+    	if ( curByte & mask ) *bufPtr = 0xFF;
+
+    	/* select next pixel */
+    	bufPtr++;
+    	mask >>= 1;
+    	if ( mask == 0 ) {
+	    mask = 0x80;
+	    curPtr++;
+	    curByte = *curPtr;
+	}
+    }
+
+    /*
+     * Flip the workBuf horiziontally
+     */
+    for ( n = 0; n < width/2; n++ ) {
+	tmp = workBuf[n];
+	workBuf[n] = workBuf[width-n-1];
+	workBuf[width-n-1] = tmp;
+    }
+
+    /*
+     * Copy workBuf back to source buffer
+     */
+    mask = 0x80;
+    bufPtr = workBuf;		/* source pointer */
+    curPtr = srcData;		/* destination pointer */
+    curByte = 0;
+
+    for ( n = 0; n < width; n++ ) {
+
+    	/* handle current pixel */
+    	if ( *bufPtr ) curByte |= mask;
+
+    	/* select next pixel */
+    	bufPtr++;
+    	mask >>= 1;
+    	if ( mask == 0 ) {
+    	    /* write current byte and select next destination byte */
+    	    *curPtr =curByte;
+    	    curPtr++;
+    	    curByte = 0;
+    	    mask = 0x80;
+    	}
+    }
+
+    /*
+     * The last destination byte may not yet have been written.
+     * This is the case if mask has a value other than 0x80.
+     */
+    if ( mask != 0x80) *curPtr = curByte;
+}
+
+/*--------------------- Flip4BitLineH ---------------------
+ * Purpose:	Flip 4 bit pixel line horizontally
+ 		Result will be copied back to srcData buffer
+ * Parameters:	srcData: Pointer to source line
+ *		workBuf: Pointer to working buffer. Must be at least “width” bytes in size.
+ *		width:	bitmap width in pixel
+ * Strategy
+ *	- Copy every 4 bit value to a byte buffer
+ *	- flip this buffer
+ *	- copy result back to source buffer
+ * Return:
+ ---------------------------------------------------------------------------*/
+void Flip4BitLineH(byte *srcData, byte *workBuf, int width) {
+word n;
+byte *curPtr, *bufPtr;
+int tmp;
+
+    /*
+     * Copy source data to workBuf
+     */
+    curPtr = srcData;
+    bufPtr = workBuf;		/* destination pointer */
+
+    for ( n = 0; n < width; n++ ) {
+
+    	/*
+    	 * for even pixels, the high nibble is used, the low nibble ist used for odd pixles
+    	 * Pointer to source (curPtr) must be incremented aft every odd pixel
+    	 * workBuf must be incremented in every case.
+    	 */
+    	if ( n & 1 ) {
+    	    /* odd pixel */
+    	    *bufPtr = (*curPtr) & 0x0F;
+    	    curPtr++;
+    	} else {
+    	    *bufPtr = ( (*curPtr) & 0xF0 ) >> 4;
+    	}
+    	bufPtr++;
+
+    }
+
+    /*
+     * Flip the workBuf horiziontally
+     */
+    for ( n = 0; n < width/2; n++ ) {
+	tmp = workBuf[n];
+	workBuf[n] = workBuf[width-n-1];
+	workBuf[width-n-1] = tmp;
+    }
+
+    /*
+     * Copy workBuf back to source buffer
+     */
+    bufPtr = workBuf;		/* source pointer */
+    curPtr = srcData;		/* destination pointer */
+
+    for ( n = 0; n < width; n++ ) {
+
+    	/*
+    	 * Even pixels must be stored in the upper half byte,
+    	 * odd pixels in the lower half byte.
+    	 * If an odd pixel was handled, the combined byte must be written
+    	 * to the destination buffer (curPtr) and the pointer must be incremented.
+    	 * workBuf must be incremented in every case.
+    	 */
+    	if ( n & 1 ) {
+    	    /* odd pixel. Store combined byte and inc destination pointer */
+    	    tmp |= ((*bufPtr) & 0x0F);
+    	    *curPtr = tmp;
+    	    curPtr++;
+    	} else {
+    	    /* even pixels simple to handle */
+    	    tmp = ((*bufPtr) & 0x0F) << 4;
+    	}
+    	bufPtr++;
+
+    }
+
+    /*
+     * The last destination byte may not yet have been written.
+     * This is the case if 'with' is odd.
+     */
+    if ( width & 1 ) *curPtr = tmp;
+
+}
+
+/*---------------------  ---------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+

@@ -20,13 +20,7 @@
 
 @include "bmptools.goh"
 @include "Code/rtools.goh"
-
-/*
- ***************************************************************************
- *		Bitmap-Tools: Anlegen und Verwalten von OffsceenBitmaps
- *			Zugriff auf den Header
- ***************************************************************************
- */
+@include "stdio.h"
 
 
 /*
@@ -356,6 +350,132 @@ Boolean    err;
    VMUnlock(mh);
    return err;
    }
+
+/*
+ ***************************************************************************
+ *		Debugg helper routines
+ ***************************************************************************
+ */
+
+static optr debugText = 0;
+
+/*--------------------- BTSetDebugText ---------------------
+ *	Purpose:	Enable debugging helper routines
+ *			This routine can be used while debugging the bmptools library
+ *	Parameters:	text object to print debug messages
+ *	Return:
+ ---------------------------------------------------------------------------*/
+extern void EXPORT BTSetDebugText(optr textObj) {
+	debugText = textObj;
+}
+
+void DebugInfo(char* text) {
+    if ( debugText == 0 ) return;
+    @call debugText::MSG_VIS_TEXT_APPEND_PTR(text, 0);
+}
+
+void DebugInfo1(char *text, word val) {
+char buffer[100];
+    if ( debugText == 0 ) return;
+    sprintf(buffer, text, val);
+    @call debugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+void DebugInfo2(char *text, word val, word val2) {
+char buffer[100];
+    if ( debugText == 0 ) return;
+    sprintf(buffer, text, val, val2);
+    @call debugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+
+void DebugInfo1DW(char *text, dword val) {
+char buffer[100];
+    if ( debugText == 0 ) return;
+    sprintf(buffer, text, val);
+    @call debugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+void DebugInfo2DW(char *text, dword val, dword val2) {
+char buffer[100];
+    if ( debugText == 0 ) return;
+    sprintf(buffer, text, val, val2);
+    @call debugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+
+
+void DebugClearText(void) {
+    if ( debugText == 0 ) return;
+    @call debugText::MSG_VIS_TEXT_DELETE_ALL();
+}
+
+
+void WWFToASCII(char *buffer, WWFixedAsDWord wwf, Boolean addHex) {
+char *p;
+word	i, f;
+WWFixedAsDWord  sik;
+
+     p = buffer;
+     *p =0;
+     sik = wwf;
+     i = (wwf>>16) & 0xFFFF;
+     f = wwf & 0xFFFF;
+
+
+
+     // Negative Zahl?
+     if ( i & 0x8000 ) {
+     	wwf = 0-wwf;
+	i = (wwf>>16) & 0xFFFF;
+	f = wwf & 0xFFFF;
+     	*p = '-';
+     	p++;
+     	}
+
+
+     // Ganzzahligen Teil
+     UtilHex32ToAscii(p, i, UHTAF_NULL_TERMINATE);
+     strcat(p, ".");
+     p = strchr(p, 0);
+
+     // Gebrochener Teil: Q'Dirty - 3 Nachkommastellen ohne Runden
+     i = 0;
+     if (f & 0x8000) i  = 5000;	/* 1/2	*/
+     if (f & 0x4000) i += 2500;	/* 1/4	*/
+     if (f & 0x2000) i += 1250;	/* 1/8	*/
+     if (f & 0x1000) i +=  625;	/* 1/16	*/
+     if (f & 0x0800) i +=  313;	/* 1/32	*/
+     if (f & 0x0400) i +=  156;	/* 1/64	*/
+     if (f & 0x0200) i +=   78;	/* 1/128	*/
+     if (f & 0x0100) i +=   39;	/* 1/256	*/
+     if (f & 0x0080) i +=   20;	/* 1/512	*/
+     if (f & 0x0040) i +=   10;	/* 1/1024	*/
+     if (f & 0x0020) i +=    5;	/* 1/2048	*/
+     if (f & 0x0010) i +=    2;	/* 1/4096	*/
+     if (f & 0x0008) i +=    1;
+
+     i = i/10;
+     sprintf(p, "%03u", i);
+
+     if ( addHex) {
+     	i = (sik>>16) & 0xFFFF;
+     	f = sik & 0xFFFF;
+     	p = strchr(p, 0);
+     	sprintf(p, " (%04X:%04X)", i,f);
+	}
+
+}
+
+
+void DebugWWF(char *txt, WWFixedAsDWord wwf) {
+char buf[30];
+
+    if ( debugText == 0 ) return;
+    DebugInfo(txt);
+    WWFToASCII(buf, wwf, TRUE);
+    DebugInfo(buf);
+}
 
 /*---------------------  ---------------------
  *	Purpose:

@@ -5,9 +5,10 @@
 #
 GEODE           = bmptools
 CODE            = access.goc bmptools.goc disptool.goc moretool.goc\
-                  rtools.goh
+                  transform.goc rtools.goh
 UI_TO_RDFS      =
-OBJS            = access.obj bmptools.obj disptool.obj moretool.obj
+OBJS            = access.obj bmptools.obj disptool.obj moretool.obj\
+                  transform.obj
 COMMON          = bmptools.goh
 MODULES         =
 CMODULES        = Code
