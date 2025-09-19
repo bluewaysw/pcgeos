@@ -525,13 +525,12 @@
     SKIP( 2 );
 #endif
 
-    header->advance_Width_Max = GET_UShort();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    header->advance_Width_Max      = GET_UShort();
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
-
     header->xMax_Extent            = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
@@ -544,7 +543,7 @@
 
     header->metric_Data_Format = GET_Short();
 #else
-    SKIP( 22 );
+    SKIP( 16 );
 #endif
 
     header->number_Of_HMetrics = GET_UShort();

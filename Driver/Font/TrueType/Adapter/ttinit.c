@@ -1019,8 +1019,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_minLSB   =  9999;
         fontHeader->FH_maxBSB   = -9999;
         fontHeader->FH_minTSB   = -9999;
-        fontHeader->FH_maxRSB   = -9999;
-        fontHeader->FH_descent  = 9999;
         fontHeader->FH_accent   = 0;
         fontHeader->FH_ascent   = 0;
 
@@ -1053,10 +1051,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
                         fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
 
-                /* scan xMax -> check */
-                if ( fontHeader->FH_maxRSB < GLYPH_BBOX.xMax )
-                        fontHeader->FH_maxRSB = GLYPH_BBOX.xMax;
-
                 /* scan yMin -> check */
                 if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
                         fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
@@ -1082,9 +1076,14 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_x_height = FACE_PROPERTIES.os2->sxHeight;
         fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
 
+        /* read parameter from horizontal head table */
+
+        fontHeader->FH_maxRSB   = FACE_PROPERTIES.horizontal->xMax_Extent;
+        fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
+
+        
         fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
         fontHeader->FH_height     = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
