@@ -1044,15 +1044,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
                 /* load glyph metrics without scaling or hinting */
                 TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
-
-                //h_height -> check
-                if( unicode == C_LATIN_CAPITAL_LETTER_H )
-                        fontHeader->FH_h_height = GLYPH_BBOX.yMax;
-
-                //x_height -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_X )
-                        fontHeader->FH_x_height = GLYPH_BBOX.yMax;
-        
+ 
                 //ascender -> check
                 if ( unicode == C_LATIN_SMALL_LETTER_D )
                         fontHeader->FH_ascender = GLYPH_BBOX.yMax;
@@ -1084,9 +1076,14 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                 fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
 
+        /* read parameter from os2 table */
+        
+        fontHeader->FH_h_height = FACE_PROPERTIES.os2->sCapHeight;
+        fontHeader->FH_x_height = FACE_PROPERTIES.os2->sxHeight;
+        fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
+
         fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
         fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
@@ -1096,11 +1093,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
         fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
         
-        if( fontHeader->FH_x_height > 0 )
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
-        else
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
-
         fontHeader->FH_initialized = TRUE;
 
         TrueType_Cache_WriteHeader(
