@@ -16,6 +16,7 @@ library extgraph
 library pnglib
 
 resource ExportInterface object
+resource ImportInterface object
 
 export TransGetImportUI
 export TransGetExportUI

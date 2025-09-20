@@ -11,6 +11,8 @@ include manager.rdef
 global  PNGIMPORT: far
 global  PNGTESTFILE: far
 global  PNGEXPORT: far
+extrn   PNGIMPORTBUILDOPTIONS:far
+extrn   PNGIMPORTINITUI:far
 
 ; build up the right palette from gstring
 ; global  PALGSTRINGCOLELEMENT: far
@@ -161,8 +163,17 @@ TransGetExportUI endp
 ;--------------------------------------------------------------------------------
 
 TransGetImportOptions proc far
-		xor     dx,dx
-		ret
+                push    dx
+                call    PNGIMPORTBUILDOPTIONS
+                mov     dx, ax
+                or      ax, ax
+                jnz     tgio_success
+                xor     dx, dx
+                stc
+                ret
+tgio_success:
+                clc
+                ret
 TransGetImportOptions endp
 
 ;--------------------------------------------------------------------------------
@@ -210,7 +221,9 @@ TransGetExportOptions endp
 ;--------------------------------------------------------------------------------
 
 TransInitImportUI proc far
-		ret
+                push    dx
+                call    PNGIMPORTINITUI
+                ret
 TransInitImportUI endp
 
 ;--------------------------------------------------------------------------------
@@ -226,7 +239,7 @@ ASM     ends
 InfoResource    segment lmem LMEM_TYPE_GENERAL, mask LMF_IN_RESOURCE
 
 		dw	fmt_1_name,fmt_1_mask
-		D_OPTR	0
+		D_OPTR	PngImportGroup
 		D_OPTR  PngExportGroup
 		dw	0C000h          ; 8000h = only support import, 0C000h = import and export
 		dw	0
