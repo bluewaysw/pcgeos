@@ -253,7 +253,7 @@ TransGetExportOptions proc far
         push    ax                   ; save pointer to options structure
         pop     ds                   ; set DS to point to it
         pop     ax                   ; restore selected option
-        mov     [ds:00000h],ax       ; move selected value to booleanOptions?!
+        mov     [ds:00000h],ax       ; move selected value to bottom of options structure (?)
         call    MemUnlock            ; unlock options structure
         mov     dx,bx                ; restore dialog handle
         clc
