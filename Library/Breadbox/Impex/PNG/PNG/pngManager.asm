@@ -240,22 +240,22 @@ TransGetExportOptions proc far
         mov     ax,MSG_GEN_ITEM_GROUP_GET_SELECTION
         mov     bx,dx
         mov     si,offset _PngExpFormGroup
-        mov     di,mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
+        mov     di,mask MF_CALL
         call    ObjMessage
 
-        push    ax
-        mov     ax,00002h
-        mov     cl,050h
-        mov     ch,040h
-        call    MemAlloc
-        xor     dx,dx
-        jc      iopt_err
-        push    ax
-        pop     ds
-        pop     ax
-        mov     [ds:00000h],ax          ; booleanOptions
-        call    MemUnlock
-        mov     dx,bx
+        push    ax                   ; store selected option
+        mov     ax,00002h            ; size of options structure (bytes)
+        mov     cl,050h              ; 80h = movable
+        mov     ch,040h              ; 40h = zero filled
+        call    MemAlloc             ; allocate options structure
+        xor     dx,dx                ; no special flags
+        jc      iopt_err             ; jump if error
+        push    ax                   ; save pointer to options structure
+        pop     ds                   ; set DS to point to it
+        pop     ax                   ; restore selected option
+        mov     [ds:00000h],ax       ; move selected value to booleanOptions?!
+        call    MemUnlock            ; unlock options structure
+        mov     dx,bx                ; restore dialog handle
         clc
 iopt_err:
         pop     ds                             ; 0236 1F
