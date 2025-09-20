@@ -5,11 +5,14 @@ include resource.def    ; idata/udata, ProcCallFixedOrMovable etc.
 include graphics.def
 
 UseLib Objects/colorC.def
+UseLib Objects/gValueC.def
 
 ; UI symbols defined in C that we need to access here: prefix with underscore!
 global _PngImportGroup: nptr
 global _PngExportGroup: nptr
 global _PngAlphaMethodGroup: nptr
+global _PngAlphaBlendColor: nptr
+global _PngAlphaThresholdValue: nptr
 global _PngExpFormGroup: nptr
 
 ; global functions implemented in C
@@ -39,7 +42,7 @@ global  TransGetImportOptions: far
 global  TransGetExportOptions: far
 
 
-PNG_ALPHA_OPTIONS_SIZE equ     1        ; size of ie_uidata options structure
+PNG_ALPHA_OPTIONS_SIZE equ     6        ; sizeof(struct ie_uidata)
 
 ;================================================================================
 
@@ -189,24 +192,67 @@ TransGetImportOptions proc far uses ax,bx,cx,bp,si,di,ds
     mov     di, mask MF_CALL                        ; flags
     call    ObjMessage                              ; get selected item
 
-    push    ax                                      ; store selected option
+    push    ax                                      ; store selected method
+
+    mov     ax, MSG_GEN_VALUE_GET_VALUE             ; get alpha threshold (WWFixed)
+    mov     si, offset _PngAlphaThresholdValue
+    mov     di, mask MF_CALL
+    call    ObjMessage
+    and     dx, 00FFh                               ; clamp to byte range
+    push    dx                                      ; store threshold
+
+    mov     ax, MSG_COLOR_SELECTOR_GET_COLOR        ; grab blend color selection
+    mov     si, offset _PngAlphaBlendColor
+    mov     di, mask MF_CALL
+    call    ObjMessage
+
+    mov     ax, cx                                  ; AL=index/red, AH=flags
+    mov     bx, dx                                  ; BL=green, BH=blue
+    test    ah, CF_RGB                              ; already RGB values?
+    jnz     short color_ready
+
+    mov     ah, al                                  ; convert palette index to RGB
+    xor     dx, dx
+    xor     di, di
+    call    GrMapColorIndex
+
+color_ready:
+    xor     ah, ah                                  ; clear flag bits before storing red
+    push    bx                                      ; save green & blue (BH/BL)
+    push    ax                                      ; save red (AL)
 
     mov     ax, PNG_ALPHA_OPTIONS_SIZE              ; size of options structure (bytes)
     mov     cl, mask HF_SWAPABLE                    ; 50h = movable + swapable
     mov     ch, mask HAF_ZERO_INIT or mask HAF_LOCK ; 40h = zero filled + locked
     call    MemAlloc                                ; allocate options structure
     xor     dx,dx                                   ; no special flags
-    jc      iopt_err                                ; jump if error
+    jc      alloc_fail                              ; jump if error
 
-    push    ax                                      ; save pointer to options structure
-    pop     ds                                      ; set DS to point to it
-    pop     ax                                      ; restore selected option
-    mov     [ds:00000h],ax                          ; move selected value to aTransforMethod
+    mov     ds, ax                                  ; set DS to options block
+    mov     di, bx                                  ; save mem handle while we use BX
+
+    pop     ax                                      ; red (AL)
+    pop     bx                                      ; green/blue (BL/BH)
+    pop     dx                                      ; threshold (DL)
+    pop     cx                                      ; method (word)
+
+    mov     [ds:00000h], cx                         ; store method
+    mov     [ds:00002h], dl                         ; store alpha threshold
+    mov     [ds:00003h], al                         ; store blend color red
+    mov     [ds:00004h], bl                         ; store blend color green
+    mov     [ds:00005h], bh                         ; store blend color blue
+
+    mov     bx, di                                  ; restore mem handle
     call    MemUnlock                               ; unlock options structure
-    mov     dx,bx                                   ; restore dialog handle
+    mov     dx,di                                   ; return handle in DX
     clc                                             ; clear carry to indicate success
+    jmp     short iopt_done
+
+alloc_fail:
+    add     sp, 8                                   ; discard saved values on error
 
 iopt_err:
+iopt_done:
     .leave
     ret
 TransGetImportOptions endp

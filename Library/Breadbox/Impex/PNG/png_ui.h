@@ -9,6 +9,6 @@ typedef enum {
 
 struct ie_uidata {
     aTransformMethod method;
-    // byte alphaThreshold;
-    // RGBValue blendColor;
+    byte alphaThreshold;
+    RGBValue blendColor;
 };
