@@ -13,6 +13,7 @@ library	geos
 library ui
 library impex
 library extgraph
+library color
 library pnglib
 
 resource ExportInterface object

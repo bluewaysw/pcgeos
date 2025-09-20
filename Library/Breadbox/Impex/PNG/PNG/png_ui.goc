@@ -1,0 +1,140 @@
+/***********************************************************************
+ *
+ * MODULE:    PNG Import/Export UI
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/gItemGC.goh>
+@include <Objects/gValueC.goh>
+@include <Objects/colorC.goh>
+
+@start ImportInterface;
+
+@object GenItemClass PngAlphaMethodBlend = {
+    GI_visMoniker = "Blend color";
+    GII_identifier = 1;
+}
+
+@object GenItemClass PngAlphaMethodMask = {
+    GI_visMoniker = "Alpha to mask";
+    GII_identifier = 0;
+}
+
+@object GenItemGroupClass PngAlphaMethodGroup = {
+    GI_visMoniker = "Method:";
+    GIGI_selection = 1;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GI_comp = @PngAlphaMethodBlend, @PngAlphaMethodMask;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenTextClass PngAlphaBlendExplain = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Composite the image over a chosen background color, replacing per-pixel alpha with blended results.";
+    HINT_FIXED_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 60,
+        SST_LINES_OF_TEXT | 3,
+        0
+    };
+}
+
+@object ColorSelectorClass PngAlphaBlendColor = {
+    GI_visMoniker = "Blend color";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_INDEX | CSF_RGB | CSF_OTHER);
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
+}
+
+@object GenInteractionClass PngAlphaBlendBox = {
+    GI_visMoniker = "Blend Settings";
+    GI_comp = @PngAlphaBlendExplain, @PngAlphaBlendColor;
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass PngAlphaMaskExplain = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Convert the alpha channel to a 1-bit mask. Pixels with alpha at or above the chosen threshold stay opaque.";
+    HINT_FIXED_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 60,
+        SST_LINES_OF_TEXT | 3,
+        0
+    };
+}
+
+@object GenValueClass PngAlphaThresholdValue = {
+    GI_visMoniker = "Alpha threshold";
+    GVLI_minimum = MakeWWFixed(0);
+    GVLI_maximum = MakeWWFixed(255);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_value = MakeWWFixed(192);
+    GVLI_displayFormat = GVDF_INTEGER;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PngAlphaMaskBox = {
+    GI_visMoniker = "Mask Settings";
+    GI_comp = @PngAlphaMaskExplain, @PngAlphaThresholdValue;
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenInteractionClass PngImportGroup = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @PngAlphaMethodGroup, @PngAlphaBlendBox, @PngAlphaMaskBox;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@end ImportInterface;
+
+
+@start ExportInterface;
+
+@object GenItemClass PngExpBit1 = {
+    GI_visMoniker = 'M', "Monochrome (1 bit/pixel)";
+    GII_identifier = 0;
+}
+
+@object GenItemClass PngExpBit4 = {
+    GI_visMoniker = '1', "16 colors (4 bits/pixel)";
+    GII_identifier = 1;
+}
+
+@object GenItemClass PngExpBit8 = {
+    GI_visMoniker = '2', "256 colors (8 bits/pixel)";
+    GII_identifier = 2;
+}
+
+@object GenItemClass PngExpBit24 = {
+    GI_visMoniker = 'T', "TrueColor (24 bits/pixel)";
+    GII_identifier = 3;
+}
+
+@object GenItemGroupClass PngExpFormGroup = {
+    GIGI_selection = 3;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GI_comp = @PngExpBit1, @PngExpBit4, @PngExpBit8, @PngExpBit24;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenInteractionClass PngExpBitFormat = {
+    GI_visMoniker = 'C', "Colors:";
+    GI_comp = @PngExpFormGroup;
+}
+
+@object GenInteractionClass PngExportGroup = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @PngExpBitFormat;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@end ExportInterface;
