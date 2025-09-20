@@ -174,28 +174,28 @@ blendGreen      local   byte
 blendBlue       local   byte
                 .enter
 
-                mov     ss:[uiHandle], dx
+                mov     uiHandle, dx
                 mov     ax, 1                     ; PNG_AT_BLEND
-                mov     ss:[methodValue], ax
+                mov     methodValue, ax
                 mov     ax, 192
-                mov     ss:[thresholdValue], ax
+                mov     thresholdValue, ax
                 mov     al, 255
-                mov     ss:[blendRed], al
-                mov     ss:[blendGreen], al
-                mov     ss:[blendBlue], al
+                mov     blendRed, al
+                mov     blendGreen, al
+                mov     blendBlue, al
 
-                tst     ss:[uiHandle]
+                tst     uiHandle
                 je      tgio_alloc
 
                 mov     ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
-                mov     bx, ss:[uiHandle]
+                mov     bx, uiHandle
                 mov     si, offset PngAlphaMethodGroup
                 mov     di, mask MF_CALL
                 call    ObjMessage
-                mov     ss:[methodValue], ax
+                mov     methodValue, ax
 
                 mov     ax, MSG_COLOR_SELECTOR_GET_COLOR
-                mov     bx, ss:[uiHandle]
+                mov     bx, uiHandle
                 mov     si, offset PngAlphaBlendColor
                 mov     di, mask MF_CALL
                 call    ObjMessage
@@ -204,35 +204,35 @@ blendBlue       local   byte
                 mov     ah, ch
                 mov     bl, dl
                 mov     bh, dh
-                mov     ss:[blendRed], al
-                mov     ss:[blendGreen], bl
-                mov     ss:[blendBlue], bh
+                mov     blendRed, al
+                mov     blendGreen, bl
+                mov     blendBlue, bh
 
                 cmp     ah, CF_INDEX
                 jne     tgio_checkGray
                 xor     di, di
                 xchg    ah, al
-                call    GRMAPCOLORINDEX
-                mov     ss:[blendRed], al
-                mov     ss:[blendGreen], bl
-                mov     ss:[blendBlue], bh
+                call    GrMapColorIndex
+                mov     blendRed, al
+                mov     blendGreen, bl
+                mov     blendBlue, bh
                 jmp     short tgio_colorDone
 
 tgio_checkGray:
                 cmp     ah, CF_GRAY
                 jne     tgio_colorDone
                 mov     al, cl
-                mov     ss:[blendRed], al
-                mov     ss:[blendGreen], al
-                mov     ss:[blendBlue], al
+                mov     blendRed, al
+                mov     blendGreen, al
+                mov     blendBlue, al
 
 tgio_colorDone:
                 mov     ax, MSG_GEN_VALUE_GET_VALUE
-                mov     bx, ss:[uiHandle]
+                mov     bx, uiHandle
                 mov     si, offset PngAlphaThresholdValue
                 mov     di, mask MF_CALL
                 call    ObjMessage
-                mov     ss:[thresholdValue], dx
+                mov     thresholdValue, dx
 
 tgio_alloc:
                 mov     ax, PNG_ALPHA_OPTIONS_SIZE
@@ -242,15 +242,15 @@ tgio_alloc:
                 jc      tgio_error
                 push    ax
                 pop     ds
-                mov     ax, ss:[methodValue]
+                mov     ax, methodValue
                 mov     ds:[0], ax
-                mov     ax, ss:[thresholdValue]
+                mov     ax, thresholdValue
                 mov     ds:[2], al
-                mov     al, ss:[blendRed]
+                mov     al, blendRed
                 mov     ds:[3], al
-                mov     al, ss:[blendGreen]
+                mov     al, blendGreen
                 mov     ds:[4], al
-                mov     al, ss:[blendBlue]
+                mov     al, blendBlue
                 mov     ds:[5], al
                 call    MemUnlock
                 mov     dx, bx
