@@ -26,7 +26,7 @@ API.eobj: API/apiManager.asm \
                 Objects/gValueC.def Objects/gToolGC.def \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
-                library.def API/png.def manager.rdef
+                library.def Objects/colorC.def API/png.def manager.rdef
 exppng.obj \
 exppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -76,7 +76,7 @@ imppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh impex.goh
+                Objects/helpCC.goh impex.goh Objects/colorC.goh
 imppng.obj \
 imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -89,6 +89,6 @@ imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 pnglib.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h \
                 zconf.h htmldrv.h product.h math.h htmlfstr.h awatcher.h \
                 htmlprog.h
-manager.rdef: generic.uih product.uih
+manager.rdef: generic.uih product.uih Objects/colorC.uih
 
 pngEC.geo png.geo : geos.ldf ui.ldf impex.ldf extgraph.ldf pnglib.ldf 

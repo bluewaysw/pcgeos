@@ -4,6 +4,7 @@ include library.def
 include resource.def    ; idata/udata, ProcCallFixedOrMovable etc.
 include graphics.def
 
+UseLib Objects/colorC.def
 DefLib API/png.def
 
 include manager.rdef
@@ -19,13 +20,6 @@ extrn   PNGIMPORTINITUI:far
 ; global  MY_GRPARSEGSTRING:far
 
         SetGeosConvention               ; set calling convention
-
-PNG_AT_TRESHOLD        equ     0
-PNG_AT_BLEND           equ     1
-
-CF_INDEX               equ     0
-CF_GRAY                equ     1
-CF_RGB                 equ     080h
 
 PNG_ALPHA_OPTIONS_SIZE equ     6
 
@@ -171,8 +165,8 @@ TransGetExportUI endp
 
 ;--------------------------------------------------------------------------------
 
-TransGetImportOptions proc far uses bx,cx,si,di,ds
-uiHandle        local   word
+TransGetImportOptions proc far uses bx, cx, si, di, ds
+uiHandle        local   hptr
 methodValue     local   word
 thresholdValue  local   word
 blendRed        local   byte
@@ -180,26 +174,28 @@ blendGreen      local   byte
 blendBlue       local   byte
                 .enter
 
-                mov     ss:[bp].uiHandle, dx
-                mov     word ptr ss:[bp].methodValue, PNG_AT_BLEND
+                mov     ss:[uiHandle], dx
+                mov     ax, 1                     ; PNG_AT_BLEND
+                mov     ss:[methodValue], ax
                 mov     ax, 192
-                mov     ss:[bp].thresholdValue, ax
-                mov     byte ptr ss:[bp].blendRed, 255
-                mov     byte ptr ss:[bp].blendGreen, 255
-                mov     byte ptr ss:[bp].blendBlue, 255
+                mov     ss:[thresholdValue], ax
+                mov     al, 255
+                mov     ss:[blendRed], al
+                mov     ss:[blendGreen], al
+                mov     ss:[blendBlue], al
 
-                cmp     ss:[bp].uiHandle, 0
+                tst     ss:[uiHandle]
                 je      tgio_alloc
 
                 mov     ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
-                mov     bx, ss:[bp].uiHandle
+                mov     bx, ss:[uiHandle]
                 mov     si, offset PngAlphaMethodGroup
                 mov     di, mask MF_CALL
                 call    ObjMessage
-                mov     ss:[bp].methodValue, ax
+                mov     ss:[methodValue], ax
 
                 mov     ax, MSG_COLOR_SELECTOR_GET_COLOR
-                mov     bx, ss:[bp].uiHandle
+                mov     bx, ss:[uiHandle]
                 mov     si, offset PngAlphaBlendColor
                 mov     di, mask MF_CALL
                 call    ObjMessage
@@ -208,35 +204,35 @@ blendBlue       local   byte
                 mov     ah, ch
                 mov     bl, dl
                 mov     bh, dh
-                mov     ss:[bp].blendRed, al
-                mov     ss:[bp].blendGreen, bl
-                mov     ss:[bp].blendBlue, bh
+                mov     ss:[blendRed], al
+                mov     ss:[blendGreen], bl
+                mov     ss:[blendBlue], bh
 
                 cmp     ah, CF_INDEX
                 jne     tgio_checkGray
                 xor     di, di
                 xchg    ah, al
                 call    GRMAPCOLORINDEX
-                mov     ss:[bp].blendRed, al
-                mov     ss:[bp].blendGreen, bl
-                mov     ss:[bp].blendBlue, bh
+                mov     ss:[blendRed], al
+                mov     ss:[blendGreen], bl
+                mov     ss:[blendBlue], bh
                 jmp     short tgio_colorDone
 
 tgio_checkGray:
                 cmp     ah, CF_GRAY
                 jne     tgio_colorDone
                 mov     al, cl
-                mov     ss:[bp].blendRed, al
-                mov     ss:[bp].blendGreen, al
-                mov     ss:[bp].blendBlue, al
+                mov     ss:[blendRed], al
+                mov     ss:[blendGreen], al
+                mov     ss:[blendBlue], al
 
 tgio_colorDone:
-                mov     ax, MSG_GEN_VALUE_GET_INTEGER_VALUE
-                mov     bx, ss:[bp].uiHandle
+                mov     ax, MSG_GEN_VALUE_GET_VALUE
+                mov     bx, ss:[uiHandle]
                 mov     si, offset PngAlphaThresholdValue
                 mov     di, mask MF_CALL
                 call    ObjMessage
-                mov     ss:[bp].thresholdValue, dx
+                mov     ss:[thresholdValue], dx
 
 tgio_alloc:
                 mov     ax, PNG_ALPHA_OPTIONS_SIZE
@@ -246,15 +242,15 @@ tgio_alloc:
                 jc      tgio_error
                 push    ax
                 pop     ds
-                mov     ax, ss:[bp].methodValue
+                mov     ax, ss:[methodValue]
                 mov     ds:[0], ax
-                mov     al, ss:[bp].thresholdValue
+                mov     ax, ss:[thresholdValue]
                 mov     ds:[2], al
-                mov     al, ss:[bp].blendRed
+                mov     al, ss:[blendRed]
                 mov     ds:[3], al
-                mov     al, ss:[bp].blendGreen
+                mov     al, ss:[blendGreen]
                 mov     ds:[4], al
-                mov     al, ss:[bp].blendBlue
+                mov     al, ss:[blendBlue]
                 mov     ds:[5], al
                 call    MemUnlock
                 mov     dx, bx
@@ -315,8 +311,6 @@ TransGetExportOptions endp
 ;--------------------------------------------------------------------------------
 
 TransInitImportUI proc far
-                push    dx
-                call    PNGIMPORTINITUI
                 ret
 TransInitImportUI endp
 
