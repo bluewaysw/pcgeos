@@ -190,14 +190,14 @@ blendBlue       local   byte
                 mov     ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
                 mov     bx, uiHandle
                 mov     si, offset PngAlphaMethodGroup
-                mov     di, mask MF_CALL
+                mov     di, mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
                 call    ObjMessage
                 mov     methodValue, ax
 
                 mov     ax, MSG_COLOR_SELECTOR_GET_COLOR
                 mov     bx, uiHandle
                 mov     si, offset PngAlphaBlendColor
-                mov     di, mask MF_CALL
+                mov     di, mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
                 call    ObjMessage
 
                 mov     al, cl
@@ -230,7 +230,7 @@ tgio_colorDone:
                 mov     ax, MSG_GEN_VALUE_GET_VALUE
                 mov     bx, uiHandle
                 mov     si, offset PngAlphaThresholdValue
-                mov     di, mask MF_CALL
+                mov     di, mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
                 call    ObjMessage
                 mov     thresholdValue, dx
 
@@ -280,7 +280,7 @@ TransGetExportOptions proc far
         mov     ax,MSG_GEN_ITEM_GROUP_GET_SELECTION
         mov     bx,dx
         mov     si,offset PngExpFormGroup
-        mov     di,mask MF_CALL
+        mov     di,mask MF_CALL or mask MF_STACK or mask MF_FIXUP_DS
         call    ObjMessage
 
         push    ax
