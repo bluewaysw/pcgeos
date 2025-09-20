@@ -991,9 +991,6 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, const TT_UShort nam
 #pragma code_seg(ttcharmapper_TEXT)
 void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
-        TT_UShort  charIndex;
-        word       geosChar;
-
 
 EC(     ECCheckBounds( (void*)fontHeader ) );
 
@@ -1015,37 +1012,14 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 return;	    
         }
 
-        /* initialize min, max and avg values in fontHeader */
-        fontHeader->FH_minTSB   = -9999;
-
+        /* fill font header */
         fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
                                                        &fontHeader->FH_firstChar, 
                                                        &fontHeader->FH_lastChar ); 
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
-        {
-                const word  unicode = GeosCharToUnicode( geosChar );
-
-
-                if( !GeosCharMapFlag( geosChar ) )
-                        continue;
-
-                charIndex = TT_Char_Index( CHAR_MAP, unicode );
-                if ( charIndex == 0 )
-                        continue;
-
-                /* load glyph metrics without scaling or hinting */
-                TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
-
-                /* scan yMax -> check */
-                if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
-                        fontHeader->FH_minTSB = GLYPH_BBOX.yMax;
-        }
-
         /* read parameter from os2 table */
-        
         fontHeader->FH_h_height   = FACE_PROPERTIES.os2->sCapHeight;
         fontHeader->FH_x_height   = FACE_PROPERTIES.os2->sxHeight;
         fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
@@ -1055,23 +1029,19 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_ascender   = FACE_PROPERTIES.os2->sTypoAscender;
         fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
+        fontHeader->FH_baseAdjust = fontHeader->FH_ascender- FACE_PROPERTIES.os2->usWinAscent;
 
         /* read parameter from horizontal head table */
-
         fontHeader->FH_maxRSB   = FACE_PROPERTIES.horizontal->xMax_Extent;
         fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_minLSB   = FACE_PROPERTIES.horizontal->min_Left_Side_Bearing;
 
         /* read parameter from header table */
+        fontHeader->FH_accent   = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
+        fontHeader->FH_maxBSB   = fontHeader->FH_descender- FACE_PROPERTIES.header->yMin;
+        fontHeader->FH_minTSB   = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
+        fontHeader->FH_underPos = FACE_PROPERTIES.header->yMax + DEFAULT_UNDER_POSITION( UNITS_PER_EM );
 
-        fontHeader->FH_accent = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
-        fontHeader->FH_maxBSB = fontHeader->FH_descender- FACE_PROPERTIES.header->yMin;
-
-
-
-        fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
-        fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
-        fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
         fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
         
         fontHeader->FH_initialized = TRUE;
