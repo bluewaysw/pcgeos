@@ -18,7 +18,7 @@ global _PngExpFormGroup: nptr
 ; global functions implemented in C
 ; segment must be "public 'CODE'" to ensure that it combines
 ; with properly the C segment of the same name.
-; imptpng_TEXT = "imppng.goc - .goc + TEXT"
+; imptpng_TEXT = "imppng.goc" - ".goc + "TEXT"
 imppng_TEXT   segment public 'CODE'
     extrn  PNGIMPORT: far
     extrn  PNGTESTFILE: far
