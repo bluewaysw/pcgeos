@@ -61,8 +61,8 @@
     GI_states = @default | GS_USABLE | GS_ENABLED;
 
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_RGB | CSF_OTHER);
-    ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK | CSF_INDEX);
+    ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_INDEX | CSF_RGB | CSF_OTHER);
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
 }
 
 @object GenInteractionClass PngAlphaBlendBox = {
@@ -158,6 +158,39 @@
 
 @end ExportInterface;
 
+
+void _pascal
+PngImportAttach(word uiHandle, word uiChunk)
+{
+    optr root;
+
+    if (!uiHandle) {
+        return;
+    }
+
+    root = ConstructOptr(uiHandle, uiChunk);
+    if (root == NullOptr) {
+        return;
+    }
+
+    @call root::MSG_PNG_IMPORT_ATTACH(uiHandle);
+}
+
+@method PngImportGroupClass, MSG_PNG_IMPORT_ATTACH
+{
+    if (!uiHandle) {
+        pself->PIG_methodGroup = NullOptr;
+        pself->PIG_blendBox = NullOptr;
+        pself->PIG_maskBox = NullOptr;
+        return;
+    }
+
+    pself->PIG_methodGroup = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+    pself->PIG_blendBox = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(1);
+    pself->PIG_maskBox = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(2);
+}
+
+
 @method PngImportGroupClass, MSG_VIS_OPEN
 {
     optr selfOptr;
@@ -193,35 +226,4 @@
         @call pself->PIG_maskBox::MSG_GEN_SET_USABLE(VUM_NOW);
         @call pself->PIG_blendBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
     }
-}
-
-@method PngImportGroupClass, MSG_PNG_IMPORT_ATTACH
-{
-    if (!uiHandle) {
-        pself->PIG_methodGroup = NullOptr;
-        pself->PIG_blendBox = NullOptr;
-        pself->PIG_maskBox = NullOptr;
-        return;
-    }
-
-    pself->PIG_methodGroup = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0);
-    pself->PIG_blendBox = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(1);
-    pself->PIG_maskBox = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(2);
-}
-
-void _pascal
-PngImportAttach(word uiHandle, word uiChunk)
-{
-    optr root;
-
-    if (!uiHandle) {
-        return;
-    }
-
-    root = ConstructOptr(uiHandle, uiChunk);
-    if (root == NullOptr) {
-        return;
-    }
-
-    @call root::MSG_PNG_IMPORT_ATTACH(uiHandle);
 }
