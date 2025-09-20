@@ -1075,18 +1075,18 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_h_height = FACE_PROPERTIES.os2->sCapHeight;
         fontHeader->FH_x_height = FACE_PROPERTIES.os2->sxHeight;
         fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
+        fontHeader->FH_height   = FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent;
 
         /* read parameter from horizontal head table */
 
         fontHeader->FH_maxRSB   = FACE_PROPERTIES.horizontal->xMax_Extent;
         fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
 
-        
+
         fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
-        fontHeader->FH_height     = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
         fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
         fontHeader->FH_maxBSB     = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
         fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
