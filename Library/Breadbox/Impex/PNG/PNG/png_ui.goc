@@ -8,6 +8,20 @@
 @include <Objects/gItemGC.goh>
 @include <Objects/gValueC.goh>
 @include <Objects/colorC.goh>
+@include <object.h>
+
+@class PngImportGroupClass, GenInteractionClass;
+
+     @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PNG_ALPHA_METHOD_APPLY;
+     @message void MSG_PNG_IMPORT_ATTACH(word uiHandle = cx);
+
+     @instance optr PIG_methodGroup = NullOptr;
+     @instance optr PIG_blendBox = NullOptr;
+     @instance optr PIG_maskBox = NullOptr;
+
+@endc
+
+@classdecl PngImportGroupClass;
 
 @start ImportInterface;
 
@@ -82,6 +96,7 @@
 
 @object GenInteractionClass PngAlphaMaskBox = {
     GI_visMoniker = "Mask Settings";
+    GI_states = @default & ~GS_USABLE;
     GI_comp = @PngAlphaMaskExplain, @PngAlphaThresholdValue;
     HINT_DRAW_IN_BOX;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
@@ -89,7 +104,7 @@
     HINT_CENTER_CHILDREN_ON_MONIKERS;
 }
 
-@object GenInteractionClass PngImportGroup = {
+@object PngImportGroupClass PngImportGroup = {
     GI_states = @default & ~GS_USABLE;
     GI_comp = @PngAlphaMethodGroup, @PngAlphaBlendBox, @PngAlphaMaskBox;
     HINT_ORIENT_CHILDREN_VERTICALLY;
@@ -142,3 +157,71 @@
 }
 
 @end ExportInterface;
+
+@method PngImportGroupClass, MSG_VIS_OPEN
+{
+    optr selfOptr;
+    word selection;
+
+    @callsuper();
+
+    if (pself->PIG_methodGroup == NullOptr) {
+        return;
+    }
+
+    selfOptr = @call oself::MSG_META_GET_OPTR();
+    @call pself->PIG_methodGroup::MSG_GEN_ITEM_GROUP_SET_DESTINATION(selfOptr);
+    @call pself->PIG_methodGroup::MSG_GEN_ITEM_GROUP_SET_APPLY_MSG(MSG_PNG_ALPHA_METHOD_APPLY);
+
+    selection = @call pself->PIG_methodGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @call oself::MSG_PNG_ALPHA_METHOD_APPLY(selection, 1, 0);
+}
+
+@method PngImportGroupClass, MSG_PNG_ALPHA_METHOD_APPLY
+{
+    if (pself->PIG_blendBox == NullOptr || pself->PIG_maskBox == NullOptr) {
+        return;
+    }
+
+    if (selection == GIGS_NONE) {
+        @call pself->PIG_blendBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @call pself->PIG_maskBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    } else if (selection == 1) {
+        @call pself->PIG_blendBox::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call pself->PIG_maskBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    } else {
+        @call pself->PIG_maskBox::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call pself->PIG_blendBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+}
+
+@method PngImportGroupClass, MSG_PNG_IMPORT_ATTACH
+{
+    if (!uiHandle) {
+        pself->PIG_methodGroup = NullOptr;
+        pself->PIG_blendBox = NullOptr;
+        pself->PIG_maskBox = NullOptr;
+        return;
+    }
+
+    pself->PIG_methodGroup = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+    pself->PIG_blendBox = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(1);
+    pself->PIG_maskBox = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(2);
+}
+
+void _pascal
+PngImportAttach(word uiHandle, word uiChunk)
+{
+    optr root;
+
+    if (!uiHandle) {
+        return;
+    }
+
+    root = ConstructOptr(uiHandle, uiChunk);
+    if (root == NullOptr) {
+        return;
+    }
+
+    @call root::MSG_PNG_IMPORT_ATTACH(uiHandle);
+}

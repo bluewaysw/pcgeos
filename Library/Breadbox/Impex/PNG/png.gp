@@ -29,3 +29,4 @@ export TransImport
 export TransExport
 export TransGetFormat
 
+export PngImportGroupClass

@@ -7,6 +7,11 @@ include graphics.def
 UseLib Objects/colorC.def
 UseLib Objects/gValueC.def
 
+
+png_ui_TEXT   segment public 'CODE'
+    extrn  PNGIMPORTATTACH: far
+png_ui_TEXT   ends
+
 ; UI symbols defined in C that we need to access here: prefix with underscore!
 global _PngImportGroup: nptr
 global _PngExportGroup: nptr
@@ -292,7 +297,14 @@ TransGetExportOptions endp
 ;--------------------------------------------------------------------------------
 
 TransInitImportUI proc far
-                ret
+        or      cx, cx
+        jz      short tiu_done
+
+        push    cx                                  ; uiHandle
+        push    dx                                  ; uiChunk
+        call    PNGIMPORTATTACH
+tiu_done:
+        ret
 TransInitImportUI endp
 
 ;--------------------------------------------------------------------------------
