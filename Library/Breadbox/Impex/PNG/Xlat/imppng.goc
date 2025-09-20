@@ -36,60 +36,6 @@ PngImportInitAlphaDefaults(pngAlphaTransformData *patd)
 }
 
 static void
-PngImportReadAlphaFromUI(MemHandle optionsUI, pngAlphaTransformData *patd)
-{
-    optr methodGroup;
-    optr colorSelector;
-    optr thresholdValue;
-    ColorAndFlagReturn cafr;
-    RGBColorAsDWord mappedColor;
-    word selection;
-    word threshold;
-
-    if (optionsUI == NullHandle)
-    {
-        return;
-    }
-
-    methodGroup = ConstructOptr(optionsUI, PngAlphaMethodGroup);
-    selection = (word) @call methodGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    patd->method = (pngAlphaTransformMethod) selection;
-
-    colorSelector = ConstructOptr(optionsUI, PngAlphaBlendColor);
-    cafr.CAFR_unused = 0;
-    cafr.CAFR_indeterminate = FALSE;
-    cafr.CAFR_color.CQ_redOrIndex = 0;
-    cafr.CAFR_color.CQ_info = 0;
-    cafr.CAFR_color.CQ_green = 0;
-    cafr.CAFR_color.CQ_blue = 0;
-    @call colorSelector::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
-
-    if (cafr.CAFR_color.CQ_info == CF_INDEX)
-    {
-        mappedColor = GrMapColorIndex((GStateHandle)0, cafr.CAFR_color.CQ_redOrIndex);
-        patd->blendColor.RGB_red = (byte) RGB_RED(mappedColor);
-        patd->blendColor.RGB_green = (byte) RGB_GREEN(mappedColor);
-        patd->blendColor.RGB_blue = (byte) RGB_BLUE(mappedColor);
-    }
-    else if (cafr.CAFR_color.CQ_info == CF_RGB)
-    {
-        patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-        patd->blendColor.RGB_green = cafr.CAFR_color.CQ_green;
-        patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
-    }
-    else if (cafr.CAFR_color.CQ_info == CF_GRAY)
-    {
-        patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-        patd->blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
-        patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
-    }
-
-    thresholdValue = ConstructOptr(optionsUI, PngAlphaThresholdValue);
-    threshold = (word) @call thresholdValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
-    patd->alphaThreshold = (byte) threshold;
-}
-
-static void
 PngImportApplyAlphaToUI(MemHandle optionsUI, const pngAlphaTransformData *patd)
 {
     optr methodGroup;
@@ -116,46 +62,6 @@ PngImportApplyAlphaToUI(MemHandle optionsUI, const pngAlphaTransformData *patd)
 
     thresholdValue = ConstructOptr(optionsUI, PngAlphaThresholdValue);
     @call thresholdValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((word) patd->alphaThreshold, FALSE);
-}
-
-static MemHandle
-PngImportCreateOptionsBlock(const pngAlphaTransformData *patd)
-{
-    MemHandle optionsH;
-    pngAlphaTransformData *optionsP;
-
-    optionsH = MemAlloc(sizeof(pngAlphaTransformData), HF_FIXED, HAF_ZERO_INIT);
-    if (optionsH == NullHandle)
-    {
-        return NullHandle;
-    }
-
-    optionsP = (pngAlphaTransformData *) MemLock(optionsH);
-    if (optionsP == (pngAlphaTransformData *)0)
-    {
-        MemFree(optionsH);
-        return NullHandle;
-    }
-
-    *optionsP = *patd;
-    MemUnlock(optionsH);
-
-    return optionsH;
-}
-
-MemHandle _pascal
-PngImportBuildOptions(MemHandle optionsUI)
-{
-    pngAlphaTransformData patd;
-
-    PngImportInitAlphaDefaults(&patd);
-
-    if (optionsUI != NullHandle)
-    {
-        PngImportReadAlphaFromUI(optionsUI, &patd);
-    }
-
-    return PngImportCreateOptionsBlock(&patd);
 }
 
 void _pascal
