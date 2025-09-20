@@ -1016,11 +1016,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         }
 
         /* initialize min, max and avg values in fontHeader */
-        fontHeader->FH_minLSB   =  9999;
         fontHeader->FH_maxBSB   = -9999;
         fontHeader->FH_minTSB   = -9999;
         fontHeader->FH_accent   = 0;
-        fontHeader->FH_ascent   = 0;
 
         fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
                                                        &fontHeader->FH_firstChar, 
@@ -1042,14 +1040,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
                 /* load glyph metrics without scaling or hinting */
                 TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
- 
-                //ascender -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_D )
-                        fontHeader->FH_ascender = GLYPH_BBOX.yMax;
-
-                /* scan xMin -> check */
-                if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
-                        fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
 
                 /* scan yMin -> check */
                 if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
@@ -1060,11 +1050,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                         fontHeader->FH_minTSB = GLYPH_BBOX.yMax;
 
                 /* check */
-                if ( GeosCharMapFlag( geosChar ) & ( CMF_ASCENT | CMF_CAP ) )
-                        if ( fontHeader->FH_ascent < GLYPH_BBOX.yMax )
-                                fontHeader->FH_ascent = GLYPH_BBOX.yMax;
-
-                /* check */
                 if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT )
                         if ( fontHeader->FH_accent < GLYPH_BBOX.yMax )
                                 fontHeader->FH_accent = GLYPH_BBOX.yMax;
@@ -1072,20 +1057,24 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         /* read parameter from os2 table */
         
-        fontHeader->FH_h_height = FACE_PROPERTIES.os2->sCapHeight;
-        fontHeader->FH_x_height = FACE_PROPERTIES.os2->sxHeight;
-        fontHeader->FH_avgwidth = FACE_PROPERTIES.os2->xAvgCharWidth;
-        fontHeader->FH_height   = FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent;
+        fontHeader->FH_h_height   = FACE_PROPERTIES.os2->sCapHeight;
+        fontHeader->FH_x_height   = FACE_PROPERTIES.os2->sxHeight;
+        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
+        fontHeader->FH_height     = FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent;
+
+        fontHeader->FH_ascent     = FACE_PROPERTIES.os2->sTypoAscender;
+        fontHeader->FH_ascender   = FACE_PROPERTIES.os2->sTypoAscender;
+        fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
+        fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
 
         /* read parameter from horizontal head table */
 
         fontHeader->FH_maxRSB   = FACE_PROPERTIES.horizontal->xMax_Extent;
         fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
+        fontHeader->FH_minLSB   = FACE_PROPERTIES.horizontal->min_Left_Side_Bearing;
 
 
-        fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
+        fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent; 
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
         fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
         fontHeader->FH_maxBSB     = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
