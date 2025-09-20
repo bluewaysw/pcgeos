@@ -13,38 +13,208 @@
 
 @include <stdapp.goh>
 @include <impex.goh>
+@include <Objects/colorC.goh>
+@include <Objects/gItemGC.goh>
+@include <Objects/gValueC.goh>
 #include <pnglib.h>
+#include <heap.h>
+#include <graphics.h>
+#include <color.h>
 
-dword _pascal PngImport(ImportFrame *frame, VMChain *chain)
+@extern chunk PngAlphaMethodGroup;
+@extern chunk PngAlphaBlendColor;
+@extern chunk PngAlphaThresholdValue;
+
+static void
+PngImportInitAlphaDefaults(pngAlphaTransformData *patd)
+{
+    patd->method = PNG_AT_BLEND;
+    patd->alphaThreshold = 192;
+    patd->blendColor.RGB_red = 255;
+    patd->blendColor.RGB_green = 255;
+    patd->blendColor.RGB_blue = 255;
+}
+
+static void
+PngImportReadAlphaFromUI(MemHandle optionsUI, pngAlphaTransformData *patd)
+{
+    optr methodGroup;
+    optr colorSelector;
+    optr thresholdValue;
+    ColorAndFlagReturn cafr;
+    RGBColorAsDWord mappedColor;
+    word selection;
+    word threshold;
+
+    if (optionsUI == NullHandle)
+    {
+        return;
+    }
+
+    methodGroup = ConstructOptr(optionsUI, PngAlphaMethodGroup);
+    selection = (word) @call methodGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    patd->method = (pngAlphaTransformMethod) selection;
+
+    colorSelector = ConstructOptr(optionsUI, PngAlphaBlendColor);
+    cafr.CAFR_unused = 0;
+    cafr.CAFR_indeterminate = FALSE;
+    cafr.CAFR_color.CQ_redOrIndex = 0;
+    cafr.CAFR_color.CQ_info = 0;
+    cafr.CAFR_color.CQ_green = 0;
+    cafr.CAFR_color.CQ_blue = 0;
+    @call colorSelector::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+
+    if (cafr.CAFR_color.CQ_info == CF_INDEX)
+    {
+        mappedColor = GrMapColorIndex((GStateHandle)0, cafr.CAFR_color.CQ_redOrIndex);
+        patd->blendColor.RGB_red = (byte) RGB_RED(mappedColor);
+        patd->blendColor.RGB_green = (byte) RGB_GREEN(mappedColor);
+        patd->blendColor.RGB_blue = (byte) RGB_BLUE(mappedColor);
+    }
+    else if (cafr.CAFR_color.CQ_info == CF_RGB)
+    {
+        patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        patd->blendColor.RGB_green = cafr.CAFR_color.CQ_green;
+        patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
+    }
+    else if (cafr.CAFR_color.CQ_info == CF_GRAY)
+    {
+        patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        patd->blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
+        patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
+    }
+
+    thresholdValue = ConstructOptr(optionsUI, PngAlphaThresholdValue);
+    threshold = (word) @call thresholdValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    patd->alphaThreshold = (byte) threshold;
+}
+
+static void
+PngImportApplyAlphaToUI(MemHandle optionsUI, const pngAlphaTransformData *patd)
+{
+    optr methodGroup;
+    optr colorSelector;
+    optr thresholdValue;
+    ColorQuad color;
+    word selection;
+
+    if ((optionsUI == NullHandle) || (patd == (const pngAlphaTransformData *)0))
+    {
+        return;
+    }
+
+    methodGroup = ConstructOptr(optionsUI, PngAlphaMethodGroup);
+    selection = (word) patd->method;
+    @call methodGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+
+    colorSelector = ConstructOptr(optionsUI, PngAlphaBlendColor);
+    color.CQ_redOrIndex = patd->blendColor.RGB_red;
+    color.CQ_info = CF_RGB;
+    color.CQ_green = patd->blendColor.RGB_green;
+    color.CQ_blue = patd->blendColor.RGB_blue;
+    @call colorSelector::MSG_COLOR_SELECTOR_SET_COLOR(color, FALSE);
+
+    thresholdValue = ConstructOptr(optionsUI, PngAlphaThresholdValue);
+    @call thresholdValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((word) patd->alphaThreshold, FALSE);
+}
+
+static MemHandle
+PngImportCreateOptionsBlock(const pngAlphaTransformData *patd)
+{
+    MemHandle optionsH;
+    pngAlphaTransformData *optionsP;
+
+    optionsH = MemAlloc(sizeof(pngAlphaTransformData), HF_FIXED, HAF_ZERO_INIT);
+    if (optionsH == NullHandle)
+    {
+        return NullHandle;
+    }
+
+    optionsP = (pngAlphaTransformData *) MemLock(optionsH);
+    if (optionsP == (pngAlphaTransformData *)0)
+    {
+        MemFree(optionsH);
+        return NullHandle;
+    }
+
+    *optionsP = *patd;
+    MemUnlock(optionsH);
+
+    return optionsH;
+}
+
+MemHandle _pascal
+PngImportBuildOptions(MemHandle optionsUI)
+{
+    pngAlphaTransformData patd;
+
+    PngImportInitAlphaDefaults(&patd);
+
+    if (optionsUI != NullHandle)
+    {
+        PngImportReadAlphaFromUI(optionsUI, &patd);
+    }
+
+    return PngImportCreateOptionsBlock(&patd);
+}
+
+void _pascal
+PngImportInitUI(MemHandle optionsUI)
+{
+    pngAlphaTransformData patd;
+
+    if (optionsUI == NullHandle)
+    {
+        return;
+    }
+
+    PngImportInitAlphaDefaults(&patd);
+    PngImportApplyAlphaToUI(optionsUI, &patd);
+}
+
+dword _pascal
+PngImport(ImportFrame *frame, VMChain *chain)
 {
     VMBlockHandle bmblock;
-    pngAlphaTransformData pngAlphaTransform = {0};
+    pngAlphaTransformData pngAlphaTransform;
+    pngAlphaTransformData *optionsP;
 
-    pngAlphaTransform.method = PNG_AT_BLEND;
-    pngAlphaTransform.blendColor.RGB_red = 255;
-    pngAlphaTransform.blendColor.RGB_green = 255;
-    pngAlphaTransform.blendColor.RGB_blue = 255;
+    PngImportInitAlphaDefaults(&pngAlphaTransform);
 
     *chain = 0;
+
+    if (frame->IF_importOptions != NullHandle)
+    {
+        optionsP = (pngAlphaTransformData *) MemLock(frame->IF_importOptions);
+        if (optionsP != (pngAlphaTransformData *)0)
+        {
+            pngAlphaTransform = *optionsP;
+            MemUnlock(frame->IF_importOptions);
+        }
+    }
+
     bmblock = pngImportConvertFile(frame->IF_sourceFile, frame->IF_transferVMFile, &pngAlphaTransform);
 
     if (bmblock != NullHandle)
     {
         *chain = VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock);
-        return (TE_NO_ERROR | (((dword)CIF_BITMAP) << 16)); /* CIF_BITMAP must be included if no error */
+        return (TE_NO_ERROR | (((dword)CIF_BITMAP) << 16));
     }
 
     return (TE_INVALID_FORMAT);
 }
 
-word _pascal PngTestFile(FileHandle file)
+word _pascal
+PngTestFile(FileHandle file)
 {
-    Boolean isPNG = FALSE;
+    Boolean isPNG;
 
     isPNG = pngImportCheckHeader(file);
 
-    if(!isPNG) return NO_IDEA_FORMAT;
+    if (!isPNG)
+    {
+        return NO_IDEA_FORMAT;
+    }
 
     return TE_NO_ERROR;
-};
-
+}
