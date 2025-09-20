@@ -1016,9 +1016,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         }
 
         /* initialize min, max and avg values in fontHeader */
-        fontHeader->FH_maxBSB   = -9999;
         fontHeader->FH_minTSB   = -9999;
-        fontHeader->FH_accent   = 0;
 
         fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
                                                        &fontHeader->FH_firstChar, 
@@ -1041,18 +1039,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 /* load glyph metrics without scaling or hinting */
                 TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
-                /* scan yMin -> check */
-                if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
-                        fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
-
                 /* scan yMax -> check */
                 if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
                         fontHeader->FH_minTSB = GLYPH_BBOX.yMax;
-
-                /* check */
-                if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT )
-                        if ( fontHeader->FH_accent < GLYPH_BBOX.yMax )
-                                fontHeader->FH_accent = GLYPH_BBOX.yMax;
         }
 
         /* read parameter from os2 table */
@@ -1073,11 +1062,15 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
         fontHeader->FH_minLSB   = FACE_PROPERTIES.horizontal->min_Left_Side_Bearing;
 
+        /* read parameter from header table */
 
-        fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent; 
+        fontHeader->FH_accent = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
+        fontHeader->FH_maxBSB = fontHeader->FH_descender- FACE_PROPERTIES.header->yMin;
+
+
+
         fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
         fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
-        fontHeader->FH_maxBSB     = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
         fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
         fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
         
