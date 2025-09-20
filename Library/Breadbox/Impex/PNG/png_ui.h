@@ -3,8 +3,8 @@
  */
 
 typedef enum {
-    PNG_AT_TRESHOLD = 0,
-    PNG_AT_BLEND
+    AT_TRESHOLD = 0,
+    AT_BLEND
 } aTransformMethod;
 
 struct ie_uidata {

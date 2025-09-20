@@ -180,62 +180,41 @@ TransGetExportUI endp
 
 ;--------------------------------------------------------------------------------
 
-TransGetImportOptions proc far uses bx, cx, si, di, ds
-        .enter
-        push    ax
-        push    cx
-        push    bx
-        push    bp
-        push    si
-        push    di
-        push    ds
+TransGetImportOptions proc far uses ax,bx,cx,bp,si,di,ds
+    .enter
 
+    mov     ax, MSG_GEN_ITEM_GROUP_GET_SELECTION    ; message to get selected item
+    mov     bx,dx                                   ; dialog handle
+    mov     si, offset _PngAlphaMethodGroup         ; UI element is PngAlphaMethodGroup
+    mov     di, mask MF_CALL                        ; flags
+    call    ObjMessage                              ; get selected item
 
-        mov     bx,dx                                   ; dialog handle
-        mov     si, offset _PngAlphaMethodGroup         ; import options group
-        mov     di, mask MF_CALL or mask MF_FIXUP_DS    ; flags
-        mov     ax, MSG_GEN_ITEM_GROUP_GET_SELECTION    ; message to get selected item
-        call    ObjMessage                              ; get selected item
+    push    ax                                      ; store selected option
 
-        push    ax                                      ; store selected option
+    mov     ax, PNG_ALPHA_OPTIONS_SIZE              ; size of options structure (bytes)
+    mov     cl, mask HF_SWAPABLE                    ; 50h = movable + swapable
+    mov     ch, mask HAF_ZERO_INIT or mask HAF_LOCK ; 40h = zero filled + locked
+    call    MemAlloc                                ; allocate options structure
+    xor     dx,dx                                   ; no special flags
+    jc      iopt_err                                ; jump if error
 
-        mov     ax, PNG_ALPHA_OPTIONS_SIZE              ; size of options structure (bytes)
-        mov     cl,050h                                 ; 80h = movable
-        mov     ch,040h                                 ; 40h = zero filled
-        call    MemAlloc                                ; allocate options structure
-
-        xor     dx,dx  ; no special flags
-        jc      iopt_err ; jump if error
-        push    ax  ; save pointer to options structure
-        pop     ds ; set DS to point to it
-        pop     ax ; restore selected option
-        mov     [ds:00000h],ax          ; move selected value to aTransforMethod
-        call    MemUnlock ; unlock options structure
-        mov     dx,bx ; restore dialog handle
-        clc     ; clear carry to indicate success
+    push    ax                                      ; save pointer to options structure
+    pop     ds                                      ; set DS to point to it
+    pop     ax                                      ; restore selected option
+    mov     [ds:00000h],ax                          ; move selected value to aTransforMethod
+    call    MemUnlock                               ; unlock options structure
+    mov     dx,bx                                   ; restore dialog handle
+    clc                                             ; clear carry to indicate success
 
 iopt_err:
-        pop     ds
-        pop     di
-        pop     si
-        pop     bp
-        pop     bx
-        pop     cx
-        pop     ax
-        .leave
-        ret
+    .leave
+    ret
 TransGetImportOptions endp
 
 ;--------------------------------------------------------------------------------
 
-TransGetExportOptions proc far
-        push    ax                             ; 01ED 50
-        push    cx                             ; 01EE 51
-        push    bx                             ; 01EF 53
-        push    bp                             ; 01F0 55
-        push    si                             ; 01F1 56
-        push    di                             ; 01F2 57
-        push    ds                             ; 01F3 1E
+TransGetExportOptions proc far uses ax,bx,cx,bp,si,di,ds
+        .enter
 
         mov     ax,MSG_GEN_ITEM_GROUP_GET_SELECTION
         mov     bx,dx
@@ -243,28 +222,24 @@ TransGetExportOptions proc far
         mov     di,mask MF_CALL
         call    ObjMessage
 
-        push    ax                   ; store selected option
-        mov     ax,00002h            ; size of options structure (bytes)
-        mov     cl,050h              ; 80h = movable
-        mov     ch,040h              ; 40h = zero filled
-        call    MemAlloc             ; allocate options structure
-        xor     dx,dx                ; no special flags
-        jc      iopt_err             ; jump if error
-        push    ax                   ; save pointer to options structure
-        pop     ds                   ; set DS to point to it
-        pop     ax                   ; restore selected option
-        mov     [ds:00000h],ax       ; move selected value to bottom of options structure (?)
-        call    MemUnlock            ; unlock options structure
-        mov     dx,bx                ; restore dialog handle
+        push    ax                                      ; store selected option
+
+        mov     ax,00002h                               ; size of options structure (bytes), 2 = word
+        mov     cl, mask HF_SWAPABLE                    ; 50h = movable + swapable
+        mov     ch, mask HAF_ZERO_INIT or mask HAF_LOCK ; 40h = zero filled + locked
+        call    MemAlloc                                ; allocate options structure
+        xor     dx,dx                                   ; no special flags
+        jc      iopt_err                                ; jump if error
+
+        push    ax                                      ; save pointer to options structure
+        pop     ds                                      ; set DS to point to it
+        pop     ax                                      ; restore selected option
+        mov     [ds:00000h],ax                          ; move selected value to bottom of options structure (?)
+        call    MemUnlock                               ; unlock options structure
+        mov     dx,bx                                   ; restore dialog handle
         clc
 iopt_err:
-        pop     ds                             ; 0236 1F
-        pop     di                             ; 0237 5F
-        pop     si                             ; 0238 5E
-        pop     bp                             ; 0239 5D
-        pop     bx                             ; 023A 5B
-        pop     cx                             ; 023B 59
-        pop     ax                             ; 023C 58
+        .leave
         ret
 TransGetExportOptions endp
 

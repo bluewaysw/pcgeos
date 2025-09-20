@@ -21,6 +21,7 @@
 #include <graphics.h>
 #include <color.h>
 #include <xlatLib.h>
+#include <png_ui.h>
 
 
 dword _pascal
@@ -28,6 +29,7 @@ PngImport(ImportFrame *frame, VMChain *chain)
 {
     VMBlockHandle bmblock;
     pngAlphaTransformData pngAlphaTransform;
+    byte *optionsP;
 
     /*
     pngAlphaTransformData *optionsP;
@@ -46,6 +48,22 @@ PngImport(ImportFrame *frame, VMChain *chain)
         }
     }
         */
+
+    pngAlphaTransform.method = AT_TRESHOLD;
+    pngAlphaTransform.alphaThreshold = 128;
+    pngAlphaTransform.blendColor.RGB_red = 128;
+    pngAlphaTransform.blendColor.RGB_green = 128;
+    pngAlphaTransform.blendColor.RGB_blue = 128;
+
+    if (frame->IF_importOptions != NullHandle)
+    {
+        optionsP = (byte*) MemLock(frame->IF_importOptions);
+        //if (optionsP != (pngAlphaTransformData *)0)
+        {
+            pngAlphaTransform.method = *optionsP;
+            MemUnlock(frame->IF_importOptions);
+        }
+    }
 
     bmblock = pngImportConvertFile(frame->IF_sourceFile, frame->IF_transferVMFile, &pngAlphaTransform);
 

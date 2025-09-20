@@ -88,7 +88,7 @@ imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
                 pnglib.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h \
                 zconf.h htmldrv.h product.h math.h htmlfstr.h awatcher.h \
-                htmlprog.h
+                htmlprog.h png_ui.h
 png_ui.obj \
 png_ui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
