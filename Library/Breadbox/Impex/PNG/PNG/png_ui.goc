@@ -11,6 +11,7 @@
 @include <object.h>
 
 #include "png_ui.h"
+#include "pnglib.h"
 
 /* Accessing elements of a duplicated UI resource - combines known offset with current handle */
 @define dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
@@ -18,8 +19,11 @@
 /* Derives classes, Messages */
 @class PngImportGroupClass, GenInteractionClass;
 
-     @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PNG_ALPHA_METHOD_SELECTED;
-     @message (GEN_TRIGGER_ACTION) MSG_DISMISS_PNG_IMPORT_DIALOG;
+    @instance pngAlphaTransformData pngAlphaTransform = {0};
+
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PNG_ALPHA_METHOD_SELECTED;
+    @message (GEN_TRIGGER_ACTION) MSG_RESET_PNG_IMPORT_DIALOG;
+    @message (GEN_TRIGGER_ACTION) MSG_DISMISS_PNG_IMPORT_DIALOG;
 
 @endc
 @classdecl PngImportGroupClass;
@@ -29,17 +33,17 @@
 /*----- Alpha handling method selection -----*/
 
 @object GenItemClass PngAlphaMethodBlend = {
-    GI_visMoniker = "Blend color";
+    GI_visMoniker = "Blend with Background Color";
     GII_identifier = AT_BLEND;
 }
 
 @object GenItemClass PngAlphaMethodMask = {
-    GI_visMoniker = "Alpha to mask";
+    GI_visMoniker = "Convert to 1-bit Mask";
     GII_identifier = AT_TRESHOLD;
 }
 
 @object GenItemGroupClass PngAlphaMethodGroup = {
-    GI_visMoniker = "Method:";
+    GI_visMoniker = "Alpha Channel Conversion:";
     GIGI_selection = AT_BLEND;
     GIGI_behaviorType = GIGBT_EXCLUSIVE;
     GI_comp = @PngAlphaMethodBlend, @PngAlphaMethodMask;
@@ -55,12 +59,6 @@
 @object GenTextClass PngAlphaBlendExplain = {
     GI_attrs = @default | GA_READ_ONLY;
     GTXI_text = "Replace transparency by blending the image with a single background color you choose. Semi-transparent pixels are mixed with that color so the saved image has no transparent areas.";
-
-    HINT_FIXED_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 60,
-        SST_LINES_OF_TEXT | 4,
-        0
-    };
 }
 
 @object ColorSelectorClass PngAlphaBlendColor = {
@@ -88,11 +86,6 @@
     GI_attrs = @default | GA_READ_ONLY;
     GTXI_text = "Convert the alpha channel to a 1-bit mask: each pixel becomes either fully opaque or fully transparent. Pixels with alpha equal to or above the threshold will remain opaque; those below become fully transparent. Increasing the threshold makes fewer pixels opaque (more transparent).";
 
-    HINT_FIXED_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 60,
-        SST_LINES_OF_TEXT | 7,
-        0
-    };
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
 
@@ -127,8 +120,17 @@
     HINT_DEFAULT_DEFAULT_ACTION;
 }
 
-@object GenTriggerClass PngImportCancelButton = {
+@object GenTriggerClass PngImportResetButton = {
     ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_RESET;
+    // GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_actionMsg = MSG_RESET_PNG_IMPORT_DIALOG;
+    GTI_destination = @PngImportGroup;
+
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PngImportCancelButton = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
     GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
     GTI_actionMsg = MSG_DISMISS_PNG_IMPORT_DIALOG;
     GTI_destination = @PngImportGroup;
@@ -137,7 +139,7 @@
 }
 
 @object GenInteractionClass PngImportReplyBar = {
-    GI_comp = @PngImportApplyButton, @PngImportCancelButton;
+    GI_comp = @PngImportApplyButton, @PngImportResetButton, @PngImportCancelButton;
 
     HINT_MAKE_REPLY_BAR;
 }
@@ -203,6 +205,38 @@
 @end ExportInterface;
 
 
+@method PngImportGroupClass, MSG_VIS_OPEN
+{
+    ColorAndFlagReturn   cafr;
+
+    @callsuper();
+
+    pself->pngAlphaTransform.method = @call @dup(@PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    pself->pngAlphaTransform.alphaThreshold = (byte) @call @dup(@PngAlphaThresholdValue)::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call @dup(@PngAlphaBlendColor)::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+
+    // convert INDEX to RGB
+    if(cafr.CAFR_color.CQ_info == CF_INDEX)
+    {
+        RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
+        pself->pngAlphaTransform.blendColor.RGB_red = RGB_RED(c);
+        pself->pngAlphaTransform.blendColor.RGB_green = RGB_GREEN(c);
+        pself->pngAlphaTransform.blendColor.RGB_blue = RGB_BLUE(c);
+    }
+    else if (cafr.CAFR_color.CQ_info == CF_RGB)
+    {
+        pself->pngAlphaTransform.blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        pself->pngAlphaTransform.blendColor.RGB_green = cafr.CAFR_color.CQ_green;
+        pself->pngAlphaTransform.blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
+    }
+    else if (cafr.CAFR_color.CQ_info == CF_GRAY)
+    {
+        pself->pngAlphaTransform.blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        pself->pngAlphaTransform.blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
+        pself->pngAlphaTransform.blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
+    }
+}
+
 @method PngImportGroupClass, MSG_PNG_ALPHA_METHOD_SELECTED
 {
     if (selection == GIGS_NONE)
@@ -224,8 +258,7 @@
     @call oself::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);// shrink to minimum size
 }
 
-
-@method PngImportGroupClass, MSG_DISMISS_PNG_IMPORT_DIALOG
+@method PngImportGroupClass, MSG_RESET_PNG_IMPORT_DIALOG
 {
     ColorQuad   defaultBlendColor = {C_WHITE, CF_INDEX, 0, 0};
 
@@ -235,4 +268,29 @@
 
     @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
     @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+}
+
+@method PngImportGroupClass, MSG_DISMISS_PNG_IMPORT_DIALOG
+{
+    ColorQuad   orginalBlendColor = {C_WHITE, CF_INDEX, 0, 0};
+
+    orginalBlendColor.CQ_info = CF_RGB;
+    orginalBlendColor.CQ_redOrIndex = pself->pngAlphaTransform.blendColor.RGB_red;
+    orginalBlendColor.CQ_green = pself->pngAlphaTransform.blendColor.RGB_green;
+    orginalBlendColor.CQ_blue = pself->pngAlphaTransform.blendColor.RGB_blue;
+
+    @call @dup(@PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(pself->pngAlphaTransform.method, FALSE);
+    @call @dup(@PngAlphaBlendColor)::MSG_COLOR_SELECTOR_SET_COLOR(orginalBlendColor, FALSE);
+    @call @dup(@PngAlphaThresholdValue)::MSG_GEN_VALUE_SET_INTEGER_VALUE(pself->pngAlphaTransform.alphaThreshold , FALSE);
+
+    if (pself->pngAlphaTransform.method == AT_BLEND)
+    {
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else
+    {
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
 }
