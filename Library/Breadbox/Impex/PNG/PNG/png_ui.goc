@@ -10,6 +10,8 @@
 @include <Objects/colorC.goh>
 @include <object.h>
 
+#include "png_ui.h"
+
 /* Accessing elements of a duplicated UI resource - combines known offset with current handle */
 @define dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
 
@@ -17,6 +19,7 @@
 @class PngImportGroupClass, GenInteractionClass;
 
      @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PNG_ALPHA_METHOD_SELECTED;
+     @message (GEN_TRIGGER_ACTION) MSG_DISMISS_PNG_IMPORT_DIALOG;
 
 @endc
 @classdecl PngImportGroupClass;
@@ -27,17 +30,17 @@
 
 @object GenItemClass PngAlphaMethodBlend = {
     GI_visMoniker = "Blend color";
-    GII_identifier = 1;
+    GII_identifier = AT_BLEND;
 }
 
 @object GenItemClass PngAlphaMethodMask = {
     GI_visMoniker = "Alpha to mask";
-    GII_identifier = 0;
+    GII_identifier = AT_TRESHOLD;
 }
 
 @object GenItemGroupClass PngAlphaMethodGroup = {
     GI_visMoniker = "Method:";
-    GIGI_selection = 1;
+    GIGI_selection = AT_BLEND;
     GIGI_behaviorType = GIGBT_EXCLUSIVE;
     GI_comp = @PngAlphaMethodBlend, @PngAlphaMethodMask;
     GIGI_destination = @PngImportGroup;
@@ -117,16 +120,25 @@
 
 /*----- Reply bar and wrapper -----*/
 
-@object GenTriggerClass PngImportOkButton = {
-    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK; // IC_APPLY; IC_DISMISS
+@object GenTriggerClass PngImportApplyButton = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
     GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
 
     HINT_SEEK_REPLY_BAR;
     HINT_DEFAULT_DEFAULT_ACTION;
 }
 
+@object GenTriggerClass PngImportCancelButton = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_RESET;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_actionMsg = MSG_DISMISS_PNG_IMPORT_DIALOG;
+    GTI_destination = @PngImportGroup;
+
+    HINT_SEEK_REPLY_BAR;
+}
+
 @object GenInteractionClass PngImportReplyBar = {
-    GI_comp = @PngImportOkButton;
+    GI_comp = @PngImportApplyButton, @PngImportCancelButton;
 
     HINT_MAKE_REPLY_BAR;
 }
@@ -210,5 +222,18 @@
         @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
     }
 
-    @call oself::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);	// shrink to minimum size
+    @call oself::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);// shrink to minimum size
+}
+
+
+@method PngImportGroupClass, MSG_DISMISS_PNG_IMPORT_DIALOG
+{
+    ColorQuad       defaultBlendColor = {C_WHITE, CF_INDEX, 0, 0};
+
+    @call @dup(@PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(AT_BLEND, FALSE);
+    @call @dup(@PngAlphaBlendColor)::MSG_COLOR_SELECTOR_SET_COLOR(defaultBlendColor, FALSE);
+    @call @dup(@PngAlphaThresholdValue)::MSG_GEN_VALUE_SET_INTEGER_VALUE(192, FALSE);
+
+    @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
 }
