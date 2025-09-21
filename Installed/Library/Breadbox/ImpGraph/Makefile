@@ -5,11 +5,11 @@
 #
 GEODE           = impgraph
 ASMIMP          = asmimpManager.asm impgif.asm iimpgif.def
-IMPBMP          = ibcommon.h impgif.h impjpeg.h imppng.h impfjpeg.goc\
-                  impgifc.goc impjpeg.goc imppng.goc
+IMPBMP          = impgif.h impjpeg.h ibcommon.h imppng.h impgifc.goc\
+                  impjpeg.goc impfjpeg.goc imppng.goc
 MAIN            = awatcher.goc impgraph.goc
 UI_TO_RDFS      =
-OBJS            = impfjpeg.obj impgifc.obj impjpeg.obj imppng.obj\
+OBJS            = impgifc.obj impjpeg.obj impfjpeg.obj imppng.obj\
                   awatcher.obj impgraph.obj
 COMMON          =
 MODULES         = ASMIMP

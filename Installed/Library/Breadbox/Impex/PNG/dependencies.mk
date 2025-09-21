@@ -88,7 +88,7 @@ imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
                 pnglib.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h \
                 zconf.h htmldrv.h product.h math.h htmlfstr.h awatcher.h \
-                htmlprog.h png_ui.h
+                htmlprog.h
 png_ui.obj \
 png_ui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -116,9 +116,8 @@ png_ui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h png_ui.h pnglib.h \
-                Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h zconf.h \
-                htmldrv.h product.h math.h htmlfstr.h awatcher.h \
-                htmlprog.h
+                parallDr.h hugearr.h fileEnum.h pnglib.h Ansi/stdio.h \
+                Ansi/stdlib.h Ansi/string.h zlib.h zconf.h htmldrv.h \
+                product.h math.h htmlfstr.h awatcher.h htmlprog.h
 
 pngEC.geo png.geo : geos.ldf ui.ldf impex.ldf extgraph.ldf color.ldf pnglib.ldf 

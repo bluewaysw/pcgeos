@@ -7,12 +7,9 @@ include graphics.def
 UseLib Objects/colorC.def
 UseLib Objects/gValueC.def
 
-
-png_ui_TEXT   segment public 'CODE'
-    extrn  PNGIMPORTATTACH: far
-png_ui_TEXT   ends
-
+;================================================================================
 ; UI symbols defined in C that we need to access here: prefix with underscore!
+
 global _PngImportGroup: nptr
 global _PngExportGroup: nptr
 global _PngAlphaMethodGroup: nptr
@@ -20,10 +17,12 @@ global _PngAlphaBlendColor: nptr
 global _PngAlphaThresholdValue: nptr
 global _PngExpFormGroup: nptr
 
+;================================================================================
 ; global functions implemented in C
 ; segment must be "public 'CODE'" to ensure that it combines
 ; with properly the C segment of the same name.
 ; imptpng_TEXT = "imppng.goc" - ".goc + "TEXT"
+
 imppng_TEXT   segment public 'CODE'
     extrn  PNGIMPORT: far
     extrn  PNGTESTFILE: far
@@ -33,8 +32,13 @@ exppng_TEXT   segment public 'CODE'
     extrn  PNGEXPORT: far
 exppng_TEXT   ends
 
+png_ui_TEXT   segment public 'CODE'
+    extrn  PNGIMPORTATTACH: far
+png_ui_TEXT   ends
 
+;================================================================================
 ; the following functions are required by the GEOS translator interface
+
 global  LibraryEntry: far
 global  TransExport: far
 global  TransImport: far
@@ -46,9 +50,12 @@ global  TransInitExportUI: far
 global  TransGetImportOptions: far
 global  TransGetExportOptions: far
 
+;================================================================================
 
-PNG_ALPHA_OPTIONS_SIZE equ     6        ; sizeof(struct ie_uidata)
+PNG_ALPHA_OPTIONS_SIZE equ     6        ; sizeof(pngAlphaTransformData)
 
+;================================================================================
+; standard translator interface resource segment
 ;================================================================================
 
 INIT    segment resource
@@ -68,12 +75,14 @@ LibraryEntry endp
 INIT    ends
 
 ;================================================================================
+; main code segment for translator functions
 
 ASM     segment resource
     assume cs:ASM
 
 ;--------------------------------------------------------------------------------
-
+; The following three functions are the main import/export/format test entry points
+;--------------------------------------------------------------------------------
 TransExport proc far
     uses    es,ds,si,di
         .enter
@@ -141,7 +150,9 @@ TransGetFormat proc far
 TransGetFormat endp
 
 ;--------------------------------------------------------------------------------
-
+; The following two functions get the dialog UI elements for import and export
+; options from InfoResource
+;--------------------------------------------------------------------------------
 TransGetImportUI proc far
         mov     bp,00004h                      ; 0006 BD0800
         push    di                             ; 0009 57
@@ -187,6 +198,16 @@ TransGetExportUI proc far
 TransGetExportUI endp
 
 ;--------------------------------------------------------------------------------
+; Get the values that have been chosen / selected in the UI import options.
+; We basically allocate and build this C struct and return:
+;
+;   typedef struct {
+;       pngAlphaTransformMethod method;
+;       byte alphaThreshold;
+;       RGBValue blendColor;
+;   } pngAlphaTransformData;
+;
+;--------------------------------------------------------------------------------
 
 TransGetImportOptions proc far uses ax,bx,cx,bp,si,di,ds
     .enter
@@ -226,6 +247,7 @@ color_ready:
     push    bx                                      ; save green & blue (BH/BL)
     push    ax                                      ; save red (AL)
 
+                                                    ; now allocate and fill options structure
     mov     ax, PNG_ALPHA_OPTIONS_SIZE              ; size of options structure (bytes)
     mov     cl, mask HF_SWAPABLE                    ; 50h = movable + swapable
     mov     ch, mask HAF_ZERO_INIT or mask HAF_LOCK ; 40h = zero filled + locked
@@ -241,6 +263,7 @@ color_ready:
     pop     dx                                      ; threshold (DL)
     pop     cx                                      ; method (word)
 
+                                                    ; fill the options structure that will be pngAlphaTransformData in C
     mov     [ds:00000h], cx                         ; store method
     mov     [ds:00002h], dl                         ; store alpha threshold
     mov     [ds:00003h], al                         ; store blend color red
@@ -263,7 +286,8 @@ iopt_done:
 TransGetImportOptions endp
 
 ;--------------------------------------------------------------------------------
-
+; Get the values that have been chosen / selected in the export options
+;--------------------------------------------------------------------------------
 TransGetExportOptions proc far uses ax,bx,cx,bp,si,di,ds
         .enter
 
@@ -295,7 +319,9 @@ iopt_err:
 TransGetExportOptions endp
 
 ;--------------------------------------------------------------------------------
-
+; The following two functions are called once when the import/export dialog is created.
+; They can be used to initialize UI elements to default values.
+;--------------------------------------------------------------------------------
 TransInitImportUI proc far
         ret
 TransInitImportUI endp
@@ -309,14 +335,15 @@ TransInitExportUI endp
 ASM     ends
 
 ;================================================================================
+; standard translator info resource segment
 
 InfoResource    segment lmem LMEM_TYPE_GENERAL, mask LMF_IN_RESOURCE
 
     dw  fmt_1_name,fmt_1_mask
-        D_OPTR  _PngImportGroup ; nptr to import options group ui element root
-        D_OPTR  _PngExportGroup ; nptr to export options group ui element root
-        dw  0C000h          ; 8000h = only support import, 0C000h = import and export
-    dw  0                   ; closing
+        D_OPTR  _PngImportGroup     ; nptr to import options group ui element root
+        D_OPTR  _PngExportGroup     ; nptr to export options group ui element root
+        dw  0C000h                  ; 8000h = only support import, 0C000h = import and export
+    dw  0                           ; closing
 
 fmt_1_name      chunk   char
         char    "PNG", 0
