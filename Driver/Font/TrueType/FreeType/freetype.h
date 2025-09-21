@@ -490,10 +490,10 @@
     TT_UShort  version;                /* 0x0001 */
     TT_FWord   xAvgCharWidth;
     TT_UShort  usWeightClass;
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  usWidthClass;
     TT_Short   fsType;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   ySubscriptXSize;
     TT_FWord   ySubscriptYSize;
     TT_FWord   ySubscriptXOffset;

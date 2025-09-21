@@ -1022,10 +1022,10 @@
     os2->version             = GET_UShort();
     os2->xAvgCharWidth       = GET_Short();
     os2->usWeightClass       = GET_UShort();
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->ySubscriptXSize     = GET_Short();
     os2->ySubscriptYSize     = GET_Short();
     os2->ySubscriptXOffset   = GET_Short();
@@ -1037,7 +1037,7 @@
     os2->yStrikeoutSize      = GET_Short();
     os2->yStrikeoutPosition  = GET_Short();
 #else
-    SKIP( 20 );
+    SKIP( 24 );
 #endif
 
     os2->sFamilyClass        = GET_Short();
