@@ -297,13 +297,6 @@ TransGetExportOptions endp
 ;--------------------------------------------------------------------------------
 
 TransInitImportUI proc far
-        or      cx, cx                              ; check for zero
-        jz      short tiu_done                      ; no UI to init
-
-        push    cx                                  ; uiHandle
-        push    dx                                  ; uiChunk
-        call    PNGIMPORTATTACH
-tiu_done:
         ret
 TransInitImportUI endp
 
