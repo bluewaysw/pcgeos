@@ -28,6 +28,7 @@ PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHan
     PngError stat = PE_NO_ERROR;
     EGError egStat = EGE_NO_ERROR;
     pngIHDRData ihdrData = {0};
+    Boolean hasMask = FALSE;
 
     // Determine bitmap size
     size_xy = BmpGetBitmapSize(srcfile, bmpblock, &egStat);
@@ -49,10 +50,12 @@ PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHan
     ihdrData.colorType = mapGEOSToPNGColorType(bmptype);
 
     // Determine bit depth based on BMFormat
+    hasMask = (bmptype & BMT_MASK) ? TRUE : FALSE;
+
     switch (bitform)
     {
-        case BMF_MONO:  ihdrData.bitDepth = 1; break;
-        case BMF_4BIT:  ihdrData.bitDepth = 4; break;
+        case BMF_MONO:  ihdrData.bitDepth = hasMask ? 8 : 1; break;
+        case BMF_4BIT:  ihdrData.bitDepth = hasMask ? 8 : 4; break;
         case BMF_8BIT:  ihdrData.bitDepth = 8; break;
         case BMF_24BIT: ihdrData.bitDepth = 8; break; // 8 bits per channel in truecolor
         default:        return PE_INVALID_BITMAP; // Unsupported format
@@ -76,12 +79,12 @@ PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHan
     }
 
     // Write PLTE chunk (if applicable)
-    if ((stat = writePLTEChunk(destfile, srcfile, bmpblock, bmptype, bitform)) != PE_NO_ERROR) {
+    if ((stat = writePLTEChunk(destfile, srcfile, bmpblock, bmptype, bitform, &ihdrData)) != PE_NO_ERROR) {
         return stat;
     }
 
     // Write IDAT chunk (handles scanline processing, filtering and compression)
-    if ((stat = writeIDATChunk(destfile, srcfile, bmpblock, &ihdrData)) != PE_NO_ERROR) {
+    if ((stat = writeIDATChunk(destfile, srcfile, bmpblock, &ihdrData, bmptype, bitform)) != PE_NO_ERROR) {
         return stat;
     }
 
@@ -149,7 +152,7 @@ PngError _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData)
 
 /*********************************************************************
 *********************************************************************/
-PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform)
+PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform, pngIHDRData* ihdrData)
 {
     pngChunkHeader header = {0};
     dword crc = 0;
@@ -161,7 +164,7 @@ PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
     byte rgb[3] = {0};
     Boolean stat = PE_NO_ERROR;
 
-    if (bmptype & BMT_PALETTE)
+    if ((bmptype & BMT_PALETTE) && ihdrData && (ihdrData->colorType == PNG_COLOR_TYPE_PALETTE))
     {
         numEntries = (bitform == BMF_4BIT) ? 16 : 256;
         palMem = MemAlloc((sizeof(RGBValue) * numEntries), HF_SWAPABLE, HAF_ZERO_INIT);
@@ -226,11 +229,12 @@ exit:
 
 /*********************************************************************
 *********************************************************************/
-PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData)
+PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData, BMType bmptype, BMFormat bitform)
 {
     void *scanlinePtr = NULL;
     word scanlineSize = 0;
-    word scanlineSizeWithFilterByte = 0;
+    dword pngRowBytes = 0;
+    dword scanlineSizeWithFilterByte = 0;
     dword idatChunkSize = 0;
     dword idatChunkPos = 0;
     dword crc = 0;
@@ -242,55 +246,120 @@ PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
 
     MemHandle filteredScanlineHan = NullHandle;
     MemHandle prevScanlineHan = NullHandle;
+    MemHandle pngScanlineHan = NullHandle;
     byte *filteredScanlinePtr = NULL;
     byte *prevScanlinePtr = NULL;
+    byte *pngScanlinePtr = NULL;
     word bytesPerPixel = calcBytesPerPixel(ihdrData);
+    Boolean hasMask = (bmptype & BMT_MASK) ? TRUE : FALSE;
+    dword width = swapEndian(ihdrData->width);
+    dword height = swapEndian(ihdrData->height);
+    word maskBytesPerRow = hasMask ? (word)((width + 7) >> 3) : 0;
+    RGBValue *palettePtr = NULL;
+    MemHandle paletteHan = NullHandle;
+    word paletteEntries = 0;
 
     if (bytesPerPixel == 0) {
         stat = PE_OTHER_ERROR; // Invalid format
         goto exit;
     }
 
-    if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, 0, &scanlinePtr, &scanlineSize)))
+    // Load palette if needed for conversion (masked paletted bitmaps expand to RGBA)
+    if (hasMask && (bitform == BMF_4BIT || bitform == BMF_8BIT))
     {
-        // Unlock source scanline, we only locked it for obtaining scanlineSize
-        HugeArrayUnlock(scanlinePtr);
-
-        scanlineSizeWithFilterByte = scanlineSize + 1; // +1 for PNG filter byte
-        if (scanlineSizeWithFilterByte == 1) {
-            stat = PE_OTHER_ERROR; // Invalid format or scanline too smol
+        EGError palErr;
+        paletteEntries = (bitform == BMF_4BIT) ? 16 : 256;
+        paletteHan = MemAlloc((word)(sizeof(RGBValue) * paletteEntries), HF_SWAPABLE, HAF_ZERO_INIT);
+        if (!paletteHan)
+        {
+            stat = PE_OUT_OF_MEMORY;
             goto exit;
         }
 
-        // Allocate memory for the output scanline buffer and previous scanline buffer
-        filteredScanlineHan = MemAlloc(scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
-        if (!filteredScanlineHan) {
-            stat = PE_OUT_OF_MEMORY; // Memory allocation failed
+        palettePtr = (RGBValue*)MemLock(paletteHan);
+        if (!palettePtr)
+        {
+            stat = PE_BLOCK_LOCK_FAILURE;
             goto exit;
         }
 
-        prevScanlineHan = MemAlloc(scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
-        if (!prevScanlineHan) {
-            stat = PE_OUT_OF_MEMORY; // Memory allocation failed
-            goto exit;
-        }
-
-        // Lock the memory
-        filteredScanlinePtr = MemLock(filteredScanlineHan);
-        if (!filteredScanlinePtr) {
-            stat = PE_BLOCK_LOCK_FAILURE; // Memory lock failed
-            goto exit;
-        }
-
-        prevScanlinePtr = MemLock(prevScanlineHan);
-        if (!prevScanlinePtr) {
-            stat = PE_BLOCK_LOCK_FAILURE; // Memory lock failed
+        palErr = EGE_NO_ERROR;
+        BmpGetBitmapPalette(srcfile, bmpblock, palettePtr, paletteEntries, &palErr);
+        if (palErr != EGE_NO_ERROR)
+        {
+            stat = PE_PALETTE_RETRIEVAL_FAILURE;
             goto exit;
         }
     }
-    else
+
+    // Calculate PNG row bytes
+    switch (ihdrData->colorType)
     {
-        stat = PE_OTHER_ERROR; // Failed to lock scanline
+        case PNG_COLOR_TYPE_GREY:
+        case PNG_COLOR_TYPE_PALETTE:
+            pngRowBytes = ((width * ihdrData->bitDepth) + 7) >> 3;
+            break;
+        case PNG_COLOR_TYPE_RGB:
+            pngRowBytes = width * 3 * (ihdrData->bitDepth / 8);
+            break;
+        case PNG_COLOR_TYPE_GREY_ALPHA:
+            pngRowBytes = width * 2 * (ihdrData->bitDepth / 8);
+            break;
+        case PNG_COLOR_TYPE_RGBA:
+            pngRowBytes = width * 4 * (ihdrData->bitDepth / 8);
+            break;
+        default:
+            stat = PE_OTHER_ERROR;
+            goto exit;
+    }
+
+    if (pngRowBytes == 0)
+    {
+        stat = PE_OTHER_ERROR;
+        goto exit;
+    }
+
+    scanlineSizeWithFilterByte = pngRowBytes + 1; // +1 for PNG filter byte
+    if (scanlineSizeWithFilterByte == 1) {
+        stat = PE_OTHER_ERROR; // Invalid format or scanline too small
+        goto exit;
+    }
+
+    // Allocate memory for the output scanline buffer and previous scanline buffer
+    filteredScanlineHan = MemAlloc((word)scanlineSizeWithFilterByte, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (!filteredScanlineHan) {
+        stat = PE_OUT_OF_MEMORY; // Memory allocation failed
+        goto exit;
+    }
+
+    prevScanlineHan = MemAlloc((word)pngRowBytes, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (!prevScanlineHan) {
+        stat = PE_OUT_OF_MEMORY; // Memory allocation failed
+        goto exit;
+    }
+
+    pngScanlineHan = MemAlloc((word)pngRowBytes, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (!pngScanlineHan) {
+        stat = PE_OUT_OF_MEMORY;
+        goto exit;
+    }
+
+    // Lock the memory
+    filteredScanlinePtr = MemLock(filteredScanlineHan);
+    if (!filteredScanlinePtr) {
+        stat = PE_BLOCK_LOCK_FAILURE; // Memory lock failed
+        goto exit;
+    }
+
+    prevScanlinePtr = MemLock(prevScanlineHan);
+    if (!prevScanlinePtr) {
+        stat = PE_BLOCK_LOCK_FAILURE; // Memory lock failed
+        goto exit;
+    }
+
+    pngScanlinePtr = MemLock(pngScanlineHan);
+    if (!pngScanlinePtr) {
+        stat = PE_BLOCK_LOCK_FAILURE;
         goto exit;
     }
 
@@ -322,18 +391,123 @@ PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
     }
 
     // Loop through all scanlines
-    for (y = 0; y < ihdrData->height; y++)
+    for (y = 0; y < height; y++)
     {
         if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &scanlinePtr, &scanlineSize)))
         {
-            // Apply best PNG filter
-            filterScanline(scanlinePtr, filteredScanlinePtr, prevScanlinePtr, scanlineSize, bytesPerPixel, ihdrData->bitDepth);
+            byte *maskPtr = (byte *)scanlinePtr;
+            byte *pixelPtr = maskPtr + maskBytesPerRow;
+            byte *dst = pngScanlinePtr;
+            dword x;
 
-            // Update prevScanline
-            memcpy(prevScanlinePtr, scanlinePtr, scanlineSize);
+            switch (ihdrData->colorType)
+            {
+                case PNG_COLOR_TYPE_GREY:
+                case PNG_COLOR_TYPE_PALETTE:
+                {
+                    // Copy pixel data directly, ignoring mask (there is none)
+                    memcpy(dst, pixelPtr, (word)pngRowBytes);
+                    break;
+                }
+
+                case PNG_COLOR_TYPE_RGB:
+                {
+                    memcpy(dst, pixelPtr, (word)pngRowBytes);
+                    break;
+                }
+
+                case PNG_COLOR_TYPE_GREY_ALPHA:
+                {
+                    dword maskIndex = 0;
+                    byte bitMask = 0x80;
+                    byte *src = pixelPtr;
+
+                    for (x = 0; x < width; x++)
+                    {
+                        byte pixelValue = (src[ x >> 3 ] >> (7 - (x & 7))) & 0x1;
+                        dst[0] = pixelValue ? 0xFF : 0x00;
+
+                        dst[1] = (maskPtr[maskIndex] & bitMask) ? 0xFF : 0x00;
+
+                        dst += 2;
+
+                        bitMask >>= 1;
+                        if (bitMask == 0)
+                        {
+                            bitMask = 0x80;
+                            maskIndex++;
+                        }
+                    }
+                    break;
+                }
+
+                case PNG_COLOR_TYPE_RGBA:
+                {
+                    dword maskIndex = 0;
+                    byte bitMask = 0x80;
+                    for (x = 0; x < width; x++)
+                    {
+                        byte alpha = (maskPtr[maskIndex] & bitMask) ? 0xFF : 0x00;
+
+                        switch (bitform)
+                        {
+                            case BMF_24BIT:
+                            {
+                                byte *src = pixelPtr + (x * 3);
+                                dst[0] = src[0];
+                                dst[1] = src[1];
+                                dst[2] = src[2];
+                                dst[3] = alpha;
+                                break;
+                            }
+                            case BMF_8BIT:
+                            {
+                                byte index = pixelPtr[x];
+                                RGBValue color = palettePtr[index];
+                                dst[0] = color.RGB_red;
+                                dst[1] = color.RGB_green;
+                                dst[2] = color.RGB_blue;
+                                dst[3] = alpha;
+                                break;
+                            }
+                            case BMF_4BIT:
+                            {
+                                byte packed = pixelPtr[x >> 1];
+                                byte index = (x & 1) ? (packed & 0x0F) : (packed >> 4);
+                                RGBValue color = palettePtr[index];
+                                dst[0] = color.RGB_red;
+                                dst[1] = color.RGB_green;
+                                dst[2] = color.RGB_blue;
+                                dst[3] = alpha;
+                                break;
+                            }
+                            default:
+                                dst[0] = dst[1] = dst[2] = 0;
+                                dst[3] = alpha;
+                                break;
+                        }
+
+                        dst += 4;
+
+                        bitMask >>= 1;
+                        if (bitMask == 0)
+                        {
+                            bitMask = 0x80;
+                            maskIndex++;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // Apply best PNG filter using prepared PNG scanline data
+            filterScanline(pngScanlinePtr, filteredScanlinePtr, prevScanlinePtr, (word)pngRowBytes, bytesPerPixel, ihdrData->bitDepth);
+
+            // Update prevScanline with the PNG data for next iteration
+            memcpy(prevScanlinePtr, pngScanlinePtr, (word)pngRowBytes);
 
             // Deflate and append to IDAT chunk
-            if (!deflateScanline(filteredScanlinePtr, scanlineSizeWithFilterByte, &zstrm, file, &idatChunkSize, &crc))
+            if (!deflateScanline(filteredScanlinePtr, (word)scanlineSizeWithFilterByte, &zstrm, file, &idatChunkSize, &crc))
             {
                 HugeArrayUnlock(scanlinePtr);
                 stat = PE_OTHER_ERROR; // Compression failed
@@ -370,6 +544,9 @@ exit:
     if (zstrmInited == TRUE) deflateEnd(&zstrm);
     if (filteredScanlineHan) MemFree(filteredScanlineHan);
     if (prevScanlineHan) MemFree(prevScanlineHan);
+    if (pngScanlineHan) MemFree(pngScanlineHan);
+    if (palettePtr) MemUnlock(paletteHan);
+    if (paletteHan) MemFree(paletteHan);
 
     return stat;
 }
@@ -639,11 +816,11 @@ word _pascal mapGEOSToPNGColorType(BMType bmptype)
     switch (bmptype & BMT_FORMAT)
     {
         case BMF_MONO:
-            return PNG_COLOR_TYPE_GREY; // 1-bit grayscale (monochrome)
+            return (bmptype & BMT_MASK) ? PNG_COLOR_TYPE_GREY_ALPHA : PNG_COLOR_TYPE_GREY; // grayscale or grayscale+alpha
 
         case BMF_4BIT:
         case BMF_8BIT:
-            return (bmptype & BMT_MASK) ? PNG_COLOR_TYPE_GREY_ALPHA : PNG_COLOR_TYPE_PALETTE; // Indexed or grayscale+alpha
+            return (bmptype & BMT_MASK) ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_PALETTE; // Indexed palette or expanded RGBA
 
         case BMF_24BIT:
             return (bmptype & BMT_MASK) ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB; // RGB or RGBA

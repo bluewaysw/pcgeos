@@ -9,8 +9,8 @@
 // Chunk Writing Functions
 PngError _pascal writePngHeader(FileHandle file);
 PngError _pascal writeIHDRChunk(FileHandle file, pngIHDRData* ihdrData);
-PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform);
-PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData);
+PngError _pascal writePLTEChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, BMType bmptype, BMFormat bitform, pngIHDRData* ihdrData);
+PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHandle bmpblock, pngIHDRData* ihdrData, BMType bmptype, BMFormat bitform);
 PngError _pascal writeIENDChunk(FileHandle file);
 
 // Processing Functions

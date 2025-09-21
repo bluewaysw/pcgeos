@@ -4,6 +4,8 @@
 #include <timer.h>
 #include <ec.h>
 #include <graphics.h>
+#include <gstring.h>
+#include <color.h>
 #include <heap.h>
 #include <Ansi/string.h>
 #include <hugearr.h>
@@ -540,25 +542,86 @@ BmpGStringToBitmap(VMFileHandle srcfile, VMBlockHandle gsblock,
 	bmstate = GrEditBitmap(destfile, bmblock, 0);
 	if(bmstate)
 	{
-		// set gstate palette for color mapping
-/*
-		if(colortab)
+		GStateHandle gstring = GrLoadGString(srcfile, GST_VMEM, gsblock);
+
+		if(gstring)
 		{
-//			stat = PalGStateCreateBmpPalette(bmstate, destfile, bmblock);
+			Rectangle bounds;
+			sword drawX;
+			sword drawY;
 
-			// if mask set highest color to white and fill the bg
-			if(bmtype & BMT_MASK)
-			{
-				GrSetAreaColor(bmstate, CF_RGB, 255, 255, 255);
-				GrFillRect(bmstate, 0, 0, width, height);
+			// define color mapping for the final draw
+			GrSetAreaColorMap(bmstate, CMT_CLOSEST);
+			GrSetTextColorMap(bmstate, CMT_CLOSEST);
+
+			GrGetGStringBounds(gstring, bmstate, 0, &bounds);
+			drawX = -bounds.R_left;
+			drawY = -bounds.R_top;
+
+				if(bmtype & BMT_MASK)
+				{
+					word originalBitmapMode = GrGetBitmapMode(bmstate);
+					word originalMixMode = GrGetMixMode(bmstate);
+					word element = 0;
+					Boolean maskDone = FALSE;
+					Boolean maskActive = FALSE;
+
+					GrSaveState(bmstate);
+					GrSetBitmapMode(bmstate, BM_EDIT_MASK, 0);
+					maskActive = (GrGetBitmapMode(bmstate) & BM_EDIT_MASK) ? TRUE : FALSE;
+
+					if(maskActive)
+				{
+					// Populate the mask by redrawing with MM_SET so painted pixels become opaque
+					GrClearBitmap(bmstate);
+					GrSetMixMode(bmstate, MM_SET);
+					GrSetAreaColor(bmstate, CF_INDEX, 1, 0, 0);
+					GrSetLineColor(bmstate, CF_INDEX, 1, 0, 0);
+					GrSetTextColor(bmstate, CF_INDEX, 1, 0, 0);
+
+					do
+					{
+						word drawResult;
+
+					drawResult = GrDrawGString(bmstate, gstring, drawX, drawY, GSC_ATTR, &element);
+					if(drawResult == GSRT_FAULT)
+					{
+						stat = EGE_BLOCK_LOCKING_FAILURE;
+						maskDone = TRUE;
+						break;
+					}
+						if(element == GR_SET_MIX_MODE)
+						{
+							GrSetGStringPos(gstring, GSSPT_SKIP_1, 0);
+							continue;
+						}
+
+						if((drawResult == GSRT_COMPLETE) || (element == GR_END_GSTRING))
+						{
+							maskDone = TRUE;
+						}
+					} while(maskDone == FALSE);
+				}
+
+				GrRestoreState(bmstate);
+				GrSetBitmapMode(bmstate, originalBitmapMode, 0);
+				GrSetMixMode(bmstate, originalMixMode);
+				GrSetGStringPos(gstring, GSSPT_BEGINNING, 0);
 			}
-		}
-*/
-		// define color mapping
-		GrSetAreaColorMap(bmstate, CMT_CLOSEST);
-		GrSetTextColorMap(bmstate, CMT_CLOSEST);
 
-		stat = ExtGrDrawGString(bmstate, 0, 0,srcfile, gsblock);
+			// draw image data into the bitmap plane
+			if(stat == EGE_NO_ERROR)
+			{
+				word finalElement = 0;
+				GrDrawGString(bmstate, gstring, drawX, drawY, 0, &finalElement);
+			}
+
+			GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+		}
+		else
+		{
+			stat = EGE_BLOCK_LOCKING_FAILURE;
+		}
 
 		GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
 	}
@@ -1034,4 +1097,3 @@ BmpSetBitmapPaletteEntry(VMFileHandle file, VMBlockHandle block,
 }
 
 /***************************************************************************/
-
