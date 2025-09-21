@@ -30,6 +30,16 @@
  */
 void FlipMonoLineH(byte *srcData, byte *workBuf, int width);
 void Flip4BitLineH(byte *srcData, byte *workBuf, int width);
+void InternalFlipBitmapH(VMFileHandle vmFile, VMBlockHandle bmpBlock, optr progressText);
+VMBlockHandle InternalCreateRotatedBitmap(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile);
+VMBlockHandle InternalRotateBitmap90(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, Boolean rotateRight, optr progressText);
+
+void InternalCopyRotatedPixel4Bit(VMFileHandle srcFile, VMBlockHandle bmpBlock, byte *destPtr, int line, int h, int maskLen);
+void InternalCopyRotatedPixel24Bit(VMFileHandle srcFile, VMBlockHandle bmpBlock, byte *destPtr, int line, int h, int maskLen);
+void InternalCopyRotatedPixelMono(VMFileHandle srcFile, VMBlockHandle bmpBlock, byte *destPtr, int line, int h, int maskLen);
+
+void InternalCopyRotatedPixel8Bit(VMFileHandle srcFile, VMBlockHandle bmpBlock, byte *destPtr, int line,
+				int oWidth, int oHeight, Boolean isMasked, Boolean rotateRight);
 
 /*
  ***************************************************************************
@@ -44,7 +54,8 @@ void Flip4BitLineH(byte *srcData, byte *workBuf, int width);
  *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
  *			destFile: 	file for the new bitmap
  *	Return: 	VMHandle of the new bitmap
- *			Null handle on error (e.g., bitmap is compressed)
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
  ---------------------------------------------------------------------------*/
 extern VMBlockHandle EXPORT BTFlipBitmap(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile) {
     return BTFlipBitmapV(srcFile, bmpBlock, destFile, 0);
@@ -58,6 +69,7 @@ extern VMBlockHandle EXPORT BTFlipBitmap(VMFileHandle srcFile, VMBlockHandle bmp
  *			progressText: optr of an text object to show progress
  *				if given, routine append dots  ('.') for every 16th line
  *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error
  ---------------------------------------------------------------------------*/
 extern VMBlockHandle EXPORT BTFlipBitmapV(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
@@ -67,14 +79,12 @@ VMBlockHandle	newBitmap;
 BitmapAccessRecord	srcBar, destBar;
 byte	*palPtr;
 
-     if ( !(srcFile && bmpBlock && destFile) ) return 0;	// Parameter error
+    if ( (!srcFile) || (!bmpBlock) || (!destFile) ) return 0;	// parameter error
 
-     /* Informationen Åber die Quell-Bitmap ermittelm */
+     /* get information about the source bitmap */
      type = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, (int*)&compact);
 
-//     masked = type & BMT_MASK;
      hasPalette = type & BMT_PALETTE;
-//     format = type & BMT_FORMAT;
 
      /* If present: retrieve palette */
      if ( hasPalette )	{
@@ -144,23 +154,54 @@ byte	*palPtr;
  *			progressText: optr of an text object to show progress
  *				if given, routine append dots  ('.') for every 16th line
  *				pass zero for no progress report
- *			Null handle on error (e.g., bitmap is compressed)
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
  ---------------------------------------------------------------------------*/
 extern VMBlockHandle EXPORT BTFlipBitmapH(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
-int format, width, height;
+int compress;
+
+    if ( (!srcFile) || (!bmpBlock) || (!destFile) ) return 0;	// parameter error
+
+    /*
+     * Copy bitmap. If compressed, decompress it instead
+     * The copy will be flipped horizontally
+     */
+    BTGetMoreBitmapInfos(srcFile, bmpBlock, NULL, NULL, &compress);
+    if (compress ) {
+    	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, destFile);
+    }else {
+    	bmpBlock  = BTCopyBitmap(srcFile, destFile, bmpBlock);
+    }
+
+    /*
+     * Now flip it. This routine flips the bitmap itself; it makes no copy.
+     */
+    InternalFlipBitmapH(destFile, bmpBlock, progressText);
+
+    return bmpBlock;
+
+}
+
+/*--------------------- InternalFlipBitmapH ---------------------
+ * Purpose:	Do the horizonal flipping job an a bitmap without copying it.
+ *		This operation is needed twice.
+ * Parameters:
+ * Strategy:
+ *	- Get informatation about the bitmap to flip
+ *	- flip it line by line. Mask (if any) is flipped separately
+ *	  The flipping code differs depending on the color depth od teh bitmap
+ * Return:	nothing. bitmap has been flipped
+ ---------------------------------------------------------------------------*/
+void InternalFlipBitmapH(VMFileHandle vmFile, VMBlockHandle bmpBlock, optr progressText) {
 int line, i, tmp;
+int format, width, height;
+int maskLen = 0;
 byte *pixel, *tmpBuffer;
 PaletteEntry rgbTmp, *rgb;
 BitmapAccessRecord bar;
-int compress;
-int	maskLen = 0; 	// zero if there is no mask present
 
-    if ( (!srcFile) || (!bmpBlock) || (!destFile) ) return 0;
 
-    /*
-     * Collect information about the bitmap to flip
-     */
-    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compress);
+    format = BTGetMoreBitmapInfos(vmFile, bmpBlock, &width, &height, NULL);
 
 DebugInfo("\rFlip! ");
 
@@ -169,25 +210,16 @@ EC(    switch ( format & BMT_FORMAT ) { \
     	case BMF_4BIT: DebugInfo("\rFlip 4 Bit"); break; \
     	case BMF_8BIT: DebugInfo("\rFlip 8 Bit"); break; \
     	case BMF_24BIT: DebugInfo("\rFlip 24 Bit"); break; \
+    	default: DebugInfo("-def-"); \
 	} )
 
     if (format & BMT_MASK ) maskLen = (width+7)/8;
     tmpBuffer = malloc(width + 2);			// 2 byte savety buffer
 
     /*
-     * Copy bitmap. If compressed, decompress it instead
-     * The copy will be flipped horizontally
-     */
-    if (compress ) {
-    	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, destFile);
-    }else {
-    	bmpBlock  = BTCopyBitmap(srcFile, destFile, bmpBlock);
-    }
-
-    /*
      * Progress line-by-line
      */
-    pixel = BTBitmapLock(destFile, bmpBlock, &bar, 0);
+    pixel = BTBitmapLock(vmFile, bmpBlock, &bar, 0);
     for ( line = 0; line < height; line++ )
     {
 	if ( progressText && ((line & 0x0F) == 0) ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
@@ -238,11 +270,7 @@ EC(    switch ( format & BMT_FORMAT ) { \
     /* clean up */
     BTBitmapUnlock(&bar, TRUE);
     free(tmpBuffer);
-
-    return bmpBlock;
-
 }
-
 
 /*--------------------- FlipMonoLineH ---------------------
  * Purpose:	Flip mask data or a monochrome pixel line horizontally
@@ -412,9 +440,479 @@ int tmp;
 
 }
 
+/*
+ ***************************************************************************
+ *
+ *	Rotate bitmap by 90∞, 180∞ or 270∞
+ *
+ *	The routines that actually fill in a line of the rotated bitmap differs
+ *      depending in the color depth, but are very similar in concept.
+ *	To make the code more readable we use two very specializec macros that
+ *	deal with the trasparency mask, which does noit depend on the color depth.
+ *
+ *
+ *
+ ***************************************************************************
+ */
+
+   /* ------------------------------------------------------------------------
+    *
+    *  Macro InitializeRotateMaskStuff
+    *  Set up some local variables that are used to rotate the transparency mask
+    *
+    *  This specialized macro uses the following variables defined in the calling routine
+    *	- y 	 must hold the index of the destination line
+    *	- oWidth must hold the width of the source bitmap
+    *	- retBuffer must point to the buffer into which the rotated pixel data is written.
+    *
+    *	- srcMaskOffset is the offset for reading the mask pixel
+    *	- srcMaskBit specifies the bit to read
+    *	- destMaskPtr ist a pointer into the transparency are of the destination bitmap
+    *	- deskMaskBit specifies the bit to write
+    *
+    *  Initial values of srcMaskOffset and srcMaskBit depends on whether we rotate clockwise
+    *  or counterclockwise. This task is somethat tricky :-)
+    *
+    *  We always write destination pixels from left to right, so the
+    *  initial setup for destMaskPtr and deskMaskBit is simple.
+    *  The values for destMaskPtr and destMaskBit will change from pixel to pixel
+    *
+    * ------------------------------------------------------------------------    */
+
+#define InitializeRotateMaskStuff 			\
+	if (clockwise) {				\
+		srcMaskOffset = y/8;			\
+		srcMaskBit = 0x80 >> (y & 0x07); 	\
+	} else {					\
+		int x;					\
+		srcMaskOffset = ((sWidth-y+7)/8) - 1;	\
+		x = (sWidth - y - 1) & 0x07;		\
+		srcMaskBit = 0x80 >> x;			\
+	}						\
+	destMaskPtr = retBuffer; 			\
+	destMaskBit = 0x80;
+
+
+
+	    /*
+	     *
+	     *
+	     */
+   /* ------------------------------------------------------------------------
+    *
+    *  Macro CopyRotatedMaskPixel
+    *  Copy a pixel of the transparency mask from source to destination.
+    *  We assume that the transparency mask of the destination was initialized with zeroes.
+    *
+    *  This specialized macro uses the following variables defined in the calling routine
+    *	- srcMaskPtr points to the start of the source transparency area
+    *	- srcMaskOffset is the offset for reading the mask pixel
+    *	- srcMaskBit specifies the bit to read
+    *	- destMaskPtr is a pointer into the transparency are of the destination bitmap
+    *	- deskMaskBit specifies the bit to write
+    *
+    *  See it the source mask bit is set. If yes, set destination bit.
+    *  In any case, move 'destination maskBit pointer' to right.
+    *
+    * ------------------------------------------------------------------------    */
+
+#define CopyRotatedMaskPixel 					\
+	    if (srcMaskPtr[srcMaskOffset] & srcMaskBit) {	\
+		*destMaskPtr = (*destMaskPtr) | destMaskBit;	\
+	    }							\
+	    destMaskBit >>= 1;					\
+	    if ( !destMaskBit ) {destMaskBit = 0x80; destMaskPtr++; }
+
+
+
+/*--------------------- BTRotateBitmap180 ---------------------
+ *	Purpose:	Rotate the bitmap by 180 degrees.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ * 	Strategy
+ *		Rotating a bitmap by 180 degrees is identical to:
+ *		- Flipping vertically with BTFlipBitmapV()
+ *		- Flipping horizontally with InternalFlipBitmapH()
+ *		  InternalFlipBitmapH() will flip the output from BTFlipBitmapV()
+ *		  directly, without making another copy.
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTRotateBitmap180(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
+VMBlockHandle newBitmap;
+
+    if ( (!srcFile) || (!bmpBlock) || (!destFile) ) return 0;	// parameter error
+
+    newBitmap = BTFlipBitmapV(srcFile, bmpBlock, destFile, progressText);
+    if ( !newBitmap ) return 0;
+
+    InternalFlipBitmapH(destFile, newBitmap, progressText);
+    return newBitmap;
+
+}
+
+/*--------------------- BTRotateBitmap90 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees clockwise.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ * 	Strategy
+
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTRotateBitmap90(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
+VMBlockHandle newBitmap;
+
+    newBitmap = InternalRotateBitmap90(srcFile, bmpBlock, destFile, TRUE, progressText);
+    return newBitmap;
+}
+
+
+/*--------------------- BTRotateBitmap270 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees counter clockwise.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ * 	Strategy
+
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTRotateBitmap270(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText) {
+VMBlockHandle newBitmap;
+
+    newBitmap = InternalRotateBitmap90(srcFile, bmpBlock, destFile, FALSE, progressText);
+    return newBitmap;
+
+}
+/*--------------------- InternalRotateBitmap90 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ * 	Strategy
+
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+VMBlockHandle InternalRotateBitmap90(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, Boolean rotateRight, optr progressText) {
+VMBlockHandle newBitmap;
+int w, h, format, compact;
+int line, isMasked;
+BitmapAccessRecord	destBar;
+void *destPtr;
+
+    /*
+     * Create the rotated bitmap
+     */
+    if ( (!srcFile) || (!bmpBlock) || (!destFile) ) return 0;	// parameter error
+    newBitmap = InternalCreateRotatedBitmap(srcFile, bmpBlock, destFile);
+    if (!newBitmap) return 0;
+
+
+    /*
+     * Get information about bitmap to rotate.
+     * If the bitmap is compacted, uncompact it first
+     */
+    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &w, &h, &compact);
+    isMasked = (format & BMT_MASK) ? TRUE : FALSE;
+
+
+    if ( compact ) {
+     	/* The uncomapcted bitmap will be stored in destFile
+     	 * --> "souceFile" must be switched to this file
+     	 */
+     	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, srcFile);
+     	destFile = srcFile;
+    }
+
+
+     /*
+      * Lock line-by-line of the destination bitmap and fill it in.
+      * Filling is done by specialized routines, depending on the color depth.
+      */
+     destPtr = BTBitmapLock(destFile, newBitmap, &destBar, 0);
+     for (line = 0; line < w; line++) {			// note: w is the height of the destination bitmap
+
+	if ( progressText) {
+	    if ( (line & 0x0F) == 0 ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+
+	switch (format & BMT_FORMAT) {
+    	case BMF_MONO:
+//
+    		break;
+
+    	case BMF_4BIT:
+//
+    		break;
+
+    	case BMF_8BIT:
+    	    InternalCopyRotatedPixel8Bit(srcFile, bmpBlock, destPtr, line, w, h, isMasked, rotateRight);
+	    break;
+
+    	case BMF_24BIT:
+//
+	    break;
+	}
+
+
+
+    	/* dest destination line */
+	destPtr = BTBitmapNext(&destBar, TRUE);
+	if(!destPtr) break;
+        }
+
+    /*
+     * Finaly, unlock bitmap. If the source was compacted, free the uncompacted copy
+     * Then we are done.
+     */
+    BTBitmapUnlock(&destBar, TRUE);
+    if ( compact ) {
+     	HugeArrayDestroy(srcFile, bmpBlock);	// in fact, sourceFile is equal to destFile here
+    }
+
+    return newBitmap;
+
+}
+
+
+
+
+/*--------------------- InternalCreateRotatedBitmap ---------------------
+ * Purpose:	Create a bitmap with te same color depth, which is rotated by 90 degrees
+ *		Copy palette, if any
+ *		Do not copy any data. Do not initialize the bitmap data in any other way.
+ * Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *		destFile: 	file for the new bitmap
+ * Return:	VMBlockHandle of the new bitmap
+ *		Zero in case of error
+ ---------------------------------------------------------------------------*/
+VMBlockHandle InternalCreateRotatedBitmap(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile) {
+Boolean	hasPalette;
+int width, height, type;
+VMBlockHandle	newBitmap;
+byte	*palPtr = 0;
+
+     /* get information about the source bitmap */
+     type = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, NULL);
+
+     hasPalette = type & BMT_PALETTE;
+
+     /* If present: retrieve palette */
+     if ( hasPalette )	{
+	int numColors;
+	switch ( type & BMT_FORMAT ) {
+		case BMF_MONO: numColors = 2; break;
+		case BMF_4BIT: numColors = 16; break;
+		case BMF_8BIT: numColors = 256; break;
+		default: numColors = 0;
+		}
+	palPtr = malloc( sizeof(PaletteEntry) * 256 );
+	BTGetBitmapPalette(srcFile, bmpBlock, (PaletteEntry *)palPtr, numColors);
+	}
+     else palPtr = 0;
+
+
+     /* Create new bitmap of reversed size, release palette if necessary */
+     newBitmap = BTCreateOffscreenBitmap(destFile,
+			type, height, width, (PaletteEntry *)palPtr);
+     if ( palPtr )  free(palPtr);
+
+     return newBitmap;	// my be zero in code of error
+
+}
+
+
+/*--------------------- InternalCopyRotatedPixel8Bit ---------------------
+ * Purpose:	Fill a line of the rotated bitmap
+ *		Source and destination must be 8 bit bitmaps.
+ * Parameters:	srcFile, bmpBlock: the source bitmap (to rotate)
+ *		retBuffer: Pointer to pixel line of the rotated bitmap
+ *		y: 	   currently locked line of the destination bitmap
+ *			   This determines to the position to read pixel from source bitmap
+ *		sWidth:    width of the source bitmap (equ height of the destinateion bitmap)
+ *		sHeight:   height of the source bitmap (equ width of the destinateion bitmap)
+ *		isMasked:  TRUE if there is a transparency mask,
+ *			   FALSE if the bitmap has no transparency mask
+ *		clockwise  TRUE to rotate the bitmap clockwise
+ *			   FALSE to rotate the bitmap counter clockwise
+ * Return:	*retBuffer pixel line is filled in
+ ---------------------------------------------------------------------------*/
+void InternalCopyRotatedPixel8Bit(VMFileHandle srcFile, VMBlockHandle bmpBlock, byte *retBuffer, int y,
+				int sWidth, int sHeight, Boolean isMasked, Boolean clockwise) {
+
+/* Mask related stuff, also used by the macros InitializeRotateMaskStuff and  CopyRotatedMaskPixel */
+byte srcMaskOffset, srcMaskBit;
+byte *destMaskPtr, destMaskBit;
+byte *srcMaskPtr;
+int sMaskLen, dMaskLen;
+
+BitmapAccessRecord srcBar;		/* access the source bitmap */
+int x; 					/* loop index for pixels to write */
+int readOffset;				/* offset to read pixel from */
+int loopSel;
+byte *srcDataPtr, *destDataPtr;		/* pointer to pixels to copy */
+
+    /*
+     * Prepare transparency stuff, if appropriate
+     */
+    if (isMasked) {
+
+	/*
+	 * Set up transparency mask area sizes (source's height is equal to destinations's width)
+	 * Clear transparency mask area for destination, so that we have to handle only bits that are set
+	 * Use a powerful Macro to initialize srcMaskOffset, srcMaskBit, destMaskPtr and destMaskBit
+	 */
+	sMaskLen = (sWidth+7)/8;
+	dMaskLen = (sHeight+7)/8;
+	memset(retBuffer, 0, dMaskLen);
+
+	InitializeRotateMaskStuff;	/* Initialize some mask related local variables */
+
+    } else {
+    	sMaskLen = 0;
+    	dMaskLen = 0;
+    }
+
+    /*
+     * Common remarks:
+     * To fill in the retBuffer, we have to lock every line of the source bitmap
+     * and copy one pixel from this line to the correct location in retBuffer.
+     * We will always go through the retBuffer from left to right.
+     *
+     * If we rotate clockwise, the pixel at the bottom left becomes the  pixel
+     * at the top left, and the pixel at the top left becomes the pixel at  the
+     * top right. Therefore, we must go through the source bitmap from bottom to top.
+     *
+     * If we rotate counterclockwise, the top-right pixel becomes the  top-left
+     * pixel, and the bottom pixel becomes the top-right pixel. Therefore, we must
+     * go through the source bitmap from top to bottom.
+     *
+     * The meaning of the used variables are:
+     *	- srcMaskPtr:	Pointer to source mask area (if any)
+     *	- srcDataPtr:	Pointer to data buffer to read from
+     *	- deskMaskPtr:	Pointer to destination mask area (if any)
+     *	- deskDataPtr:	Pointer to data buffer to wirte to
+     *	- readOffset:	offset into source data buffer
+     *	- x:	position to write the pixel into destination buffer
+     *
+     *	Therefore, in priciple, we can copy a pixel with the command
+     *		destDataPtr[x] = srcDataPtr[readOffset];
+     *  but this can be more complex for monochromoe or 4 bit bitmaps.
+     *
+     */
+
+    destDataPtr = retBuffer + dMaskLen;
+
+    /*
+     * For efficiency we use separate loops for masked and not masked bitmaps
+     * as well as for clockwise and counter clockwise roatation.
+     * To make the code more readable we set up the variable loopSel with a value
+     * from 0 to 3 and use a switch command to select the correct loop code.
+     */
+
+    loopSel = clockwise ? 2 : 0;	// Bit 1 set if clockwise
+    if (isMasked) loopSel++;		// Bit 0 set if masked
+
+    switch (loopSel) {
+
+    case 0:		/* rotate counter clockwise, no transparency mask
+    			 * rop right pixel becomes the top left pixel
+    			 * lock source bitmap from top to bottom */
+
+	srcDataPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
+	readOffset = sWidth-y-1;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    destDataPtr[x] = srcDataPtr[readOffset];	/* copy pixel */
+
+	    srcDataPtr = BTBitmapNext(&srcBar, FALSE);	/* lock next source line */
+	    if(!srcDataPtr) break;
+	}
+
+    	break;
+
+    case 1:		/* rotate counter clockwise, transparency mask present
+    			 * rop right pixel becomes the top left pixel
+    			 * lock source bitmap from top to bottom */
+
+	srcMaskPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
+	srcDataPtr = srcMaskPtr + sMaskLen;
+	readOffset = sWidth-y-1;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    CopyRotatedMaskPixel;			/* Copy mask bit */
+	    destDataPtr[x] = srcDataPtr[readOffset];	/* copy pixel */
+
+	    srcMaskPtr = BTBitmapNext(&srcBar, FALSE);	/* lock next source line */
+	    srcDataPtr = srcMaskPtr + sMaskLen;
+	    if(!srcMaskPtr) break;
+	}
+
+    	break;
+
+    case 2:		/* rotate clockwise, no transparency mask
+    			 * bottom left pixel becomes the top left pixel
+    			 * lock source bitmap from bottom to top */
+
+	srcDataPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, sHeight-1);
+	readOffset = y;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    destDataPtr[x] = srcDataPtr[readOffset];	/* copy pixel */
+
+	    srcDataPtr = BTBitmapPrev(&srcBar, FALSE);	/* lock previous source line */
+	    if(!srcDataPtr) break;
+	}
+    	break;
+
+    case 3:		/* rotate clockwise, transparency mask present
+    			 * bottom left pixel becomes the top left pixel
+    			 * lock source bitmap from bottom to top */
+
+	srcMaskPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, sHeight-1);
+	srcDataPtr = srcMaskPtr + sMaskLen;
+	readOffset = y;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    CopyRotatedMaskPixel;			/* Copy mask bit */
+	    destDataPtr[x] = srcDataPtr[readOffset];	/* copy pixel */
+
+	    srcMaskPtr = BTBitmapPrev(&srcBar, FALSE);	/* lock previous source line */
+	    srcDataPtr = srcMaskPtr + sMaskLen;
+	    if(!srcMaskPtr) break;
+      	}
+
+    	break;
+
+    }
+
+    BTBitmapUnlock(&srcBar, FALSE);
+}
+
+
 /*---------------------  ---------------------
  * Purpose:
  * Parameters:
  * Return:
  ---------------------------------------------------------------------------*/
-
