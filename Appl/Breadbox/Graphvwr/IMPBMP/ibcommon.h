@@ -15,19 +15,6 @@ typedef enum
   IBF_PNG
 } ImpBmpFormat;
 
-// make sure to keep the following two structs in sync with
-// alpha supporting formats, like PNG and QOI
-typedef enum {
-    AT_TRESHOLD = 0,
-    AT_BLEND
-} alphaTransformMethod;
-
-typedef struct {
-    alphaTransformMethod method;
-    byte alphaThreshold;
-    RGBValue blendColor;
-} alphaTransformData;
-
 typedef struct
 {
   FileHandle              IBP_source;
@@ -38,7 +25,6 @@ typedef struct
   word                    IBP_height;
   BMType                  IBP_format;
   char                    IBP_impForm[31];
-  alphaTransformData      IBP_alphaTransform;
 } ImpBmpParams;
 
 typedef enum

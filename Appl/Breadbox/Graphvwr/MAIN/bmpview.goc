@@ -8,7 +8,7 @@
 *   AUTHOR:     20th January 1995
 *
 *   REVISION HISTROY:
-*        Written 1995-98 by Falk Rehwagen
+*		 Written 1995-98 by Falk Rehwagen
 *
 *
 ****************************************************************************/
@@ -30,9 +30,9 @@
 #include "GRAPH/quant.h"
 #include <initfile.h>
 #include <graphics.h>
+#include <pnglib.h>
+#include <color.h>
 @include "bvdirmon.goh"
-#include "pnglib.h"
-#include "color.h"
 
 @ifndef OLD_THUMBNAIL_DB
 @include <thumbdb.h>
@@ -43,18 +43,18 @@
 
 #undef GSSetClipRect
 #define GSSetClipRect(path,rl_sw,rt_sw,rr_sw,rb_sw)      \
-        GR_SET_CLIP_RECT, GOC_WORD(path) , GOC_SW(rl_sw),                             \
-    GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
+		GR_SET_CLIP_RECT, GOC_WORD(path) , GOC_SW(rl_sw),                             \
+	GOC_SW(rt_sw),GOC_SW(rr_sw),GOC_SW(rb_sw)
 
 /**************************************************************************/
 
 extern VMChain  /*XXX*/
-    _pascal MyVMCopyVMChain(VMFileHandle sourceFile,
-          VMChain sourceChain,
-          VMFileHandle destFile);
+	_pascal MyVMCopyVMChain(VMFileHandle sourceFile,
+		  VMChain sourceChain,
+		  VMFileHandle destFile);
 extern VMChain  /*XXX*/
-    _pascal MyVMFreeVMChain(VMFileHandle sourceFile,
-                  VMChain sourceChain);
+	_pascal MyVMFreeVMChain(VMFileHandle sourceFile,
+				  VMChain sourceChain);
 
 /**************************************************************************/
 
@@ -72,7 +72,7 @@ typedef struct
 
 void
 ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
-                VMFileHandle file, VMBlockHandle block);
+				VMFileHandle file, VMBlockHandle block);
 
 typedef struct
 {
@@ -96,9 +96,9 @@ typedef struct
 
 typedef struct
 {
-    char    BVSD_path[256];
-    word    BVSD_attrs;
-    Boolean BVSD_focus;
+	char    BVSD_path[256];
+	word    BVSD_attrs;
+	Boolean BVSD_focus;
 } BVStateData;
 
 /**************************************************************************/
@@ -108,7 +108,7 @@ static void SendSelectNotify(VMBlockHandle bmpblock);
 */
 
 #define BITMAP_FORMAT FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, \
-                             CIF_BITMAP)
+							 CIF_BITMAP)
 
 #define BV_BETTER_PALETTE 0x01
 
@@ -171,10 +171,10 @@ FileHandle BVThumbnailDB = 0;
 @message void MSG_BV_CLOSE_DIRECTORY();
 @message void MSG_BV_GO_TO_DOCUMENT();
 @message void MSG_BV_CREATE_THUMBNAIL(char *name,
-                                      dword size,
-                                      FileDateAndTime date,
-                                      VMFileHandle file,
-                                      VMBlockHandle block);
+									  dword size,
+									  FileDateAndTime date,
+									  VMFileHandle file,
+									  VMBlockHandle block);
 
 @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_BV_FILE_FORMAT_CHANGED;
 @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_BV_FILE_SELECTION;
@@ -188,8 +188,6 @@ FileHandle BVThumbnailDB = 0;
 
 @message void MSG_BV_SAVE_PATH();
 @message void MSG_BV_RESET_PATH();
-@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE;
-@message void MSG_BV_ALPHA_TRANSFORM_APPLY();
 @endc;
 @classdecl BVProcessClass, neverSaved;
 
@@ -206,9 +204,9 @@ FileHandle BVThumbnailDB = 0;
 @instance byte          BVType = 0;
 @instance char          BVImpForm[31] = "";
 @message void MSG_BV_OPEN_BITMAP(FileHandle file,
-                                 VMBlockHandle block,
-                                 char *name,
-                                 char *srcform);
+								 VMBlockHandle block,
+								 char *name,
+								 char *srcform);
 @message void MSG_BV_CLOSE_BITMAP();
 @message void MSG_BV_SET_PALETTE();
 @message void MSG_BV_RESET_PALETTE();
@@ -251,9 +249,9 @@ FileHandle BVThumbnailDB = 0;
 @class ThumbnailItemClass, GenItemClass;
 
 @message void MSG_THUMBNAIL_ITEM_SET_DATA(char *name,
-                                          dword size,
-                                          FileDateAndTime date,
-                                          int folderflag);
+										  dword size,
+										  FileDateAndTime date,
+										  int folderflag);
 
 @instance FileLongName          TII_name;
 @instance dword                 TII_size;
@@ -267,85 +265,82 @@ FileHandle BVThumbnailDB = 0;
 
 @method ThumbnailItemClass, MSG_THUMBNAIL_ITEM_SET_DATA
 {
-    strcpy(&(pself->TII_name[0]), name);
-    pself->TII_size = size;
-    pself->TII_date = date;
-    pself->TII_folderflag = folderflag;
+	strcpy(&(pself->TII_name[0]), name);
+	pself->TII_size = size;
+	pself->TII_date = date;
+	pself->TII_folderflag = folderflag;
 
-    @send oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID|
-                 VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);
+	@send oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID|
+				 VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);
 }
 
 /**************************************************************************/
 
 @method ThumbnailItemClass, MSG_VIS_RECALC_SIZE
 {
-    ExtraSizeParams extraSize;
+	ExtraSizeParams extraSize;
 
-    @call oself::MSG_SPEC_GET_EXTRA_SIZE(&extraSize, 0);
+	@call oself::MSG_SPEC_GET_EXTRA_SIZE(&extraSize, 0);
 
-    return(MAKE_SIZE_DWORD(96 + extraSize.ESP_extraWidth,
-                           96 + extraSize.ESP_extraHeight));
+	return(MAKE_SIZE_DWORD(96 + extraSize.ESP_extraWidth,
+						   96 + extraSize.ESP_extraHeight));
 }
 
 /**************************************************************************/
 
 @method ThumbnailItemClass, MSG_VIS_DRAW
 {
-    word width, count;
-    VisInstance *visptr;
-    GStateHandle gstring;
+	word width, count;
+	VisInstance *visptr;
+	GStateHandle gstring;
 
-    @callsuper();
+	@callsuper();
 
-    visptr = ObjDerefVis(oself);
+	visptr = ObjDerefVis(oself);
 
-    GrSetFont(gstate, FID_BERKELEY, MakeWWFixed(9));
-    width = GrTextWidth(gstate, pself->TII_name, 0);
+	GrSetFont(gstate, FID_BERKELEY, MakeWWFixed(9));
+	width = GrTextWidth(gstate, pself->TII_name, 0);
 
-    if(width > 90)
-    {
-        width = GrTextWidth(gstate, "...", 0);
-        count = 0;
-        while ((width < 96) && (pself->TII_name[count] != 0))
-        {
-            width += (GrCharWidth(gstate, pself->TII_name[count])>>16);
-            count++;
-        };
-        count--;
-        width -= (GrCharWidth(gstate, pself->TII_name[count])>>16);
-        GrDrawText(gstate, visptr->VI_bounds.R_left + 48-(width/2),
-                            visptr->VI_bounds.R_top + 85, pself->TII_name, count);
-        GrDrawTextAtCP(gstate, "...",0);
-    }
-    else
-    {
-        GrDrawText(gstate, visptr->VI_bounds.R_left + 48-(width/2),
-                            visptr->VI_bounds.R_top + 85, pself->TII_name, 0);
-    }
+	if(width > 90)
+	{
+	  width = GrTextWidth(gstate, "...", 0);
+	  count = 0;
+	  while ((width < 96) && (pself->TII_name[count] != 0))
+	  {
+		width += (GrCharWidth(gstate, pself->TII_name[count])>>16);
+		count++;
+	  };
+	  count--;
+	  width -= (GrCharWidth(gstate, pself->TII_name[count])>>16);
+	  GrDrawText(gstate, visptr->VI_bounds.R_left + 48-(width/2),
+						visptr->VI_bounds.R_top + 85, pself->TII_name, count);
+	  GrDrawTextAtCP(gstate, "...",0);
 
-    if(pself->TII_folderflag)
-    {
-      gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK, (word) OptrToChunk(@BVDirMoniker));
-      GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+18,
-                visptr->VI_bounds.R_top+17,0,0);
-      GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
-    }
-    else
-    {
-        if(ThumbDrawItem(gstate, visptr->VI_bounds.R_left + 48,
-                            visptr->VI_bounds.R_top + 43, THJ_CENTER, TVJ_CENTER,
-                            pself->TII_name,
-                            pself->TII_size,
-                            pself->TII_date) != TE_NO_ERROR)
-        {
-            gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
-                        (word) OptrToChunk(@BVUnknownMoniker));
-            GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+21,
-                        visptr->VI_bounds.R_top+14,0,0);
-            GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
-        }
-    }
+	}
+	else
+	  GrDrawText(gstate, visptr->VI_bounds.R_left + 48-(width/2),
+						 visptr->VI_bounds.R_top + 85, pself->TII_name, 0);
+
+	if(pself->TII_folderflag)
+	{
+	  gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK, (word) OptrToChunk(@BVDirMoniker));
+	  GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+18,
+				visptr->VI_bounds.R_top+17,0,0);
+	  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+	}
+	else
+		if(ThumbDrawItem(gstate, visptr->VI_bounds.R_left + 48,
+							  visptr->VI_bounds.R_top + 43, THJ_CENTER, TVJ_CENTER,
+							 pself->TII_name,
+							 pself->TII_size,
+							 pself->TII_date) != TE_NO_ERROR)
+		{
+			  gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
+						  (word) OptrToChunk(@BVUnknownMoniker));
+			  GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+21,
+						visptr->VI_bounds.R_top+14,0,0);
+			  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+		}
 }
 
 @endif
@@ -357,42 +352,42 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object BVAppClass BVApp = {
-    GI_visMoniker = list {
-        @BVTextMoniker,
-        @BVVGAMoniker,
-        @BVHGAMoniker,
-        @BVCGAMoniker,
-        @BVTCMoniker
-    };
-    GI_comp = @BVPrimary;
+	GI_visMoniker = list {
+		@BVTextMoniker,
+		@BVVGAMoniker,
+		@BVHGAMoniker,
+		@BVCGAMoniker,
+		@BVTCMoniker
+	};
+	GI_comp = @BVPrimary;
 
-    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @BVDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @BVDocumentControl;
 
-    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @BVPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @BVPrimary;
 
-    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
-        @BVViewControl,
-        @BVEditControl,
-        @BVDocumentControl,
-        @BVDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+		@BVViewControl,
+		@BVEditControl,
+		@BVDocumentControl,
+		@BVDisplayControl;
 
-    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
-        @BVOptionGroup,
-        @BVViewOptGroup,
-        @BVImpFileShowTools;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		@BVOptionGroup,
+		@BVViewOptGroup,
+		@BVImpFileShowTools;
 
-    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
-        @BVViewControl,
-        @BVDocumentControl,
-        @BVDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+		@BVViewControl,
+		@BVDocumentControl,
+		@BVDisplayControl;
 
 
 @ifdef NEWDEAL_MEDIA_VIEWER
-          ATTR_GEN_INIT_FILE_CATEGORY = "MediaViewer";
+		  ATTR_GEN_INIT_FILE_CATEGORY = "MediaViewer";
 @else
-          ATTR_GEN_INIT_FILE_CATEGORY = "GraphicsViewer";
+		  ATTR_GEN_INIT_FILE_CATEGORY = "GraphicsViewer";
 @endif
-    //    ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER = @BVOptionSaveTrigger;
+	//	  ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER = @BVOptionSaveTrigger;
 }
 
 /**************************************************************************/
@@ -428,30 +423,30 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenPrimaryClass BVPrimary = {
-          GI_comp = @BVWorkArea,
-                        @BVFileMenu,
-                        @BVEditMenu,
-                        @BVViewMenu,
-                        @BVOptionMenu,
-                        @BVWindowMenu,
-                        @BVImportingDlg,
-                        @BVThumbDlg,
-                        @BVFileImpBmp;
-    GI_attrs = @default | GA_TARGETABLE
-                          | GA_KBD_SEARCH_PATH;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_PRIMARY_FULL_SCREEN;
+		  GI_comp = @BVWorkArea,
+						@BVFileMenu,
+						@BVEditMenu,
+												@BVViewMenu,
+						@BVOptionMenu,
+												@BVWindowMenu,
+												@BVImportingDlg,
+												@BVThumbDlg,
+												@BVFileImpBmp;
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_PRIMARY_FULL_SCREEN;
    ATTR_GEN_HELP_CONTEXT = "TOC";
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVWorkArea = {
-    GI_comp = @BVToolArea, @BVDisplayGroup;
-
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+				  GI_comp = @BVToolArea,
+							@BVDisplayGroup;
+		HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
 /**************************************************************************/
@@ -459,20 +454,20 @@ FileHandle BVThumbnailDB = 0;
 @ifdef NEWDEAL_MEDIA_VIEWER
 
 @object GenInteractionClass BVToolArea = {
-        GII_visibility = GIV_POPOUT;
-        GI_comp = @BVDocumentTool,
-                  @BVEditTool,
-                  @BVViewTool,
-                  @BVDisplayTool;
-        GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+		GII_visibility = GIV_POPOUT;
+		GI_comp = @BVDocumentTool,
+				  @BVEditTool,
+				  @BVViewTool,
+				  @BVDisplayTool;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_TOOLBOX;
+		  HINT_ALLOW_CHILDREN_TO_WRAP;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+				  HINT_CENTER_CHILDREN_VERTICALLY;
+		GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+		HINT_INTERACTION_NO_DISTURB;
 
-        HINT_ORIENT_CHILDREN_HORIZONTALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-        HINT_TOOLBOX;
-        HINT_ALLOW_CHILDREN_TO_WRAP;
-        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-        HINT_CENTER_CHILDREN_VERTICALLY;
-        HINT_INTERACTION_NO_DISTURB;
 }
 
 @else
@@ -480,30 +475,29 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenInteractionClass BVToolArea = {
-        GII_visibility = GIV_POPOUT;
-        GI_comp = @BVRealToolArea;
-        HINT_ORIENT_CHILDREN_HORIZONTALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-        HINT_CENTER_CHILDREN_VERTICALLY;
+		GII_visibility = GIV_POPOUT;
+		GI_comp = @BVRealToolArea;
+		HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		HINT_CENTER_CHILDREN_VERTICALLY;
 
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVRealToolArea = {
-        GI_comp = @BVDocumentTool,
-                  @BVEditTool,
-                  @BVViewTool,
-                  @BVDisplayTool;
-        GI_attrs = @default | GA_NOTIFY_VISIBILITY;
-
-        HINT_ORIENT_CHILDREN_HORIZONTALLY;
-        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-        HINT_TOOLBOX;
-        HINT_ALLOW_CHILDREN_TO_WRAP;
-        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-        HINT_CENTER_CHILDREN_VERTICALLY;
-        HINT_INTERACTION_NO_DISTURB;
+		GI_comp = @BVDocumentTool,
+				  @BVEditTool,
+				  @BVViewTool,
+				  @BVDisplayTool;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_TOOLBOX;
+		  HINT_ALLOW_CHILDREN_TO_WRAP;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+				  HINT_CENTER_CHILDREN_VERTICALLY;
+		GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+		HINT_INTERACTION_NO_DISTURB;
 
 }
 
@@ -512,69 +506,70 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenToolGroupClass BVEditTool = {
-    GTGI_controller = @BVEditControl;
-    HINT_MINIMIZE_CHILD_SPACING;
-    HINT_SAME_ORIENTATION_AS_PARENT;
+	GTGI_controller = @BVEditControl;
+		  HINT_MINIMIZE_CHILD_SPACING;
+		  HINT_SAME_ORIENTATION_AS_PARENT;
 }
 
 /**************************************************************************/
 
 @object GenToolGroupClass BVViewTool = {
-    GTGI_controller = @BVViewControl;
-    HINT_MINIMIZE_CHILD_SPACING;
-    HINT_SAME_ORIENTATION_AS_PARENT;
+		  GTGI_controller = @BVViewControl;
+		  HINT_MINIMIZE_CHILD_SPACING;
+		  HINT_SAME_ORIENTATION_AS_PARENT;
 }
 
 /**************************************************************************/
 
 @object GenToolGroupClass BVDisplayTool = {
-    GTGI_controller = @BVDisplayControl;
-    HINT_MINIMIZE_CHILD_SPACING;
-    HINT_SAME_ORIENTATION_AS_PARENT;
+				  GTGI_controller = @BVDisplayControl;
+		  HINT_MINIMIZE_CHILD_SPACING;
+		  HINT_SAME_ORIENTATION_AS_PARENT;
 }
 
 /**************************************************************************/
 
 @object GenToolGroupClass BVDocumentTool = {
-    GTGI_controller = @BVDocumentControl;
-    HINT_MINIMIZE_CHILD_SPACING;
-    HINT_SAME_ORIENTATION_AS_PARENT;
+				  GTGI_controller = @BVDocumentControl;
+		  HINT_MINIMIZE_CHILD_SPACING;
+		  HINT_SAME_ORIENTATION_AS_PARENT;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVWindowMenu ={
-    GI_comp = @BVDisplayControl;
-    GII_visibility = GIV_POPUP;
-    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_WINDOW_MENU);
+		GI_comp = @BVDisplayControl;
+		  GII_visibility = GIV_POPUP;
+		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_WINDOW_MENU);
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVFileMenu = {
 @ifdef NEWDEAL_MEDIA_VIEWER
-    GI_comp = @BVFileGroup;
+				  GI_comp = @BVFileGroup;
 @else
-    GI_comp = @BVFileGroup;
+				  GI_comp = @BVFileGroup;
 @endif
-    GII_visibility = GIV_POPUP;
-    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+		  GII_visibility = GIV_POPUP;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVFileGroup = {
-    GI_comp = @BVFileOpenTrigger, @BVDocumentControl;
-    GII_visibility = GIV_SUB_GROUP;
+		GI_comp = @BVFileOpenTrigger,
+				  @BVDocumentControl;
+		  GII_visibility = GIV_SUB_GROUP;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVFileOpenTrigger = {
-    GI_visMoniker = 'O', "Open";
-    HINT_TRIGGER_BRINGS_UP_WINDOW;
-    GTI_destination = BVDocumentControl;
-    GTI_actionMsg = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC;
+		GI_visMoniker = 'O', "Open";
+		HINT_TRIGGER_BRINGS_UP_WINDOW;
+		GTI_destination = BVDocumentControl;
+		GTI_actionMsg = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC;
 }
 
 /**************************************************************************/
@@ -584,425 +579,291 @@ FileHandle BVThumbnailDB = 0;
  */
 
 @object BVDocCtrlClass BVDocumentControl = {
-    GDCI_attrs = (@default &
-            (~(GDCA_VM_FILE|GDCA_CURRENT_TASK|GDCA_MODE)))
-                    | (GDCA_NATIVE
-                    | GDCA_MULTIPLE_OPEN_FILES
-                    | (GDCM_VIEWER << GDCA_MODE_OFFSET)
-                    | (GDCT_NONE << GDCA_CURRENT_TASK_OFFSET));
-    GDCI_features = @default & ~(
-                GDCF_SUPPORTS_TEMPLATES |
-                GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT |
-                GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS |
-                GDCF_NAME_ON_PRIMARY);
-    GDCI_noNameText = "No Document";
-    GDCI_documentGroup = BVDocumentGroup;
+		GDCI_attrs = (@default &
+				(~(GDCA_VM_FILE|GDCA_CURRENT_TASK|GDCA_MODE)))
+					 | (GDCA_NATIVE
+					 | GDCA_MULTIPLE_OPEN_FILES
+					 | (GDCM_VIEWER << GDCA_MODE_OFFSET)
+					 | (GDCT_NONE << GDCA_CURRENT_TASK_OFFSET));
+		GDCI_features = @default & ~(
+					GDCF_SUPPORTS_TEMPLATES |
+					GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT |
+					GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS |
+					GDCF_NAME_ON_PRIMARY);
+	GDCI_noNameText = "No Document";
+	GDCI_documentGroup = BVDocumentGroup;
 }
 
 
 /**************************************************************************/
 
 @object GenInteractionClass BVViewMenu = {
-    GII_visibility = GIV_POPUP;
-    GI_comp = @BVViewControl,
-                @BVViewOptGroup;
-    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_VIEW_MENU);
+		  GII_visibility = GIV_POPUP;
+		  GI_comp = @BVViewControl,
+						@BVViewOptGroup;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_VIEW_MENU);
 }
 
 /**************************************************************************/
 
 @object GenBooleanGroupClass BVViewOptGroup = {
-    GI_comp = @BVViewPalette;
-    GBGI_selectedBooleans = BV_BETTER_PALETTE;
-    GBGI_destination = process;
-    GBGI_applyMsg = MSG_BV_PALETTE_OPT_CHANGED;
-    ATTR_GEN_INIT_FILE_KEY = "viewMenu";
+		  GI_comp = @BVViewPalette;
+		  GBGI_selectedBooleans = BV_BETTER_PALETTE;
+		  GBGI_destination = process;
+		  GBGI_applyMsg = MSG_BV_PALETTE_OPT_CHANGED;
+		  ATTR_GEN_INIT_FILE_KEY = "viewMenu";
 }
 
 /**************************************************************************/
 
 @object GenBooleanClass BVViewPalette = {
-    GI_visMoniker = 'P', "Optimize Palette";
-    GBI_identifier = BV_BETTER_PALETTE;
+		  GI_visMoniker = 'P', "Optimize Palette";
+		  GBI_identifier = BV_BETTER_PALETTE;
 }
 
 /**************************************************************************/
 
 @object GenViewControlClass BVViewControl = {
-    GVCI_maxZoom = 400;
-    ATTR_GEN_CONTROL_PROHIBIT_UI = { (
-                                        GVCF_SHOW_HORIZONTAL
-                    |GVCF_SHOW_VERTICAL) };
-    ATTR_GEN_INIT_FILE_KEY = "viewControl";
+		GVCI_maxZoom = 400;
+		ATTR_GEN_CONTROL_PROHIBIT_UI = { (
+										 GVCF_SHOW_HORIZONTAL
+					 |GVCF_SHOW_VERTICAL) };
+		ATTR_GEN_INIT_FILE_KEY = "viewControl";
+
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVEditMenu = {
-    GII_visibility = GIV_POPUP;
-    GI_comp = @BVEditControl;
-    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
-    GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+		  GII_visibility = GIV_POPUP;
+		  GI_comp = @BVEditControl;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+	GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
 }
 
 /**************************************************************************/
 
 @object GenEditControlClass BVEditControl = {
-    ATTR_GEN_CONTROL_PROHIBIT_UI =
-        { (GECF_UNDO|GECF_SELECT_ALL|GECF_CUT|GECF_PASTE|GECF_DELETE) };
-    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
-        { (GECTF_UNDO|GECTF_SELECT_ALL|GECTF_CUT|GECTF_PASTE|GECTF_DELETE) };
-    GCI_output = (TO_APP_TARGET);
+		  ATTR_GEN_CONTROL_PROHIBIT_UI =
+ { (GECF_UNDO|GECF_SELECT_ALL|GECF_CUT|GECF_PASTE|GECF_DELETE) };
+				  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+ { (GECTF_UNDO|GECTF_SELECT_ALL|GECTF_CUT|GECTF_PASTE|GECTF_DELETE) };
+				  GCI_output = (TO_APP_TARGET);
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVOptionMenu = {
-    GII_visibility = GIV_POPUP;
-    GI_comp = @BVOptionGroup,
-            @BVAlphaConvSubgroup,
-            @BVDialogsGroup,
-            @BVOptionSaveGroup;
-    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+		GII_visibility = GIV_POPUP;
+		GI_comp = 	@BVOptionGroup,
+				@BVDialogsGroup,
+				@BVOptionSaveGroup;
+		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
 };
-
-
-/*----------------------------------------------------------------------
- * Alpha Conversion Dialog
- *----------------------------------------------------------------------*/
-
-@object GenInteractionClass BVAlphaConvSubgroup = {
-    GII_visibility = GIV_SUB_GROUP;
-    GI_comp = @AlphaConvDialog;
-};
-
-@object GenInteractionClass AlphaConvDialog = {
-    GI_visMoniker = "Alpha Channel Conversion";
-    GI_states = @default;
-    GI_comp = @AlphaMethodGroup, @AlphaBlendBox, @AlphaMaskBox,
-              @AlphaOK, @AlphaCancel;
-    GII_visibility = GIV_DIALOG;
-    GII_attrs = @default | GIA_MODAL;
-
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_DRAW_IN_BOX;
-}
-
-@object GenItemGroupClass AlphaMethodGroup = {
-    GI_visMoniker = "Method:";
-    GI_comp = @AlphaItemBlend, @AlphaItemMask;
-    GIGI_behaviorType = GIGBT_EXCLUSIVE;
-    GIGI_selection = PNG_AT_TRESHOLD;
-    GIGI_destination = process;
-    GIGI_applyMsg = MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE;
-
-    HINT_ITEM_GROUP_TOOLBOX_STYLE;
-    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
-    HINT_LEFT_JUSTIFY_CHILDREN;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-}
-
-@object GenItemClass AlphaItemBlend = {
-    GI_visMoniker = "Blend color";
-    GII_identifier = AT_BLEND;
-
-    HINT_CENTER_MONIKER;
-}
-
-@object GenItemClass AlphaItemMask = {
-    GI_visMoniker = "Alpha to mask";
-    GII_identifier = AT_TRESHOLD;
-
-    HINT_CENTER_MONIKER;
-}
-
-/* ----- blend settings (enabled by default) ----- */
-@object GenInteractionClass AlphaBlendBox = {
-    GI_visMoniker = "Blend Settings";
-    GI_comp = @AlphaBlendExplain, @AlphaBlendColor;
-
-    HINT_DRAW_IN_BOX;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_CENTER_CHILDREN_ON_MONIKERS;
-}
-
-@object GenTextClass AlphaBlendExplain =
-{
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_text = "Composite the image over a chosen background color, replacing per-pixel alpha.\rSemi-transparent areas mix with that color.\rThe result has no alpha channel.";
-    HINT_FIXED_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 80,
-        SST_LINES_OF_TEXT | 4,
-        0
-    };
-}
-
-@object ColorSelectorClass AlphaBlendColor = {
-    GI_visMoniker = "Blend color";
-
-    CSI_color = {C_WHITE, CF_INDEX, 0, 0};
-    GI_states = @default | GS_USABLE | GS_ENABLED;
-    GCI_output = process;
-    GII_type = GIT_PROPERTIES;
-
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_RGB | CSF_INDEX | CSF_OTHER);
-    ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
-}
-
-@object GenInteractionClass AlphaMaskBox = {
-    GI_visMoniker = "Mask Settings";
-    GI_comp = @AlphaMaskExplain, @AlphaThresholdValue;
-
-    HINT_DRAW_IN_BOX;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_CENTER_CHILDREN_ON_MONIKERS;
-}
-
-@object GenTextClass AlphaMaskExplain =
-{
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_text = "Convert the alpha channel to a 1-bit mask using a threshold. Pixels at or above the threshold stay opaque; the rest become fully transparent.";
-    HINT_FIXED_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 60,
-        SST_LINES_OF_TEXT | 4,
-        0
-    };
-}
-
-@object GenValueClass AlphaThresholdValue = {
-    GI_visMoniker = "Alpha threshold";
-    GVLI_minimum = MakeWWFixed(0);
-    GVLI_maximum = MakeWWFixed(255);
-    GVLI_increment = MakeWWFixed(1);
-    GVLI_value = MakeWWFixed(192);
-    GVLI_displayFormat = GVDF_INTEGER;
-
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-}
-
-/* ----- reply-bar buttons ----- */
-@object GenTriggerClass AlphaOK = {
-    GI_visMoniker = "OK";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_ALPHA_TRANSFORM_APPLY;
-    GI_attrs = @default;
-
-    HINT_SEEK_REPLY_BAR;
-    HINT_DEFAULT_DEFAULT_ACTION;
-}
-
-@object GenTriggerClass AlphaCancel = {
-    GI_visMoniker = "Cancel";
-    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-
-    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
-    HINT_SEEK_REPLY_BAR;
-}
-
 
 /**************************************************************************/
 
 @object GenInteractionClass BVDialogsGroup = {
-    GII_visibility = GIV_SUB_GROUP;
-    GI_comp = @BVDlgPicInfo;
+		GII_visibility = GIV_SUB_GROUP;
+		GI_comp = @BVDlgPicInfo;
 };
 
 /**************************************************************************/
 
 @object GenInteractionClass BVDlgPicInfo = {
-    GII_visibility = GIV_DIALOG;
+		GII_visibility = GIV_DIALOG;
 @ifdef NEWDEAL_MEDIA_VIEWER
-    GI_visMoniker = 'M', "Media Info";
+		GI_visMoniker = 'M', "Media Info";
 @else
-    GI_visMoniker = 'G', "Graphic Info";
+		GI_visMoniker = 'G', "Graphic Info";
 @endif
-    HINT_INTERACTION_NO_DISTURB;
-    GI_comp = @BVPicInfoName,
-                @BVPicInfoX,
-                @BVPicInfoY,
-                @BVPicInfoCol,
-                @BVPicInfoForm;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_CENTER_CHILDREN_ON_MONIKERS;
+		HINT_INTERACTION_NO_DISTURB;
+		GI_comp = @BVPicInfoName,
+				  @BVPicInfoX,
+				  @BVPicInfoY,
+				  @BVPicInfoCol,
+				  @BVPicInfoForm;
+		HINT_ORIENT_CHILDREN_VERTICALLY;
+		HINT_CENTER_CHILDREN_ON_MONIKERS;
 }
 
 /**************************************************************************/
 
 @object GenTextClass BVPicInfoName = {
-    GI_visMoniker = "Name:";
+		GI_visMoniker = "Name:";
 @ifdef NEWDEAL_MEDIA_VIEWER
-    GTXI_text = "<no media opened>";
+		GTXI_text = "<no media opened>";
 @else
-    GTXI_text = "<no graphic opened>";
+		GTXI_text = "<no graphic opened>";
 @endif
-    GI_attrs = @default | GA_READ_ONLY;
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
-    HINT_FIXED_SIZE = {
-        SST_WIDE_CHAR_WIDTHS|12,
-        0,
-        0
-    };
+		GI_attrs = @default | GA_READ_ONLY;
+		GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+		HINT_FIXED_SIZE = {
+		  SST_WIDE_CHAR_WIDTHS|12,
+		  0,
+		  0
+		};
 }
 
 /**************************************************************************/
 
 @object GenTextClass BVPicInfoX = {
-    GI_visMoniker = "Width:";
-    GI_attrs = @default | GA_READ_ONLY;
-    HINT_FIXED_SIZE = {
-        SST_WIDE_CHAR_WIDTHS|12,
-        0,
-        0
-    };
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+		GI_visMoniker = "Width:";
+		GI_attrs = @default | GA_READ_ONLY;
+		HINT_FIXED_SIZE = {
+		  SST_WIDE_CHAR_WIDTHS|12,
+		  0,
+		  0
+		};
+		GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
 }
 
 /**************************************************************************/
 
 @object GenTextClass BVPicInfoY = {
-    GI_visMoniker = "Height:";
-    GI_attrs = @default | GA_READ_ONLY;
-    HINT_FIXED_SIZE = {
-        SST_WIDE_CHAR_WIDTHS|12,
-        0,
-        0
-    };
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+		GI_visMoniker = "Height:";
+		GI_attrs = @default | GA_READ_ONLY;
+		HINT_FIXED_SIZE = {
+		  SST_WIDE_CHAR_WIDTHS|12,
+		  0,
+		  0
+		};
+		GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
 }
 
 /**************************************************************************/
 
 @object GenTextClass BVPicInfoCol = {
-    GI_visMoniker = "Color Count:";
-    GI_attrs = @default | GA_READ_ONLY;
-    HINT_FIXED_SIZE = {
-        SST_WIDE_CHAR_WIDTHS|12,
-        0,
-        0
-    };
-    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+		GI_visMoniker = "Color Count:";
+		GI_attrs = @default | GA_READ_ONLY;
+		HINT_FIXED_SIZE = {
+		  SST_WIDE_CHAR_WIDTHS|12,
+		  0,
+		  0
+		};
+		GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
 }
 
 /**************************************************************************/
 
 @object GenTextClass BVPicInfoForm = {
-    GI_visMoniker = "Format:";
-    HINT_FIXED_SIZE = {
-        SST_WIDE_CHAR_WIDTHS|12,
-        0,
-        0
-    };
-    GI_attrs = @default | GA_READ_ONLY;
-/*      GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;    */
+		GI_visMoniker = "Format:";
+		HINT_FIXED_SIZE = {
+		  SST_WIDE_CHAR_WIDTHS|12,
+		  0,
+		  0
+		};
+		GI_attrs = @default | GA_READ_ONLY;
+  /*      GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;    */
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVOptionSaveGroup = {
-    GII_visibility = GIV_SUB_GROUP;
-    GI_comp = @BVOptionSaveTrigger,
-            @BVOptionLoadTrigger;
+		  GII_visibility = GIV_SUB_GROUP;
+		  GI_comp = @BVOptionSaveTrigger,
+				  @BVOptionLoadTrigger;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVOptionSaveTrigger = {
-    GI_visMoniker = 'S', "Save Configuration";
-    GTI_destination = BVApp;
-    GTI_actionMsg = MSG_META_SAVE_OPTIONS;
+		  GI_visMoniker = 'S', "Save Configuration";
+		  GTI_destination = BVApp;
+		  GTI_actionMsg = MSG_META_SAVE_OPTIONS;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVOptionLoadTrigger = {
-    GI_visMoniker = 'R', "Reset Configuration";
-    GTI_actionMsg = MSG_BV_QUERY_RESET_OPTIONS;
-    GTI_destination = process;
+		  GI_visMoniker = 'R', "Reset Configuration";
+		  GTI_actionMsg = MSG_BV_QUERY_RESET_OPTIONS;
+		  GTI_destination = process;
 }
 
 /**************************************************************************/
 
 @object GenBooleanGroupClass BVOptionGroup = {
-    GI_comp = @BVOptionTool,
-                @BVOptionImp,
-                @BVOptionCloseOBox,
-                @BVOptionCreatThumb,
-                @BVOptionUseThumb;
-    GBGI_selectedBooleans = BV_SHOW_TOOLS|BV_AUTOCLOSE_OBOX|
-                            BV_AUTOCREAT_THUMB|BV_USE_THUMBNAILS;
-    GBGI_destination = process;
-    GBGI_applyMsg = MSG_BV_OPTION_STATE_CHANGED;
-    ATTR_GEN_INIT_FILE_KEY = "optMenu";
+		GI_comp = @BVOptionTool,
+				  @BVOptionImp,
+				  @BVOptionCloseOBox,
+				  @BVOptionCreatThumb,
+				  @BVOptionUseThumb;
+		GBGI_selectedBooleans = BV_SHOW_TOOLS|BV_AUTOCLOSE_OBOX|
+								BV_AUTOCREAT_THUMB|BV_USE_THUMBNAILS;
+		GBGI_destination = process;
+		GBGI_applyMsg = MSG_BV_OPTION_STATE_CHANGED;
+		ATTR_GEN_INIT_FILE_KEY = "optMenu";
 }
 
 /**************************************************************************/
 
 @object GenBooleanClass BVOptionImp = {
-                  GI_visMoniker = 'F', "Show Import Format";
-                  GBI_identifier = BV_IMP_INFO;
+				  GI_visMoniker = 'F', "Show Import Format";
+				  GBI_identifier = BV_IMP_INFO;
 }
 
 /**************************************************************************/
 
 @object GenBooleanClass BVOptionTool = {
-          GI_visMoniker = 'T', "Show Toolbar";
-          GBI_identifier = BV_SHOW_TOOLS;
+		  GI_visMoniker = 'T', "Show Toolbar";
+		  GBI_identifier = BV_SHOW_TOOLS;
 }
 
 /**************************************************************************/
 
 @object GenBooleanClass BVOptionCloseOBox = {
-      GI_visMoniker = 'A', "Auto-Close Selector";
-      GBI_identifier = BV_AUTOCLOSE_OBOX;
+	  GI_visMoniker = 'A', "Auto-Close Selector";
+	  GBI_identifier = BV_AUTOCLOSE_OBOX;
 }
 
 /**************************************************************************/
 
 @object GenBooleanClass BVOptionUseThumb = {
-      GI_visMoniker = 'U', "Use Thumbnails";
-      GBI_identifier = BV_USE_THUMBNAILS;
+	  GI_visMoniker = 'U', "Use Thumbnails";
+	  GBI_identifier = BV_USE_THUMBNAILS;
 }
 
 /**************************************************************************/
 
 @object GenBooleanClass BVOptionCreatThumb = {
-      GI_visMoniker = 'u', "Auto-Create Thumbnails";
-      GBI_identifier = BV_AUTOCREAT_THUMB;
+	  GI_visMoniker = 'u', "Auto-Create Thumbnails";
+	  GBI_identifier = BV_AUTOCREAT_THUMB;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImportingDlg = {
-          GII_attrs = @default | GIA_NOT_USER_INITIATABLE
-                                      | GIA_MODAL;
-                  GI_comp = @BVImportingTex,
-                        @BVImpStatus,
-                        @BVImportingWait,
-                        @BVStopProgressTrigger;
-          GII_visibility = GIV_DIALOG;
-          GII_type = GIT_PROGRESS;
-          HINT_CENTER_CHILDREN_HORIZONTALLY;
-          HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+		  GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+									  | GIA_MODAL;
+				  GI_comp = @BVImportingTex,
+						@BVImpStatus,
+						@BVImportingWait,
+						@BVStopProgressTrigger;
+		  GII_visibility = GIV_DIALOG;
+		  GII_type = GIT_PROGRESS;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
 }
 
 /**************************************************************************/
 
 @object GenGlyphClass BVImportingTex = {
-          GI_visMoniker = "Importing Bitmap TEST.GIF...";
+		  GI_visMoniker = "Importing Bitmap TEST.GIF...";
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpStatus = {
-          HINT_MINIMUM_SIZE = {
-             0,
-             SST_LINES_OF_TEXT|2,
-             0
-          };
-          GI_comp = @BVImportStatus;
-          HINT_CENTER_CHILDREN_HORIZONTALLY;
-          HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_MINIMUM_SIZE = {
+			 0,
+			 SST_LINES_OF_TEXT|2,
+			 0
+		  };
+		  GI_comp = @BVImportStatus;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
 }
 
 /**************************************************************************/
@@ -1013,51 +874,52 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenGlyphClass BVImportingWait = {
-          GI_visMoniker = "Please Wait!";
+		  GI_visMoniker = "Please Wait!";
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVStopProgressTrigger = {
-          GI_visMoniker = 'S', "Stop";
-          GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-          GTI_destination = BVImportStatus;
-          GTI_actionMsg = MSG_SB_STOP_PROGRESS;
-          ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_STOP };
-          HINT_SEEK_REPLY_BAR;
+		  GI_visMoniker = 'S', "Stop";
+		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+		  GTI_destination = BVImportStatus;
+		  GTI_actionMsg = MSG_SB_STOP_PROGRESS;
+		  ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_STOP };
+		  HINT_SEEK_REPLY_BAR;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVThumbDlg = {
-          GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
-                  GI_comp = @BVThumbTex,
-                        @BVThumbStatus,
-                        @BVThumbWait,
-                        @BVThumbStopTrigger;
-          GII_visibility = GIV_DIALOG;
-          GII_type = GIT_PROGRESS;
-          HINT_CENTER_CHILDREN_HORIZONTALLY;
-          HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+		  GII_attrs = @default | GIA_NOT_USER_INITIATABLE
+									  | GIA_MODAL;
+				  GI_comp = @BVThumbTex,
+						@BVThumbStatus,
+						@BVThumbWait,
+						@BVThumbStopTrigger;
+		  GII_visibility = GIV_DIALOG;
+		  GII_type = GIT_PROGRESS;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
 }
 
 /**************************************************************************/
 
 @object GenGlyphClass BVThumbTex = {
-          GI_visMoniker = "Creating Thumbnail for TEST.GIF...";
+		  GI_visMoniker = "Creating Thumbnail for TEST.GIF...";
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVThumbStatus = {
-          HINT_MINIMUM_SIZE = {
-             0,
-             SST_LINES_OF_TEXT|2,
-             0
-          };
-          GI_comp = @BVThumbnailStatus;
-          HINT_CENTER_CHILDREN_HORIZONTALLY;
-          HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_MINIMUM_SIZE = {
+			 0,
+			 SST_LINES_OF_TEXT|2,
+			 0
+		  };
+		  GI_comp = @BVThumbnailStatus;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
 }
 
 /**************************************************************************/
@@ -1068,18 +930,18 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenGlyphClass BVThumbWait = {
-          GI_visMoniker = "Please Wait!";
+		  GI_visMoniker = "Please Wait!";
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVThumbStopTrigger = {
-          GI_visMoniker = 'S', "Stop";
-          GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-          GTI_destination = BVThumbnailStatus;
-          GTI_actionMsg = MSG_SB_STOP_PROGRESS;
-          ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_STOP };
-          HINT_SEEK_REPLY_BAR;
+		  GI_visMoniker = 'S', "Stop";
+		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+		  GTI_destination = BVThumbnailStatus;
+		  GTI_actionMsg = MSG_SB_STOP_PROGRESS;
+		  ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_STOP };
+		  HINT_SEEK_REPLY_BAR;
 }
 
 /**************************************************************************/
@@ -1090,13 +952,13 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenDisplayGroupClass BVDisplayGroup = {
-    HINT_INITIAL_SIZE = {
-    SST_PCT_OF_FIELD_WIDTH | PCT_70,
-    SST_PCT_OF_FIELD_HEIGHT | PCT_55,
-    0
-    };
-    HINT_DEFAULT_FOCUS;
-    HINT_DEFAULT_TARGET;
+	HINT_INITIAL_SIZE = {
+	SST_PCT_OF_FIELD_WIDTH | PCT_70,
+	SST_PCT_OF_FIELD_HEIGHT | PCT_55,
+	0
+	};
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
 }
 
 /**************************************************************************/
@@ -1110,17 +972,17 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenDocumentGroupClass BVDocumentGroup = {
-        GDGI_attrs = (@default | GDGA_NATIVE)
-                             & ~(GDGA_VM_FILE |
-                                 GDGA_SUPPORTS_AUTO_SAVE |
-                                 GDGA_AUTOMATIC_CHANGE_NOTIFICATION|
-                                 GDGA_AUTOMATIC_DIRTY_NOTIFICATION);
-        GDGI_untitledName = "UNNAMED";
-        GDGI_documentClass = &BVDocumentClass;
-        GDGI_documentControl = BVDocumentControl;
-        GDGI_genDisplayGroup = BVDisplayGroup;
-        GDGI_genDisplay = BVDisplay;
-        GDGI_genView = BVView;
+		GDGI_attrs = (@default | GDGA_NATIVE)
+							 & ~(GDGA_VM_FILE |
+								 GDGA_SUPPORTS_AUTO_SAVE |
+								 GDGA_AUTOMATIC_CHANGE_NOTIFICATION|
+								 GDGA_AUTOMATIC_DIRTY_NOTIFICATION);
+		GDGI_untitledName = "UNNAMED";
+		GDGI_documentClass = &BVDocumentClass;
+		GDGI_documentControl = BVDocumentControl;
+		GDGI_genDisplayGroup = BVDisplayGroup;
+		GDGI_genDisplay = BVDisplay;
+		GDGI_genView = BVView;
 }
 
 /**************************************************************************/
@@ -1134,30 +996,30 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenDisplayClass BVDisplay = {
-    GI_states = @default & ~GS_USABLE;
-    GI_comp = @BVView;
-    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @BVView;
+	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
 }
 
 /**************************************************************************/
 
 @object GenViewClass BVView = {
-    GVI_attrs = @default | GVA_CONTROLLED;
-    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
-    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
-    GVI_docBounds = {0, 0, 20, 20};
-    HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-    HINT_MINIMUM_SIZE = {
-        20,
-        20,
-        0
-    };
+		  GVI_attrs = @default | GVA_CONTROLLED;
+		  GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+		  GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+		  HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		  HINT_MINIMUM_SIZE = {
+						 20,
+						 20,
+			 0
+		  };
+	GVI_docBounds = {0, 0, 20, 20};
 
-    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
-    HINT_DEFAULT_FOCUS;
-    HINT_DEFAULT_TARGET;
+	 ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
 }
 
 /**************************************************************************/
@@ -1171,314 +1033,315 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object BVBrowserInterClass BVFileImpBmp = {
-    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
-    GI_visMoniker = "Open";
-    GI_comp = @BVImpFileTools,
-                @BVImpFileView,
-                @BVImpTrigger;
+		GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+		GI_visMoniker = "Open";
+		GI_comp = @BVImpFileTools,
+				  @BVImpFileView,
+				  @BVImpTrigger;
 
-    GII_visibility = GIV_DIALOG;
-    GII_type = GIT_COMMAND;
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+		GII_visibility = GIV_DIALOG;
+		GII_type = GIT_COMMAND;
+		HINT_ORIENT_CHILDREN_VERTICALLY;
+		HINT_CENTER_CHILDREN_HORIZONTALLY;
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
 
-    /* set window handling  */
-    HINT_INTERACTION_MAXIMIZABLE;
-    HINT_INTERACTION_MAKE_RESIZABLE;
+		/* set window handling  */
+		HINT_INTERACTION_MAXIMIZABLE;
+		HINT_INTERACTION_MAKE_RESIZABLE;
 
-    /* window initial position and size */
-    HINT_CENTER_WINDOW;
-    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
-        SWSS_RATIO|PCT_85,
-        SWSS_RATIO|PCT_85
-    };
+		/* window initial position and size */
+		HINT_CENTER_WINDOW;
+		HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+		  SWSS_RATIO|PCT_85,
+		  SWSS_RATIO|PCT_85
+		};
 
-    ATTR_GEN_HELP_CONTEXT = "bvOpen";
+		ATTR_GEN_HELP_CONTEXT = "bvOpen";
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpFileTools = {
-    GI_comp = @BVImpFileDirTools,
-                @BVImpFileItemTools;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_ALLOW_CHILDREN_TO_WRAP;
+		GI_comp = @BVImpFileDirTools,
+				  @BVImpFileItemTools;
+		HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		HINT_ALLOW_CHILDREN_TO_WRAP;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpFileDirTools = {
-    GI_comp = @BVImpFileDirBelow,
-                @BVImpFileDirPath,
-                @BVImpFileDirDoc,
-                @BVImpFileDirDrive;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
-    HINT_CENTER_CHILDREN_VERTICALLY;
+		GI_comp = @BVImpFileDirBelow,
+				  @BVImpFileDirPath,
+				  @BVImpFileDirDoc,
+				  @BVImpFileDirDrive;
+		HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
+		HINT_CENTER_CHILDREN_VERTICALLY;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpFileDirBelow = {
-    GI_visMoniker = list { @BVDirUpMoniker } ;
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_CLOSE_DIRECTORY;
+		GI_visMoniker = list { @BVDirUpMoniker } ;
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_CLOSE_DIRECTORY;
 }
 
 /**************************************************************************/
 
 @object GenDynamicListClass BVImpFileDirPath = {
-    GI_visMoniker = 'P', "Path";
-    GIGI_destination = process;
-    GIGI_applyMsg = MSG_BV_SELECT_PATH;
-    GDLI_queryMsg = MSG_BV_SET_PATH_MONIKER;
-    HINT_ITEM_GROUP_MINIMIZE_SIZE;
-    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+		GI_visMoniker = 'P', "Path";
+		GIGI_destination = process;
+		GIGI_applyMsg = MSG_BV_SELECT_PATH;
+		GDLI_queryMsg = MSG_BV_SET_PATH_MONIKER;
+		HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpFileDirDoc = {
-    GI_visMoniker = 'u', "Go to Document";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_GO_TO_DOCUMENT;
+		GI_visMoniker = 'u', "Go to Document";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_GO_TO_DOCUMENT;
 }
 
 /**************************************************************************/
 
 @object GenDynamicListClass BVImpFileDirDrive = {
-    GI_visMoniker = 'v', "Drive";
-    GIGI_destination = process;
-    GDLI_queryMsg = MSG_BV_SET_DRIVE_MONIKER;
-    GIGI_applyMsg = MSG_BV_SELECT_DRIVE;
-    HINT_ITEM_GROUP_MINIMIZE_SIZE;
-    ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+		GI_visMoniker = 'v', "Drive";
+		GIGI_destination = process;
+		GDLI_queryMsg = MSG_BV_SET_DRIVE_MONIKER;
+		GIGI_applyMsg = MSG_BV_SELECT_DRIVE;
+		HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpFileItemTools = {
-    GI_comp = @BVImpFileShowTools,
-                @BVImpFileEditTools;
-    HINT_ORIENT_CHILDREN_HORIZONTALLY;
-    HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
-    HINT_CENTER_CHILDREN_VERTICALLY;
+		GI_comp = @BVImpFileShowTools,
+				  @BVImpFileEditTools;
+		HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
+		HINT_CENTER_CHILDREN_VERTICALLY;
 }
 
 /**************************************************************************/
 
 @object GenItemGroupClass BVImpFileShowTools = {
-    GIGI_numSelections = 1;
-    GIGI_selection = BV_SHOW_ALL_MEDIA;
-    GIGI_destination = process;
-    GIGI_applyMsg = MSG_BV_VIEW_CHANGED;
-    GI_visMoniker = 'f', "Preferences";
-    GI_comp = @BVImpFileShowAll,
-                @BVImpFileShowAllMedia,
-                @BVImpFileShowBMP,
-                @BVImpFileShowPCX,
-                @BVImpFileShowPNG,
+		GIGI_numSelections = 1;
+		GIGI_selection = BV_SHOW_ALL_MEDIA;
+		GIGI_destination = process;
+		GIGI_applyMsg = MSG_BV_VIEW_CHANGED;
+		GI_visMoniker = 'f', "Preferences";
+		GI_comp = @BVImpFileShowAll,
+				  @BVImpFileShowAllMedia,
+				  @BVImpFileShowBMP,
+				  @BVImpFileShowPCX,
+				  @BVImpFileShowPNG,
 @ifdef JPEG_SUPPORT
-                @BVImpFileShowGIF,
-                @BVImpFileShowJPEG;
+				  @BVImpFileShowGIF,
+				  @BVImpFileShowJPEG;
 @else
-                @BVImpFileShowGIF;
+				  @BVImpFileShowGIF;
 @endif
-    HINT_ITEM_GROUP_MINIMIZE_SIZE;
-    ATTR_GEN_INIT_FILE_KEY = "viewOpt";
+		HINT_ITEM_GROUP_MINIMIZE_SIZE;
+		ATTR_GEN_INIT_FILE_KEY = "viewOpt";
 }
 
 /**************************************************************************/
 
 @object GenItemClass BVImpFileShowAll = {
-    GI_visMoniker = 'A', "Show All Files";
-    GII_identifier = BV_SHOW_ALL;
+		GI_visMoniker = 'A', "Show All Files";
+		GII_identifier = BV_SHOW_ALL;
 }
 
 /**************************************************************************/
 
 @object GenItemClass BVImpFileShowAllMedia = {
 @ifdef NEWDEAL_MEDIA_VIEWER
-    GI_visMoniker = 'M', "Show All Media Files";
+		GI_visMoniker = 'M', "Show All Media Files";
 @else
-    GI_visMoniker = 'G', "Show All Graphic Files";
+		GI_visMoniker = 'G', "Show All Graphic Files";
 @endif
-    GII_identifier = BV_SHOW_ALL_MEDIA;
+		GII_identifier = BV_SHOW_ALL_MEDIA;
 }
 
 /**************************************************************************/
 
 @object GenItemClass BVImpFileShowBMP = {
-    GI_visMoniker = 'B', "Show .BMP Files";
-    GII_identifier = BV_SHOW_BMP;
+		GI_visMoniker = 'B', "Show .BMP Files";
+		GII_identifier = BV_SHOW_BMP;
 }
 
 /**************************************************************************/
 
 @object GenItemClass BVImpFileShowPCX = {
-    GI_visMoniker = 'P', "Show .PCX Files";
-    GII_identifier = BV_SHOW_PCX;
+		GI_visMoniker = 'P', "Show .PCX Files";
+		GII_identifier = BV_SHOW_PCX;
 }
 
 /**************************************************************************/
 
 @object GenItemClass BVImpFileShowPNG = {
-    GI_visMoniker = 'N', "Show .PNG Files";
-    GII_identifier = BV_SHOW_PNG;
+		GI_visMoniker = 'N', "Show .PNG Files";
+		GII_identifier = BV_SHOW_PNG;
 }
 
 /**************************************************************************/
 
 @object GenItemClass BVImpFileShowGIF = {
-    GI_visMoniker = 'I', "Show .GIF Files";
-    GII_identifier = BV_SHOW_GIF;
+		GI_visMoniker = 'I', "Show .GIF Files";
+		GII_identifier = BV_SHOW_GIF;
 }
 
 /**************************************************************************/
 
 @ifdef JPEG_SUPPORT
 @object GenItemClass BVImpFileShowJPEG = {
-    GI_visMoniker = 'J', "Show .JPG Files";
-    GII_identifier = BV_SHOW_JPEG;
+		GI_visMoniker = 'J', "Show .JPG Files";
+		GII_identifier = BV_SHOW_JPEG;
 }
 @endif
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpFileEditTools = {
-    GI_visMoniker = 'D', "Display";
-    GII_visibility = GIV_POPUP;
-    HINT_AVOID_MENU_BAR;
-    GI_comp = @BVImpEditSelect,
-                @BVImpEditThumb,
-                @BVImpEditPath;
+		GI_visMoniker = 'D', "Display";
+		GII_visibility = GIV_POPUP;
+		HINT_AVOID_MENU_BAR;
+		GI_comp = @BVImpEditSelect,
+				  @BVImpEditThumb,
+				  @BVImpEditPath;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpEditSelect = {
-    GI_comp = @BVImpEditSelAllTrig,
-                @BVImpEditDeSelAllTrig;
-    GII_visibility = GIV_SUB_GROUP;
+		GI_comp = @BVImpEditSelAllTrig,
+				  @BVImpEditDeSelAllTrig;
+		GII_visibility = GIV_SUB_GROUP;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpEditSelAllTrig = {
-    GI_visMoniker = 'A', "Select All";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_SELECT_ALL_FILES;
+		GI_visMoniker = 'A', "Select All";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_SELECT_ALL_FILES;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpEditDeSelAllTrig = {
-    GI_visMoniker = 'U', "Unselect All";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_DESELECT_ALL_FILES;
+		GI_visMoniker = 'U', "Unselect All";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_DESELECT_ALL_FILES;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpEditThumb = {
-    GI_comp = @BVImpEditReadThumbTrig,
-                @BVImpEditDelThumbTrig;
-    GII_visibility = GIV_SUB_GROUP;
+		GI_comp = @BVImpEditReadThumbTrig,
+				  @BVImpEditDelThumbTrig;
+		GII_visibility = GIV_SUB_GROUP;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpEditReadThumbTrig = {
-    GI_visMoniker = 'C', "Create Thumbnail(s)";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_READ_THUMBNAILS;
+		GI_visMoniker = 'C', "Create Thumbnail(s)";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_READ_THUMBNAILS;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpEditDelThumbTrig = {
-    GI_visMoniker = 'R', "Remove Thumbnail(s)";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_DELETE_THUMBNAILS;
+		GI_visMoniker = 'R', "Remove Thumbnail(s)";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_DELETE_THUMBNAILS;
 }
 
 /**************************************************************************/
 
 @object GenInteractionClass BVImpEditPath = {
-    GI_comp = @BVImpEditSavePath,
-                @BVImpEditResetPath;
-    GII_visibility = GIV_SUB_GROUP;
+		GI_comp = @BVImpEditSavePath,
+				  @BVImpEditResetPath;
+		GII_visibility = GIV_SUB_GROUP;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpEditSavePath = {
-    GI_visMoniker = 'S', "Save Path";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_SAVE_PATH;
+		GI_visMoniker = 'S', "Save Path";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_SAVE_PATH;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpEditResetPath = {
-    GI_visMoniker = 'P', "Reset Path";
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_RESET_PATH;
+		GI_visMoniker = 'P', "Reset Path";
+		GTI_destination = process;
+		GTI_actionMsg = MSG_BV_RESET_PATH;
 }
 
 
 /**************************************************************************/
 
 @object GenViewClass BVImpFileView = {
-    GVI_attrs = @default | GVA_GENERIC_CONTENTS
-                            | GVA_SAME_COLOR_AS_PARENT_WIN
-                            | GVA_SEND_ALL_KBD_CHARS;
+		GVI_attrs = @default | GVA_GENERIC_CONTENTS
+							 | GVA_SAME_COLOR_AS_PARENT_WIN
+							 | GVA_SEND_ALL_KBD_CHARS;
 
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-    GVI_content = @BVFileListCont;
-    GVI_vertAttrs = @default | GVDA_SCROLLABLE
-                                | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
-    GVI_horizAttrs = @default | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
-    HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
-    GVI_increment = {100, 100};
-    HINT_DEFAULT_TARGET;
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+		GVI_content = @BVFileListCont;
+		GVI_vertAttrs = @default | GVDA_SCROLLABLE
+								 | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
+		GVI_horizAttrs = @default | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
+		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
+		GVI_increment = {100, 100};
+		HINT_DEFAULT_TARGET;
 }
 
 /**************************************************************************/
 
 @object GenContentClass BVFileListCont = {
-    GI_comp = @BVDynFileList;
-    GCI_genView = @BVImpFileView;
-    GCI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW;
+		GI_comp = @BVDynFileList;
+		GCI_genView = @BVImpFileView;
+		GCI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW;
 }
 
 /**************************************************************************/
 
 @object BVDynListClass BVDynFileList = {
-    GIGI_selection = 0;
-    GIGI_numSelections = 1;
-    GIGI_applyMsg = MSG_BV_FILELIST_SELECTION;
-    GIGI_destination = process;
-    GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
-    HINT_ALLOW_CHILDREN_TO_WRAP;
-    HINT_ITEM_GROUP_TOOLBOX_STYLE;
-    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_BV_FILELIST_OPEN;
+		GIGI_selection = 0;
+		GIGI_numSelections = 1;
+		GIGI_applyMsg = MSG_BV_FILELIST_SELECTION;
+		GIGI_destination = process;
+		GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+		HINT_ALLOW_CHILDREN_TO_WRAP;
+		HINT_ITEM_GROUP_TOOLBOX_STYLE;
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS
+		  = MSG_BV_FILELIST_OPEN;
 }
 
 /**************************************************************************/
 
 @object GenTriggerClass BVImpTrigger = {
-    GI_visMoniker = "Open";
-    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
-    GI_states = @default & ~GS_ENABLED;
-    GTI_destination = process;
-    GTI_actionMsg = MSG_BV_IMPORT_BITMAP;
-    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
-    HINT_SEEK_REPLY_BAR;
+				  GI_visMoniker = "Open";
+		  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+		  GI_states = @default & ~GS_ENABLED;
+				  GTI_destination = process;
+		  GTI_actionMsg = MSG_BV_IMPORT_BITMAP;
+		  ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_OK };
+		  HINT_SEEK_REPLY_BAR;
 }
 
 /*
@@ -1500,20 +1363,20 @@ FileHandle BVThumbnailDB = 0;
 {
   if((modifiedBooleans & BV_SHOW_TOOLS) != 0)
   {
-     if((selectedBooleans & BV_SHOW_TOOLS) == 0)
-     {
-            @send BVToolArea::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-     }
-     else
-     {
-                @send BVToolArea::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-                @send BVToolArea::MSG_GEN_INTERACTION_INITIATE();
+	 if((selectedBooleans & BV_SHOW_TOOLS) == 0)
+	 {
+			@send BVToolArea::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	 }
+	 else
+	 {
+				@send BVToolArea::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+				@send BVToolArea::MSG_GEN_INTERACTION_INITIATE();
 
-     };
+	 };
   };
   if((modifiedBooleans & BV_USE_THUMBNAILS) != 0)
   {
-    @call oself::MSG_BV_READ_FILES();
+	@call oself::MSG_BV_READ_FILES();
   };
 }
 
@@ -1527,29 +1390,29 @@ FileHandle BVThumbnailDB = 0;
 
   if((modifiedBooleans & BV_BETTER_PALETTE) != 0)
   {
-     if((selectedBooleans & BV_BETTER_PALETTE) == 0)
-     {
-                BVAttrs2 &= ~BVA_REALIZE_PALETTE;
-        @call oself::MSG_BV_RESET_PALETTE();
-     }
-     else
-     {
-                BVAttrs2 |= BVA_REALIZE_PALETTE;
-      @call oself::MSG_BV_SET_PALETTE();
-     };
+	 if((selectedBooleans & BV_BETTER_PALETTE) == 0)
+	 {
+				BVAttrs2 &= ~BVA_REALIZE_PALETTE;
+		@call oself::MSG_BV_RESET_PALETTE();
+	 }
+	 else
+	 {
+				BVAttrs2 |= BVA_REALIZE_PALETTE;
+	  @call oself::MSG_BV_SET_PALETTE();
+	 };
   }
 
   stat = @call BVDisplayGroup::MSG_META_GET_TARGET_EXCL(&target);
 
   if(stat != 0)
   {
-    /* neuzeichnen aller Dokumente */
-    @call target::MSG_META_RELEASE_TARGET_EXCL();
+	/* neuzeichnen aller Dokumente */
+	@call target::MSG_META_RELEASE_TARGET_EXCL();
 
-    event = @record null::MSG_BVDOC_PAL_STATE_CHANGED();
-    @call BVDocumentGroup::MSG_GEN_SEND_TO_CHILDREN(event);
+	event = @record null::MSG_BVDOC_PAL_STATE_CHANGED();
+	@call BVDocumentGroup::MSG_GEN_SEND_TO_CHILDREN(event);
 
-    @send target::MSG_META_GRAB_TARGET_EXCL();
+	@send target::MSG_META_GRAB_TARGET_EXCL();
   };
 }
 
@@ -1562,33 +1425,33 @@ FileHandle BVThumbnailDB = 0;
 
   switch(selection)
   {
-     case IBF_AUTO:
-        strcpy(mask, "*.*");
-        break;
+	 case IBF_AUTO:
+		strcpy(mask, "*.*");
+		break;
 
-     case IBF_BMP:
-        strcpy(mask, "*.BMP");
-        break;
+	 case IBF_BMP:
+		strcpy(mask, "*.BMP");
+		break;
 
-     case IBF_PCX:
-        strcpy(mask, "*.PCX");
-        break;
+	 case IBF_PCX:
+		strcpy(mask, "*.PCX");
+		break;
 
-     case IBF_PNG:
-        strcpy(mask, "*.PNG");
-        break;
+	 case IBF_PNG:
+		strcpy(mask, "*.PNG");
+		break;
 
-     case IBF_GIF:
-        strcpy(mask, "*.GIF");
-        break;
+	 case IBF_GIF:
+		strcpy(mask, "*.GIF");
+		break;
 @ifdef JPEG_SUPPORT
-     case IBF_JPEG:
-        strcpy(mask, "*.JPG");
-        break;
+	 case IBF_JPEG:
+		strcpy(mask, "*.JPG");
+		break;
 @endif
-     case IBF_TIFF:
-        strcpy(mask, "*.TIF");
-        break;
+	 case IBF_TIFF:
+		strcpy(mask, "*.TIF");
+		break;
   };
   @call BVImpFileMask::MSG_VIS_TEXT_REPLACE_ALL_PTR(mask, 0);
   @call BVImpFileSel::MSG_GEN_FILE_SELECTOR_SET_MASK(mask);
@@ -1617,7 +1480,7 @@ CheckPasteable(ClipboardItemFlags transferFlags)
 
   ClipboardQueryItem(transferFlags, &query);
   pasteable = (query.CQA_numFormats &&
-         ClipboardTestItemFormat(query.CQA_header, BITMAP_FORMAT));
+		 ClipboardTestItemFormat(query.CQA_header, BITMAP_FORMAT));
 
   ClipboardDoneWithItem(query.CQA_header);
 
@@ -1633,36 +1496,36 @@ SendSelectNotify(VMBlockHandle bmpblock)
   NotifySelectStateChange *nsscPtr;
   EventHandle notifyEvent;
 
-     data = MemAlloc(sizeof(NotifySelectStateChange), HF_DYNAMIC|HF_SHARABLE,
-             HAF_STANDARD_NO_ERR);
-     nsscPtr = (NotifySelectStateChange *)MemLock(data);
+	 data = MemAlloc(sizeof(NotifySelectStateChange), HF_DYNAMIC|HF_SHARABLE,
+			 HAF_STANDARD_NO_ERR);
+	 nsscPtr = (NotifySelectStateChange *)MemLock(data);
 
-     nsscPtr->NSSC_selectionType = SDT_GRAPHICS;
-     nsscPtr->NSSC_clipboardableSelection =
-         nsscPtr->NSSC_deleteableSelection = (bmpblock != 0);
-     nsscPtr->NSSC_selectAllAvailable = FALSE;
-     nsscPtr->NSSC_pasteable = CheckPasteable(TIF_NORMAL);
+	 nsscPtr->NSSC_selectionType = SDT_GRAPHICS;
+	 nsscPtr->NSSC_clipboardableSelection =
+		 nsscPtr->NSSC_deleteableSelection = (bmpblock != 0);
+	 nsscPtr->NSSC_selectAllAvailable = FALSE;
+	 nsscPtr->NSSC_pasteable = CheckPasteable(TIF_NORMAL);
 
-     MemUnlock(data);
-     MemInitRefCount(data, 1);
+	 MemUnlock(data);
+	 MemInitRefCount(data, 1);
 
-     notifyEvent =
-    @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(MANUFACTURER_ID_GEOWORKS,
-                                GWNT_SELECT_STATE_CHANGE,
-                                data);
-     @call application::MSG_META_GCN_LIST_SEND
-    (GCNLSF_SET_STATUS,
-     notifyEvent,
-     data,
-     GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE,
-     MANUFACTURER_ID_GEOWORKS);
+	 notifyEvent =
+	@record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(MANUFACTURER_ID_GEOWORKS,
+								GWNT_SELECT_STATE_CHANGE,
+								data);
+	 @call application::MSG_META_GCN_LIST_SEND
+	(GCNLSF_SET_STATUS,
+	 notifyEvent,
+	 data,
+	 GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE,
+	 MANUFACTURER_ID_GEOWORKS);
 }
 
 /**************************************************************************/
 
 static TransferBlockID
 BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
-               FileLongName bmpname, word bmpwidth, word bmpheight)
+			   FileLongName bmpname, word bmpwidth, word bmpheight)
 {
   MemHandle mem;
   VMFileHandle    transferFile;
@@ -1674,14 +1537,14 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
   transferFile = ClipboardGetClipboardFile();
 
   chain = MyVMCopyVMChain(bmpfile,
-                        VMCHAIN_MAKE_FROM_VM_BLOCK(bmpblock)
-                        , transferFile);
+						VMCHAIN_MAKE_FROM_VM_BLOCK(bmpblock)
+						, transferFile);
   transferItem = VMAlloc(transferFile,
-                                 sizeof(ClipboardItemHeader),
-                                 0);
+								 sizeof(ClipboardItemHeader),
+								 0);
 
   ptr = (ClipboardItemHeader *)
-             VMLock(transferFile, transferItem, &mem);
+			 VMLock(transferFile, transferItem, &mem);
 
   ptr->CIH_owner = (optr) (((dword)GeodeGetProcessHandle()<<16) | 0);
   ptr->CIH_flags = 0;
@@ -1690,7 +1553,7 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
   ptr->CIH_sourceID = 0;
 
   ptr->CIH_formats[1].CIFI_format =
-         FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_BITMAP);
+		 FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_BITMAP);
   ptr->CIH_formats[1].CIFI_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(chain);
   ptr->CIH_formats[1].CIFI_extra1 = 0;
   ptr->CIH_formats[1].CIFI_extra2 = 0;
@@ -1711,7 +1574,7 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
 
 
   ptr->CIH_formats[0].CIFI_format =
-         FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_GRAPHICS_STRING);
+		 FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_GRAPHICS_STRING);
   ptr->CIH_formats[0].CIFI_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(chain);
   ptr->CIH_formats[0].CIFI_extra1 = bmpwidth;
   ptr->CIH_formats[0].CIFI_extra2 = bmpheight;
@@ -1725,110 +1588,20 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
 
 static Boolean
 CopyCommon(ClipboardItemFlags transferFlags, FileHandle bmpfile,
-                       VMBlockHandle bmpblock, char *bmpname,
-                        word bmpwidth, word bmpheight)
+					   VMBlockHandle bmpblock, char *bmpname,
+						word bmpwidth, word bmpheight)
 {
   if (bmpblock != 0)
   {
-         TransferBlockID transferItem = BuildBitmapTransferItem(bmpfile,
-                                    bmpblock, bmpname, bmpwidth, bmpheight);
-     return ClipboardRegisterItem(transferItem, transferFlags);
+		 TransferBlockID transferItem = BuildBitmapTransferItem(bmpfile,
+									bmpblock, bmpname, bmpwidth, bmpheight);
+	 return ClipboardRegisterItem(transferItem, transferFlags);
   }
   else
   {
-     return(FALSE);
+	 return(FALSE);
   }
 }
-
-static void getAlphaHandlingFromUI(alphaTransformData* patd)
-{
-    ColorAndFlagReturn cafr = {0};
-
-    patd->method = (alphaTransformMethod) @call AlphaMethodGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-
-    @call AlphaBlendColor::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
-
-    // convert INDEX to RGB
-    if(cafr.CAFR_color.CQ_info == CF_INDEX)
-    {
-        RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
-        patd->blendColor.RGB_red = RGB_RED(c);
-        patd->blendColor.RGB_green = RGB_GREEN(c);
-        patd->blendColor.RGB_blue = RGB_BLUE(c);
-    }
-    else if (cafr.CAFR_color.CQ_info == CF_RGB)
-    {
-        patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-        patd->blendColor.RGB_green = cafr.CAFR_color.CQ_green;
-        patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
-    }
-    else if (cafr.CAFR_color.CQ_info == CF_GRAY)
-    {
-        patd->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-        patd->blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
-        patd->blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
-    }
-
-    patd->alphaThreshold = (byte) @call AlphaThresholdValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
-
-}
-
-static void updateAlphaHandlingUI(alphaTransformData* patd)
-{
-    ColorQuad cq = {0};
-
-    // Set method
-    @call AlphaMethodGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION((word)patd->method, FALSE);
-
-    // Convert RGB to ColorQuad (assume RGB, no alpha or CF_INDEX handling here)
-    cq.CQ_info = CF_RGB;
-    cq.CQ_redOrIndex = patd->blendColor.RGB_red;
-    cq.CQ_green = patd->blendColor.RGB_green;
-    cq.CQ_blue = patd->blendColor.RGB_blue;
-
-    // Set blend color
-    @call AlphaBlendColor::MSG_COLOR_SELECTOR_SET_COLOR(cq, FALSE);
-
-    // Set threshold
-    @call AlphaThresholdValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((sword)patd->alphaThreshold, FALSE);
-
-    if (patd->method == AT_TRESHOLD)
-    {
-        @call AlphaBlendBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-        @call AlphaMaskBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-    else // AT_BLEND
-    {
-        @call AlphaBlendBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-        @call AlphaMaskBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-}
-
-static void getAlphaHandlingFromIni(alphaTransformData* patd)
-{
-    if (
-       (InitFileReadDataBuffer("GraphicsViewer", "alphaBlendColor", &patd->blendColor, sizeof(RGBValue), 0)) ||
-       (InitFileReadDataBuffer("GraphicsViewer", "alphaTreshold", &patd->alphaThreshold, sizeof(byte), 0)) ||
-       (InitFileReadDataBuffer("GraphicsViewer", "alphaTransformMethod", &patd->method, sizeof(alphaTransformMethod), 0))
-    )
-    { // if one or more of the ini keys returned true (== error), reset the whole thing to use defaults
-        patd->method = AT_BLEND;
-        patd->blendColor.RGB_red = 255;
-        patd->blendColor.RGB_green = 255;
-        patd->blendColor.RGB_blue = 255;
-        patd->alphaThreshold = 192;
-    }
-}
-
-static void writeAlphaHandlingToIni(alphaTransformData* patd)
-{
-    InitFileWriteData("GraphicsViewer", "alphaBlendColor", &patd->blendColor, sizeof(RGBValue));
-    InitFileWriteData("GraphicsViewer", "alphaTreshold", &patd->alphaThreshold, sizeof(byte));
-    InitFileWriteData("GraphicsViewer", "alphaTransformMethod", &patd->method, sizeof(alphaTransformMethod));
-
-    InitFileCommit();
-}
-
 
 /**************************************************************************/
 
@@ -1847,49 +1620,49 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   ClipboardQueryItem(transferFlags, &query);
   if (query.CQA_numFormats)
   {
-     if (ClipboardTestItemFormat(query.CQA_header, BITMAP_FORMAT))
-     {
-        item = VMLock(FileFromTransferBlockID(query.CQA_header),
-                 BlockFromTransferBlockID(query.CQA_header),
-                 &mem);
+	 if (ClipboardTestItemFormat(query.CQA_header, BITMAP_FORMAT))
+	 {
+		item = VMLock(FileFromTransferBlockID(query.CQA_header),
+				 BlockFromTransferBlockID(query.CQA_header),
+				 &mem);
 
-        if(item->CIH_name[0] != 0)
-        {
-          strcpy(name, item->CIH_name);
-        }
-        else
-        {
-                  MemLock(OptrToHandle(@BVClipUnnamed));
-                  strcpy(name, LMemDeref(@BVClipUnnamed));
-                  MemUnlock(OptrToHandle(@BVClipUnnamed));
-                };
-        VMUnlock(mem);
-        ClipboardRequestItemFormat(BITMAP_FORMAT, query.CQA_header, &request);
+		if(item->CIH_name[0] != 0)
+		{
+		  strcpy(name, item->CIH_name);
+		}
+		else
+		{
+				  MemLock(OptrToHandle(@BVClipUnnamed));
+				  strcpy(name, LMemDeref(@BVClipUnnamed));
+				  MemUnlock(OptrToHandle(@BVClipUnnamed));
+				};
+		VMUnlock(mem);
+		ClipboardRequestItemFormat(BITMAP_FORMAT, query.CQA_header, &request);
 
-                bitmap = MyVMCopyVMChain(request.CRA_file, request.CRA_data,
-                                              ClipboardGetClipboardFile());
-        if(bitmap != 0)
-        {
-                  if((bvattrs & BVA_BITMAP_OPEN)!=0)
-                         @call oself::MSG_BV_CLOSE_BITMAP();
-                  @call oself::MSG_BV_OPEN_BITMAP(ClipboardGetClipboardFile(),
-                                                  bitmap, name, 0);
-                  retVal = CQNF_COPY; */
-                  /*SendSelectNotify(bitmap);*/
-        /*        }
-        else
-        {
-          retVal = CQNF_ERROR;
-        }
-     }
-     else
-     {
-        retVal = CQNF_NO_OPERATION;
-     }
+				bitmap = MyVMCopyVMChain(request.CRA_file, request.CRA_data,
+											  ClipboardGetClipboardFile());
+		if(bitmap != 0)
+		{
+				  if((bvattrs & BVA_BITMAP_OPEN)!=0)
+						 @call oself::MSG_BV_CLOSE_BITMAP();
+				  @call oself::MSG_BV_OPEN_BITMAP(ClipboardGetClipboardFile(),
+												  bitmap, name, 0);
+				  retVal = CQNF_COPY; */
+				  /*SendSelectNotify(bitmap);*/
+		/*        }
+		else
+		{
+		  retVal = CQNF_ERROR;
+		}
+	 }
+	 else
+	 {
+		retVal = CQNF_NO_OPERATION;
+	 }
   }
   else
   {
-     retVal = CQNF_NO_OPERATION;
+	 retVal = CQNF_NO_OPERATION;
   }
   ClipboardDoneWithItem(query.CQA_header);
 
@@ -1912,8 +1685,8 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVDocumentClass, MSG_META_CLIPBOARD_COPY
 {
   (void) CopyCommon(TIF_NORMAL, pself->BVBmpFile, pself->BVBmpBlock,
-                            pself->GDI_fileName,
-                           pself->BVBmpWidth, pself->BVBmpHeight);
+							pself->GDI_fileName,
+						   pself->BVBmpWidth, pself->BVBmpHeight);
 }
 
 /**************************************************************************/
@@ -1954,51 +1727,50 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   char *path;
   char path2[256];
   char path3[256];
-  alphaTransformData patd = {0};
 
   if((extraState != 0) &&
-    ((attachFlags & AAF_RESTORING_FROM_STATE)!=0))
+	((attachFlags & AAF_RESTORING_FROM_STATE)!=0))
   {
-    sdptr = MemLock(extraState);
-    path = &(path2[0]);
+	sdptr = MemLock(extraState);
+	path = &(path2[0]);
 
-    disk = FileConstructFullPath(&path,255,0,&(sdptr->BVSD_path[0]), FALSE);
+	disk = FileConstructFullPath(&path,255,0,&(sdptr->BVSD_path[0]), FALSE);
 
-    path = &(path2[0]);
-    BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
-    strcpy(BVCurrentPath, path);
-    if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
-      BVCurrentDisk = disk;
+	path = &(path2[0]);
+	BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
+	strcpy(BVCurrentPath, path);
+	if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
+	  BVCurrentDisk = disk;
 
-    if(BVCurrentPath[0] == 0)
-      strcpy(BVCurrentPath, "\\");
+	if(BVCurrentPath[0] == 0)
+	  strcpy(BVCurrentPath, "\\");
 
-    BVBrowserFocus = sdptr->BVSD_focus;
-    BVAttrs2 = sdptr->BVSD_attrs;
+	BVBrowserFocus = sdptr->BVSD_focus;
+	BVAttrs2 = sdptr->BVSD_attrs;
 
-    MemUnlock(extraState);
+	MemUnlock(extraState);
   }
   else
   {
 @ifdef NEWDEAL_MEDIA_VIEWER
-    stat = InitFileReadStringBuffer("MediaViewer","dlgPath",path3,255,&size);
+	stat = InitFileReadStringBuffer("MediaViewer","dlgPath",path3,255,&size);
 @else
-    stat = InitFileReadStringBuffer("GraphicsViewer","dlgPath",path3,255,&size);
+	stat = InitFileReadStringBuffer("GraphicsViewer","dlgPath",path3,255,&size);
 @endif
-    if(stat == FALSE)
-    {
-      path = &(path2[0]);
+	if(stat == FALSE)
+	{
+	  path = &(path2[0]);
 
-      disk = FileConstructFullPath(&path,255,0,&(path3[0]), FALSE);
-      path = &(path2[0]);
-      BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
-      strcpy(BVCurrentPath, path);
-      if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
-        BVCurrentDisk = disk;
+	  disk = FileConstructFullPath(&path,255,0,&(path3[0]), FALSE);
+	  path = &(path2[0]);
+	  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
+	  strcpy(BVCurrentPath, path);
+	  if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
+		BVCurrentDisk = disk;
 
-      if(BVCurrentPath[0] == 0)
-        strcpy(BVCurrentPath, "\\");
-    };
+	  if(BVCurrentPath[0] == 0)
+		strcpy(BVCurrentPath, "\\");
+	};
   };
 
   BVFileList = 0;
@@ -2010,9 +1782,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   /* show open trigger in file menu */
   docOptStat = InitFileReadInteger("uiFeatures","docControlOptions",&docOpt);
   if((docOptStat != FALSE) || ((docOpt & 8192) == 0))
-    @send BVFileOpenTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
+	@send BVFileOpenTrigger::MSG_GEN_SET_USABLE(VUM_NOW);
   else
-    @send BVFileOpenTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send BVFileOpenTrigger::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
 
 /* temp = 9; */
 
@@ -2028,32 +1800,32 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   mapblock = VMGetMapBlock(BVThumbnailDB);
   if(mapblock == 0)
   {
-    /* create map block */
-    mapblock = VMAlloc(BVThumbnailDB, sizeof(BVThumbDBMap), 0);
-    mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
+	/* create map block */
+	mapblock = VMAlloc(BVThumbnailDB, sizeof(BVThumbDBMap), 0);
+	mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
 
-    mapptr->BVTDBM_firstItem = 0;
-    mapptr->BVTDBM_lastItem = 0;
-    mapptr->BVTDBM_version = 1;
+	mapptr->BVTDBM_firstItem = 0;
+	mapptr->BVTDBM_lastItem = 0;
+	mapptr->BVTDBM_version = 1;
 
-    VMDirty(mem);
-    VMUnlock(mem);
-    VMSetMapBlock(BVThumbnailDB, mapblock);
+	VMDirty(mem);
+	VMUnlock(mem);
+	VMSetMapBlock(BVThumbnailDB, mapblock);
   }
   else
   {
-    /* create map block */
-    mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
+	/* create map block */
+	mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
 
-    version = mapptr->BVTDBM_version;
+	version = mapptr->BVTDBM_version;
 
-    VMUnlock(mem);
+	VMUnlock(mem);
 
-    if(version != 1)
-    {
-        VMClose(BVThumbnailDB, FILE_NO_ERRORS);
-        BVThumbnailDB = 0;
-    }
+	if(version != 1)
+	{
+		VMClose(BVThumbnailDB, FILE_NO_ERRORS);
+		BVThumbnailDB = 0;
+	}
   }
 @endif
 
@@ -2063,12 +1835,12 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   count = 256;
   do
   {
-    count--;
-    drvstat = DriveGetStatus(count);
-    if((drvstat&DS_PRESENT) != 0)
-      drives++;
-    if(count == drive)
-      count1 = drives;
+	count--;
+	drvstat = DriveGetStatus(count);
+	if((drvstat&DS_PRESENT) != 0)
+	  drives++;
+	if(count == drive)
+	  count1 = drives;
   }
   while(count != 0);
 
@@ -2080,14 +1852,11 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   @call BVApp::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&display);
   BVDisplayClass = display.DS_displayType & DT_DISP_CLASS;
   if(BVDisplayClass != DC_COLOR_8)
-     @send BVViewPalette::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	 @send BVViewPalette::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 
   ClipboardAddToNotificationList(HandleToOptr(GeodeGetProcessHandle()));
 
   @send BVImpFileDirDrive::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drives - count1, FALSE);
-
-    getAlphaHandlingFromIni(&patd);
-    updateAlphaHandlingUI(&patd);
 
   @callsuper();
 }
@@ -2104,8 +1873,8 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   if(BVFileList != 0)
   {
-    MemFree(BVFileList);
-    BVFileList = 0;
+	MemFree(BVFileList);
+	BVFileList = 0;
   }
 
   @call BVDynFileList::MSG_BV_DELETE_FILELIST();
@@ -2113,8 +1882,8 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @ifdef OLD_THUMBNAIL_DB
   if(BVThumbnailDB != 0)
   {
-    VMClose(BVThumbnailDB, FILE_NO_ERRORS);
-    BVThumbnailDB = 0;
+	VMClose(BVThumbnailDB, FILE_NO_ERRORS);
+	BVThumbnailDB = 0;
   }
 @endif
 
@@ -2129,31 +1898,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   MemUnlock(extramem);
   return(extramem);
 }
-
-@method BVProcessClass, MSG_BV_ALPHA_TRANSFORM_METHOD_CHANGE
-{
-    if (selection == AT_TRESHOLD)
-    {
-        @call AlphaBlendBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-        @call AlphaMaskBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-    else // AT_BLEND
-    {
-        @call AlphaBlendBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-        @call AlphaMaskBox::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    }
-}
-
-@method BVProcessClass, MSG_BV_ALPHA_TRANSFORM_APPLY
-{
-    alphaTransformData patd = {0};
-
-    getAlphaHandlingFromUI(&patd);
-    writeAlphaHandlingToIni(&patd);
-
-    @send AlphaConvDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
-}
-
 
 /**************************************************************************/
 
@@ -2189,7 +1933,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   @send pself->GCI_genView::MSG_GEN_VIEW_SET_ATTRS(0, GVA_SCALE_TO_FIT, update);
   @send pself->GCI_genView::MSG_GEN_VIEW_SET_SCALE_FACTOR(0, 0, SVT_AROUND_POINT,
-                            MakeWWFixed(1.0), MakeWWFixed(1.0));
+							MakeWWFixed(1.0), MakeWWFixed(1.0));
   @send pself->GCI_genView::MSG_GEN_VIEW_SET_DOC_BOUNDS(1000, 1000,0 ,0);
 
   pself->BVBmpWidth = width;
@@ -2202,27 +1946,27 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   if((pallen != 0)&&((type&BMT_PALETTE) != 0))
   {
-     palmem = MemAlloc(240*3, 0, 0);
-         pself->BVPalette = palmem;
+	 palmem = MemAlloc(240*3, 0, 0);
+		 pself->BVPalette = palmem;
 
-     palmem2 = MemAlloc(256*3, 0, 0);
-     temppal = MemLock(palmem2);
-     ptr = VMLock(file, block, &mem);
-     memcpy(temppal, &(ptr[offset]), pallen*3);
-     VMUnlock(mem);
+	 palmem2 = MemAlloc(256*3, 0, 0);
+	 temppal = MemLock(palmem2);
+	 ptr = VMLock(file, block, &mem);
+	 memcpy(temppal, &(ptr[offset]), pallen*3);
+	 VMUnlock(mem);
 
-     destpal = MemLock(palmem);
-     if(pallen == 256)
-     {
-        QuantPalette((RGBValue *)temppal, pallen, (RGBValue *) destpal, 240);
-        memcpy(temppal, destpal, 240*3);
-        pallen = 240;
-     };
-     MemUnlock(palmem);
-     MemUnlock(palmem2);
-     MemFree(palmem2);
+	 destpal = MemLock(palmem);
+	 if(pallen == 256)
+	 {
+		QuantPalette((RGBValue *)temppal, pallen, (RGBValue *) destpal, 240);
+		memcpy(temppal, destpal, 240*3);
+		pallen = 240;
+	 };
+	 MemUnlock(palmem);
+	 MemUnlock(palmem2);
+	 MemFree(palmem2);
 
-     /* Palette an System ausrichten */
+	 /* Palette an System ausrichten */
   };
 
   pself->BVAttrs |= BVA_BITMAP_OPEN;
@@ -2231,7 +1975,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   GrInvalRect(gstate, 0, 0, width, height);
   GrDestroyState(gstate);
   if(pself->BVWindow != 0)
-         @call process::MSG_META_EXPOSED(pself->BVWindow);
+		 @call process::MSG_META_EXPOSED(pself->BVWindow);
 
 }
 
@@ -2253,13 +1997,13 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   GrDestroyState(gstate);
 
   if(pself->BVWindow != 0)
-         @call oself::MSG_META_EXPOSED(pself->BVWindow);
+		 @call oself::MSG_META_EXPOSED(pself->BVWindow);
 
   MyVMFreeVMChain(pself->BVBmpFile,
-      VMCHAIN_MAKE_FROM_VM_BLOCK(pself->BVBmpBlock));
+	  VMCHAIN_MAKE_FROM_VM_BLOCK(pself->BVBmpBlock));
 
   if(pself->BVWindow != 0)
-         @call process::MSG_META_EXPOSED(pself->BVWindow);
+		 @call process::MSG_META_EXPOSED(pself->BVWindow);
 
 /*  @send pself->GCI_genView::MSG_GEN_VIEW_SET_ORIGIN(0, 0);
   @send pself->GCI_genView::MSG_GEN_VIEW_SET_DOC_BOUNDS(0, 0 ,0 ,0);
@@ -2276,7 +2020,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   pal = pself->BVPalette;
   pself->BVPalette = 0;
   if(pal != 0)
-    MemFree(pal);
+	MemFree(pal);
 }
 
 /**************************************************************************/
@@ -2292,20 +2036,20 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   /* is this a 256 color device */
   if((pself->BVAttrs&BVA_BITMAP_OPEN)==BVA_BITMAP_OPEN)
   {
-         if(((pself->BVPalette != 0)&&((BVAttrs2&BVA_REALIZE_PALETTE)!=0))
-             && (BVDisplayClass == DC_COLOR_8))
-     {
-        GrCreatePalette(gstate);
-                pal = MemLock(pself->BVPalette);
-        GrSetPalette(gstate, (RGBValue *)pal, 16, 240);
-                MemUnlock(pself->BVPalette);
-                GrDrawHugeBitmap(gstate, 0, 0, pself->BVBmpFile, pself->BVBmpBlock);
-        GrDestroyPalette(gstate);
-     }
-     else
-     {
-        GrDrawHugeBitmap(gstate, 0, 0, pself->BVBmpFile, pself->BVBmpBlock);
-     };
+		 if(((pself->BVPalette != 0)&&((BVAttrs2&BVA_REALIZE_PALETTE)!=0))
+			 && (BVDisplayClass == DC_COLOR_8))
+	 {
+		GrCreatePalette(gstate);
+				pal = MemLock(pself->BVPalette);
+		GrSetPalette(gstate, (RGBValue *)pal, 16, 240);
+				MemUnlock(pself->BVPalette);
+				GrDrawHugeBitmap(gstate, 0, 0, pself->BVBmpFile, pself->BVBmpBlock);
+		GrDestroyPalette(gstate);
+	 }
+	 else
+	 {
+		GrDrawHugeBitmap(gstate, 0, 0, pself->BVBmpFile, pself->BVBmpBlock);
+	 };
   };
   GrEndUpdate(gstate);
   GrDestroyState(gstate);
@@ -2372,25 +2116,25 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   GStateHandle gstate;
 
   if(BVBrowserFocus == TRUE)
-    return;
+	return;
 
   /* is this a 256 color device */
   if(((pself->BVAttrs&(BVA_BITMAP_OPEN|BVA_SYS_TARGET|BVA_WIN_OPEN))
-     ==(BVA_SYS_TARGET|BVA_WIN_OPEN|BVA_BITMAP_OPEN))
-      && (BVDisplayClass == DC_COLOR_8))
+	 ==(BVA_SYS_TARGET|BVA_WIN_OPEN|BVA_BITMAP_OPEN))
+	  && (BVDisplayClass == DC_COLOR_8))
   {
-         if(((pself->BVPalette != 0)&&((BVAttrs2&BVA_REALIZE_PALETTE)!=0))
-                             && (BVDisplayClass == DC_COLOR_8))
-     {
-                gstate = GrCreateState(pself->BVWindow);
-        GrCreatePalette(gstate);
-                pal = MemLock(pself->BVPalette);
-        GrSetPalette(gstate, (RGBValue *)pal, 16, 240);
-                MemUnlock(pself->BVPalette);
-                WinRealizePalette(pself->BVWindow);
-        GrDestroyPalette(gstate);
-        GrDestroyState(gstate);
-     };
+		 if(((pself->BVPalette != 0)&&((BVAttrs2&BVA_REALIZE_PALETTE)!=0))
+							 && (BVDisplayClass == DC_COLOR_8))
+	 {
+				gstate = GrCreateState(pself->BVWindow);
+		GrCreatePalette(gstate);
+				pal = MemLock(pself->BVPalette);
+		GrSetPalette(gstate, (RGBValue *)pal, 16, 240);
+				MemUnlock(pself->BVPalette);
+				WinRealizePalette(pself->BVWindow);
+		GrDestroyPalette(gstate);
+		GrDestroyState(gstate);
+	 };
   };
 }
 
@@ -2402,14 +2146,14 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 
   if(((pself->BVAttrs&(BVA_BITMAP_OPEN|BVA_SYS_TARGET|BVA_WIN_OPEN))
-    ==(BVA_BITMAP_OPEN|BVA_SYS_TARGET|BVA_WIN_OPEN))
-      && (BVDisplayClass == DC_COLOR_8))
+	==(BVA_BITMAP_OPEN|BVA_SYS_TARGET|BVA_WIN_OPEN))
+	  && (BVDisplayClass == DC_COLOR_8))
   {
-         gstate = GrCreateState(pself->BVWindow);
-     GrCreatePalette(gstate);
-         WinRealizePalette(pself->BVWindow);
-     GrDestroyPalette(gstate);
-     GrDestroyState(gstate);
+		 gstate = GrCreateState(pself->BVWindow);
+	 GrCreatePalette(gstate);
+		 WinRealizePalette(pself->BVWindow);
+	 GrDestroyPalette(gstate);
+	 GrDestroyState(gstate);
   }
 }
 
@@ -2435,7 +2179,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVDocumentClass, MSG_META_DELETE
 {
   if((pself->BVAttrs & BVA_BITMAP_OPEN)!=0)
-                         @call oself::MSG_BV_CLOSE_BITMAP();
+						 @call oself::MSG_BV_CLOSE_BITMAP();
   SendSelectNotify(0);
 }
 */
@@ -2445,17 +2189,17 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVDocumentClass, MSG_META_START_MOVE_COPY
 {
   if (ClipboardStartQuickTransfer(CQTF_COPY_ONLY | CQTF_NOTIFICATION,
-        CQTF_COPY,0, 0, 0, oself))
+		CQTF_COPY,0, 0, 0, oself))
   {
-         if (CopyCommon(CIF_QUICK, pself->BVBmpFile, pself->BVBmpBlock,
-          pself->GDI_fileName, pself->BVBmpWidth, pself->BVBmpHeight))
-     {
-                @send pself->GCI_genView::MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
-     }
-     else
-     {
-        ClipboardAbortQuickTransfer();
-     }
+		 if (CopyCommon(CIF_QUICK, pself->BVBmpFile, pself->BVBmpBlock,
+		  pself->GDI_fileName, pself->BVBmpWidth, pself->BVBmpHeight))
+	 {
+				@send pself->GCI_genView::MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
+	 }
+	 else
+	 {
+		ClipboardAbortQuickTransfer();
+	 }
   }
   retVal->flags = MRF_PROCESSED;
 }
@@ -2466,12 +2210,12 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVDocumentClass, MSG_META_PTR
 {
   if ((GET_UI_FUNCTIONS_ACTIVE(inputState) & UIFA_MOVE_COPY) &&
-            ClipboardGetQuickTransferStatus())
+			ClipboardGetQuickTransferStatus())
   {
-     ClipboardSetQuickTransferFeedback((CheckPasteable(CIF_QUICK) ?
-                     CQTF_COPY :
-                     CQTF_CLEAR),
-                    inputState);
+	 ClipboardSetQuickTransferFeedback((CheckPasteable(CIF_QUICK) ?
+					 CQTF_COPY :
+					 CQTF_CLEAR),
+					inputState);
   }
   retVal->flags = MRF_PROCESSED;
 }
@@ -2494,13 +2238,13 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 {
   if(GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
   {
-     @send process::MSG_BV_FILE_SELECTED();
-     if(GFS_GET_ENTRY_FLAGS(entryFlags) & GFSEF_OPEN)
-          @send BVImpTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+	 @send process::MSG_BV_FILE_SELECTED();
+	 if(GFS_GET_ENTRY_FLAGS(entryFlags) & GFSEF_OPEN)
+		  @send BVImpTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
   }
   else
   {
-     @send process::MSG_BV_NO_FILE_SELECTED();
+	 @send process::MSG_BV_NO_FILE_SELECTED();
   };
 };
 */
@@ -2509,163 +2253,161 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 @method BVProcessClass, MSG_BV_QUERY_RESET_OPTIONS
 {
-     MemLock(OptrToHandle(@BVResetConfig));
+	 MemLock(OptrToHandle(@BVResetConfig));
 
-     if (UserStandardDialog((char *) 0,
-                (char *) 0,
-                (char *) 0, (char *) 0,
-                LMemDeref(@BVResetConfig),
-                (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) |
-                (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET))
-                                 == IC_YES)
-    {
-      @send BVApp::MSG_META_RESET_OPTIONS();
-    };
-    MemUnlock(OptrToHandle(@BVResetConfig));
+	 if (UserStandardDialog((char *) 0,
+				(char *) 0,
+				(char *) 0, (char *) 0,
+				LMemDeref(@BVResetConfig),
+				(GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) |
+				(CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET))
+								 == IC_YES)
+	{
+	  @send BVApp::MSG_META_RESET_OPTIONS();
+	};
+	MemUnlock(OptrToHandle(@BVResetConfig));
 };
 
 /**************************************************************************/
 
 @method BVDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
 {
-    dword date, size;
-    Boolean stat;
-    ImpBmpStatus status;
-    ImpBmpParams para;
-    char string[255];
-    VMBlockHandle bmpblock;
-    word count;
+	dword date, size;
+	Boolean stat;
+	ImpBmpStatus status;
+	ImpBmpParams para;
+	char string[255];
+	VMBlockHandle bmpblock;
+	word count;
 
-    MemLock(OptrToHandle(@BVImportingText));
-    strcpy(string, LMemDeref(@BVImportingText));
-    MemUnlock(OptrToHandle(@BVImportingText));
+	MemLock(OptrToHandle(@BVImportingText));
+	strcpy(string, LMemDeref(@BVImportingText));
+	MemUnlock(OptrToHandle(@BVImportingText));
 
-    strcat(string, pself->GDI_fileName);
-    strcat(string, "...");
+	strcat(string, pself->GDI_fileName);
+	strcat(string, "...");
 
-    @callsuper();
+	@callsuper();
 
-    @send BVImportingTex::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(string ,VUM_NOW);
-    @send BVImportingDlg::MSG_GEN_INTERACTION_INITIATE();
+	@send BVImportingTex::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(string ,VUM_NOW);
+	@send BVImportingDlg::MSG_GEN_INTERACTION_INITIATE();
 
-    count = 0;
-    while(count != sizeof(pself->BVTempName))
-    {
-        pself->BVTempName[count] = 0;
-        count++;
-    };
+	count = 0;
+	while(count != sizeof(pself->BVTempName))
+	{
+		pself->BVTempName[count] = 0;
+		count++;
+	};
 
-    FilePushDir();
-    FileSetCurrentPath(SP_WASTE_BASKET, ".");
-    para.IBP_source = pself->GDI_fileHandle ;
-    para.IBP_dest = VMOpen(pself->BVTempName, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
-    FilePopDir();
-    para.IBP_status = @BVImportStatus;
+	FilePushDir();
+	FileSetCurrentPath(SP_WASTE_BASKET, ".");
+	para.IBP_source = pself->GDI_fileHandle ;
+	para.IBP_dest = VMOpen(pself->BVTempName, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
+	FilePopDir();
+	para.IBP_status = @BVImportStatus;
 
-    getAlphaHandlingFromIni(&para.IBP_alphaTransform);
+	// start importing
+	status = Imp_BmpProcessFile(&para, IBF_AUTO);
 
-    // start importing
-    status = Imp_BmpProcessFile(&para, IBF_AUTO);
+	@send BVImportingDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
-    @send BVImportingDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	if(status == IBS_NO_ERROR)
+	{
+		bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
+		MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
+		para.IBP_bitmap = bmpblock;
 
-    if(status == IBS_NO_ERROR)
-    {
-        bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
-        MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
-        para.IBP_bitmap = bmpblock;
+		date = FileGetDateAndTime(pself->GDI_fileHandle) ;
+		/* this doesn't work in all fs drivers (only ms4) so we'll go with...
+		FileGetHandleExtAttributes(pself->GDI_fileHandle,FEA_SIZE,&size, sizeof(size));
+		/* this more generic routine. jfh 6/7/04 */
+		size = FileSize(pself->GDI_fileHandle);
 
-        date = FileGetDateAndTime(pself->GDI_fileHandle) ;
-        /* this doesn't work in all fs drivers (only ms4) so we'll go with...
-        FileGetHandleExtAttributes(pself->GDI_fileHandle,FEA_SIZE,&size, sizeof(size));
-        /* this more generic routine. jfh 6/7/04 */
-        size = FileSize(pself->GDI_fileHandle);
+		stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_AUTOCREAT_THUMB);
+        	if(stat != FALSE)
+			@call process::MSG_BV_CREATE_THUMBNAIL(pself->GDI_fileName, size, date,
+				para.IBP_dest, para.IBP_bitmap);
 
-        stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_AUTOCREAT_THUMB);
-            if(stat != FALSE)
-            @call process::MSG_BV_CREATE_THUMBNAIL(pself->GDI_fileName, size, date,
-                para.IBP_dest, para.IBP_bitmap);
+		pself = ObjDerefGen(oself);
+		if((pself->BVAttrs & BVA_BITMAP_OPEN)!=0)
+			@call oself::MSG_BV_CLOSE_BITMAP();
 
-        pself = ObjDerefGen(oself);
-        if((pself->BVAttrs & BVA_BITMAP_OPEN)!=0)
-            @call oself::MSG_BV_CLOSE_BITMAP();
+		@call oself::MSG_BV_OPEN_BITMAP(para.IBP_dest, para.IBP_bitmap,
+			pself->GDI_fileName, para.IBP_impForm);
 
-        @call oself::MSG_BV_OPEN_BITMAP(para.IBP_dest, para.IBP_bitmap,
-            pself->GDI_fileName, para.IBP_impForm);
+		stat = @call BVOptionGroup::
+			MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_IMP_INFO);
 
-        stat = @call BVOptionGroup::
-            MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_IMP_INFO);
+		if(stat != FALSE)
+		{
+			MemLock(OptrToHandle(@BVImportFormat));
 
-        if(stat != FALSE)
-        {
-            MemLock(OptrToHandle(@BVImportFormat));
+			UserStandardDialog((char *) 0,
+				(char *) 0,
+				(char *) 0, para.IBP_impForm,
+				LMemDeref(@BVImportFormat),
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+				(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET));
 
-            UserStandardDialog((char *) 0,
-                (char *) 0,
-                (char *) 0, para.IBP_impForm,
-                LMemDeref(@BVImportFormat),
-                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET));
+			MemUnlock(OptrToHandle(@BVImportFormat));
+		};
+		stat = FALSE;
+	}
+	else
+	{
+		stat = TRUE;
 
-            MemUnlock(OptrToHandle(@BVImportFormat));
-        };
-        stat = FALSE;
-    }
-    else
-    {
-        stat = TRUE;
+		if(status == IBS_IMPORT_STOPPED)
+		{
+			MemLock(OptrToHandle(@BVImportStopped));
 
-        if(status == IBS_IMPORT_STOPPED)
-        {
-            MemLock(OptrToHandle(@BVImportStopped));
+			UserStandardDialog((char *) 0,
+				(char *) 0,
+				(char *) 0, (char *) 0,
+				LMemDeref(@BVImportStopped),
+				(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+				(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET));
 
-            UserStandardDialog((char *) 0,
-                (char *) 0,
-                (char *) 0, (char *) 0,
-                LMemDeref(@BVImportStopped),
-                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-                (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET));
+			MemUnlock(OptrToHandle(@BVImportStopped));
+		}
+		else
+			if(status == IBS_UNSUPPORTED_COMPRESSION)
+			{
+				MemLock(OptrToHandle(@BVImportError));
 
-            MemUnlock(OptrToHandle(@BVImportStopped));
-        }
-        else
-            if(status == IBS_UNSUPPORTED_COMPRESSION)
-            {
-                MemLock(OptrToHandle(@BVImportError));
+				LocalFixedToAscii(string, MakeWWFixed(status), 0);
+				UserStandardDialog((char *) 0,
+					(char *) 0,
+					(char *) 0, string,
+					LMemDeref(@BVUnsupportedCompressionError),
+					(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+					(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 
-                LocalFixedToAscii(string, MakeWWFixed(status), 0);
-                UserStandardDialog((char *) 0,
-                    (char *) 0,
-                    (char *) 0, string,
-                    LMemDeref(@BVUnsupportedCompressionError),
-                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-                    (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
+				MemUnlock(OptrToHandle(@BVImportError));
+			}
+			else
+			{
+				MemLock(OptrToHandle(@BVImportError));
 
-                MemUnlock(OptrToHandle(@BVImportError));
-            }
-            else
-            {
-                MemLock(OptrToHandle(@BVImportError));
+				LocalFixedToAscii(string, MakeWWFixed(status), 0);
+				UserStandardDialog((char *) 0,
+					(char *) 0,
+					(char *) 0, string,
+					LMemDeref(@BVImportError),
+					(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+					(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 
-                LocalFixedToAscii(string, MakeWWFixed(status), 0);
-                UserStandardDialog((char *) 0,
-                    (char *) 0,
-                    (char *) 0, string,
-                    LMemDeref(@BVImportError),
-                    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
-                    (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
+				MemUnlock(OptrToHandle(@BVImportError));
+			};
 
-                MemUnlock(OptrToHandle(@BVImportError));
-            };
-
-        @send oself::MSG_GEN_DOCUMENT_CLOSE(0);
-    };
+		@send oself::MSG_GEN_DOCUMENT_CLOSE(0);
+	};
 }
 
 /**************************************************************************/
 
 @method BVDocumentClass, /* MSG_GEN_DOCUMENT_PHYSICAL_CLOSE */
-                         MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+						 MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
 {
   FileHandle file;
 
@@ -2673,15 +2415,15 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   if(file != 0)
   {
-    if((pself->BVAttrs & BVA_BITMAP_OPEN)!=0)
-                         @call oself::MSG_BV_CLOSE_BITMAP();
+	if((pself->BVAttrs & BVA_BITMAP_OPEN)!=0)
+						 @call oself::MSG_BV_CLOSE_BITMAP();
 
-    VMClose(file, FILE_NO_ERRORS);
+	VMClose(file, FILE_NO_ERRORS);
 
-    FilePushDir();
-    FileSetCurrentPath(SP_WASTE_BASKET,".");
-    FileDelete(pself->BVTempName);
-    FilePopDir();
+	FilePushDir();
+	FileSetCurrentPath(SP_WASTE_BASKET,".");
+	FileDelete(pself->BVTempName);
+	FilePopDir();
   }
 }
 
@@ -2713,56 +2455,56 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_AUTOCLOSE_OBOX);
 
   if(stat != FALSE)
-    @send BVFileImpBmp::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	@send BVFileImpBmp::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
   if(BVFileList != 0)
   {
 
-    filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
 
-    fileidlist = MemAlloc(filenum*2, 0, 0);
+	fileidlist = MemAlloc(filenum*2, 0, 0);
 
-    idlistptr = MemLock(fileidlist);
+	idlistptr = MemLock(fileidlist);
 
-    filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
-      idlistptr, filenum*2);
+	filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+	  idlistptr, filenum*2);
 
-    MemUnlock(fileidlist);
+	MemUnlock(fileidlist);
 
-    filecount = 0;
-    do
-    {
-      idlistptr = MemLock(fileidlist);
-      filenum2 = idlistptr[filecount];
-      MemUnlock(fileidlist);
+	filecount = 0;
+	do
+	{
+	  idlistptr = MemLock(fileidlist);
+	  filenum2 = idlistptr[filecount];
+	  MemUnlock(fileidlist);
 
-      filelist = MemLock(BVFileList);
-      if((filelist[filenum2].BVFA_type&FA_SUBDIR) == 0)
-      {
-        strcpy(docParams.DCP_name, filelist[filenum2].BVFA_name);
-        MemUnlock(BVFileList);
+	  filelist = MemLock(BVFileList);
+	  if((filelist[filenum2].BVFA_type&FA_SUBDIR) == 0)
+	  {
+		strcpy(docParams.DCP_name, filelist[filenum2].BVFA_name);
+		MemUnlock(BVFileList);
 
-        strcpy(docParams.DCP_path, BVCurrentPath);
-        docParams.DCP_diskHandle = BVCurrentDisk;
+		strcpy(docParams.DCP_path, BVCurrentPath);
+		docParams.DCP_diskHandle = BVCurrentDisk;
 
-        docParams.DCP_docAttrs = GDA_READ_ONLY;
-        docParams.DCP_flags = 0;
-        docParams.DCP_connection = 0;
-        @call BVDocumentGroup::MSG_GEN_DOCUMENT_GROUP_OPEN_DOC(&docParams);
+		docParams.DCP_docAttrs = GDA_READ_ONLY;
+		docParams.DCP_flags = 0;
+		docParams.DCP_connection = 0;
+		@call BVDocumentGroup::MSG_GEN_DOCUMENT_GROUP_OPEN_DOC(&docParams);
 
-        @send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
-      }
-      else
-      {
-        MemUnlock(BVFileList);
-      };
-      filecount++;
-    }
-    while(filecount != filenum);
+		@send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
+	  }
+	  else
+	  {
+		MemUnlock(BVFileList);
+	  };
+	  filecount++;
+	}
+	while(filecount != filenum);
 
-    MemFree(fileidlist);
+	MemFree(fileidlist);
 
-    @send oself::MSG_BV_UPDATE_OPEN_TRIGGER();
+	@send oself::MSG_BV_UPDATE_OPEN_TRIGGER();
   };
 }
 
@@ -2771,9 +2513,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 @method BVAppClass, MSG_GEN_APPLICATION_VISIBILITY_NOTIFICATION
 {
   @send BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
-                                (BV_SHOW_TOOLS,opening);
+								(BV_SHOW_TOOLS,opening);
   @send BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_MODIFIED_STATE
-                                (BV_SHOW_TOOLS,TRUE);
+								(BV_SHOW_TOOLS,TRUE);
 };
 
 /**************************************************************************/
@@ -2839,13 +2581,12 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
     @call BVPicInfoForm::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVImpForm,0);
 
 }
-
 /**************************************************************************/
 
 @method BVDocumentClass, MSG_BV_CLEAR_PIC_INFO
 {
   @call BVPicInfoName::MSG_VIS_TEXT_REPLACE_ALL_OPTR(
-    @BVNoGraphicOpenText, 0);
+	@BVNoGraphicOpenText, 0);
   @call BVPicInfoX::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
   @call BVPicInfoY::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
   @call BVPicInfoCol::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
@@ -2856,11 +2597,11 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 Boolean StrEnd(char *text, char *endstr)
 {
-    word pos;
+	word pos;
 
-    pos = strlen(text) - strlen(endstr);
+	pos = strlen(text) - strlen(endstr);
 
-    return((LocalCmpStringsNoCase(&(text[pos]), endstr, 0)) == 0);
+	return((LocalCmpStringsNoCase(&(text[pos]), endstr, 0)) == 0);
 }
 
 /**************************************************************************/
@@ -2873,12 +2614,12 @@ Boolean StrEnd(char *text, char *endstr)
 #define NAME_S   sizeof(FileLongName)
 
   FileExtAttrDesc attrs[] = {
-                        {FEA_MODIFICATION, (void *) 0, sizeof(FileDateAndTime), 0},
-                        {FEA_SIZE, (void *) MOD_S, sizeof(dword), 0},
-                        {FEA_FILE_ATTR, (void *) (MOD_S + SIZE_S), sizeof(FileAttrs), 0},
-                        {FEA_NAME, (void *) (MOD_S + SIZE_S + ATTR_S), sizeof(FileLongName), 0},
-                        {FEA_END_OF_LIST, 0, 0, 0}
-                      };
+						{FEA_MODIFICATION, (void *) 0, sizeof(FileDateAndTime), 0},
+						{FEA_SIZE, (void *) MOD_S, sizeof(dword), 0},
+						{FEA_FILE_ATTR, (void *) (MOD_S + SIZE_S), sizeof(FileAttrs), 0},
+						{FEA_NAME, (void *) (MOD_S + SIZE_S + ATTR_S), sizeof(FileLongName), 0},
+						{FEA_END_OF_LIST, 0, 0, 0}
+					  };
   FileEnumParams params;
   word itemsleft;
 /*  word number; */
@@ -2914,110 +2655,110 @@ Boolean StrEnd(char *text, char *endstr)
   BVFileNumber = FileEnum(&params, &mem, &itemsleft);
 
   if(BVFileList != 0)
-    MemFree(BVFileList);
+	MemFree(BVFileList);
 
   if(BVFileNumber != 0)
-    BVFileList = mem;
+	BVFileList = mem;
   else
-    BVFileList = 0;
+	BVFileList = 0;
 
   if(BVFileNumber != 0)
   {
-    filelist = MemLock(mem);
+	filelist = MemLock(mem);
 
-    /* sorting */
-    count1 = BVFileNumber;
-    while(count1 != 0)
-    {
-      count2 = count1;
-      while(count2 != 0)
-      {
-        attrs1 = filelist[count1 - 1].BVFA_type & FA_SUBDIR;
-        attrs2 = filelist[count2 - 1].BVFA_type & FA_SUBDIR;
+	/* sorting */
+	count1 = BVFileNumber;
+	while(count1 != 0)
+	{
+	  count2 = count1;
+	  while(count2 != 0)
+	  {
+		attrs1 = filelist[count1 - 1].BVFA_type & FA_SUBDIR;
+		attrs2 = filelist[count2 - 1].BVFA_type & FA_SUBDIR;
 
-        if( ( (strcmp(filelist[count1-1].BVFA_name,
-               filelist[count2-1].BVFA_name) < 0) &&  ((attrs1 == attrs2) || (attrs1 != 0))) ||
-           ((attrs1 != attrs2) && (attrs1 != 0)))
-        {
+		if( ( (strcmp(filelist[count1-1].BVFA_name,
+			   filelist[count2-1].BVFA_name) < 0) &&  ((attrs1 == attrs2) || (attrs1 != 0))) ||
+		   ((attrs1 != attrs2) && (attrs1 != 0)))
+		{
 
-         /* swap if (count2) greater (count1) */
-            fileattr = filelist[count1-1];
-            filelist[count1-1] = filelist[count2-1];
-            filelist[count2-1] = fileattr;
-        };
-        count2--;
-      };
-      count1--;
-    };
+		 /* swap if (count2) greater (count1) */
+			fileattr = filelist[count1-1];
+			filelist[count1-1] = filelist[count2-1];
+			filelist[count2-1] = fileattr;
+		};
+		count2--;
+	  };
+	  count1--;
+	};
 
-    /* get view options */
-    sel = @call BVImpFileShowTools::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	/* get view options */
+	sel = @call BVImpFileShowTools::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
-    /* filtering the file list */
-    if(sel != BV_SHOW_ALL)
-    {
-        count1 = 0; /* writing */
-        count2 = 0; /* reading */
-        do
-        {
-            attrs1 = filelist[count2].BVFA_type & FA_SUBDIR;
+	/* filtering the file list */
+	if(sel != BV_SHOW_ALL)
+	{
+		count1 = 0; /* writing */
+		count2 = 0; /* reading */
+		do
+		{
+			attrs1 = filelist[count2].BVFA_type & FA_SUBDIR;
 
-            if(attrs1 == 0)
-            {
-                if(StrEnd(&filelist[count2].BVFA_name, ".BMP") && ((sel == BV_SHOW_BMP)
-                    || (sel == BV_SHOW_ALL_MEDIA)))
-                {
-                    filelist[count1] = filelist[count2];
-                    count1++;
-                }
-                else
-                    if(StrEnd(&filelist[count2].BVFA_name, ".PCX") && ((sel == BV_SHOW_PCX)
-                        || (sel == BV_SHOW_ALL_MEDIA)))
-                    {
-                        filelist[count1] = filelist[count2];
-                        count1++;
-                    }
-                    else
-                        if(StrEnd(&filelist[count2].BVFA_name, ".GIF") && ((sel == BV_SHOW_GIF)
-                            || (sel == BV_SHOW_ALL_MEDIA)))
-                        {
-                            filelist[count1] = filelist[count2];
-                            count1++;
-                        }
-                        else
-                            if(StrEnd(&filelist[count2].BVFA_name, ".PNG") && ((sel == BV_SHOW_PNG)
-                                || (sel == BV_SHOW_ALL_MEDIA)))
-                            {
-                                filelist[count1] = filelist[count2];
-                                count1++;
-                            }
+			if(attrs1 == 0)
+			{
+				if(StrEnd(&filelist[count2].BVFA_name, ".BMP") && ((sel == BV_SHOW_BMP)
+					|| (sel == BV_SHOW_ALL_MEDIA)))
+				{
+					filelist[count1] = filelist[count2];
+					count1++;
+				}
+				else
+					if(StrEnd(&filelist[count2].BVFA_name, ".PCX") && ((sel == BV_SHOW_PCX)
+						|| (sel == BV_SHOW_ALL_MEDIA)))
+					{
+						filelist[count1] = filelist[count2];
+						count1++;
+					}
+					else
+						if(StrEnd(&filelist[count2].BVFA_name, ".GIF") && ((sel == BV_SHOW_GIF)
+							|| (sel == BV_SHOW_ALL_MEDIA)))
+						{
+							filelist[count1] = filelist[count2];
+							count1++;
+						}
+						else
+							if(StrEnd(&filelist[count2].BVFA_name, ".PNG") && ((sel == BV_SHOW_PNG)
+								|| (sel == BV_SHOW_ALL_MEDIA)))
+							{
+								filelist[count1] = filelist[count2];
+								count1++;
+							}
 
 @ifdef JPEG_SUPPORT
-                            else
-                                if(StrEnd(&filelist[count2].BVFA_name, ".JPG") && ((sel == BV_SHOW_JPEG)
-                                    || (sel == BV_SHOW_ALL_MEDIA)))
-                                {
-                                    filelist[count1] = filelist[count2];
-                                    count1++;
-                                }
+							else
+								if(StrEnd(&filelist[count2].BVFA_name, ".JPG") && ((sel == BV_SHOW_JPEG)
+									|| (sel == BV_SHOW_ALL_MEDIA)))
+								{
+									filelist[count1] = filelist[count2];
+									count1++;
+								}
 @endif
-            }
-            else
-            {
-                filelist[count1] = filelist[count2];
-                count1++;
-            }
+			}
+			else
+			{
+				filelist[count1] = filelist[count2];
+				count1++;
+			}
 
-            count2++;
-        }
-        while((count2 != BVFileNumber) && (count1 < 250));
+			count2++;
+		}
+		while((count2 != BVFileNumber) && (count1 < 250));
 
-        BVFileNumber = count1;
-    }
+		BVFileNumber = count1;
+	}
 
-    MemUnlock(mem);
+	MemUnlock(mem);
 
-    BVFileList = MemReAlloc(mem, BVFileNumber * sizeof(BVFileAttr), 0);
+	BVFileList = MemReAlloc(mem, BVFileNumber * sizeof(BVFileAttr), 0);
   };
 
   @call BVDynFileList::MSG_BV_DELETE_FILELIST();
@@ -3027,13 +2768,13 @@ Boolean StrEnd(char *text, char *endstr)
   objblock = 0;
   while(childcount != BVFileNumber)
   {
-    child = @call BVDynFileList::MSG_BV_ADD_FILELIST_ITEM(&objblock);
+	child = @call BVDynFileList::MSG_BV_ADD_FILELIST_ITEM(&objblock);
 
-    @call BVDynFileList::MSG_GEN_ADD_CHILD(child, CCF_MARK_DIRTY|CCO_LAST);
-    @call oself::MSG_BV_SET_FILELIST_MONIKER(childcount,child);
-    @call child::MSG_GEN_ITEM_SET_IDENTIFIER(childcount);
-    @call child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
-    childcount++;
+	@call BVDynFileList::MSG_GEN_ADD_CHILD(child, CCF_MARK_DIRTY|CCO_LAST);
+	@call oself::MSG_BV_SET_FILELIST_MONIKER(childcount,child);
+	@call child::MSG_GEN_ITEM_SET_IDENTIFIER(childcount);
+	@call child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	childcount++;
   };
   @send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
 
@@ -3052,27 +2793,27 @@ Boolean StrEnd(char *text, char *endstr)
   if(path[count1] == 0) count2 = 1;
   while(path[count1] != 0)
   {
-    if(path[count1] == '\\')
-      count2++;
-    count1++;
+	if(path[count1] == '\\')
+	  count2++;
+	count1++;
   }
 
 
   if((BVCurrentDisk == SP_DOCUMENT)&&(strcmp(BVCurrentPath, "") == 0))
 
-    @send BVImpFileDirDoc::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send BVImpFileDirDoc::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
   else
-    @send BVImpFileDirDoc::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send BVImpFileDirDoc::MSG_GEN_SET_ENABLED(VUM_NOW);
 
   if(strcmp(path, "\\")==0)
   {
-    @send BVImpFileDirBelow::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    @send BVImpFileDirPath::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send BVImpFileDirBelow::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send BVImpFileDirPath::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
   }
   else
   {
-    @send BVImpFileDirBelow::MSG_GEN_SET_ENABLED(VUM_NOW);
-    @send BVImpFileDirPath::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send BVImpFileDirBelow::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send BVImpFileDirPath::MSG_GEN_SET_ENABLED(VUM_NOW);
   }
 
   @send process::MSG_BV_NO_FILE_SELECTED();
@@ -3090,7 +2831,7 @@ Boolean StrEnd(char *text, char *endstr)
 
 @ifdef OLD_THUMBNAIL_DB
 VMBlockHandle ThumbFindItem(FileLongName name, dword size,
-                            FileDateAndTime date)
+							FileDateAndTime date)
 {
   VMBlockHandle thumbnail = 0, mapblock;
   BVThumbDBMap *mapptr;
@@ -3099,25 +2840,25 @@ VMBlockHandle ThumbFindItem(FileLongName name, dword size,
   BVThumbDBItem *itemptr;
 
   if(BVThumbnailDB == 0)
-    return(0);
+	return(0);
 
   mapblock = VMGetMapBlock(BVThumbnailDB);
 
   if(mapblock != 0)
   {
-    mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
-    item = mapptr->BVTDBM_firstItem;
-    VMUnlock(mem);
-    while((item != 0) && (thumbnail == 0))
-    {
-      itemptr = DBLockUngrouped(BVThumbnailDB, item);
-      if((strcmp(name, itemptr->BVTDBI_name) == 0) &&
-         (date == itemptr->BVTDBI_date) &&
-         (size == itemptr->BVTDBI_size))
-        thumbnail = itemptr->BVTDBI_thumbnail;
-      item = itemptr->BVTDBI_next;
-      DBUnlock(itemptr);
-    }
+	mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
+	item = mapptr->BVTDBM_firstItem;
+	VMUnlock(mem);
+	while((item != 0) && (thumbnail == 0))
+	{
+	  itemptr = DBLockUngrouped(BVThumbnailDB, item);
+	  if((strcmp(name, itemptr->BVTDBI_name) == 0) &&
+		 (date == itemptr->BVTDBI_date) &&
+		 (size == itemptr->BVTDBI_size))
+		thumbnail = itemptr->BVTDBI_thumbnail;
+	  item = itemptr->BVTDBI_next;
+	  DBUnlock(itemptr);
+	}
   };
   return(thumbnail);
 };
@@ -3126,7 +2867,7 @@ VMBlockHandle ThumbFindItem(FileLongName name, dword size,
 
 void
 ThumbDeleteItem(FileLongName name, dword size,
-                            FileDateAndTime date)
+							FileDateAndTime date)
 {
   VMBlockHandle thumbnail = 0, mapblock;
   BVThumbDBMap *mapptr;
@@ -3136,7 +2877,7 @@ ThumbDeleteItem(FileLongName name, dword size,
   DBGroupAndItem last, newitem;
 
   if(BVThumbnailDB == 0)
-    return;
+	return;
 
   last = 0;
 
@@ -3144,59 +2885,59 @@ ThumbDeleteItem(FileLongName name, dword size,
 
   if(mapblock != 0)
   {
-    mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
-    item = mapptr->BVTDBM_firstItem;
-    VMUnlock(mem);
-    while((item != 0) && (thumbnail == 0))
-    {
-      itemptr = DBLockUngrouped(BVThumbnailDB, item);
-      if((strcmp(name, itemptr->BVTDBI_name) == 0) &&
-         (date == itemptr->BVTDBI_date) &&
-         (size == itemptr->BVTDBI_size))
-      {
-        newitem = itemptr->BVTDBI_next;
+	mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
+	item = mapptr->BVTDBM_firstItem;
+	VMUnlock(mem);
+	while((item != 0) && (thumbnail == 0))
+	{
+	  itemptr = DBLockUngrouped(BVThumbnailDB, item);
+	  if((strcmp(name, itemptr->BVTDBI_name) == 0) &&
+		 (date == itemptr->BVTDBI_date) &&
+		 (size == itemptr->BVTDBI_size))
+	  {
+		newitem = itemptr->BVTDBI_next;
 
-        thumbnail = itemptr->BVTDBI_thumbnail;
+		thumbnail = itemptr->BVTDBI_thumbnail;
 
-         /* Thumbnail l�schen */
-         MyVMFreeVMChain(BVThumbnailDB, VMCHAIN_MAKE_FROM_VM_BLOCK(thumbnail));
+		 /* Thumbnail l�schen */
+		 MyVMFreeVMChain(BVThumbnailDB, VMCHAIN_MAKE_FROM_VM_BLOCK(thumbnail));
 
-         /* item l�schen */
-        DBUnlock(itemptr);
-        DBFreeUngrouped(BVThumbnailDB, item);
+		 /* item l�schen */
+		DBUnlock(itemptr);
+		DBFreeUngrouped(BVThumbnailDB, item);
 
-        if(last == 0)
-        {
-            mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
-            mapptr->BVTDBM_firstItem = newitem;
-            VMDirty(mem);
-            VMUnlock(mem);
-        }
-        else
-        {
-            /* letztes item lock */
-            itemptr = DBLockUngrouped(BVThumbnailDB, last);
+		if(last == 0)
+		{
+			mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
+			mapptr->BVTDBM_firstItem = newitem;
+			VMDirty(mem);
+			VMUnlock(mem);
+		}
+		else
+		{
+			/* letztes item lock */
+			itemptr = DBLockUngrouped(BVThumbnailDB, last);
 
-            /* n�chstes eintragen */
-            itemptr->BVTDBI_next = newitem;
+			/* n�chstes eintragen */
+			itemptr->BVTDBI_next = newitem;
 
-            DBDirty(itemptr);
-            DBUnlock(itemptr);
-        }
+			DBDirty(itemptr);
+			DBUnlock(itemptr);
+		}
 
-        mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
-        if(item == mapptr->BVTDBM_lastItem)
-            mapptr->BVTDBM_lastItem = last;
-        VMDirty(mem);
-        VMUnlock(mem);
-      }
-      else
-      {
-        last = item;
-        item = itemptr->BVTDBI_next;
-        DBUnlock(itemptr);
-      }
-    }
+		mapptr = VMLock(BVThumbnailDB, mapblock, &mem);
+		if(item == mapptr->BVTDBM_lastItem)
+			mapptr->BVTDBM_lastItem = last;
+		VMDirty(mem);
+		VMUnlock(mem);
+	  }
+	  else
+	  {
+		last = item;
+		item = itemptr->BVTDBI_next;
+		DBUnlock(itemptr);
+	  }
+	}
   };
   return;
 };
@@ -3205,7 +2946,7 @@ ThumbDeleteItem(FileLongName name, dword size,
 
 void
 ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
-                VMFileHandle file, VMBlockHandle block)
+				VMFileHandle file, VMBlockHandle block)
 {
   VMBlockHandle thumbnail, compact;
   DBGroupAndItem item, item2;
@@ -3221,97 +2962,97 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
   word size_x, size_y;
 
   if(BVThumbnailDB == 0)
-    return;
+	return;
 
   if((ThumbFindItem(name, size, date) == 0)&&
-     (BVThumbnailDB != 0))
+	 (BVThumbnailDB != 0))
   {
-    ptr = VMLock(file, block, &mem);
+	ptr = VMLock(file, block, &mem);
 
-    x = ptr[0x1a]+256*(ptr[0x1b]);
-    y = ptr[0x1c]+256*(ptr[0x1d]);
-    type = ptr[0x1f] & 7;
-    VMUnlock(mem);
+	x = ptr[0x1a]+256*(ptr[0x1b]);
+	y = ptr[0x1c]+256*(ptr[0x1d]);
+	type = ptr[0x1f] & 7;
+	VMUnlock(mem);
 
-    /* creating thumbnail */
-    sx=GrSDivWWFixed(MakeWWFixed(88), MakeWWFixed(x));
-    sy=GrSDivWWFixed(MakeWWFixed(80), MakeWWFixed(y));
+	/* creating thumbnail */
+	sx=GrSDivWWFixed(MakeWWFixed(88), MakeWWFixed(x));
+	sy=GrSDivWWFixed(MakeWWFixed(80), MakeWWFixed(y));
 
-    if(sx > sy)
-      sx = sy;
+	if(sx > sy)
+	  sx = sy;
 
-    size_x = IntegerOf(GrMulWWFixed(MakeWWFixed(x),sx));
-    if(size_x == 0) size_x = 1;
-    size_y = IntegerOf(GrMulWWFixed(MakeWWFixed(y),sx));
-    if(size_y == 0) size_y = 1;
+	size_x = IntegerOf(GrMulWWFixed(MakeWWFixed(x),sx));
+	if(size_x == 0) size_x = 1;
+	size_y = IntegerOf(GrMulWWFixed(MakeWWFixed(y),sx));
+	if(size_y == 0) size_y = 1;
 
-    thumbnail = GrCreateBitmap(type, size_x, size_y
-                               , BVThumbnailDB,
-                                   0, &gstate);
+	thumbnail = GrCreateBitmap(type, size_x, size_y
+							   , BVThumbnailDB,
+								   0, &gstate);
 /*    GrDestroyBitmap(gstate, BMD_LEAVE_DATA);
 
 
-    if(((type&(BMT_FORMAT|BMT_PALETTE))==(BMF_4BIT|BMT_PALETTE))||
-       ((type&(BMT_FORMAT|BMT_PALETTE))==(BMF_8BIT|BMT_PALETTE)))
-    {
-      ptr = VMLock(file, block, &mem);
-      ptr2 = VMLock(BVThumbnailDB, thumbnail, &mem2);
-      offset = ptr[0x28]+256*(ptr[0x29]);
-      offset += 0x1c;
-      offset2 = ptr2[0x28]+256*(ptr2[0x29]);
-      offset2 += 0x1c;
+	if(((type&(BMT_FORMAT|BMT_PALETTE))==(BMF_4BIT|BMT_PALETTE))||
+	   ((type&(BMT_FORMAT|BMT_PALETTE))==(BMF_8BIT|BMT_PALETTE)))
+	{
+	  ptr = VMLock(file, block, &mem);
+	  ptr2 = VMLock(BVThumbnailDB, thumbnail, &mem2);
+	  offset = ptr[0x28]+256*(ptr[0x29]);
+	  offset += 0x1c;
+	  offset2 = ptr2[0x28]+256*(ptr2[0x29]);
+	  offset2 += 0x1c;
 
-      if((type&BMT_FORMAT) == BMF_4BIT)
-        memcpy(&(ptr2[offset2]),&(ptr[offset]), 16*3);
-      else
-        memcpy(&(ptr2[offset2]),&(ptr[offset]), 256*3);
+	  if((type&BMT_FORMAT) == BMF_4BIT)
+		memcpy(&(ptr2[offset2]),&(ptr[offset]), 16*3);
+	  else
+		memcpy(&(ptr2[offset2]),&(ptr[offset]), 256*3);
 
-      VMDirty(mem2);
-      VMUnlock(mem2);
-      VMUnlock(mem);
-    };
+	  VMDirty(mem2);
+	  VMUnlock(mem2);
+	  VMUnlock(mem);
+	};
 
-    gstate = GrEditBitmap(BVThumbnailDB, thumbnail, 0);
-    type &= BMT_PALETTE;
+	gstate = GrEditBitmap(BVThumbnailDB, thumbnail, 0);
+	type &= BMT_PALETTE;
 */
-    if(sx == 0)
-      FatalError(300);
-    GrApplyScale(gstate, sx, sx);
-    GrDrawHugeBitmap(gstate, 0, 0, file, block);
-    GrDestroyBitmap(gstate, BMD_LEAVE_DATA);
+	if(sx == 0)
+	  FatalError(300);
+	GrApplyScale(gstate, sx, sx);
+	GrDrawHugeBitmap(gstate, 0, 0, file, block);
+	GrDestroyBitmap(gstate, BMD_LEAVE_DATA);
 
-    compact =  GrCompactBitmap(BVThumbnailDB, thumbnail,BVThumbnailDB);
+	compact =  GrCompactBitmap(BVThumbnailDB, thumbnail,BVThumbnailDB);
 
-    MyVMFreeVMChain(BVThumbnailDB,
-      VMCHAIN_MAKE_FROM_VM_BLOCK( thumbnail));
+	MyVMFreeVMChain(BVThumbnailDB,
+	  VMCHAIN_MAKE_FROM_VM_BLOCK( thumbnail));
 
 
-    item = DBAllocUngrouped(BVThumbnailDB, sizeof(BVThumbDBItem));
-    itemptr = DBLockUngrouped(BVThumbnailDB, item);
-    strcpy(itemptr->BVTDBI_name, name);
-    itemptr->BVTDBI_date = date;
-    itemptr->BVTDBI_size = size;
-    itemptr->BVTDBI_next = 0;
-    itemptr->BVTDBI_thumbnail = compact;
-    DBDirty(itemptr);
-    DBUnlock(itemptr);
+	item = DBAllocUngrouped(BVThumbnailDB, sizeof(BVThumbDBItem));
+	itemptr = DBLockUngrouped(BVThumbnailDB, item);
+	strcpy(itemptr->BVTDBI_name, name);
+	itemptr->BVTDBI_date = date;
+	itemptr->BVTDBI_size = size;
+	itemptr->BVTDBI_next = 0;
+	itemptr->BVTDBI_thumbnail = compact;
+	DBDirty(itemptr);
+	DBUnlock(itemptr);
 
-    thumbnail = VMGetMapBlock(BVThumbnailDB);
-    mapptr = VMLock(BVThumbnailDB, thumbnail, &mem);
-    item2 = mapptr->BVTDBM_lastItem;
-    mapptr->BVTDBM_lastItem = item;
-    if(item2 == 0)
-      mapptr->BVTDBM_firstItem = item;
-    VMDirty(mem);
-    VMUnlock(mem);
+	thumbnail = VMGetMapBlock(BVThumbnailDB);
+	mapptr = VMLock(BVThumbnailDB, thumbnail, &mem);
+	item2 = mapptr->BVTDBM_lastItem;
+	mapptr->BVTDBM_lastItem = item;
+	if(item2 == 0)
+	  mapptr->BVTDBM_firstItem = item;
+	VMDirty(mem);
+	VMUnlock(mem);
 
-    if(item2 != 0)
-    {
-      itemptr = DBLockUngrouped(BVThumbnailDB, item2);
-      itemptr->BVTDBI_next = item;
-      DBDirty(itemptr);
-      DBUnlock(itemptr);
-    };
+	if(item2 != 0)
+	{
+	  itemptr = DBLockUngrouped(BVThumbnailDB, item2);
+	  itemptr->BVTDBI_next = item;
+	  DBDirty(itemptr);
+	  DBUnlock(itemptr);
+	};
   };
 };
 @endif
@@ -3329,9 +3070,9 @@ BVCalcDriveName(char *text, word item)
   item++;
   while(item != 0)
   {
-    while(((drvstat = DriveGetStatus(count))&DS_PRESENT) == 0) count++;
-    count++;
-    item--;
+	while(((drvstat = DriveGetStatus(count))&DS_PRESENT) == 0) count++;
+	count++;
+	item--;
   };
 
   text[0] = count + 64;
@@ -3339,14 +3080,14 @@ BVCalcDriveName(char *text, word item)
   text[2] = 0;
   if((drvstat & (DS_TYPE|DS_MEDIA_REMOVABLE)) == DRIVE_FIXED)
   {
-    disk = DiskRegisterDiskSilently(count-1);
-    if(disk != 0)
-    {
-      strcat(text, "[");
-      DiskGetVolumeName(disk, name);
-      strcat(text, name);
-      strcat(text,"]");
-    };
+	disk = DiskRegisterDiskSilently(count-1);
+	if(disk != 0)
+	{
+	  strcat(text, "[");
+	  DiskGetVolumeName(disk, name);
+	  strcat(text, name);
+	  strcat(text,"]");
+	};
   };
 };
 
@@ -3358,7 +3099,7 @@ BVCalcDriveName(char *text, word item)
 
   BVCalcDriveName(text, item);
   @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-                                           item, text);
+										   item, text);
 };
 
 /**************************************************************************/
@@ -3367,21 +3108,21 @@ BVCalcDriveName(char *text, word item)
 
 @method BVProcessClass, MSG_BV_SET_FILELIST_MONIKER
 {
-    BVFileAttr *filelist;
+	BVFileAttr *filelist;
 
-    if(BVFileList)
-    {
-        filelist = MemLock(BVFileList);
+	if(BVFileList)
+	{
+		filelist = MemLock(BVFileList);
 
-        if(filelist)
-            @call list::MSG_THUMBNAIL_ITEM_SET_DATA(
-                             filelist[item].BVFA_name,
-                             filelist[item].BVFA_size,
-                             filelist[item].BVFA_date,
-                             filelist[item].BVFA_type & FA_SUBDIR);
+		if(filelist)
+			@call list::MSG_THUMBNAIL_ITEM_SET_DATA(
+							 filelist[item].BVFA_name,
+							 filelist[item].BVFA_size,
+							 filelist[item].BVFA_date,
+							 filelist[item].BVFA_type & FA_SUBDIR);
 
-        MemUnlock(BVFileList);
-    }
+		MemUnlock(BVFileList);
+	}
 }
 
 @else
@@ -3408,97 +3149,97 @@ BVCalcDriveName(char *text, word item)
   mem = MemAllocLMem(LMEM_TYPE_GENERAL,0);
 
   if(mem == 0)
-    return;
+	return;
 
   gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
   if(BVFileList == 0)
-    GrDrawRect(gstate, 0, 0, 80, 80);
+	GrDrawRect(gstate, 0, 0, 80, 80);
   else
   {
-    filelist = MemLock(BVFileList);
-    GrSetGStringBounds(gstate, 0, 0, 96,96);
-    GrSetFont(gstate, FID_BERKELEY, MakeWWFixed(9));
-    width = GrTextWidth(gstate, filelist[item].BVFA_name, 0);
-    if(width > 90)
-    {
-      width = GrTextWidth(gstate, "...", 0);
-      count = 0;
-      while ((width < 96) && (filelist[item].BVFA_name[count] != 0))
-      {
-        width += (GrCharWidth(gstate, filelist[item].BVFA_name[count])>>16);
-        count++;
-      };
-      count--;
-      width -= (GrCharWidth(gstate, filelist[item].BVFA_name[count])>>16);
-      GrDrawText(gstate, 48-(width/2),85, filelist[item].BVFA_name, count);
-      GrDrawTextAtCP(gstate, "...",0);
+	filelist = MemLock(BVFileList);
+	GrSetGStringBounds(gstate, 0, 0, 96,96);
+	GrSetFont(gstate, FID_BERKELEY, MakeWWFixed(9));
+	width = GrTextWidth(gstate, filelist[item].BVFA_name, 0);
+	if(width > 90)
+	{
+	  width = GrTextWidth(gstate, "...", 0);
+	  count = 0;
+	  while ((width < 96) && (filelist[item].BVFA_name[count] != 0))
+	  {
+		width += (GrCharWidth(gstate, filelist[item].BVFA_name[count])>>16);
+		count++;
+	  };
+	  count--;
+	  width -= (GrCharWidth(gstate, filelist[item].BVFA_name[count])>>16);
+	  GrDrawText(gstate, 48-(width/2),85, filelist[item].BVFA_name, count);
+	  GrDrawTextAtCP(gstate, "...",0);
 
-    }
-    else
-      GrDrawText(gstate, 48-(width/2),85, filelist[item].BVFA_name, 0);
+	}
+	else
+	  GrDrawText(gstate, 48-(width/2),85, filelist[item].BVFA_name, 0);
 
-    if(filelist[item].BVFA_type & FA_SUBDIR)
-    {
-      gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK,
-                  OptrToChunk(@BVDirMoniker));
-      GrDrawGString(gstate, gstring, 18,14,0,0);
-      GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
-    }
-    else
-    {
-      stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_USE_THUMBNAILS);
+	if(filelist[item].BVFA_type & FA_SUBDIR)
+	{
+	  gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK,
+				  OptrToChunk(@BVDirMoniker));
+	  GrDrawGString(gstate, gstring, 18,14,0,0);
+	  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+	}
+	else
+	{
+	  stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_USE_THUMBNAILS);
 
-      if(stat != FALSE)
-      {
+	  if(stat != FALSE)
+	  {
 @ifdef OLD_THUMBNAIL_DB
-        thumbnail = ThumbFindItem(filelist[item].BVFA_name,
-                                filelist[item].BVFA_size,
-                                filelist[item].BVFA_date);
+		thumbnail = ThumbFindItem(filelist[item].BVFA_name,
+								filelist[item].BVFA_size,
+								filelist[item].BVFA_date);
 
-        if(thumbnail != 0)
-        {
-            ptr = VMLock(BVThumbnailDB, thumbnail, &mem2);
+		if(thumbnail != 0)
+		{
+			ptr = VMLock(BVThumbnailDB, thumbnail, &mem2);
 
-            x = ptr[0x1a]+256*(ptr[0x1b]);
-            y = ptr[0x1c]+256*(ptr[0x1d]);
-            VMUnlock(mem2);
-            GrDrawHugeBitmap(gstate, 48-(x/2) , 43-(y/2), BVThumbnailDB, thumbnail);
-        }
-        else
-        {
-            gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
-                      OptrToChunk(@BVUnknownMoniker));
-            GrDrawGString(gstate, gstring, 18,14,0,0);
-            GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
-        }
+			x = ptr[0x1a]+256*(ptr[0x1b]);
+			y = ptr[0x1c]+256*(ptr[0x1d]);
+			VMUnlock(mem2);
+			GrDrawHugeBitmap(gstate, 48-(x/2) , 43-(y/2), BVThumbnailDB, thumbnail);
+		}
+		else
+		{
+			gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
+					  OptrToChunk(@BVUnknownMoniker));
+			GrDrawGString(gstate, gstring, 18,14,0,0);
+			GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+		}
 @else
-        if(ThumbDrawItem(gstate, 48, 43, THJ_CENTER, TVJ_CENTER,
-                         filelist[item].BVFA_name,
-                         filelist[item].BVFA_size,
-                         filelist[item].BVFA_date) != TE_NO_ERROR)
-        {
-            gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
-                  OptrToChunk(@BVUnknownMoniker));
-            GrDrawGString(gstate, gstring, 18,14,0,0);
-            GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
-        }
+		if(ThumbDrawItem(gstate, 48, 43, THJ_CENTER, TVJ_CENTER,
+						 filelist[item].BVFA_name,
+						 filelist[item].BVFA_size,
+						 filelist[item].BVFA_date) != TE_NO_ERROR)
+		{
+			gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
+				  OptrToChunk(@BVUnknownMoniker));
+			GrDrawGString(gstate, gstring, 18,14,0,0);
+			GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+		}
 @endif
-      }
-      else
-      {
-        gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
-                  OptrToChunk(@BVUnknownMoniker));
-        GrDrawGString(gstate, gstring, 18,14,0,0);
-        GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
-      };
-    };
-    MemUnlock(BVFileList);
+	  }
+	  else
+	  {
+		gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
+				  OptrToChunk(@BVUnknownMoniker));
+		GrDrawGString(gstate, gstring, 18,14,0,0);
+		GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+	  };
+	};
+	MemUnlock(BVFileList);
   };
 
   GrEndGString(gstate);
   @call list::MSG_GEN_REPLACE_VIS_MONIKER(
-      VUM_NOW,96,96,
-      0, VMDT_GSTRING, VMST_OPTR, ConstructOptr(mem, chunk));
+	  VUM_NOW,96,96,
+	  0, VMDT_GSTRING, VMST_OPTR, ConstructOptr(mem, chunk));
   GrDestroyGString(gstate, 0, GSKT_KILL_DATA);
 
   MemFree(mem);
@@ -3517,19 +3258,19 @@ BVCalcDriveName(char *text, word item)
 
   if((BVFileList != 0) && (count != 0))
   {
-    filelist = MemLock(BVFileList);
-    if(((filelist[selection].BVFA_type & FA_SUBDIR) == 0) || (count > 1))
-    {
-      @send process::MSG_BV_FILE_SELECTED();
-    }
-    else
-    {
-      @send process::MSG_BV_NO_FILE_SELECTED();
-    };
-    MemUnlock(BVFileList);
+	filelist = MemLock(BVFileList);
+	if(((filelist[selection].BVFA_type & FA_SUBDIR) == 0) || (count > 1))
+	{
+	  @send process::MSG_BV_FILE_SELECTED();
+	}
+	else
+	{
+	  @send process::MSG_BV_NO_FILE_SELECTED();
+	};
+	MemUnlock(BVFileList);
   }
   else
-    @send process::MSG_BV_NO_FILE_SELECTED();
+	@send process::MSG_BV_NO_FILE_SELECTED();
 }
 
 /**************************************************************************/
@@ -3546,31 +3287,31 @@ BVCalcDriveName(char *text, word item)
 
   if((BVFileList != 0)&&(count != 0))
   {
-    filelist = MemLock(BVFileList);
-    if(((filelist[selection].BVFA_type & FA_SUBDIR) == 0) || (count > 1))
-    {
-      @send process::MSG_BV_FILE_SELECTED();
-      MemUnlock(BVFileList);
-      @send BVImpTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
-    }
-    else
-    {
-      /* open subdir */
-      @send process::MSG_BV_NO_FILE_SELECTED();
-      len = strlen(BVCurrentPath);
-      if((BVCurrentPath[len-1] != '\\') || (len == 0))
-      strcat(BVCurrentPath, "\\");
-      strcat(BVCurrentPath, filelist[selection].BVFA_name);
+	filelist = MemLock(BVFileList);
+	if(((filelist[selection].BVFA_type & FA_SUBDIR) == 0) || (count > 1))
+	{
+	  @send process::MSG_BV_FILE_SELECTED();
+	  MemUnlock(BVFileList);
+	  @send BVImpTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+	}
+	else
+	{
+	  /* open subdir */
+	  @send process::MSG_BV_NO_FILE_SELECTED();
+	  len = strlen(BVCurrentPath);
+	  if((BVCurrentPath[len-1] != '\\') || (len == 0))
+	  strcat(BVCurrentPath, "\\");
+	  strcat(BVCurrentPath, filelist[selection].BVFA_name);
 
-      pathptr = &(BVCurrentPath[0]);
-      disk = FileParseStandardPath(BVCurrentDisk, (const char**) &pathptr);
-      if(disk != 0)
-        BVCurrentDisk = disk;
-      strcpy(BVCurrentPath, pathptr);
+	  pathptr = &(BVCurrentPath[0]);
+	  disk = FileParseStandardPath(BVCurrentDisk, (const char**) &pathptr);
+	  if(disk != 0)
+		BVCurrentDisk = disk;
+	  strcpy(BVCurrentPath, pathptr);
 
-      MemUnlock(BVFileList);
-      @send process::MSG_BV_READ_FILES();
-    };
+	  MemUnlock(BVFileList);
+	  @send process::MSG_BV_READ_FILES();
+	};
   }
 }
 
@@ -3592,21 +3333,21 @@ BVCalcDriveName(char *text, word item)
 
   while((pos != 0) && (endFlag == 255))
   {
-    pos--;
-    if((path[pos] == '\\')||(pos == 0))
-    {
-      endFlag = 0;
-      path[pos] = 0;
-    };
+	pos--;
+	if((path[pos] == '\\')||(pos == 0))
+	{
+	  endFlag = 0;
+	  path[pos] = 0;
+	};
   }
   pathptr = &(path[0]);
   BVCurrentDisk = FileParseStandardPath(disk, (const char**) &pathptr);
 
   if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
-    BVCurrentDisk = disk;
+	BVCurrentDisk = disk;
   strcpy(BVCurrentPath, pathptr);
   if(BVCurrentPath[0] == 0)
-    strcpy(BVCurrentPath, "\\");
+	strcpy(BVCurrentPath, "\\");
 
   @send process::MSG_BV_READ_FILES();
 }
@@ -3628,38 +3369,38 @@ BVCalcDriveName(char *text, word item)
 
   if(item == 0)
   {
-    count1 = DiskGetDrive(disk);
-    DiskGetVolumeName(disk, path);
-    name[0] = 65 + count1;
-    name[1] = ':';
-    name[2] = '[';
-    name[3] = 0;
-    strcat(name, path);
-    strcat(name, "]\\");
+	count1 = DiskGetDrive(disk);
+	DiskGetVolumeName(disk, path);
+	name[0] = 65 + count1;
+	name[1] = ':';
+	name[2] = '[';
+	name[3] = 0;
+	strcat(name, path);
+	strcat(name, "]\\");
   }
   else
   {
 
-    end = 0;
-    count1 = item + 1;
-    count2 = 0;
-    do
-    {
-      start = end;
-      while((path[count2] != '\\') &&
-          (path[count2] != 0 )) count2++;
-      count1--;
-      count2++;
-      end = count2;
-    }
-    while(count1 != 0);
+	end = 0;
+	count1 = item + 1;
+	count2 = 0;
+	do
+	{
+	  start = end;
+	  while((path[count2] != '\\') &&
+		  (path[count2] != 0 )) count2++;
+	  count1--;
+	  count2++;
+	  end = count2;
+	}
+	while(count1 != 0);
 
-    strncpy(name, &(path[start]), count2 - start - 1);
-    name[count2 - start -1] = 0;
+	strncpy(name, &(path[start]), count2 - start - 1);
+	name[count2 - start -1] = 0;
 
   };
   @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-                                           item, name);
+										   item, name);
 
 }
 
@@ -3676,9 +3417,9 @@ BVCalcDriveName(char *text, word item)
   itemcount = selection + 1;
   while(itemcount != 0)
   {
-    while((DriveGetStatus(count)&DS_PRESENT)== 0) count++;
-    count++;
-    itemcount--;
+	while((DriveGetStatus(count)&DS_PRESENT)== 0) count++;
+	count++;
+	itemcount--;
   };
 
   text[0] = count + 64;
@@ -3688,15 +3429,15 @@ BVCalcDriveName(char *text, word item)
   disk = DiskRegisterDiskSilently(count-1);
   if(disk != 0)
   {
-    strcat(text, "[");
-    DiskGetVolumeName(disk, name);
-    strcat(text, name);
-    strcat(text,"]");
+	strcat(text, "[");
+	DiskGetVolumeName(disk, name);
+	strcat(text, name);
+	strcat(text,"]");
   };
   @call BVImpFileDirDrive::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
-                                           selection, text);
+										   selection, text);
   @call BVImpFileDirDrive::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
-                                           text, 0);
+										   text, 0);
   BVCurrentDisk = disk;
   strcpy(BVCurrentPath, "\\");
 
@@ -3715,31 +3456,31 @@ BVCalcDriveName(char *text, word item)
   pathptr = &(path[0]);
   disk = FileConstructFullPath(&pathptr, 256, BVCurrentDisk, BVCurrentPath, FALSE);
   if(selection == 0)
-    strcpy(path, "\\");
+	strcpy(path, "\\");
   else
   {
-    count = selection;
-    count2 = 0;
-    while(path[count2] == '\\') count2++;
-    while(count != 0)
-    {
-      if(path[count2] == '\\')
-        count--;
-      if(path[count2] == 0)
-        count = 0;
-      count2++;
-    }
-    path[count2 -1] = 0;
+	count = selection;
+	count2 = 0;
+	while(path[count2] == '\\') count2++;
+	while(count != 0)
+	{
+	  if(path[count2] == '\\')
+		count--;
+	  if(path[count2] == 0)
+		count = 0;
+	  count2++;
+	}
+	path[count2 -1] = 0;
   };
 
   pathptr = &(path[0]);
   BVCurrentDisk = FileParseStandardPath(disk, (const char**) &pathptr);
 
   if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
-    BVCurrentDisk = disk;
+	BVCurrentDisk = disk;
   strcpy(BVCurrentPath, pathptr);
   if(BVCurrentPath[0] == 0)
-    strcpy(BVCurrentPath, "\\");
+	strcpy(BVCurrentPath, "\\");
 
   @send process::MSG_BV_READ_FILES();
 };
@@ -3763,7 +3504,7 @@ BVCalcDriveName(char *text, word item)
   optr childoptr;
 
   if(ThumbFindItem(name, size, date) != 0)
-    return;
+	return;
 
 @ifdef OLD_THUMBNAIL_DB
   ThumbCreateItem(name, size, date, file, block);
@@ -3772,20 +3513,20 @@ BVCalcDriveName(char *text, word item)
 @endif
   if(BVFileList != 0)
   {
-    filelist = MemLock(BVFileList);
-    count = 0;
-    while(count != BVFileNumber)
-    {
-      if((size == filelist[count].BVFA_size) &&
-         (date == filelist[count].BVFA_date) &&
-         (strcmp(name, filelist[count].BVFA_name) == 0))
-      {
-        childoptr = @call BVDynFileList::MSG_GEN_FIND_CHILD_AT_POSITION(count);
-        @call process::MSG_BV_SET_FILELIST_MONIKER(count, childoptr);
-      };
-      count++;
-    };
-    MemUnlock(BVFileList);
+	filelist = MemLock(BVFileList);
+	count = 0;
+	while(count != BVFileNumber)
+	{
+	  if((size == filelist[count].BVFA_size) &&
+		 (date == filelist[count].BVFA_date) &&
+		 (strcmp(name, filelist[count].BVFA_name) == 0))
+	  {
+		childoptr = @call BVDynFileList::MSG_GEN_FIND_CHILD_AT_POSITION(count);
+		@call process::MSG_BV_SET_FILELIST_MONIKER(count, childoptr);
+	  };
+	  count++;
+	};
+	MemUnlock(BVFileList);
   };
 };
 
@@ -3802,20 +3543,20 @@ BVCalcDriveName(char *text, word item)
 
   while(childcount != 0)
   {
-    childcount--;
-    child = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(childcount);
-    @send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
-    @call child::MSG_GEN_REMOVE(VUM_DELAYED_VIA_UI_QUEUE, CCF_MARK_DIRTY);
+	childcount--;
+	child = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(childcount);
+	@send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	@call child::MSG_GEN_REMOVE(VUM_DELAYED_VIA_UI_QUEUE, CCF_MARK_DIRTY);
 
-    ObjLockObjBlock( OptrToHandle( child ) );
-    pCount = (word *)LMemDerefHandles(
-                OptrToHandle( child ),
-                OptrToChunk( @objBlockObjectCount ) );
-    count = --(*pCount);
-    MemUnlock( OptrToHandle( child ) );
+	ObjLockObjBlock( OptrToHandle( child ) );
+	pCount = (word *)LMemDerefHandles(
+				OptrToHandle( child ),
+				OptrToChunk( @objBlockObjectCount ) );
+	count = --(*pCount);
+	MemUnlock( OptrToHandle( child ) );
 
-    if( count==0 )
-        ObjFreeObjBlock(HandleOf(child));
+	if( count==0 )
+		ObjFreeObjBlock(HandleOf(child));
   };
 };
 
@@ -3823,32 +3564,32 @@ BVCalcDriveName(char *text, word item)
 
 @method BVDynListClass, MSG_BV_ADD_FILELIST_ITEM
 {
-        optr child;
-        word blocksize;
+		optr child;
+		word blocksize;
 
-        /* create new object and a new object block if
-           needed */
-        if((*objblock) != 0)
-            blocksize = MemGetInfo((*objblock), MGIT_SIZE);
+		/* create new object and a new object block if
+		   needed */
+		if((*objblock) != 0)
+			blocksize = MemGetInfo((*objblock), MGIT_SIZE);
 
-        if(((*objblock) == 0) || (blocksize > (8192-200)))
-        {
-                *objblock =
-                  ObjDuplicateResource(
-                    OptrToHandle(@objBlockObjectCount), 0, -1);
-        };
+		if(((*objblock) == 0) || (blocksize > (8192-200)))
+		{
+				*objblock =
+				  ObjDuplicateResource(
+					OptrToHandle(@objBlockObjectCount), 0, -1);
+		};
 @ifdef OLD_THUMBNAIL_DB
-        child = ObjInstantiate((*objblock), &GenItemClass);
+		child = ObjInstantiate((*objblock), &GenItemClass);
 @else
-        child = ObjInstantiate((*objblock), &ThumbnailItemClass);
+		child = ObjInstantiate((*objblock), &ThumbnailItemClass);
 @endif
 
-        ObjLockObjBlock(*objblock);
-        (*(word *)LMemDerefHandles( (*objblock),
-          OptrToChunk(@objBlockObjectCount) ))++;
-        MemUnlock(*objblock);
+		ObjLockObjBlock(*objblock);
+		(*(word *)LMemDerefHandles( (*objblock),
+		  OptrToChunk(@objBlockObjectCount) ))++;
+		MemUnlock(*objblock);
 
-        return(child);
+		return(child);
 };
 
 /**************************************************************************/
@@ -3861,9 +3602,9 @@ BVCalcDriveName(char *text, word item)
   {
    gstate = GrCreateState(pself->BVWindow);
    GrInvalRect(gstate, 0, 0, pself->BVBmpWidth, pself->BVBmpHeight);
-     GrDestroyState(gstate);
+	 GrDestroyState(gstate);
    if(pself->BVWindow != 0)
-    @call oself::MSG_META_EXPOSED(pself->BVWindow);
+	@call oself::MSG_META_EXPOSED(pself->BVWindow);
   };
 
 }
@@ -3880,32 +3621,32 @@ BVCalcDriveName(char *text, word item)
 
   if(BVFileList != 0)
   {
-    mem = MemAlloc(BVFileNumber*2, 0, 0);
-    selptr = MemLock(mem);
-    selection = selptr[0];
+	mem = MemAlloc(BVFileNumber*2, 0, 0);
+	selptr = MemLock(mem);
+	selection = selptr[0];
 
-    count = 0;
-    while(count != BVFileNumber)
-    {
-      selptr[count] = count;
-      count++;
-    };
+	count = 0;
+	while(count != BVFileNumber)
+	{
+	  selptr[count] = count;
+	  count++;
+	};
 
-    @call BVDynFileList::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(selptr, BVFileNumber);
-    MemUnlock(mem);
-    MemFree(mem);
-    @send process::MSG_BV_NO_FILE_SELECTED();
+	@call BVDynFileList::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(selptr, BVFileNumber);
+	MemUnlock(mem);
+	MemFree(mem);
+	@send process::MSG_BV_NO_FILE_SELECTED();
 
-    if(BVFileNumber > 1)
-      @send process::MSG_BV_FILE_SELECTED();
-    else
-      if(BVFileNumber == 1)
-      {
-        filelist = MemLock(BVFileList);
-        if((filelist[selection].BVFA_type & FA_SUBDIR) == 0)
-          @send process::MSG_BV_FILE_SELECTED();
-        MemUnlock(BVFileList);
-      };
+	if(BVFileNumber > 1)
+	  @send process::MSG_BV_FILE_SELECTED();
+	else
+	  if(BVFileNumber == 1)
+	  {
+		filelist = MemLock(BVFileList);
+		if((filelist[selection].BVFA_type & FA_SUBDIR) == 0)
+		  @send process::MSG_BV_FILE_SELECTED();
+		MemUnlock(BVFileList);
+	  };
   };
 }
 
@@ -3949,34 +3690,34 @@ BVCalcDriveName(char *text, word item)
 
 @method BVBrowserInterClass, MSG_META_GAINED_SYS_FOCUS_EXCL
 {
-/*  Boolean stat; */
-/*  optr target, doc;*/
-    EventHandle event;
+/*	Boolean stat; */
+/*	optr target, doc;*/
+	EventHandle event;
 
-    BVBrowserFocus = TRUE;
+	BVBrowserFocus = TRUE;
 
-    event = @record BVDocumentClass::MSG_BV_RESET_PALETTE();
+	event = @record BVDocumentClass::MSG_BV_RESET_PALETTE();
 
-    @send BVDisplayGroup::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
+	@send BVDisplayGroup::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
 
-    @callsuper();
+	@callsuper();
 }
 
 /**************************************************************************/
 
 @method BVBrowserInterClass, MSG_META_LOST_SYS_FOCUS_EXCL
 {
-/*  Boolean stat;*/
-/*  optr target, doc;*/
-    EventHandle event;
+/*	Boolean stat;*/
+/*	optr target, doc;*/
+	EventHandle event;
 
-    BVBrowserFocus = FALSE;
+	BVBrowserFocus = FALSE;
 
-    event = @record BVDocumentClass::MSG_BV_SET_PALETTE();
+	event = @record BVDocumentClass::MSG_BV_SET_PALETTE();
 
-    @send BVDisplayGroup::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
+	@send BVDisplayGroup::MSG_META_SEND_CLASSED_EVENT(event, TO_TARGET);
 
-    @callsuper();
+	@callsuper();
 }
 
 /**************************************************************************/
@@ -4000,111 +3741,109 @@ BVCalcDriveName(char *text, word item)
   if(BVFileList != 0)
   {
 
-    filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
 
-    fileidlist = MemAlloc(filenum*2, 0, 0);
+	fileidlist = MemAlloc(filenum*2, 0, 0);
 
-    idlistptr = MemLock(fileidlist);
+	idlistptr = MemLock(fileidlist);
 
-    filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
-      idlistptr, filenum*2);
+	filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+	  idlistptr, filenum*2);
 
-    MemUnlock(fileidlist);
+	MemUnlock(fileidlist);
 
-    filecount = 0;
-    do
-    {
-      idlistptr = MemLock(fileidlist);
-      filenum2 = idlistptr[filecount];
-      MemUnlock(fileidlist);
+	filecount = 0;
+	do
+	{
+	  idlistptr = MemLock(fileidlist);
+	  filenum2 = idlistptr[filecount];
+	  MemUnlock(fileidlist);
 
-      filelist = MemLock(BVFileList);
-      if((filelist[filenum2].BVFA_type&FA_SUBDIR) == 0)
-      {
-        strcpy(srcname, filelist[filenum2].BVFA_name);
-        MemUnlock(BVFileList);
+	  filelist = MemLock(BVFileList);
+	  if((filelist[filenum2].BVFA_type&FA_SUBDIR) == 0)
+	  {
+		strcpy(srcname, filelist[filenum2].BVFA_name);
+		MemUnlock(BVFileList);
 
-        MemLock(OptrToHandle(@BVThumbnailText));
-        strcpy(string, LMemDeref(@BVThumbnailText));
-        MemUnlock(OptrToHandle(@BVThumbnailText));
+		MemLock(OptrToHandle(@BVThumbnailText));
+		strcpy(string, LMemDeref(@BVThumbnailText));
+		MemUnlock(OptrToHandle(@BVThumbnailText));
 
-        strcat(string, srcname);
-        strcat(string, "...");
+		strcat(string, srcname);
+		strcat(string, "...");
 
-        @send BVThumbTex::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(string ,VUM_NOW);
+		@send BVThumbTex::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(string ,VUM_NOW);
 
-        count = 0;
-        while(count != sizeof(tempname))
-        {
-            tempname[count] = 0;
-            count++;
-        };
+		count = 0;
+		while(count != sizeof(tempname))
+		{
+			tempname[count] = 0;
+			count++;
+		};
 
-        /* import bitmap */
-        FilePushDir();
+		/* import bitmap */
+		FilePushDir();
 
-        FileSetCurrentPath(BVCurrentDisk, BVCurrentPath);
-        para.IBP_source = FileOpen(srcname, FILE_DENY_W|FILE_ACCESS_R);
+		FileSetCurrentPath(BVCurrentDisk, BVCurrentPath);
+		para.IBP_source = FileOpen(srcname, FILE_DENY_W|FILE_ACCESS_R);
 
-        date = FileGetDateAndTime(para.IBP_source) ;
-        FileGetHandleExtAttributes(para.IBP_source,FEA_SIZE,&size, sizeof(size));
+		date = FileGetDateAndTime(para.IBP_source) ;
+		FileGetHandleExtAttributes(para.IBP_source,FEA_SIZE,&size, sizeof(size));
 
-        if(ThumbFindItem(srcname, size, date) != 0)
-        {
-            FileClose(para.IBP_source, FILE_NO_ERRORS);
-            FilePopDir();
+		if(ThumbFindItem(srcname, size, date) != 0)
+		{
+			FileClose(para.IBP_source, FILE_NO_ERRORS);
+			FilePopDir();
 
-            @send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
-        }
-        else
-        {
-            @send BVThumbDlg::MSG_GEN_INTERACTION_INITIATE();
+			@send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
+		}
+		else
+		{
+			@send BVThumbDlg::MSG_GEN_INTERACTION_INITIATE();
 
-            FileSetCurrentPath(SP_WASTE_BASKET, ".");
-            para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
+			FileSetCurrentPath(SP_WASTE_BASKET, ".");
+			para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
 
-            getAlphaHandlingFromIni(&para.IBP_alphaTransform);
+			FilePopDir();
 
-            FilePopDir();
+			para.IBP_status = @BVThumbnailStatus;
+			status = Imp_BmpProcessFile(&para, IBF_AUTO);
 
-            para.IBP_status = @BVThumbnailStatus;
-            status = Imp_BmpProcessFile(&para, IBF_AUTO);
+			@send BVThumbDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
-            @send BVThumbDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+			/* create thumbnail */
+			if(status == IBS_NO_ERROR)
+			{
+				@call process::MSG_BV_CREATE_THUMBNAIL(srcname, size, date,
+					para.IBP_dest, para.IBP_bitmap);
 
-            /* create thumbnail */
-            if(status == IBS_NO_ERROR)
-            {
-                @call process::MSG_BV_CREATE_THUMBNAIL(srcname, size, date,
-                    para.IBP_dest, para.IBP_bitmap);
+				@send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
+			}
 
-                @send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
-            }
+			if(status == IBS_IMPORT_STOPPED)
+				filecount = filenum - 1;
 
-            if(status == IBS_IMPORT_STOPPED)
-                filecount = filenum - 1;
+			FileClose(para.IBP_source, FILE_NO_ERRORS);
+			VMClose(para.IBP_dest, FILE_NO_ERRORS);
 
-            FileClose(para.IBP_source, FILE_NO_ERRORS);
-            VMClose(para.IBP_dest, FILE_NO_ERRORS);
+			/* delete temp file */
+			FilePushDir();
+			FileSetCurrentPath(SP_WASTE_BASKET, ".");
+			FileDelete(tempname);
+			FilePopDir();
+		}
+	  }
+	  else
+	  {
+		MemUnlock(BVFileList);
+	  };
+	  filecount++;
+	}
+	while(filecount != filenum);
 
-            /* delete temp file */
-            FilePushDir();
-            FileSetCurrentPath(SP_WASTE_BASKET, ".");
-            FileDelete(tempname);
-            FilePopDir();
-        }
-      }
-      else
-      {
-        MemUnlock(BVFileList);
-      };
-      filecount++;
-    }
-    while(filecount != filenum);
+	MemFree(fileidlist);
 
-    MemFree(fileidlist);
-
-    @send oself::MSG_BV_UPDATE_OPEN_TRIGGER();
+	@send oself::MSG_BV_UPDATE_OPEN_TRIGGER();
   };
 }
 
@@ -4127,64 +3866,64 @@ BVCalcDriveName(char *text, word item)
   if(BVFileList != 0)
   {
 
-    filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
 
-    fileidlist = MemAlloc(filenum*2, 0, 0);
+	fileidlist = MemAlloc(filenum*2, 0, 0);
 
-    idlistptr = MemLock(fileidlist);
+	idlistptr = MemLock(fileidlist);
 
-    filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
-      idlistptr, filenum*2);
+	filenum = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(
+	  idlistptr, filenum*2);
 
-    MemUnlock(fileidlist);
+	MemUnlock(fileidlist);
 
-    filecount = 0;
-    do
-    {
-      idlistptr = MemLock(fileidlist);
-      filenum2 = idlistptr[filecount];
-      MemUnlock(fileidlist);
+	filecount = 0;
+	do
+	{
+	  idlistptr = MemLock(fileidlist);
+	  filenum2 = idlistptr[filecount];
+	  MemUnlock(fileidlist);
 
-      filelist = MemLock(BVFileList);
-      if((filelist[filenum2].BVFA_type&FA_SUBDIR) == 0)
-      {
-        strcpy(srcname, filelist[filenum2].BVFA_name);
-        MemUnlock(BVFileList);
+	  filelist = MemLock(BVFileList);
+	  if((filelist[filenum2].BVFA_type&FA_SUBDIR) == 0)
+	  {
+		strcpy(srcname, filelist[filenum2].BVFA_name);
+		MemUnlock(BVFileList);
 
-        /* import bitmap */
-        FilePushDir();
+		/* import bitmap */
+		FilePushDir();
 
-        FileSetCurrentPath(BVCurrentDisk, BVCurrentPath);
-        filehdl = FileOpen(srcname, FILE_DENY_W|FILE_ACCESS_R);
+		FileSetCurrentPath(BVCurrentDisk, BVCurrentPath);
+		filehdl = FileOpen(srcname, FILE_DENY_W|FILE_ACCESS_R);
 
-        date = FileGetDateAndTime(filehdl) ;
-        FileGetHandleExtAttributes(filehdl,FEA_SIZE,&size, sizeof(size));
+		date = FileGetDateAndTime(filehdl) ;
+		FileGetHandleExtAttributes(filehdl,FEA_SIZE,&size, sizeof(size));
 
-        FileClose(filehdl, FILE_NO_ERRORS);
-        FilePopDir();
+		FileClose(filehdl, FILE_NO_ERRORS);
+		FilePopDir();
 
 @ifdef OLD_THUMBNAIL_DB
-        ThumbDeleteItem(srcname, size, date);
+		ThumbDeleteItem(srcname, size, date);
 @else
-        ThumbRemoveItem(srcname, size, date);
+		ThumbRemoveItem(srcname, size, date);
 @endif
 
-        @send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
+		@send BVDynFileList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(filenum2, 0);
 
-        childoptr = @call BVDynFileList::MSG_GEN_FIND_CHILD_AT_POSITION(filenum2);
-        @call process::MSG_BV_SET_FILELIST_MONIKER(filenum2, childoptr);
-      }
-      else
-      {
-        MemUnlock(BVFileList);
-      };
-      filecount++;
-    }
-    while(filecount != filenum);
+		childoptr = @call BVDynFileList::MSG_GEN_FIND_CHILD_AT_POSITION(filenum2);
+		@call process::MSG_BV_SET_FILELIST_MONIKER(filenum2, childoptr);
+	  }
+	  else
+	  {
+		MemUnlock(BVFileList);
+	  };
+	  filecount++;
+	}
+	while(filecount != filenum);
 
-    MemFree(fileidlist);
+	MemFree(fileidlist);
 
-    @send oself::MSG_BV_UPDATE_OPEN_TRIGGER();
+	@send oself::MSG_BV_UPDATE_OPEN_TRIGGER();
   };
 }
 
@@ -4192,51 +3931,51 @@ BVCalcDriveName(char *text, word item)
 
 @method BVProcessClass, MSG_BV_UPDATE_OPEN_TRIGGER
 {
-    word count, selection;
-    BVFileAttr *filelist;
+	word count, selection;
+	BVFileAttr *filelist;
 
-    count = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
-    selection = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	count = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+	selection = @call BVDynFileList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
-    if((BVFileList != 0) && (count != 0))
-    {
-      filelist = MemLock(BVFileList);
-      if(((filelist[selection].BVFA_type & FA_SUBDIR) == 0) || (count > 1))
-      {
-        @send process::MSG_BV_FILE_SELECTED();
-      }
-      else
-      {
-        @send process::MSG_BV_NO_FILE_SELECTED();
-      };
+	if((BVFileList != 0) && (count != 0))
+	{
+	  filelist = MemLock(BVFileList);
+	  if(((filelist[selection].BVFA_type & FA_SUBDIR) == 0) || (count > 1))
+	  {
+		@send process::MSG_BV_FILE_SELECTED();
+	  }
+	  else
+	  {
+		@send process::MSG_BV_NO_FILE_SELECTED();
+	  };
 
-      MemUnlock(BVFileList);
-    }
-    else
-      @send process::MSG_BV_NO_FILE_SELECTED();
+	  MemUnlock(BVFileList);
+	}
+	else
+	  @send process::MSG_BV_NO_FILE_SELECTED();
 }
 
 /**************************************************************************/
 
 @method BVProcessClass, MSG_BV_VIEW_CHANGED
 {
-    @send process::MSG_BV_READ_FILES();
+	@send process::MSG_BV_READ_FILES();
 }
 
 /**************************************************************************/
 
 @method BVProcessClass, MSG_BV_NO_FILE_SELECTED
 {
-    @send BVImpTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-    @send BVImpEditThumb::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send BVImpTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send BVImpEditThumb::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 }
 
 /**************************************************************************/
 
 @method BVProcessClass, MSG_BV_FILE_SELECTED
 {
-    @send BVImpTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
-    @send BVImpEditThumb::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send BVImpTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send BVImpEditThumb::MSG_GEN_SET_ENABLED(VUM_NOW);
 }
 
 /**************************************************************************/
