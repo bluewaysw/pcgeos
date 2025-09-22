@@ -12,6 +12,8 @@
 #include "common.h"
 @include <extgraph.goh>
 
+static Boolean _pascal unpackPackBits(byte *src, word srcSize, byte *dest, word destSize);
+
 /********************************************************************
 * API
 ********************************************************************/
@@ -32,7 +34,7 @@ PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHan
 
     // Determine bitmap size
     size_xy = BmpGetBitmapSize(srcfile, bmpblock, &egStat);
-    if (stat != EGE_NO_ERROR) {
+    if (egStat != EGE_NO_ERROR) {
         return PE_INVALID_BITMAP;
     }
     width = DWORD_WIDTH(size_xy);
@@ -40,7 +42,7 @@ PngError _pascal _export pngExportBitmapFHandle(VMFileHandle srcfile, VMBlockHan
 
     // Determine type
     bmptype = BmpGetBitmapType(srcfile, bmpblock, &egStat);
-    if (stat != EGE_NO_ERROR) {
+    if (egStat != EGE_NO_ERROR) {
         return PE_INVALID_BITMAP;
     }
     bitform = bmptype & BMT_FORMAT;
@@ -247,14 +249,20 @@ PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
     MemHandle filteredScanlineHan = NullHandle;
     MemHandle prevScanlineHan = NullHandle;
     MemHandle pngScanlineHan = NullHandle;
+    MemHandle unpackedScanlineHan = NullHandle;
     byte *filteredScanlinePtr = NULL;
     byte *prevScanlinePtr = NULL;
     byte *pngScanlinePtr = NULL;
+    byte *unpackedScanlinePtr = NULL;
     word bytesPerPixel = calcBytesPerPixel(ihdrData);
     Boolean hasMask = (bmptype & BMT_MASK) ? TRUE : FALSE;
     dword width = swapEndian(ihdrData->width);
     dword height = swapEndian(ihdrData->height);
     word maskBytesPerRow = hasMask ? (word)((width + 7) >> 3) : 0;
+    BMCompact compact = BMC_UNCOMPACTED;
+    Boolean isPackBits = FALSE;
+    dword geosPixelRowBytes = 0;
+    dword unpackedRowBytes = 0;
     RGBValue *palettePtr = NULL;
     MemHandle paletteHan = NullHandle;
     word paletteEntries = 0;
@@ -262,6 +270,61 @@ PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
     if (bytesPerPixel == 0) {
         stat = PE_OTHER_ERROR; // Invalid format
         goto exit;
+    }
+
+    {
+        EGError compactErr = EGE_NO_ERROR;
+        compact = BmpGetBitmapCompact(srcfile, bmpblock, &compactErr);
+        if (compactErr != EGE_NO_ERROR)
+        {
+            stat = PE_INVALID_BITMAP;
+            goto exit;
+        }
+        isPackBits = (compact == BMC_PACKBITS);
+    }
+
+    switch (bitform)
+    {
+        case BMF_MONO:
+            geosPixelRowBytes = (width + 7) >> 3;
+            break;
+        case BMF_4BIT:
+            geosPixelRowBytes = (width + 1) >> 1;
+            break;
+        case BMF_8BIT:
+            geosPixelRowBytes = width;
+            break;
+        case BMF_24BIT:
+            geosPixelRowBytes = width * 3;
+            break;
+        default:
+            stat = PE_OTHER_ERROR;
+            goto exit;
+    }
+
+    unpackedRowBytes = maskBytesPerRow + geosPixelRowBytes;
+
+    if (isPackBits)
+    {
+        if (unpackedRowBytes == 0 || unpackedRowBytes > 0xFFFF)
+        {
+            stat = PE_OTHER_ERROR;
+            goto exit;
+        }
+
+        unpackedScanlineHan = MemAlloc((word)unpackedRowBytes, HF_SWAPABLE, HAF_ZERO_INIT);
+        if (!unpackedScanlineHan)
+        {
+            stat = PE_OUT_OF_MEMORY;
+            goto exit;
+        }
+
+        unpackedScanlinePtr = MemLock(unpackedScanlineHan);
+        if (!unpackedScanlinePtr)
+        {
+            stat = PE_BLOCK_LOCK_FAILURE;
+            goto exit;
+        }
     }
 
     // Load palette if needed for conversion (masked paletted bitmaps expand to RGBA)
@@ -395,10 +458,27 @@ PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
     {
         if (HAL_COUNT(HugeArrayLock(srcfile, bmpblock, y, &scanlinePtr, &scanlineSize)))
         {
-            byte *maskPtr = (byte *)scanlinePtr;
-            byte *pixelPtr = maskPtr + maskBytesPerRow;
+            byte *srcPtr = (byte *)scanlinePtr;
+            byte *rowPtr = srcPtr;
+            byte *maskPtr = NULL;
+            byte *pixelPtr = NULL;
             byte *dst = pngScanlinePtr;
             dword x;
+
+            if (isPackBits)
+            {
+                if (!unpackPackBits(srcPtr, scanlineSize, unpackedScanlinePtr, (word)unpackedRowBytes))
+                {
+                    HugeArrayUnlock(scanlinePtr);
+                    stat = PE_OTHER_ERROR;
+                    break;
+                }
+
+                rowPtr = unpackedScanlinePtr;
+            }
+
+            maskPtr = rowPtr;
+            pixelPtr = maskPtr + maskBytesPerRow;
 
             switch (ihdrData->colorType)
             {
@@ -545,6 +625,7 @@ exit:
     if (filteredScanlineHan) MemFree(filteredScanlineHan);
     if (prevScanlineHan) MemFree(prevScanlineHan);
     if (pngScanlineHan) MemFree(pngScanlineHan);
+    if (unpackedScanlineHan) MemFree(unpackedScanlineHan);
     if (palettePtr) MemUnlock(paletteHan);
     if (paletteHan) MemFree(paletteHan);
 
@@ -807,6 +888,51 @@ exit:
     // Free memory
     if (outBufferMem) MemFree(outBufferMem);
     return stat;
+}
+
+/*********************************************************************
+*********************************************************************/
+Boolean _pascal unpackPackBits(byte *src, word srcSize, byte *dest, word destSize)
+{
+    word srcPos = 0;
+    word destPos = 0;
+
+    while ((srcPos < srcSize) && (destPos < destSize))
+    {
+        signed char control = (signed char)src[srcPos++];
+
+        if (control >= 0)
+        {
+            word count = (word)control + 1;
+
+            if ((srcPos + count) > srcSize || (destPos + count) > destSize)
+            {
+                return FALSE;
+            }
+
+            memcpy(dest + destPos, src + srcPos, count);
+            srcPos += count;
+            destPos += count;
+        }
+        else if (control >= -127)
+        {
+            word count = (word)(1 - control);
+
+            if (srcPos >= srcSize || (destPos + count) > destSize)
+            {
+                return FALSE;
+            }
+
+            memset(dest + destPos, src[srcPos++], count);
+            destPos += count;
+        }
+        else
+        {
+            // control == -128 -> no-op per PackBits specification
+        }
+    }
+
+    return (destPos == destSize);
 }
 
 /*********************************************************************
