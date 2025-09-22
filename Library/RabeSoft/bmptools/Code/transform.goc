@@ -768,7 +768,7 @@ time = TimerGetCount();
 
 	switch (format & BMT_FORMAT) {
     	case BMF_MONO:
-//    	    InternalCopyRotatedPixelMono(srcFile, bmpBlock, destPtr, line, w, h, isMasked, rotateRight);
+    	    InternalCopyRotatedPixelMono(srcFile, bmpBlock, destPtr, line, w, h, isMasked, rotateRight);
     	    break;
 
     	case BMF_4BIT:
@@ -1438,6 +1438,238 @@ int dTmp, sTmp;				/* working cells */
     BTBitmapUnlock(&srcBar, FALSE);
 }
 
+/*--------------------- InternalCopyRotatedPixelMono ---------------------
+ * Purpose:	Fill a line of the rotated bitmap
+ *		Source and destination must be monochreome bitmaps.
+ *
+ * Parameters:	srcFile, bmpBlock: the source bitmap (to rotate)
+ *		retBuffer: Pointer to pixel line of the rotated bitmap
+ *			   ! must be a byte* !
+ *		y: 	   currently locked line of the destination bitmap
+ *			   This determines to the position to read pixel from source bitmap
+ *		sWidth:    width of the source bitmap (equ height of the destinateion bitmap)
+ *		sHeight:   height of the source bitmap (equ width of the destinateion bitmap)
+ *		isMasked:  TRUE if there is a transparency mask,
+ *			   FALSE if the bitmap has no transparency mask
+ *		clockwise  TRUE to rotate the bitmap clockwise
+ *			   FALSE to rotate the bitmap counter clockwise
+ *
+ * Return:	*retBuffer pixel line is filled in
+ ---------------------------------------------------------------------------*/
+void InternalCopyRotatedPixelMono(VMFileHandle srcFile, VMBlockHandle bmpBlock, byte *retBuffer, int y,
+				int sWidth, int sHeight, Boolean isMasked, Boolean clockwise) {
+
+/* Mask related stuff, also used by the macros InitializeRotateMaskStuff and  CopyRotatedMaskPixel */
+byte srcMaskOffset, srcMaskBit;
+byte *destMaskPtr, destMaskBit;
+byte *srcMaskPtr;
+int sMaskLen, dMaskLen;
+
+BitmapAccessRecord srcBar;		/* access the source bitmap */
+int x; 					/* loop index for pixels to write */
+int readOffset;				/* offset to read pixel from */
+int loopSel;
+byte *srcDataPtr, *destDataPtr;		/* pointer to pixels to copy */
+byte srcDataBit;			/* Mask to read a source pixel */
+int bitsRead, dTmp;			/* working cells */
+
+    /*
+     * Prepare transparency stuff, if appropriate
+     */
+    if (isMasked) {
+
+	/*
+	 * Set up transparency mask area sizes (source's height is equal to destinations's width)
+	 * Clear transparency mask area for destination, so that we have to handle only bits that are set
+	 * Use a powerful Macro to initialize srcMaskOffset, srcMaskBit, destMaskPtr and destMaskBit
+	 */
+	sMaskLen = (sWidth+7)/8;
+	dMaskLen = (sHeight+7)/8;
+	memset(retBuffer, 0, dMaskLen);
+
+	InitializeRotateMaskStuff;	/* Initialize some mask related local variables */
+
+    } else {
+    	sMaskLen = 0;
+    	dMaskLen = 0;
+    }
+
+    /*
+     * The meaning of the used variables are:
+     *	- srcMaskPtr:	Pointer to source mask area (if any)
+     *	- srcDataPtr:	Pointer to data buffer to read from
+     *	- deskMaskPtr:	Pointer to destination mask area (if any)
+     *	- deskDataPtr:	Pointer to data buffer to wirte to
+     *	- readOffset:	offset into source data buffer
+     *	- x:	position to write the pixel into destination buffer
+     *
+     *	For a more detailed descripton see InternalCopyRotatedPixel8Bit()
+     */
+
+    destDataPtr = retBuffer + dMaskLen;
+
+    /*
+     * For efficiency we use separate loops for masked and not masked bitmaps
+     * as well as for clockwise and counter clockwise roatation.
+     * To make the code more readable we set up the variable loopSel with a value
+     * from 0 to 3 and use a switch command to select the correct loop code.
+     */
+
+    loopSel = clockwise ? 2 : 0;	// Bit 1 set if clockwise
+    if (isMasked) loopSel++;		// Bit 0 set if masked
+
+    switch (loopSel) {
+
+    case 0:		/* rotate counter clockwise, no transparency mask
+    			 * rop right pixel becomes the top left pixel
+    			 * lock source bitmap from top to bottom */
+
+	srcDataPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
+
+	// Set up readOffset and srcDataBit to the values that are used in InitializeRotateMaskStuff macro
+	readOffset = ((sWidth-y+7)/8) - 1;
+	x = (sWidth - y - 1) & 0x07;
+	srcDataBit = 0x80 >> x;
+
+	bitsRead = 0;
+	dTmp = 0;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    /* Read one pixel. dTmp contains the last 8 pixels read  from source bitmap. */
+	    dTmp <<= 1;
+	    if (srcDataPtr[readOffset] & srcDataBit) dTmp |= 1;
+
+	    bitsRead++;
+	    if (bitsRead == 8) {		/* when 8 pixels are readed, write it */
+		destDataPtr[x/8] = dTmp;
+		bitsRead = 0;
+	    }
+
+	    RotateBitmapNext(srcBar, srcDataPtr);	/* lock next source line */
+	    if(!srcDataPtr) break;
+	}
+
+	/* The last byte may not have been written yet. */
+	if ( bitsRead != 0) destDataPtr[x/8] = (dTmp <<= (8-bitsRead));
+
+    	break;
+
+    case 1:		/* rotate counter clockwise, transparency mask present
+    			 * rop right pixel becomes the top left pixel
+    			 * lock source bitmap from top to bottom */
+
+	srcMaskPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
+	srcDataPtr = srcMaskPtr + sMaskLen;
+
+	// Set up readOffset and srcDataBit to the values that are used in InitializeRotateMaskStuff macro
+	readOffset = ((sWidth-y+7)/8) - 1;
+	x = (sWidth - y - 1) & 0x07;
+	srcDataBit = 0x80 >> x;
+
+	bitsRead = 0;
+	dTmp = 0;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    CopyRotatedMaskPixel;			/* Copy mask bit */
+
+	    /* Read one pixel. dTmp contains the last 8 pixels read  from source bitmap. */
+	    dTmp <<= 1;
+	    if (srcDataPtr[readOffset] & srcDataBit) dTmp |= 1;
+
+	    bitsRead++;
+	    if (bitsRead == 8) {		/* when 8 pixels are readed, write it */
+		destDataPtr[x/8] = dTmp;
+		bitsRead = 0;
+	    }
+
+	    RotateBitmapNext(srcBar, srcMaskPtr);	/* lock next source line */
+	    srcDataPtr = srcMaskPtr + sMaskLen;
+	    if(!srcMaskPtr) break;
+	}
+
+	/* The last byte may not have been written yet. */
+	if ( bitsRead != 0) destDataPtr[x/8] = (dTmp <<= (8-bitsRead));
+
+    	break;
+
+    case 2:		/* rotate clockwise, no transparency mask
+    			 * bottom left pixel becomes the top left pixel
+    			 * lock source bitmap from bottom to top */
+
+	srcDataPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, sHeight-1);
+
+	// Set up readOffset and srcDataBit to the values that are used in InitializeRotateMaskStuff macro
+	readOffset = y/8;
+	srcDataBit = 0x80 >> (y & 0x07);
+
+	bitsRead = 0;
+	dTmp = 0;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    /* Read one pixel. dTmp contains the last 8 pixels read  from source bitmap. */
+	    dTmp <<= 1;
+	    if (srcDataPtr[readOffset] & srcDataBit) dTmp |= 1;
+
+	    bitsRead++;
+	    if (bitsRead == 8) {		/* when 8 pixels are readed, write it */
+		destDataPtr[x/8] = dTmp;
+		bitsRead = 0;
+	    }
+
+	    RotateBitmapPref(srcBar, srcDataPtr);	/* lock previous source line */
+	    if(!srcDataPtr) break;
+	}
+
+	/* The last byte may not have been written yet. */
+	if ( bitsRead != 0) destDataPtr[x/8] = (dTmp <<= (8-bitsRead));
+
+    	break;
+
+    case 3:		/* rotate clockwise, transparency mask present
+    			 * bottom left pixel becomes the top left pixel
+    			 * lock source bitmap from bottom to top */
+
+	srcMaskPtr = BTBitmapLock(srcFile, bmpBlock, &srcBar, sHeight-1);
+	srcDataPtr = srcMaskPtr + sMaskLen;
+
+	// Set up readOffset and srcDataBit to the values that are used in InitializeRotateMaskStuff macro
+	readOffset = y/8;
+	srcDataBit = 0x80 >> (y & 0x07);
+
+	bitsRead = 0;
+	dTmp = 0;
+
+	for ( x = 0; x < sHeight; x++ ) {
+
+	    CopyRotatedMaskPixel;			/* Copy mask bit */
+
+	    /* Read one pixel. dTmp contains the last 8 pixels read  from source bitmap. */
+	    dTmp <<= 1;
+	    if (srcDataPtr[readOffset] & srcDataBit) dTmp |= 1;
+
+	    bitsRead++;
+	    if (bitsRead == 8) {		/* when 8 pixels are readed, write it */
+		destDataPtr[x/8] = dTmp;
+		bitsRead = 0;
+	    }
+
+	    RotateBitmapPref(srcBar, srcMaskPtr);	/* lock previous source line */
+	    srcDataPtr = srcMaskPtr + sMaskLen;
+	    if(!srcMaskPtr) break;
+      	}
+
+	/* The last byte may not have been written yet. */
+	if ( bitsRead != 0) destDataPtr[x/8] = (dTmp <<= (8-bitsRead));
+
+    	break;
+
+    }
+
+    BTBitmapUnlock(&srcBar, FALSE);
+}
 
 
 
