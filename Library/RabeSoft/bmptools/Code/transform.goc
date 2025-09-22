@@ -2,16 +2,11 @@
  *
  *	Code-File for Bitmap Tool Library
  *
- *      Made by RABE-Soft for free PC/GEOS project 09/2025
- *
- *
- *	Note: Comments were translated from German to English with AI support
- *	and were not always manually reviewed in detail. Some may sound
- *	a little odd as a result.
+ *      Made by RABE-Soft for free PC/GEOS project 10/2025
  *
  *	File: 	transform.goc
  *
- *	Simple tranfomations such as flipping
+ *	Simple tranfomations such as flipping and rotating
  *
  ***********************************************************************/
 
@@ -205,16 +200,6 @@ BitmapAccessRecord bar;
 
 
     format = BTGetMoreBitmapInfos(vmFile, bmpBlock, &width, &height, NULL);
-
-DebugInfo("\rFlip! ");
-
-EC(    switch ( format & BMT_FORMAT ) { \
-    	case BMF_MONO: DebugInfo("\rFlip Mono"); break; \
-    	case BMF_4BIT: DebugInfo("\rFlip 4 Bit"); break; \
-    	case BMF_8BIT: DebugInfo("\rFlip 8 Bit"); break; \
-    	case BMF_24BIT: DebugInfo("\rFlip 24 Bit"); break; \
-    	default: DebugInfo("-def-"); \
-	} )
 
     if (format & BMT_MASK ) maskLen = (width+7)/8;
     tmpBuffer = malloc(width + 2);			// 2 byte savety buffer
@@ -705,8 +690,6 @@ int line, isMasked;
 BitmapAccessRecord	destBar;
 void *destPtr;
 
-dword time;
-
     /*
      * Create the rotated bitmap
      */
@@ -721,26 +704,6 @@ dword time;
      */
     format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &w, &h, &compact);
     isMasked = (format & BMT_MASK) ? TRUE : FALSE;
-
-@if 0
-switch (format & BMT_FORMAT) {
-case BMF_MONO:
-   	DebugInfo("\rRot-MONO");
-	break;
-
-case BMF_4BIT:
-   	DebugInfo("\rRot-4 Bit");
-	break;
-
-case BMF_8BIT:
-   	DebugInfo("\rRot-8 bit");
-    break;
-
-case BMF_24BIT:
-   	DebugInfo("\rRot- 24 bit");
-    break;
-}
-@endif
 
 
     if ( compact ) {
@@ -757,8 +720,6 @@ case BMF_24BIT:
       * Filling is done by specialized routines, depending on the color depth.
       */
      destPtr = BTBitmapLock(destFile, newBitmap, &destBar, 0);
-
-time = TimerGetCount();
 
      for (line = 0; line < w; line++) {			// note: w is the height of the destination bitmap
 
@@ -791,8 +752,6 @@ time = TimerGetCount();
 	if(!destPtr) break;
         }
 
-time = TimerGetCount() - time;
-DebugInfo1("\rRot-Time = %u", time);
 
     /*
      * Finaly, unlock bitmap. If the source was compacted, free the uncompacted copy
@@ -916,12 +875,12 @@ byte *srcDataPtr, *destDataPtr;		/* pointer to pixels to copy */
      * We will always go through the retBuffer from left to right.
      *
      * If we rotate clockwise, the pixel at the bottom left becomes the  pixel
-     * at the top left, and the pixel at the top left becomes the pixel at  the
+     * at the top left, and the pixel at the top left becomes the pixel at the
      * top right. Therefore, we must go through the source bitmap from bottom to top.
      *
      * If we rotate counterclockwise, the top-right pixel becomes the  top-left
-     * pixel, and the bottom pixel becomes the top-right pixel. Therefore, we must
-     * go through the source bitmap from top to bottom.
+     * pixel, and the bottom-right-pixel becomes the top-right pixel. Therefore,
+     * we must go through the source bitmap from top to bottom.
      *
      * The meaning of the used variables are:
      *	- srcMaskPtr:	Pointer to source mask area (if any)
@@ -1220,9 +1179,9 @@ int readOffset;				/* offset to read pixel from */
 int loopSel;
 byte *srcDataPtr, *destDataPtr;		/* pointer to pixels to copy */
 
-int srcOdd, destOdd;			/* Even Pixels (like zero odr two) are stored in
-					 * the upper half byte, odd pixels (lie 1 or 3)
-					 * are stored in the lowe half byte */
+int srcOdd, destOdd;			/* Even pixels (like zero or two) are stored in
+					 * the upper half byte, odd pixels (like 1 or 3)
+					 * are stored in the lower half byte */
 int dTmp, sTmp;				/* working cells */
 
 
@@ -1291,7 +1250,7 @@ int dTmp, sTmp;				/* working cells */
 	    Read4BitPixelOddOrEven(dTmp);	/* read next source pixel */
 
 	    /*
-	     * If the current pixel to write is odd, save the zwo pixels in dTmp.
+	     * If the current pixel to write is odd, save the zwo pixels stored in dTmp.
 	     * Toggle odd/even after that
 	     */
 	    if ( destOdd ) {
@@ -1331,7 +1290,7 @@ int dTmp, sTmp;				/* working cells */
 	    Read4BitPixelOddOrEven(dTmp);		/* read next source pixel */
 
 	    /*
-	     * If the current pixel to write is odd, save the zwo pixels in dTmp.
+	     * If the current pixel to write is odd, save the zwo pixels stored in dTmp.
 	     * Toggle odd/even after that.
 	     */
 	    if ( destOdd ) {
@@ -1371,7 +1330,7 @@ int dTmp, sTmp;				/* working cells */
 	    Read4BitPixelOddOrEven(dTmp);	/* read next source pixel */
 
 	    /*
-	     * If the current pixel to write is odd, save the zwo pixels in dTmp.
+	     * If the current pixel to write is odd, save the zwo pixels stored in dTmp.
 	     * Toggle odd/even after that
 	     */
 	    if ( destOdd ) {
@@ -1412,7 +1371,7 @@ int dTmp, sTmp;				/* working cells */
 	    Read4BitPixelOddOrEven(dTmp);		/* read next source pixel */
 
 	    /*
-	     * If the current pixel to write is odd, save the zwo pixels in dTmp.
+	     * If the current pixel to write is odd, save the zwo pixels in stored dTmp.
 	     * Toggle odd/even after that.
 	     */
 	    if ( destOdd ) {
