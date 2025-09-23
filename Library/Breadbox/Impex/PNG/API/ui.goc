@@ -14,6 +14,12 @@
 
 /* Accessing elements of a duplicated UI resource - combines known offset with current handle */
 @define dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
+@define dupHan(uiHandle, obj) ConstructOptr(uiHandle, OptrToChunk(obj))
+
+/* Some forward declarations */
+MemHandle _pascal _export GatherExportOptions(Handle dialogHan);
+MemHandle _pascal _export GatherImportOptions(Handle dialogHan);
+void _pascal _export PngGetImportOptionsFromUI(Handle dialogHan, pngAlphaTransformData* patdP);
 
 /* Derives classes, Messages */
 @class PngImportGroupClass, GenInteractionClass;
@@ -46,7 +52,7 @@
     GIGI_selection = PNG_AT_BLEND;
     GIGI_behaviorType = GIGBT_EXCLUSIVE;
     GI_comp = @PngAlphaMethodBlend, @PngAlphaMethodMask;
-    GIGI_destination = @PngImportGroup;
+    GIGI_destination = @ImportGroup;
     GIGI_applyMsg = MSG_PNG_ALPHA_METHOD_SELECTED;
 
     HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
@@ -122,7 +128,7 @@
 @object GenTriggerClass PngImportResetButton = {
     GI_visMoniker = "Reset";
     GTI_actionMsg = MSG_RESET_PNG_IMPORT_DIALOG;
-    GTI_destination = @PngImportGroup;
+    GTI_destination = @ImportGroup;
 
     HINT_SEEK_REPLY_BAR;
 }
@@ -131,7 +137,7 @@
     GI_visMoniker = "Cancel";
     GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
     GTI_actionMsg = MSG_DISMISS_PNG_IMPORT_DIALOG;
-    GTI_destination = @PngImportGroup;
+    GTI_destination = @ImportGroup;
 
     HINT_SEEK_REPLY_BAR;
 }
@@ -142,7 +148,7 @@
     HINT_MAKE_REPLY_BAR;
 }
 
-@object PngImportGroupClass PngImportGroup = {
+@object PngImportGroupClass ImportGroup = {
     GI_visMoniker = "Import Options";
     GI_states = @default & ~GS_USABLE;
     GII_visibility = GIV_DIALOG;
@@ -192,7 +198,7 @@
     GI_comp = @PngExpFormGroup;
 }
 
-@object GenInteractionClass PngExportGroup = {
+@object GenInteractionClass ExportGroup = {
     GI_states = @default & ~GS_USABLE;
     GI_comp = @PngExpBitFormat;
 
@@ -202,37 +208,104 @@
 
 @end ExportInterface;
 
+/*---------------------------------------------------------------------------
+ *  Helper used by TransGetExportOptions to gather export options.
+ *---------------------------------------------------------------------------*/
+MemHandle _pascal _export GatherExportOptions(Handle dialogHan)
+{
+    MemHandle optionsHan;
+    word *optionsPtr;
+    optr formGroup = ConstructOptr(dialogHan, OptrToChunk(@PngExpFormGroup));
+    word selection;
 
-@method PngImportGroupClass, MSG_VIS_OPEN
+    // Get the selected format option
+    selection = @call formGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    // Allocate and fill options structure
+    optionsHan = MemAlloc(sizeof(word), HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    if (optionsHan == NullHandle) {
+        return NullHandle;
+    }
+
+    optionsPtr = (word *) MemLock(optionsHan);
+    if (optionsPtr == NULL) {
+        MemFree(optionsHan);
+        return NullHandle;
+    }
+
+    *optionsPtr = selection;
+    MemUnlock(optionsHan);
+
+    return optionsHan;
+}
+
+/*---------------------------------------------------------------------------
+ *  Helper used by TransGetImportOptions to gather import options.
+ *---------------------------------------------------------------------------*/
+MemHandle _pascal _export GatherImportOptions(Handle dialogHan)
+{
+    MemHandle               patdH;
+    pngAlphaTransformData*  patdP;
+
+    patdH = MemAlloc(sizeof(pngAlphaTransformData), HF_SWAPABLE, HAF_ZERO_INIT);
+    if (patdH == NullHandle)
+    {
+        return NullHandle;
+    }
+
+    patdP = (pngAlphaTransformData *) MemLock(patdH);
+    if (patdP == NULL)
+    {
+        MemFree(patdH);
+        return NullHandle;
+    }
+
+    PngGetImportOptionsFromUI(dialogHan, patdP);
+    MemUnlock(patdH);
+
+    return patdH;
+}
+
+/*---------------------------------------------------------------------------
+ *  Helper used by MSG_VIS_OPEN to set the UI elements to reflect current
+ *  import options.
+ *---------------------------------------------------------------------------*/
+
+void _pascal _export PngGetImportOptionsFromUI(Handle dialogHan, pngAlphaTransformData* patdP)
 {
     ColorAndFlagReturn   cafr;
 
-    @callsuper();
-
-    pself->pngAlphaTransform.method = @call @dup(@PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    pself->pngAlphaTransform.alphaThreshold = (byte) @call @dup(@PngAlphaThresholdValue)::MSG_GEN_VALUE_GET_INTEGER_VALUE();
-    @call @dup(@PngAlphaBlendColor)::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+    patdP->method = @call @dupHan(dialogHan, @PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    patdP->alphaThreshold = (byte) @call @dupHan(dialogHan, @PngAlphaThresholdValue)::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call @dupHan(dialogHan, @PngAlphaBlendColor)::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
 
     // convert INDEX to RGB
     if(cafr.CAFR_color.CQ_info == CF_INDEX)
     {
         RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
-        pself->pngAlphaTransform.blendColor.RGB_red = RGB_RED(c);
-        pself->pngAlphaTransform.blendColor.RGB_green = RGB_GREEN(c);
-        pself->pngAlphaTransform.blendColor.RGB_blue = RGB_BLUE(c);
+        patdP->blendColor.RGB_red = RGB_RED(c);
+        patdP->blendColor.RGB_green = RGB_GREEN(c);
+        patdP->blendColor.RGB_blue = RGB_BLUE(c);
     }
     else if (cafr.CAFR_color.CQ_info == CF_RGB)
     {
-        pself->pngAlphaTransform.blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-        pself->pngAlphaTransform.blendColor.RGB_green = cafr.CAFR_color.CQ_green;
-        pself->pngAlphaTransform.blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
+        patdP->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_green = cafr.CAFR_color.CQ_green;
+        patdP->blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
     }
     else if (cafr.CAFR_color.CQ_info == CF_GRAY)
     {
-        pself->pngAlphaTransform.blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-        pself->pngAlphaTransform.blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
-        pself->pngAlphaTransform.blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
     }
+}
+
+@method PngImportGroupClass, MSG_VIS_OPEN
+{
+    @callsuper();
+
+    PngGetImportOptionsFromUI(OptrToHandle(oself), &pself->pngAlphaTransform);
 }
 
 @method PngImportGroupClass, MSG_PNG_ALPHA_METHOD_SELECTED

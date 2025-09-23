@@ -1,5 +1,5 @@
-PNG.obj \
-PNG.eobj: PNG/pngManager.asm \
+API.obj \
+API.eobj: API/apiManager.asm \
                 stdapp.def geos.def geode.def resource.def ec.def lmem.def \
                 object.def graphics.def fontID.def font.def color.def \
                 gstring.def text.def char.def heap.def ui.def file.def \
@@ -27,8 +27,8 @@ PNG.eobj: PNG/pngManager.asm \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
                 library.def Objects/colorC.def
-exppng.obj \
-exppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+exp.obj \
+exp.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -46,8 +46,8 @@ exppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh impex.goh extgraph.goh
-exppng.obj \
-exppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+exp.obj \
+exp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -58,8 +58,8 @@ exppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 pnglib.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h \
                 zconf.h htmldrv.h product.h math.h htmlfstr.h awatcher.h \
                 htmlprog.h
-imppng.obj \
-imppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+imp.obj \
+imp.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -77,8 +77,8 @@ imppng.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh impex.goh Objects/colorC.goh
-imppng.obj \
-imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+imp.obj \
+imp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -89,8 +89,8 @@ imppng.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 pnglib.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h zlib.h \
                 zconf.h htmldrv.h product.h math.h htmlfstr.h awatcher.h \
                 htmlprog.h
-png_ui.obj \
-png_ui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+ui.obj \
+ui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -108,8 +108,8 @@ png_ui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh Objects/colorC.goh object.h
-png_ui.obj \
-png_ui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+ui.obj \
+ui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
