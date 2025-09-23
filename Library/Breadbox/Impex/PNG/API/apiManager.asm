@@ -52,7 +52,7 @@ global  TransGetExportOptions: far
 ; standard translator interface resource segment
 ;================================================================================
 
-NUMBER_OF_FORMATS equ 1         ; number of supported formats
+NUMBER_OF_FORMATS equ 1         ; number of supported formats, must match number of entries in InfoResource
 
 INIT    segment resource
     assume cs:INIT
