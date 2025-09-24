@@ -8,7 +8,7 @@ UseLib Objects/colorC.def
 UseLib Objects/gValueC.def
 
 ;================================================================================
-; UI symbols defined in C that we need to access here: prefix with underscore
+; UI symbols defined in C that we need to access here
 
 global _ImportGroup: nptr
 global _ExportGroup: nptr
