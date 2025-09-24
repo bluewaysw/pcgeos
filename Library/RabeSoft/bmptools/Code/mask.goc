@@ -45,7 +45,7 @@ void LocalSetMask24Bit(byte *dataPtr, int width, int red1, int red2, int green1,
  ***************************************************************************
  */
 
-/*--------------------- BTSetTransparencyMask ---------------------
+/*--------------------- BTApplyTransparencyColor ---------------------
  *	Purpose:	Set a all pixels that have a specified color to be transparent.
  *			If no transparency mask exists yet, it will be created.
  *
@@ -78,11 +78,12 @@ void LocalSetMask24Bit(byte *dataPtr, int width, int red1, int red2, int green1,
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error  (e.g. passed zero for destFile and souce is compacted)
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTSetTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			int redOrIndex, int green, int blue, int variance,
 			optr progressText) {
 
-VMBlockHandle	newBmp;
+VMBlockHandle	workBmp;
+VMFileHandle	workFile;
 int format, width, height, compact;
 int n;
 int red1, red2, green1, green2, blue1, blue2;
@@ -91,43 +92,50 @@ byte *dataPtr;
 
     /*
      * Get information about the source bitmap.
-     * If destFile is zero (i.e. manipulate bitmap, do not make a copy) check if this is possible
      */
     format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compact);
+
+    
+    /*
+     * Find out or create the bitmap to work with.
+     * If destfile==zero has been passed, work with the original bitmap (if posible)
+     * Otherwise, create a copy that has a transparency mask
+     */
     if ( !destFile ) {
+        /*
+         * To work with the original bitmap, it must be have a mask
+         * and it must not be compressed.
+         */
     	if ( compact ) return 0;
     	if ( (format & BMT_MASK) == 0 ) return 0;
-    }
-
-    /*
-     * See if destFile is zero (i.e. manipulate bitmap, do not make a copy) and handle it.
-     * If not, make a copy of the source bitmap (this may uncompact the bitmap).
-     */
-    if ( !destFile ) {
-    	/* Set the source bitmap as the bitmap to manipulate */
-    	destFile = srcFile;
-    	newBmp = bmpBlock;
+    	workFile = srcFile;
+    	workBmp = bmpBlock;
+    	
     } else {
-    	/* Copy the bitmap. If the bitmap is compacted, uncompact it instead */
-    	if ( compact ) {
-     	    newBmp = GrUncompactBitmap(srcFile, bmpBlock, destFile);
-     	} else  {
-     	    newBmp = BTCopyBitmap(srcFile, destFile, bmpBlock);
-     	}
-    }
-
-    /*
-     * Finally see, whether the bitmap already has a mask. If not, we have
-     * to create another copy with a mask, which is pretty stupid.
-     */
-    if ( (format & BMT_MASK) == 0 ) {
-    	VMBlockHandle copyWithMask;
-    	copyWithMask = LocalCreateAMaskedCopy(destFile, newBmp);
-
+    
+    	/*
+    	 * We need a masked bitmap to work with. 
+    	 * If the original is already masked, create an (uncompacted) copy.
+    	 * The copy will reside in the destFile.
+    	 */
+    	workFile = destFile;
+    	
+    	if (format & BMT_MASK) {
+    	    if ( compact ) workBmp = GrUncompactBitmap(srcFile, bmpBlock, workFile);
+    	    	else workBmp = BTCopyBitmap(srcFile, workFile, bmpBlock);
+    	    	
+    	    } else {
+    	    	/* 
+    	    	 * the original bitmap has no mask yet. Let's do another routine
+    	    	 * stupid "copy-and-create-a-mask" job.
+    	    	 */
+    	    	 workBmp = BTBitmapGetMaskedCopy(srcFile, workFile, bmpBlock, 0);
+    	    }
+    }    
 
     /*
      * Now, we can process the bitmap. We can be sure, that the bitmap is uncompaced and has a mask.
-     * If the bitmap is a 24 bit bitmap, we have to set up the color value limits fist;
+     * If the bitmap is a 24 bit bitmap, we have to set up the color value limits fist.
      */
     if ( (format & BMT_FORMAT) == BMF_24BIT ) {
     	/* We use a macro ... see above */
@@ -136,7 +144,7 @@ byte *dataPtr;
     	SetColorLimits(blue1, blue2, blue, variance);
     }
 
-    dataPtr = BTBitmapLock(destFile, newBmp, &bar, 0);
+    dataPtr = BTBitmapLock(workFile, workBmp, &bar, 0);
     for ( n = 0; n < height; n++ ) {
 
 	if ( progressText) {
@@ -167,16 +175,112 @@ byte *dataPtr;
     BTBitmapUnlock(&bar, TRUE);
 
 
+    return workBmp;
+}
+
+/*--------------------- BTBitmapGetMaskedCopy ---------------------
+ *	Purpose:	Copies a bitmap and ensures that the copy has a transparency mask 
+ *			Also ensure that the copy is uncompressed
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ * 	Strategy:
+ *		- if the bitmap has already a transparency mask, make a simple copy
+ *		- if not:
+ *		  * fetch the palette, if any
+ *		  * create a new bitmap of same size and color depth
+ *		  * copy data over
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTBitmapGetMaskedCopy(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			optr progressText) {
+			
+int format, width, height, compact;
+int maskLen, dataSize;
+void *maskPtr, *srcPtr, *destPtr;
+VMBlockHandle newBmp;
+byte *palPtr;
+
     /*
-     * free uncompacted copy, if any
+     * Get information about the source bitmap.
+     */
+    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compact);
+    
+    /*
+     * See if a mask is already present. If yes, make a (uncompressed) copy
+     */
+    if (format & BMT_MASK) {
+	if ( compact ) newBmp = GrUncompactBitmap(srcFile, bmpBlock, destFile);
+    	    	else newBmp = BTCopyBitmap(srcFile, destFile, bmpBlock);
+    	return newBmp;
+    }
+
+    /*
+     * See if the bitmap is compacted. If yes, we need an uncompacted copy first.
+     * Ths copy will be the source to be copied, but it resides in the destFile.
+     * Therefore we have to switch our "sourceFile" to the destFile in this case.
+     */
+    if ( compact) {
+    	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, destFile);
+    	srcFile = destFile;
+    }
+    
+    
+    /* 
+     * Create the new, masked bitmap 
+     * If present: retrieve and set the palette 
+     */
+    if ( format & BMT_PALETTE )	{
+    	int numColors;
+    	switch ( format & BMT_FORMAT ) {
+    		case BMF_MONO: numColors = 2; break;
+    		case BMF_4BIT: numColors = 16; break;
+    		case BMF_8BIT: numColors = 256; break;
+    		default: numColors = 0;
+    		}
+    	palPtr = malloc( sizeof(PaletteEntry) * 256 );
+    	BTGetBitmapPalette(srcFile, bmpBlock, (PaletteEntry *)palPtr, numColors);
+    	}
+      else palPtr = 0;
+    
+    newBmp = BTCreateOffscreenBitmap(destFile,
+    			format | BMT_MASK, width, height, (PaletteEntry *)palPtr);
+    if ( palPtr )  free(palPtr);
+
+    /*
+     * Finally we can copy the bitmap data to the new bitmap. Don't forget to set the
+     * mask area to "not transparent" and to calculate the pixel buffer size first.
+     */ 	
+    switch ( format & BMT_FORMAT ) {
+	case BMF_MONO: dataSize = (width+7)/8; break;
+	case BMF_4BIT: dataSize = (width+1)/2; break;
+	case BMF_8BIT: dataSize = width; break;
+	case BMF_24BIT: dataSize = 3*width; break;
+	}
+    maskLen = (width+7)/8;
+    
+    
+    
+    /*
+     * Destroy the uncompaced copy, if any.
      */
     if ( compact ) {
-     	HugeArrayDestroy(srcFile, bmpBlock);
-     }
+    	HugeArrayDestroy(srcFile, bmpBlock);
+    }
+     
 
-
-    return newBmp;
+srcFile =  srcFile;
+bmpBlock =  bmpBlock;
+destFile = destFile;
+progressText = progressText;
+return 0;
 }
+
 
 
 /*--------------------- BTExtractTransparencyMask ---------------------
@@ -263,7 +367,7 @@ BitmapAccessRecord	srcBar, monoBar;
     return newBmp;
 }
 
-/*--------------------- BTImportTransparencyMask ---------------------
+/*--------------------- BTApplyTransparencyMask ---------------------
  *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken from a monochrome
  *			bitmap.
  *			If no transparency mask exists yet, it will be created.
@@ -285,7 +389,7 @@ BitmapAccessRecord	srcBar, monoBar;
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTImportTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			VMFileHandle maskFile, VMBlockHandle maskBitmap,
 			optr progressText) {
 srcFile =  srcFile;

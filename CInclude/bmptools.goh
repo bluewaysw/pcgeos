@@ -873,6 +873,8 @@ extern void EXPORT BTSetDebugText(optr textObj);
  ***************************************************************************
  *
  *	Simple bitmap transformations
+ *	These routines works with monochrome, 4 bit, 8 bit and 24 bit bitmaps
+ *	The bitmaps may have a transparency mask and / or a palette or not.
  *
  ***************************************************************************
  */
@@ -918,8 +920,107 @@ extern VMBlockHandle EXPORT BTRotateBitmap180(VMFileHandle srcFile, VMBlockHandl
 
 
 
+/*--------------------- BTRotateBitmap90 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees clockwise.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
 extern VMBlockHandle EXPORT BTRotateBitmap90(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+/*--------------------- BTRotateBitmap270 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees counterclockwise.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
 extern VMBlockHandle EXPORT BTRotateBitmap270(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+
+/*
+ ***************************************************************************
+ *
+ *	Editing the transparenvy mask
+ *	These routines works with monochrome, 4 bit, 8 bit and 24 bit bitmaps
+ *	The bitmaps may have a palette or not.
+ *
+ ***************************************************************************
+ */
+
+/*--------------------- BTApplyTransparencyColor ---------------------
+ *	Purpose:	Set a all pixels that have a specified color to be transparent.
+ *			If no transparency mask exists yet, it will be created.
+ *			Does not compact the new bitmap, even if the source is compacted
+
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *				Pass zero for destFile so that the bitmap is not copied
+ *				but modified instead.
+ *				This will fail if the bitmap does not yet have a transparency
+ *				mask.
+ *			redOrIndex: red color value
+ *				if the bitmap not a 24 bit bitmap, redOrIndex is the
+ *				color index to be set transparent. NOTE: The parameters
+ *				green, blue and variance are ignored in this case
+ *			green:	green color value
+ *			blue:	blue color value
+ *			variance: Permitted difference between the real color value and
+ *				the passed color value for red, green and blue.
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Example for variance:
+ *		Assuming you have passed the value red=200, green = 150, blue = 0 and
+ *		a variance of 10. Then a pixel that fulfills the following conditions is
+ *		set to transparent: red 190...210 AND green 140..160 AND blue 0...10.
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			int redOrIndex, int green, int blue, int variance,
+			optr progressText);
+
+/*--------------------- BTBitmapGetMaskedCopy ---------------------
+ *	Purpose:	Copies a bitmap and ensures that the copy has a transparency mask 
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ * 	Strategy:
+ *		- if the bitmap has already a transparency mask, make a simple copy
+ *		- if not:
+ *		  * fetch the palette, if any
+ *		  * create a new bitmap of same size and color depth
+ *		  * copy data over
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTBitmapGetMaskedCopy(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			optr progressText);
+
+
+extern VMBlockHandle EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			optr progressText);
+
+extern VMBlockHandle EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			VMFileHandle maskFile, VMBlockHandle maskBitmap,
+			optr progressText);
+
 
 /*###########################################################################
  #      End of Library
