@@ -1,0 +1,340 @@
+/***********************************************************************
+ *
+ *	Code-File for Bitmap Tool Library
+ *
+ *      Made by RABE-Soft for free PC/GEOS project 10/2025
+ *
+ *	File: 	transform.goc
+ *
+ *	Simple tranfomations such as flipping and rotating
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <stdlib.h>
+
+#include <string.h>
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+
+
+/*
+ * Local header
+ */
+void LocalSetMaskMono(byte *dataPtr, int width, int index);
+void LocalSetMask4Bit(byte *dataPtr,int width, int index);
+void LocalSetMask8Bit(byte *dataPtr,int width, int index);
+void LocalSetMask24Bit(byte *dataPtr, int width, int red1, int red2, int green1, int green2, int blue1, int blue2);
+
+  /* -----------------------------------------------------------
+   * SetColorLimits - a macro to set up color limits for LocalSetMask24Bit
+   *	color1 is the lower limit - must be defined as int
+   *	color2 is the upper limit - must be defined as int
+   * -----------------------------------------------------------*/
+#define SetColorLimits(color1, color2, color, variance) \
+	color1 = color - variance; 			\
+	if (color1 < 0) color1 = 0; 			\
+	color2 = color + variance; 			\
+	if (color2 < 255) color2 = 255;
+
+/*
+ ***************************************************************************
+ *	Manipulate transparency mask
+ ***************************************************************************
+ */
+
+/*--------------------- BTSetTransparencyMask ---------------------
+ *	Purpose:	Set a all pixels that have a specified color to be transparent.
+ *			If no transparency mask exists yet, it will be created.
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *				- You may pass zero for destFile. In this case the bitmap
+ *				  is not copied but modified instead.
+ *				  Note! This will fail if:
+ *				    - the bitmap does not yet have a transparency mask
+ *				    - the bitmap is compacted
+ *			redOrIndex: red color value
+ *				- if the bitmap not a 24 bit bitmap, redOrIndex is the
+ *				  color index to be set transparent.
+ *				  For monochrome bitmaps this may be 0 or 1.
+ *				  NOTE: The parameters green, blue and variance are
+ *				  ignored in these cases
+ *			green:	green color value
+ *			blue:	blue color value
+ *			variance: Permitted difference between the real color value and
+ *				the passed color value for red, green and blue.
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Example for variance:
+ *		Assuming you have passed the values red = 200, green = 150, blue = 0 and
+ *		a variance of 10. Then a pixel that fulfills the following conditions is
+ *		set to transparent: red 190...210 AND green 140..160 AND blue 0...10.
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error  (e.g. passed zero for destFile and souce is compacted)
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTSetTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			int redOrIndex, int green, int blue, int variance,
+			optr progressText) {
+
+VMBlockHandle	newBmp;
+int format, width, height, compact;
+int n;
+int red1, red2, green1, green2, blue1, blue2;
+BitmapAccessRecord bar;
+byte *dataPtr;
+
+    /*
+     * Get information about the source bitmap.
+     * If destFile is zero (i.e. manipulate bitmap, do not make a copy) check if this is possible
+     */
+    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compact);
+    if ( !destFile ) {
+    	if ( compact ) return 0;
+    	if ( (format & BMT_MASK) == 0 ) return 0;
+    }
+
+    /*
+     * See if destFile is zero (i.e. manipulate bitmap, do not make a copy) and handle it.
+     * If not, make a copy of the source bitmap (this may uncompact the bitmap).
+     */
+    if ( !destFile ) {
+    	/* Set the source bitmap as the bitmap to manipulate */
+    	destFile = srcFile;
+    	newBmp = bmpBlock;
+    } else {
+    	/* Copy the bitmap. If the bitmap is compacted, uncompact it instead */
+    	if ( compact ) {
+     	    newBmp = GrUncompactBitmap(srcFile, bmpBlock, destFile);
+     	} else  {
+     	    newBmp = BTCopyBitmap(srcFile, destFile, bmpBlock);
+     	}
+    }
+
+    /*
+     * Finally see, whether the bitmap already has a mask. If not, we have
+     * to create another copy with a mask, which is pretty stupid.
+     */
+    if ( (format & BMT_MASK) == 0 ) {
+    	VMBlockHandle copyWithMask;
+    	copyWithMask = LocalCreateAMaskedCopy(destFile, newBmp);
+
+
+    /*
+     * Now, we can process the bitmap. We can be sure, that the bitmap is uncompaced and has a mask.
+     * If the bitmap is a 24 bit bitmap, we have to set up the color value limits fist;
+     */
+    if ( (format & BMT_FORMAT) == BMF_24BIT ) {
+    	/* We use a macro ... see above */
+    	SetColorLimits(red1, red2, redOrIndex, variance);
+    	SetColorLimits(green1, green2, green, variance);
+    	SetColorLimits(blue1, blue2, blue, variance);
+    }
+
+    dataPtr = BTBitmapLock(destFile, newBmp, &bar, 0);
+    for ( n = 0; n < height; n++ ) {
+
+	if ( progressText) {
+	    if ( (n & 0x0F) == 0 ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+
+    	switch ( format & BMT_FORMAT ) {
+
+    	case BMF_MONO:
+    	    LocalSetMaskMono(dataPtr, width, redOrIndex);
+    	    break;
+
+    	case BMF_4BIT:
+    	    LocalSetMask4Bit(dataPtr, width, redOrIndex);
+	    break;
+
+    	case BMF_8BIT:
+	    LocalSetMask8Bit(dataPtr, width, redOrIndex);
+	    break;
+
+    	case BMF_24BIT:
+	    LocalSetMask24Bit(dataPtr, width, red1, red2, green1, green2, blue1, blue2);
+	    break;
+
+	}
+	dataPtr = BTBitmapNext(&bar, TRUE);
+    }
+    BTBitmapUnlock(&bar, TRUE);
+
+
+    /*
+     * free uncompacted copy, if any
+     */
+    if ( compact ) {
+     	HugeArrayDestroy(srcFile, bmpBlock);
+     }
+
+
+    return newBmp;
+}
+
+
+/*--------------------- BTExtractTransparencyMask ---------------------
+ *	Purpose:	Copies the transparency mask of a bitmap into a monochrome bitmap.
+ *			Transparent pixels will be white, not transparent pixels will be black.
+ *			If no transparency mask exists yet, the monochrome bitmap will be completely black.
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new (monochrome) bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error (e.g. passed zero for dertFile and souce is compacted)
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			optr progressText) {
+VMBlockHandle	newBmp;
+int format, width, height, compact;
+int maskWidth, n;
+byte *monoData, *srcData;
+BitmapAccessRecord	srcBar, monoBar;
+
+    /*
+     * Get information about the source bitmap.
+     * Create a monochrome bitmap of the same size.
+     */
+    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compact);
+    newBmp = BTCreateOffscreenBitmap(destFile, BMF_MONO, width, height, NULL);
+
+
+    /*
+     * If the source bitmap has no mask, fill the new bitmap black and we are done.
+     */
+    maskWidth = (width+7)/8;
+    if ( (format & BMT_MASK) == 0 ) {
+    	monoData = BTBitmapLock(destFile, newBmp, &monoBar, 0);
+    	for ( n = 0; n < height; n++) {
+    	    memset(monoData, 0xFF, maskWidth);
+    	    monoData = BTBitmapNext(&monoBar, TRUE);
+    	}
+    	BTBitmapUnlock(&monoBar, TRUE);
+    	return newBmp;
+    }
+
+
+     /*
+      * If the bitmap is compacted, uncompact it first
+      * The uncomapcted bitmap will be stored in destFile
+      * --> "souceFile" must be switched to this file
+      */
+    if ( compact ) {
+     	bmpBlock = GrUncompactBitmap(srcFile, bmpBlock, destFile);
+     	srcFile = destFile;
+     }
+
+
+    /*
+     * Now, we can copy the mask data to the new bitmap
+     */
+    monoData = BTBitmapLock(destFile, newBmp, &monoBar, 0);
+    srcData = BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
+    for (n = 0; n < height; n++ ) {
+
+	if ( progressText) {
+	    if ( (n & 0x0F) == 0 ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+
+    	memcpy(monoData, srcData, maskWidth);
+    	monoData = BTBitmapNext(&monoBar, TRUE);
+    	srcData = BTBitmapNext(&srcBar, TRUE);
+    }
+    BTBitmapUnlock(&monoBar, TRUE);
+    BTBitmapUnlock(&srcBar, TRUE);
+
+    /*
+     * free uncompacted copy, if any
+     */
+    if ( compact ) {
+     	HugeArrayDestroy(srcFile, bmpBlock);
+     }
+
+    return newBmp;
+}
+
+/*--------------------- BTImportTransparencyMask ---------------------
+ *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken from a monochrome
+ *			bitmap.
+ *			If no transparency mask exists yet, it will be created.
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *				- Pass zero for destFile so that the bitmap is not copied
+ *				  but modified instead.
+ *				  This will fail if the bitmap does not yet have a transparency
+ *				  mask.
+ *			maskFile, maskBitmap: handle of a monochrome bitmap that holds the new mask
+ *				- if the bitmap is not monochrome, the result will be unpredictable
+ *				- if the bitmap also has a mask, picture bits and mask bits will be
+ *				  combinded with AND, just as we draw the bitmap.
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTImportTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			VMFileHandle maskFile, VMBlockHandle maskBitmap,
+			optr progressText) {
+srcFile =  srcFile;
+bmpBlock =  bmpBlock;
+destFile = destFile;
+maskFile =  maskFile;
+maskBitmap =  maskBitmap;
+progressText = progressText;
+return 0;
+}
+
+/*--------------------- LocalSetMaskMono ---------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+void LocalSetMaskMono(byte *dataPtr, int width, int index) {
+*dataPtr = width = index;
+}
+
+/*--------------------- LocalSetMask4Bit ---------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+void LocalSetMask4Bit(byte *dataPtr,int width, int index) {
+*dataPtr = width = index;
+}
+
+/*--------------------- LocalSetMask8Bit ---------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+void LocalSetMask8Bit(byte *dataPtr,int width, int index) {
+*dataPtr = width = index;
+}
+
+/*--------------------- LocalSetMask24Bit ---------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+void LocalSetMask24Bit(byte *dataPtr, int width, int red1, int red2, int green1, int green2, int blue1, int blue2) {
+*dataPtr = width = red1 = red2 = green1 = green2 = blue1 = blue2;
+}
+
+/*---------------------  ---------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
