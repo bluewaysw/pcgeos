@@ -442,8 +442,7 @@ EC(     ECCheckBounds( (void*)outline ) );
                         }
 
                         case CURVE_TAG_CONIC:  /* consume conic arcs */
-                                v_control.x = point->x;
-                                v_control.y = point->y;
+                                v_control = *point;
 
                         Do_Conic:
                                 if ( point < limit )
@@ -455,8 +454,7 @@ EC(     ECCheckBounds( (void*)outline ) );
                                         ++point;
                                         ++tags;
 
-                                        vec.x = point->x;
-                                        vec.y = point->y;
+                                        vec = *point;
 
                                         if (  *tags & CURVE_TAG_ON )
                                         {
@@ -602,7 +600,7 @@ static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
         p[0].P_x = v_control->x;
         p[0].P_y = v_control->y;
         p[1].P_x = p[2].P_x = vec->x;
-        p[1].P_y = p[2].P_y = vec->y;
+        p[1].P_y = p[2].P_y = vec->y;;
 
         GrDrawCurveTo( (GStateHandle) handle, p );
 }
