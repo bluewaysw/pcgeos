@@ -54,9 +54,7 @@ impbmp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                IMPBMP/impbmp.h IMPBMP/ibcommon.h pnglib.h Ansi/stdio.h \
-                Ansi/stdlib.h zlib.h zconf.h htmldrv.h product.h math.h \
-                htmlfstr.h awatcher.h htmlprog.h
+                IMPBMP/impbmp.h IMPBMP/ibcommon.h
 impgif.obj \
 impgif.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -85,9 +83,7 @@ impgif.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                IMPBMP/impgif.h IMPBMP/ibcommon.h pnglib.h Ansi/stdio.h \
-                Ansi/stdlib.h zlib.h zconf.h htmldrv.h product.h math.h \
-                htmlfstr.h awatcher.h htmlprog.h
+                IMPBMP/impgif.h IMPBMP/ibcommon.h
 imppcx.obj \
 imppcx.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -116,9 +112,7 @@ imppcx.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                IMPBMP/imppcx.h IMPBMP/ibcommon.h pnglib.h Ansi/stdio.h \
-                Ansi/stdlib.h zlib.h zconf.h htmldrv.h product.h math.h \
-                htmlfstr.h awatcher.h htmlprog.h
+                IMPBMP/imppcx.h IMPBMP/ibcommon.h
 imp_bmp.obj \
 imp_bmp.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -147,8 +141,8 @@ imp_bmp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/imp_bmp.h \
-                IMPBMP/ibcommon.h pnglib.h Ansi/stdio.h Ansi/stdlib.h \
-                Ansi/string.h zlib.h zconf.h htmldrv.h product.h math.h \
+                IMPBMP/ibcommon.h Ansi/string.h pnglib.h Ansi/stdio.h \
+                Ansi/stdlib.h zlib.h zconf.h htmldrv.h product.h math.h \
                 htmlfstr.h awatcher.h htmlprog.h IMPBMP/imppcx.h \
                 IMPBMP/impbmp.h jpeglib.h jconfig.h jmorecfg.h
 bmpview.obj \
@@ -181,10 +175,10 @@ bmpview.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/imp_bmp.h \
-                IMPBMP/ibcommon.h pnglib.h Ansi/stdio.h Ansi/stdlib.h \
-                Ansi/string.h zlib.h zconf.h htmldrv.h product.h math.h \
-                htmlfstr.h awatcher.h htmlprog.h GRAPH/quant.h initfile.h \
-                library.h sem.h
+                IMPBMP/ibcommon.h Ansi/string.h GRAPH/quant.h initfile.h \
+                pnglib.h Ansi/stdio.h Ansi/stdlib.h zlib.h zconf.h \
+                htmldrv.h product.h math.h htmlfstr.h awatcher.h \
+                htmlprog.h library.h sem.h
 quant.obj \
 quant.eobj: Ansi/string.h geos.h GRAPH/quant.h color.h heap.h
 

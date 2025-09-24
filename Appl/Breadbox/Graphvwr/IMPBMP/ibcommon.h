@@ -2,7 +2,6 @@
 #define __IBCOMMON_H
 
 #include <geos.h>
-#include <pnglib.h>
 
 typedef enum
 {

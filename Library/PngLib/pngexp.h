@@ -14,6 +14,7 @@ PngError _pascal writeIDATChunk(FileHandle file, VMFileHandle srcfile, VMBlockHa
 PngError _pascal writeIENDChunk(FileHandle file);
 
 // Processing Functions
+static Boolean _pascal unpackPackBits(byte *src, word srcSize, byte *dest, word destSize);
 dword _pascal calculateScanlineBufferSize(dword width, BMFormat bitform);
 word _pascal calcBytesPerPixel(pngIHDRData* ihdrData);
 byte _pascal getFilterForScanline(byte* scanlinePtr, byte *prevScanlinePtr, word scanlineSize, word bytesPerPixel, word bitDepth);

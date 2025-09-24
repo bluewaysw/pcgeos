@@ -110,7 +110,7 @@ typedef struct {
 #define PNG_COLOR_TYPE_GREY_ALPHA  4   /* Grayscale with alpha */
 #define PNG_COLOR_TYPE_RGBA        6   /* Truecolor with alpha */
 
-
+// Alpha channel handling methods and struct
 typedef enum {
     PNG_AT_TRESHOLD = 0,
     PNG_AT_BLEND
@@ -132,7 +132,6 @@ typedef enum {
     PE_PALETTE_RETRIEVAL_FAILURE,
     PE_OTHER_ERROR
 } PngError;
-
 
 /* Public API */
 VMBlockHandle   _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile, pngAlphaTransformData* pngAlphaTransform);
