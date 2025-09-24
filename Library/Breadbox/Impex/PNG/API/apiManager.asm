@@ -16,8 +16,8 @@ global _ExportGroup: nptr
 ;================================================================================
 ; global functions implemented in C
 ; segment must be "public 'CODE'" to ensure that it combines
-; with properly the C segment of the same name.
-; imptpng_TEXT = "imppng.goc" - ".goc + "TEXT"
+; properly with the C segment of the same name.
+; imptpng_TEXT = "imp.goc" - ".goc + "_TEXT"
 
 imp_TEXT   segment public 'CODE'
     extrn  IMPORTPROCEDURE: far
@@ -49,7 +49,7 @@ global  TransGetExportOptions: far
 
 
 ;================================================================================
-; standard translator interface resource segment
+; initialization segment for translator
 ;================================================================================
 
 NUMBER_OF_FORMATS equ 1         ; number of supported formats, must match number of entries in InfoResource
@@ -72,6 +72,8 @@ INIT    ends
 
 ;================================================================================
 ; standard translator info resource segment
+; Each format variation supported by the translator
+; requires one entry in this resource.
 ;================================================================================
 
 InfoResource    segment lmem LMEM_TYPE_GENERAL, mask LMF_IN_RESOURCE
@@ -254,8 +256,9 @@ TransGetExportOptions proc far uses ax,bx,cx,bp,si,di,ds
 TransGetExportOptions endp
 
 ;--------------------------------------------------------------------------------
-; The following two functions are called once when the import/export dialog is created.
-; They can be used to initialize UI elements to default values.
+; The following two functions are called once when the import/export dialog is
+; created. They can be used to initialize UI elements to default values.
+; Not used here.
 ;--------------------------------------------------------------------------------
 TransInitImportUI proc far
         ret
