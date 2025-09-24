@@ -17,7 +17,7 @@ global _ExportGroup: nptr
 ; global functions implemented in C
 ; segment must be "public 'CODE'" to ensure that it combines
 ; properly with the C segment of the same name.
-; imptpng_TEXT = "imp.goc" - ".goc + "_TEXT"
+; imp_TEXT = "imp.goc" - ".goc + "_TEXT"
 
 imp_TEXT   segment public 'CODE'
     extrn  IMPORTPROCEDURE: far
