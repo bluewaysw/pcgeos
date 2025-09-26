@@ -600,7 +600,7 @@ static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
         p[0].P_x = v_control->x;
         p[0].P_y = v_control->y;
         p[1].P_x = p[2].P_x = vec->x;
-        p[1].P_y = p[2].P_y = vec->y;;
+        p[1].P_y = p[2].P_y = vec->y;
 
         GrDrawCurveTo( (GStateHandle) handle, p );
 }
@@ -928,18 +928,20 @@ EC(             ECCheckWindowHandle( win ) );
         temp_e22 = GrMulWWFixed( transformMatrix->TM_matrix.yx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e12 ) ) 
                         + GrMulWWFixed( transformMatrix->TM_matrix.yy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) );
 
+
         transformMatrix->TM_matrix.xx = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
-                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
-        transformMatrix->TM_matrix.xy = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
-                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
-        transformMatrix->TM_matrix.yx = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
-                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
+                                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
+        transformMatrix->TM_matrix.yx = - ( GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
+                                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) ) );
+        transformMatrix->TM_matrix.xy = - ( GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
+                                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) ) );
         transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
-                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+                                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+
+
 
         transformMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                         WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xy ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xx ) ) + BASELINE_CORRECTION;
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), -transformMatrix->TM_matrix.xy ) ) + BASELINE_CORRECTION;
 }
-
