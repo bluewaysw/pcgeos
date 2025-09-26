@@ -939,9 +939,8 @@ EC(             ECCheckWindowHandle( win ) );
                                         + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
 
 
-
         transformMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                         WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xy ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), -transformMatrix->TM_matrix.xy ) ) + BASELINE_CORRECTION;
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xx ) ) + BASELINE_CORRECTION;
 }
