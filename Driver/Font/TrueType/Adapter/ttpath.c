@@ -825,7 +825,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         transMatrix->TM_matrix.yx = 0L;
         transMatrix->TM_matrix.yy = scaleFactor;
         transMatrix->TM_heightX   = 0;
-        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent;
+        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent + BASELINE_CORRECTION;
         transMatrix->TM_scriptX   = 0;
         transMatrix->TM_scriptY   = 0;
 
@@ -936,5 +936,5 @@ EC(             ECCheckWindowHandle( win ) );
         transformMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                         WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xy ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.yy ) ) + BASELINE_CORRECTION;
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.yy ) );
 }
