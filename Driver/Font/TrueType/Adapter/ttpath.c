@@ -442,8 +442,7 @@ EC(     ECCheckBounds( (void*)outline ) );
                         }
 
                         case CURVE_TAG_CONIC:  /* consume conic arcs */
-                                v_control.x = point->x;
-                                v_control.y = point->y;
+                                v_control = *point;
 
                         Do_Conic:
                                 if ( point < limit )
@@ -455,8 +454,7 @@ EC(     ECCheckBounds( (void*)outline ) );
                                         ++point;
                                         ++tags;
 
-                                        vec.x = point->x;
-                                        vec.y = point->y;
+                                        vec = *point;
 
                                         if (  *tags & CURVE_TAG_ON )
                                         {
@@ -826,10 +824,10 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         transMatrix->TM_matrix.xy = 0L;
         transMatrix->TM_matrix.yx = 0L;
         transMatrix->TM_matrix.yy = scaleFactor;
-        transMatrix->TM_heightX   = 0L;
-        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent;
-        transMatrix->TM_scriptX   = 0L;
-        transMatrix->TM_scriptY   = 0L;
+        transMatrix->TM_heightX   = 0;
+        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent + BASELINE_CORRECTION;
+        transMatrix->TM_scriptX   = 0;
+        transMatrix->TM_scriptY   = 0;
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
@@ -930,18 +928,13 @@ EC(             ECCheckWindowHandle( win ) );
         temp_e22 = GrMulWWFixed( transformMatrix->TM_matrix.yx, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e12 ) ) 
                         + GrMulWWFixed( transformMatrix->TM_matrix.yy, WWFIXED_TO_WWFIXEDASDWORD( graphicMatrix.TM_e22 ) );
 
-        transformMatrix->TM_matrix.xx = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
-                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
-        transformMatrix->TM_matrix.xy = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
-                        + GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
-        transformMatrix->TM_matrix.yx = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) ) 
-                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e21 ) );
-        transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e12 ) ) 
-                        + GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+        transformMatrix->TM_matrix.xx = GrMulWWFixed( temp_e11, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) );
+        transformMatrix->TM_matrix.yx = - GrMulWWFixed( temp_e12, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
+        transformMatrix->TM_matrix.xy = - GrMulWWFixed( temp_e21, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e11 ) );
+        transformMatrix->TM_matrix.yy = GrMulWWFixed( temp_e22, WWFIXED_TO_WWFIXEDASDWORD( windowMatrix.TM_e22 ) );
 
         transformMatrix->TM_heightX = -INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
                         WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xy ) );
         transformMatrix->TM_heightY = INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( 
-                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.xx ) ) + BASELINE_CORRECTION;
+                        WORD_TO_WWFIXEDASDWORD( transformMatrix->TM_heightY ), transformMatrix->TM_matrix.yy ) );
 }
-

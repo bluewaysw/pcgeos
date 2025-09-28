@@ -678,33 +678,33 @@ EC(     ECCheckBounds( (void*)fontBuf ) );
                                               WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_heightAdjust );
 
 
-                styleMatrix.xx = TrueType_GrMulWWFixed( styleMatrix.xx, SCRIPT_FACTOR );
-                styleMatrix.yy = TrueType_GrMulWWFixed( styleMatrix.yy, SCRIPT_FACTOR );
+                styleMatrix.xx = GrMulWWFixed( styleMatrix.xx, SCRIPT_FACTOR );
+                styleMatrix.yy = GrMulWWFixed( styleMatrix.yy, SCRIPT_FACTOR );
 
                 if( stylesToImplement & TS_SUBSCRIPT )
                 {
                         //TODO: Is rounding necessary here?
-                        transMatrix->TM_scriptY = TrueType_GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
+                        transMatrix->TM_scriptY = GrMulWWFixed( scriptOffset, SUBSCRIPT_OFFSET ) >> 16;
                 }
                 else
                 {
                         //TODO: Is rounding necessary here?
-                        transMatrix->TM_scriptY = ( TrueType_GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
+                        transMatrix->TM_scriptY = ( GrMulWWFixed( scriptOffset, SUPERSCRIPT_OFFSET) -
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baselinePos ) -
                                                 WBFIXED_TO_WWFIXEDASDWORD( fontBuf->FB_baseAdjust ) ) >> 16;
                 }
         }
 
-        transMatrix->TM_matrix.xx = TrueType_GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.xx = GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_11 );
         transMatrix->TM_matrix.yx = 0;
-        transMatrix->TM_matrix.xy = TrueType_GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_11 );
-        transMatrix->TM_matrix.yy = TrueType_GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_22 );
+        transMatrix->TM_matrix.xy = GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_11 );
+        transMatrix->TM_matrix.yy = GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_22 );
 
         if( fontMatrix->FM_flags & TF_ROTATED )
         {
-                transMatrix->TM_matrix.yx = - ( TrueType_GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
-                                                TrueType_GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
-                transMatrix->TM_matrix.xy = - ( TrueType_GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
+                transMatrix->TM_matrix.yx = - ( GrMulWWFixed( styleMatrix.xx, fontMatrix->FM_12 ) +
+                                                GrMulWWFixed( styleMatrix.xy, fontMatrix->FM_22 ) );
+                transMatrix->TM_matrix.xy = - ( GrMulWWFixed( styleMatrix.yy, fontMatrix->FM_21 ) );
         }
 }
 
@@ -1048,13 +1048,13 @@ static Boolean IsRegionNeeded( TransformMatrix* transMatrix, FontBuf* fontBuf )
         sword param2;
 
 
-        param1 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.xx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        param2 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.yx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yx, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
-        param1 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.xy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
-        param2 = IntegerOf( TrueType_GrMulWWFixed( transMatrix->TM_matrix.yy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param1 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.xy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
+        param2 = IntegerOf( GrMulWWFixed( transMatrix->TM_matrix.yy, WORD_TO_WWFIXEDASDWORD( fontBuf->FB_pixHeight ) ) );
         if( ( ABS( param1 ) + ABS( param2 ) ) > MAX_BITMAP_SIZE )
                 return TRUE;
 
