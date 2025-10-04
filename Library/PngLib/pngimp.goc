@@ -8,17 +8,11 @@
 
 // Include our API
 #include "pnglib.h"
-
-// some internal functions defined below, but declared here...
-int nextIDATChunk(pngIDATState* state);
-static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
-static inline unsigned char paethPredictor(int a, int b, int c);
-static inline int abs(int x);
-static inline unsigned long swapEndian(unsigned long val);
-
+#include "pngimp.h"
+#include "common.h"
 
 // Reading and processing a complete PNG file
-VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile)
+VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile, pngAlphaTransformData* pngAlphaTransform)
 {
     pngIHDRData ihdrData = {0};
     VMBlockHandle vmBlock = NullHandle;
@@ -27,14 +21,13 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
     pngPLTEChunkEntry plteChunk = {0};
     pngIDATState state = {0};
     BMFormat fmt = 0;
-    RGBValue blendColor = {255, 255, 255};
 
     if (pngImportCheckHeader(fileHan))
     {
         // Read PNG Chunks, get overview
         if (pngImportProcessChunks(fileHan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
         {
-            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth, pngAlphaTransform);
             if (fmt != 0)
             {
                 // Initialize output bitmap
@@ -51,7 +44,7 @@ VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHan
                 {
                     pngImportIDATProcessingUnlockHandles(&state);
 
-                    pngImportApplyGEOSFormatTransformations(&state, blendColor);
+                    pngImportApplyGEOSFormatTransformations(&state, pngAlphaTransform);
 
                     // Write the processed scanline (without the filter byte) to the VMFile
                     pngImportWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
@@ -262,7 +255,7 @@ void _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileH
 void _pascal _export pngImportIDATProcessingUnlockHandles(pngIDATState* state)
 {
     state->inOff = state->strm.next_in - MemDeref(state->inHan);
-    MemUnlock(state->inHan); // disabled as it seems to create memory overflows somewhere
+    MemUnlock(state->inHan);
 
     state->outOff = state->strm.next_out - MemDeref(state->outHan);
     MemUnlock(state->outHan);
@@ -549,9 +542,19 @@ void _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry p
 }
 
 // determine which GEOS bitmap format to create
-BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth)
+BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth, pngAlphaTransformData* pngAlphaTransform)
 {
     BMFormat output = 0;
+    pngAlphaTransformData defaults = {0};
+
+    if (pngAlphaTransform == (void*) 0)
+    {
+        defaults.method = PNG_AT_BLEND;
+        defaults.blendColor.RGB_red = 255;
+        defaults.blendColor.RGB_green = 255;
+        defaults.blendColor.RGB_blue = 255;
+        pngAlphaTransform = &defaults;
+    }
 
     switch (colorType)
     {
@@ -589,11 +592,16 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
         case PNG_COLOR_TYPE_GREY_ALPHA:
             switch (bitDepth)
             {
-                case 8: // Processing 8-bit Greyscale + Alpha
-                case 16: // Processing 16-bit Greyscale + Alpha
-                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                case 8:
+                case 16:
+                    /* Paletted GREY plus a 1-bit mask */
+                    if (pngAlphaTransform->method == PNG_AT_TRESHOLD) {
+                        output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE | BMT_MASK;
+                    } else {
+                        output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    }
                     break;
-                default: // Invalid BitDepth for Greyscale with Alpha
+                default:
                     break;
             }
             break;
@@ -603,7 +611,11 @@ BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsi
             {
                 case 8: // Processing 8-bit Truecolor + Alpha
                 case 16: // Processing 16-bit Truecolor + Alpha
-                    output = BMF_24BIT | BMT_COMPLEX;
+                    if (pngAlphaTransform->method == PNG_AT_TRESHOLD) {
+                        output = BMF_24BIT | BMT_COMPLEX | BMT_MASK;
+                    } else {
+                        output = BMF_24BIT | BMT_COMPLEX;
+                    }
                     break;
                 default: // Invalid BitDepth for Truecolor with Alpha
                     break;
@@ -654,13 +666,31 @@ VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile,
 }
 
 // transform the original bitmap data for the target GEOS format
-void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, RGBValue pngBlendColor)
+void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, pngAlphaTransformData* pngAlphaTransform)
 {
+    pngAlphaTransformData defaults = {0};
+
     // Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel
     pngConvert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
 
-    // Remove any alpha channel
-    pngRemoveAlphaChannel(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngBlendColor);
+    if (pngAlphaTransform == (void*) 0) {
+        defaults.method = PNG_AT_BLEND;
+        defaults.blendColor.RGB_red = 255;
+        defaults.blendColor.RGB_green = 255;
+        defaults.blendColor.RGB_blue = 255;
+        pngAlphaTransform = &defaults;
+    }
+
+    if (pngAlphaTransform->method == PNG_AT_TRESHOLD)
+    {
+        // remove alpha channel by converting to mask
+        pngAlphaChannelToMask(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngAlphaTransform->alphaThreshold);
+    }
+    else
+    {
+        // Blend alpha channel with color
+        pngAlphaChannelBlend(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngAlphaTransform->blendColor);
+    }
 
     // add "padding" to 1- and 2-bitted paletted data bytes or to 2-bitted grayscale values
     pngPad1BitTo4Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
@@ -670,21 +700,21 @@ void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state
 // write a scanline to the VMFile
 void _pascal _export pngImportWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
 {
-    void *lineptr;
+    void *scanlinePtr;
     word size;
 
     HugeArrayLock(
         vmFile,
         vmBlock,
         (dword) lineNo,
-        &lineptr,
+        &scanlinePtr,
         &size
     );
 
-    memcpy(lineptr, rowData, size);
+    memcpy(scanlinePtr, rowData, size);
 
-    HugeArrayDirty(lineptr);
-    HugeArrayUnlock(lineptr);
+    HugeArrayDirty(scanlinePtr);
+    HugeArrayUnlock(scanlinePtr);
 }
 
 
@@ -888,7 +918,7 @@ void _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, unsigned lon
 }
 
 // remove the alpha channel, for now. blend it with a blendColor
-void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
+void _pascal _export pngAlphaChannelBlend(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
 {
     unsigned long j;
     unsigned char *src = data; // Start at the first pixel
@@ -935,6 +965,116 @@ void _pascal _export pngRemoveAlphaChannel(unsigned char *data, unsigned long wi
         }
     }
     // If any other colorType with alpha is introduced in the future, handle it here
+}
+
+/* Build [mask][RGB or GRAY] from RGBA or GREY+ALPHA using a 1-bit mask.
+ * Input  'data':
+ *   RGBA: 4*width bytes  (R,G,B,A)
+ *   GA:   2*width bytes  (Gray,Alpha)
+ * Output back into 'data':
+ *   RGBA -> [ (W+7)/8 mask ][ 3*W RGB ]
+ *   GA   -> [ (W+7)/8 mask ][   W GRAY ]
+ * Opaque if (alpha >= alphaThreshold), otherwise transparent.
+ * (Mask bit order: MSB-first in each byte)
+ */
+void _pascal _export pngAlphaChannelToMask(
+    unsigned char *data,
+    unsigned long  width,
+    int            colorType,
+    byte           alphaThreshold)
+{
+    MemHandle       tmpHan;
+    unsigned char  *tmp;
+    unsigned long   maskBytes;
+    unsigned long   outBytes;
+    unsigned char  *dstMask;
+    unsigned char  *dstPix;
+    unsigned long   x;
+
+    /* Only RGBA and GREY+ALPHA have alpha to convert. */
+    if (!((colorType == PNG_COLOR_TYPE_RGBA) ||
+          (colorType == PNG_COLOR_TYPE_GREY_ALPHA)))
+    {
+        return;
+    }
+
+    maskBytes = (width + 7) / 8;
+    outBytes  = (colorType == PNG_COLOR_TYPE_RGBA)
+                ? (maskBytes + 3 * width)     /* RGB */
+                : (maskBytes + 1 * width);    /* GRAY */
+
+    /* Temp row for [mask][payload] */
+    tmpHan = MemAlloc((word)outBytes, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (tmpHan == NullHandle) { return; }
+
+    tmp = (unsigned char*) MemLock(tmpHan);
+    if (tmp == NULL)
+    {
+        MemFree(tmpHan);
+        return;
+    }
+
+    dstMask = tmp;
+    dstPix  = tmp + maskBytes;
+
+    if (colorType == PNG_COLOR_TYPE_RGBA)
+    {
+        const unsigned char *src = data;   /* R G B A */
+        unsigned long  mIdx = 0;
+        unsigned char  bit  = 0x80;
+
+        /* mask is zeroed by HAF_ZERO_INIT */
+        for (x = 0; x < width; x++)
+        {
+            unsigned char r = src[0];
+            unsigned char g = src[1];
+            unsigned char b = src[2];
+            unsigned char a = src[3];
+
+            if (a >= alphaThreshold) { dstMask[mIdx] |= bit; } /* opaque=1 */
+
+            dstPix[0] = r; dstPix[1] = g; dstPix[2] = b;
+
+            src   += 4;
+            dstPix+= 3;
+
+            bit >>= 1;
+            if (bit == 0) { bit = 0x80; mIdx++; }
+        }
+    }
+    else /* PNG_COLOR_TYPE_GREY_ALPHA */
+    {
+        const unsigned char *src = data;   /* Gray, Alpha */
+        unsigned long  mIdx = 0;
+        unsigned char  bit  = 0x80;
+
+        for (x = 0; x < width; x++)
+        {
+            unsigned char gray = src[0];
+            unsigned char a    = src[1];
+
+            if (a >= alphaThreshold) { dstMask[mIdx] |= bit; } /* opaque=1 */
+
+            dstPix[0] = gray;  /* keep grayscale sample; palette already handled */
+
+            src   += 2;
+            dstPix+= 1;
+
+            bit >>= 1;
+            if (bit == 0) { bit = 0x80; mIdx++; }
+        }
+    }
+
+    /* Clear padding bits in the last mask byte if width%8 != 0 */
+    if ((width & 7) != 0)
+    {
+        dstMask[maskBytes - 1] &= (unsigned char)(0xFF << (8 - (width & 7)));
+    }
+
+    /* Copy result back to caller’s buffer */
+    memcpy(data, tmp, (word)outBytes);
+
+    MemFree(tmpHan);
 }
 
 // Function to convert 1-bit packed values to 4-bit padded values
@@ -1096,32 +1236,4 @@ static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigne
             // Invalid filter type
             return;
     }
-}
-
-// Paeth-Predictor-Function
-static inline unsigned char paethPredictor(int a, int b, int c)
-{
-    int p = a + b - c;
-    int pa = abs(p - a);
-    int pb = abs(p - b);
-    int pc = abs(p - c);
-
-    if (pa <= pb && pa <= pc) return (unsigned char)a;
-    else if (pb <= pc) return (unsigned char)b;
-    else return (unsigned char)c;
-}
-
-// swap endianness
-static inline unsigned long swapEndian(unsigned long val)
-{
-    return ((val >> 24) & 0x000000FF) |
-           ((val >> 8) & 0x0000FF00) |
-           ((val << 8) & 0x00FF0000) |
-           ((val << 24) & 0xFF000000);
-}
-
-// abs function, GEOS probably has one somewhere...
-static inline int abs(int x)
-{
-    return x >= 0 ? x : -x;
 }
