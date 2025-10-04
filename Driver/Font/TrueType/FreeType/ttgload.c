@@ -314,41 +314,34 @@
       }
     }
 
-    /* read the X */
-
-    x    = 0;
+    x    = y = 0;
     vec  = exec->pts.org;
+
+    
+    /* read the X */
 
     for ( j = 0; j < n_points; ++j )
     {
-      if ( flag[j] & 2 )
-      {
-        if ( flag[j] & 16 )
-          x += GET_Byte();
-        else
-          x -= GET_Byte();
-      }
-      else if ( (flag[j] & 16) == 0 )
-          x += GET_Short();
+      Byte f = flag[j];
+
+      if ( f & 2 )
+        x += ( (f & 16) ? GET_Byte() : -GET_Byte() );
+      else if ( (f & 16) == 0 )
+        x += GET_Short();
 
       vec[j].x = x;
     }
 
 
-   /* read the Y */
-
-    y    = 0;
+    /* read the Y */
 
     for ( j = 0; j < n_points; ++j )
     {
-      if ( flag[j] & 4 )
-      {
-        if ( flag[j] & 32 )
-          y += GET_Byte();
-        else
-          y -= GET_Byte();
-      }
-      else if ( (flag[j] & 32) == 0 )
+      Byte f = flag[j];
+
+      if ( f & 4 )
+          y += ( (f & 32) ? GET_Byte() : -GET_Byte() );
+      else if ( (f & 32) == 0 )
           y += GET_Short();
 
       vec[j].y = y;

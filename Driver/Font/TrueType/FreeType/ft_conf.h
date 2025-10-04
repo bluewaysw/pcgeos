@@ -269,6 +269,13 @@
 
 #define   TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 
+
+/*************************************************************************/
+/* Define this option to store the checksum of the elements in the       */
+/* table directory.                                                      */
+
+#undef TT_CONFIG_OPTION_SUPPORT_CHECKSUM
+
 /**********************************************************************/
 /*                                                                    */
 /*  The following macros are used to define the debug level, as well  */

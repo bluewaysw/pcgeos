@@ -28,11 +28,11 @@
  * types
  */
 
-typedef void  Function_MoveTo( Handle han, TT_Vector* vec );
+typedef void  Function_MoveTo( Handle han, const TT_Vector* vec );
 
-typedef void  Function_LineTo( Handle han, TT_Vector* vec );
+typedef void  Function_LineTo( Handle han, const TT_Vector* vec );
 
-typedef void  Function_ConicTo( Handle han, TT_Vector* v_control, TT_Vector* vec );
+typedef void  Function_ConicTo( Handle han, const TT_Vector* v_control, const TT_Vector* vec );
 
 
 /*
@@ -59,17 +59,17 @@ static void ConvertOutline( Handle            handle,
                             TT_Outline*       outline, 
                             RenderFunctions*  functions );
 
-static void _near MoveTo( Handle handle, TT_Vector* vec );
+static void _near MoveTo( Handle handle, const TT_Vector* vec );
 
-static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec );
+static void _near RegionPathMoveTo( Handle handle, const TT_Vector* vec );
 
-static void _near LineTo( Handle handle, TT_Vector* vec );
+static void _near LineTo( Handle handle, const TT_Vector* vec );
 
-static void _near RegionPathLineTo( Handle handle, TT_Vector* vec );
+static void _near RegionPathLineTo( Handle handle, const TT_Vector* vec );
 
-static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
+static void _near ConicTo( Handle handle, const TT_Vector* v_control, const TT_Vector* vec );
 
-static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec );
+static void _near RegionPathConicTo( Handle handle, const TT_Vector* v_control, const TT_Vector* vec );
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
@@ -499,7 +499,7 @@ EC(     ECCheckBounds( (void*)outline ) );
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void _near MoveTo( Handle handle, TT_Vector* vec )
+static void _near MoveTo( Handle handle, const TT_Vector* vec )
 {
         GrMoveTo( (GStateHandle) handle, vec->x, vec->y );
 }
@@ -522,7 +522,7 @@ static void _near MoveTo( Handle handle, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec )
+static void _near RegionPathMoveTo( Handle handle, const TT_Vector* vec )
 {
         GrRegionPathMovePen( handle, vec->x, vec->y );
 }
@@ -545,7 +545,7 @@ static void _near RegionPathMoveTo( Handle handle, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void _near LineTo( Handle handle, TT_Vector* vec )
+static void _near LineTo( Handle handle, const TT_Vector* vec )
 {
         GrDrawLineTo( (GStateHandle) handle, vec->x, vec->y );
 }
@@ -568,7 +568,7 @@ static void _near LineTo( Handle handle, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void _near RegionPathLineTo( Handle handle, TT_Vector* vec )
+static void _near RegionPathLineTo( Handle handle, const TT_Vector* vec )
 {
         GrRegionPathDrawLineTo( handle, vec->x, vec->y );
 }
@@ -592,7 +592,7 @@ static void _near RegionPathLineTo( Handle handle, TT_Vector* vec )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
+static void _near ConicTo( Handle handle, const TT_Vector* v_control, const TT_Vector* vec )
 {
         Point p[3];
 
@@ -624,7 +624,7 @@ static void _near ConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
  *      14/03/24  JK        Initial Revision
  *******************************************************************/
 
-static void _near RegionPathConicTo( Handle handle, TT_Vector* v_control, TT_Vector* vec )
+static void _near RegionPathConicTo( Handle handle, const TT_Vector* v_control, const TT_Vector* vec )
 {
         Point p[3];
 

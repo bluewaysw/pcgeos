@@ -71,6 +71,8 @@ extern TEngine_Instance engineInstance;
 #define STANDARD_GRIDSIZE                   1000
 #define MAX_NUM_GLYPHS                      2000
 
+#define MIN_OS2_TABLE_VERSION               2
+
 #define BASELINE_CORRECTION                 1
 #define MIN_BITMAP_DIMENSION                1
 
