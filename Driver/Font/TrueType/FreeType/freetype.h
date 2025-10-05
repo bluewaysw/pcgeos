@@ -393,15 +393,17 @@
 #endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-    TT_FWord   Line_Gap;
-
-    TT_UFWord  advance_Width_Max;      /* advance width maximum */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   Line_Gap;
+#endif
+
+    TT_UFWord  advance_Width_Max;      /* advance width maximum */
     TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
-
     TT_FWord   xMax_Extent;            /* xmax extents          */
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
@@ -410,9 +412,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_HMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -439,15 +442,17 @@
 #endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-    TT_FWord   Line_Gap;
-
-    TT_UFWord  advance_Height_Max;      /* advance height maximum */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   Line_Gap;
+#endif
+
+    TT_UFWord  advance_Height_Max;      /* advance height maximum */
     TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
     TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
-
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
     TT_FWord   caret_Offset;
@@ -456,9 +461,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_VMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -484,10 +490,10 @@
     TT_UShort  version;                /* 0x0001 */
     TT_FWord   xAvgCharWidth;
     TT_UShort  usWeightClass;
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  usWidthClass;
     TT_Short   fsType;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   ySubscriptXSize;
     TT_FWord   ySubscriptYSize;
     TT_FWord   ySubscriptXOffset;
@@ -528,7 +534,11 @@
     TT_ULong   ulCodePageRange1;       /* Bits 0-31   */
     TT_ULong   ulCodePageRange2;       /* Bits 32-63  */
 #endif
-  };
+
+    /* only version 2 tables: */
+    TT_Short   sxHeight;
+    TT_Short   sCapHeight;  
+  };  
 
   typedef struct TT_OS2_  TT_OS2;
 
@@ -676,7 +686,7 @@
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( void );
+  void      TT_Done_FreeType( void );
 
 
   /* ----------------------- face management ----------------------- */
@@ -838,7 +848,7 @@
   /* Release an outline. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_Outline( TT_Outline*  outline );
+  void      TT_Done_Outline( TT_Outline*  outline );
 
 
   /* Render an outline into a bitmap. */

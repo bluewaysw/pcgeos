@@ -39,7 +39,7 @@ static void ProcessFont(        TRUETYPE_VARS,
                                 const char*  file, 
                                 MemHandle    fontInfoBlock );
 
-static Boolean isFontResourceIntensive( TRUETYPE_VARS );
+static Boolean isFontUnacceptable( TRUETYPE_VARS );
 
 static sword getFontIDAvailIndex( 
                                 FontID     fontID, 
@@ -123,9 +123,7 @@ TT_Error _pascal Init_FreeType()
  * PARAMETERS:     MemHandle varBlock
  *                    Memory handle to the block containing TrueType variables.None
  * 
- * RETURNS:        TT_Error
- *                    Returns `TT_Err_Ok` on successful cleanup, or an
- *                    error code if deinitialization fails.
+ * RETURNS:        void
  * 
  * STRATEGY:       - Call `TT_Done_FreeType()` to clean up resources
  *                   used by the FreeType library.
@@ -136,7 +134,7 @@ TT_Error _pascal Init_FreeType()
  *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
-TT_Error _pascal Exit_FreeType(MemHandle varBlock) 
+void _pascal Exit_FreeType(MemHandle varBlock) 
 {
         if ( varBlock != NullHandle ) {
 
@@ -151,7 +149,7 @@ EC(         ECCheckBounds( (void*)trueTypeVars ) );
             MemUnlock( varBlock );
         }
 
-        return TT_Done_FreeType();
+        TT_Done_FreeType();
 }
 
 /********************************************************************
@@ -357,7 +355,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
                 goto Fail;
 
-        if ( isFontResourceIntensive( trueTypeVars ) )
+        if ( isFontUnacceptable( trueTypeVars ) )
                 goto Fail;
 
         if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
@@ -523,35 +521,39 @@ Fin:
 
 
 /********************************************************************
- *                      isFontResourceIntensive
+ *                      isFontUnacceptable
  ********************************************************************
- * SYNOPSIS:       Determines whether the given font is considered
- *                 resource-intensive based on certain criteria.
+ * SYNOPSIS:       Checks whether the given TrueType font is
+ *                 unacceptable for use with this driver.
  * 
  * PARAMETERS:     TRUETYPE_VARS
  *                    Cached variables needed by the driver.
  * 
  * RETURNS:        Boolean
- *                    TRUE if the font is considered resource-intensive.
- *                    FALSE otherwise.
+ *                    TRUE  if the font does not meet the driver's
+ *                          requirements (unacceptable).
+ *                    FALSE if the font is acceptable.
  * 
- * STRATEGY:       - Currently, this function evaluates the resource 
- *                   intensity of a font based solely on the number 
- *                   of glyphs it contains.
- *                 - If the number of glyphs exceeds a defined threshold 
- *                   (MAX_NUM_GLYPHS), it returns TRUE.
- *                 - The function is designed to be extensible, allowing 
- *                   additional criteria to be added in the future.
+ * STRATEGY:       - Currently, the validation is based on two criteria:
+ *                      1. The OS/2 table version must be at least 
+ *                         MIN_OS2_TABLE_VERSION.
+ *                      2. The number of glyphs must not exceed 
+ *                         MAX_NUM_GLYPHS.
+ *                 - The function is designed to be extensible so that 
+ *                   further rejection criteria can be added later.
  * 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
  *      19.12.23  JK        Initial Revision
+ *      17.09.25  JK        Renamed and improved docs
  *******************************************************************/
-static Boolean isFontResourceIntensive( TRUETYPE_VARS )
+static Boolean isFontUnacceptable( TRUETYPE_VARS )
 {
-        /* At the moment we are only checking the number of glyphs */
-        /* in the font. Further checks can be implemented here.    */
+        /* Additional rejection checks can be added here. */
+        
+        if ( FACE_PROPERTIES.os2->version < MIN_OS2_TABLE_VERSION )
+                return TRUE;
 
         return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;
 }
@@ -989,9 +991,6 @@ static word getNameFromNameTable( TRUETYPE_VARS, char* name, const TT_UShort nam
 #pragma code_seg(ttcharmapper_TEXT)
 void InitConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader )
 {
-        TT_UShort  charIndex;
-        word       geosChar;
-
 
 EC(     ECCheckBounds( (void*)fontHeader ) );
 
@@ -1013,92 +1012,38 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 return;	    
         }
 
-        /* initialize min, max and avg values in fontHeader */
-        fontHeader->FH_minLSB   =  9999;
-        fontHeader->FH_maxBSB   = -9999;
-        fontHeader->FH_minTSB   = -9999;
-        fontHeader->FH_maxRSB   = -9999;
-        fontHeader->FH_descent  = 9999;
-        fontHeader->FH_accent   = 0;
-        fontHeader->FH_ascent   = 0;
-
+        /* fill font header */
         fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
                                                        &fontHeader->FH_firstChar, 
                                                        &fontHeader->FH_lastChar ); 
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
 
-        for ( geosChar = fontHeader->FH_firstChar; geosChar < fontHeader->FH_lastChar; ++geosChar )
-        {
-                const word  unicode = GeosCharToUnicode( geosChar );
+        /* read parameter from os2 table */
+        fontHeader->FH_h_height   = FACE_PROPERTIES.os2->sCapHeight;
+        fontHeader->FH_x_height   = FACE_PROPERTIES.os2->sxHeight;
+        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
+        fontHeader->FH_height     = FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent;
 
-
-                if( !GeosCharMapFlag( geosChar ) )
-                        continue;
-
-                charIndex = TT_Char_Index( CHAR_MAP, unicode );
-                if ( charIndex == 0 )
-                        continue;
-
-                /* load glyph metrics without scaling or hinting */
-                TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
-
-                //h_height -> check
-                if( unicode == C_LATIN_CAPITAL_LETTER_H )
-                        fontHeader->FH_h_height = GLYPH_BBOX.yMax;
-
-                //x_height -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_X )
-                        fontHeader->FH_x_height = GLYPH_BBOX.yMax;
-        
-                //ascender -> check
-                if ( unicode == C_LATIN_SMALL_LETTER_D )
-                        fontHeader->FH_ascender = GLYPH_BBOX.yMax;
-
-                /* scan xMin -> check */
-                if( fontHeader->FH_minLSB > GLYPH_BBOX.xMin )
-                        fontHeader->FH_minLSB = GLYPH_BBOX.xMin;
-
-                /* scan xMax -> check */
-                if ( fontHeader->FH_maxRSB < GLYPH_BBOX.xMax )
-                        fontHeader->FH_maxRSB = GLYPH_BBOX.xMax;
-
-                /* scan yMin -> check */
-                if ( fontHeader->FH_maxBSB < -GLYPH_BBOX.yMin )
-                        fontHeader->FH_maxBSB = -GLYPH_BBOX.yMin;
-
-                /* scan yMax -> check */
-                if ( fontHeader->FH_minTSB < GLYPH_BBOX.yMax )
-                        fontHeader->FH_minTSB = GLYPH_BBOX.yMax;
-
-                /* check */
-                if ( GeosCharMapFlag( geosChar ) & ( CMF_ASCENT | CMF_CAP ) )
-                        if ( fontHeader->FH_ascent < GLYPH_BBOX.yMax )
-                                fontHeader->FH_ascent = GLYPH_BBOX.yMax;
-
-                /* check */
-                if ( GeosCharMapFlag( geosChar ) == CMF_ACCENT )
-                        if ( fontHeader->FH_accent < GLYPH_BBOX.yMax )
-                                fontHeader->FH_accent = GLYPH_BBOX.yMax;
-        }
-
+        fontHeader->FH_ascent     = FACE_PROPERTIES.os2->sTypoAscender;
+        fontHeader->FH_ascender   = FACE_PROPERTIES.os2->sTypoAscender;
         fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
         fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
-        fontHeader->FH_maxwidth   = FACE_PROPERTIES.horizontal->advance_Width_Max;
-        fontHeader->FH_accent     = fontHeader->FH_accent - fontHeader->FH_ascent;    
-        fontHeader->FH_baseAdjust = BASELINE( UNITS_PER_EM ) - fontHeader->FH_ascent - fontHeader->FH_accent;
-        fontHeader->FH_height     = fontHeader->FH_maxBSB + fontHeader->FH_ascent + DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM );
-        fontHeader->FH_minTSB     = fontHeader->FH_minTSB - BASELINE( UNITS_PER_EM );
-        fontHeader->FH_maxBSB     = fontHeader->FH_maxBSB - ( DESCENT( UNITS_PER_EM ) - SAFETY( UNITS_PER_EM ) );
-        fontHeader->FH_underPos   = DEFAULT_UNDER_POSITION( UNITS_PER_EM ) + fontHeader->FH_accent + fontHeader->FH_ascent;
+        fontHeader->FH_baseAdjust = fontHeader->FH_ascender- FACE_PROPERTIES.os2->usWinAscent;
+
+        /* read parameter from horizontal head table */
+        fontHeader->FH_maxRSB   = FACE_PROPERTIES.horizontal->xMax_Extent;
+        fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
+        fontHeader->FH_minLSB   = FACE_PROPERTIES.horizontal->min_Left_Side_Bearing;
+
+        /* read parameter from header table */
+        fontHeader->FH_accent   = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
+        fontHeader->FH_maxBSB   = fontHeader->FH_descender- FACE_PROPERTIES.header->yMin;
+        fontHeader->FH_minTSB   = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
+        fontHeader->FH_underPos = FACE_PROPERTIES.header->yMax + DEFAULT_UNDER_POSITION( UNITS_PER_EM );
+
         fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
         
-        if( fontHeader->FH_x_height > 0 )
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_x_height / 5;
-        else
-                fontHeader->FH_strikePos = 3 * fontHeader->FH_ascent / 5;
-
         fontHeader->FH_initialized = TRUE;
 
         TrueType_Cache_WriteHeader(

@@ -729,7 +729,7 @@ extern TEngine_Instance engineInstance;
     Bool  fresh  = ras.fresh;
     Bool  result = Line_Up( RAS_VARS x1, -y1, x2, -y2, -maxy, -miny );
 
-    if ( fresh && !ras.fresh )
+    if ( fresh ^ ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
 
     return result;
@@ -887,7 +887,7 @@ extern TEngine_Instance engineInstance;
 
     result = Bezier_Up( RAS_VARS -maxy, -miny );
 
-    if ( fresh && !ras.fresh )
+    if ( fresh ^ ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
 
     arc[0].y = -arc[0].y;
@@ -983,7 +983,7 @@ extern TEngine_Instance engineInstance;
                                    Long  cx,
                                    Long  cy )
   {
-    Long     y1, y2, y3, x3;
+    Long     y1, y2, y3;
     TStates  state_bez;
 
 
@@ -997,7 +997,6 @@ extern TEngine_Instance engineInstance;
       y1 = ras.arc[2].y;
       y2 = ras.arc[1].y;
       y3 = ras.arc[0].y;
-      x3 = ras.arc[0].x;
 
       /* first, categorize the bezier arc */
 
@@ -1064,8 +1063,8 @@ extern TEngine_Instance engineInstance;
       }
     } while ( ras.arc >= ras.arcs );
 
-    ras.lastX = x3;
-    ras.lastY = y3;
+    ras.lastX = x;
+    ras.lastY = y;
 
     return SUCCESS;
   }
@@ -2003,7 +2002,11 @@ extern TEngine_Instance engineInstance;
 
     PProfile  P, Q, P_Left, P_Right;
 
-    Short  min_Y, max_Y, top, bottom, dropouts;
+    Short  min_Y, bottom, dropouts;
+
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
+    Short  max_Y, top;
+#endif
 
     Long  x1, x2, xs;
     Short e1, e2;
@@ -2016,7 +2019,9 @@ extern TEngine_Instance engineInstance;
     /* first, compute min and max Y */
 
     P     = ras.fProfile;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     max_Y = (short)TRUNC( ras.minY );
+#endif
     min_Y = (short)TRUNC( ras.maxY );
 
     while ( P )
@@ -2024,10 +2029,14 @@ extern TEngine_Instance engineInstance;
       Q = P->link;
 
       bottom = P->start;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
       top    = P->start + P->height-1;
+#endif
 
       if ( min_Y > bottom ) min_Y = bottom;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
       if ( max_Y < top    ) max_Y = top;
+#endif
 
       P->X = 0;
       InsNew( &wait, P );
@@ -2469,21 +2478,19 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 #undef ras
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Done( )
+  void  TTRaster_Done( )
   {
     TRaster_Instance*  ras = (TRaster_Instance*)engineInstance.raster_component;
 
 
     if ( !ras )
-      return TT_Err_Ok;
+      return;
 
     GEO_FREE( ras->buffer);
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( ras );
 #endif
-
-    return TT_Err_Ok;
   }
 
 

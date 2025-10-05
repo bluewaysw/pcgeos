@@ -91,15 +91,6 @@
 
 
 /*************************************************************************/
-/* Define this if you want to generate code to support engine extensions */
-/* Default is on, but if you're satisfied by the basic services provided */
-/* by the engine and need no extensions, undefine this configuration     */
-/* macro to save a few more bytes.                                       */
-
-//#define  TT_CONFIG_OPTION_EXTEND_ENGINE
-
-
-/*************************************************************************/
 /* Define this if you want to generate code to support gray-scaling,     */
 /* a.k.a. font-smoothing or anti-aliasing. Default is on, but you can    */
 /* disable it if you don't need it.                                      */
@@ -277,6 +268,13 @@
 /*          "InterpExtra"                                                */
 
 #define   TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
+
+
+/*************************************************************************/
+/* Define this option to store the checksum of the elements in the       */
+/* table directory.                                                      */
+
+#undef TT_CONFIG_OPTION_SUPPORT_CHECKSUM
 
 /**********************************************************************/
 /*                                                                    */

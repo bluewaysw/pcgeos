@@ -298,6 +298,8 @@ GRREGIONPATHDRAWCURVETO	proc	far
 	push	ds
 	push	bp
 	push	es
+	push	si
+	push	di
 	mov	ds, cx
 	xchg	di, ax						;ds:di addr of points
 	
@@ -309,6 +311,8 @@ GRREGIONPATHDRAWCURVETO	proc	far
 	call	MemUnlock
 
 	xchg	di, ax
+	pop	di
+	pop	si
 	pop	es
 	pop	bp
 	pop	ds

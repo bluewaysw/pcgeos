@@ -165,7 +165,7 @@ extern "C" {
 
   /* Releases all resources allocated for a kerning directory.          */
   EXPORT_DEF
-  TT_Error  TT_Kerning_Directory_Done( TT_Kerning*  directory );
+  void      TT_Kerning_Directory_Done( TT_Kerning*  directory );
 
 
   /* Load the kerning table number `kern_index' in the kerning          */

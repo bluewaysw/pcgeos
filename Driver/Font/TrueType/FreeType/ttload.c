@@ -121,10 +121,15 @@
     limit = face->numTables;
     entry = face->dirTables;
 
+    /* loop through the tables and get all entries */
     for ( n = 0; n < limit; ++n )
-    {                      /* loop through the tables and get all entries */
+    {
       entry->Tag      = GET_Tag4();
+#ifdef TT_CONFIG_OPTION_SUPPORT_CHECKSUM
       entry->CheckSum = GET_ULong();
+#else
+      SKIP( 4 );
+#endif
       entry->Offset   = GET_Long();
       entry->Length   = GET_Long();
 
@@ -513,15 +518,19 @@
 #endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
-    header->Line_Gap  = GET_Short();
-
-    header->advance_Width_Max = GET_UShort();
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    header->Line_Gap  = GET_Short();
+#else
+    SKIP( 2 );
+#endif
+
+    header->advance_Width_Max      = GET_UShort();
     header->min_Left_Side_Bearing  = GET_Short();
     header->min_Right_Side_Bearing = GET_Short();
-
     header->xMax_Extent            = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
@@ -531,11 +540,12 @@
     header->Reserved2 = GET_Short();
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
-#else
-    SKIP( 20 );
-#endif
 
     header->metric_Data_Format = GET_Short();
+#else
+    SKIP( 16 );
+#endif
+
     header->number_Of_HMetrics = GET_UShort();
 
     FORGET_Frame();
@@ -754,12 +764,12 @@
  *
  *  Input  :  face     face table to look for
  *
- *  Output :  TT_Err_Ok.
+ *  Output :  void.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Free_TrueType_Names( PFace  face )
+  void  Free_TrueType_Names( PFace  face )
   {
     TName_Table*  names = &face->nameTable;
 
@@ -773,8 +783,6 @@
     names->numNameRecords = 0;
     names->format         = 0;
     names->storageOffset  = 0;
-
-    return TT_Err_Ok;
   }
 
 
@@ -1002,7 +1010,6 @@
     if ( ( i = TT_LookUp_Table( face, TTAG_OS2 ) ) < 0 )
     {
       face->os2.version = 0xFFFF;
-      error = TT_Err_Ok;
       return TT_Err_Ok;
     }
 
@@ -1015,10 +1022,10 @@
     os2->version             = GET_UShort();
     os2->xAvgCharWidth       = GET_Short();
     os2->usWeightClass       = GET_UShort();
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->ySubscriptXSize     = GET_Short();
     os2->ySubscriptYSize     = GET_Short();
     os2->ySubscriptXOffset   = GET_Short();
@@ -1030,7 +1037,7 @@
     os2->yStrikeoutSize      = GET_Short();
     os2->yStrikeoutPosition  = GET_Short();
 #else
-    SKIP( 20 );
+    SKIP( 24 );
 #endif
 
     os2->sFamilyClass        = GET_Short();
@@ -1066,25 +1073,26 @@
 
     FORGET_Frame();
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
-    if ( os2->version >= 0x0001 )
+    if ( os2->version >= 0x0002 )
     {
-      /* only version 1 tables */
 
-      if ( ACCESS_Frame( 8 ) )  /* read into frame */
+      /* only version 2 tables */
+      if ( ACCESS_Frame( 12 ) )  /* read into frame */
         return error;
 
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       os2->ulCodePageRange1 = GET_ULong();
       os2->ulCodePageRange2 = GET_ULong();
+#else
+      SKIP( 8 );
+#endif
+
+      os2->sxHeight = GET_Short();
+      os2->sCapHeight = GET_Short();   
 
       FORGET_Frame();
     }
-    else
-    {
-      os2->ulCodePageRange1 = 0;
-      os2->ulCodePageRange2 = 0;
-    }
-#endif
     
     return TT_Err_Ok;
   }
