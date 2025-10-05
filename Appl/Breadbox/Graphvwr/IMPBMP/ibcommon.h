@@ -16,15 +16,14 @@ typedef enum
 
 typedef struct
 {
-  FileHandle    IBP_source;
-  FileHandle    IBP_dest;
-  optr          IBP_status;
-  VMBlockHandle IBP_bitmap;
-  word          IBP_width;
-  word          IBP_height;
-  BMType        IBP_format;
-  char          IBP_impForm[31];
-  RGBValue      IBP_pngBlendColor;
+  FileHandle              IBP_source;
+  FileHandle              IBP_dest;
+  optr                    IBP_status;
+  VMBlockHandle           IBP_bitmap;
+  word                    IBP_width;
+  word                    IBP_height;
+  BMType                  IBP_format;
+  char                    IBP_impForm[31];
 } ImpBmpParams;
 
 typedef enum

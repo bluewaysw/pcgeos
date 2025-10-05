@@ -26,20 +26,6 @@ ASMTOOLS.eobj: ASMTOOLS/asmtoolsManager.asm \
                 Objects/gValueC.def Objects/gToolGC.def \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def
-pal.obj \
-pal.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
-                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh
-pal.obj \
-pal.eobj: geos.h heap.h gstring.h graphics.h fontID.h font.h color.h \
-                Ansi/string.h lmem.h vm.h chunkarr.h object.h geode.h \
-                Objects/helpCC.h file.h input.h char.h hwr.h win.h
-extgr.obj \
-extgr.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
-                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh
-extgr.obj \
-extgr.eobj: geos.h gstring.h graphics.h fontID.h font.h color.h \
-                chunkarr.h object.h geode.h lmem.h Objects/helpCC.h \
-                file.h input.h char.h hwr.h win.h vm.h timer.h ec.h
 bmp.obj \
 bmp.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
                 Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh
@@ -55,5 +41,19 @@ bmpRotate.obj \
 bmpRotate.eobj: geos.h gstring.h graphics.h fontID.h font.h color.h \
                 chunkarr.h object.h geode.h lmem.h Objects/helpCC.h \
                 file.h input.h char.h hwr.h win.h vm.h hugearr.h ec.h
+extgr.obj \
+extgr.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
+                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh
+extgr.obj \
+extgr.eobj: geos.h gstring.h graphics.h fontID.h font.h color.h \
+                chunkarr.h object.h geode.h lmem.h Objects/helpCC.h \
+                file.h input.h char.h hwr.h win.h vm.h timer.h ec.h
+pal.obj \
+pal.eobj: extgraph.goh Objects/winC.goh Objects/metaC.goh object.goh \
+                Objects/inputC.goh Objects/uiInputC.goh Objects/visC.goh
+pal.obj \
+pal.eobj: geos.h heap.h gstring.h graphics.h fontID.h font.h color.h \
+                Ansi/string.h lmem.h vm.h chunkarr.h object.h geode.h \
+                Objects/helpCC.h file.h input.h char.h hwr.h win.h
 
 extgraphEC.geo extgraph.geo : geos.ldf ansic.ldf 
