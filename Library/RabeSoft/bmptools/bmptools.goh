@@ -991,14 +991,14 @@ extern VMBlockHandle EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBl
 			optr progressText);
 
 /*--------------------- BTApplyTransparencyMask ---------------------
- *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken 
+ *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken
  *			from a monochrome bitmap.
  *			If no transparency mask exists yet, it will be created.
- *			The size of both bitmaps must be the same, or the result will be 
+ *			The size of both bitmaps must be the same, or the result will be
  *			unpredictable.
  *
- *	Tipp: 		To transfer (copy) a transparency mask form one colored bitmap to 
- *			 another, useBTExtractTransparencyMask() first.
+ *	Tipp: 		To transfer (copy) a transparency mask form one colored bitmap to
+ *			another, use BTExtractTransparencyMask() first.
  *
  *	Parameters:	srcFile, bmpBlock: handles of the bitmap
  *			destFile: file for the new bitmap
@@ -1006,12 +1006,14 @@ extern VMBlockHandle EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBl
  *				  Note! This will fail (return zero) if:
  *				    - the bitmap does not yet have a transparency mask
  *				    - the bitmap is compacted
- *			maskFile, maskBitmap: handle of a monochrome bitmap that holds the new mask
+ *			maskFile, maskBitmap: handles of a monochrome bitmap that holds the new mask
+ *				White pixels become transparent, black pixels become opaque.
  *				- if this bitmap is not monochrome, the result will be unpredictable
  *				- if this bitmaps size does not fit to the size of image, the result
  *				  will be unpredictable.
  *				- if this bitmap also has a mask, picture bits and mask bits will be
- *				  combinded with AND, just as we draw the bitmap.
+ *				  combinded with AND. This means that only black pixels that are not
+ * 				  masked out become opaque.
  *			progressText: optr of an text object to show progress
  *				if given, routine append dots  ('.') for every 16th line
  *				pass zero for no progress report
@@ -1039,19 +1041,19 @@ extern VMBlockHandle EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBloc
  *		progressText: optr of an text object to show progress
  *			  if given, routine append dots  ('.') for every 16th line
  *			  pass zero for no progress report
- *			
- *	If a true-color bitmap has been passed	
+ *
+ *	If a true-color bitmap has been passed
  *		redOrIndex: red color value for transparency color
  *		green:	    green color value for transparency color
  *		blue:	    blue color value for transparency color
  *		variance:   Permitted difference between the real color value and
  *			    the passed color value for red, green and blue.
  *
- *	If a 8-bit, 4-bit or monochrome bitmap has been passed	
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed
  *		redOrIndex: index of the color to make transparent
  *			    for monochrome mitmaps this may be 0 or 1
  *		green, blue and variance will be ignored
- *			
+ *
  * Example for variance:
  *		Assuming you have passed the values red = 200, green = 150, blue = 0 and
  *		a variance of 10. Then a pixel that fulfills the following conditions is
@@ -1069,23 +1071,49 @@ extern VMBlockHandle EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlo
  *	Purpose:	Copies a bitmap and removes the transparency mask, if any
  *			Also ensure that the copy is uncompressed
  *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	If a true-color bitmap has been passed
+ *		redOrIndex: red value for pixels that were transparent before
+ *		green:	    geen value for pixels that were transparent before
+ *		blue:	    blue value for pixels that were transparent before
+ *
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed
+ *		redOrIndex: index value for pixels that were transparent before
+ *			    for monochrome mitmaps this may be 0 or 1
+ *		green and blue will be ignored
+ *
+ * 	Strategy:
+ *		- if the bitmap already has no transparency mask, make a simple copy
+ *		- if there is a transparency mask:
+ *		  * fetch the palette, if any
+ *		  * create a new non-masked bitmap of same size and color depth
+ *		  * copy data over. Replace color for formerly transparent pixels.
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTCopyBitmapAndRemoveMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+ extern VMBlockHandle EXPORT BTCopyBitmapAndRemoveMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			int redOrIndex, int green, int blue, optr progressText);
 
 
 
 /*--------------------- BTBitmapFillMask ---------------------
- *	Purpose:	Makes the bitmap non transparent at all
+ *	Purpose:	Makes the bitmap transparent or non transparent at all
  *			The bitmap must already have a transparency
  *			mask and must be not compacted.
- *			
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			makeSolid: pass zero to make the bitmap transparent at all
+ *				   pass non-zero to make the bitmap non-transparent at all
+ *
  *	Return:		FALSE if successful
  *			TRUE in any case of error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock);
+extern VMBlockHandle EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, int makeSolid);
 
 
 

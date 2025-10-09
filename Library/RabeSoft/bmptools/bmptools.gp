@@ -23,7 +23,7 @@ library         ui
 
 resource DataResource      lmem read-only shared
 
-usernotes	"International version 1.0.5"
+usernotes	"International version 1.0.6"
 
 
 
