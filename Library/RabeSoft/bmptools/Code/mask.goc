@@ -51,37 +51,39 @@ void LocalSetHiddenColor24Bit(byte *maskPtr, byte *dataPtr, int width, PaletteEn
  */
 
 /*--------------------- BTApplyTransparencyColor ---------------------
- *	Purpose:	Set a all pixels that have a specified color to be transparent.
- *			If no transparency mask exists yet, it will be created.
+ * Purpose:	Set a all pixels that have a specified color to be transparent.
+ *		Pixels that are already transparent remain transparent.
+ *		If no transparency mask exists yet, it will be created.
  *
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *		Note:		- You may pass zero for destFile. In this case the bitmap
- *				  is not copied but modified instead.
- *				  Note! This will fail (return zero) if:
- *				    - the bitmap does not yet have a transparency mask
- *				    - the bitmap is compacted
- *			redOrIndex: red color value
- *				- if the bitmap not a 24 bit bitmap, redOrIndex is the
- *				  color index to be set transparent.
- *				  For monochrome bitmaps this may be 0 or 1.
- *				  NOTE: The parameters green, blue and variance are
- *				  ignored in these cases
- *			green:	green color value
- *			blue:	blue color value
- *			variance: Permitted difference between the real color value and
- *				the passed color value for red, green and blue.
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
+ * Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *		destFile: file for the new bitmap
+ *			  Pass zero to modify the passed bitmap instead of copying it.
+ *			  Note! This will fail (return zero) if:
+ *			    - the bitmap does not yet have a transparency mask
+ *			    - the bitmap is compacted
+ *		progressText: optr of an text object to show progress
+ *			  if given, routine append dots  ('.') for every 16th line
+ *			  pass zero for no progress report
+ *			
+ *	If a true-color bitmap has been passed	
+ *		redOrIndex: red color value for transparency color
+ *		green:	    green color value for transparency color
+ *		blue:	    blue color value for transparency color
+ *		variance:   Permitted difference between the real color value and
+ *			    the passed color value for red, green and blue.
  *
- *	Example for variance:
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed	
+ *		redOrIndex: index of the color to make transparent
+ *			    for monochrome mitmaps this may be 0 or 1
+ *		green, blue and variance will be ignored
+ *			
+ * Example for variance:
  *		Assuming you have passed the values red = 200, green = 150, blue = 0 and
  *		a variance of 10. Then a pixel that fulfills the following conditions is
  *		set to transparent: red 190...210 AND green 140..160 AND blue 0...10.
  *
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error  (e.g. passed zero for destFile and souce is compacted)
+ * Return:	VMBlockHandle of the new bitmap
+ *		Null handle on error  (e.g. passed zero for destFile and source is compacted)
  ---------------------------------------------------------------------------*/
 extern VMBlockHandle EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			int redOrIndex, int green, int blue, int variance,
@@ -184,10 +186,10 @@ byte *dataPtr;
 }
 
 /*--------------------- BTCopyToBitmapWithMask ---------------------
- *	Purpose:	Copies a bitmap and ensures that the copy has a transparency mask
- *			Also ensure that the copy is uncompressed
+ *	Purpose:	Copies a bitmap and ensures that the copy has a transparency mask.
+ *			Also ensure that the copy is uncompressed.
  *
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *	Parameters:	srcFile, bmpBlock: handles of the bitmap
  *			destFile: 	file for the new bitmap
  *			progressText: optr of an text object to show progress
  *				if given, routine append dots  ('.') for every 16th line
@@ -216,10 +218,12 @@ BitmapAccessRecord	srcBar, destBar;
      * Check parameters
      */
     if ( (srcFile==0) || (bmpBlock==0)|| (destFile==0) ) return 0;
+    
     /*
      * Get information about the source bitmap.
      */
     format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compact);
+    
     /*
      * See if a mask is already present. If yes, make a (uncompressed) copy
      */
@@ -231,7 +235,7 @@ BitmapAccessRecord	srcBar, destBar;
 
     /*
      * See if the bitmap is compacted. If yes, we need an uncompacted copy first.
-     * Ths copy will be the source to be copied, but it resides in the destFile.
+     * This copy will be the source to be copied, but it resides in the destFile.
      * Therefore we have to switch our "sourceFile" to the destFile in this case.
      */
     if ( compact) {
@@ -317,7 +321,7 @@ BitmapAccessRecord	srcBar, destBar;
  *			Transparent pixels will be white, not transparent pixels will be black.
  *			If no transparency mask exists yet, the monochrome bitmap will be completely black.
  *
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *	Parameters:	srcFile, bmpBlock: handles of the bitmap
  *			destFile: 	file for the new (monochrome) bitmap
  *			progressText: optr of an text object to show progress
  *				if given, routine append dots  ('.') for every 16th line
@@ -401,26 +405,26 @@ BitmapAccessRecord	srcBar, monoBar;
 }
 
 /*--------------------- BTApplyTransparencyMask ---------------------
- *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken from a monochrome
- *			bitmap.
+ *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken 
+ *			from a monochrome bitmap.
  *			If no transparency mask exists yet, it will be created.
- *			The size of both bitmaps must be the same, or the result will be unpredictable
+ *			The size of both bitmaps must be the same, or the result will be 
+ *			unpredictable.
  *
- *	Tipp: 		To transfer (copy) a transparency mask form one colored bitmap to another, use
- *			BTExtractTransparencyMask() first.
+ *	Tipp: 		To transfer (copy) a transparency mask form one colored bitmap to 
+ *			 another, useBTExtractTransparencyMask() first.
  *
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *		Note:	- You may pass zero for destFile. In this case the bitmap
- *			  is not copied but modified instead.
- *			  Note! This will fail (return zero) if:
- *				- the bitmap does not yet have a transparency mask
- *				- the bitmap is compacted
+ *	Parameters:	srcFile, bmpBlock: handles of the bitmap
+ *			destFile: file for the new bitmap
+ *				  Pass zero to modify the passed bitmap instead of copying it.
+ *				  Note! This will fail (return zero) if:
+ *				    - the bitmap does not yet have a transparency mask
+ *				    - the bitmap is compacted
  *			maskFile, maskBitmap: handle of a monochrome bitmap that holds the new mask
- *				- if the bitmap is not monochrome, the result will be unpredictable
- *				- if the bitmaps size does not fit to the size of image, the result
+ *				- if this bitmap is not monochrome, the result will be unpredictable
+ *				- if this bitmaps size does not fit to the size of image, the result
  *				  will be unpredictable.
- *				- if the bitmap also has a mask, picture bits and mask bits will be
+ *				- if this bitmap also has a mask, picture bits and mask bits will be
  *				  combinded with AND, just as we draw the bitmap.
  *			progressText: optr of an text object to show progress
  *				if given, routine append dots  ('.') for every 16th line
@@ -534,6 +538,70 @@ int mFormat, maskIsMasked, x;
  * Return:
  ---------------------------------------------------------------------------*/
 void LocalApplyTransparencyColorMono(byte *dataPtr, int width, int index) {
+int maskLen, maskBit, x;
+byte *maskPtr, *pixelPtr, bits, pixels;
+
+
+    /*
+     * initialize values and pointers
+     */
+    maskLen = (width+7)/8;
+    maskBit = 0x80;
+    maskPtr = dataPtr;
+    pixelPtr = dataPtr + maskLen;
+    bits = *maskPtr;
+    pixels = *pixelPtr;
+
+    /*
+     * Iterate over every pixel. If the color value of the bitmap fits to the passed
+     * index value, clear the corresponding mask bit.
+     */
+    for ( x = 0; x < width; x++ ) {
+
+	/*
+	 * If index is 1, the data pixel must be set, if it is 0, the data pixel
+	 * must be clear to reset the mask pixel
+	 */
+	if ( index ) {
+	    if ( pixels & maskBit ) bits &= ~maskBit;
+	} else {
+	    if ( 0 == (pixels & maskBit) ) bits &= ~maskBit;
+	}
+
+    	/* Select next pixel-bit and next mask bit */
+	maskBit >>= 1;
+
+	/* If 8 bits are handled, save mask byte select next location */
+	if ( !maskBit ) {
+	    *maskPtr = bits;
+	    maskPtr++;
+	    pixelPtr++;
+	    maskBit = 0x80;
+	    bits = *maskPtr;
+	    pixels = *pixelPtr;	    
+	}
+
+
+    }
+
+    /*
+     * Last mask byte may not be stored yet. This is the case if maskBit != 0x80
+     */
+    if ( maskBit != 0x80 ) *maskPtr = bits;
+}
+
+
+/*--------------------- LocalApplyTransparencyColorMono ---------------------
+ * Purpose:	Set pixels with the given 'color' (0 or 1) to transparent
+ * Parameters:	dataPtr: pointer to mask area, follewed by the pixel data
+ *		width: width of the bitmap
+ *		index: color value (0 or 1) to set transparent
+ * Return:
+ 
+ µµ - delme wenn fertig
+ 
+ ---------------------------------------------------------------------------*/
+void LocalApplyTransparencyColorMono_old(byte *dataPtr, int width, int index) {
 int maskLen, x;
 byte *maskPtr, *pixelPtr;
 
@@ -579,9 +647,9 @@ byte *maskPtr, *pixelPtr, bits, twoPixels;
      */
     maskLen = (width+7)/8;
     maskBit = 0x80;
-    bits = 0xFF;
     maskPtr = dataPtr;
     pixelPtr = dataPtr + maskLen;
+    bits = *maskPtr;
 
     /*
      * Iterate over every pixel. If the color value of the bitmap fits to the passed
@@ -598,7 +666,7 @@ byte *maskPtr, *pixelPtr, bits, twoPixels;
 	if ( x & 1 ) {
 	    /* odd pixel - check index and move the pixel pointer */
 	    if ( (twoPixels & 0x0F) == index ) {
-		bits ^= maskBit;			/* Clear the corresponding mask bit */
+		bits &= ~maskBit;			/* Clear the corresponding mask bit */
 		}
 
 	    /* Move pointer to next two pixels and fetch it */
@@ -609,7 +677,7 @@ byte *maskPtr, *pixelPtr, bits, twoPixels;
     	{
     	    /* even pixel - check index only */
 	    if ( (twoPixels >> 4) == index ) {
-		bits ^= maskBit;			/* Clear the corresponding mask bit */
+		bits &= ~maskBit;			/* Clear the corresponding mask bit */
 		}
 	}
 
@@ -621,7 +689,7 @@ byte *maskPtr, *pixelPtr, bits, twoPixels;
 	    *maskPtr = bits;
 	    maskPtr++;
 	    maskBit = 0x80;
-	    bits = 0xFF;
+	    bits = *maskPtr;
 	}
 
 
@@ -651,9 +719,9 @@ byte *maskPtr, *pixelPtr, bits;
      */
     maskLen = (width+7)/8;
     maskBit = 0x80;
-    bits = 0xFF;
     maskPtr = dataPtr;
     pixelPtr = dataPtr + maskLen;
+    bits = *maskPtr;
 
     /*
      * Iterate over every pixel. If the color value of the bitmap fits to the passed
@@ -665,7 +733,7 @@ byte *maskPtr, *pixelPtr, bits;
     	if ( *pixelPtr == index ) {
 
     	    /* Clear the corresponding mask bit */
-    	    bits ^= maskBit;
+    	    bits &= ~maskBit;
     	    }
 
     	/* Select next pixel and next mask bit */
@@ -677,7 +745,7 @@ byte *maskPtr, *pixelPtr, bits;
 	    *maskPtr = bits;
 	    maskPtr++;
 	    maskBit = 0x80;
-	    bits = 0xFF;
+	    bits = *maskPtr;
 	}
 
 
@@ -709,10 +777,10 @@ PaletteEntry *pixelPtr, rgbVal;
      */
     maskLen = (width+7)/8;
     maskBit = 0x80;
-    bits = 0xFF;
     maskPtr = dataPtr;
     pixelPtr = (void*) (dataPtr + maskLen);
-
+    bits = *maskPtr;
+    
     /*
      * Iterate over every pixel. If the color value of the bitmap fits to the passed
      * index value, clear the corresponding mask bit.
@@ -736,7 +804,7 @@ PaletteEntry *pixelPtr, rgbVal;
 	     * All checks passed
     	     * Clear the corresponding mask bit
     	     */
-    	    bits ^= maskBit;
+    	    bits &= ~maskBit;
     	} while (FALSE);
 
 
@@ -749,7 +817,7 @@ PaletteEntry *pixelPtr, rgbVal;
 	    *maskPtr = bits;
 	    maskPtr++;
 	    maskBit = 0x80;
-	    bits = 0xFF;
+	    bits = *maskPtr;
 	}
 
 
@@ -919,6 +987,49 @@ PaletteEntry	rgbColor;
 
 
     return newBmp;
+}
+
+/*--------------------- BTBitmapFillMask ---------------------
+ *	Purpose:	Makes the bitmap non transparent at all
+ *			The bitmap must already have a transparency
+ *			mask and must be not compacted.
+ *			
+ *	Return:		FALSE if successful
+ *			TRUE in any case of error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock) {
+int format, width, height, compact;
+int y, maskLen;
+byte *maskPtr;
+BitmapAccessRecord	bar;
+
+    /*
+     * Check parameters
+     */
+    if ( (srcFile==0) || (bmpBlock==0) ) return TRUE;
+
+    /*
+     * Get information about the source bitmap and check conditions
+     */
+    format = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, &compact);
+    if ( (format & BMT_MASK) == 0 )  return TRUE;
+    if (compact) return TRUE;
+    
+    /*
+     * Now fill mask
+     */
+    maskLen =(width+7)/8;
+    maskPtr = BTBitmapLock(srcFile, bmpBlock, &bar, 0);
+
+    for ( y = 0; y < height; y++ ) {
+	memset(maskPtr, 0xFF, maskLen);
+	maskPtr = BTBitmapNext(&bar, FALSE);
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+  
+    return FALSE;
+    
 }
 
 
@@ -1217,7 +1328,7 @@ byte *maskPtr, *pixelPtr, bits, twoPixels;
 	if ( x & 1 ) {
 	    /* odd pixel - check index and move the pixel pointer */
 	    if ( (twoPixels & 0x0F) == index ) {
-		bits ^= maskBit;			/* Clear the corresponding mask bit */
+		bits &= ~maskBit;			/* Clear the corresponding mask bit */
 		}
 
 	    /* Move pointer to next two pixels and fetch it */
@@ -1228,7 +1339,7 @@ byte *maskPtr, *pixelPtr, bits, twoPixels;
     	{
     	    /* even pixel - check index only */
 	    if ( (twoPixels >> 4) == index ) {
-		bits ^= maskBit;			/* Clear the corresponding mask bit */
+		bits &= ~maskBit;			/* Clear the corresponding mask bit */
 		}
 	}
 
@@ -1284,7 +1395,7 @@ byte *maskPtr, *pixelPtr, bits;
     	if ( *pixelPtr == index ) {
 
     	    /* Clear the corresponding mask bit */
-    	    bits ^= maskBit;
+    	    bits &= ~maskBit;
     	    }
 
     	/* Select next pixel and next mask bit */
@@ -1355,7 +1466,7 @@ PaletteEntry *pixelPtr, rgbVal;
 	     * All checks passed
     	     * Clear the corresponding mask bit
     	     */
-    	    bits ^= maskBit;
+    	    bits &= ~maskBit;
     	} while (FALSE);
 
 
