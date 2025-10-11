@@ -529,68 +529,6 @@ BitmapAccessRecord	srcBar, destBar;
      return newBitmap;
 }
 
-/*--------------------- BTFlipBitmap ---------------------
- *	Purpose:	Flip an uncompressed bitmap vertically (top to bottom)
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *	Return: 	VMHandle of the new bitmap
- *			Null handle on error (e.g., bitmap is compressed)
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTFlipBitmap(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile) {
-Boolean	compact, hasPalette;
-int width, height, type, line;
-VMBlockHandle	newBitmap;
-BitmapAccessRecord	srcBar, destBar;
-byte	*palPtr;
-
-     if ( !(srcFile && bmpBlock && destFile) ) return 0;	// Parameter error
-
-     /* Informationen Åber die Quell-Bitmap ermittelm */
-     type = BTGetMoreBitmapInfos(srcFile, bmpBlock, &width, &height, (int*)&compact);
-     if ( compact ) return 0;
-
-//     masked = type & BMT_MASK;
-     hasPalette = type & BMT_PALETTE;
-//     format = type & BMT_FORMAT;
-
-     /* If present: retrieve palette */
-     if ( hasPalette )	{
-	int numColors;
-	switch ( type & BMT_FORMAT ) {
-		case BMF_MONO: numColors = 2; break;
-		case BMF_4BIT: numColors = 16; break;
-		case BMF_8BIT: numColors = 256; break;
-		default: numColors = 0;
-		}
-	palPtr = malloc( sizeof(PaletteEntry) * 256 );
-	BTGetBitmapPalette(srcFile, bmpBlock, (PaletteEntry *)palPtr, numColors);
-	}
-     else palPtr = 0;
-
-     /* Create new bitmap, release palette if necessary */
-     newBitmap = BTCreateOffscreenBitmap(destFile,
-			type, width, height, (PaletteEntry *)palPtr);
-     if ( palPtr )  free(palPtr);
-     if (!newBitmap) return 0;
-
-
-   /* Copy graphic data ñ */
-
-     BTBitmapLock(srcFile, bmpBlock, &srcBar, 0);
-     BTBitmapLock(destFile, newBitmap, &destBar, height-1);
-
-     for ( line = 0; line < height; line++) {
-	// copy data line by line
-	memcpy(destBar.linePtr, srcBar.linePtr, destBar.lineLen);
-	BTBitmapPrev(&destBar, TRUE);
-	BTBitmapNext(&srcBar, FALSE);
-	}
-
-     BTBitmapUnlock(&srcBar, FALSE);
-     BTBitmapUnlock(&destBar, TRUE);
-
-     return newBitmap;
-}
 
 /*--------------------- BTCopyBitmap ---------------------
  *	Purpose:	Copy a bitmap into (another) file
