@@ -11,7 +11,8 @@
  * REVISION HISTORY:
  *	Date	  Name	    Description
  *	----	  ----	    -----------
- *	12/5/22	  JK	    Initial version
+ *	05.12.22  JK	    Initial version
+ *      21.09.25  JK        refactoring
  *
  * DESCRIPTION:
  *	Structures and definitions for mapping character from FreeGEOS 
@@ -23,24 +24,6 @@
 #include <geos.h>
 #include <freetype.h>
 #include "ttadapter.h"
-
-
-typedef ByteFlags CharMapFlags;
-#define CMF_CAP         0x10
-#define CMF_ASCENT      0x08
-#define CMF_DESCENT     0x04
-#define CMF_MEAN        0x02
-#define CMF_ACCENT      0x01
-
-
-/*
- * Entry for converting FreeGEOS chars to unicode. 
- */
-typedef struct 
-{
-        word            unicode;
-        CharMapFlags    flags;
-} CharMapEntry;
 
 
 /*
@@ -68,8 +51,6 @@ word  GeosCharToUnicode( const word  geosChar );
 
 word  CountValidGeosChars( const TT_CharMap  map, 
                            char*  firstChar, char*  lastChar );
-
-CharMapFlags  GeosCharMapFlag( const word  geosChar );
 
 MemHandle  CreateIndexLookupTable( const TT_CharMap  map );
 
