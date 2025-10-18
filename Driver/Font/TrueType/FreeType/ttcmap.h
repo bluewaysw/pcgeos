@@ -118,7 +118,9 @@
     UShort  platformEncodingID;
     UShort  format;
     UShort  length;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     UShort  version;
+#endif
 
     Bool    loaded;
     ULong   offset;

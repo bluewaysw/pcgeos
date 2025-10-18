@@ -910,7 +910,9 @@
 
       cmap->format  = GET_UShort();
       cmap->length  = GET_UShort();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       cmap->version = GET_UShort();
+#endif
 
       FORGET_Frame();
 
