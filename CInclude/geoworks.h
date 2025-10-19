@@ -17,7 +17,7 @@ DESCRIPTION:
 	is an enumeration defined by the manufacturer identified by the
 	first word.  This file contains the enumerations for Geoworks's
 	own ManufacturerID of MANUFACTURER_ID_GEOWORKS.
-	
+
 	NOTE:  Any developer assigned a ManufacturerID should have a file
 	       similar to this one, named after their own company, for the
 	       purpose of defining the meaning of enumerations when that
@@ -34,7 +34,7 @@ DESCRIPTION:
 	       for a library-specific definition file;  Constants & structures
 	       pertinent to a specific library belong in a specific include
 	       file for that library.
-	       
+
 	$Id: geoworks.h,v 1.1 97/04/04 15:57:07 newdeal Exp $
 
 ----------------------------------------------------------------------------*/
@@ -65,7 +65,7 @@ typedef enum /* word */ {
     GWNT_GEN_CONTROL_NOTIFY_STATUS_CHANGE,
 
     GWNT_SELECT_STATE_CHANGE,
-    GWNT_UNDO_STATE_CHANGE,    
+    GWNT_UNDO_STATE_CHANGE,
 
     GWNT_STYLE_CHANGE,
     GWNT_STYLE_SHEET_CHANGE,
@@ -152,7 +152,7 @@ typedef enum /* word */ {
 
     GWNT_TEXT_NAME_CHANGE,
     GWNT_CARD_BACK_CHANGE,
-    
+
     GWNT_TEXT_OBJECT_HAS_FOCUS,
     GWNT_TEXT_CONTEXT,
     GWNT_TEXT_REPLACE_WITH_HWR,
@@ -279,7 +279,7 @@ typedef enum /* word */ {
     GWNT_LOGIN_INITIALIZE,
     GWNT_LOGIN_ATTACH,
     GWNT_LOGIN_DETACH,
-    
+
     GWNT_PENELOPE_HARDWARE_NOTIFICATION,
     GWNT_PENELOPE_RADIO_STATUS_NOTIFICATION,
 
@@ -443,7 +443,7 @@ typedef enum /* word */ {
     GAGCNLT_NOTIFY_HELP_CONTEXT_CHANGE = 0x68a0,
 
     GAGCNLT_FLOAT_FORMAT_INIT = 0x68a2,
-    
+
     GAGCNLT_ALWAYS_INTERACTABLE_WINDOWS = 0x68a4,
     GAGCNLT_USER_DO_DIALOGS = 0x68a6,
 
@@ -461,7 +461,7 @@ typedef enum /* word */ {
     GAGCNLT_NOTIFY_CONTENT_BOOK_CHANGE = 0x68be,
     GAGCNLT_APP_TARGET_NOTIFY_HYPERLINK_STATUS_CHANGE = 0x68c0,
     GAGCNLT_NOTIFY_NAVIGATE_ENTRY_CHANGE = 0x68c2,
-    
+
     GAGCNLT_FOAM_NOTIFICATIONS = 0x68c4,
 
     GAGCNLT_FULL_SCREEN_EXCL_CHANGE = 0x68c6,
@@ -497,7 +497,9 @@ typedef enum /* word */ {
     CIF_GEODEX,
     CIF_BITMAP,
     CIF_SOUND_SYNTH,
-    CIF_SOUND_SAMPLE
+    CIF_SOUND_SAMPLE,
+    CIF_ICON_LIST,
+    CIF_FAX_FILE_PAGE_WITH_INK
 } ClipboardItemFormat;
 
 /*
