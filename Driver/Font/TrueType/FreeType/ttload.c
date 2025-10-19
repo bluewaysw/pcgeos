@@ -224,8 +224,8 @@
      
     /* We also increase maxPoints and maxContours in order to support */
     /* some broken fonts.                                             */
-    face->maxPoints   += 8;
-    face->maxContours += 4;
+    face->maxPoints   += 4;
+    face->maxContours += 2;
 
     return TT_Err_Ok;
   }
