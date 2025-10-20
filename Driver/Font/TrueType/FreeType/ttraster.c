@@ -333,7 +333,7 @@ extern TEngine_Instance engineInstance;
 /*                                                                      */
 /************************************************************************/
 
-  static void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
+  static inline void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
   {
     if ( y_ppem < 24 )
     {
