@@ -220,11 +220,16 @@ extern TEngine_Instance engineInstance;
 
 /* NOTE: These operations are only valid on 2's complement processors */
 
-#define FLOOR( x )    ( (x) & -ras.precision )
-#define CEILING( x )  ( ((x) + ras.precision - 1) & -ras.precision )
-#define TRUNC( x )    ( (signed long)(x) >> ras.precision_bits )
-#define FRAC( x )     ( (x) & (ras.precision - 1) )
-#define SCALED( x )   ( ((x) << ras.precision_shift) - ras.precision_half )
+#define PRECISION_BITS  8
+#define PRECISION       ( 1 << PRECISION_BITS )
+#define PRECISION_HALF  ( PRECISION >> 1 )
+#define PRECISION_SHIFT ( PRECISION_BITS - Pixel_Bits )
+
+#define FLOOR( x )    ( (x) & -PRECISION )
+#define CEILING( x )  ( ((x) + PRECISION - 1) & -PRECISION )
+#define TRUNC( x )    ( (signed long)(x) >> PRECISION_BITS )
+#define FRAC( x )     ( (x) & (PRECISION - 1) )
+#define SCALED( x )   ( ((x) << PRECISION_SHIFT) - PRECISION_HALF )
 
 #ifdef DEBUG_RASTER
 #define DEBUG_PSET  Pset()
@@ -247,10 +252,6 @@ extern TEngine_Instance engineInstance;
 
   struct  TRaster_Instance_
   {
-    Int       precision_bits;       /* precision related variables */
-    Int       precision;
-    Int       precision_half;
-    Int       precision_shift;
     Int       precision_step;
 
     MemHandle buffer;               /* The profiles bufferblock     */
@@ -337,18 +338,12 @@ extern TEngine_Instance engineInstance;
   {
     if ( y_ppem < 24 )
     {
-      ras.precision_bits   = 10;
       ras.precision_step   = 128;
     }
     else
     {
-      ras.precision_bits   = 6;
       ras.precision_step   = 32;
     }
-
-    ras.precision       = 1 << ras.precision_bits;
-    ras.precision_half  = ras.precision >> 1;
-    ras.precision_shift = ras.precision_bits - Pixel_Bits;
   }
 
 
@@ -660,7 +655,6 @@ extern TEngine_Instance engineInstance;
 
     if ( y2 > maxy )
     {
-      /* x2 += FMulDiv( Dx, maxy - y2, Dy );  UNNECESSARY */
       e2  = TRUNC( maxy );
       f2  = 0;
     }
@@ -673,7 +667,7 @@ extern TEngine_Instance engineInstance;
     if ( f1 > 0 )
     {
       if ( e1 == e2 ) return SUCCESS;
-      x1 += FMulDiv( Dx, ras.precision - f1, Dy );
+      x1 += FMulDiv( Dx, PRECISION - f1, Dy );
       ++e1;
     }
     else if ( ras.joint )
@@ -697,8 +691,8 @@ extern TEngine_Instance engineInstance;
       return FAILURE;
     }
 
-    Ix = (ras.precision * Dx) / Dy;
-    Rx = (ras.precision * Dx) % Dy;
+    Ix = (PRECISION * Dx) / Dy;
+    Rx = (PRECISION * Dx) % Dy;
     Dx = (Dx > 0) ? 1 : -1;
 
     Ax  = -Dy;
@@ -793,7 +787,7 @@ extern TEngine_Instance engineInstance;
 
         DEBUG_PSET;
 
-        e += ras.precision;
+        e += PRECISION;
       }
     }
 
@@ -836,7 +830,7 @@ extern TEngine_Instance engineInstance;
                                        y2 - y1 );
 
           arc -= 2;
-          e   += ras.precision;
+          e   += PRECISION;
         }
       }
       else
@@ -846,7 +840,7 @@ extern TEngine_Instance engineInstance;
           ras.joint  = TRUE;
           *top++     = arc[0].x;
 
-          e += ras.precision;
+          e += PRECISION;
         }
         arc -= 2;
       }
@@ -1431,7 +1425,7 @@ extern TEngine_Instance engineInstance;
 
     e1 = TRUNC( CEILING( x1 ) );
 
-    if ( x2-x1-ras.precision <= 1 )
+    if ( x2-x1- PRECISION <= 1 )
       e2 = e1;
     else
       e2 = TRUNC( FLOOR( x2 ) );
@@ -1477,7 +1471,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 > e2 )
     {
-      if ( e1 == e2 + ras.precision )
+      if ( e1 == e2 + PRECISION )
       {
         switch ( ras.dropOutControl )
         {
@@ -1516,7 +1510,6 @@ extern TEngine_Instance engineInstance;
           /*           bit problem in the '7' of verdana 10pts, but   */
           /*           makes a new one in the 'C' of arial 14pts      */
 
-          /* if ( x2-x1 < ras.precision_half ) */
           {
             /* upper stub test */
 
@@ -1686,7 +1679,7 @@ extern TEngine_Instance engineInstance;
     PByte  bits;
 
 
-    if ( x2-x1 < ras.precision )
+    if ( x2-x1 < PRECISION )
     {
       e1 = CEILING( x1 );
       e2 = FLOOR  ( x2 );
@@ -1720,7 +1713,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 > e2 )
     {
-      if ( e1 == e2 + ras.precision )
+      if ( e1 == e2 + PRECISION )
       {
         switch ( ras.dropOutControl )
         {
@@ -2132,13 +2125,13 @@ extern TEngine_Instance engineInstance;
             x2 = xs;
           }
 
-          if ( x2-x1 <= ras.precision )
+          if ( x2-x1 <= PRECISION )
           {
             e1 = FLOOR( x1 );
             e2 = CEILING( x2 );
 
             if ( ras.dropOutControl != 0 &&
-                 (e1 > e2 || e2 == e1 + ras.precision) )
+                 (e1 > e2 || e2 == e1 + PRECISION ) ) 
             {
               /* a drop out was detected */
 
@@ -2267,8 +2260,8 @@ Scan_DropOuts :
 
     while ( band_top >= 0 )
     {
-      ras.maxY = (Long)ras.band_stack[band_top].y_max * ras.precision;
-      ras.minY = (Long)ras.band_stack[band_top].y_min * ras.precision;
+      ras.maxY = (Long)ras.band_stack[band_top].y_max * PRECISION;
+      ras.minY = (Long)ras.band_stack[band_top].y_min * PRECISION;
 
       ras.top = MemDeref( ras.buffer );
 
