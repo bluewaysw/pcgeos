@@ -329,13 +329,11 @@ extern TEngine_Instance engineInstance;
   static inline void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
   {
     if ( y_ppem < 24 )
-    {
       ras.precision_step   = 128;
-    }
-    else
-    {
+    else if ( y_ppem < 48 )
+      ras.precision_step   = 64;
+    else  
       ras.precision_step   = 32;
-    }
   }
 
 
