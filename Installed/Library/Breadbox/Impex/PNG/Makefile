@@ -4,14 +4,14 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = png
-XLAT            = exp.goc imp.goc
 API             = apiManager.asm ui.goc
+XLAT            = exp.goc imp.goc
 UI_TO_RDFS      =
-OBJS            = exp.obj imp.obj ui.obj
+OBJS            = ui.obj exp.obj imp.obj
 COMMON          =
 MODULES         = API
-CMODULES        = Xlat API
-SRCS            = $(XLAT) $(API) $(COMMON)
+CMODULES        = API Xlat
+SRCS            = $(API) $(XLAT) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = png

@@ -5,11 +5,11 @@
 #
 GEODE           = extgraph
 ASMTOOLS        = asmtoolsManager.asm
-BMP             = bmp.goc bmpRotate.goc
+BMP             = bmpRotate.goc bmp.goc
 EXTGR           = extgr.goc
 PAL             = pal.goc
 UI_TO_RDFS      =
-OBJS            = bmp.obj bmpRotate.obj extgr.obj pal.obj
+OBJS            = bmpRotate.obj bmp.obj extgr.obj pal.obj
 COMMON          =
 MODULES         = ASMTOOLS
 CMODULES        = BMP EXTGR PAL
