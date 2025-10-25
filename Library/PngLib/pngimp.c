@@ -1,0 +1,1242 @@
+/********************************************************************
+ A simple and pretty incomplete PNG import libray for PC/GEOS.
+ Started in 08/2024 by MeyerK for the FreeGEOS project.
+
+ The code itself was written from scratch - relying heavily
+ on ChatGPT for the PNG-specific parts.
+ *******************************************************************/
+
+/* Include our API */
+#include <pnglib.h>
+#include "common.h"
+
+/* some forward declarations for internal functions */
+int nextIDATChunk(pngIDATState* state);
+static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes);
+
+/* Reading and processing a complete PNG file */
+VMBlockHandle _pascal _export pngImportConvertFile(FileHandle fileHan, VMFileHandle vmFile, pngAlphaTransformData* pngAlphaTransform)
+{
+    pngIHDRData ihdrData = {0};
+    VMBlockHandle vmBlock = NullHandle;
+    MemHandle idatChunksHan = NullHandle; /* this is freed via pngImportCleanupIDATProcessingState! */
+    int idatNumChunks = 0;
+    pngPLTEChunkEntry plteChunk = {0};
+    pngIDATState state = {0};
+    BMFormat fmt = 0;
+
+    if (pngImportCheckHeader(fileHan))
+    {
+        /* Read PNG Chunks, get overview */
+        if (pngImportProcessChunks(fileHan, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
+        {
+            fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth, pngAlphaTransform);
+            if (fmt != 0)
+            {
+                /* Initialize output bitmap */
+                vmBlock = pngImportInitiateOutputBitmap(vmFile, ihdrData, fmt);
+
+                /* transfers only if a palette exists, also creates palettes for grayscale images */
+                pngImportHandlePalette(fileHan, plteChunk, vmFile, vmBlock, ihdrData.colorType, ihdrData.bitDepth);
+
+                /* Initialize the IDAT state */
+                pngImportInitIDATProcessingState(&state, fileHan, idatChunksHan, idatNumChunks, ihdrData);
+
+                /* Process each scanline */
+                while (pngImportGetNextIDATScanline(&state) == 1)
+                {
+                    pngImportIDATProcessingUnlockHandles(&state);
+
+                    pngImportApplyGEOSFormatTransformations(&state, pngAlphaTransform);
+
+                    /* Write the processed scanline (without the filter byte) to the VMFile */
+                    pngImportWriteScanlineToBitmap(vmFile, vmBlock, state.lineNo - 1, state.currentRow);
+
+                    pngImportIDATProcessingLockHandles(&state);
+                }
+
+                /* Clean up resources */
+                pngImportCleanupIDATProcessingState(&state);
+
+                return vmBlock;
+            }
+        }
+    }
+
+    return NullHandle;
+}
+
+/* check PNG Header */
+int _pascal _export pngImportCheckHeader(FileHandle file)
+{
+    unsigned char header[sizeof(PNG_SIGNATURE)] = {0};
+
+    /* Read first 8 bytes */
+    if (FileRead(file, header, sizeof(PNG_SIGNATURE), FALSE) != sizeof(PNG_SIGNATURE))
+    {
+        return 0; /* file not long enough, no PNG */
+    }
+
+    /* Compare first 8 bytes with PNG-signature */
+    if (memcmp(header, PNG_SIGNATURE, sizeof(PNG_SIGNATURE)) != 0)
+    {
+        return 0; /* no PNG signature */
+    }
+
+    /* a PNG-signature it is */
+    return 1;
+}
+
+/* main function for processing PNG-Chunks */
+int _pascal _export pngImportProcessChunks(FileHandle file, pngIHDRData* ihdrData, MemHandle* idatChunksHan, int *idatNumChunks, pngPLTEChunkEntry* plteChunk)
+{
+    pngChunkHeader chdr = {0};
+    int idatChunkIdx = 0;
+    pngIDATChunkEntry* idatChunks;
+    unsigned int bytesRead = 0;
+    unsigned int headerSize = sizeof(pngIHDRData);
+    unsigned int lineSize = 0;
+
+	 /* make sure we start at the beginning, but after the PNG header */
+	FilePos(file, sizeof(PNG_SIGNATURE), FILE_POS_START);
+
+    while (FileRead(file, &chdr, sizeof(pngChunkHeader), FALSE))
+    {
+        /* Swap endianness for chunk length and type */
+        chdr.length = swapEndian(chdr.length);
+        chdr.type = swapEndian(chdr.type);
+
+        switch (chdr.type)
+        {
+            case PNG_CHUNK_IHDR:
+            {
+                /* read file */
+                bytesRead = FileRead(file, ihdrData, headerSize, FALSE);
+                if (bytesRead != headerSize)
+                    return 0;
+
+                /* we don't support interlacing (yet?) */
+                if (ihdrData->interlaceMethod != 0)
+                    return 0;
+
+                ihdrData->width = swapEndian(ihdrData->width);
+                ihdrData->height = swapEndian(ihdrData->height);
+
+                lineSize = pngCalcBytesPerRow(ihdrData->width, ihdrData->colorType, ihdrData->bitDepth);
+                if (lineSize > PNG_MAX_SCANLINE_SIZE)
+                    return 0;
+
+                /* now that we seem to have a valid IHDR, create the memory for an array of IDATChunks */
+                *idatChunksHan = MemAlloc(PNG_MAX_IDAT_CHUNKS * sizeof(pngIDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
+
+                /* Move file pointer forward by the remaining part of the IHDR chunk */
+                FilePos(file, chdr.length - sizeof(pngIHDRData), FILE_POS_RELATIVE);
+
+                break;
+            }
+
+            case PNG_CHUNK_PLTE:
+            {
+                /* Read PLTE chunk */
+                plteChunk->length = chdr.length;
+                plteChunk->chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); /* Store current position */
+
+                /* Skip the PLTE chunk's data only, but not the CRC (CRC will be skipped outside the switch) */
+                FilePos(file, chdr.length, FILE_POS_RELATIVE);
+
+                break;
+            }
+
+            case PNG_CHUNK_IDAT:
+            {
+                if (idatChunkIdx < PNG_MAX_IDAT_CHUNKS) /* Prevent buffer overflow */
+                {
+                    idatChunks = MemLock(*idatChunksHan);
+                    idatChunks[idatChunkIdx].length = chdr.length;
+                    idatChunks[idatChunkIdx].chunkPos = FilePos(file, 0, FILE_POS_RELATIVE); /* Store current position */
+                    MemUnlock(*idatChunksHan);
+
+                    idatChunkIdx++;
+                    *idatNumChunks = idatChunkIdx;
+                }
+                else
+                {
+                    /* Handle error: too many IDAT chunks */
+                    if (*idatChunksHan != NullHandle) MemFree(*idatChunksHan);
+                    return 0;
+                }
+
+                /* Skip the IDAT chunk's data only, but not the CRC (CRC will be skipped outside the switch) */
+                FilePos(file, chdr.length, FILE_POS_RELATIVE);
+                break;
+            }
+
+            case PNG_CHUNK_IEND:
+            {
+                /* Stop processing at IEND */
+                return 1;
+            }
+
+            default:
+            {
+                /* Skip unknown chunks */
+                FilePos(file, chdr.length, FILE_POS_RELATIVE);
+                break;
+            }
+        }
+
+        /* Skip the CRC (4 bytes) for all chunks */
+        FilePos(file, 4, FILE_POS_RELATIVE);
+    }
+
+    if (*idatChunksHan != NullHandle) MemFree(*idatChunksHan);
+    return 0;
+}
+
+/* init the IDAT processing structure */
+void _pascal _export pngImportInitIDATProcessingState(pngIDATState* state, FileHandle file, MemHandle idatChunksHan, int idatNumChunks, pngIHDRData ihdr)
+{
+    /* how many bytes to allocate for a scanline */
+    unsigned long allocSize = NULL;
+    pngIDATChunkEntry* idatChunks;
+
+    /* Initialize the zlib stream */
+    state->strm.zalloc = Z_NULL;
+    state->strm.zfree = Z_NULL;
+    state->strm.opaque = Z_NULL;
+    state->strm.avail_in = 0;
+    state->strm.next_in = Z_NULL;
+
+    inflateInit2(&state->strm, 15);
+    /* inflateInit2(&state.strm, 15 + 32); */
+
+    /* memory for the input data from file to zlib */
+    state->inHan = MemAlloc(PNG_CHUNK_SIZE_IN, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state->in = MemLock(state->inHan);
+    state->inOff = 0;
+
+    /* memory for what zlib decodes */
+    state->outHan = MemAlloc(PNG_CHUNK_SIZE_OUT, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    state->out = MemLock(state->outHan);
+    state->outOff = 0;
+
+    /* how many bytes in a pixel, how many bytes in a row? */
+    state->bytesPerPixel = pngCalcBytesPerPixel(ihdr.colorType, ihdr.bitDepth);
+    state->rowBytes = pngCalcBytesPerRow(ihdr.width, ihdr.colorType, ihdr.bitDepth);
+
+    /* determine how much memory to allocate per line, this is NOT always the same */
+    /* as "rowBytes" */
+    allocSize = pngCalcLineAllocSize(ihdr.width, ihdr.colorType, ihdr.bitDepth);
+
+    /* Allocate memory for the zlib-decoded and unfiltered current row, raw pixel data */
+    state->currentRowHan = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); /* +1 for filter byte */
+    state->currentRow = MemLock(state->currentRowHan);
+
+    /* Allocate memory for the previous row - needed for the PNG unfilter mechanism */
+    state->previousRowHandle = MemAlloc(allocSize, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); /* +1 for filter byte */
+    state->previousRow = MemLock(state->previousRowHandle);
+
+    state->rowBufferOffset = 0;
+    state->lineNo = 0;
+    state->file = file;
+    state->ihdr = ihdr;
+    state->have = 0;
+    state->outBufferPos = 0;
+
+    state->idatNumChunks = idatNumChunks;
+    state->idatChunkIdx = 0;
+    state->idatChunksHan = idatChunksHan;
+
+    idatChunks = MemLock(state->idatChunksHan);
+    state->length = idatChunks[state->idatChunkIdx].length;
+    FilePos(state->file, idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
+    MemUnlock(idatChunksHan);
+}
+
+/* temporarily unlock the memory not needed for just putting out the pixels we just decoded */
+/* NOTE: currentRow stays locked for further processing */
+void _pascal _export pngImportIDATProcessingUnlockHandles(pngIDATState* state)
+{
+    state->inOff = state->strm.next_in - MemDeref(state->inHan);
+    MemUnlock(state->inHan);
+
+    state->outOff = state->strm.next_out - MemDeref(state->outHan);
+    MemUnlock(state->outHan);
+
+    MemUnlock(state->previousRowHandle);
+}
+
+/* relock the memory needed for further IDAT chunk processing */
+void _pascal _export pngImportIDATProcessingLockHandles(pngIDATState* state)
+{
+    state->in = MemLock(state->inHan);
+    state->strm.next_in = state->in + state->inOff;
+
+    state->out = MemLock(state->outHan);
+    state->strm.next_out = state->out + state->outOff;
+
+    state->previousRow = MemLock(state->previousRowHandle);
+}
+
+/* Processing of IDAT-Chunks */
+int _pascal _export pngImportGetNextIDATScanline(pngIDATState* state)
+{
+    unsigned long have;  /* Amount of data decompressed into the output buffer */
+    unsigned char *src;  /* Pointer to the current position in the output buffer */
+    int ret;  /* Return value of the zlib inflate function */
+
+    unsigned long rowBytes = state->rowBytes;  /* Total number of bytes per scanline (excluding the filter byte) */
+
+    do
+    {
+        /* If there is previously decompressed data remaining in the output buffer, process it first */
+        if (state->have > 0)
+        {
+            src = state->out + state->outBufferPos;  /* Start processing from where we left off in the output buffer */
+            have = state->have;  /* Set the remaining decompressed data to be processed */
+
+            /* Loop to process the remaining data in the output buffer */
+            while (have > 0)
+            {
+                /* Calculate how many bytes to copy into the row buffer (excluding the filter byte) */
+                unsigned long toCopy = (rowBytes + 1 - state->rowBufferOffset) < have ? (rowBytes + 1 - state->rowBufferOffset) : have;
+                memcpy(state->currentRow + state->rowBufferOffset, src, toCopy);  /* Copy data from output buffer to row buffer */
+                state->rowBufferOffset += toCopy;  /* Update the row buffer offset */
+                src += toCopy;  /* Move source pointer forward */
+                have -= toCopy;  /* Decrease the remaining data to be processed */
+
+                /* If we have a full scanline (including the filter byte), process the scanline */
+                if (state->rowBufferOffset == rowBytes + 1)
+                {
+                    /* Unfilter the scanline using the previous row's data */
+                    unfilterRow(state->currentRow, state->previousRow, state->bytesPerPixel, rowBytes);
+
+                    /* Move the pixel data in the row buffer to skip the filter byte */
+                    memmove(state->currentRow, state->currentRow + 1, rowBytes);
+
+                    /* Save the current scanline (after unfiltering) to use in the next unfilter operation */
+                    memcpy(state->previousRow, state->currentRow, rowBytes);
+
+                    /* Reset the row buffer offset for the next scanline */
+                    state->rowBufferOffset = 0;
+
+                    /* Store the remaining data in the output buffer for the next call */
+                    state->have = have;
+                    state->outBufferPos = src - state->out;  /* Update the position in the output buffer */
+
+                    state->lineNo++;  /* Increment the line number (note: NOT zero-based) */
+
+                    return 1;  /* Successfully processed one scanline */
+                }
+            }
+
+            /* If all remaining decompressed data has been processed, reset the state */
+            state->have = 0;
+            state->outBufferPos = 0;
+        }
+
+        /* If there is still data to read from the file or data left in the zlib stream, continue processing */
+        while (state->length > 0 || state->strm.avail_in > 0)
+        {
+            /* If there is no more input data in the zlib stream, read more from the file */
+            if (state->strm.avail_in == 0 && state->length > 0)
+            {
+                unsigned long bytesToRead = (state->length < PNG_CHUNK_SIZE_IN) ? state->length : PNG_CHUNK_SIZE_IN;
+
+                /* Read the next chunk of compressed data from the file */
+                if (FileRead(state->file, state->in, bytesToRead, FALSE) != bytesToRead)
+                {
+                    inflateEnd(&state->strm);  /* Clean up if there is an error */
+                    return -1;  /* Return error code */
+                }
+
+                /* Set the input data for the zlib stream */
+                state->strm.avail_in = bytesToRead;
+                state->strm.next_in = state->in;
+                state->length -= bytesToRead;  /* Decrease the remaining length of the compressed data */
+            }
+
+            /* Set up the output buffer for decompression */
+            state->strm.avail_out = PNG_CHUNK_SIZE_OUT;
+            state->strm.next_out = state->out;
+
+            /* Decompress the data from the input buffer into the output buffer */
+            ret = inflate(&state->strm, Z_NO_FLUSH);
+
+            if (ret != Z_OK && ret != Z_STREAM_END)
+            {
+                inflateEnd(&state->strm);  /* Clean up if decompression error occurs */
+                return -1;  /* Return error code */
+            }
+
+            /* Calculate how much data was decompressed */
+            have = PNG_CHUNK_SIZE_OUT - state->strm.avail_out;
+            src = state->out;  /* Point to the start of the decompressed data */
+
+            /* Process the decompressed data in the output buffer */
+            while (have > 0)
+            {
+                /* Calculate how many bytes to copy into the row buffer */
+                unsigned long toCopy = (rowBytes + 1 - state->rowBufferOffset) < have ? (rowBytes + 1 - state->rowBufferOffset) : have;
+                memcpy(state->currentRow + state->rowBufferOffset, src, toCopy);  /* Copy the decompressed data to the row buffer */
+                state->rowBufferOffset += toCopy;  /* Update the row buffer offset */
+                src += toCopy;  /* Move the source pointer forward */
+                have -= toCopy;  /* Decrease the remaining decompressed data to process */
+
+                /* If a full scanline (including the filter byte) has been accumulated, process it */
+                if (state->rowBufferOffset == rowBytes + 1)
+                {
+                    /* Unfilter the scanline */
+                    unfilterRow(state->currentRow, state->previousRow, state->bytesPerPixel, rowBytes);
+
+                    /* Move the pixel data to skip the filter byte */
+                    memmove(state->currentRow, state->currentRow + 1, rowBytes);
+
+                    /* Save the current scanline for future unfiltering */
+                    memcpy(state->previousRow, state->currentRow, rowBytes);
+
+                    /* Reset the row buffer offset for the next scanline */
+                    state->rowBufferOffset = 0;
+
+                    /* Store the remaining decompressed data for the next call */
+                    state->have = have;
+                    state->outBufferPos = src - state->out;  /* Update the position in the output buffer */
+
+                    state->lineNo++;  /* Increment the line number (not zero-based) */
+
+                    return 1;  /* Successfully processed one scanline */
+                }
+            }
+        }
+    }
+    while(nextIDATChunk(state));
+
+    /* Return 0 when all scanlines are processed */
+    return 0;
+}
+
+int nextIDATChunk(pngIDATState* state)
+{
+    pngIDATChunkEntry* idatChunks;
+
+    if (state->idatChunkIdx + 1 < state->idatNumChunks) /* zero based! */
+    {
+        state->idatChunkIdx++;
+        idatChunks = MemLock(state->idatChunksHan);
+        state->length = idatChunks[state->idatChunkIdx].length;
+        FilePos(state->file, idatChunks[state->idatChunkIdx].chunkPos, FILE_POS_START);
+        MemUnlock(state->idatChunksHan);
+        return 1;
+    }
+
+    return 0;
+}
+
+void _pascal _export pngImportCleanupIDATProcessingState(pngIDATState* state)
+{
+    inflateEnd(&state->strm);
+    MemFree(state->inHan);
+    MemFree(state->outHan);
+    MemFree(state->currentRowHan);
+    MemFree(state->idatChunksHan);
+    MemFree(state->previousRowHandle);
+}
+
+void _pascal _export pngImportHandlePalette(FileHandle file, pngPLTEChunkEntry plteChunk, VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned char colorType, unsigned char bitDepth)
+{
+    RGBValue* palette = NULL;
+    char* rawPalette = NULL;
+    MemHandle paletteHan = NullHandle;
+    MemHandle bmmem = NullHandle;
+    EditableBitmap* bmblock = NULL;
+    unsigned int numColors = 0;
+    unsigned int paletteSize = 0;
+    int i;
+    int grayscaleValue;
+    byte* palPtr;
+
+    /* Check if the color type is grayscale (except for 1-bit mono) */
+    if (
+         ((colorType == PNG_COLOR_TYPE_GREY) || (colorType == PNG_COLOR_TYPE_GREY_ALPHA)) &&
+         (bitDepth > 1)
+       )
+    {
+        /* Calculate the number of "colors" based on bitDepth */
+        if (bitDepth == 2) {
+            numColors = 4;  /* 2-bit grayscale has 4 colors */
+        } else if (bitDepth == 4) {
+            numColors = 16;  /* 4-bit grayscale has 16 colors */
+        } else if (bitDepth == 8) {
+            numColors = 256;  /* 8-bit grayscale has 256 colors */
+        } else if (bitDepth == 16) {
+            numColors = 256;  /* 16-bit grayscale has 256 colors (after reduction later on) */
+        } else {
+            return;  /* Unsupported bit depth */
+        }
+
+        /* Palette size */
+        paletteSize = numColors * sizeof(RGBValue);
+
+        /* Allocate enough space for the palette based on the bitDepth */
+        paletteHan = MemAlloc(paletteSize, HF_SWAPABLE, HAF_ZERO_INIT);
+        palette = (RGBValue*) MemLock(paletteHan);
+
+        /* Create the grayscale palette based on bitDepth and colorType */
+        for (i = 0; i < numColors; i++)
+        {
+            /* calculate greyscale value */
+            grayscaleValue = (i * 255) / (numColors - 1);
+
+            /* Set the palette entry for grayscale */
+            palette[i].RGB_red = grayscaleValue;
+            palette[i].RGB_green = grayscaleValue;
+            palette[i].RGB_blue = grayscaleValue;
+        }
+
+        rawPalette = (char*) palette;
+    }
+    else if ((plteChunk.chunkPos != 0) && (plteChunk.length != 0))
+    {
+        /* Make sure the length is divisible by 3 (each color is 3 bytes) */
+        if (plteChunk.length % 3 != 0 || (plteChunk.length / 3) > PNG_MAX_PALETTE_ENTRIES)
+        {
+            return;  /* Invalid palette length */
+        }
+
+        /* Create our temp. palette storage */
+        paletteHan = MemAlloc(plteChunk.length, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+        rawPalette = (char*) MemLock(paletteHan);
+
+        /* Read the palette data */
+        FilePos(file, plteChunk.chunkPos, FILE_POS_START);
+        FileRead(file, rawPalette, plteChunk.length, FALSE);
+
+        paletteSize = plteChunk.length;
+    }
+
+    if (paletteHan != NullHandle)
+    {
+        /* Copy palette data to Bitmap VM File - hacked version */
+        /* We leave this version in here as there are other places */
+        /* in the source where this is done that way, so a grep */
+        /* will reveal the "clean" version below... */
+        /* */
+        /* bmblock = VMLock(vmFile, vmBlock, &bmmem); */
+        /* offset = bmblock[0x28]+256*(bmblock[0x29]);  WHUT?! */
+        /* offset += 0x1c; */
+        /* memcpy(&(bmblock[offset]), rawPalette, paletteSize); */
+
+        /* Copy palette data to Bitmap VM File - clean version */
+        bmblock = (EditableBitmap*) VMLock(vmFile, vmBlock, &bmmem);
+        palPtr  =   (byte*) bmblock +
+                            sizeof(bmblock->EB_header) +
+                            bmblock->EB_bm.CB_palette +
+                            sizeof(word); /* Number of entries entry */;
+
+        /* Now copy over the new palette */
+        memcpy(palPtr, rawPalette, paletteSize);
+
+        VMDirty(bmmem);
+        VMUnlock(bmmem);
+
+        /* Free Palette mem, no unlock needed */
+        MemFree(paletteHan);
+    }
+}
+
+/* determine which GEOS bitmap format to create */
+BMFormat _pascal _export pngImportWhatOutputFormat(unsigned char colorType, unsigned char bitDepth, pngAlphaTransformData* pngAlphaTransform)
+{
+    BMFormat output = 0;
+    pngAlphaTransformData defaults = {0};
+
+    if (pngAlphaTransform == (void*) 0)
+    {
+        defaults.method = PNG_AT_BLEND;
+        defaults.blendColor.RGB_red = 255;
+        defaults.blendColor.RGB_green = 255;
+        defaults.blendColor.RGB_blue = 255;
+        pngAlphaTransform = &defaults;
+    }
+
+    switch (colorType)
+    {
+        case PNG_COLOR_TYPE_GREY:
+            switch (bitDepth)
+            {
+                case 1: /* Processing 1-bit Greyscale */
+                    output = BMF_MONO | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                case 2: /* Processing 2-bit Greyscale */
+                case 4: /* Processing 4-bit Greyscale */
+                    output = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                case 8: /* Processing 8-bit Greyscale */
+                case 16: /* Processing 16-bit Greyscale */
+                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                default: /* Invalid BitDepth for Greyscale */
+                    break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_RGB:
+            switch (bitDepth)
+            {
+                case 8: /* Processing 8-bit Truecolor */
+                case 16: /* Processing 16-bit Truecolor */
+                    output = BMF_24BIT | BMT_COMPLEX;
+                    break;
+                default: /* Invalid BitDepth for Truecolor */
+                    break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_GREY_ALPHA:
+            switch (bitDepth)
+            {
+                case 8:
+                case 16:
+                    /* Paletted GREY plus a 1-bit mask */
+                    if (pngAlphaTransform->method == PNG_AT_TRESHOLD) {
+                        output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE | BMT_MASK;
+                    } else {
+                        output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_RGBA:
+            switch (bitDepth)
+            {
+                case 8: /* Processing 8-bit Truecolor + Alpha */
+                case 16: /* Processing 16-bit Truecolor + Alpha */
+                    if (pngAlphaTransform->method == PNG_AT_TRESHOLD) {
+                        output = BMF_24BIT | BMT_COMPLEX | BMT_MASK;
+                    } else {
+                        output = BMF_24BIT | BMT_COMPLEX;
+                    }
+                    break;
+                default: /* Invalid BitDepth for Truecolor with Alpha */
+                    break;
+            }
+            break;
+
+        case PNG_COLOR_TYPE_PALETTE:
+            switch (bitDepth)
+            {
+                case 1: /* Processing 1-bit Palette (2 colors) */
+                case 2: /* Processing 2-bit Palette (4 colors) */
+                case 4: /* Processing 4-bit Palette (16 colors) */
+                    output = BMF_4BIT | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                case 8: /* Processing 8-bit Palette (256 colors) */
+                    output = BMF_8BIT | BMT_COMPLEX | BMT_PALETTE;
+                    break;
+                default: /* Invalid BitDepth for Palette */
+                    break;
+            }
+            break;
+
+        default:
+            /* Invalid ColorType */
+            break;
+    }
+
+    return output;
+}
+
+/* create the GEOS Bitmap */
+VMBlockHandle _pascal _export pngImportInitiateOutputBitmap(VMFileHandle vmFile, pngIHDRData ihdrData, BMFormat fmt)
+{
+    GStateHandle bmstate;
+    VMBlockHandle vmBlock = NullHandle;
+
+    vmBlock = GrCreateBitmap(
+        fmt,
+        ihdrData.width, ihdrData.height,
+        vmFile,
+        0,
+        &bmstate
+    );
+
+    GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+
+    return vmBlock;
+}
+
+/* transform the original bitmap data for the target GEOS format */
+void _pascal _export pngImportApplyGEOSFormatTransformations(pngIDATState* state, pngAlphaTransformData* pngAlphaTransform)
+{
+    pngAlphaTransformData defaults = {0};
+
+    /* Convert any 16-bit channel data to 8-bit, we don't support more than 8-bit per Channel */
+    pngConvert16BitLineTo8Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+
+    if (pngAlphaTransform == (void*) 0) {
+        defaults.method = PNG_AT_BLEND;
+        defaults.blendColor.RGB_red = 255;
+        defaults.blendColor.RGB_green = 255;
+        defaults.blendColor.RGB_blue = 255;
+        pngAlphaTransform = &defaults;
+    }
+
+    if (pngAlphaTransform->method == PNG_AT_TRESHOLD)
+    {
+        /* remove alpha channel by converting to mask */
+        pngAlphaChannelToMask(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngAlphaTransform->alphaThreshold);
+    }
+    else
+    {
+        /* Blend alpha channel with color */
+        pngAlphaChannelBlend(state->currentRow, state->ihdr.width, state->ihdr.colorType, pngAlphaTransform->blendColor);
+    }
+
+    /* add "padding" to 1- and 2-bitted paletted data bytes or to 2-bitted grayscale values */
+    pngPad1BitTo4Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+    pngPad2BitTo4Bit(state->currentRow, state->ihdr.width, state->ihdr.colorType, state->ihdr.bitDepth);
+}
+
+/* write a scanline to the VMFile */
+void _pascal _export pngImportWriteScanlineToBitmap(VMFileHandle vmFile, VMBlockHandle vmBlock, unsigned long lineNo, unsigned char* rowData)
+{
+    void *scanlinePtr;
+    word size;
+
+    HugeArrayLock(
+        vmFile,
+        vmBlock,
+        (dword) lineNo,
+        &scanlinePtr,
+        &size
+    );
+
+    memcpy(scanlinePtr, rowData, size);
+
+    HugeArrayDirty(scanlinePtr);
+    HugeArrayUnlock(scanlinePtr);
+}
+
+
+/**
+ * Helpers and processing of image data itself
+ ********************************************************************
+ */
+
+/* Calculate the number of bits per pixel based on bitDepth and colorType */
+unsigned long _pascal _export pngCalcBytesPerRow(unsigned long width, unsigned char colorType, unsigned char bitDepth)
+{
+    unsigned long bitsPerPixel;
+    unsigned long rowBytes;
+
+    switch (colorType)
+    {
+        case PNG_COLOR_TYPE_GREY: /* Grayscale */
+            bitsPerPixel = bitDepth;
+            break;
+        case PNG_COLOR_TYPE_RGB: /* Truecolor (RGB) */
+            bitsPerPixel = 3 * bitDepth;
+            break;
+        case PNG_COLOR_TYPE_PALETTE: /* Indexed color */
+            bitsPerPixel = bitDepth;
+            break;
+        case PNG_COLOR_TYPE_GREY_ALPHA: /* Grayscale with Alpha */
+            bitsPerPixel = 2 * bitDepth;
+            break;
+        case PNG_COLOR_TYPE_RGBA: /* Truecolor with Alpha (RGBA) */
+            bitsPerPixel = 4 * bitDepth;
+            break;
+        default:
+            /* Unsupported color type */
+            return 0;
+    }
+
+    rowBytes = (width * bitsPerPixel + 7) / 8; /* Round up to the next whole byte */
+
+    return rowBytes;
+}
+
+/* Bytes per Pixel. */
+unsigned long _pascal _export pngCalcBytesPerPixel(unsigned char colorType, unsigned char bitDepth)
+{
+    return pngCalcBytesPerRow(1, colorType, bitDepth);
+}
+
+/* determine how much memory to allocate - we need to allocate a little more */
+/* for 1 and 2 bit pixel data as it gets "padded to 4" */
+unsigned long _pascal _export pngCalcLineAllocSize(unsigned long width, unsigned char colorType, unsigned char bitDepth)
+{
+    unsigned long allocSize = 0;
+
+    if ((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 2))
+    {
+        allocSize = pngCalcBytesPerRow(width, colorType, 4) + 1;
+    }
+    else if (
+        ((colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 1)) ||
+        ((colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 2))
+    )
+    {
+        allocSize = pngCalcBytesPerRow(width, colorType, 4) + 1;
+    }
+    else
+    {
+        allocSize = pngCalcBytesPerRow(width, colorType, bitDepth) + 1;
+    }
+
+    return allocSize;
+}
+
+/* reduce 16 bit values to 8 bit, GEOS doesn't know about 16 bit ;-) */
+void _pascal _export pngConvert16BitLineTo8Bit(unsigned char *line, unsigned long width, unsigned char colorType, unsigned char bitDepth)
+{
+    /* Variable declarations */
+    unsigned long i;
+    unsigned long index16;
+    unsigned long index8;
+    unsigned long bytes_per_pixel_16;
+    unsigned long bytes_per_pixel_8;
+    unsigned long rowBytes;
+    MemHandle dstHan;
+    unsigned char *dst;
+    unsigned char *dstStart;
+    unsigned short value16;
+    unsigned short grayValue16;
+    unsigned short alphaValue16;
+    int channels;
+    int c;
+
+    /* Initialize variables */
+    dstHan = NullHandle;
+    dst = NULL;
+    dstStart = NULL;
+    rowBytes = 0;
+    channels = 0;
+
+    /* Check if the bitDepth is 16 bits. If not, return as this function only handles 16-bit channels. */
+    if (bitDepth != 16)
+    {
+        return;
+    }
+
+    /* Determine the number of channels and bytes per pixel based on colorType */
+    switch (colorType)
+    {
+        case PNG_COLOR_TYPE_RGB:
+            channels = 3; /* RGB: 3 channels (R, G, B) */
+            break;
+        case PNG_COLOR_TYPE_RGBA:
+            channels = 4; /* RGBA: 4 channels (R, G, B, A) */
+            break;
+        case PNG_COLOR_TYPE_GREY:
+            channels = 1; /* Grayscale: 1 channel */
+            break;
+        case PNG_COLOR_TYPE_GREY_ALPHA:
+            channels = 2; /* Grayscale with alpha: 2 channels (grayscale, alpha) */
+            break;
+        default:
+            /* Unsupported or invalid colorType */
+            return;
+    }
+
+    /* Calculate the number of bytes per row for both 16-bit (input) and 8-bit (output) data */
+    bytes_per_pixel_16 = channels * 2; /* 2 bytes per channel in 16-bit data */
+    bytes_per_pixel_8 = channels * 1;  /* 1 byte per channel in 8-bit data */
+    rowBytes = pngCalcBytesPerRow(width, colorType, 8); /* 8 bits per channel after conversion */
+
+    /* Allocate memory for the destination buffer */
+    dstHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+    if (dstHan == NullHandle)
+    {
+        return;
+    }
+
+    dst = MemLock(dstHan);
+    if (dst == NULL)
+    {
+        MemFree(dstHan);
+        return;
+    }
+
+    dstStart = dst;
+
+    /* Process each pixel */
+    for (i = 0; i < width; i++)
+    {
+        index16 = i * bytes_per_pixel_16; /* Index in the 16-bit source line */
+        index8 = i * bytes_per_pixel_8;   /* Index in the 8-bit destination line */
+
+        /* Handle each colorType separately */
+        if (colorType == PNG_COLOR_TYPE_GREY)
+        {
+            /* Combine two bytes to form the 16-bit grayscale value */
+            grayValue16 = (line[index16] << 8) | line[index16 + 1];
+            /* Scale 16-bit grayscale to 8-bit */
+            dst[index8] = grayValue16 / 257;
+        }
+        else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
+        {
+            /* Combine two bytes to form the 16-bit grayscale value */
+            grayValue16 = (line[index16] << 8) | line[index16 + 1];
+            /* Scale 16-bit grayscale to 8-bit */
+            dst[index8] = grayValue16 / 257;
+
+            /* Combine two bytes to form the 16-bit alpha value */
+            alphaValue16 = (line[index16 + 2] << 8) | line[index16 + 3];
+            /* Scale 16-bit alpha to 8-bit */
+            dst[index8 + 1] = alphaValue16 / 257;
+        }
+        else if (colorType == PNG_COLOR_TYPE_RGB)
+        {
+            /* For RGB, we have 3 channels: R, G, B */
+            for (c = 0; c < 3; c++)
+            {
+                /* Combine two bytes to form the 16-bit value for each channel (R, G, or B) */
+                value16 = (line[index16 + c * 2] << 8) | line[index16 + c * 2 + 1];
+                /* Convert to 8-bit per channel */
+                dst[index8 + c] = value16 >> 8;
+            }
+        }
+        else if (colorType == PNG_COLOR_TYPE_RGBA)
+        {
+            /* For RGBA, we have 4 channels: R, G, B, A */
+            for (c = 0; c < 4; c++)
+            {
+                /* Combine two bytes to form the 16-bit value for each channel (R, G, B, or A) */
+                value16 = (line[index16 + c * 2] << 8) | line[index16 + c * 2 + 1];
+                /* Convert to 8-bit per channel */
+                dst[index8 + c] = value16 >> 8;
+            }
+        }
+    }
+
+    /* Copy the converted 8-bit values back to the original buffer */
+    memcpy(line, dstStart, rowBytes);
+
+    /* Free the memory allocated for the destination buffer */
+    MemFree(dstHan);
+}
+
+/* remove the alpha channel, for now. blend it with a blendColor */
+void _pascal _export pngAlphaChannelBlend(unsigned char *data, unsigned long width, int colorType, RGBValue blendColor)
+{
+    unsigned long j;
+    unsigned char *src = data; /* Start at the first pixel */
+    unsigned char *dst = data;
+    unsigned char gray, a, blendedGray;
+
+    /* RGBA (Truecolor with alpha) */
+    if (colorType == PNG_COLOR_TYPE_RGBA)
+    {
+        for (j = 0; j < width; j++)
+        {
+            unsigned char r = src[0];  /* Red component */
+            unsigned char g = src[1];  /* Green component */
+            unsigned char b = src[2];  /* Blue component */
+            a = src[3];  /* Alpha component */
+
+            /* Blend RGB with the provided background color using alpha blending */
+            dst[0] = (r * a + blendColor.RGB_red * (255 - a)) / 255;
+            dst[1] = (g * a + blendColor.RGB_green * (255 - a)) / 255;
+            dst[2] = (b * a + blendColor.RGB_blue * (255 - a)) / 255;
+
+            /* Move pointers: skip the alpha channel for the destination */
+            src += 4; /* Move forward by 4 in the source (RGBA) */
+            dst += 3; /* Move forward by 3 in the destination (RGB) */
+        }
+    }
+    /* Grayscale with Alpha (colorType 4) */
+    else if (colorType == PNG_COLOR_TYPE_GREY_ALPHA)
+    {
+        for (j = 0; j < width; j++)
+        {
+            gray = src[0];  /* Grayscale value */
+            a = src[1];     /* Alpha component */
+
+            /* Blend the grayscale value with the provided background grayscale value */
+            blendedGray = (gray * a + blendColor.RGB_red * (255 - a)) / 255;  /* Assume blendColor.RGB_red is used for grayscale */
+
+            /* Set the blended grayscale value (single byte, no RGB expansion) */
+            dst[0] = blendedGray;
+
+            /* Move pointers: skip alpha for destination */
+            src += 2; /* Move forward by 2 in the source (Grayscale + Alpha) */
+            dst += 1; /* Move forward by 1 in the destination (Grayscale only) */
+        }
+    }
+    /* If any other colorType with alpha is introduced in the future, handle it here */
+}
+
+/* Build [mask][RGB or GRAY] from RGBA or GREY+ALPHA using a 1-bit mask.
+ * Input  'data':
+ *   RGBA: 4*width bytes  (R,G,B,A)
+ *   GA:   2*width bytes  (Gray,Alpha)
+ * Output back into 'data':
+ *   RGBA -> [ (W+7)/8 mask ][ 3*W RGB ]
+ *   GA   -> [ (W+7)/8 mask ][   W GRAY ]
+ * Opaque if (alpha >= alphaThreshold), otherwise transparent.
+ * (Mask bit order: MSB-first in each byte)
+ */
+void _pascal _export pngAlphaChannelToMask(
+    unsigned char *data,
+    unsigned long  width,
+    int            colorType,
+    byte           alphaThreshold)
+{
+    MemHandle       tmpHan;
+    unsigned char  *tmp;
+    unsigned long   maskBytes;
+    unsigned long   outBytes;
+    unsigned char  *dstMask;
+    unsigned char  *dstPix;
+    unsigned long   x;
+
+    /* Only RGBA and GREY+ALPHA have alpha to convert. */
+    if (!((colorType == PNG_COLOR_TYPE_RGBA) ||
+          (colorType == PNG_COLOR_TYPE_GREY_ALPHA)))
+    {
+        return;
+    }
+
+    maskBytes = (width + 7) / 8;
+    outBytes  = (colorType == PNG_COLOR_TYPE_RGBA)
+                ? (maskBytes + 3 * width)     /* RGB */
+                : (maskBytes + 1 * width);    /* GRAY */
+
+    /* Temp row for [mask][payload] */
+    tmpHan = MemAlloc((word)outBytes, HF_SWAPABLE, HAF_ZERO_INIT);
+    if (tmpHan == NullHandle) { return; }
+
+    tmp = (unsigned char*) MemLock(tmpHan);
+    if (tmp == NULL)
+    {
+        MemFree(tmpHan);
+        return;
+    }
+
+    dstMask = tmp;
+    dstPix  = tmp + maskBytes;
+
+    if (colorType == PNG_COLOR_TYPE_RGBA)
+    {
+        const unsigned char *src = data;   /* R G B A */
+        unsigned long  mIdx = 0;
+        unsigned char  bit  = 0x80;
+
+        /* mask is zeroed by HAF_ZERO_INIT */
+        for (x = 0; x < width; x++)
+        {
+            unsigned char r = src[0];
+            unsigned char g = src[1];
+            unsigned char b = src[2];
+            unsigned char a = src[3];
+
+            if (a >= alphaThreshold) { dstMask[mIdx] |= bit; } /* opaque=1 */
+
+            dstPix[0] = r; dstPix[1] = g; dstPix[2] = b;
+
+            src   += 4;
+            dstPix+= 3;
+
+            bit >>= 1;
+            if (bit == 0) { bit = 0x80; mIdx++; }
+        }
+    }
+    else /* PNG_COLOR_TYPE_GREY_ALPHA */
+    {
+        const unsigned char *src = data;   /* Gray, Alpha */
+        unsigned long  mIdx = 0;
+        unsigned char  bit  = 0x80;
+
+        for (x = 0; x < width; x++)
+        {
+            unsigned char gray = src[0];
+            unsigned char a    = src[1];
+
+            if (a >= alphaThreshold) { dstMask[mIdx] |= bit; } /* opaque=1 */
+
+            dstPix[0] = gray;  /* keep grayscale sample; palette already handled */
+
+            src   += 2;
+            dstPix+= 1;
+
+            bit >>= 1;
+            if (bit == 0) { bit = 0x80; mIdx++; }
+        }
+    }
+
+    /* Clear padding bits in the last mask byte if width%8 != 0 */
+    if ((width & 7) != 0)
+    {
+        dstMask[maskBytes - 1] &= (unsigned char)(0xFF << (8 - (width & 7)));
+    }
+
+    /* Copy result back to caller’s buffer */
+    memcpy(data, tmp, (word)outBytes);
+
+    MemFree(tmpHan);
+}
+
+/* Function to convert 1-bit packed values to 4-bit padded values */
+void _pascal _export pngPad1BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth)
+{
+    unsigned int in_index = 0;   /* Index for the input array */
+    unsigned int out_index = 0;  /* Index for the output array */
+    unsigned int bit;
+    unsigned int x = 0;
+
+    /* Calculate the number of output bytes needed (4 bits per pixel, so 2 pixels per byte) */
+    unsigned int rowBytes = (width + 1) / 2;  /* Each byte holds 2 pixels in 4-bit format */
+
+    MemHandle outputHan = NullHandle;
+    unsigned char* output;
+
+    /* Apply only to paletted colorTypes and only if bitDepth is 1. */
+    /* we don't need to convert PNG_COLOR_TYPE_GREY at 1-bit, as this is MONO */
+    /* and GEOS has its own format for this */
+    if (
+         (colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 1)
+       )
+    {
+        /* Allocate memory for the output row */
+        outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); /* Allocate memory with zero-initialization */
+        output = (unsigned char*) MemLock(outputHan);  /* Lock the memory to access the output array */
+
+        /* Process each bit in the input array */
+        for (x = 0; x < width; x++)
+        {
+            /* Get the current bit (extract from the input byte) */
+            bit = (input[in_index] >> (7 - (x % 8))) & 1;
+
+            /* Place the bit as a 4-bit value (0x0 or 0x1) into the correct nibble */
+            if (x % 2 == 0) {
+                /* If even index, put the 4-bit value in the high nibble */
+                output[out_index] = bit << 4;  /* 0 or 1 shifted to the high nibble */
+            } else {
+                /* If odd index, put the 4-bit value in the low nibble */
+                output[out_index] |= bit;  /* Place bit in the low nibble */
+                out_index++;  /* Move to the next byte in the output array after filling both nibbles */
+            }
+
+            /* Move to the next byte in the input after processing 8 pixels (1 byte) */
+            if ((x % 8) == 7) {
+                in_index++;
+            }
+        }
+
+        /* Copy the padded 4-bit values back to the input buffer */
+        memcpy(input, output, rowBytes);
+
+        /* Free the allocated memory */
+        MemFree(outputHan);
+    }
+}
+
+/* function to convert 2-bit packed values to 4-bit padded values */
+void _pascal _export pngPad2BitTo4Bit(unsigned char *input, unsigned int width, unsigned char colorType, unsigned char bitDepth)
+{
+    unsigned int in_index = 0;   /* Index for the input array */
+    unsigned int out_index = 0;  /* Index for the output array */
+    unsigned int pixel;
+    unsigned int x = 0;
+    MemHandle outputHan = NullHandle;
+    unsigned char* output = 0;
+
+    /* Calculate the number of output bytes needed (4 bits per pixel, so 2 pixels per byte) */
+    unsigned int rowBytes = (width + 1) / 2;  /* Each byte holds 2 pixels in 4-bit format */
+
+    /* Apply only to paletted or grayscale colorTypes and only if bitDepth is 2 */
+    if (
+         ((colorType == PNG_COLOR_TYPE_PALETTE) && (bitDepth == 2)) ||
+         ((colorType == PNG_COLOR_TYPE_GREY) && (bitDepth == 2))
+       )
+    {
+        /* Allocate memory for the output row */
+        outputHan = MemAlloc(rowBytes, HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT); /* Allocate memory with zero-initialization */
+        output = (unsigned char*) MemLock(outputHan);  /* Lock the memory to access the output array */
+
+        /* Process each 2-bit pixel in the input array */
+        for (x = 0; x < width; x++)
+        {
+            /* Get the current 2-bit pixel (extract from the input byte) */
+            pixel = (input[in_index] >> (6 - (x % 4) * 2)) & 0x03;
+
+            /* Place the 2-bit value as a 4-bit value (0x0 to 0x3) into the correct nibble */
+            if (x % 2 == 0)
+            {
+                /* If even index, put the 4-bit value in the high nibble */
+                output[out_index] = pixel << 4;  /* Shift 2-bit value to the high nibble */
+            }
+            else
+            {
+                /* If odd index, put the 4-bit value in the low nibble */
+                output[out_index] |= pixel;  /* Place the 2-bit value in the low nibble */
+                out_index++;  /* Move to the next byte in the output array after filling both nibbles */
+            }
+
+            /* Move to the next byte in the input after processing 4 pixels (1 byte) */
+            if ((x % 4) == 3)
+            {
+                in_index++;
+            }
+        }
+
+        /* Copy the padded 4-bit values back to the input buffer */
+        memcpy(input, output, rowBytes);
+
+        /* Free the allocated memory */
+        MemFree(outputHan);
+    }
+}
+
+/* Unfilter-Function for processing PNG image data, basically the heart of PNG */
+static void unfilterRow(unsigned char *data, unsigned char *previousRow, unsigned long bytesPerPixel, unsigned long rowBytes)
+{
+    unsigned char *currentRow = data;
+    unsigned char filterType = *currentRow; /* just the first byte! */
+    unsigned long i;
+
+    /* Pointer to the first byte after the filter type */
+    currentRow++;
+
+    /* Apply the filter */
+    switch (filterType)
+    {
+        case PNG_FILTER_NONE:
+            /* No filter, data is already in place */
+            break;
+        case PNG_FILTER_SUB:
+            for (i = bytesPerPixel; i < rowBytes; i++) {
+                currentRow[i] += currentRow[i - bytesPerPixel];
+            }
+            break;
+        case PNG_FILTER_UP:
+            for (i = 0; i < rowBytes; i++) {
+                currentRow[i] += previousRow[i];
+            }
+            break;
+        case PNG_FILTER_AVERAGE:
+            for (i = 0; i < rowBytes; i++)
+            {
+                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
+                unsigned char up = previousRow[i];
+                currentRow[i] += (left + up) / 2;
+            }
+            break;
+        case PNG_FILTER_PAETH:
+            for (i = 0; i < rowBytes; i++)
+            {
+                unsigned char left = (i >= bytesPerPixel) ? currentRow[i - bytesPerPixel] : 0;
+                unsigned char up = previousRow[i];
+                unsigned char upLeft = (i >= bytesPerPixel) ? previousRow[i - bytesPerPixel] : 0;
+                currentRow[i] += paethPredictor(left, up, upLeft);
+            }
+            break;
+        default:
+            /* Invalid filter type */
+            return;
+    }
+}

@@ -1,6 +1,6 @@
 name extgraph.lib
 
-longname "Breadbox Extended Graphics Lib"
+longname "Extended Graphics Lib"
 
 type library, single
 
@@ -8,7 +8,7 @@ tokenchars "ExGr"
 tokenid    16431
 
 library geos
-library ansic 
+library ansic
 
 # 1.0
 export PALPARSEGSTRING
@@ -56,5 +56,5 @@ incminor
 
 export BMPGETBITMAPCOMPACT
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
+#usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

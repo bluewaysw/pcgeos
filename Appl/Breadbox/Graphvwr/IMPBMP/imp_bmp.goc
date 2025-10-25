@@ -344,8 +344,14 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 	BMFormat fmt = 0;
 	ImpBmpStatus status;
 	Boolean flag = TRUE;
+	pngAlphaTransformData alphaTransform = {0};
 
 	status = IBS_NO_ERROR;
+
+	alphaTransform.method = PNG_AT_BLEND;
+	alphaTransform.blendColor.RGB_red = 255;
+	alphaTransform.blendColor.RGB_green = 255;
+	alphaTransform.blendColor.RGB_blue = 255;
 
 	if(params->IBP_source == 0)
 		FatalError(2000);
@@ -357,7 +363,7 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 	// Read PNG Chunks, get overview
 	if (pngImportProcessChunks(params->IBP_source, &ihdrData, &idatChunksHan, &idatNumChunks, &plteChunk))
 	{
-		fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth);
+		fmt = pngImportWhatOutputFormat(ihdrData.colorType, ihdrData.bitDepth, &alphaTransform);
 		if (fmt != 0)
 		{
 			// Initialize output bitmap
@@ -382,7 +388,7 @@ ImpBmpStatus _pascal ImpPNGProcessFile(ImpBmpParams *params)
 					pngImportIDATProcessingUnlockHandles(&state);
 
 					// make sure we have data compatible with GEOS HugeBitmaps
-					pngImportApplyGEOSFormatTransformations(&state, params->IBP_pngBlendColor);
+					pngImportApplyGEOSFormatTransformations(&state, &alphaTransform);
 
 					// Write the processed scanline (without the filter byte) to the VMFile
 					pngImportWriteScanlineToBitmap(params->IBP_dest, params->IBP_bitmap, state.lineNo - 1, state.currentRow);

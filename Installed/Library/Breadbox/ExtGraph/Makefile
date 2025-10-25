@@ -5,15 +5,15 @@
 #
 GEODE           = extgraph
 ASMTOOLS        = asmtoolsManager.asm
-PAL             = pal.goc
-EXTGR           = extgr.goc
-BMP             = bmp.goc bmpRotate.goc
+BMP             = bmp.c bmpRotate.c
+EXTGR           = extgr.c
+PAL             = pal.c
 UI_TO_RDFS      =
-OBJS            = pal.obj extgr.obj bmp.obj bmpRotate.obj
+OBJS            = bmp.obj bmpRotate.obj extgr.obj pal.obj
 COMMON          =
 MODULES         = ASMTOOLS
-CMODULES        = PAL EXTGR BMP
-SRCS            = $(ASMTOOLS) $(PAL) $(EXTGR) $(BMP) $(COMMON)
+CMODULES        = BMP EXTGR PAL
+SRCS            = $(ASMTOOLS) $(BMP) $(EXTGR) $(PAL) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = extgraph

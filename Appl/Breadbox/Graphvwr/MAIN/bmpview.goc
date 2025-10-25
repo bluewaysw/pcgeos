@@ -30,6 +30,7 @@
 #include "GRAPH/quant.h"
 #include <initfile.h>
 #include <graphics.h>
+#include <pnglib.h>
 @include "bvdirmon.goh"
 
 @ifndef OLD_THUMBNAIL_DB
@@ -367,20 +368,17 @@ FileHandle BVThumbnailDB = 0;
 		@BVViewControl,
 		@BVEditControl,
 		@BVDocumentControl,
-		@BVDisplayControl,
-		@BlendColorControl;
+		@BVDisplayControl;
 
 	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
 		@BVOptionGroup,
 		@BVViewOptGroup,
-		@BVImpFileShowTools,
-		@BlendColorControl;
+		@BVImpFileShowTools;
 
 	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
 		@BVViewControl,
 		@BVDocumentControl,
-		@BVDisplayControl,
-		@BlendColorControl;
+		@BVDisplayControl;
 
 
 @ifdef NEWDEAL_MEDIA_VIEWER
@@ -658,26 +656,9 @@ FileHandle BVThumbnailDB = 0;
 @object GenInteractionClass BVOptionMenu = {
 		GII_visibility = GIV_POPUP;
 		GI_comp = 	@BVOptionGroup,
-		  		@BlendColorControl,
 				@BVDialogsGroup,
 				@BVOptionSaveGroup;
 		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
-};
-
-/**************************************************************************/
-@object ColorSelectorClass BlendColorControl = {
-	GI_visMoniker = "Set PNG Blend Color";
-	GI_states = @default | GS_USABLE | GS_ENABLED;
-	CSI_color = {C_WHITE, CF_INDEX, 0, 0};
-
-	GCI_output = process;
-	GII_visibility = GIV_DIALOG;
-	GII_type = GIT_PROPERTIES;
-
-	ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_RGB | CSF_INDEX | CSF_OTHER);
-	ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
-	HINT_DRAW_IN_BOX;
-    	HINT_PLACE_MONIKER_ABOVE;
 };
 
 /**************************************************************************/
@@ -1621,37 +1602,6 @@ CopyCommon(ClipboardItemFlags transferFlags, FileHandle bmpfile,
   }
 }
 
-static void
-getPngBlendColor(RGBValue* blendColor)
-{
-	ColorAndFlagReturn cafr = {0};
-
-	@call BlendColorControl::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
-
-	// convert INDEX to RGB
-	if(cafr.CAFR_color.CQ_info == CF_INDEX)
-	{
-		RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
-		blendColor->RGB_red = RGB_RED(c);
-		blendColor->RGB_green = RGB_GREEN(c);
-		blendColor->RGB_blue = RGB_BLUE(c);
-	}
-	else if (cafr.CAFR_color.CQ_info == CF_RGB)
-	{
-		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-		blendColor->RGB_green = cafr.CAFR_color.CQ_green;
-		blendColor->RGB_blue = cafr.CAFR_color.CQ_blue;
-	}
-	else if (cafr.CAFR_color.CQ_info == CF_GRAY)
-	{
-		blendColor->RGB_red = cafr.CAFR_color.CQ_redOrIndex;
-		blendColor->RGB_green = cafr.CAFR_color.CQ_redOrIndex;
-		blendColor->RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
-	}
-
-}
-
-
 /**************************************************************************/
 
 /*
@@ -1776,7 +1726,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   char *path;
   char path2[256];
   char path3[256];
-  ColorQuad pngBlendColor = {0};
 
   if((extraState != 0) &&
 	((attachFlags & AAF_RESTORING_FROM_STATE)!=0))
@@ -1908,17 +1857,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   @send BVImpFileDirDrive::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(drives - count1, FALSE);
 
-@ifdef NEWDEAL_MEDIA_VIEWER
-	stat = InitFileReadDataBuffer("MediaViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
-@else
-	stat = InitFileReadDataBuffer("GraphicsViewer", "pngBlendColor", &pngBlendColor, sizeof(ColorQuad), 0);
-@endif
-
-	if (!stat)
-	{
-		@send BlendColorControl::MSG_COLOR_SELECTOR_SET_COLOR(pngBlendColor, FALSE);
-	}
-
   @callsuper();
 }
 
@@ -1958,21 +1896,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   sdptr->BVSD_attrs = BVAttrs2;
   MemUnlock(extramem);
   return(extramem);
-}
-
-/**************************************************************************/
-@method BVProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
-{
-
-@ifdef NEWDEAL_MEDIA_VIEWER
-	InitFileWriteData("MediaViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
-@else
-	InitFileWriteData("GraphicsViewer", "pngBlendColor", &colorQuad, sizeof(ColorQuad));
-@endif
-
-  	InitFileCommit();
-
-	@send BlendColorControl::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 }
 
 /**************************************************************************/
@@ -2355,7 +2278,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	char string[255];
 	VMBlockHandle bmpblock;
 	word count;
-	RGBValue blendColor = {0};
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2382,9 +2304,6 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	para.IBP_dest = VMOpen(pself->BVTempName, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
-
-	getPngBlendColor(&blendColor);
-	para.IBP_pngBlendColor = blendColor;
 
 	// start importing
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
@@ -2602,7 +2521,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 @method BVDocumentClass, MSG_BV_SHOW_PIC_INFO
 {
-  char string[20];
+  char string[30] = {0};
 
   @call BVPicInfoName::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVName,0);
 
@@ -2614,51 +2533,51 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   switch((pself->BVType)&BMT_FORMAT)
   {
-	 case BMF_MONO:
-				strcpy(string, "2");
-		break;
+     case BMF_MONO:
+                strcpy(string, "Monochrome (1 bit/pixel)");
+        break;
 
-	 case BMF_4BIT:
-				strcpy(string, "16");
-		break;
+     case BMF_4BIT:
+                strcpy(string, "16 (4 bits/pixel)");
+        break;
 
-	 case BMF_8BIT:
-				strcpy(string, "256");
-		break;
+     case BMF_8BIT:
+                strcpy(string, "256 (8 bits/pixel)");
+        break;
 
-	 case BMF_24BIT:
-				strcpy(string, "16.7M");
-		break;
+     case BMF_24BIT:
+                strcpy(string, "TrueColor (24 bits/pixel)");
+        break;
 
-	 default:
-				strcpy(string, "???");
-		break;
+     default:
+                strcpy(string, "???");
+        break;
   }
-  @call BVPicInfoCol::MSG_VIS_TEXT_REPLACE_ALL_PTR(string,0);
-	/*
-		 switch(pself->BVImpForm)
-		 {
-			 case IBF_BMP:
-				strcpy(string, ".BMP");
-				break;
+ @call BVPicInfoCol::MSG_VIS_TEXT_REPLACE_ALL_PTR(string,0);
+    /*
+         switch(pself->BVImpForm)
+         {
+             case IBF_BMP:
+                strcpy(string, ".BMP");
+                break;
 
-			 case IBF_PCX:
-				strcpy(string, ".PCX");
-				break;
+             case IBF_PCX:
+                strcpy(string, ".PCX");
+                break;
 
-			 case IBF_GIF:
-				strcpy(string, ".GIF");
-				break;
+             case IBF_GIF:
+                strcpy(string, ".GIF");
+                break;
 @ifdef JPEG_SUPPORT
-			 case IBF_JPEG:
-				strcpy(string, ".JPG");
-				break;
+             case IBF_JPEG:
+                strcpy(string, ".JPG");
+                break;
 @endif
-			 case IBF_TIFF:
-				strcpy(string, ".TIF");
-				break;
-	}; */
-	@call BVPicInfoForm::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVImpForm,0);
+             case IBF_TIFF:
+                strcpy(string, ".TIF");
+                break;
+    }; */
+    @call BVPicInfoForm::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVImpForm,0);
 
 }
 
@@ -3818,7 +3737,6 @@ BVCalcDriveName(char *text, word item)
   ImpBmpStatus status;
   ImpBmpParams para;
   char string[255];
-  RGBValue blendColor = {0};
 
   if(BVFileList != 0)
   {
@@ -3885,9 +3803,6 @@ BVCalcDriveName(char *text, word item)
 
 			FileSetCurrentPath(SP_WASTE_BASKET, ".");
 			para.IBP_dest = VMOpen(tempname, VMAF_FORCE_READ_WRITE, VMO_TEMP_FILE, 0);
-
-			getPngBlendColor(&blendColor);
-			para.IBP_pngBlendColor = blendColor;
 
 			FilePopDir();
 

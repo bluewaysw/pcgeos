@@ -6,7 +6,7 @@
 #include <color.h>
 #include <vm.h>
 
-@include "extgraph.goh"
+#include "extgraph.h"
 
 /*========================================================================*/
 
@@ -174,11 +174,11 @@ palAddColor(MemHandle mem, RGBValue  *entry)
     /* check if the color is already in there */
     loopCount = 0 ;
     while(loopCount < pal->PT_used) {
-    
+
         if( (entry->RGB_red == pal->PT_entry[loopCount].RGB_red) &&
             (entry->RGB_green == pal->PT_entry[loopCount].RGB_green) &&
             (entry->RGB_blue == pal->PT_entry[loopCount].RGB_blue)    ) {
-         
+
             colorFound = TRUE ;
             break ;
         }
@@ -279,7 +279,7 @@ palAddBitmapPal(MemHandle mem, byte *ptr)
             MemHandle palmem ;
             word numEntries ;
 
-            palmem = GrGetPalette(gstate, GPT_DEFAULT) ; 
+            palmem = GrGetPalette(gstate, GPT_DEFAULT) ;
 
             GrDestroyState(0) ;
 
@@ -404,7 +404,7 @@ palSortQuant(RGBValue *pal, word size, byte sortentry)
 		{
 		  swap = pal[i];
 		  pal[i] = pal[j];
-		  pal[j] = swap;     
+		  pal[j] = swap;
 		};
 		j++;
 	 }
@@ -584,7 +584,7 @@ PalParseGString(GStateHandle gstring, word palsize)
 		if(pal->PT_used > palsize)
 			PalQuantPalette((RGBValue *) &pal->PT_entry, pal->PT_used,
 				(RGBValue *) pal2, palsize);
-		else   
+		else
 			memcpy(pal2, &pal->PT_entry, 3*pal->PT_used);
 
 		MemUnlock(mem2);
@@ -623,7 +623,7 @@ PalQuantPalette(RGBValue *srcpal, word srcsize,
 /***************************************************************************/
 
 EGError _pascal _export
-PalGStateCreateBmpPalette(GStateHandle gstate, 
+PalGStateCreateBmpPalette(GStateHandle gstate,
 	VMFileHandle bmfile, VMBlockHandle bmblock)
 {
 	EGError stat = EGE_NO_ERROR;
@@ -646,11 +646,11 @@ PalGStateCreateBmpPalette(GStateHandle gstate,
 			(bmtype & BMT_PALETTE))
 		{
 			offset = *((word*)(&bmptr[0x28]));
-			palsize = *((word*)(&bmptr[offset + 0x1a])); 
+			palsize = *((word*)(&bmptr[offset + 0x1a]));
 			bmpalptr = (RGBValue*) (&bmptr[offset + 0x1a]);
 
 			gspalsize = GrCreatePalette(gstate);
-			
+
 			if(gspalsize >= palsize)
 			{
 				GrSetPalette(gstate, bmpalptr, 0, palsize);

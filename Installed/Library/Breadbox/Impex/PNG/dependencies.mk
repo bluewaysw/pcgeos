@@ -26,9 +26,9 @@ API.eobj: API/apiManager.asm \
                 Objects/gValueC.def Objects/gToolGC.def \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
-                library.def math.def manager.rdef
-EXPGIF.obj \
-EXPGIF.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                library.def Objects/colorC.def
+ui.obj \
+ui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -45,46 +45,29 @@ EXPGIF.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh impex.goh giflib.goh
-EXPGIF.obj \
-EXPGIF.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+                Objects/helpCC.goh Objects/colorC.goh
+ui.obj \
+ui.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/stdio.h ieCommon.h \
-                xlatLib.h Ansi/string.h extgraph.h
-IMPGIF.obj \
-IMPGIF.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
-                Objects/inputC.goh Objects/clipbrd.goh \
-                Objects/uiInputC.goh iacp.goh Objects/winC.goh \
-                Objects/gProcC.goh alb.goh Objects/processC.goh \
-                Objects/visC.goh Objects/vCompC.goh Objects/vCntC.goh \
-                Objects/gAppC.goh Objects/genC.goh Objects/gInterC.goh \
-                Objects/gPrimC.goh Objects/gDispC.goh Objects/gTrigC.goh \
-                Objects/gViewC.goh Objects/gTextC.goh Objects/vTextC.goh \
-                Objects/gCtrlC.goh gcnlist.goh spool.goh \
-                Objects/gFSelC.goh Objects/gGlyphC.goh \
-                Objects/gDocCtrl.goh Objects/gDocGrpC.goh \
-                Objects/gDocC.goh Objects/gContC.goh Objects/gDCtrlC.goh \
-                Objects/gEditCC.goh Objects/gBoolGC.goh \
-                Objects/gItemGC.goh Objects/gDListC.goh \
-                Objects/gItemC.goh Objects/gBoolC.goh \
-                Objects/gGadgetC.goh Objects/gToolCC.goh \
-                Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh impex.goh giflib.goh
-IMPGIF.obj \
-IMPGIF.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
-                graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
-                dbase.h localize.h Ansi/ctype.h timedate.h file.h \
-                sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
-                disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
-                Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
-                driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h ieCommon.h xlatLib.h \
-                Ansi/stdio.h Ansi/string.h
-manager.rdef: generic.uih product.uih
+                parallDr.h hugearr.h fileEnum.h pnglib.h Ansi/stdio.h \
+                Ansi/stdlib.h Ansi/string.h zlib.h zconf.h htmldrv.h \
+                product.h math.h htmlfstr.h awatcher.h htmlprog.h
+imp.obj \
+imp.eobj: pnglib.h geos.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
+                graphics.h fontID.h font.h color.h vm.h lmem.h hugearr.h \
+                zlib.h zconf.h file.h ec.h heap.h htmldrv.h product.h \
+                math.h timedate.h htmlfstr.h awatcher.h htmlprog.h \
+                xlatLib.h geode.h geoworks.h
+exp.obj \
+exp.eobj: pnglib.h geos.h Ansi/stdio.h Ansi/stdlib.h Ansi/string.h \
+                graphics.h fontID.h font.h color.h vm.h lmem.h hugearr.h \
+                zlib.h zconf.h file.h ec.h heap.h htmldrv.h product.h \
+                math.h timedate.h htmlfstr.h awatcher.h htmlprog.h \
+                xlatLib.h geode.h geoworks.h extgraph.h gstring.h
 
-gifEC.geo gif.geo : geos.ldf ui.ldf impex.ldf ansic.ldf extgraph.ldf giflib.ldf 
+pngEC.geo png.geo : geos.ldf ui.ldf impex.ldf extgraph.ldf color.ldf pnglib.ldf 

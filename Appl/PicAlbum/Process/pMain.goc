@@ -13,7 +13,7 @@
 
 @include "PicAlbum.goh"
 @include <Objects/gViewCC.goh>
-@include <ExtGraph.goh>
+#include <extgraph.h>
 #include <Ansi/string.h>
 #include <library.h>
 #include <Ansi/stdio.h>
@@ -212,7 +212,7 @@ extern optr G_printValueChanged = NullOptr;
 	@callsuper();
 
 	@send process::MSG_PA_INIT_ALBUM_SCREEN();
-	
+
 }
 
 /***********************************************************************
@@ -326,7 +326,7 @@ extern optr G_printValueChanged = NullOptr;
  *
  * CALLED BY:	MSG_PA_COPY_TO_DOCUMENT, MSG_PA_GET_PICTURES_FROM_DOCUMENT
  *
- * DESCRIPTION:	
+ * DESCRIPTION:
  *
  *
  ***********************************************************************/
@@ -449,10 +449,10 @@ void SetPathForDocuments(optr fsel, optr popup)
 		G_yOffset = 0;
 		if(size_x < viewWidth) {
 
-			G_xOffset = (viewWidth - size_x) / 2; 
+			G_xOffset = (viewWidth - size_x) / 2;
 		}
 		if(size_y < viewHeight) {
-		
+
 			G_yOffset = (viewHeight - size_y) / 2;
 		}
 
@@ -464,7 +464,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 
 		/* store current settings */
 		if((G_usedXOffset != G_xOffset) || (G_usedYOffset != G_yOffset)) {
-		
+
 			@send PAViewView::MSG_GEN_VIEW_REDRAW_CONTENT();
 		}
 	}
@@ -479,7 +479,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 		if(UserStandardDialog(0, 0, 0, 0, "You have made changes to this picture. Do you wish to save these changes before closing?",
 			(GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) | (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET)
 			) == IC_YES) {
-		
+
 			/* save the changed bitmap here */
 		}
 	}
@@ -488,7 +488,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 	@call oself::MSG_PA_INIT_ALBUM_SCREEN();
 
 	if(G_bitmapHandle) {
-	
+
 		VMFreeVMChain(G_tempVMFile, VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
 		G_bitmapHandle = 0;
 	}
@@ -538,12 +538,12 @@ void SetPathForDocuments(optr fsel, optr popup)
 		}
 	MemUnlock(HandleOf(@PAAlbumsFolderName));
 	FilePopDir();
-	
+
 	/* sort album list */
 	if(listMem) {
 		FileLongName	*p_name;
 		word				loopCount = 0;
-		
+
 		p_name = MemLock(listMem);
 		while(loopCount < itemsRead) {
 			word loopCount2 = 0;
@@ -638,18 +638,18 @@ void SetPathForDocuments(optr fsel, optr popup)
 		currentItem = @call PAAlbumList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 		if(currentItem != 0xFFFF) {
 			p_name = MemLock(G_albumList);
-			strcpy(selName, p_name[currentItem]);	
+			strcpy(selName, p_name[currentItem]);
 			MemUnlock(G_albumList);
 			}
 		else {
 			strcpy(selName, "");
 			}
-			
+
 		if(!(*G_albumName) || (strcmp(selName, G_albumName) != 0)) {
 			MemLock(HandleOf(@PAAlbumsFolderName));
 			strcpy(pathName, LMemDeref(@PAAlbumsFolderName));
 			MemUnlock(HandleOf(@PAAlbumsFolderName));
-			strcat(pathName, "\\");	
+			strcat(pathName, "\\");
 			strcat(pathName, selName);
 			strcpy(G_albumName, selName);
 			@call PAAlbumViewContent::MSG_PATL_INIT_FILE_LIST(SP_PRIVATE_DATA,
@@ -668,9 +668,9 @@ void SetPathForDocuments(optr fsel, optr popup)
 	optr viewChild, childObj;
 	word loopCount;
 	word itemCount;
-	
+
 	if(G_albumList && (item < G_albumCount)) {
-	
+
 		FileLongName *p_name;
 
 		p_name = MemLock(G_albumList);
@@ -680,7 +680,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 
     /* adjust doc bounds */
     viewChild = @call list::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0) ;
- 
+
     if(viewChild) {
 
         RectDWord bounds ;
@@ -696,15 +696,15 @@ void SetPathForDocuments(optr fsel, optr popup)
             while(loopCount < itemCount) {
 
                 optr childObj = @call list::MSG_GEN_FIND_CHILD_AT_POSITION(loopCount) ;
-        
+
                 if(childObj) {
 
                     dword size ;
 
                     size = @call childObj::MSG_VIS_GET_SIZE() ;
-                
+
                     if(DWORD_WIDTH(size) > maxWidth) {
-                    
+
                         maxWidth = DWORD_WIDTH(size) ;
                     }
                 }
@@ -740,7 +740,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 		retry = FALSE;
 
 		if(UserDoDialog(@PACreateNewAlbumDialog) == IC_APPLY) {
-		
+
 			FileLongName name;
 
 			@call PACreateNewAlbumText::MSG_VIS_TEXT_GET_ALL_PTR(name);
@@ -750,27 +750,27 @@ void SetPathForDocuments(optr fsel, optr popup)
 			if(FileSetCurrentPath(SP_PRIVATE_DATA, LMemDeref(@PAAlbumsFolderName))) {
 
 				word err;
-			
+
 				err = FileCreateDir(name);
 
 				if(err == ERROR_FILE_EXISTS) {
-				
+
 					UserStandardDialogOptr(0, 0, 0, 0, @PAAlbumExistsError,
-							(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+							(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 							(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 
 					retry = TRUE;
 
 				} else if(!err) {
-		
+
 					word albumIndex;
-				
+
 					strcpy(G_albumName, name);
 
 					G_albumList = @call oself::MSG_PA_READ_ALBUM_LIST(G_albumName, &albumIndex, &G_albumCount);
 
 					if(albumIndex == 0xFFFF) {
-					
+
 						albumIndex = 0;
 					}
 
@@ -782,21 +782,21 @@ void SetPathForDocuments(optr fsel, optr popup)
 					/* successfully created, update triggers */
 					@call oself::MSG_PA_ADJUST_BUTTONS();
 				} else {
-				
+
 					UserStandardDialogOptr(0, 0, 0, 0, @PACantCreateAlbumError,
-							(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+							(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 							(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 				}
-				
+
 			}
 			MemUnlock(HandleOf(@PAAlbumsFolderName));
 			FilePopDir();
 		}
-		
+
 	} while(retry);
 }
 
-/* 
+/*
  * deletes the current album of the application
  */
 @method PADeleteAlbum, PAProcessClass, MSG_PA_DELETE_ALBUM {
@@ -815,10 +815,10 @@ void SetPathForDocuments(optr fsel, optr popup)
 		itemIndex = @call PAAlbumList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
 		if(UserStandardDialogOptr(0, &customTriggers, 0, 0, @PADeleteAlbumAffirmation,
-							(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) | 
+							(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) |
 							(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET)) == IC_APPLY) {
 
-			MemLock(HandleOf(@PAAlbumsFolderName));	
+			MemLock(HandleOf(@PAAlbumsFolderName));
 			strcpy(pathName, LMemDeref(@PAAlbumsFolderName));
 			MemUnlock(HandleOf(@PAAlbumsFolderName));
 
@@ -829,9 +829,9 @@ void SetPathForDocuments(optr fsel, optr popup)
 			        @call PAAlbumViewContent::MSG_PATL_EXIT();
 
 				if(PADeleteTree(G_albumName)) {
-				
+
 					UserStandardDialogOptr(0, 0, 0, 0, @PACantDeleteAlbumError,
-							(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+							(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 							(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 
 				}
@@ -841,7 +841,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 				@send oself::MSG_PA_INIT_ALBUM_LIST();
 
 				if(itemIndex >= G_albumCount) {
-					
+
 				    itemIndex = G_albumCount - 1;
 				}
 
@@ -875,7 +875,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 			err = FileRename(oldName, newName);
 			if(err == ERROR_FILE_EXISTS) {
 			    UserStandardDialogOptr(0, 0, 0, 0, @PAAlbumExistsError,
-						   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+						   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 						   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 			    retry = TRUE;
 			} else if(!err) {
@@ -899,7 +899,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 			    @call oself::MSG_PA_ADJUST_BUTTONS();
 			} else {
 			    UserStandardDialogOptr(0, 0, 0, 0, @PACantRenameAlbumError,
-						   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+						   (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 						   (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 			}
 		    }
@@ -923,7 +923,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 @method PAProcessClass, MSG_PA_ADJUST_BUTTONS
 {
  word		numSel, numItems, curSel;
-	
+
 
 	numSel = @call PAAlbumViewContent::MSG_PATL_GET_NUM_SELECTIONS();
 	if(numSel != 1) {
@@ -974,7 +974,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 			@call PAAlbumEditMoveBackTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 			@call PAAlbumNaviForwardTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 			}
-		
+
 		if((curSel + 1) < numItems) {
 			@call PAAlbumEditMoveEndTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
 			@call PAAlbumEditMoveForwardTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
@@ -1150,9 +1150,9 @@ void SetPathForDocuments(optr fsel, optr popup)
 	itemCount = @call PAGetPicturesViewContent::MSG_PATL_GET_NUM_ITEMS();
 	loopCount = 0;
 	while(loopCount < itemCount) {
-	
+
 		if(@call PAGetPicturesViewContent::MSG_PATL_IS_ITEM_SELECTED(loopCount)) {
-		
+
 			/* copy the file to the new album in fuzzy mode */
 			FilePushDir();
 			if(FileSetCurrentPath(SP_PRIVATE_DATA, "PA Albums")) {
@@ -1287,15 +1287,15 @@ void SetPathForDocuments(optr fsel, optr popup)
 	};
 
 	if(@call PAAlbumViewContent::MSG_PATL_GET_NUM_SELECTIONS() > 1) {
-	
+
 		if(UserStandardDialogOptr(0, &customTriggers, 0, 0, @PADeleteMultiplePictureAffirmation,
-							(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) | 
+							(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) |
 							(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET)) == IC_APPLY) {
 
 			if(@call PAAlbumViewContent::MSG_PATL_DELETE_SELECTED_ITEMS()) {
-			
+
 				UserStandardDialogOptr(0, 0, 0, 0, @PADeletePictureError,
-						(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+						(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 						(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 			}
 		}
@@ -1303,13 +1303,13 @@ void SetPathForDocuments(optr fsel, optr popup)
 	} else {
 
 		if(UserStandardDialogOptr(0, &customTriggers, 0, 0, @PADeletePictureAffirmation,
-							(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) | 
+							(GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) |
 							(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET)) == IC_APPLY) {
 
 			if(@call PAAlbumViewContent::MSG_PATL_DELETE_CURRENT_ITEM()) {
-			
+
 				UserStandardDialogOptr(0, 0, 0, 0, @PADeletePictureError,
-						(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) | 
+						(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
 						(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET));
 			}
 		}
@@ -1373,7 +1373,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 		@call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
 		}
 
-	@call PACopyPicturesDialog::MSG_GEN_MAKE_APPLYABLE();	
+	@call PACopyPicturesDialog::MSG_GEN_MAKE_APPLYABLE();
 
 	/* enable the album button if there are any albums */
 	if(@call PACopyPicturesWhichView::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS())
@@ -1413,7 +1413,7 @@ void SetPathForDocuments(optr fsel, optr popup)
 /***********************************************************************
  *
  * MESSAGE:	MSG_PA_COPY_TO_ALBUM for PAProcessClass
- *         
+ *
  *
  * DESCRIPTION:	user selected the album list from the file sel
  *

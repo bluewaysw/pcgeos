@@ -1,4 +1,4 @@
-@include "extgraph.goh"
+#include "extgraph.h"
 #include <geos.h>
 #include <vm.h>
 #include <timer.h>
@@ -9,14 +9,14 @@
 /***************************************************************************/
 
 SizeAsDWord _pascal _export
-ExtGrGetGStringSize(VMFileHandle file, VMBlockHandle block, 
+ExtGrGetGStringSize(VMFileHandle file, VMBlockHandle block,
 	EGError *error)
 {
 	GStateHandle gstring, bmstate;
 	Rectangle rect;
 	word width = 0, height = 0;
 	EGError stat = EGE_NO_ERROR;
-	
+
 	gstring = GrLoadGString(file, GST_VMEM, block);
 
 	if(gstring)
@@ -33,7 +33,7 @@ ExtGrGetGStringSize(VMFileHandle file, VMBlockHandle block,
 			GrDestroyState(bmstate);
 		}
 		else
-			stat = EGE_BLOCK_LOCKING_FAILURE; 
+			stat = EGE_BLOCK_LOCKING_FAILURE;
 
 		GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
 	}
@@ -65,14 +65,14 @@ ExtGrDrawGString(GStateHandle gstate, sword x, sword y, VMFileHandle file, VMBlo
 		GrGetGStringBounds(gstring, gstate, 0, &rect);
 
 		// draw
-		GrDrawGString(gstate, gstring, 
+		GrDrawGString(gstate, gstring,
 			(-rect.R_left) + x, (-rect.R_top) + y, 0, &element);
 
 		// unload
 		GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
 	}
 	else
-		stat = EGE_BLOCK_LOCKING_FAILURE; 
+		stat = EGE_BLOCK_LOCKING_FAILURE;
 
 	return(stat);
 }

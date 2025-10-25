@@ -1,16 +1,16 @@
-@include "extgraph.goh"
+#include "extgraph.h"
 #include <geos.h>
 #include <vm.h>
 #include <hugearr.h>
 #include <ec.h>
 
-byte 
+byte
 bmpGet1Bit(byte *dataPtr, word index)
 {
 	return dataPtr[index / 8] & (0x80 >> (index % 8));
 }
- 
-byte 
+
+byte
 bmpGet4Bit(byte *dataPtr, word index)
 {
 	return (dataPtr[index / 2] & (0xF0 >> ((index % 2) * 4))) >> ((index % 2) ? 0 : 4);
@@ -52,11 +52,11 @@ bmpFlipBuffer(byte *dataPtr, BMType dataType, word pixels)
 				{
 					byte data1, data2;
 
-					data1 = bmpGet1Bit(dataPtr, loopCount); 
-					data2 = bmpGet1Bit(dataPtr, pixels - loopCount - 1); 
+					data1 = bmpGet1Bit(dataPtr, loopCount);
+					data2 = bmpGet1Bit(dataPtr, pixels - loopCount - 1);
 
-					bmpSet1Bit(dataPtr, loopCount, data2); 
-					bmpSet1Bit(dataPtr, pixels - loopCount - 1, data1); 
+					bmpSet1Bit(dataPtr, loopCount, data2);
+					bmpSet1Bit(dataPtr, pixels - loopCount - 1, data1);
 				}
 				break;
 
@@ -64,11 +64,11 @@ bmpFlipBuffer(byte *dataPtr, BMType dataType, word pixels)
 				{
 					byte data1, data2;
 
-					data1 = bmpGet4Bit(dataPtr, loopCount); 
-					data2 = bmpGet4Bit(dataPtr, pixels - loopCount - 1); 
+					data1 = bmpGet4Bit(dataPtr, loopCount);
+					data2 = bmpGet4Bit(dataPtr, pixels - loopCount - 1);
 
-					bmpSet4Bit(dataPtr, loopCount, data2); 
-					bmpSet4Bit(dataPtr, pixels - loopCount - 1, data1); 
+					bmpSet4Bit(dataPtr, loopCount, data2);
+					bmpSet4Bit(dataPtr, pixels - loopCount - 1, data1);
 				}
 				break;
 
@@ -91,7 +91,7 @@ bmpFlipBuffer(byte *dataPtr, BMType dataType, word pixels)
 					((RGBValue*) dataPtr)[pixels - loopCount - 1] = tempValue;
 				}
 				break;
-		}		
+		}
 
 		loopCount++;
 	}
@@ -132,8 +132,8 @@ bmpFlipLines(VMFileHandle file, VMBlockHandle block, word start, word lines,
 			elemSize = elemSize2;
 			if (elemSize != elemSize1)
 			    HugeArrayResize(file, block, line1, elemSize);
-		} 
-		else 
+		}
+		else
 		{
 			if (elemSize != elemSize2)
 			    HugeArrayResize(file, block, line2, elemSize);
@@ -143,7 +143,7 @@ bmpFlipLines(VMFileHandle file, VMBlockHandle block, word start, word lines,
 		HugeArrayLock(file, block, line2, (void**) &elemPtr2, &elemSize4);
 
 		loopCount2 = 0;
-		while(loopCount2 < elemSize) 
+		while(loopCount2 < elemSize)
 		{
 			byte swapByte;
 
@@ -163,7 +163,7 @@ bmpFlipLines(VMFileHandle file, VMBlockHandle block, word start, word lines,
 				offset = (pixels + 7) / 8;
 
 				bmpFlipBuffer(elemPtr1, bmtype & BMF_MONO, pixels);
-			
+
 				if(vert)
 				{
 					bmpFlipBuffer(elemPtr2, bmtype & BMF_MONO, pixels);
@@ -171,7 +171,7 @@ bmpFlipLines(VMFileHandle file, VMBlockHandle block, word start, word lines,
 			}
 
 			bmpFlipBuffer(elemPtr1 + offset, bmtype & BMT_FORMAT, pixels);
-		
+
 			if(vert)
 			{
 				bmpFlipBuffer(elemPtr2 + offset, bmtype & BMT_FORMAT, pixels);
@@ -188,8 +188,8 @@ bmpFlipLines(VMFileHandle file, VMBlockHandle block, word start, word lines,
 		{
 		    if (elemSize != elemSize2)
 			HugeArrayResize(file, block, line2, elemSize);
-		} 
-		else 
+		}
+		else
 		{
 			elemSize = elemSize2;
 			if (elemSize != elemSize1)
@@ -224,7 +224,7 @@ void _near copypix(byte *p1, word x1, byte *p2, word x2, BMFormat bmform)
         ((RGBValue*)p2)[x2].RGB_green = ((RGBValue*)p1)[x1].RGB_green;
         ((RGBValue*)p2)[x2].RGB_blue = ((RGBValue*)p1)[x1].RGB_blue;
 		break;
-	}		       
+	}
 }
 
 /*
@@ -303,7 +303,7 @@ bmpRot90(VMFileHandle file, VMBlockHandle src, VMBlockHandle dst,
         for(y=y1; y<y2; y++,HugeArrayNext((void**) &elemPtr1, &elemSize1))
         {
           HugeArrayLock(file, dst, srcwidth-x2, (void**) &elemPtr2, &elemSize2);
-          for(x=x2-1; (int)x>=(int)x1; x--,HugeArrayNext((void**) 
+          for(x=x2-1; (int)x>=(int)x1; x--,HugeArrayNext((void**)
 	  					&elemPtr2, &elemSize2))
           {
             copypix(elemPtr1+offset1, x, elemPtr2+offset2, y, bmform);
@@ -350,14 +350,14 @@ BmpOp(BmpOpType op, VMFileHandle file, VMBlockHandle *blockPtr)
 	if((stat == EGE_NO_ERROR) && (compact != BMC_UNCOMPACTED))
 	{
 		newBlock = GrUncompactBitmap(file, block, file);
-		if(newBlock && (newBlock != block)) 
+		if(newBlock && (newBlock != block))
 		{
 			(*blockPtr) = newBlock;
 			VMFreeVMChain(file, VMCHAIN_MAKE_FROM_VM_BLOCK(block));
 			block = newBlock;
 		}
 	}
-	if(stat == EGE_NO_ERROR) 
+	if(stat == EGE_NO_ERROR)
 	{
 		bmsize = BmpGetBitmapSize(file, block, &stat);
 	    width = DWORD_WIDTH(bmsize);
@@ -372,8 +372,8 @@ BmpOp(BmpOpType op, VMFileHandle file, VMBlockHandle *blockPtr)
         case BOT_ROT_90:
         case BOT_ROT_270:
 	      newBlock = GrCreateBitmapRaw(bmtype, height, width, file);
-	      if(newBlock) 
-          {    
+	      if(newBlock)
+          {
               RGBValue pal[256];
               word palsize;
 
@@ -382,17 +382,17 @@ BmpOp(BmpOpType op, VMFileHandle file, VMBlockHandle *blockPtr)
               if(palsize)
                 BmpSetBitmapPalette(file, newBlock, pal, 0, palsize);
 
-              (*blockPtr) = newBlock;            
-              
+              (*blockPtr) = newBlock;
+
               if(op==BOT_ROT_90)
                 bmpRot90(file, block, newBlock, width, height, bmtype);
               else
                 bmpRot270(file, block, newBlock, width, height, bmtype);
 
-              VMFreeVMChain(file, VMCHAIN_MAKE_FROM_VM_BLOCK(block));	    
+              VMFreeVMChain(file, VMCHAIN_MAKE_FROM_VM_BLOCK(block));
 		      block = newBlock;
 	      }
-          else 
+          else
               stat = EGE_CANT_CREATE_BITMAP;
           break;
 
@@ -409,10 +409,10 @@ BmpOp(BmpOpType op, VMFileHandle file, VMBlockHandle *blockPtr)
         }
 	}
 
-	if(compact != BMC_UNCOMPACTED) 
+	if(compact != BMC_UNCOMPACTED)
 	{
 		newBlock = GrCompactBitmap(file, block, file);
-		if(newBlock && (newBlock != block)) 
+		if(newBlock && (newBlock != block))
 		{
 			(*blockPtr) = newBlock;
 			VMFreeVMChain(file, VMCHAIN_MAKE_FROM_VM_BLOCK(block));
@@ -451,7 +451,7 @@ BmpFlipVertical(VMFileHandle file, VMBlockHandle *blockPtr)
 
 	/* get bitmap type */
 	bmtype = BmpGetBitmapType(file, block, &stat);
-	if(stat == EGE_NO_ERROR) 
+	if(stat == EGE_NO_ERROR)
 	{
 		bmsize = BmpGetBitmapSize(file, block, &stat);
 	}
