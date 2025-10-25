@@ -5,9 +5,9 @@
 #
 GEODE           = png
 API             = apiManager.asm ui.goc
-XLAT            = exp.goc imp.goc
+XLAT            = imp.c exp.c
 UI_TO_RDFS      =
-OBJS            = ui.obj exp.obj imp.obj
+OBJS            = ui.obj imp.obj exp.obj
 COMMON          =
 MODULES         = API
 CMODULES        = API Xlat

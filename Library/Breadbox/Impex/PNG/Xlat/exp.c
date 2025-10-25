@@ -13,7 +13,7 @@
 
 #include <pnglib.h>
 #include <xlatLib.h>
-@include <extgraph.goh>
+#include <extgraph.h>
 
 
 /****************************************************************************
