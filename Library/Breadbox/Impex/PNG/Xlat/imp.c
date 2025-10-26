@@ -1,0 +1,69 @@
+/***********************************************************************
+ *
+ * MODULE:    imppng.goc (PNG Import)
+ * FILE:      imppng.goc
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+#include <pnglib.h>
+#include <heap.h>
+#include <graphics.h>
+#include <color.h>
+#include <xlatLib.h>
+
+dword _pascal
+ImportProcedure(ImportFrame *frame, VMChain *chain)
+{
+    VMBlockHandle bmblock;
+    pngAlphaTransformData pngAlphaTransform;
+    pngAlphaTransformData* optionsP;
+
+    pngAlphaTransform.method = PNG_AT_TRESHOLD;
+    pngAlphaTransform.alphaThreshold = 128;
+    pngAlphaTransform.blendColor.RGB_red = 255;
+    pngAlphaTransform.blendColor.RGB_green = 255;
+    pngAlphaTransform.blendColor.RGB_blue = 255;
+
+    *chain = 0;
+
+    if (frame->IF_importOptions != NullHandle)
+    {
+        optionsP = (pngAlphaTransformData*) MemLock(frame->IF_importOptions);
+        if (optionsP != (pngAlphaTransformData*)0)
+        {
+            pngAlphaTransform = *optionsP;
+            MemUnlock(frame->IF_importOptions);
+        }
+    }
+
+    bmblock = pngImportConvertFile(frame->IF_sourceFile, frame->IF_transferVMFile, &pngAlphaTransform);
+
+    if (bmblock != NullHandle)
+    {
+        *chain = VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock);
+        return (TE_NO_ERROR | (((dword)CIF_BITMAP) << 16));
+    }
+
+    return (TE_INVALID_FORMAT);
+}
+
+word _pascal
+TestFile(FileHandle file)
+{
+    Boolean isPNG;
+
+    isPNG = pngImportCheckHeader(file);
+
+    if (!isPNG)
+    {
+        return NO_IDEA_FORMAT;
+    }
+
+    return TE_NO_ERROR;
+}

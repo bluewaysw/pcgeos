@@ -6,7 +6,7 @@
 @include <Objects/metaC.goh>
 @include <Objects/visC.goh>
 @include "giflib.goh"
-@include <extgraph.goh>
+#include <extgraph.h>
 
 #include <vm.h>
 #include <file.h>
@@ -43,7 +43,7 @@ typedef struct
 	int		GES_outCount;
 	FileHandle	GES_outFile;
 	byte	GES_rasterOut;
-	byte	GES_rasterData[256];    
+	byte	GES_rasterData[256];
 	int		GES_EOFcode;
 	byte	GES_writeBuf[GIF_EXPORT_WRITE_BUF_SIZE];
 	word	GES_writeBufLeft;
@@ -114,13 +114,13 @@ gifExpFileWrite(gifExpStream *stream, byte *buf, word size)
 			memcpy(&stream->GES_writeBuf[stream->GES_writeBufPos],
 					&buf[srcpos], stream->GES_writeBufLeft);
 
-			if(FileWrite(stream->GES_outFile, stream->GES_writeBuf, 
+			if(FileWrite(stream->GES_outFile, stream->GES_writeBuf,
 				GIF_EXPORT_WRITE_BUF_SIZE, 0) != GIF_EXPORT_WRITE_BUF_SIZE)
 				stat = GE_WRITE_PROBLEM;
-					
+
 			srcpos += stream->GES_writeBufLeft;
 			size -= stream->GES_writeBufLeft;
-			stream->GES_writeBufPos = 0; 
+			stream->GES_writeBufPos = 0;
 			stream->GES_writeBufLeft = GIF_EXPORT_WRITE_BUF_SIZE;
 		}
 		else
@@ -148,7 +148,7 @@ gifExpFinishFileWrite(gifExpStream *stream)
 	if(stream->GES_writeBufPos)
 	{
 		if(
-		FileWrite(stream->GES_outFile, stream->GES_writeBuf, 
+		FileWrite(stream->GES_outFile, stream->GES_writeBuf,
 			stream->GES_writeBufPos, 0)
 			!= stream->GES_writeBufPos)
 			stat = GE_WRITE_PROBLEM;
@@ -208,7 +208,7 @@ gifExpFinishRasterDataByteWriting(gifExpStream *stream)
 GifError
 gifExpWriteCode(gifExpStream *stream, int code)
 {
-	static unsigned long masks[] = { 
+	static unsigned long masks[] = {
 		0x0000, 0x0001, 0x0003, 0x0007, 0x000F,
 		0x001F, 0x003F, 0x007F, 0x00FF, 0x01FF,
 		0x03FF, 0x07FF, 0x0FFF, 0x1FFF, 0x3FFF,
@@ -229,9 +229,9 @@ gifExpWriteCode(gifExpStream *stream, int code)
 		// put bytes out
 		stat = gifExpWriteRasterDataByte(stream, stream->GES_outBuf & 0xFF);
 		stream->GES_outBuf >>= 8;
-		stream->GES_outCount -= 8;      
+		stream->GES_outCount -= 8;
 	}
-	
+
 	return(stat);
 }
 
@@ -243,8 +243,8 @@ gifExpFinishCodeWriting(gifExpStream *stream)
 	GifError stat = GE_NO_ERROR;
 
 	if(stream->GES_outCount > 0)
-		stat = gifExpWriteRasterDataByte(stream, 
-			(byte) stream->GES_outBuf << (8 - stream->GES_outCount)); 
+		stat = gifExpWriteRasterDataByte(stream,
+			(byte) stream->GES_outBuf << (8 - stream->GES_outCount));
 
 	return(stat);
 }
@@ -258,7 +258,7 @@ gifExpFindStringInTable(gifExpStream *stream, int pixel)
 	long fcode;
 	int hindex;
 
-	fcode = 
+	fcode =
 	stream->GES_fCode = (((long) pixel << 12) + stream->GES_tabIndex);
 	hindex =
 	stream->GES_hIndex = (((word) pixel << stream->GES_hashShift) ^ stream->GES_tabIndex);
@@ -285,7 +285,7 @@ gifExpFindStringInTable(gifExpStream *stream, int pixel)
 				return(stream->GES_codeTab[hindex]);
 		}
 	}
-			
+
 	return(-1);
 #else
 	int foundIndex;
@@ -316,7 +316,7 @@ gifExpClearCode(gifExpStream *stream)
 	GifError stat = GE_NO_ERROR;
 
 	// write clear code
-	stat = gifExpWriteCode(stream, stream->GES_clearCode); 
+	stat = gifExpWriteCode(stream, stream->GES_clearCode);
 
 	if(stat == GE_NO_ERROR)
 	{
@@ -454,12 +454,12 @@ gifExpWritePixel(gifExpStream *stream, byte pixel)
 	{
 		// write stored index
 		stat = gifExpWriteCode(stream, stream->GES_tabIndex);
-		
+
 		if(stat == GE_NO_ERROR)
 			gifExpTableAddPixel(stream, pixel);
 
 		// save ptr to string K
-		stream->GES_tabIndex = pixel; 
+		stream->GES_tabIndex = pixel;
 	}
 
 	return(stat);
@@ -474,7 +474,7 @@ gifExpWritePixelLine(gifExpStream *stream, BMFormat bitform, byte *lineptr, word
 
 	if(bitform == BMF_8BIT)
 	{
-		while(width && (stat == GE_NO_ERROR))      
+		while(width && (stat == GE_NO_ERROR))
 		{
 			stat = gifExpWritePixel(stream, *lineptr);
 			lineptr ++;
@@ -510,12 +510,12 @@ gifExpWritePixelLine(gifExpStream *stream, BMFormat bitform, byte *lineptr, word
 					byte data_b[2];
 					word data_w;
 				} data;
-	
+
 				data.data_b[0] = *lineptr;
-				data.data_b[1] = 0; 
-	
+				data.data_b[1] = 0;
+
 				localCount = 8;
-	
+
 				while(localCount && width && (stat == GE_NO_ERROR))
 				{
 					data.data_w <<= 1;
@@ -582,14 +582,14 @@ GifExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock,
 	static const byte nullVar = 0;
 	MemHandle streammem;
 	SizeAsDWord size_xy;
-	
+
 	byte bitFormSize[] = {1, 4, 8};
 	byte bitCodeSize[] = {2, 4, 8};
 	word PowersOf2[] = {1, 2, 4, 8, 16, 32, 64, 128, 256};
 
 	// write header and screen descriptor
 	FilePos(destfile, 0, FILE_POS_START);
-  
+
 	// determine bitmap size
 	size_xy = BmpGetBitmapSize(srcfile, bmpblock, &stat);
 	if(stat != GE_NO_ERROR)
@@ -609,7 +609,7 @@ GifExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock,
 		return(GE_OUT_OF_MEMORY);
 
 	stream = (gifExpStream*) MemDeref(streammem);
-	if(!stream) 
+	if(!stream)
 	{
 		MemFree(streammem);
 		return(GE_OUT_OF_MEMORY);
@@ -643,7 +643,7 @@ GifExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock,
 	strncpy(header.GH_id, "GIF87a", 6);
 	header.GH_width = width;
 	header.GH_height = height;
-	header.GH_resFlag = 0xF0 | (bitFormSize[bitform] - 1); 
+	header.GH_resFlag = 0xF0 | (bitFormSize[bitform] - 1);
 	header.GH_background = 0;
 
 	// write the aspect ratio here FR_WORK
@@ -655,19 +655,19 @@ GifExportBitmapFHandle(VMFileHandle srcfile, VMBlockHandle bmpblock,
 	// get palette, temporary use code table memory
 	// skip return value because it is not needed here
 #ifdef GIF_EXPORT_HASH_TABLE_SUPPORT
-	BmpGetBitmapPalette(srcfile, bmpblock, 
+	BmpGetBitmapPalette(srcfile, bmpblock,
 		(RGBValue*) stream->GES_hashTab, 256, &stat);
 #else
-	BmpGetBitmapPalette(srcfile, bmpblock, 
+	BmpGetBitmapPalette(srcfile, bmpblock,
 		(RGBValue*) stream->GES_suffix, 256, &stat);
 #endif
 	if(stat == GE_NO_ERROR)
 		/* writing gif palette */
 #ifdef GIF_EXPORT_HASH_TABLE_SUPPORT
-		stat = gifExpFileWrite(stream, stream->GES_hashTab, 
+		stat = gifExpFileWrite(stream, stream->GES_hashTab,
 				(1 << bitFormSize[bitform]) * sizeof(RGBValue));
 #else
-		stat = gifExpFileWrite(stream, stream->GES_suffix, 
+		stat = gifExpFileWrite(stream, stream->GES_suffix,
 				(1 << bitFormSize[bitform]) * sizeof(RGBValue));
 #endif
 	if(stat != GE_NO_ERROR) goto end;
@@ -737,8 +737,8 @@ end:
 /*********************************************************************/
 
 GifStreamHandle _pascal _export
-GifExportStreamCreate(BMFormat bitform, word width, word height, 
-			FileLongName destname, FileHandle destfile, 
+GifExportStreamCreate(BMFormat bitform, word width, word height,
+			FileLongName destname, FileHandle destfile,
 			RGBValue *palptr, GifError *error)
 {
 	GifError stat = GE_NO_ERROR;
@@ -750,7 +750,7 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 	MemHandle streammem = 0;
 	FileHandle outfile = 0;
 	SizeAsDWord size_xy;
-	
+
 	byte bitFormSize[] = {1, 4, 8};
 	byte bitCodeSize[] = {2, 4, 8};
 	word PowersOf2[] = {1, 2, 4, 8, 16, 32, 64, 128, 256};
@@ -776,18 +776,18 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 
 	// write header and screen descriptor
 	FilePos(outfile, 0, FILE_POS_START);
-  
+
 	// init raster block data stream and code output stream
 	streammem = MemAlloc(sizeof(gifExpStream), HF_SWAPABLE, 0);
 	if(!streammem)
-	{	
+	{
 		stat = GE_OUT_OF_MEMORY;
 
 		goto end;
 	}
 
 	stream = (gifExpStream*) MemLock(streammem);
-	if(!stream) 
+	if(!stream)
 	{
 		stat =  GE_OUT_OF_MEMORY;
 
@@ -837,7 +837,7 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 	strncpy(header.GH_id, "GIF87a", 6);
 	header.GH_width = width;
 	header.GH_height = height;
-	header.GH_resFlag = 0xF0 | (bitFormSize[bitform] - 1); 
+	header.GH_resFlag = 0xF0 | (bitFormSize[bitform] - 1);
 	header.GH_background = 0;
 
 	// write the aspect ratio here FR_WORK
@@ -850,7 +850,7 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 	// skip return value because it is not needed here
 	if(palptr)
 	{
-		stat = gifExpFileWrite(stream, (byte*) palptr, 
+		stat = gifExpFileWrite(stream, (byte*) palptr,
 				(1 << bitFormSize[bitform]) * sizeof(RGBValue));
 	}
 	else
@@ -863,7 +863,7 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 			col_entry.RGB_green = 255;
 			col_entry.RGB_blue = 255;
 
-			stat = gifExpFileWrite(stream, (byte*) &col_entry, 
+			stat = gifExpFileWrite(stream, (byte*) &col_entry,
 				sizeof(RGBValue));
 
 			if(stat == GE_NO_ERROR)
@@ -872,7 +872,7 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 				col_entry.RGB_green = 0;
 				col_entry.RGB_blue = 0;
 
-				stat = gifExpFileWrite(stream, (byte*) &col_entry, 
+				stat = gifExpFileWrite(stream, (byte*) &col_entry,
 					sizeof(RGBValue));
 			}
 		}
@@ -896,7 +896,7 @@ GifExportStreamCreate(BMFormat bitform, word width, word height,
 					if(palptr_local)
 					{
 						/* writing gif palette */
-						stat = gifExpFileWrite(stream, &palptr_local[2], 
+						stat = gifExpFileWrite(stream, &palptr_local[2],
 								(1 << bitFormSize[bitform]) * sizeof(RGBValue));
 
 						MemUnlock(palmem);
@@ -972,14 +972,14 @@ GifExportStreamWriteLine(GifStreamHandle handle, byte *data)
 		return(GE_ILLEGAL_STREAM_HANDLE);
 
 	stream = MemLock(handle);
-	
+
 	if(stream)
 	{
 		if(stream->GES_pendingError == GE_NO_ERROR)
 		{
 			if(stream->GES_curLine < stream->GES_height)
 			{
-				stat = gifExpWritePixelLine(stream, stream->GES_bitform, data, 
+				stat = gifExpWritePixelLine(stream, stream->GES_bitform, data,
 							stream->GES_width);
 				if(stat == GE_NO_ERROR)
 					stream->GES_curLine ++;
@@ -1036,20 +1036,20 @@ GifExportStreamDestroy(GifStreamHandle handle, Boolean forcekill)
 				// write EOF code
 				stat = gifExpWriteCode(stream, stream->GES_EOFcode);
 
-			if(stat == GE_NO_ERROR) 
+			if(stat == GE_NO_ERROR)
 				//*** finishing the file
 				// finish code output stream
 				stat = gifExpFinishCodeWriting(stream);
-			
+
 			if(stat == GE_NO_ERROR)
 				// finish raster block data stream
 				stat = gifExpFinishRasterDataByteWriting(stream);
-			
+
 			if(stat == GE_NO_ERROR)
 				// write 0 for file End
 				stat = gifExpFileWrite(stream, (byte*) &nullVar, 1);
 
-			if(stat == GE_NO_ERROR) 
+			if(stat == GE_NO_ERROR)
 				stat = gifExpFinishFileWrite(stream);
 
 			if(stream->GES_nameGiven)

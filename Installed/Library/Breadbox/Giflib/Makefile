@@ -4,9 +4,9 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = giflib
-MAIN            = EXPSTR.goc IMPFILE.goc EXPFILE.goc
+MAIN            = EXPFILE.goc EXPSTR.goc IMPFILE.goc
 UI_TO_RDFS      =
-OBJS            = EXPSTR.obj IMPFILE.obj EXPFILE.obj
+OBJS            = EXPFILE.obj EXPSTR.obj IMPFILE.obj
 COMMON          = config.h
 MODULES         =
 CMODULES        = Main
