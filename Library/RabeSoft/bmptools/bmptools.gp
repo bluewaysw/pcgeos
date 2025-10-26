@@ -23,7 +23,7 @@ library         ui
 
 resource DataResource      lmem read-only shared
 
-usernotes	"International version 1.0.5"
+usernotes	"International version 1.0.6"
 
 
 
@@ -82,4 +82,17 @@ export BTDRAWBITMAPWITHMASKS
 export BTDRAWGSTRING
 export BTLOADANDDRAWGSTRING
 
+incminor
+export BTSETDEBUGTEXT
+export BTFLIPBITMAPV
+export BTFLIPBITMAPH
+export BTROTATEBITMAP180
+export BTROTATEBITMAP90
+export BTROTATEBITMAP270
 
+export BTEXTRACTTRANSPARENCYMASK
+export BTAPPLYTRANSPARENCYMASK
+export BTCOPYTOBITMAPWITHMASK
+export BTAPPLYTRANSPARENCYCOLOR
+export BTCOPYBITMAPANDREMOVEMASK
+export BTBITMAPFILLMASK

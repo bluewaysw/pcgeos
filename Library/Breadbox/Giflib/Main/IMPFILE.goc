@@ -7,7 +7,7 @@
 #include <Ansi/string.h>
 #include <graphics.h>
 #include "config.h"
-@include <extgraph.goh>
+#include <extgraph.h>
 
 /**********************************************************************
 *	LOCAL TYPE DEFINITION
@@ -77,56 +77,56 @@ typedef RGBValue gifImpPalette[256];
 *	LOCAL FUNCTION DEFINITION
 **********************************************************************/
 
-GifError 
+GifError
 gifImpReadSimpleByte(FileHandle file, byte *read);
 
-GifError 
+GifError
 gifImpProcessExtentions(FileHandle file, word *transparent);
 
 GifError
 gifImpGetHeader(FileHandle source, GifHeader *fh);
 
-GifError 
+GifError
 gifImpGetPicDesc(FileHandle source, GifPicDescriptor *pd);
 
-GifError 
+GifError
 gifImpGetPalette(FileHandle source,	MemHandle palmem, word size);
 
-GifError 
+GifError
 gifImpGetRawByte(gifImpStream *stream, byte *value);
 
-GifError  
+GifError
 gifImpReadCode(gifImpStream *stream, word *code, byte csize);
 
-GifError  
+GifError
 gifImpPutPixel(gifImpOutStream *stream, byte pixel);
 
-GifError 
-gifImpReadPic(FileHandle file, 
+GifError
+gifImpReadPic(FileHandle file,
 		gifImpOutStream *out_stream, word pixSize);
 
 /**********************************************************************
 *	LOCAL FUNCTION DECLARATION
 **********************************************************************/
 
-GifError 
+GifError
 gifImpReadSimpleByte(FileHandle file, byte *read)
 {
 	int result;
 
 	result = FileRead(file, read, 1, 0);
-  
+
 	if(result == -1)
 		return(GE_INVALID_FILE);
 	if(result != 1)
-		return(GE_WRONG_FILE_FORMAT); 
- 
+		return(GE_WRONG_FILE_FORMAT);
+
 	return(GE_NO_ERROR);
 };
 
 //*********************************************************************
 
-GifError 
+GifError
 gifImpProcessExtentions(FileHandle file, word *transparent)
 {
 	GifError stat;
@@ -134,17 +134,17 @@ gifImpProcessExtentions(FileHandle file, word *transparent)
 	byte buffer[256];
 
 	stat = gifImpReadSimpleByte(file, &read);
-	
+
 	while((read == '!') && (stat == GE_NO_ERROR))
 	{
 		stat = gifImpReadSimpleByte(file, &read);
-	 
+
 		if(stat == GE_NO_ERROR)
 			stat = gifImpReadSimpleByte(file, &count);
 
 		if(read == 0xF9)
 		{
-	
+
 			count2 = 0;
 			do
 			{
@@ -166,7 +166,7 @@ gifImpProcessExtentions(FileHandle file, word *transparent)
 				{
 					stat = gifImpReadSimpleByte(file, &read);
 					count--;
-				} 
+				}
 				while ((count != 0) && (stat == GE_NO_ERROR));
 
 				if(stat == GE_NO_ERROR)
@@ -182,7 +182,7 @@ gifImpProcessExtentions(FileHandle file, word *transparent)
 				{
 					stat = gifImpReadSimpleByte(file, &read);
 					count--;
-				} 
+				}
 				while ((count != 0) && (stat == GE_NO_ERROR));
 
 				if(stat == GE_NO_ERROR)
@@ -195,7 +195,7 @@ gifImpProcessExtentions(FileHandle file, word *transparent)
 	};
 
 	FilePos(file, -1, FILE_POS_RELATIVE);
-  
+
 	return(stat);
 };
 
@@ -207,10 +207,10 @@ gifImpGetHeader(FileHandle source, GifHeader *fh)
 	int result; /* normally word */
 
 	result = FileRead(source, fh, sizeof(GifHeader), 0);
-  
+
 	if(result == -1)
 		return(GE_INVALID_FILE);
-  
+
 	if(result != sizeof(GifHeader))
 		return(GE_WRONG_FILE_FORMAT);
 	if(strncmp(fh->GH_id, "GIF", 3) != 0)
@@ -225,28 +225,28 @@ gifImpGetHeader(FileHandle source, GifHeader *fh)
 
 //*********************************************************************
 
-GifError 
+GifError
 gifImpGetPicDesc(FileHandle source, GifPicDescriptor *pd)
 {
 	int result; /*normally word */
 
 	result = FileRead(source, pd, sizeof(GifPicDescriptor), 0);
-  
+
 	if(result == -1)
 		return(GE_INVALID_FILE);
-  
+
 	if(result != sizeof(GifPicDescriptor))
 		return(GE_WRONG_FILE_FORMAT);
-  
+
 	if(pd->GPD_header != ',')
 		return(GE_WRONG_FILE_FORMAT);
-  
+
 	return(GE_NO_ERROR);
 };
 
 //*********************************************************************
 
-GifError 
+GifError
 gifImpGetPalette(FileHandle source,	MemHandle palmem, word size)
 {
 	int result;
@@ -255,18 +255,18 @@ gifImpGetPalette(FileHandle source,	MemHandle palmem, word size)
 	pal = MemLock(palmem);
 	result = FileRead(source, pal, size*3, 0);
 	MemUnlock(palmem);
-  
+
 	if(result == -1)
 		return(GE_INVALID_FILE);
 	if(result != size*3)
 		return(GE_WRONG_FILE_FORMAT);
-  
+
 	return(GE_NO_ERROR);
 };
 
 //*********************************************************************
 
-GifError 
+GifError
 gifImpGetRawByte(gifImpStream *stream, byte *value)
 {
 	byte *buffer;
@@ -279,29 +279,29 @@ gifImpGetRawByte(gifImpStream *stream, byte *value)
 	if(stream->GIS_count == 0)
 	{
 		result = FileRead(stream->GIS_file, buffer, stream->GIS_size, 0);
-	 
+
 		if(result == -1)
 			stat = GE_INVALID_FILE;
 		if(result == 0)
 			stat = GE_OUT_OF_DATA;
-	 
+
 		if (stat == GE_NO_ERROR)
 		{
 			stream->GIS_index = 0;
 			stream->GIS_count = result;
 		};
 	};
-  
+
 	*value = buffer[stream->GIS_index];
 	stream->GIS_index++;
 	stream->GIS_count--;
-  
+
 	return(stat);
 };
 
 //*********************************************************************
 
-GifError  
+GifError
 gifImpGetByte(gifImpStream *stream,	byte *value)
 {
 	GifError stat = GE_NO_ERROR;
@@ -319,13 +319,13 @@ gifImpGetByte(gifImpStream *stream,	byte *value)
 		else
 			return(GE_OUT_OF_DATA);
 	};
-  
+
 	return(stat);
 }
 
 //*********************************************************************
 
-GifError  
+GifError
 gifImpReadCode(gifImpStream *stream, word *code, byte csize)
 {
 	GifError stat = GE_NO_ERROR;
@@ -382,7 +382,7 @@ gifImpReadCode(gifImpStream *stream, word *code, byte csize)
 
 //*********************************************************************
 
-GifError  
+GifError
 gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 {
 	struct
@@ -400,7 +400,7 @@ gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 	{
 		if(pixel != stream->GIOS_transparent)
 		{
-			stream->GIOS_mask |= MASK[stream->GIOS_maskCount]; 
+			stream->GIOS_mask |= MASK[stream->GIOS_maskCount];
 		}
 		stream->GIOS_maskCount++;
 		if(stream->GIOS_maskCount == 8)
@@ -432,7 +432,7 @@ gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 			stream->GIOS_inCount = 0;
 		};
 	};
-	
+
 	if(stream->GIOS_format == BMF_4BIT)
 	{
 		stream->GIOS_outByte = stream->GIOS_outByte << 4;
@@ -444,7 +444,7 @@ gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 			stream->GIOS_inCount = 0;
 		};
 	};
-  
+
 	if(stream->GIOS_format == BMF_8BIT)
 	{
 		outflag = TRUE;
@@ -482,14 +482,14 @@ gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 			stream->GIOS_index++;
 			MemUnlock(stream->GIOS_mem);
 		};
-   
+
 		if(stream->GIOS_maskCount != 0)
 		{
 			array = MemLock(stream->GIOS_mem);
 			array[stream->GIOS_maskIndex]= stream->GIOS_mask;
 			MemUnlock(stream->GIOS_mem);
 		}
-	
+
 		stream->GIOS_index = stream->GIOS_maskoff;
 		stream->GIOS_x = 0;
 		stream->GIOS_inCount = 0;
@@ -532,7 +532,7 @@ gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 //			if(status != NULL)
 //			{
 //				flag = @call status::MSG_SB_SET_STATUS_VALUE(((dword)stream->GIOS_ycount)*100/stream->GIOS_height);
-//		
+//
 //				if(flag == FALSE)
 //					return(IBS_IMPORT_STOPPED);
 //			}
@@ -548,8 +548,8 @@ gifImpPutPixel(gifImpOutStream *stream, byte pixel)
 
 //*********************************************************************
 
-GifError 
-gifImpReadPic(FileHandle file, 
+GifError
+gifImpReadPic(FileHandle file,
 		gifImpOutStream *out_stream, word pixSize) /* status param needed here */
 {
 	byte CodeMask[] = {1, 3, 7, 15, 31, 63, 127, 255};
@@ -626,7 +626,7 @@ gifImpReadPic(FileHandle file,
 		{
 			if(OutCount)
 			{
-				for(i = OutCount-1; 
+				for(i = OutCount-1;
 				((i >= 0)&&(stat == GE_NO_ERROR)&&(out_stream->GIOS_finished == FALSE)); i--)
 				{
 					stat = gifImpPutPixel(out_stream, table->Outcode[i]);
@@ -652,11 +652,11 @@ gifImpReadPic(FileHandle file,
 				{
 					table->Prefix[i] = table->Suffix[i] = 0;
 				};
-	
+
 				CodeSize = InitCodeSize;
 				MaxCode = ClearCode*2;
 				FreeCode = FirstFree;
-				
+
 				do
 				{
 					stat = gifImpReadCode(&in_stream, &Code, CodeSize);
@@ -674,7 +674,7 @@ gifImpReadPic(FileHandle file,
 					CurCode = Code;
 					OldCode = Code;
 					FinChar = Code & BitMask;
-					stat = gifImpPutPixel(out_stream, 
+					stat = gifImpPutPixel(out_stream,
 							FinChar);
 				};
 			}
@@ -697,36 +697,36 @@ gifImpReadPic(FileHandle file,
 					OutCount++;
 					CurCode = table->Prefix[CurCode];
 				};
-			
+
 				FinChar = CurCode & BitMask;
 
 				table->Outcode[OutCount] = FinChar;
 				OutCount++;
-  
-				for(i = OutCount-1; 
+
+				for(i = OutCount-1;
 					((i >= 0)&&(stat == GE_NO_ERROR)&&(out_stream->GIOS_finished == FALSE)); i--)
 				{
 					stat = gifImpPutPixel(out_stream, table->Outcode[i]);
 				};
 				OutCount = 0;
-				
+
 				if(FreeCode < (1 << 12))
 				{
 					table->Prefix[FreeCode] = OldCode;
 					table->Suffix[FreeCode] = FinChar;
 					FreeCode++;
-				
+
 					if((FreeCode>=MaxCode)&&(CodeSize<12))
 					{
 						CodeSize++;
 						MaxCode=MaxCode<<1;
 					};
 				};
-			 
+
 				OldCode = InCode;
 			};
 		 };
-	} 
+	}
 	while ((Code!=EOFCode)&&(stat == GE_NO_ERROR)&&
 	   (out_stream->GIOS_finished == FALSE));
 
@@ -743,7 +743,7 @@ gifImpReadPic(FileHandle file,
 **********************************************************************/
 
 VMBlockHandle _pascal _export
-GifImportBitmapFName(PathName srcname, VMFileHandle destfile, 
+GifImportBitmapFName(PathName srcname, VMFileHandle destfile,
 				GifError *error)
 {
 	FileHandle srcfile;
@@ -762,10 +762,10 @@ GifImportBitmapFName(PathName srcname, VMFileHandle destfile,
 	}
 	else
 		stat = GE_CANT_OPEN_SOURCE_FILE;
-	
+
 	if(error)
 		*error = stat;
-	
+
 	if(stat != GE_NO_ERROR)
 		bmblock = 0;
 
@@ -775,7 +775,7 @@ GifImportBitmapFName(PathName srcname, VMFileHandle destfile,
 //*********************************************************************
 
 VMBlockHandle _pascal _export
-GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile, 
+GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile,
 				GifError *error)
 {
 	GifError stat = GE_NO_ERROR;
@@ -831,7 +831,7 @@ GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile,
 
 	if(GIF_HEADER_GLOB_PAL(&fh))
 	{
-		stat = gifImpGetPalette(srcfile, palmem, 
+		stat = gifImpGetPalette(srcfile, palmem,
 					GIF_HEADER_COL_MAP_SIZE(&fh));
 		if(stat != GE_NO_ERROR)
 		{
@@ -934,7 +934,7 @@ GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile,
 	if(transparent != 0xFFFF)
 		bmformat |= BMT_MASK;
 
-	out_stream.GIOS_block = 
+	out_stream.GIOS_block =
 		GrCreateBitmap(bmformat|BMT_PALETTE|BMT_COMPLEX,
 			pd.GPD_width, pd.GPD_height,
 			destfile, 0, &bmstate);
@@ -944,17 +944,17 @@ GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile,
 
 	/* save palette only for 16 or 256 color bmps */
 	if(
-		((bmformat & 7) >= 1) && 
+		((bmformat & 7) >= 1) &&
 		((GIF_HEADER_GLOB_PAL(&fh) != FALSE) ||
 		(GIF_PIC_DESCRIPTOR_LOCAL_PAL(&pd) != FALSE)))
 	{
 		EGError egstat = EGE_NO_ERROR;
-		
+
 		palette = MemLock(palmem);
 
 		if(palette)
 		{
-			egstat = BmpSetBitmapPalette(destfile, out_stream.GIOS_block, 
+			egstat = BmpSetBitmapPalette(destfile, out_stream.GIOS_block,
 						palette, 0, colMapSize);
 
 			if(egstat != EGE_NO_ERROR)
@@ -996,11 +996,11 @@ GifImportBitmapFHandle(FileHandle srcfile, VMFileHandle destfile,
 
 	/* read pic data */
 	if(stat == GE_NO_ERROR)
-		stat = gifImpReadPic(srcfile, &out_stream, pixSize); 
+		stat = gifImpReadPic(srcfile, &out_stream, pixSize);
 									/* status param needed here */
 
 	if(stat != GE_NO_ERROR)
-		VMFreeVMChain(destfile, 
+		VMFreeVMChain(destfile,
 			VMCHAIN_MAKE_FROM_VM_BLOCK(out_stream.GIOS_block));
 
 	/* free buffer line */
@@ -1041,7 +1041,7 @@ GifImportTestBitmapFName(PathName srcname)
 	}
 	else
 		stat = GE_CANT_OPEN_SOURCE_FILE;
-	
+
 	return(stat);
 };
 

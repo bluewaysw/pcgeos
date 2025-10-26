@@ -1,9 +1,11 @@
-@include "extgraph.goh"
+#include "extgraph.h"
 #include <geos.h>
 #include <vm.h>
 #include <timer.h>
 #include <ec.h>
 #include <graphics.h>
+#include <gstring.h>
+#include <color.h>
 #include <heap.h>
 #include <Ansi/string.h>
 #include <hugearr.h>
@@ -38,7 +40,7 @@ extGrFillMosaicLineReal(GStateHandle gstate, Rectangle *rect, int end, Boolean v
 
 	checkStart = blockStart;
 	checkCount = blockCount = 1;
-	
+
 	startPos = localPos;
 
 	while((localPos < end) && (localPos >= startPos))
@@ -57,10 +59,10 @@ extGrFillMosaicLineReal(GStateHandle gstate, Rectangle *rect, int end, Boolean v
 			word loopCount;
 
 			loopCount = 0;
-			while(loopCount < toDo) 
+			while(loopCount < toDo)
 			{
 				GrDrawHugeBitmap(gstate, rect->R_left, localPos + (loopCount * stepPoints), file, block);
-				
+
 				loopCount++;
 			}
 		}
@@ -69,10 +71,10 @@ extGrFillMosaicLineReal(GStateHandle gstate, Rectangle *rect, int end, Boolean v
 			word loopCount;
 
 			loopCount = 0;
-			while(loopCount < toDo) 
+			while(loopCount < toDo)
 			{
 				GrDrawHugeBitmap(gstate, localPos + (loopCount * stepPoints), rect->R_top, file, block);
-				
+
 				loopCount++;
 			}
 		}
@@ -100,7 +102,7 @@ extGrFillMosaicLineReal(GStateHandle gstate, Rectangle *rect, int end, Boolean v
 					rect->R_bottom - 1) == TRRT_IN)
 					break;
 			}
-			
+
 			clipStat = TRUE;
 			toDo --;
 		}
@@ -156,7 +158,7 @@ extGrFillMosaicLine(GStateHandle gstate, Rectangle *rect, int end, Boolean vert,
 
 	checkStart = blockStart;
 	checkCount = blockCount = 1;
-	
+
 	startPos = localPos;
 
 	while((localPos < end) && (localPos >= startPos))
@@ -172,16 +174,16 @@ extGrFillMosaicLine(GStateHandle gstate, Rectangle *rect, int end, Boolean vert,
 
 		if(vert)
 		{
-			GrBitBlt(gstate, rect->R_left, blockStart,  
-				rect->R_left, localPos, 
+			GrBitBlt(gstate, rect->R_left, blockStart,
+				rect->R_left, localPos,
 				bandWidth, stepPoints * toDo,
 				BLTM_COPY);
 		}
 		else
 		{
-			GrBitBlt(gstate, blockStart, rect->R_top,  
+			GrBitBlt(gstate, blockStart, rect->R_top,
 				localPos, rect->R_top,
-				stepPoints * toDo, bandWidth, 
+				stepPoints * toDo, bandWidth,
 				BLTM_COPY);
 		}
 
@@ -208,7 +210,7 @@ extGrFillMosaicLine(GStateHandle gstate, Rectangle *rect, int end, Boolean vert,
 					rect->R_bottom - 1) == TRRT_IN)
 					break;
 			}
-			
+
 			clipStat = TRUE;
 			toDo --;
 		}
@@ -276,7 +278,7 @@ BmpGetBitmapType(VMFileHandle file, VMBlockHandle block, EGError *error)
 	MemHandle mem;
 	byte *ptr;
 // word defined in the Bitmap structure <graphics.h>
-	BMType bmtype;	
+	BMType bmtype;
 
 	ptr = VMLock(file, block, &mem);
 
@@ -305,7 +307,7 @@ BmpGetBitmapCompact(VMFileHandle file, VMBlockHandle block, EGError *error)
 	MemHandle mem;
 	byte *ptr;
 // word defined in the Bitmap structure <graphics.h>
-	BMCompact bmcompact;	
+	BMCompact bmcompact;
 
 	ptr = VMLock(file, block, &mem);
 
@@ -328,7 +330,7 @@ BmpGetBitmapCompact(VMFileHandle file, VMBlockHandle block, EGError *error)
 /***************************************************************************/
 
 word _pascal _export
-BmpGetBitmapPalette(VMFileHandle file, VMBlockHandle block, 
+BmpGetBitmapPalette(VMFileHandle file, VMBlockHandle block,
 	RGBValue *pal, word size, EGError *error)
 {
 	EGError stat = EGE_NO_ERROR;
@@ -384,7 +386,7 @@ BmpGetBitmapPalette(VMFileHandle file, VMBlockHandle block,
 				{
 					size --;
 
-					pal[size] = palsrc[size];		
+					pal[size] = palsrc[size];
 				}
 			}
 			else
@@ -409,16 +411,16 @@ BmpGetBitmapPalette(VMFileHandle file, VMBlockHandle block,
 
 EGError _pascal _export
 BmpFillBitmapMosaic(
-	GStateHandle gstate,	// where to put the bitmap mosaic to 
-    VMFileHandle file,		// vm file containing the bitmap 
+	GStateHandle gstate,	// where to put the bitmap mosaic to
+    VMFileHandle file,		// vm file containing the bitmap
 	VMBlockHandle block,	// block of huge bitmap
     sword x1,				// rectangle to fill with the mosaic
-	sword y1, 
-	sword x2, 
-	sword y2, 
-	sword off_x,			// offset from the left top edge of the 
+	sword y1,
+	sword x2,
+	sword y2,
+	sword off_x,			// offset from the left top edge of the
 							// output rectangle into the area
-	sword off_y, 
+	sword off_y,
 	Boolean clip)			// hard clip at the rectangle boundaries
 //*****
 {
@@ -454,13 +456,13 @@ BmpGStringToBitmap(VMFileHandle srcfile, VMBlockHandle gsblock,
 	{
 		stat = EGE_ILLEGAL_BITMAP_SIZE;
 		goto end;
-	}		
+	}
 
 	// build palette if needed
 	if(bmtype & BMT_PALETTE)
 	{
 		if((bmformat > BMF_MONO) && (bmformat < BMF_24BIT))
-		{	
+		{
 //			colortab = 16;
 //			if(bmformat == BMF_8BIT)
 //				colortab = 256;
@@ -501,7 +503,7 @@ BmpGStringToBitmap(VMFileHandle srcfile, VMBlockHandle gsblock,
 	{
 		if(palette)
 			MemFree(palette);
-		
+
 		// destroy vm chain
 		VMFreeVMChain(destfile, VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock));
 
@@ -518,7 +520,7 @@ BmpGStringToBitmap(VMFileHandle srcfile, VMBlockHandle gsblock,
 		if(palptr)
 		{
 			// set bitmap palette
-//			stat = BmpSetBitmapPalette(destfile, bmblock, 
+//			stat = BmpSetBitmapPalette(destfile, bmblock,
 //				palptr, 0, colortab);
 
 			MemUnlock(palette);
@@ -540,25 +542,86 @@ BmpGStringToBitmap(VMFileHandle srcfile, VMBlockHandle gsblock,
 	bmstate = GrEditBitmap(destfile, bmblock, 0);
 	if(bmstate)
 	{
-		// set gstate palette for color mapping
-/*
-		if(colortab)
+		GStateHandle gstring = GrLoadGString(srcfile, GST_VMEM, gsblock);
+
+		if(gstring)
 		{
-//			stat = PalGStateCreateBmpPalette(bmstate, destfile, bmblock);
+			Rectangle bounds;
+			sword drawX;
+			sword drawY;
 
-			// if mask set highest color to white and fill the bg
-			if(bmtype & BMT_MASK)
-			{
-				GrSetAreaColor(bmstate, CF_RGB, 255, 255, 255);
-				GrFillRect(bmstate, 0, 0, width, height);
+			// define color mapping for the final draw
+			GrSetAreaColorMap(bmstate, CMT_CLOSEST);
+			GrSetTextColorMap(bmstate, CMT_CLOSEST);
+
+			GrGetGStringBounds(gstring, bmstate, 0, &bounds);
+			drawX = -bounds.R_left;
+			drawY = -bounds.R_top;
+
+				if(bmtype & BMT_MASK)
+				{
+					word originalBitmapMode = GrGetBitmapMode(bmstate);
+					word originalMixMode = GrGetMixMode(bmstate);
+					word element = 0;
+					Boolean maskDone = FALSE;
+					Boolean maskActive = FALSE;
+
+					GrSaveState(bmstate);
+					GrSetBitmapMode(bmstate, BM_EDIT_MASK, 0);
+					maskActive = (GrGetBitmapMode(bmstate) & BM_EDIT_MASK) ? TRUE : FALSE;
+
+					if(maskActive)
+				{
+					// Populate the mask by redrawing with MM_SET so painted pixels become opaque
+					GrClearBitmap(bmstate);
+					GrSetMixMode(bmstate, MM_SET);
+					GrSetAreaColor(bmstate, CF_INDEX, 1, 0, 0);
+					GrSetLineColor(bmstate, CF_INDEX, 1, 0, 0);
+					GrSetTextColor(bmstate, CF_INDEX, 1, 0, 0);
+
+					do
+					{
+						word drawResult;
+
+					drawResult = GrDrawGString(bmstate, gstring, drawX, drawY, GSC_ATTR, &element);
+					if(drawResult == GSRT_FAULT)
+					{
+						stat = EGE_BLOCK_LOCKING_FAILURE;
+						maskDone = TRUE;
+						break;
+					}
+						if(element == GR_SET_MIX_MODE)
+						{
+							GrSetGStringPos(gstring, GSSPT_SKIP_1, 0);
+							continue;
+						}
+
+						if((drawResult == GSRT_COMPLETE) || (element == GR_END_GSTRING))
+						{
+							maskDone = TRUE;
+						}
+					} while(maskDone == FALSE);
+				}
+
+				GrRestoreState(bmstate);
+				GrSetBitmapMode(bmstate, originalBitmapMode, 0);
+				GrSetMixMode(bmstate, originalMixMode);
+				GrSetGStringPos(gstring, GSSPT_BEGINNING, 0);
 			}
-		}
-*/
-		// define color mapping
-		GrSetAreaColorMap(bmstate, CMT_CLOSEST);
-		GrSetTextColorMap(bmstate, CMT_CLOSEST);
 
-		stat = ExtGrDrawGString(bmstate, 0, 0,srcfile, gsblock);
+			// draw image data into the bitmap plane
+			if(stat == EGE_NO_ERROR)
+			{
+				word finalElement = 0;
+				GrDrawGString(bmstate, gstring, drawX, drawY, 0, &finalElement);
+			}
+
+			GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+		}
+		else
+		{
+			stat = EGE_BLOCK_LOCKING_FAILURE;
+		}
 
 		GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
 	}
@@ -569,8 +632,8 @@ BmpGStringToBitmap(VMFileHandle srcfile, VMBlockHandle gsblock,
 
 		stat = EGE_BLOCK_LOCKING_FAILURE;
 	}
-	
-end:	
+
+end:
 	if(error)
 		*error = stat;
 
@@ -595,10 +658,10 @@ BmpCheckMaskType(VMFileHandle file, VMBlockHandle block, SizeAsDWord size)
 	word elemSize;
 	byte *elemPtr;
 	BMType bmType;
-	
+
 	bmType = BmpGetBitmapType(file, block, 0);
-	
-	if(bmType & BMT_MASK) 
+
+	if(bmType & BMT_MASK)
 	{
 		while(loopCount < DWORD_HEIGHT(size))
 		{
@@ -610,7 +673,7 @@ BmpCheckMaskType(VMFileHandle file, VMBlockHandle block, SizeAsDWord size)
 
 				/* check line for pixels */
 				lineLoop = 0;
-				while(lineLoop < ((DWORD_WIDTH(size) + 7) / 8)) 
+				while(lineLoop < ((DWORD_WIDTH(size) + 7) / 8))
 				{
 					byte byteMask = 0xFF;
 
@@ -618,12 +681,12 @@ BmpCheckMaskType(VMFileHandle file, VMBlockHandle block, SizeAsDWord size)
 					{
 						byte bitMask[] = {0x80, 0x0C0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF};
 
-						byteMask = bitMask[DWORD_WIDTH(size) % 8];  
+						byteMask = bitMask[DWORD_WIDTH(size) % 8];
 					}
 
 					if(elemPtr[lineLoop] & byteMask)
 					{
-						if((elemPtr[lineLoop] & byteMask) == byteMask) 
+						if((elemPtr[lineLoop] & byteMask) == byteMask)
 						{
 							if((lineLoop == 0) && (loopCount == 0))
 							{
@@ -675,16 +738,16 @@ BmpCheckMaskType(VMFileHandle file, VMBlockHandle block, SizeAsDWord size)
 // function BmpFillBitmapMosaic
 EGError _pascal _export
 ExtGrFillMosaic(
-	GStateHandle gstate,	// where to put the bitmap mosaic to 
-    VMFileHandle file,		// vm file containing the bitmap 
+	GStateHandle gstate,	// where to put the bitmap mosaic to
+    VMFileHandle file,		// vm file containing the bitmap
 	VMBlockHandle block,	// block of huge bitmap
     sword x1,				// rectangle to fill with the mosaic
-	sword y1, 
-	sword x2, 
-	sword y2, 
-	sword off_x,			// offset from the left top edge of the 
+	sword y1,
+	sword x2,
+	sword y2,
+	sword off_x,			// offset from the left top edge of the
 							// output rectangle into the area
-	sword off_y, 
+	sword off_y,
 	Boolean clip,			// hard clip at the rectangle boundaries
 	EGMosaicSourceType srctype)	// describes what kind of data
 								// is stored in the block to put out
@@ -710,7 +773,7 @@ ExtGrFillMosaic(
 		bmp_size = BmpGetBitmapSize(file, block, &stat);
 	else
 		if(srctype == EGMST_GSTRING)
-			bmp_size = ExtGrGetGStringSize(file, block, &stat);	
+			bmp_size = ExtGrGetGStringSize(file, block, &stat);
 		else
 		{
 			return(EGE_ILLEGAL_MOSIAC_SRC_TYPE);
@@ -718,18 +781,18 @@ ExtGrFillMosaic(
 
 	// as soon as we have transparent bitmaps with a mask we have to redraw (if forced to)
 	// as soon as we have transparent empty bitmaps we have to do nothing
-	if(srctype == EGMST_BITMAP) 
+	if(srctype == EGMST_BITMAP)
 	{
 		BmpMaskType maskType;
 
 		maskType = BmpCheckMaskType(file, block, bmp_size);
 
-		if(maskType == EGBMT_EMPTY) 
+		if(maskType == EGBMT_EMPTY)
 		{
 			return EGE_NO_ERROR;
 		}
 
-		if(maskType == EGBMT_PART) 
+		if(maskType == EGBMT_PART)
 		{
 			realDraw = TRUE;
 		}
@@ -753,7 +816,7 @@ ExtGrFillMosaic(
 		if(winBounds.R_bottom > y2)
 			winBounds.R_bottom = y2;
 	}
-	
+
 	bmpSizeX = DWORD_WIDTH(bmp_size);
 	bmpSizeY = DWORD_HEIGHT(bmp_size);
 
@@ -793,7 +856,7 @@ ExtGrFillMosaic(
 			GrRestoreState(gstate);
 		return(EGE_WRONG_COORDINATES_Y);
 	}
-		
+
 	loopY = start_y;
     loopX = start_x;
     while(((loopY < y2) && (loopY >= start_y))
@@ -809,7 +872,7 @@ ExtGrFillMosaic(
 		outRect.R_bottom = loopY + bmpSizeY;
 
 		visRect = outRect;
-		
+
 		if(visRect.R_left < winBounds.R_left)
 			visRect.R_left = winBounds.R_left;
 		if(visRect.R_right > winBounds.R_right)
@@ -820,8 +883,8 @@ ExtGrFillMosaic(
 			visRect.R_bottom = winBounds.R_bottom;
 
 		visIn = (GrTestRectInMask(gstate,
-					visRect.R_left, visRect.R_top, 
-					visRect.R_right - 1, visRect.R_bottom - 1) 
+					visRect.R_left, visRect.R_top,
+					visRect.R_right - 1, visRect.R_bottom - 1)
 					== TRRT_IN);
 
 		/* if completly in width */
@@ -837,8 +900,8 @@ ExtGrFillMosaic(
 				ExtGrDrawGString(gstate, loopX, loopY, file, block);
 
 			loopY += bmpSizeY;
-			
-			if(realDraw) 
+
+			if(realDraw)
 			{
 				result = extGrFillMosaicLineReal(gstate, &visRect, x2, FALSE, file, block, srctype, &stat);
 			}
@@ -854,14 +917,14 @@ ExtGrFillMosaic(
 						visRect.R_right = x2;
 
 						// if full height of the last line simply copy it
-						if(realDraw) 
+						if(realDraw)
 						{
-							extGrFillMosaicLineReal(gstate, &visRect, y2, 
+							extGrFillMosaicLineReal(gstate, &visRect, y2,
 								TRUE, file, block, srctype, &stat);
 						}
 						else
 						{
-							extGrFillMosaicLine(gstate, &visRect, y2, 
+							extGrFillMosaicLine(gstate, &visRect, y2,
 								TRUE, &stat);
 						}
 
@@ -886,11 +949,11 @@ ExtGrFillMosaic(
 				loopX += bmpSizeX;
 				if(realDraw)
 				{
-					result = extGrFillMosaicLineReal(gstate, &visRect, y2, TRUE, file, block, srctype, &stat); 
+					result = extGrFillMosaicLineReal(gstate, &visRect, y2, TRUE, file, block, srctype, &stat);
 				}
 				else
 				{
-					result = extGrFillMosaicLine(gstate, &visRect, y2, TRUE, &stat); 
+					result = extGrFillMosaicLine(gstate, &visRect, y2, TRUE, &stat);
 				}
 				if(!result)
 					if((loopX < x2) && (loopX >= start_x))
@@ -902,12 +965,12 @@ ExtGrFillMosaic(
 							// if full height of the last line simply copy it
 							if(realDraw)
 							{
-								extGrFillMosaicLineReal(gstate, &visRect, x2, 
+								extGrFillMosaicLineReal(gstate, &visRect, x2,
 									FALSE, block, file, srctype, &stat);
-							} 
+							}
 							else
 							{
-								extGrFillMosaicLine(gstate, &visRect, x2, 
+								extGrFillMosaicLine(gstate, &visRect, x2,
 									FALSE, &stat);
 							}
 
@@ -945,7 +1008,7 @@ ExtGrFillMosaic(
 						localRect.R_right = localDestX + bmpSizeX;
 						localRect.R_bottom = loopY + bmpSizeY;
 
-						if(realDraw) 
+						if(realDraw)
 						{
 							extGrFillMosaicLineReal(gstate, &localRect, x2, FALSE, file, block, srctype, &stat);
 						}
@@ -976,7 +1039,7 @@ ExtGrFillMosaic(
 /***************************************************************************/
 
 EGError _pascal _export
-BmpSetBitmapPalette(VMFileHandle file, VMBlockHandle block, 
+BmpSetBitmapPalette(VMFileHandle file, VMBlockHandle block,
 					RGBValue *palptr, byte start, word count)
 {
 	EGError stat = EGE_NO_ERROR;
@@ -998,13 +1061,13 @@ BmpSetBitmapPalette(VMFileHandle file, VMBlockHandle block,
 			(bmtype & BMT_PALETTE))
 		{
 			offset = *((word*)(&bmptr[0x28]));
-			palsize = *((word*)(&bmptr[offset + 0x1a])); 
+			palsize = *((word*)(&bmptr[offset + 0x1a]));
 			bmpalptr = (RGBValue*) (&bmptr[offset + 0x1c]);
 
 			if((((word)start) + count) > palsize)
 				stat = EGE_ILLEGAL_PALETTE_ENTRIES;
 			else
-				memcpy(&bmpalptr[start], palptr, count * sizeof(RGBValue));	
+				memcpy(&bmpalptr[start], palptr, count * sizeof(RGBValue));
 		}
 		else
 			stat = EGE_BITMAP_NO_PALETTE;
@@ -1021,7 +1084,7 @@ BmpSetBitmapPalette(VMFileHandle file, VMBlockHandle block,
 /***************************************************************************/
 
 EGError _pascal _export
-BmpSetBitmapPaletteEntry(VMFileHandle file, VMBlockHandle block, 
+BmpSetBitmapPaletteEntry(VMFileHandle file, VMBlockHandle block,
 					byte red, byte green, byte blue, byte entry)
 {
 	RGBValue color;
@@ -1034,4 +1097,3 @@ BmpSetBitmapPaletteEntry(VMFileHandle file, VMBlockHandle block,
 }
 
 /***************************************************************************/
-

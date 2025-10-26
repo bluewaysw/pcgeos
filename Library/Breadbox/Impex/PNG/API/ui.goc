@@ -1,0 +1,365 @@
+/***********************************************************************
+ *
+ * MODULE:    PNG Import/Export UI
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/gItemGC.goh>
+@include <Objects/gValueC.goh>
+@include <Objects/colorC.goh>
+
+#include <pnglib.h>
+
+/* Accessing elements of a duplicated UI resource - combines known offset with current handle */
+@define dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
+@define dupHan(uiHandle, obj) ConstructOptr(uiHandle, OptrToChunk(obj))
+
+/* Some forward declarations */
+MemHandle _pascal _export GatherExportOptions(Handle dialogHan);
+MemHandle _pascal _export GatherImportOptions(Handle dialogHan);
+void _pascal _export PngGetImportOptionsFromUI(Handle dialogHan, pngAlphaTransformData* patdP);
+
+/* Derives classes, Messages */
+@class PngImportGroupClass, GenInteractionClass;
+
+    @instance pngAlphaTransformData pngAlphaTransform = {0};
+
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PNG_ALPHA_METHOD_SELECTED;
+    @message (GEN_TRIGGER_ACTION) MSG_RESET_PNG_IMPORT_DIALOG;
+    @message (GEN_TRIGGER_ACTION) MSG_DISMISS_PNG_IMPORT_DIALOG;
+
+@endc
+@classdecl PngImportGroupClass;
+
+@start ImportInterface;
+
+/*----- Alpha handling method selection -----*/
+
+@object GenItemClass PngAlphaMethodBlend = {
+    GI_visMoniker = "Blend with Background Color";
+    GII_identifier = PNG_AT_BLEND;
+}
+
+@object GenItemClass PngAlphaMethodMask = {
+    GI_visMoniker = "Convert to 1-bit Mask";
+    GII_identifier = PNG_AT_TRESHOLD;
+}
+
+@object GenItemGroupClass PngAlphaMethodGroup = {
+    GI_visMoniker = "Alpha Channel Conversion:";
+    GIGI_selection = PNG_AT_BLEND;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GI_comp = @PngAlphaMethodBlend, @PngAlphaMethodMask;
+    GIGI_destination = @ImportGroup;
+    GIGI_applyMsg = MSG_PNG_ALPHA_METHOD_SELECTED;
+
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+    HINT_ITEM_GROUP_RADIO_BUTTON_STYLE; // HINT_ITEM_GROUP_TAB_STYLE;
+}
+
+/*----- Alpha blend color selection -----*/
+
+@object GenTextClass PngAlphaBlendExplain = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Blend transparency into one background color you pick. Semi-transparent parts get mixed so the final image has no transparency.";
+
+}
+
+@object ColorSelectorClass PngAlphaBlendColor = {
+    GI_visMoniker = "Blend color:";
+    CSI_color = {C_WHITE, CF_INDEX, 0, 0};
+    GI_states = @default | GS_USABLE | GS_ENABLED;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    ATTR_GEN_CONTROL_REQUIRE_UI = (CSF_INDEX | CSF_RGB | CSF_OTHER);
+    ATTR_GEN_CONTROL_PROHIBIT_UI = (CSF_PATTERN | CSF_DRAW_MASK);
+}
+
+@object GenInteractionClass PngAlphaBlendBox = {
+    GI_visMoniker = "Blend Settings";
+    GI_comp = @PngAlphaBlendExplain, @PngAlphaBlendColor;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+/*----- Alpha to mask selection -----*/
+
+@object GenTextClass PngAlphaMaskExplain = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Convert continuous transparency to on/off. Pixels become fully opaque or transparent. At or above the threshold stays opaque, below turns transparent. A higher threshold makes more pixels transparent.";
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenValueClass PngAlphaThresholdValue = {
+    GI_visMoniker = "Alpha threshold:";
+    GVLI_minimum = MakeWWFixed(1);
+    GVLI_maximum = MakeWWFixed(255);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_value = MakeWWFixed(192);
+    GVLI_displayFormat = GVDF_INTEGER;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PngAlphaMaskBox = {
+    GI_visMoniker = "Mask Settings";
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @PngAlphaMaskExplain, @PngAlphaThresholdValue;
+
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+/*----- Reply bar and wrapper -----*/
+
+@object GenTriggerClass PngImportApplyButton = {
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass PngImportResetButton = {
+    GI_visMoniker = "Reset";
+    GTI_actionMsg = MSG_RESET_PNG_IMPORT_DIALOG;
+    GTI_destination = @ImportGroup;
+
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PngImportCancelButton = {
+    GI_visMoniker = "Cancel";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    GTI_actionMsg = MSG_DISMISS_PNG_IMPORT_DIALOG;
+    GTI_destination = @ImportGroup;
+
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass PngImportReplyBar = {
+    GI_comp = @PngImportApplyButton, @PngImportResetButton, @PngImportCancelButton;
+
+    HINT_MAKE_REPLY_BAR;
+}
+
+@object PngImportGroupClass ImportGroup = {
+    GI_visMoniker = "Import Options";
+    GI_states = @default & ~GS_USABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_MODAL;
+    GI_comp = @PngAlphaMethodGroup, @PngAlphaBlendBox, @PngAlphaMaskBox, @PngImportReplyBar;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@end ImportInterface;
+
+
+@start ExportInterface;
+
+@object GenItemClass PngExpBit1 = {
+    GI_visMoniker = 'M', "Monochrome (1 bit/pixel)";
+    GII_identifier = 0;
+}
+
+@object GenItemClass PngExpBit4 = {
+    GI_visMoniker = '1', "16 colors (4 bits/pixel)";
+    GII_identifier = 1;
+}
+
+@object GenItemClass PngExpBit8 = {
+    GI_visMoniker = '2', "256 colors (8 bits/pixel)";
+    GII_identifier = 2;
+}
+
+@object GenItemClass PngExpBit24 = {
+    GI_visMoniker = 'T', "TrueColor (32 bits/pixel, RGBA)";
+    GII_identifier = 3;
+}
+
+@object GenItemGroupClass PngExpFormGroup = {
+    GIGI_selection = 3;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GI_comp = @PngExpBit1, @PngExpBit4, @PngExpBit8, @PngExpBit24;
+
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenInteractionClass PngExpBitFormat = {
+    GI_visMoniker = 'C', "Colors:";
+    GI_comp = @PngExpFormGroup;
+}
+
+@object GenInteractionClass ExportGroup = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @PngExpBitFormat;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@end ExportInterface;
+
+/*---------------------------------------------------------------------------
+ *  Helper used by TransGetExportOptions to gather export options.
+ *---------------------------------------------------------------------------*/
+MemHandle _pascal _export GatherExportOptions(Handle dialogHan)
+{
+    MemHandle optionsHan;
+    word *optionsPtr;
+    optr formGroup = ConstructOptr(dialogHan, OptrToChunk(@PngExpFormGroup));
+    word selection;
+
+    // Get the selected format option
+    selection = @call formGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    // Allocate and fill options structure
+    optionsHan = MemAlloc(sizeof(word), HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+    if (optionsHan == NullHandle) {
+        return NullHandle;
+    }
+
+    optionsPtr = (word *) MemLock(optionsHan);
+    if (optionsPtr == NULL) {
+        MemFree(optionsHan);
+        return NullHandle;
+    }
+
+    *optionsPtr = selection;
+    MemUnlock(optionsHan);
+
+    return optionsHan;
+}
+
+/*---------------------------------------------------------------------------
+ *  Helper used by TransGetImportOptions to gather import options.
+ *---------------------------------------------------------------------------*/
+MemHandle _pascal _export GatherImportOptions(Handle dialogHan)
+{
+    MemHandle               patdH;
+    pngAlphaTransformData*  patdP;
+
+    patdH = MemAlloc(sizeof(pngAlphaTransformData), HF_SWAPABLE, HAF_ZERO_INIT);
+    if (patdH == NullHandle)
+    {
+        return NullHandle;
+    }
+
+    patdP = (pngAlphaTransformData *) MemLock(patdH);
+    if (patdP == NULL)
+    {
+        MemFree(patdH);
+        return NullHandle;
+    }
+
+    PngGetImportOptionsFromUI(dialogHan, patdP);
+    MemUnlock(patdH);
+
+    return patdH;
+}
+
+/*---------------------------------------------------------------------------
+ *  Helper used by MSG_VIS_OPEN to set the UI elements to reflect current
+ *  import options.
+ *---------------------------------------------------------------------------*/
+
+void _pascal _export PngGetImportOptionsFromUI(Handle dialogHan, pngAlphaTransformData* patdP)
+{
+    ColorAndFlagReturn   cafr;
+
+    patdP->method = @call @dupHan(dialogHan, @PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    patdP->alphaThreshold = (byte) @call @dupHan(dialogHan, @PngAlphaThresholdValue)::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    @call @dupHan(dialogHan, @PngAlphaBlendColor)::MSG_COLOR_SELECTOR_GET_COLOR(&cafr);
+
+    // convert INDEX to RGB
+    if(cafr.CAFR_color.CQ_info == CF_INDEX)
+    {
+        RGBColorAsDWord c = GrMapColorIndex(0, cafr.CAFR_color.CQ_redOrIndex);
+        patdP->blendColor.RGB_red = RGB_RED(c);
+        patdP->blendColor.RGB_green = RGB_GREEN(c);
+        patdP->blendColor.RGB_blue = RGB_BLUE(c);
+    }
+    else if (cafr.CAFR_color.CQ_info == CF_RGB)
+    {
+        patdP->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_green = cafr.CAFR_color.CQ_green;
+        patdP->blendColor.RGB_blue = cafr.CAFR_color.CQ_blue;
+    }
+    else if (cafr.CAFR_color.CQ_info == CF_GRAY)
+    {
+        patdP->blendColor.RGB_red = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_green = cafr.CAFR_color.CQ_redOrIndex;
+        patdP->blendColor.RGB_blue = cafr.CAFR_color.CQ_redOrIndex;
+    }
+}
+
+@method PngImportGroupClass, MSG_VIS_OPEN
+{
+    @callsuper();
+
+    PngGetImportOptionsFromUI(OptrToHandle(oself), &pself->pngAlphaTransform);
+}
+
+@method PngImportGroupClass, MSG_PNG_ALPHA_METHOD_SELECTED
+{
+    if (selection == GIGS_NONE)
+    {
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else if (selection == 1)
+    {
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else
+    {
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+}
+
+@method PngImportGroupClass, MSG_RESET_PNG_IMPORT_DIALOG
+{
+    ColorQuad   defaultBlendColor = {C_WHITE, CF_INDEX, 0, 0};
+
+    @call @dup(@PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(PNG_AT_BLEND, FALSE);
+    @call @dup(@PngAlphaBlendColor)::MSG_COLOR_SELECTOR_SET_COLOR(defaultBlendColor, FALSE);
+    @call @dup(@PngAlphaThresholdValue)::MSG_GEN_VALUE_SET_INTEGER_VALUE(192, FALSE);
+
+    @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+}
+
+@method PngImportGroupClass, MSG_DISMISS_PNG_IMPORT_DIALOG
+{
+    ColorQuad   orginalBlendColor = {C_WHITE, CF_INDEX, 0, 0};
+
+    orginalBlendColor.CQ_info = CF_RGB;
+    orginalBlendColor.CQ_redOrIndex = pself->pngAlphaTransform.blendColor.RGB_red;
+    orginalBlendColor.CQ_green = pself->pngAlphaTransform.blendColor.RGB_green;
+    orginalBlendColor.CQ_blue = pself->pngAlphaTransform.blendColor.RGB_blue;
+
+    @call @dup(@PngAlphaMethodGroup)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(pself->pngAlphaTransform.method, FALSE);
+    @call @dup(@PngAlphaBlendColor)::MSG_COLOR_SELECTOR_SET_COLOR(orginalBlendColor, FALSE);
+    @call @dup(@PngAlphaThresholdValue)::MSG_GEN_VALUE_SET_INTEGER_VALUE(pself->pngAlphaTransform.alphaThreshold , FALSE);
+
+    if (pself->pngAlphaTransform.method == PNG_AT_BLEND)
+    {
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+    else
+    {
+        @call @dup(@PngAlphaMaskBox)::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+        @call @dup(@PngAlphaBlendBox)::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    }
+}
