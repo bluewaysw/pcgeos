@@ -6,7 +6,7 @@
 @include <Objects/metaC.goh>
 @include <Objects/visC.goh>
 @include "giflib.goh"
-@include <extgraph.goh>
+#include <extgraph.h>
 
 #include <vm.h>
 #include <file.h>
@@ -45,7 +45,7 @@ typedef struct
 	int		GES_outCount;
 	FileHandle	GES_outFile;
 	byte	GES_rasterOut;
-	byte	GES_rasterData[256];    
+	byte	GES_rasterData[256];
 	int		GES_EOFcode;
 	byte	GES_writeBuf[GIF_EXPORT_WRITE_BUF_SIZE];
 	word	GES_writeBufLeft;
@@ -117,13 +117,13 @@ gifExpFileWrite(gifExpStream *stream, byte *buf, word size)
 			memcpy(&stream->GES_writeBuf[stream->GES_writeBufPos],
 					&buf[srcpos], stream->GES_writeBufLeft);
 
-			if(FileWrite(stream->GES_outFile, stream->GES_writeBuf, 
+			if(FileWrite(stream->GES_outFile, stream->GES_writeBuf,
 				GIF_EXPORT_WRITE_BUF_SIZE, 0) != GIF_EXPORT_WRITE_BUF_SIZE)
 				stat = GE_WRITE_PROBLEM;
-					
+
 			srcpos += stream->GES_writeBufLeft;
 			size -= stream->GES_writeBufLeft;
-			stream->GES_writeBufPos = 0; 
+			stream->GES_writeBufPos = 0;
 			stream->GES_writeBufLeft = GIF_EXPORT_WRITE_BUF_SIZE;
 		}
 		else
@@ -151,7 +151,7 @@ gifExpFinishFileWrite(gifExpStream *stream)
 	if(stream->GES_writeBufPos)
 	{
 		if(
-		FileWrite(stream->GES_outFile, stream->GES_writeBuf, 
+		FileWrite(stream->GES_outFile, stream->GES_writeBuf,
 			stream->GES_writeBufPos, 0)
 			!= stream->GES_writeBufPos)
 			stat = GE_WRITE_PROBLEM;
@@ -211,7 +211,7 @@ gifExpFinishRasterDataByteWriting(gifExpStream *stream)
 GifError
 gifExpWriteCode(gifExpStream *stream, int code)
 {
-	static unsigned long masks[] = { 
+	static unsigned long masks[] = {
 		0x0000, 0x0001, 0x0003, 0x0007, 0x000F,
 		0x001F, 0x003F, 0x007F, 0x00FF, 0x01FF,
 		0x03FF, 0x07FF, 0x0FFF, 0x1FFF, 0x3FFF,
@@ -232,9 +232,9 @@ gifExpWriteCode(gifExpStream *stream, int code)
 		// put bytes out
 		stat = gifExpWriteRasterDataByte(stream, stream->GES_outBuf & 0xFF);
 		stream->GES_outBuf >>= 8;
-		stream->GES_outCount -= 8;      
+		stream->GES_outCount -= 8;
 	}
-	
+
 	return(stat);
 }
 
@@ -246,8 +246,8 @@ gifExpFinishCodeWriting(gifExpStream *stream)
 	GifError stat = GE_NO_ERROR;
 
 	if(stream->GES_outCount > 0)
-		stat = gifExpWriteRasterDataByte(stream, 
-			(byte) stream->GES_outBuf << (8 - stream->GES_outCount)); 
+		stat = gifExpWriteRasterDataByte(stream,
+			(byte) stream->GES_outBuf << (8 - stream->GES_outCount));
 
 	return(stat);
 }
@@ -261,7 +261,7 @@ gifExpFindStringInTable(gifExpStream *stream, int pixel)
 	long fcode;
 	int hindex;
 
-	fcode = 
+	fcode =
 	stream->GES_fCode = (((long) pixel << 12) + stream->GES_tabIndex);
 	hindex =
 	stream->GES_hIndex = (((word) pixel << stream->GES_hashShift) ^ stream->GES_tabIndex);
@@ -288,7 +288,7 @@ gifExpFindStringInTable(gifExpStream *stream, int pixel)
 				return(stream->GES_codeTab[hindex]);
 		}
 	}
-			
+
 	return(-1);
 #else
 	int foundIndex;
@@ -319,7 +319,7 @@ gifExpClearCode(gifExpStream *stream)
 	GifError stat = GE_NO_ERROR;
 
 	// write clear code
-	stat = gifExpWriteCode(stream, stream->GES_clearCode); 
+	stat = gifExpWriteCode(stream, stream->GES_clearCode);
 
 	if(stat == GE_NO_ERROR)
 	{
@@ -457,12 +457,12 @@ gifExpWritePixel(gifExpStream *stream, byte pixel)
 	{
 		// write stored index
 		stat = gifExpWriteCode(stream, stream->GES_tabIndex);
-		
+
 		if(stat == GE_NO_ERROR)
 			gifExpTableAddPixel(stream, pixel);
 
 		// save ptr to string K
-		stream->GES_tabIndex = pixel; 
+		stream->GES_tabIndex = pixel;
 	}
 
 	return(stat);
@@ -477,7 +477,7 @@ gifExpWritePixelLine(gifExpStream *stream, BMFormat bitform, byte *lineptr, word
 
 	if(bitform == BMF_8BIT)
 	{
-		while(width && (stat == GE_NO_ERROR))      
+		while(width && (stat == GE_NO_ERROR))
 		{
 			stat = gifExpWritePixel(stream, *lineptr);
 			lineptr ++;
@@ -513,12 +513,12 @@ gifExpWritePixelLine(gifExpStream *stream, BMFormat bitform, byte *lineptr, word
 					byte data_b[2];
 					word data_w;
 				} data;
-	
+
 				data.data_b[0] = *lineptr;
-				data.data_b[1] = 0; 
-	
+				data.data_b[1] = 0;
+
 				localCount = 8;
-	
+
 				while(localCount && width && (stat == GE_NO_ERROR))
 				{
 					data.data_w <<= 1;
@@ -552,7 +552,7 @@ gifExpBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock,
 	BMFormat bitform;
 	SizeAsDWord size_xy;
 	word y;
-	
+
 	// determine bitmap size
 	size_xy = BmpGetBitmapSize(srcfile, bmpblock, &stat);
 	if(stat != GE_NO_ERROR)
@@ -611,14 +611,14 @@ gifExpBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock,
 			MemFree(palmem);
 		}
 		else
-			return(GE_OUT_OF_MEMORY); 
+			return(GE_OUT_OF_MEMORY);
 	}
 	else
 	{
-		handle = GifExportStreamCreate(bitform, width, height, destname, destfile, 
+		handle = GifExportStreamCreate(bitform, width, height, destname, destfile,
 					0, &stat);
 	}
-	
+
 	if(stat != GE_NO_ERROR)
 		return(stat);
 
@@ -629,14 +629,14 @@ gifExpBitmap(VMFileHandle srcfile, VMBlockHandle bmpblock,
 		if(HAL_COUNT(HugeArrayLock(srcfile, bmpblock,
 				  y,&lineptr,&size)))
 		{
-			stat = 
+			stat =
 				GifExportStreamWriteLine(handle, lineptr);
 
 			HugeArrayUnlock(lineptr);
 		}
 		else
 		{
-			GifExportStreamDestroy(handle, TRUE);	
+			GifExportStreamDestroy(handle, TRUE);
 			return(GE_INVALID_BITMAP);
 		}
 
