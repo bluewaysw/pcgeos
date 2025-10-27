@@ -2248,12 +2248,12 @@ Scan_DropOuts :
     Int    band_top = 0;
 
 
+    ras.top = MemDeref( ras.buffer );
+
     while ( band_top >= 0 )
     {
       ras.maxY = (Long)ras.band_stack[band_top].y_max * PRECISION;
       ras.minY = (Long)ras.band_stack[band_top].y_min * PRECISION;
-
-      ras.top = MemDeref( ras.buffer );
 
       ras.error = Raster_Err_None;
 
