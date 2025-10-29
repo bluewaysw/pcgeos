@@ -392,7 +392,7 @@ OLFieldVisSetSize	method	dynamic OLFieldClass, MSG_VIS_SET_SIZE
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
 	tst	si
 	jz	done
-	jmp	done
+	
 	mov	bx, ds:[LMBH_handle]
 
 	push	cx
@@ -405,11 +405,11 @@ OLFieldVisSetSize	method	dynamic OLFieldClass, MSG_VIS_SET_SIZE
 
 	mov	ax, MSG_VIS_SET_SIZE
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	;call	ObjMessage
+	call	ObjMessage
 
 	mov	ax, MSG_VIS_MARK_INVALID
 	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_GEOMETRY_INVALID
-	mov	dl, VUM_NOW
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 	mov	di, mask MF_CALL  or mask MF_FIXUP_DS
 	call	ObjMessage
 
@@ -433,11 +433,11 @@ OLFieldVisSetSize	method	dynamic OLFieldClass, MSG_VIS_SET_SIZE
 done:
 	pop	si
 	DoPop	di, bx
-	;push	bp
+	push	bp
 	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 	mov	dx, MSG_OL_APP_APPLY_FIELD_SIZE_CHANGE
-	;call	ObjCallInstanceNoLock
-	;pop	bp
+	call	ObjCallInstanceNoLock
+	pop	bp
 
 	ret
 

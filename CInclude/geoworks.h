@@ -291,7 +291,12 @@ typedef enum /* word */ {
     GWNT_INSTANT_SUSPEND_RESUME_NOTIFICATION,
 
     GWNT_TCPIP_LINK_STATUS,
-    GWNT_TCPIP_DHCP_STATUS
+    GWNT_TCPIP_DHCP_STATUS,
+
+    GWNT_HOST_DISPLAY_SIZE_CHANGE,
+    GWNT_HOST_SCREEN_FIELD_SIZE_CHANGE,
+    GWNT_HOST_SOCKET_STATE_CHANGE
+
 } GeoWorksNotificationType;
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -32,4 +32,4 @@ DefEscapeTable	2
     DefEscape	VidQEscape, 	DRV_ESC_QUERY_ESC
     				; query esc capability
     DefEscape	VidEscSetDeviceAgain,	VID_ESC_UPDATE_DEVICE
-				; update device for changed display sizee
+				; update device for changed display size

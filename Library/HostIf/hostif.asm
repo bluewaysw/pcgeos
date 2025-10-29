@@ -35,6 +35,7 @@ include vm.def
 include dbase.def
 include file.def
 include gcnlist.def
+include sem.def
 
 include object.def
 include graphics.def
@@ -51,15 +52,35 @@ include Internal/im.def
 DefLib hostif.def
 
 HOST_API_INTERRUPT 	equ 	0xA0
+MAX_ASYNC_OP_SLOTS	equ	16
+
+AsyncSlotData		struct
+ASD_registers		word 6 dup (?)
+ASD_semaphore		Semaphore
+AsyncSlotData		ends
 
 
 HostIfProcessClass	class	ProcessClass
 
-MSG_HOSTIF_DETECT		message
-
 MSG_HOSTIF_PROCESS_EVENTS	message
 
 HostIfProcessClass	endc
+
+idata   segment
+
+	asyncOpSem	Semaphore <1, 0>
+
+	asyncOpTable	fptr MAX_ASYNC_OP_SLOTS dup (0)
+
+idata   ends
+
+
+udata   segment
+
+    	hostIfGeode		hptr
+
+udata   ends
+
 
 Resident	segment	resource
 
@@ -97,20 +118,16 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 HostIfInterrupt	proc	far
 
-	pushf
+	;pushf
 
 	push	ax, bx, cx, dx, si, di, bp, ds, es
 	call	SysEnterInterrupt		; disable context switching
 	cld					;clear direction flag
 	INT_ON
 
-EC <	call	ECCheckStack						>
+	segmov	ds, dgroup
+	mov		bx, ds:hostIfGeode
 
-	segmov	cx, cs
-	call	MemSegmentToHandle	;cx = handle
-
-	mov	bx, cx
-	call	MemOwner
 	;mov_trash	ax, bx
 	mov	ax, MSG_HOSTIF_PROCESS_EVENTS
 	mov	di, mask MF_FORCE_QUEUE
@@ -118,7 +135,7 @@ EC <	call	ECCheckStack						>
 
 	call	SysExitInterrupt
 	pop	ax, bx, cx, dx, si, di, bp, ds, es
-	popf
+	;popf
 	iret
 
 HostIfInterrupt	endp
@@ -128,59 +145,6 @@ Resident	ends
 
 Code	segment	resource
 
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		HostIfProcDetect
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Signs up for the DHCP GCN list.
-
-CALLED BY:	MSG_META_ATTACH
-
-PASS:		*ds:si	= EtherProcessClass object
-		ds:di	= EtherProcessClass instance data
-		ds:bx	= EtherProcessClass object (same as *ds:si)
-		es 	= segment of EtherProcessClass
-		ax	= message #
-RETURN:		ax - interface version, 0 mean no host interface found
-DESTROYED:	
-SIDE EFFECTS:	
-
-PSEUDO CODE/STRATEGY:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	ed	7/03/00   	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-HostIfProcDetect	method dynamic HostIfProcessClass, 
-					MSG_HOSTIF_DETECT
-	.enter
-
-	mov	ax, HIF_API_CHECK
-	call	HostIfCall
-
-	cmp	ax, HIF_OK
-	jne	failed
-	cmp	si, {word} cs:baseboxID
-	jne	failed
-	cmp	bx, {word} cs:baseboxID[2]
-	jne	failed
-	cmp	cx, {word} cs:baseboxID[4]
-	jne	failed
-	cmp	dx, {word} cs:baseboxID[6]
-	jne	failed
-
-	mov	ax, di
-done:
-	.leave
-	ret
-
-failed:
-	mov	ax, 0
-	jmp	done
-
-HostIfProcDetect	endm
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfProcEventProcess
@@ -221,10 +185,45 @@ eventLoop:
 	cmp	ax, HIF_NOT_FOUND
 	je	done
 
+	cmp	ax, HIF_EVENT_NOTIFICATION
+	je	doEvent
+
+	; handle async op result
+	push	ds, bp
+	segmov	ds, dgroup
+
+	push	ax, cx, si
+	mov	cl, ah
+	clr	ch
+	shl	cx
+	shl	cx
+	mov	si, cx
+
+	mov	bp, ds:asyncOpTable[si].offset
+	mov	ds, ds:asyncOpTable[si].segment
+	pop	ax, cx, si
+
+	VSem	ds, [bp].ASD_semaphore
+
+	mov	ds:[bp].ASD_registers, ax
+	mov	ds:[bp+2].ASD_registers, si
+	mov	ds:[bp+4].ASD_registers, bx
+	mov	ds:[bp+6].ASD_registers, cx
+	mov	ds:[bp+8].ASD_registers, dx
+	mov	ds:[bp+10].ASD_registers, di
+
+	pop	ds, bp
+	jmp eventLoop
+
+doEvent:
 	; Record the message
 	mov	ax, MSG_META_NOTIFY
 	mov	cx, MANUFACTURER_ID_GEOWORKS
 	mov	dx, GWNT_HOST_DISPLAY_SIZE_CHANGE
+	cmp	si, HIF_NOTIFY_DISPLAY_SIZE_CHANGE
+	je	useType
+	mov	dx, GWNT_HOST_SOCKET_STATE_CHANGE
+useType:
 	mov	di, mask MF_RECORD
 	call	ObjMessage
 
@@ -232,8 +231,9 @@ eventLoop:
 	mov	bx, MANUFACTURER_ID_GEOWORKS
 	mov	ax, GCNSLT_HOST_NOTIFICATIONS
 	mov	cx, di		; event handle
-	clr	dx, bp		; no additional block sent
+	clr	dx		; no additional block sent
 				; not set status flag
+	mov	bp, mask GCNLSF_FORCE_QUEUE
 	call	GCNListSend
 
 	jmp	eventLoop
@@ -278,6 +278,17 @@ HostIfAttach	method dynamic HostIfProcessClass,
 		mov	di, offset HostIfProcessClass
 		call	ObjCallSuperNoLock
 
+		push	ds
+		segmov	ds, dgroup
+		segmov	cx, cs
+		call	MemSegmentToHandle	;cx = handle
+
+		mov	bx, cx
+		call	MemOwner
+
+		mov	ds:hostIfGeode, bx
+
+		pop		ds
 	; 
 	; Setup interrupt handle
 	;
@@ -327,89 +338,12 @@ HostIfDetach	method dynamic HostIfProcessClass,
 	uses	ax, bx, cx, dx
 	.enter
 
-	;mov	cx, ss:[0].TPD_threadHandle
-	;clr	dx
-	;mov	bx, MANUFACTURER_ID_GEOWORKS
-	;mov	cx, GCNSLT_TCPIP_STATUS_NOTIFICATIONS
-	;call	GCNListRemove
-
 	.leave
 	mov	di, offset HostIfProcessClass
 	call	ObjCallSuperNoLock
 
 	ret
 HostIfDetach	endm
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		HostIfEntry
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Entry point for the kernel's benefit
-
-CALLED BY:	kernel
-PASS:		di	= LibraryCallTypes
-		cx	= handle of client, if LCT_NEW_CLIENT or LCT_CLIENT_EXIT
-RETURN:		carry set on error
-DESTROYED:	nothing
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	jcw	 3/24/91	Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-HostIfEntry	proc	far
-		uses	ds, si, cx, dx, ax, bp, es, bx
-		.enter
-		cmp	di, LCT_ATTACH
-		jne	checkDetach
-
-		segmov	es, dgroup, cx	; es, cx <- dgroup
-	;
-	; Detect host interface
-	;
-		call	HostIfDetect
-		tst	ax
-		jz	done	; 0 if not host API
-
-	; 
-	; Setup interrupt handle
-	;
-		mov	ax, HOST_API_INTERRUPT
-		mov	bx, segment HostIfInterrupt		
-		mov	cx, offset HostIfInterrupt	; bx:cx <- fptr of my handler
-		call	SysCatchInterrupt
-
-	;
-	; Register event interrupt
-	;
-		mov	ax, HIF_SET_EVENT_INTERRUPT
-		call	HostIfCall
-
-done:
-		.leave
-		clc		; no errors
-		ret
-checkDetach:
-		cmp	di, LCT_DETACH
-		jne	done
-	;
-	; Unregister event interrupt
-	;
-
-	; 
-	; Unset interrupt handler
-	;
-		call	SysResetInterrupt
-
-		jmp	done
-
-HostIfEntry	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -420,7 +354,7 @@ SYNOPSIS:	Determine if host side API is available and in case it is
 		what version is supported.
 
 CALLED BY:	GLOBAL
-PASS:		nada
+PASS:		ax - API ID of interest
 RETURN:		ax - interface version, 0 mean no host interface found
 DESTROYED:	nada
  
@@ -442,25 +376,33 @@ REVISION HISTORY:
 baseboxID	byte 	"XOBESAB2"
 
 HostIfDetect	proc	far
-
-	;	
-	; Check host call if SSL interface is available
-	;
 		uses	bx, cx, dx, si, di
 
 		.enter
-		segmov	cx, cs
-		call	MemSegmentToHandle	;cx = handle
 
-		mov	bx, cx
-		call	MemOwner
-		;mov_trash	ax, bx
-		mov	ax, MSG_HOSTIF_DETECT
-		mov	di, mask MF_CALL
-		call	ObjMessage
+		mov	si, ax		; API ID
+		mov	ax, HIF_API_CHECK
+		call	HostIfCall
 
+		cmp	ax, HIF_OK
+		jne	failed
+		cmp	si, {word} cs:baseboxID
+		jne	failed
+		cmp	bx, {word} cs:baseboxID[2]
+		jne	failed
+		cmp	cx, {word} cs:baseboxID[4]
+		jne	failed
+		cmp	dx, {word} cs:baseboxID[6]
+		jne	failed
+
+		mov	ax, di
+done:
 		.leave
 		ret
+
+failed:
+		clr	ax
+		jmp	done
 
 HostIfDetect	endp
 
@@ -488,11 +430,17 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-HOSTIFDETECT	proc	far
+HOSTIFDETECT	proc	far 	apiid:word	
+		.enter
+		mov	ax, apiid
+		.leave
 		GOTO	HostIfDetect
 HOSTIFDETECT	endp
 
 HostIfCall	proc	far
+
+		push	ds
+		segmov	ds, dgroup
 
 		push	bp
 		mov	bp, dx
@@ -517,6 +465,9 @@ HostIfCall	proc	far
 		out	dx, ax
 		mov	ax, bp
 		out	dx, ax
+
+		PSem	ds, asyncOpSem, TRASH_AX_BX
+
 		mov	ax, di
 		out	dx, ax
 
@@ -539,8 +490,68 @@ HostIfCall	proc	far
 		mov	dx, bp
 		pop	bp
 
-		.leave
+		cmp	al, HIF_PENDING	
+		jne	doneSync
+
+		; handle async operation here
+asyncOp:
+		push	bp
+		sub	sp, AsyncSlotData
+		mov	bp, sp				; structure => SS:BP
+
+		mov	ss:[bp].ASD_semaphore.Sem_value, 0
+		mov	ss:[bp].ASD_semaphore.Sem_queue, 0
+
+		; register slot
+		; ss:bp - ptr to AsyncSlotData struct on stack
+		; si    - slot number
+		mov	cl, ah
+		mov	ch, 0
+		shl	cx
+		shl	cx
+		push	cx
+		mov	si, cx
+		clrdw	ds:asyncOpTable[si]
+
+		mov	{word} ds:asyncOpTable[si].segment, ss
+		mov	{word} ds:asyncOpTable[si].offset, bp
+
+		; unlock slot table access
+		VSem	ds, asyncOpSem
+
+		; wait for async op endind
+		PSem	ss, [bp].ASD_semaphore
+
+		PSem	ds, asyncOpSem, TRASH_AX_BX
+
+		; fetch async result
+		mov	ax, ss:[bp].ASD_registers
+		mov	si, ss:[bp+2].ASD_registers
+		mov	bx, ss:[bp+4].ASD_registers
+		mov	cx, ss:[bp+6].ASD_registers
+		mov	dx, ss:[bp+8].ASD_registers
+		mov	di, ss:[bp+10].ASD_registers
+
+		; unlock slot
+		pop	bp
+		clrdw	ds:asyncOpTable[bp]
+
+
+		; free slot data struct
+		add	sp, AsyncSlotData
+
+		;PSem	ds, asyncOpSem
+
+		;jmp	done
+		pop	bp
+
+doneSync:	VSem	ds, asyncOpSem
+
+;done:
+		pop	ds
 		ret
+
+
 HostIfCall	endp
 
 HOSTIFCALL		proc	far	func:word, 

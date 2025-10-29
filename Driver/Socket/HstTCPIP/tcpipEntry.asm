@@ -497,7 +497,7 @@ closeLoop:
 		mov	ax, HIF_NC_RECV_NEXT_CLOSE	; get next receive close socket
 		call	HostIfCall
 
-		cmp	cx, 0
+		cmp	si, 0
 		je	recvLoop			; branch, no more closed links
 
 	; send close to socket library
@@ -510,7 +510,7 @@ closeLoop:
 		mov	bx, handle dgroup
 		call	MemDerefES
 
-		mov	ax, cx			; ax = connection
+		mov	ax, si		; ax = connection
 		mov	cx, SCT_HALF	; cx = SocketCloseType
 
 		push	es
@@ -536,11 +536,11 @@ recvLoop:
 		call	HostIfCall
 
 	; done if size 0 or below
-		cmp	cx, 0
+		cmp	si, 0
 		je	done
 
 doRecv:
-		mov	ax, cx	; size now in ax
+		mov	ax, si	; size now in ax
 
 	; alloc buffer
 
@@ -573,18 +573,23 @@ doRecv:
 	; Copy packetSize bytes of input data into the new buffer.
 	;
 		push	ax, dx				
-		push 	di
+		push 	di, bx, dx
 		add	di, size SequencedPacketHeader	; es:di = place for data
 		; ax is size in bytes
 
-		mov	cx, ax
+		mov	si, ax
 		mov	ax, HIF_NC_RECV_NEXT		; get recv buf size
+		; si = size
+		;   = segment
+		mov bx,es
+		;   = offset
+		mov cx,di
 		call	HostIfCall
 
-		pop	di
+		pop	di, bx, dx
 
 		; fill in link
-		mov	es:[di].SPH_link, dx	
+		mov	es:[di].SPH_link, si	
 
 		movdw	bxdx, newBuffer
 		call	HugeLMemUnlock
@@ -685,24 +690,18 @@ TcpipInit	proc	far
 	;	
 	; Check host call if network interface is available
 	;
+		mov	ax, HIF_API_SOCKET
 		call	HostIfDetect
 		cmp	ax, 0
 		je	straightError
 
-		mov	ax, HIF_CHECK
-		mov	cx, 1	; check function group networking
-		call	HostIfCall
-
-		cmp	ax, 0
-		jne	error
-
 	;
 	; Hook into callback
 	;
-		segmov	es, <segment ResidentCode>
-		mov	bx, offset ResidentCode:TcpipReceiveInterrupt
-		mov	ax, HIF_SET_RECEIVE_HANDLE
-		call	HostIfCall
+	;	segmov	es, <segment ResidentCode>
+	;	mov	bx, offset ResidentCode:TcpipReceiveInterrupt
+	;	mov	ax, HIF_SET_RECEIVE_HANDLE
+	;	call	HostIfCall
 
 	;
 	; Create the input queue.
@@ -1133,18 +1132,23 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipAllocConnection	proc	far
 
-		push	bx
+		push	bx,cx,dx,si
 EC <		call	ECCheckCallerThread				>
 EC <		call	ECCheckClientHandle				>
 
 		;call	TSocketCreateConnection		; ax = error or handle
 		mov	ax, HIF_NC_ALLOC_CONNECTION
 		call	HostIfCall
-		cmp	bx, 0
+		cmp	ax, 0
 		je	success
 		mov	ax, SDE_INSUFFICIENT_MEMORY
+		stc
+		jmp	done
 success:
-		pop	bx
+		clc
+		mov	ax, si
+done:
+		pop	bx,cx,dx,si
 		ret
 TcpipAllocConnection	endp
 
@@ -1345,8 +1349,15 @@ EC <		call	ECCheckIPAddr				>
 	; Have driver's thread establish the connection.
 	;
 		push	bx
+		mov	cx, dx
+		mov	dx, bx
+		; sibx = host address
+		; cx   = port
+		; dx   = handle
+		mov	bx, si
+		mov	si, di
 		mov	ax, HIF_NC_CONNECT_REQUEST	; async connect
-		call	HostIfCallAsync
+		call	HostIfCall
 		pop	bx
 
 		cmp	ax, 0
@@ -1534,8 +1545,9 @@ TcpipDisconnectRequest	proc	far
 		push	bx
 		
 		push	bp
+		mov	si, bx
 		mov	ax, HIF_NC_DISCONNECT		; async disconnect
-		call	HostIfCallAsync
+		call	HostIfCall
 		pop	bp		
 		pop	bx
 		
@@ -1603,7 +1615,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipSendData	proc	far
 savebp		local	word	push	bp
-		uses	bx, cx, dx, ds
+		uses	bx, cx, dx, ds, si
 		.enter
 
 EC <		call	ECCheckCallerThread			>
@@ -1640,8 +1652,15 @@ EC <		call	ECCheckCallerThread			>
 
 		; es:si ptr to data to sent
 		; bx connection handle
-		pop	bx
+		mov	dx, cx
+		mov	bx, es
+		mov	cx, si
+		pop	si
 		mov	ax, HIF_NC_SEND_DATA
+
+		; si    = connection handle
+		; bx:cx = data address
+		; dx	= size
 		call	HostIfCall
 errDone:
 		pop	dx
@@ -4096,6 +4115,13 @@ EC <		Assert	thread	bx				>
 		mov	ax, GCNSLT_ACCESS_POINT_CHANGE
 		call	GCNListAdd
 		clc
+
+		mov	cx, ds:[driverThread]
+		clr	dx
+		mov	bx, MANUFACTURER_ID_GEOWORKS
+		mov	ax, GCNSLT_HOST_NOTIFICATIONS
+		call	GCNListAdd
+		clc
 done:
 		.leave
 		ret
@@ -4140,6 +4166,12 @@ TcpipDestroyThreadAndTimer	proc	near
 	; Remove ourselves from the GCN list for access point netmask
 	; changes.
 	;
+		mov	cx, es:[driverThread]
+		clr	dx
+		mov	bx, MANUFACTURER_ID_GEOWORKS
+		mov	ax, GCNSLT_HOST_NOTIFICATIONS
+		call	GCNListRemove
+
 		mov	cx, es:[driverThread]
 		clr	dx
 		mov	bx, MANUFACTURER_ID_GEOWORKS
@@ -4626,20 +4658,22 @@ doQuery:
 	; Query address from resolver.
 	; 
 		push	bx
+		push	si, di
+		mov	bx, si
+		mov	si, ds
 		mov	ax, HIF_NC_RESOLVE_ADDR		; resolve address
 							; dxbp = addr or
 							;  dx = ResolverError
 		call	HostIfCall
-		
-		;lahf
+		mov	dx, si
+		pop	si, di
 
-		;sahf
-		;mov	ax, bp				; dxax = resolved addr
 		clc
-		cmp	bx, 0
+		cmp	al, 0
 		je	noC
 		stc
 noC:
+		mov	ax, bx
 		pop 	bx
 		jnc	checkValid
 	;
