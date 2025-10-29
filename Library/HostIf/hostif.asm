@@ -334,8 +334,7 @@ HostIfAttach	method dynamic HostIfProcessClass,
 	ret
 HostIfAttach	endm
 
-
-
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetach
@@ -374,8 +373,7 @@ HostIfDetach	method dynamic HostIfProcessClass,
 	ret
 HostIfDetach	endm
 
-
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -409,8 +407,6 @@ HostIfDetect	proc	far
 		uses	bx, cx, dx, si, di
 
 		.enter
-		segmov	cx, cs
-		call	MemSegmentToHandle	;cx = handle
 
 		mov	si, ax		; API ID
 		mov	ax, HIF_API_CHECK
@@ -431,6 +427,10 @@ HostIfDetect	proc	far
 done:
 		.leave
 		ret
+failed:
+		clr	ax
+		jmp	done
+
 failed:
 		clr	ax
 		jmp	done

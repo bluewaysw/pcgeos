@@ -550,18 +550,29 @@ VidTestVESA	proc	near
 		uses	di, bx, cx
 		.enter
 
+		push	es
+
 		push	ax
+		mov	ax, HIF_API_VIDEO
 		call	HostIfDetect
 		mov	ss:[hostIfVersion], ax	; save it
-		pop	ax
 
-		;push	es
+		cmp	ax, REQUIRED_HOSTIF_VIDEO_API
+		jb	noHost		; branch, if no compatible host found
+		
+		pop	ax
 
 		; save away the mode number
 		mov	ss:[vesaMode], ax	; save it
 
+		; if host video API is available
+		; we are able to use any compatible resolution we want
+		; so we just accept all of the defined device modes
+
 		mov	ax, DP_PRESENT		; yep, it's there
-		jmp	donedone
+		jmp	realDone
+noHost:
+		pop	ax
 
 		push	ax
 		mov	ax, HIF_API_VIDEO
@@ -738,7 +749,6 @@ REVISION HISTORY:
 		Jim	09/90		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-.ioenable
 
 if ALLOW_BIG_MOUSE_POINTER
 screenCategory	char	"screen0",0

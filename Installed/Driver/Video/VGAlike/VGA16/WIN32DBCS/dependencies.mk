@@ -21,7 +21,5 @@ Win32/vga16Manager.eobj: vidcomGeode.def geos.def heap.def geode.def resource.de
                 vga16Dither.asm vidcomPolygon.asm vidcomLine.asm \
                 vidcomPutLine.asm vidcomRaster.asm vga16Raster.asm \
                 vga16Admin.asm vidcomExclBounds.asm
-Win32/vga16S3.obj \
-Win32/vga16S3.eobj: vga16S3.def
 
 WIN32DBCS/vga16EC.geo WIN32DBCS/vga16.geo : geos.ldf hostif.ldf 
