@@ -1,7 +1,7 @@
 /*
         GEOS2.H
 
-        by Marcus Gr�ber 1993-94
+        by Marcus Groeber 1993-94
 
         Include file for the PC/GEOS 2 file format
         Requires GEOS.H to be included first.
@@ -31,8 +31,8 @@ typedef struct {
  ******************************************************************************/
 #define GEOS2_ID 0x53C145C7             // GEOS2 file identification "magic"
 
-typedef struct {                        /*** GEOS2 standard header */
-  int ID;                              // GEOS2 id magic: C7 45 CF 53
+typedef struct {                        /*** GEOS2 standard header: */
+  int ID;                               // GEOS2 id magic: C7 45 CF 53
   char name[GEOS_LONGNAME];             // long filename
   unsigned short class;                       // geos filetype, see SDK docs
   unsigned short flags;                       // attributes
@@ -47,7 +47,7 @@ typedef struct {                        /*** GEOS2 standard header */
   PackedFileTime create_time;           // creation date/time in DOS format
   char password[8];                     // password, encrypted as hex string
   char _x2[44];                         // not yet decoded
-} GEOS2header;
+} GEOS2header; /* ~~~os90File.h: GeosFileHeader2 */
 
 typedef struct {                        /*** Additional geode file header */
   unsigned short _attr;                       // attribute (see below)
@@ -82,7 +82,7 @@ typedef struct {                        /*** Additional geode file header */
                         char _x4[2];
   unsigned short numseg;                      // Number of program segments
                         char _x5[6];
-} GEOS2appheader;
+} GEOS2appheader; /* ~~~geode.h: GeodeHeader */
 
 typedef struct {                        /*** Additional VM file header */
   unsigned short IDVM;                        // VM id "magic"
