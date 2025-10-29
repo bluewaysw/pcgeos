@@ -313,6 +313,11 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	mov	di, VID_ESC_UPDATE_DEVICE 
 	call	ds:[si].DIS_strategy
 
+	;push    ax,bx,cx,dx,si,di,bp
+	;mov	di, DR_VID_SHOWPTR
+	;call	ds:[si].DIS_strategy
+	;pop 	ax,bx,cx,dx,si,di,bp
+
 	; update screen coordinates
 	pop	bx
 	pop	si, ds, di
