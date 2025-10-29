@@ -501,7 +501,9 @@ extern TEngine_Instance engineInstance;
     exec->pts.n_points   = 0;
     exec->pts.n_contours = 0;
 
+#ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
+#endif    
 
     return TT_Err_Ok;
   }
@@ -781,7 +783,9 @@ extern TEngine_Instance engineInstance;
       metrics->ratio        = 1L << 16;
     }
 
+#ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
+#endif
 
     exec->cvtSize = ins->cvtSize;
     exec->cvt     = ins->cvt;
@@ -905,7 +909,9 @@ extern TEngine_Instance engineInstance;
 
     Clear_CodeRange( exec, TT_CodeRange_Glyph );
 
+#ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
+#endif
 
     exec->top     = 0;
     exec->callTop = 0;

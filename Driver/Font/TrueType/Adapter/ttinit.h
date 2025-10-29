@@ -67,7 +67,7 @@
  ***********************************************************************/
 
 #define DEFAULT_DEFAULT_CHAR                '.'
-#define DEFAULT_UNDER_THICK( value )	    ( value / 10 )      // 10% of size
+#define DEFAULT_UNDER_THICK( value )	    ( value >> 4 )      // 1/16 of size
 #define DEFAULT_UNDER_POSITION( value )	    ( value / 10 )      // -10% of size
 
 
