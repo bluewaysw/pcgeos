@@ -1360,7 +1360,7 @@ EC <		call	ECCheckIPAddr				>
 		call	HostIfCall
 		pop	bx
 
-		cmp	ax, 0
+		cmp	al, 0
 		jz	ok
 		stc
 		jc	errorDestroy
@@ -4679,7 +4679,7 @@ noC:
 	;
 	; Convert ResolverError to SocketDrError.
 	;
-		;mov	ax, SDE_DESTINATION_UNREACHABLE
+		mov	ax, SDE_DESTINATION_UNREACHABLE
 		;cmp	dx, size ResolverToSDETable
 		;jae	setC
 

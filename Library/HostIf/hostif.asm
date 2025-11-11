@@ -47,7 +47,7 @@ include Objects/winC.def
 
 include Internal/interrup.def
 include Internal/im.def
-
+include Internal/heapInt.def
 
 DefLib hostif.def
 
@@ -71,6 +71,8 @@ idata   segment
 	asyncOpSem	Semaphore <1, 0>
 
 	asyncOpTable	fptr MAX_ASYNC_OP_SLOTS dup (0)
+
+	oldIntVec	fptr 0
 
 idata   ends
 
@@ -117,11 +119,34 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 HostIfInterrupt	proc	far
+	call	SysEnterInterrupt		; disable context switching
 
 	;pushf
-
 	push	ax, bx, cx, dx, si, di, bp, ds, es
-	call	SysEnterInterrupt		; disable context switching
+
+EC <		call	ECCheckStack						>
+
+if	ERROR_CHECK
+	mov	ax, TGIT_THREAD_HANDLE
+	clr	bx				; get current thread handle
+	call	ThreadGetInfo
+	cmp	bx, 0
+	jnz	done
+	;
+	; In the case here where we have big local variables, We want to
+	; check stack space before .enter ourselves.  Otherwise if we use
+	; ECCheckStack after .enter, it won't give a valid backtrace when
+	; sp has wrapped around.  --- AY 2/19/97
+	;
+	push	ax
+	mov	ax, ss:[TPD_stackBot]
+	add	ax, 100
+					; offset of bottom-most local variable
+	cmp	ax, sp
+	ERROR_AE -1
+	pop	ax
+endif	; ERROR_CHECK
+
 	cld					;clear direction flag
 	INT_ON
 
@@ -132,10 +157,10 @@ HostIfInterrupt	proc	far
 	mov	ax, MSG_HOSTIF_PROCESS_EVENTS
 	mov	di, mask MF_FORCE_QUEUE
 	call	ObjMessage
-
-	call	SysExitInterrupt
+done:
 	pop	ax, bx, cx, dx, si, di, bp, ds, es
 	;popf
+	call	SysExitInterrupt
 	iret
 
 HostIfInterrupt	endp
@@ -199,11 +224,13 @@ eventLoop:
 	shl	cx
 	mov	si, cx
 
+EC <	mov	ax, ds:asyncOpTable[si].offset 				>
+EC <	or 	ax, ds:asyncOpTable[si].segment				>
+EC <	ERROR_Z -1							>
+
 	mov	bp, ds:asyncOpTable[si].offset
 	mov	ds, ds:asyncOpTable[si].segment
 	pop	ax, cx, si
-
-	VSem	ds, [bp].ASD_semaphore
 
 	mov	ds:[bp].ASD_registers, ax
 	mov	ds:[bp+2].ASD_registers, si
@@ -211,6 +238,8 @@ eventLoop:
 	mov	ds:[bp+6].ASD_registers, cx
 	mov	ds:[bp+8].ASD_registers, dx
 	mov	ds:[bp+10].ASD_registers, di
+
+	VSem	ds, [bp].ASD_semaphore
 
 	pop	ds, bp
 	jmp eventLoop
@@ -292,6 +321,9 @@ HostIfAttach	method dynamic HostIfProcessClass,
 	; 
 	; Setup interrupt handle
 	;
+		segmov	es, ds
+		mov	di, offset oldIntVec
+
 		mov	ax, HOST_API_INTERRUPT
 		mov	bx, segment HostIfInterrupt		
 		mov	cx, offset HostIfInterrupt	; bx:cx <- fptr of my handler
@@ -570,7 +602,8 @@ HOSTIFCALL		proc	far	func:word,
 
 		mov	ax, func
 		
-		int	HOST_API_INTERRUPT
+		call 	HostIfCall
+		;int	HOST_API_INTERRUPT
 
 		.leave
 		
