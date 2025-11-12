@@ -126,27 +126,6 @@ HostIfInterrupt	proc	far
 
 EC <		call	ECCheckStack						>
 
-if	ERROR_CHECK
-	mov	ax, TGIT_THREAD_HANDLE
-	clr	bx				; get current thread handle
-	call	ThreadGetInfo
-	cmp	bx, 0
-	jnz	done
-	;
-	; In the case here where we have big local variables, We want to
-	; check stack space before .enter ourselves.  Otherwise if we use
-	; ECCheckStack after .enter, it won't give a valid backtrace when
-	; sp has wrapped around.  --- AY 2/19/97
-	;
-	push	ax
-	mov	ax, ss:[TPD_stackBot]
-	add	ax, 100
-					; offset of bottom-most local variable
-	cmp	ax, sp
-	ERROR_AE -1
-	pop	ax
-endif	; ERROR_CHECK
-
 	cld					;clear direction flag
 	INT_ON
 
