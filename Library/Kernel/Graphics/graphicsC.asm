@@ -85,7 +85,7 @@ GRDRAWRECTTO	proc	far	gstate:hptr.GState,
 		mov	dx, y
 		call	GrFillRectTo
 		mov_tr	di, ax		;restore di
-	.leave		
+	.leave
 	ret
 
 GRDRAWRECTTO	endp
@@ -150,7 +150,7 @@ GRFILLRECTTO	proc	far	gstate:hptr.GState,
 		mov	dx, y
 		call	GrFillRectTo
 		mov_tr	di, ax		;restore di
-	.leave		
+	.leave
 	ret
 
 GRFILLRECTTO	endp
@@ -189,7 +189,7 @@ C FUNCTION:	GrTextWidth
 C DECLARATION:	extern word
 		    _far _pascal GrTextWidth(GStateHandle gstate,
 					const char _far *str, word size);
-			Note: "str" *cannot* be pointing to the XIP movable 
+			Note: "str" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -259,7 +259,7 @@ C FUNCTION:	GrTextWidthWWFixed
 C DECLARATION:	extern dword
 		    _far _pascal GrTextWidthWWFixed(GStateHandle gstate,
 					const char _far *str, word size);
-			Note: "str" *cannot* be pointing to the XIP movable 
+			Note: "str" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -302,7 +302,7 @@ C DECLARATION:	extern void
 		    _far _pascal GrDrawRegion(GStateHandle gstate, sword xPos,
 					sword yPos, const Region _far *reg,
 					word cxParam, word dxParam);
-			Note: "reg" *cannot* be pointing to the XIP movable 
+			Note: "reg" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -340,7 +340,7 @@ C DECLARATION:	extern void
 					const Region _far *reg,
 					word axParam, word bxParam,
 					word cxParam, word dxParam);
-			Note: "reg" *cannot* be pointing to the XIP movable 
+			Note: "reg" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -408,7 +408,7 @@ C FUNCTION:	GrMulDWFixed
 C DECLARATION:	extern void
 		    _far _pascal GrMulDWFixed(const DWFixed _far *i,
 				const DWFixed _far *j, DWFixed _far *result);
-			Note:The fptrs *cannot* be pointing to the XIP movable 
+			Note:The fptrs *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -527,7 +527,7 @@ C FUNCTION:	GrSDivDWFbyWWF
 C DECLARATION:	extern void
 		    _far _pascal GrSDivDWFbyWWF(const DWFixed _far *dividend,
 			const WWFixed _far *divisor, DWFixed _far *quotient);
-			Note:The fptrs *cannot* be pointing to the XIP movable 
+			Note:The fptrs *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -938,11 +938,11 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C DECLARATION:	extern void
 		    _far _pascal GrDrawImage(GStateHandle gstate, sword x,
 			    sword y, ImageFlags flags, const Bitmap _far *bm);
-			Note: "bm" *cannot* be pointing to the XIP movable 
+			Note: "bm" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -974,11 +974,11 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 C DECLARATION:	extern void
 		    _far _pascal GrDrawHugeImage(GStateHandle gstate, sword x,
-			    sword y, ImageFlags flags, VMFileHandle vmFile, 
+			    sword y, ImageFlags flags, VMFileHandle vmFile,
 			    VMBlockHandle vmBlk);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1028,7 +1028,7 @@ realDS	local	sptr
 				uses si, di, ds
 	.enter
 		ForceRef	callback
-		
+
 if	FULL_EXECUTE_IN_PLACE
 	;
 	; Make sure the fptr passed in is valid
@@ -1343,7 +1343,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrDrawHugeBitmapAtCP
 
 C DECLARATION:	extern void
-		    _far _pascal GrDrawHugeBitmapAtCP(GStateHandle gstate, 
+		    _far _pascal GrDrawHugeBitmapAtCP(GStateHandle gstate,
 			    VMFileHandle vmFile, VMBlockHandle vmBlk);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -1402,7 +1402,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrDrawHugeBitmapAtCP
 
 C DECLARATION:	extern void
-		    _far _pascal GrFillHugeBitmapAtCP(GStateHandle gstate, 
+		    _far _pascal GrFillHugeBitmapAtCP(GStateHandle gstate,
 			    VMFileHandle vmFile, VMBlockHandle vmBlk);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -1769,7 +1769,7 @@ C DECLARATION:	extern void
 					LineStyle style, word skipDistance,
 					const DashPairArray _far *dpa,
 					word numPairs);
-			Note: "dpa" *cannot* be pointing to the XIP movable 
+			Note: "dpa" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -2172,7 +2172,7 @@ C FUNCTION:	GrSetTextAttr
 C DECLARATION:	extern void
 			_far _pascal GrSetTextAttr(GStateHandle gstate,
 						    const TextAttr _far *ta);
-			Note: "ta" *cannot* be pointing to the XIP movable 
+			Note: "ta" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -2310,7 +2310,7 @@ COMMENT @----------------------------------------------------------------------
 
 C FUNCTION:	GrGetPoint
 
-C DECLARATION:	extern RGBColorAsDWord	
+C DECLARATION:	extern RGBColorAsDWord
 		    _far _pascal GrGetPoint(GStateHandle gstate, sword x,
 								 sword y);
 
@@ -2322,14 +2322,14 @@ REVISION HISTORY:
 	Jim	8/92		Initial version
 
 ------------------------------------------------------------------------------@
-GRGETPOINT	proc	far	
+GRGETPOINT	proc	far
 	C_GetThreeWordArgs	dx, ax, bx,  cx	;dx = gs, ax = x, bx = y
 
 	xchg	di, dx		; save di
 	call	GrGetPoint
 	xchg	di, dx		; restore di
 	xchg	ah, bl		; ah <- green, bl <- index
-	xchg	bl, bh		; bh <- index  bl <- blue 
+	xchg	bl, bh		; bh <- index  bl <- blue
 				; dxax now set up as RGBColorAsDWord
 	ret
 
@@ -2379,8 +2379,8 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrCreateBitmap
 
 C DECLARATION:	extern VMBlockHandle
-		    _far _pascal GrCreateBitmap(BMFormat initFormat, 
-					word initWidth, word initHeight, 
+		    _far _pascal GrCreateBitmap(BMFormat initFormat,
+					word initWidth, word initHeight,
 					VMFileHandle vmFile,
 					MemHandle exposureODHan,
 					ChunkHandle exposureODCh,
@@ -2395,9 +2395,9 @@ REVISION HISTORY:
 	Jim	1/92		Fixed for new GrCreateBitmap
 
 ------------------------------------------------------------------------------@
-GRCREATEBITMAP	proc	far	initFormat:word, initWidth:word, 
+GRCREATEBITMAP	proc	far	initFormat:word, initWidth:word,
 				initHeight:word, vmFile:word,
-				exposureODHan:hptr, exposureODCh:word, 
+				exposureODHan:hptr, exposureODCh:word,
 				bmgs:fptr
 					uses si, di, ds
 	.enter
@@ -2423,8 +2423,8 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrCreateBitmapRaw
 
 C DECLARATION:	extern VMBlockHandle
-		    _far _pascal GrCreateBitmapRaw(BMFormat initFormat, 
-					word initWidth, word initHeight, 
+		    _far _pascal GrCreateBitmapRaw(BMFormat initFormat,
+					word initWidth, word initHeight,
 					VMFileHandle vmFile);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -2435,7 +2435,7 @@ REVISION HISTORY:
 	mg	12/00		Initial version
 
 ------------------------------------------------------------------------------@
-GRCREATEBITMAPRAW	proc	far	initFormat:word, initWidth:word, 
+GRCREATEBITMAPRAW	proc	far	initFormat:word, initWidth:word,
 				initHeight:word, vmFile:word
 	.enter
 
@@ -2490,7 +2490,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrDestroyBitmap
 
 C DECLARATION:	extern void
-			_far _pascal GrDestroyBitmap(GStateHandle gstate, 
+			_far _pascal GrDestroyBitmap(GStateHandle gstate,
 						     word flags);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -2517,8 +2517,8 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrSetBitmapMode
 
 C DECLARATION:	extern void
-			_far _pascal GrSetBitmapMode(GStateHandle gstate, 
-						     word flags, 
+			_far _pascal GrSetBitmapMode(GStateHandle gstate,
+						     word flags,
 						     MemHandle colorCorr);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -2580,7 +2580,7 @@ REVISION HISTORY:
 	Tony	3/91		Initial version
 
 ------------------------------------------------------------------------------@
-GRSETBITMAPRES	proc	far	
+GRSETBITMAPRES	proc	far
 	C_GetThreeWordArgs	dx, ax, bx, cx	; dx=gs, ax-xres, bx=yres
 
 	xchg	dx, di
@@ -3170,9 +3170,9 @@ GRRELEASEEXCLUSIVE	proc	far	videoDriver:hptr, gstate:hptr, bounds:fptr
 	call	GrReleaseExclusive
 	lds	si, bounds
 	mov	ds:[si].R_left, ax	; store bounds
-	mov	ds:[si].R_top, bx	
-	mov	ds:[si].R_right, cx		
-	mov	ds:[si].R_bottom, dx		
+	mov	ds:[si].R_top, bx
+	mov	ds:[si].R_right, cx
+	mov	ds:[si].R_bottom, dx
 
 	.leave
 	ret
@@ -4175,7 +4175,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 GRGETCURPOSWWFIXED	proc	far	gstate:hptr, cp:fptr
-	uses	di
+	uses	di, ds
 	.enter
 	mov	di, gstate
 	call	GrGetCurPosWWFixed
@@ -4306,7 +4306,7 @@ C DECLARATION:	extern Boolean
 						RF_rule rule, Point _far *list,
 						word numPoints, sword xCoord,
 						sword yCoord);
-			Note: "list" *cannot* be pointing to the XIP movable 
+			Note: "list" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -4382,7 +4382,7 @@ C DECLARATION:	extern void
 		    _far _pascal GrComment(GStateHandle gstate,
 					const void _far *data, word size);
 
-			Note: "data" *can* be pointing to the XIP movable 
+			Note: "data" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -4640,7 +4640,7 @@ C FUNCTION:	GrSetTransform
 C DECLARATION:	extern void
 			_far _pascal GrSetTransform(GStateHandle gstate,
 						const TransMatrix _far *tm);
-			Note: "tm" *can* be pointing to the XIP movable 
+			Note: "tm" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -4674,7 +4674,7 @@ C FUNCTION:	GrApplyTransform
 C DECLARATION:	extern void
 			_far _pascal GrApplyTransform(GStateHandle gstate,
 						const TransMatrix _far *tm);
-			Note: "tm" *can* be pointing to the XIP movable 
+			Note: "tm" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -4918,7 +4918,7 @@ C FUNCTION:	GrDrawPolyline
 C DECLARATION:	extern void
 		    _far _pascal GrDrawPolyline(GStateHandle gstate
 				const Point _far *points, word numPoints);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -4952,7 +4952,7 @@ C DECLARATION:	extern void
 		    _far _pascal GrDrawPolyline(GStateHandle gstate
 				const Point _far *points, word numPoints,
 				word brushW, word brushH);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5077,7 +5077,7 @@ C FUNCTION:	GrDrawArc3Point
 C DECLARATION:	extern void
 		    _far _pascal GrDrawArc3Point (GStateHandle gstate,
 				const ThreePointArcParams *params);
-			Note: "params" *can* be pointing to the XIP movable 
+			Note: "params" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5108,7 +5108,7 @@ C FUNCTION:	GrDrawArc3PointTo
 C DECLARATION:	extern void
 		    _far _pascal GrDrawArc3PointTo (GStateHandle gstate,
 				const ThreePointArcToParams *params);
-			Note: "params" *can* be pointing to the XIP movable 
+			Note: "params" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5139,7 +5139,7 @@ C FUNCTION:	GrDrawRelArc3PointTo
 C DECLARATION:	extern void
 		    _far _pascal GrDrawRelArc3PointTo (GStateHandle gstate,
 				const ThreePointRelArcToParams *params);
-			Note: "params" *can* be pointing to the XIP movable 
+			Note: "params" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5172,7 +5172,7 @@ C DECLARATION:	extern void
 		    _far _pascal GrDrawSpline(GStateHandle gstate,
 						const Point _far *points,
 						word numPoints);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5206,7 +5206,7 @@ C DECLARATION:	extern void
 		    _far _pascal GrDrawSplineTo(GStateHandle gstate,
 						const Point _far *points,
 						word numPoints);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5238,7 +5238,7 @@ C FUNCTION:	GrDrawCurve
 C DECLARATION:	extern void
 		    _far _pascal GrDrawCurve(GStateHandle gstate,
 						const Point _far *points);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5270,7 +5270,7 @@ C FUNCTION:	GrDrawCurveTo
 C DECLARATION:	extern void
 		    _far _pascal GrDrawCurveTo(GStateHandle gstate,
 						const Point _far *points);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5339,7 +5339,7 @@ C DECLARATION:	extern void
 		    _far _pascal GrFillRoundRect(GStateHandle gstate,
 					sword left, sword top,
 					sword right, sword bottom, word radius);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5388,7 +5388,7 @@ GRFILLROUNDRECTTO	proc	far	gstate:hptr, right:sword,
 					bottom:sword, radius:word
 					uses	di, si
 	.enter
-	
+
 	mov	cx, right
 	mov	dx, bottom
 	mov	di, gstate
@@ -5458,7 +5458,7 @@ C FUNCTION:	GrFillArc3Point
 C DECLARATION:	extern void
 		    _far _pascal GrFillArc3Point (GStateHandle gstate,
 				const ThreePointArcParams *params);
-			Note: "params" *can* be pointing to the XIP movable 
+			Note: "params" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5489,7 +5489,7 @@ C FUNCTION:	GrFillArc3PointTo
 C DECLARATION:	extern void
 		    _far _pascal GrFillArc3PointTo (GStateHandle gstate,
 				const ThreePointArcToParams *params);
-			Note: "params" *can* be pointing to the XIP movable 
+			Note: "params" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5520,7 +5520,7 @@ C FUNCTION:	GrFillPolygon
 C DECLARATION:	extern void
 		    _far _pascal GrFillPolygon(GStateHandle gstate
 				const Point _far *points, word numPoints);
-			Note: "points" *can* be pointing to the XIP movable 
+			Note: "points" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5592,7 +5592,7 @@ C FUNCTION:	GrSetLineAttr
 C DECLARATION:	extern void
 		    _far _pascal GrSetLineAttr(GStateHandle gstate,
 				const LineAttr _far *la);
-			Note: "la" *cannot* be pointing to the XIP movable 
+			Note: "la" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5604,7 +5604,7 @@ REVISION HISTORY:
 	jim	5/92		changed for new ptr version of GrSetLineAttr
 
 ------------------------------------------------------------------------------@
-GRSETLINEATTR	proc	far	
+GRSETLINEATTR	proc	far
 	C_GetThreeWordArgs	dx, cx, ax,  bx ; dx=gs, cx = seg, ax = off
 
 	push	ds
@@ -5612,7 +5612,7 @@ GRSETLINEATTR	proc	far
 	xchg	ax, si
 	xchg	dx, di
 	call	GrSetLineAttr
-	xchg	dx, di	
+	xchg	dx, di
 	xchg	ax, si
 	pop	ds
 	ret
@@ -5626,7 +5626,7 @@ C FUNCTION:	GrSetAreaAttr
 C DECLARATION:	extern void
 		    _far _pascal GrSetAreaAttr(GStateHandle gstate,
 				const AreaAttr _far *aa);
-			Note: "aa" *cannot* be pointing to the XIP movable 
+			Note: "aa" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -5638,7 +5638,7 @@ REVISION HISTORY:
 	jim	5/92		changed for new ptr version of GrSetLineAttr
 
 ------------------------------------------------------------------------------@
-GRSETAREAATTR	proc	far	
+GRSETAREAATTR	proc	far
 	C_GetThreeWordArgs	dx, cx, ax,  bx ; dx=gs, cx = seg, ax = off
 
 	push	ds
@@ -5646,7 +5646,7 @@ GRSETAREAATTR	proc	far
 	xchg	ax, si
 	xchg	dx, di
 	call	GrSetAreaAttr
-	xchg	dx, di	
+	xchg	dx, di
 	xchg	ax, si
 	pop	ds
 	ret
@@ -5990,7 +5990,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrSetClipPath
 
 C DECLARATION:	extern void
-			_far _pascal GrSetClipPath (GStateHandle gstate, 
+			_far _pascal GrSetClipPath (GStateHandle gstate,
 				PathCombineType params, RegionFillRule rule);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6016,7 +6016,7 @@ COMMENT @----------------------------------------------------------------------
 C FUNCTION:	GrSetWinClipPath
 
 C DECLARATION:	extern void
-			_far _pascal GrSetWinClipPath (GStateHandle gstate, 
+			_far _pascal GrSetWinClipPath (GStateHandle gstate,
 				PathCombineType params, RegionFillRule rule);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6153,7 +6153,7 @@ C FUNCTION:	GrInvalRectDWord
 C DECLARATION:	extern void
 			_far _pascal GrInvalRectDWord(GStateHandle gstate,
 						const RectDWord _far *bounds);
-			Note: "bounds" *cannot* be pointing to the XIP movable 
+			Note: "bounds" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6221,7 +6221,7 @@ C DECLARATION:	extern Boolean
 						    RectDWord _far *bounds);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-	
+
 		Returns FALSE if the mask is null. Bounds are not set in
 		this case.
 
@@ -6346,9 +6346,9 @@ C FUNCTION:	GrGetTextBounds
 
 C DECLARATION:	extern Boolean
 			_far _pascal GrGetTextBounds (GStateHandle gstate,
-				word xpos, word ypos, const char _far *str, 
+				word xpos, word ypos, const char _far *str,
 				word count, Rectangle *bounds);
-			Note: "str" *cannot* be pointing to the XIP movable 
+			Note: "str" *cannot* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6533,7 +6533,7 @@ GRTESTPATH	proc	far
 	xchg	di, bx				; restore DI
 	jnc	region
 	mov	ax, FALSE
-exit:	
+exit:
 	ret
 region:
 	mov	ax, TRUE
@@ -6548,7 +6548,7 @@ C FUNCTION:	GrGetPathBounds
 C DECLARATION:	extern Boolean
 			_far _pascal GrGetPathBounds (GStateHandle gstate,
 				  GetPathType ptype,Rectangle _far *bounds);
-			Note: "bounds" *can* be pointing to the XIP movable 
+			Note: "bounds" *can* be pointing to the XIP movable
 				code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6640,7 +6640,7 @@ REVISION HISTORY:
 GRGETPATHPOINTS	proc	far
 	C_GetTwoWordArgs	bx,ax, dx,cx	; GState => BX, resolution => AX
 	push	di
-	mov	di, bx	
+	mov	di, bx
 	call	GrGetPathPoints
 	pop	di
 	mov_tr	ax, bx				; move handle to points => AX
@@ -6729,7 +6729,7 @@ C DECLARATION:	extern void
 			_far _pascal GrSetCustomAreaPattern (
 				GStateHandle gstate, GraphicPattern pattern,
 				const void *patternData, word patternSize);
-			Note: "patternData" *cannot* be pointing to the XIP 
+			Note: "patternData" *cannot* be pointing to the XIP
 				movable code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6788,7 +6788,7 @@ C DECLARATION:	extern void
 			_far _pascal GrSetCustomTextPattern (
 				GStateHandle gstate, GraphicPattern pattern,
 				const void *patternData);
-			Note: "patternData" *cannot* be pointing to the XIP 
+			Note: "patternData" *cannot* be pointing to the XIP
 				movable code resource.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
@@ -6882,7 +6882,7 @@ GetPatternCommonC	proc	near	gstate:hptr, customPattern:fptr,
 	jcxz	area
 	call	GrGetTextPattern		; text Pattern => AX
 	jmp	common
-area:	
+area:
 	call	GrGetAreaPattern		; area Pattern => AX
 common:
 	les	di, customPattern
