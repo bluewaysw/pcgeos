@@ -15,7 +15,7 @@ REVISION HISTORY:
 
 
 DESCRIPTION:
-	This file contains C interface routines for the net library	
+	This file contains C interface routines for the net library
 
 	$Id: netC.asm,v 1.1 97/04/05 01:24:51 newdeal Exp $
 
@@ -29,7 +29,7 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetEnumConnectedUsers
 C DESCRIPTION: 	Return a chunk array with a list of all users
-C DECLARATION:	extern ChunkHandle _far _pascal 
+C DECLARATION:	extern ChunkHandle _far _pascal
 		    NetEnumConnectedUsers(NetEnumBufferType bt, MemHandle mh);
 
 REVISION HISTORY:
@@ -37,23 +37,23 @@ REVISION HISTORY:
 	----	----		-----------
 	CL	2/3/93		Initial version
 ----------------------------------------------------------------------------@
-NETENUMCONNECTEDUSERS	proc	far		bt:word, 
+NETENUMCONNECTEDUSERS	proc	far		bt:word,
 						mh:hptr
 	uses	bx, ds, si
-enumParams		local	NetEnumParams	
+enumParams		local	NetEnumParams
 	.enter
 	mov	bx, bt
 	mov	enumParams.NEP_bufferType, bx
 
 	mov	bx, mh
 	call 	MemDerefDS
-	
+
 	push	bp
 	lea	bp, ss:[enumParams]
 	call	NetEnumConnectedUsers			;returns *ds:si = chunk array
 	pop	bp
 
-	mov	ax, si				;return the chunk handle of 
+	mov	ax, si				;return the chunk handle of
 						;the chunk array.
 	.leave
 	ret
@@ -63,7 +63,7 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetEnumUsers
 C DESCRIPTION: 	Return a chunk array with a list of all users
-C DECLARATION:	extern ChunkHandle _far _pascal 
+C DECLARATION:	extern ChunkHandle _far _pascal
   			NetEnumUsers(NetEnumBufferType bt, MemHandle mh);
 
 REVISION HISTORY:
@@ -71,23 +71,23 @@ REVISION HISTORY:
 	----	----		-----------
 	CL	2/3/93		Initial version
 ----------------------------------------------------------------------------@
-NETENUMUSERS	proc	far		bt:word, 
+NETENUMUSERS	proc	far		bt:word,
 					mh:hptr
 	uses	bx, ds, si
-enumParams		local	NetEnumParams	
+enumParams		local	NetEnumParams
 	.enter
 	mov	bx, bt
 	mov	enumParams.NEP_bufferType, bx
 
 	mov	bx, mh
 	call 	MemDerefDS
-	
+
 	push	bp
 	lea	bp, ss:[enumParams]
 	call	NetEnumUsers			;returns *ds:si = chunk array
 	pop	bp
 
-	mov	ax, si				;return the chunk handle of 
+	mov	ax, si				;return the chunk handle of
 						;the chunk array.
 	.leave
 	ret
@@ -97,7 +97,7 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetUserGetLoginName
 C DESCRIPTION: 	Get current user's login name
-C DECLARATION:	extern void _far _pascal 
+C DECLARATION:	extern void _far _pascal
 			NetUserGetLoginName(char *buffer)
 REVISION HISTORY:
 	Name	Date		Description
@@ -126,7 +126,7 @@ C DECLARATION:	extern word
 							   char *groupName);
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -137,7 +137,7 @@ NETUSERCHECKIFINGROUP	proc	far	userName:fptr,
 					groupName:fptr
 	uses	ds,es,bx,cx,dx,si
 	.enter
-	lds	si, userName		
+	lds	si, userName
 	movdw	cxdx, groupName
 	call	NetUserCheckIfInGroup
 	jc	fail
@@ -166,10 +166,10 @@ C DECLARATION:	extern NetWareReturnCode
 							   byte nameSize,
 							   byte passwordSize);
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-		Should not have to pass nameSize and passwordSize.  
+		Should not have to pass nameSize and passwordSize.
 		The strings should be null terminated, and we should figure
 		out the length ourselves.
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -180,7 +180,7 @@ NETVERIFYUSERPASSWORD	proc	far	userName:fptr,
 					password:fptr,
 					nameSize:word, 	;actually byte
 					passwordSize:word
-	uses	es,bx,cx,dx,si
+	uses	es,bx,cx,dx,si,ds
 	.enter
 	mov	bx, nameSize
 	mov	al, bl
@@ -199,16 +199,16 @@ COMMENT @--------------------------------------------------------------------
 C FUNCTION:	NetGetServerNameTable
 
 C DESCRIPTION: 	returns a pointer to the first of 8 entries in the
-		Server Name Table.  
-		Each entry is NW_USER_NAME_LENGTH bytes long, 
+		Server Name Table.
+		Each entry is NW_USER_NAME_LENGTH bytes long,
 		and can contain a null-terminated server name.
 
-C DECLARATION:	extern char 
+C DECLARATION:	extern char
 			_far _pascal *NetGetServerNameTable();
-			
+
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -229,14 +229,14 @@ COMMENT @--------------------------------------------------------------------
 C FUNCTION:	NetGetConnectionIDTable
 
 C DESCRIPTION: 	returns a pointer to the first of 8 entries in the
-		Connection ID Table.  
+		Connection ID Table.
 
 C DECLARATION:	extern NetwareConnectionIDTableItem
 			_far _pascal *NetGetConnectionIDTable();
-			
+
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -261,9 +261,9 @@ C DESCRIPTION: 	return information about a server
 C DECLARATION:	extern NetWareReturnCode
 			_far _pascal NetScanForServer(
 					NetWareBinderyObjectID oldID,
-					char *nameBuffer, 
+					char *nameBuffer,
 					NetWareBinderyObjectID *ID);
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -271,7 +271,7 @@ REVISION HISTORY:
 
 ----------------------------------------------------------------------------@
 NETSCANFORSERVER	proc	far	oldID:dword,
-					nameBuffer:fptr,	
+					nameBuffer:fptr,
 					ID:fptr
 	uses	ds,si,cx,dx
 	.enter
@@ -282,7 +282,7 @@ NETSCANFORSERVER	proc	far	oldID:dword,
 	lds	si, ID
 	mov	ds:[si].high, cx
 	mov	ds:[si].low, dx
-	
+
 	.leave
 	ret
 NETSCANFORSERVER	endp
@@ -295,7 +295,7 @@ C DESCRIPTION: 	return connection ID of default server
 
 C DECLARATION:	extern NetWareConnectionID
 			_far _pascal NetGetDefaultConnectionID(void);
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -318,7 +318,7 @@ C DESCRIPTION: 	return connection ID of default server
 
 C DECLARATION:	extern word
 			_far _pascal NetServerAttach(char *server);
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -338,7 +338,7 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetServerChangeUserPassword
 C DESCRIPTION: 	Change the user's password
-C DECLARATION:	extern word _far _pascal 
+C DECLARATION:	extern word _far _pascal
 			NetServerChangeUserPassword(char *server,
 						    char *userName,
 						    char *oldPassword,
@@ -412,7 +412,7 @@ NETSERVERLOGIN	proc	far		server:fptr,
 					reopenFiles:word
 	uses	bp,dx
 	.enter
-	
+
 	sub	sp, size NetServerLoginFrame
 	mov	bx, sp
 	movdw	ss:[bx].NSLF_serverName, server, dx
@@ -434,7 +434,7 @@ C FUNCTION:	NetServerLogout
 C DESCRIPTION: 	logout from named file server
 C DECLARATION:	extern word
 			_far _pascal NetServerLogout(char *server)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -455,10 +455,10 @@ C FUNCTION:	NetServerGetNetAddr
 
 C DESCRIPTION: 	Get the net address of the server
 
-C DECLARATION:	extern word _far _pascal 
-			NetServerGetNetAddr(char *server, 
+C DECLARATION:	extern word _far _pascal
+			NetServerGetNetAddr(char *server,
 					    NovellNodeSocketAddr *np)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -482,10 +482,10 @@ C FUNCTION:	NetServerGetWSNetAddr
 
 C DESCRIPTION: 	get the net address of the workstation calling this function.
 
-C DECLARATION:	extern word _far _pascal 
-			NetServerGetWSNetAddr(char *server, 
+C DECLARATION:	extern word _far _pascal
+			NetServerGetWSNetAddr(char *server,
 					    NovellNodeSocketAddr *np)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -508,13 +508,13 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetMapDrive
 
-C DESCRIPTION: 	Permanently assign a workstation drive to a network 
+C DESCRIPTION: 	Permanently assign a workstation drive to a network
 		directory
 
 C DECLARATION:	extern word
 			_far _pascal NetMapdrive(char letter, char *path,
 						 char *driveName)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -538,12 +538,12 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetUnmapDrive
 
-C DESCRIPTION: 	Permanently assign a workstation drive to a network 
+C DESCRIPTION: 	Permanently assign a workstation drive to a network
 		directory
 
 C DECLARATION:	extern word
 			_far _pascal NetUnmapdrive(char letter)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -566,19 +566,19 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetGetConnectionNumber
 
-C DESCRIPTION: 	returns the connection number the workstation uses to 
+C DESCRIPTION: 	returns the connection number the workstation uses to
 		communicate with the default file server
 
 C DECLARATION:	extern NetWareConnectionNumber
 			_far _pascal NetGetConnectionNumber()
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	CL	9/22/92		Initial version
 
 ----------------------------------------------------------------------------@
-NETGETCONNECTIONNUMBER	proc	far	
+NETGETCONNECTIONNUMBER	proc	far
 	uses	cx
 	.enter
 	call	NetGetConnectionNumber
@@ -595,7 +595,7 @@ C DESCRIPTION:  open a port for communication, return a port token.
 
 C DECLARATION:	extern word
 			_far _pascal NetMsgOpenPort(PortInfoStruct *portInfo)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -603,7 +603,7 @@ REVISION HISTORY:
 
 ----------------------------------------------------------------------------@
 NETMSGOPENPORT	proc	far		portInfo:fptr
-	uses	si
+	uses	ds, si
 	.enter
 	mov	cx, size PortInfoStruct
 	lds	si, portInfo
@@ -621,7 +621,7 @@ C DESCRIPTION:  Close a 2-way communication port
 
 C DECLARATION:	extern word
 			_far _pascal NetMsgClosePort(word  PortToken)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -647,7 +647,7 @@ C DECLARATION:	extern word
 						word SocketID,
 						void _far *Callback,
 						word CallbackData)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -696,10 +696,10 @@ PASS:		ds:si - buffer
 		di - handle of mem buffer with NetMsgCCallbackStruct
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -745,7 +745,7 @@ C DESCRIPTION:  Destroys a socket
 C DECLARATION:	extern word
 			_far _pascal NetMsgDestroySocket(word PortToken,
 						word SocketToken)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -766,7 +766,7 @@ COMMENT @--------------------------------------------------------------------
 
 C FUNCTION:	NetMsgSendBuffer
 
-C DESCRIPTION:  Send a message 
+C DESCRIPTION:  Send a message
 
 C DECLARATION:	extern word
 			_far _pascal NetMsgSendBuffer(word PortToken,
@@ -774,7 +774,7 @@ C DECLARATION:	extern word
 						word extraData,
 						word SizeOfBuffer,
 						char *Buffer)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -786,7 +786,7 @@ NETMSGSENDBUFFER	proc	far		PortToken:word,
 						extraData:word,
 						SizeOfBuffer:word,
 						Buffer:fptr
-	uses	si, bp, di
+	uses	si, bp, di, ds
 	.enter
 	mov	bx, PortToken
 	mov	dx, SocketToken
@@ -808,7 +808,7 @@ C DECLARATION:	extern word
 			_far _pascal NetMsgSetTimeOut(word PortToken,
 						word SocketToken,
 						word TimeOut)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -834,10 +834,10 @@ C FUNCTION:	NetOpenSem
 C DESCRIPTION:  Open a network semaphore.
 
 C DECLARATION:	extern MemHandle _pascal
-		    NetOpenSem(char *semName, 
-		    	       int initValue, 
+		    NetOpenSem(char *semName,
+		    	       int initValue,
 			       word pollIntervalTicks);
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -872,7 +872,7 @@ C DESCRIPTION:  Open a network semaphore.
 
 C DECLARATION:	extern Boolean _pascal
 		    NetPSem(MemHandle semHandle, word timeoutTicks)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -903,7 +903,7 @@ C FUNCTION:	NetVSem
 C DESCRIPTION:  Open a network semaphore.
 
 C DECLARATION:	extern void _pascal NetVSem(MemHandle semHandle)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -926,7 +926,7 @@ C FUNCTION:	NetCloseSem
 C DESCRIPTION:  Open a network semaphore.
 
 C DECLARATION:	extern void _pascal NetCloseSem(MemHandle semHandle)
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -950,7 +950,7 @@ C FUNCTION:	NetPrintSetBannerStatus
 C DESCRIPTION:  Turn banner printing on/off
 
 C DECLARATION:	extern void _pascal NetPrintSetBannerStatus(int status);
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -974,7 +974,7 @@ C FUNCTION:	NetPrintSetTimeout
 C DESCRIPTION:  Set the capture timeout value
 
 C DECLARATION:	extern void _pascal NetPrintSetTimeout(int timeout);
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
