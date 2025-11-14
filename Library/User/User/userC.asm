@@ -1367,13 +1367,16 @@ global USERCREATEICONTEXTMONIKER:far
 USERCREATEICONTEXTMONIKER	proc	far	params:CreateIconTextMonikerParams
 	ForceRef params
 
-	push	ds 			; we will clobber DS, so let's save it
+	;push	ds 			; we will clobber DS, so let's save it
 
 	; lock icon moniker lmem block, as UserCreateIconTextMoniker expects one
 	mov 	cx, bp
 	mov 	bp, sp
 	mov 	bx, ss: [bp+4].CITMP_iconMoniker.handle
 	mov 	bp, cx
+
+	mov	di, ds			; we will clobber DS, so let's save it
+
 	call	ObjLockObjBlock 	; *ds:si icon moniker
 	mov	ds, ax
 
@@ -1385,7 +1388,8 @@ USERCREATEICONTEXTMONIKER	proc	far	params:CreateIconTextMonikerParams
 	mov	bx, ds: [LMBH_handle]
 	call	MemUnlock
 
-	pop	ds			; restore DS
+	mov	ds, di			; restore DS
+	;pop	ds			; restore DS
 
 	ret	@ArgSize
 
