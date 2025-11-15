@@ -14,7 +14,7 @@ IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE% (
    GOTO :EOF
 )
 for /f "delims=" %%a in (%LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE%) do set %%a
-IF NOT EXIST %destdir%\localpc\ensemble\swatgo.bat (
+IF NOT EXIST %destdir%\localpc\ensemble\ensemble.bat (
    echo *** Target at "%destdir%" not usable.
    GOTO :EOF
 )

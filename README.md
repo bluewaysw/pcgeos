@@ -15,13 +15,13 @@ The SDK requires "sed" (https://en.wikipedia.org/wiki/Sed) and "perl" (https://e
 On Linux if you want to use swat for debugging with good system integration is is required to install xdotools package. It ensures swat receives the keyboard focus once needed. 
 
 ## Install WATCOM and set environment
-- Unzip WATCOM tools from the latest [release-tar-gz](https://github.com/open-watcom/open-watcom-v2/releases/download/2020-12-01-Build/ow-snapshot.tar.gz) for instance to `C:\WATCOM-V2`
+- Unzip WATCOM tools from a suitable [release-tar-gz](https://github.com/open-watcom/open-watcom-v2/releases/download/2020-12-01-Build/ow-snapshot.tar.gz) snapshot (currently tested: 2020-12-01) for instance to `C:\WATCOM-V2`
 - add WATCOM env variable: `WATCOM=c:\WATCOM-V2`
 - set `BASEBOX=basebox` to use the advanced emulator backend from [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) if it is on the executable path, alternatively you may provide the full path to the executable as well
 - set `ROOT_DIR` to the root of the checkout
 - set `LOCAL_ROOT` to a local working directory (can be empty at first, but should be under `pcgeos`, so you can use it for development of your own apps as well)
 - add `C:\WATCOM-V2\binnt` to your system path variable
-- add bin of the checkout of this repo to path variable
+- add `bin` of the checkout of this repo to path variable
 - add sed and perl to path variable - note the order to avoid loading the wrong Perl version. Example:
 
         set WATCOM=c:\WATCOM-V2
@@ -35,20 +35,24 @@ Document is work in progress.... stay tuned!
 
 ## Building PC/GEOS SDK
 Build pmake tool:
-- `cd %ROOT_DIR%/Tools/pmake/pmake`
-- `wmake install`
+
+    cd %ROOT_DIR%/Tools/pmake/pmake
+    wmake install
 
 Build all the other SDK Tools:
-- `cd %ROOT_DIR%/Installed/Tools`
-- `pmake install`
+
+    cd %ROOT_DIR%/Installed/Tools
+    pmake install
 
 Build all PC/GEOS (target) components:
-- `cd %ROOT_DIR%/Installed`
-- `pmake`
+
+    cd %ROOT_DIR%/Installed`
+    pmake`
 
 Build the target environment:
-- `cd %ROOT_DIR%/Tools/build/product/bbxensem/Scripts`
-- `perl -I. buildbbx.pl`
+
+    perl %ROOT_DIR%/Tools/build/product/bbxensem/Scripts/buildbbx.pl
+
   - the answers to the questions from the above perl-script are:
     - nt (for the platform)
     - y (for the EC version)
@@ -59,6 +63,10 @@ Build the target environment:
     - n (for the VM files)
     - and then you'll have to enter the path to a "gbuild"-folder in your LOCAL_ROOT-folder.
   - BTW: It's expected that the current version of the perl-script creates several "Could not find file _name_ in any of the source trees."-messages.
+  - Advanced use: You can use the EC target and the NC target simultaneously.
+    - Build the EC target (answers nt/y/n/y/n/path). The path should end with `gbuild.ec`.
+    - Build the NC target (answers nt/y/n/y/n/path). The path should end with `gbuild` or `gbuild.nc`.
+    - The `target` command (see below) starts the EC target by default. To start the NC target, enter `target -n`.
 
 Launch the target environment in dosbox:
 - make sure dosbox is added to your path variable, or [pcgeos-basebox](https://github.com/bluewaysw/pcgeos-basebox/tags) is installed and configured using BASEBOX environmental variable
@@ -66,7 +74,6 @@ Launch the target environment in dosbox:
   - the "swat" debugger stops immediately after the first stage of the boot process
   - enter `quit` at the "=>" prompt to detach the debugger and launch PC/GEOS stand-alone
     - or: enter `c` to launch with the debugger running in the background (slower)
-- Alternatively, adding the `-n` option to the `target` command launches the NC ("release") version
 
 ## Customize target environment
 If you want to customize the target environment settings only for yourself, you should not change the file `%ROOT_DIR%/bin/basebox.conf`.
