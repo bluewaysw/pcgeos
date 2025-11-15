@@ -679,6 +679,15 @@ EC <		call	AssertIsResEditDocument			>
 		mov	cx, size PathName
 		rep	movsb
 
+	; Copy user notes from the old to the new map block
+
+		movdw	sidi, axdx
+		lea	si, ds:[si].TMH_userNotes
+		lea	di, es:[di].TMH_userNotes
+SBCS <		mov	cx, GFH_USER_NOTES_BUFFER_SIZE			>
+DBCS <		mov	cx, size FileUserNotes			>
+		rep	movsb
+
 	; Copy source name from the old to the new map block
 
 		movdw	sidi, axdx	
