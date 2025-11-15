@@ -1367,7 +1367,7 @@ GEOS will look for a key called inixxx for the names of the files to be used.
 This key defines the location of the shared token database file. This key is 
 most useful in network situations, when many users may be sharing a single 
 token database, or when splitting the installation into a pre-installed and
-a user-specific part. The location should be a pathname on,y and not include
+a user-specific part. The location should be a pathname only and not include
 the filename of the token database.
 
     sharedTokenDatabase = N:\NETFILES
