@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = PicAlbum
+GEODE           = picalbum
 CLASS           = cThumbV.goc popups.goc
 MAIN            = mAlbum.goc mImport.goc
 PROCESS         = AWATCHER.GOC pBmpOp.goc pCamera.goc pMain.goc pPrint.goc\

@@ -224,8 +224,8 @@
      
     /* We also increase maxPoints and maxContours in order to support */
     /* some broken fonts.                                             */
-    face->maxPoints   += 8;
-    face->maxContours += 4;
+    face->maxPoints   += 4;
+    face->maxContours += 2;
 
     return TT_Err_Ok;
   }
@@ -910,7 +910,9 @@
 
       cmap->format  = GET_UShort();
       cmap->length  = GET_UShort();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       cmap->version = GET_UShort();
+#endif
 
       FORGET_Frame();
 

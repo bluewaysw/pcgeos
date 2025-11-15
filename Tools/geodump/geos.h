@@ -1,7 +1,7 @@
 /*
         GEOS.H
 
-        by Marcus Gr�ber 1992-95
+        by Marcus Groeber 1992-95
 
         Include file for the PC/GEOS file format
 */
@@ -37,9 +37,9 @@ typedef struct {                        /*** "Release" */
 #define GEOS_ID 0x53CF45C7              // GEOS file identification "magic"
 
 typedef struct {                        /*** Standard-Dateikof */
-  unsigned char ID[4];                              // GEOS id magic: C7 45 CF 53
-  unsigned char class[2];                       // 00=applciation, 01=VM file
-  unsigned char flags[2];                       // flags ??? (always seen 0000h)
+  int ID;                               // GEOS id magic: C7 45 CF 53
+  unsigned char class[2];               // 00=applciation, 01=VM file
+  unsigned char flags[2];               // flags ??? (always seen 0000h)
   GEOSrelease release;                  // "release"
   GEOSprotocol protocol;                // protocol/version
   GEOStoken token;                      // file type/icon
@@ -133,14 +133,16 @@ typedef struct {                        /*** Base typ of segment fixup table */
  *                        GEOS VM files (documents etc.)                      *
  ******************************************************************************/
 #define GEOS_IDVM 0xADEB                // identification "magic" of VM file
+					// ~~~VMFH_SIG
 #define GEOS_IDvmfdir 0x00FB            // identification for VM directory hdr
+					// ~~~VM_HEADER_SIG
 
 typedef struct {                        /*** Additional VM file header */
   char _x1[8];
   unsigned short IDVM;                        // VM id "magic"
   unsigned short dirsize;                     // size of directory block (bytes)
   long dirptr;                          // absolute file pos of dir block
-} GEOSvmfheader;
+} GEOSvmfheader; /* ~~~vm.h: VMFileHeader */
 
 typedef struct {                        /*** File header of directory block */
   unsigned short IDvmfdir;                    // ID sequence (?) 0xFB 0x00
@@ -158,7 +160,8 @@ typedef struct {                        /*** File header of directory block */
   long totalsize;                       // Total size of allocated blocks
   unsigned short flags;                       // flags (?)
   unsigned short hdl_dbmap;                   // handle of DB map data block
-} GEOSvmfdirheader;                     // (handle table follows)
+  // block directory follows
+} GEOSvmfdirheader; /* ~~~vm.h: VMHeader */
 
 typedef struct {                        /*** Entry in handle table */
   union {
@@ -184,7 +187,7 @@ typedef struct {                        /*** Entry in handle table */
   unsigned short blocksize;                   // size of block (bytes, 0 if free)
   long blockptr;                        // file pointer to beginning of block
                                         // (0=unused handle entry)
-} GEOSvmfdirrec;
+} GEOSvmfdirrec; /* ~~~vm.h: VMBlock */
 
 // Note: "Handles" in the global VM directory are offsets relative to the
 //   beginning of the block directory structure that point into the directory
@@ -203,7 +206,7 @@ typedef struct {                        /*** Header of block with LMem heap */
 //unsigned dbblock;                     // block index in group, if dbman file
 } GEOSlocalheap;
 
-typedef unsigned GEOSlocallist;         /*** Base type of local heap table */
+typedef unsigned short GEOSlocallist;   /*** Base type of local heap table */
 
 /* macros to operate on VM block directory as on an array */
 #define GeosHdl2Idx(hdl)\
@@ -226,7 +229,7 @@ typedef struct {                        /*** Header block of dbmanager file */
   GEOSdbadr prim;                       // db adress of primary item
   unsigned short x;
   char _x1[6];
-} GEOSdbheader;
+} GEOSdbheader; /* ~~~vm.h: DBMapBlock */
 
 typedef struct {                        /*** Header of group index block */
   unsigned short hdl;                         // VM file handle
@@ -236,7 +239,7 @@ typedef struct {                        /*** Header of group index block */
   unsigned short curitemlist;                 // current top of item list
   unsigned short curblocklist;                // curent top of block list
   unsigned short blocksize;                   // size of index data in block
-} GEOSdbidx;
+} GEOSdbidx; /* ~~~vm.h: DBGroupHeader */
 
 typedef struct {                        /*** Base type of item list */
   unsigned short block;                       // Pointer to block record
@@ -247,7 +250,7 @@ typedef struct {                        /*** Base type of storage block list */
   unsigned short _x;
   unsigned short hdl;                         // VM handle of storage block
   unsigned short num;                         // number of items in that block
-} GEOSdbblocklist;
+} GEOSdbblocklist; /* ~~~vm.h: DBItemBlockInfo */
 #pragma pack()
 
 /*** Nimbus Q font files (Geos-specific format) ***/
