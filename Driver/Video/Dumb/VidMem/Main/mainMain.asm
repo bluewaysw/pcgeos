@@ -227,8 +227,7 @@ else
 		fptr	0				; not supported
 endif							; if _8BIT
 if _24BIT
-;		fptr	Clr24:Clr24MaskInfo		; re-enable this when
-		fptr	Clr24:Clr24Entry		;  24-bit implemented
+		fptr	Clr24:Clr24MaskInfo
 else
 		fptr	0				; not supported
 endif							; if _24BIT

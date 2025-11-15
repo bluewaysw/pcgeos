@@ -41,7 +41,7 @@ protocols. The **pmake** program uses grev to keep track of incremental
 changes; if you make large changes to a geode at some point, you can use 
 grev to modify your geode's revision file to reflect your changes.
 
-**mkmf** 	Makefile maker. Creates a MAKEFILE which will in turn be used by 
+**mkmf**    Makefile maker. Creates a MAKEFILE which will in turn be used by 
 **pmake** to determine how to create the geode's files.
 
 **pccom**  
@@ -291,7 +291,7 @@ one.
 isn't.
 
 + **field** - Warn if structure field used with . operator when lhs isn't of the 
-type that contains the field	
+type that contains the field    
 
 + **shadow** - Warn if a local variable or procedure overrides a definition in a 
 larger scope
@@ -312,7 +312,7 @@ directive
 
 + **inline_data** - Warn if a variable is defined where execution can reach
 
-+ **unref_local** - Warn if a local label isn't ever referenced	
++ **unref_local** - Warn if a local label isn't ever referenced 
 
 + **jmp** - Warn if out-of-range jumps are transformed into short jumps 
 around near jumps
@@ -346,8 +346,8 @@ will make the proper calls to Glue for the most common cases.
 
 The Glue application takes the following arguments:
 
-	glue @file
-	glue <flags> <objFile>+ [-l<objFile>]*
+    glue @file
+    glue <flags> <objFile>+ [-l<objFile>]*
 
 **@file** - The Glue linker should take its arguments from the file *file* in addition to 
 those on the command line. This may come in handy if you often use the 
@@ -481,8 +481,8 @@ Under normal circumstances, you will not invoke Goc directly. Instead,
 If for some reason you do need to invoke Goc directly, you may wish to know 
 about its command line arguments:
 
-	goc @file
-	goc [args] <file>
+    goc @file
+    goc [args] <file>
 
 **@file** - Command-line arguments are stored in a file-Goc will read 
 this file and treat the contents as its arguments. If you use this 
@@ -524,7 +524,7 @@ what @default means).
 
 **-l** - Do localization work.
 
-**-o** - file	Specify name of output file.
+**-o** - file   Specify name of output file.
 
 **-p** - For Geoworks use only.
 
@@ -793,33 +793,33 @@ DOS file names, PCCOM will treat it as the argument delineator character.
 Because of this, file operation commands will not work on files with 
 exclamation points in their names.
 
-	Command			Sequence			Description
+    Command         Sequence            Description
 
-	Send File		<Esc>XF1			Send a file from the host to the remote machine using the PCCOM file transfer protocol (see below).
+    Send File       <Esc>XF1            Send a file from the host to the remote machine using the PCCOM file transfer protocol (see below).
 
-	Get File		<Esc>XF2			Retrieve a file from the remote machine using the PCCOM file transfer protocol (see below).
+    Get File        <Esc>XF2            Retrieve a file from the remote machine using the PCCOM file transfer protocol (see below).
 
-	Copy File		<Esc>CPsrc!dest!	Copy the file named in the src argument to the file named in the dest argument. File name arguments may be full or relative paths with or without drive letters. This is equivalent to the DOS COPY command.
+    Copy File       <Esc>CPsrc!dest!    Copy the file named in the src argument to the file named in the dest argument. File name arguments may be full or relative paths with or without drive letters. This is equivalent to the DOS COPY command.
 
-	Move File		<Esc>MVsrc!dest!	Move the file named in the src argument to the file named in the dest argument. File name arguments may be full or relative paths with or without drive letters. This is equivalent to the DOS MOVE command.
+    Move File       <Esc>MVsrc!dest!    Move the file named in the src argument to the file named in the dest argument. File name arguments may be full or relative paths with or without drive letters. This is equivalent to the DOS MOVE command.
 
-	Delete File		<Esc>RFfile!		Remove the named file; the file argument may be a full path or a file in the current directory. This is equivalent to the DOS DEL command.
+    Delete File     <Esc>RFfile!        Remove the named file; the file argument may be a full path or a file in the current directory. This is equivalent to the DOS DEL command.
 
-	Change Drive	<Esc>CDdrive:!		Change the working volume to the drive named in the drive argument. This is equivalent to changing the drive in DOS by typing the drive letter followed by a colon (e.g. C:).
+    Change Drive    <Esc>CDdrive:!      Change the working volume to the drive named in the drive argument. This is equivalent to changing the drive in DOS by typing the drive letter followed by a colon (e.g. C:).
 
-	Change Directory	<Esc>CDdir!		Change the working directory to that named. The dir argument may be a full or relative path; this is the equivalent of the DOS CD command.
+    Change Directory    <Esc>CDdir!     Change the working directory to that named. The dir argument may be a full or relative path; this is the equivalent of the DOS CD command.
 
-	Show Current Path	<Esc>CD!		Print the current directory's path. This is equivalent to the DOS CD command with no arguments passed.	
+    Show Current Path   <Esc>CD!        Print the current directory's path. This is equivalent to the DOS CD command with no arguments passed.  
 
-	List Files in Dir	<Esc>LS			List files in the current working directory. This is equivalent to the DOS DIR command with no arguments.
+    List Files in Dir   <Esc>LS         List files in the current working directory. This is equivalent to the DOS DIR command with no arguments.
 
-	Create Directory	<Esc>MDdir!		Create a new directory according to the dir argument. The dir argument may be a full or relative path. This is the equivalent of the DOS MKDIR command.
+    Create Directory    <Esc>MDdir!     Create a new directory according to the dir argument. The dir argument may be a full or relative path. This is the equivalent of the DOS MKDIR command.
 
-	Delete Directory	<Esc>RDdir!		Remove the directory named in the dir argument. The dir argument may be a full or relative path; this is equivalent to the DOS RMDIR and RD commands.
+    Delete Directory    <Esc>RDdir!     Remove the directory named in the dir argument. The dir argument may be a full or relative path; this is equivalent to the DOS RMDIR and RD commands.
 
-	Clear Screen	<Esc>cl				Clear the screen. This is equivalent to the DOS CLS command.
+    Clear Screen    <Esc>cl             Clear the screen. This is equivalent to the DOS CLS command.
 
-	Exit PCCOM		<Esc>EX				Exit PCCOM on the remote machine.
+    Exit PCCOM      <Esc>EX             Exit PCCOM on the remote machine.
 
 ##### 10.9.2.3 Sending and Receiving Files
 
@@ -972,11 +972,11 @@ accepted tokens are and what they send.
 
 For example, if the SEND file contained the lines
 
-	PC		DRIVER/VIDEO/DUMB/HGC/HGC				GEO
+    PC      DRIVER/VIDEO/DUMB/HGC/HGC               GEO
 
-	PCB		DRIVER/VIDEO/DUMB/HGC/HGC				GEO
+    PCB     DRIVER/VIDEO/DUMB/HGC/HGC               GEO
 
-	PCB		DRIVER/MOUSE/LOGIBUS/LOGIBUS			GEO
+    PCB     DRIVER/MOUSE/LOGIBUS/LOGIBUS            GEO
 
 then typing
 
@@ -1029,10 +1029,10 @@ The file size should be encoded as a dword value. Send the low byte first.
 Once you have received the SYNC or 0xFF byte, you can safely begin 
 sending packets of data to PCCOM. A packet has the following format 
 (sequence of bytes, with the first listed being the first sent):  
-`BLOCK_START				( = 1 )`  
+`BLOCK_START                ( = 1 )`  
 `data`  
-`BLOCK_END				( = 2 )`  
-`CRC				( checksum value )`  
+`BLOCK_END              ( = 2 )`  
+`CRC                ( checksum value )`  
 The data between BLOCK_START and the checksum value (CRC) may be 
 up to 1 K. In order to avoid PCCOM confusion between a normal data byte 
 and a BLOCK_START or BLOCK_END, a third 
@@ -1046,20 +1046,20 @@ value. Thus, if you had a data sequence consisting of the following
 
 you would send the following sequence of bytes to transfer the data:
 
-	<Esc>FX1					( alert PCCOM a
-					  file is coming )
-	<null-terminated file name>
-	<wait for SYNC byte>
-	BLOCK_START					( = 1 )
-	100
-	42
-	BLOCK_QUOTE					( = 3 )
-	5					( = 2 + 3 )
-	BLOCK_QUOTE					( = 3 )
-	6					( = 3 + 3 )
-	16
-	BLOCK_END					( = 2 )
-	CRC					( checksum value )
+    <Esc>FX1                    ( alert PCCOM a
+                      file is coming )
+    <null-terminated file name>
+    <wait for SYNC byte>
+    BLOCK_START                 ( = 1 )
+    100
+    42
+    BLOCK_QUOTE                 ( = 3 )
+    5                   ( = 2 + 3 )
+    BLOCK_QUOTE                 ( = 3 )
+    6                   ( = 3 + 3 )
+    16
+    BLOCK_END                   ( = 2 )
+    CRC                 ( checksum value )
 
 The CRC word is two bytes of checksum value as calculated using the 
 table and code shown in "Calculating Checksum Values," below. The CRC 
@@ -1076,8 +1076,8 @@ corrupted by noise, this provides a surer backup.
 
 This data block should have the following data:
 
-	"!PCCom File Transfer Filename Block! "
-		<no NULL><null-terminated file name>
+    "!PCCom File Transfer Filename Block! "
+        <no NULL><null-terminated file name>
 
 The CRC for this block should be one higher than it would normally 
 be - this signals that this block is of this special format.
@@ -1176,17 +1176,17 @@ BLOCK_QUOTE, or BLOCK_END characters in your calculations.
 
 **Code Display 10-1 PCCOM Checksums**
 
-	/**********************************************************************
-	 *		CalcCRC						*
-	**********************************************************************
-	 * SUMMARY:		Calculate the CRC on a block of data.
-	 * PASS:		char *buf		Pointer to the data buffer
-	 *		short size				Size of the data buffer
-	 *		short checksum		Previous checksum (0 at first)
-	 * RETURN:		CRC value (2 bytes)
- 	**********************************************************************/
+    /**********************************************************************
+     *      CalcCRC                     *
+    **********************************************************************
+     * SUMMARY:     Calculate the CRC on a block of data.
+     * PASS:        char *buf       Pointer to the data buffer
+     *      short size              Size of the data buffer
+     *      short checksum      Previous checksum (0 at first)
+     * RETURN:      CRC value (2 bytes)
+    **********************************************************************/
 
-	short	crcTable[] = { 
+    short   crcTable[] = { 
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
     0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef,
     0x1231, 0x0210, 0x3273, 0x2252, 0x52b5, 0x4294, 0x72f7, 0x62d6,
@@ -1219,20 +1219,20 @@ BLOCK_QUOTE, or BLOCK_END characters in your calculations.
     0x7c26, 0x6c07, 0x5c64, 0x4c45, 0x3ca2, 0x2c83, 0x1ce0, 0x0cc1,
     0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8,
     0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0
-	};
+    };
 
-	unsigned short		IncCRC(unsigned short crc, char c){
-	    return ((crc << 8) ^ crcTable[((crc >> 8) ^ c) & 0xff]);
-	}
+    unsigned short      IncCRC(unsigned short crc, char c){
+        return ((crc << 8) ^ crcTable[((crc >> 8) ^ c) & 0xff]);
+    }
 
-	short		CalcCRC(char *buf, short size, short checksum){
-	/* The CRC is for the data part of the packet only. 
-	 * The CRC value is passed low byte first. */
-	    for (;size > 0; size--){
-		 	checksum = IncCRC(checksum, *buf++);
-	    }
-	    return checksum;
-	}
+    short       CalcCRC(char *buf, short size, short checksum){
+    /* The CRC is for the data part of the packet only. 
+     * The CRC value is passed low byte first. */
+        for (;size > 0; size--){
+            checksum = IncCRC(checksum, *buf++);
+        }
+        return checksum;
+    }
 
 ----------
 
@@ -1296,12 +1296,12 @@ token is passed. Look in the SEND file to find out what the accepted tokens
 are and what they send. Suppose your send file consisted of the following 
 lines:
 
-	PC		DRIVER/VIDEO/DUMB/HGC/HGC 				GEO
-	HGCAT 	DRIVER/VIDEO/DUMB/HGC/HGC 				GEO
-	PCB 	DRIVER/VIDEO/DUMB/HGC/HGC 				GEO
-	PCB 	DRIVER/MOUSE/LOGIBUS/LOGIBUS 			GEO
-	PCS 	DRIVER/VIDEO/DUMB/HGC/HGC 				GEO
-	PCS 	DRIVER/MOUSE/LOGISER/LOGISER 			GEO
+    PC      DRIVER/VIDEO/DUMB/HGC/HGC               GEO
+    HGCAT   DRIVER/VIDEO/DUMB/HGC/HGC               GEO
+    PCB     DRIVER/VIDEO/DUMB/HGC/HGC               GEO
+    PCB     DRIVER/MOUSE/LOGIBUS/LOGIBUS            GEO
+    PCS     DRIVER/VIDEO/DUMB/HGC/HGC               GEO
+    PCS     DRIVER/MOUSE/LOGISER/LOGISER            GEO
 
 Typing 
 
@@ -1311,46 +1311,44 @@ would send the file DRIVER\VIDEO\DUMB\HGC\HGCEC.GEO (HGC.GEO if
 sending non-EC). Typing "pcs -S pcb" would send that file, and also 
 DRIVER\MOUSE\LOGIBUS\LOGIBUSE.GEO (or LOGIBUS.GEO). 
 
-**Table 10-1** *Destination of Files Sent by Pcs*
+**Table 10-1** Destination of Files Sent by Pcs
 
-----------
+    Development Directory               Suffix      Target Directory
 
-	Development Directory 				Suffix 		Target Directory
-
-	*\LIBRARY\HWR\DATA\ 				* 		PRIVDATA\HWR
-	*\LIBRARY\SPELL\DICTS\* 			* 		USERDATA\DICTS
-	*\LIBRARY\SAVER\ 					GEO 	WORLD
-	*\LIBRARY\SAVER\*\ 					GEO 	SYSTEM\SAVERS
-	*\LIBRARY\PREF\* 					GEO 	SYSTEM\PREF
-	*\LIBRARY\TRANSLAT\GRAPHICS\*\*\	GEO		SYSTEM
-	*\LIBRARY\TRANSLAT\TEXT\MSMFILE\ 	GEO 	SYSTEM
-	*\LIBRARY\TRANSLAT\*				GEO		SYSTEM\IMPEX
-	*\LIBRARY\FMTOOLS\* 				GEO 	SYSTEM\FILEMGR
-	*\LIBRARY\NET\*						GEO 	SYSTEM\SYSAPPL
-	*\LIBRARY\* 						GEO 	SYSTEM
-	*\DRIVER\IFS\* 						GEO 	SYSTEM\FS
-	*\DRIVER\COMM\* 					GEO 	SYSTEM
-	*\DRIVER\NET\* 						GEO 	SYSTEM\NET
-	*\DRIVER\FAX\* 						GEO		SYSTEM\FAX
-	*\DRIVER\TASK\* 					GEO		SYSTEM\TASK
-	*\DRIVER\FONT\* 					GEO		SYSTEM\FONT
-	*\DRIVER\KEYBOARD\* 				GEO 	SYSTEM\KBD
-	*\DRIVER\MOUSE\* 					GEO 	SYSTEM\MOUSE
-	*\DRIVER\PRINTER\* 					GEO		SYSTEM\PRINTER
-	*\DRIVER\SWAP\* 					GEO 	SYSTEM\SWAP
-	*\DRIVER\VIDEO\* 					GEO 	SYSTEM\VIDEO
-	*\DRIVER\STREAM\* 					GEO 	SYSTEM
-	*\DRIVER\POWER\* 					GEO 	SYSTEM\POWER
-	*\DRIVER\SOUND\* 					GEO 	SYSTEM\SOUND
-	*\APPL\LAUNCHER\* 					GEO 	PRIVDATA
-	*\APPL\WELCOME\* 					GEO 	SYSTEM\SYSAPPL
-	*\APPL\PREFEREN\SETUP\* 			GEO 	SYSTEM\SYSAPPL
-	*\APPL\SDK_C\*						GEO		WORLD\C
-	*\APPL\SDK_ASM\* 					GEO 	WORLD\ASM
-	*\APPL\* 							GEO 	WORLD
-	*\FONTDATA\* 						FNT 	USERDATA\FONT
-	*\DOCUMENT\* 						* 		DOCUMENT
-	*\DOSAPPL\*							* 		.
+    *\LIBRARY\HWR\DATA\                 *       PRIVDATA\HWR
+    *\LIBRARY\SPELL\DICTS\*             *       USERDATA\DICTS
+    *\LIBRARY\SAVER\                    GEO     WORLD
+    *\LIBRARY\SAVER\*\                  GEO     SYSTEM\SAVERS
+    *\LIBRARY\PREF\*                    GEO     SYSTEM\PREF
+    *\LIBRARY\TRANSLAT\GRAPHICS\*\*\    GEO     SYSTEM
+    *\LIBRARY\TRANSLAT\TEXT\MSMFILE\    GEO     SYSTEM
+    *\LIBRARY\TRANSLAT\*                GEO     SYSTEM\IMPEX
+    *\LIBRARY\FMTOOLS\*                 GEO     SYSTEM\FILEMGR
+    *\LIBRARY\NET\*                     GEO     SYSTEM\SYSAPPL
+    *\LIBRARY\*                         GEO     SYSTEM
+    *\DRIVER\IFS\*                      GEO     SYSTEM\FS
+    *\DRIVER\COMM\*                     GEO     SYSTEM
+    *\DRIVER\NET\*                      GEO     SYSTEM\NET
+    *\DRIVER\FAX\*                      GEO     SYSTEM\FAX
+    *\DRIVER\TASK\*                     GEO     SYSTEM\TASK
+    *\DRIVER\FONT\*                     GEO     SYSTEM\FONT
+    *\DRIVER\KEYBOARD\*                 GEO     SYSTEM\KBD
+    *\DRIVER\MOUSE\*                    GEO     SYSTEM\MOUSE
+    *\DRIVER\PRINTER\*                  GEO     SYSTEM\PRINTER
+    *\DRIVER\SWAP\*                     GEO     SYSTEM\SWAP
+    *\DRIVER\VIDEO\*                    GEO     SYSTEM\VIDEO
+    *\DRIVER\STREAM\*                   GEO     SYSTEM
+    *\DRIVER\POWER\*                    GEO     SYSTEM\POWER
+    *\DRIVER\SOUND\*                    GEO     SYSTEM\SOUND
+    *\APPL\LAUNCHER\*                   GEO     PRIVDATA
+    *\APPL\WELCOME\*                    GEO     SYSTEM\SYSAPPL
+    *\APPL\PREFEREN\SETUP\*             GEO     SYSTEM\SYSAPPL
+    *\APPL\SDK_C\*                      GEO     WORLD\C
+    *\APPL\SDK_ASM\*                    GEO     WORLD\ASM
+    *\APPL\*                            GEO     WORLD
+    *\FONTDATA\*                        FNT     USERDATA\FONT
+    *\DOCUMENT\*                        *       DOCUMENT
+    *\DOSAPPL\*                         *       .
 
 ### 10.12 pcsend
 
@@ -1453,69 +1451,69 @@ Depending on how much customization you need to do, you may wish to read
 on to find out about makefile syntax. However, there are several simple 
 things you can do without learning too much about makefiles.
 
-	# Pass extra flags to Goc:
-	GOCFLAGS		+= flag1 flag2
+    # Pass extra flags to Goc:
+    GOCFLAGS        += flag1 flag2
 
-	# Pass extra flags to your C compiler:
-	CCOMFLAGS		+= flag1 flag2
+    # Pass extra flags to your C compiler:
+    CCOMFLAGS       += flag1 flag2
 
-	# Pass extra flags to the Esp assembler (if you have
-	# that tool):
-	ASMFLAGS		+= flag1 flag2
+    # Pass extra flags to the Esp assembler (if you have
+    # that tool):
+    ASMFLAGS        += flag1 flag2
 
-	# Pass extra flags to the Glue linker:
-	LINKFLAGS 		+= flag1 flag2
+    # Pass extra flags to the Glue linker:
+    LINKFLAGS       += flag1 flag2
 
-	# Look somewhere special for .GOC files
-	# (This pattern applies to any suffix):
-	.PATH.GOC 		: $(ROOT_DIR)\DIR1 \DIR2
+    # Look somewhere special for .GOC files
+    # (This pattern applies to any suffix):
+    .PATH.GOC       : $(ROOT_DIR)\DIR1 \DIR2
 
-	# Specify geode name:
-	GEODE 		= NAME
+    # Specify geode name:
+    GEODE       = NAME
 
-	# Set NO_EC variable (which signals that we don't
-	# want to make an Error Checking version):
-	NO_EC 		= 1
+    # Set NO_EC variable (which signals that we don't
+    # want to make an Error Checking version):
+    NO_EC       = 1
 
-	# If your preprocessor is not reachable via the 
-	# Path environment variable:
-	CPP 		= vol:\path\name
+    # If your preprocessor is not reachable via the 
+    # Path environment variable:
+    CPP         = vol:\path\name
 
-	# If your C compiler is not reachable via the Path
-	# environment variable:
-	CCOM 		= vol:\path\name
+    # If your C compiler is not reachable via the Path
+    # environment variable:
+    CCOM        = vol:\path\name
 
-	# Include some other make file
-	#include "OTHERMF.MK"
-	# Include the standard makefile directives
-	# This will include INCLUDE\GEODE.MK:
-	#include <$(SYSMAKEFILE)>
+    # Include some other make file
+    #include "OTHERMF.MK"
+    # Include the standard makefile directives
+    # This will include INCLUDE\GEODE.MK:
+    #include <$(SYSMAKEFILE)>
 
 ----------
 
 **Code Display 10-2 Sample local.mk Files**
 
-	---FINGER\LOCAL.MK
-	# Local Makefile for FPaint
-	#  FPaint is stored in a directory called FINGER. This would normally confuse
-	#  pmake, which expects the geode name to be the same as the directory name.
-	#  Let us, therefore, alert pmake to the geode's real name:
-	GEODE		= FPAINT
-	# This was the only thing we wanted to change, so include standard definitions:
-	#include <$(SYSMAKEFILE)>
+    ---FINGER\LOCAL.MK
+    # Local Makefile for FPaint
+    #  FPaint is stored in a directory called FINGER. This would normally confuse
+    #  pmake, which expects the geode name to be the same as the directory name.
+    #  Let us, therefore, alert pmake to the geode's real name:
+    GEODE       = FPAINT
+    # This was the only thing we wanted to change, so include standard definitions:
+    #include <$(SYSMAKEFILE)>
 
-	---PROMO\LOCAL.MK
-	# Local Makefile for Promo
-	#  Promo uses some clip art that isn't in or below its source directory, so we
-	#  tell pmake where to look for it:
-	.PATH.GOH 	: $(CSOURCE_PATHS) $(CINCLUDE_DIR) $(ROOT_DIR)\LOGOART
-	# This program contains no Error Checking code (See 
-	# "GEOS Programming," Chapter 5 of the Concepts Book for information
-	# about EC code. So we tell pmake not to bother making an Error Checking
-	# version:
-	NO_EC = 1
-	# Include the standard system makefile:
-	#include <$(SYSMAKEFILE)>
+    ---PROMO\LOCAL.MK
+    # Local Makefile for Promo
+    #  Promo uses some clip art that isn't in or below its source directory, so we
+    #  tell pmake where to look for it:
+    .PATH.GOH   : $(CSOURCE_PATHS) $(CINCLUDE_DIR) $(ROOT_DIR)\LOGOART
+    # This program contains no Error Checking code (See 
+    # "GEOS Programming," Chapter 5 of the Concepts Book for information
+    # about EC code. So we tell pmake not to bother making an Error Checking
+    # version:
+    NO_EC = 1
+    # Include the standard system makefile:
+    #include <$(SYSMAKEFILE)>
 
 ----------
 
@@ -1536,17 +1534,17 @@ make little sense to you unless you've dealt with Make before. Just
 remember where this table is and come back to it as you read on. The 
 characters and the information they produce are as follows:
 
-	*	All debugging information.  
-	c	Conditional evaluation.  
-	d 	The searching and caching of directories.  
-	m	The making of each target: what target is being examined; 
-		when it was last modified; whether it is out-of-date; etc.  
-	p	Makefile parsing.  
-	r	Remote execution.  
-	s	The application of suffix-transformation rules.  
-	t	The maintenance of the list of targets.  
-	v	Variable assignment. 
-	Of these, the "m" and "s" flags will be most useful.
+    *   All debugging information.  
+    c   Conditional evaluation.  
+    d   The searching and caching of directories.  
+    m   The making of each target: what target is being examined; 
+        when it was last modified; whether it is out-of-date; etc.  
+    p   Makefile parsing.  
+    r   Remote execution.  
+    s   The application of suffix-transformation rules.  
+    t   The maintenance of the list of targets.  
+    v   Variable assignment. 
+    Of these, the "m" and "s" flags will be most useful.
 
 **-f file** - Specify a makefile to read different from the default (MAKEFILE). If file 
 is "-", **pmake** uses the standard input. This is useful for making "quick 
@@ -1669,7 +1667,7 @@ in need of creation) if
 
 + any of the sources has been modified more recently than the target.
 
-	Under this operator, steps will be taken to re-create the target only if it 
+    Under this operator, steps will be taken to re-create the target only if it 
 is found to be out-of-date by using these two rules.
 
 **!** - If an exclamation point is used, the target will always be re-created, but 
@@ -1684,19 +1682,19 @@ re-created, if necessary.
 
 + the target doesn't exist.
 
-	If the target is out-of-date according to these rules, it will be re-created. 
+    If the target is out-of-date according to these rules, it will be re-created. 
 This operator also does something else to the targets, as described in 
 section 10.13.4.2).
 
-	Suppose there are three C files (**a.c**, **b.c** and **c.c**) each of which includes the 
+    Suppose there are three C files (**a.c**, **b.c** and **c.c**) each of which includes the 
 file **defs.h**. The dependencies between the files could then be expressed as 
 follows:
 
-	PROGRAM.EXE 		: A.OBJ B.OBJ C.OBJ  
-	A.OBJ B.OBJ C.OBJ 	: DEFS.H  
-	A.OBJ 				: A.C  
-	B.OBJ 				: B.C  
-	C.OBJ 				: C.C  
+    PROGRAM.EXE         : A.OBJ B.OBJ C.OBJ  
+    A.OBJ B.OBJ C.OBJ   : DEFS.H  
+    A.OBJ               : A.C  
+    B.OBJ               : B.C  
+    C.OBJ               : C.C  
 
 You may be wondering at this point, where A.OBJ, B.OBJ and C.OBJ came in 
 and why they depend on defs.h and the C files don't. The reason is quite 
@@ -1774,15 +1772,15 @@ line, according to the rules given earlier.
 
 To expand on the earlier makefile, you might add commands as follows:
 
-	PROGRAM.EXE : A.OBJ B.OBJ C.OBJ
-		BCC A.OBJ B.OBJ C.OBJ -o PROGRAM.EXE
-	A.OBJ B.OBJ C.OBJ : DEFS.H
-	A.OBJ : A.C
-		bcc -c A.C
-	B.OBJ : B.C
-		bcc -c B.C
-	C.OBJ : C.C
-		bcc -c C.C
+    PROGRAM.EXE : A.OBJ B.OBJ C.OBJ
+        BCC A.OBJ B.OBJ C.OBJ -o PROGRAM.EXE
+    A.OBJ B.OBJ C.OBJ : DEFS.H
+    A.OBJ : A.C
+        bcc -c A.C
+    B.OBJ : B.C
+        bcc -c B.C
+    C.OBJ : C.C
+        bcc -c C.C
 
 Something you should remember when writing a makefile is that the 
 commands will be executed if the target on the dependency line is out-of-date, 
@@ -1801,8 +1799,8 @@ This is to keep you informed of what's going on. If an "@" appears, however,
 this echoing is suppressed. In the case of an echo command, perhaps 
 "echo Linking index" it would be rather messy to output 
 
-	echo Linking index
-	Linking index
+    echo Linking index
+    Linking index
 
 The other special character is the dash ("-"). Shell commands finish with a 
 certain "exit status." This status is made available by the operating system 
@@ -1825,33 +1823,33 @@ later at your convenience. Variables in **pmake** are used much like variables
 in the shell and, by tradition, consist of all upper-case letters. Variables are 
 assigned using lines of the form
 
-	VARIABLE = value
+    VARIABLE = value
 
 append using lines of the form
 
-	VARIABLE += value
+    VARIABLE += value
 
 conditionally assigned (if the variable isn't already defined) by using lines of 
 the form
 
-	VARIABLE ?= value
+    VARIABLE ?= value
 
 and assigned with expansion (i.e. the value is expanded (see below) before 
 being assigned to the variable-useful for placing a value at the beginning of 
 a variable, or other things) by using lines of the form
 
-	VARIABLE := value
+    VARIABLE := value
 
 Any whitespace before value is stripped off. When appending, a space is 
 placed between the old value and the values being appended.
 
 The final way a variable may be assigned is using lines of the form
 
-	VARIABLE != shell-command
+    VARIABLE != shell-command
 
 or, if the shell command requires the use of the command.com interpreter, 
 
-	VARIABLE != `shell-command
+    VARIABLE != `shell-command
 
 In this case, shell-command has all its variables expanded (see below) and is 
 passed off to a shell to execute. The output of the shell is then placed in the 
@@ -1859,18 +1857,18 @@ variable. Any newlines (other than the final one) are replaced by spaces
 before the assignment is made. This is typically used to find the current 
 directory via a line like:
 
-	CURRENT_DIR != `cd
+    CURRENT_DIR != `cd
 
 The value of a variable may be retrieved by enclosing the variable name in 
 parentheses or curly braces and preceding the whole thing with a dollar sign. 
 For example, to set the variable CFLAGS to the string 
 "-I\NIHON\LIB\LIBC -O", you would place a line
 
-	CFLAGS = -I\NIHON\LIB\LIBC -O
+    CFLAGS = -I\NIHON\LIB\LIBC -O
 
 in the makefile and use the expression
 
-	$(CFLAGS)
+    $(CFLAGS)
 
  wherever you would like the string "-I\NIHON\LIB\LIBC -O" to appear. This 
 is called variable expansion.
@@ -1928,7 +1926,7 @@ once for each target on the dependency line, providing what is known as a
 "dynamic source," allowing you to specify several dependency lines at once. 
 For example,
 
-	$(OBJS) : $(.PREFIX).c
+    $(OBJS) : $(.PREFIX).c
 
 will create a dependency between each object file and its corresponding C 
 source file.
@@ -1938,7 +1936,7 @@ source file.
 Command-line variables are set when pmake is first invoked by giving a 
 variable assignment as one of the arguments. For example,
 
-	pmake "CFLAGS = -I\NIHON\LIB\LIBC -O"
+    pmake "CFLAGS = -I\NIHON\LIB\LIBC -O"
 
 would make CFLAGS be a command-line variable with the given value. Any 
 assignments to CFLAGS in the makefile will have no effect, because once it is 
@@ -1972,7 +1970,7 @@ special targets (See section 10.13.4.9 of chapter 10).
 
 Global variables may be deleted using lines of the form:
 
-	#undef variable
+    #undef variable
 
 The "#" must be the first character on the line. Note that this may only be 
 done to global variables.
@@ -1996,23 +1994,23 @@ Include\GEOS.MK included Makefile.
 
 Using all these variables, you can compress the sample makefile even more:
 
-	OBJS = A.OBJ B.OBJ C.OBJ
-	PROGRAM.EXE : $(OBJS)
-		BCC $(.ALLSRC) -o $(.TARGET)
-	$(OBJS) : DEFS.H
-	A.OBJ : A.C
-		BCC -c A.C
-	B.OBJ : B.C
-		BCC -c B.C
-	C.OBJ : C.C
-		BCC -c C.C
+    OBJS = A.OBJ B.OBJ C.OBJ
+    PROGRAM.EXE : $(OBJS)
+        BCC $(.ALLSRC) -o $(.TARGET)
+    $(OBJS) : DEFS.H
+    A.OBJ : A.C
+        BCC -c A.C
+    B.OBJ : B.C
+        BCC -c B.C
+    C.OBJ : C.C
+        BCC -c C.C
 
 In addition to variables which **pmake** will use, you can set environment 
 variables which shell commands may use using the pmake_set directive.
 
-	.C.EBJ :
-	pmake_set CL = $(CCOMFLAGS) /Fo$(.TARGET)
-	$(CCOM) $(.IMPSRC)
+    .C.EBJ :
+    pmake_set CL = $(CCOMFLAGS) /Fo$(.TARGET)
+    $(CCOM) $(.IMPSRC)
 
 You might use the above sequence to set up an argument list in the CL 
 environment variable if your compiler (invoked with CCOM) needed its 
@@ -2044,9 +2042,9 @@ made of two known suffixes stuck together. Suffixes are made known to
 **pmake** by placing them as sources on a dependency line whose target is the 
 special target .SUFFIXES. For example:
 
-	.SUFFIXES 			: .obj .c
-	.c.obj 			:
-		$(CCOM) $(CFLAGS) -c $(.IMPSRC)
+    .SUFFIXES           : .obj .c
+    .c.obj          :
+        $(CCOM) $(CFLAGS) -c $(.IMPSRC)
 
 The creation script attached to the target is used to transform a file with the 
 first suffix (in this case, .c) into a file with the second suffix (here, .obj). In 
@@ -2073,19 +2071,19 @@ CodeView, you would set the CFLAGS variable to contain -g ("CFLAGS =
 
 To give you a quick example, the makefile could be changed to this:
 
-	OBJS = A.OBJ B.OBJ C.OBJ
-	PROGRAM .EXE		: $(OBJS)
-		$(CCOM) -o $(.TARGET) $(.ALLSRC)
-	$(OBJS) 			: DEFS.H
+    OBJS = A.OBJ B.OBJ C.OBJ
+    PROGRAM .EXE        : $(OBJS)
+        $(CCOM) -o $(.TARGET) $(.ALLSRC)
+    $(OBJS)             : DEFS.H
 
 The transformation rule given above takes the place of the 6 lines.
 
-	A.OBJ : A.C
-		BCC -c A.C
-	B.OBJ : B.C
-		BCC -c B.C
-	C.OBJ : C.C
-		BCC -c C.C
+    A.OBJ : A.C
+        BCC -c A.C
+    B.OBJ : B.C
+        BCC -c B.C
+    C.OBJ : C.C
+        BCC -c C.C
 
 Now you may be wondering about the dependency between the .obj and .c 
 files-it's not mentioned anywhere in the new makefile. This is because it 
@@ -2094,49 +2092,49 @@ comes to depend on the implied source (hence the name).
 
 For a more detailed example, Suppose you have a makefile like this:
 
-	A.EXE 			: A.OBJ B.OBJ
-		$(CCOM) $(.ALLSRC)
+    A.EXE           : A.OBJ B.OBJ
+        $(CCOM) $(.ALLSRC)
 
 and a directory set up like this:
 
-	total 4
+    total 4
 
-	MAKEFILE 		  34	09-07-89 		12:43a
-	A        C		 119	10-03-89 		 7:39p
-	A        OBJ 	 201	09-07-89 		12:43a
-	B        C		  69	09-07-89 		12:43a
+    MAKEFILE          34    09-07-89        12:43a
+    A        C       119    10-03-89         7:39p
+    A        OBJ     201    09-07-89        12:43a
+    B        C        69    09-07-89        12:43a
 
 While just typing "**pmake**" will do the right thing, it's much more 
 informative to type "**pmake -ds**" This will show you what **pmake** is up to as 
 it processes the files. In this case, **pmake** prints the following:
 
-	Suff_FindDeps (A.EXE)
-		using existing source A.OBJ
-		applying .OBJ -> .EXE to "A.OBJ"
-	Suff_FindDeps (A.OBJ)
-		trying A.C...got it
-		applying .C -> .OBJ to "A.C"
-	Suff_FindDeps (B.OBJ)
-		trying B.C...got it
-		applying .C -> .OBJ to "B.C"
-	Suff_FindDeps (A.C)
-		trying A.Y...not there
-		trying A.L...not there
-		trying A.C,V...not there
-		trying A.Y,V...not there
-		trying A.L,V...not there
-	Suff_FindDeps (B.C)
-		trying B.Y...not there
-		trying B.L...not there
-		trying B.C,V...not there
-		trying B.Y,V...not there
-		trying B.L,V...not there
-	--- A.OBJ ---
-	bcc -c A.C
-	--- B.OBJ ---
-	bcc -c B.C
-	--- A.EXE ---
-	bcc A.OBJ B.OBJ
+    Suff_FindDeps (A.EXE)
+        using existing source A.OBJ
+        applying .OBJ -> .EXE to "A.OBJ"
+    Suff_FindDeps (A.OBJ)
+        trying A.C...got it
+        applying .C -> .OBJ to "A.C"
+    Suff_FindDeps (B.OBJ)
+        trying B.C...got it
+        applying .C -> .OBJ to "B.C"
+    Suff_FindDeps (A.C)
+        trying A.Y...not there
+        trying A.L...not there
+        trying A.C,V...not there
+        trying A.Y,V...not there
+        trying A.L,V...not there
+    Suff_FindDeps (B.C)
+        trying B.Y...not there
+        trying B.L...not there
+        trying B.C,V...not there
+        trying B.Y,V...not there
+        trying B.L,V...not there
+    --- A.OBJ ---
+    bcc -c A.C
+    --- B.OBJ ---
+    bcc -c B.C
+    --- A.EXE ---
+    bcc A.OBJ B.OBJ
 
 *Suff_FindDeps* is the name of a function in **pmake** that is called to check for 
 implied sources for a target using transformation rules. The transformations 
@@ -2166,29 +2164,29 @@ file into the target.
 For example, ignoring what's in the system makefile for now, say you have a 
 makefile like this:
 
-	.SUFFIXES : .EXE .OBJ .C .Y .L
-	.L.C :
-		LEX $(.IMPSRC)
-		MOVE LEX.YY.C $(.TARGET)
-	.Y.C :
-		YACC $(.IMPSRC)
-		MOVE Y.TAB.C $(.TARGET)
-	.C.OBJ :
-	BCC -L $(.IMPSRC)
-	.OBJ.EXE :
-		BCC -o $(.TARGET) $(.IMPSRC)
+    .SUFFIXES : .EXE .OBJ .C .Y .L
+    .L.C :
+        LEX $(.IMPSRC)
+        MOVE LEX.YY.C $(.TARGET)
+    .Y.C :
+        YACC $(.IMPSRC)
+        MOVE Y.TAB.C $(.TARGET)
+    .C.OBJ :
+    BCC -L $(.IMPSRC)
+    .OBJ.EXE :
+        BCC -o $(.TARGET) $(.IMPSRC)
 
 and the single file jive.l. If you were to type **pmake -rd ms jive.exe**, you 
 would get the following output for jive.exe:
 
-	Suff_FindDeps (JIVE.EXE)
-	trying JIVE.OBJ...not there
-	trying JIVE.C...not there
-	trying JIVE.Y...not there
-	trying JIVE.L...got it
-	applying .L -> .C to "JIVE.L"
-	applying .C -> .OBJ to "JIVE.C"
-	applying .OBJ -> .EXE to "JIVE.OBJ"
+    Suff_FindDeps (JIVE.EXE)
+    trying JIVE.OBJ...not there
+    trying JIVE.C...not there
+    trying JIVE.Y...not there
+    trying JIVE.L...got it
+    applying .L -> .C to "JIVE.L"
+    applying .C -> .OBJ to "JIVE.C"
+    applying .OBJ -> .EXE to "JIVE.OBJ"
 
 The **pmake** tool starts with the target jive.exe, figures out its suffix (.exe) 
 and looks for things it can transform to a .exe file. In this case, it only finds 
@@ -2203,26 +2201,26 @@ At this point, it has defined a transformation path as follows: .l->.c-> .obj->
 to give you a better idea of what **pmake** actually did with this three-step 
 transformation, this is what **pmake** printed for the rest of the process:
 
-	Suff_FindDeps (JIVE.OBJ)
-	using existing source JIVE.C
-	applying .C -> .OBJ to "JIVE.C"
-	Suff_FindDeps (JIVE.C)
-	using existing source JIVE.L
-	applying .L -> .C to "JIVE.L"
-	Suff_FindDeps (JIVE.L)
-	Examining JIVE.L...modified 17:16:01 Oct 4,
-	 1987...up-to-date
-	Examining JIVE.C...non-existent...out-of-date
-	--- JIVE.C ---
-	LEX JIVE.L
-	-meaningless lex output deleted-
-	MV LEX.YY.C JIVE.C
-	Examining JIVE.OBJ...non-existent...out-of-date
-	--- JIVE.OBJ ---
-	bcc -c JIVE.C
-	Examining JIVE.EXE...non-existent...out-of-date
-	--- JIVE.EXE ---
-	bcc -o JIVE.EXE JIVE.OBJ
+    Suff_FindDeps (JIVE.OBJ)
+    using existing source JIVE.C
+    applying .C -> .OBJ to "JIVE.C"
+    Suff_FindDeps (JIVE.C)
+    using existing source JIVE.L
+    applying .L -> .C to "JIVE.L"
+    Suff_FindDeps (JIVE.L)
+    Examining JIVE.L...modified 17:16:01 Oct 4,
+     1987...up-to-date
+    Examining JIVE.C...non-existent...out-of-date
+    --- JIVE.C ---
+    LEX JIVE.L
+    -meaningless lex output deleted-
+    MV LEX.YY.C JIVE.C
+    Examining JIVE.OBJ...non-existent...out-of-date
+    --- JIVE.OBJ ---
+    bcc -c JIVE.C
+    Examining JIVE.EXE...non-existent...out-of-date
+    --- JIVE.EXE ---
+    bcc -o JIVE.EXE JIVE.OBJ
 
 ##### 10.13.4.6 Including Other Makefiles
 
@@ -2230,18 +2228,18 @@ Just as for programs, it is often useful to extract certain parts of a makefile
 into another file and just include it in other makefiles somehow. Many 
 compilers allow you to use something like
 
-	#include "defs.h"
+    #include "defs.h"
 
 to include the contents of defs.h in the source file. The **pmake** program 
 allows you to do the same thing for makefiles, with the added ability to use 
 variables in the filenames. An include directive in a makefile looks either like 
 this
 
-	#include <file>
+    #include <file>
 
 or like this
 
-	#include "file"
+    #include "file"
 
 The difference between the two is where **pmake** searches for the file: the first 
 way, **pmake** will look for the file only in the system makefile directory (to find 
@@ -2266,13 +2264,13 @@ them before searching for the file. You must specify the searching method
 with either angle brackets or double-quotes outside of a variable expansion. 
 That is, the following
 
-	SYSTEM= <command.mk>
-	#include $(SYSTEM)
+    SYSTEM= <command.mk>
+    #include $(SYSTEM)
 
 won't work; instead use the following:
 
-	SYSTEM= command.mk
-	#include <$(SYSTEM)>
+    SYSTEM= command.mk
+    #include <$(SYSTEM)>
 
 ##### 10.13.4.7 Saving Commands
 
@@ -2312,7 +2310,7 @@ from any of the target's commands, as if they all had "-" before them.
 target (if it's out-of-date) even if you gave the -n or -t flag. By doing this, 
 you can start at the top of a system and type
 
-	pmake -n
+    pmake -n
 
 and have it descend the directory tree (if your makefiles are set up 
 correctly), printing what it would have executed if you hadn't included 
@@ -2385,13 +2383,13 @@ argument for the compiler in the normal fashion. The ".h" suffix is
 already marked in this way in the system makefile. For example, if you 
 have 
 
-	.SUFFIXES 			: .PCX
-	.PATH.PCX 			: \CLIPART
-	.INCLUDES 			: .PCX
+    .SUFFIXES           : .PCX
+    .PATH.PCX           : \CLIPART
+    .INCLUDES           : .PCX
 
 **pmake** places "-I\CLIPART" in the .INCLUDES variable and you can say 
 
-	bcc $(.INCLUDES) -c xprogram.c
+    bcc $(.INCLUDES) -c xprogram.c
 
 (Note: the .INCLUDES variable is not actually filled in until the entire 
 makefile has been read.)
@@ -2437,7 +2435,7 @@ line with no sources, **pmake** will forget about all the suffixes it knew.
 
 In addition to these targets, a line of the form
 
-	attribute : sources
+    attribute : sources
 
 applies the attribute to all the targets listed as sources .
 
@@ -2448,7 +2446,7 @@ defines several modifiers that may be applied to a variable's value before it is
 expanded. You apply a modifier by placing it after the variable name with a 
 colon between the two, like so:
 
-	${VARIABLE:modifier}
+    ${VARIABLE:modifier}
 
 Each modifier is a single character followed by something specific to the 
 modifier itself. You may apply as many modifiers as you want - each one is 
@@ -2475,7 +2473,7 @@ this can lead to some impressive search strings, because
 **pmake** also requires that backslashes be preceded with 
 backslashes:
 
-	#if !empty(CURRENT_DIR:M*\\\\APPL\\\\*)
+    #if !empty(CURRENT_DIR:M*\\\\APPL\\\\*)
 
 The above line checks to see if the current directory matches 
 the form `*\APPL\*`. (The pattern matcher is passed the 
@@ -2490,8 +2488,8 @@ by enclosing it within backslashed square brackets (`\[` and
 `\]`) (however, due to the backslash rules, you must actually 
 use `\\[` and `\\]`.)
 
-		DEVEL_DIR 	:= \
-		 $(CURRENT_DIR:X\\[*\\\\$(ROOT_DIR:T)\\\\*\\]\\\\*)
+        DEVEL_DIR   := \
+         $(CURRENT_DIR:X\\[*\\\\$(ROOT_DIR:T)\\\\*\\]\\\\*)
 
 The above line returns part of the CURRENT_DIR string, 
 specifically the directory just under the root directory. Free of 
@@ -2526,8 +2524,8 @@ either string by preceding it with a backslash.
 **:T** - Replaces each word in the variable expansion by its last 
 component (its "tail"). For example, given
 
-		OBJS = ..\LIB\A.OBJ B \USR\LIB\LIBM.A
-		TAILS = $(OBJS:T)
+        OBJS = ..\LIB\A.OBJ B \USR\LIB\LIBM.A
+        TAILS = $(OBJS:T)
 
 the variable TAILS would expand to "a.obj b libm.a" .
 
@@ -2547,7 +2545,7 @@ returning the "root" of the word). "$(OBJS:R)" expands to
 
 In addition, another style of substitution is also supported. This looks like:
 
-	$(VARIABLE:search-string=replacement)
+    $(VARIABLE:search-string=replacement)
 
 It must be the last modifier in the chain. The search is anchored at the end 
 of each word, so only suffixes or whole words may be replaced.
@@ -2576,7 +2574,7 @@ There are two types of search paths in **pmake**: one is used for all types of f
 by the file's suffix. A specific search path is indicated by immediately 
 following the .PATH with the suffix of the file. For instance
 
-	.PATH.H : \GEOSDEV\DEVEL\APPL\WORPRO \GEOSDEV\DEVEL
+    .PATH.H : \GEOSDEV\DEVEL\APPL\WORPRO \GEOSDEV\DEVEL
 
 would tell **pmake** to look in the directories 
 \GEOSDEV\DEVEL\APPL\WORPRO and \GEOSDEV\DEVEL for any files 
@@ -2595,9 +2593,9 @@ variables that would have contained the target's name (.ALLSRC and
 .IMPSRC) will instead contain the path to the file, as found by pmake. Thus 
 if you have a file ..\LIB\MUMBLE.C and a makefile
 
-	.PATH.c : ..\LIB
-	MUMBLE.EXE 			: MUMBLE.C
-		$(CCOM) -o $(.TARGET) $(.ALLSRC)
+    .PATH.c : ..\LIB
+    MUMBLE.EXE          : MUMBLE.C
+        $(CCOM) -o $(.TARGET) $(.ALLSRC)
 
 the command executed to create MUMBLE.EXE would be  
 "bcc -o MUMBLE ..\LIB\MUMBLE.C"
@@ -2619,13 +2617,13 @@ file was created in the current directory.
 Like a C compiler, **pmake** allows you to configure the makefile using 
 conditional statements. A conditional looks like this:
 
-	#if <Boolean expression>
-	<lines>
-	#elif <another Boolean expression>
-	<more lines>
-	#else
-	<still more lines>
-	#endif
+    #if <Boolean expression>
+    <lines>
+    #elif <another Boolean expression>
+    <more lines>
+    #else
+    <still more lines>
+    #endif
 
 They may be nested to a depth of 30 and may occur anywhere (except in a 
 comment, of course). The "#" must be the very first character on the line.
@@ -2664,14 +2662,14 @@ conditional, and at the worst will cause the process to stop once
 it has read the makefile. If you want to check for a variable 
 being defined or empty, use the expression 
 
-	!defined(var) || empty(var)
+    !defined(var) || empty(var)
 
 as the definition of || will prevent the empty() from being 
 evaluated and causing an error, if the variable is undefined). 
 This can be used to see if a variable contains a given word, for 
 example:
 
-	#if !empty(var:Mword)
+    #if !empty(var:Mword)
 
 The arithmetic and string operators may only be used to test the value of a 
 variable. The left-hand side must contain the variable expansion, while the 
@@ -2679,28 +2677,28 @@ right-hand side contains either a string, enclosed in double-quotes, or a
 number. The standard C numeric conventions (except for specifying an octal 
 number) apply to both sides. For example, 
 
-	#if $(OS) == 4.3
-	#if $(MACHINE) == "sun3"
-	#if $(LOAD_ADDR) < 0xc000
+    #if $(OS) == 4.3
+    #if $(MACHINE) == "sun3"
+    #if $(LOAD_ADDR) < 0xc000
 
 are all valid conditionals. In addition, the numeric value of a variable can be 
 tested as a Boolean as follows:
 
-	#if $(LOAD)
+    #if $(LOAD)
 
 would see if LOAD contains a non-zero value and
 
-	#if !$(LOAD)
+    #if !$(LOAD)
 
 would test if LOAD contains a zero value.
 
 In addition to the bare #if, there are other forms that apply one of the first 
 two functions to each term. They are as follows:
 
-	ifdef		defined
-	ifndef		!defined
-	ifmake		make
-	ifnmake		!make
+    ifdef       defined
+    ifndef      !defined
+    ifmake      make
+    ifnmake     !make
 
 There are also the "else if" forms: elif, elifdef, elifndef, elifmake, and 
 elifnmake.

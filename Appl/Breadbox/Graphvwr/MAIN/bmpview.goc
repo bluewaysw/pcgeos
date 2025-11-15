@@ -21,6 +21,7 @@
 
 @include <stdapp.goh>
 @include <Objects/gViewCC.goh>
+@include <Objects/colorC.goh>
 #include <IMPBMP/imp_bmp.h>
 @include <statbar/statbar.goh>
 #include <Ansi/string.h>
@@ -29,6 +30,7 @@
 #include "GRAPH/quant.h"
 #include <initfile.h>
 #include <graphics.h>
+#include <pnglib.h>
 @include "bvdirmon.goh"
 
 @ifndef OLD_THUMBNAIL_DB
@@ -127,6 +129,7 @@ static void SendSelectNotify(VMBlockHandle bmpblock);
 #define BV_SHOW_PCX         3
 #define BV_SHOW_GIF         4
 #define BV_SHOW_JPEG        5
+#define BV_SHOW_PNG         6
 
 /**************************************************************************/
 
@@ -319,8 +322,7 @@ FileHandle BVThumbnailDB = 0;
 
 	if(pself->TII_folderflag)
 	{
-	  gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK,
-				  OptrToChunk(@BVDirMoniker));
+	  gstring = GrLoadGString(OptrToHandle(@BVDirMoniker), GST_CHUNK, (word) OptrToChunk(@BVDirMoniker));
 	  GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+18,
 				visptr->VI_bounds.R_top+17,0,0);
 	  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
@@ -333,7 +335,7 @@ FileHandle BVThumbnailDB = 0;
 							 pself->TII_date) != TE_NO_ERROR)
 		{
 			  gstring = GrLoadGString(OptrToHandle(@BVUnknownMoniker), GST_CHUNK,
-						  OptrToChunk(@BVUnknownMoniker));
+						  (word) OptrToChunk(@BVUnknownMoniker));
 			  GrDrawGString(gstate, gstring, visptr->VI_bounds.R_left+21,
 						visptr->VI_bounds.R_top+14,0,0);
 			  GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
@@ -349,32 +351,35 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object BVAppClass BVApp = {
-		  GI_visMoniker = list { @BVTextMoniker,
-										 @BVVGAMoniker,
-										 @BVHGAMoniker,
-										 @BVCGAMoniker,
-                               @BVTCMoniker
-								 };
-		  GI_comp = @BVPrimary;
+	GI_visMoniker = list {
+		@BVTextMoniker,
+		@BVVGAMoniker,
+		@BVHGAMoniker,
+		@BVCGAMoniker,
+		@BVTCMoniker
+	};
+	GI_comp = @BVPrimary;
 
-				  gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP)
-								 = @BVDocumentControl;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS)
-						 = @BVPrimary;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS)
-						 = @BVViewControl,
-												   @BVEditControl,
-												   @BVDocumentControl,
-												   @BVDisplayControl;
-		  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS)
-						 = @BVOptionGroup,
-						   @BVViewOptGroup,
-						   @BVImpFileShowTools;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @BVDocumentControl;
 
-		  gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST)
-												 = @BVViewControl,
-												   @BVDocumentControl,
-												   @BVDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @BVPrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+		@BVViewControl,
+		@BVEditControl,
+		@BVDocumentControl,
+		@BVDisplayControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		@BVOptionGroup,
+		@BVViewOptGroup,
+		@BVImpFileShowTools;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+		@BVViewControl,
+		@BVDocumentControl,
+		@BVDisplayControl;
+
 
 @ifdef NEWDEAL_MEDIA_VIEWER
 		  ATTR_GEN_INIT_FILE_CATEGORY = "MediaViewer";
@@ -649,12 +654,12 @@ FileHandle BVThumbnailDB = 0;
 /**************************************************************************/
 
 @object GenInteractionClass BVOptionMenu = {
-		  GII_visibility = GIV_POPUP;
-		  GI_comp = @BVOptionGroup,
-							@BVDialogsGroup,
-							@BVOptionSaveGroup;
-		  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
-}
+		GII_visibility = GIV_POPUP;
+		GI_comp = 	@BVOptionGroup,
+				@BVDialogsGroup,
+				@BVOptionSaveGroup;
+		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+};
 
 /**************************************************************************/
 
@@ -1136,6 +1141,7 @@ FileHandle BVThumbnailDB = 0;
 				  @BVImpFileShowAllMedia,
 				  @BVImpFileShowBMP,
 				  @BVImpFileShowPCX,
+				  @BVImpFileShowPNG,
 @ifdef JPEG_SUPPORT
 				  @BVImpFileShowGIF,
 				  @BVImpFileShowJPEG;
@@ -1180,8 +1186,15 @@ FileHandle BVThumbnailDB = 0;
 
 /**************************************************************************/
 
+@object GenItemClass BVImpFileShowPNG = {
+		GI_visMoniker = 'N', "Show .PNG Files";
+		GII_identifier = BV_SHOW_PNG;
+}
+
+/**************************************************************************/
+
 @object GenItemClass BVImpFileShowGIF = {
-		GI_visMoniker = 'G', "Show .GIF Files";
+		GI_visMoniker = 'I', "Show .GIF Files";
 		GII_identifier = BV_SHOW_GIF;
 }
 
@@ -1189,7 +1202,7 @@ FileHandle BVThumbnailDB = 0;
 
 @ifdef JPEG_SUPPORT
 @object GenItemClass BVImpFileShowJPEG = {
-		GI_visMoniker = 'G', "Show .JPG Files";
+		GI_visMoniker = 'J', "Show .JPG Files";
 		GII_identifier = BV_SHOW_JPEG;
 }
 @endif
@@ -1421,6 +1434,10 @@ FileHandle BVThumbnailDB = 0;
 
 	 case IBF_PCX:
 		strcpy(mask, "*.PCX");
+		break;
+
+	 case IBF_PNG:
+		strcpy(mask, "*.PNG");
 		break;
 
 	 case IBF_GIF:
@@ -1716,11 +1733,10 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	sdptr = MemLock(extraState);
 	path = &(path2[0]);
 
-	disk = FileConstructFullPath(&path,255,
-									0,&(sdptr->BVSD_path[0]), FALSE);
+	disk = FileConstructFullPath(&path,255,0,&(sdptr->BVSD_path[0]), FALSE);
 
 	path = &(path2[0]);
-	BVCurrentDisk = FileParseStandardPath(disk, &path);
+	BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
 	strcpy(BVCurrentPath, path);
 	if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 	  BVCurrentDisk = disk;
@@ -1744,10 +1760,9 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	{
 	  path = &(path2[0]);
 
-	  disk = FileConstructFullPath(&path,255,
-									0,&(path3[0]), FALSE);
+	  disk = FileConstructFullPath(&path,255,0,&(path3[0]), FALSE);
 	  path = &(path2[0]);
-	  BVCurrentDisk = FileParseStandardPath(disk, &path);
+	  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &path);
 	  strcpy(BVCurrentPath, path);
 	  if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 		BVCurrentDisk = disk;
@@ -2262,10 +2277,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	ImpBmpParams para;
 	char string[255];
 	VMBlockHandle bmpblock;
-/*	GStateHandle gstate;*/
 	word count;
-/*	FileLongName tempName; */
-/*	optr display; */
 
 	MemLock(OptrToHandle(@BVImportingText));
 	strcpy(string, LMemDeref(@BVImportingText));
@@ -2293,18 +2305,15 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	FilePopDir();
 	para.IBP_status = @BVImportStatus;
 
+	// start importing
 	status = Imp_BmpProcessFile(&para, IBF_AUTO);
 
 	@send BVImportingDlg::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
 
 	if(status == IBS_NO_ERROR)
 	{
-		bmpblock =  GrCompactBitmap(para.IBP_dest, para.IBP_bitmap,para.IBP_dest);
-
-		MyVMFreeVMChain(para.IBP_dest,
-			VMCHAIN_MAKE_FROM_VM_BLOCK( para.IBP_bitmap));
-
-
+		bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
+		MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
 		para.IBP_bitmap = bmpblock;
 
 		date = FileGetDateAndTime(pself->GDI_fileHandle) ;
@@ -2314,7 +2323,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 		size = FileSize(pself->GDI_fileHandle);
 
 		stat = @call BVOptionGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(BV_AUTOCREAT_THUMB);
-        if(stat != FALSE)
+        	if(stat != FALSE)
 			@call process::MSG_BV_CREATE_THUMBNAIL(pself->GDI_fileName, size, date,
 				para.IBP_dest, para.IBP_bitmap);
 
@@ -2512,7 +2521,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
 @method BVDocumentClass, MSG_BV_SHOW_PIC_INFO
 {
-  char string[20];
+  char string[30] = {0};
 
   @call BVPicInfoName::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVName,0);
 
@@ -2524,51 +2533,51 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 
   switch((pself->BVType)&BMT_FORMAT)
   {
-	 case BMF_MONO:
-				strcpy(string, "2");
-		break;
+     case BMF_MONO:
+                strcpy(string, "Monochrome (1 bit/pixel)");
+        break;
 
-	 case BMF_4BIT:
-				strcpy(string, "16");
-		break;
+     case BMF_4BIT:
+                strcpy(string, "16 (4 bits/pixel)");
+        break;
 
-	 case BMF_8BIT:
-				strcpy(string, "256");
-		break;
+     case BMF_8BIT:
+                strcpy(string, "256 (8 bits/pixel)");
+        break;
 
-	 case BMF_24BIT:
-				strcpy(string, "65536K");
-		break;
+     case BMF_24BIT:
+                strcpy(string, "TrueColor (24 bits/pixel)");
+        break;
 
-	 default:
-				strcpy(string, "???");
-		break;
+     default:
+                strcpy(string, "???");
+        break;
   }
-  @call BVPicInfoCol::MSG_VIS_TEXT_REPLACE_ALL_PTR(string,0);
-	/*
-		 switch(pself->BVImpForm)
-		 {
-			 case IBF_BMP:
-				strcpy(string, ".BMP");
-				break;
+ @call BVPicInfoCol::MSG_VIS_TEXT_REPLACE_ALL_PTR(string,0);
+    /*
+         switch(pself->BVImpForm)
+         {
+             case IBF_BMP:
+                strcpy(string, ".BMP");
+                break;
 
-			 case IBF_PCX:
-				strcpy(string, ".PCX");
-				break;
+             case IBF_PCX:
+                strcpy(string, ".PCX");
+                break;
 
-			 case IBF_GIF:
-				strcpy(string, ".GIF");
-				break;
+             case IBF_GIF:
+                strcpy(string, ".GIF");
+                break;
 @ifdef JPEG_SUPPORT
-			 case IBF_JPEG:
-				strcpy(string, ".JPG");
-				break;
+             case IBF_JPEG:
+                strcpy(string, ".JPG");
+                break;
 @endif
-			 case IBF_TIFF:
-				strcpy(string, ".TIF");
-				break;
-	}; */
-	@call BVPicInfoForm::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVImpForm,0);
+             case IBF_TIFF:
+                strcpy(string, ".TIF");
+                break;
+    }; */
+    @call BVPicInfoForm::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->BVImpForm,0);
 
 }
 
@@ -2716,14 +2725,22 @@ Boolean StrEnd(char *text, char *endstr)
 							filelist[count1] = filelist[count2];
 							count1++;
 						}
-@ifdef JPEG_SUPPORT
 						else
-							if(StrEnd(&filelist[count2].BVFA_name, ".JPG") && ((sel == BV_SHOW_JPEG)
+							if(StrEnd(&filelist[count2].BVFA_name, ".PNG") && ((sel == BV_SHOW_PNG)
 								|| (sel == BV_SHOW_ALL_MEDIA)))
 							{
 								filelist[count1] = filelist[count2];
 								count1++;
 							}
+
+@ifdef JPEG_SUPPORT
+							else
+								if(StrEnd(&filelist[count2].BVFA_name, ".JPG") && ((sel == BV_SHOW_JPEG)
+									|| (sel == BV_SHOW_ALL_MEDIA)))
+								{
+									filelist[count1] = filelist[count2];
+									count1++;
+								}
 @endif
 			}
 			else
@@ -3287,7 +3304,7 @@ BVCalcDriveName(char *text, word item)
 	  strcat(BVCurrentPath, filelist[selection].BVFA_name);
 
 	  pathptr = &(BVCurrentPath[0]);
-	  disk = FileParseStandardPath(BVCurrentDisk, &pathptr);
+	  disk = FileParseStandardPath(BVCurrentDisk, (const char**) &pathptr);
 	  if(disk != 0)
 		BVCurrentDisk = disk;
 	  strcpy(BVCurrentPath, pathptr);
@@ -3324,7 +3341,7 @@ BVCalcDriveName(char *text, word item)
 	};
   }
   pathptr = &(path[0]);
-  BVCurrentDisk = FileParseStandardPath(disk, &pathptr);
+  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &pathptr);
 
   if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 	BVCurrentDisk = disk;
@@ -3457,7 +3474,7 @@ BVCalcDriveName(char *text, word item)
   };
 
   pathptr = &(path[0]);
-  BVCurrentDisk = FileParseStandardPath(disk, &pathptr);
+  BVCurrentDisk = FileParseStandardPath(disk, (const char**) &pathptr);
 
   if(BVCurrentDisk == SP_NOT_STANDARD_PATH)
 	BVCurrentDisk = disk;
@@ -3655,7 +3672,7 @@ BVCalcDriveName(char *text, word item)
 @else
   InitFileWriteString("GraphicsViewer","dlgPath",&pfad);
 @endif
-  InitFileSave();
+  InitFileCommit();
 }
 
 /**************************************************************************/

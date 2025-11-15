@@ -477,36 +477,36 @@ Code Display 16-1 LMem Usage in GOC
  * want. To make it easy to access the fixed data, we define a structure.
  */
 typedef struct {
-	LMemBlockHeader		MLMBH_standardHeader;
-	float		MLMBH_someData;
-	float		MLMBH_someMoreData;
-	char		MLMBH_someChars[10];
+        LMemBlockHeader         MLMBH_standardHeader;
+        float           MLMBH_someData;
+        float           MLMBH_someMoreData;
+        char            MLMBH_someChars[10];
 } MyLMemBlockHeader;
 
-MyLMemBlockHeader 			*thisHeapsHeader;
-MemHandle			thisHeapsHandle;
-ChunkHandle			firstChH, secondChH;
-char 			*firstChPtr, *secondChPtr;
-int			i;
+MyLMemBlockHeader                       *thisHeapsHeader;
+MemHandle                       thisHeapsHandle;
+ChunkHandle                     firstChH, secondChH;
+char                    *firstChPtr, *secondChPtr;
+int                     i;
 
 /*
  * Code
  */
 
 /* We have to create the LMem heap. First, we create the block: */
-thisHeapsHandle = MemAlloc(					/* MemAlloc returns the block handle */
-			2048,		/* Allocate 2K; can grow as necessary */
-			HF_SWAPABLE,		/* Make block swapable. LMemInitHeap()
-					 * will add the flag HF_LMEM. */
-			HAF_ZERO_INIT | HAF_LOCK); 				/* Zero & lock the block
-							 * upon allocation */
+thisHeapsHandle = MemAlloc(                                     /* MemAlloc returns the block handle */
+                        2048,           /* Allocate 2K; can grow as necessary */
+                        HF_SWAPABLE,            /* Make block swapable. LMemInitHeap()
+                                         * will add the flag HF_LMEM. */
+                        HAF_ZERO_INIT | HAF_LOCK);                              /* Zero & lock the block
+                                                         * upon allocation */
 
-LMemInitHeap(thisHeapsHandle,					/* Pass handle of locked block */
-		LMEM_TYPE_GENERAL,			/* Allocate a general heap */
-		0,			/* Don't pass any flags */
-		sizeof(MyLMemBlockHeader), 	/* Offset to leave room for header */
-		STD_INIT_HANDLES,			/* Standard # of starter handles */
-		STD_INIT_HEAP);		/* Allocate standard amt. of empty heap */
+LMemInitHeap(thisHeapsHandle,                                   /* Pass handle of locked block */
+                LMEM_TYPE_GENERAL,                      /* Allocate a general heap */
+                0,                      /* Don't pass any flags */
+                sizeof(MyLMemBlockHeader),      /* Offset to leave room for header */
+                STD_INIT_HANDLES,                       /* Standard # of starter handles */
+                STD_INIT_HEAP);         /* Allocate standard amt. of empty heap */
 
 /* The block is still locked; we can initialize the fixed data section. */
 thisHeapsHeader = (MyLMemBlockHeader *) MemDeref(thisHeapsHandle);
@@ -516,9 +516,9 @@ thisHeapsHeader->MLMBH_someData = 3.1415926;
  * thisHeapsHeader), since chunk allocation may cause the heap to be resized (and
  * thus moved). The block must be locked when we do this.
  */
-firstChH = LMemAlloc(					/* LMemAlloc returns a chunk handle */
-		thisHeapsHandle,			/* Pass handle of block . . . */
-		100);			/* . . . and number of bytes in chunk */
+firstChH = LMemAlloc(                                   /* LMemAlloc returns a chunk handle */
+                thisHeapsHandle,                        /* Pass handle of block . . . */
+                100);                   /* . . . and number of bytes in chunk */
 
 secondChH = LMemAlloc(thisHeapsHandle, 50);
 
@@ -530,9 +530,9 @@ for(i = 0; i <= 30; i++)
 /* We can insert 10 bytes into the middle of the second chunk. This may cause the
  * chunks or blocks to be shuffled; all pointers are invalidated
  */
-LMemInsertAtHandles(thisHeapsHandle, secondChH, 						/* Block & chunk handles */
-		20,				/* Insert after 20th byte */
-		30);				/* Insert 30 null bytes */
+LMemInsertAtHandles(thisHeapsHandle, secondChH,                                                 /* Block & chunk handles */
+                20,                             /* Insert after 20th byte */
+                30);                            /* Insert 30 null bytes */
 
 /* If we want to access the first chunk, we need to dereference its handle again:
  */
@@ -904,31 +904,31 @@ shows several common chunk array actions, including sorting the array.
 Code Display 16-2 Example of Chunk Array Usage
 ~~~
 /*
- *	Declarations (not in any routine)
+ *      Declarations (not in any routine)
  */
 
 /* We want to store some data right after the chunk array header, so we define our
  * own header structure. Data in this structure (except for the ChunkArrayHeader
  * proper) will not be affected by the chunk array routines. */
 typedef struct {
-	ChunkArrayHeader			standardChunkArrayHeader;
-	int			someData;
-	float			someMoreData;
+        ChunkArrayHeader                        standardChunkArrayHeader;
+        int                     someData;
+        float                   someMoreData;
 } MyChunkArrayHeader;
 
 /* For simplicity, we define a structure which will be used for each element in the
  * array. (This is entirely optional.) */
 typedef struct {
-	char	someText[80];
-	int	anInteger;
-	float	aFloat;
+        char    someText[80];
+        int     anInteger;
+        float   aFloat;
 } MyElementStructure;
 
 /* We define some values to pass to the sort routine. The routine will sort by a
  * different field depending on what value it's passed. */
-#define	SORT_ARRAY_BY_STRING				0
-#define	SORT_ARRAY_ASCENDING_BY_INT				1
-#define	SORT_ARRAY_DESCENDING_BY_FLOAT				2
+#define SORT_ARRAY_BY_STRING                            0
+#define SORT_ARRAY_ASCENDING_BY_INT                             1
+#define SORT_ARRAY_DESCENDING_BY_FLOAT                          2
 
 /* This is the routine we will use to sort the array. We pass the address of this
  * routine to ChunkArraySort(), which will call this routine to compare elements.
@@ -936,58 +936,58 @@ typedef struct {
  * in the sorted array, and a positive integer if the second should come before the
  * first. If the elements can be in either order, it returns zero. */
 sword _pascal MyElementCompareRoutine(
-	MyElementStructure 			*e1,	/* Address of first element */
-	MyElementStructure 			*e2,	/* Address of second element */
-	word		valueForCallback) 		/* Datum passed in to ChunkArraySort() */
+        MyElementStructure                      *e1,    /* Address of first element */
+        MyElementStructure                      *e2,    /* Address of second element */
+        word            valueForCallback)               /* Datum passed in to ChunkArraySort() */
 {
 
-	/* We sort differently depending on what the value of valueForCallback is.
-	 * That way, we can use this one routine for all our sorting.
-	 */
-	switch(valueForCallback) {
-	    case SORT_ARRAY_ASCENDING_BY_INT:
-	    /* Compare the elements based on their integer fields. Smaller int
-	     * comes first.*/
-		if (e1->anInteger < e2->anInteger)
-		    return(-1);
-		else if (e1->anInteger > e2->anInteger)
-		    return(1);
-		else return(0);
-		break;
+        /* We sort differently depending on what the value of valueForCallback is.
+         * That way, we can use this one routine for all our sorting.
+         */
+        switch(valueForCallback) {
+            case SORT_ARRAY_ASCENDING_BY_INT:
+            /* Compare the elements based on their integer fields. Smaller int
+             * comes first.*/
+                if (e1->anInteger < e2->anInteger)
+                    return(-1);
+                else if (e1->anInteger > e2->anInteger)
+                    return(1);
+                else return(0);
+                break;
 
-	    case SORT_ARRAY_DESCENDING_BY_FLOAT:
-	    /* Compare the elements based on their float fields. Larger float
-	     * comes first.*/
-		if (e1->aFloat > e2->aFloat)
-		    return(-1);
-		else if (e2->aFloat < e2->aFloat)
-		    return(1);
-		else return(0);
-		break;
+            case SORT_ARRAY_DESCENDING_BY_FLOAT:
+            /* Compare the elements based on their float fields. Larger float
+             * comes first.*/
+                if (e1->aFloat > e2->aFloat)
+                    return(-1);
+                else if (e2->aFloat < e2->aFloat)
+                    return(1);
+                else return(0);
+                break;
 
-	    case SORT_ARRAY_BY_STRING:
-		/* In this case, we call the localization routine to compare the
-		 * two strings. The localization routine has the same return
-		 * conventions as this routine, so we return its result directly.
-		 */
-			return(LocalCmpStrings(e1->someText, e2->someText, 40));
-			break;
-	    default:
-		/* If we get here, we were passed a bad callback word. The callback
-		 * routine therefore does not express a preference in ordering the
-		 * two elements; it shows this by returning zero.
-		 */
-	} /* end of switch */
+            case SORT_ARRAY_BY_STRING:
+                /* In this case, we call the localization routine to compare the
+                 * two strings. The localization routine has the same return
+                 * conventions as this routine, so we return its result directly.
+                 */
+                        return(LocalCmpStrings(e1->someText, e2->someText, 40));
+                        break;
+            default:
+                /* If we get here, we were passed a bad callback word. The callback
+                 * routine therefore does not express a preference in ordering the
+                 * two elements; it shows this by returning zero.
+                 */
+        } /* end of switch */
 
 }
 
 /* All of the above appears in some declaration section. The code below might
  * appear in any routine which creates a chunk array. First, the declarations:
  */
-MemHandle			blockWithHeap;
-chunkHandle			myChunkArray;
-MyChunkArrayHeader			*chunkArrayAddress;
-MyElementStructure			*currentElement;
+MemHandle                       blockWithHeap;
+chunkHandle                     myChunkArray;
+MyChunkArrayHeader                      *chunkArrayAddress;
+MyElementStructure                      *currentElement;
 
 /* Now the code. Here, blockWithHeap has already been set to hold the block handle
  * of an LMem heap.
@@ -995,22 +995,22 @@ MyElementStructure			*currentElement;
 
 MemLock(blockWithHeap); /* Always lock LMem heap before acting on it */
 myChunkArray = ChunkArrayCreate(blockWithHeap, 
-			sizeof(MyElementStructure), /* Size of each element */
-			sizeof(MyChunkArrayHeader)); /* Size of header */
+                        sizeof(MyElementStructure), /* Size of each element */
+                        sizeof(MyChunkArrayHeader)); /* Size of header */
 
 /* Let's write some data into our part of the header. We need the array's address: 
 */
 chunkArrayAddress = LMemDerefHandles(blockWithHeap, myChunkArray);
-chunkArrayAddress->someData = 42;						/* This data won't be affected */
-chunkArrayAddress->someMoreData = 2.7182818;						/* by chunk array actions */
+chunkArrayAddress->someData = 42;                                               /* This data won't be affected */
+chunkArrayAddress->someMoreData = 2.7182818;                                            /* by chunk array actions */
 
 /* Now, let's create an element: */
 currentElement = ChunkArrayAppendHandles(blockWithHeap, myChunkArray, 0);
-	/* That invalidates chunkArrayAddress */
+        /* That invalidates chunkArrayAddress */
 currentElement->anInteger = 1999;
 currentElement->aFloat = 1.4142135;
-strcpy(currentElement->someText, 				"Work is the curse of the drinking class.\n" \
-				"  --Oscar Wilde")
+strcpy(currentElement->someText,                                "Work is the curse of the drinking class.\n" \
+                                "  --Oscar Wilde")
 
 /* We're done with the array for the moment, so we unlock it: */
 MemUnlock(blockWithHeap);
@@ -1022,8 +1022,8 @@ MemUnlock(blockWithHeap);
 /* Now we need to sort the array: */
 MemLock(blockWithHeap);
 ChunkArraySortHandles(blockWithHeap, myChunkArray, 
-		SORT_ARRAY_ASCENDING_BY_INT, /* this is passed to comp. routine */
-		MyElementCompareRoutine);
+                SORT_ARRAY_ASCENDING_BY_INT, /* this is passed to comp. routine */
+                MyElementCompareRoutine);
 
 /* Array is now sorted! */
 ~~~
@@ -1190,14 +1190,14 @@ Code Display 16-3 Structure for Element Array Elements
  */
 
 typedef struct {
-	word		amount;		/* This has the element's data fields */
-	float		interestRate;
-	char		description[20];
+        word            amount;         /* This has the element's data fields */
+        float           interestRate;
+        char            description[20];
 } MyElementBody;
 
 typedef struct {
-	RefElementHeader			header; 	/* We won't use this-it holds ref count */
-	MyElementBody		body;
+        RefElementHeader                        header;         /* We won't use this-it holds ref count */
+        MyElementBody           body;
 } MyElement;
 ~~~
 
@@ -1346,8 +1346,8 @@ following definition:
 
 ~~~
 typedef struct {
-	ElementArrayHeader			NAH_meta;
-	word				NAH_dataSize;
+        ElementArrayHeader                      NAH_meta;
+        word                            NAH_dataSize;
 } NameArrayHeader;
 ~~~
 
@@ -1425,31 +1425,31 @@ is specified by its global and chunk handles; this version is called
 Code Display 16-4 Allocating a Name Array
 ~~~
 /* We want a fixed data space, so we define our own header structure. */
-typedef	struct {
-	NameArrayHeader	MNAH_meta;		/* Must begin with a NameArrayHeader!!! */
-	char *		MNAH_comments[32];
+typedef struct {
+        NameArrayHeader MNAH_meta;              /* Must begin with a NameArrayHeader!!! */
+        char *          MNAH_comments[32];
 } MyNameArrayHeader;
 
 /* The data section of the name array will be this structure: */
 typedef struct {
-	double		MDSS_myDataFloat;
-	int		MDSS_myDataInts[20];
+        double          MDSS_myDataFloat;
+        int             MDSS_myDataInts[20];
 } MyDataSectionStruct;
 
 /* Every element in the name array will have this structure: */
 typedef struct {
-	RefElementHeader			MES_header;		/* For internal use */
-	MyDataSectionStruct			MES_data;
-	char			MES_name[]; 		/* We don't know how long this
-						 * will actually be */
+        RefElementHeader                        MES_header;             /* For internal use */
+        MyDataSectionStruct                     MES_data;
+        char                    MES_name[];             /* We don't know how long this
+                                                 * will actually be */
 } MyElementStruct;
 
-MemHandle		myLMemHeap;		/* Assume this is initialized */
-ChunkHandle		myNameArray;
+MemHandle               myLMemHeap;             /* Assume this is initialized */
+ChunkHandle             myNameArray;
 
 /* Sample call to NameArrayCreate() */
 myNameArray = NameArrayCreate(myLMemHeap, sizeof(MyDataSectionStruct),
-				sizeof(MyNameArrayHeader));
+                                sizeof(MyNameArrayHeader));
 ~~~
 
 ##### 16.4.3.2 Accessing Elements in a Name Array

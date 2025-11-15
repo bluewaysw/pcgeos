@@ -26,7 +26,7 @@ VCImpex.eobj: VCImpex/vcimpexManager.asm \
                 Objects/gValueC.def Objects/gToolGC.def \
                 Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
-                objects/gCtrlC.def math.def
+                math.def
 imptproc.obj \
 imptproc.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \

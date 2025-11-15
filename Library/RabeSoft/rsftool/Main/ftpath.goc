@@ -1,0 +1,913 @@
+/***************************************************************************
+ *
+ *  File-Tool-Library
+ *  Module: Main tool routines
+ *  (c) by RABE-Soft 12/99
+ *
+ *  Note: The comments were translated from German to English with AI support
+ *  and were not checked in detail. Therefore, they may sometimes sound a bit strange.
+ *
+ ***************************************************************************/
+@include <stdapp.goh>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fileEnum.h>
+#include <file.h>
+#include <localize.h>
+
+@include "rsftool.goh"
+@include "UI/toolui.goh"
+@include "Main/ftlocals.goh"
+@include "Main/macros.goh"
+
+
+int InternalFileToolCompare(char *p1st, char *p2nd, int nameOffs, int attrOffs);
+
+/*---------------------------------------------------------------------------
+ *  $ID Compatibility routines
+ ---------------------------------------------------------------------------*/
+
+ /*--------------------- FileToolParseNameFromPath_old ---------------------
+    The old version always accepted \ and / as separators for folders or file names
+    - and thus had problems with GEOS names,
+    which can contain a slash /.
+ ---------------------------------------------------------------------------*/
+extern word EXPORT FileToolParseNameFromPath_old ( char ** path) {
+    return FileToolParseNameFromPath (path, FT_WINDOWS_NAME_CONVENTION);
+    }
+
+/*###########################################################################
+ #  - Support for file selectors
+ #  - Comparing and converting
+ #  - Editing path strings
+ #  -> is implemented in FSelSupp.goc
+ ###########################################################################*/
+
+
+
+/*--------------------- FileToolParseNameFromPath ---------------------
+    Changes the passed pointer so that it points to the last element
+    of the path string (exactly: after the last \ or //, i.e. usually
+    to the file or current dir name).
+    Parameters:
+       path:   Pointer to the path string, will be modified
+       useGeosNameConvention:
+        GEOS names may have a slash (/) in the name, for Windows
+        and other systems it is also used as a path separator (like backslash)
+        --> TRUE if GEOS conventions, otherwise FALSE
+    return: Length of the new string
+ ---------------------------------------------------------------------------*/
+
+extern word EXPORT FileToolParseNameFromPath ( char ** path, Boolean useGeosNameConvention)
+	{
+	int k,n, l;
+	char *p;
+
+	p = *path;
+	l = strlen(p);
+	if ( useGeosNameConvention ) {
+		// GEOS names can contain a slash /, which is then
+		// not a path separator
+		for ( k=0, n= 0; n < l; n++ )
+			if ( (p[n] == '\\') ) k = n+1;
+		}
+	else    {
+		for ( k=0, n= 0; n < l; n++ )
+			if ( (p[n] == '/') || (p[n] == '\\') ) k = n+1;
+		}
+	p+=k;
+	*path = p;
+	return strlen(p);
+	}
+
+
+
+/*###########################################################################
+ #  Paths and files (not opened)
+ ###########################################################################*/
+
+/*--------------------- FileToolExistFileGD ---------------------
+ *  Task:          tests whether a file with the specified Geos and
+ *          DOS name exists. The file name must not contain any
+ *          path component
+ *  Parameters: geosName:   (must be set)
+ *          dosName     (may be null. In this case,
+ *                   geosName may also refer to a DOS file)
+ *  Return:     FTEF_YES | FTEF_NO | FTEF_INVALID_DOSNAME |
+ *          FTEF_IVALID_GEOSNAME | FTEF_DIFFERENT_FILES
+ *          { FTExistFilesValue }
+ ---------------------------------------------------------------------------*/
+
+/* Boolean FileToolExistFile(char *name); */
+#define FileToolExistFile(name) (FileToolExistFileGD(name,0)==FTEF_YES)
+
+extern FTExistFilesValue EXPORT  FileToolExistFileGD(char * geosName, char * dosName) {
+Boolean		geosFound, dosFound;
+FileLongName	dosNameOfGeos;
+
+    FileGetAttributes(geosName);
+    geosFound = ThreadGetError();
+    geosFound = !geosFound;
+    if ( !dosName) {
+	return ( geosFound ? FTEF_YES : FTEF_NO );
+	}
+
+    FileGetAttributes(dosName);
+    dosFound = ThreadGetError();
+    dosFound = !dosFound;
+
+    if ( geosFound ) {		// File with Geos name exists
+	FileGetPathExtAttributes(geosName, FEA_DOS_NAME,
+				dosNameOfGeos, sizeof(FileLongName));
+	if ( !strcmp(dosName,dosNameOfGeos) ) {
+		return FTEF_YES;
+		}
+	// DOS name is different than required
+	return ( dosFound ? FTEF_DIFFERENT_FILES : FTEF_INVALID_DOSNAME );
+	}
+
+    // Geos file does not exist
+    return ( dosFound ? FTEF_INVALID_GEOSNAME : FTEF_NO );
+    }
+
+/*--------------------- LocalCreateDir ---------------------/*--------------------- LocalCreateDir ---------------------
+ *  Task:       Outsourced FileCreateDir() routine, in order to
+ *          possibly shorten the DOS name
+ *          e.g. NEUER_OR.000 -> NEUER_OR
+ *  Strategy:
+ *  Return:     Error code from FileCreateDir()
+ *          OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+int LocalCreateDir(char *path) {
+int err, dosErr;
+FileLongName    dosName, oldName;
+char *p;
+
+    err = FileCreateDir(path);
+
+    /* Only if the folder was newly (and successfully) created,
+     * an attempt is made to shorten the DOS name. The error ERROR_FILE_EXIST
+     * (folder already exists) also leads to abort, so that the tool does not
+     * uncontrollably rename existing directory structures - sometimes
+     * the user actually had a reason for the DOS names. */
+    if ( err ) return err;
+
+
+    /* Folder was newly created -> try to shorten the DOS name
+     * To do this, determine the current DOS name of the directory */
+    dosErr = FileGetPathExtAttributes(path, FEA_DOS_NAME, dosName, sizeof(FileLongName));
+    if ( !dosErr ) {
+    /* The directory has a DOS name, i.e. it exists :-) */
+    p = strchr(dosName, '.');
+    if ( p ) {
+        /* DOS folder has an extension -> delete it
+         * To do this, switch to the just parent directory, because
+         * path can also be "\Paulchen Daten\Meine\Willi\Neuer Ordner"
+         */
+        FilePushDir();
+        FileSetCurrentPath(0, path);
+        FileSetCurrentPath(0, "..");
+
+        strcpy(oldName, dosName);
+        *p = 0;         /* dosName: NEUER_OR.000 -> NEUER_OR */
+        if ( strlen(dosName) ) {
+            /* Rename, without message if it fails */
+            FileToolModifyDosName( oldName, dosName, FALSE);
+            }
+        FilePopDir();
+        }
+    }
+
+
+    return err;
+}
+
+/*--------------------- LocalSeeIfFolder ---------------------
+ *  Task:       Check whether an existing folder (ERROR_FILE_EXISTS) is really
+ *              a folder and not possibly a file
+ *              In that case, an error message must be given
+ *  Strategy:
+ *  Return:     TRUE: It is a folder (everything OK)
+ *              FALSE: It is a file (error)
+ *
+ *  Note: For links I cannot decide this -> give an error message
+ *		Unless links also return FA_SUBDIR -> I am not testing that now
+ ---------------------------------------------------------------------------*/
+Boolean LocalSeeIfFolder(char *name) {
+int attr;
+
+	attr = FileGetAttributes(name);
+	if ( attr & FA_SUBDIR ) return TRUE;
+	return FALSE;
+}
+
+
+
+/*--------------------- FileToolCreateSubdir ---------------------
+ *	Aufgabe:	Anlegen Unterverzeichnisses relativ zu Working Dir
+ *			Bei Bedarf rekursiver Aufruf
+ *	Strategie:
+ *	Return:		 -1, wenn sich der Pfad nicht anlegen l„át
+ *			oder Fehlercode von FileCreateDir()
+ *			OK: FALSE  ( == 0 )
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCreateSubdir( char *path ) {
+int 	i,err;
+char	z;
+
+/* // try to create normally, slow down too long names */
+
+    err = LocalCreateDir(path);
+    if (err == 0 ) return FALSE;        /* created successfully  */
+    if (err == ERROR_FILE_EXISTS )      /* already exists */
+    {
+        /* Then it must be a folder, otherwise error */
+        if (LocalSeeIfFolder(path)) return FALSE;
+        return err;
+    }
+
+
+
+/* Handle write protection error separately */
+    if ( err == ERROR_WRITE_PROTECTED ) {
+        return ERROR_WRITE_PROTECTED;
+        }
+
+
+/* it did not work: Try to shorten and call again */
+    i = strlen(path);
+    if ( i==0 )
+    {
+    return (-1);    /* slow down empty strings */
+    }
+
+    while ( i != 0 && path[i] != '\\' ) i--;  /* find backslash */
+    z = path[i];
+    path[i] = 0;    /* shorten string */
+            /* i is zero if there is no backslash, or it
+             * was at the beginning -> it did not work */
+    if ( i != 0 ) err = FileToolCreateSubdir(path); /* recursive call */
+        else    err = (-1);
+    path[i] = z;                /* restore old string */
+
+    if ( err == 0 )
+    {
+        /* try again to create normally, slow down too long names */
+        err = LocalCreateDir(path);
+        if (err == 0 ) return FALSE;        /* created successfully  */
+        if (err == ERROR_FILE_EXISTS )      /* already exists */
+        {
+            /* Then it must be a folder, otherwise error */
+            if (LocalSeeIfFolder(path)) return FALSE;
+            return err;
+        }
+
+    }
+
+    return err;
+}
+
+/*--------------------- FileToolCreatePath ---------------------
+ *  Task:       Create a path on a storage medium
+ *  Strategy:
+ *  Return:     -1, if the path cannot be created
+ *          or error code from FileToolCreateSubdir()
+ *          OK: FALSE ( ==0 )
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCreatePath (DiskHandle dh, char *path) {
+DiskHandle ndh;
+int ret;
+
+    if ( dh==0) return (-1);    /* no handle: no storage medium */
+    FilePushDir();
+    ndh = FileSetCurrentPath(dh,"\\");
+    if ( ndh == 0 ) {
+        FilePopDir();
+        return (-1);
+        }
+    ret = FileToolCreateSubdir(path);       /* create directory, recursively if necessary */
+    FilePopDir();
+    return ret;
+    }
+
+/*--------------------- FileToolGetCurrentDirName ---------------------
+ Task:      Returns the name of the current directory.
+ Parameter: rootFlag: TRUE  Root directory is returned as "C:\"
+              FALSE Root directory is returned as an empty string
+ Return:        TRUE, the current directory is a root directory.
+        FALSE, if the current directory is not a root directory.
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT FileToolGetCurrentDirName(char * name, Boolean rootFlag) {
+DiskHandle  dh;
+char path[PATH_BUFFER_SIZE+1],fullPath[PATH_BUFFER_SIZE+5];
+char *p;
+int n;
+    dh = FileGetCurrentPath(path,PATH_BUFFER_SIZE);
+    p = fullPath;
+    FileConstructFullPath(&p,PATH_BUFFER_SIZE,dh,path,TRUE);
+    n = strlen(fullPath);
+    if ( n>3 ) {
+        n--;
+        while ( (n!=0) && (fullPath[n]!='\\') ) n--;
+        if (fullPath[n] == '\\') n++;
+        strcpy(name,&fullPath[n]);
+        return FALSE;
+        }
+    /* it is a root directory! */
+	if (rootFlag) {
+		strcpy(name,fullPath);
+		}
+	  else	{
+		*name = 0;
+		}
+	return TRUE;
+	}
+
+
+/* ---------------------------------------------------------------------------
+    Searching directories
+ ---------------------------------------------------------------------------*/
+/*
+	FileToolEnumSubdir and FileToolEnumDirsAndFiles return a memory block
+	that contains an array with the following structure (for each found file one)
+*/
+
+/* the following values can be passed as parameter 'flags' to the
+    FileToolEnum~ routines
+    FT_EF_DIRS and FT_EF_FILES only find links if FT_EF_LINKS
+    was also passed.
+    At least FT_EF_DIRS or FT_EF_FILES must be passed.
+
+/* FileToolEnumFlags
+#define FT_EF_DIRS  1
+#define FT_EF_FILES 2
+#define FT_EF_LINKS 4
+#define FT_EF_LINKS_ONLY    8
+/* Examples:    All files and subdirs, including links:
+            FT_EF_DIRS | FT_EF_FILES | FT_EF_LINKS
+        Only file links:
+            FT_EF_FILES | FT_EF_LINKS_ONLY
+        Only directories, no directory links:
+            FT_EF_DIRS
+        */
+
+/*--------------------- FileToolEnumSubdir ---------------------
+    Search a directory. For each file that matches 'flags',
+    a structure FTStandardEnumType is returned in the allocated
+    memory mh
+    - flags determines whether directories (FT_EF_DIRS), files (FT_EF_FILES)
+      and links (FT_EF_LINKS, FT_EF_LINKS_ONLY) should be found
+      Combination with | (e.g. FT_EF_FILES | FT_EF_DIRS) is allowed
+      : FT_EF_LINKS | FT_EF_LINKS_ONLY == FT_EF_LINKS_ONLY
+      : FT_EF_SORT causes the files to be sorted (directories
+        first), but this takes a long time for large directories!
+ *  Return: Number of found files
+ *      *mh: Handle of the block with the array of FTStandardEnumType
+ *           NullHandle if number == 0
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolEnumSubdir (MemHandle * mh, word flags)
+ {
+ /* Description of the structure of the values to be returned:
+    FEAD_value contains the offset at which the requested attribute
+        is to be written into the structure
+    FEAD_size contains the maximum available size for the
+        requested attribute */
+
+FileExtAttrDesc stdReturnAttrs[5] = {
+	{FEA_NAME,	(void*)FT_SET_NAME_OFFSET, (word)sizeof(FileLongName),0},
+	{FEA_FILE_TYPE,	(void*)FT_SET_TYPE_OFFSET, (word)sizeof(GeosFileType),0},
+	{FEA_FILE_ATTR,	(void*)FT_SET_ATTR_OFFSET,	1,0},
+	{FEA_SIZE,	(void*)FT_SET_SIZE_OFFSET, (word)sizeof(dword),0},
+	{FEA_END_OF_LIST,0,0,0}};
+ int count;
+
+ count = FileToolExtendedEnumSubdir( mh, flags, stdReturnAttrs,
+					sizeof(FTStandardEnumType));
+ count = FileToolAdjustLinkDirs( mh, sizeof(FTStandardEnumType),
+				count, flags, FT_SET_ATTR_OFFSET);
+ if ( flags & FT_EF_SORT ) {
+	 FileToolSortFileEnumResult( *mh, sizeof(FTStandardEnumType), count,
+				FT_SET_NAME_OFFSET, FT_SET_ATTR_OFFSET);
+	 }
+ return count;
+ }
+
+/*--------------------- FileToolExtendedEnumSubdir ---------------------
+    Search a directory. For each file that matches 'flags',
+    a structure is returned in the allocated memory mh,
+    which is described by returnAttrs and returnSize.
+    - returnDesc is passed directly via the field FEP_returnAttrs
+      and returnSize via FEP_returnSize to FileEnum()
+    - Description of the layout of returnDesc: Concepts, File System, p.656
+    - flags determines whether directories (FT_EF_DIRS), files (FT_EF_FILES)
+      and links (FT_EF_LINKS, FT_EF_LINKS_ONLY) should be found
+      Combination with | (e.g. FT_EF_FILES | FT_EF_DIRS) is allowed
+      : FT_EF_LINKS | FT_EF_LINKS_ONLY == FT_EF_LINKS_ONLY
+ *  Return: Number of found files
+ *      *mh: Handle of the block with the array according to returnAttrs
+ *           NullHandle if number == 0
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolExtendedEnumSubdir(MemHandle * mh, word flags,
+		FileExtAttrDesc * returnAttrs, word returnSize)
+  {
+  word noFitCount = 0;
+  int  retVal;
+
+    /* from library version 1.3 Routine extended */
+    retVal =  FileToolExtEnumSubdirWithSkip(mh, flags, returnAttrs,
+		returnSize, 0 /* skipCount*/, &noFitCount);
+
+    if ( noFitCount ) {
+		FileLongName	dirName;
+		FileToolGetCurrentDirName(dirName, TRUE);
+		{
+		optr op = @ErrorEnumCount;
+		ErrorMsgNumberBox(op,dirName,noFitCount);
+		// for any unknown reason, compiling ErrorMsgNumberBox(@ErrorEnumCount,dirName,noFitCount); fails here
+		}
+		}
+    return retVal;
+  }
+
+/*--------------------- FileToolExtEnumSubdirWithSkip ---------------------
+ *  Search a directory. Functionally like
+ *  FileToolExtendedEnumSubdir(), but with the possibility to specify the number
+ *  of files to skip as well as returning the number of files not analyzed.
+ *  This makes it possible to process a directory completely, even if in steps.
+ *  In contrast to FileToolExtendedEnumSubdir(), no error box
+ *  is displayed if not all files can be processed.
+ *  Parameters: - See FileToolExtendedEnumSubdir()
+ *           	- skipCount: number of files to skip
+ *           	- noFitCount: number of files not analyzed
+ *  Return: Number of found files
+ *      *mh: Handle of the block with the array according to returnAttrs
+ *           NullHandle if number == 0
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolExtEnumSubdirWithSkip(MemHandle * mh, word flags,
+		FileExtAttrDesc * returnAttrs, word returnSize,
+		word skipCount, word *noFitCount)
+  {
+  dword requestFlags = FA_SUBDIR;
+  dword avoidFlags = FA_SUBDIR | FA_LINK;
+
+  int  retVal;
+  dword	enumFlags;
+
+  FileExtAttrDesc	matchAttrDesc[2]; 	/* Array with 2 elements */
+  FileEnumParams	enumParams;
+
+  /*EnumParameter*/
+	enumParams.FEP_returnAttrs = (void *) returnAttrs;
+	enumParams.FEP_returnSize = returnSize;
+	enumParams.FEP_matchAttrs = &matchAttrDesc[0];
+	enumParams.FEP_bufSize = FEP_BUFSIZE_UNLIMITED;
+	enumParams.FEP_skipCount =skipCount;
+	enumParams.FEP_callback = NULL;
+	enumParams.FEP_callbackAttrs = NULL;
+	enumParams.FEP_searchFlags = FILE_ENUM_ALL_FILE_TYPES ;
+	if ( flags & FT_EF_DIRS )
+		enumParams.FEP_searchFlags  |= FESF_DIRS;
+
+  /* Match descriptor: Only files that match the parameters passed here
+    (in this case: certain attributes are set or
+    cleared) will be found */
+    /* First element of the array */
+    matchAttrDesc[0].FEAD_attr = FEA_FILE_ATTR; /* what to check */
+    matchAttrDesc[0].FEAD_size = 2;
+    /* Setting the flags in FEAD_value:
+       higher word: the attributes must not be set
+       lower word: the attributes must be set */
+	if ( flags & FT_EF_FILES ) requestFlags &= ~FA_SUBDIR;
+	if ( flags & FT_EF_DIRS ) avoidFlags &= ~FA_SUBDIR;
+	if ( flags & FT_EF_LINKS_ONLY ) {
+			avoidFlags &= ~FA_LINK;
+			requestFlags |= FA_LINK;
+			}
+		else if ( flags & FT_EF_LINKS ) avoidFlags &= ~FA_LINK;
+
+	avoidFlags &= 0xFF;
+	requestFlags &=0xFF;
+	enumFlags = (avoidFlags <<16 ) + requestFlags;
+	matchAttrDesc[0].FEAD_value = (void * ) enumFlags;
+
+    /* 2nd element of the array: End of List */
+	matchAttrDesc[1].FEAD_attr = FEA_END_OF_LIST;
+
+    retVal = FileEnum ( &enumParams, mh, noFitCount);
+    if ( retVal == 0 )	*mh = 0;	// ensure NullHandle
+
+    return retVal;
+  }
+
+/*--------------------- FileToolEnumDirsAndFiles ---------------------
+    Search a directory.
+    First, the directory is searched with FileToolEnumSubdir, then
+    the found entries of type FTStandardEnumType
+    are sorted (directories first), stored in a memory block,
+    and the corresponding handle is returned.
+    - For flags, only FT_EF_LINKS, FT_EF_LINKS_ONLY, or FT_EF_SORT
+      are valid, other flags are ignored
+
+    Return: Total number of found entries (files + dirs)
+        (-1) if a memory block could not be allocated
+ *      *mh: Handle of the block with the array of FTStandardEnumType
+ *           NullHandle if number == 0 or memory error
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolEnumDirsAndFiles( MemHandle * mh, int * dirCount, word flags)
+  {
+  MemHandle localHandle;
+  word localFlags, count;
+  FTStandardEnumType * source, *dest;
+  int n, dcount;
+
+  localFlags = flags & (FT_EF_LINKS | FT_EF_LINKS_ONLY | FT_EF_SORT);
+
+  count = FileToolEnumSubdir(&localHandle,localFlags | FT_EF_DIRS | FT_EF_FILES);
+  if ( count >0 )
+	{
+	*mh = MemAlloc(count*sizeof(FTStandardEnumType),
+		HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+
+	if ( !*mh) {
+		MemFree(localHandle);
+		return -1;	/* error */
+		}
+
+	source = MemLock(localHandle);
+	dest = MemDeref(*mh);
+	dcount = 0;			/* counter for folders*/
+
+	for ( n = 0; n<count; source++,n++)
+		{
+		if (source->FT_SET_attrs & FA_SUBDIR )
+			{
+			*dest = *source; dest++;
+			dcount++;
+			}
+		}
+	if ( dirCount != 0 ) *dirCount = dcount;
+
+	source = MemDeref(localHandle);
+	for ( n = 0; n<count; source++,n++)
+		{
+		if ( !(source->FT_SET_attrs & FA_SUBDIR ) )
+			{
+			*dest = *source; dest++;
+			}
+		}
+
+	MemFree(localHandle);
+	MemUnlock(*mh);
+	}
+    else {
+	*mh = 0;	// ensure NullHandle
+	if ( dirCount != 0 ) *dirCount = 0;	// no folders too
+	}
+  return count;
+  }
+
+/*--------------------- FileToolSortFileEnumResult ---------------------
+    Sort a search result from FileEnum().
+    Goal: alphabetical display in a file list
+    - Place directories before files (if attrOffs != (-1) )
+    - Sort in alphabetical order
+    mh: block returned by FileEnum
+    structSize, structCount     size and number of structures in the block
+    nameOffs, typeOffs      offset of the fields for FileName and
+                    FileAttrs (FA_xxx), for the actual
+                    comparison
+    If attrOffs == (-1) -> type is ignored (or not present)
+ ---------------------------------------------------------------------------*/
+extern void EXPORT FileToolSortFileEnumResult( MemHandle mh,
+				int structSize, int structCount,
+				int nameOffs, int attrOffs)
+  {
+  int first, last, current, min;
+  char *tp, *mPtr;
+  MemHandle tmh;
+  optr iBox, iValue;
+
+  if ( (structCount < 2) || (mh == 0) ) return;
+
+  iBox = UserCreateDialog(@InfoSortBox);
+  @send iBox::MSG_GEN_INTERACTION_INITIATE();
+
+  iValue = @call iBox::MSG_GEN_FIND_CHILD_AT_POSITION(CHILD_NR_IVALUE);
+
+  tmh = FTGetMem(structSize);
+  tp = MemLock(tmh);
+  mPtr = MemLock(mh);
+  first = 0;
+  last = structCount-1;
+
+  while (first < last )
+     {
+// Provide number of the smallest element in min
+     min = first;
+     for ( current = first+1; current <= last; current ++)
+	{
+	if ( InternalFileToolCompare( mPtr+current*structSize,
+		      mPtr+min*structSize,nameOffs, attrOffs) < 0 ) min = current;
+	}
+// Swap elements (if appropriate)
+     if ( min != first )
+	{
+	memcpy(tp, mPtr+first*structSize,structSize);
+	memcpy(mPtr + first*structSize, mPtr+min*structSize,structSize);
+	memcpy(mPtr + min*structSize, tp,structSize);
+	}
+     first++;   // smallest is at the beginning-> do not pay attention anymore
+     @send iValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(first,FALSE);
+     }
+
+  MemUnlock(mh);
+  MemFree(tmh);
+
+  @send iBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+  UserDestroyDialog(iBox);
+  }
+
+/*--------------------- FileToolAdjustLinkDirs ---------------------
+    Workaround for a bug in the system: FileEnum ALWAYS returns ALL directories
+    if directories are requested, regardless of whether they are links or not.
+    -> the unnecessary directories must be hidden.
+
+    mh: 			block returned by FileEnum
+    structSize, structCount     size and number of structures in the block
+    flags               	flags as passed to the DirListEnumXXXX
+                    		routines
+    attrOffs           		offset of the field FileAttrs (FA_xxx),
+                    		for the actual comparison
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolAdjustLinkDirs( MemHandle *mh,
+				int structSize, int structCount,
+				int flags, int attrOffset)
+  {
+  MemHandle localMh;
+  int	lFlags, newCount, n, attr;
+  byte * src, *dest;
+  Boolean	lnk, cpyLnk;
+
+  // check if parameters valid
+  if ( (structCount < 2) || (mh == 0) || (*mh == 0) ) return structCount;
+
+  // Check whether corrections are required
+  if ( !(flags & FT_EF_DIRS) ) return structCount;
+			// No directories scanned
+
+  lFlags = flags & ( FT_EF_LINKS | FT_EF_LINKS_ONLY);
+  if ( lFlags == FT_EF_LINKS ) return structCount;
+			// Folder and links searched -> were found
+  cpyLnk = lFlags & FT_EF_LINKS_ONLY;	// TRUE, if links are to be taken over
+  newCount = 0;			/* new count */
+
+  if ( structCount >0 )
+	{
+	localMh = MemAlloc(structCount*structSize,
+		HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+	if ( !localMh ) return -1;	/* error */
+
+	dest = MemDeref(localMh);
+	src = MemLock(*mh);
+
+	for ( n = 0; n<structCount; src+=structSize,n++)
+	   {
+	   attr = (*(src+attrOffset));
+	   lnk = attr & FA_LINK;	// TRUE if Link
+	   if ( !(attr & FA_SUBDIR) )
+		{			// take files in every case
+		memcpy(dest,src,structSize);
+		dest += structSize;
+		newCount++;
+		}
+	   else
+		if ( (lnk && cpyLnk) || ( (!lnk) && (!cpyLnk) ) )
+		{			// folders only fi requested
+		memcpy(dest,src,structSize);
+		dest += structSize;
+		newCount++;
+		}
+	   }
+
+	MemFree(*mh);		// pass new memory block
+	*mh = localMh;
+	MemUnlock(*mh);
+	}
+
+  return newCount;
+  }
+
+/*--------------------- InternalFileToolCompare ---------------------
+   Compare two structure entries for FileToolSortFileEnumResult
+    p1st, p2nd: Pointers to the structures
+    nameOffs    Offset of the file or directory name in the structure
+    attrOffs    Offset of the file attributes (FA_xx) in the structure
+            (-1) means: ignore!
+   Return: (-1)     Structure1 "<" Structure2
+            Structure1 "==" Structure2
+            Structure1 ">" Structure2
+            Directories always come before files
+ ---------------------------------------------------------------------------*/
+int InternalFileToolCompare(char *p1st, char *p2nd, int nameOffs, int attrOffs)
+  {
+  byte a1, a2;      /* will hold FileAttribute */
+  char *sp1, *sp2;  /* string pointer */
+
+  int retVal;
+  MemHandle	mh1, mh2;
+
+  if (attrOffs == (-1) )	a1=a2=0;
+	else {
+		a1 = *(p1st+attrOffs);
+		a2 = *(p2nd+attrOffs);
+		}
+
+  if ( (a1 & FA_SUBDIR) != (a2 & FA_SUBDIR) )
+			return ( a1 & FA_SUBDIR ) ? (-1) : (+1);
+                /* Expression is true if
+                   struct 1 is a directory */
+/* both are directories or files: compare names */
+  mh1 = FTGetMem(strlen(p1st+nameOffs)+2);
+  if ( !mh1 ) return strcmp(p1st+nameOffs,p2nd+nameOffs);
+  sp1 = MemLock(mh1);
+
+  mh2 = FTGetMem(strlen(p2nd+nameOffs)+2);
+  if ( !mh2 ) {
+	MemFree(mh1);
+	return strcmp(p1st+nameOffs,p2nd+nameOffs);
+	}
+  sp2 = MemLock(mh2);
+
+  strcpy(sp1,p1st+nameOffs);
+  LocalUpcaseString(sp1,strlen(sp1));
+  strcpy(sp2,p2nd+nameOffs);
+  LocalUpcaseString(sp2,strlen(sp2));
+
+  retVal = strcmp(sp1,sp2);
+  MemFree(mh1);
+  MemFree(mh2);
+
+  return retVal;
+  }
+
+/*****************************************************************************
+ *	$ID
+ *****************************************************************************/
+
+/*--------------------- FileToolRequestDisk ---------------------
+ *  Task:       Request a new disk,
+ *          with a warning if minSpace is not met
+ *  Parameters: lwNr: drive number
+ *          freeSpace: return: free space on the new disk
+ *              null pointer not allowed!
+ *          minSpace: minimum space on disk, zero if it doesn't matter
+ *              if it is not met, a warning is given
+ *              and the option to insert another disk is offered
+ *  Return:     DiskHandle of the new disk
+ *          NullHandle if user chooses cancel
+ ---------------------------------------------------------------------------*/
+extern DiskHandle EXPORT FileToolRequestDisk(int lwNr, dword *freeSpace, dword minSpace) {
+char lw[] ="A:";
+char nummer[16];
+int retVal;
+DiskHandle	dh;
+
+	TryStart:
+
+	   dh = DiskRegisterDiskSilently(lwNr);
+	   if ( !dh) {
+		lw[0] += lwNr;
+		retVal = ToolErrorCancelBox(@NoDiskInDrive,lw,0);
+		if ( retVal != IC_YES) return NULL;
+		goto TryStart;
+		}
+
+	   *freeSpace = DiskGetVolumeFreeSpace(dh);
+	   if ( (!(*freeSpace)) &&  (minSpace!=0) ) {
+		lw[0] += lwNr;
+		UserStandardSound(SST_WARNING);
+		retVal = ToolInfoCancelBox(@DiskFull,lw,0);
+		if ( retVal != IC_YES) return NULL;
+		goto TryStart;
+		}
+
+	   if ( (*freeSpace) < minSpace ) {
+		lw[0] += lwNr;
+		UserStandardSound(SST_WARNING);
+		UtilHex32ToAscii(nummer,(*freeSpace),UHTAF_NULL_TERMINATE);
+		retVal = WarningMsgBox(@DiskSpaceLow,lw,nummer);
+		if ( retVal == IC_NULL) return NULL;
+		if ( retVal == IC_YES) return dh;
+		if ( dh == DiskRegisterDiskSilently(lwNr) )
+					InfoMsgBox(@InsertNewDisk,0,0);
+		goto TryStart;
+		}
+
+	return dh;
+	}
+
+/*--------------------- FileToolReadLine ---------------------
+ *  Read a text line from a file
+ *      -Line ending 0D, 0A, 0A0D or 0D0A
+ *      -File pointer is set to the first character after the line
+ *      -bufSize must be at least 2 (read 1 character + terminator)
+ *
+ *  Return  FTRL_OK | FTRL_EOF | FTRL_NO_LINE | FTRL_ERROR
+ ---------------------------------------------------------------------------*/
+
+extern FTReadLineReturnValue EXPORT FileToolReadLine( FileHandle file, char * line, word bufSize ) {
+word ignore;
+	return FileToolReadLine2(file, line, bufSize, &ignore );
+}
+
+extern FTReadLineReturnValue EXPORT FileToolReadLine2( FileHandle file, char * line, word bufSize, word *terminator  )
+{
+char *a, *d, *t;
+dword	fpos0;
+int read, len;
+
+
+	*terminator = 0;		// important!
+
+	if (bufSize <= 1 ) return FTRL_ERROR;		// Parameter error
+	memset(line,0,bufSize);
+	bufSize--;                                 	// space for terminator
+	fpos0 = FilePos(file,0,FILE_POS_RELATIVE);
+
+	read = FileRead(file,line,bufSize,FALSE);
+	if ( read<0 ) return FTRL_ERROR;    		// reading error
+	if ( read == 0 ) return FTRL_EOF;		// already at end
+
+	d = strchr(line,0x0d);
+	a = strchr(line,0x0a);
+
+	// Handle "No line" and set terminator
+	    if ( !a && !d ) {
+	        *terminator = 0;
+	        return FTRL_NO_LINE;            // no end character
+	        }
+	       // new in version 1.8: set terminator
+       	    else do { // allow exit with break
+		if (!d) { *terminator = 0x0A; break; }
+		if (!a) { *terminator = 0x0D; break; }
+		if ( d < a ) {
+		    if ( a != d+1 ) { *terminator = 0x0D; break; }
+		    *terminator = 0x0A0D; break;
+		    }
+		if ( d != a+1 ) { *terminator = 0x0A; break; }
+		*terminator = 0x0D0A; break;
+		} while (0);
+
+	if ( !a ) a = d;
+	if ( !d ) d = a;		// handle special cases
+
+	if ( a<d ) { t = a; a = d; d = t; }	// ensure d<=a
+
+	*d = 0;				// terminator
+	len = d-line+1;
+    	if ( a == d+1 ) len++;      // line length including end character
+                    		// if the distance is greater than 1,
+                    		// they delimit different lines
+	FilePos(file,fpos0+len,FILE_POS_START);
+	return FTRL_OK;
+	}
+
+/*--------------------- FileToolTrimLine ---------------------
+ * 	Remove all leading and trailing spaces or tab stops
+ * 	from a string
+ ---------------------------------------------------------------------------*/
+ extern void EXPORT FileToolTrimLine(char * line) {
+char * termi,*text;
+
+	text = line;
+// Delete leading spaces and tabs
+	while ( (*text == ' ') || (*text == '\t') ) text++;
+// Delete the following spaces and tabs
+	termi = strchr(text,0);
+	do {
+	  *termi = 0;
+	  termi--;
+	  } while ( (termi >=text) && ((*termi==' ') || (*termi=='\t')) );
+
+	if ( text != line ) {
+		char *s,*d;
+		s= text, d=line;
+		do {
+		   *d = *s;
+		   d++; s++;
+		   } while (*d  != 0);
+		*d = 0;
+		}
+	}
+
+
+/*---------------------  ---------------------
+ *
+ ---------------------------------------------------------------------------*/
+
+/*###########################################################################
+ #	End of file
+ ###########################################################################*/
+
+

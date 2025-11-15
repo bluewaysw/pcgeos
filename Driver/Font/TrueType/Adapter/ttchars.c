@@ -17,6 +17,7 @@
  *	Definition of driver function DR_FONT_GEN_CHARS.
  ***********************************************************************/
 
+#include "ttacache.h"
 #include "ttadapter.h"
 #include "ttchars.h"
 #include "ttcharmapper.h"
@@ -68,8 +69,11 @@ void _pascal TrueType_Gen_Chars(
                         word                 character, 
                         FontBuf*             fontBuf,
                         WWFixedAsDWord       pointSize,
-			const FontInfo*      fontInfo, 
+                        Byte                 widthIn,
+                        Byte                 weight,
+                        const FontInfo*      fontInfo, 
                         const OutlineEntry*  outlineEntry,
+                        TextStyle            stylesToImplement,
                         MemHandle            bitmapHandle,
                         MemHandle            varBlock ) 
 {
@@ -138,8 +142,8 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
                 TT_Matrix         flipmatrix = HORIZONTAL_FLIP_MATRIX;
 
 
-                /* We calculate with an average of 4 on/off points, line number and line end code. */
-                size = height * 6 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
+                /* We calculate with an average of 6 on/off points, line number and line end code. */
+                size = height * 8 * sizeof( word ) + REGION_SAFETY + SIZE_REGION_HEADER; 
 
                 /* get pointer to bitmapBlock */
                 charData = EnsureBitmapBlock( bitmapHandle, size );
@@ -173,12 +177,9 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         }
         else
         {      
-                /* Avoid widths or heights of 0 pixels */
+                /* Avoid heights of 0 pixels */
                 if( height == 0 && width > 0 )
                         height = 1;
-
-                if( width == 0 && height > 0 )
-                        width = 0;
 
                 size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 
@@ -229,7 +230,24 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
 
         /* cleanup */
         MemUnlock( bitmapHandle );
+        {
+            TrueTypeCacheBufSpec   bufSpec;
 
+            bufSpec.TTCBS_pointSize = pointSize;
+            bufSpec.TTCBS_width = widthIn;
+            bufSpec.TTCBS_weight = weight;
+            bufSpec.TTCBS_stylesToImplement = stylesToImplement;
+
+            if( !(fontBuf->FB_flags & FBF_IS_COMPLEX) ) {
+                TrueType_Cache_UpdateFontBlock(
+                    trueTypeVars->cacheFile,
+                    trueTypeVars->entry.TTOE_fontFileName, 
+                    trueTypeVars->entry.TTOE_fontFileSize,
+                    trueTypeVars->entry.TTOE_magicWord,
+                    &bufSpec, fontBufHandle		
+                );
+            }
+        }
 Fail:        
         TrueType_Unlock_Face( trueTypeVars );
 Fin:
@@ -268,6 +286,7 @@ static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word char
  
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize  + charDataSize - 1) ) );
 
         /* copy rendered Glyph to fontBuf */
         memmove( ((byte*)fontBuf) + fontBuf->FB_dataSize, charData, charDataSize );
@@ -447,7 +466,7 @@ static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove - 1) ) );
  
         memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 
@@ -484,7 +503,7 @@ static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
 
 EC(     ECCheckBounds( (void*)charData ) );
 EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove ) ) );
+EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove  - 1) ) );
 
         memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
 

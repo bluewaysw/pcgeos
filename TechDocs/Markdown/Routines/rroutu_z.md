@@ -1,8 +1,9 @@
 ## 3.7 Routines U-Z
 ----------
 #### UserAddAutoExec()
-	void	UserAddAutoExec(
-			const char *		appName);
+    void    UserAddAutoExec(
+            const char *        appName);
+
 This routine adds an application to the list of those, like Welcome, that are 
 automatically started by the UI when it loads. It is passed one argument:
 
@@ -14,8 +15,9 @@ SP_APPLICATION or SP_SYS_APPLICATION.
 
 ----------
 #### UserCreateDialog()
-	optr	UserCreateDialog(
-			optr	dialogBox);
+    optr    UserCreateDialog(
+            optr    dialogBox);
+
 This routine duplicates a template dialog box, attaches the dialog box to an 
 application object, and sets it fully GS_USABLE so that it may be called with 
 **UserDoDialog()**. Dialog boxes created in such a manner should be removed 
@@ -31,11 +33,12 @@ dialog box.
 
 ----------
 #### UserCreateInkDestinationInfo()
-	MemHandle 	UserCreateInkDestinationInfo(
-			optr 				dest,
-			GStateHandle 		gs,
-			word				brushSize,
-			GestureCallback		*callback);
+    MemHandle   UserCreateInkDestinationInfo(
+            optr                dest,
+            GStateHandle        gs,
+            word                brushSize,
+            GestureCallback     *callback);
+
 This routine creates an **InkDestinationInfo** structure to be returned with 
 MSG_META_QUERY_IF_PRESS_IS_INK. The callback routine must be 
 declared _pascal.
@@ -44,15 +47,16 @@ declared _pascal.
 
 **Structures:** 
 
-	typedef Boolean _pascal GestureCallback (
-		Point *arrayOfInkPoints, 
-		word numPoints, 
-		word numStrokes);
+    typedef Boolean _pascal GestureCallback (
+        Point *arrayOfInkPoints, 
+        word numPoints, 
+        word numStrokes);
 
 ----------
 #### UserDestroyDialog()
-	void	UserDestroyDialog(
-			optr	dialogBox);
+    void    UserDestroyDialog(
+            optr    dialogBox);
+
 This routine destroys the passed dialog box, usually created with 
 **UserCreateDialog()**. This routine may only be used to destroy dialog boxes 
 occupying a single block; the block must also hold nothing other than the 
@@ -63,8 +67,9 @@ routine to destroy dialogs created with **UserCreateDialog()**.
 
 ----------
 #### UserDoDialog()
-	InteractionCommand UserDoDialog(
-			optr	dialogBox);
+    InteractionCommand UserDoDialog(
+            optr    dialogBox);
+
 **UserDoDialog()** brings a pre-instantiated dialog box on-screen, blocking 
 the calling thread until the user responds to the dialog. You must pass the 
 optr of a GIV_DIALOG Interaction that is set both 
@@ -77,17 +82,17 @@ IC_CUSTOM_START.
 
 The pre-defined **InteractionCommands** are:
 
-	IC_NULL
-	IC_DISMISS
-	IC_APPLY
-	IC_RESET
-	IC_OK
-	IC_YES
-	IC_NO
-	IC_STOP
-	IC_EXIT
-	IC_HELP
-	IC_INTERACTION_COMPLETE
+    IC_NULL
+    IC_DISMISS
+    IC_APPLY
+    IC_RESET
+    IC_OK
+    IC_YES
+    IC_NO
+    IC_STOP
+    IC_EXIT
+    IC_HELP
+    IC_INTERACTION_COMPLETE
 
 This routine may return IC_NULL for those cases in which a system 
 shutdown causes the dialog to be dismissed before the user has entered a 
@@ -102,27 +107,29 @@ messages from the response triggers.
 
 ----------
 #### UserGetInterfaceLevel()
-	UIInterfaceLevel UserGetInterfaceLevel(void)
+    UIInterfaceLevel UserGetInterfaceLevel(void)
+
 This routine returns the current **UIInterfaceLevel**. This is a word-sized 
 enumerated type. It has the following values:
 
-	UIIL_NOVICE
-	UIIL_BEGINNING_INTERMEDIATE
-	UIIL_ADVANCED_INTERMEDIATE
-	UIIL_ADVANCED
-	UIIL_GURU
+    UIIL_NOVICE
+    UIIL_BEGINNING_INTERMEDIATE
+    UIIL_ADVANCED_INTERMEDIATE
+    UIIL_ADVANCED
+    UIIL_GURU
 
 **Include:** ui.goh
 
 ----------
 #### UserLoadApplication
-	extern	GeodeHandle UserLoadApplication(
-			AppLaunchFlags 		alf,
-			Message 			attachMethod,
-			MemHandle 			appLaunchBlock,
-			char 				*filename,
-			StandardPath 		sPath,
-			GeodeLoadError 		*err);
+    extern  GeodeHandle UserLoadApplication(
+            AppLaunchFlags      alf,
+            Message             attachMethod,
+            MemHandle           appLaunchBlock,
+            char                *filename,
+            StandardPath        sPath,
+            GeodeLoadError      *err);
+
 Loads an application.  Changes to standard application directory before 
 attempting GeodeLoad on filename passed. Stores the filename being 
 launched into the AppLaunchBlock, so that information needed to restore 
@@ -130,8 +137,9 @@ this application instance will be around later if needed.
 
 ----------
 #### UserRemoveAutoExec()
-	void	UserRemoveAutoExec(
-			const char *		appName);
+    void    UserRemoveAutoExec(
+            const char *        appName);
+
 This routine removes an application from the list of those to be launched on 
 start-up. It is passed one argument:
 
@@ -142,13 +150,14 @@ name of the application.
 
 ----------
 #### UserStandardDialog()
-	word	UserStandardDialog(
-			char *					helpContext,
-			char *					customTriggers,
-			char *					arg2,
-			char *					arg1,
-			char *					string,
-			CustomDialogBoxFlags	dialogFlags);
+    word    UserStandardDialog(
+            char *                  helpContext,
+            char *                  customTriggers,
+            char *                  arg2,
+            char *                  arg1,
+            char *                  string,
+            CustomDialogBoxFlags    dialogFlags);
+
 **UserStandardDialog()** creates and displays either a custom dialog box or 
 one of several pre-defined standard dialog boxes. 
 
@@ -182,13 +191,14 @@ up a Response Trigger Table with several trigger parameters.
 
 ----------
 #### UserStandardDialogOptr()
-	word	UserStandardDialogOptr(
-			char					*helpContext,
-			optr					customTriggers,
-			optr					arg2,
-			optr					arg1,
-			optr					string
-			CustomDialogBoxFlags	dialogFlags);
+    word    UserStandardDialogOptr(
+            char                    *helpContext,
+            optr                    customTriggers,
+            optr                    arg2,
+            optr                    arg1,
+            optr                    string
+            CustomDialogBoxFlags    dialogFlags);
+
 **UserStandardDialogOptr()** performs the same functionality as 
 **UserStandardDialog()** except that optrs to strings and string parameters 
 are passed instead of fptrs. This is useful for localized strings in resource 
@@ -198,9 +208,10 @@ blocks.
 
 ----------
 #### UserStandardSound()
-	void	UserStandardSound(
-			StandardSoundType		type,
-			...);
+    void    UserStandardSound(
+            StandardSoundType       type,
+            ...);
+
 This routine plays a simple sequence of notes. It can be used to play a 
 standard system sound, a single custom tone, or a sequence of tones.
 
@@ -250,9 +261,10 @@ the note (such as returned by **SoundAllocNote()**).
 
 ----------
 #### UtilAsciiToHex32()
-	Boolean	UtilAsciiToHex32(
-			const char *		string,
-			dword *				value);
+    Boolean UtilAsciiToHex32(
+            const char *        string,
+            dword *             value);
+
 This routine converts a null-terminated ASCII string into a 32-bit integer. 
 The string may begin with a hyphen, indicating a negative number. Aside 
 from that, the string may contain nothing but numerals until the null 
@@ -275,16 +287,16 @@ signed 32-bit integer.
 
 ----------
 #### UtilHex32ToAscii()
-	word	UtilHex32ToAscii(
-			char *						buffer,
-			sdword						value, 
-			UtilHexToAsciiFlags 		flags);
+    word    UtilHex32ToAscii(
+            char *                      buffer,
+            sdword                      value, 
+            UtilHexToAsciiFlags         flags);
+
 This routine converts a 32-bit unsigned integer to its ASCII representation 
 and writes it to the specified buffer. It returns the length of the string (not 
 counting the nulll termination, if any). The routine is passed the following 
 arguments:
-*
-buffer* - This is a pointer to a character buffer. The buffer must be long 
+*buffer* - This is a pointer to a character buffer. The buffer must be long 
 enough to accommodate the largest string; that is, there must 
 be ten bytes for the characters, plus one for the trailing null (if 
 necessary).
@@ -307,8 +319,9 @@ ten bytes long.
 
 ----------
 #### VarDataFlagsPtr()
-	VarDataFlags 	VarDataFlagsPtr(
-			void *	ptr);
+    VarDataFlags    VarDataFlagsPtr(
+            void *  ptr);
+
 This macro fetches the flags of a variable data type when given a pointer to 
 the extra data for the type. The flags are stored in a **VarDataFlags** record. 
 Only the flags VDF_EXTRA_DATA and/or VDF_SAVE_TO_STATE will be 
@@ -321,8 +334,9 @@ space.
 
 ----------
 #### VarDataSizePtr()
-	word	VarDataSizePtr(
-			void *	ptr);
+    word    VarDataSizePtr(
+            void *  ptr);
+
 This macro fetches the size of a variable data entry when given a pointer to 
 the extra data for the type.
 
@@ -333,8 +347,9 @@ space.
 
 ----------
 #### VarDataTypePtr()
-	word	VarDataTypePtr(
-			void *	ptr);
+    word    VarDataTypePtr(
+            void *  ptr);
+
 This macro fetches the type of a variable data entry when given a pointer to 
 the extra data of the entry. The type is stored in a **VarDataFlags** record. All 
 flags outside the VDF_TYPE section will be cleared.
@@ -346,25 +361,27 @@ space.
 
 ----------
 #### VisObjectHandlesInkReply()
-	void	VisObjectHandlesInkReply(void);
+    void    VisObjectHandlesInkReply(void);
 
 ----------
 #### VisTextGraphicCompressGraphic()
-	extern VMChain VisTextGraphicCompressGraphic(
-			VisTextGraphic 		*graphic,
-			FileHandle 			sourceFile,
-			FileHandle 			destFile,
-			BMFormat			format,
-			word				xRes, 
-			word				yRes);
+    extern VMChain VisTextGraphicCompressGraphic(
+            VisTextGraphic      *graphic,
+            FileHandle          sourceFile,
+            FileHandle          destFile,
+            BMFormat            format,
+            word                xRes, 
+            word                yRes);
+
 This routine compresses the bitmaps in a VisTextGraphic.
 
 ----------
 #### VMAlloc()
-	VMBlockHandle 	VMAlloc(
-			VMFileHandle	file,			
-			word			size,		/* Size of a file in bytes */
-			word			userID);	/* ID # to associate with block */
+    VMBlockHandle   VMAlloc(
+            VMFileHandle    file,           
+            word            size,       /* Size of a file in bytes */
+            word            userID);    /* ID # to associate with block */
+
 This routine creates a VM block. The block is not initialized. Before you use 
 the block, you must lock it with **VMLock()**. If you pass a size of zero bytes, 
 the VM block will be given an entry in the VM handle table, but no space in 
@@ -377,11 +394,12 @@ assigned with **VMAttach()**.
 
 ----------
 #### VMAllocLMem()
-	VMBlockHandle 	VMAllocLmem(
-			VMFileHandle	file,				
-			LMemType		ltype,			/* Type of LMem heap to create */
-			word			headerSize		/* Size to leave for LMem header,
-											 * pass zero for standard header */
+    VMBlockHandle   VMAllocLmem(
+            VMFileHandle    file,               
+            LMemType        ltype,          /* Type of LMem heap to create */
+            word            headerSize      /* Size to leave for LMem header,
+                                             * pass zero for standard header */
+
 This routine allocates a VM block and initializes it to contain an LMem heap. 
 You must pass the type of LMem heap to create. If you want a fixed data 
 space, you must pass the total size to leave for a header (including the 
@@ -402,10 +420,11 @@ to the LMem routines (not the block's VM handle).
 
 ----------
 #### VMAttach()
-	VMBlockHandle 	VMAttach(
-			VMFileHandle		file,
-			VMBlockHandle		vmBlock,
-			MemHandle			mh);
+    VMBlockHandle   VMAttach(
+            VMFileHandle        file,
+            VMBlockHandle       vmBlock,
+            MemHandle           mh);
+
 This routine attaches an existing global memory block to a VM block. It is 
 passed the following arguments:
 
@@ -429,8 +448,9 @@ undefined.
 
 ----------
 #### VMCheckForModifications()
-Boolean	VMCheckForModifications(
-			VMFileHandle		file);
+Boolean VMCheckForModifications(
+            VMFileHandle        file);
+
 This routine returns *true* if the VM file has been dirtied or updated since the 
 last full save.
 
@@ -438,9 +458,10 @@ last full save.
 
 ----------
 #### VMClose()
-	word	VMClose(
-			VMFileHandle		file,
-			Boolean				noErrorFlag);
+    word    VMClose(
+            VMFileHandle        file,
+            Boolean             noErrorFlag);
+
 This routine updates and closes a VM file. If it is successful, it returns false. 
 If it fails, it returns a member of the **FileError** enumerated type. Note that 
 the routine closes the file even if it could not successfully update the file; in 
@@ -455,11 +476,12 @@ update and close the file.
 
 ----------
 #### VMCompareVMChains()
-	Boolean	VMCompareVMChains(
-			VMFileHandle		sourceFile,
-			VMChain				sourceChain,
-			VMFileHandle		destFile,
-			VMChain				destChain);
+    Boolean VMCompareVMChains(
+            VMFileHandle        sourceFile,
+            VMChain             sourceChain,
+            VMFileHandle        destFile,
+            VMChain             destChain);
+
 This routine compares two VM chains or DB items. It returns *true* if the two 
 are identical; otherwise it returns *false*.
 
@@ -467,10 +489,11 @@ are identical; otherwise it returns *false*.
 
 ----------
 #### VMCopyVMBlock()
-	VMBlockHandle 	VMCopyVMBlock(
-			VMFileHandle		sourceFile,
-			VMBlockHandle		sourceBlock,
-			VMFileHandle		destFile);
+    VMBlockHandle   VMCopyVMBlock(
+            VMFileHandle        sourceFile,
+            VMBlockHandle       sourceBlock,
+            VMFileHandle        destFile);
+
 This routine creates a duplicate of a VM block in the specified destination file 
 (which may be the same as the source file). It returns the duplicate block's 
 handle. The duplicate will have the same user ID as the original block.
@@ -479,10 +502,11 @@ handle. The duplicate will have the same user ID as the original block.
 
 ----------
 #### VMCopyVMChain()
-	VMChain 	VMCopyVMChain(
-			VMFileHandle		sourceFile,
-			VMChain				sourceChain,
-			VMFileHandle		destFile);
+    VMChain     VMCopyVMChain(
+            VMFileHandle        sourceFile,
+            VMChain             sourceChain,
+            VMFileHandle        destFile);
+
 This routine creates a duplicate of a VM chain (or DB item) in the specified 
 destination file (which may be the same as the source file). It returns the 
 duplicate's **VMChain** structure. All blocks in the duplicate will have the 
@@ -492,11 +516,12 @@ same user ID numbers as the corresponding original blocks.
 
 ----------
 #### VMDetach()
-	MemHandle 	VMDetach(
-			VMFileHandle	file,
-			VMBlockHandle	block,
-			GeodeHandle		owner);		/* Pass zero to have block owned by 
-										 * current thread's owner */
+    MemHandle   VMDetach(
+            VMFileHandle    file,
+            VMBlockHandle   block,
+            GeodeHandle     owner);     /* Pass zero to have block owned by 
+                                         * current thread's owner */
+
 This routine detaches a global memory block from a VM block. If the VM block 
 is not currently in memory, **VMDetach()** allocates a memory block and 
 copies the VM block into it. If the VM block is dirty, **VMDetach()** will update 
@@ -506,18 +531,20 @@ the block to the file before detaching it.
 
 ----------
 #### VMDirty()
-	void	VMDirty(
-			MemHandle		mh);
+    void    VMDirty(
+            MemHandle       mh);
+
 This routine marks a locked VM block as dirty.
 
 **Include:** vm.h
 
 ----------
 #### VMFind()
-	VMBlockHandle 	VMFind(
-			VMFileHandle		file,
-			VMBlockHandle		startBlock,
-			word				userID);
+    VMBlockHandle   VMFind(
+            VMFileHandle        file,
+            VMBlockHandle       startBlock,
+            word                userID);
+
 This routine finds a VM block with the specified user ID number. If the second 
 argument is **NullHandle** the routine will return the matching block with the 
 lowest handle. If the second argument is non-null, it will return the first 
@@ -528,9 +555,10 @@ order).
 
 ----------
 #### VMFree()
-	void	VMFree(
-			VMFileHandle		file,
-			VMBlockHandle		block);
+    void    VMFree(
+            VMFileHandle        file,
+            VMBlockHandle       block);
+
 This routine frees the specified VM block. If a global memory block is 
 currently attached to the VM block, it is freed too.
 
@@ -538,9 +566,10 @@ currently attached to the VM block, it is freed too.
 
 ----------
 #### VMFreeVMChain()
-	void	VMFreeVMChain(
-			VMFileHandle		file,
-			VMChain				chain);
+    void    VMFreeVMChain(
+            VMFileHandle        file,
+            VMChain             chain);
+
 This routine frees the specified VM chain or DB item. If a chain is specified, 
 all blocks in the chain will be freed.
 
@@ -548,8 +577,9 @@ all blocks in the chain will be freed.
 
 ----------
 #### VMGetAttributes()
-	word	VMGetAttributes(
-			VMFileHandle		file);
+    word    VMGetAttributes(
+            VMFileHandle        file);
+
 Each VM file contains a set of **VMAttributes** flags. These determine how the 
 VM manager will treat the file. This routine returns the current flags.
 
@@ -562,8 +592,9 @@ the attributes appropriately.
 
 ----------
 #### VMGetDirtyState()
-	word	VMGetDirtyState(
-			VMFileHandle		file);
+    word    VMGetDirtyState(
+            VMFileHandle        file);
+
 This routine finds out if a file has been dirtied. It returns a word-sized value. 
 The upper byte of the return value is non-zero if the file has not been dirtied 
 since the last save, auto-save, or update; the lower byte is non-zero if the file 
@@ -578,29 +609,32 @@ to call **VMUpdate()** than it is to first check the dirty state, then call
 
 ----------
 #### VMGetMapBlock()
-	VMBlockHandle 	VMGetMapBlock(
-			VMFIleHandle		file);
+    VMBlockHandle   VMGetMapBlock(
+            VMFIleHandle        file);
+
 This routine returns the VM block handle of the file's map block.
 
 **Include:** vm.h
 
 ----------
 #### VMGrabExclusive()
-	VMStartExclusiveReturnValue VMGrabExclusive(
-			VMFileHandle		file,
-			word				timeout,
-			VMOperation			operation,
-			VMOperation *		currentOperation);
+    VMStartExclusiveReturnValue VMGrabExclusive(
+            VMFileHandle        file,
+            word                timeout,
+            VMOperation         operation,
+            VMOperation *       currentOperation);
+
 This routine gets exclusive access to a VM file for this thread.
 
 **Include:** vm.h
 
 ----------
 #### VMInfo()
-	Boolean	VMInfo(
-			VMFileHandle		file,
-			VMBlockHandle		block,
-			VMInfoStruct *		info
+    Boolean VMInfo(
+            VMFileHandle        file,
+            VMBlockHandle       block,
+            VMInfoStruct *      info
+
 This routine writes the memory handle, block size, and user ID number of the 
 block. It returns *false* if the handle is invalid or free.
 
@@ -608,10 +642,11 @@ block. It returns *false* if the handle is invalid or free.
 
 ----------
 #### VMLock()
-	void *	VMLock(
-			VMFileHandle		file,
-			VMBlockHandle		block,
-			MemHandle*			mh);
+    void *  VMLock(
+            VMFileHandle        file,
+            VMBlockHandle       block,
+            MemHandle*          mh);
+
 This routine locks a VM block into the global heap. It returns the block's base 
 address.
 
@@ -619,9 +654,10 @@ address.
 
 ----------
 #### VMMemBlockToVMBlock()
-	VMBlockHandle 	VMMemBlockToVMBlock(
-			MemHandle			mh,
-			VMFileHandle*		file);
+    VMBlockHandle   VMMemBlockToVMBlock(
+            MemHandle           mh,
+            VMFileHandle*       file);
+
 This routine gets the VM block and file handles for a specified memory block. 
 It returns the VM block handle and copies the VM file handle into **file*.
 
@@ -632,22 +668,24 @@ to a VM file. If it is not, the results are undefined.
 
 ----------
 #### VMModifyUserID()
-	void	VMModifyUserID(
-			VMFileHandle		file,
-			VMBlockHandle		block,
-			word				userID);
+    void    VMModifyUserID(
+            VMFileHandle        file,
+            VMBlockHandle       block,
+            word                userID);
+
 This routine changes a VM block's user ID number.
 
 **Include:** vm.h
 
 ----------
 #### VMOpen()
-	VMFileHandle 	VMOpen(
-			char *			name,			/* Name of file to open/create */
-			VMAccessFlags	flags,
-			VMOpenType		mode,
-			word			compression);	/* Compression threshold percentage 
-											 * passed as an integer */
+    VMFileHandle    VMOpen(
+            char *          name,           /* Name of file to open/create */
+            VMAccessFlags   flags,
+            VMOpenType      mode,
+            word            compression);   /* Compression threshold percentage 
+                                             * passed as an integer */
+
 This routine opens or creates a VM file. It returns the handle of the opened 
 file. If it is unable to open the file, it sets the error value for 
 **ThreadGetError()**. **VMOpen()** looks for the file in the thread's working 
@@ -776,9 +814,10 @@ necessary; you will not need to call **VMOpen()**.
 
 ----------
 #### VMPreserveBlocksHandle()
-	void	VMPreserveBlocksHandle(
-			VMFileHandle		file,
-			VMBlockHandle		block);
+    void    VMPreserveBlocksHandle(
+            VMFileHandle        file,
+            VMBlockHandle       block);
+
 Keep the same global memory block with this VM block until the block is 
 explicitly detached or the VM block is freed.
 
@@ -786,36 +825,40 @@ explicitly detached or the VM block is freed.
 
 ----------
 #### VMReleaseExclusive()
-	void VMReleaseExclusive(
-			VMFileHandle 		file);
+    void VMReleaseExclusive(
+            VMFileHandle        file);
+
 This routine releases a thread's exclusive access to a VM file.
 
 **Include:** vm.h
 
 ----------
 #### VMRevert()
-	void	VMRevert(
-			VMFileHandle		file,);
+    void    VMRevert(
+            VMFileHandle        file,);
+
 This routine reverts a file to its last-saved state.
 
 **Include:** vm.h
 
 ----------
 #### VMSave()
-	void	VMSave(
-			VMFileHandle		file);
+    void    VMSave(
+            VMFileHandle        file);
+
 This routine updates and saves a file, freeing all backup blocks.
 
 **Include:** vm.h
 
 ----------
 #### VMSaveAs()
-	VMFileHandle VMSaveAs(
-			VMFileHandle		file,
-			const char			*name,
-			VMAccessFlags		flags.
-			VMOpenTypes			mode,
-			word				compression);
+    VMFileHandle VMSaveAs(
+            VMFileHandle        file,
+            const char          *name,
+            VMAccessFlags       flags.
+            VMOpenTypes         mode,
+            word                compression);
+
 This routine saves a file under a new name. The old file is reverted to its 
 last-saved condition.
 
@@ -823,10 +866,11 @@ last-saved condition.
 
 ----------
 #### VMSetAttributes()
-	word	VMSetAttributes(
-			VMFileHandle	file,
-			VMAttributes	attrToSet,		/* Turn these flags on... */
-			VMAttributes	attrToClear);	/* after turning these flags off */
+    word    VMSetAttributes(
+            VMFileHandle    file,
+            VMAttributes    attrToSet,      /* Turn these flags on... */
+            VMAttributes    attrToClear);   /* after turning these flags off */
+
 This routine changes a VM file's **VMAttributes** settings. The routine returns 
 the new attribute settings.
 
@@ -842,39 +886,43 @@ the attributes appropriately.
 
 ----------
 #### VMSetExecThread()
-	void	VMSetExecThread(
-			VMFileHandle		file,
-			ThreadHandle		thread);
+    void    VMSetExecThread(
+            VMFileHandle        file,
+            ThreadHandle        thread);
+
 Set which thread will execute methods of all objects in the file.
 
 **Include:** vm.h
 
 ----------
 #### VMSetMapBlock()
-	void	VMSetMapBlock(
-			VMFileHandle		file,
-			VMBlockHandle		block);
+    void    VMSetMapBlock(
+            VMFileHandle        file,
+            VMBlockHandle       block);
+
 This routine sets the map block for a VM file. 
 
 **Include:** vm.h
 
 ----------
 #### VMSetReloc()
-	void	VMSetReloc(
-			VMFileHandle	file,
-			void (*reloc) 	(VMFileHandle		file,
-							 VMBlockHandle		block,
-							 MemHandle			mh,
-							 void				*data,
-							 VMRelocTypes		type));
+    void    VMSetReloc(
+            VMFileHandle    file,
+            void (*reloc)   (VMFileHandle       file,
+                             VMBlockHandle      block,
+                             MemHandle          mh,
+                             void               *data,
+                             VMRelocTypes       type));
+
 This routine sets a data-relocation routine for the VM file.
 
 **Include:** vm.h
 
 ----------
 #### VMUnlock()
-	void	VMUnlock(
-			MemHandle		mh);
+    void    VMUnlock(
+            MemHandle       mh);
+
 This routine unlocks a locked VM block. Note that the block's global memory 
 handle is passed (not its VM handle).
 
@@ -882,8 +930,9 @@ handle is passed (not its VM handle).
 
 ----------
 #### VMUpdate()
-	word	VMUpdate(
-			VMFileHandle		file);
+    word    VMUpdate(
+            VMFileHandle        file);
+
 This routine updates dirty blocks to the disk.
 
 **Include:** vm.h
@@ -895,9 +944,10 @@ actually dirty.
 
 ----------
 #### VMVMBlockToMemBlock()
-	MemHandle 	VMVMBlockToMemBlock(
-			VMFileHandle		file,
-			VmBlockHandle		block);
+    MemHandle   VMVMBlockToMemBlock(
+            VMFileHandle        file,
+            VmBlockHandle       block);
+
 This routine returns the global handle of the memory block attached to a 
 specified VM block. If no global block is currently attached, it will allocate and 
 attach one.
@@ -906,8 +956,9 @@ attach one.
 
 ----------
 #### WinAckUpdate()
-	void	WinAckUpdate(
-			WindowHandle		win);
+    void    WinAckUpdate(
+            WindowHandle        win);
+
 This routine acknowledges that the application has received 
 MSG_META_EXPOSED for the specified window, but chooses not to do any 
 updating.
@@ -916,10 +967,11 @@ updating.
 
 ----------
 #### WinApplyRotation()
-	void	WinApplyRotation(
-			WindowHandle		win,
-			WWFixedAsDWord		angle,
-			WinInvalFlag		flag);
+    void    WinApplyRotation(
+            WindowHandle        win,
+            WWFixedAsDWord      angle,
+            WinInvalFlag        flag);
+
 This routine applies the specified rotation to the window's transformation 
 matrix.
 
@@ -927,11 +979,12 @@ matrix.
 
 ----------
 #### WinApplyScale()
-	void	WinApplyScale(
-			WindowHandle		win,
-			WWFixedAsDWord		xScale,
-			WWFixedAsDWord		yScale,
-			WinInvalFlag		flag);
+    void    WinApplyScale(
+            WindowHandle        win,
+            WWFixedAsDWord      xScale,
+            WWFixedAsDWord      yScale,
+            WinInvalFlag        flag);
+
 This routine applies the specified scale factor to the window's transformation 
 matrix.
 
@@ -939,10 +992,11 @@ matrix.
 
 ----------
 #### WinApplyTranform()
-	void	WinApplyTransform(
-			WindowHandle			win,
-			const TransMatrix *		tm,
-			WinInvalFlag			flag);
+    void    WinApplyTransform(
+            WindowHandle            win,
+            const TransMatrix *     tm,
+            WinInvalFlag            flag);
+
 This routine concatenates the passed transformation matrix with the 
 window's transformation matrix. The result will be the window's new 
 transformation matrix.
@@ -951,11 +1005,12 @@ transformation matrix.
 
 ----------
 #### WinApplyTranslation()
-	void	WinApplyTranslation(
-			WindowHandle		win,
-			WWFixedAsDWord		xTrans,
-			WWFixedAsDword		yTrans,
-			WinInvalFlag		flag);
+    void    WinApplyTranslation(
+            WindowHandle        win,
+            WWFixedAsDWord      xTrans,
+            WWFixedAsDword      yTrans,
+            WinInvalFlag        flag);
+
 This routine applies the specified translation to the window's transformation 
 matrix.
 
@@ -963,11 +1018,12 @@ matrix.
 
 ----------
 #### WinApplyTranslationDWord()
-	void	WinApplyExtTranslation(
-			WindowHandle		win,
-			sdword				xTrans,
-			sdword				yTrans,
-			WinInvalFlag		flag);
+    void    WinApplyExtTranslation(
+            WindowHandle        win,
+            sdword              xTrans,
+            sdword              yTrans,
+            WinInvalFlag        flag);
+
 This routine applies the specified translation to the window's transformation 
 matrix. The translations are specified as 32-bit integers.
 
@@ -975,46 +1031,51 @@ matrix. The translations are specified as 32-bit integers.
 
 ----------
 #### WinChangeAck()
-	WindowHandle WinChangeAck(
-			WindowHandle		win,
-			sword				x,
-			sword				y,
-			optr *				winOD);
-			Include:			win.h
+    WindowHandle WinChangeAck(
+            WindowHandle        win,
+            sword               x,
+            sword               y,
+            optr *              winOD);
+            Include:            win.h
 
 ----------
 #### WinChangePriority()
-	void	WinChangePriority(
-			WindowHandle		win,
-			WinPassFlags		flags,
-			word		layerID);
+    void    WinChangePriority(
+            WindowHandle        win,
+            WinPassFlags        flags,
+            word        layerID);
+
 This routine changes the priority for the specified window.
 
 **Include:** win.h
 
 ----------
 #### WinClose()
-	void	WinClose(
-			WindowHandle		win);
+    void    WinClose(
+            WindowHandle        win);
+
 This routine closes and frees the specified window.
 
 **Include:** win.h
 
 ----------
 #### WinDecRefCount()
-	void	WinDecRefCount(
-			WindowHandle		win);
+    void    WinDecRefCount(
+            WindowHandle        win);
+
 This routine is part of the window closing mechanism.
 
 ----------
 #### WinEnsureChangeNotification()
-	void	WinEnsureChangeNotification(void);
+    void    WinEnsureChangeNotification(void);
+
 **Include:** win.h
 
 ----------
 #### WinGeodeGetInputObj()
-	optr	WinGeodeGetInputObj(
-			GeodeHandle		obj);
+    optr    WinGeodeGetInputObj(
+            GeodeHandle     obj);
+
 This routine fetches the optr of the input object for the specified geode. If 
 there is no such object, it returns a null optr.
 
@@ -1022,8 +1083,9 @@ there is no such object, it returns a null optr.
 
 ----------
 #### WinGeodeGetParentObj()
-	optr	WinGeodeGetParentObj(
-			GeodeHandle		obj);
+    optr    WinGeodeGetParentObj(
+            GeodeHandle     obj);
+
 This routine fetches the optr of the parent object of the specified geode. If 
 there is no such object, it returns a null optr.
 
@@ -1031,55 +1093,61 @@ there is no such object, it returns a null optr.
 
 ----------
 #### WinGeodeSetActiveWin()
-	void	WinGeodeSetActiveWin(
-			GeodeHandle			gh,
-			WindowHandle		win);
+    void    WinGeodeSetActiveWin(
+            GeodeHandle         gh,
+            WindowHandle        win);
+
 This routine sets the active window for the specified geode.
 
 **Include:** win.h
 
 ----------
 #### WinGeodeSetInputObj()
-	void	WinGeodeSetInputObj(
-			GeodeHandle		gh,
-			optr			iObj);
+    void    WinGeodeSetInputObj(
+            GeodeHandle     gh,
+            optr            iObj);
+
 This routine sets the input object for the specified geode.
 
 **Include:** win.h
 
 ----------
 #### WinGeodeSetParentObj()
-	void	WinGeodeSetParentObj(
-			GeodeHandle		gh,
-			optr			pObj);
+    void    WinGeodeSetParentObj(
+            GeodeHandle     gh,
+            optr            pObj);
+
 This routine sets the parent object for the specified geode.
 
 **Include:** win.h
 
 ----------
 #### WinGeodeSetPtrImage()
-	void	WinGeodeSetPtrImage(
-			GeodeHandle		gh,
-			optr			ptrCh);
+    void    WinGeodeSetPtrImage(
+            GeodeHandle     gh,
+            optr            ptrCh);
+
 This routine sets the pointer image for the specified geode.
 
 **Include:** win.h
 
 ----------
 #### WinGetInfo()
-	dword	WinGetInfo(
-			WindowHandle		win,
-			WinInfoTypes		type,
-			void *				data);
+    dword   WinGetInfo(
+            WindowHandle        win,
+            WinInfoTypes        type,
+            void *              data);
+
 This routine retrieves the private data from a GState.
 
 **Include:** win.h
 
 ----------
 #### WinGetTransform()
-	void	WinGetTransform(
-			WindowHandle		win,
-			TransMatrix *		tm);
+    void    WinGetTransform(
+            WindowHandle        win,
+            TransMatrix *       tm);
+
 This routine retrieves the transformation matrix for the specified window. It 
 writes the matrix to *tm.
 
@@ -1087,9 +1155,10 @@ writes the matrix to *tm.
 
 ----------
 #### WinGetWinScreenBounds()
-	void	WinGetWinScreenBounds(
-			WindowHandle		win,
-			Rectangle *			bounds);
+    void    WinGetWinScreenBounds(
+            WindowHandle        win,
+            Rectangle *         bounds);
+
 This routine returns the bounds of the on-screen portion of a window 
 (specified in screen co-ordinates). It writes the bounds to **bounds*.
 
@@ -1097,9 +1166,10 @@ This routine returns the bounds of the on-screen portion of a window
 
 ----------
 #### WinGrabChange()
-	Boolean	WinGrabChange(
-			WindowHandle		win,
-			optr				newObj);
+    Boolean WinGrabChange(
+            WindowHandle        win,
+            optr                newObj);
+
 This routine allows an object to grab pointer events. It returns zero if it was 
 successful; otherwise it returns non-zero.
 
@@ -1107,24 +1177,26 @@ successful; otherwise it returns non-zero.
 
 ----------
 #### WinInvalReg()
-	void	WinInvalReg(
-			WindowHandle		win,
-			const Region *		reg,
-			word				axParam,
-			word				bxParam,
-			word				cxParam,
-			word				dxParam);
+    void    WinInvalReg(
+            WindowHandle        win,
+            const Region *      reg,
+            word                axParam,
+            word                bxParam,
+            word                cxParam,
+            word                dxParam);
+
 This routine invalidates the specified region or rectangle.
 
 **Include:** win.h
 
 ----------
 #### WinMove()
-	void	WinMove(
-			WindowHandle		win,
-			sword		xMove,
-			sword		yMove,
-			WinPassFlags		flags);
+    void    WinMove(
+            WindowHandle        win,
+            sword       xMove,
+            sword       yMove,
+            WinPassFlags        flags);
+
 This routine moves a window. If the WPF_ABS bit of *flags* is set, the window's 
 new position is specified relative to its parent's position. If it is clear, the 
 window's new position is specified relative to its current position.
@@ -1133,22 +1205,23 @@ window's new position is specified relative to its current position.
 
 ----------
 #### WinOpen()
-	WindowHandle WinOpen(
-			Handle			parentWinOrVidDr,
-			optr			inputRecipient,
-			optr			exposureRecipient,
-			WinColorFlags	colorFlags,
-			word			redOrIndex,
-			word			green,
-			word			blue,
-			word			flags,
-			word			layerID,
-			GeodeHandle		owner,
-			const Region *	winReg,
-			word			axParam,
-			word			bxParam,
-			word			cxParam,
-			word			dxParam);
+    WindowHandle WinOpen(
+            Handle          parentWinOrVidDr,
+            optr            inputRecipient,
+            optr            exposureRecipient,
+            WinColorFlags   colorFlags,
+            word            redOrIndex,
+            word            green,
+            word            blue,
+            word            flags,
+            word            layerID,
+            GeodeHandle     owner,
+            const Region *  winReg,
+            word            axParam,
+            word            bxParam,
+            word            cxParam,
+            word            dxParam);
+
 This routine allocates and initializes a window and (optionally) an associated 
 GState.
 
@@ -1156,52 +1229,57 @@ GState.
 
 ----------
 #### WinReleaseChange()
-	void	WinReleaseChange(
-			WindowHandle		win,
-			optr		obj);
+    void    WinReleaseChange(
+            WindowHandle        win,
+            optr        obj);
+
 This routine releases an object's grab on the change OD.
 
 **Include:** win.h
 
 ----------
 #### WinResize()
-	void	WinResize(
-			WindowHandle		win,
-			const Region *		reg,
-			word				axParam,
-			word				bxParam,
-			word				cxParam,
-			WinPassFlags		flags);
+    void    WinResize(
+            WindowHandle        win,
+            const Region *      reg,
+            word                axParam,
+            word                bxParam,
+            word                cxParam,
+            WinPassFlags        flags);
+
 This routine resizes a window. It can move it as well.
 
 **Include:** win.h
 
 ----------
 #### WinScroll()
-	void	WinScroll(
-			WindowHandle		win,
-			WWFixedAsDWord		xMove,
-			WWFixedAsSWord		yMove,
-			PointWWFixed *		scrollAmt);
+    void    WinScroll(
+            WindowHandle        win,
+            WWFixedAsDWord      xMove,
+            WWFixedAsSWord      yMove,
+            PointWWFixed *      scrollAmt);
+
 This routine scrolls a window.
 
 **Include:** win.h
 
 ----------
 #### WinSetInfo()
-	void	WinSetInfo(
-			WindowHandle		win,
-			WinInfoType			type,
-			dword				data);
+    void    WinSetInfo(
+            WindowHandle        win,
+            WinInfoType         type,
+            dword               data);
+
 This routine sets some data for the specified window.
 
 **Include:** win.h
 
 ----------
 #### WinSetNullTransform()
-	void	WinSetNullTransform(
-			WindowHandle		win,
-			WinInvalFlag		flag);
+    void    WinSetNullTransform(
+            WindowHandle        win,
+            WinInvalFlag        flag);
+
 This routine changes a window's transformation matrix to the null (or 
 identity) matrix.
 
@@ -1209,10 +1287,11 @@ identity) matrix.
 
 ----------
 #### WinSetPtrImage()
-	void	WinSetPtrImage(
-			WindowHandle			win,
-			WinSetPtrImageLevel		ptrLevel,
-			optr					ptrCh);
+    void    WinSetPtrImage(
+            WindowHandle            win,
+            WinSetPtrImageLevel     ptrLevel,
+            optr                    ptrCh);
+
 This routine sets the pointer image within the range handled by the specified 
 window.
 
@@ -1220,10 +1299,11 @@ window.
 
 ----------
 #### WinSetTransform()
-	void	WinSetTransform(
-			WindowHandle			win,
-			const TransMatrix *		tm,
-			WinInvalFlag			flag);
+    void    WinSetTransform(
+            WindowHandle            win,
+            const TransMatrix *     tm,
+            WinInvalFlag            flag);
+
 This routine replaces the window's transformation matrix with the one 
 passed in **tm*.
 
@@ -1231,8 +1311,9 @@ passed in **tm*.
 
 ----------
 #### WinSuspendUpdate()
-	void	WinSuspendUpdate(
-			WindowHandle		win);
+    void    WinSuspendUpdate(
+            WindowHandle        win);
+
 This routine suspends the sending of update messages to the window. The 
 messages will be sent when **WinUnSuspendUpdate()** is called.
 
@@ -1240,10 +1321,11 @@ messages will be sent when **WinUnSuspendUpdate()** is called.
 
 ----------
 #### WinTransform()
-	XYValueAsDWord 	WinTransform(
-			WindowHandle		win,
-			sword				x,
-			sword				y);
+    XYValueAsDWord  WinTransform(
+            WindowHandle        win,
+            sword               x,
+            sword               y);
+
 This routine translates the passed document coordinates into screen 
 coordinates.
 
@@ -1251,11 +1333,12 @@ coordinates.
 
 ----------
 #### WinTransformDWord()
-	void	WinTransformDWord(
-			WindowHandle		win,
-			sdword				xCoord,
-			sdword				yCoord,
-			PointDWord *		screenCoordinates);
+    void    WinTransformDWord(
+            WindowHandle        win,
+            sdword              xCoord,
+            sdword              yCoord,
+            PointDWord *        screenCoordinates);
+
 This routine translates the passed document coordinates into screen 
 coordinates. The translated coordinates are written to **screenCoordinates*.
 
@@ -1263,18 +1346,20 @@ coordinates. The translated coordinates are written to **screenCoordinates*.
 
 ----------
 #### WinUnSuspendUpdate()
-	void	WinUnSuspendUpdate(
-			WindowHandle		win);
+    void    WinUnSuspendUpdate(
+            WindowHandle        win);
+
 This routine cancels a previous **WinSuspendUpdate()** call.
 
 **Include:** win.h
 
 ----------
 #### WinUntransform
-	XYValueAsDWord 	WinUntransform(
-			WindowHandle		win,
-			sword				x,
-			sword				y);
+    XYValueAsDWord  WinUntransform(
+            WindowHandle        win,
+            sword               x,
+            sword               y);
+
 This routine translates the passed screen coordinates into document 
 coordinates.
 
@@ -1282,11 +1367,12 @@ coordinates.
 
 ----------
 #### WinUnTransformDWord()
-	void	WinTransformDWord(
-			WindowHandle		win,
-			sdword				xCoord,
-			sdword				yCoord,
-			PointDWord *		documentCoordinates);
+    void    WinTransformDWord(
+            WindowHandle        win,
+            sdword              xCoord,
+            sdword              yCoord,
+            PointDWord *        documentCoordinates);
+
 This routine translates the passed screen coordinates into document 
 coordinates. The translated coordinates are written to 
 **documentCoordinates*.
@@ -1295,11 +1381,12 @@ coordinates. The translated coordinates are written to
 
 ----------
 #### WWFixedToFrac
-	word	WWFixedToFrac(WWFixed wwf)
+    word    WWFixedToFrac(WWFixed wwf)
+
 This macro lets you address the fractional portion of a **WWFixed** value. It is 
 legal to use this to assign a value to the fractional portion; that is,
 
-	WWFixedToFrac(myWWFixed) = 5;
+    WWFixedToFrac(myWWFixed) = 5;
 
 is perfectly legal.
 
@@ -1307,11 +1394,12 @@ is perfectly legal.
 
 ----------
 #### WWFixedToInt
-	word	WWFixedToInt(WWFixed wwf)
+    word    WWFixedToInt(WWFixed wwf)
+
 This macro lets you address the intetgral portion of a **WWFixed** value. It is 
 legal to use this to assign a value to the integral portion; that is,
 
-	WWFixedToInt(myWWFixed) = 5;
+    WWFixedToInt(myWWFixed) = 5;
 
 is perfectly legal.
 

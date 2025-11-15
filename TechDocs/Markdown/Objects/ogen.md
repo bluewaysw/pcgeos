@@ -75,30 +75,30 @@ instance fields are listed in Code Display 2-1.
 
 **Code Display 2-1 GenClass Instance Data Fields**
 
-		@instance @link					GI_link;
-		@instance @visMoniker			GI_visMoniker;
-		@instance @composite			GI_comp;
-		@instance @kbdAccelerator		GI_kbdAccelerator;
-		@instance GenAttrs				GI_attrs = 0;
-		@instance GenStates GI_states = GS_USABLE | GS_ENABLED;
-	
-	/* GenAttrs store attributes of a generic object. */
-	
-	typedef ByteFlags GenAttrs;
-	#define GA_SIGNAL_INTERACTION_COMPLETE		0x80
-	#define GA_INITIATES_BUSY_STATE				0x40
-	#define GA_INITIATES_INPUT_HOLD_UP			0x20
-	#define GA_INITIATES_INPUT_IGNORE			0x10
-	#define GA_READ_ONLY						0x08
-	#define GA_KBD_SEARCH_PATH					0x04
-	#define GA_TARGETABLE						0x02
-	#define GA_NOTIFY_VISIBILITY				0x01
-	
-	/* GenStates store the usability states of a generic object. */
-	
-	typedef ByteFlags GenStates;
-	#define GS_USABLE			0x80
-	#define GS_ENABLED			0x40*
+        @instance @link                 GI_link;
+        @instance @visMoniker           GI_visMoniker;
+        @instance @composite            GI_comp;
+        @instance @kbdAccelerator       GI_kbdAccelerator;
+        @instance GenAttrs              GI_attrs = 0;
+        @instance GenStates GI_states = GS_USABLE | GS_ENABLED;
+    
+    /* GenAttrs store attributes of a generic object. */
+    
+    typedef ByteFlags GenAttrs;
+    #define GA_SIGNAL_INTERACTION_COMPLETE      0x80
+    #define GA_INITIATES_BUSY_STATE             0x40
+    #define GA_INITIATES_INPUT_HOLD_UP          0x20
+    #define GA_INITIATES_INPUT_IGNORE           0x10
+    #define GA_READ_ONLY                        0x08
+    #define GA_KBD_SEARCH_PATH                  0x04
+    #define GA_TARGETABLE                       0x02
+    #define GA_NOTIFY_VISIBILITY                0x01
+    
+    /* GenStates store the usability states of a generic object. */
+    
+    typedef ByteFlags GenStates;
+    #define GS_USABLE           0x80
+    #define GS_ENABLED          0x40*
 
 ----------
 
@@ -171,59 +171,59 @@ attributes.
 
 **Code Display 2-2 ATTR vardata fields**
 
-	@vardata void 			ATTR_GEN_PROPERTY;
-	@vardata void 			ATTR_GEN_NOT_PROPERTY;
-	
-	@vardata DestinationClassArgs		ATTR_GEN_DESTINATION_CLASS;
-		@reloc ATTR_GEN_DESTINATION_CLASS, 0, optr;
+    @vardata void           ATTR_GEN_PROPERTY;
+    @vardata void           ATTR_GEN_NOT_PROPERTY;
+    
+    @vardata DestinationClassArgs       ATTR_GEN_DESTINATION_CLASS;
+        @reloc ATTR_GEN_DESTINATION_CLASS, 0, optr;
 
-	@vardata char[]			ATTR_GEN_INIT_FILE_KEY;
-	@vardata char[]			ATTR_GEN_INIT_FILE_CATEGORY;
-	@vardata void			ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
-	@vardata void			ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY;
-	
-	@vardata Point			ATTR_GEN_POSITION;
-	@vardata sword			ATTR_GEN_POSITION_X;
-	@vardata sword			ATTR_GEN_POSITION_Y;
-	
-	@vardata void			ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
-	@vardata void			ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED;
-	
-	@vardata dword			ATTR_GEN_VISIBILITY_DATA;
-	@vardata word			ATTR_GEN_VISIBILITY_MESSAGE;
-	@vardata optr			ATTR_GEN_VISIBILITY_DESTINATION;
-		@reloc ATTR_GEN_VISIBILITY_DESTINATION, 0, optr;
-	
-	@vardata GenFilePath			ATTR_GEN_PATH_DATA;
-	
-	@vardata ChunkHandle			ATTR_GEN_FEATURE_LINK;
-	
-	@vardata GenDefaultMonikerType	ATTR_GEN_DEFAULT_MONIKER;
-	
-	@vardata optr 			ATTR_GEN_OUTPUT_TRAVEL_START;
-		@reloc ATTR_GEN_OUTPUT_TRAVEL_START, 0, optr;
-	
-	/* Generic Help attributes */
-	
-	@vardata char[]			ATTR_GEN_HELP_FILE;
-	@vardata byte			ATTR_GEN_HELP_TYPE;
-	@vardata void			ATTR_GEN_HELP_FILE_FROM_INIT_FILE;
-	@vardata optr			ATTR_GEN_FOCUS_HELP;
-	@vardata optr			ATTR_GEN_FOCUS_HELP_LIB;
-		@reloc ATTR_GEN_FOCUS_HELP_LIB, 0, optr;
-	@vardata char[]			ATTR_GEN_HELP_CONTEXT;
-	
-	/* Generic Window attributes */
+    @vardata char[]         ATTR_GEN_INIT_FILE_KEY;
+    @vardata char[]         ATTR_GEN_INIT_FILE_CATEGORY;
+    @vardata void           ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    @vardata void           ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY;
+    
+    @vardata Point          ATTR_GEN_POSITION;
+    @vardata sword          ATTR_GEN_POSITION_X;
+    @vardata sword          ATTR_GEN_POSITION_Y;
+    
+    @vardata void           ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+    @vardata void           ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED;
+    
+    @vardata dword          ATTR_GEN_VISIBILITY_DATA;
+    @vardata word           ATTR_GEN_VISIBILITY_MESSAGE;
+    @vardata optr           ATTR_GEN_VISIBILITY_DESTINATION;
+        @reloc ATTR_GEN_VISIBILITY_DESTINATION, 0, optr;
+    
+    @vardata GenFilePath            ATTR_GEN_PATH_DATA;
+    
+    @vardata ChunkHandle            ATTR_GEN_FEATURE_LINK;
+    
+    @vardata GenDefaultMonikerType  ATTR_GEN_DEFAULT_MONIKER;
+    
+    @vardata optr           ATTR_GEN_OUTPUT_TRAVEL_START;
+        @reloc ATTR_GEN_OUTPUT_TRAVEL_START, 0, optr;
+    
+    /* Generic Help attributes */
+    
+    @vardata char[]         ATTR_GEN_HELP_FILE;
+    @vardata byte           ATTR_GEN_HELP_TYPE;
+    @vardata void           ATTR_GEN_HELP_FILE_FROM_INIT_FILE;
+    @vardata optr           ATTR_GEN_FOCUS_HELP;
+    @vardata optr           ATTR_GEN_FOCUS_HELP_LIB;
+        @reloc ATTR_GEN_FOCUS_HELP_LIB, 0, optr;
+    @vardata char[]         ATTR_GEN_HELP_CONTEXT;
+    
+    /* Generic Window attributes */
 
-	@vardata MemHandle			ATTR_GEN_WINDOW_CUSTOM_LAYER_ID;
-		@reloc ATTR_GEN_WINDOW_CUSTOM_LAYER_ID, 0, optr;
-	@vardata WinPriority		ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY;
-	@vardata LayerPriority		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY;
-	@vardata MemHandle			ATTR_GEN_WINDOW_CUSTOM_PARENT;
-	@vardata void				ATTR_GEN_CUSTOM_WINDOW;
-	@vardata void				ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED;
-	@vardata KeyboardOverride	ATTR_GEN_WINDOW_KBD_OVERRIDE;
-	@vardata Point				ATTR_GEN_WINDOW_KDB_POSITION;
+    @vardata MemHandle          ATTR_GEN_WINDOW_CUSTOM_LAYER_ID;
+        @reloc ATTR_GEN_WINDOW_CUSTOM_LAYER_ID, 0, optr;
+    @vardata WinPriority        ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY;
+    @vardata LayerPriority      ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY;
+    @vardata MemHandle          ATTR_GEN_WINDOW_CUSTOM_PARENT;
+    @vardata void               ATTR_GEN_CUSTOM_WINDOW;
+    @vardata void               ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED;
+    @vardata KeyboardOverride   ATTR_GEN_WINDOW_KBD_OVERRIDE;
+    @vardata Point              ATTR_GEN_WINDOW_KDB_POSITION;
 
 ----------
 
@@ -337,125 +337,125 @@ Geometry," Chapter 12 of the Concepts Book.
 
 **Code Display 2-3 Geometry Hints**
 
-	/* These hints are explained within the Geometry Management chapter. */
-	
-	@vardata void			HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
-	@vardata void			HINT_ALLOW_CHILDREN_TO_WRAP;
-	@vardata word			HINT_WRAP_AFTER_CHILD_COUNT;
-	@vardata word			HINT_WRAP_AFTER_CHILD_COUNT_IF_VERTICAL_SCREEN;
+    /* These hints are explained within the Geometry Management chapter. */
+    
+    @vardata void           HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
+    @vardata void           HINT_ALLOW_CHILDREN_TO_WRAP;
+    @vardata word           HINT_WRAP_AFTER_CHILD_COUNT;
+    @vardata word           HINT_WRAP_AFTER_CHILD_COUNT_IF_VERTICAL_SCREEN;
 
-	@vardata void			HINT_BOTTOM_JUSTIFY_CHILDREN;
-	@vardata void			HINT_LEFT_JUSTIFY_CHILDREN;
-	@vardata void			HINT_RIGHT_JUSTIFY_CHILDREN;
-	@vardata void			HINT_TOP_JUSTIFY_CHILDREN;
-	
-	@vardata void			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
-	@vardata void			HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
-	@vardata void			HINT_DONT_FULL_JUSTIFY_CHILDREN;
+    @vardata void           HINT_BOTTOM_JUSTIFY_CHILDREN;
+    @vardata void           HINT_LEFT_JUSTIFY_CHILDREN;
+    @vardata void           HINT_RIGHT_JUSTIFY_CHILDREN;
+    @vardata void           HINT_TOP_JUSTIFY_CHILDREN;
+    
+    @vardata void           HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    @vardata void           HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    @vardata void           HINT_DONT_FULL_JUSTIFY_CHILDREN;
 
-	@vardata SpecSizeSpec	HINT_CUSTOM_CHILD_SPACING;
-	@vardata SpecSizeSpec	HINT_CUSTOM_CHILD_SPACING_IF_LIMITED_SPACE;
-	@vardata void			HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING;
-	@vardata void			HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
-	@vardata void 			HINT_MINIMIZE_CHILD_SPACING;
-	
-	@vardata void			HINT_LEFT_JUSTIFY_MONIKERS;
-	@vardata void			HINT_CENTER_MONIKER;
-	@vardata void			HINT_DO_NOT_USE_MONIKER;
-	@vardata void			HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD;
-	
-	@vardata void			HINT_CENTER_CHILDREN_HORIZONTALLY;
-	@vardata void			HINT_CENTER_CHILDREN_ON_MONIKERS;
-	@vardata void			HINT_CENTER_CHILDREN_VERTICALLY;
-	
-	@vardata optr			HINT_ALIGN_LEFT_EDGE_WITH_OBJECT;
-		@reloc HINT_ALIGN_LEFT_EDGE_WITH_OBJECT, 0, optr;
-	@vardata optr			HINT_ALIGN_TOP_EDGE_WITH_OBJECT;
-		@reloc HINT_ALIGN_TOP_EDGE_WITH_OBJECT, 0, optr;
-	@vardata optr			HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT;
-		@reloc HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT, 0, optr;
-	@vardata optr			HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT;
-		@reloc HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT, 0, optr;
-	
-	@vardata CompSizeHintArgs			HINT_FIXED_SIZE;
-	@vardata CompSizeHintArgs			HINT_INITIAL_SIZE;
-	@vardata CompSizeHintArgs			HINT_MAXIMUM_SIZE;
-	@vardata CompSizeHintArgs			HINT_MINIMUM_SIZE;
-	@vardata void			HINT_SIZE_WINDOW_AS_DESIRED;
-	
-	@vardata void			HINT_DRAW_IN_BOX;
-	
-	@vardata void			HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-	@vardata void			HINT_EXPAND_WIDTH_TO_FIT_PARENT;
-	
-	@vardata void			HINT_MAKE_REPLY_BAR;
-	
-	@vardata void			HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
-	@vardata void			HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
-	
-	@vardata void			HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	@vardata void			HINT_ORIENT_CHILDREN_VERTICALLY;
-	@vardata void			HINT_ORIENT_CHILDREN_ALONG_LARGER_DIMENSION;
-	@vardata void			HINT_SAME_ORIENTATION_AS_PARENT;
-	
-	@vardata void			HINT_PLACE_MONIKER_ABOVE;
-	@vardata void			HINT_PLACE_MONIKER_BELOW;
-	@vardata void			HINT_PLACE_MONIKER_TO_LEFT;
-	@vardata void			HINT_PLACE_MONIKER_TO_RIGHT;
-	@vardata void			HINT_PLACE_MONIKER_ALONG_LARGER_DIMENSION;
-	@vardata void			HINT_NO_BORDER_ON_MONIKERS
-	
-	@vardata void			HINT_SEEK_MENU_BAR;
-	@vardata void			HINT_AVOID_MENU_BAR;
-	
-	@vardata void			HINT_SEEK_REPLY_BAR;
-	
-	@vardata void			HINT_SEEK_X_SCROLLER_AREA;
-	@vardata void			HINT_SEEK_Y_SCROLLER_AREA;
-	
-	@vardata void			HINT_SEEK_LEFT_OF_VIEW;
-	@vardata void			HINT_SEEK_TOP_OF_VIEW;
-	@vardata void			HINT_SEEK_RIGHT_OF_VIEW;
-	@vardata void			HINT_SEEK_BOTTOM_OF_VIEW;
-	
-	@vardata void			HINT_SEEK_TITLE_BAR_LEFT;
-	@vardata void			HINT_SEEK_TITLE_BAR_RIGHT;
-	
-	@vardata void			HINT_USE_INITIAL_BOUNDS_WHEN_RESTORED;
-	
-	@vardata void			HINT_DIVIDE_WIDTH_EQUALLY;
-	@vardata void			HINT_DIVIDE_HEIGHT_EQUALLY;
-	
-	@vardata void			HINT_KEEP_INITIALLY_ONSCREEN;
-	@vardata void			HINT_DONT_KEEP_INITIALLY_ONSCREEN;
-	@vardata void			HINT_KEEP_PARTIALLY_ONSCREEN;
-	@vardata void			HINT_DONT_KEEP_PARTIALLY_ONSCREEN;
-	@vardata void			HINT_KEEP_ENTIRELY_ONSCREEN;
-	@vardata void			HINT_KEEP_ENTIRELY_ONSCREEN_WITH_MARGIN;
-	
-	@vardata void			HINT_POPS_UP_TO_RIGHT;
-	@vardata void			HINT_POPS_UP_BELOW;
-	
-	@vardata void			HINT_NOT_MOVABLE;
-	
-	@vardata SpecWinSizePair HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT;
-	@vardata void			HINT_POSITION_WINDOW_AT_MOUSE;
-	
-	@vardata void			HINT_WINDOW_NO_TITLE_BAR;
-	@vardata void			HINT_WINDOW_NO_SYS_MENU;
-	
-	@vardata void			HINT_STAGGER_WINDOW;
-	@vardata void			HINT_CENTER_WINDOW;
-	@vardata void			HINT_TILE_WINDOW;
-	
-	@vardata void			HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT;
-	@vardata void			HINT_EXTEND_WINDOW_NEAR_BOTTOM_RIGHT;
-	
-	@vardata SpecWinSizePair HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT;
-	@vardata SpecWinSizePair HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD;
-	@vardata void			HINT_WINDOW_NO_CONSTRAINTS;
-	
-	@vardata SpecWinSizePair HINT_POSITION_ICON_AS_RATIO_OF_FIELD;
+    @vardata SpecSizeSpec   HINT_CUSTOM_CHILD_SPACING;
+    @vardata SpecSizeSpec   HINT_CUSTOM_CHILD_SPACING_IF_LIMITED_SPACE;
+    @vardata void           HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    @vardata void           HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    @vardata void           HINT_MINIMIZE_CHILD_SPACING;
+    
+    @vardata void           HINT_LEFT_JUSTIFY_MONIKERS;
+    @vardata void           HINT_CENTER_MONIKER;
+    @vardata void           HINT_DO_NOT_USE_MONIKER;
+    @vardata void           HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD;
+    
+    @vardata void           HINT_CENTER_CHILDREN_HORIZONTALLY;
+    @vardata void           HINT_CENTER_CHILDREN_ON_MONIKERS;
+    @vardata void           HINT_CENTER_CHILDREN_VERTICALLY;
+    
+    @vardata optr           HINT_ALIGN_LEFT_EDGE_WITH_OBJECT;
+        @reloc HINT_ALIGN_LEFT_EDGE_WITH_OBJECT, 0, optr;
+    @vardata optr           HINT_ALIGN_TOP_EDGE_WITH_OBJECT;
+        @reloc HINT_ALIGN_TOP_EDGE_WITH_OBJECT, 0, optr;
+    @vardata optr           HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT;
+        @reloc HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT, 0, optr;
+    @vardata optr           HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT;
+        @reloc HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT, 0, optr;
+    
+    @vardata CompSizeHintArgs           HINT_FIXED_SIZE;
+    @vardata CompSizeHintArgs           HINT_INITIAL_SIZE;
+    @vardata CompSizeHintArgs           HINT_MAXIMUM_SIZE;
+    @vardata CompSizeHintArgs           HINT_MINIMUM_SIZE;
+    @vardata void           HINT_SIZE_WINDOW_AS_DESIRED;
+    
+    @vardata void           HINT_DRAW_IN_BOX;
+    
+    @vardata void           HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    @vardata void           HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    
+    @vardata void           HINT_MAKE_REPLY_BAR;
+    
+    @vardata void           HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+    @vardata void           HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    
+    @vardata void           HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    @vardata void           HINT_ORIENT_CHILDREN_VERTICALLY;
+    @vardata void           HINT_ORIENT_CHILDREN_ALONG_LARGER_DIMENSION;
+    @vardata void           HINT_SAME_ORIENTATION_AS_PARENT;
+    
+    @vardata void           HINT_PLACE_MONIKER_ABOVE;
+    @vardata void           HINT_PLACE_MONIKER_BELOW;
+    @vardata void           HINT_PLACE_MONIKER_TO_LEFT;
+    @vardata void           HINT_PLACE_MONIKER_TO_RIGHT;
+    @vardata void           HINT_PLACE_MONIKER_ALONG_LARGER_DIMENSION;
+    @vardata void           HINT_NO_BORDER_ON_MONIKERS
+    
+    @vardata void           HINT_SEEK_MENU_BAR;
+    @vardata void           HINT_AVOID_MENU_BAR;
+    
+    @vardata void           HINT_SEEK_REPLY_BAR;
+    
+    @vardata void           HINT_SEEK_X_SCROLLER_AREA;
+    @vardata void           HINT_SEEK_Y_SCROLLER_AREA;
+    
+    @vardata void           HINT_SEEK_LEFT_OF_VIEW;
+    @vardata void           HINT_SEEK_TOP_OF_VIEW;
+    @vardata void           HINT_SEEK_RIGHT_OF_VIEW;
+    @vardata void           HINT_SEEK_BOTTOM_OF_VIEW;
+    
+    @vardata void           HINT_SEEK_TITLE_BAR_LEFT;
+    @vardata void           HINT_SEEK_TITLE_BAR_RIGHT;
+    
+    @vardata void           HINT_USE_INITIAL_BOUNDS_WHEN_RESTORED;
+    
+    @vardata void           HINT_DIVIDE_WIDTH_EQUALLY;
+    @vardata void           HINT_DIVIDE_HEIGHT_EQUALLY;
+    
+    @vardata void           HINT_KEEP_INITIALLY_ONSCREEN;
+    @vardata void           HINT_DONT_KEEP_INITIALLY_ONSCREEN;
+    @vardata void           HINT_KEEP_PARTIALLY_ONSCREEN;
+    @vardata void           HINT_DONT_KEEP_PARTIALLY_ONSCREEN;
+    @vardata void           HINT_KEEP_ENTIRELY_ONSCREEN;
+    @vardata void           HINT_KEEP_ENTIRELY_ONSCREEN_WITH_MARGIN;
+    
+    @vardata void           HINT_POPS_UP_TO_RIGHT;
+    @vardata void           HINT_POPS_UP_BELOW;
+    
+    @vardata void           HINT_NOT_MOVABLE;
+    
+    @vardata SpecWinSizePair HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT;
+    @vardata void           HINT_POSITION_WINDOW_AT_MOUSE;
+    
+    @vardata void           HINT_WINDOW_NO_TITLE_BAR;
+    @vardata void           HINT_WINDOW_NO_SYS_MENU;
+    
+    @vardata void           HINT_STAGGER_WINDOW;
+    @vardata void           HINT_CENTER_WINDOW;
+    @vardata void           HINT_TILE_WINDOW;
+    
+    @vardata void           HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT;
+    @vardata void           HINT_EXTEND_WINDOW_NEAR_BOTTOM_RIGHT;
+    
+    @vardata SpecWinSizePair HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT;
+    @vardata SpecWinSizePair HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD;
+    @vardata void           HINT_WINDOW_NO_CONSTRAINTS;
+    
+    @vardata SpecWinSizePair HINT_POSITION_ICON_AS_RATIO_OF_FIELD;
 
 ----------
 
@@ -467,56 +467,56 @@ internal and are not listed in this code display.
 
 **Code Display 2-4 Hints Explained Within This Chapter**
 
-	/* These hints are explained within this chapter (or they are self-explanatory). */
-	
-	@vardata void			HINT_FREQUENTLY_USED;
-	@vardata void			HINT_INFREQUENTLY_USED;
-	@vardata void			HINT_AN_ADVANCED_FEATURE;
-	
-	@vardata void			HINT_DEFAULT_DEFAULT_ACTION;
-	@vardata void			HINT_ENSURE_TEMPORARY_DEFAULT;
-	@vardata void			HINT_PREVENT_DEFAULT_OVERRIDES;
-	
-	@vardata void			HINT_SAME_CATEGORY_AS_PARENT;
-	
-	@vardata void			HINT_USE_TEXT_MONIKER;
-	@vardata void			HINT_USE_ICONIC_MONIKER;
+    /* These hints are explained within this chapter (or they are self-explanatory). */
+    
+    @vardata void           HINT_FREQUENTLY_USED;
+    @vardata void           HINT_INFREQUENTLY_USED;
+    @vardata void           HINT_AN_ADVANCED_FEATURE;
+    
+    @vardata void           HINT_DEFAULT_DEFAULT_ACTION;
+    @vardata void           HINT_ENSURE_TEMPORARY_DEFAULT;
+    @vardata void           HINT_PREVENT_DEFAULT_OVERRIDES;
+    
+    @vardata void           HINT_SAME_CATEGORY_AS_PARENT;
+    
+    @vardata void           HINT_USE_TEXT_MONIKER;
+    @vardata void           HINT_USE_ICONIC_MONIKER;
 
-	@vardata void			HINT_DEFAULT_FOCUS;
-	@vardata void			HINT_DEFAULT_TARGET;
-	@vardata void			HINT_DEFAULT_MODEL;
+    @vardata void           HINT_DEFAULT_FOCUS;
+    @vardata void           HINT_DEFAULT_TARGET;
+    @vardata void           HINT_DEFAULT_MODEL;
 
-	@vardata void			HINT_PRESERVE_FOCUS;
-	@vardata void			HINT_DO_NOT_PRESERVE_FOCUS;
-	
-	@vardata void			HINT_GENERAL_CONSUMER_MODE;
-	
-	@vardata void			HINT_NEVER_ADOPT_MENUS;
-	@vardata void			HINT_ALWAYS_ADOPT_MENUS;
-	
-	@vardata void			HINT_NAVIGATION_ID;
-	@vardata void			HINT_NAVIGATION_NEXT_ID
-	
-	@vardata void			HINT_DISMISS_WHEN_DISABLED;
-	
-	@vardata void			HINT_HELP;
-	
-	@vardata void			HINT_TOOLBOX;
-	
-	@vardata void			HINT_SHOW_SHORTCUT;
-	@vardata void			HINT_DONT_SHOW_SHORTCUT;
-	@vardata void			HINT_DRAW_SHORTCUT_BELOW;
-	
-	@vardata void			HINT_CAN_CLIP_MONIKER_WIDTH;
-	@vardata void			HINT_CAN_CLIP_MONIKER_HEIGHT;
-	@vardata void			HINT_SHOW_ENTIRE_MONIKER;
-	
-	@vardata BackgroundColors	HINT_GADGET_BACKGROUND_COLORS;
-	@vardata word			HINT_GADGET_TEXT_COLOR;
-	
-	@vardata SystemAttrs	HINT_IF_SYSTEM_ATTRS;
-	@vardata void			HINT_ENDIF;
-	@vardata void			HINT_ELSE;
+    @vardata void           HINT_PRESERVE_FOCUS;
+    @vardata void           HINT_DO_NOT_PRESERVE_FOCUS;
+    
+    @vardata void           HINT_GENERAL_CONSUMER_MODE;
+    
+    @vardata void           HINT_NEVER_ADOPT_MENUS;
+    @vardata void           HINT_ALWAYS_ADOPT_MENUS;
+    
+    @vardata void           HINT_NAVIGATION_ID;
+    @vardata void           HINT_NAVIGATION_NEXT_ID
+    
+    @vardata void           HINT_DISMISS_WHEN_DISABLED;
+    
+    @vardata void           HINT_HELP;
+    
+    @vardata void           HINT_TOOLBOX;
+    
+    @vardata void           HINT_SHOW_SHORTCUT;
+    @vardata void           HINT_DONT_SHOW_SHORTCUT;
+    @vardata void           HINT_DRAW_SHORTCUT_BELOW;
+    
+    @vardata void           HINT_CAN_CLIP_MONIKER_WIDTH;
+    @vardata void           HINT_CAN_CLIP_MONIKER_HEIGHT;
+    @vardata void           HINT_SHOW_ENTIRE_MONIKER;
+    
+    @vardata BackgroundColors   HINT_GADGET_BACKGROUND_COLORS;
+    @vardata word           HINT_GADGET_TEXT_COLOR;
+    
+    @vardata SystemAttrs    HINT_IF_SYSTEM_ATTRS;
+    @vardata void           HINT_ENDIF;
+    @vardata void           HINT_ELSE;
 
 ----------
 
@@ -664,23 +664,23 @@ the Goc keyword **@visMoniker**. (See Code Display 2-5.)
 
 **Code Display 2-5 Setting Visual Monikers**
 
-	/* A visual moniker can be set directly within the object's definition. */
-	
-	@object GenTriggerClass MyTrigger = {
-		GI_visMoniker = "Push Me";
-	}
-	
-	/* A visual moniker may also be defined indirectly within a .goc file. */
-	
-	/* The data for MyMoniker is set using the Goc keyword @visMoniker. This moniker
-	 * must reside in the same resource block as the object using it. This moniker
-	 * should be declared before being used in an object declaration. */
-	
-	@visMoniker MyMoniker = "Push Me";
-	
-	@object GenTriggerClass MyTrigger = {
-		GI_visMoniker = @MyMoniker;
-	}
+    /* A visual moniker can be set directly within the object's definition. */
+    
+    @object GenTriggerClass MyTrigger = {
+        GI_visMoniker = "Push Me";
+    }
+    
+    /* A visual moniker may also be defined indirectly within a .goc file. */
+    
+    /* The data for MyMoniker is set using the Goc keyword @visMoniker. This moniker
+     * must reside in the same resource block as the object using it. This moniker
+     * should be declared before being used in an object declaration. */
+    
+    @visMoniker MyMoniker = "Push Me";
+    
+    @object GenTriggerClass MyTrigger = {
+        GI_visMoniker = @MyMoniker;
+    }
 
 ----------
 
@@ -746,21 +746,21 @@ and mnemonics are not satisfactory, see "Keyboard Accelerators" below.
 
 **Code Display 2-6 Setting Mnemonic Characters**
 
-	/* Mnemonics are case specific. If the following example enclosed f instead of
-	 * F within single quotes, then the character f in parentheses would follow the
-	 * text "File." Note that this case specificity does not apply to the user's
-	 * activation of the object. That is, alt f will activate a mnemonic of F. */
-	
-	@object MyTrigger GenTriggerClass {
-		GI_visMoniker = `F', "File";
-	}
-	
-	/* You can also specify the character to highlight with an actual numerical
-	 * position, counting from a zero-based (1st character is 0, 2nd character is 1,
-	 * etc.) character position in the text string. The "5" in the following example
-	 * will underline the F character (the sixth character in the text string.) */
-	
-		GI_visMoniker = 5, "Open File";
+    /* Mnemonics are case specific. If the following example enclosed f instead of
+     * F within single quotes, then the character f in parentheses would follow the
+     * text "File." Note that this case specificity does not apply to the user's
+     * activation of the object. That is, alt f will activate a mnemonic of F. */
+    
+    @object MyTrigger GenTriggerClass {
+        GI_visMoniker = `F', "File";
+    }
+    
+    /* You can also specify the character to highlight with an actual numerical
+     * position, counting from a zero-based (1st character is 0, 2nd character is 1,
+     * etc.) character position in the text string. The "5" in the following example
+     * will underline the F character (the sixth character in the text string.) */
+    
+        GI_visMoniker = 5, "Open File";
 
 ----------
 
@@ -825,38 +825,38 @@ using the **Bitmap** operator.
 
 **Code Display 2-7 Examples of GString Visual Monikers**
 
-	/* A Graphics string consisting of GString opcodes. */
-		GI_visMoniker = {
-			size = tiny;
-			color = color4;
-			aspectRatio = normal;
-			cachedSize = 15,15;
-			gstring{
-				GSSaveTransform(),
-				GSApplyRotation(45),
-				GSFillEllipse(0,0,10,15),
-				GSRestoreTransform(),
-				GSDrawEllipse(0,0,10,15),
-				GSEndString()
-			}
-		}
-	
-	/* A Graphics string containing a bitmap. */
-	@visMoniker MyBitmap = {
-			style = icon;
-			size = standard;
-			color = color4;
-			aspectRatio = normal;
-			cachedSize = 64, 40;
-			gstring {
-				GSDrawBitmapAtCP(166),
-				Bitmap (64,40,BMC_PACKBITS, (BMT_MASK|BMF_4BIT)),
-				251, 0,
-				233, 221,
-				...,
-				GSEndString()
-			}
-	}
+    /* A Graphics string consisting of GString opcodes. */
+        GI_visMoniker = {
+            size = tiny;
+            color = color4;
+            aspectRatio = normal;
+            cachedSize = 15,15;
+            gstring{
+                GSSaveTransform(),
+                GSApplyRotation(45),
+                GSFillEllipse(0,0,10,15),
+                GSRestoreTransform(),
+                GSDrawEllipse(0,0,10,15),
+                GSEndString()
+            }
+        }
+    
+    /* A Graphics string containing a bitmap. */
+    @visMoniker MyBitmap = {
+            style = icon;
+            size = standard;
+            color = color4;
+            aspectRatio = normal;
+            cachedSize = 64, 40;
+            gstring {
+                GSDrawBitmapAtCP(166),
+                Bitmap (64,40,BMC_PACKBITS, (BMT_MASK|BMF_4BIT)),
+                251, 0,
+                233, 221,
+                ...,
+                GSEndString()
+            }
+    }
 
 ----------
 #### 2.3.1.3 Visual Moniker Lists
@@ -877,77 +877,77 @@ function automatically.
 ----------
 **Code Display 2-8 Simple Lists**
 
-	/* A list of monikers. */
-		GI_visMoniker = list {
-			@moniker1, 
-			@moniker2, 
-			@moniker3
-		}
-	
-	/* If several monikers are specified in a list, they must be explicitly defined
-	 * somewhere else. If these monikers are complicated (as in the case of graphics
-	 * strings) they should each reside within their own resource because they will be
-	 * loaded in only once per application run. (Those that will be used together can
-	 * be within the same resource.) For example, in GEOS, several monikers
-	 * pertaining to different display types would be placed within separate resources.
-	 * When the appropriate moniker is selected, the list will be replaced with the
-	 * specific moniker. */
-	
-	@start AppMonikerOneResource, notDetachable;
-	
-	@visMoniker moniker1 = {
-		size = large;
-		color = color4;
-		aspectRatio = normal;
-		cachedSize = 64, 40;
-		gstring {gstring data}
-	}
-	
-	@end AppMonikerOneResource;
-	
-	/* That moniker could then be declared within the object's instance data. */
-	@object GenPrimaryClass MyObject = {
-		GI_visMoniker = list { @moniker1 }
-	}
-		
-	/*
-	 * The GenApplication object usually contains a moniker list that allows the 
-	 * specific UI to select a moniker based on the display.
-	 */
-	@object GenApplicationClass MyApplication = {
-		GI_visMoniker = list {
-				@TrigTextMoniker,		/* a simple text string */
-				@TrigLCMoniker,			/* Large Color */
-				@TrigLMMoniker,			/* Large Mono */
-				@TrigSCMoniker,			/* Small Color */
-				@TrigSMMoniker,			/* Small Mono */
-				@TrigLCGAMoniker,		/* Large CGA */
-				@TrigSCGAMoniker		/* Small CGA */
-		}
-	}
-	
-	@visMoniker TrigTextMoniker = "Push Me";
+    /* A list of monikers. */
+        GI_visMoniker = list {
+            @moniker1, 
+            @moniker2, 
+            @moniker3
+        }
+    
+    /* If several monikers are specified in a list, they must be explicitly defined
+     * somewhere else. If these monikers are complicated (as in the case of graphics
+     * strings) they should each reside within their own resource because they will be
+     * loaded in only once per application run. (Those that will be used together can
+     * be within the same resource.) For example, in GEOS, several monikers
+     * pertaining to different display types would be placed within separate resources.
+     * When the appropriate moniker is selected, the list will be replaced with the
+     * specific moniker. */
+    
+    @start AppMonikerOneResource, notDetachable;
+    
+    @visMoniker moniker1 = {
+        size = large;
+        color = color4;
+        aspectRatio = normal;
+        cachedSize = 64, 40;
+        gstring {gstring data}
+    }
+    
+    @end AppMonikerOneResource;
+    
+    /* That moniker could then be declared within the object's instance data. */
+    @object GenPrimaryClass MyObject = {
+        GI_visMoniker = list { @moniker1 }
+    }
+        
+    /*
+     * The GenApplication object usually contains a moniker list that allows the 
+     * specific UI to select a moniker based on the display.
+     */
+    @object GenApplicationClass MyApplication = {
+        GI_visMoniker = list {
+                @TrigTextMoniker,       /* a simple text string */
+                @TrigLCMoniker,         /* Large Color */
+                @TrigLMMoniker,         /* Large Mono */
+                @TrigSCMoniker,         /* Small Color */
+                @TrigSMMoniker,         /* Small Mono */
+                @TrigLCGAMoniker,       /* Large CGA */
+                @TrigSCGAMoniker        /* Small CGA */
+        }
+    }
+    
+    @visMoniker TrigTextMoniker = "Push Me";
 
-	/* Graphics monikers might then appear within their own resource block. This
-	 * enables efficient memory management. */
-	
-	@start AppMonikerResource, notDetachable;
-	
-	@visMoniker TrigLCMoniker = {
-		style = icon;
-		size = large;
-		color = color4;
-		aspectRatio = normal;
-		cachedSize = 64, 40;
-		gstring {
-			GSDrawBitmapAtCP(166),
-			Bitmap (64,40,BMC_PACKBITS, (BMT_MASK|BMF_4BIT)),
-			/*** insert Bitmap here ***/
-			GSEndString()
-		}
-	}
-	
-	@end AppMonikerResource
+    /* Graphics monikers might then appear within their own resource block. This
+     * enables efficient memory management. */
+    
+    @start AppMonikerResource, notDetachable;
+    
+    @visMoniker TrigLCMoniker = {
+        style = icon;
+        size = large;
+        color = color4;
+        aspectRatio = normal;
+        cachedSize = 64, 40;
+        gstring {
+            GSDrawBitmapAtCP(166),
+            Bitmap (64,40,BMC_PACKBITS, (BMT_MASK|BMF_4BIT)),
+            /*** insert Bitmap here ***/
+            GSEndString()
+        }
+    }
+    
+    @end AppMonikerResource
 
 ----------
 #### 2.3.1.4 The Inner Workings of Visual Monikers
@@ -978,43 +978,43 @@ types.
 ----------
 **Code Display 2-9 The Basic VisMoniker Structure**
 
-	/* The Basic VisMoniker structure contains a header which describes the type of 
-	 * VisMoniker (VisMonikerType) and stores the cached width (width in pixels) of the 
-	 * VisMoniker. The actual visual moniker data (either text or a gstring) follows
-	 * this header. 
-	 *
-	 * If the visual moniker is text, this VisMoniker structure is contained within a
-	 * VisMonikerWithText structure. If the visual moniker is a gstring, this 
-	 * VisMoniker structure is contained within a VisMonikerWithGString structure.*/
-	
-	typedef struct {
-		byte		VM_type;		/* VisMonikerType */
-		word		VM_width;		/* Cached width of moniker */
-	} VisMoniker;
-	
-	/* VisMonikerType specifies the type of moniker contained in the VisMoniker 
-	 * structure. 
-	 *
-	 * The flag VMT_MONIKER_LIST is actually a dummy flag. (This flag is never set
-	 * within a VisMoniker structure.) VisMonikerListEntryType has a matching flag 
-	 * in the same location (VMLET_MONIKER_LIST). If that flag is set, it tells the 
-	 * system that this isn't actually a VisMoniker structure but is instead a
-	 * VisMonikerListEntry. This is used in moniker lists (see below). 
-	 *
-	 * The flag VMT_GSTRING is set if the visual moniker is in the form of a gstring 
-	 * instead of a simple text string. If this flag is set, VMT_GS_ASPECT_RATIO and
-	 * VMT_GS_COLOR specify the DisplayAspectRatio and DisplayClass used by this
-	 * gstring. 
-	 */
-	
-	typedef ByteFlags VisMonikerType;
-	#define VMT_MONIKER_LIST		0x80
-	#define VMT_GSTRING				0x40
-	#define VMT_GS_ASPECT_RATIO		0x30	/* DisplayAspectRatio */
-	#define VMT_GS_COLOR			0x0f	/* Color */
-	
-	#define VMT_GS_ASPECT_RATIO_OFFSET 4
-	#define VMT_GS_COLOR_OFFSET 0
+    /* The Basic VisMoniker structure contains a header which describes the type of 
+     * VisMoniker (VisMonikerType) and stores the cached width (width in pixels) of the 
+     * VisMoniker. The actual visual moniker data (either text or a gstring) follows
+     * this header. 
+     *
+     * If the visual moniker is text, this VisMoniker structure is contained within a
+     * VisMonikerWithText structure. If the visual moniker is a gstring, this 
+     * VisMoniker structure is contained within a VisMonikerWithGString structure.*/
+    
+    typedef struct {
+        byte        VM_type;        /* VisMonikerType */
+        word        VM_width;       /* Cached width of moniker */
+    } VisMoniker;
+    
+    /* VisMonikerType specifies the type of moniker contained in the VisMoniker 
+     * structure. 
+     *
+     * The flag VMT_MONIKER_LIST is actually a dummy flag. (This flag is never set
+     * within a VisMoniker structure.) VisMonikerListEntryType has a matching flag 
+     * in the same location (VMLET_MONIKER_LIST). If that flag is set, it tells the 
+     * system that this isn't actually a VisMoniker structure but is instead a
+     * VisMonikerListEntry. This is used in moniker lists (see below). 
+     *
+     * The flag VMT_GSTRING is set if the visual moniker is in the form of a gstring 
+     * instead of a simple text string. If this flag is set, VMT_GS_ASPECT_RATIO and
+     * VMT_GS_COLOR specify the DisplayAspectRatio and DisplayClass used by this
+     * gstring. 
+     */
+    
+    typedef ByteFlags VisMonikerType;
+    #define VMT_MONIKER_LIST        0x80
+    #define VMT_GSTRING             0x40
+    #define VMT_GS_ASPECT_RATIO     0x30    /* DisplayAspectRatio */
+    #define VMT_GS_COLOR            0x0f    /* Color */
+    
+    #define VMT_GS_ASPECT_RATIO_OFFSET 4
+    #define VMT_GS_COLOR_OFFSET 0
 
 
 ----------
@@ -1032,22 +1032,22 @@ The null-terminated text appears after the **VisMonikerWithText** structure.*
 ----------
 **Code Display 2-10 VisMonikers With Text**
 
-	/* If the VisMoniker contains simple text, the ChunkHandle within GI_visMoniker 
-	 * points to a VisMonikerWithText structure. This structure contains the 
-	 * basic VisMoniker header and the character of the mnemonic. (A value of -1 is 
-	 * stored in VMWT_mnemonicOffset if there is no mnemonic for this visual moniker.) 
-	 */
-	
-	typedef struct {
-		VisMoniker		VMWT_common;
-		char			VMWT_mnemonicOffset;
-	} VisMonikerWithText;
-	
-	/* The text, in the form of a null-terminated text string, follows this structure. 
-	 * This text may be accessed (though it is not recommended) with the VMWT_text 
-	 * offset. */
-	
-	#define VMWT_text	(sizeof(VisMonikerWithText)) /* Start of text. */
+    /* If the VisMoniker contains simple text, the ChunkHandle within GI_visMoniker 
+     * points to a VisMonikerWithText structure. This structure contains the 
+     * basic VisMoniker header and the character of the mnemonic. (A value of -1 is 
+     * stored in VMWT_mnemonicOffset if there is no mnemonic for this visual moniker.) 
+     */
+    
+    typedef struct {
+        VisMoniker      VMWT_common;
+        char            VMWT_mnemonicOffset;
+    } VisMonikerWithText;
+    
+    /* The text, in the form of a null-terminated text string, follows this structure. 
+     * This text may be accessed (though it is not recommended) with the VMWT_text 
+     * offset. */
+    
+    #define VMWT_text   (sizeof(VisMonikerWithText)) /* Start of text. */
 
 ----------
 If the visual moniker is a gstring, the ChunkHandle within *GI_visMoniker* 
@@ -1065,21 +1065,21 @@ The gstring appears after the **VisMonikerWithGString** structure.*
 ----------
 **Code Display 2-11 VisMonikers With GStrings**
 
-	/* If the VisMoniker contains a gstring, the ChunkHandle within GI_visMoniker 
-	 * points to a VisMonikerWithGString structure. This structure contains the 
-	 * basic VisMoniker header and the cached height of the gstring. (The cached width 
-	 * is stored within the VisMoniker structure.
-	 */
-		
-	typedef struct {
-		VisMoniker		VMWGS_common;
-		word		VMWGS_height;
-	} VisMonikerWithGSTring;
-	
-	/* The gstring follows this structure.This gstring may be accessed (though it is 
-	 * not recommended) with the VMWGS_gString offset. */
-	
-	#define VMWGS_gString	(sizeof(VisMonikerWithGString)) /* Start of gstring. */
+    /* If the VisMoniker contains a gstring, the ChunkHandle within GI_visMoniker 
+     * points to a VisMonikerWithGString structure. This structure contains the 
+     * basic VisMoniker header and the cached height of the gstring. (The cached width 
+     * is stored within the VisMoniker structure.
+     */
+        
+    typedef struct {
+        VisMoniker      VMWGS_common;
+        word        VMWGS_height;
+    } VisMonikerWithGSTring;
+    
+    /* The gstring follows this structure.This gstring may be accessed (though it is 
+     * not recommended) with the VMWGS_gString offset. */
+    
+    #define VMWGS_gString   (sizeof(VisMonikerWithGString)) /* Start of gstring. */
 
 ----------
 If instead of a single visual moniker, be it a text string or a gstring, 
@@ -1107,67 +1107,67 @@ a visual moniker chunk, which may reside outside the current object block.*
 ----------
 **Code Display 2-12 VisMoniker Lists**
 
-	/* If GI_visMoniker contains a list of monikers instead of a single moniker, the 
-	 * ChunkHandle of that instance field actually points to a collection of 
-	 * VisMonikerListEntry structures. (The total number can be calculated by dividing 
-	 * the size of the chunk by sizeof(VisMonikerListEntry) if needed.)
-	 *
-	 * Each VisMonikerListEntry structure contains a header which describes the type of 
-	 * VisMoniker stored in that list entry (VisMonikerListEntryType) and the optr of 
-	 * the stored moniker. The actual moniker may reside in a different resource. */
-	
-	typedef struct {
-		word		VMLE_type;
-		optr		VMLE_moniker;
-	} VisMonikerListEntry;
-	
-	/* VisMonikerListEntryType specifies the type of moniker specified in the 
-	 * VisMonikerListEntry structure. 
-	 *
-	 * The flag VMLET_MONIKER_LIST must be set within this structure. This flag tells
-	 * the system that this isn't actually a VisMoniker structure but is instead a
-	 * VisMonikerListEntry.
-	 *
-	 * The system uses the other flags in this structure to determine the type of 
-	 * moniker contained as the list entry. The system will use this information to
-	 * select the most appropriate moniker that will satisfy the system's needs. This
-	 * method is used most often in the selection of a GenPrimary's main application 
-	 * moniker based on the DisplaySize of the system.
-	 * 
-	 * VMLET_GS_SIZE stores the DisplaySize that this moniker is most appropriate for. 
-	 * This DisplaySize is set using the "size" entry within the visual moniker 
-	 * declaration.
-	 *
-	 * VMLET_STYLE stores the VMStyle that this moniker most closely matches. This 
-	 * VMStyle is set using the "style" entry within the visual moniker declaration.
-	 *
-	 * VMLET_GSTRING specifies that this moniker list entry is in the form of a gstring
-	 * If this flag is set, VMLET_GS_ASPECT_RATIO and VMLET_GS_COLOR specify the 
-	 * DisplayAspectRatio and DisplayClass used by this gstring.
-	 */
-	
-	typedef ByteFlags VisMonikerListEntryType;
-	#define VMLET_GS_SIZE			0x0300 	/* DisplaySize. */
-	#define VMLET_STYLE				0x0f00	/* VMStyle */
-	#define VMLET_MONIKER_LIST		0x0080
-	#define VMLET_GSTRING			0x0040
-	#define VMLET_GS_ASPECT_RATIO	0x0030	/* DisplayAspectRatio */
-	#define VMLET_GS_COLOR			0x000f	/* DisplayClass */
-	
-	#define VMLET_GS_SIZE_OFFSET			12
-	#define VMLET_STYLE_OFFSET				8
-	#define VMLET_GS_ASPECT_RATIO_OFFSET	4
-	#define VMLET_GS_COLOR_OFFSET			0
-	
-	/* VMStyle specifies the style of the visual moniker. The system may select a 
-	 * moniker based on the style it wishes to display. */
-	
-	typedef ByteEnum VMStyle;
-	#define VMS_TEXT 0				/* Simple text */
-	#define VMS_ABBREV_TEXT 1		/* Abbreviated text */
-	#define VMS_GRAPHIC_TEXT 2		/* Textual graphics string */
-	#define VMS_ICON 3				/* Normal gstring */
-	#define VMS_TOOL 4				/* Tool-sized gstring */
+    /* If GI_visMoniker contains a list of monikers instead of a single moniker, the 
+     * ChunkHandle of that instance field actually points to a collection of 
+     * VisMonikerListEntry structures. (The total number can be calculated by dividing 
+     * the size of the chunk by sizeof(VisMonikerListEntry) if needed.)
+     *
+     * Each VisMonikerListEntry structure contains a header which describes the type of 
+     * VisMoniker stored in that list entry (VisMonikerListEntryType) and the optr of 
+     * the stored moniker. The actual moniker may reside in a different resource. */
+    
+    typedef struct {
+        word        VMLE_type;
+        optr        VMLE_moniker;
+    } VisMonikerListEntry;
+    
+    /* VisMonikerListEntryType specifies the type of moniker specified in the 
+     * VisMonikerListEntry structure. 
+     *
+     * The flag VMLET_MONIKER_LIST must be set within this structure. This flag tells
+     * the system that this isn't actually a VisMoniker structure but is instead a
+     * VisMonikerListEntry.
+     *
+     * The system uses the other flags in this structure to determine the type of 
+     * moniker contained as the list entry. The system will use this information to
+     * select the most appropriate moniker that will satisfy the system's needs. This
+     * method is used most often in the selection of a GenPrimary's main application 
+     * moniker based on the DisplaySize of the system.
+     * 
+     * VMLET_GS_SIZE stores the DisplaySize that this moniker is most appropriate for. 
+     * This DisplaySize is set using the "size" entry within the visual moniker 
+     * declaration.
+     *
+     * VMLET_STYLE stores the VMStyle that this moniker most closely matches. This 
+     * VMStyle is set using the "style" entry within the visual moniker declaration.
+     *
+     * VMLET_GSTRING specifies that this moniker list entry is in the form of a gstring
+     * If this flag is set, VMLET_GS_ASPECT_RATIO and VMLET_GS_COLOR specify the 
+     * DisplayAspectRatio and DisplayClass used by this gstring.
+     */
+    
+    typedef ByteFlags VisMonikerListEntryType;
+    #define VMLET_GS_SIZE           0x0300  /* DisplaySize. */
+    #define VMLET_STYLE             0x0f00  /* VMStyle */
+    #define VMLET_MONIKER_LIST      0x0080
+    #define VMLET_GSTRING           0x0040
+    #define VMLET_GS_ASPECT_RATIO   0x0030  /* DisplayAspectRatio */
+    #define VMLET_GS_COLOR          0x000f  /* DisplayClass */
+    
+    #define VMLET_GS_SIZE_OFFSET            12
+    #define VMLET_STYLE_OFFSET              8
+    #define VMLET_GS_ASPECT_RATIO_OFFSET    4
+    #define VMLET_GS_COLOR_OFFSET           0
+    
+    /* VMStyle specifies the style of the visual moniker. The system may select a 
+     * moniker based on the style it wishes to display. */
+    
+    typedef ByteEnum VMStyle;
+    #define VMS_TEXT 0              /* Simple text */
+    #define VMS_ABBREV_TEXT 1       /* Abbreviated text */
+    #define VMS_GRAPHIC_TEXT 2      /* Textual graphics string */
+    #define VMS_ICON 3              /* Normal gstring */
+    #define VMS_TOOL 4              /* Tool-sized gstring */
 
 ----------
 For information on manipulating visual monikers dynamically using 
@@ -1188,28 +1188,28 @@ create and reassign all necessary links.
 ----------
 **Code Display 2-13 Using GI_comp to Add Children**
 
-	/* The GenInteraction (MyInteraction) acts as the parent object for the three
-	 * child GenTriggers. All three GenTrigger children will be placed within the
-	 * GenInteraction object. */
-	
-	@object GenInteractionClass MyInteraction = {
-		GI_visMoniker = "Menu";					 /* Text Moniker */
-		GII_visibility = GIV_POPUP;				 /* Creates a Menu */
-		GI_comp = @MyFirstChild, @MySecondChild, @MyThirdChild;
-												/* list of children */
-	}
-	
-	@object GenTriggerClass MyFirstChild= {
-		GI_visMoniker = "Child 1";				/* Text Moniker */
-	}
-	
-	@object GenTriggerClass MySecondChild = {
-		GI_visMoniker = "Child 2";				/* Text Moniker */
-	}
-	
-	@object GenTriggerClass MyThirdChild = {
-		GI_visMoniker = "Child 3";				/* Text Moniker */
-	}
+    /* The GenInteraction (MyInteraction) acts as the parent object for the three
+     * child GenTriggers. All three GenTrigger children will be placed within the
+     * GenInteraction object. */
+    
+    @object GenInteractionClass MyInteraction = {
+        GI_visMoniker = "Menu";                  /* Text Moniker */
+        GII_visibility = GIV_POPUP;              /* Creates a Menu */
+        GI_comp = @MyFirstChild, @MySecondChild, @MyThirdChild;
+                                                /* list of children */
+    }
+    
+    @object GenTriggerClass MyFirstChild= {
+        GI_visMoniker = "Child 1";              /* Text Moniker */
+    }
+    
+    @object GenTriggerClass MySecondChild = {
+        GI_visMoniker = "Child 2";              /* Text Moniker */
+    }
+    
+    @object GenTriggerClass MyThirdChild = {
+        GI_visMoniker = "Child 3";              /* Text Moniker */
+    }
 
 ----------
 This simple functionality is all you need to know to add children to your 
@@ -1289,25 +1289,25 @@ modified keystrokes, which may confuse the user. In general, it is good
 practice to use the "control" key exclusively for keyboard accelerators to 
 prevent overlapping with GEOS keyboard acclelators and mnemonics.
 
-**Table 2-1** *Valid Action Keys for Keyboard Accelerators*  
-*These keys are only valid using the specific UI keyword. These Action Keys 
-must also be combined with valid Modifiers (alt, shift, or ctrl)*.  
+**Table 2-1** Valid Action Keys for Keyboard Accelerators.  
+_These keys are only valid using the specific UI keyword. These Action Keys 
+must also be combined with valid Modifiers (alt, shift, or ctrl)_
 
-	NUMPAD_0				SPACE		UP
-	NUMPAD_1				TAB			DOWN
-	NUMPAD_2				ESCAPE		RIGHT
-	NUMPAD_3				F1			LEFT
-	NUMPAD_4				F2			HOME
-	NUMPAD_5				F3			END
-	NUMPAD_6				F4			PAGEUP
-	NUMPAD_7				F5			PAGEDOWN
-	NUMPAD_8				F6			INSERT
-	NUMPAD_9				F7			DELETE
-	NUMPAD_PLUS				F8			BACKSPACE
-	NUMPAD_MINUS			F9			MINUS
-	NUMPAD_DIV				F10			ENTER
-	NUMPAD_MULT				F11
-	NUMPAD_PERIOD			F12
+    NUMPAD_0                SPACE       UP
+    NUMPAD_1                TAB         DOWN
+    NUMPAD_2                ESCAPE      RIGHT
+    NUMPAD_3                F1          LEFT
+    NUMPAD_4                F2          HOME
+    NUMPAD_5                F3          END
+    NUMPAD_6                F4          PAGEUP
+    NUMPAD_7                F5          PAGEDOWN
+    NUMPAD_8                F6          INSERT
+    NUMPAD_9                F7          DELETE
+    NUMPAD_PLUS             F8          BACKSPACE
+    NUMPAD_MINUS            F9          MINUS
+    NUMPAD_DIV              F10         ENTER
+    NUMPAD_MULT             F11
+    NUMPAD_PERIOD           F12
 
 
 You can set up keyboard accelerators using the *GI_kbdAccelerator* attribute. 
@@ -1328,27 +1328,27 @@ accelerator below the object's visual moniker.
 Code Display 2-14 Using a Keyboard Accelerator
 
 ----------
-	@object GenTriggerClass MyTrigger = {
-		/* Case is ignored for keyboard accelerators. */
-		GI_kbdAccelerator = ctrl `R';		/* `ctrl' and `control' are both valid. */
-	}
-	
-	/ * Other examples:
-		GI_kbdAccelerator = control `A';
-	
-		Case is ignored for keyboard accelerators (unlike mnemonics). If you need
-		an uppercase `A', use `shift' as a modifier.
-	
-		GI_kbdAccelerator = control shift `A';
-		GI_kbdAccelerator = alt `z';
-		GI_kbdAccelerator = alt shift `Z';
-		GI_kbdAccelerator = ctrl shift `G';
-	
-		If you know what specific keyboard set will be implemented, you can add such
-		special characters with the @specificUI keyword, though this is discouraged.
-	
-		GI_kbdAccelerator = @specificUI alt shift DELETE;
-		GI_kbdAccelerator = @specificUI F6;						*/
+    @object GenTriggerClass MyTrigger = {
+        /* Case is ignored for keyboard accelerators. */
+        GI_kbdAccelerator = ctrl `R';       /* `ctrl' and `control' are both valid. */
+    }
+    
+    / * Other examples:
+        GI_kbdAccelerator = control `A';
+    
+        Case is ignored for keyboard accelerators (unlike mnemonics). If you need
+        an uppercase `A', use `shift' as a modifier.
+    
+        GI_kbdAccelerator = control shift `A';
+        GI_kbdAccelerator = alt `z';
+        GI_kbdAccelerator = alt shift `Z';
+        GI_kbdAccelerator = ctrl shift `G';
+    
+        If you know what specific keyboard set will be implemented, you can add such
+        special characters with the @specificUI keyword, though this is discouraged.
+    
+        GI_kbdAccelerator = @specificUI alt shift DELETE;
+        GI_kbdAccelerator = @specificUI F6;                     */
 
 ----------
 For information on manipulating keyboard accelerators dynamically, see 
@@ -1356,7 +1356,7 @@ For information on manipulating keyboard accelerators dynamically, see
 
 ### 2.3.4 Attributes
 
-	GI_attrs, MSG_GEN_GET_ATTRIBUTES, MSG_GEN_SET_ATTRS
+    GI_attrs, MSG_GEN_GET_ATTRIBUTES, MSG_GEN_SET_ATTRS
 
 The *GI_attrs* attribute is a record specifying how an object will behave under 
 various circumstances. In some cases, the *GI_attrs* instance field indicates 
@@ -1467,31 +1467,31 @@ behavior by including one of the visibility vardata attributes.
 ----------
 **Code Display 2-15 Using GI_attrs in a Dialog Box**
 
-	@object GenInteractionClass MyDialogBox = {
-		GI_comp = @MyButton, @MyOtherButton;
-		GII_visibility = GIV_DIALOG;	/* build this Interaction as a dialog box.*/
-	}
-	
-	@object GenTriggerClass MyButton = {
-		GTI_actionMsg = MSG_MY_SPECIAL_MESSAGE;
-		GTI_destination = process;
-		/* MyButton, when activated, will send the message above to the
-		 * process object. Only when that happens will it activate the
-		 * behavior within the GI_attrs instance data below. */
-		GI_attrs = @default | 
-		/* This flag will close the MyDialogBox object */
-		GA_SIGNAL_INTERACTION_COMPLETE |
-		/* This flag will set the application to ignore all input events while the
-		 * message above is processed. */
-		GA_INITIATES_INPUT_IGNORE;
-	}
+    @object GenInteractionClass MyDialogBox = {
+        GI_comp = @MyButton, @MyOtherButton;
+        GII_visibility = GIV_DIALOG;    /* build this Interaction as a dialog box.*/
+    }
+    
+    @object GenTriggerClass MyButton = {
+        GTI_actionMsg = MSG_MY_SPECIAL_MESSAGE;
+        GTI_destination = process;
+        /* MyButton, when activated, will send the message above to the
+         * process object. Only when that happens will it activate the
+         * behavior within the GI_attrs instance data below. */
+        GI_attrs = @default | 
+        /* This flag will close the MyDialogBox object */
+        GA_SIGNAL_INTERACTION_COMPLETE |
+        /* This flag will set the application to ignore all input events while the
+         * message above is processed. */
+        GA_INITIATES_INPUT_IGNORE;
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_GET_ATTRIBUTES
 
-	byte	MSG_GEN_GET_ATTRIBUTES();
+    byte    MSG_GEN_GET_ATTRIBUTES();
 
 This message retrieves the *GI_attrs* instance data for the object the message 
 is sent to. This message returns a byte length bitfield.
@@ -1507,9 +1507,9 @@ is sent to. This message returns a byte length bitfield.
 ----------
 #### MSG_GEN_SET_ATTRS
 
-	void	MSG_GEN_SET_ATTRS(
-			byte attrsToSet,
-			byte attrsToClear);
+    void    MSG_GEN_SET_ATTRS(
+            byte attrsToSet,
+            byte attrsToClear);
 
 This message sets the recipient's *GI_attrs* field. This message takes two 
 arguments: the attributes to set and the attributes to clear. There is no need 
@@ -1535,36 +1535,36 @@ Setting the attributes of a GS_USABLE object may cause an error.
 ----------
 **Code Display 2-16 Conditionally Altering the GI_attrs Field**
 
-	@method MyProcessClass, MSG_DO_CUSTOM_ATTRS {
-		byte MyAttrs;
+    @method MyProcessClass, MSG_DO_CUSTOM_ATTRS {
+        byte MyAttrs;
 
-		/* retrieve the GI_attrs field */
-		MyAttrs = @call @MyObject::MSG_GEN_GET_ATTRIBUTES();
-	
-		/* If the GA_COMPLETES_INTERACTION bit is set, then set it 
-		 * GA_INITIATES_BUSY_STATE also. Otherwise set it
-		 * GA_INITIATES_INPUT_IGNORE. */
-	
-		if (MyAttrs & GA_COMPLETES_INTERACTION){
-			@call @MyObject::MSG_GEN_SET_NOT_USABLE();
-			@call @MyObject::MSG_GEN_SET_ATTRS(GA_INITIATES_BUSY_STATE, 0);
-	
-			/* Note that setting an object's GA_INITIATES_BUSY_STATE attribute will
-			 * not in itself initiate a busy state. That object will only issue a busy
-			 * state when it is activated in the normal fashion. */
-	
-			@call @MyObject::MSG_GEN_SET_USABLE();
-		} else {
-			@call @MyObject::MSG_GEN_SET_NOT_USABLE();
-			@call @MyObject::MSG_GEN_SET_ATTRS(GA_INITITATES_INPUT_IGNORE, 0);
-			@call @MyObject::MSG_GEN_SET_USABLE();
-		}
-	}
+        /* retrieve the GI_attrs field */
+        MyAttrs = @call @MyObject::MSG_GEN_GET_ATTRIBUTES();
+    
+        /* If the GA_COMPLETES_INTERACTION bit is set, then set it 
+         * GA_INITIATES_BUSY_STATE also. Otherwise set it
+         * GA_INITIATES_INPUT_IGNORE. */
+    
+        if (MyAttrs & GA_COMPLETES_INTERACTION){
+            @call @MyObject::MSG_GEN_SET_NOT_USABLE();
+            @call @MyObject::MSG_GEN_SET_ATTRS(GA_INITIATES_BUSY_STATE, 0);
+    
+            /* Note that setting an object's GA_INITIATES_BUSY_STATE attribute will
+             * not in itself initiate a busy state. That object will only issue a busy
+             * state when it is activated in the normal fashion. */
+    
+            @call @MyObject::MSG_GEN_SET_USABLE();
+        } else {
+            @call @MyObject::MSG_GEN_SET_NOT_USABLE();
+            @call @MyObject::MSG_GEN_SET_ATTRS(GA_INITITATES_INPUT_IGNORE, 0);
+            @call @MyObject::MSG_GEN_SET_USABLE();
+        }
+    }
 
 ----------
 ### 2.3.5 States
 
-	GI_states
+    GI_states
 
 The *GI_states* attribute is a record that holds the state of the generic object. 
 These states affect the object's visual representation and its functionality. By 
@@ -1648,18 +1648,18 @@ object GS_USABLE again. This ensures that the object is built out correctly
 ----------
 **Code Display 2-17 Setting GI_states**
 
-	@object GenTriggerClass MyTrigger = {
-		/* The default GI_states are GS_USABLE and GS_ENABLED.
-		 * This object will only be GS_USABLE */
-		GI_states = @default & ~GS_ENABLED;
-	}
+    @object GenTriggerClass MyTrigger = {
+        /* The default GI_states are GS_USABLE and GS_ENABLED.
+         * This object will only be GS_USABLE */
+        GI_states = @default & ~GS_ENABLED;
+    }
 
 ----------
 
 #### 2.3.5.1 The Usable State
 
-	MSG_GEN_GET_USABLE, MSG_GEN_SET_USABLE, 
-	MSG_GEN_SET_NOT_USABLE, MSG_GEN_CHECK_IF_FULLY_USABLE 
+    MSG_GEN_GET_USABLE, MSG_GEN_SET_USABLE, 
+    MSG_GEN_SET_NOT_USABLE, MSG_GEN_CHECK_IF_FULLY_USABLE 
 
 Setting an object GS_USABLE will incorporate the object into the generic tree 
 and regard the object as part of the user interface. (It will not by itself enable 
@@ -1671,7 +1671,7 @@ manipulate an object's usable state.
 ----------
 #### MSG_GEN_GET_USABLE
 
-	Boolean	MSG_GEN_GET_USABLE();
+    Boolean MSG_GEN_GET_USABLE();
 
 This message checks the GS_USABLE bit of the *GI_states* field.
 
@@ -1688,8 +1688,8 @@ This message checks the GS_USABLE bit of the *GI_states* field.
 ----------
 #### MSG_GEN_SET_USABLE
 
-	void	MSG_GEN_SET_USABLE(
-			VisUpdateMode updateMode);
+    void    MSG_GEN_SET_USABLE(
+            VisUpdateMode updateMode);
 
 This message sets an object GS_USABLE. (This message has no effect on an 
 object already GS_USABLE.) Objects may be set GS_USABLE only after they 
@@ -1725,8 +1725,8 @@ the screen.
 ----------
 #### MSG_GEN_SET_NOT_USABLE
 
-	void	MSG_GEN_SET_NOT_USABLE(
-			VisUpdateMode updateMode);
+    void    MSG_GEN_SET_NOT_USABLE(
+            VisUpdateMode updateMode);
 
 This message sets an object not usable (clears the GS_USABLE bit). Because 
 an object may be visually unbuilt by this message, the **VisUpdateMode** 
@@ -1747,7 +1747,7 @@ the screen. May not be VUM_MANUAL.
 ----------
 #### MSG_GEN_CHECK_IF_FULLY_USABLE
 
-	Boolean	MSG_GEN_CHECK_IF_FULLY_USABLE();
+    Boolean MSG_GEN_CHECK_IF_FULLY_USABLE();
 
 This message checks whether an object is fully usable. The object and all of 
 its parents must be GS_USABLE for the object to be fully usable. 
@@ -1762,8 +1762,8 @@ its parents must be GS_USABLE for the object to be fully usable.
 
 #### 2.3.5.2 The Enabled State
 
-	MSG_GEN_GET_ENABLED, MSG_GEN_SET_ENABLED, 
-	MSG_GEN_SET_NOT_ENABLED, MSG_GEN_CHECK_IF_FULLY_ENABLED
+    MSG_GEN_GET_ENABLED, MSG_GEN_SET_ENABLED, 
+    MSG_GEN_SET_NOT_ENABLED, MSG_GEN_CHECK_IF_FULLY_ENABLED
 
 An object that is GS_ENABLED is ready for user interaction. As in the case 
 with GS_USABLE, all parents of the object in question must be GS_ENABLED 
@@ -1779,7 +1779,7 @@ disabled object will visually update it.
 ----------
 
 #### MSG_GEN_GET_ENABLED
-	Boolean  MSG_GEN_GET_ENABLED();
+    Boolean  MSG_GEN_GET_ENABLED();
 
 This message returns the enabled state of the object the message is sent to.
 
@@ -1795,8 +1795,8 @@ This message returns the enabled state of the object the message is sent to.
 
 #### MSG_GEN_SET_ENABLED
 
-	void	MSG_GEN_SET_ENABLED(
-			VisUpdateMode updateMode);
+    void    MSG_GEN_SET_ENABLED(
+            VisUpdateMode updateMode);
 
 This message sets an object GS_ENABLED. (This message has no effect on an 
 object already GS_ENABLED.) You must pass this message a 
@@ -1818,8 +1818,8 @@ the screen.
 
 #### MSG_GEN_SET_NOT_ENABLED
 
-	void	MSG_GEN_SET_NOT_ENABLED(
-			VisUpdateMode updateMode);
+    void    MSG_GEN_SET_NOT_ENABLED(
+            VisUpdateMode updateMode);
 
 This message sets the object not enabled (clears the object's GS_ENABLED 
 bit.) You must pass the message a **VisUpdateMode**. In most specific UIs a 
@@ -1840,7 +1840,7 @@ the screen. May not be VUM_MANUAL.
 
 #### MSG_GEN_CHECK_IF_FULLY_ENABLED
 
-	Boolean	MSG_GEN_CHECK_IF_FULLY_ENABLED();
+    Boolean MSG_GEN_CHECK_IF_FULLY_ENABLED();
 
 This message checks whether an object is fully enabled. An object is only fully 
 enabled (ready for user interaction) when both it and all of its ancestors are 
@@ -1886,13 +1886,13 @@ of moniker, the width of the moniker chunk, and the moniker data.
 
 ### 2.4.2 Managing Visual Monikers
 
-	MSG_GEN_GET_VIS_MONIKER, MSG_GEN_USE_VIS_MONIKER, 
-	MSG_GEN_CREATE_VIS_MONIKER, MSG_GEN_REPLACE_VIS_MONIKER, 
-	MSG_GEN_REPLACE_VIS_MONIKER_OPTR, 
-	MSG_GEN_REPLACE_VIS_MONIKER_TEXT, MSG_GEN_FIND_MONIKER, 
-	MSG_GEN_DRAW_MONIKER, MSG_GEN_GET_MONIKER_POS, 
-	MSG_GEN_GET_MONIKER_SIZE, MSG_GEN_RELOC_MONIKER_LIST, 
-	MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER
+    MSG_GEN_GET_VIS_MONIKER, MSG_GEN_USE_VIS_MONIKER, 
+    MSG_GEN_CREATE_VIS_MONIKER, MSG_GEN_REPLACE_VIS_MONIKER, 
+    MSG_GEN_REPLACE_VIS_MONIKER_OPTR, 
+    MSG_GEN_REPLACE_VIS_MONIKER_TEXT, MSG_GEN_FIND_MONIKER, 
+    MSG_GEN_DRAW_MONIKER, MSG_GEN_GET_MONIKER_POS, 
+    MSG_GEN_GET_MONIKER_SIZE, MSG_GEN_RELOC_MONIKER_LIST, 
+    MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER
 
 Sending MSG_GEN_GET_VIS_MONIKER to an object returns the chunk 
 handle of the visual moniker (*GI_visMoniker*) for that object. You can then 
@@ -1949,7 +1949,7 @@ start the top-down search, passing the text to perform the match.
 ----------
 #### MSG_GEN_GET_VIS_MONIKER
 
-	ChunkHandle	 MSG_GEN_GET_VIS_MONIKER();
+    ChunkHandle  MSG_GEN_GET_VIS_MONIKER();
 
 This message retrieves the instance data in the object's current 
 GI_visMoniker instance field. This message returns the ChunkHandle of the 
@@ -1967,9 +1967,9 @@ the visual moniker directly or to copy the moniker for use by other objects.
 ----------
 
 #### MSG_GEN_USE_VIS_MONIKER
-	void	MSG_GEN_USE_VIS_MONIKER(
-			ChunkHandle moniker,
-			VisUpdateMode updateMode);
+    void    MSG_GEN_USE_VIS_MONIKER(
+            ChunkHandle moniker,
+            VisUpdateMode updateMode);
 
 This message allows an object to reference a visual moniker; this message 
 does not destroy the chunk of the object's current visual moniker. The 
@@ -1999,49 +1999,49 @@ will be redrawn.
 ----------
 **Code Display 2-18 Getting and Using Visual Monikers**
 
-	/* This method effectively copies a visual moniker from ObjectOne into ObjectTwo.
-	 * Both objects must reside in the same object block. Note that in effect, both
-	 * ObjectOne and ObjectTwo will "share" the same moniker. This can be dangerous if
-	 * one object is freed, thereby causing the other object to become dereferenced.
-	 * For more complex copy operations, use MSG_GEN_REPLACE_VIS_MONIKER instead. */
-	
-	@method MyProcessClass, MSG_MY_MONIKER_MESSAGE {
-		/* Set up variable to store the chunk handle of the visual moniker. */
-		ChunkHandle MyVisMonikerCH;
-	
-		/* Retrieve the visMoniker of ObjectOne and store it in the variable. */
-		MyVisMonikerCH = @call @ObjectOne::MSG_GEN_GET_VIS_MONIKER();
-	
-		/* Set the visMoniker of Object Two to MyVisMonikerCH and update
-		 * immediately. Use @send if you don't expect a return value. */
-		@send @ObjectTwo::MSG_GEN_USE_VIS_MONIKER(MyVisMonikerCH, VUM_NOW);
-	}
-	
-	/* You can also declare visual monikers in your .goc file and set them later */
-	
-		@visMoniker OnMoniker = "On";
-		@visMoniker OffMoniker = "Off";
+    /* This method effectively copies a visual moniker from ObjectOne into ObjectTwo.
+     * Both objects must reside in the same object block. Note that in effect, both
+     * ObjectOne and ObjectTwo will "share" the same moniker. This can be dangerous if
+     * one object is freed, thereby causing the other object to become dereferenced.
+     * For more complex copy operations, use MSG_GEN_REPLACE_VIS_MONIKER instead. */
+    
+    @method MyProcessClass, MSG_MY_MONIKER_MESSAGE {
+        /* Set up variable to store the chunk handle of the visual moniker. */
+        ChunkHandle MyVisMonikerCH;
+    
+        /* Retrieve the visMoniker of ObjectOne and store it in the variable. */
+        MyVisMonikerCH = @call @ObjectOne::MSG_GEN_GET_VIS_MONIKER();
+    
+        /* Set the visMoniker of Object Two to MyVisMonikerCH and update
+         * immediately. Use @send if you don't expect a return value. */
+        @send @ObjectTwo::MSG_GEN_USE_VIS_MONIKER(MyVisMonikerCH, VUM_NOW);
+    }
+    
+    /* You can also declare visual monikers in your .goc file and set them later */
+    
+        @visMoniker OnMoniker = "On";
+        @visMoniker OffMoniker = "Off";
 
-		/* Within a method, the following routine will set the moniker to "On". The
-		 * OptrToChunk operator casts the object from an optr to a ChunkHandle. */
-		@call @MyObject::MSG_GEN_SET_MONIKER(OptrToChunk(@OnMoniker), VUM_NOW);
-	
-		/* Within a method, the following routine will set the moniker to "Off" */
-	    @call @MyObject::MSG_GEN_SET_MONIKER(OptrToChunk(@OffMoniker), VUM_NOW);
+        /* Within a method, the following routine will set the moniker to "On". The
+         * OptrToChunk operator casts the object from an optr to a ChunkHandle. */
+        @call @MyObject::MSG_GEN_SET_MONIKER(OptrToChunk(@OnMoniker), VUM_NOW);
+    
+        /* Within a method, the following routine will set the moniker to "Off" */
+        @call @MyObject::MSG_GEN_SET_MONIKER(OptrToChunk(@OffMoniker), VUM_NOW);
 
 ----------
 
 ----------
 #### MSG_GEN_REPLACE_VIS_MONIKER
 
-	ChunkHandle	 MSG_GEN_REPLACE_VIS_MONIKER(@stack
-				VisUpdateMode			updateMode,
-				word					height,
-				word					width,
-				word					length,
-				VisMonikerDataType		dataType,
-				VisMonikerSourceType	sourceType,
-				dword					source);
+    ChunkHandle  MSG_GEN_REPLACE_VIS_MONIKER(@stack
+                VisUpdateMode           updateMode,
+                word                    height,
+                word                    width,
+                word                    length,
+                VisMonikerDataType      dataType,
+                VisMonikerSourceType    sourceType,
+                dword                   source);
 
 This message copies a visual moniker from a source to the object that sent the 
 message. The message returns the chunk handle of the newly copied 
@@ -2098,9 +2098,9 @@ in *sourceType*.
 ----------
 #### MSG_GEN_REPLACE_VIS_MONIKER_OPTR
 
-	ChunkHandle	 MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
-				optr				source,
-				VisUpdateMode		updateMode);
+    ChunkHandle  MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                optr                source,
+                VisUpdateMode       updateMode);
 
 This message is a simplified version of MSG_GEN_REPLACE_VIS_MONIKER. 
 If your visual moniker source is an existing **visMoniker** structure, you can 
@@ -2124,9 +2124,9 @@ visually updating the changes to the screen.
 ----------
 #### MSG_GEN_REPLACE_VIS_MONIKER_TEXT
 
-	ChunkHandle	 MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
-				const char			*source,
-				VisUpdateMode		updateMode);
+    ChunkHandle  MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                const char          *source,
+                VisUpdateMode       updateMode);
 
 This message is a simplified version of MSG_GEN_REPLACE_VIS_MONIKER. 
 If your visual moniker source is a pointer to a null-terminated text string, 
@@ -2151,14 +2151,14 @@ visually updating the changes to the screen.
 ----------
 #### MSG_GEN_CREATE_VIS_MONIKER
 
-	ChunkHandle MSG_GEN_CREATE_VIS_MONIKER(@stack
-				CreateVisMonikerFlags		flags,
-				word						height,
-				word						width,
-				word						length,
-				VisMonikerDataType			dataType,
-				VisMonikerSourceType		sourceType,
-				dword						source);
+    ChunkHandle MSG_GEN_CREATE_VIS_MONIKER(@stack
+                CreateVisMonikerFlags       flags,
+                word                        height,
+                word                        width,
+                word                        length,
+                VisMonikerDataType          dataType,
+                VisMonikerSourceType        sourceType,
+                dword                       source);
 
 This message creates a visual moniker chunk within the resource block of the 
 object sent this message. The moniker is copied from the source specified but 
@@ -2205,10 +2205,10 @@ in *sourceType*.
 ----------
 #### MSG_GEN_FIND_MONIKER
 
-	optr	MSG_GEN_FIND_MONIKER(
-			Boolean			useAppMonikerList,
-			word			searchFlags,	/* VisMonikerSearchFlags */
-			MemHandle		destBlock);
+    optr    MSG_GEN_FIND_MONIKER(
+            Boolean         useAppMonikerList,
+            word            searchFlags,    /* VisMonikerSearchFlags */
+            MemHandle       destBlock);
 
 This message scans a list of monikers and selects a specific moniker (or the 
 most appropriate moniker). The moniker selected is determined according to 
@@ -2249,14 +2249,14 @@ may be outside the current object block.)
 ----------
 #### MSG_GEN_DRAW_MONIKER
 
-	void	MSG_GEN_DRAW_MONIKER(@stack
-			DrawMonikerFlags	monikerFlags,
-			word				textHeight,
-			GStateHandle		gState,
-			word				yMaximum,
-			word				xMaximum,
-			word				yInset,
-			word				xInset);
+    void    MSG_GEN_DRAW_MONIKER(@stack
+            DrawMonikerFlags    monikerFlags,
+            word                textHeight,
+            GStateHandle        gState,
+            word                yMaximum,
+            word                xMaximum,
+            word                yInset,
+            word                xInset);
 
 This message draws a moniker for an object according to the parameters 
 passed. The moniker must currently exist. You can use this message to 
@@ -2304,11 +2304,11 @@ drawing a currently existing visual moniker. This record is used by
 MSG_GEN_DRAW_MONIKER, MSG_GEN_GET_MONIKER_POS and 
 MSG_GEN_GET_MONIKER_SIZE. Its flags are shown below:
 
-	DMF_UNDERLINE_ACCELERATOR
-	DMF_CLIP_TO_MAX_WIDTH
-	DMF_NONE
-	DMF_Y_JUST_MASK		/* of type Justifications */
-	DMF_X_JUST_MASK		/* of type Justifications */
+    DMF_UNDERLINE_ACCELERATOR
+    DMF_CLIP_TO_MAX_WIDTH
+    DMF_NONE
+    DMF_Y_JUST_MASK     /* of type Justifications */
+    DMF_X_JUST_MASK     /* of type Justifications */
 
 Use DMF_UNDERLINE_ACCELERATOR to underline the keyboard 
 accelerator of a text moniker. Use DMF_CLIP_TO_MAX_WIDTH to clip the 
@@ -2319,22 +2319,22 @@ The two justification masks are of type **Justification**, and they specify the
 vertical and horizontal justifications to use when drawing the moniker. The 
 values you can use in the justification fields are
 
-	J_LEFT
-	J_RIGHT
-	J_CENTER
-	J_FULL
+    J_LEFT
+    J_RIGHT
+    J_CENTER
+    J_FULL
 
 ----------
 #### MSG_GEN_GET_MONIKER_POS
 
-	XYValueASDWord MSG_GEN_GET_MONIKER_POS(@stack
-			DrawMonikerFlags	monikerFlags,
-			word				textHeight,
-			GStateHandle		gState,
-			word				yMaximum,
-			word				xMaximum,
-			word				yInset,
-			word				xInset);
+    XYValueASDWord MSG_GEN_GET_MONIKER_POS(@stack
+            DrawMonikerFlags    monikerFlags,
+            word                textHeight,
+            GStateHandle        gState,
+            word                yMaximum,
+            word                xMaximum,
+            word                yInset,
+            word                xInset);
 
 This message returns the x and y coordinates of the moniker for the object as 
 if the moniker were drawn according to the passed parameters (the same as 
@@ -2351,17 +2351,17 @@ modification of custom gadgets.
 
 **Parameters:** See MSG_GEN_DRAW_MONIKER.
 
-**Return:**	**XYValueAsDWord** which can be split up into x and y coordinates of 
+**Return:** **XYValueAsDWord** which can be split up into x and y coordinates of 
 the moniker position with the macros DWORD_X and DWORD_Y.
 
 **Interception:** Generally not intercepted.
 
 ----------
-n	MSG_GEN_GET_MONIKER_SIZE
+n   MSG_GEN_GET_MONIKER_SIZE
 
-	SizeAsDWord MSG_GEN_GET_MONIKER_SIZE(
-			word		textHeight,
-			GStateHandle		gState);
+    SizeAsDWord MSG_GEN_GET_MONIKER_SIZE(
+            word        textHeight,
+            GStateHandle        gState);
 
 This message returns the width and height (in points) of the moniker for the 
 object. Use the macros DWORD_WIDTH and DWORD_HEIGHT to extract the 
@@ -2387,9 +2387,9 @@ macros DWORD_WIDTH and DWORD_HEIGHT.
 ----------
 #### MSG_GEN_RELOC_MONIKER_LIST
 
-	void 	MSG_GEN_RELOC_MONIKER_LIST(
-			optr		monikerList,
-			word 		relocFlag); /* 0: relocate; 1: unrelocate */
+    void    MSG_GEN_RELOC_MONIKER_LIST(
+            optr        monikerList,
+            word        relocFlag); /* 0: relocate; 1: unrelocate */
 
 This method (un)relocates a passed moniker list. 
 
@@ -2410,9 +2410,9 @@ is desired.
 ----------
 #### MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER
 
-	optr	MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER(
-			char	*text,
-			word	flags);
+    optr    MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER(
+            char    *text,
+            word    flags);
 
 This message recursively searches through the generic tree (starting at the 
 object that sent the message) for an object whose visual moniker matches the 
@@ -2421,9 +2421,9 @@ GFTMF_EXACT_MATCH is passed); the message will return the first object
 whose initial characters match the given text. The message must pass 
 **GenFindObjectWithMonikerFlags**.
 
-		typedef WordFlags GenFindObjectWithMonikerFlags;
-		#define GFTMF_EXACT_MATCH 0x8000
-		#define GFTMF_SKIP_THIS_NODE 0x4000
+        typedef WordFlags GenFindObjectWithMonikerFlags;
+        #define GFTMF_EXACT_MATCH 0x8000
+        #define GFTMF_SKIP_THIS_NODE 0x4000
 
 If GFTMF_EXACT_MATCH is passed, the text and the visual moniker text 
 must match exactly (null-terminated). If GFTMF_SKIP_THIS_NODE is 
@@ -2446,8 +2446,8 @@ found.
 
 ### 2.4.3 Managing Keyboard Accelerators
 
-	MSG_GEN_GET_KBD_ACCELERATOR, MSG_GEN_SET_KBD_ACCELERATOR, 
-	MSG_GEN_CHANGE_ACCELERATOR 
+    MSG_GEN_GET_KBD_ACCELERATOR, MSG_GEN_SET_KBD_ACCELERATOR, 
+    MSG_GEN_CHANGE_ACCELERATOR 
 
 Keyboard Accelerators provide keyboard shortcuts for heavily used 
 application functions. For complete information on valid GI_kbdAccelerator 
@@ -2469,7 +2469,7 @@ a low-level replace operation.
 ----------
 #### MSG_GEN_GET_KBD_ACCLERATOR
 
-	word	MSG_GEN_GET_KBD_ACCELERATOR();
+    word    MSG_GEN_GET_KBD_ACCELERATOR();
 
 This message returns the object's current *GI_kbdAccelerator*. The message 
 returns a word-length data structure (**KeyboardShortcut**). You can then 
@@ -2488,9 +2488,9 @@ keyboard accelerator.
 ----------
 #### MSG_GEN_SET_KBD_ACCELERATOR
 
-	void	MSG_GEN_SET_KBD_ACCELERATOR(
-			word		accelerator,
-			VisUpdateMode		updateMode);
+    void    MSG_GEN_SET_KBD_ACCELERATOR(
+            word        accelerator,
+            VisUpdateMode       updateMode);
 
 This message sets the *GI_kbdAccelerator* of the object the message is sent to.
 
@@ -2510,25 +2510,25 @@ occurs.
 ----------
 **Code Display 2-19 Using a Keyboard Accelerator**
 
-	@kbdAccelerator ShortcutOne = ctrl shift `k';
-	
-		/* @specificUI keyword needed to use DELETE key */
-	@kbdAccelerator ShortcutTwo = @specificUI ctrl DELETE;
-	
-	@object GenTriggerClass MyTrigger = {
-		GI_kbdAccelerator = ShortcutOne;	/* sets accel to "ctrl shift `k'" */
-	}
-	@object GenTriggerClass MyOtherTrigger = {
-		GI_kbdAccelerator = ShortcutCopy;	/* Copies "ctrl shift `k'" to
-											 * MyOtherTrigger */
-	}
+    @kbdAccelerator ShortcutOne = ctrl shift `k';
+    
+        /* @specificUI keyword needed to use DELETE key */
+    @kbdAccelerator ShortcutTwo = @specificUI ctrl DELETE;
+    
+    @object GenTriggerClass MyTrigger = {
+        GI_kbdAccelerator = ShortcutOne;    /* sets accel to "ctrl shift `k'" */
+    }
+    @object GenTriggerClass MyOtherTrigger = {
+        GI_kbdAccelerator = ShortcutCopy;   /* Copies "ctrl shift `k'" to
+                                             * MyOtherTrigger */
+    }
 
 ----------
 #### MSG_GEN_CHANGE_ACCELERATOR
 
-	void	MSG_GEN_CHANGE_ACCELERATOR(
-			word	bitsToClear,
-			word	bitsToSet);
+    void    MSG_GEN_CHANGE_ACCELERATOR(
+            word    bitsToClear,
+            word    bitsToSet);
 
 This message changes the keyboard accelerator using constants defined in 
 the input library. In most cases, use MSG_GEN_SET_KBD_ACCELERATOR 
@@ -2611,8 +2611,8 @@ MSG_GEN_REMOVE_CHILD) to remove a child added in this manner.
 
 ### 2.5.1 Child-Parent Searches
 
-	MSG_GEN_FIND_CHILD, MSG_GEN_FIND_CHILD_AT_POSITION, 
-	MSG_GEN_FIND_PARENT, MSG_GEN_COUNT_CHILDREN
+    MSG_GEN_FIND_CHILD, MSG_GEN_FIND_CHILD_AT_POSITION, 
+    MSG_GEN_FIND_PARENT, MSG_GEN_COUNT_CHILDREN
 
 The following messages provide means of searching the generic tree. It is 
 necessary (in most cases) to check whether a child exists for an object before 
@@ -2624,8 +2624,8 @@ MSG_GEN_SEND_TO_CHILDREN, etc.
 
 ----------
 #### MSG_GEN_FIND_CHILD
-	word	MSG_GEN_FIND_CHILD(
-			optr child);
+    word    MSG_GEN_FIND_CHILD(
+            optr child);
 
 This message checks whether the object is a child of the recipient. If so, it 
 returns the child's position. If you wish to find out if a specific child currently 
@@ -2646,8 +2646,8 @@ child is not found.
 ----------
 #### MSG_GEN_FIND_CHILD_AT_POSITION
 
-	optr	MSG_GEN_FIND_CHILD_AT_POSITION(
-			word position);
+    optr    MSG_GEN_FIND_CHILD_AT_POSITION(
+            word position);
 
 This message returns the optr of the child at *position*, if any. Pass the 
 message the zero-based (zero indicates the first child) position to check. If no 
@@ -2667,7 +2667,7 @@ child is found, the message returns zero.
 ----------
 #### MSG_GEN_FIND_PARENT
 
-	optr	MSG_GEN_FIND_PARENT();
+    optr    MSG_GEN_FIND_PARENT();
 
 This message returns the parent of the recipient object, if any.
 
@@ -2683,7 +2683,7 @@ returns zero.
 ----------
 #### MSG_GEN_COUNT_CHILDREN
 
-	word	MSG_GEN_COUNT_CHILDREN();
+    word    MSG_GEN_COUNT_CHILDREN();
 
 This message returns the number of children of the recipient.
 
@@ -2697,8 +2697,8 @@ This message returns the number of children of the recipient.
 
 ### 2.5.2 Manipulating Children Directly
 
-	MSG_GEN_ADD_CHILD, MSG_GEN_REMOVE, MSG_GEN_REMOVE_CHILD, 
-	MSG_GEN_MOVE_CHILD, MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY
+    MSG_GEN_ADD_CHILD, MSG_GEN_REMOVE, MSG_GEN_REMOVE_CHILD, 
+    MSG_GEN_MOVE_CHILD, MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY
 
 The following messages create, move, and remove objects set up directly in 
 your **.goc** file or created with **ObjInstantiate()** or 
@@ -2711,16 +2711,16 @@ When adding or removing children, you typically have to use a
 flag; the other is a position number indicating a child's position. The record 
 has the following structure:
 
-	typedef WordFlags CompChildFlags;
-	#define CCF_MARK_DIRTY			0x8000 /* high bit */
-	#define CCF_REFERENCE			0x7FFF /* low 15 bits */
-	
-	#define CCF_REFERENCE_OFFSET			0
-	/* The CCF_REFERENCE field may have any integral
-	 * number or may be set to one of the following
-	 * constants:
-	 *	CCO_FIRST			first child's position
-	 *	CCO_LAST			last child's position */
+    typedef WordFlags CompChildFlags;
+    #define CCF_MARK_DIRTY          0x8000 /* high bit */
+    #define CCF_REFERENCE           0x7FFF /* low 15 bits */
+    
+    #define CCF_REFERENCE_OFFSET            0
+    /* The CCF_REFERENCE field may have any integral
+     * number or may be set to one of the following
+     * constants:
+     *  CCO_FIRST           first child's position
+     *  CCO_LAST            last child's position */
 
 The **CompChildFlags** fields are
 
@@ -2747,9 +2747,9 @@ cases.
 
 ----------
 #### MSG_GEN_ADD_CHILD
-	void	MSG_GEN_ADD_CHILD(
-			optr				child,
-			CompChildFlags		flags);
+    void    MSG_GEN_ADD_CHILD(
+            optr                child,
+            CompChildFlags      flags);
 
 This message adds the passed object as a child of the recipient. The child 
 object must not be GS_USABLE before being added to the generic tree. Make 
@@ -2796,38 +2796,38 @@ supplement or supersede default functionality.
 ----------
 **Code Display 2-20 ObjDuplicateBlock() with MSG_GEN_ADD_CHILD**
 
-	/* This method duplicates a pre-instantiated version of MyMenu.
-		 * A duplicated object block may also be added using MSG_GEN_ADD_CHILD.*/
+    /* This method duplicates a pre-instantiated version of MyMenu.
+         * A duplicated object block may also be added using MSG_GEN_ADD_CHILD.*/
 
-	@method MyProcessClass, MSG_DUPLICATE_MY_MENU {
-		MemHandle newBlock;		/* The handle of the Duplicate block. */
-		optr newMenu;			/* The optr of the new menu. */
-		GeodeHandle procHan;	/* The geode handle of the process. */
+    @method MyProcessClass, MSG_DUPLICATE_MY_MENU {
+        MemHandle newBlock;     /* The handle of the Duplicate block. */
+        optr newMenu;           /* The optr of the new menu. */
+        GeodeHandle procHan;    /* The geode handle of the process. */
 
-		procHan = GeodeGetProcessHandle();
-		newBlock = ObjDuplicateBlock(OptrToHandle(@MyMenu), procHan);
-				/* Pass the handle of MyMenu's resource as well as the
-				 * GeodeHandle of the process. */
+        procHan = GeodeGetProcessHandle();
+        newBlock = ObjDuplicateBlock(OptrToHandle(@MyMenu), procHan);
+                /* Pass the handle of MyMenu's resource as well as the
+                 * GeodeHandle of the process. */
 
-		/* The new optr is created from the newly created block. */
-		newMenu = ConstructOptr(newBlock, OptrToChunk(MyMenu));
+        /* The new optr is created from the newly created block. */
+        newMenu = ConstructOptr(newBlock, OptrToChunk(MyMenu));
 
-		/* Add the duplicated object tree (MyMenu) as the
-		* first child of MyPrimary. */
-		@call @MyPrimary::MSG_GEN_ADD_CHILD(newMenu, (CCF_MARK_DIRTY | CCO_FIRST));
+        /* Add the duplicated object tree (MyMenu) as the
+        * first child of MyPrimary. */
+        @call @MyPrimary::MSG_GEN_ADD_CHILD(newMenu, (CCF_MARK_DIRTY | CCO_FIRST));
 
-		/* Then set it usable. Remember, you cannot add a child
-		* that is already GS_USABLE. */
-		@call @newMenu::MSG_GEN_SET_USABLE(VUM_NOW);
-	}
+        /* Then set it usable. Remember, you cannot add a child
+        * that is already GS_USABLE. */
+        @call @newMenu::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY
 
-	void	MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY(
-			optr		child);
+    void    MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY(
+            optr        child);
 
 This message sets a parent link to a passed child object without adding a 
 composite link from the parent to the child. This is a "one way" link in that 
@@ -2846,9 +2846,9 @@ used with caution.
 ----------
 #### MSG_GEN_REMOVE
 
-	void 	MSG_GEN_REMOVE(
-			VisUpdateMode 		updateMode,
-			CompChildFlags 		flags) 
+    void    MSG_GEN_REMOVE(
+            VisUpdateMode       updateMode,
+            CompChildFlags      flags) 
 
 This message removes the receiving object from the generic tree. The object 
 to be removed need not be set not usable.
@@ -2869,9 +2869,9 @@ to be removed need not be set not usable.
 ----------
 #### MSG_GEN_REMOVE_CHILD
 
-	void	MSG_GEN_REMOVE_CHILD(
-			optr				child,
-			CompChildFlags		flags);
+    void    MSG_GEN_REMOVE_CHILD(
+            optr                child,
+            CompChildFlags      flags);
 
 This message removes the passed object from the recipient. A child must be 
 marked not GS_USABLE in order to be removed. The child must currently 
@@ -2892,28 +2892,28 @@ also exist as a child of the recipient.
 
 *flags* - **CompChildFlags** to use when removing the child.
 
-**Interception:**	Generally not intercepted. Custom gadgets may intercept to 
+**Interception:**   Generally not intercepted. Custom gadgets may intercept to 
 supplement or supersede default functionality.
 
 ----------
 **Code Display 2-21 MSG_GEN_REMOVE_CHILD**
 
-	/* This sample method removes the MyChild object from its parent, MyParent. */
-	@method MyProcessClass, MSG_REMOVE_MY_CHILD {
-		/* If the child currently exists, mark it not usable and remove it. */
-		if (@call @MyParent::MSG_GEN_FIND_CHILD(@MyChild) != -1) {
-			@call @MyChild::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
-			@call @MyParent::MSG_GEN_REMOVE_CHILD(@MyChild, CCF_MARK_DIRTY);
-		}
-	}
+    /* This sample method removes the MyChild object from its parent, MyParent. */
+    @method MyProcessClass, MSG_REMOVE_MY_CHILD {
+        /* If the child currently exists, mark it not usable and remove it. */
+        if (@call @MyParent::MSG_GEN_FIND_CHILD(@MyChild) != -1) {
+            @call @MyChild::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+            @call @MyParent::MSG_GEN_REMOVE_CHILD(@MyChild, CCF_MARK_DIRTY);
+        }
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_MOVE_CHILD
-	void	MSG_GEN_MOVE_CHILD(
-			optr				child,
-			CompChildFlags		flags);
+    void    MSG_GEN_MOVE_CHILD(
+            optr                child,
+            CompChildFlags      flags);
 
 This message moves the given object from the location it currently occupies 
 among its siblings to another location among its siblings. The object will still 
@@ -2948,10 +2948,10 @@ MSG_GEN_ADD_CHILD.
 
 ### 2.5.3 Branch Construction-Destruction
 
-	MSG_GEN_COPY_TREE, MSG_GEN_DESTROY, 
-	MSG_GEN_DESTROY_AND_FREE_BLOCK, 
-	MSG_GEN_BRANCH_REPLACE_PARAMS, 
-	MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT 
+    MSG_GEN_COPY_TREE, MSG_GEN_DESTROY, 
+    MSG_GEN_DESTROY_AND_FREE_BLOCK, 
+    MSG_GEN_BRANCH_REPLACE_PARAMS, 
+    MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT 
 
 In addition to instantiating and manipulating generic objects one at a time, 
 you can create, move, and destroy entire branches. One way of doing this is 
@@ -2963,25 +2963,25 @@ the source block.
 ----------
 **Code Display 2-22 Using ObjDuplicateResource()**
 
-	@start ResourceToCopy;
-	
-	@object GenItemGroupClass MyList = {
+    @start ResourceToCopy;
+    
+    @object GenItemGroupClass MyList = {
     GI_comp = @AirplaneEntry, @TrainEntry, @CarEntry, @BicycleEntry;
-	}
-	@object GenItemClass AirplaneEntry = {}
-	@object GenItemClass TrainEntry = {}
-	@object GenItemClass CarEntry = {}
-	@object GenItemClass BicycleEntry = {}
-	
-	@end ResourceToCopy;
-	
-	@method MyProcessClass, MSG_COPY_MY_RESOURCE {
-		MemHandle newBlock;
-	
-		newBlock = ObjDuplicateResouce(OptrToHandle(@MyList));
-		@call @MyPrimary::MSG_GEN_ADD_CHILD(ConstructOptr(newBlock,
-							OptrToChunk(@MyList));
-	}
+    }
+    @object GenItemClass AirplaneEntry = {}
+    @object GenItemClass TrainEntry = {}
+    @object GenItemClass CarEntry = {}
+    @object GenItemClass BicycleEntry = {}
+    
+    @end ResourceToCopy;
+    
+    @method MyProcessClass, MSG_COPY_MY_RESOURCE {
+        MemHandle newBlock;
+    
+        newBlock = ObjDuplicateResouce(OptrToHandle(@MyList));
+        @call @MyPrimary::MSG_GEN_ADD_CHILD(ConstructOptr(newBlock,
+                            OptrToChunk(@MyList));
+    }
 
 ----------
 
@@ -3018,10 +3018,10 @@ branch.
 ----------
 #### MSG_GEN_COPY_TREE
 
-	optr	MSG_GEN_COPY_TREE(
-			MemHandle		destBlock,
-			ChunkHandle		parentChunk,
-			word			flags);
+    optr    MSG_GEN_COPY_TREE(
+            MemHandle       destBlock,
+            ChunkHandle     parentChunk,
+            word            flags);
 
 This message copies an entire branch of a generic object tree, starting at the 
 object first called. Pass this message the handle of the destination object 
@@ -3073,46 +3073,46 @@ referenced by instance data of the intercepting class.
 ----------
 **Code Display 2-23 MSG_GEN_COPY_TREE**
 
-	/* Create a template resource block. For demonstration purposes, this block will
-	 * only contain one object, a GenItem. All declared resources must also be
-	 * declared in an application's corresponding .gp file. */
-	
-	@start MyTemplate;
-	@object GenItemClass TemplateItem = {
-		GI_states = @default & ~GS_USABLE;		/* Make sure it is NOT usable. */
-	}
-	@end MyTemplate;
-	
-	/* Start the Interface resource block */
-	@start Interface;
-	@object GenItemGroupClass MyList = { }
-			/* Object the template above will be added to. */
-	@end Interface
-	
-	@method MyProcessClass, MSG_COPY_A_LIST_ITEM {
-		optr		newListEntry;
+    /* Create a template resource block. For demonstration purposes, this block will
+     * only contain one object, a GenItem. All declared resources must also be
+     * declared in an application's corresponding .gp file. */
+    
+    @start MyTemplate;
+    @object GenItemClass TemplateItem = {
+        GI_states = @default & ~GS_USABLE;      /* Make sure it is NOT usable. */
+    }
+    @end MyTemplate;
+    
+    /* Start the Interface resource block */
+    @start Interface;
+    @object GenItemGroupClass MyList = { }
+            /* Object the template above will be added to. */
+    @end Interface
+    
+    @method MyProcessClass, MSG_COPY_A_LIST_ITEM {
+        optr        newListEntry;
 
-		/* This call copies TemplateItem to the location at MyList. The macros
-		 * OptrToHandle and OptrToChunk are used to cast the optr of MyList into
-		 * the proper type for MSG_GEN_COPY_TREE. This new linkage will be marked
-		 * dirty, and the child will become the first child of MyList. */
-		newListEntry = @call @TemplateItem::MSG_GEN_COPY_TREE(
-						OptrToHandle(@MyList),
-						OptrToChunk(@MyList),
-						(CCF_MARK_DIRTY | CCO_FIRST));
-	
-		/* The newListEntry is set usable to bring it up on screen. */
-		@call @newListEntry::MSG_GEN_SET_USABLE(VUM_NOW);
-	}
+        /* This call copies TemplateItem to the location at MyList. The macros
+         * OptrToHandle and OptrToChunk are used to cast the optr of MyList into
+         * the proper type for MSG_GEN_COPY_TREE. This new linkage will be marked
+         * dirty, and the child will become the first child of MyList. */
+        newListEntry = @call @TemplateItem::MSG_GEN_COPY_TREE(
+                        OptrToHandle(@MyList),
+                        OptrToChunk(@MyList),
+                        (CCF_MARK_DIRTY | CCO_FIRST));
+    
+        /* The newListEntry is set usable to bring it up on screen. */
+        @call @newListEntry::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_DESTROY
 
-	void	MSG_GEN_DESTROY(
-			VisUpdateMode		updateMode,
-			word				flags);
+    void    MSG_GEN_DESTROY(
+            VisUpdateMode       updateMode,
+            word                flags);
 
 This message destroys a generic branch starting at the object called. The 
 message sets all required generic objects not usable, removes them from the 
@@ -3153,7 +3153,7 @@ to destroy the object's **GenClass** instance data.
 ----------
 #### MSG_GEN_DESTROY_AND_FREE_BLOCK
 
-	Boolean	MSG_GEN_DESTROY_AND_FREE_BLOCK();
+    Boolean MSG_GEN_DESTROY_AND_FREE_BLOCK();
 
 This is a utility message used to destroy a generic branch which resides 
 completely within one block. The block will be freed. The object called with 
@@ -3180,10 +3180,10 @@ unbuild process is carefully avoided.
 ----------
 #### MSG_GEN_BRANCH_REPLACE_PARAMS
 
-	void	MSG_GEN_BRANCH_REPLACE_PARAMS(@stack
-			BranchReplaceParamType		type,
-			dword						replaceParam,
-			dword						searchParam);
+    void    MSG_GEN_BRANCH_REPLACE_PARAMS(@stack
+            BranchReplaceParamType      type,
+            dword                       replaceParam,
+            dword                       searchParam);
 
 This message travels down a generic branch to all of an object's children; the 
 message replaces all instance data specified in type with replacement 
@@ -3235,9 +3235,9 @@ then search and replace any instance data in the intercepting class.
 ----------
 #### MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT
 
-	void	MSG_GEN_BRANCH_OUTPUT_OPTR_CONSTANT(
-			optr		replacementOptr,
-			word		searchConstant);
+    void    MSG_GEN_BRANCH_OUTPUT_OPTR_CONSTANT(
+            optr        replacementOptr,
+            word        searchConstant);
 
 This message is a special case of MSG_GEN_BRANCH_REPLACE_PARAMS 
 where the **BranchReplaceParamType** is BRPT_OUTPUT_OPTR with a 
@@ -3302,7 +3302,7 @@ Managing VarData" below.
 
 #### 2.6.1.1 Destination Classes
 
-	ATTR_GEN_DESTINATION_CLASS
+    ATTR_GEN_DESTINATION_CLASS
 
 ATTR_GEN_DESTINATION_CLASS specifies the object class that should 
 handle messages sent out by this object. Typically, an object marked with this 
@@ -3318,54 +3318,54 @@ ATTR_GEN_DESTINATION_CLASS takes an argument of type
 may have to cast the class name into a **ClassStruct** type when setting 
 ATTR_GEN_DESTINATION_CLASS.
 
-	typedef struct {
-		ClassStruct		* DCA_class;
-	} DestinationClassArgs;
+    typedef struct {
+        ClassStruct     * DCA_class;
+    } DestinationClassArgs;
 
 ----------
 **Code Display 2-24 Using ATTR_GEN_DESTINATION_CLASS**
 
-	/* This object will send MSG_META_CUT to the application object and follow the
-	 * target path until it encounters a VisTextClass object. At that point, the
-	 * message will be handled. */
+    /* This object will send MSG_META_CUT to the application object and follow the
+     * target path until it encounters a VisTextClass object. At that point, the
+     * message will be handled. */
 
-	@object GenTriggerClass MyTrigger = {
-		GI_visMoniker = "This trigger cuts text from the target object."
-		GTI_actionMsg = MSG_META_CUT;
-		GTI_destination = (TO_APP_TARGET);
-	/* The class pointer points to a ClassStruct structure. */
-		ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&VisTextClass };
-	} 
-	
-	/* To set up a destination class as any generic object, set
-	 * ATTR_GEN_DESTINATION_CLASS to GenClass. This interaction sends
-	 * MSG_GEN_SET_NOT_USABLE to the first focus object below the GenInteraction. */
-	
-	@object GenTriggerClass MyTrigger = {
-		GI_visMoniker = "Remove the Focus object";
-		GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
-		GTI_destination = (TO_FOCUS);
-		ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenClass };
-	}
+    @object GenTriggerClass MyTrigger = {
+        GI_visMoniker = "This trigger cuts text from the target object."
+        GTI_actionMsg = MSG_META_CUT;
+        GTI_destination = (TO_APP_TARGET);
+    /* The class pointer points to a ClassStruct structure. */
+        ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&VisTextClass };
+    } 
+    
+    /* To set up a destination class as any generic object, set
+     * ATTR_GEN_DESTINATION_CLASS to GenClass. This interaction sends
+     * MSG_GEN_SET_NOT_USABLE to the first focus object below the GenInteraction. */
+    
+    @object GenTriggerClass MyTrigger = {
+        GI_visMoniker = "Remove the Focus object";
+        GTI_actionMsg = MSG_GEN_SET_NOT_USABLE;
+        GTI_destination = (TO_FOCUS);
+        ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenClass };
+    }
 
 ----------
 
-	typedef enum {
-			/* These values may be used as normal
-			 * TravelOptions, and have been set up
-			 * so that they will have no value in
-			 * common with normal TravelOptions. */
-		TO_GEN_PARENT=_FIRST_GenClass,
-		TO_FOCUS,
-		TO_TARGET,
-		TO_MODEL,
-		TO_APP_FOCUS,
-		TO_APP_TARGET,
-		TO_APP_MODEL,
-		TO_SYS_FOCUS,
-		TO_SYS_TARGET,
-		TO_SYS_MODEL,
-	} GenTravelOption;
+    typedef enum {
+            /* These values may be used as normal
+             * TravelOptions, and have been set up
+             * so that they will have no value in
+             * common with normal TravelOptions. */
+        TO_GEN_PARENT=_FIRST_GenClass,
+        TO_FOCUS,
+        TO_TARGET,
+        TO_MODEL,
+        TO_APP_FOCUS,
+        TO_APP_TARGET,
+        TO_APP_MODEL,
+        TO_SYS_FOCUS,
+        TO_SYS_TARGET,
+        TO_SYS_MODEL,
+    } GenTravelOption;
 
 The **TravelOption** types provided with **GenClass** are additional 
 enumerations of the types supplied with **MetaClass**. **MetaClass** provides 
@@ -3384,10 +3384,10 @@ destination.
 
 #### 2.6.1.2 Initialization File Management
 
-	MSG_GEN_LOAD_OPTIONS, MSG_GEN_SAVE_OPTIONS, 
-	ATTR_GEN_INIT_FILE_KEY, ATTR_GEN_INIT_FILE_CATEGORY, 
-	ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN, 
-	ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY
+    MSG_GEN_LOAD_OPTIONS, MSG_GEN_SAVE_OPTIONS, 
+    ATTR_GEN_INIT_FILE_KEY, ATTR_GEN_INIT_FILE_CATEGORY, 
+    ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN, 
+    ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY
 
 Your object may request information from the GEOS.INI file upon startup. 
 Each object on the appropriate GenApplication GCN list may receive a 
@@ -3428,8 +3428,8 @@ Most applications should only need one init file category.
 ----------
 #### MSG_GEN_LOAD_OPTIONS
 
-	void	MSG_GEN_LOAD_OPTIONS(
-			GenOptionsParams		*params);
+    void    MSG_GEN_LOAD_OPTIONS(
+            GenOptionsParams        *params);
 
 This message instructs the generic object to load a value from the GEOS.INI 
 file. It is called automatically by the handler in **GenClass** for 
@@ -3462,8 +3462,8 @@ of category and file key is.
 ----------
 #### MSG_GEN_SAVE_OPTIONS
 
-	void	MSG_GEN_SAVE_OPTIONS(
-			GenOptionsParams		*params);
+    void    MSG_GEN_SAVE_OPTIONS(
+            GenOptionsParams        *params);
 
 This message instructs the generic object to save its options to the 
 initialization file.
@@ -3485,16 +3485,16 @@ of category and file key is.
 
 **Structures:** The **GenOptionsParams** structure is defined as follows:
 
-	typedef struct {
-		char	GOP_category[INIT_CATEGORY_BUFFER_SIZE];
-		char	GOP_key[INIT_CATEGORY_BUFFER_SIZE];
-	} GenOptionsParams;
+    typedef struct {
+        char    GOP_category[INIT_CATEGORY_BUFFER_SIZE];
+        char    GOP_key[INIT_CATEGORY_BUFFER_SIZE];
+    } GenOptionsParams;
 
 ----------
 
 #### 2.6.1.3 Altering Default Geometry Management
 
-	****ATTR_GEN_POSITION, ATTR_GEN_POSITION_X, ATTR_GEN_POSITION_Y
+    ****ATTR_GEN_POSITION, ATTR_GEN_POSITION_X, ATTR_GEN_POSITION_Y
 
 You may wish, in rare cases, to hard-wire a generic object's position relative 
 to its parent. You can do this by including one of these attributes with a 
@@ -3529,8 +3529,8 @@ avoid using these hints if possible.
 
 #### 2.6.1.4 Altering Delayed Mode Activity
 
-	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED, 
-	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED, 
+    ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED
 
 Most generic objects act on changes made by the user. Some generic objects 
 may not immediately react to these changes; instead these objects allow the 
@@ -3562,8 +3562,8 @@ these changes anyway.
 
 #### 2.6.1.5 Notification of Visibility
 
-	ATTR_GEN_VISIBILITY_DATA, ATTR_GEN_VISIBILITY_MESSAGE, 
-	ATTR_GEN_VISIBILITY_DESTINATION
+    ATTR_GEN_VISIBILITY_DATA, ATTR_GEN_VISIBILITY_MESSAGE, 
+    ATTR_GEN_VISIBILITY_DESTINATION
 
 If a generic object has its GA_NOTIFY_VISIBILITY bit set, it will notify the 
 GenApplication object when it becomes visible or not visible. The object does 
@@ -3581,7 +3581,7 @@ have no effect on objects not marked GA_NOTIFY_VISIBILITY.
 
 #### 2.6.1.6 Generic Properties
 
-	ATTR_GEN_PROPERTY, ATTR_GEN_NOT_PROPERTY
+    ATTR_GEN_PROPERTY, ATTR_GEN_NOT_PROPERTY
 
 Objects that exhibit properties (List Objects, GenValues, GenTexts, etc.) 
 sometimes do not exhibit immediate effects when the user interacts with the 
@@ -3623,11 +3623,11 @@ provide floating keyboards for pen input.
 
 ##### Window Layering
 
-	ATTR_GEN_WINDOW_CUSTOM_LAYER_ID, 
-	ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY, 
-	ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY, 
-	ATTR_GEN_WINDOW_CUSTOM_PARENT, 
-	ATTR_GEN_WINDOW_CUSTOM_WINDOW
+    ATTR_GEN_WINDOW_CUSTOM_LAYER_ID, 
+    ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY, 
+    ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY, 
+    ATTR_GEN_WINDOW_CUSTOM_PARENT, 
+    ATTR_GEN_WINDOW_CUSTOM_WINDOW
 
 ATTR_GEN_WINDOW_CUSTOM_LAYER_ID sets a unique layer identifier for 
 the windowed object. All objects with a common identifier are considered part 
@@ -3665,10 +3665,10 @@ is very low-level behavior and should be used with caution, however.
 
 ##### Window Input Management
 
-	ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED, 
-	ATTR_GEN_WINDOW_KBD_OVERRIDE, 
-	ATTR_GEN_WINDOW_KBD_POSITION, MSG_GEN_SET_KBD_OVERRIDE, 
-	MSG_GEN_SET_KBD_POSITION
+    ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED, 
+    ATTR_GEN_WINDOW_KBD_OVERRIDE, 
+    ATTR_GEN_WINDOW_KBD_POSITION, MSG_GEN_SET_KBD_OVERRIDE, 
+    MSG_GEN_SET_KBD_POSITION
 
 ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED indicates that 
 the object should accept ink even if it doesn't have the focus. In general, 
@@ -3726,8 +3726,8 @@ keyboard at.
 ----------
 #### MSG_GEN_SET_KBD_OVERRIDE
 
-	void	MSG_GEN_SET_KBD_OVERRIDE(
-			KeyboardOverride 		override);
+    void    MSG_GEN_SET_KBD_OVERRIDE(
+            KeyboardOverride        override);
 
 This message sets an object's ATTR_GEN_WINDOW_KBD_OVERRIDE to the 
 passed **KeyboardOverride** value.
@@ -3744,9 +3744,9 @@ passed **KeyboardOverride** value.
 ----------
 ### MSG_GEN_SET_KBD_POSITION
 
-	void	MSG_GEN_SET_KBD_POSITION(
-			sword		xCoord,
-			sword		yCoord);
+    void    MSG_GEN_SET_KBD_POSITION(
+            sword       xCoord,
+            sword       yCoord);
 
 This message sets an object's ATTR_GEN_WINDOW_KBD_POSITION to the 
 passed **Point** values. 
@@ -3773,8 +3773,8 @@ information.
 
 ##### Help Files
 
-	ATTR_GEN_HELP_FILE, ATTR_GEN_HELP_TYPE, 
-	ATTR_GEN_HELP_FILE_FROM_INIT_FILE, ATTR_GEN_HELP_CONTEXT
+    ATTR_GEN_HELP_FILE, ATTR_GEN_HELP_TYPE, 
+    ATTR_GEN_HELP_FILE_FROM_INIT_FILE, ATTR_GEN_HELP_CONTEXT
 
 ATTR_GEN_HELP_FILE stores the help file associated with this object. Help 
 files are generated by the help editor (a modified GeoWrite) from GeoWrite 
@@ -3789,8 +3789,8 @@ name as the application and a key named "helpfile." Thus, to set the help file
 to "My Own Help File" for the HelpSamp application, you could add the 
 following to your GEOS.INI file:
 
-	[HelpSamp]
-	helpfile = My Own Help File
+    [HelpSamp]
+    helpfile = My Own Help File
 
 If, however, no object has ATTR_GEN_HELP_FILE_FROM_INIT_FILE, this init 
 file entry will not be noticed by the help controller.
@@ -3813,7 +3813,7 @@ alter the contents of the object's ATTR_GEN_HELP_CONTEXT.
 
 ##### Focus Help
 
-	ATTR_GEN_FOCUS_HELP, ATTR_GEN_FOCUS_HELP_LIB
+    ATTR_GEN_FOCUS_HELP, ATTR_GEN_FOCUS_HELP_LIB
 
 ATTR_GEN_FOCUS_HELP is currently unsupported. This help mechanism is 
 a simple, scaled down version of the previously mentioned help system. A 
@@ -3827,7 +3827,7 @@ only applies to objects exported from a library(e.g., controllers).
 
 #### 2.6.1.9 Default Monikers
 
-	ATTR_GEN_DEFAULT_MONIKER, GenDefaultMonikerType
+    ATTR_GEN_DEFAULT_MONIKER, GenDefaultMonikerType
 
 ATTR_GEN_DEFAULT_MONIKER specifies a default moniker for this object. 
 Default monikers are generally used for gstring monikers that occur several 
@@ -3835,14 +3835,14 @@ places within the system (i.e., they are stored outside of the application).
 ATTR_GEN_DEFAULT_MONIKER expects an argument of type 
 **GenDefaultMonikerType**.
 
-	typedef enum {
-		GDMT_LEVEL_0,
-		GDMT_LEVEL_1,
-		GDMT_LEVEL_2,
-		GDMT_LEVEL_3,
-		GDMT_HELP,
-		GDMT_HELP_PRIMARY
-	} GenDefaultMonikerType;
+    typedef enum {
+        GDMT_LEVEL_0,
+        GDMT_LEVEL_1,
+        GDMT_LEVEL_2,
+        GDMT_LEVEL_3,
+        GDMT_HELP,
+        GDMT_HELP_PRIMARY
+    } GenDefaultMonikerType;
 
 The GDMT_LEVEL monikers correspond to the gstring monikers used to 
 indicate the current user level. GDMT_HELP corresponds to the default help 
@@ -3851,7 +3851,7 @@ trigger for a GenPrimary object.
 
 #### 2.6.1.10 Feature Links
 
-	ATTR_GEN_FEATURE_LINK
+    ATTR_GEN_FEATURE_LINK
 
 This optional attribute indicates that a feature within a GenControl object 
 maps to multiple generic trees within the child block. If a feature in a 
@@ -3862,8 +3862,8 @@ features are discussed more fully in "Generic UI Controllers," Chapter 12.
 
 #### 2.6.1.11 Generic Paths
 
-	ATTR_GEN_PATH_DATA, MSG_GEN_PATH_SET, MSG_GEN_PATH_GET, 
-	GenFilePath
+    ATTR_GEN_PATH_DATA, MSG_GEN_PATH_SET, MSG_GEN_PATH_GET, 
+    GenFilePath
 
 **GenClass** is able to keep track of file path information. **GenClass** does not 
 use this information itself, but maintains it so that various subclasses (e.g., 
@@ -3882,10 +3882,10 @@ after it has called the superclass (which will actually allocate the attribute).
 
 The ATTR_GEN_PATH_DATA field contains the following structure;
 
-	typedef struct {
-		DiskHandle 		GFP_disk;
-		PathName 		GFP_path;
-	} GenFilePath;
+    typedef struct {
+        DiskHandle      GFP_disk;
+        PathName        GFP_path;
+    } GenFilePath;
 
 *GFP_disk* stores the handle of the disk on which the path resides. This value 
 may be initialized to a **StandardPath** constant. *GFP_path* stores the 
@@ -3898,9 +3898,9 @@ alter an object's path with MSG_GEN_PATH_SET.
 ----------
 #### MSG_GEN_PATH_SET
 
-	Boolean 	MSG_GEN_PATH_SET(
-				char 		*path,
-				DiskHandle 		disk);
+    Boolean     MSG_GEN_PATH_SET(
+                char        *path,
+                DiskHandle      disk);
 
 This message sets the path associated with the object. Normally, a complete 
 path name must be passed. Note that this path string should not include a 
@@ -3929,9 +3929,9 @@ on by **GenClass**.
 ----------
 #### MSG_GEN_PATH_GET
 
-	Boolean 	MSG_GEN_PATH_GET(
-				char 		*buffer,
-				word 		bufSize);
+    Boolean     MSG_GEN_PATH_GET(
+                char        *buffer,
+                word        bufSize);
 
 This message returns a null-terminated complete path (no drive 
 letter-drive is implied by the disk handle) for the object. Note that if the 
@@ -3957,9 +3957,9 @@ invalid).
 ----------
 #### MSG_GEN_PATH_GET_BLOCK
 
-	@alias (MSG_GEN_PATH_GET)  MemHandle 	MSG_GEN_PATH_GET_BLOCK(
-			char 		*buffer, 	/* This must be NULL */
-			word 		bufSize);
+    @alias (MSG_GEN_PATH_GET)  MemHandle    MSG_GEN_PATH_GET_BLOCK(
+            char        *buffer,    /* This must be NULL */
+            word        bufSize);
 
 This message returns the handle of a block containing the path.
 
@@ -3979,7 +3979,7 @@ This message returns the handle of a block containing the path.
 ----------
 #### MSG_GEN_PATH_GET_DISK_HANDLE
 
-	DiskHandle MSG_GEN_PATH_GET_DISK_HANDLE();
+    DiskHandle MSG_GEN_PATH_GET_DISK_HANDLE();
 
 This message returns the disk handle for the path bound to the object.
 
@@ -4016,28 +4016,28 @@ be implemented.
 ----------
 **Code Display 2-25 Setting Hints**
 
-	@object GenInteractionClass MyInteraction = {
-		GI_comp = @OneTrigger, @TwoTrigger, @ThreeTrigger;
-	
-		/* Hints are added directly in an object's declaration. Note that each
-		 * vardata entry will expand the size of the object in memory. */
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		/* This hint instructs the specific UI to arrange the object's children
-		 * in one or more horizontal rows, if possible. */
-	}
-	
-	/* Hints are entered separately in C if multiple hints are desired. */
-	
-	@object MyObjectClass MyObject = {
-		GI_comp = @MyObjectChild;
-		HINT_LIST_CHECKBOXES;
-		HINT_ORIENT_CHILDREN_HORIZONTALLY;
-	}
+    @object GenInteractionClass MyInteraction = {
+        GI_comp = @OneTrigger, @TwoTrigger, @ThreeTrigger;
+    
+        /* Hints are added directly in an object's declaration. Note that each
+         * vardata entry will expand the size of the object in memory. */
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        /* This hint instructs the specific UI to arrange the object's children
+         * in one or more horizontal rows, if possible. */
+    }
+    
+    /* Hints are entered separately in C if multiple hints are desired. */
+    
+    @object MyObjectClass MyObject = {
+        GI_comp = @MyObjectChild;
+        HINT_LIST_CHECKBOXES;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
 
 ----------
 #### 2.6.2.1 System Attributes
 
-	SystemAttrs, HINT_IF_SYSTEM_ATTRS, HINT_ELSE, HINT_ENDIF
+    SystemAttrs, HINT_IF_SYSTEM_ATTRS, HINT_ELSE, HINT_ENDIF
 
 The system attributes are global flags that describe what sort of environment 
 is running the generic object. HINT_IF_SYSTEM_ATTRS is used to 
@@ -4083,37 +4083,37 @@ satisfied.
 ----------
 **Code Display 2-26 System Attributes**
 
-	/* The SA_NOT bit acts as a logical not operation. In this case, the hint 
-	 * HINT_EXPAND_HEIGHT_TO_FIT_PARENT will only be included in the object 
-	 * declaration if the system is not pen-based. In addition, if the system is tiny,
-	 * the other hints will be included. The HINT_ENDIF marks the end of these
-	 * conditional hints. */
+    /* The SA_NOT bit acts as a logical not operation. In this case, the hint 
+     * HINT_EXPAND_HEIGHT_TO_FIT_PARENT will only be included in the object 
+     * declaration if the system is not pen-based. In addition, if the system is tiny,
+     * the other hints will be included. The HINT_ENDIF marks the end of these
+     * conditional hints. */
 
-		HINT_IF_SYSTEM_ATTRS = SA_NOT | SA_PEN_BASED;
-			HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-		HINT_IF_SYSTEM_ATTRS = SA_TINY;
-			HINT_MINIMIZE_SIZE;
-			HINT_DISPLAY_CURRENT_SELECTION;
-		HINT_ENDIF;
-	
-	/* Example within an object declaration. */
-	
-	@object GenInteractionClass GroupingObject = {
-		GI_comp = @One, @Two, @Three, @Four, @Five, @Six;
-		HINT_IF_SYSTEM_ATTRS = SA_HORIZONTALLY_TINY;
-			HINT_ORIENT_CHILDREN_VERTICALLY;
-			HINT_WRAP_AFTER_CHILD_COUNT = 3;
-		HINT_ELSE;
-			HINT_ORIENT_CHILDREN_HORIZONTALLY;
-		HINT_ENDIF;
-	}
+        HINT_IF_SYSTEM_ATTRS = SA_NOT | SA_PEN_BASED;
+            HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_IF_SYSTEM_ATTRS = SA_TINY;
+            HINT_MINIMIZE_SIZE;
+            HINT_DISPLAY_CURRENT_SELECTION;
+        HINT_ENDIF;
+    
+    /* Example within an object declaration. */
+    
+    @object GenInteractionClass GroupingObject = {
+        GI_comp = @One, @Two, @Three, @Four, @Five, @Six;
+        HINT_IF_SYSTEM_ATTRS = SA_HORIZONTALLY_TINY;
+            HINT_ORIENT_CHILDREN_VERTICALLY;
+            HINT_WRAP_AFTER_CHILD_COUNT = 3;
+        HINT_ELSE;
+            HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_ENDIF;
+    }
 
 ----------
-#### 2.6.2.2	Default Actions
+#### 2.6.2.2    Default Actions
 
-	HINT_DEFAULT_DEFAULT_ACTION, 
-	HINT_ENSURE_TEMPORARY_DEFAULT, 
-	HINT_PREVENT_DEFAULT_OVERRIDES
+    HINT_DEFAULT_DEFAULT_ACTION, 
+    HINT_ENSURE_TEMPORARY_DEFAULT, 
+    HINT_PREVENT_DEFAULT_OVERRIDES
 
 Normally, objects in the user interface are activated by direct action (e.g., 
 clicking on them). Objects may also be indirectly activated, however. The 
@@ -4142,7 +4142,7 @@ object even if the specific UI does not normally allow such behavior.
 
 #### 2.6.2.3 Keyboard Navigation Hints
 
-	HINT_NAVIGATION_ID, HINT_NAVIGATION_NEXT_ID
+    HINT_NAVIGATION_ID, HINT_NAVIGATION_NEXT_ID
 
 Most specific UIs allow keyboard navigation within windows, usually 
 through use of the TAB key. Normally, the navigation path follows the order 
@@ -4157,23 +4157,23 @@ to travel to.
 ----------
 **Code Display 2-27 Navigation IDs**
 
-	/* Essentially, this code allows keyboard navigation to skip the Two 
-	 * trigger. Hitting the TAB key on the `One' trigger navigates the focus to the
-	 * Three trigger. */
-	
-	@object GenTriggerClass One = {
-		GI_visMoniker = "TAB here to get to Three";
-		HINT_NAVIGATION_NEXT_ID = 3;
-	}
-	
-	@object GenTriggerClass Two = {
-		GI_visMoniker = "2";
-	}
-	
-	@object GenTriggerClass Three = {
-		GI_visMoniker = "3";
-		HINT_NAVIGATION_ID = 3;
-	}
+    /* Essentially, this code allows keyboard navigation to skip the Two 
+     * trigger. Hitting the TAB key on the `One' trigger navigates the focus to the
+     * Three trigger. */
+    
+    @object GenTriggerClass One = {
+        GI_visMoniker = "TAB here to get to Three";
+        HINT_NAVIGATION_NEXT_ID = 3;
+    }
+    
+    @object GenTriggerClass Two = {
+        GI_visMoniker = "2";
+    }
+    
+    @object GenTriggerClass Three = {
+        GI_visMoniker = "3";
+        HINT_NAVIGATION_ID = 3;
+    }
 
 ----------
 Note that an object with a matching navigation ID must exist, so this method 
@@ -4182,8 +4182,8 @@ to allow the default behavior.
 
 ### 2.6.3 Dynamically Managing VarData
 
-	MSG_META_ADD_VAR_DATA, MSG_META_DELETE_VAR_DATA, 
-	MSG_GEN_ADD_GEOMETRY_HINT, MSG_GEN_REMOVE_GEOMETRY_HINT
+    MSG_META_ADD_VAR_DATA, MSG_META_DELETE_VAR_DATA, 
+    MSG_GEN_ADD_GEOMETRY_HINT, MSG_GEN_REMOVE_GEOMETRY_HINT
 
 You must use special kernel routines and **MetaClass** messages to access, 
 add, or remove entries within an object's instance fields.
@@ -4220,10 +4220,10 @@ geometry.
 ----------
 #### MSG_GEN_ADD_GEOMETRY_HINT
 
-	void	MSG_GEN_ADD_GEOMETRY_HINT(
-			word				hint,
-			word				hintArgument,
-			VisUpdateMode		updateMode);
+    void    MSG_GEN_ADD_GEOMETRY_HINT(
+            word                hint,
+            word                hintArgument,
+            VisUpdateMode       updateMode);
 
 This message adds a geometry hint to a generic object. The object may be 
 GS_USABLE at the time, in which case the object is redrawn according to the 
@@ -4247,9 +4247,9 @@ will be redrawn.
 ----------
 #### MSG_GEN_REMOVE_GEOMETRY_HINT
 
-	void	MSG_GEN_REMOVE_GEOMETRY_HINT(
-			word				hint,
-			VisUpdateMode		updateMode);
+    void    MSG_GEN_REMOVE_GEOMETRY_HINT(
+            word                hint,
+            VisUpdateMode       updateMode);
 
 This message removes a geometry hint from an object's instance data. The 
 object may be GS_USABLE at the time, in which case it will be redrawn 
@@ -4290,8 +4290,8 @@ the message and class using the @**record** keyword.
 
 ### 2.7.1 Parent and Child Message Passing
 
-	MSG_GEN_CALL_PARENT, MSG_GEN_SEND_TO_PARENT, 
-	MSG_GEN_SEND_TO_CHILDREN
+    MSG_GEN_CALL_PARENT, MSG_GEN_SEND_TO_PARENT, 
+    MSG_GEN_SEND_TO_CHILDREN
 
 Three messages enable you to pass other messages to a generic object's 
 parents and children without having to know the proper optrs. Using these 
@@ -4311,8 +4311,8 @@ message to a parent or the generic children of an object.
 ----------
 #### MSG_GEN_CALL_PARENT
 
-	void	MSG_GEN_CALL_PARENT(
-			EventHandle		event);
+    void    MSG_GEN_CALL_PARENT(
+            EventHandle     event);
 
 This message delivers an event to the generic parent of the recipient. This 
 message must pass a classed event that the parent object will handle. You 
@@ -4336,34 +4336,34 @@ or supersede default functionality.
 ----------
 **Code Display 2-28 MSG_GEN_CALL_PARENT**
 
-	/* The following method retrieves the visual moniker
-	 * of an object's parent. */
-	
-	@method MyProcessClass, MSG_GET_MY_PARENTS_MONIKER {
-		ChunkHandle parentMoniker;
-		EventHandle myEvent;
-	
-		/* Encapsulate the message to be handled
-		 * by any generic (GenClass) object. */
+    /* The following method retrieves the visual moniker
+     * of an object's parent. */
+    
+    @method MyProcessClass, MSG_GET_MY_PARENTS_MONIKER {
+        ChunkHandle parentMoniker;
+        EventHandle myEvent;
+    
+        /* Encapsulate the message to be handled
+         * by any generic (GenClass) object. */
 
-		myEvent = @record GenClass::MSG_GEN_GET_MONIKER();
+        myEvent = @record GenClass::MSG_GEN_GET_MONIKER();
 
-		/* Calls the parent of EntryNumberTwo with the classed event specified above. Note
-		 * that the return value is cast to type (MSG_GEN_GET_MONIKER) because
-		 * MSG_GEN_CALL_PARENT itself returns void. */
+        /* Calls the parent of EntryNumberTwo with the classed event specified above. Note
+         * that the return value is cast to type (MSG_GEN_GET_MONIKER) because
+         * MSG_GEN_CALL_PARENT itself returns void. */
 
-		parentMoniker = @call (MSG_GEN_GET_MONIKER) 
-				@EntryNumberTwo::MSG_GEN_CALL_PARENT(myEvent);
-		return(parentMoniker); /* return the parentMoniker. */
-	}
+        parentMoniker = @call (MSG_GEN_GET_MONIKER) 
+                @EntryNumberTwo::MSG_GEN_CALL_PARENT(myEvent);
+        return(parentMoniker); /* return the parentMoniker. */
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_SEND_TO_PARENT
 
-	void	MSG_GEN_SEND_TO_PARENT(
-			EventHandle event);
+    void    MSG_GEN_SEND_TO_PARENT(
+            EventHandle event);
 
 This message sends an encapsulated event to the parent but expects no 
 return values. The event will be freed after it is sent.
@@ -4381,8 +4381,8 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_SEND_TO_CHILDREN
 
-	void	MSG_GEN_SEND_TO_CHILDREN(
-			EventHandle event);
+    void    MSG_GEN_SEND_TO_CHILDREN(
+            EventHandle event);
 
 This message sends an encapsulated event to all children of the generic 
 object receiving it. This message cannot return values. The event will be 
@@ -4400,11 +4400,11 @@ or supersede default functionality.
 
 ### 2.7.2 Generic Upward Queries
 
-	MSG_GEN_GUP_CALL_OBJECT_OF_CLASS, 
-	MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS, 
-	MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS, 
-	MSG_GEN_GUP_FIND_OBJECT_OF_CLASS, MSG_GEN_GUP_QUERY, 
-	MSG_GEN_GUP_INTERACTION_COMMAND, MSG_GEN_GUP_FINISH_QUIT
+    MSG_GEN_GUP_CALL_OBJECT_OF_CLASS, 
+    MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS, 
+    MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS, 
+    MSG_GEN_GUP_FIND_OBJECT_OF_CLASS, MSG_GEN_GUP_QUERY, 
+    MSG_GEN_GUP_INTERACTION_COMMAND, MSG_GEN_GUP_FINISH_QUIT
 
 **GenClass** provides the capability to search up the generic tree beyond the 
 parent. Using the following messages, the UI can continue passing classed 
@@ -4433,8 +4433,8 @@ that it is unwise to later use this optr as the generic tree may have changed.
 ----------
 #### MSG_GEN_GUP_CALL_OBJECT_OF_CLASS
 
-	void	MSG_GEN_GUP_CALL_OBJECT_OF_CLASS(
-			EventHandle event);
+    void    MSG_GEN_GUP_CALL_OBJECT_OF_CLASS(
+            EventHandle event);
 
 This message performs a generic upward query, passing the classed event 
 upward until it reaches an object of the passed class. This message allows 
@@ -4462,8 +4462,8 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS
 
-	void	MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(
-			EventHandle event);
+    void    MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(
+            EventHandle event);
 
 This message performs a generic upward query, passing the classed event 
 upward until it reaches an object of the described class. Since this message 
@@ -4486,46 +4486,46 @@ or supersede default functionality.
 ----------
 **Code Display 2-29 Nesting Classed Events**
 
-	/* The following method can be used by any object in the generic tree below the
-	 * primary to set all menus and GenInteractions below the primary window enabled
-	 * all at once. */
-	
-	@method MyProcessClass, MSG_ENABLE_ALL_MY_MENUS {
-		EventHandle menuEvent, primaryEvent;
-	
-	/* The first classed event (menuEvent) encapsulates MSG_GEN_SET_ENABLED for any
-	 * object of GenInteractionClass (typically menus). The @record keyword
-	 * encapsulates the message to be handled by GenInteractionClass. The
-	 * VisUpdateMode delays updates via the Application queue to avoid constant visual
-	 * updates and "flashing." */
-	
-		menuEvent = @record GenInteractionClass::MSG_GEN_SET_ENABLED( 
-					VUM_DELAYED_VIA_APP_QUEUE);
-	
-	/* The second classed event binds MSG_GEN_SEND_TO_CHILDREN to the GenPrimaryClass.
-	 * Sending this message to the GenPrimary will send the menuEvent to all
-	 * its children. In this case, sending this event to the Primary will send
-	 * MSG_GEN_SET_ENABLED to all its GenInteraction children. */
-	
-		primaryEvent = @record GenPrimaryClass::MSG_GEN_SEND_TO_CHILDREN(menuEvent);
+    /* The following method can be used by any object in the generic tree below the
+     * primary to set all menus and GenInteractions below the primary window enabled
+     * all at once. */
+    
+    @method MyProcessClass, MSG_ENABLE_ALL_MY_MENUS {
+        EventHandle menuEvent, primaryEvent;
+    
+    /* The first classed event (menuEvent) encapsulates MSG_GEN_SET_ENABLED for any
+     * object of GenInteractionClass (typically menus). The @record keyword
+     * encapsulates the message to be handled by GenInteractionClass. The
+     * VisUpdateMode delays updates via the Application queue to avoid constant visual
+     * updates and "flashing." */
+    
+        menuEvent = @record GenInteractionClass::MSG_GEN_SET_ENABLED( 
+                    VUM_DELAYED_VIA_APP_QUEUE);
+    
+    /* The second classed event binds MSG_GEN_SEND_TO_CHILDREN to the GenPrimaryClass.
+     * Sending this message to the GenPrimary will send the menuEvent to all
+     * its children. In this case, sending this event to the Primary will send
+     * MSG_GEN_SET_ENABLED to all its GenInteraction children. */
+    
+        primaryEvent = @record GenPrimaryClass::MSG_GEN_SEND_TO_CHILDREN(menuEvent);
 
-	/* Finally, to send this message to the GenPrimary from any object below the
-	 * GenPrimary, simply send a MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS with the
-	 * PrimaryEvent above. The GUP message will send the message
-	 * MSG_GEN_SEND_TO_CHILDREN up the generic tree until it encounters the GenPrimary,
-	 * at which point the Primary will send the MenuEvent MSG_GEN_SEND_TO_CHILDREN to
-	 * all its GenInteraction children. */
-	
-		@send @MyObject::MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(primaryEvent);
-	}
+    /* Finally, to send this message to the GenPrimary from any object below the
+     * GenPrimary, simply send a MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS with the
+     * PrimaryEvent above. The GUP message will send the message
+     * MSG_GEN_SEND_TO_CHILDREN up the generic tree until it encounters the GenPrimary,
+     * at which point the Primary will send the MenuEvent MSG_GEN_SEND_TO_CHILDREN to
+     * all its GenInteraction children. */
+    
+        @send @MyObject::MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(primaryEvent);
+    }
 
 ----------
 
 ----------
 #### MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS
 
-	Boolean	MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS(
-			ClassStruct  *class);
+    Boolean MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS(
+            ClassStruct  *class);
 
 This message searches up the generic tree for any object of the specific class. 
 This message is useful for testing the existence of required classes before 
@@ -4540,7 +4540,7 @@ MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS.
 *class* - **ClassStruct** to search for among the object's 
 parents.
 
-**Return:**	Will return *true* if the class is found, *false* if not.
+**Return:** Will return *true* if the class is found, *false* if not.
 
 **Interception:** Generally not intercepted. Custom gadgets may handle to supplement 
 or supersede default functionality.
@@ -4548,8 +4548,8 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_GUP_FIND_OBJECT_OF_CLASS
 
-	optr	MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(
-			ClassStruct  *class);
+    optr    MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(
+            ClassStruct  *class);
 
 This message performs a function similar to that of 
 MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS, but it returns the optr of the 
@@ -4573,9 +4573,9 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_GUP_QUERY
 
-	void 	MSG_GEN_GUP_QUERY(
-			GenReturnParams 	*retValue,
-			word 				queryType);
+    void    MSG_GEN_GUP_QUERY(
+            GenReturnParams     *retValue,
+            word                queryType);
 
 This message is used to query up the generic composite tree. 
 
@@ -4616,19 +4616,19 @@ depend on query type.
 
 **Structures:**  
 
-	typedef struct {
-		word 	GRP_ax;
-		word 	GRP_bp;
-		word 	GRP_cx;
-		word 	GRP_dx;
-	
-	} GenReturnParams;
+    typedef struct {
+        word    GRP_ax;
+        word    GRP_bp;
+        word    GRP_cx;
+        word    GRP_dx;
+    
+    } GenReturnParams;
 
 ----------
 #### MSG_GEN_GUP_INTERACTION_COMMAND
 
-	Boolean 	MSG_GEN_GUP_INTERACTION_COMMAND(
-				InteractionCommand 		command);
+    Boolean     MSG_GEN_GUP_INTERACTION_COMMAND(
+                InteractionCommand      command);
 
 This message travels up the generic tree until it reaches a 
 non-GIT_ORGANIZATIONAL GenInteraction. Once there, it performs the 
@@ -4658,9 +4658,9 @@ command* - Standard InteractionCommand.
 ----------
 #### MSG_GEN_GUP_FINISH_QUIT
 
-	void 	MSG_GEN_GUP_FINISH_QUIT(
-			Boolean 		abortFlag, 
-			Boolean 		notifyParent); 
+    void    MSG_GEN_GUP_FINISH_QUIT(
+            Boolean         abortFlag, 
+            Boolean         notifyParent); 
 
 Message to be used by nodes that implement a GCN active list. This should 
 be used if MSG_META_QUIT is handled and sent to the active list items by 
@@ -4685,9 +4685,9 @@ intercept to know when a quit is aborted or finished.
 
 ### 2.7.3 Object-Specific Queries
 
-	MSG_GEN_CALL_APPLICATION, MSG_GEN_SEND_TO_PROCESS, 
-	MSG_GEN_CALL_SYSTEM,MSG_GEN_OUTPUT_ACTION 
-	MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST
+    MSG_GEN_CALL_APPLICATION, MSG_GEN_SEND_TO_PROCESS, 
+    MSG_GEN_CALL_SYSTEM,MSG_GEN_OUTPUT_ACTION 
+    MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST
 
 Besides the Generic Upward Queries, **GenClass** also contains several 
 object-specific queries. These messages behave in the same manner as the 
@@ -4710,8 +4710,8 @@ whatever return values are expected of the passed message.
 MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST 
 
 #### MSG_GEN_CALL_APPLICATION
-	void	MSG_GEN_CALL_APPLICATION(
-			EventHandle event);
+    void    MSG_GEN_CALL_APPLICATION(
+            EventHandle event);
 
 This message calls the GenApplication object associated with the recipient. 
 This message allows return values and should be cast to whatever return 
@@ -4733,8 +4733,8 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_SEND_TO_PROCESS
 
-	void	MSG_GEN_SEND_TO_PROCESS(
-			EventHandle event);
+    void    MSG_GEN_SEND_TO_PROCESS(
+            EventHandle event);
 
 This message sends the event to the Process object of your application. 
 Because the message may cross threads, return values are not allowed.
@@ -4753,8 +4753,8 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_CALL_SYSTEM
 
-	void	MSG_GEN_CALL_SYSTEM(
-			EventHandle event);
+    void    MSG_GEN_CALL_SYSTEM(
+            EventHandle event);
 
 This message calls the GenSystem object (the root object) associated with 
 your application and sends the event. If you expect return values, make sure 
@@ -4776,9 +4776,9 @@ or supersede default functionality.
 ----------
 #### MSG_GEN_OUTPUT_ACTION
 
-	void	MSG_GEN_OUTPUT_ACTION(
-			EventHandle		event,
-			optr			dest);
+    void    MSG_GEN_OUTPUT_ACTION(
+            EventHandle     event,
+            optr            dest);
 
 This message sends an event via the destination optr (if any) of the object 
 sent the message. The default handler (which is rarely subclassed) also scans 
@@ -4807,7 +4807,7 @@ destination optr or leave it null, depending on the object being activated.
 ----------
 #### MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST
 
-	Boolean	MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST();
+    Boolean MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST();
 
 This message queries whether an object still needs to be on an active list. The 
 active list mechanism sends this message if a mechanism no longer needs an 
@@ -4837,7 +4837,7 @@ should be sent to the superclass for handling.
 
 ## 2.8 Visual Refreshing
 
-	MSG_GEN_UPDATE_VISUAL
+    MSG_GEN_UPDATE_VISUAL
 
 MSG_GEN_UPDATE_VISUAL performs a visual update of the object sent the 
 message. Use this message to force a visual update on objects previously 
@@ -4846,8 +4846,8 @@ updated using the **VisUpdateMode** VUM_MANUAL.
 ----------
 #### MSG_GEN_UPDATE_VISUAL
 
-	void	MSG_GEN_UPDATE_VISUAL(
-			VisUpdateMode updateMode);
+    void    MSG_GEN_UPDATE_VISUAL(
+            VisUpdateMode updateMode);
 
 This message updates the visual tree at the node specified and is used for 
 updating objects modified with VUM_MANUAL.
@@ -4864,11 +4864,11 @@ should be redrawn.
 
 ## 2.9 Setting Sizes
 
-	MSG_GEN_SET_INITIAL_SIZE, MSG_GEN_SET_MINIMUM_SIZE, 
-	MSG_GEN_SET_MAXIMUM_SIZE, MSG_GEN_SET_FIXED_SIZE, 
-	MSG_GEN_GET_INITIAL_SIZE, MSG_GEN_GET_MINIMUM_SIZE, 
-	MSG_GEN_GET_MAXIMUM_SIZE, MSG_GEN_GET_FIZED_SIZE, 
-	MSG_GEN_RESET_TO_INITIAL_SIZE, CompSizeHintArgs
+    MSG_GEN_SET_INITIAL_SIZE, MSG_GEN_SET_MINIMUM_SIZE, 
+    MSG_GEN_SET_MAXIMUM_SIZE, MSG_GEN_SET_FIXED_SIZE, 
+    MSG_GEN_GET_INITIAL_SIZE, MSG_GEN_GET_MINIMUM_SIZE, 
+    MSG_GEN_GET_MAXIMUM_SIZE, MSG_GEN_GET_FIZED_SIZE, 
+    MSG_GEN_RESET_TO_INITIAL_SIZE, CompSizeHintArgs
 
 These messages all perform resizing operations on generic objects. In some 
 cases, the geometry is not redone by sending these messages; the object will 
@@ -4887,29 +4887,29 @@ HINT_MINIMUM_SIZE, and HINT_FIXED_SIZE, all of which are described in
 The size parameter required by each of these hints is a structure of type 
 **CompSizeHintArgs**. This structure is shown below:
 
-	typedef struct {
-		SpecWidth			CSHA_width;
-		SpecHeight			CSHA_height;
-		sword				CSHA_count;
-	} CompSizeHintArgs;
+    typedef struct {
+        SpecWidth           CSHA_width;
+        SpecHeight          CSHA_height;
+        sword               CSHA_count;
+    } CompSizeHintArgs;
 
 Many of the messages pass a structure of **GetSizeArgs** to place size 
 information retrieved from the message. This size information is used by the 
 specific UI to visually construct the object, bypassing default sizes in the 
 process. The structure is shown below:
 
-	typedef struct {
-		word		GSA_width;
-		word		GSA_height;
-		word		GSA_unused;
-		word		GSA_count;
-	} GetSizeArgs;
+    typedef struct {
+        word        GSA_width;
+        word        GSA_height;
+        word        GSA_unused;
+        word        GSA_count;
+    } GetSizeArgs;
 
 ----------
 #### MSG_GEN_GET_INITIAL_SIZE
 
-	void	MSG_GEN_GET_INITIAL_SIZE(
-			GetSizeArgs *initSize);
+    void    MSG_GEN_GET_INITIAL_SIZE(
+            GetSizeArgs *initSize);
 
 This message retrieves the initial size specifications of a generic object stored 
 in the hint HINT_INITIAL_SIZE. The object must be passed a pointer to a 
@@ -4931,11 +4931,11 @@ object of size **GetSizeArgs** will remain empty.
 ----------
 #### MSG_GEN_SET_INITIAL_SIZE
 
-	void	MSG_GEN_SET_INITIAL_SIZE(@stack
-			byte		updateMode,
-			word		count,
-			word		height,		/* SpecHeight */
-			word		width);		/* SpecWidth */
+    void    MSG_GEN_SET_INITIAL_SIZE(@stack
+            byte        updateMode,
+            word        count,
+            word        height,     /* SpecHeight */
+            word        width);     /* SpecWidth */
 
 This message sets the initial size of a generic object (its size on being first 
 built). This is only done by creating or modifying the hint 
@@ -4963,8 +4963,8 @@ count* - The number of children (or zero, if not applicable).
 ----------
 #### MSG_GEN_RESET_TO_INITIAL_SIZE
 
-	void	MSG_GEN_RESET_TO_INITIAL_SIZE(
-			VisUpdateMode		updateMode);
+    void    MSG_GEN_RESET_TO_INITIAL_SIZE(
+            VisUpdateMode       updateMode);
 
 This message forces the recipient and all of its children to be resized 
 according to their initial size specifications. If the objects contain 
@@ -4985,8 +4985,8 @@ will be redrawn.
 ----------
 #### MSG_GEN_GET_MINIMUM_SIZE
 
-	void	MSG_GEN_GET_MINIMUM_SIZE(
-			GetSizeArgs  *minSize);
+    void    MSG_GEN_GET_MINIMUM_SIZE(
+            GetSizeArgs  *minSize);
 
 This message retrieves the recipient's minimum size specifications stored in 
 the hint HINT_MINIMUM_SIZE. If HINT_MINIMUM_SIZE is not set, the 
@@ -5006,11 +5006,11 @@ structure passed to the object will remain empty.
 ----------
 #### MSG_GEN_SET_MINIMUM_SIZE
 
-	void	MSG_GEN_SET_MINIMUM_SIZE(@stack
-			byte	updateMode,
-			word	count,
-			word	height,		/* SpecHeight */
-			word	width);		/* SpecWidth */
+    void    MSG_GEN_SET_MINIMUM_SIZE(@stack
+            byte    updateMode,
+            word    count,
+            word    height,     /* SpecHeight */
+            word    width);     /* SpecWidth */
 
 This message sets the minimum allowable size of an object. An object with a 
 minimum size is not allowed to shrink smaller than the bounds set in 
@@ -5041,8 +5041,8 @@ allowable size of an object in its normal usable state.
 ----------
 #### MSG_GEN_GET_MAXIMUM_SIZE
 
-	void	MSG_GEN_GET_MAXIMUM_SIZE(
-			GetSizeArgs  *maxSize);
+    void    MSG_GEN_GET_MAXIMUM_SIZE(
+            GetSizeArgs  *maxSize);
 
 This message retrieves the recipient's maximum size stored in the hint 
 HINT_MAXIMUM_SIZE. If HINT_MAXIMUM_SIZE is not set, the structure 
@@ -5062,10 +5062,10 @@ passed will remain empty.
 ----------
 #### MSG_GEN_SET_MAXIMUM_SIZE
 
-	void	MSG_GEN_SET_MAXIMUM_SIZE(
-			word	count,
-			word	height,		/* SpecHeight */
-			word	width);		/* SpecWidth */
+    void    MSG_GEN_SET_MAXIMUM_SIZE(
+            word    count,
+            word    height,     /* SpecHeight */
+            word    width);     /* SpecWidth */
 
 This message sets the maximum allowable size of an object. An object with a 
 maximum size is not allowed to grow larger than the bounds set with 
@@ -5095,8 +5095,8 @@ maximum allowable size of an object in its normal usable state.
 ----------
 #### MSG_GEN_GET_FIXED_SIZE
 
-	void	MSG_GEN_GET_FIXED_SIZE(
-			GetSizeArgs *fixedSize);
+    void    MSG_GEN_GET_FIXED_SIZE(
+            GetSizeArgs *fixedSize);
 
 This message retrieves the size stored in HINT_FIXED_SIZE. If 
 HINT_FIXED_SIZE is not set, the structure passed will remain empty.
@@ -5115,10 +5115,10 @@ HINT_FIXED_SIZE is not set, the structure passed will remain empty.
 ----------
 #### MSG_GEN_SET_FIXED_SIZE
 
-	void	MSG_GEN_SET_FIXED_SIZE(
-			word	count,
-			word	height,		/* SpecHeight */
-			word	width);		/* SpecWidth */
+    void    MSG_GEN_SET_FIXED_SIZE(
+            word    count,
+            word    height,     /* SpecHeight */
+            word    width);     /* SpecWidth */
 
 This message sets the fixed size of an object. An object with a fixed size is 
 forced to remain at the size set with HINT_FIXED_SIZE. This message alters 
@@ -5141,10 +5141,10 @@ message in the expected fashion.
 
 ## 2.10 Activation Messages
 
-	MSG_GEN_APPLY, MSG_GEN_PRE_APPLY, MSG_GEN_POST_APPLY, 
-	MSG_GEN_RESET, MSG_GEN_MAKE_APPLYABLE, 
-	MSG_GEN_MAKE_NOT_APPLYABLE, MSG_GEN_ACTIVATE, 
-	MSG_GEN_ACTIVATE_INTERACTION_DEFAULT 
+    MSG_GEN_APPLY, MSG_GEN_PRE_APPLY, MSG_GEN_POST_APPLY, 
+    MSG_GEN_RESET, MSG_GEN_MAKE_APPLYABLE, 
+    MSG_GEN_MAKE_NOT_APPLYABLE, MSG_GEN_ACTIVATE, 
+    MSG_GEN_ACTIVATE_INTERACTION_DEFAULT 
 
 These messages only affect objects with contain properties. These property 
 gadgets (such as GenItemGroups, GenValues, GenTexts, etc.) typically 
@@ -5213,7 +5213,7 @@ the default object for that windowed object.
 ----------
 #### MSG_GEN_APPLY
 
-	void	MSG_GEN_APPLY();
+    void    MSG_GEN_APPLY();
 
 This message is sent to property gadgets to cause them to dispatch their 
 "apply" message and at the same time reset any modified states associated 
@@ -5241,7 +5241,7 @@ their changes.
 ----------
 #### MSG_GEN_PRE_APPLY
 
-	Boolean 	MSG_GEN_PRE_APPLY();
+    Boolean     MSG_GEN_PRE_APPLY();
 
 A properties dialog will send this message before MSG_GEN_APPLY. Geodes 
 may use this to do validation of settings or to prepare for applying of changes.
@@ -5259,7 +5259,7 @@ may use this to do validation of settings or to prepare for applying of changes.
 ----------
 #### MSG_GEN_POST_APPLY
 
-	void	MSG_GEN_POST_APPLY();
+    void    MSG_GEN_POST_APPLY();
 
 A properties dialog will send this message after MSG_GEN_APPLY. This can 
 be used to clean up after application of changes.
@@ -5277,7 +5277,7 @@ be used to clean up after application of changes.
 ----------
 #### MSG_GEN_RESET
 
-	void	MSG_GEN_RESET();
+    void    MSG_GEN_RESET();
 
 This message, if sent to a GenInteraction within a GIT_PROPERTIES dialog 
 box, will propagate to all children below the receiving Interaction. This 
@@ -5301,7 +5301,7 @@ its own custom reset behavior.
 ----------
 #### MSG_GEN_MAKE_APPLYABLE
 
-	void	MSG_GEN_MAKE_APPLYABLE();
+    void    MSG_GEN_MAKE_APPLYABLE();
 
 This message is typically sent to a dialog GenInteraction to enable its default 
 "apply" and "reset" buttons. This message also sets up the proper user and 
@@ -5322,7 +5322,7 @@ for objects within a GIT_PROPERTIES GenInteraction, however.)
 ----------
 #### MSG_GEN_MAKE_NOT_APPLYABLE
 
-	void	MSG_GEN_MAKE_NOT_APPLYABLE();
+    void    MSG_GEN_MAKE_NOT_APPLYABLE();
 
 This message is typically sent to a dialog GenInteraction to disable its 
 default "apply" and "reset" buttons. This message is useful in the 
@@ -5342,7 +5342,7 @@ for objects within a GIT_PROPERTIES GenInteraction, however.)
 ----------
 #### MSG_GEN_ACTIVATE
 
-	void	MSG_GEN_ACTIVATE();
+    void    MSG_GEN_ACTIVATE();
 
 This message manually activates an object as if the user had activated it in 
 the manner defined by the specific UI. For example, this message may 
@@ -5362,7 +5362,7 @@ normal visual cues associated with the activation.
 ----------
 #### MSG_GEN_ACTIVATE_INTERACTION_DEFAULT
 
-	Boolean	MSG_GEN_ACTIVATE_INTERACTION_DEFAULT();
+    Boolean MSG_GEN_ACTIVATE_INTERACTION_DEFAULT();
 
 This message acts on a default exclusive object within a window, forcing that 
 object to activate as in MSG_GEN_ACTIVATE. This message travels up the 
@@ -5382,7 +5382,7 @@ is typically marked with the hint HINT_DEFAULT_DEFAULT_ACTION.)
 
 ## 2.11 Focus Modifications
 
-	MSG_GEN_BRING_TO_TOP, MSG_GEN_LOWER_TO_BOTTOM 
+    MSG_GEN_BRING_TO_TOP, MSG_GEN_LOWER_TO_BOTTOM 
 
 **MetaClass** provides the main means of changing the focus and target 
 hierarchies within an application. **GenClass** also provides two messages to 
@@ -5403,7 +5403,7 @@ MSG_META_RELEASE_TARGET_EXCL to the window lowered to the bottom.
 ----------
 #### MSG_GEN_BRING_TO_TOP
 
-	void	MSG_GEN_BRING_TO_TOP();
+    void    MSG_GEN_BRING_TO_TOP();
 
 This message brings a windowed object to the front if it is in a maximized or 
 overlapping arrangement with other window objects. This message may also 
@@ -5424,7 +5424,7 @@ displayable GenInteractions, and GenPrimarys are affected.)
 ----------
 #### MSG_GEN_LOWER_TO_BOTTOM
 
-	void	MSG_GEN_LOWER_TO_BOTTOM();
+    void    MSG_GEN_LOWER_TO_BOTTOM();
 
 This message lowers a windowed object to the bottom if it is in an overlapping 
 arrangement with other windowed objects. This message may also release 
@@ -5444,9 +5444,9 @@ displayable GenInteractions, and GenPrimarys are affected.)
 
 ## 2.12 Navigation Methods
 
-	MSG_GEN_NAVIGATE_TO_NEXT_FIELD, 
-	MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD, 
-	MSG_GEN_NAVIGATION_QUERY
+    MSG_GEN_NAVIGATE_TO_NEXT_FIELD, 
+    MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD, 
+    MSG_GEN_NAVIGATION_QUERY
 
 These messages move the navigation cursor between fields at the same level. 
 Typically, these messages alter the focus and target exclusives to implement 
@@ -5455,7 +5455,7 @@ this behavior. These messages are rarely used within applications.
 ----------
 #### MSG_GEN_NAVIGATE_TO_NEXT_FIELD
 
-	void	MSG_GEN_NAVIGATE_TO_NEXT_FIELD();
+    void    MSG_GEN_NAVIGATE_TO_NEXT_FIELD();
 
 This message moves the navigation cursor from its current object to the next 
 valid object. This message is useful if you are trapping keyboard characters 
@@ -5477,7 +5477,7 @@ MSG_GEN_NAVIGATION_QUERY instead.
 ----------
 #### MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD
 
-	void	MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD();
+    void    MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD();
 
 This message moves the navigation cursor from its current object to the 
 previous valid object. This message is useful if you are trapping keyboard 
@@ -5499,10 +5499,10 @@ MSG_GEN_NAVIGATION_QUERY instead.
 ----------
 #### MSG_GEN_NAVIGATION_QUERY
 
-	void 	MSG_GEN_NAVIGATION_QUERY(
-			NavigationQueryParams 	*retValue,
-			optr 					queryOrigin,
-			word 					navFlags);
+    void    MSG_GEN_NAVIGATION_QUERY(
+            NavigationQueryParams   *retValue,
+            optr                    queryOrigin,
+            word                    navFlags);
 
 This message can be used by applications to initiate navigation-oriented 
 queries, as the MSG_GEN_NAVIGATE_TO_[NEXT|PREVIOUS]_FIELD 
@@ -5533,17 +5533,17 @@ in the next query.
 
 **Structures:**
 
-	typedef struct {
-		optr 		NQP_nextObject;
-		word 		NQP_navFlags;
-		byte 		NQP_focusableFlag;
-		byte 		NQP_unused;
-	} NavigationQueryParams;
+    typedef struct {
+        optr        NQP_nextObject;
+        word        NQP_navFlags;
+        byte        NQP_focusableFlag;
+        byte        NQP_unused;
+    } NavigationQueryParams;
 
 ## 2.13 Window Positions and Sizes
 
-	MSG_GEN_SET_WIN_POSITION, MSG_GEN_SET_WIN_SIZE, 
-	MSG_GEN_SET_WIN_CONSTRAIN
+    MSG_GEN_SET_WIN_POSITION, MSG_GEN_SET_WIN_SIZE, 
+    MSG_GEN_SET_WIN_CONSTRAIN
 
 These messages allow window objects to override their default window 
 behavior. Sending these messages may cause the objects involved to be 
@@ -5556,10 +5556,10 @@ send the windowed object MSG_GEN_SET_WIN_CONSTRAIN, passing it the
 ----------
 #### MSG_GEN_SET_WIN_POSITION
 
-	void	MSG_GEN_SET_WIN_POSITION(
-			word				modeAndType,
-			SpecWinSizeSpec		xPosSpec,
-			SpecWinSizeSpec		yPosSpec);
+    void    MSG_GEN_SET_WIN_POSITION(
+            word                modeAndType,
+            SpecWinSizeSpec     xPosSpec,
+            SpecWinSizeSpec     yPosSpec);
 
 This message sets a window's position. The message must be passed a 
 **WinPositionType** along with two x and y coordinates passed in 
@@ -5589,10 +5589,10 @@ to combine these two values into one word.
 ----------
 #### MSG_GEN_SET_WIN_SIZE
 
-	void	MSG_GEN_SET_WIN_SIZE(
-			word				modeAndType,
-			SpecWinSizeSpec		xSizeSpec,
-			SpecWinsizeSpec		ySizeSpec);
+    void    MSG_GEN_SET_WIN_SIZE(
+            word                modeAndType,
+            SpecWinSizeSpec     xSizeSpec,
+            SpecWinsizeSpec     ySizeSpec);
 
 This message sets a window's size. The message must be passed a 
 **WinPositionType** along with two x and y coordinates passed in 
@@ -5619,9 +5619,9 @@ values into one word.
 ----------
 ####MSG_GEN_SET_WIN_CONSTRAIN
 
-	void	MSG_GEN_SET_WIN_CONSTRAIN(
-			VisUpdateMode		updateMode,
-			byte				constrainType);
+    void    MSG_GEN_SET_WIN_CONSTRAIN(
+            VisUpdateMode       updateMode,
+            byte                constrainType);
 
 This message changes a window's constrain type to the passed 
 **WindowConstrainType**. 

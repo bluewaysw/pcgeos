@@ -118,7 +118,9 @@
     UShort  platformEncodingID;
     UShort  format;
     UShort  length;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     UShort  version;
+#endif
 
     Bool    loaded;
     ULong   offset;
@@ -152,7 +154,7 @@
   /* Destroy one character mapping table */
 
   LOCAL_DEF
-  TT_Error  CharMap_Free( PCMapTable  table );
+  void      CharMap_Free( PCMapTable  table );
 
 
   /* Use character mapping table to perform mapping */

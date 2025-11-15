@@ -2,7 +2,8 @@
 
 ----------
 #### @alias
-	@alias(<protoMsg>) <messageDef>;
+    @alias(<protoMsg>) <messageDef>;
+
 The @alias keyword is used for messages which take conditional parameters in 
 an assembly handler. For example, if the assembly handler takes a word 
 parameter normally and a dword only if a certain flag is set, you will need to 
@@ -14,15 +15,16 @@ allows this. Its arguments are shown below:
 *messageDef* - The new message definition. This is a standard message 
 definition as would follow the @message keyword.
 
-	@message void MSG_MY_MSG(word par);
-	@alias(MSG_MY_MSG) void MSG_MY_SECOND_MSG(dword par);
+    @message void MSG_MY_MSG(word par);
+    @alias(MSG_MY_MSG) void MSG_MY_SECOND_MSG(dword par);
 
 **See Also:** @message
 
 ----------
 #### @call
-	<ret> = @call [,<flags>] [{<cast_ret>}] \
-	<obj>::[{<cast_par>}]<msg>(<param>*);
+    <ret> = @call [,<flags>] [{<cast_ret>}] \
+    <obj>::[{<cast_par>}]<msg>(<param>*);
+
 The @call keyword sends the specified message to the specified object and 
 makes the caller wait until the message is processed before continuing. The 
 arguments of @call are shown below:
@@ -96,14 +98,14 @@ recipient:
 
 **self** - Send the message to the object issuing the @call command. e.g.
 
-	@call self::MSG_VIS_DRAW(flags, gstate);
+    @call self::MSG_VIS_DRAW(flags, gstate);
 **process** - Send the message to the object's associated Process object. e.g.
 
-	@call process::MSG_HELLO_RESPOND();
+    @call process::MSG_HELLO_RESPOND();
 **application** - Send the message to the object's associated GenApplication 
 object.
 
-	attr = @call application::MSG_GEN_GET_ATTRIBUTES();
+    attr = @call application::MSG_GEN_GET_ATTRIBUTES();
 **@genParent** - Send the message to the object's generic parent in a generic 
 object tree.
 
@@ -113,18 +115,19 @@ tree.
 If you need to send a message to an object's superclass, use the @callsuper 
 keyword rather than @call.
 
-	gstate = @call myObj::MSG_META_CUT();
-	retVal = @call {MSG_MY_MSG} myObj::MSG_OTHER_MSG();
-	retVal = @call myObj::MSG_MY_MSG(10, param1);
+    gstate = @call myObj::MSG_META_CUT();
+    retVal = @call {MSG_MY_MSG} myObj::MSG_OTHER_MSG();
+    retVal = @call myObj::MSG_MY_MSG(10, param1);
 
 **See Also:** @send, @callsuper, @message, @method, @object
 
 ----------
 #### @callsuper
-	<ret> = @callsuper [{<cast_ret>}] \
-	<obj>::<class>::[{<cast_par>}]<msg>(<param>*) [<flags>]+;
+    <ret> = @callsuper [{<cast_ret>}] \
+    <obj>::<class>::[{<cast_par>}]<msg>(<param>*) [<flags>]+;
 
-	@callsuper;
+    @callsuper;
+
 The @callsuper keyword does two things: The most useful is to pass a received 
 message on to the superclass to ensure default behavior is preserved; the 
 second, and less used, acts just like @call but sends the message to the 
@@ -150,13 +153,14 @@ superclass.
 
 *flags* - Same as @call.
 
-	(void) @callsuper myObj::MySupClass::MSG_MY_MSG();
+    (void) @callsuper myObj::MySupClass::MSG_MY_MSG();
 
 **See Also:** @call, @send, @message, @method
 
 ----------
 #### @chunk
-	@chunk	<type> <name> [= <init>];
+    @chunk  <type> <name> [= <init>];
+
 The @chunk keyword declares a resource chunk containing data of some kind. 
 Data can be of any GEOS or C data type or structure, including a string of 
 characters. The chunk must be declared between the resource delimiters 
@@ -172,24 +176,25 @@ entities.
 If you will need to access the chunk from another executable file, you must 
 declare it in the other file with @extern. Objects are declared with @object.
 
-	typedef struct {
-		int		a;
-		int		b;
-	} MyStruct;
+    typedef struct {
+        int     a;
+        int     b;
+    } MyStruct;
 
-	char	MyString[8];
+    char    MyString[8];
 
-	@start MyDataResource, data, notDetachable;
-	@chunk word			MyWordChunk;
-	@chunk MyStruct		MyMSChunk = {5, 10};
-	@chunk MyString		MyStringChunk = "My string";
-	@end;
+    @start MyDataResource, data, notDetachable;
+    @chunk word         MyWordChunk;
+    @chunk MyStruct     MyMSChunk = {5, 10};
+    @chunk MyString     MyStringChunk = "My string";
+    @end;
 
 **See Also:** @start, @end, @object, @extern
 
 ----------
 #### @chunkArray
-	@chunkArray 	<stype> <aname> [= {<init>}];
+    @chunkArray     <stype> <aname> [= {<init>}];
+
 The @chunkArray keyword declares a Chunk Array, a special kind of chunk. Only 
 uniform-element-size chunk arrays may be declared with this keyword. It has 
 the following arguments:
@@ -203,17 +208,18 @@ any standard C or Goc type, or any derived type.
 not set any initial values, the Chunk Array will be created with 
 no elements.
 
-	@chunkArray int		someints;
+    @chunkArray int     someints;
 
-	@chunkArray dword	somedwords = {123456789, 
-										6021023, 
-										31415926};
+    @chunkArray dword   somedwords = {123456789, 
+                                        6021023, 
+                                        31415926};
 
 **See Also:** @chunk, @elementArray
 
 ----------
 #### @class
-	@class	<cname>, <super> [, master [, variant]];
+    @class  <cname>, <super> [, master [, variant]];
+
 The @class keyword begins a class definition. All instance data and messages 
 for the class are declared between @class and @endc. The arguments of @class 
 are listed below:
@@ -226,17 +232,18 @@ are listed below:
 
 *variant* - Use of this term designates this class as a variant class.
 
-	@class MyTriggerClass, GenTriggerClass;
-	@endc
+    @class MyTriggerClass, GenTriggerClass;
+    @endc
 
-	@class MyMasterVarClass, MetaClass, master, variant;
-	@endc
+    @class MyMasterVarClass, MetaClass, master, variant;
+    @endc
 
 **See Also:** @endc, @classdecl
 
 ----------
 #### @classdecl
-	@classdecl <cname> [, neverSaved];
+    @classdecl <cname> [, neverSaved];
+
 The @classdecl keyword defines a given class structure in memory. Every new 
 class that will be used by an application must appear in an @classdecl 
 declaration. The arguments for this keyword are shown below:
@@ -246,14 +253,15 @@ declaration. The arguments for this keyword are shown below:
 *neverSaved* - Using this term indicates that objects of this class are never 
 saved along with state information.
 
-	@classdecl MyTriggerClass;
-	@classdecl MyProcessClass, neverSaved;
+    @classdecl MyTriggerClass;
+    @classdecl MyProcessClass, neverSaved;
 
 **See Also:** @class
 
 ----------
 #### @composite
-	@instance @composite <iname> = <linkFieldName>;
+    @instance @composite <iname> = <linkFieldName>;
+
 The @composite keyword appears as a subcommand of @instance. It is a type 
 of instance data - it indicates that an object of this class can have several 
 children and that the @composite instance data field will be an optr to the first 
@@ -263,25 +271,25 @@ of its children. The arguments of the @composite keyword are given below:
 
 *linkFieldName* - The name of the @link instance data field for this class.
 
-	@class GenTrigWithKidsClass, GenTriggerClass;
-		/* GI_link is the GenClass sibling link field. */
-		@instance @composite GTWKI_comp = GI_link;
-	@endc
+    @class GenTrigWithKidsClass, GenTriggerClass;
+        /* GI_link is the GenClass sibling link field. */
+        @instance @composite GTWKI_comp = GI_link;
+    @endc
 
 **See Also:** @instance, @link
 
 ----------
 #### @default
-	<fname> = @default [<op> [~]<attr>]*; /* to use default value of
-											instance data field */
+    <fname> = @default [<op> [~]<attr>]*; /* to use default value of
+                                            instance data field */
 
-	@default <varRoot> = <super>; /* to specify default superclass of 
-									a variant class */
+    @default <varRoot> = <super>; /* to specify default superclass of 
+                                    a variant class */
 
-	@default <fname> = <value>; /* to specify a default value for an instance
-									data field defined by a superclass. */
+    @default <fname> = <value>; /* to specify a default value for an instance
+                                    data field defined by a superclass. */
 
-	<fname> = @default;
+    <fname> = @default;
 
 The @default keyword can be used in several ways: to specify the default value 
 of an instance data field, to represent the default value of an object's instance 
@@ -303,10 +311,10 @@ operator (|); if removing certain bits, use the AND operator (&).
 attribute bits, place the logical NOT character (~) in front of the 
 attribute.
 
-	@object GenPrimaryClass MyPrimary {
-		GI_states = @default & ~GENS_MAXIMIZED;
-		GI_attrs = @default | GENA_TARGETABLE;
-	}
+    @object GenPrimaryClass MyPrimary {
+        GI_states = @default & ~GENS_MAXIMIZED;
+        GI_attrs = @default | GENA_TARGETABLE;
+    }
 
 The @default keyword can also be used to specify the default superclass of a 
 variant class. In this case, it has the following arguments:
@@ -332,7 +340,8 @@ the following arguments:
 
 ----------
 #### @define
-	@define <mname>[(<pdef>)] <macro>
+    @define <mname>[(<pdef>)] <macro>
+
 The @define directive defines a Goc macro. You can define C macros with the 
 \#define directive; macros that use Goc operators, keywords, or code must be 
 defined with @define. Similarly, macros defined with @define must be later 
@@ -347,20 +356,21 @@ the macro.
 
 *macro* - The macro.
 
-	@define MyChunk(a) @chunk char[] a = "text";
-	@define MyText(a,b) @chunk char[] a = "b";
+    @define MyChunk(a) @chunk char[] a = "text";
+    @define MyText(a,b) @chunk char[] a = "b";
 
-	/* You can later use these macros as follows: */
-	@MyChunk(Text1)
-	@MyText(Text2, newText)
+    /* You can later use these macros as follows: */
+    @MyChunk(Text1)
+    @MyText(Text2, newText)
 
-	/* This will evaluate to the following: */
-	@chunk char[] Text1 = "text";
-	@chunk char[] Text2 = "newText";
+    /* This will evaluate to the following: */
+    @chunk char[] Text1 = "text";
+    @chunk char[] Text2 = "newText";
 
 ----------
 #### @deflib
-	@deflib <libName>
+    @deflib <libName>
+
 Most Goc libraries will have a **.goh** header file. This file should begin with a 
 @deflib directive. This will see to it that no library header file is included more 
 than once in a given compilation. The file must end with an @endlib directive. 
@@ -370,13 +380,14 @@ The @deflib directive takes the following argument:
 stripped off. For example, if the library's header file is 
 **hellolib.goh**, the file would begin with
 
-	@deflib		hellolib
+    @deflib     hellolib
 
 **See Also:** @endlib
 
 ----------
 #### @dispatch
-	@dispatch [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
+    @dispatch [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
+
 The @dispatch keyword sends a previously-encapsulated message to the 
 specified object. This keyword is analogous to @send; use @dispatchcall if the 
 event must be processed immediately. The encapsulated event must have been 
@@ -397,15 +408,16 @@ value. If no override is desired, specify this as null.
 *event* - The name of the encapsulated event, defined earlier with 
 @record.
 
-	@dispatch null::null::myEvent;
-	@dispatch newObject::null::myEvent;
-	@dispatch null::MSG_NEW_MSG::myEvent;
+    @dispatch null::null::myEvent;
+    @dispatch newObject::null::myEvent;
+    @dispatch null::MSG_NEW_MSG::myEvent;
 
 **See Also:** @record, @send, @dispatchcall
 
 ----------
 #### @dispatchcall
-	<ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
+    <ret> = @dispatchcall [noFree] [{<cast>}] <nObj>::<nMsg>::<event>;
+
 The @dispatchcall keyword sends a previously-encapsulated message to the 
 specified object. This keyword is analogous to @call; use @dispatch if the event 
 can be sent with no return values. The encapsulated event must have been 
@@ -428,15 +440,16 @@ value. If no override is desired, specify this as null.
 *event* - The name of the encapsulated event, defined earlier with 
 @record.
 
-	retVal = @dispatchcall null::null::myEvent;
-	retVal = @dispatchcall newObject::null::myEvent;
-	(void) @dispatchcall null::MSG_NEW_MSG::myEvent;
+    retVal = @dispatchcall null::null::myEvent;
+    retVal = @dispatchcall newObject::null::myEvent;
+    (void) @dispatchcall null::MSG_NEW_MSG::myEvent;
 
 **See Also:** @record, @send, @dispatchcall
 
 ----------
 #### @elementArray
-	@elementArray 	<stype> <aname> [= {<init>}];
+    @elementArray   <stype> <aname> [= {<init>}];
+
 The @elementArray keyword declares an Element Array, a special kind of Chunk Array. 
 It has the following arguments:
 
@@ -453,18 +466,20 @@ no elements.
 
 ----------
 #### @end
-	@end	<segname>
+    @end    <segname>
+
 The @end keyword denotes the end of a resource block definition that had been 
 started with @start. Its one argument is the name of the resource segment.
 
-	@start MenuResource;
-	@end
+    @start MenuResource;
+    @end
 
 **See Also:** @start, @header, @object, @chunk
 
 ----------
 #### @endc
-	@endc
+    @endc
+
 The @endc keyword denotes the end of a class definition begun with @class. It 
 has no arguments.
 
@@ -472,7 +487,8 @@ has no arguments.
 
 ----------
 #### @endif
-	@endif
+    @endif
+
 The @endif directive denotes the end of a block of conditionally-compiled code. 
 It is used with @if, @ifdef, and @ifndef.
 
@@ -480,7 +496,8 @@ It is used with @if, @ifdef, and @ifndef.
 
 ----------
 #### @endlib
-	@endlib
+    @endlib
+
 Most Goc libraries will have a .goh header file. This file should end with an 
 @endlib directive. This will see to it that no library header file is included more 
 than once in a given compilation. The file must begin with an @deflib directive.
@@ -489,7 +506,8 @@ than once in a given compilation. The file must begin with an @deflib directive.
 
 ----------
 #### @exportMessages
-	@exportMessages <expname>, <num>;
+    @exportMessages <expname>, <num>;
+
 The @exportMessages keyword sets aside a number of message spots so the 
 messages may be declared elsewhere. This allows users of the class to declare 
 messages that are guaranteed to be unique across all subclasses. Exported 
@@ -500,15 +518,16 @@ messages are declared with the @importMessage keyword. The arguments of
 
 *num* - Number of message spots to be exported.
 
-	@exportMessages MetaUIMessages, 50;
-	@exportMessages MyExportedMessages, 12;
+    @exportMessages MetaUIMessages, 50;
+    @exportMessages MyExportedMessages, 12;
 
 **See Also:** - @importMessage, @reserveMessages, @message
 
 ----------
 #### @extern
-	@extern	<type> <name>;
-	@extern	method <cname>, <manme>+
+    @extern <type> <name>;
+    @extern method <cname>, <manme>+
+
 The @extern keyword allows code in a given compilation session to access 
 objects, chunks, monikers, and methods defined in another compilation 
 session. The compiler will assume the element exists and will be linked by the 
@@ -520,9 +539,9 @@ of *object*, *chunk*, *visMoniker*, or *method*.
 
 *name* - The name of the element being referenced.
 
-	@extern chunk MyChunk;
-	@extern object MyBlueTrigger;
-	@extern visMoniker GAL_visMoniker;
+    @extern chunk MyChunk;
+    @extern object MyBlueTrigger;
+    @extern visMoniker GAL_visMoniker;
 
 If @extern is being used to declare a method which is in a different file from the 
 class declaration, it has the following arguments:
@@ -550,12 +569,12 @@ keyword like so:
 
 In file containing class declaration:
 
-	@extern method MyClass, MSG_MY_DO_SOMETHING;
+    @extern method MyClass, MSG_MY_DO_SOMETHING;
 
 In file containing method code:
 
-	@extern method MyClass, MSG_MY_DO_SOMETHING(word myArg)
-	{ /* Method code here */ }
+    @extern method MyClass, MSG_MY_DO_SOMETHING(word myArg)
+    { /* Method code here */ }
 
 ##### Object Trees
 
@@ -572,20 +591,21 @@ If an object declared in one source file will send a message to an object in
 another source file, you must include an @**extern** line in the source file 
 containing the sending object: 
 
-	@extern object ReceivingObjectName;
+    @extern object ReceivingObjectName;
 
 The message itself should be sent in the following manner (with variations 
 possible if you will be using @**call**, passing arguments, or what have you):
 
-	optr ROOptr;
-	ROOptr = GeodeGetOptrNS(@ReceivingObjectName);
-	@send ROOptr::MSG_DO_SOMETHING(0, 0);
+    optr ROOptr;
+    ROOptr = GeodeGetOptrNS(@ReceivingObjectName);
+    @send ROOptr::MSG_DO_SOMETHING(0, 0);
 
 **See Also:** @chunk, @object, @visMoniker
 
 ----------
 #### gcnList
-	gcnList(<manufID>,<lname>) = <oname> [, <oname>]*;
+    gcnList(<manufID>,<lname>) = <oname> [, <oname>]*;
+
 The gcnList keyword, which does not have the keyword marker @ preceeding 
 it, puts the listed objects onto the specified notification list. GCN lists are 
 specified by both manufacturer ID and list type. The arguments of the gcnList 
@@ -599,17 +619,18 @@ be MANUFACTURER_ID_GEOWORKS.
 *oname* - A listing of all the objects that will be included on the GCN list. 
 Separate objects with commas.
 
-	@object GenApplicationClass HelloApp = {
-		GI_comp = HelloPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =
-										HelloPrimary;
-	}
+    @object GenApplicationClass HelloApp = {
+        GI_comp = HelloPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =
+                                        HelloPrimary;
+    }
 
 **See Also:** @object
 
 ----------
 #### @genChildren
-	@send @genChildren::<msg>(<params>);
+    @send @genChildren::<msg>(<params>);
+
 Any composite object in a generic object tree (therefore a subclass of 
 **GenClass**) can send a message that will be dispatched at once to all of its 
 children. Note that any message sent with @genChildren as the destination 
@@ -618,14 +639,16 @@ value and can not pass pointers in its parameters.
 
 ----------
 #### @genParent
-	[@send | @call]@genParent::<msg>(<params>);
+    [@send | @call]@genParent::<msg>(<params>);
+
 Any composite object in a generic object tree (therefore a subclass of 
 GenClass) can use the @genParent address to send a message to its **generic** 
 parent. This can be used with either @send or @call.
 
 ----------
 #### @gstring
-	@gstring <gsname> = {[<command> [, <command>]+]}
+    @gstring <gsname> = {[<command> [, <command>]+]}
+
 The @gstring keyword lets you declare a GString in Goc source code.
 
 *gsname* - The name of the chunk which will contain the GString.
@@ -634,7 +657,8 @@ The @gstring keyword lets you declare a GString in Goc source code.
 
 ----------
 #### @header
-	@header	<type> [= <init>];
+    @header <type> [= <init>];
+
 The @header keyword sets the header of an object or data resource segment to 
 a custom structure. The structure must begin with an LMemBlockHeader or 
 ObjLMemBlockHeader. The arguments of @header are given below:
@@ -643,20 +667,21 @@ ObjLMemBlockHeader. The arguments of @header are given below:
 
 *init* - Any initializer data for the fields added to your structure.
 
-	typedef struct {
-		LMemBlockHeader  meta;
-		int		a;
-		int		b;
-	} MyLMemBlockHeader;
-	@start MyDataResource, data, notDetachable;
-	@header MyLMemBlockHeader = 10, 12;
-	@end;
+    typedef struct {
+        LMemBlockHeader  meta;
+        int     a;
+        int     b;
+    } MyLMemBlockHeader;
+    @start MyDataResource, data, notDetachable;
+    @header MyLMemBlockHeader = 10, 12;
+    @end;
 
 **See Also:** @start, @end, @object, @chunk
 
 ----------
 #### @if
-	@if (<cond>)
+    @if (<cond>)
+
 The @if directive denotes the beginning of a conditionally-compiled block of 
 code. If the expression detailed in *cond* equates to *true*, then the code between 
 the @if directive and the first corresponding @endif directive will be compiled 
@@ -666,24 +691,25 @@ with the rest of the code.
 not. This expression is based on numerical values, names of 
 macros, and Boolean operators (|| and &&).
 
-	@if 0
-		/* code not compiled */
-	@endif
+    @if 0
+        /* code not compiled */
+    @endif
 
-	@if MyMacro
-		/* code compiled if MyMacro is defined */
-	@endif
+    @if MyMacro
+        /* code compiled if MyMacro is defined */
+    @endif
 
-	@if defined(MyMacro) || MY_CONDITION
-		/* code compiled either if MyMacro is defined or
-		 * if MY_CONDITION is non-zero */
-	@endif
+    @if defined(MyMacro) || MY_CONDITION
+        /* code compiled either if MyMacro is defined or
+         * if MY_CONDITION is non-zero */
+    @endif
 
 **See Also:** @ifdef, @ifndef, @endif
 
 ----------
 #### @ifdef
-	@ifdef <item>
+    @ifdef <item>
+
 The @ifdef directive is similar to the @if directive in use, except the condition 
 it evaluates is based solely on whether the *item* is defined or not (if *item* is 
 defined, the following code is compiled).
@@ -692,7 +718,8 @@ defined, the following code is compiled).
 
 ----------
 #### @ifndef
-	@ifndef <item>
+    @ifndef <item>
+
 The @ifndef directive is similar to the @ifdef directive in use, except the 
 condition it evaluates is based solely on whether *item* is not defined (if *item* is 
 not defined, the following code is compiled).
@@ -701,7 +728,8 @@ not defined, the following code is compiled).
 
 ----------
 #### @importMessage
-	@importMessage <expname>, <messageDef>;
+    @importMessage <expname>, <messageDef>;
+
 The @importMessage keyword declares a message with a reserved message 
 number set aside earlier by @exportMessages. The arguments of this keyword 
 are given below:
@@ -711,27 +739,29 @@ are given below:
 *messageDef* - Standard message definition - exactly the same as would follow 
 the @message keyword for message declaration.
 
-	@importMessage MyExportedMessages, word MSG_MY_MSG(
-						byte param1, byte param2);
+    @importMessage MyExportedMessages, word MSG_MY_MSG(
+                        byte param1, byte param2);
 
 **See Also:** @exportMessages, @reserveMessages, @message
 
 ----------
 #### @include
-	@include <fname>
+    @include <fname>
+
 The @include directive is used to include Goc files into a code file. It is similar 
 to the #include directive in C. Its only argument is a file name (*fname*) enclosed 
 in either angled brackets or quotation marks. If you use quotation marks, the 
 compiler will look first in the file's own directory; if you use angled brackets, it 
 will look first in the standard include directories.
 
-	@include <stdapp.goh>
-	@include <uitsctrl.goh>
-	@include "Art/mkrGenDoc"
+    @include <stdapp.goh>
+    @include <uitsctrl.goh>
+    @include "Art/mkrGenDoc"
 
 ----------
 #### @instance
-	@instance <insType> <iname> = <default>;
+    @instance <insType> <iname> = <default>;
+
 The @instance keyword declares an instance data field for a class. This 
 keyword will appear between the class delimeters @class and @endc. Its 
 arguments are shown below:
@@ -769,50 +799,53 @@ moniker resource chunk.
 Note that if you want to declare instance data fields for variable-sized data, you 
 should use the @vardata keyword rather than @instance.
 
-	@instance int				myInteger = 10;
+    @instance int               myInteger = 10;
 
-	typedef struc {
-		int		a;
-		int		b;
-	} MyStruc;
-	@instance MyStruc			strucField = {7, 11};
+    typedef struc {
+        int     a;
+        int     b;
+    } MyStruc;
+    @instance MyStruc           strucField = {7, 11};
 
-	@instance @visMoniker 		GI_moniker;
+    @instance @visMoniker       GI_moniker;
 
-	@instance @link				VI_link;
-	@instance @composite 		VCI_comp = VI_link;
+    @instance @link             VI_link;
+    @instance @composite        VCI_comp = VI_link;
 
-	@instance @kbdAccelerator	GI_kbdAcc;
+    @instance @kbdAccelerator   GI_kbdAcc;
 
 **See Also:** @vardata, @visMoniker, @link, @composite, @kbdAccelerator
 
 ----------
 #### @kbdAccelerator
-	@instance @kbdAccelerator <iname>;
+    @instance @kbdAccelerator <iname>;
+
 The @kbdAccelerator keyword follows @instance to create an instance data 
 field that will contain a keyboard accelerator. The *iname* argument is the name 
 of the instance data field.
 
-	@instance @kbdAccelerator GI_kbdAcc;
+    @instance @kbdAccelerator GI_kbdAcc;
 
 **See Also:** @instance
 
 ----------
 #### @link
-	@instance @link <iname>;
+    @instance @link <iname>;
+
 The @link keyword follows @instance to define a link instance data field 
 pointing to the object's next sibling in the object hierarchy. The *iname* 
 argument is the name of the instance data field. Note that the name of the link 
 field must be set as the default value of the corresponding @composite field.
 
-	@instance @link GI_link;
-	@instance @composite GI_comp = GI_link;
+    @instance @link GI_link;
+    @instance @composite GI_comp = GI_link;
 
 **See Also:** @instance, @composite
 
 ----------
 #### @message
-	@message	<retType> <mname>([@stack] <param>*);
+    @message    <retType> <mname>([@stack] <param>*);
+
 The @message keyword defines a message and its parameters and return 
 values. This keyword will appear within a class definition (i.e., between @class 
 and @endc). The message defined with @message will automatically be valid 
@@ -838,15 +871,16 @@ Parameters are defined in a similar manner as for functions and
 routines; each one consists of a data type followed by the name of 
 the parameter of that type.
 
-	message void MSG_TRIGGER_PUSHED(int push1);
-	@message word MSG_MY_MSG(byte firstParam, word secParam,
-							long thirdParam);
+    message void MSG_TRIGGER_PUSHED(int push1);
+    @message word MSG_MY_MSG(byte firstParam, word secParam,
+                            long thirdParam);
 
 **See Also:** @method, @reserveMessages, @exportMessages, @importMessage, @record
 
 ----------
 #### @method
-	@method	[<hname>,] <cname>, <mname>+ [{<code>}];
+    @method [<hname>,] <cname>, <mname>+ [{<code>}];
+
 The @method keyword begins definition of a method (message handler). Its 
 arguments are listed below:
 
@@ -866,19 +900,20 @@ parameters.
 *hname* is assumed to be the name of an existing routine which 
 should be used as the method.
 
-	@method   MyClass, MSG_MY_MSG {
-		/* method code goes here */
-	}
+    @method   MyClass, MSG_MY_MSG {
+        /* method code goes here */
+    }
 
-	@method   MyClassMethod, MyClass, MSG_MY_MSG {
-		/* method code goes here */
-	}
+    @method   MyClassMethod, MyClass, MSG_MY_MSG {
+        /* method code goes here */
+    }
 
 **See Also:** - @message
 
 ----------
 #### @noreloc
-	@noreloc <iname>;
+    @noreloc <iname>;
+
 The @noreloc keyword specifies that an instance data field (defined in the 
 previous program statement) is not relocatable. Normally optr fields are 
 assumed to be relocatable and will be automatically relocated by the system 
@@ -887,10 +922,11 @@ when shutting down and coming back from a shutdown; by means of the
 
 ----------
 #### @object
-	@object	<class> <name> <flags>* = {
-		[<fieldName> = <init>;]*
-		[<varName> [= <init>];]*
-	}
+    @object <class> <name> <flags>* = {
+        [<fieldName> = <init>;]*
+        [<varName> [= <init>];]*
+    }
+
 The @object keyword defines an object in an object resource block. It must 
 appear between @start and @end. Its arguments are defined below:
 
@@ -918,32 +954,33 @@ must be defined in a class in the object's class ancestry. Additionally, not all
 fields must be set. If a field is not specified within the @object declaration, the 
 field will be set to its default value as defined by the class.
 
-	@start MyObjectResource;
+    @start MyObjectResource;
 
-	@object GenTriggerClass MyTrigger ignoreDirty = {
-		GI_visMoniker = "MyTrigger's Moniker";
-	}
-	@object GenApplicationClass MyApp = {
-		GI_comp = MyPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =
-							MyPrimary;
-	}
-	@object GenPrimaryClass MyPrimary = {
-		GI_comp = MyMenu, MyInteraction, MyView;
-		GI_visMoniker = "My Primary's Moniker";
-	}
-	@object MyClass NewObject = {
-		NO_instance1 = 1;
-		NO_instance6 = `C';
-	}
+    @object GenTriggerClass MyTrigger ignoreDirty = {
+        GI_visMoniker = "MyTrigger's Moniker";
+    }
+    @object GenApplicationClass MyApp = {
+        GI_comp = MyPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =
+                            MyPrimary;
+    }
+    @object GenPrimaryClass MyPrimary = {
+        GI_comp = MyMenu, MyInteraction, MyView;
+        GI_visMoniker = "My Primary's Moniker";
+    }
+    @object MyClass NewObject = {
+        NO_instance1 = 1;
+        NO_instance6 = `C';
+    }
 
-	@end
+    @end
 
 **See Also:** @start, @end, @extern, @class, @instance, @vardata
 
 ----------
 #### @optimize
-	@optimize
+    @optimize
+
 This directive may be placed at the top of a **.goh** file. The directive instructs 
 Goc to generate a specially processed **.poh** file which contains all the 
 information of the **.goh** file, but is somewhat faster to compile. This **.poh** file is 
@@ -952,35 +989,37 @@ since the last compilation.
 
 ----------
 #### @protominor
-	@protominor <prototypeName>
+    @protominor <prototypeName>
+
 When creating a new version of an existing library, use the @**protominor** 
 keyword to declare new messages and variable data fields for a class. Suppose 
 your original class declaration looked like so:
 
-		@class MyClass, SuperClass;
-			@message void MSG_M_DO_THIS(void);
-			@vardata void TEMP_M_DONE_FLAG;
-		@endc
+        @class MyClass, SuperClass;
+            @message void MSG_M_DO_THIS(void);
+            @vardata void TEMP_M_DONE_FLAG;
+        @endc
 
 Having released this version of your class, you wished to release another 
 version in which this class handled another message. You wanted to specify 
 that this new message would only work with this new version of the library. 
 This would be set up like so:
 
-	@class MyClass, SuperClass;
-		@message void MSG_M_DO_THIS(void);
-		@vardata void TEMP_M_DONE_FLAG;
+    @class MyClass, SuperClass;
+        @message void MSG_M_DO_THIS(void);
+        @vardata void TEMP_M_DONE_FLAG;
 
-	@protominor MyVersion20
-	@message void MSG_M_DO_THAT(void);
-	@endc
+    @protominor MyVersion20
+    @message void MSG_M_DO_THAT(void);
+    @endc
 
 To do the equivalent version control with routines, use the **incminor** .gp file 
 directive.
 
 ----------
 #### @prototype
-	@prototype <messageDef>;
+    @prototype <messageDef>;
+
 The @prototype keyword allows multiple messages to have the same pass and 
 return parameters. Use @prototype to define the pass and return values, then 
 use @message to declare the messages that have these parameters. The 
@@ -988,16 +1027,17 @@ messages defined with @message will have different message numbers and
 will invoke different methods. The *messageDef* argument is a standard 
 message definition.
 
-	@prototype word MSG_MY_PROTO(byte param1);
+    @prototype word MSG_MY_PROTO(byte param1);
 
-	@message(MSG_MY_PROTO) MSG_MY_MSG;
-	@message(MSG_MY_PROTO) MSG_MY_SECOND_MSG;
+    @message(MSG_MY_PROTO) MSG_MY_MSG;
+    @message(MSG_MY_PROTO) MSG_MY_SECOND_MSG;
 
 **See Also:** @alias, @message
 
 ----------
 #### @record
-	<event> = @record <obj>::<msg>(<param>*);
+    <event> = @record <obj>::<msg>(<param>*);
+
 The @record keyword encapsulates an event for later use with @dispatch or 
 @dispatchcall. The arguments of @record are as follows:
 
@@ -1015,14 +1055,15 @@ the message will be determined when it it sent.
 *param* - This is a list of parameters that will be sent with the message 
 when it is dispatched.
 
-	myEvent = @record myObj::MSG_VIS_VUP_CREATE_GSTATE();
+    myEvent = @record myObj::MSG_VIS_VUP_CREATE_GSTATE();
 
 **See Also:** @dispatch, @dispatchcall, @call, @send
 
 ----------
 #### @reloc
-	@reloc	<iname>, [(<count>, <struct>)] <ptrType>;
-	@reloc	<iname>, <fn>, [(<count>, <struct>)] <ptrType>;
+    @reloc  <iname>, [(<count>, <struct>)] <ptrType>;
+    @reloc  <iname>, <fn>, [(<count>, <struct>)] <ptrType>;
+
 The @reloc keyword designates an instance data field that contains data 
 requiring relocation on startup. Note that this does not include instance fields 
 declared with the @composite and @link fields, but it does include any handle 
@@ -1050,15 +1091,16 @@ one of *optr* (object pointer), *ptr* (far pointer), or *handle*.
 data. If no extra data will be associated with this relocatable 
 field, then put a zero (0) rather than a field name.
 
-	@reloc MO_myHandle, handle;
-	@reloc MO_myVarHandle, 0, handle;
-	@reloc MO_myTable, (10, MyStruct), ptr;
+    @reloc MO_myHandle, handle;
+    @reloc MO_myVarHandle, 0, handle;
+    @reloc MO_myTable, (10, MyStruct), ptr;
 
 **See Also:** @instance, @vardata
 
 ----------
 #### _reloc
-	@method [<hname>,] <cname>, _reloc { <code>};
+    @method [<hname>,] <cname>, _reloc { <code>};
+
 The _reloc keyword is used to write relocation handlers for classes, if you need 
 to relocate-unrelocate instance data when it's either read in or saved to state.
 
@@ -1066,24 +1108,26 @@ The arguments of _reloc are show below:
 
 *code* - Code to execute when the object block is loaded in or saved out to 
 state, in which case instance data may need to be relocated or 
-unrelocated by hand.	
+unrelocated by hand.    
 
 ----------
 #### @reserveMessages
-	@reserveMessages <number>;
+    @reserveMessages <number>;
+
 The @reserveMessages keyword reserves the given number of message spots. 
 Messages are numbered sequentially according to the order of their 
 declaration; this keyword allows one or more numbers to be skipped in the 
 numbering process, allowing application upgrades without making earlier 
 versions obsolete. The single argument is the number of message spots to skip.
 
-	@reserveMessages 25;
+    @reserveMessages 25;
 
 **See Also:** @exportMessages, @importMessage, @message
 
 ----------
 #### @send
-	@send	[<flags>+] [(<cast_ret>)] <obj>::[{<cast_par>}]<msg>(<param>*);
+    @send   [<flags>+] [(<cast_ret>)] <obj>::[{<cast_par>}]<msg>(<param>*);
+
 The @send keyword sends a given message to the specified object. The message 
 will be sent and the sender's thread will continue executing without waiting for 
 a response. If return values or synchronization is important, use the @call 
@@ -1150,14 +1194,15 @@ This flag indicates that this event may be discarded if the system
 is running extremely low on handles and requires more space 
 immediately.
 
-	@send, forceQueue MyObj::MSG_MY_MSG(10, x);
-	@send MyObj::MSG_SET_ATTR(attributesParam);
+    @send, forceQueue MyObj::MSG_MY_MSG(10, x);
+    @send MyObj::MSG_SET_ATTR(attributesParam);
 
 **See Also:** @call, @callsuper, @message, @method
 
 ----------
 #### @specificUI
-	<fname>	= [@specificUI] <mod>* <key>;
+    <fname> = [@specificUI] <mod>* <key>;
+
 The @specificUI keyword is used when setting a keyboard accelerator instance 
 field in an object declaration. It tells the UI to allow the use of the keystrokes 
 specified, even if they are normally reserved for the specific UI. The keyword 
@@ -1171,15 +1216,16 @@ field *GI_kbdAccelerator*. These are
 *key* - The accelerator character. Must be either a numeric value of a 
 keyboard key or a letter enclosed in single quotation marks.
 
-	@object MyClass MyObject {
-		GI_kbdAccelerator = ctrl shift `k';
-	}
+    @object MyClass MyObject {
+        GI_kbdAccelerator = ctrl shift `k';
+    }
 
 **See Also:** GenClass, @kbdAccelerator, @instance
 
 ----------
 #### @stack
-	@message	<retType> <mname>([@stack] <param>*);
+    @message    <retType> <mname>([@stack] <param>*);
+
 This keyword may be used if the message might be sent from assembly 
 language code instead of Goc. It indicates that the arguments will be passed on 
 the stack; the handler will pop them off the stack in reverse order from the way 
@@ -1189,7 +1235,8 @@ they are listed in the declaration.
 
 ----------
 #### @start
-	@start	<segname> [, <flags>];
+    @start  <segname> [, <flags>];
+
 The @start keyword indicates the beginning of a resource block. The end of the 
 block is denoted by the keyword @end. The arguments of @start are listed 
 below:
@@ -1201,17 +1248,18 @@ be a data resource rather than an object resource. The flag
 *notDetachable*, when set, indicates the block should not be saved 
 to a state file.
 
-	@start MenuResource;
-	@end
+    @start MenuResource;
+    @end
 
-	@start MyDataResource, data, notDetachable;
-	@end
+    @start MyDataResource, data, notDetachable;
+    @end
 
 **See Also:** @end, @header, @object, @chunk
 
 ----------
 #### @uses
-	@uses <class>;
+    @uses <class>;
+
 If you know that a variant class will always be resolved to be a subclass of some 
 particular class, you can declare this with the @uses keyword. This will let the 
 variant class define handlers for the "used" superclass. The keyword uses the 
@@ -1227,7 +1275,8 @@ such that the used class is one of its ancestor classes.
 
 ----------
 #### @vardata
-	@vardata	<type> <vname>;
+    @vardata    <type> <vname>;
+
 The @vardata keyword creates a vardata data type for a class. Each type 
 created with @vardata can be simply the name of the type, or it can have 
 additional data (a single structure). The arguments of @vardata are given below:
@@ -1238,21 +1287,22 @@ place of a type.
 
 *vname* - This is the name of the variable data instance field.
 
-	@vardata		dword		MY_FIRST_VAR_DATA;
+    @vardata        dword       MY_FIRST_VAR_DATA;
 
-	typedef struc {
-		int		a;
-		int		b;
-	} MyStruc;
+    typedef struc {
+        int     a;
+        int     b;
+    } MyStruc;
 
-	@vardata		MyStruc		MY_SECOND_VAR_DATA;
-	@vardata		void		MY_THIRD_VAR_DATA;
+    @vardata        MyStruc     MY_SECOND_VAR_DATA;
+    @vardata        void        MY_THIRD_VAR_DATA;
 
 **See Also:** @vardataAlias, @instance
 
 ----------
 #### @vardataAlias
-	@vardataAlias (<origName>) <newType> <newName>;
+    @vardataAlias (<origName>) <newType> <newName>;
+
 The @vardataAlias keyword allows you to set up variable data fields with 
 varying amounts of extra data. That is, a single variable data field in the 
 instance chunk could have two different sizes and two different names. The 
@@ -1267,22 +1317,23 @@ the word void instead of a type.
 
 *newName* - The new name of the variable data field that uses the new type.
 
-	/* defined in GenTriggerClass */
-	@vardata word ATTR_GEN_TRIGGER_ACTION_DATA;
+    /* defined in GenTriggerClass */
+    @vardata word ATTR_GEN_TRIGGER_ACTION_DATA;
 
-	/* A special GenTrigger that uses a different data
-	 * type is defined in the application: */
-	@object GenTriggerClass MyTrigger = {
-		GTI_actionMsg = MSG_MY_APPS_MESSAGE;
-		GTI_destination = process;
-		@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
-					dword ATTR_MY_TRIGGER_SPECIAL_DATA;
+    /* A special GenTrigger that uses a different data
+     * type is defined in the application: */
+    @object GenTriggerClass MyTrigger = {
+        GTI_actionMsg = MSG_MY_APPS_MESSAGE;
+        GTI_destination = process;
+        @vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+                    dword ATTR_MY_TRIGGER_SPECIAL_DATA;
 
 **See Also:** @vardata, @instance
 
 ----------
 #### @visChildren
-	@send @visChildren::<msg>(<params>);
+    @send @visChildren::<msg>(<params>);
+
 Any composite object in a visible object tree (therefore a subclass of 
 **VisCompClass**) can send a message that will be dispatched at once to all of its 
 children. Note that any message sent with @visChildren as the destination 
@@ -1291,19 +1342,21 @@ value.
 
 ----------
 #### @visParent
-	@send @visParent::<msg>(<params>);
+    @send @visParent::<msg>(<params>);
+
 Any object in a visible tree can use @**visParent** as the destination of an @call 
 command. The message will be sent to the object's parent in the visible object 
 tree. The remainder of the command is the same as a normal @**call**.
 
 ----------
 #### @visMoniker
-	@instance @visMoniker <iname>;
+    @instance @visMoniker <iname>;
+
 The @visMoniker keyword follows @instance to create an instance data field 
 for a visual moniker. The iname argument is the name of the instance data 
 field.
 
-	@instance @visMoniker GI_visMoniker;
+    @instance @visMoniker GI_visMoniker;
 
 **See Also:** @instance, **GenClass**
 

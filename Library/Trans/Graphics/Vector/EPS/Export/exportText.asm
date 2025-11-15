@@ -1504,12 +1504,20 @@ tgs		local	TGSLocals
 tryAgain:
 		mov	si, tgs.TGS_pageFonts.chunk	; get chunk handle
 		mov	si, ds:[si]		; dereference chunk handle
-		mov	dx, cx			; dx = desired font id
+		push	ax
+		mov	ax, cx
+		and	ah, not FID_MAKER_BITS	; clear maker bits
+		mov	dx, ax			; dx = desired font id
+		pop	ax
 		mov	cx, ds:[si].PF_count	; get entry count
 		add	si, offset PF_first	; point at first entry
 entryLoop:
 		add	si, size PageFont	; bump past scratch space
-		cmp	dx, ds:[si].PF_id	; id match ?
+		push	ax
+		mov	ax,ds:[si].PF_id	; id match ?
+		and	ah, not FID_MAKER_BITS	; clear maker bits
+		cmp	dx, ax
+		pop	ax
 		jne	nextEntry
 		cmp	al, ds:[si].PF_style	; style match ?
 		je	foundMatch
@@ -2797,12 +2805,26 @@ checkPS:
 
 		; map the font id and style combinations to see how far the 
 		; font driver will go for us...
-		; For 2.0, we want to try to map better for styles.  For
-		; 1.2, we're going to punt and do all the style in PostScript
 
 		mov	cx, es:[di].PF_id	; get font id
 		mov	dl, es:[di].PF_style	; tack on style bits
-		mov	es:[di].PF_newstyle, dl	; store leftovers
+
+		; Compute the styles to be implemented by PS when using
+		; the available local outline font
+
+		push	di	
+		call	FontDrLockInfoBlock	; ds = font info block
+
+		call	FontDrFindFontInfo	; ds:di -> font info chunk
+
+		mov	al, dl			; al -> required style
+		mov	bx, ODF_PART1
+		call	FontDrFindOutlineData	; al -> style to implement
+
+		call	FontDrUnlockInfoBlock
+		pop	di
+
+		mov	es:[di].PF_newstyle, al	; store leftovers
 		mov	es:[di].PF_nlen, 8	; #chars in new name
 		mov	si, di			; save pointer to entry
 		add	di, offset PF_name	; point to the name field
@@ -3197,6 +3219,7 @@ tgs		local	TGSLocals
 		; note: we know that we always have an outline font here, since 
 		; all bitmap (non-outline) fonts will be mapped to Times-Roman.
 
+		push	{word} ds:[si].PF_style		; save style
 		push	ds:[si].PF_id			; save font id
 		mov	bx, tgs.TGS_chunk.handle 	; make a gstring
 		call	MemDerefDS			; ds -> LMem block
@@ -3212,11 +3235,8 @@ tgs		local	TGSLocals
 		clr	ax
 		call	GrSetFont
 
-		; for 1.2 we're going to simulate ALL style in PostScript.
-		; For 2.0, we'll want to change this and get the largest 
-		; subset of styles that the actual outline data supports.
-
-		mov	ax, 0xff00			; restore style bits
+		pop	ax				; font style
+		mov	ah, 0xff			; set as it is
 		call	GrSetTextStyle
 
 		; initialize the various variables we keep track of

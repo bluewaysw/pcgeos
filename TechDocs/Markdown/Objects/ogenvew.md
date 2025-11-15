@@ -261,63 +261,63 @@ extensively by the GenViewControl.
 ----------
 **Code Display 9-1 The Basic GenView**
 
-	/*
-	 * The GenView object creates a window in which the application may draw all or
-	 * portions of its document. Whenever a portion of this window becomes "invalid"
-	 * (when the window is resized or moved, for example), the view will send
-	 * MSG_META_EXPOSED to its content (in this case the application's Process object)
-	 * indicating that a redraw is required. The view keeps track of the clipping
-	 * boundaries and will automatically display the document properly.
-	 */
+    /*
+     * The GenView object creates a window in which the application may draw all or
+     * portions of its document. Whenever a portion of this window becomes "invalid"
+     * (when the window is resized or moved, for example), the view will send
+     * MSG_META_EXPOSED to its content (in this case the application's Process object)
+     * indicating that a redraw is required. The view keeps track of the clipping
+     * boundaries and will automatically display the document properly.
+     */
 
-	/*
-	 * The view defined here provides a window with the default white background and
-	 * normal scrolling and sizing behavior. Its document boundaries are set to 11
-	 * by 17 inches (the default has all bounds set to zero). The view provides
-	 * scrollbars automatically, and the application does not need to understand how
-	 * scrolling is implemented; instead, the view will simply request a redraw of the
-	 * entire document.
-	 */
+    /*
+     * The view defined here provides a window with the default white background and
+     * normal scrolling and sizing behavior. Its document boundaries are set to 11
+     * by 17 inches (the default has all bounds set to zero). The view provides
+     * scrollbars automatically, and the application does not need to understand how
+     * scrolling is implemented; instead, the view will simply request a redraw of the
+     * entire document.
+     */
 
-	@object GenViewClass MyView = {
+    @object GenViewClass MyView = {
 
-		/*
-		 * The document bounds are set to build an 11 x 17 inch document. Document
-		 * coordinates are in 1/72 inch (points), and document bounds must also be
-		 * specified in points. The upper-left corner of the document is placed at
-		 * (0,0), and the coordinates increase down and right to the far corner
-		 * (792, 1224).
-		 */
+        /*
+         * The document bounds are set to build an 11 x 17 inch document. Document
+         * coordinates are in 1/72 inch (points), and document bounds must also be
+         * specified in points. The upper-left corner of the document is placed at
+         * (0,0), and the coordinates increase down and right to the far corner
+         * (792, 1224).
+         */
 
-		GVI_docBounds = {
-			0,			/* left bound */
-			0,			/* top bound */
-			792,		/* right bound */
-			1224};		/* bottom bound */
+        GVI_docBounds = {
+            0,          /* left bound */
+            0,          /* top bound */
+            792,        /* right bound */
+            1224};      /* bottom bound */
 
-		/*
-		 * The GVI_horizAttrs and GVI_vertAttrs fields determine the view's
-		 * scrolling, linking, and sizing behavior in the appropriate dimension.
-		 * Setting the scrollable attribute in both these fields will make the view
-		 * create and maintain scrollers (in OSF/Motif, these will appear as
-		 * scrollbars). All scrolling will happen automatically.
-		 * These lines are necessary if scrolling is desired.
-		 */
-		GVI_horizAttrs = @default | GVDA_SCROLLABLE;
-		GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+        /*
+         * The GVI_horizAttrs and GVI_vertAttrs fields determine the view's
+         * scrolling, linking, and sizing behavior in the appropriate dimension.
+         * Setting the scrollable attribute in both these fields will make the view
+         * create and maintain scrollers (in OSF/Motif, these will appear as
+         * scrollbars). All scrolling will happen automatically.
+         * These lines are necessary if scrolling is desired.
+         */
+        GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE;
 
-		/* Lastly, we must designate which object (our Process 	object in this case)
-		 * will receive and handle the message to draw the 	displayed data
-		 * (MSG_META_EXPOSED). This object is called the content object and may
-		 * be the Process, a GenContent, or a VisContent.
-		 * Note that no message is defined here as with most action descriptors;
-		 * the view will send only MSG_META_EXPOSED. You must set this attribute no
-		 * matter what object is designated as the content; when using a
-		 * GenContent or a VisContent, the object's name should appear in
-		 * place of process.
-		 */
-		GVI_content = process;
-	}
+        /* Lastly, we must designate which object (our Process  object in this case)
+         * will receive and handle the message to draw the  displayed data
+         * (MSG_META_EXPOSED). This object is called the content object and may
+         * be the Process, a GenContent, or a VisContent.
+         * Note that no message is defined here as with most action descriptors;
+         * the view will send only MSG_META_EXPOSED. You must set this attribute no
+         * matter what object is designated as the content; when using a
+         * GenContent or a VisContent, the object's name should appear in
+         * place of process.
+         */
+        GVI_content = process;
+    }
 
 ----------
 
@@ -346,51 +346,51 @@ the Screen" in "VisClass," Chapter 23.
 ----------
 **Code Display 9-2 MSG_META_EXPOSED Handler**
 
-	/* Each time some part of the view window becomes invalid, the view will send a
-	 * MSG_META_EXPOSED to its content object. When MSG_META_EXPOSED is received,
-	 * the content must draw the document to a newly-created GState, then pass the
-	 * GState to the windowing system for drawing to the screen. */
+    /* Each time some part of the view window becomes invalid, the view will send a
+     * MSG_META_EXPOSED to its content object. When MSG_META_EXPOSED is received,
+     * the content must draw the document to a newly-created GState, then pass the
+     * GState to the windowing system for drawing to the screen. */
 
-	/* The format of this message is
-	 * 	void MSG_META_EXPOSED(WindowHandle win);
-	 * The passed value is the window handle of the view window; it will be used in
-	 * conjunction with the temporary GState for drawing. */
+    /* The format of this message is
+     *  void MSG_META_EXPOSED(WindowHandle win);
+     * The passed value is the window handle of the view window; it will be used in
+     * conjunction with the temporary GState for drawing. */
 
-	@method	MyProcessClass, MSG_META_EXPOSED {
-		/* Set up a temporary GState handle variable for our document. */
-		GStateHandle tempGState;
+    @method MyProcessClass, MSG_META_EXPOSED {
+        /* Set up a temporary GState handle variable for our document. */
+        GStateHandle tempGState;
 
-		/* Initialize the GState to the default. */
-		tempGState = GrCreateState(win);
+        /* Initialize the GState to the default. */
+        tempGState = GrCreateState(win);
 
-		/* Now start a window update. The routine GrBeginUpdate() notifies the window
-		 * system that we are in the process of drawing in the region in the window
-		 * that was invalidated. GrBeginUpdate() allows drawing to be clipped to only
-		 * the region that was invalidated. */
+        /* Now start a window update. The routine GrBeginUpdate() notifies the window
+         * system that we are in the process of drawing in the region in the window
+         * that was invalidated. GrBeginUpdate() allows drawing to be clipped to only
+         * the region that was invalidated. */
 
-		GrBeginUpdate(tempGState);
+        GrBeginUpdate(tempGState);
 
-		/* Now that we have a GState and have notified the windowing system that we
-		 * intend to draw, we can draw our document. Here, your method should call
-		 * whatever routines are appropriate for drawing the entire document.
-		 * A good hint here relates also to printing: Because printing and drawing to a
-		 * view are essentially the same operation, you might want to consolidate all
-		 * your drawing into a single routine that is called by both this method and
-		 * your printing method. This is what is done here; the routine called
-		 * MyDrawingRoutine() draws the document we wish displayed. MyDrawingRoutine()
-		 * will also be called by our printing method with a different GState. */
+        /* Now that we have a GState and have notified the windowing system that we
+         * intend to draw, we can draw our document. Here, your method should call
+         * whatever routines are appropriate for drawing the entire document.
+         * A good hint here relates also to printing: Because printing and drawing to a
+         * view are essentially the same operation, you might want to consolidate all
+         * your drawing into a single routine that is called by both this method and
+         * your printing method. This is what is done here; the routine called
+         * MyDrawingRoutine() draws the document we wish displayed. MyDrawingRoutine()
+         * will also be called by our printing method with a different GState. */
 
-		MyDrawingRoutine(tempGState);
+        MyDrawingRoutine(tempGState);
 
-		/* Now that we have finished drawing the document, we must inform the window
-		 * system that we are done. Additionally, we must now destroy the temporary
-		 * GState we used to draw the document. This is essential as not destroying
-		 * gstates causes small locked blocks to remain on the heap, eroding system
-		 * performance quickly and eventually making the system run out of handles. */
+        /* Now that we have finished drawing the document, we must inform the window
+         * system that we are done. Additionally, we must now destroy the temporary
+         * GState we used to draw the document. This is essential as not destroying
+         * gstates causes small locked blocks to remain on the heap, eroding system
+         * performance quickly and eventually making the system run out of handles. */
 
-		GrEndUpdate(tempGState);
-		GrDestroyState(tempGState);
-	}
+        GrEndUpdate(tempGState);
+        GrDestroyState(tempGState);
+    }
 
 ----------
 ### 9.3 Basic View Attributes
@@ -405,69 +405,69 @@ changeable with the use of messages defined by GenView.
 ----------
 **Code Display 9-3 GenView Instance Data**
 
-	/* Default settings are shown in the definitions. Other possible settings are
-	 * shown in a comment after the definition. */
+    /* Default settings are shown in the definitions. Other possible settings are
+     * shown in a comment after the definition. */
 
-		@instance PointDWFixed			GVI_origin = {{0, 0}, {0,0}};
-		@instance RectDWord				GVI_docBounds = {0, 0, 0, 0};
-		@instance PointDWord			GVI_increment = {20, 15};
-		@instance PointWWFixed			GVI_scaleFactor = {{0, 1}, {0, 1}};
-		@instance ColorQuad				GVI_color = {WHITE, 0, 0, 0};
-		@instance GenViewAttrs			GVI_attrs = (GVA_FOCUSABLE);
-			/* Possible flags for GVI_attrs:
-			 *	GVA_CONTROLLED			GVA_GENERIC_CONTENTS
-			 *	GVA_TRACK_SCROLLING		GVA_DRAG_SCROLLING
-			 *	GVA_NO_WIN_FRAME		GVA_SAME_COLOR_AS_PARENT_WIN
-			 *	GVA_VIEW_FOLLOWS_CONTENT_GEOMETRY
-			 *	GVA_WINDOW_COORDINATE_MOUSE_EVENTS
-			 *	GVA_DONT_SEND_PTR_EVENTS GVA_DONT_SEND_KBD_RELEASES
-			 *	GVA_SEND_ALL_KBD_CHARS	GVA_FOCUSABLE
-			 *	GVA_SCALE_TO_FIT		GVA_ADJUST_FOR_ASPECT_RATIO */
+        @instance PointDWFixed          GVI_origin = {{0, 0}, {0,0}};
+        @instance RectDWord             GVI_docBounds = {0, 0, 0, 0};
+        @instance PointDWord            GVI_increment = {20, 15};
+        @instance PointWWFixed          GVI_scaleFactor = {{0, 1}, {0, 1}};
+        @instance ColorQuad             GVI_color = {WHITE, 0, 0, 0};
+        @instance GenViewAttrs          GVI_attrs = (GVA_FOCUSABLE);
+            /* Possible flags for GVI_attrs:
+             *  GVA_CONTROLLED          GVA_GENERIC_CONTENTS
+             *  GVA_TRACK_SCROLLING     GVA_DRAG_SCROLLING
+             *  GVA_NO_WIN_FRAME        GVA_SAME_COLOR_AS_PARENT_WIN
+             *  GVA_VIEW_FOLLOWS_CONTENT_GEOMETRY
+             *  GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+             *  GVA_DONT_SEND_PTR_EVENTS GVA_DONT_SEND_KBD_RELEASES
+             *  GVA_SEND_ALL_KBD_CHARS  GVA_FOCUSABLE
+             *  GVA_SCALE_TO_FIT        GVA_ADJUST_FOR_ASPECT_RATIO */
 
-		@instance GenViewDimensionAttrs		GVI_horizAttrs = 0;
-		@instance GenViewDimensionAttrs		GVI_vertAttrs = 0;
-			/* Possible flags for the dimension attribute records:
-			 *	GVDA_SCROLLABLE			GVDA_SPLITTABLE
-			 *	GVDA_TAIL_ORIENTED		GVDA_DONT_DISPLAY_SCROLLBAR
-			 *	GVDA_NO_LARGER_THAN_CONTENT
-			 *	GVDA_NO_SMALLER_THAN_CONTENT
-			 *	GVDA_SIZE_A_MULTIPLE_OF_INCREMENT
-			 *	GVDA_KEEP_ASPECT_RATIO			*/
+        @instance GenViewDimensionAttrs     GVI_horizAttrs = 0;
+        @instance GenViewDimensionAttrs     GVI_vertAttrs = 0;
+            /* Possible flags for the dimension attribute records:
+             *  GVDA_SCROLLABLE         GVDA_SPLITTABLE
+             *  GVDA_TAIL_ORIENTED      GVDA_DONT_DISPLAY_SCROLLBAR
+             *  GVDA_NO_LARGER_THAN_CONTENT
+             *  GVDA_NO_SMALLER_THAN_CONTENT
+             *  GVDA_SIZE_A_MULTIPLE_OF_INCREMENT
+             *  GVDA_KEEP_ASPECT_RATIO          */
 
-		@instance GenViewInkType		GVI_inkType = GVIT_PRESSES_ARE_NOT_INK;
-			/* Possible flags for GVI_inkType:
-			 *	GVIT_PRESSES_ARE_NOT_INK	GVIT_INK_WITH_STANDARD_OVERRIDE
-			 *	GVIT_PRESSES_ARE_INK		GVIT_QUERY_OUTPUT */
+        @instance GenViewInkType        GVI_inkType = GVIT_PRESSES_ARE_NOT_INK;
+            /* Possible flags for GVI_inkType:
+             *  GVIT_PRESSES_ARE_NOT_INK    GVIT_INK_WITH_STANDARD_OVERRIDE
+             *  GVIT_PRESSES_ARE_INK        GVIT_QUERY_OUTPUT */
 
-		@instance @optr				GVI_content;
-		@instance @optr				GVI_horizLink;
-		@instance @optr				GVI_vertLink;
+        @instance @optr             GVI_content;
+        @instance @optr             GVI_horizLink;
+        @instance @optr             GVI_vertLink;
 
-	/* The following are the hints and attributes defined for the GenView's vardata.
-	 * Because GenViewClass is a subclass of GenClass, it inherits all other generic
-	 * hints as well. */
+    /* The following are the hints and attributes defined for the GenView's vardata.
+     * Because GenViewClass is a subclass of GenClass, it inherits all other generic
+     * hints as well. */
 
-		@vardata void		HINT_VIEW_LEAVE_ROOM_FOR_VERT_SCROLLER;
-		@vardata void		HINT_VIEW_LEAVE_ROOM_FOR_HORIZ_SCROLLER;
+        @vardata void       HINT_VIEW_LEAVE_ROOM_FOR_VERT_SCROLLER;
+        @vardata void       HINT_VIEW_LEAVE_ROOM_FOR_HORIZ_SCROLLER;
 
-		@vardata void		HINT_VIEW_IMMEDIATE_DRAG_UPDATES;
-		@vardata void		HINT_VIEW_DELAYED_DRAG_UPDATES;
-		@vardata void		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
-		@vardata void		HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE;
+        @vardata void       HINT_VIEW_IMMEDIATE_DRAG_UPDATES;
+        @vardata void       HINT_VIEW_DELAYED_DRAG_UPDATES;
+        @vardata void       HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
+        @vardata void       HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE;
 
-		@vardata InkDestinationInfoParams ATTR_GEN_VIEW_INK_DESTINATION_INFO;
-			@reloc ATTR_GEN_VIEW_INK_DESTINATION_INFO,
-				word_offsetof(InkDestinationInfoParams, IDIP_dest), optr;
+        @vardata InkDestinationInfoParams ATTR_GEN_VIEW_INK_DESTINATION_INFO;
+            @reloc ATTR_GEN_VIEW_INK_DESTINATION_INFO,
+                word_offsetof(InkDestinationInfoParams, IDIP_dest), optr;
 
-		@vardata void ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+        @vardata void ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
 
-		@vardata XYSize			ATTR_GEN_VIEW_PAGE_SIZE;
-		@vardata void			ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X;
-		@vardata void			ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS;
-		@vardata void			ATTR_GEN_VIEW_DO_NOT_WIN_SCROLL;
+        @vardata XYSize         ATTR_GEN_VIEW_PAGE_SIZE;
+        @vardata void           ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X;
+        @vardata void           ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS;
+        @vardata void           ATTR_GEN_VIEW_DO_NOT_WIN_SCROLL;
 
-	/* By default, all GenView objects are targetable. */
-		@default GI_attrs = @default | GA_TARGETABLE;
+    /* By default, all GenView objects are targetable. */
+        @default GI_attrs = @default | GA_TARGETABLE;
 
 ----------
 The attributes shown in Code Display 9-3 are all dynamically changeable; in 
@@ -477,7 +477,7 @@ and GeoDraw). Each attribute, therefore, is described under its appropriate
 section of this chapter.
 
 ### 9.3.1 The GVI_attrs Attribute
-	GVI_attrs, MSG_GEN_VIEW_SET_ATTRS, MSG_GEN_VIEW_GET_ATTRS
+    GVI_attrs, MSG_GEN_VIEW_SET_ATTRS, MSG_GEN_VIEW_GET_ATTRS
 
 The *GVI_attrs* field, as shown in Code Display 9-3, controls many aspects of 
 the view, including several features related to scrolling, input events, and the 
@@ -584,10 +584,10 @@ the aspect ratio of the screen.
 
 ----------
 #### MSG_GEN_VIEW_SET_ATTRS
-	void	MSG_GEN_VIEW_SET_ATTRS(
-			word			attrsToSet,
-			word			attrsToClear,
-			VisUpdateMode	updateMode);
+    void    MSG_GEN_VIEW_SET_ATTRS(
+            word            attrsToSet,
+            word            attrsToClear,
+            VisUpdateMode   updateMode);
 
 This message changes the view's *GVI_attrs* record to new values.
 
@@ -610,7 +610,7 @@ should be visually updated.
 
 ----------
 #### MSG_GEN_VIEW_GET_ATTRS
-	word	MSG_GEN_VIEW_GET_ATTRS();
+    word    MSG_GEN_VIEW_GET_ATTRS();
 
 This message returns a word representing the current *GVI_attrs* record. To 
 check whether an attribute is set, mask the returned word value against the 
@@ -627,9 +627,9 @@ attribute.
 **Interception:** Generally not intercepted.
 
 ### 9.3.2 Dimensional Attributes
-	GVI_horizAttrs, GVI_vertAttrs, 
-	MSG_GEN_VIEW_GET_DIMENSION_ATTRS, 
-	MSG_GEN_VIEW_SET_DIMENSION_ATTRS
+    GVI_horizAttrs, GVI_vertAttrs, 
+    MSG_GEN_VIEW_GET_DIMENSION_ATTRS, 
+    MSG_GEN_VIEW_SET_DIMENSION_ATTRS
 
 Together, the *GVI_horizAttrs* and *GVI_vertAttrs* fields are called the 
 "dimension attributes." They determine the characteristics of the view in 
@@ -697,16 +697,16 @@ the attribute fields, you can use the three macros also shown below.
 
 ----------
 #### MAKE_SET_CLEAR_ATTRS
-	word	MAKE_SET_CLEAR_ATTRS(setAttrs, clearAttrs);
-			byte	setAttrs, clearAttrs;
+    word    MAKE_SET_CLEAR_ATTRS(setAttrs, clearAttrs);
+            byte    setAttrs, clearAttrs;
 
 This macro takes two byte values and combines them into a one-word 
 argument. It is used with MSG_GEN_VIEW_SET_DIMENSION_ATTRS, below.
 
 ----------
 #### MAKE_HORIZ_ATTRS
-	byte	MAKE_HORIZ_ATTRS(val);
-			word	val;
+    byte    MAKE_HORIZ_ATTRS(val);
+            word    val;
 
 This macro takes a word-sized value and returns the high byte only (used 
 with MSG_GEN_VIEW_GET_DIMENSION_ATTRS, below, to retrieve the 
@@ -714,8 +714,8 @@ with MSG_GEN_VIEW_GET_DIMENSION_ATTRS, below, to retrieve the
 
 ----------
 #### MAKE_VERT_ATTRS
-	byte	MAKE_VERT_ATTRS(val);
-			word	val;
+    byte    MAKE_VERT_ATTRS(val);
+            word    val;
 
 This macro takes a word and returns the low byte only. It should be used with 
 MSG_GEN_VIEW_GET_DIMENSION_ATTRS, below, to extract the 
@@ -723,10 +723,10 @@ MSG_GEN_VIEW_GET_DIMENSION_ATTRS, below, to extract the
 
 ----------
 #### MSG_GEN_VIEW_SET_DIMENSION_ATTRS
-	void	MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
-			word			horizAttrsToSetClear,
-			word			vertAttrsToSetClear,
-			VisUpdateMode	updateMode);
+    void    MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+            word            horizAttrsToSetClear,
+            word            vertAttrsToSetClear,
+            VisUpdateMode   updateMode);
 
 This message changes the *GVI_horizAttrs* and *GVI_vertAttrs* records of the 
 view.
@@ -758,14 +758,14 @@ the *GVI_vertAttrs* field.
 two byte-sized records into one word-sized record for the Goc 
 preprocessor. Its use is shown in the example below.
 
-	@call MyView::MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
-		MAKE_SET_CLEAR_ATTRS(horizSet, horizClear),
-		MAKE_SET_CLEAR_ATTRS(vertSet, vertClear),
-		VUM_NOW);
+    @call MyView::MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+        MAKE_SET_CLEAR_ATTRS(horizSet, horizClear),
+        MAKE_SET_CLEAR_ATTRS(vertSet, vertClear),
+        VUM_NOW);
 
 ----------
 #### MSG_GEN_VIEW_GET_DIMENSION_ATTRS
-	word	MSG_GEN_VIEW_GET_DIMENSION_ATTRS();
+    word    MSG_GEN_VIEW_GET_DIMENSION_ATTRS();
 
 This message returns the GenView's current dimension attribute records.
 
@@ -783,9 +783,9 @@ the macro MAKE_VERT_ATTRS.
 **Interception:** Generally not intercepted.
 
 ### 9.3.3 Setting the Background Color
-	GVI_color, MSG_GEN_VIEW_SET_COLOR, MSG_GEN_VIEW_GET_COLOR, 
-	GVCD_INDEX, GVCD_RED, GVCD_FLAGS, GVCD_BLUE_AND_GREEN, 
-	GVCD_BLUE, GVCD_GREEN
+    GVI_color, MSG_GEN_VIEW_SET_COLOR, MSG_GEN_VIEW_GET_COLOR, 
+    GVCD_INDEX, GVCD_RED, GVCD_FLAGS, GVCD_BLUE_AND_GREEN, 
+    GVCD_BLUE, GVCD_GREEN
 
 A view can have its background color determined by an RGB value, a 
 grayscale value, a CMY value, or as a GEOS color index.
@@ -795,15 +795,15 @@ appropriate for the view to appear with the same background color as its
 parent Primary window. To do this, set the view's *GVI_attrs* field to the 
 following:
 
-	GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
+    GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
 
 Otherwise, you will probably want to set the view to something other than 
 the parent's color. To use a standard color index (16-color EGA set), set the 
 *GVI_color* attribute as follows:
 
-	GVI_color = {index, 0, 0, 0};
-		/* index is a GEOS color index, one
-		 * of the Color enumerated type. */
+    GVI_color = {index, 0, 0, 0};
+        /* index is a GEOS color index, one
+         * of the Color enumerated type. */
 
 There is no need to set any of the other color fields if you are using an index. 
 The default background color is determined by the specific UI but is normally 
@@ -815,23 +815,23 @@ know the structure used for defining the color. The view uses the structure
 ColorQuad to hold all four of the color data fields. This structure is defined 
 as follows:
 
-	typedef struct {
-		byte			CQ_redOrIndex;
-						/* color index or red value */
-		ColorFlag		CQ_info;
-		byte			CQ_green;		/* green value */
-		byte			CQ_blue;		/* blue value */
-	} ColorQuad;
+    typedef struct {
+        byte            CQ_redOrIndex;
+                        /* color index or red value */
+        ColorFlag       CQ_info;
+        byte            CQ_green;       /* green value */
+        byte            CQ_blue;        /* blue value */
+    } ColorQuad;
 
 When using a color index, you only need to set the *CQ_info* field to the proper 
 index and set the flags to zero. When using other types of value, however, you 
 must set the *CQ_info* byte to the type and the other fields to their proper 
 values as shown below:
 
-	GVI_color = { redVal,		/* red RGB value */
-				CF_RGB,			/* RGB flag */
-				greenVal,		/* green RGB value */
-				blueVal }		/* blue RGB value */
+    GVI_color = { redVal,       /* red RGB value */
+                CF_RGB,         /* RGB flag */
+                greenVal,       /* green RGB value */
+                blueVal }       /* blue RGB value */
 
 The **ColorFlag** record determines how the color will appear on the screen. It 
  may have any of one the following values:
@@ -858,10 +858,10 @@ arguments.
 
 ----------
 #### MSG_GEN_VIEW_SET_COLOR
-	void	MSG_GEN_VIEW_SET_COLOR(
-			byte		indexOrRed,		/* color index or red value */
-			ColorFlag		flags,		/* color flags */
-			word		greenBlue);		/* green and blue values */
+    void    MSG_GEN_VIEW_SET_COLOR(
+            byte        indexOrRed,     /* color index or red value */
+            ColorFlag       flags,      /* color flags */
+            word        greenBlue);     /* green and blue values */
 
 This message sets the background color of the view. It will not affect the 
 document or printing. The color may be specified either by standard GEOS 
@@ -892,7 +892,7 @@ macro GVC_GREEN_AND_BLUE.
 
 ----------
 #### MSG_GEN_VIEW_GET_COLOR
-	dword	MSG_GEN_VIEW_GET_COLOR();
+    dword   MSG_GEN_VIEW_GET_COLOR();
 
 This message returns all four fields of the view's background color in a single 
 dword value.
@@ -910,42 +910,42 @@ color. The individual values may be retrieved with the macros below.
 
 ----------
 #### GVCD_INDEX
-	byte	GVCD_INDEX(val);
-			dword	val;
+    byte    GVCD_INDEX(val);
+            dword   val;
 
 This macro extracts the color index byte from the given dword value. It is 
 intended for use when an index is used.
 
 ----------
 #### GVCD_RED
-	byte	GVCD_RED(val)
-			dword	val;
+    byte    GVCD_RED(val)
+            dword   val;
 
 This macro extracts the red component byte from the given dword value. It 
 is intended for use with RGB values.
 
 ----------
 #### GVCD_FLAGS
-	byte	GVCD_FLAGS(val)
-			dword	val;
+    byte    GVCD_FLAGS(val)
+            dword   val;
 
 This macro extracts the color flags byte from the given dword.
 
 ----------
 #### GVCD_GREEN
-	byte	GVCD_GREEN(val)
-			dword	val;
+    byte    GVCD_GREEN(val)
+            dword   val;
 
 This macro extracts the green component byte from the given dword.
 
 ----------
 #### GVCD_BLUE
-	byte	GVCD_BLUE(val)
-			dword	val;
+    byte    GVCD_BLUE(val)
+            dword   val;
 
 This macro extracts the blue component byte from the given dword.
 
-#### 9.3.4	The GVI_increment Attribute
+#### 9.3.4  The GVI_increment Attribute
 GVI_increment, MSG_GEN_VIEW_GET_INCREMENT, 
 MSG_GEN_VIEW_SET_INCREMENT
 
@@ -960,16 +960,16 @@ The increment values are stored in the *GVI_increment* field. This field is a
 structure of type **PointDWord**. This structure consists of two signed long 
 integers, as follows:
 
-	typedef struct {
-		sdword		PD_x;		/* x increment */
-		sdword		PD_y;		/* y increment */
-	} PointDWord;
+    typedef struct {
+        sdword      PD_x;       /* x increment */
+        sdword      PD_y;       /* y increment */
+    } PointDWord;
 
 It is easy to set the increment values in your Goc code, thus:
 
-	GVI_increment = {
-			horiz,    /* horizontal increment value */
-			vert }    /* vertical increment value */
+    GVI_increment = {
+            horiz,    /* horizontal increment value */
+            vert }    /* vertical increment value */
 
 In general, the increment will not change during execution. However, if you 
 find it necessary to do so, you can retrieve and set the increment with 
@@ -977,9 +977,9 @@ MSG_GEN_VIEW_GET_INCREMENT and MSG_GEN_VIEW_SET_INCREMENT.
 
 ----------
 #### MSG_GEN_VIEW_SET_INCREMENT
-	void	MSG_GEN_VIEW_SET_INCREMENT(@stack
-			sdword	yIncrement,
-			sdword	xIncrement);
+    void    MSG_GEN_VIEW_SET_INCREMENT(@stack
+            sdword  yIncrement,
+            sdword  xIncrement);
 
 This message sets the horizontal and vertical increment values for the view. 
 If the increment had been used before for scrolling, sizing, or scaling, all the 
@@ -1001,8 +1001,8 @@ increment values must be in document coordinates (1/72 inch).
 
 ----------
 #### MSG_GEN_VIEW_GET_INCREMENT
-	void	MSG_GEN_VIEW_GET_INCREMENT(
-			PointDWord *increment);
+    void    MSG_GEN_VIEW_GET_INCREMENT(
+            PointDWord *increment);
 
 This message returns the view's current horizontal and vertical increments 
 in document coordinates.
@@ -1041,12 +1041,12 @@ that it is closing. Again, the Process does not typically need to handle these
 messages.
 
 #### 9.4.1.1 Handling View Messages
-	MSG_META_CONTENT_SET_VIEW, 
-	MSG_META_CONTENT_VIEW_ORIGIN_CHANGED, 
-	MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED, 
-	MSG_META_CONTENT_VIEW_WIN_OPENED, 
-	MSG_META_CONTENT_VIEW_OPENING, 
-	MSG_META_CONTENT_VIEW_SIZE_CHANGED
+    MSG_META_CONTENT_SET_VIEW, 
+    MSG_META_CONTENT_VIEW_ORIGIN_CHANGED, 
+    MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED, 
+    MSG_META_CONTENT_VIEW_WIN_OPENED, 
+    MSG_META_CONTENT_VIEW_OPENING, 
+    MSG_META_CONTENT_VIEW_SIZE_CHANGED
 
 When a GenView is instantiated, the UI takes care of most of the work. 
 However, the view will send several messages to its new content in order to 
@@ -1101,9 +1101,9 @@ special handler is required when a view starts up; the MSG_META_EXPOSED
 is the same as would be received normally.
 
 #### 9.4.1.2 When the View Shuts Down
-	MSG_META_CONTENT_VIEW_CLOSING, 
-	MSG_META_CONTENT_VIEW_WIN_CLOSED, 
-	MSG_META_CONTENT_SET_VIEW
+    MSG_META_CONTENT_VIEW_CLOSING, 
+    MSG_META_CONTENT_VIEW_WIN_CLOSED, 
+    MSG_META_CONTENT_SET_VIEW
 
 When a view is about to be closed, a MSG_META_CONTENT_VIEW_CLOSING 
 is sent to the content to notify it of the shutdown. This message is primarily 
@@ -1144,8 +1144,8 @@ documents will have their upper-left corners at the origin and will occupy
 only a small portion of a 16-bit coordinate space.
 
 #### 9.4.2.2 Current Origin
-	GVI_origin, MSG_GEN_VIEW_SET_ORIGIN, 
-	MSG_GEN_VIEW_GET_ORIGIN, MSG_GEN_VIEW_SET_ORIGIN_LOW
+    GVI_origin, MSG_GEN_VIEW_SET_ORIGIN, 
+    MSG_GEN_VIEW_GET_ORIGIN, MSG_GEN_VIEW_SET_ORIGIN_LOW
 
 The GenView must know where in the coordinate space it is located. To do 
 this, it maintains an origin-the upper left coordinates of the window's 
@@ -1154,10 +1154,10 @@ document. The origin is stored in the field GVI_origin, a **PointDWFixed**
 structure containing two **DWFixed** structures. The **PointDWFixed** 
 structure definition is shown below:
 
-	typedef struct {
-			DWFixed		PDF_x;		/* x origin coord */
-			DWFixed		PDF_y;		/* y origin coord */
-	} PointDWFixed;
+    typedef struct {
+            DWFixed     PDF_x;      /* x origin coord */
+            DWFixed     PDF_y;      /* y origin coord */
+    } PointDWFixed;
 
 The view notifies its content each time the origin is changed with the 
 message MSG_META_CONTENT_VIEW_ORIGIN_CHANGED. Typically, the 
@@ -1172,10 +1172,10 @@ still be sent to the content; the window will not scroll, however.
 The default origin of the view is (0,0), but this may be set in your Goc code as 
 follows:
 
-	GVI_origin = {
-		xPosition,			/* x coordinate of origin */
-		yPosition			/* y coordinate of origin */
-	}
+    GVI_origin = {
+        xPosition,          /* x coordinate of origin */
+        yPosition           /* y coordinate of origin */
+    }
 
 You can also change the origin during execution either by causing the view to 
 scroll or by sending a MSG_GEN_VIEW_SET_ORIGIN. To retrieve the view's 
@@ -1192,9 +1192,9 @@ stored in the GVI_origin instance field.*
 
 ----------
 #### MSG_GEN_VIEW_SET_ORIGIN
-	void	MSG_GEN_VIEW_SET_ORIGIN(@stack
-			sdword	yOrigin,		/* y coordinate of new origin */
-			sdword	xOrigin);		/* x coordinate of new origin */
+    void    MSG_GEN_VIEW_SET_ORIGIN(@stack
+            sdword  yOrigin,        /* y coordinate of new origin */
+            sdword  xOrigin);       /* x coordinate of new origin */
 
 This message changes the view's current origin, causing it to scroll 
 immediately to the new location. The origin represents the upper-left corner 
@@ -1219,8 +1219,8 @@ MSG_GEN_VIEW_MAKE_RECT_VISIBLE
 
 ----------
 #### MSG_GEN_VIEW_GET_ORIGIN
-	void	MSG_GEN_VIEW_GET_ORIGIN(
-			PointDWord *origin);
+    void    MSG_GEN_VIEW_GET_ORIGIN(
+            PointDWord *origin);
 
 This message returns a **PointDWord** structure containing the current X and 
 Y coordinates of the view's origin.
@@ -1243,9 +1243,9 @@ MSG_GEN_VIEW_GET_DOC_SIZE
 
 ----------
 #### MSG_GEN_VIEW_SET_ORIGIN_LOW
-	void	MSG_GEN_VIEW_SET_ORIGIN_LOW(@stack
-			sdword		yOrigin,
-			sdword		xOrigin);
+    void    MSG_GEN_VIEW_SET_ORIGIN_LOW(@stack
+            sdword      yOrigin,
+            sdword      xOrigin);
 
 This low-level scroll message is just like MSG_GEN_VIEW_SET_ORIGIN 
 except that it will not propagate to linked views.
@@ -1272,8 +1272,8 @@ GVSOL_NO_CHANGE.
 **Structures:** GVSOL_NO_CHANGE is equal to 0x8000000.
 
 #### 9.4.2.3 Document Bounds
-	GVI_docBounds, MSG_GEN_VIEW_SET_DOC_BOUNDS, 
-	MSG_GEN_VIEW_GET_DOC_BOUNDS
+    GVI_docBounds, MSG_GEN_VIEW_SET_DOC_BOUNDS, 
+    MSG_GEN_VIEW_GET_DOC_BOUNDS
 
 Because most documents will not actually require the entire document space, 
 the view has an instance data field that defines the view's scrollable 
@@ -1281,18 +1281,18 @@ boundaries. This field is a **RectDWord** structure containing four signed
 dwords, each of which represents a specific boundary of the document. The 
 **RectDWord** structure is shown below:
 
-	typedef struct {
-			sdword		RD_left;		/* left bound */
-			sdword		RD_top;			/* top bound */
-			sdword		RD_right;		/* right bound */
-			sdword		RD_bottom;		/* bottom bound */
-	} RectDword;
+    typedef struct {
+            sdword      RD_left;        /* left bound */
+            sdword      RD_top;         /* top bound */
+            sdword      RD_right;       /* right bound */
+            sdword      RD_bottom;      /* bottom bound */
+    } RectDword;
 
 The document bounds are stored in the view's *GVI_docBounds* instance field. 
 The defaults are shown in the following code; note that each of the values in 
 the field must be in document coordinates.
 
-	GVI_docBounds = {0, 0, 0, 0};		/* zero size */
+    GVI_docBounds = {0, 0, 0, 0};       /* zero size */
 
 To change the scrollable document bounds at run-time, send the view a 
 message MSG_GEN_VIEW_SET_DOC_BOUNDS. To retrieve the current 
@@ -1300,11 +1300,11 @@ document bounds, send MSG_GEN_VIEW_GET_DOC_BOUNDS.
 
 ----------
 #### MSG_GEN_VIEW_SET_DOC_BOUNDS
-	void	MSG_GEN_VIEW_SET_DOC_BOUNDS(@stack
-			sdword	bottom,		/* new bottom document bound */
-			sdword	right,		/* new right document bound */
-			sdword	top,		/* new top document bound */
-			sdword	left);		/* new left document bound */
+    void    MSG_GEN_VIEW_SET_DOC_BOUNDS(@stack
+            sdword  bottom,     /* new bottom document bound */
+            sdword  right,      /* new right document bound */
+            sdword  top,        /* new top document bound */
+            sdword  left);      /* new left document bound */
 
 This message sets the view's scrollable document bounds to those passed. 
 Each of the four parameters must be given in document coordinates (points), 
@@ -1325,8 +1325,8 @@ document space.
 
 ----------
 #### MSG_GEN_VIEW_GET_DOC_BOUNDS
-	void	MSG_GEN_VIEW_GET_DOC_BOUNDS(
-			RectDWord *bounds);
+    void    MSG_GEN_VIEW_GET_DOC_BOUNDS(
+            RectDWord *bounds);
 
 This message returns the current boundaries of the view's scrollable 
 document space.
@@ -1346,7 +1346,7 @@ scrollable document boundaries of the GenView, as stored in
 **Interception:** Generally not intercepted.
 
 #### 9.4.2.4 Current Coordinates in the View
-	MSG_GEN_VIEW_GET_VISIBLE_RECT
+    MSG_GEN_VIEW_GET_VISIBLE_RECT
 
 To learn what visible rectangle the view is currently displaying, send it a 
 MSG_GEN_VIEW_GET_VISIBLE_RECT. This message will return the current 
@@ -1355,8 +1355,8 @@ view is not on the screen, the message will return a structure full of zeros.
 
 ----------
 #### MSG_GEN_VIEW_GET_VISIBLE_RECT
-	void	MSG_GEN_VIEW_GET_VISIBLE_RECT(
-			RectDWord *rect);
+    void    MSG_GEN_VIEW_GET_VISIBLE_RECT(
+            RectDWord *rect);
 
 This message returns the rectangle currently visible in the view, in document 
 coordinates.
@@ -1380,7 +1380,7 @@ message and draw only the visible portions upon receiving either
 MSG_META_EXPOSED or MSG_VIS_DRAW.
 
 ### 9.4.3 Drawing the Document
-	MSG_GEN_VIEW_GET_WINDOW, MSG_GEN_VIEW_REDRAW_CONTENT
+    MSG_GEN_VIEW_GET_WINDOW, MSG_GEN_VIEW_REDRAW_CONTENT
 
 Displaying your document inside a view is as easy as drawing the document. 
 Any time part of the view becomes invalid (due to scrolling or window 
@@ -1410,7 +1410,7 @@ screen. Note that this is an option provided by the GenViewControl object.
 
 ----------
 #### MSG_GEN_VIEW_GET_WINDOW
-	WindowHandle MSG_GEN_VIEW_GET_WINDOW();
+    WindowHandle MSG_GEN_VIEW_GET_WINDOW();
 
 This message returns the window handle of the view window. As an 
 alternative, you can store the view's window handle when 
@@ -1433,7 +1433,7 @@ MSG_META_CONTENT_VIEW_CLOSING
 
 ----------
 #### MSG_GEN_VIEW_REDRAW_CONTENT
-	void	MSG_GEN_VIEW_REDRAW_CONTENT();
+    void    MSG_GEN_VIEW_REDRAW_CONTENT();
 
 This message causes the GenView to redraw its entire content. This is 
 essentially the same as exposing the entire view window.
@@ -1452,8 +1452,8 @@ Primary window. However, you can change the sizing behavior of the view
 simply by setting attributes or applying hints.
 
 #### 9.4.4.1 Setting the View's Size
-	HINT_INITIAL_SIZE, HINT_MINIMUM_SIZE, HINT_MAXIMUM_SIZE, 
-	HINT_FIXED_SIZE
+    HINT_INITIAL_SIZE, HINT_MINIMUM_SIZE, HINT_MAXIMUM_SIZE, 
+    HINT_FIXED_SIZE
 
 Although the view normally sizes itself to fit the specifications of its parent 
 window, you can change this behavior by applying one of four hints or by 
@@ -1486,13 +1486,13 @@ GVDA_NO_SMALLER_THAN_CONTENT in the *GVI_horizAttrs* and
 *GVI_vertAttrs* attribute fields to ensure that the view stays with the content's 
 size. These attributes can be set as follows:
 
-	GVI_horizAttrs = @default
-					 | GVDA_NO_LARGER_THAN_CONTENT
-					 | GVDA_NO_SMALLER_THAN_CONTENT;
+    GVI_horizAttrs = @default
+                     | GVDA_NO_LARGER_THAN_CONTENT
+                     | GVDA_NO_SMALLER_THAN_CONTENT;
 
-	GVI_vertAttrs = @default
-					 | GVDA_NO_LARGER_THAN_CONTENT
-					 | GVDA_NO_SMALLER_THAN_CONTENT;
+    GVI_vertAttrs = @default
+                     | GVDA_NO_LARGER_THAN_CONTENT
+                     | GVDA_NO_SMALLER_THAN_CONTENT;
 
 The above lines will ensure that the view will remain exactly the same size 
 as the content (within screen boundaries).
@@ -1502,15 +1502,15 @@ multiple of the current horizontal or vertical increment. To do this, set the
 *GVI_vertAttrs* or *GVI_horizAttrs* attribute 
 GVDA_SIZE_A_MULTIPLE_OF_INCREMENT as below:
 
-	GVI_horizAttrs = @default
-					 | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
-	
-	GVI_vertAttrs = @default
-					 | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
+    GVI_horizAttrs = @default
+                     | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
+    
+    GVI_vertAttrs = @default
+                     | GVDA_SIZE_A_MULTIPLE_OF_INCREMENT;
 
 #### 9.4.4.2 Leaving Room for Scrollers
-	HINT_VIEW_LEAVE_ROOM_FOR_VERT_SCROLLER, 
-	HINT_VIEW_LEAVE_ROOM_FOR_HORIZ_SCROLLER
+    HINT_VIEW_LEAVE_ROOM_FOR_VERT_SCROLLER, 
+    HINT_VIEW_LEAVE_ROOM_FOR_HORIZ_SCROLLER
 
 Occasionally, you may want to leave extra room for scroller objects even when 
 your view will not have scrollers. You can do so with the hints 
@@ -1520,7 +1520,7 @@ will not affect the size of the view's window, they will affect the view's
 geometry with respect to its parent window.
 
 #### 9.4.4.3 Adjusting the view's Size
-	MSG_GEN_VIEW_CALC_WIN_SIZE
+    MSG_GEN_VIEW_CALC_WIN_SIZE
 
 When determining its size initially, the view sends itself the message 
 MSG_GEN_VIEW_CALC_WIN_SIZE. This message, while not useful to 
@@ -1533,9 +1533,9 @@ large enough to show scrollers and other children if required.
 
 ----------
 #### MSG_GEN_VIEW_CALC_WIN_SIZE
-	SizeAsDWord MSG_GEN_VIEW_CALC_WIN_SIZE(
-			word	width,		/* suggested new width of view window */
-			word	height);		/* suggested new height of view window */
+    SizeAsDWord MSG_GEN_VIEW_CALC_WIN_SIZE(
+            word    width,      /* suggested new width of view window */
+            word    height);        /* suggested new height of view window */
 
 This message is sent by the view to itself when it is first being initialized. It 
 takes a suggested size and returns a new suggested size, adjusted for specific 
@@ -1558,11 +1558,11 @@ high word.
 subclass this method. Be sure to call the superclass in the handler.
 
 ### 9.4.5 Document Scaling
-	GVI_scaleFactor, MSG_GEN_VIEW_GET_SCALE_FACTOR, 
-	MSG_GEN_VIEW_SET_SCALE_FACTOR, MSG_GEN_VIEW_SCALE_LOW, 
-	ATTR_GEN_VIEW_PAGE_SIZE, 
-	ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X, 
-	ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS
+    GVI_scaleFactor, MSG_GEN_VIEW_GET_SCALE_FACTOR, 
+    MSG_GEN_VIEW_SET_SCALE_FACTOR, MSG_GEN_VIEW_SCALE_LOW, 
+    ATTR_GEN_VIEW_PAGE_SIZE, 
+    ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X, 
+    ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS
 
 Many applications implement scaling to allow users to view and modify their 
 documents at various scale factors. This scaling behavior, apart from the 
@@ -1580,24 +1580,24 @@ code and change it with MSG_GEN_VIEW_SET_SCALE_FACTOR.
 The **PointWWFixed** structure contains two fields, each of which is a 
 **WWFixed** structure. Both **WWFixed** and **PointWWFixed** are shown below.
 
-	typedef struct {
-			word		WWF_frac;	/* 16 bits decimal */
-			word		WWF_int;	/* 16 bits integral */
-	} WWFixed;
-	
-	typedef struct {
-			WWFixed		PF_x;		/* x scale factor */
-			WWFixed		PF_y;		/* y scale factor */
-	} PointWWFixed;
+    typedef struct {
+            word        WWF_frac;   /* 16 bits decimal */
+            word        WWF_int;    /* 16 bits integral */
+    } WWFixed;
+    
+    typedef struct {
+            WWFixed     PF_x;       /* x scale factor */
+            WWFixed     PF_y;       /* y scale factor */
+    } PointWWFixed;
 
 A scale factor of 2.5 (250%) in both dimensions would be declared as follows:
 
-	GVI_scaleFactor = {{5, 2}, {5, 2}};
+    GVI_scaleFactor = {{5, 2}, {5, 2}};
 
 A scale factor of 100% in the horizontal and 250% in the vertical would be 
 declared as follows:
 
-	GVI_scaleFactor = {{0, 1}, {5, 2}};
+    GVI_scaleFactor = {{0, 1}, {5, 2}};
 
 To change the scale factor at run-time (for example, when a user clicks on a 
 Zoom button), send MSG_GEN_VIEW_SET_SCALE_FACTOR to the view, 
@@ -1626,10 +1626,10 @@ This attribute takes an argument of type **XYSize** (shown
 below). The view will scale itself to fit this page size rather than 
 its entire document size.
 
-	typedef struct {
-		word		XYS_width;		/* width of page */
-		word		XYS_height;		/* height of page */
-	} XYSize;
+    typedef struct {
+        word        XYS_width;      /* width of page */
+        word        XYS_height;     /* height of page */
+    } XYSize;
 
 ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X  
 This attribute causes the view to scale itself based on the 
@@ -1643,12 +1643,12 @@ scale factors may end up different.
 
 ----------
 #### MSG_GEN_VIEW_SET_SCALE_FACTOR
-	void	MSG_GEN_VIEW_SET_SCALE_FACTOR(@stack
-		sdword	yOrigin,			/* New Y origin coordinate after scaling */
-		sdword	xOrigin,			/* New X origin coordinate after scaling */
-		ScaleViewType scaleType,			/* Determines Positioning after scaling */
-		WWFixedAsDWord yScaleFactor,		/* New scale factor on Y axis */
-		WWFixedAsDWord xScaleFactor);		/* New scale factor on X axis */
+    void    MSG_GEN_VIEW_SET_SCALE_FACTOR(@stack
+        sdword  yOrigin,            /* New Y origin coordinate after scaling */
+        sdword  xOrigin,            /* New X origin coordinate after scaling */
+        ScaleViewType scaleType,            /* Determines Positioning after scaling */
+        WWFixedAsDWord yScaleFactor,        /* New scale factor on Y axis */
+        WWFixedAsDWord xScaleFactor);       /* New scale factor on X axis */
 
 This message changes the view's scale factor, causing it to redraw at the new 
 scale. The view will continue to display your document at the new scale until 
@@ -1705,8 +1705,8 @@ coordinates are set as the view's new origin.
 
 ----------
 #### MSG_GEN_VIEW_GET_SCALE_FACTOR
-	void	MSG_GEN_VIEW_GET_SCALE_FACTOR(
-			GetScaleParams *retValue);
+    void    MSG_GEN_VIEW_GET_SCALE_FACTOR(
+            GetScaleParams *retValue);
 
 This message returns the current scale factors of the view.
 
@@ -1729,19 +1729,19 @@ fractional (decimal) portion of the scale factor, and the low word
 represents the integral portion. The **GetScaleParams** structure 
 definition is shown below:
 
-	typedef struct {
-		WWFixedAsDWord			GSP_yScaleFactor;			/* y */
-		WWFixedAsDWord			GSP_xScaleFactor;			/* x */
-	} GetScaleParams;
+    typedef struct {
+        WWFixedAsDWord          GSP_yScaleFactor;           /* y */
+        WWFixedAsDWord          GSP_xScaleFactor;           /* x */
+    } GetScaleParams;
 
 ----------
 #### MSG_GEN_VIEW_SCALE_LOW
-	void	MSG_GEN_VIEW_SCALE_LOW(@stack
-			sdword				yOrigin,
-			sdword				xOrigin,
-			ScaleViewType		scaleType,
-			WWFixedAsDWord		yScaleFactor,
-			WWFixedAsDWord		xScaleFactor);
+    void    MSG_GEN_VIEW_SCALE_LOW(@stack
+            sdword              yOrigin,
+            sdword              xOrigin,
+            ScaleViewType       scaleType,
+            WWFixedAsDWord      yScaleFactor,
+            WWFixedAsDWord      xScaleFactor);
 
 This low-level message is similar to MSG_GEN_VIEW_SET_SCALE_FACTOR 
 except that it does not propagate to linked views. It is generally encapsulated 
@@ -1759,9 +1759,9 @@ to linked views later.
 **Interception:** Should not be intercepted.
 
 ### 9.4.6 Children of the View
-	HINT_SEEK_X_SCROLLER_AREA, HINT_SEEK_Y_SCROLLER_AREA, 
-	HINT_SEEK_LEFT_OF_VIEW, HINT_SEEK_RIGHT_OF_VIEW, 
-	HINT_SEEK_TOP_OF_VIEW, HINT_SEEK_BOTTOM_OF_VIEW
+    HINT_SEEK_X_SCROLLER_AREA, HINT_SEEK_Y_SCROLLER_AREA, 
+    HINT_SEEK_LEFT_OF_VIEW, HINT_SEEK_RIGHT_OF_VIEW, 
+    HINT_SEEK_TOP_OF_VIEW, HINT_SEEK_BOTTOM_OF_VIEW
 
 Children of GenView objects always appear at a specified edge of the view; 
 you may decide which children appear on the top, left, right, or bottom, but 
@@ -1809,8 +1809,8 @@ scrolling. In most situations, scrolling will be automatic when you use a view.
 However, you can modify the view's scrolling behavior.
 
 #### 9.4.7.1 Removing the Scrollbars
-	HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE, 
-	HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE
+    HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE, 
+    HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE
 
 You can determine when scrollbars will be visible on your 
 GVDA_SCROLLABLE view in several ways. One is to set the 
@@ -1834,8 +1834,8 @@ Views, by default, are not scrollable. To make your view scrollable, set the
 GVDA_SCROLLABLE attribute in both the *GVI_horizAttrs* and *GVI_vertAttrs* 
 records. It is easiest to do this in your Goc code, as follows:
 
-	GVI_horizAttrs = @default | GVDA_SCROLLABLE;
-	GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
 
 You can also set these attributes during execution by sending the message 
 MSG_GEN_VIEW_SET_DIMENSION_ATTRS to the view. See section 9.3.2 above.
@@ -1871,10 +1871,10 @@ To take advantage of the normal scrolling features, therefore, you only have
 to make the view scrollable and respond to MSG_META_EXPOSED.
 
 #### 9.4.7.4 Drag Scrolling
-	MSG_GEN_VIEW_INITIATE_DRAG_SCROLL, 
-	MSG_GEN_VIEW_SET_DRAG_BOUNDS, 
-	HINT_VIEW_IMMEDIATE_DRAG_UPDATES, 
-	HINT_VIEW_DELAYED_DRAG_UPDATES
+    MSG_GEN_VIEW_INITIATE_DRAG_SCROLL, 
+    MSG_GEN_VIEW_SET_DRAG_BOUNDS, 
+    HINT_VIEW_IMMEDIATE_DRAG_UPDATES, 
+    HINT_VIEW_DELAYED_DRAG_UPDATES
 
 In many cases, applications will want to supplement normal scrolling with 
 drag scrolling, in which a user clicks within the view and drags beyond its 
@@ -1893,9 +1893,9 @@ To implement drag scrolling, your view must be scrollable. It also must have
 the GVA_DRAG_SCROLLING attribute of the *GVI_attrs* record set. You can do 
 this in Goc as follows:
 
-	GVI_horizAttrs = @default | GVDA_SCROLLABLE;
-	GVI_vertAttrs = @default | GVDA_SCROLLABLE;
-	GVI_attrs = @default | GVA_DRAG_SCROLLING;
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+    GVI_attrs = @default | GVA_DRAG_SCROLLING;
 
 You can also set the drag scrolling attribute by sending the view the message 
 MSG_GEN_VIEW_SET_ATTRS (see section 9.3.1 above).
@@ -1914,7 +1914,7 @@ view a MSG_GEN_VIEW_SET_DRAG_BOUNDS.
 
 ----------
 #### MSG_GEN_VIEW_INITIATE_DRAG_SCROLL
-	void	MSG_GEN_VIEW_INITIATE_DRAG_SCROLL();
+    void    MSG_GEN_VIEW_INITIATE_DRAG_SCROLL();
 
 This message instructs the view to begin drag scrolling until the pressed 
 mouse button is let go by the user. When drag scrolling is enabled, the select 
@@ -1929,11 +1929,11 @@ mouse event.
 
 ----------
 #### MSG_GEN_VIEW_SET_DRAG_BOUNDS
-	void	MSG_GEN_VIEW_SET_DRAG_BOUNDS(@stack
-			sdword	bottom,	 /* bottom scrolling bound */
-			sdword	right,	 /* right scrolling bound */
-			sdword	top,	 /* top scrolling bound */
-			sdword	left);	 /* left scrolling bound */
+    void    MSG_GEN_VIEW_SET_DRAG_BOUNDS(@stack
+            sdword  bottom,  /* bottom scrolling bound */
+            sdword  right,   /* right scrolling bound */
+            sdword  top,     /* top scrolling bound */
+            sdword  left);   /* left scrolling bound */
 
 This message sets a temporary rectangle in which drag scrolling can operate 
 if the user should not drag scroll across the entire document.
@@ -1963,7 +1963,7 @@ your application must scroll by different increments depending on the
 situation.
 
 ##### Scrolling from the Content
-	MSG_GEN_VIEW_SCROLL_---
+    MSG_GEN_VIEW_SCROLL_---
 
 All typical messages sent by scrollers to the view are also available for 
 sending by applications and other geodes. These messages are listed below. 
@@ -1973,9 +1973,9 @@ on the screen will ignore these messages.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL
-	void	MSG_GEN_VIEW_SCROLL(@stack
-			sdword	yOffset,		/* amount to scroll vertically */
-			sdword	xOffset);		/* amount to scroll horizontally */
+    void    MSG_GEN_VIEW_SCROLL(@stack
+            sdword  yOffset,        /* amount to scroll vertically */
+            sdword  xOffset);       /* amount to scroll horizontally */
 
 This message causes the view to scroll a given amount in both the X and Y 
 directions.
@@ -1996,7 +1996,7 @@ directions.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_TOP
-	void	MSG_GEN_VIEW_SCROLL_TOP();
+    void    MSG_GEN_VIEW_SCROLL_TOP();
 
 Causes the view to scroll to the top of the document.
 
@@ -2008,7 +2008,7 @@ Causes the view to scroll to the top of the document.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_PAGE_UP
-	void	MSG_GEN_VIEW_SCROLL_PAGE_UP();
+    void    MSG_GEN_VIEW_SCROLL_PAGE_UP();
 
 Causes the view to scroll up one window height.
 
@@ -2020,7 +2020,7 @@ Causes the view to scroll up one window height.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_UP
-	void	MSG_GEN_VIEW_SCROLL_UP();
+    void    MSG_GEN_VIEW_SCROLL_UP();
 
 Causes the view to scroll up one increment.
 
@@ -2032,8 +2032,8 @@ Causes the view to scroll up one increment.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN
-	void	MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN(
-			sdword	yOrigin);
+    void    MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN(
+            sdword  yOrigin);
 
 Causes the view to scroll to a given vertical point and sets the Y component 
 of the origin to the passed value. It keeps the X component of the origin fixed.
@@ -2047,7 +2047,7 @@ of the origin to the passed value. It keeps the X component of the origin fixed.
 ----------
 
 #### MSG_GEN_VIEW_SCROLL_DOWN
-	void	MSG_GEN_VIEW_SCROLL_DOWN();
+    void    MSG_GEN_VIEW_SCROLL_DOWN();
 
 Causes the view to scroll down one increment.
 
@@ -2059,7 +2059,7 @@ Causes the view to scroll down one increment.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_PAGE_DOWN
-	void	MSG_GEN_VIEW_SCROLL_PAGE_DOWN();
+    void    MSG_GEN_VIEW_SCROLL_PAGE_DOWN();
 
 Causes the view to scroll down one window height.
 
@@ -2071,7 +2071,7 @@ Causes the view to scroll down one window height.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_BOTTOM
-	void	MSG_GEN_VIEW_SCROLL_BOTTOM();
+    void    MSG_GEN_VIEW_SCROLL_BOTTOM();
 
 Causes the view to scroll to the bottom of the document.
 
@@ -2083,7 +2083,7 @@ Causes the view to scroll to the bottom of the document.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_LEFT_EDGE
-	void	MSG_GEN_VIEW_SCROLL_LEFT_EDGE();
+    void    MSG_GEN_VIEW_SCROLL_LEFT_EDGE();
 
 Causes the view to scroll to the document's left edge.
 
@@ -2095,7 +2095,7 @@ Causes the view to scroll to the document's left edge.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_PAGE_LEFT
-	void	MSG_GEN_VIEW_SCROLL_PAGE_LEFT();
+    void    MSG_GEN_VIEW_SCROLL_PAGE_LEFT();
 
 Causes the view to scroll left one window width.
 
@@ -2107,7 +2107,7 @@ Causes the view to scroll left one window width.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_LEFT
-	void	MSG_GEN_VIEW_SCROLL_LEFT();
+    void    MSG_GEN_VIEW_SCROLL_LEFT();
 
 Causes the view to scroll left one increment.
 
@@ -2120,8 +2120,8 @@ Causes the view to scroll left one increment.
 ----------
 
 #### MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN
-	void	MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN(
-			sdword	xOrigin);
+    void    MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN(
+            sdword  xOrigin);
 
 Causes the view to scroll to a given horizontal point and sets the X component 
 of the origin to the passed value. It keeps the Y component of the origin fixed.
@@ -2134,7 +2134,7 @@ of the origin to the passed value. It keeps the Y component of the origin fixed.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_RIGHT
-	void	MSG_GEN_VIEW_SCROLL_RIGHT();
+    void    MSG_GEN_VIEW_SCROLL_RIGHT();
 
 Causes the view to scroll right one increment.
 
@@ -2146,7 +2146,7 @@ Causes the view to scroll right one increment.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_PAGE_RIGHT
-	void	MSG_GEN_VIEW_SCROLL_PAGE_RIGHT();
+    void    MSG_GEN_VIEW_SCROLL_PAGE_RIGHT();
 
 Causes the view to scroll right one window width.
 
@@ -2158,7 +2158,7 @@ Causes the view to scroll right one window width.
 
 ----------
 #### MSG_GEN_VIEW_SCROLL_RIGHT_EDGE
-	void	MSG_GEN_VIEW_SCROLL_RIGHT_EDGE();
+    void    MSG_GEN_VIEW_SCROLL_RIGHT_EDGE();
 
 Causes the view to scroll to the document's right edge.
 
@@ -2169,7 +2169,7 @@ Causes the view to scroll to the document's right edge.
 **Interception:** Generally not intercepted.
 
 ##### Making a Rectangle Visible
-	MSG_GEN_VIEW_MAKE_RECT_VISIBLE
+    MSG_GEN_VIEW_MAKE_RECT_VISIBLE
 
 You can easily make any portion of your document visible with the passage 
 of a single message. For example, if you were displaying a map of the United 
@@ -2191,15 +2191,15 @@ partially on the screen).
 
 ----------
 #### MSG_GEN_VIEW_MAKE_RECT_VISIBLE
-	void	MSG_GEN_VIEW_MAKE_RECT_VISIBLE(@stack
-			word	yFlags,		/* MakeRectVisibleFlags for y dimension */
-			word	yMargin,	/* percentage to scroll onto screen in y */
-			word	xFlags,		/* MakeRectVisibleFlags for x dimension */
-			word	xMargin,	/* percentage to scroll onto screen in x */
-			sdword	bottom,		/* bottom bound of the target rectangle */
-			sdword	right,		/* right bound of the target rectangle */
-			sdword	top,		/* top bound of the target rectangle */
-			sdword	left);		/* left bound of the target rectangle */
+    void    MSG_GEN_VIEW_MAKE_RECT_VISIBLE(@stack
+            word    yFlags,     /* MakeRectVisibleFlags for y dimension */
+            word    yMargin,    /* percentage to scroll onto screen in y */
+            word    xFlags,     /* MakeRectVisibleFlags for x dimension */
+            word    xMargin,    /* percentage to scroll onto screen in x */
+            sdword  bottom,     /* bottom bound of the target rectangle */
+            sdword  right,      /* right bound of the target rectangle */
+            sdword  top,        /* top bound of the target rectangle */
+            sdword  left);      /* left bound of the target rectangle */
 
 This message causes the view to scroll until a given portion of a passed 
 rectangle is visible in the display window. If the rectangle is already partially 
@@ -2261,16 +2261,16 @@ percentage (e.g. ".50" represents 50 percent) by the hexadecimal number
 0xffff; or, instead of doing that math, you can use one of the following 
 system-provided constants:
 
-	MRVM_0_PERCENT
-	MRVM_25_PERCENT
-	MRVM_50_PERCENT
-	MRVM_75_PERCENT
-	MRVM_100_PERCENT
+    MRVM_0_PERCENT
+    MRVM_25_PERCENT
+    MRVM_50_PERCENT
+    MRVM_75_PERCENT
+    MRVM_100_PERCENT
 
 **Interception:** Generally not intercepted.
 
 ##### Handling Complex Scrolling Operations
-	MSG_GEN_VIEW_SUSPEND_UPDATE, MSG_GEN_VIEW_UNSUSPEND_UPDATE
+    MSG_GEN_VIEW_SUSPEND_UPDATE, MSG_GEN_VIEW_UNSUSPEND_UPDATE
 
 If you cause the view to go through several scrolling operations in rapid order, 
 you may want to suspend the view from sending a MSG_META_EXPOSED 
@@ -2284,7 +2284,7 @@ MSG_GEN_VIEW_UNSUSPEND_UPDATE.
 
 ----------
 #### MSG_GEN_VIEW_SUSPEND_UPDATE
-	void	MSG_GEN_VIEW_SUSPEND_UPDATE();
+    void    MSG_GEN_VIEW_SUSPEND_UPDATE();
 
 This message causes the view to suspend sending MSG_META_EXPOSED 
 until it receives MSG_GEN_VIEW_UNSUSPEND_UPDATE. 
@@ -2298,7 +2298,7 @@ Suspend-unsuspend pairs can be nested.
 
 ----------
 #### MSG_GEN_VIEW_UNSUSPEND_UPDATE
-	void	MSG_GEN_VIEW_UNSUSPEND_UPDATE();
+    void    MSG_GEN_VIEW_UNSUSPEND_UPDATE();
 
 This message allows the view to send a MSG_META_EXPOSED again after 
 being suspended with MSG_GEN_VIEW_SUSPEND_UPDATE.
@@ -2313,9 +2313,9 @@ being suspended with MSG_GEN_VIEW_SUSPEND_UPDATE.
 
 #### 9.4.7.6 Tracking the Scrolling
 
-	MSG_META_CONTENT_TRACK_SCROLLING, 
-	MSG_GEN_VIEW_SETUP_TRACKING_ARGS, 
-	MSG_GEN_VIEW_TRACKING_COMPLETE
+    MSG_META_CONTENT_TRACK_SCROLLING, 
+    MSG_GEN_VIEW_SETUP_TRACKING_ARGS, 
+    MSG_GEN_VIEW_TRACKING_COMPLETE
 
 For flexibility, the view allows applications to track scrolling as it happens 
 and alter it before it gets implemented. When GVA_TRACK_SCROLLING is set 
@@ -2355,76 +2355,76 @@ definition of the structure.
 
 **Code Display 9-4 TrackScrollingParams and Associated Structures**
 
-	/*
-	 * The TrackScrollingParams structure contains all the necessary information about
-	 * a given scrolling event. It is made up of several substructures, each of which
-	 * is shown below.
-	 */
+    /*
+     * The TrackScrollingParams structure contains all the necessary information about
+     * a given scrolling event. It is made up of several substructures, each of which
+     * is shown below.
+     */
 
-	/*
-	 * ScrollAction is an enumerated type, each enumeration of which designates a
-	 * different type of event. The handler should not change these.
-	 */
-	typedef ByteEnum ScrollAction;		/* byte-length enumeration */
-	/*  SA_NOTHING			* No scrolling action
-	    SA_TO_BEGINNING		* Scrolling to beginning of document
-	    SA_PAGE_BACK		* Scrolling back one screen height or width
-	    SA_INC_BACK			* Scrolling back one increment
-	    SA_INC_FWD			* Scrolling forward one increment
-	    SA_DRAGGING			* Drag scrolling is underway
-	    SA_PAGE_FWD			* Scrolling forward one page
-	    SA_TO_END			* Scrolling to end of document
-	    SA_SCROLL			* Generic scrolling message sent
-	    SA_SCROLL_INTO		* Scrolling while keeping a point on screen
-	    SA_INITIAL_POS		* Indicating the initial scrolling position.
-	    					* Subsequent scroll messages will be relative to
-	    					* this origin.
-	    SA_SCALE			* Scaling may cause scrolling
-	    SA_PAN				* Pan-scrolling is underway. Otherwise
-	    					* identical to SA_SCROLL
-	    SA_DRAG_SCROLL		* Drag-scrolling, otherwise like SA_SCROLL
-	    SA_SCROLL_FOR_SIZE_CHANGE	* Scrolling because view size changed
-	*/
+    /*
+     * ScrollAction is an enumerated type, each enumeration of which designates a
+     * different type of event. The handler should not change these.
+     */
+    typedef ByteEnum ScrollAction;      /* byte-length enumeration */
+    /*  SA_NOTHING          * No scrolling action
+        SA_TO_BEGINNING     * Scrolling to beginning of document
+        SA_PAGE_BACK        * Scrolling back one screen height or width
+        SA_INC_BACK         * Scrolling back one increment
+        SA_INC_FWD          * Scrolling forward one increment
+        SA_DRAGGING         * Drag scrolling is underway
+        SA_PAGE_FWD         * Scrolling forward one page
+        SA_TO_END           * Scrolling to end of document
+        SA_SCROLL           * Generic scrolling message sent
+        SA_SCROLL_INTO      * Scrolling while keeping a point on screen
+        SA_INITIAL_POS      * Indicating the initial scrolling position.
+                            * Subsequent scroll messages will be relative to
+                            * this origin.
+        SA_SCALE            * Scaling may cause scrolling
+        SA_PAN              * Pan-scrolling is underway. Otherwise
+                            * identical to SA_SCROLL
+        SA_DRAG_SCROLL      * Drag-scrolling, otherwise like SA_SCROLL
+        SA_SCROLL_FOR_SIZE_CHANGE   * Scrolling because view size changed
+    */
 
-	/*
-	 * ScrollFlags is a byte record of flags used to determine the type of scrolling
-	 * taking place and the context of the scroll.
-	 */
+    /*
+     * ScrollFlags is a byte record of flags used to determine the type of scrolling
+     * taking place and the context of the scroll.
+     */
 
-	typedef ByteFlags ScrollFlags;
-	#define	SF_VERTICAL		0x80	/* Scrolling is vertical if set. If clear,
-				 * scrolling is horizontal. Invalid for
-				 * ScrollAction types SA_SCROLL_INTO,
-				 * SA_SCROLL, and SA_INITIAL_POS. */
-	#define	SF_ABSOLUTE		0x40	/* Scrolling is to an absolute point. Set for
-				 * ScrollAction types SA_TO_BEGINNING,
-				 * SA_TO_END, SA_INITIAL_POS, SA_SCROLL_INTO,
-				 * SA_DRAGGING, and some SA_SCROLL. */
-	#define	SF_DOC_SIZE_CHANGE 0x20		/* Scroll resulted from document size change. */
-	#define	SF_WINDOW_NOT_SUSPENDED 0x10
-				/* Flag used internally only. */
-	#define	SF_SCALE_TO_FIT		0x08	/* Flag used when the View is in scale-to-fit
-				 * mode (often changes scrolling behavior). */
-	#define	SF_SETUP_HAPPENED  0x04		/* Flag for error checking only. */
+    typedef ByteFlags ScrollFlags;
+    #define SF_VERTICAL     0x80    /* Scrolling is vertical if set. If clear,
+                 * scrolling is horizontal. Invalid for
+                 * ScrollAction types SA_SCROLL_INTO,
+                 * SA_SCROLL, and SA_INITIAL_POS. */
+    #define SF_ABSOLUTE     0x40    /* Scrolling is to an absolute point. Set for
+                 * ScrollAction types SA_TO_BEGINNING,
+                 * SA_TO_END, SA_INITIAL_POS, SA_SCROLL_INTO,
+                 * SA_DRAGGING, and some SA_SCROLL. */
+    #define SF_DOC_SIZE_CHANGE 0x20     /* Scroll resulted from document size change. */
+    #define SF_WINDOW_NOT_SUSPENDED 0x10
+                /* Flag used internally only. */
+    #define SF_SCALE_TO_FIT     0x08    /* Flag used when the View is in scale-to-fit
+                 * mode (often changes scrolling behavior). */
+    #define SF_SETUP_HAPPENED  0x04     /* Flag for error checking only. */
 
-	/*
-	 * The TrackScrollingParams structure contains several elements, each of
-	 * which is described in the comments below. All the fields will be filled by
-	 * MSG_GEN_VIEW_SETUP_TRACKING_ARGS; however, only certain fields will be filled
-	 * by MSG_META_CONTENT_TRACK_SCROLLING. Therefore, you should always send
-	 * MSG_GEN_VIEW_SETUP_TRACKING_ARGS in the handler for this message.
-	 */
+    /*
+     * The TrackScrollingParams structure contains several elements, each of
+     * which is described in the comments below. All the fields will be filled by
+     * MSG_GEN_VIEW_SETUP_TRACKING_ARGS; however, only certain fields will be filled
+     * by MSG_META_CONTENT_TRACK_SCROLLING. Therefore, you should always send
+     * MSG_GEN_VIEW_SETUP_TRACKING_ARGS in the handler for this message.
+     */
 
-	typedef struct {
-		ScrollAction	TSP_action;		/* The type of scrolling underway */
-		ScrollFlags		TSP_flags;		/* flags shown above */
-		optr			TSP_caller;		/* The sender of the scroll message */
-		PointDWord		TSP_change;		/* The relative amount being scrolled */
-		PointDWord		TSP_newOrigin;	/* The new absolute origin */
-		PointDWord		TSP_oldOrigin;	/* The original origin */
-		sword			TSP_viewWidth;	/* Current view width */
-		sword			TSP_viewHeight;	/* Current view height */
-	} TrackScrollingParams;
+    typedef struct {
+        ScrollAction    TSP_action;     /* The type of scrolling underway */
+        ScrollFlags     TSP_flags;      /* flags shown above */
+        optr            TSP_caller;     /* The sender of the scroll message */
+        PointDWord      TSP_change;     /* The relative amount being scrolled */
+        PointDWord      TSP_newOrigin;  /* The new absolute origin */
+        PointDWord      TSP_oldOrigin;  /* The original origin */
+        sword           TSP_viewWidth;  /* Current view width */
+        sword           TSP_viewHeight; /* Current view height */
+    } TrackScrollingParams;
 
 ----------
 
@@ -2456,27 +2456,27 @@ intercept MSG_META_CONTENT_VIEW_ORIGIN_CHANGED.
 ----------
 **Code Display 9-5 Handling Track Scrolling**
 
-	/* This message is sent by the view to its content object when track scrolling is
-	 * enabled and a scrolling event is begun. If you plan to track the scrolling, you
-	 * MUST handle this message. The first thing your handler should do is send
-	 * MSG_GEN_VIEW_SETUP_TRACKING_ARGS to the view. This message fills in the
-	 * TrackScrollingParams structure. The last thing the handler must do is send
-	 * MSG_GEN_VIEW_TRACKING_COMPLETE to the view. This message locks your changes
-	 * in and directs the view to implement them.
-	 * The format of this message is
-	 *	void (TrackScrollingParams *args);								*/
+    /* This message is sent by the view to its content object when track scrolling is
+     * enabled and a scrolling event is begun. If you plan to track the scrolling, you
+     * MUST handle this message. The first thing your handler should do is send
+     * MSG_GEN_VIEW_SETUP_TRACKING_ARGS to the view. This message fills in the
+     * TrackScrollingParams structure. The last thing the handler must do is send
+     * MSG_GEN_VIEW_TRACKING_COMPLETE to the view. This message locks your changes
+     * in and directs the view to implement them.
+     * The format of this message is
+     *  void (TrackScrollingParams *args);                              */
 
-	@message		MyProcessClass, MSG_META_CONTENT_TRACK_SCROLLING {
-		@call (args->TSP_caller)::MSG_GEN_VIEW_SETUP_TRACKING_ARGS(args);
-		/* Here you can do whatever you want to args->TSP_change. */
-		@call MyView::MSG_GEN_VIEW_TRACKING_COMPLETE(&args);
-	}
+    @message        MyProcessClass, MSG_META_CONTENT_TRACK_SCROLLING {
+        @call (args->TSP_caller)::MSG_GEN_VIEW_SETUP_TRACKING_ARGS(args);
+        /* Here you can do whatever you want to args->TSP_change. */
+        @call MyView::MSG_GEN_VIEW_TRACKING_COMPLETE(&args);
+    }
 
 ----------
 
 #### MSG_GEN_VIEW_SETUP_TRACKING_ARGS
-	void	MSG_GEN_VIEW_SETUP_TRACKING_ARGS(
-			TrackScrollingParams *args);
+    void    MSG_GEN_VIEW_SETUP_TRACKING_ARGS(
+            TrackScrollingParams *args);
 
 This message takes the **TrackScrollingParams** structure and fills in 
 remaining fields not passed by MSG_META_CONTENT_TRACK_SCROLLING.
@@ -2499,8 +2499,8 @@ method.
 
 ----------
 #### MSG_GEN_VIEW_TRACKING_COMPLETE
-	void	MSG_GEN_VIEW_TRACKING_COMPLETE(
-			TrackScrollingParams *args);
+    void    MSG_GEN_VIEW_TRACKING_COMPLETE(
+            TrackScrollingParams *args);
 
 This message sets the altered scrolling arguments and makes them official, 
 instructing the view to implement them.
@@ -2522,8 +2522,8 @@ MSG_META_CONTENT_TRACK_SCROLLING).
 
 ----------
 #### MSG_META_CONTENT_TRACK_SCROLLING
-	void	MSG_META_CONTENT_TRACK_SCROLLING(
-			TrackScrollingParams *args);
+    void    MSG_META_CONTENT_TRACK_SCROLLING(
+            TrackScrollingParams *args);
 
 This message is sent by the GenView to its content if the content has 
 requested track-scrolling (with GVA_TRACK_SCROLLING set in the 
@@ -2547,7 +2547,7 @@ MSG_GEN_VIEW_TRACKING_COMPLETE to the object specified in
 TSP_caller.
 
 #### 9.4.7.7 Customizing the Scrollers
-	HINT_VALUE_X_SCROLLER, HINT_VALUE_Y_SCROLLER
+    HINT_VALUE_X_SCROLLER, HINT_VALUE_Y_SCROLLER
 
 Although a view's scrollers should remain generic to maintain UI consistency, 
 you may set your own GenValue objects to be the scrollers of your view. This 
@@ -2560,15 +2560,15 @@ HINT_VALUE_Y_SCROLLER. For example, if you wanted to put your vertical
 scroller on the left of the view rather than on the right, you could add the 
 following code:
 
-	@object GenViewClass MyView = {
-		/* other view attributes */
-		GI_comp = MyViewScroller;
-	}
+    @object GenViewClass MyView = {
+        /* other view attributes */
+        GI_comp = MyViewScroller;
+    }
 
-	@object GenRangeClass MyViewScroller = {
-		HINT_Y_SCROLLER;
-		HINT_SEEK_LEFT_OF_VIEW;
-	}
+    @object GenRangeClass MyViewScroller = {
+        HINT_Y_SCROLLER;
+        HINT_SEEK_LEFT_OF_VIEW;
+    }
 
 Custom scrollers do not need to be direct children of the view; instead, they 
 may be any number of generations below the view in the generic object tree.
@@ -2639,7 +2639,7 @@ have the mouse grab. When it loses the grab, it will be notified with a
 MSG_META_CONTENT_LOST_GADGET_EXCLUSIVE.
 
 ##### Supporting Quick-Transfer
-	MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER
+    MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER
 
 When using a view and supporting the quick-transfer mechanism, the view 
 will grab the mouse when a quick-transfer operation is invoked. Conclusion 
@@ -2654,7 +2654,7 @@ when they become a potential destination for the transfer.
 
 ----------
 #### MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER
-	void	MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
+    void    MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();
 
 This message indicates to the view that it should relinquish the mouse grab 
 to allow a quick-transfer operation to continue. Pointer events will then be 
@@ -2699,10 +2699,10 @@ handler for MSG_META_VUP_KBD_CHAR; in the method, take the events you
 want and then call the superclass with @**callsuper()**.
 
 #### 9.4.8.3 Pen Input and Ink
-	GVI_inkType, MSG_GEN_VIEW_SET_INK_TYPE, 
-	MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE, 
-	MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE, 
-	ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT
+    GVI_inkType, MSG_GEN_VIEW_SET_INK_TYPE, 
+    MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE, 
+    MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE, 
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT
 
 Pen input will be sent to applications through the Ink library - it is suggested 
 that you read "Pen Object Library," Chapter 21, as well as "Input," 
@@ -2753,26 +2753,26 @@ You can also pre-set the extended Ink information with the vardata attribute
 ATTR_GEN_VIEW_INK_DESTINATION_INFO. This attribute has an extra 
 data structure of type **InkDestinationInfoParams**, shown below.
 
-	typedef struct {
-		optr		IDIP_dest;
-					/* destination object
-					 * for Ink output. */
-		word		IDIP_brushSize;
-					/* Size of Ink brush. 
-					 * High byte is x size,
-					 * Low byte is y size. */
-		byte		IDIP_color;		/* Color of Ink */
-		Boolean		IDIP_createGState;
-						/* Boolean indicating
-						 * if the Ink should
-						 * have its own
-						 * GState. */
-	} InkDestinationInfoParams;
+    typedef struct {
+        optr        IDIP_dest;
+                    /* destination object
+                     * for Ink output. */
+        word        IDIP_brushSize;
+                    /* Size of Ink brush. 
+                     * High byte is x size,
+                     * Low byte is y size. */
+        byte        IDIP_color;     /* Color of Ink */
+        Boolean     IDIP_createGState;
+                        /* Boolean indicating
+                         * if the Ink should
+                         * have its own
+                         * GState. */
+    } InkDestinationInfoParams;
 
 ----------
 #### MSG_GEN_VIEW_SET_INK_TYPE
-	void	MSG_GEN_VIEW_SET_INK_TYPE(
-			GenViewInkType inkType);		/* value of GenViewInkType */
+    void    MSG_GEN_VIEW_SET_INK_TYPE(
+            GenViewInkType inkType);        /* value of GenViewInkType */
 
 This message sets the type of Ink input expected by the view's content.
 
@@ -2789,11 +2789,11 @@ This message sets the type of Ink input expected by the view's content.
 
 ----------
 #### MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE
-	void	MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE(@stack
-			Boolean		createGState,
-			Color		inkColor,
-			word		brushSize,
-			optr		destObj);
+    void    MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE(@stack
+            Boolean     createGState,
+            Color       inkColor,
+            word        brushSize,
+            optr        destObj);
 
 This message sets the extended Ink type for the GenView. The extended Ink 
 type is stored in the vardata ATTR_GEN_VIEW_INK_DESTINATION_INFO.
@@ -2820,7 +2820,7 @@ to this object.
 
 ----------
 #### MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE
-	void	MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE();
+    void    MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE();
 
 This message resets the extended Ink type to default values.
 
@@ -2831,7 +2831,7 @@ This message resets the extended Ink type to default values.
 **Interception:** Generally not intercepted.
 
 #### 9.4.8.4 Target and Focus
-	MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO
+    MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO
 
 Some applications may draw some portion of their documents differently if 
 they have the target or focus. The view will pass along the following 
@@ -2845,8 +2845,8 @@ GVA_FOCUSABLE attribute in the *GVI_attrs* record.
 
 ----------
 #### MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO
-	void	MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO(
-			ViewTargetInfo *targetInfo);
+    void    MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO(
+            ViewTargetInfo *targetInfo);
 
 This message is sent to the view from **VisContentClass** contents whenever 
 target information within the view changes. This is done so that 
@@ -2867,14 +2867,14 @@ below.
 
 **Structures:** The **ViewTargetInfo** structure has two fields, as shown:
 
-	typedef struct {
-		optr		TR_object;		/* optr of object */
-		ClassStruct	*TR_class;		/* class of object */
-	} TargetReference;
-	typedef struct {
-		TargetReference			VTI_target;
-		TargetReference			VTI_content;
-	} ViewTargetInfo;
+    typedef struct {
+        optr        TR_object;      /* optr of object */
+        ClassStruct *TR_class;      /* class of object */
+    } TargetReference;
+    typedef struct {
+        TargetReference         VTI_target;
+        TargetReference         VTI_content;
+    } ViewTargetInfo;
 
 The *VTI_target* field contains the optr and class pointer of the object in the 
 view that currently has the target exclusive. The *VTI_content* field contains 
@@ -2883,7 +2883,7 @@ the optr and class pointer of the view's content object.
 **Interception:** Generally not intercepted.
 
 #### 9.4.8.5 Setting the Pointer Image
-	MSG_GEN_VIEW_SET_PTR_IMAGE
+    MSG_GEN_VIEW_SET_PTR_IMAGE
 
 If you want to change the pointer's image while it is over your view or while 
 the view has the focus, use MSG_GEN_VIEW_SET_PTR_IMAGE. To use this 
@@ -2894,9 +2894,9 @@ zeroed. The pointer image structure is detailed in section 11.2.4 of chapter 11.
 
 ----------
 #### MSG_GEN_VIEW_SET_PTR_IMAGE
-	void	MSG_GEN_VIEW_SET_PTR_IMAGE(
-			optr			pointerDef;		/* Optr of pointer definition */
-			PtrImageLevel	level);			/* Image level of pointer */
+    void    MSG_GEN_VIEW_SET_PTR_IMAGE(
+            optr            pointerDef;     /* Optr of pointer definition */
+            PtrImageLevel   level);         /* Image level of pointer */
 
 This message causes the view to set the pointer image to a custom image 
 whenever the pointer is over the view.
@@ -2926,21 +2926,21 @@ parameter is not used.
 **Structures:** **PointerDef16** has the following structure (see the appropriate 
 reference entry for a full description):
 
-	typedef struct {
-		byte		PD_width;
-		byte		PD_height
-		sbyte		PD_hotX;
-		sbyte		PD_hotY;
-		byte		PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
-		byte		PD_image[STANDARD_CURSOR_IMAGE_SIZE];
-	} PointerDef16;
+    typedef struct {
+        byte        PD_width;
+        byte        PD_height
+        sbyte       PD_hotX;
+        sbyte       PD_hotY;
+        byte        PD_mask[STANDARD_CURSOR_IMAGE_SIZE];
+        byte        PD_image[STANDARD_CURSOR_IMAGE_SIZE];
+    } PointerDef16;
 
 **Interception:** Generally not intercepted.
 
 ### 9.4.9 Linking Views
-	GVI_horizLink, GVI_vertLink, MSG_GEN_VIEW_SEND_TO_LINKS, 
-	MSG_GEN_VIEW_SEND_TO_VLINK, MSG_GEN_VIEW_SEND_TO_HLINK, 
-	MSG_GEN_VIEW_CALL_WITHOUT_LINKS
+    GVI_horizLink, GVI_vertLink, MSG_GEN_VIEW_SEND_TO_LINKS, 
+    MSG_GEN_VIEW_SEND_TO_VLINK, MSG_GEN_VIEW_SEND_TO_HLINK, 
+    MSG_GEN_VIEW_CALL_WITHOUT_LINKS
 
 Views may be linked together either in the horizontal or the vertical 
 dimension. Classed events may then be sent to the view's links, causing the 
@@ -2968,9 +2968,9 @@ MSG_GEN_VIEW_CALL_WITHOUT_LINKS.
 
 ----------
 #### MSG_GEN_VIEW_SEND_TO_LINKS
-	void	MSG_GEN_VIEW_SEND_TO_LINKS(
-			EventHandle event,		/* handle of recorded event */
-			optr	originator);	/* optr of view first receiving event */
+    void    MSG_GEN_VIEW_SEND_TO_LINKS(
+            EventHandle event,      /* handle of recorded event */
+            optr    originator);    /* optr of view first receiving event */
 
 This message sends a recorded event to the receiving view and then to all the 
 view's links. Any linked view will send this message upon receiving a 
@@ -2995,9 +2995,9 @@ the scrolling event and sent this message out.
 
 ----------
 #### MSG_GEN_VIEW_SEND_TO_VLINK
-	void	MSG_GEN_VIEW_SEND_TO_VLINK(
-			EventHandle event,		/* handle of recorded event */
-			optr	originator);	/* optr of view first receiving event */
+    void    MSG_GEN_VIEW_SEND_TO_VLINK(
+            EventHandle event,      /* handle of recorded event */
+            optr    originator);    /* optr of view first receiving event */
 
 This message sends a recorded event to the receiving view and then to all the 
 view's vertical links. It works the same as MSG_GEN_VIEW_SEND_TO_LINKS 
@@ -3024,9 +3024,9 @@ the scrolling event and sent this message out.
 
 ----------
 #### MSG_GEN_VIEW_SEND_TO_HLINK
-	void	MSG_GEN_VIEW_SEND_TO_HLINK(
-			EventHandle event,		/* handle of recorded event */
-			optr	originator);	/* optr of view first receiving event */
+    void    MSG_GEN_VIEW_SEND_TO_HLINK(
+            EventHandle event,      /* handle of recorded event */
+            optr    originator);    /* optr of view first receiving event */
 
 This message sends a recorded event to the receiving view, then to the view's 
 horizontal links. It works the same as MSG_GEN_VIEW_SEND_TO_LINKS 
@@ -3053,10 +3053,10 @@ the scrolling event and sent this message out.
 
 ----------
 #### MSG_GEN_VIEW_CALL_WITHOUT_LINKS
-	void	MSG_GEN_VIEW_CALL_WITHOUT_LINKS(
-			EventHandle		event,			/* handle of recorded event */
-			MessageFlags	messageFlags);	/* flags normally sent with
-											 * classed event */
+    void    MSG_GEN_VIEW_CALL_WITHOUT_LINKS(
+            EventHandle     event,          /* handle of recorded event */
+            MessageFlags    messageFlags);  /* flags normally sent with
+                                             * classed event */
 
 This message sends the recorded event to the view and ensures the event 
 does not get passed on to any of the recipient's links. Because the recorded 
@@ -3080,7 +3080,7 @@ the flag MF_CALL in this record.
 **Interception:** Generally not intercepted.
 
 ### 9.4.10 Setting the Content
-	MSG_GEN_VIEW_SET_CONTENT, MSG_GEN_VIEW_GET_CONTENT
+    MSG_GEN_VIEW_SET_CONTENT, MSG_GEN_VIEW_GET_CONTENT
 
 The GVI_content field in the GenView instance data determines what object 
 is designated as its content. By default, an application's Process object acts 
@@ -3100,8 +3100,8 @@ MSG_GEN_VIEW_GET_CONTENT.
 
 ----------
 #### MSG_GEN_VIEW_SET_CONTENT
-	void	MSG_GEN_VIEW_SET_CONTENT(
-			optr	content);
+    void    MSG_GEN_VIEW_SET_CONTENT(
+            optr    content);
 
 This message sets the view's *GVI_content* instance data field to a new optr. 
 The current content will receive messages as if the view were shutting down, 
@@ -3121,7 +3121,7 @@ anew. (See section 9.4.1 above.)
 
 ----------
 #### MSG_GEN_VIEW_GET_CONTENT
-	optr	MSG_GEN_VIEW_GET_CONTENT();
+    optr    MSG_GEN_VIEW_GET_CONTENT();
 
 This message returns the optr of the object currently set as the view's 
 content.
@@ -3137,15 +3137,15 @@ content.
 **Interception:** Generally not intercepted.
 
 ### 9.4.11 Internal Utilities
-	MSG_GEN_VIEW_DETERMINE_VIS_PARENT
+    MSG_GEN_VIEW_DETERMINE_VIS_PARENT
 
 Some messages supported by the view may be used as general utilities. Most 
 of these, however, will never be needed by applications.
 
 ----------
 #### MSG_GEN_VIEW_DETERMINE_VIS_PARENT
-	optr	MSG_GEN_VIEW_DETERMINE_VIS_PARENT(
-			optr	child);
+    optr    MSG_GEN_VIEW_DETERMINE_VIS_PARENT(
+            optr    child);
 
 This message returns the optr of the visible parent for a GenView's child 
 object. This is used by the GenView's children during its specific-UI building 
@@ -3164,7 +3164,7 @@ and should not be needed by applications.
 
 ----------
 #### MSG_GEN_VIEW_SEND_NOTIFICATION
-	void	MSG_GEN_VIEW_SEND_NOTIFICATION();
+    void    MSG_GEN_VIEW_SEND_NOTIFICATION();
 
 This message is part of the GenViewControl mechanism and is used almost 
 exclusively by the GenView. It sends the special notification from the 
@@ -3178,9 +3178,9 @@ GenView to the controller, if needed.
 
 ----------
 #### MSG_GEN_VIEW_SET_CONTROLLED_ATTRS
-	void	MSG_GEN_VIEW_SET_CONTROLLED_ATTRS(
-			GenViewControlAttrs		controlAttrs,
-			word		scaleFactor);
+    void    MSG_GEN_VIEW_SET_CONTROLLED_ATTRS(
+            GenViewControlAttrs     controlAttrs,
+            word        scaleFactor);
 
 This message sets attributes controlled by the GenViewControl.
 
@@ -3216,58 +3216,58 @@ GAGCNLT_CONTROLLED_GEN_VIEW_OBJECTS list.
 ----------
 **Code Display 9-6 GenViewControl Features and Tools**
 
-	/* The GenViewControl supports the following features. */
+    /* The GenViewControl supports the following features. */
 
-	typedef		WordFlags GVCFeatures;
-	#define	GVCF_MAIN_100			0x4000	/* sets scale to 100% from View menu */
-	#define	GVCF_MAIN_SCALE_TO_FIT	0x2000	/* allows scale-to-fit in View menu */
-	#define	GVCF_ZOOM_IN			0x1000	/* zooms in on the document */
-	#define	GVCF_ZOOM_OUT			0x0800	/* zooms out on the document */
-	#define	GVCF_REDUCE				0x0400	/* reduces the view's scale factor */
-	#define	GVCF_100				0x0200	/* sets scale to 100% in View submenu */
-	#define	GVCF_ENLARGE			0x0100	/* enlarges the view's scale factor */
-	#define	GVCF_BIG_ENLARGE		0x0080	/* enlarges the scale factor twice */
-	#define	GVCF_SCALE_TO_FIT		0x0040	/* scales the view to fit the document */
-	#define	GVCF_ADJUST_ASPECT_RATIO 0x0020	/* adjusts scale for aspect ratio */
-	#define	GVCF_APPLY_TO_ALL		0x0010	/* applies to all active views */
-	#define	GVCF_SHOW_HORIZONTAL	0x0008	/* shows/hides the horizontal scroller */
-	#define	GVCF_SHOW_VERTICAL		0x0004	/* shows/hides the vertical scroller */
-	#define	GVCF_CUSTOM_SCALE		0x0002	/* allows custom scaling */
-	#define	GVCF_REDRAW				0x0001	/* refreshes the view window */
+    typedef     WordFlags GVCFeatures;
+    #define GVCF_MAIN_100           0x4000  /* sets scale to 100% from View menu */
+    #define GVCF_MAIN_SCALE_TO_FIT  0x2000  /* allows scale-to-fit in View menu */
+    #define GVCF_ZOOM_IN            0x1000  /* zooms in on the document */
+    #define GVCF_ZOOM_OUT           0x0800  /* zooms out on the document */
+    #define GVCF_REDUCE             0x0400  /* reduces the view's scale factor */
+    #define GVCF_100                0x0200  /* sets scale to 100% in View submenu */
+    #define GVCF_ENLARGE            0x0100  /* enlarges the view's scale factor */
+    #define GVCF_BIG_ENLARGE        0x0080  /* enlarges the scale factor twice */
+    #define GVCF_SCALE_TO_FIT       0x0040  /* scales the view to fit the document */
+    #define GVCF_ADJUST_ASPECT_RATIO 0x0020 /* adjusts scale for aspect ratio */
+    #define GVCF_APPLY_TO_ALL       0x0010  /* applies to all active views */
+    #define GVCF_SHOW_HORIZONTAL    0x0008  /* shows/hides the horizontal scroller */
+    #define GVCF_SHOW_VERTICAL      0x0004  /* shows/hides the vertical scroller */
+    #define GVCF_CUSTOM_SCALE       0x0002  /* allows custom scaling */
+    #define GVCF_REDRAW             0x0001  /* refreshes the view window */
 
-	/* The GenViewControl provides the following tools. */
-	typedef		WordFlags GVCToolboxFeatures;
-	#define	GVCTF_100				0x1000	/* sets the scale factor to 100% */
-	#define	GVCTF_SCALE_TO_FIT		0x0800	/* scales the view to fit the document */
-	#define	GVCTF_ZOOM_IN			0x0400	/* zooms in; enlarges the scale factor */
-	#define	GVCTF_ZOOM_OUT			0x0200	/* zooms out; reduces the scale factor */
-	#define	GVCTF_REDRAW			0x0100	/* refreshes the view window */
-	#define	GVCTF_PAGE_LEFT			0x0080	/* scrolls left/back one page width */
-	#define	GVCTF_PAGE_RIGHT		0x0040	/* scrolls right/forward one page width */
-	#define	GVCTF_PAGE_UP			0x0020	/* scrolls up/back one page height */
-	#define	GVCTF_PAGE_DOWN			0x0010	/* scrolls down/forward one page height */
-	#define	GVCTF_ADJUST_ASPECT_RATIO 0x0008 /* adjusts scale for aspect ratio */
-	#define	GVCTF_APPLY_TO_ALL		0x0004	/* applies to all active views */
-	#define	GVCTF_SHOW_HORIZONTAL	0x0002	/* shows/hides the horizontal scroller */
-	#define	GVCTF_SHOW_VERTICAL		0x0001	/* shows/hides the vertical scroller */
+    /* The GenViewControl provides the following tools. */
+    typedef     WordFlags GVCToolboxFeatures;
+    #define GVCTF_100               0x1000  /* sets the scale factor to 100% */
+    #define GVCTF_SCALE_TO_FIT      0x0800  /* scales the view to fit the document */
+    #define GVCTF_ZOOM_IN           0x0400  /* zooms in; enlarges the scale factor */
+    #define GVCTF_ZOOM_OUT          0x0200  /* zooms out; reduces the scale factor */
+    #define GVCTF_REDRAW            0x0100  /* refreshes the view window */
+    #define GVCTF_PAGE_LEFT         0x0080  /* scrolls left/back one page width */
+    #define GVCTF_PAGE_RIGHT        0x0040  /* scrolls right/forward one page width */
+    #define GVCTF_PAGE_UP           0x0020  /* scrolls up/back one page height */
+    #define GVCTF_PAGE_DOWN         0x0010  /* scrolls down/forward one page height */
+    #define GVCTF_ADJUST_ASPECT_RATIO 0x0008 /* adjusts scale for aspect ratio */
+    #define GVCTF_APPLY_TO_ALL      0x0004  /* applies to all active views */
+    #define GVCTF_SHOW_HORIZONTAL   0x0002  /* shows/hides the horizontal scroller */
+    #define GVCTF_SHOW_VERTICAL     0x0001  /* shows/hides the vertical scroller */
 
-	/* Default features and tools */
-	#define GVC_DEFAULT_FEATURES	(GVCF_MAIN_100 | GVCF_MAIN_SCALE_TO_FIT |
-					 GVCF_REDUCE | GCVF_ENLARGE | GVCF_BIG_ENLARGE |
-					 GVCF_SCALE_TO_FIT | GVCF_ADJUST_ASPECT_RATIO |
-					 GVCF_APPLY_TO_ALL | GVCF_SHOW_HORIZONTAL |
-					 GVCF_SHOW_VERTICAL | GVCF_CUSTOM_SCALE)
+    /* Default features and tools */
+    #define GVC_DEFAULT_FEATURES    (GVCF_MAIN_100 | GVCF_MAIN_SCALE_TO_FIT |
+                     GVCF_REDUCE | GCVF_ENLARGE | GVCF_BIG_ENLARGE |
+                     GVCF_SCALE_TO_FIT | GVCF_ADJUST_ASPECT_RATIO |
+                     GVCF_APPLY_TO_ALL | GVCF_SHOW_HORIZONTAL |
+                     GVCF_SHOW_VERTICAL | GVCF_CUSTOM_SCALE)
 
-	#define GVC_DEFAULT_TOOLBOX_FEATURES (GVCTF_100 | GVCTF_ZOOM_IN | GVCTF_ZOOM_OUT)
+    #define GVC_DEFAULT_TOOLBOX_FEATURES (GVCTF_100 | GVCTF_ZOOM_IN | GVCTF_ZOOM_OUT)
 
-	#define GVC_SUGGESTED_SIMPLE_FEATURES (GVCF_MAIN_100 | GVCF_MAIN_SCALE_TO_FIT |
-					 GVCF_ZOOM_IN | GVCF_ZOOM_OUT)
+    #define GVC_SUGGESTED_SIMPLE_FEATURES (GVCF_MAIN_100 | GVCF_MAIN_SCALE_TO_FIT |
+                     GVCF_ZOOM_IN | GVCF_ZOOM_OUT)
 
-	#define GVC_SUGGESTED_INTRODUCTORY_FEATURES (GVCF_MAIN_100 | GVCF_ZOOM_IN |
-					 GVCF_ZOOM_OUT)
+    #define GVC_SUGGESTED_INTRODUCTORY_FEATURES (GVCF_MAIN_100 | GVCF_ZOOM_IN |
+                     GVCF_ZOOM_OUT)
 
-	#define GVC_SUGGESTED_BEGINNING_FEATURES (GVC_SUGGESTED_INTRODUCTORY_FEATURES |
-					 GVCF_MAIN_SCALE_TO_FIT)
+    #define GVC_SUGGESTED_BEGINNING_FEATURES (GVC_SUGGESTED_INTRODUCTORY_FEATURES |
+                     GVCF_MAIN_SCALE_TO_FIT)
 
 ----------
 ### 9.5.1 GenViewControl Instance Data
@@ -3278,34 +3278,34 @@ Display 9-7 along with their default values.
 ----------
 **Code Display 9-7 GenViewControl Instance Data**
 
-	/* The GenViewControl has four instance fields in addition to those inherited
-	 * from GenControlClass. You may wish to set these to determine the controller's
-	 * initial configuration, but typically you will not need to. */
+    /* The GenViewControl has four instance fields in addition to those inherited
+     * from GenControlClass. You may wish to set these to determine the controller's
+     * initial configuration, but typically you will not need to. */
 
-	/* Constants used for scaling boundaries */
-	#define DEFAULT_ZOOM_MINIMUM		 25
-	#define DEFAULT_ZOOM_MAZIMUM		200
+    /* Constants used for scaling boundaries */
+    #define DEFAULT_ZOOM_MINIMUM         25
+    #define DEFAULT_ZOOM_MAZIMUM        200
 
-	/* GVCI_minZoom determines the minimum percentage zoom allowed. */
-	/* GVCI_maxZoom indicates the maximum zoom percentage allowed. */
-	/* GVCI_scale indicates the current view scale factor setting. */
-	/* GVCI_attrs indicates which attributes the controller should
-	 * implement on startup. */
+    /* GVCI_minZoom determines the minimum percentage zoom allowed. */
+    /* GVCI_maxZoom indicates the maximum zoom percentage allowed. */
+    /* GVCI_scale indicates the current view scale factor setting. */
+    /* GVCI_attrs indicates which attributes the controller should
+     * implement on startup. */
 
-    @instance word		GVCI_minZoom =		DEFAULT_ZOOM_MINIMUM;
-    @instance word		GVCI_maxZoom =		DEFAULT_ZOOM_MAXIMUM;
-    @instance word		GVCI_scale = 		100;
-    @instance GenViewControlAttrs GVCI_attrs =	(GVCA_SHOW_HORIZONTAL |
-									 GVCA_SHOW_VERTICAL |
-									 GVCA_APPLY_TO_ALL);
+    @instance word      GVCI_minZoom =      DEFAULT_ZOOM_MINIMUM;
+    @instance word      GVCI_maxZoom =      DEFAULT_ZOOM_MAXIMUM;
+    @instance word      GVCI_scale =        100;
+    @instance GenViewControlAttrs GVCI_attrs =  (GVCA_SHOW_HORIZONTAL |
+                                     GVCA_SHOW_VERTICAL |
+                                     GVCA_APPLY_TO_ALL);
 
-	/* Possible GenViewControlAttrs flags:
-	 *	GVCA_ADJUST_ASPECT_RATIO				GVCA_APPLY_TO_ALL
-	 *	GVCA_SHOW_HORIZONTAL					GVCA_SHOW_VERTICAL */
+    /* Possible GenViewControlAttrs flags:
+     *  GVCA_ADJUST_ASPECT_RATIO                GVCA_APPLY_TO_ALL
+     *  GVCA_SHOW_HORIZONTAL                    GVCA_SHOW_VERTICAL */
 
     @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
-				/* This adds the view controller to the default
-				 * keyboard accelerator search path. */
+                /* This adds the view controller to the default
+                 * keyboard accelerator search path. */
 
 ----------
 ### 9.5.2 Notification Received
@@ -3327,25 +3327,25 @@ change and handle the appropriate attributes.
 ----------
 **Code Display 9-8 The NotifyViewStateChange Structure**
 
-	/* This structure is passed to the GenViewControl object when a feature of the
-	 * active view changes. It is passed with notification NT_VIEW_STATE_CHANGE. */
+    /* This structure is passed to the GenViewControl object when a feature of the
+     * active view changes. It is passed with notification NT_VIEW_STATE_CHANGE. */
 
-	typedef struct {
-		PointDWFixed		NVSC_origin;		/* absolute origin of the view */
-		RectDWord			NVSC_docBounds;		/* document bounds of the view */
-		PointDWord			NVSC_increment;		/* the view's increment value */
-		PointWWFixed		NVSC_scaleFactor;	/* view's current scale factor */
-		ColorQuad			NVSC_color;			/* view's background color */
-		GenViewAttrs		NVSC_attrs;			/* view's GVI_attrs record */
-		GenViewDimensionAttrs	NVSC_horizAttrs; /* view's GVI_horizAttrs record */
-		GenViewDimensionAttrs	NVSC_vertAttrs;	/* view's GVI_vertAttrs record */
-		GenViewInkType		NVSC_inkType;		/* view's GVI_inkType value */
-	/* The following four fields are used internally by the GenViewControl. */
-		XYSize				NVSC_contentSize;
-		XYSize				NVSC_contentScreenSize;
-		PointDWord			NVSC_originRelative;
-		PointDWord			NVSC_documentSize;
-	} NotifyViewStateChange;
+    typedef struct {
+        PointDWFixed        NVSC_origin;        /* absolute origin of the view */
+        RectDWord           NVSC_docBounds;     /* document bounds of the view */
+        PointDWord          NVSC_increment;     /* the view's increment value */
+        PointWWFixed        NVSC_scaleFactor;   /* view's current scale factor */
+        ColorQuad           NVSC_color;         /* view's background color */
+        GenViewAttrs        NVSC_attrs;         /* view's GVI_attrs record */
+        GenViewDimensionAttrs   NVSC_horizAttrs; /* view's GVI_horizAttrs record */
+        GenViewDimensionAttrs   NVSC_vertAttrs; /* view's GVI_vertAttrs record */
+        GenViewInkType      NVSC_inkType;       /* view's GVI_inkType value */
+    /* The following four fields are used internally by the GenViewControl. */
+        XYSize              NVSC_contentSize;
+        XYSize              NVSC_contentScreenSize;
+        PointDWord          NVSC_originRelative;
+        PointDWord          NVSC_documentSize;
+    } NotifyViewStateChange;
 
 ----------
 ### 9.5.3 GenViewControl Example
@@ -3357,73 +3357,73 @@ a GenToolControl to Hello World as well.
 ----------
 **Code Display 9-9 An Example of GenViewControl**
 
-	/* This display builds on the Hello World sample application. You should make the
-	 * changes shown here to that program, compile it, and run it to get a solid feel
-	 * for how the GenViewControl works and the features it provides.
-	 * Only the alterations to Hello World are shown here; the basic code can be found
-	 * in "The Source File and Source Code" on page 116 of
-	 * "First Steps: Hello World," Chapter 4 of the Concepts Book. */
+    /* This display builds on the Hello World sample application. You should make the
+     * changes shown here to that program, compile it, and run it to get a solid feel
+     * for how the GenViewControl works and the features it provides.
+     * Only the alterations to Hello World are shown here; the basic code can be found
+     * in "The Source File and Source Code" on page 116 of
+     * "First Steps: Hello World," Chapter 4 of the Concepts Book. */
 
-	/* HelloApp changes
-	 * Add a new GCN list type to the application object, and add the HelloViewControl
-	 * object to the list. This list is typical of system-provided controllers. */
+    /* HelloApp changes
+     * Add a new GCN list type to the application object, and add the HelloViewControl
+     * object to the list. This list is typical of system-provided controllers. */
 
-	@object GenApplicationClass HelloApp = {
-		GI_visMoniker = list { @HelloTextMoniker };
-		GI_comp = @HelloPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =							@HelloPrimary;
-		gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =	/* add */
-									@HelloViewControl;
-	}
+    @object GenApplicationClass HelloApp = {
+        GI_visMoniker = list { @HelloTextMoniker };
+        GI_comp = @HelloPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =                            @HelloPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =  /* add */
+                                    @HelloViewControl;
+    }
 
-	/* HelloPrimary changes
-	 * Add a new menu to the Primary's list of children. This new menu is called
-	 * HelloViewMenu and is declared below. */
+    /* HelloPrimary changes
+     * Add a new menu to the Primary's list of children. This new menu is called
+     * HelloViewMenu and is declared below. */
 
-	@object GenPrimaryClass HelloPrimary = {
-		GI_visMoniker = "Hello Sample Application";			/* unchanged */
-		GI_comp = @HelloView, @HelloMenu, @HelloViewMenu;	/* add @HelloViewMenu */
-		ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;					/* unchanged */
-		HINT_DISPLAY_SIZE_WINDOW_AS_DESIRED;				/* unchanged */
-	}
+    @object GenPrimaryClass HelloPrimary = {
+        GI_visMoniker = "Hello Sample Application";         /* unchanged */
+        GI_comp = @HelloView, @HelloMenu, @HelloViewMenu;   /* add @HelloViewMenu */
+        ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;                   /* unchanged */
+        HINT_DISPLAY_SIZE_WINDOW_AS_DESIRED;                /* unchanged */
+    }
 
-	/* HelloViewMenu declaration
-	 * Declare a new menu, HelloViewMenu. The GenViewControl object will add its
-	 * features to this menu. */
+    /* HelloViewMenu declaration
+     * Declare a new menu, HelloViewMenu. The GenViewControl object will add its
+     * features to this menu. */
 
-	@object GenInteractionClass HelloViewMenu = {
-		GII_visibility = GIV_POPUP;		/* This makes the GenInteraction a menu */
-		GI_comp = HelloViewControl;		/* Add the GenViewControl as the menu's child */
-		ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_VIEW_MENU);
-						/* Give this menu the default characteristics
-						 * of the standard View menu. */
-	}
+    @object GenInteractionClass HelloViewMenu = {
+        GII_visibility = GIV_POPUP;     /* This makes the GenInteraction a menu */
+        GI_comp = HelloViewControl;     /* Add the GenViewControl as the menu's child */
+        ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_VIEW_MENU);
+                        /* Give this menu the default characteristics
+                         * of the standard View menu. */
+    }
 
-	/* HelloViewControl declaration
-	 * Declare the GenViewControl object, HelloViewControl. This needs no extra
-	 * settings; we will use all the defaults. */
+    /* HelloViewControl declaration
+     * Declare the GenViewControl object, HelloViewControl. This needs no extra
+     * settings; we will use all the defaults. */
 
-	@object GenViewControlClass HelloViewControl = {
-	}
+    @object GenViewControlClass HelloViewControl = {
+    }
 
-	/* HelloView changes
-	 * The only change necessary to the GenView itself is to mark it controlled.
-	 * This entails setting the GVA_CONTROLLED flag in GVI_attrs. */
+    /* HelloView changes
+     * The only change necessary to the GenView itself is to mark it controlled.
+     * This entails setting the GVA_CONTROLLED flag in GVI_attrs. */
 
-	@object GenViewClass HelloView = {
-		GVI_attrs = @default | GVA_CONTROLLED;	/* set the controlled attr */
-		GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
-												/* unchanged */
-		GVI_vertAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
-												/* unchanged */
-		GVI_content = process;					/* unchanged */
-	}
+    @object GenViewClass HelloView = {
+        GVI_attrs = @default | GVA_CONTROLLED;  /* set the controlled attr */
+        GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+                                                /* unchanged */
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+                                                /* unchanged */
+        GVI_content = process;                  /* unchanged */
+    }
 
 ----------
 ### 9.5.4 Messages Handled
-	MSG_GEN_VIEW_CONTROL_SET_ATTRS, 
-	MSG_GEN_VIEW_CONTROL_SET_MINIMUM_SCALE_FACTOR, 
-	MSG_GEN_VIEW_CONTROL_SET_MAXIMUM_SCALE_FACTOR
+    MSG_GEN_VIEW_CONTROL_SET_ATTRS, 
+    MSG_GEN_VIEW_CONTROL_SET_MINIMUM_SCALE_FACTOR, 
+    MSG_GEN_VIEW_CONTROL_SET_MAXIMUM_SCALE_FACTOR
 
 **GenViewControlClass** handles several messages that allow its 
 characteristics to be set or modified at run-time. It also has several other 
@@ -3431,9 +3431,9 @@ internal messages which are not documented here.
 
 ----------
 #### MSG_GEN_VIEW_CONTROL_SET_ATTRS
-	void	MSG_GEN_VIEW_CONTROL_SET_ATTRS(
-			GenViewControlAttrs		attrsToSet,
-			GenViewControlAttrs		attrsToClear);
+    void    MSG_GEN_VIEW_CONTROL_SET_ATTRS(
+            GenViewControlAttrs     attrsToSet,
+            GenViewControlAttrs     attrsToClear);
 
 This message sets the GenViewControlAttrs in GVCI_attrs. Attributes noted 
 in both parameters will be turned off for the controller.
@@ -3453,8 +3453,8 @@ in both parameters will be turned off for the controller.
 
 ----------
 #### MSG_GEN_VIEW_CONTROL_SET_MINIMUM_SCALE_FACTOR
-	void	MSG_GEN_VIEW_CONTROL_SET_MINIMUM_SCALE_FACTOR(
-			word	minimumScaleFactor);
+    void    MSG_GEN_VIEW_CONTROL_SET_MINIMUM_SCALE_FACTOR(
+            word    minimumScaleFactor);
 
 This message sets the view controller's minimum allowable scale factor.
 
@@ -3471,8 +3471,8 @@ This message sets the view controller's minimum allowable scale factor.
 
 ----------
 #### MSG_GEN_VIEW_CONTROL_SET_MAXIMUM_SCALE_FACTOR
-	void	MSG_GEN_VIEW_CONTROL_SET_MAXIMUM_SCALE_FACTOR(
-			word	maximumScaleFactor);
+    void    MSG_GEN_VIEW_CONTROL_SET_MAXIMUM_SCALE_FACTOR(
+            word    maximumScaleFactor);
 
 This message sets the maximum settable scale factor for the view controller.
 

@@ -23,7 +23,8 @@ Memory Levels
 <P>
 This chapter collects various utility routines and concepts that may not adequately be addressed within other chapters. </P>
 <P>
-If you are writing an application that requires use of memory, you will want to keep track of how much memory is available on the Nokia 9000i Communicator's flash file system (FFS). </P>
+If you are writing an application that requires use of memory, you will want to keep track of how much memory is available on the Nokia 9000i/9110 Communicator's flash file system (FFS)
+or the N9110 Communicator's <A HREF = "../MMC/combo.htm">memory card</A>. </P>
 
 <P CLASS="sectionlinks">
 <STRONG>
@@ -78,13 +79,22 @@ Engaging in an operation that consumes memory</LI>
 <A NAME="9000Utils_2.htm_68929">
  </A>
 Modifying Files on the FFS</H2>
-<PRE>FoamWarnForSaving(), FoamSaveAction</PRE>
+<PRE>FoamWarnForSaving(), FoamSaveAction
+<EM>On N9110:</EM> FoamWarnForSavingOnDisk()
+</PRE>
 <P>
 Whenever you perform an operation that modifies a file on the FFS, you should make sure that you have enough space to save the file. For example, you may bring up a document, modify it, and then wish to close the app, saving the document as it now exists.</P>
 <P>
 In those case, use <CODE>
 FoamWarnForSaving()</CODE>
- to make sure you can proceed with the operation. Pass this routine the number of bytes required for the operation. The routine checks if there is enough memory available for the operation. If there is, it returns FSA_SAVE_DATA. Otherwise, it initiates a dialog box that asks you whether you wish to either throw away the changes or cancel the operation.</P>
+ to make sure you can proceed with the operation. Pass this routine the number of bytes required for the 
+operation. The routine checks if there is enough memory available for the operation. If there is, it returns 
+<CODE>FSA_SAVE_DATA</CODE>. Otherwise, it initiates a dialog box that asks you whether you wish to either 
+throw away the changes or cancel the operation. If you are using a N9110 Communicator and want to save to the
+<A HREF="../MMC/combo.htm">memory card</A>, use <CODE>FoamWarnForSavingOnDisk()</CODE> and pass the card's <A HREF="../MMC/api.htm"><CODE>DiskHandle</CODE></A> in addition to the 
+number of required bytes.
+
+</P>
 <P>
 <CODE>
 FoamWarnForSaving()</CODE>
@@ -111,33 +121,38 @@ The operation could not proceed due to memory constraints, and the user chose to
 <A NAME="9000Utils_3.htm_93121">
  </A>
 Operations that Consume FFS Space</H2>
-<PRE>FoamWarnIfNotEnoughSpace(), FoamCheckIfOutOfSpace(), FoamDiskSpaceStatus</PRE>
+<PRE>FoamWarnIfNotEnoughSpace(), FoamCheckIfOutOfSpace(), FoamWarnSpaceAfterOperation(), FoamDiskSpaceStatus
+<EM>On N9110:</EM> FoamWarnIfNotEnoughSpaceOnDisk(), FoamCheckIfOutOfSpaceOnDisk(), FoamWarnSpaceAfterOperationOnDisk() 
+</PRE>
 <P>
 Some operations may consume memory once they are begun, and it might be difficult to stop them once they start. For example, receiving a fax, reading or receiving e-mail, downloading something from the Web or printing a document may all consume FFS space.</P>
 <P>
 <CODE>
 FoamWarnIfNotEnoughSpace() </CODE>
-takes a numeric value corresponding to the bytes required for the operation. If the operation would result in memory falling below the critical level, the routine will notify the user that it has insufficient memory to complete the operation (via a dialog box) and will return FDDS_FULL.</P>
+takes a numeric value corresponding to the bytes required for the operation. If 
+the operation would result in memory falling below the critical level, the routine will 
+notify the user that it has insufficient memory to complete the operation (via a dialog box)
+and will return FDDS_FULL. Before writing to the N9110's memory card, use the analogous routine
+<CODE>FoamWarnIfNotEnoughSpaceOnDisk()</CODE>.
+</P>
 <P>
 If the operation can proceed otherwise, it will return the appropriate <CODE>
 FoamDiskSpaceStatus</CODE>
  value:</P>
 <DL>
-<DT>
-	FDDS_NOT_FULL</DT><DD>
+<DD>
+FDDS_NOT_FULL<BR>
 FDDS_NEARLY_FULL<BR>
 FDDS_FULL</DD>
 </DL>
+<P><CODE>FoamCheckIfOutOfSpace()</CODE> 
+ also returns a <CODE>FoamDiskSpaceStatus</CODE>
+ but does not initiate any dialog box (<CODE>FoamCheckIfOutOfSpaceOnDisk()</CODE> for memory card).</P>
 <P>
-<CODE>
-FoamCheckIfOutOfSpace()</CODE>
- also returns a <CODE>
-FoamDiskSpaceStatus</CODE>
- but does not initiate any dialog box.</P>
-<P>
-You should call<CODE>
- FoamWarnSpaceAfter Operation()</CODE>
- after any operation that consumes FFS space. If the operation resulted in an FDDS_NEARLY_FULL  status, the routine brings up a dialog alerting the user that the device is nearly out of FFS space.</P>
+You should call<CODE>FoamWarnSpaceAfterOperation()</CODE>
+ after any operation that consumes FFS space (<CODE>FoamWarnSpaceAfterOperationOnDisk()</CODE> for the memory card). If 
+the operation resulted in an <CODE>FDDS_NEARLY_FULL</CODE> 
+status, the routine brings up a dialog alerting the user that the device is nearly out of FFS space.</P>
 <HR>
 <A NAME="9000Utils_4.htm"></A>
 
@@ -147,17 +162,19 @@ You should call<CODE>
 <A NAME="9000Utils_4.htm_43527">
  </A>
 Utility Space Routines</H2>
-<PRE>FoamGetFreeSpace(), FoamCheckIfOutOfSpace()</PRE>
+<PRE>FoamGetFreeDiskSpace(), FoamCheckIfOutOfSpace()
+<EM>On N9110:</EM> FoamGetFreeDiskSpaceOnDisk(), FoamCheckIfOutOfSpaceOnDisk()
+</PRE>
 <P>
 <CODE>
-FoamGetFreeSpace()</CODE>
- returns the number of bytes of free space.</P>
+FoamGetFreeDiskSpace()</CODE>
+ returns the number of bytes of free space. Use 
+<CODE>FoamGetFreeDiskSpaceOnDisk()</CODE> on a N9110 to get the number of free bytes on the disk (such as the memory card)
+with the passed <A HREF="../MMC/api.htm"><CODE>DiskHandle</CODE></A>.</P>
 <P>
-<CODE>
-FoamCheckIfOutOfSpace()</CODE>
- also returns a <CODE>
-FoamDiskSpaceStatus</CODE>
- but does not initiate any dialog box.</P>
+<CODE>FoamCheckIfOutOfSpace()</CODE>
+ also returns a <CODE>FoamDiskSpaceStatus</CODE>
+ but does not initiate any dialog box (<CODE>FoamCheckIfOutOfSpaceOnDisk()</CODE> on N9110).</P>
 <HR>
 This document is a single-page version of a <A HREF="index.htm">a multi-page document</A>, suitable for easy printing.
 </BODY>

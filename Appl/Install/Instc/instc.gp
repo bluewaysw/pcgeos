@@ -3,7 +3,7 @@
 #       (c) by RABE-Soft 10/96 - 05/2023
 #**************************************************************************
 
-# Name der Applikation fr glue und swat
+# Name der Applikation fï¿½r glue und swat
 
 name ICreat.app
 
@@ -15,12 +15,12 @@ usernotes "English FreeGEOS Version 6.0"
 
 type appl, process, single
 
-#  class legt den KlassenName des Applikations-Prozeá-Objekts fest. Messages,
-#  die an den Appliaktions-Prozeá gesendet werden, mssen hier behandelt werden.
+#  class legt den KlassenName des Applikations-Prozeï¿½-Objekts fest. Messages,
+#  die an den Appliaktions-Prozeï¿½ gesendet werden, mï¿½ssen hier behandelt werden.
 
 class ICProcessClass
 
-# alle anderen Klassen mssen mit export bekannt gemacht werden
+# alle anderen Klassen mï¿½ssen mit export bekannt gemacht werden
 
 export ICOptionsDialogClass
 export FileSelectDialogClass
@@ -29,13 +29,13 @@ export InifEditDialogClass
 export SelectDirOrFileDialogClass
 
 
-# legt fest, welches Objekt die Applikation nach "außen" vertreten soll.
+# legt fest, welches Objekt die Applikation nach "auï¿½en" vertreten soll.
 # Dieses Objekt ist gleichzeitig das Top-Level-Objekt im UI-tree
 
 appobj ICApp
 
 # make the program compatible width BreadBox Ensemble 4.1.3
-platform geos21
+#platform geos21
 
 # Token for den GeoManager
 

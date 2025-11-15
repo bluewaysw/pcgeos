@@ -52,7 +52,9 @@
   struct  TTableDirEntry_
   {
     ULong  Tag;        /*        table type */
+#ifdef TT_CONFIG_OPTION_SUPPORT_CHECKSUM
     ULong  CheckSum;   /*    table checksum */
+#endif
     ULong  Offset;     /* table file offset */
     ULong  Length;     /*      table length */
   };
@@ -87,7 +89,9 @@
 
   struct  TMaxProfile_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed  version;
+#endif
     UShort    numGlyphs,
               maxPoints,
               maxContours,

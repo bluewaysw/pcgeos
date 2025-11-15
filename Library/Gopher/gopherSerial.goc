@@ -1,0 +1,1132 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client	
+MODULE:		GopherSerialClass code
+FILE:		gopherSerial.goc
+
+AUTHOR:		Alvin Cham, Aug 23, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+	MSG_GOPHER_INITIALIZE	
+				- initialize the states of the gopher object
+
+	MSG_GOPHER_SHUT_DOWN	
+				- clean up the gopher object
+	
+	MSG_GOPHER_RECV_DATA
+				- receive incoming data via serial
+
+	MSG_GOPHER_SERIAL_SET_DRIVER
+				- set the serial driver	
+
+	MSG_GOPHER_SERIAL_GET_DRIVER
+				- get the serial driver	
+
+	MSG_GOPHER_SERIAL_SET_PORT_OPEN
+				- set the status of the serial port
+
+	MSG_GOPHER_SERIAL_GET_PORT_OPEN
+				- get the status of the serial port
+
+	MSG_GOPHER_SERIAL_SET_COM_PORT
+				- set the com port
+
+	MSG_GOPHER_SERIAL_GET_COM_PORT
+				- get the com port
+
+	MSG_GOPHER_SERIAL_SET_BAUD_RATE
+				- set the baud rate
+
+	MSG_GOPHER_SERIAL_GET_BAUD_RATE
+				- get the baud rate
+
+	MSG_GOPHER_SERIAL_SET_LENGTH
+				- set the bit length
+
+	MSG_GOPHER_SERIAL_GET_LENGTH
+				- get the bit length
+
+	MSG_GOPHER_SERIAL_SET_PARITY
+				- set the parity bit
+
+	MSG_GOPHER_SERIAL_GET_PARITY
+				- get the parity bit
+
+	MSG_GOPHER_SERIAL_SET_XSTOP_BITS
+				- set the xstop bits
+
+	MSG_GOPHER_SERIAL_GET_XSTOP_BITS
+				- get the xstop bits
+
+	MSG_GOPHER_SERIAL_SET_MODE
+				- set the mode
+
+	MSG_GOPHER_SERIAL_GET_MODE
+				- get the mode
+
+	MSG_GOPHER_SERIAL_SET_FLOW_CONTROL
+				- set the flow control
+
+	MSG_GOPHER_SERIAL_GET_FLOW_CONTROL
+				- get the flow control
+
+	MSG_GOPHER_SERIAL_SET_MODEM
+				- set the modem
+
+	MSG_GOPHER_SERIAL_GET_MODEM
+				- get the modem
+
+	MSG_GOPHER_SERIAL_SET_MODEM_STATUS
+				- set the modem status
+
+	MSG_GOPHER_SERIAL_GET_MODEM_STATUS
+				- get the modem status
+
+	MSG_GOPHER_SERIAL_SET_TIMER_HANDLE
+				- set the timer handle
+
+	MSG_GOPHER_SERIAL_GET_TIMER_HANDLE
+				- get the timer handle
+
+	MSG_GOPHER_SERIAL_SET_TIMER_ID
+				- set the timer ID
+
+	MSG_GOPHER_SERIAL_GET_TIMER_ID
+				- get the timer ID
+
+	MSG_GOPHER_CHANNEL_SET_UP
+				- set up the serial channel
+
+	MSG_GOPHER_CHANNEL_TEAR_DOWN
+				- tear down the serial channel
+
+	MSG_GOPHER_SERIAL_CHANNEL_SET_FORMAT
+				- set the format for the channel
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	8/23/94   	Initial version.
+
+DESCRIPTION:
+	This file contains the messages and functions for the 
+	GopherSerialClass.	
+
+	$Id: gopherSerial.goc,v 1.1 97/04/04 18:04:57 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define __SERIAL_GOPHER_CODE
+
+@include <stdapp.goh>
+@include <gopherSerialC.goh>
+#include <Ansi/stdlib.h>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@classdecl	GopherSerialClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Localizable Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	GopherSerialConstantData, data;
+
+/*
+ * GopherSerialDriverLoadError informs the user that the Serial driver could
+ * *not* be loaded (and so the application is basically useless).
+ */
+@chunk	char GopherSerialDriverLoadErrorString [] =
+		"Unable to load the Serial driver!";
+
+@end	GopherSerialConstantData;
+ 
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Methods and procedures
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_INITIALIZE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Initialize the serial connections.
+ * PARAMETERS:	none
+ *
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Load the serial driver
+ *		(2) Set up the channel
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/23/94   	Initial Revision
+ *
+
+***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_INITIALIZE 
+{
+	GeodeLoadError gle;
+
+	/* let its superclass do its things first */
+	@callsuper();
+
+	/* load the serial driver here */
+#if	ERROR_CHECK
+	char *driverName = "serialec.geo";
+#else	
+	char *driverName = "serial.geo";
+#endif
+
+	/* Move to the "SYSTEM" directory (where the libraries are) */
+	FilePushDir();
+	FileSetStandardPath(SP_SYSTEM);
+
+	pself = ObjDeref(oself,0);
+	/* load the driver w/ error checking */
+	if ((pself->GSI_driver = GeodeUseDriver(driverName, 0, 0, &gle)) ==
+	    NullHandle) {
+	    /* 
+	     * Inform the user that the serial driver was not loaded.
+	     *
+	     * 1.  Lock down the block containing the error message strings.
+	     * 2.  Inform the user.
+	     * 3.  Unlock the string block
+	     */
+	    MemLock(OptrToHandle(@GopherSerialDriverLoadErrorString));
+	    UserStandardDialog(
+		(char *) NULL,
+		(char *) NULL,
+		(char *) NULL,
+		(char *) NULL,
+		LMemDeref(@GopherSerialDriverLoadErrorString),
+		(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+		    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+	    MemUnlock(OptrToHandle(@GopherSerialDriverLoadErrorString));
+	} 
+
+	/* establish the channel communication */
+	@call self::MSG_GOPHER_CHANNEL_SET_UP();
+}	/* End of MSG_GOPHER_INITIALIZE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SHUT_DOWN for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Perform all application shutdown duties
+ * PARAMETERS:	none
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Tear down the serial channel 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SHUT_DOWN
+{
+	/* let its superclass do its things first */
+	@callsuper();
+
+	/* Shutdown the communication channel */
+	@call self::MSG_GOPHER_CHANNEL_TEAR_DOWN();
+
+	pself = ObjDeref(oself,0);
+
+	/* Get rid of the driver */
+	if (pself->GSI_driver) {
+	    GeodeFreeDriver(pself->GSI_driver);
+	}
+}	/* End of MSG_GOPHER_SHUT_DOWN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_RECV_DATA for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Reading in the text from the communication channel and 
+ *		store it into the buffer, that leads to parsing the buffer.
+ *	    
+ * PARAMETERS:	byte	*data;
+ *		word	bytesRead;
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	(1)This message is invoked from a one-shot timer.  Read in 
+ *		up to a buffer's worth of data and then go to the parser.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_RECV_DATA
+{
+    word		errorCode	= 0;
+    byte		*readBufPtr	= NULL;
+    word		lengthSoFar	= 0;
+    word		bytesAvailable;
+    word		pos;
+    word		totalLength;
+    byte		tmpBuffer[GOPHER_READ_BUFFER_SIZE];
+    ChunkHandle		cachedFileChunk;
+    char		*cachedFileName;
+
+    /* Disregard any timer firings when the timer has been nuked */
+    if (pself->GSI_timerHandle) {     
+	if (SerialQuery(pself->GSI_driver,
+			pself->GSI_comPort,
+			STREAM_ROLES_READER,
+			&bytesAvailable)) {
+	    /* report some error here */
+	    return;
+	}
+
+	/* 
+	 * if there are bytes available to be read, read the bytes into
+	 * our temporary buffer, re-allocate our text buffer size to hold
+	 * both the left-overs bytes from last time, plus the bytes read
+	 * this time.  We then try to parse the buffer as far as we can
+	 */
+	if (bytesAvailable) {
+	    Boolean eof;
+	    FileHandle file;
+    	    char tmpFileName[GOPHER_TMP_FILENAME_TEMPLATE_LENGTH];
+
+	    strncpy(tmpFileName, 
+		    GOPHER_TMP_FILENAME_TEMPLATE,
+		    GOPHER_TMP_FILENAME_TEMPLATE_LENGTH);
+
+	    /* 
+	     * if we are starting to parse a new item, then we want to set the 
+	     * eof back to false now, and we also want to create a new
+	     * tmp file. 
+	     */ 
+	    eof = @call self::MSG_GOPHER_GET_EOF();
+	    if (eof) {
+		@call self::MSG_GOPHER_SET_EOF(FALSE);
+
+		FilePushDir();
+		FileSetStandardPath(SP_PRIVATE_DATA);
+		file = FileCreateTempFile(tmpFileName,
+				     	  ((FILE_CREATE_TRUNCATE) |
+				      	  (FILE_ACCESS_RW | FILE_DENY_RW)),
+				     	  FILE_ATTR_NORMAL);
+		GopherUpdateCacheFileArray(tmpFileName, oself);
+		FileClose(file, TRUE);			
+		@call self::MSG_GOPHER_SET_CUR_CACHE_FILE_NAME(tmpFileName);
+		FilePopDir();
+	    }
+
+	    pself = ObjDeref(oself, 0);
+	    if (!(SerialRead(pself->GSI_driver,
+			     pself->GSI_comPort,
+			     STREAM_BLOCK,
+			     bytesAvailable,
+			     tmpBuffer,
+			     &bytesRead) ||
+	      	 (StreamGetError(pself->GSI_driver,
+			 	 pself->GSI_comPort,
+			 	 STREAM_ROLES_READER,
+			 	 &errorCode)))) {
+	    	if (errorCode) {
+		    /* inform the user of a serial error here */
+		    FatalError(0);
+		    return;
+	    	}
+
+		/* convert all line feeds to 'enter' for displaying purpose */
+		GopherLineFeedToEnter(tmpBuffer, bytesRead);
+
+	    	/* 
+	     	 * keep the total length of the useful contents, we'll 
+		 * re-allocate the chunk size of the buffer to store the size
+		 * of the content, and then we'll parse an item and returns 
+		 * the number of bytes that have been parsed,we keep on doing 
+		 * it until we can't parse anymore items, then we need to 
+		 * shift the contents by the number of bytes parsed, so that 
+		 * we can update the position at where to append more bytes 
+		 * next time when we read in more bytes from the serial line. 
+	     	 */
+
+		/* get the position where we should append the buffer */
+		pos = @call self::MSG_GOPHER_GET_DATA_BUFFER_POS();
+
+    	    	totalLength = bytesRead + pos;
+
+	    	if (totalLength) {
+		    MemHandle infoBlock;
+
+		    pself = ObjDeref(oself, 0);
+		    infoBlock = pself->GI_infoBlock;
+
+		    /* Lock down the read buffer block */
+		    MemLock(infoBlock);
+		    if (LMemReAllocHandles(infoBlock,
+					   pself->GI_dataBuffer,
+					   totalLength)) {
+			/* can't re-alloc more space */
+			MemUnlock(infoBlock);
+			return;
+		    }
+
+		    pself = ObjDeref(oself, 0);
+		    readBufPtr = LMemDerefHandles(infoBlock,
+						  pself->GI_dataBuffer);
+
+		    /* append the new stuff to the end of the chunk */
+		    memcpy(&readBufPtr[pos], tmpBuffer, bytesRead);
+
+		    /* get the cached file name */
+		    cachedFileChunk = @call self::
+			MSG_GOPHER_GET_CUR_CACHE_FILE_NAME_CHUNK();
+		    cachedFileName = LMemDerefHandles(infoBlock,
+						      cachedFileChunk);
+	    	    /* length of parsed bytes */
+		    while ( lengthSoFar< totalLength) {
+	    	    	pos = @call self::MSG_GOPHER_PARSE_ITEM
+				(&readBufPtr[lengthSoFar], 
+				 (dword)totalLength-lengthSoFar,
+				 cachedFileName,
+				 FALSE);
+			if (!pos) {
+			    break;
+			}
+			lengthSoFar += pos;
+
+			/* can't parse more than what we have */
+			EC_ERROR_IF((lengthSoFar > totalLength), 0);
+		    }
+	    	    if (lengthSoFar) {
+			GopherShiftBufferContent(readBufPtr, 
+				lengthSoFar, totalLength-lengthSoFar);
+		    }
+
+		    /* re-set our position for next time */
+	    	    @call self::MSG_GOPHER_SET_DATA_BUFFER_POS
+			(totalLength-lengthSoFar);
+
+		    MemUnlock(infoBlock);
+	        }
+	    } 
+	}
+
+   	/* Re-start the timer */
+	pself = ObjDeref(oself, 0);
+   	pself->GSI_timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, 
+			     		    oself,
+			     		    GOPHER_SERIAL_TIMER_READ_INTERVAL,
+			     		    MSG_GOPHER_RECV_DATA,
+			     		    0,
+			     		    &pself->GSI_timerID);
+    }
+}	/* End of MSG_GOPHER_RECV_DATA.	*/
+
+/*
+ ******************************************************************
+ *		Get's and Set's messages
+ ******************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_DRIVER for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the handle of the serial driver.
+ * PARAMETERS:	Handle	driver
+ * SIDE EFFECTS:none
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_DRIVER
+{
+	pself->GSI_driver = driver;
+}	/* End of MSG_GOPHER_SERIAL_SET_DRIVER.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_DRIVER for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the handle of the serial driver	    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_DRIVER
+{
+	return pself->GSI_driver;
+}	/* End of MSG_GOPHER_SERIAL_GET_DRIVER.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_PORT_OPEN for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the serial port open status    
+ * PARAMETERS:	Boolean	status    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_PORT_OPEN
+{
+	pself->GSI_portOpen = status;
+}	/* End of MSG_GOPHER_SERIAL_SET_PORT_OPEN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_PORT_OPEN for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the serial port open status    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_PORT_OPEN
+{
+	return pself->GSI_portOpen;
+}	/* End of MSG_GOPHER_SERIAL_GET_PORT_OPEN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_COM_PORT for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the com port of the serial driver    
+ * PARAMETERS:	word	comPort    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_COM_PORT
+{
+	pself->GSI_comPort = comPort;
+}	/* End of MSG_GOPHER_SERIAL_SET_COM_PORT.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_COM_PORT for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the com port of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_COM_PORT
+{
+	return pself->GSI_comPort;
+}	/* End of MSG_GOPHER_SERIAL_GET_COM_PORT.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_BAUD_RATE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the baud rate of the serial driver    
+ * PARAMETERS:	word	baudRate    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_BAUD_RATE
+{
+	pself->GSI_baudRate = baudRate;
+}	/* End of MSG_GOPHER_SERIAL_SET_BAUD_RATE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_BAUD_RATE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the baud rate of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_BAUD_RATE
+{
+	return pself->GSI_baudRate;
+}	/* End of MSG_GOPHER_SERIAL_GET_BAUD_RATE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_LENGTH for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the length of the serial driver
+ * PARAMETERS:	word	length    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_LENGTH
+{
+	pself->GSI_length = length;
+}	/* End of MSG_GOPHER_SERIAL_SET_LENGTH.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_LENGTH for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the length of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_LENGTH
+{
+	return pself->GSI_length;
+}	/* End of MSG_GOPHER_SERIAL_GET_LENGTH.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_PARITY for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the parity of the serial driver    
+ * PARAMETERS:	word	parity    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_PARITY
+{
+	pself->GSI_parity = parity;
+}	/* End of MSG_GOPHER_SERIAL_SET_PARITY.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_PARITY for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the parity of the serial driver    
+ * PARAMETERS:	none   
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:    none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_PARITY
+{
+	return pself->GSI_parity;
+}	/* End of MSG_GOPHER_SERIAL_GET_PARITY.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_XSTOP_BITS for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the x-stop bits of the serial driver
+ * PARAMETERS:	word	xStopBits    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_XSTOP_BITS
+{
+	pself->GSI_xStopBits = xStopBits;
+}	/* End of MSG_GOPHER_SERIAL_SET_XSTOP_BITS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_XSTOP_BITS for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the x-stop bits of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_XSTOP_BITS
+{
+	return pself->GSI_xStopBits;
+}	/* End of MSG_GOPHER_SERIAL_GET_XSTOP_BITS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_MODE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the mode of the serial driver    
+ * PARAMETERS:	word mode    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_MODE
+{
+	pself->GSI_mode = mode;
+}	/* End of MSG_GOPHER_SERIAL_SET_MODE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_MODE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the mode of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_MODE
+{
+	return pself->GSI_mode;
+}	/* End of MSG_GOPHER_SERIAL_GET_MODE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_FLOW_CONTROL for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the flow control of the serial driver    
+ * PARAMETERS:	word flowControl    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_FLOW_CONTROL
+{
+	pself->GSI_flowControl = flowControl;
+}	/* End of MSG_GOPHER_SERIAL_SET_FLOW_CONTROL.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_FLOW_CONTROL for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the flow control of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_FLOW_CONTROL
+{
+	return pself->GSI_flowControl;
+}	/* End of MSG_GOPHER_SERIAL_GET_FLOW_CONTROL.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_MODEM for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the serial modem of the serial driver    
+ * PARAMETERS:	word modem    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_MODEM
+{
+	pself->GSI_modem = modem;
+}	/* End of MSG_GOPHER_SERIAL_SET_SERIAL_MODEM.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_MODEM for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the serial modem of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_MODEM
+{
+	return pself->GSI_modem;
+}	/* End of MSG_GOPHER_SERIAL_GET_SERIAL_MODEM.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_MODEM_STATUS for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the serial modem statusof the serial driver    
+ * PARAMETERS:	word modemStatus    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_MODEM_STATUS
+{
+	pself->GSI_modemStatus = modemStatus;
+}	/* End of MSG_GOPHER_SERIAL_SET_SERIAL_MODEM_STATUS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_MODEM_STATUS for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the serial modem status of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_MODEM_STATUS
+{
+	return pself->GSI_modemStatus;
+}	/* End of MSG_GOPHER_SERIAL_GET_SERIAL_MODEM_STATUS.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_TIMER_HANDLE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the timer handle of the serial driver    
+ * PARAMETERS:	Handle	timerHandle    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_TIMER_HANDLE
+{
+	pself->GSI_timerHandle = timerHandle;
+}	/* End of MSG_GOPHER_SERIAL_SET_TIMER_HANDLE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_TIMER_HANDLE for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the timer handle of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_TIMER_HANDLE
+{
+	return pself->GSI_timerHandle;
+}	/* End of MSG_GOPHER_SERIAL_GET_TIMER_HANDLE.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_SET_TIMER_ID for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Set the timer ID of the serial driver    
+ * PARAMETERS:	word	id
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_SET_TIMER_ID
+{
+	pself->GSI_timerID = id;
+}	/* End of MSG_GOPHER_SERIAL_SET_TIMER_ID.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_GET_TIMER_ID for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Get the timer ID of the serial driver    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_GET_TIMER_ID
+{
+	return pself->GSI_timerID;
+}	/* End of MSG_GOPHER_SERIAL_GET_TIMER_ID.	*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Communication methods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/***********************************************************************
+ *		MSG_GOPHER_CHANNEL_SET_UP for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Handles the setting up of serial communication.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Set up the serial communication
+ *		(2) Re-start timer
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_CHANNEL_SET_UP
+{
+	/* Is there a serial driver? */
+	if (pself->GSI_driver != NullHandle) {
+	    /* first, tear down the current communication channel */
+	    @call self::MSG_GOPHER_CHANNEL_TEAR_DOWN();
+
+	    pself = ObjDeref(oself,0);
+
+	    /* opening the serial communication and check for error*/
+	    if (!SerialOpen(pself->GSI_driver,
+		      	    pself->GSI_comPort,
+			    STREAM_OPEN_NO_BLOCK,
+			    GOPHER_READ_BUFFER_SIZE,
+			    GOPHER_READ_BUFFER_SIZE,
+		      	    0)) {
+		/* set open-port variable */
+		pself->GSI_portOpen = TRUE;
+
+		/* set up the channel's line format */
+		@call self::MSG_GOPHER_SERIAL_CHANNEL_SET_FORMAT();
+		pself = ObjDeref(oself,0);
+
+		/* set up the channel's flow control handling */
+		SerialSetFlowControl(pself->GSI_driver, 
+				     pself->GSI_comPort,
+				     pself->GSI_flowControl,
+				     pself->GSI_modem,
+				     pself->GSI_modemStatus);
+
+		/* re-start the timer */
+		pself->GSI_timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT,
+			oself,
+			GOPHER_SERIAL_TIMER_READ_INTERVAL,
+			MSG_GOPHER_RECV_DATA,
+			0,
+			&pself->GSI_timerID);
+	    }  /* if */
+	}  /* if */
+}	/* End of MSG_GOPHER_CHANNEL_SET_UP.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_CHANNEL_TEAR_DOWN for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Shut down the current serial communication channel    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_CHANNEL_TEAR_DOWN
+{
+	SerialModem serialStatus = 0;
+
+	/* 
+	 * If the timerHandle is not NULL, then a timer is currently
+	 * running.  Shut it down before exiting.
+	 */
+	if (pself->GSI_timerHandle) {
+	    TimerStop(pself->GSI_timerHandle, pself->GSI_timerID);
+	    pself->GSI_timerHandle = NullHandle;
+	}
+
+	/* Close the currently open port (if any) */
+	if (pself->GSI_portOpen) {
+	    /* Flush both sides of the stream */
+	    SerialFlush(pself->GSI_driver, 
+			pself->GSI_comPort, 
+			STREAM_ROLES_BOTH);
+
+	    /* Drop the DTR signal (to 'hang up' on the other end) */
+	    SerialGetModem(pself->GSI_driver, 
+			   pself->GSI_comPort, 
+			   &serialStatus);
+	    SerialSetModem(pself->GSI_driver, 
+			   pself->GSI_comPort, 
+			   serialStatus & ~SERIAL_MODEM_DTR);
+
+	    /* Close the port */
+	    SerialClose(pself->GSI_driver, pself->GSI_comPort, FALSE);
+	    
+	    /* Un-set variable */
+	    pself->GSI_portOpen = FALSE;
+	}  /* if */
+}	/* End of MSG_GOPHER_CHANNEL_TEAR_DOWN.	*/
+
+
+/***********************************************************************
+ *		MSG_GOPHER_SERIAL_CHANNEL_SET_FORMAT for GopherSerialClass
+ ***********************************************************************
+ * SYNOPSIS:	Specify the current serial driver format settings.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) Set the format if there is a currently open COM port
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/15/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GopherSerialClass, MSG_GOPHER_SERIAL_CHANNEL_SET_FORMAT
+{
+	/* 
+	 * If there is an open COM port, then set the channel's line 
+	 * format
+	 */
+	if (pself->GSI_portOpen) {
+	    SerialSetFormat
+		(pself->GSI_driver,
+		 pself->GSI_comPort,
+		 (pself->GSI_length << SERIAL_FORMAT_LENGTH_OFFSET) |
+		 (pself->GSI_parity << SERIAL_FORMAT_PARITY_OFFSET) |
+		 (pself->GSI_xStopBits << SERIAL_FORMAT_EXTRA_STOP_OFFSET),
+		 pself->GSI_mode,
+		 pself->GSI_baudRate);
+	} /* if */
+}	/* End of MSG_GOPHER_SERIAL_CHANNEL_SET_FORMAT.	*/
+

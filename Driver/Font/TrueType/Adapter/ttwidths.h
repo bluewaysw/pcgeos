@@ -40,10 +40,11 @@ MemHandle _pascal TrueType_Gen_Widths(
                                 WWFixedAsDWord       pointSize,
                                 Byte                 width,
                                 Byte                 weight,
-			                    const FontInfo*      fontInfo, 
+			        const FontInfo*      fontInfo, 
                                 const OutlineEntry*  headerEntry,
                                 const OutlineEntry*  firstEntry,
                                 TextStyle            stylesToImplement,
+                                FontMatrix*          windowMatrix,
                                 MemHandle            varBlock
 );
 

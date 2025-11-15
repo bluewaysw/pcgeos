@@ -224,18 +224,28 @@ HHSetTextHints		proc	near
 	call	InitFileReadInteger
 	pop	ds, si
 	jc	afterColor
-	;
-	; set the color
-	; NOTE: use MF_FORCE_QUEUE so the spui text object doesn't set
-	; the wash color back to gray after we set it.
-	;
-	mov_tr	cl, al				;cl <- color
-	mov	ch, CF_INDEX
-	mov	ax, MSG_VIS_TEXT_SET_WASH_COLOR
-	mov	di, mask MF_FIXUP_DS or mask MF_FORCE_QUEUE
+
+	sub	sp, (size ColorQuad + size AddVarDataParams)
+	mov	bp, sp				;ss:bp <- args
+
+	mov	ss:[bp].CQ_redOrIndex, al
+	mov	ss:[bp].CQ_info, CF_INDEX
+	
+	mov	ax, bp
+	add	bp, size ColorQuad
+
+	mov	ss:[bp].AVDP_data.segment, ss
+	mov	ss:[bp].AVDP_data.offset, ax
+	mov	ss:[bp].AVDP_dataSize, size ColorQuad
+	mov	ss:[bp].AVDP_dataType, HINT_TEXT_WASH_COLOR or mask VDF_SAVE_TO_STATE
+	
+	mov	ax, MSG_META_ADD_VAR_DATA
+	mov	dx, size AddVarDataParams
+	mov	di, mask MF_STACK or mask MF_FIXUP_DS
 	call	ObjMessage
-	mov	ax, MSG_VIS_TEXT_RECALC_AND_DRAW
-	mov	di, mask MF_FIXUP_DS or mask MF_FORCE_QUEUE
+
+	add	sp, (size ColorQuad + size AddVarDataParams)
+
 afterColor:
 
 	;

@@ -114,12 +114,12 @@ extern TEngine_Instance engineInstance;
  *
  *            cache       address of cache to create
  *
- *  Output :  Error code.
+ *  Output :  void
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Cache_Create( PCache_Class      clazz,
+  void  Cache_Create( PCache_Class      clazz,
                           TCache*           cache )
   {
     cache->clazz      = clazz;
@@ -127,8 +127,6 @@ extern TEngine_Instance engineInstance;
 
     ZERO_List( cache->active );
     ZERO_List( cache->idle );
-
-    return TT_Err_Ok;
   }
 
 
@@ -142,7 +140,7 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  cache   address of cache to destroy
  *
- *  Output :  error code.
+ *  Output :  void
  *
  *  Note: This function is not MT-Safe, as we assume that a client
  *        isn't stupid enough to use an object while destroying it.
@@ -150,11 +148,11 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Cache_Destroy( TCache*  cache )
+  void  Cache_Destroy( TCache*  cache )
   {
-    PDestructor    destroy;
-    PList_Element  current;
-    PList_Element  next;
+    TDestructor _near*  destroy;
+    PList_Element       current;
+    PList_Element       next;
 
 
     /* now destroy all active and idle listed objects */
@@ -167,11 +165,8 @@ extern TEngine_Instance engineInstance;
     while ( current )
     {
       next = current->next;
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( destroy, current->data );
-#else
+
       destroy( current->data );
-#endif  /* __GEOS__ */  
       FREE( current->data );
 
       Element_Done( current );
@@ -184,11 +179,8 @@ extern TEngine_Instance engineInstance;
     while ( current )
     {
       next = current->next;
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( destroy, current->data );
-#else
+
       destroy( current->data );
-#endif
       FREE( current->data );
 
       Element_Done( current );
@@ -198,8 +190,6 @@ extern TEngine_Instance engineInstance;
 
     cache->clazz      = NULL;
     cache->idle_count = 0;
-
-    return TT_Err_Ok;
   }
 
 
@@ -233,10 +223,10 @@ extern TEngine_Instance engineInstance;
                        void**   new_object,
                        void*    parent_object )
   {
-    TT_Error       error;
-    PList_Element  current;
-    PConstructor   build;
-    void*          object;
+    TT_Error             error;
+    PList_Element        current;
+    TConstructor _near*  build;
+    void*                object;
 
 
     current = cache->idle;
@@ -259,11 +249,8 @@ extern TEngine_Instance engineInstance;
 
       current->data = object;
 
-#ifdef __GEOS__
-      error = ProcCallFixedOrMovable_cdecl( build, object, parent_object );
-#else
       error = build( object, parent_object );
-#endif    /* __GEOS__ */
+
       if ( error )
       {
         Element_Done( current );
@@ -339,11 +326,8 @@ extern TEngine_Instance engineInstance;
     if ( cache->idle_count >= cache->clazz->idle_limit )
     {
       /* destroy the object when the cache is full */
-#ifdef __GEOS__
-      ProcCallFixedOrMovable_cdecl( cache->clazz->done, element->data );
-#else
       cache->clazz->done( element->data );
-#endif  /* __GEOS__ */
+
       FREE( element->data );
       Element_Done( element );
     }
@@ -360,16 +344,15 @@ extern TEngine_Instance engineInstance;
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Init( )
+  void  TTCache_Init( )
   {
     /* Create list elements mutex */
     FREE_Elements = NULL;
-    return TT_Err_Ok;
   }
 
 
   LOCAL_FUNC
-  TT_Error  TTCache_Done( )
+  void  TTCache_Done( )
   {
     /* We don't protect this function, as this is the end of the engine's */
     /* execution..                                                        */
@@ -384,7 +367,6 @@ extern TEngine_Instance engineInstance;
       FREE( element );
       element = next;
     }
-    return TT_Err_Ok;
   }
 
 

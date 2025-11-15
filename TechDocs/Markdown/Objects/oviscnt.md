@@ -33,53 +33,54 @@ shown in Code Display 25-1. Each field is described later in this section.
 ----------
 **Code Display 25-1 VisContent Instance Data Fields**
 
-	/* All the instance fields defined in VisContentClass are described below. You
-	 * will likely use very few of them, if any; see the later sections of this
-	 * chapter for specific information about each field. */
+    /* All the instance fields defined in VisContentClass are described below. You
+     * will likely use very few of them, if any; see the later sections of this
+     * chapter for specific information about each field. */
 
-	/* The following fields deal with the GenView and the view window. */
-	@instance optr				VCNI_view = 0;
-	@instance WindowHandle		VCNI_window = 0;
-	@instance word				VCNI_viewHeight = 0;
-	@instance word				VCNI_viewWidth = 0;
+    /* The following fields deal with the GenView and the view window. */
+    @instance optr              VCNI_view = 0;
+    @instance WindowHandle      VCNI_window = 0;
+    @instance word              VCNI_viewHeight = 0;
+    @instance word              VCNI_viewWidth = 0;
 
-	/* VCNI_attrs determines the content's attributes. */
-	@instance VisContentAttrs	VCNI_attrs = 0;
-	/* The possible flags for VCNI_attrs are
-	 *	VCNA_SAME_WIDTH_AS_VIEW							0x80
-	 *	VCNA_SAME_HEIGHT_AS_VIEW						0x40
-	 *	VCNA_LARGE_DOCUMENT_MODEL						0x20
-	 *	VCNA_WINDOW_COORDINATE_MOUSE_EVENTS				0x10
-	 *	VCNA_ACTIVE_MOUSE_GRAB_REQUIRES_LARGE_EVENTS	0x08
-	 *	VCNA_VIEW_DOC_BOUNDS_SET_MANUALLY				0x04	 */
+    /* VCNI_attrs determines the content's attributes. */
+    @instance VisContentAttrs   VCNI_attrs = 0;
+    /* The possible flags for VCNI_attrs are
+     *  VCNA_SAME_WIDTH_AS_VIEW                         0x80
+     *  VCNA_SAME_HEIGHT_AS_VIEW                        0x40
+     *  VCNA_LARGE_DOCUMENT_MODEL                       0x20
+     *  VCNA_WINDOW_COORDINATE_MOUSE_EVENTS             0x10
+     *  VCNA_ACTIVE_MOUSE_GRAB_REQUIRES_LARGE_EVENTS    0x08
+     *  VCNA_VIEW_DOC_BOUNDS_SET_MANUALLY               0x04     */
 
-	/* The following fields determine features of the content's document. */
-	@instance PointDWord		VCNI_docOrigin = {0, 0};
-	@instance PointWWFixed		VCNI_scaleFactor = {{0, 1}, {0, 1}};
+    /* The following fields determine features of the content's document. */
+    @instance PointDWord        VCNI_docOrigin = {0, 0};
+    @instance PointWWFixed      VCNI_scaleFactor = {{0, 1}, {0, 1}};
 
-	/* The following fields deal with how the content handles input. */
-	@instance ChunkHandle		VCNI_prePassiveMouseGrabList = 0;
-	@instance VisMouseGrab		VCNI_impliedMouseGrab =
-							{0, 0, {0, 0}, (VIFGF_MOUSE | VIFGF_PTR), 0};
-	@instance VisMouseGrab				VCNI_activeMouseGrab =
-							{0, 0, {0, 0}, 0, 0};
-	@instance ChunkHandle		VCNI_postPassiveMouseGrabList = 0;
-	@instance KbdGrab			VCNI_kbdGrab = {0, 0};
-	@instance FTVMCGrab			VCNI_focusExcl = {0, MAEF_FOCUS};
-	@instance FTVMCGrab			VCNI_targetExcl = {0, MAEF_TARGET};
-	@instance Handle			VCNI_holdUpInputQueue = 0;
-	@instance word				VCNI_holdUpInputCount = 0;
-	@instance byte				VCNI_holdUpInputFlags = 0;
+    /* The following fields deal with how the content handles input. */
+    @instance ChunkHandle       VCNI_prePassiveMouseGrabList = 0;
+    @instance VisMouseGrab      VCNI_impliedMouseGrab =
+                            {0, 0, {0, 0}, (VIFGF_MOUSE | VIFGF_PTR), 0};
+    @instance VisMouseGrab              VCNI_activeMouseGrab =
+                            {0, 0, {0, 0}, 0, 0};
+    @instance ChunkHandle       VCNI_postPassiveMouseGrabList = 0;
+    @instance KbdGrab           VCNI_kbdGrab = {0, 0};
+    @instance FTVMCGrab         VCNI_focusExcl = {0, MAEF_FOCUS};
+    @instance FTVMCGrab         VCNI_targetExcl = {0, MAEF_TARGET};
+    @instance Handle            VCNI_holdUpInputQueue = 0;
+    @instance word              VCNI_holdUpInputCount = 0;
+    @instance byte              VCNI_holdUpInputFlags = 0;
 
-	/* The type flags of the content are special and should not be altered. */
-	@default		VI_typeFlags =	VTF_IS_COMPOSITE | VTF_IS_WINDOW |
-						VTF_IS_CONTENT | VTF_IS_WIN_GROUP |
-						VTF_IS_INPUT_NODE;
+    /* The type flags of the content are special and should not be altered. */
+    @default        VI_typeFlags =  VTF_IS_COMPOSITE | VTF_IS_WINDOW |
+                        VTF_IS_CONTENT | VTF_IS_WIN_GROUP |
+                        VTF_IS_INPUT_NODE;
 
 ----------
 ### 25.1.1 The VCNI_attrs Field
-	VCNI_attrs, MSG_VIS_CONTENT_SET_ATTRS, 
-	MSG_VIS_CONTENT_GET_ATTRS
+    VCNI_attrs, MSG_VIS_CONTENT_SET_ATTRS, 
+    MSG_VIS_CONTENT_GET_ATTRS
+
 The *VCNI_attrs* field is a record of **VisContentAttrs** that contains several 
 attributes which affect how the content object interacts with the view and 
 with the visible object tree. You can set these attributes with 
@@ -138,9 +139,10 @@ Chapter 9, for full information on view scrolling.
 
 ----------
 #### MSG_VIS_CONTENT_SET_ATTRS
-	void	MSG_VIS_CONTENT_SET_ATTRS(
-			VisContentAttrs attrsToSet,
-			VisContentAttrs attrsToClear);
+    void    MSG_VIS_CONTENT_SET_ATTRS(
+            VisContentAttrs attrsToSet,
+            VisContentAttrs attrsToClear);
+
 This message sets the *VCNI_attrs* field of the content object according to the 
 passed values.
 
@@ -165,7 +167,8 @@ parameters, it will end up cleared.
 
 ----------
 #### MSG_VIS_CONTENT_GET_ATTRS
-	VisContentAttrs MSG_VIS_CONTENT_GET_ATTRS();
+    VisContentAttrs MSG_VIS_CONTENT_GET_ATTRS();
+
 This message returns the current contents of the object's *VCNI_attrs* field, a 
 record of **VisContentAttrs**.
 
@@ -181,8 +184,8 @@ object's *VCNI_attrs* field.
 **Interception:** Unlikely.
 
 ### 25.1.2 Fields That Affect the View
-	VCNI_view, VCNI_viewHeight, VCNI_viewWidth, VCNI_window, 
-	MSG_VIS_CONTENT_GET_WIN_SIZE
+    VCNI_view, VCNI_viewHeight, VCNI_viewWidth, VCNI_window, 
+    MSG_VIS_CONTENT_GET_WIN_SIZE
 
 Because the content must interact directly with the view, it must maintain 
 some information about both the GenView object and its associated window. 
@@ -232,7 +235,8 @@ detailed in "Messages Received from the View" below.
 
 ----------
 #### MSG_VIS_CONTENT_GET_WIN_SIZE
-	SizeAsDWord MSG_VIS_CONTENT_GET_WIN_SIZE();
+    SizeAsDWord MSG_VIS_CONTENT_GET_WIN_SIZE();
+
 This message returns the size of the content object's associated window in 
 terms of width and height.
 
@@ -249,9 +253,10 @@ DWORD_WIDTH macros to extract the proper values.
 **Interception:** Unlikely.
 
 ### 25.1.3 Fields That Affect the Document
-	VCNI_docOrigin, VCNI_scaleFactor, 
-	MSG_VIS_CONTENT_SET_DOC_BOUNDS, 
-	MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW
+    VCNI_docOrigin, VCNI_scaleFactor, 
+    MSG_VIS_CONTENT_SET_DOC_BOUNDS, 
+    MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW
+
 The GenView object maintains quite a bit of information about the document 
 as managed by the content object. The content must also keep information 
 about the document and how the view is displaying it. This information is 
@@ -281,10 +286,10 @@ origin is the location of the view's upper left corner in the
 document (where the scrollers are). This field is of type 
 **PointDWord**, which has the following structure:
 
-	typedef struct {
-		sdword   PD_x;    /* x coordinate of origin */
-		sdword   PD_y;    /* y coordinate of origin */
-	} PointDWord;
+    typedef struct {
+        sdword   PD_x;    /* x coordinate of origin */
+        sdword   PD_y;    /* y coordinate of origin */
+    } PointDWord;
 
 Normally, this field is set when the view is first opened or when 
 the view is scrolled, scaled, or otherwise changed in document 
@@ -299,19 +304,19 @@ GenView object; some content objects, however, will want to
 react in a special way when the scale factor is changed. The 
 scale factor is stored in a **PointWWFixed** structure, as follows:
 
-	typedef struct {
-	WWFixed    PF_x;   /* horizontal scale factor */
-	WWFixed    PF_y;   /* vertical scale factor */
-	} PointWWFixed;
+    typedef struct {
+    WWFixed    PF_x;   /* horizontal scale factor */
+    WWFixed    PF_y;   /* vertical scale factor */
+    } PointWWFixed;
 
 The **WWFixed** structures that determine the scale factor in 
 each dimension consist of two elements. This structure is 
 shown below:
 
-	typedef struct {
-	word    WWF_frac;   /* fractional portion */
-	word    WWF_int;    /* integral portion */
-	} WWFixed;
+    typedef struct {
+    word    WWF_frac;   /* fractional portion */
+    word    WWF_int;    /* integral portion */
+    } WWFixed;
 
 The *VCNI_scaleFactor* field in the content is never set directly 
 by the application; instead, it is set with 
@@ -322,11 +327,12 @@ Messages that set these fields are discussed in section 25.2.2 below.
 
 ----------
 #### MSG_VIS_CONTENT_SET_DOC_BOUNDS
-	void	MSG_VIS_CONTENT_SET_DOC_BOUNDS(@stack
-			sdword	bottom,
-			sdword	right,
-			sdword	top,
-			sdword	left);
+    void    MSG_VIS_CONTENT_SET_DOC_BOUNDS(@stack
+            sdword  bottom,
+            sdword  right,
+            sdword  top,
+            sdword  left);
+
 This message is used to set the document bounds of a content's large 
 document. The content will send MSG_GEN_VIEW_SET_DOC_BOUNDS to its 
 view and MSG_VIS_LAYER_SET_DOC_BOUNDS to each of its children with 
@@ -352,7 +358,8 @@ will result in a fatal error.
 
 ----------
 #### MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW
-	SizeAsDWord MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW();
+    SizeAsDWord MSG_VIS_CONTENT_RECALC_SIZE_BASED_ON_VIEW();
+
 This message causes the content to recalculate its size based on the view's 
 geometry. It will try to set its width if it has VCNA_SAME_WIDTH_AS_VIEW 
 set, and it will try to set its height if it has VCNA_SAME_HEIGHT_AS_VIEW 
@@ -377,11 +384,12 @@ manage, and pass on input events sent through the GenView. The content
 has a large amount of functionality built into it to provide these features.
 
 #### 25.1.4.1 Mouse and Keyboard Grabs
-	VCNI_prePassiveMouseGrabList, VCNI_impliedMouseGrab, 
-	VCNI_activeMouseGrab, VCNI_postPassiveMouseGrabList, 
-	VCNI_kbdGrab, MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT, 
-	MSG_VIS_CONTENT_UNWANTED_KBD_EVENT, 
-	MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN
+    VCNI_prePassiveMouseGrabList, VCNI_impliedMouseGrab, 
+    VCNI_activeMouseGrab, VCNI_postPassiveMouseGrabList, 
+    VCNI_kbdGrab, MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT, 
+    MSG_VIS_CONTENT_UNWANTED_KBD_EVENT, 
+    MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN
+
 **VisContentClass**, as the head of the visible tree displayed in the view, keeps 
 track of which object in its tree has each different type of input grab. With 
 this information, the content can simply pass the input event directly to the 
@@ -424,36 +432,36 @@ information.
 ----------
 **Code Display 25-2 Grab Data Structures**
 
-	/* These structures are obscure, and you will likely never have to use them. */
+    /* These structures are obscure, and you will likely never have to use them. */
 
-	/* The VisMouseGrab structure contains information about the object that
-	 * currently has the mouse grab. */
-	typedef struct {
-		optr		VMG_object;		/* The optr of the object that has the grab.
-								 * If no object has the grab, this is zero. */
-		WindowHandle	VMG_gWin;	/* The window handle of the window with the object
-								 * having the grab, if it's different from
-								 * the content's window. If it's in the content's
-								 * window, this field contains zero.	*/
-		PointDWord	VMG_translation;/* The 32-bit translation applied to mouse events
-								 * if the large document model is in use. This is
-								 * set with a previous message call. */
-		VisInputFlowGrabFlags VMG_flags; /* A record of VisInputFlowGrabFlags,
-								   * described below. */
-		byte		VMG_unused;		/* Reserved byte. */
-	} VisMouseGrab;
+    /* The VisMouseGrab structure contains information about the object that
+     * currently has the mouse grab. */
+    typedef struct {
+        optr        VMG_object;     /* The optr of the object that has the grab.
+                                 * If no object has the grab, this is zero. */
+        WindowHandle    VMG_gWin;   /* The window handle of the window with the object
+                                 * having the grab, if it's different from
+                                 * the content's window. If it's in the content's
+                                 * window, this field contains zero.    */
+        PointDWord  VMG_translation;/* The 32-bit translation applied to mouse events
+                                 * if the large document model is in use. This is
+                                 * set with a previous message call. */
+        VisInputFlowGrabFlags VMG_flags; /* A record of VisInputFlowGrabFlags,
+                                   * described below. */
+        byte        VMG_unused;     /* Reserved byte. */
+    } VisMouseGrab;
 
-	/* The VisInputFlowGrabFlags determine the type and context of the grab. These
-	 * flags are not listed here for simplicity. You do not have to know these flags;
-	 * they are set with MSG_VIS_VUP_ALTER_INPUT_FLOW. */
+    /* The VisInputFlowGrabFlags determine the type and context of the grab. These
+     * flags are not listed here for simplicity. You do not have to know these flags;
+     * they are set with MSG_VIS_VUP_ALTER_INPUT_FLOW. */
 
-	/* The KbdGrab structure contains information about the object that currently
-	 * has the keyboard grab. */
-	typedef struct {
-		optr		KG_OD;			/* The optr of the object that has the
-									 * keyboard grab. */
-		word		KG_unused;		/* Reserved word. */
-	} KbdGrab;
+    /* The KbdGrab structure contains information about the object that currently
+     * has the keyboard grab. */
+    typedef struct {
+        optr        KG_OD;          /* The optr of the object that has the
+                                     * keyboard grab. */
+        word        KG_unused;      /* Reserved word. */
+    } KbdGrab;
 
 ----------
 In addition, the VisContent has the following messages that are affected by 
@@ -479,8 +487,9 @@ unlikely that you will ever send or intercept this message.
 
 ----------
 #### MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN
-	Boolean	MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN(
-			WindowHandle window);
+    Boolean MSG_VIS_CONTENT_TEST_IF_ACTIVE_OR_IMPLIED_WIN(
+            WindowHandle window);
+
 This message checks to see if the passed window handle is the same as the 
 window of the object having either the implied or active mouse grab. This is 
 typically used by objects in a Specific UI library to determine if the mouse 
@@ -500,9 +509,10 @@ implied window, *false* otherwise.
 
 ----------
 #### MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT
-	void	MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT(
-			VisMouseGrab *mouseGrab,
-			word	inputState);
+    void    MSG_VIS_CONTENT_UNWANTED_MOUSE_EVENT(
+            VisMouseGrab *mouseGrab,
+            word    inputState);
+
 This message is received by the content if a mouse event was received and 
 there was no active or implied grab. This is most frequently encountered 
 when the user presses a mouse button outside a modal dialog box. The 
@@ -525,10 +535,10 @@ structure.
 
 ----------
 #### MSG_VIS_CONTENT_UNWANTED_KBD_EVENT
-	void	MSG_VIS_CONTENT_UNWANTED_KBD_EVENT(
-			word	character,
-			word	flags,
-			word	state);
+    void    MSG_VIS_CONTENT_UNWANTED_KBD_EVENT(
+            word    character,
+            word    flags,
+            word    state);
 
 This message will be received by the content if a keyboard event was sent and 
 there was no keyboard grab set up. The default action of the content is to beep 
@@ -556,8 +566,9 @@ original MSG_META_KBD_CHAR.
 **Interception:** Unlikely.
 
 #### 25.1.4.2 Focus and Target
-	VCNI_focusExcl, VCNI_targetExcl, 
-	MSG_META_CONTENT_APPLY_DEFAULT_FOCUS
+    VCNI_focusExcl, VCNI_targetExcl, 
+    MSG_META_CONTENT_APPLY_DEFAULT_FOCUS
+
 In addition to keeping track of which of its children have the mouse and 
 keyboard grabs, the content also keeps track of which objects have the focus 
 and target input exclusives. Both *VCNI_focusExcl* and VCNI_targetExcl 
@@ -566,12 +577,13 @@ the subject exclusive. The messages sent by the GenView that set these fields
 are described in "Messages Received from the View" below.
 
 #### 25.1.4.3 Input Flow Control
-	VCNI_holdUpInputQueue, VCNI_holdUpInputCount, 
-	VCNI_holdUpInputFlags, 
-	MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW, 
-	MSG_VIS_CONTENT_RESUME_INPUT_FLOW, 
-	MSG_VIS_CONTENT_DISABLE_HOLD_UP, 
-	MSG_VIS_CONTENT_ENABLE_HOLD_UP
+    VCNI_holdUpInputQueue, VCNI_holdUpInputCount, 
+    VCNI_holdUpInputFlags, 
+    MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW, 
+    MSG_VIS_CONTENT_RESUME_INPUT_FLOW, 
+    MSG_VIS_CONTENT_DISABLE_HOLD_UP, 
+    MSG_VIS_CONTENT_ENABLE_HOLD_UP
+
 GEOS allows a visible tree to hold up input - that is, input will be stored 
 elsewhere while the visible tree is doing something else. This can be useful if 
 complex tree operations are going on and you don't want input to go to the 
@@ -607,7 +619,8 @@ information hold-up. These messages are detailed below.
 
 ----------
 #### MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW
-	void	MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW();
+    void    MSG_VIS_CONTENT_HOLD_UP_INPUT_FLOW();
+
 This message increments the count in *VCNI_holdUpInputCount*. If this count 
 is nonzero and HUIF_HOLD_UP_MODE_DISABLED is clear, subsequent input 
 events will be sent into the hold-up queue until either the flag is set or the 
@@ -624,7 +637,8 @@ MSG_VIS_CONTENT_RESUME_INPUT_FLOW.
 
 ----------
 #### MSG_VIS_CONTENT_RESUME_INPUT_FLOW
-	void	MSG_VIS_CONTENT_RESUME_INPUT_FLOW();
+    void    MSG_VIS_CONTENT_RESUME_INPUT_FLOW();
+
 This message decrements the count in *VCNI_holdUpInputCount*. If the count 
 becomes zero with this call, the hold-up event queue is flushed and all the 
 events in it are "played back." If the count goes below zero, GEOS will give an 
@@ -644,7 +658,8 @@ going below zero.
 
 ----------
 #### MSG_VIS_CONTENT_DISABLE_HOLD_UP
-	void	MSG_VIS_CONTENT_DISABLE_HOLD_UP();
+    void    MSG_VIS_CONTENT_DISABLE_HOLD_UP();
+
 This message sets the HUIF_HOLD_UP_MODE_DISABLED flag, forcing all 
 input events to flow normally until the flag is cleared. In essence, it turns off 
 the hold-up mechanism.
@@ -657,7 +672,8 @@ the hold-up mechanism.
 
 ----------
 #### MSG_VIS_CONTENT_ENABLE_HOLD_UP
-	void	MSG_VIS_CONTENT_ENABLE_HOLD_UP();
+    void    MSG_VIS_CONTENT_ENABLE_HOLD_UP();
+
 This message clears the HUIF_HOLD_UP_MODE_DISABLED flag, allowing 
 input events to be held up in the hold-up event queue.
 
@@ -702,40 +718,40 @@ behavior are shown in Code Display 25-3.
 ----------
 **Code Display 25-3 Sizing the View with a Fixed Content**
 
-	/* This code display shows three different types of sizing behavior of the GenView
-	 * if its VisContent object is of a fixed size. Note that if the content is
-	 * managing its geometry, its bounds (and therefore the view's) will be determined
-	 * by the content's children. */
+    /* This code display shows three different types of sizing behavior of the GenView
+     * if its VisContent object is of a fixed size. Note that if the content is
+     * managing its geometry, its bounds (and therefore the view's) will be determined
+     * by the content's children. */
 
-	/* The view window is scrollable in both dimensions. This will result in the view
-	 * being sizable and scrollable in both dimensions. */
-	@object GenViewClass MyView = {
-		GVI_content = @MyVisContent;
-		GVI_horizAttrs = @default | GVDA_SCROLLABLE;
-		GVI_vertAttrs = @default | GVDA_SCROLLABLE;
-	};
+    /* The view window is scrollable in both dimensions. This will result in the view
+     * being sizable and scrollable in both dimensions. */
+    @object GenViewClass MyView = {
+        GVI_content = @MyVisContent;
+        GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+    };
 
-	/* The view window is scrollable in only the vertical dimension. It follows the
-	 * width of the VisContent object and therefore does not scroll vertically. The
-	 * VisContent's VI_bounds field should be set by the content. */
-	@object GenViewClass MyView = {
-		GVI_content = @MyVisContent;
-		GVDI_horizAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
-									| GVDA_NO_SMALLER_THAN_CONTENT;
-		GVDI_vertAttrs = @default	| GVDA_SCROLLABLE;
-	};
+    /* The view window is scrollable in only the vertical dimension. It follows the
+     * width of the VisContent object and therefore does not scroll vertically. The
+     * VisContent's VI_bounds field should be set by the content. */
+    @object GenViewClass MyView = {
+        GVI_content = @MyVisContent;
+        GVDI_horizAttrs = @default  | GVDA_NO_LARGER_THAN_CONTENT
+                                    | GVDA_NO_SMALLER_THAN_CONTENT;
+        GVDI_vertAttrs = @default   | GVDA_SCROLLABLE;
+    };
 
-	/* The view window sizes itself exactly to the size of the VisContent's bounds.
-	 * The VisContent's VI_bounds field should be set appropriately by the content. 
-	 * Note that this is not a valid combination for VisContents that display large
-	 * documents or layer objects. */
-	@object GenViewClass MyView = {
-		GVI_content = @MyVisContent;
-		GVDI_horizAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
-									| GVDA_NO_SMALLER_THAN_CONTENT;
-		GVDI_vertAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
-									| GVDA_NO_SMALLER_THAN_CONTENT;
-	}
+    /* The view window sizes itself exactly to the size of the VisContent's bounds.
+     * The VisContent's VI_bounds field should be set appropriately by the content. 
+     * Note that this is not a valid combination for VisContents that display large
+     * documents or layer objects. */
+    @object GenViewClass MyView = {
+        GVI_content = @MyVisContent;
+        GVDI_horizAttrs = @default  | GVDA_NO_LARGER_THAN_CONTENT
+                                    | GVDA_NO_SMALLER_THAN_CONTENT;
+        GVDI_vertAttrs = @default   | GVDA_NO_LARGER_THAN_CONTENT
+                                    | GVDA_NO_SMALLER_THAN_CONTENT;
+    }
 
 ----------
 Another type of behavior with fixed-size contents is called "keeping the 
@@ -755,30 +771,30 @@ Code Display 25-4.
 ----------
 **Code Display 25-4 Keeping the View Aspect Ratio**
 
-	/* This example shows a view and its content. The content object is of a fixed
-	 * size, and the view is resizable. The content/view pair will keep the aspect
-	 * ratio to automatically figure the view's height based on its width and then
-	 * scale the image to keep the entire bounds of the content within the view
-	 * window. */
-	@object GenViewClass MyView = {
-		GVI_content = @MyVisContent;
-		GVDI_horizAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
-									| GVDA_NO_SMALLER_THAN_CONTENT;
-		GVDI_vertAttrs = @default	| GVDA_KEEP_ASPECT_RATIO;
-	};
+    /* This example shows a view and its content. The content object is of a fixed
+     * size, and the view is resizable. The content/view pair will keep the aspect
+     * ratio to automatically figure the view's height based on its width and then
+     * scale the image to keep the entire bounds of the content within the view
+     * window. */
+    @object GenViewClass MyView = {
+        GVI_content = @MyVisContent;
+        GVDI_horizAttrs = @default  | GVDA_NO_LARGER_THAN_CONTENT
+                                    | GVDA_NO_SMALLER_THAN_CONTENT;
+        GVDI_vertAttrs = @default   | GVDA_KEEP_ASPECT_RATIO;
+    };
 
-	@object VisContentClass MyVisContent = {
-		VI_bounds =	{0,		/* left bound */
-					 0,		/* top bound */
-					 250,	/* right bound */
-					 250};	/* bottom bound */
-		VCI_comp =			/* put any children here */;
-		VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
-		/* This is set because typically a content's bounds are determined
-		 * by its children. If we want to set our own bounds, we should
-		 * custom manage our geometry. This is true of contents used with
-		 * the views in the previous example. */
-	};
+    @object VisContentClass MyVisContent = {
+        VI_bounds = {0,     /* left bound */
+                     0,     /* top bound */
+                     250,   /* right bound */
+                     250};  /* bottom bound */
+        VCI_comp =          /* put any children here */;
+        VCI_geoAttrs = VCGA_CUSTOM_MANAGE_CHILDREN;
+        /* This is set because typically a content's bounds are determined
+         * by its children. If we want to set our own bounds, we should
+         * custom manage our geometry. This is true of contents used with
+         * the views in the previous example. */
+    };
 
 ----------
 #### 25.2.1.2 If the Content Is Variable Size
@@ -796,14 +812,15 @@ the content will have the VCNA_SAME_WIDTH_AS_VIEW and
 VCNA_SAME_HEIGHT_AS_VIEW flags set in its *VCNI_attrs* field.
 
 ### 25.2.2 Messages Received from the View
-	MSG_META_CONTENT_SET_VIEW, 
-	MSG_META_CONTENT_VIEW_ORIGIN_CHANGED, 
-	MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED, 
-	MSG_META_CONTENT_VIEW_OPENING, 
-	MSG_META_CONTENT_VIEW_WIN_OPENED, 
-	MSG_META_CONTENT_VIEW_SIZE_CHANGED, 
-	MSG_META_CONTENT_VIEW_CLOSING, 
-	MSG_META_CONTENT_VIEW_WIN_CLOSED
+    MSG_META_CONTENT_SET_VIEW, 
+    MSG_META_CONTENT_VIEW_ORIGIN_CHANGED, 
+    MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED, 
+    MSG_META_CONTENT_VIEW_OPENING, 
+    MSG_META_CONTENT_VIEW_WIN_OPENED, 
+    MSG_META_CONTENT_VIEW_SIZE_CHANGED, 
+    MSG_META_CONTENT_VIEW_CLOSING, 
+    MSG_META_CONTENT_VIEW_WIN_CLOSED
+
 As detailed in the discussions on GenView, the view sends a sequence of 
 messages to its content when the view is first opening and when it is closing. 
 These messages set up the content's visible instance data and prime the 
@@ -887,8 +904,9 @@ will once again be passed the view's optr.
 
 ----------
 #### MSG_META_CONTENT_SET_VIEW
-	void	MSG_META_CONTENT_SET_VIEW(
-			optr	view);
+    void    MSG_META_CONTENT_SET_VIEW(
+            optr    view);
+
 This message passes the optr of the GenView object that will display this 
 content object. The default handler will set the content's *VCNI_view* field to 
 the passed optr. This message is also used when the view has been shut 
@@ -908,10 +926,11 @@ content.
 
 ----------
 #### MSG_META_CONTENT_VIEW_ORIGIN_CHANGED
-	void	MSG_META_CONTENT_VIEW_ORIGIN_CHANGED(@stack
-			WindowHandle	viewWindow,
-			sdword			xOrigin,
-			sdword			yOrigin);
+    void    MSG_META_CONTENT_VIEW_ORIGIN_CHANGED(@stack
+            WindowHandle    viewWindow,
+            sdword          xOrigin,
+            sdword          yOrigin);
+
 This message notifies the content that the view's origin has changed. The 
 content will set its *VCNI_docOrigin* field to the passed values.
 
@@ -934,10 +953,10 @@ coordinates.
 
 ----------
 #### MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED
-	void	MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED(@stack
-			WindowHandle		viewWindow,
-			WWFixedAsDWord		yScaleFactor,
-			WWFixedAsDWord		xScaleFactor);
+    void    MSG_META_CONTENT_VIEW_SCALE_FACTOR_CHANGED(@stack
+            WindowHandle        viewWindow,
+            WWFixedAsDWord      yScaleFactor,
+            WWFixedAsDWord      xScaleFactor);
 
 This message notifies the content that the view window's scale factor has 
 changed. The content will set its *VCNI_scaleFactor* field to the passed values.
@@ -961,10 +980,10 @@ coordinates.
 
 ----------
 #### MSG_META_CONTENT_VIEW_WIN_OPENED
-	void	MSG_META_CONTENT_VIEW_WIN_OPENED(
-			word			viewWidth,
-			word			viewHeight,
-			WindowHandle	viewWindow);
+    void    MSG_META_CONTENT_VIEW_WIN_OPENED(
+            word            viewWidth,
+            word            viewHeight,
+            WindowHandle    viewWindow);
 
 This message notifies the content that the view's window has been created 
 and is being put on the screen. This message will be followed by 
@@ -988,8 +1007,8 @@ data before the view's window is actually on the screen.
 
 ----------
 #### MSG_META_CONTENT_VIEW_OPENING
-	void	MSG_META_CONTENT_VIEW_OPENING(
-			optr	view);
+    void    MSG_META_CONTENT_VIEW_OPENING(
+            optr    view);
 
 This message notifies the content that the view window is being put on the 
 screen. Although the window will usually be fully realized by the time the 
@@ -1013,10 +1032,11 @@ the view window is fully opened.
 
 ----------
 #### MSG_META_CONTENT_VIEW_SIZE_CHANGED
-	void	MSG_META_CONTENT_VIEW_SIZE_CHANGED(
-			word			viewWidth,
-			word			viewHeight,
-			WindowHandle	viewWindow);
+    void    MSG_META_CONTENT_VIEW_SIZE_CHANGED(
+            word            viewWidth,
+            word            viewHeight,
+            WindowHandle    viewWindow);
+
 This message is sent to the content whenever the view's size changes for any 
 reason. The passed height and width will be stored in the content's 
 *VCNI_viewHeight* and *VCNI_viewWidth* fields.
@@ -1039,7 +1059,8 @@ this message to apply translations for 32-bit coordinates.
 
 ----------
 #### MSG_META_CONTENT_VIEW_CLOSING
-	void	MSG_META_CONTENT_VIEW_CLOSING();
+    void    MSG_META_CONTENT_VIEW_CLOSING();
+
 This message indicates to the content that the view window is being shut 
 down. The content should remove the visible tree from the screen and should 
 prepare itself for the window to be closed.
@@ -1053,8 +1074,9 @@ when the view is taken off the screen.
 
 ----------
 #### MSG_META_CONTENT_VIEW_WIN_CLOSED
-	void	MSG_META_CONTENT_VIEW_WIN_CLOSED(
-			WindowHandle viewWindow);
+    void    MSG_META_CONTENT_VIEW_WIN_CLOSED(
+            WindowHandle viewWindow);
+
 This message indicates that the view's window has been shut down, taken off 
 the screen, and destroyed. The content responds to this message by 
 discarding the window handle stored in its *VCNI_window* field. The content 

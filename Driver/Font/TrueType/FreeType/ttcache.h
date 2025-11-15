@@ -95,10 +95,7 @@
   typedef TT_Error  TConstructor( void*  object,
                                   void*  parent );
 
-  typedef TT_Error  TDestructor ( void*  object );
-
-  typedef TConstructor*  PConstructor;
-  typedef TDestructor*   PDestructor;
+  typedef void      TDestructor ( void*  object );
 
 
   /* A Cache class record holds the data necessary to define */
@@ -107,8 +104,8 @@
   {
     UShort        object_size;
     Short         idle_limit;
-    PConstructor  init;
-    PDestructor   done;
+    TConstructor _near * init;
+    TDestructor  _near * done;
   };
 
   typedef struct TCache_Class_  TCache_Class;
@@ -156,14 +153,13 @@
   /* doesn't need protection                                        */
 
   LOCAL_DEF
-  TT_Error  Cache_Create( /*PEngine_Instance  engine,*/
-                          PCache_Class      clazz,
+  void     Cache_Create( PCache_Class      clazz,
                           TCache*           cache );
 
   /* Destroys a cache and all its listed objects */
 
   LOCAL_DEF
-  TT_Error  Cache_Destroy( TCache*  cache );
+  void     Cache_Destroy( TCache*  cache );
 
 
   /* Extracts a new object from the cache */
@@ -189,10 +185,10 @@
 
 
   LOCAL_DEF
-  TT_Error  TTCache_Init( );
+  void      TTCache_Init( );
 
   LOCAL_DEF
-  TT_Error  TTCache_Done( );
+  void      TTCache_Done( );
 
 
 #ifdef __cplusplus

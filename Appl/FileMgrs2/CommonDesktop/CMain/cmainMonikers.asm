@@ -14,7 +14,7 @@ ROUTINES:
 	INT	SetUpDesktopMonikers	Installs all desktop icons in TokenDB
 	INT	LookUpDesktopMonikers	Loads default monikers into
 					global variables in dgroup
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -24,7 +24,7 @@ REVISION HISTORY:
 DESCRIPTION:
 	Code and tables to handle adding standard desktop monikers to
 	the token database.
-		
+
 RCS STAMP:
 	$Id: cmainMonikers.asm,v 1.5 98/08/20 05:41:03 joon Exp $
 
@@ -56,7 +56,7 @@ COMMENT @-------------------------------------------------------------------
 ----------------------------------------------------------------------------
 
 SYNOPSIS:	Makes sure that all desktop tokens are defined in the
-		TokenDB. 
+		TokenDB.
 
 CALLED BY:	INTERNAL - DesktopOpenApplication
 
@@ -142,11 +142,12 @@ TokenMoniker	< <'ndPL'>,	NDPlayAndLearnFolderMonikerList	>
 TokenMoniker	< <'ndCU'>,	NDComputerUtilsFolderMonikerList >
 TokenMoniker	< <'ndAc'>,	NDAccessoriesFolderMonikerList	>
 TokenMoniker	< <'ndAO'>,	NDAddOnsFolderMonikerList	>
-TokenMoniker	< <'ndMS'>,	NDMainScreenMonikerList		>
+;TokenMoniker	< <'ndMS'>,	NDMainScreenMonikerList		>
 TokenMoniker	< <'ndSU'>,	NDSignUpMonikerList		>
 ;DOS files
 TokenMoniker	< <'dJPG'>,	GPCdJPGMonikerList		>
 TokenMoniker	< <'dGIF'>,	GPCdGIFMonikerList		>
+TokenMoniker	< <'dPNG'>,	GPCdPNGMonikerList		>
 TokenMoniker	< <'dCSV'>,	GPCdCSVMonikerList		>
 TokenMoniker	< <'dWKS'>,	GPCdWKSMonikerList		>
 TokenMoniker	< <'dVCF'>,	GPCdVCFMonikerList		>
@@ -227,7 +228,7 @@ FXIP<DESKTOP_MONIKER_TABLE_SIZE	= $-desktopMonikerTable		>
 if _DOS_LAUNCHERS
 ;-----------------------------------------------------------------
 ;	FileManagers that have launcher creation need to make
-; sure they include at least one launcher token, incase the user 
+; sure they include at least one launcher token, incase the user
 ; biffs their tokenDB and all the provided launcher tokens.  Default
 ; to the regular GEOS appl icon.
 ;-----------------------------------------------------------------

@@ -52,7 +52,7 @@
   Short  TT_LookUp_Table( PFace  face,
                          ULong  tag  )
   {
-    UShort  i;
+    Short  i;
 
 
     for ( i = 0; i < face->numTables; ++i )
@@ -121,10 +121,15 @@
     limit = face->numTables;
     entry = face->dirTables;
 
+    /* loop through the tables and get all entries */
     for ( n = 0; n < limit; ++n )
-    {                      /* loop through the tables and get all entries */
+    {
       entry->Tag      = GET_Tag4();
+#ifdef TT_CONFIG_OPTION_SUPPORT_CHECKSUM
       entry->CheckSum = GET_ULong();
+#else
+      SKIP( 4 );
+#endif
       entry->Offset   = GET_Long();
       entry->Length   = GET_Long();
 
@@ -168,7 +173,11 @@
       return error;
 
     /* read frame data into face table */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     maxProfile->version               = GET_ULong();
+#else
+    SKIP( 4 );
+#endif
 
     maxProfile->numGlyphs             = GET_UShort();
 
@@ -215,8 +224,8 @@
      
     /* We also increase maxPoints and maxContours in order to support */
     /* some broken fonts.                                             */
-    face->maxPoints   += 8;
-    face->maxContours += 4;
+    face->maxPoints   += 4;
+    face->maxContours += 2;
 
     return TT_Err_Ok;
   }
@@ -352,8 +361,9 @@
 #endif
 
     header->Index_To_Loc_Format = GET_Short();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Glyph_Data_Format   = GET_Short();
-
+#endif
     FORGET_Frame();
 
     return TT_Err_Ok;
@@ -501,18 +511,26 @@
          ACCESS_Frame( 36 ) )
       return error;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Version   = GET_ULong();
+#else
+    SKIP( 4 );
+#endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
-    header->Line_Gap  = GET_Short();
-
-    header->advance_Width_Max = GET_UShort();
-
-    header->min_Left_Side_Bearing  = GET_Short();
-    header->min_Right_Side_Bearing = GET_Short();
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    header->Line_Gap  = GET_Short();
+#else
+    SKIP( 2 );
+#endif
+
+    header->advance_Width_Max      = GET_UShort();
+    header->min_Left_Side_Bearing  = GET_Short();
+    header->min_Right_Side_Bearing = GET_Short();
     header->xMax_Extent            = GET_Short();
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
@@ -522,11 +540,12 @@
     header->Reserved2 = GET_Short();
     header->Reserved3 = GET_Short();
     header->Reserved4 = GET_Short();
+
+    header->metric_Data_Format = GET_Short();
 #else
     SKIP( 16 );
 #endif
 
-    header->metric_Data_Format = GET_Short();
     header->number_Of_HMetrics = GET_UShort();
 
     FORGET_Frame();
@@ -745,12 +764,12 @@
  *
  *  Input  :  face     face table to look for
  *
- *  Output :  TT_Err_Ok.
+ *  Output :  void.
  *
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Free_TrueType_Names( PFace  face )
+  void  Free_TrueType_Names( PFace  face )
   {
     TName_Table*  names = &face->nameTable;
 
@@ -764,8 +783,6 @@
     names->numNameRecords = 0;
     names->format         = 0;
     names->storageOffset  = 0;
-
-    return TT_Err_Ok;
   }
 
 
@@ -893,7 +910,9 @@
 
       cmap->format  = GET_UShort();
       cmap->length  = GET_UShort();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       cmap->version = GET_UShort();
+#endif
 
       FORGET_Frame();
 
@@ -993,7 +1012,6 @@
     if ( ( i = TT_LookUp_Table( face, TTAG_OS2 ) ) < 0 )
     {
       face->os2.version = 0xFFFF;
-      error = TT_Err_Ok;
       return TT_Err_Ok;
     }
 
@@ -1006,10 +1024,10 @@
     os2->version             = GET_UShort();
     os2->xAvgCharWidth       = GET_Short();
     os2->usWeightClass       = GET_UShort();
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->ySubscriptXSize     = GET_Short();
     os2->ySubscriptYSize     = GET_Short();
     os2->ySubscriptXOffset   = GET_Short();
@@ -1021,7 +1039,7 @@
     os2->yStrikeoutSize      = GET_Short();
     os2->yStrikeoutPosition  = GET_Short();
 #else
-    SKIP( 20 );
+    SKIP( 24 );
 #endif
 
     os2->sFamilyClass        = GET_Short();
@@ -1057,25 +1075,26 @@
 
     FORGET_Frame();
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
-    if ( os2->version >= 0x0001 )
+    if ( os2->version >= 0x0002 )
     {
-      /* only version 1 tables */
 
-      if ( ACCESS_Frame( 8 ) )  /* read into frame */
+      /* only version 2 tables */
+      if ( ACCESS_Frame( 12 ) )  /* read into frame */
         return error;
 
+
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       os2->ulCodePageRange1 = GET_ULong();
       os2->ulCodePageRange2 = GET_ULong();
+#else
+      SKIP( 8 );
+#endif
+
+      os2->sxHeight = GET_Short();
+      os2->sCapHeight = GET_Short();   
 
       FORGET_Frame();
     }
-    else
-    {
-      os2->ulCodePageRange1 = 0;
-      os2->ulCodePageRange2 = 0;
-    }
-#endif
     
     return TT_Err_Ok;
   }
@@ -1263,90 +1282,5 @@
   }
 #endif
 
-
-/*******************************************************************
- *
- *  Function    :  Load_TrueType_Any
- *
- *  Description :  Loads any font table into client memory. Used by
- *                 the TT_Get_Font_Data() API function.
- *
- *  Input  :  face     face object to look for
- *
- *            tag      tag of table to load. Use the value 0 if you
- *                     want to access the whole font file, else set
- *                     this parameter to a valid TrueType table tag
- *                     that you can forge with the MAKE_TT_TAG
- *                     macro.
- *
- *            offset   starting offset in the table (or the file
- *                     if tag == 0 )
- *
- *            buffer   address of target buffer
- *
- *            length   address of decision variable :
- *
- *                       if length == NULL :
- *                             load the whole table. returns an
- *                             an error if 'offset' == 0 !!
- *
- *                       if *length == 0 :
- *                             exit immediately, returning the
- *                             length of the given table, or of
- *                             the font file, depending on the
- *                             value of 'tag'
- *
- *                       if *length != 0 :
- *                             load the next 'length' bytes of
- *                             table or font, starting at offset
- *                             'offset' (in table or font too).
- *
- *  Output :  Error condition
- *
- ******************************************************************/
-/*
-  LOCAL_FUNC
-  TT_Error  Load_TrueType_Any( PFace  face,
-                               ULong  tag,
-                               Long   offset,
-                               void*  buffer,
-                               Long*  length )
-  {
-    TT_Stream  stream;
-    TT_Error   error;
-    Long       table;
-    ULong      size;
-
-
-    if ( tag != 0 )
-    {
-      // look for tag in font directory
-      table = TT_LookUp_Table( face, tag );
-      if ( table < 0 )
-        return TT_Err_Table_Missing;
-
-      offset += face->dirTables[table].Offset;
-      size    = face->dirTables[table].Length;
-    }
-    else
-      // tag = 0 -- the use want to access the font file directly
-      size = TT_Stream_Size( face->stream );
-
-    if ( length && *length == 0 )
-    {
-      *length = size;
-      return TT_Err_Ok;
-    }
-
-    if ( length )
-      size = *length;
-
-    if ( !USE_Stream( face->stream, stream ) )
-      (void)FILE_Read_At( offset, buffer, size );
-    DONE_Stream( stream );
-
-    return error;
-  }
-*/
 
 /* END */

@@ -1,0 +1,863 @@
+/***************************************************************************
+ *
+ *  File-Tool-Library
+ *  Module: Main tool routines
+ *  (c) by RABE-Soft 12/99
+ *
+ *  Note: The comments were translated from German to English with AI support
+ *  and were not checked in detail. Therefore, they may sometimes sound a bit strange.
+ *
+ ***************************************************************************/
+@include <stdapp.goh>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <fileEnum.h>
+#include <file.h>
+@include <localize.h>
+
+@include "rsftool.goh"
+@include "UI/toolui.goh"
+@include "Main/ftlocals.goh"
+@include "Main/macros.goh"
+
+/*--------------------- BoxMessageBox ---------------------
+    Core routine message box
+        info, param1 and param2 are the display texts
+        dtyp is the dialog box type, e.g. CDT_ERROR (determines icon)
+        ityp is the interaction type, e.g. GIT_NOTIFICATION (determines trigger)
+ ---------------------------------------------------------------------------*/
+word BoxMessageBox(optr info, char *param1, char *param2, word dtyp, word ityp)	{
+char *p;
+word ret;
+	MemLock(OptrToHandle(info));
+	p = LMemDeref(info);
+	ret = UserStandardDialog(0,0,param2,param1,p,
+		( (dtyp << CDBF_DIALOG_TYPE_OFFSET) |
+		  (ityp << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));
+	return ret;
+	}
+
+/*--------------------- BoxMessageNumberBox ---------------------
+    Core routine message box with number as parameter
+        info and param are the display texts, nr is the number
+        dtyp is the dialog box type, e.g. CDT_ERROR (determines icon)
+        ityp is the interaction type, e.g. GIT_NOTIFICATION (determines trigger)
+ ---------------------------------------------------------------------------*/
+ word BoxMessageNumberBox(optr info, char *param, int nr, word dtyp, word ityp)	{
+char *p;
+word ret;
+char zahl[10];
+	sprintf(zahl,"%d",nr);
+	MemLock(OptrToHandle(info));
+	p = LMemDeref(info);
+	ret = UserStandardDialog(0,0,zahl,param,p,
+		( (dtyp << CDBF_DIALOG_TYPE_OFFSET) |
+		  (ityp << CDBF_INTERACTION_TYPE_OFFSET)));
+	MemUnlock(OptrToHandle(info));
+	return ret;
+	}
+
+
+/*---------------------------------------------------------------------------
+ *  $ID Compatibility routines
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- FileToolCopyFile_old ---------------------
+    Version 1.0 always returned FALSE (no error) for user abort and RO_Skip
+    and was therefore not suitable as a basis for FileToolMoveFile
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolCopyFile_old(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, word flags) {
+#define OLD_AVAILABLE_FLAGS 	(FT_CF_MSG_ON_ERROR | FT_CF_FORMAT_MISM_IS_NO_ERR \
+	| FT_CF_RO_ASK | FT_CF_RO_SKIP | FT_CF_FILE_BY_FILE | FT_CF_FILE_BY_LINK \
+	| FT_CF_LINK_BY_FILE | FT_CF_LINK_BY_LINK )
+word lFlags;
+	lFlags = flags & OLD_AVAILABLE_FLAGS;
+	return FileToolCopyFile(sourceFile, destFile, sdh, ddh, lFlags, 0);
+	}
+
+/*--------------------- FileToolCopyFile_old2 ---------------------
+    The old version did not support "Yes, all" triggwr when prompting.
+ ---------------------------------------------------------------------------*/
+ extern int EXPORT FileToolCopyFile_old2(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, word flags) {
+       return FileToolCopyFile(sourceFile, destFile, sdh, ddh, flags, 0);
+}
+
+#define SetYesAllStruct(yas, flags)	if (yas) { \
+		yas->flagsModified = flags; 	\
+		yas->pressedYesAllTrigger=0;	\
+		yas->cancelTriggerPressed=0;	}
+
+
+
+/*--------------------- FileToolDeleteFile_old ---------------------
+    The old version did not support "Yes, all" trigger when prompting.
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolDeleteFile_old(char * fileName,
+        FileToolDeleteFlags flags) {
+return FileToolDeleteFile(fileName, flags, 0);
+}
+
+/*--------------------- FileToolDeleteFile_old2 ---------------------
+/* since version 1.8 there are new DeleteFlags (for R-BASIC)
+ * -- enforce that new programs which may use this flag also require
+ * version 1.8 of the library (see also GP-File)
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolDeleteFile_old2(char * fileName,
+    FileToolDeleteFlags flags, FTYesAllStruct *yas) {
+    return FileToolDeleteFile(fileName, flags, yas);
+    }
+
+/*--------------------- FileToolMoveFile_old ---------------------
+    The old version did not support "Yes, all" trigger when prompting.
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolMoveFile_old(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, word flags) {
+return FileToolMoveFile(sourceFile, destFile, sdh, ddh, flags, 0);
+}
+
+/*---------------------  ---------------------
+ *
+ ---------------------------------------------------------------------------*/
+
+
+
+
+/*###########################################################################
+ #  Reading and writing files
+ ###########################################################################*/
+
+/*--------------------- FileToolDeleteFile ---------------------
+ *  Task:       Conveniently delete a file
+ *  Strategy:      Flags control the behavior
+ *          FT_DF_DEFAULT
+ *              RO files are also deleted
+ *              No error message if file not found
+ *          FT_DF_RO_SKIP
+ *              RO files are not deleted. If this flag
+ *              is set, FT_DF_RO_ASK is ignored!
+ *          FT_DF_RO_ASK | FT_DF_NOT_FOUND_ASK
+ *              Prompt for Read-Only or Not Found
+ *              "Delete all" switch is not yet
+ *                  supported
+ *          FT_DF_MSG_ON_ERR
+ *              In case of error, not only the error number
+ *              is returned but also an info box
+ *              is opened to indicate the failure.
+ *              This saves the main program from doing it.
+ *  Return:     TRUE if error
+ *          -> error number from FileDelete();
+ *          FALSE if delete OK
+ *              or user has chosen cancel
+ ---------------------------------------------------------------------------*/
+
+extern int EXPORT FileToolDeleteFile(char * fileName,
+		FileToolDeleteFlags flags, FTYesAllStruct *yas) {
+	SetYesAllStruct(yas, flags);
+	return FileToolDeleteFileMain(fileName, flags, yas);
+	}
+
+/*--------------------- FileToolDeleteFileMain ---------------------
+ *  Task:       Performs the actual work, but does not initialize
+ *          the yas structure and can thus
+ *          be called from other routines (..CopyFile(), ...MoveFile() )
+ ---------------------------------------------------------------------------*/
+ int FileToolDeleteFileMain(char * fileName,
+		FileToolDeleteFlags flags, FTYesAllStruct *yas) {
+  word attrs, err, retVal;	// retVal von Dialogen, err von FileDelete()
+
+  /* ask for system files */
+  attrs = FileGetAttributes(fileName);
+  if ( ThreadGetError() ) attrs = 0;	/* file not found */
+  if ( (attrs & (FA_SYSTEM | FA_HIDDEN)) && (flags & FT_DF_SYSTEM_ASK) ) {
+	int retVal = WarningOverwriteBox(@WarningDeleteSystem, fileName, 0,
+			yas, FT_YES_ALL_DELETE_SYSTEM);
+	if ( retVal != IC_YES ) return FALSE;
+	}
+
+
+
+  /* try to delete the file normally */
+  err = FileDelete(fileName);
+  if (!err) return FALSE;       // deletion successful
+
+  /* Assume: file not found */
+  if ( err == ERROR_FILE_NOT_FOUND  ) {
+    // Report if reporting is required
+    if ( flags & FT_DF_NOT_FOUND_IS_ERROR) return err;
+
+    // OK if no prompt is required
+    if ( !(flags & FT_DF_NOT_FOUND_ASK) ) return FALSE;
+
+    /* Prompt until file is found or cancelled */
+    do {
+       retVal = FileToolRequestChangeDir(@FileToolFileDeleteInfoText,
+                fileName,0,TRUE);
+       if ( retVal == IC_OK ) err = FileDelete(fileName);
+        else err = 0;
+       } while ( err == ERROR_FILE_NOT_FOUND );
+
+    if (!err) return FALSE;     // deletion successful or cancelled
+
+    }
+
+  /* Assume read-only file */
+  if ( !( attrs & FA_RDONLY ) )	{
+	// unexpected error
+	if ( flags & FT_DF_MSG_ON_ERR ) {
+		ErrorMsgCodeBox(@ErrorFileDelete,fileName,err);
+		}
+	return err;			// error code from FileDelete()
+	}
+
+  if ( flags & FT_DF_RO_SKIP ) {
+	return FALSE;
+	}
+
+  if ( flags & FT_DF_RO_ASK ) {
+	retVal = WarningOverwriteBox(@QuestionRO, fileName, 0,
+		 yas, FT_YES_ALL_READ_ONLY);
+	if (retVal != IC_YES ) return FALSE;	// User cancel
+	}
+
+  /* Clear RO status and delete file */
+  attrs = 0;		// overwrite
+  FileSetPathExtAttributes(fileName,FEA_FILE_ATTR,&attrs,1);
+  err = FileDelete(fileName);
+  if (err && ( flags & FT_DF_MSG_ON_ERR) ) {
+	ErrorMsgCodeBox(@ErrorFileDelete,fileName,err);
+	}
+  return err;
+  }
+
+
+/*--------------------- FileToolCopyFile ---------------------
+ *  Task:       Copy a file with error handling strategy
+ *  Note:       ERROR_FORMAT_MISMATCH - handling
+ *          - it is a normal error, but is checked separately
+ *            -> user can choose to overwrite.
+ *          - if FT_CF_FORMAT_MISM_IS_NO_ERR is set, it is not
+ *            considered an error: the target is automatically deleted
+ *            before the copy attempt (otherwise FileCopy() complains)
+ *            If the deletion fails, there is NO message about it,
+ *            instead the routine behaves as if
+ *            FT_CF_FORMAT_MISM_IS_NO_ERR is not set (i.e. dumb
+ *            message to the user or the main program)
+ *  Strategy:
+ *  Parameters:
+ *  Return:     ErrorCode (FALSE if everything is OK)
+ *          User cancel on prompt returns:
+ *              if FT_CF_USER_CANCEL_RETURN_ERROR is set:
+ *                  ERROR_CANCELED_BY_USER (-1)
+ *              else    Null (FALSE)
+ *          Skipped RO file returns
+ *              if FT_CF_RO_SKIP_RETURN_ERROR is set:
+ *                  ERROR_RO_SKIPPED (-2)
+ *              else    Null (FALSE)
+ ---------------------------------------------------------------------------*/
+
+Boolean LocalTestOverwrite(int sourceAttrs, int destAttrs,
+        char * destFileName, word flags, FTYesAllStruct *yas) {
+// Return: TRUE if the target can be overwritten
+int 	sel = 0;
+int	retVal = IC_YES;
+
+	if ( sourceAttrs & FA_LINK ) sel +=1;
+	if ( destAttrs & FA_LINK ) sel +=2;
+
+	switch ( sel ) {
+	case 0:		// no link found
+		if ( flags & FT_CF_FILE_BY_FILE ) retVal =
+			WarningOverwriteBox(@SureReplaceFileByFile, destFileName, 0,
+				yas, FT_YES_ALL_FILE_BY_FILE);
+		break;
+	case 1:		// source is a link
+		if ( flags & FT_CF_FILE_BY_LINK ) retVal =
+			WarningOverwriteBox(@SureReplaceFileByLink, destFileName, destFileName,
+				yas, FT_YES_ALL_FILE_BY_LINK);
+		break;
+	case 2:		// traget is a link
+		if ( flags & FT_CF_LINK_BY_FILE ) retVal =
+			WarningOverwriteBox(@SureReplaceLinkByFile, destFileName, 0,
+				yas, FT_YES_ALL_LINK_BY_FILE);
+		break;
+	case 3:		// both are links
+		if ( flags & FT_CF_LINK_BY_LINK ) retVal =
+			WarningOverwriteBox(@SureReplaceLinkByLink, destFileName, 0,
+				yas, FT_YES_ALL_LINK_BY_LINK);
+		break;
+
+		}
+
+	if ( retVal == IC_YES ) return TRUE;
+	return FALSE;
+	}
+
+
+/*--------------------- InternalEnterFolder ---------------------
+ *  Assumes that dh and Path come from FileCopyStruct
+ *  or are otherwise basically valid (i.e. no error
+ *  checks for empty strings, invalid combinations, etc.)
+ *  Return: error flag (TRUE == error)
+ *---------------------------------------------------------------*/
+ Boolean InternalEnterFolder(DiskHandle dh, char *path) {
+Boolean err;
+	err = !FileSetCurrentPath(dh, path);
+	return err;
+	}
+
+
+/*--------------------- InternalConstructFullPath ---------------------
+ * 	Writes full path to buffer
+ *---------------------------------------------------------------*/
+#define CFCS_BUFFER_SIZE	1000
+
+void InternalConstructFullPath(DiskHandle dh, char *path, char *buffer) {
+char * p;
+    /* Work around a small bug in the system: If the handle and the path
+     * are not consistent (e.g. handle points to D:, the path
+     * is absolute to E:), FileCopy(), FileSetCurrentPath()
+     * and FileConstructFullPath() do not behave consistently.
+     * Most of the time (but not always), when an absolute path is given
+     * "E:\folder\sub\something\file" the disk handle is ignored.
+     * In particular, the case SP_DOCUMENT+"D:\path\file" is
+     * allowed for FileCopy() (specifies "D:\path\file"), but
+     * FileConstructFullPath() returns garbage (multiple "D:")
+     * ---> "D:\GEOS\DOCUMENT\D:\path\file".
+     * Solution: If a full path is specified, I always take
+     * that and ignore the disk handle in this case.
+     * Side effect: Some (faulty) cases where the system would otherwise
+     * crash are accepted by my routines (without crash) */
+
+	if ( (path[1] == ':') && (path[2] == '\\') ) {
+		strcpy(buffer, path); /* Possibly Upcase DriveLetter makes the calling routine */
+		return;
+		}
+
+	/* Otherwise the system should construct the full path */
+	p = buffer;	/* p will be moved :( */
+	FileConstructFullPath(&p, CFCS_BUFFER_SIZE, dh, path, TRUE);
+	return;
+	}
+
+/*--------------------- CreateFileCopyStruct ---------------------
+ * Construct paths and ensure that no DiskHandle is null
+ * (This can be used as an error detector)
+ *---------------------------------------------------------------*/
+extern void EXPORT CreateFileCopyStruct(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, FileCopyStruct *fcs) {
+char *buffer, *pPtr;
+
+
+   memset(fcs, 0, sizeof(FileCopyStruct));
+   buffer = malloc(CFCS_BUFFER_SIZE);
+
+   /* Construct source path. sourceFile can be zero for debugging */
+   if ( sourceFile ) {
+	/* Create path of the form “d:\path\folder\file” */
+	InternalConstructFullPath(sdh, sourceFile, buffer);
+
+	/* get DiskHandle  */
+	buffer[0] = LocalUpcaseChar(buffer[0]);
+	fcs->srcDisk = DiskRegisterDiskSilently(buffer[0] - 'A');
+
+	/* store FileName  */
+	pPtr = buffer;
+	FileToolParseNameFromPath(&pPtr, FT_GEOS_NAME_CONVENTION);
+	fcs->srcFile = malloc(strlen(pPtr) + 2);	// + 00 + savety
+	strcpy(fcs->srcFile, pPtr);
+
+	/* Save path in the form “\path\folder” */
+	pPtr--;			/* Points to the \ before FileName */
+	*pPtr = 0;		/* Shorten string */
+	pPtr = &buffer[2];	/* Points to \ after D: */
+	/* Special case: If buffer = “D:\file”, pPtr is now an empty string */
+	if (*pPtr == 0 ) strcpy(pPtr,"\\");	/* empty string --> "\\" */
+	fcs->srcPath = malloc(strlen(pPtr) + 2);	// + 00 + savety
+	strcpy(fcs->srcPath, pPtr);
+
+	}
+
+
+   /* Construct destination path. destFile can be null for debugging */
+   if ( destFile ) {
+	/* Create path of the form “d:\path\folder\file” */
+	InternalConstructFullPath(ddh, destFile, buffer);
+
+	/* get DiskHandle */
+	buffer[0] = LocalUpcaseChar(buffer[0]);
+	fcs->destDisk = DiskRegisterDiskSilently(buffer[0] - 'A');
+
+	/* Save full path (path + file name) for FileCopy() */
+	fcs->destFullPath = malloc(strlen(buffer));
+	strcpy(fcs->destFullPath, &buffer[2]);
+
+	/* store FileName */
+	pPtr = buffer;
+	FileToolParseNameFromPath(&pPtr, FT_GEOS_NAME_CONVENTION);
+	fcs->destFile = malloc(strlen(pPtr) + 2);	// + 00 + savety
+	strcpy(fcs->destFile, pPtr);
+
+	/* Save path in the form “\path\folder” */
+	pPtr--;			/* Points to the \ in front of it */
+	*pPtr = 0;		/* Shorten string */
+	pPtr = &buffer[2];	/* Points to \ to D: */
+	/* Special case: If buffer = “D:\file”, pPtr is now an empty string */
+	if (*pPtr == 0 ) strcpy(pPtr,"\\");	/* Empty string --> "\\" */
+	fcs->destPath = malloc(strlen(pPtr) + 2);	// + 00 + savety
+	strcpy(fcs->destPath, pPtr);
+
+	}
+
+   free(buffer);
+}
+
+/*--------------------- DestroyFileCopyStruct ---------------------
+ *---------------------------------------------------------------*/
+extern void EXPORT DestroyFileCopyStruct(FileCopyStruct *fcs) {
+
+	if ( fcs->srcPath ) free(fcs->srcPath);
+	if ( fcs->srcFile ) free(fcs->srcFile);
+	if ( fcs->destPath ) free(fcs->destPath);
+	if ( fcs->destFile ) free(fcs->destFile);
+	if ( fcs->destFullPath ) free(fcs->destFullPath);
+	memset(fcs, 0, sizeof(FileCopyStruct));
+
+}
+
+
+/* ++++++++++++	Encapsulated extended FileDelete +++++++++++++++++++++++++ */
+int InternalFileDelete(DiskHandle dh, char *path, char *fileName,
+	word flags, FTYesAllStruct *yas) {
+int err;
+
+	FilePushDir();
+	err = InternalEnterFolder(dh, path);
+	if ( !err ) err = FileToolDeleteFileMain(fileName, flags, yas);
+	FilePopDir();
+	return err;
+}
+
+/* ++++++++++++ encapsulated FileCopy +++++++++++++++++++++++++
+ ++++++++++++++ to get the DOS name if needed +++++++++++++ */
+ word InternalFileCopy(FileCopyStruct *fcs,
+		Boolean destFileExist, FTYesAllStruct *yas) {
+
+Boolean err, ok;
+FileLongName	srcName, srcDosName, destName, destDosName;
+#define NUM_EXT_CHARS	8
+char ch, srcExt[NUM_EXT_CHARS+1], destExt[NUM_EXT_CHARS+1];
+GeosFileType srcType, destType;
+
+
+    // FileCopy() has the following problems, some of which can be
+    // solved here:
+    //
+    //  1. *.vm is renamed to .000 (possibly also *.RSC ... )
+    //     This is fixed by comparing the DOS name before and after copying.
+    //     If the extension has changed from "non-numeric"
+    //     (e.g. *.vm) to numeric (e.g. *.000), an attempt is made
+    //     to restore the original DOS name.
+    //
+    //  2. If a Geode (e.g. Kindermaler) exists with the DOS name
+    //     KINDER_M.000 and the Geode Kindermaler with the DOS name
+    //     KIMA.GEO is to be copied, FileCopy() does not overwrite the old
+    //     Geode, but after copying there are two
+    //     "Kindermaler", but with different DOS names.
+    //     --> Target file is deleted before copying
+    //
+    //  3. If the Geos names of a Geode differ, while the DOS
+    //     names are the same (KIMA.GEO), the Geode is replaced,
+    //     e.g. "Kindermaler" (KIMA.GEO) by "EasyPainter" (KIMA.GEO).
+    //     The same problem also exists in the Geo-Manager.
+    //     Solvable??
+    //
+    //  4. FileCopy apparently does not copy links. Which is strange, because
+    //     the library contains various code that suggests
+    //     that this used to work.
+    //     Right now (10/2007) I don't feel like looking for the error
+    //     (It's not due to the use of CurrentPath for FileCopy, I
+    //     tried that) or writing a special routine that
+    //     accesses the dirname directly.
+    //     Maybe it works automatically with another GEOS version.
+    //  ---------------------------------------------------------------------
+
+    // Set initial values so that in case of error an abort occurs
+    // Source and dest are different and invalid characters, DOS names are the same
+
+    strcpy(srcDosName,":Dos:");
+    strcpy(destDosName,":Dos:");
+    strcpy(srcName,":srcName:");
+    strcpy(destName,":destName:");
+    srcType = destType = GFT_NOT_GEOS_FILE;
+
+    // get info about source file
+    FilePushDir();
+    ok = !InternalEnterFolder(fcs->srcDisk, fcs->srcPath);
+    if ( ok ) {
+	FileGetPathExtAttributes(fcs->srcFile, FEA_DOS_NAME, srcDosName, sizeof(FileLongName));
+	FileGetPathExtAttributes(fcs->srcFile, FEA_NAME, srcName, sizeof(FileLongName));
+	FileGetPathExtAttributes(fcs->srcFile, FEA_FILE_TYPE, &srcType, sizeof(GeosFileType));
+	}
+    FilePopDir();
+
+
+    if (destFileExist) {
+	// Get information about target file (to be overwritten) and delete if necessary
+	FilePushDir();
+	do { 		// ensure FilePopDir()
+	    Boolean attrErr;
+	    ok = !InternalEnterFolder(fcs->destDisk, fcs->destPath);
+	    if (!ok) break;
+
+	    attrErr = FileGetPathExtAttributes(fcs->destFile, FEA_DOS_NAME, destDosName, sizeof(FileLongName));
+	    attrErr |= FileGetPathExtAttributes(fcs->destFile, FEA_NAME, destName, sizeof(FileLongName));
+	    attrErr |= FileGetPathExtAttributes(fcs->destFile, FEA_FILE_TYPE, &destType, sizeof(GeosFileType));
+	    if (attrErr) break;
+
+	    // only if both are geodes (FileCopy()-error no.2 and no.3 )
+	    if ( destType != GFT_EXECUTABLE ) break;
+	    if ( srcType  != GFT_EXECUTABLE ) break;
+
+	    // With the same GEOS name --> possibly problem no. 2
+	    if ( strcmp(srcName, destName) == 0 ) {
+
+		// If the DOS names are different, we have a problem
+		if ( strcmp(srcDosName, destDosName) == 0 ) break;
+
+		// Situation as described in error no. 2 occurred
+		// --> Delete target file, no error messages at all
+		FileToolDeleteFileMain(fcs->destFile, FT_DF_DEFAULT, yas);
+		}
+	    else {
+		// it could now be error no.3 ...
+		// MessageBox("possibly error 3 (different GEOS names)");
+		break; // I can't (yet?) handle it
+		}
+
+	    } while(0);
+	FilePopDir();
+	}
+
+    // execute copy
+    FilePushDir();
+/* */
+    InternalEnterFolder(fcs->srcDisk, fcs->srcPath);
+    err = FileCopy(fcs->srcFile, fcs->destFullPath, 0, fcs->destDisk);
+    FilePopDir();
+    if ( err ) return err;
+
+    // Get info about copied file and change name if necessary
+    FilePushDir();
+    do { 		// ensure FilePopDir()
+	ok = !InternalEnterFolder(fcs->destDisk, fcs->destPath);
+	if (!ok) break;
+
+	FileGetPathExtAttributes(fcs->destFile, FEA_DOS_NAME, destDosName, sizeof(FileLongName));
+	FileGetPathExtAttributes(fcs->destFile, FEA_NAME, destName, sizeof(FileLongName));
+	FileGetPathExtAttributes(fcs->destFile, FEA_FILE_TYPE, &destType, sizeof(GeosFileType));
+
+	// only if both are GEOS files and also of the same type
+	if (srcType != destType) break;	       // break wenn typen verschieden
+	if ( srcType == GFT_NOT_GEOS_FILE ) break;  // both are DOS files
+
+
+	// with the same DOS name: nothing to change
+	if ( strcmp(srcDosName, destDosName) == 0 ) break;
+
+	// now the DOS name has obviously been changed.
+	// Compare the GEOS name to be on the safe side, otherwise it could be
+	// a deliberate renaming.
+	if ( strcmp(srcName, destName) != 0 ) break;
+
+	// The DOS name must be changed if the original DOS name has no
+	// numeric extension (e.g. VM, GEO, RSC... ), but a numeric extension suddenly appears in the target
+	// ( 000, 001 ... )
+	FileToolGetDOSExtension(srcDosName, srcExt, NUM_EXT_CHARS);
+	FileToolGetDOSExtension(destDosName, destExt, NUM_EXT_CHARS);
+
+	ch = srcExt[0];
+	if ( (ch >= '0') && (ch <='9') ) break;	  // source has numeric Extension
+
+	ch = destExt[0];
+	if ( (ch < '0') || (ch > '9') ) break;  // target has no numeric Extension
+
+	/* All conditions fulfilled: Rename without message if it does not work */
+	FileToolModifyDosName( destDosName, srcDosName, FALSE);
+
+	} while(0);
+
+    FilePopDir();
+
+
+    return err;
+    }
+
+
+
+
+/* ++++++++++++	Actual copy routine +++++++++++++ */
+
+extern int EXPORT FileToolCopyFile(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, word flags,
+		FTYesAllStruct *yas) {
+FileCopyStruct fcs;
+int retVal;
+
+	CreateFileCopyStruct(sourceFile, destFile, sdh, ddh, &fcs);
+	if ( (!fcs.srcDisk) || (!fcs.destDisk) ) {
+		if ( flags & FT_CF_MSG_ON_ERROR )
+			ErrorMsgCodeBox(@CommonCopyError2, fcs.srcFile, ERROR_PATH_NOT_FOUND);
+		DestroyFileCopyStruct(&fcs);
+		return ERROR_PATH_NOT_FOUND;
+		}
+	SetYesAllStruct(yas, flags);
+	retVal = FileToolCopyFileMain(&fcs, flags, yas);
+	DestroyFileCopyStruct(&fcs);
+
+	return retVal;
+	}
+
+
+
+int FileToolCopyFileMain(FileCopyStruct *fcs, word flags, FTYesAllStruct *yas) {
+
+/*
+char * sourceFile = NULL;
+char * destFile = NULL;
+DiskHandle sdh = 1234;
+DiskHandle ddh = 1234;
+/**/
+
+int errCode, retVal;
+char	driveStr[] = "A:";
+word	sourceAttrs, destAttrs, sourceErr, destErr, err;
+dword	fileSize /* , freeSpace, destFileSize */;
+//DiskHandle realDestHandle;
+GeosFileType srcType, destType;
+
+     /* Get source and target attributes */
+	FilePushDir();
+
+	InternalEnterFolder(fcs->srcDisk, fcs->srcPath);
+	sourceAttrs = FileGetAttributes(fcs->srcFile);
+	sourceErr = ThreadGetError();
+	FileGetPathExtAttributes(fcs->srcFile, FEA_FILE_TYPE, &srcType, sizeof(GeosFileType));
+	FileGetPathExtAttributes(fcs->srcFile,FEA_SIZE,&fileSize,4);
+
+	InternalEnterFolder(fcs->destDisk, fcs->destPath);
+	destAttrs = FileGetAttributes(fcs->destFile);
+	destErr = ThreadGetError();
+	FileGetPathExtAttributes(fcs->destFile, FEA_FILE_TYPE, &destType, sizeof(GeosFileType));
+
+	FilePopDir();
+
+	if ( srcType == GFT_DIRECTORY ) {
+		if ( flags & FT_CF_MSG_ON_ERROR )
+			ErrorMsgBox(@CannotCopyFolders,fcs->srcFile,0);
+		return ERROR_CANNOT_COPY_FOLDERS;
+		}
+
+     /* Source or destination do not exist -> xxErr != 0 */
+	if ( sourceErr )
+		{
+		if ( flags & FT_CF_MSG_ON_ERROR )
+				ErrorMsgBox(@CopyFileNotFound,fcs->srcFile,0);
+		return sourceErr;
+		}
+	if ( destErr )	goto DoCopy;	// Target does not exist
+					// -> Lots of tests superfluous
+
+	if ( destType == GFT_DIRECTORY ) {
+		if ( flags & FT_CF_MSG_ON_ERROR )
+			ErrorMsgBox(@ErrorCopyFileToFolder, fcs->srcFile, fcs->destFile);
+		return ERROR_FILE_CANNOT_REPLACE_FOLDER;
+		}
+
+     /* Check ( if necessary ask) whether destination can be overwritten */
+	if ( !LocalTestOverwrite(sourceAttrs, destAttrs,
+		fcs->destFile, flags, yas) ) {
+		return (flags & FT_CF_USER_CANCEL_RETURN_ERROR) ? ERROR_CANCELED_BY_USER : FALSE;
+		}
+
+     /* Check whether target is write-protectedt */
+	if ( destAttrs & FA_RDONLY )
+		{
+		word newAttrs;
+		if ( flags & FT_CF_RO_SKIP )	{
+			return (flags & FT_CF_RO_SKIP_RETURN_ERROR) ? ERROR_RO_SKIPPED : FALSE;
+			}
+		if ( flags & FT_CF_RO_ASK )
+			retVal = WarningOverwriteBox(@SureForCopyRO, fcs->destFile, 0,
+				yas, FT_YES_ALL_READ_ONLY);
+		   else retVal = IC_YES;
+
+		if ( retVal != IC_YES )
+			return (flags & FT_CF_USER_CANCEL_RETURN_ERROR) ? ERROR_CANCELED_BY_USER : FALSE;
+
+		// Reset destination attributes
+		FilePushDir();
+		InternalEnterFolder(fcs->destDisk, fcs->destPath);
+		newAttrs = destAttrs & ~(word) FA_RDONLY;
+		err = FileToolSetExtAttr( fcs->destFile,FEA_FILE_ATTR,
+					&newAttrs, 1, flags & FT_CF_MSG_ON_ERROR);
+		FilePopDir();
+		if (err) return ERROR_ACCESS_DENIED;
+		}
+
+
+	/* Delete destination first if:
+		a) the destination is a link
+		b) the source is a link
+		(replacing file with link requires deletion of the file)
+	*/
+		if ( (destAttrs & FA_LINK) || (sourceAttrs & FA_LINK) ) {
+		InternalFileDelete(fcs->destDisk, fcs->destPath,
+			fcs->destFile, FT_DF_DEFAULT, yas);
+		}
+
+DoCopy:
+
+	do {
+	   errCode = InternalFileCopy(fcs, destErr==0, yas );
+
+	   if ( (errCode == ERROR_FILE_FORMAT_MISMATCH)
+		&& ( flags & FT_CF_FORMAT_MISM_IS_NO_ERR) )
+		{
+		// in this case there is another attempt
+		// by trying to delete the target file
+		// if this fails, the normal error strategy takes effect
+			InternalFileDelete(fcs->destDisk, fcs->destPath,
+			fcs->destFile, FT_DF_DEFAULT, yas);
+		   errCode = InternalFileCopy(fcs, destErr==0, yas);
+		}
+
+	   if (!errCode) break;		// Copy successful
+	   if ( !(flags & FT_CF_MSG_ON_ERROR) ) break;	// error, but no message
+	   switch (errCode) {
+		case ERROR_WRITE_PROTECTED:
+				driveStr[0] = 'A' + DiskGetDrive(fcs->destDisk);
+				retVal = ToolErrorCancelBox(
+					@WriteProtectedCopyError,driveStr,0);
+				break;
+		case ERROR_SHORT_READ_WRITE:
+				driveStr[0] = 'A' + DiskGetDrive(fcs->destDisk);
+				ErrorMsgBox(@NoSpaceCopyError,
+						fcs->srcFile,driveStr);
+				retVal = IC_NO;	// cancel
+				break;
+		case ERROR_FILE_FORMAT_MISMATCH:
+				retVal = WarningOverwriteBox(@FormatMismatchCopyError,
+					     fcs->srcFile, fcs->destFile,
+					     yas, FT_YES_ALL_FORMAT_MISMATCH);
+				if ( retVal == IC_YES )
+				   {	// delete target
+				   InternalFileDelete(fcs->destDisk, fcs->destPath,
+						fcs->destFile, FT_DF_DEFAULT, yas);
+				   }
+				break;
+		case ERROR_FILE_IN_USE:
+		case ERROR_SHARING_VIOLATION:  /* == write to an open file */
+				retVal = ToolErrorCancelBox(
+					@FileIsOpenCopyError,fcs->destFile,0);
+				break;
+		case ERROR_ACCESS_DENIED:
+				retVal = ToolErrorCancelBox(
+					@AccessDeniedCopyError,fcs->destFile,0);
+				break;
+		default:        { char errText[64];
+				GetErrorText(errCode, errText);
+				retVal = ToolErrorCancelBox(
+					@CommonCopyError,fcs->srcFile,errText);
+				}
+			}
+		   } while (retVal == IC_YES);	// retry
+
+	return errCode;
+	}
+
+/*--------------------- FileToolMoveFile ---------------------
+ *  Task:       Move a file with error handling strategy
+ *  Strategy:   First, FileToolCopyFile is executed and if that
+ *          was successful, the file is deleted.
+ *  Note:       FileToolCopyFlags are passed as flags
+ *          and suitable DeleteFlags are converted for deletion
+ *  Parameters:
+ *  Return:     ErrorCode (FALSE if everything is OK)
+ *          User cancel on prompt returns:
+ *              if FT_CF_USER_CANCEL_RETURN_ERROR is set:
+ *                  ERROR_CANCELED_BY_USER  (-1)
+ *              else    Null (FALSE)
+ *          Skipped RO file returns
+ *              if FT_CF_RO_SKIP_RETURN_ERROR is set:
+ *                  ERROR_RO_SKIPPED (-2)
+ *              else    Null (FALSE)
+ ---------------------------------------------------------------------------*/
+extern int EXPORT FileToolMoveFile(char * sourceFile, char * destFile,
+		DiskHandle sdh, DiskHandle ddh, word flags,
+		FTYesAllStruct *yas) {
+word	lFlags, deleteFlags;
+int	error;
+FileCopyStruct	fcs;
+
+	CreateFileCopyStruct(sourceFile, destFile, sdh, ddh, &fcs);
+	if ( (!fcs.srcDisk) || (!fcs.destDisk) ) {
+		if ( flags & FT_CF_MSG_ON_ERROR )
+			ErrorMsgCodeBox(@CommonCopyError2, fcs.srcFile, ERROR_PATH_NOT_FOUND);
+		DestroyFileCopyStruct(&fcs);
+		return ERROR_PATH_NOT_FOUND;
+		}
+	SetYesAllStruct(yas, flags);
+
+	// Ensure that all errors / aborts are returned
+	lFlags = flags | FT_CF_USER_CANCEL_RETURN_ERROR | FT_CF_RO_SKIP_RETURN_ERROR;
+	error = FileToolCopyFileMain(&fcs, lFlags, yas);
+
+	/* Create FileToolDeleteFlags and delete file
+	   If copying was successful, the file must also be deleted.
+	   Therefore, the other flags must not be set
+	   ( FT_DF_NOT_FOUND_ASK, FT_DF_RO_SKIP, FT_DF_RO_ASK)
+	   All other possible CopyFlags also have no effect
+	   on deletion (FT_CF_RO_ASK, FT_CF_RO_SKIP, FT_CF_FILE_BY_FILE,
+	   FT_CF_FILE_BY_LINK, FT_CF_LINK_BY_FILE, FT_CF_LINK_BY_LINK,
+	   FT_CF_USER_CANCEL_RETURN_ERROR, FT_CF_RO_SKIP_RETURN_ERROR)
+	*/
+
+	deleteFlags = 0;
+	if ( flags & FT_CF_MSG_ON_ERROR ) deleteFlags = FT_DF_MSG_ON_ERR;
+
+	if ( !error)
+		{
+		error=InternalFileDelete(fcs.srcDisk, fcs.srcPath,
+				fcs.srcFile, deleteFlags, yas);
+				/**/
+		}
+	else	{
+		// Error when copying -> Return error message
+		if ( (error == ERROR_CANCELED_BY_USER)
+			&& !(flags & FT_CF_USER_CANCEL_RETURN_ERROR) )
+			// User abort, but should not be reported to the main program
+			error = 0;
+		if ( (error == ERROR_RO_SKIPPED)
+			&& !(flags & FT_CF_RO_SKIP_RETURN_ERROR) )
+			// read only skipped, but should not be reported to the main program
+			error = 0;
+		}
+
+	DestroyFileCopyStruct(&fcs);
+	return error;
+	}
+
+
+
+/*---------------------  ---------------------
+ *
+ ---------------------------------------------------------------------------*/
+
+/*###########################################################################
+ #	End of file
+ ###########################################################################*/
+

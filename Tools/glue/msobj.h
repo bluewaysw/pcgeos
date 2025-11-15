@@ -759,4 +759,5 @@ extern void MSObj_ExpandIData(byte **dataPtr,	    /* Iterated data block */
 			      byte **bufPtr);	    /* Destination buffer */
 
 extern FloatingPointExtDef MSObj_IsFloatingPointExtDef(ID name);
+extern Boolean MSObj_IsWatcomFloatingPoint(ID name);
 #endif /* _MSOBJ_H_ */

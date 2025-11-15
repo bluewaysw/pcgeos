@@ -181,14 +181,6 @@ extern TEngine_Instance engineInstance;
           (( sizeof(TProfile)+sizeof(long)-1 ) / sizeof(long))
 
 
-  /* Left fill bitmask */
-  static const Byte  LMask[8] =
-    { 0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01 };
-
-  /* Right fill bitmask */
-  static const Byte  RMask[8] =
-    { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF };
-
   /* prototypes used for sweep function dispatch */
 #ifdef TT_CONFIG_OPTION_GRAY_SCALING
   typedef void  Function_Sweep_Init( RAS_ARGS Short*  min,
@@ -220,11 +212,16 @@ extern TEngine_Instance engineInstance;
 
 /* NOTE: These operations are only valid on 2's complement processors */
 
-#define FLOOR( x )    ( (x) & -ras.precision )
-#define CEILING( x )  ( ((x) + ras.precision - 1) & -ras.precision )
-#define TRUNC( x )    ( (signed long)(x) >> ras.precision_bits )
-#define FRAC( x )     ( (x) & (ras.precision - 1) )
-#define SCALED( x )   ( ((x) << ras.precision_shift) - ras.precision_half )
+#define PRECISION_BITS  8
+#define PRECISION       ( 1 << PRECISION_BITS )
+#define PRECISION_HALF  ( PRECISION >> 1 )
+#define PRECISION_SHIFT ( PRECISION_BITS - Pixel_Bits )
+
+#define FLOOR( x )    ( (x) & -PRECISION )
+#define CEILING( x )  ( ((x) + PRECISION - 1) & -PRECISION )
+#define TRUNC( x )    ( (signed long)(x) >> PRECISION_BITS )
+#define FRAC( x )     ( (x) & (PRECISION - 1) )
+#define SCALED( x )   ( ((x) << PRECISION_SHIFT) - PRECISION_HALF )
 
 #ifdef DEBUG_RASTER
 #define DEBUG_PSET  Pset()
@@ -247,10 +244,6 @@ extern TEngine_Instance engineInstance;
 
   struct  TRaster_Instance_
   {
-    Int       precision_bits;       /* precision related variables */
-    Int       precision;
-    Int       precision_half;
-    Int       precision_shift;
     Int       precision_step;
 
     MemHandle buffer;               /* The profiles bufferblock     */
@@ -333,22 +326,14 @@ extern TEngine_Instance engineInstance;
 /*                                                                      */
 /************************************************************************/
 
-  static void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
+  static inline void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
   {
     if ( y_ppem < 24 )
-    {
-      ras.precision_bits   = 10;
       ras.precision_step   = 128;
-    }
-    else
-    {
-      ras.precision_bits   = 6;
+    else if ( y_ppem < 48 )
+      ras.precision_step   = 64;
+    else  
       ras.precision_step   = 32;
-    }
-
-    ras.precision       = 1 << ras.precision_bits;
-    ras.precision_half  = ras.precision >> 1;
-    ras.precision_shift = ras.precision_bits - Pixel_Bits;
   }
 
 
@@ -427,7 +412,7 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  End_Profile( RAS_ARG )
   {
-    Long      h;
+    Short     h;
     PProfile  oldProfile;
 
 
@@ -660,7 +645,6 @@ extern TEngine_Instance engineInstance;
 
     if ( y2 > maxy )
     {
-      /* x2 += FMulDiv( Dx, maxy - y2, Dy );  UNNECESSARY */
       e2  = TRUNC( maxy );
       f2  = 0;
     }
@@ -673,7 +657,7 @@ extern TEngine_Instance engineInstance;
     if ( f1 > 0 )
     {
       if ( e1 == e2 ) return SUCCESS;
-      x1 += FMulDiv( Dx, ras.precision - f1, Dy );
+      x1 += FMulDiv( Dx, PRECISION - f1, Dy );
       ++e1;
     }
     else if ( ras.joint )
@@ -697,8 +681,8 @@ extern TEngine_Instance engineInstance;
       return FAILURE;
     }
 
-    Ix = (ras.precision * Dx) / Dy;
-    Rx = (ras.precision * Dx) % Dy;
+    Ix = (PRECISION * Dx) / Dy;
+    Rx = (PRECISION * Dx) % Dy;
     Dx = (Dx > 0) ? 1 : -1;
 
     Ax  = -Dy;
@@ -729,7 +713,7 @@ extern TEngine_Instance engineInstance;
     Bool  fresh  = ras.fresh;
     Bool  result = Line_Up( RAS_VARS x1, -y1, x2, -y2, -maxy, -miny );
 
-    if ( fresh && !ras.fresh )
+    if ( fresh ^ ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
 
     return result;
@@ -793,7 +777,7 @@ extern TEngine_Instance engineInstance;
 
         DEBUG_PSET;
 
-        e += ras.precision;
+        e += PRECISION;
       }
     }
 
@@ -836,7 +820,7 @@ extern TEngine_Instance engineInstance;
                                        y2 - y1 );
 
           arc -= 2;
-          e   += ras.precision;
+          e   += PRECISION;
         }
       }
       else
@@ -846,7 +830,7 @@ extern TEngine_Instance engineInstance;
           ras.joint  = TRUE;
           *top++     = arc[0].x;
 
-          e += ras.precision;
+          e += PRECISION;
         }
         arc -= 2;
       }
@@ -887,7 +871,7 @@ extern TEngine_Instance engineInstance;
 
     result = Bezier_Up( RAS_VARS -maxy, -miny );
 
-    if ( fresh && !ras.fresh )
+    if ( fresh ^ ras.fresh )
       ras.cProfile->start = -ras.cProfile->start;
 
     arc[0].y = -arc[0].y;
@@ -983,7 +967,7 @@ extern TEngine_Instance engineInstance;
                                    Long  cx,
                                    Long  cy )
   {
-    Long     y1, y2, y3, x3;
+    Long     y1, y2, y3;
     TStates  state_bez;
 
 
@@ -997,7 +981,6 @@ extern TEngine_Instance engineInstance;
       y1 = ras.arc[2].y;
       y2 = ras.arc[1].y;
       y3 = ras.arc[0].y;
-      x3 = ras.arc[0].x;
 
       /* first, categorize the bezier arc */
 
@@ -1064,8 +1047,8 @@ extern TEngine_Instance engineInstance;
       }
     } while ( ras.arc >= ras.arcs );
 
-    ras.lastX = x3;
-    ras.lastY = y3;
+    ras.lastX = x;
+    ras.lastY = y;
 
     return SUCCESS;
   }
@@ -1431,7 +1414,11 @@ extern TEngine_Instance engineInstance;
     /* Drop-out control */
 
     e1 = TRUNC( CEILING( x1 ) );
-    e2 = TRUNC( FLOOR( x2 ) );
+
+    if ( x2-x1- PRECISION <= 1 )
+      e2 = e1;
+    else
+      e2 = TRUNC( FLOOR( x2 ) );
 
     if ( e2 >= 0 && e1 < ras.bWidth )
     {
@@ -1445,15 +1432,15 @@ extern TEngine_Instance engineInstance;
 
       if ( c1 != c2 )
       {
-        *target |= LMask[e1 & 7];
+        *target |= (Byte)(0xFFu >> (e1 & 7));
 
         if ( c2 > c1 + 1 )
           MEM_Set( target + 1, 0xFF, c2 - c1 - 1 );
 
-        target[c2 - c1] |= RMask[e2 & 7];
+        target[c2 - c1] |= (Byte)(0xFFu << (7 - (e2 & 7)));
       }
       else
-        *target |= ( LMask[e1 & 7] & RMask[e2 & 7] );
+        *target |= (Byte)((0xFFu >> (e1 & 7)) & (0xFFu << (7 - (e2 & 7))));
     }
   }
 
@@ -1474,7 +1461,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 > e2 )
     {
-      if ( e1 == e2 + ras.precision )
+      if ( e1 == e2 + PRECISION )
       {
         switch ( ras.dropOutControl )
         {
@@ -1513,7 +1500,6 @@ extern TEngine_Instance engineInstance;
           /*           bit problem in the '7' of verdana 10pts, but   */
           /*           makes a new one in the 'C' of arial 14pts      */
 
-          /* if ( x2-x1 < ras.precision_half ) */
           {
             /* upper stub test */
 
@@ -1683,7 +1669,7 @@ extern TEngine_Instance engineInstance;
     PByte  bits;
 
 
-    if ( x2-x1 < ras.precision )
+    if ( x2-x1 < PRECISION )
     {
       e1 = CEILING( x1 );
       e2 = FLOOR  ( x2 );
@@ -1717,7 +1703,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 > e2 )
     {
-      if ( e1 == e2 + ras.precision )
+      if ( e1 == e2 + PRECISION )
       {
         switch ( ras.dropOutControl )
         {
@@ -1999,7 +1985,11 @@ extern TEngine_Instance engineInstance;
 
     PProfile  P, Q, P_Left, P_Right;
 
-    Short  min_Y, max_Y, top, bottom, dropouts;
+    Short  min_Y, bottom, dropouts;
+
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
+    Short  max_Y, top;
+#endif
 
     Long  x1, x2, xs;
     Short e1, e2;
@@ -2012,7 +2002,9 @@ extern TEngine_Instance engineInstance;
     /* first, compute min and max Y */
 
     P     = ras.fProfile;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
     max_Y = (short)TRUNC( ras.minY );
+#endif
     min_Y = (short)TRUNC( ras.maxY );
 
     while ( P )
@@ -2020,10 +2012,14 @@ extern TEngine_Instance engineInstance;
       Q = P->link;
 
       bottom = P->start;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
       top    = P->start + P->height-1;
+#endif
 
       if ( min_Y > bottom ) min_Y = bottom;
+#ifdef TT_CONFIG_OPTION_GRAY_SCALING
       if ( max_Y < top    ) max_Y = top;
+#endif
 
       P->X = 0;
       InsNew( &wait, P );
@@ -2119,13 +2115,13 @@ extern TEngine_Instance engineInstance;
             x2 = xs;
           }
 
-          if ( x2-x1 <= ras.precision )
+          if ( x2-x1 <= PRECISION )
           {
             e1 = FLOOR( x1 );
             e2 = CEILING( x2 );
 
             if ( ras.dropOutControl != 0 &&
-                 (e1 > e2 || e2 == e1 + ras.precision) )
+                 (e1 > e2 || e2 == e1 + PRECISION ) ) 
             {
               /* a drop out was detected */
 
@@ -2252,12 +2248,12 @@ Scan_DropOuts :
     Int    band_top = 0;
 
 
+    ras.top = MemDeref( ras.buffer );
+
     while ( band_top >= 0 )
     {
-      ras.maxY = (Long)ras.band_stack[band_top].y_max * ras.precision;
-      ras.minY = (Long)ras.band_stack[band_top].y_min * ras.precision;
-
-      ras.top = MemDeref( ras.buffer );
+      ras.maxY = (Long)ras.band_stack[band_top].y_max * PRECISION;
+      ras.minY = (Long)ras.band_stack[band_top].y_min * PRECISION;
 
       ras.error = Raster_Err_None;
 
@@ -2275,10 +2271,7 @@ Scan_DropOuts :
         k = ( i + j ) >> 1;
 
         if ( band_top >= 7 || k < i )
-        {
-          band_top     = 0;
           return Raster_Err_Invalid;
-        }
 
         ras.band_stack[band_top+1].y_min = k;
         ras.band_stack[band_top+1].y_max = j;
@@ -2300,6 +2293,19 @@ Scan_DropOuts :
     }
 
     return TT_Err_Ok;
+  }
+
+  LOCAL_FUNC
+  static void Initialize_Raster_Instance( RAS_ARGS TT_Outline*  glyph )
+  {
+    ras.outs      = glyph->contours;
+    ras.flags     = glyph->flags;
+    ras.nPoints   = glyph->n_points;
+    ras.nContours = glyph->n_contours;
+    ras.coords    = glyph->points;
+
+    Set_Resolution( RAS_VARS glyph->y_ppem );
+    ras.dropOutControl = glyph->dropout_mode;
   }
 
 
@@ -2324,24 +2330,12 @@ Scan_DropOuts :
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckBounds( (void*)target_map ) );
 
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
 
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-      return TT_Err_Too_Many_Points;
+    ras.target = *target_map;
 
-    if ( target_map )
-      ras.target = *target_map;
-
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.dropOutControl = glyph->dropout_mode;
+    Initialize_Raster_Instance( RAS_VARS glyph );
 
     /* Vertical Sweep */
     ras.Proc_Sweep_Init   = Vertical_Sweep_Init;
@@ -2405,24 +2399,12 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 
 EC( ECCheckMemHandle( ras.buffer ) );
+EC( ECCheckBounds( (void*)map ) );
 
-    if ( glyph->n_points == 0 || glyph->n_contours <= 0 )
-      return TT_Err_Ok;
 
-    if ( glyph->n_points < glyph->contours[glyph->n_contours - 1] )
-      return TT_Err_Too_Many_Points;
+    ras.target = *map;
 
-    if ( map )
-      ras.target = *map;
-
-    ras.outs      = glyph->contours;
-    ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
-    ras.nContours = glyph->n_contours;
-    ras.coords    = glyph->points;
-
-    Set_Resolution( RAS_VARS glyph->y_ppem );
-    ras.dropOutControl = glyph->dropout_mode;
+    Initialize_Raster_Instance( RAS_VARS glyph );
 
     /* Vertical Sweep */
   
@@ -2454,19 +2436,15 @@ EC( ECCheckMemHandle( ras.buffer ) );
 
 #endif  /* __GEOS__ */
 
-
 static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
   TT_UShort   renderpoolSize = ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
                                                       + RASTER_RENDER_POOL_MIN_SIZE;
 
-  /* discarded or not the necessary size */
-  if( MemGetInfo( ras.buffer, MGIT_FLAGS_AND_LOCK_COUNT ) & HF_DISCARDED ||
-      MemGetInfo( ras.buffer, MGIT_SIZE ) != renderpoolSize )
-    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR );
+  MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK);
 
-  ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + ( renderpoolSize / sizeof(long) );
+  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize >> 2 );
 }
 
 
@@ -2483,21 +2461,19 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 #undef ras
 
   LOCAL_FUNC
-  TT_Error  TTRaster_Done( )
+  void  TTRaster_Done( )
   {
     TRaster_Instance*  ras = (TRaster_Instance*)engineInstance.raster_component;
 
 
     if ( !ras )
-      return TT_Err_Ok;
+      return;
 
     GEO_FREE( ras->buffer);
 
 #ifndef TT_CONFIG_OPTION_STATIC_RASTER
     FREE( ras );
 #endif
-
-    return TT_Err_Ok;
   }
 
 

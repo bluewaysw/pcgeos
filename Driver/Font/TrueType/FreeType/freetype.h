@@ -258,11 +258,13 @@
     /* values are better used to compute accumulated positioning      */
     /* distances.                                                     */
 
+  #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Pos   linearHoriBearingX;  /* linearly scaled horizontal lsb     */
     TT_Pos   linearHoriAdvance;   /* linearly scaled horizontal advance */
 
     TT_Pos   linearVertBearingY;  /* linearly scaled vertical tsb     */
     TT_Pos   linearVertAdvance;   /* linearly scaled vertical advance */
+  #endif
   };
 
   typedef struct TT_Big_Glyph_Metrics_  TT_Big_Glyph_Metrics;
@@ -276,9 +278,6 @@
 
     TT_UShort   x_ppem;        /* horizontal pixels per EM square */
     TT_UShort   y_ppem;        /* vertical pixels per EM square   */
-
-    TT_Fixed    x_scale;     /* 16.16 to convert from EM units to 26.6 pix */
-    TT_Fixed    y_scale;     /* 16.16 to convert from EM units to 26.6 pix */
 
     TT_UShort   x_resolution;  /* device horizontal resolution in dpi */
     TT_UShort   y_resolution;  /* device vertical resolution in dpi   */
@@ -372,7 +371,9 @@
 #endif
 
     TT_Short   Index_To_Loc_Format;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Short   Glyph_Data_Format;
+#endif
   };
 
   typedef struct TT_Header_  TT_Header;
@@ -387,18 +388,22 @@
 
   struct  TT_Horizontal_Header_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
+#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-    TT_FWord   Line_Gap;
-
-    TT_UFWord  advance_Width_Max;      /* advance width maximum */
-
-    TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
-    TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   Line_Gap;
+#endif
+
+    TT_UFWord  advance_Width_Max;      /* advance width maximum */
+    TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
+    TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
     TT_FWord   xMax_Extent;            /* xmax extents          */
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
@@ -407,9 +412,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_HMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -431,18 +437,22 @@
 
   struct  TT_Vertical_Header_
   {
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
+#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-    TT_FWord   Line_Gap;
-
-    TT_UFWord  advance_Height_Max;      /* advance height maximum */
-
-    TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
-    TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    TT_FWord   Line_Gap;
+#endif
+
+    TT_UFWord  advance_Height_Max;      /* advance height maximum */
+    TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
+    TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
     TT_FWord   caret_Offset;
@@ -451,9 +461,10 @@
                Reserved2,
                Reserved3,
                Reserved4;
-#endif
 
     TT_Short   metric_Data_Format;
+#endif
+
     TT_UShort  number_Of_VMetrics;
 
     /* The following fields are not defined by the TrueType specification */
@@ -479,10 +490,10 @@
     TT_UShort  version;                /* 0x0001 */
     TT_FWord   xAvgCharWidth;
     TT_UShort  usWeightClass;
+
+    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  usWidthClass;
     TT_Short   fsType;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   ySubscriptXSize;
     TT_FWord   ySubscriptYSize;
     TT_FWord   ySubscriptXOffset;
@@ -523,7 +534,11 @@
     TT_ULong   ulCodePageRange1;       /* Bits 0-31   */
     TT_ULong   ulCodePageRange2;       /* Bits 32-63  */
 #endif
-  };
+
+    /* only version 2 tables: */
+    TT_Short   sxHeight;
+    TT_Short   sCapHeight;  
+  };  
 
   typedef struct TT_OS2_  TT_OS2;
 
@@ -671,7 +686,7 @@
   /* Finalize the engine, and release all allocated objects. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_FreeType( void );
+  void      TT_Done_FreeType( void );
 
 
   /* ----------------------- face management ----------------------- */
@@ -703,42 +718,12 @@
                                     TT_Face_Properties*  properties );
 
 
-  /* Close a face's file handle to save system resources.  The file */
-  /* will be re-opened automatically on the next disk access.       */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Flush_Face( TT_Face  face );
-*/
-  /* Get a face's glyph metrics expressed in font units.  Returns any    */
-  /* number of arrays.  Set the fields to NULL if you are not interested */
-  /* by a given array.                                                   */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Face_Metrics( TT_Face     face,
-                                 TT_UShort   firstGlyph,
-                                 TT_UShort   lastGlyph,
-                                 TT_Short*   leftBearings,
-                                 TT_UShort*  widths,
-                                 TT_Short*   topBearings,
-                                 TT_UShort*  heights );
-*/
-
   /* Close a given font object, destroying all associated */
   /* instances.                                           */
 
   EXPORT_DEF
   TT_Error  TT_Close_Face( TT_Face  face );
 
-
-  /* Get font or table data. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Font_Data( TT_Face   face,
-                              TT_ULong  tag,
-                              TT_Long   offset,
-                              void*     buffer,
-                              TT_Long*  length );
-*/
 
 /* A simple macro to build table tags from ASCII chars */
 
@@ -760,15 +745,6 @@
                              TT_Instance*  instance );
 
 
-  /* Set device resolution for a given instance.  The values are      */
-  /* given in dpi (Dots Per Inch).  Default is 96 in both directions. */
-
-  /*EXPORT_DEF
-  TT_Error  TT_Set_Instance_Resolutions( TT_Instance  instance,
-                                         TT_UShort    xResolution,
-                                         TT_UShort    yResolution );*/
-
-
   /* Set the pointsize for a given instance.  Default is 10pt. */
 
   EXPORT_DEF
@@ -776,32 +752,7 @@
                                                       TT_F26Dot6   charSize,
                                                       TT_UShort    xResolution,
                                                       TT_UShort    yResolution );
-  /*
-  EXPORT_DEF
-  TT_Error  TT_Set_Instance_CharSizes( TT_Instance  instance,
-                                       TT_F26Dot6   charWidth,
-                                       TT_F26Dot6   charHeight ); */
-
-/*#define TT_Set_Instance_PointSize( ins, ptsize )   \
-            TT_Set_Instance_CharSize( ins, ptsize*64L )*/
-
-
-  /* This function has been deprecated!  Do not use it, as it      */
-  /* doesn't work reliably.  You can perfectly control hinting     */
-  /* yourself when loading glyphs, then apply transforms as usual. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Set_Instance_Transform_Flags( TT_Instance  instance,
-                                             TT_Bool      rotated,
-                                             TT_Bool      stretched );
-*/
-
-  /* Return instance metrics in `metrics'. */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Instance_Metrics( TT_Instance           instance,
-                                     TT_Instance_Metrics*  metrics ); */
-
+  
 
   /* Close a given instance object, destroying all associated data. */
 
@@ -883,52 +834,6 @@
                                   TT_Glyph_Metrics*  metrics );
 
 
-  /* Copy the glyph's big metrics into `metrics'. */
-  /* Necessary to obtain vertical metrics.        */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Big_Metrics( TT_Glyph               glyph,
-                                      TT_Big_Glyph_Metrics*  metrics );
-*/
-
-  /* Render the glyph into a bitmap, with given position offsets.     */
-  /*                                                                  */
-  /* Note: Only use integer pixel offsets to preserve the fine        */
-  /*       hinting of the glyph and the `correct' anti-aliasing       */
-  /*       (where vertical and horizontal stems aren't grayed).  This */
-  /*       means that `xOffset' and `yOffset' must be multiples       */
-  /*       of 64!                                                     */
-/*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Bitmap( TT_Glyph        glyph,
-                                 TT_Raster_Map*  map,
-                                 TT_F26Dot6      xOffset,
-                                 TT_F26Dot6      yOffset );*/
-
-
-  /* Render the glyph into a region, with given position offsets.     */
-  /*                                                                  */
-  /* Note: Only use integer pixel offsets to preserve the fine        */
-  /*       hinting of the glyph and the `correct' anti-aliasing       */
-  /*       (where vertical and horizontal stems aren't grayed).  This */
-  /*       means that `xOffset' and `yOffset' must be multiples       */
-  /*       of 64!                                                     */
-  /*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Region( TT_Glyph          glyph,
-                                 TT_Raster_Map*    map,
-                                 TT_F26Dot6        xOffset,
-                                 TT_F26Dot6        yOffset ); */
-
-
-  /* Render the glyph into the passed GEOS regionpath.                */
-  /*
-  EXPORT_DEF
-  TT_Error  TT_Get_Glyph_In_Region( TT_Glyph      glyph,
-                                    MemHandle     bitmapBlock,
-                                    Handle        regionPath ); */
-
-
   /* ----------------------- outline support ------------------------ */
 
   /* Allocate a new outline.  Reserve space for `numPoints' and */
@@ -943,7 +848,7 @@
   /* Release an outline. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_Outline( TT_Outline*  outline );
+  void      TT_Done_Outline( TT_Outline*  outline );
 
 
   /* Render an outline into a bitmap. */
@@ -985,15 +890,6 @@
   void  TT_Translate_Outline( TT_Outline*  outline,
                               TT_F26Dot6   xOffset,
                               TT_F26Dot6   yOffset );
-
-
-  /* Apply a transformation to a vector. */
-
-/*
-  EXPORT_DEF
-  void  TT_Transform_Vector( TT_F26Dot6*  x,
-                             TT_F26Dot6*  y,
-                             TT_Matrix*   matrix ); */
 
 
   /* Compute A*B/C with 64 bits intermediate precision. */

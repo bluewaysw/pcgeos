@@ -1344,6 +1344,10 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
+
+backgroundCategoryString	char	"ui", C_NULL
+backgroundDisabledOnField	char	"backgroundDisabledOnField", C_NULL
+
 OLFieldOpenWin	method	dynamic OLFieldClass, MSG_VIS_OPEN_WIN
 EC<	call	VisCheckVisAssumption	; Make sure vis data exists >
 
@@ -1423,6 +1427,22 @@ OFOW_noBG:
 OFOW_gotColor:
 endif
 endif
+	; if rendering is disabled for the field
+	mov	di, ax
+	push	ds, si
+	mov	cx, cs
+	mov	ds, cx
+	mov	si, offset backgroundCategoryString
+	mov	dx, offset backgroundDisabledOnField
+	call	InitFileReadBoolean
+	pop	ds, si
+	jc	useDefault		; not found
+	cmp	ax, 0xFFFF
+	mov	ax, di
+	jne	useDefault
+	or	ah, mask WCF_PLAIN
+
+useDefault:
 	mov	bp, si			; set up chunk of this object in bp
 					; pass handle of video driver
 	mov	di, ds:[LMBH_handle]	; pass obj descriptor of this object

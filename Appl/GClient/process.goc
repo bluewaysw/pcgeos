@@ -1,0 +1,187 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Gopher Client	
+MODULE:		Process
+FILE:		process.goc
+
+AUTHOR:		Alvin Cham, Sep 14, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	9/14/94   	Initial version.
+
+DESCRIPTION:
+	Code for the process class.	
+
+	$Id: process.goc,v 1.1 97/04/04 15:10:25 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@define __GCLIENT_PROCESS_GOC
+@include "process.goh"
+@include "gClientC.goh"
+
+/*
+ ***************************************************************************
+ *		Class declarations
+ ***************************************************************************
+ */
+@classdecl	GClientProcessClass, neverSaved;
+
+
+/*
+ ***************************************************************************
+ *		Messages + procedures for GClientProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *		MSG_GCP_QUERY_MENU_ITEM_MONIKER for GClientProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    	Replace/Write new text on the item on the 
+ *			GenDynamicList object.
+ * PARAMETERS:		word	item	-- the nth item of the Dynamic list
+ *			optr	list	-- the GenDynamicList object	    
+ * SIDE EFFECTS:    	none.
+ *			
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/14/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientProcessClass, MSG_GCP_QUERY_MENU_ITEM_MONIKER
+{
+	char 	*listString;
+	GopherItem gopherItem;
+	MemHandle infoBlock;
+	ChunkHandle array;		/* the chunk array */
+	
+	/* 
+	 * First, we need to find the chunk array that stores all of the
+	 * information for every gopher menu items that we have finished 
+	 * parsing.  Then, we have to extract out the "visible name" part
+	 * of the "item"-th element in the chunk array and write that
+	 * string into the GenDynamicList object
+	 */
+	infoBlock = @call GClient::MSG_GOPHER_GET_INFO_BLOCK();
+	array = @call GClient::MSG_GOPHER_GET_MENU_ITEM_ARRAY_CHUNK();
+	MemLock(infoBlock);
+	ChunkArrayGetElementHandles(infoBlock, 
+				    array, 
+				    item, 
+				    (void *) &gopherItem);
+	listString = LMemDerefHandles(infoBlock,
+				      gopherItem.GI_userVisibleName);	
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, 
+		listString);
+	MemUnlock(infoBlock);
+}	/* End of MSG_GCP_QUERY_MENU_ITEM_MONIKER.	*/
+
+
+/***********************************************************************
+ *		MSG_GCP_QUERY_CON_PARAMETER_MONIKER for GClientProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Updates the monikers for the connection paramters display    
+ * PARAMETERS:	word	item	-- the nth item of the dynamic list    
+ * SIDE EFFECTS:optr	list	-- the GenDynamicList object    
+ *
+ * STRATEGY:	(1) replace the text of the monikers
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	9/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientProcessClass, MSG_GCP_QUERY_CON_PARAMETER_MONIKER
+{
+	char *listString;	/* temporary storage of the string */
+
+	MemLock(HandleOf(@ItemDescriptionText));
+
+	listString = LMemDerefHandles(HandleOf(@ItemDescriptionText),
+				      ChunkOf(@ItemDescriptionText)+2*item);
+
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, listString);
+	MemUnlock(HandleOf(@ItemDescriptionText));
+}	/* End of MSG_GCP_QUERY_CON_PARAMETER_MONIKER.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for GClientProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Launching an application.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1) call its superclass
+ *		(2) Initialize the gopher object.
+ *		(3) Create an extra thread
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/24/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+	ThreadHandle thread;
+
+	/* let the superclass do its things */
+	@callsuper();
+
+#if TEST_SOCKET
+	@call process::MSG_PROCESS_CREATE_EVENT_THREAD
+	    (&thread, &GopherSocketThreadClass, 1024);
+
+	@call GClient::MSG_GOPHER_SOCKET_SET_THREAD_HANDLE(thread);
+#endif
+	@call GClient::MSG_GOPHER_INITIALIZE();
+}	/* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for GClientProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	8/24/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GClientProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	@call	GClient::MSG_GOPHER_SHUT_DOWN();
+
+	/* let the superclass do its things */
+	@callsuper();
+
+	/* since we are not saving any states, we can return NULL */
+	return (NullHandle);
+}	/* End of MSG_GEN_PROCESS_CLOSE_APPLICATION.	*/
+
+
+
+
+

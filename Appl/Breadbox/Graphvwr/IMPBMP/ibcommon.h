@@ -10,19 +10,20 @@ typedef enum
   IBF_PCX,
   IBF_TIFF,
   IBF_JPEG,
-  IBF_GIF
+  IBF_GIF,
+  IBF_PNG
 } ImpBmpFormat;
 
 typedef struct
 {
-  FileHandle    IBP_source;
-  FileHandle    IBP_dest;
-  optr          IBP_status;
-  VMBlockHandle IBP_bitmap;
-  word          IBP_width;
-  word          IBP_height;
-  BMType        IBP_format;
-  char          IBP_impForm[31];
+  FileHandle              IBP_source;
+  FileHandle              IBP_dest;
+  optr                    IBP_status;
+  VMBlockHandle           IBP_bitmap;
+  word                    IBP_width;
+  word                    IBP_height;
+  BMType                  IBP_format;
+  char                    IBP_impForm[31];
 } ImpBmpParams;
 
 typedef enum

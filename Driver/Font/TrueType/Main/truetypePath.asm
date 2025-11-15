@@ -57,53 +57,53 @@ TrueTypeGenPath	proc	far
 	.enter
 
 	xchg	di, ax				;ax <- handle of GState
-	mov		di, 400
+	mov	di, 400
 	call	ThreadBorrowStackSpace
 	push	di
 
 	push 	ax					;pass GState handle
-	mov		ch, 0
+	mov	ch, 0
 	push 	cx					;pass FontGenPathFlags
 	push	dx					;pass characters code
 
 	mov 	bx, ax
 	call 	MemLock				;lock GState block
-	mov		es, ax				;es <- seg addr of gstate		
-	mov		cx, es:GS_fontAttr.FCA_fontID
-	clr		ah		                   
-	mov		al, es:GS_fontAttr.FCA_textStyle
+	mov	es, ax				;es <- seg addr of gstate		
+	mov	cx, es:GS_fontAttr.FCA_fontID
+	clr	ah		                   
+	mov	al, es:GS_fontAttr.FCA_textStyle
 
 	call	FontDrFindFontInfo
 	push	ds					;pass ptr to FontInfo
 	push	di
 
-	mov		cx, ds				;save ptr to FontInfo
-	mov		dx, di
+	mov	cx, ds				;save ptr to FontInfo
+	mov	dx, di
 
-	mov		si, bx				;si <- handle of GState
-	mov		bx, ODF_HEADER
+	mov	si, bx				;si <- handle of GState
+	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
 	push	di
 
-	mov		ds, cx
-	mov		di, dx
+	mov	ds, cx
+	mov	di, dx
 
-	clr		ah
-	mov		al, es:GS_fontAttr.FCA_textStyle
-	mov		bx, ODF_PART1
+	clr	ah
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_PART1
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to FontHeader
 	push	di
 	push	ax					;pass stylesToImplement
-	mov		bx, si				;bx <- handle of GState
+	mov	bx, si				;bx <- handle of GState
 	call	MemUnlock			;unlock GState block
 
 	segmov	ds, dgroup, ax
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_PATH
 
-	pop		di
+	pop	di
 	call	ThreadReturnStackSpace
 
 	.leave
@@ -150,8 +150,8 @@ TrueTypeGenInRegion	proc	far
 	uses	ax, bx, cx, dx, si, ds, es
 	.enter
 
-	mov		si,	di				;si <- GState handle
-	mov		di, FONT_C_CODE_STACK_SPACE
+	mov	si,	di				;si <- GState handle
+	mov	di, FONT_C_CODE_STACK_SPACE
 	call	ThreadBorrowStackSpace
 	push	di
 
@@ -160,22 +160,22 @@ TrueTypeGenInRegion	proc	far
 	push	cx					;pass regionpath handle
 	push	dx					;pass character code	
 
-	mov		bx, si				;bx <- GState handle
+	mov	bx, si				;bx <- GState handle
 	call 	MemLock				;lock GState block
-	mov		es, ax				;es <- seg addr of GState		
+	mov	es, ax				;es <- seg addr of GState		
 
-	clr		al
+	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx					;pass point size
 	push 	ax	
 
-	clr		ah
-	mov		al, es:GS_fontAttr.FCA_width
+	clr	ah
+	mov	al, es:GS_fontAttr.FCA_width
 	push	ax					;pass width
-	mov		al, es:GS_fontAttr.FCA_weight
+	mov	al, es:GS_fontAttr.FCA_weight
 	push	ax					;pass weight
 
-	mov		cx, es:GS_fontAttr.FCA_fontID
+	mov	cx, es:GS_fontAttr.FCA_fontID
 	call	FontDrFindFontInfo
 	push	ds					;pass ptr to FontInfo
 	push	di
@@ -183,9 +183,9 @@ TrueTypeGenInRegion	proc	far
 	mov	cx, ds					;save ptr to FontInfo
 	mov	dx, di	
 
-	clr		ah		                   
-	mov		al, es:GS_fontAttr.FCA_textStyle
-	mov		bx, ODF_HEADER
+	clr	ah		                   
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to OutlineEntry
 	push	di
@@ -193,9 +193,9 @@ TrueTypeGenInRegion	proc	far
 	mov	ds, cx					;get saved ptr to FontInfo
 	mov	di, dx
 
-	clr		ah
-	mov		al, es:GS_fontAttr.FCA_textStyle
-	mov		bx, ODF_PART1
+	clr	ah
+	mov	al, es:GS_fontAttr.FCA_textStyle
+	mov	bx, ODF_PART1
 	call	FontDrFindOutlineData
 	push	ds					;pass ptr to FontHeader
 	push	di
@@ -205,10 +205,10 @@ TrueTypeGenInRegion	proc	far
 	push	ds:variableHandle	;pass handle to truetype block
 	call	TRUETYPE_GEN_IN_REGION
 
-	mov		bx, si				;bx <- handle of GState
+	mov	bx, si				;bx <- handle of GState
 	call	MemUnlock			;unlock GState block
 
-	pop		di
+	pop	di
 	call	ThreadReturnStackSpace
 
 	.leave
@@ -228,7 +228,7 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	JK		3/14/24		Initial version
+	JK	3/14/24		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
@@ -237,10 +237,10 @@ GRREGIONPATHMOVEPEN		proc	far
 
 	push	es
 	call	MemLock
-	mov		es, ax
+	mov	es, ax
 	call	GrRegionPathMovePen
 	call	MemUnlock
-	pop		es
+	pop	es
 	ret
 
 GRREGIONPATHMOVEPEN		endp
@@ -258,7 +258,7 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	JK		3/14/24		Initial version
+	JK	3/14/24		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
@@ -267,10 +267,10 @@ GRREGIONPATHDRAWLINETO	proc	far
 
 	push	es
 	call	MemLock
-	mov		es, ax
+	mov	es, ax
 	call	GrRegionPathAddLineAtCP
 	call	MemUnlock
-	pop		es
+	pop	es
 	ret
 
 GRREGIONPATHDRAWLINETO	endp
@@ -288,7 +288,7 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	JK		3/19/24		Initial version
+	JK	3/19/24		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
@@ -297,19 +297,25 @@ GRREGIONPATHDRAWCURVETO	proc	far
 		
 	push	ds
 	push	bp
-	mov		ds, cx
+	push	es
+	push	si
+	push	di
+	mov	ds, cx
 	xchg	di, ax						;ds:di addr of points
 	
 	call	MemLock						;get seg of region
-	mov		es, ax
-	clr		bp
-	mov		cx, REC_BEZIER_STACK
+	mov	es, ax
+	clr	bp
+	mov	cx, REC_BEZIER_STACK
 	call	GrRegionPathAddBezierAtCP
 	call	MemUnlock
 
 	xchg	di, ax
-	pop		bp
-	pop		ds
+	pop	di
+	pop	si
+	pop	es
+	pop	bp
+	pop	ds
 
 	ret
 

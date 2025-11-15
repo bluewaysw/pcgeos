@@ -1,0 +1,671 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	  Fake Gopher Server
+ * MODULE:	  Fake Gopher Server
+ * FILE:	  gserver.goc
+ *
+ * AUTHOR:	  Alvin Cham, Dec. 5, 1994
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	12/5/94   acham	    Initial version
+ *
+ * DESCRIPTION:
+ *	This file implements a fake gopher server application for GEOS.
+ *	Its primary purpose is to use for testing the gopher client via
+ *	socket support.
+ *
+ *	$Id: gserver.goc,v 1.1 97/04/04 15:11:28 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#ifndef TEST_IRLAP
+#define TEST_IRLAP 0
+#endif
+
+#ifndef TEST_TCPIP
+#define TEST_TCPIP 0
+#endif
+
+#if  ! ( TEST_IRLAP || TEST_TCPIP )
+#define TEST_LOOPBACK 1
+#endif
+
+#ifndef TEST_LOOPBACK
+#define TEST_LOOPBACK 0
+#endif
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+#include <gopherSocket.h>
+#include <gopher.h>
+@include <stdapp.goh>
+@include <socket.goh>
+@include <ec.h>
+@include <gopherC.goh>
+
+/*
+ ***************************************************************************
+ *		Global variables
+ ***************************************************************************
+ */
+
+typedef struct {
+	SocketAddress	sa;
+	byte		ua[MAX_ADDRESS_SIZE];
+} TestAddress;
+
+TestAddress	theAddress = {
+    {
+	{3,MANUFACTURER_ID_SOCKET_16BIT_PORT},
+#if TEST_TCPIP
+	(sizeof TCP_DOMAIN - 1),
+	TCP_DOMAIN,
+	4
+#elif TEST_IRLAP
+	(sizeof IRLAP_DOMAIN - 1),
+	IRLAP_DOMAIN,
+        5
+#elif TEST_LOOPBACK
+	(sizeof LOOPBACK_DOMAIN - 1),
+	LOOPBACK_DOMAIN,
+        5
+#endif
+    },
+
+#if TEST_TCPIP
+    {198,211,209,150,0}
+#elif TEST_IRLAP
+    {'l','e','f','t',0}
+#elif TEST_LOOPBACK
+    {'n','o','n','e',0}
+#endif
+};
+
+StandardPath	selfDisk = SP_APPLICATION;
+char	selfPath[] = "EC C GClient";
+
+ThreadHandle thread;
+Socket listenSocket = 0;
+Socket dataSocket = 0;
+char	buffer[BUFFER_SIZE];
+
+/*
+ ***************************************************************************
+ *		Function prototypes
+ ***************************************************************************
+ */
+void	GserverSendFile(FileHandle, dword);
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	GserverThreadClass, ProcessClass;
+
+@message	void	MSG_GSERVER_THREAD_RECV();
+
+@endc	/* end of class definition */
+
+@classdecl	GserverThreadClass;
+
+@class	GserverProcessClass, GenProcessClass;
+
+/* Define messages for this class here. Most commonly, UI objects will
+ * send these messages to the application thread when they've been activated
+ * by the user. */
+@message	void	MSG_GSERVER_SEND();
+@message	void	MSG_GSERVER_SEND2();
+@message	void	MSG_GSERVER_SEND3();
+@message	void	MSG_GSERVER_SEND4();
+@message	void	MSG_GSERVER_SEND5();
+@message	void	MSG_GSERVER_CLOSE();
+@message	void	MSG_GSERVER_CONNECT();
+@message	void	MSG_GSERVER_LOAD();
+
+@endc   /* end of class definition */
+
+@classdecl	GserverProcessClass, neverSaved;
+
+@class	GserverTextClass, GenTextClass;
+
+@endc
+
+@classdecl	GserverTextClass;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*	Application Object	*/
+
+@start	AppResource;
+
+@object GenApplicationClass GserverApp = {
+
+    GI_visMoniker = "Gopher Server";
+
+    GI_comp = @GserverPrimary;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @GserverPrimary;
+}
+
+@end	AppResource;
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+@object GenPrimaryClass GserverPrimary  = {
+    GI_comp = @OutText, @ActionBar; 
+}
+
+@object GenInteractionClass ActionBar = {
+    GI_comp = @ConnectTrigger, @SendTrigger, @Send2Trigger,
+	      @Send3Trigger, @Send4Trigger, @Send5Trigger, @CloseTrigger, 
+	      @LoadTrigger;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass ConnectTrigger = {
+    GI_visMoniker = "Connect";
+    GTI_actionMsg = MSG_GSERVER_CONNECT;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass SendTrigger = {
+    GI_visMoniker = "Menu1";
+    GTI_actionMsg = MSG_GSERVER_SEND;
+    GTI_destination = process;
+
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass Send2Trigger = {
+    GI_visMoniker = "Menu2";
+    GTI_actionMsg = MSG_GSERVER_SEND2;
+    GTI_destination = process;
+
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass Send3Trigger = {
+    GI_visMoniker = "Menu3";
+    GTI_actionMsg = MSG_GSERVER_SEND3;
+    GTI_destination = process;
+
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass Send4Trigger = {
+    GI_visMoniker = "Menu4";
+    GTI_actionMsg = MSG_GSERVER_SEND4;
+    GTI_destination = process;
+
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass Send5Trigger = {
+    GI_visMoniker = "Gopher+";
+    GTI_actionMsg = MSG_GSERVER_SEND5;
+    GTI_destination = process;
+
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass CloseTrigger = {
+    GI_visMoniker = "Close";
+    GTI_actionMsg = MSG_GSERVER_CLOSE;
+    GTI_destination = process;
+
+    GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass LoadTrigger = {
+    GI_visMoniker = "Load";
+    GTI_actionMsg = MSG_GSERVER_LOAD;
+    GTI_destination = process;
+}
+
+
+@object GserverTextClass OutText = {
+	GI_visMoniker = "Output";
+	GTXI_text = "";
+	GI_attrs = @default | GA_READ_ONLY;
+
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}	
+
+@end Interface;
+
+/*
+ ***************************************************************************
+ *		Procedure
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *		GserverSendFile
+ ***********************************************************************
+ * SYNOPSIS:	Send a content from a file to the gopher client.
+ * CALLED BY:	UTILITY
+ * RETURN:	none
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+void
+GserverSendFile (FileHandle file, dword fileSize)
+{
+	MemHandle tmpBlock;
+	word offset, bytesSent;
+	SocketError error;
+	byte *fileBuffer;
+
+	if ((tmpBlock = GopherCopyFileToBlock(file, fileSize)) == NullHandle) {
+	    FatalError(0);
+	}
+	fileBuffer = MemDeref(tmpBlock);
+
+	for (offset = 0; 
+	     fileSize>0; 
+	     fileSize -= bytesSent, offset += bytesSent) {
+
+	    if (fileSize > BUFFER_SIZE) 
+		bytesSent = BUFFER_SIZE;
+	    else bytesSent = fileSize;
+
+	    if ((error = SocketSend(dataSocket, 
+				    &fileBuffer[offset], 
+				    bytesSent,
+				    0,
+				    (SocketAddress *) 0)) != 0) {
+		FatalError(0);
+	    }
+	}
+
+	MemFree(tmpBlock);
+}	/* End of GserverSendFile.	*/
+
+/*
+ ***************************************************************************
+ *		Methods for GserverProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Launching the application.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  Need to create a receive thread.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 5/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+	/* let its superclass do its things, first */
+	@callsuper();
+	
+	@call process::MSG_PROCESS_CREATE_EVENT_THREAD
+		(&thread, &GserverThreadClass, 2048);
+
+}	/* End of MSG_GEN_PROCESS_OPEN_APPLICATION.	*/
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Shut down the extra thread.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 5/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	@send thread, NullChunk::MSG_META_DETACH(0, NullOptr);
+
+	return (NullHandle);		
+}	/* End of MSG_GEN_PROCESS_CLOSE_APPLICATION.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_CONNECT for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 8/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_CONNECT
+{
+	SocketError error;
+
+	dataSocket = SocketCreate(SDT_STREAM);
+
+	if ((error = SocketConnect(dataSocket, 
+				   (SocketAddress *) &theAddress, 
+				   SOCKET_NO_TIMEOUT)) != 0) {	
+	FatalError(0);
+	}
+
+	/* start the receive loop */
+	@send, forceQueue thread, NullChunk::MSG_GSERVER_THREAD_RECV();
+
+	@call GeodeGetOptrNS(@ConnectTrigger)
+		::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call GeodeGetOptrNS(@SendTrigger)
+		::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call GeodeGetOptrNS(@Send2Trigger)
+		::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call GeodeGetOptrNS(@Send3Trigger)
+		::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call GeodeGetOptrNS(@Send4Trigger)
+		::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call GeodeGetOptrNS(@Send5Trigger)
+		::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call GeodeGetOptrNS(@CloseTrigger)
+		::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}	/* End of MSG_GSERVER_CONNECT.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_LOAD for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 8/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_LOAD
+{
+	SocketAddLoadOnMsg(theAddress.sa.SA_port, 
+			   SLT_USER_LOAD_APPLICATION, 
+			   selfDisk, 
+			   selfPath);
+
+}	/* End of MSG_GSERVER_LOAD.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_SEND for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Sending a file over to the client.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 8/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_SEND
+{
+	FileHandle file;
+	dword	fileSize;
+
+	file = GopherCacheFileSetUp("menu1.gfr", 
+				    &fileSize, 
+				    (FILE_ACCESS_R | FILE_DENY_W));
+
+	GserverSendFile(file, fileSize);
+}	/* End of MSG_GSERVER_SEND.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_SEND2 for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Sending a file over to the client.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_SEND2
+{
+	FileHandle file;
+	dword	fileSize;	
+
+	file = GopherCacheFileSetUp("menu2.gfr", 
+				    &fileSize, 
+				    (FILE_ACCESS_R | FILE_DENY_W));
+
+	GserverSendFile(file, fileSize);
+}	/* End of MSG_GSERVER_SEND2.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_SEND3 for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Sending a file over to the client.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_SEND3
+{
+	FileHandle file;
+	dword	fileSize;
+
+	file = GopherCacheFileSetUp("menu3.gfr", 
+				    &fileSize, 
+				    (FILE_ACCESS_R | FILE_DENY_W));
+
+	GserverSendFile(file, fileSize);
+}	/* End of MSG_GSERVER_SEND3.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_SEND4 for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Sending a file over to the client.
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/21/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_SEND4
+{
+	FileHandle file;
+	dword fileSize;
+
+	file = GopherCacheFileSetUp("menu4.gfr", 
+				    &fileSize, 
+				    (FILE_ACCESS_R | FILE_DENY_W));
+
+	GserverSendFile(file, fileSize);
+}	/* End of MSG_GSERVER_SEND4.	*/
+
+
+/***********************************************************************
+ *		MSG_GSERVER_SEND5 for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	Send a file over to the client    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	(1)  It sends a sample gopher+ attribute screen.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/23/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_SEND5
+{
+	FileHandle file;
+	dword fileSize;
+
+	file = GopherCacheFileSetUp(GOPHER_TMP_TEXT_FILENAME, 
+				    &fileSize, 
+				    (FILE_ACCESS_R | FILE_DENY_W));
+
+	GserverSendFile(file, fileSize);
+}	/* End of MSG_GSERVER_SEND5.	*/
+
+
+
+/***********************************************************************
+ *		MSG_GSERVER_CLOSE for GserverProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 8/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverProcessClass, MSG_GSERVER_CLOSE
+{
+	/* close the socket */
+	if (listenSocket) {
+	    SocketClose(listenSocket);
+	}
+	SocketCloseSend(dataSocket);
+
+    	@send, forceQueue GeodeGetOptrNS(@ConnectTrigger)::
+		MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send, forceQueue GeodeGetOptrNS(@SendTrigger)::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send, forceQueue GeodeGetOptrNS(@Send2Trigger)::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send, forceQueue GeodeGetOptrNS(@Send3Trigger)::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send, forceQueue GeodeGetOptrNS(@Send4Trigger)::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send, forceQueue GeodeGetOptrNS(@Send5Trigger)::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    	@send, forceQueue GeodeGetOptrNS(@CloseTrigger)::
+		MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+}	/* End of MSG_GSERVER_CLOSE.	*/
+
+/*
+ ***************************************************************************
+ *		Methods for GserverThreadClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GSERVER_THREAD_RECV for GserverThreadClass
+ ***********************************************************************
+ * SYNOPSIS:	Receive on the input socket.    
+ * PARAMETERS:	none    
+ * SIDE EFFECTS:none    
+ *
+ * STRATEGY:	none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AC	12/ 5/94   	Initial Revision
+ *
+ ***********************************************************************/
+@method GserverThreadClass, MSG_GSERVER_THREAD_RECV
+{
+	word 	textLen;
+
+	/* receive the data */
+
+	while ((textLen = SocketRecv(dataSocket, 
+				     (byte *) buffer, 
+				     BUFFER_SIZE, 
+				     SOCKET_NO_TIMEOUT, 
+				     0,
+				     (SocketAddress *) 0)) != 0) {
+	    /* send it to output */
+	    @call GeodeGetOptrNS(@OutText)
+		::MSG_VIS_TEXT_APPEND_PTR(buffer, textLen);
+	}
+
+	/* close the socket */
+	if (listenSocket) {
+	    SocketClose(listenSocket);
+	}
+	SocketClose(dataSocket);
+
+}	/* End of MSG_GSERVER_THREAD_RECV.	*/
+
+
+
+
+
+
+
+
+

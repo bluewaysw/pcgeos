@@ -43,11 +43,14 @@ library parentc
 # Define resources other than standard discardable code
 #
 nosort
-resource PrefPntCtrlCode	read-only code shared
-resource AppMonikerResource	shared lmem read-only
-resource MonikerResource	shared lmem read-only
-resource ParentalControlUI ui-object
-resource Strings		shared lmem read-only
+resource PrefPntCtrlCode	     read-only code shared
+resource AppLHCMonikerResource   shared lmem read-only
+resource AppLCMonikerResource    shared lmem read-only
+resource AppLMMonikerResource    shared lmem read-only
+resource AppLCGAMonikerResource  shared lmem read-only
+resource MonikerResource	     shared lmem read-only
+resource ParentalControlUI       ui-object
+resource Strings		         shared lmem read-only
 
 #
 # Exported routines.  These MUST be exported first, and they must be

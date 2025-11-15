@@ -774,9 +774,9 @@ Code Display 18-1 VMInfoStruct
  * passed to the routine VMInfo(). The routine fills in the structure's fields.
  */
 typedef struct {
-	MemHandle		mh;	/* Null handle returned if no block is attached */
-	word		size;	/* Size of VM block in bytes */
-	word		userID;	/* User ID (or zero if no user ID was specified) 
+    MemHandle       mh; /* Null handle returned if no block is attached */
+    word        size;   /* Size of VM block in bytes */
+    word        userID; /* User ID (or zero if no user ID was specified) 
 */
 } VMInfoStruct;
 ~~~

@@ -213,9 +213,9 @@ MANUFACTURER_ID_GEOWORKS.
 Code Display 9-1 Adding a Process Object to a GCN List
 ~~~
 @method MyProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
-    optr			myThread;
+    optr                        myThread;
 
-    @callsuper;			/* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */
+    @callsuper;                 /* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */
 
 /* Casts the return value for the process handle into an optr */
 
@@ -384,10 +384,10 @@ handler.
 Code Display 9-2 Removing a Process from a GCN list
 ~~~
 @method MyProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
-	optr 		myThread;
-	myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);
-	GCNListRemove(myThread, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_CHANGE);
-	@callsuper;
+        optr            myThread;
+        myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);
+        GCNListRemove(myThread, MANUFACTURER_ID_GEOWORKS, GCNSLT_FILE_CHANGE);
+        @callsuper;
 }
 ~~~
 
@@ -509,15 +509,15 @@ Code Display 9-4 Adding Yourself to a Custom GCN List
 ~~~
 @method MyProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION {
 
-    @callsuper;			/* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */
+    @callsuper;                 /* Do default MSG_GEN_PROCESS_OPEN_APPLICATION */
 
     myThread = ConstructOptr(GeodeGetProcessHandle(), NullChunk);
 
 /* myThread (the process) is added to notification of TYPE_ONE changes */
 
     @call MyApplication::MSG_META_GCN_LIST_ADD(myThread,
-	yourCompanyName_GAGCNLT_CUSTOM_LIST_TYPE_ONE,
-	MANUFACTURER_ID_yourCompanyName);
+        yourCompanyName_GAGCNLT_CUSTOM_LIST_TYPE_ONE,
+        MANUFACTURER_ID_yourCompanyName);
 }
 ~~~
 
@@ -554,21 +554,21 @@ Code Display 9-5 Using MSG_META_NOTIFY
  * particular, use NullClass.*/
 
     event = @record (optr) NullClass::MSG_META_NOTIFY(
-	MANUFACTURER_ID_yourCompanyName,
-	yourCompanyName_NT_CUSTOM_TYPE_ONE);
+        MANUFACTURER_ID_yourCompanyName,
+        yourCompanyName_NT_CUSTOM_TYPE_ONE);
 
 /* Then send this MSG_META_NOTIFY using MSG_META_GCN_LIST_SEND. You must make sure
  * to pass the particular GCN list interested in the changes encapsulated in the
  * above message. */
 
     @send MyProcess::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST (
-	(word) 0, 			/* GCNListSendFlags */
-	event,			/* Handle to MSG_NOTIFY event above. */
-	0,			/* No data passed, so no data block. */
-	/* Pass the list interested in NT_CUSTOM_TYPE_ONE notification types. */
-	yourCompanyName_GAGCNLT_APP_CUSTOM_LIST_ONE,
-	/* Pass your manufacturer ID. */
-	MANUFACTURER_ID_yourCompanyName);
+        (word) 0,                       /* GCNListSendFlags */
+        event,                  /* Handle to MSG_NOTIFY event above. */
+        0,                      /* No data passed, so no data block. */
+        /* Pass the list interested in NT_CUSTOM_TYPE_ONE notification types. */
+        yourCompanyName_GAGCNLT_APP_CUSTOM_LIST_ONE,
+        /* Pass your manufacturer ID. */
+        MANUFACTURER_ID_yourCompanyName);
 }
 ~~~
 
@@ -587,8 +587,8 @@ Code Display 9-6 MSG_META_NOTIFY_WITH_DATA_BLOCK
 @method MyProcessClass, MSG_SEND_CUSTOM_NOTIFICATION {
 
     typedef struct {
-	int number;
-	char letterToLookFor;
+        int number;
+        char letterToLookFor;
     } MyDataStructure;
 
     MemHandle myDataBlock;
@@ -599,7 +599,7 @@ Code Display 9-6 MSG_META_NOTIFY_WITH_DATA_BLOCK
  * along with the notification. NOTE: data blocks must be sharable! */
 
     myDataBlock = MemAlloc(sizeof(MyDataStructure), (HF_DYNAMIC | HF_SHARABLE),
-			 HAF_STANDARD);
+                         HAF_STANDARD);
 
     myDataPtr = MemLock(myDataBlock);
 
@@ -616,20 +616,20 @@ Code Display 9-6 MSG_META_NOTIFY_WITH_DATA_BLOCK
  * recorded for no particular class, use NullClass as its class type. */
 
     event = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
-			MANUFACTURER_ID_yourCompanyName,				/* Manufacturer ID */
-			NT_CUSTOM_TYPE_ONE,				/* List type. */
-			myDataBlock);				/* handle of data block */
+                        MANUFACTURER_ID_yourCompanyName,                                /* Manufacturer ID */
+                        NT_CUSTOM_TYPE_ONE,                             /* List type. */
+                        myDataBlock);                           /* handle of data block */
 
 /* Finally, send the message off to our process. The GCNListSendFlags depend on
  * the situation. */
 
     @send MyProcess::MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST(
-			(word) 0,			/* GCNListSendFlags */
-			event,			/* Handle to message */
-			myDataBlock,			/* Handle of data block */
-	/* Pass the type of list interested in NT_CUSTOM_TYPE_ONE notification. */
-			GAGCNLT_APP_CUSTOM_LIST_ONE,
-			MANUFACTURER_ID_yourCompanyName);
+                        (word) 0,                       /* GCNListSendFlags */
+                        event,                  /* Handle to message */
+                        myDataBlock,                    /* Handle of data block */
+        /* Pass the type of list interested in NT_CUSTOM_TYPE_ONE notification. */
+                        GAGCNLT_APP_CUSTOM_LIST_ONE,
+                        MANUFACTURER_ID_yourCompanyName);
 
 /* All done! myDataBlock will be MemFree()'d automatically. */
 }
@@ -652,7 +652,7 @@ Code Display 9-7 Intercepting an Application Notification Change
 
 @method MyObjectClass, MSG_META_NOTIFY {
 
-    MyDataStructure myData;				/* Stores the passed data block. */
+    MyDataStructure myData;                             /* Stores the passed data block. */
 
 /* Lock the data structure. */
 
@@ -662,13 +662,13 @@ Code Display 9-7 Intercepting an Application Notification Change
  * response to the previous event. */
 
     if ((notificationType == yourCompanyName_NT_CUSTOM_TYPE_ONE) & 
-	(manufID == MANUFACTURER_ID_yourCompanyName)){
-	/* Code to implement for your object. */
+        (manufID == MANUFACTURER_ID_yourCompanyName)){
+        /* Code to implement for your object. */
     }
 
     MemUnlock(data);
 
-    @callsuper;				/* Important! Frees data block. */
+    @callsuper;                         /* Important! Frees data block. */
 }
 ~~~
 
@@ -694,11 +694,11 @@ Code Display 9-8 Removing from an Application GCN List
 @method MyProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION {
 
     @send MyApplication::MSG_META_GCN_LIST_REMOVE(
-			MyObject,			/* optr to remove from list. */
-			yourCompanyName_NT_CUSTOM_LIST_ONE,
-					/* list to remove object from. */
-		/* Manufacturer ID of list to remove object from. */
-			MANUFACTURER_ID_yourCompanyName);
+                        MyObject,                       /* optr to remove from list. */
+                        yourCompanyName_NT_CUSTOM_LIST_ONE,
+                                        /* list to remove object from. */
+                /* Manufacturer ID of list to remove object from. */
+                        MANUFACTURER_ID_yourCompanyName);
 
     @callsuper;
 }

@@ -10,11 +10,12 @@ tokenid 16431
 library geos
 library ansic
 ifdef PRODUCT_FJPEG
-#library fjpeg
-#library ijgjpeg
+library fjpeg
+library ijgjpeg
 else
 library ijgjpeg
 endif
+library pnglib
 
 export MIMEDRVGRAPHIC
 export MIMEDRVINFO

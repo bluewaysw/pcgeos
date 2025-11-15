@@ -192,7 +192,7 @@
 
   static TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
   {
-    return TT_MulDiv( x, metrics->x_scale1, metrics->x_scale2 );
+    return TT_MulDiv( x, metrics->x_scale1, metrics->units_per_em );
   }
 
 
@@ -213,7 +213,7 @@
   static 
   TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
   {
-    return TT_MulDiv( y, metrics->y_scale1, metrics->y_scale2 );
+    return TT_MulDiv( y, metrics->y_scale1, metrics->units_per_em );
   }
 
 
@@ -314,41 +314,34 @@
       }
     }
 
-    /* read the X */
-
-    x    = 0;
+    x    = y = 0;
     vec  = exec->pts.org;
+
+    
+    /* read the X */
 
     for ( j = 0; j < n_points; ++j )
     {
-      if ( flag[j] & 2 )
-      {
-        if ( flag[j] & 16 )
-          x += GET_Byte();
-        else
-          x -= GET_Byte();
-      }
-      else if ( (flag[j] & 16) == 0 )
-          x += GET_Short();
+      Byte f = flag[j];
+
+      if ( f & 2 )
+        x += ( (f & 16) ? GET_Byte() : -GET_Byte() );
+      else if ( (f & 16) == 0 )
+        x += GET_Short();
 
       vec[j].x = x;
     }
 
 
-   /* read the Y */
-
-    y    = 0;
+    /* read the Y */
 
     for ( j = 0; j < n_points; ++j )
     {
-      if ( flag[j] & 4 )
-      {
-        if ( flag[j] & 32 )
-          y += GET_Byte();
-        else
-          y -= GET_Byte();
-      }
-      else if ( (flag[j] & 32) == 0 )
+      Byte f = flag[j];
+
+      if ( f & 4 )
+          y += ( (f & 32) ? GET_Byte() : -GET_Byte() );
+      else if ( (f & 32) == 0 )
           y += GET_Short();
 
       vec[j].y = y;
@@ -1188,8 +1181,10 @@
         advance      = Scale_X( &exec->metrics, advance      );
       }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       glyph->metrics.linearHoriBearingX = left_bearing;
       glyph->metrics.linearHoriAdvance  = advance;
+#endif
     }
 
     glyph->metrics.horiBearingX = glyph->metrics.bbox.xMin;
@@ -1263,8 +1258,10 @@
         advance = advance_height;
       }
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       glyph->metrics.linearVertBearingY = Top;
       glyph->metrics.linearVertAdvance  = advance;
+#endif
 
       /* XXX : for now, we have no better algo for the lsb, but it should */
       /*       work ok..                                                  */

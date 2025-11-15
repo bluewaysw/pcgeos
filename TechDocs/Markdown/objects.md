@@ -1,3 +1,6 @@
+---
+nav_order: 5
+---
 ### Objects
 **[1 System Classes](Objects/osyscla.md)**  
 [1.1 MetaClass](Objects/osyscla.md#11-metaclass)  
@@ -53,11 +56,11 @@
 [3.1.6 Application Features and Levels](Objects/ogenapp.md#316-application-features-and-levels)  
 [3.1.7 IACP](Objects/ogenapp.md#317-iacp)  
 [3.2 Advanced GenApplication Usage](Objects/ogenapp.md#32-advanced-genapplication-usage)  
-[3.2.1	An Application's Life Cycle](Objects/ogenapp.md#321-an-application's-life-cycle)  
-[3.2.2	Application Busy States](Objects/ogenapp.md#322-application-busy-states)  
-[3.2.3	The GenApplication's Moniker](Objects/ogenapp.md#323-the-genapplication's-moniker)  
-[3.2.4	Measurement Type](Objects/ogenapp.md#324-measurement-type)  
-[3.2.5	Interaction with the UI](Objects/ogenapp.md#325-interaction-with-the-ui)
+[3.2.1  An Application's Life Cycle](Objects/ogenapp.md#321-an-application's-life-cycle)  
+[3.2.2  Application Busy States](Objects/ogenapp.md#322-application-busy-states)  
+[3.2.3  The GenApplication's Moniker](Objects/ogenapp.md#323-the-genapplication's-moniker)  
+[3.2.4  Measurement Type](Objects/ogenapp.md#324-measurement-type)  
+[3.2.5  Interaction with the UI](Objects/ogenapp.md#325-interaction-with-the-ui)
 
 **[4 GenDisplay / GenPrimary](Objects/ogendis.md)**  
 [4.1 A First Look at GenDisplay](Objects/ogendis.md#41-a-first-look-at-gendisplay)  
@@ -284,7 +287,7 @@
 [14.3.7 Matching File Attributes](Objects/ogenfil.md#1437-matching-file-attributes)  
 [14.3.8 Searching Via Callback Routine](Objects/ogenfil.md#1438-searching-via-callback-routine)  
 [14.3.9 Resetting a Filter](Objects/ogenfil.md#1439-resetting-a-filter)  
-[14.4	File Selector Use](Objects/ogenfil.md#144-file-selector-use)  
+[14.4   File Selector Use](Objects/ogenfil.md#144-file-selector-use)  
 [14.4.1 When a User Selects a File](Objects/ogenfil.md#1441-when-a-user-selects-a-file)  
 [14.4.2 The Current Selection](Objects/ogenfil.md#1442-the-current-selection)  
 [14.4.3 Rescanning Directories](Objects/ogenfil.md#1443-rescanning-directories)  
@@ -327,7 +330,7 @@
 [16.3.1 How Translation Libraries Work](Objects/oimpex.md#1631-how-translation-libraries-work)  
 [16.3.2 Intermediate Formats](Objects/oimpex.md#1632-intermediate-formats)  
 
-**[17	The Spool Library](Objects/oprint.md#17-the-spool-library)**  
+**[17   The Spool Library](Objects/oprint.md#17-the-spool-library)**  
 [17.1 Introduction to Printing](Objects/oprint.md#171-introduction-to-printing)  
 [17.2 Simple Printing Example](Objects/oprint.md#172-simple-printing-example)  
 [17.3 How Jobs Get Printed](Objects/oprint.md#173-how-jobs-get-printed)  
@@ -416,7 +419,7 @@
 [19.4.5 Other Mouse Constraints](Objects/oruler.md#1945-other-mouse-constraints)  
 [19.4.6 Esoteric Messages](Objects/oruler.md#1946-esoteric-messages)
 
-**[20	Spreadsheet Objects](Objects/ossheet.md#20-spreadsheet-objects)**  
+**[20   Spreadsheet Objects](Objects/ossheet.md#20-spreadsheet-objects)**  
 [20.1 Spreadsheet Overview](Objects/ossheet.md#201-spreadsheet-overview)  
 [20.1.1 Quick Look at the Objects](Objects/ossheet.md#2011-quick-look-at-the-objects)  
 [20.1.2 Managing Cell Files](Objects/ossheet.md#2012-managing-cell-files)  

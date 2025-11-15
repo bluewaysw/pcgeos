@@ -1,6 +1,10 @@
-
+// if we put the following line after the @ifdef PRODUCT_FJPEG
+// mkmf / pmake depend will fail...
 @include <stdapp.goh>
+
+@ifdef PRODUCT_FJPEG
 #include <Ansi/stdio.h>
+#include <../../Fjpeg/fjpeg.h>
 #include <gstring.h>
 #include <Ansi/string.h>
 #include <Ansi/stdlib.h>
@@ -9,9 +13,6 @@
 @include <htmldrv.h>
 
 #include "IMPBMP/ibcommon.h"
-
-@ifdef PRODUCT_FJPEG
-#include <../../fjpeg/fjpeg.h>
 
 static void ConvertLine(byte *dest, byte *src, word size)
 {
@@ -206,9 +207,9 @@ FJpegImport(TCHAR *file,
            XYSize *picsize,
            MimeRes resolution,
            AllocWatcherHandle watcher,
-           dword *usedMem, 
+           dword *usedMem,
 #if SCANLINE_COMPRESS
-           Boolean scanlineCompress, 
+           Boolean scanlineCompress,
 #endif
            Boolean *p_completeGraphic
 #if PROGRESS_DISPLAY
@@ -273,7 +274,7 @@ EC(dword cbSize = 0;)
   } else {
       filehan = FileOpen(file, FILE_ACCESS_R|FILE_DENY_W);
       if(filehan == 0) {
-        
+
         free(cinfo);
         return(0);
       }
@@ -320,7 +321,7 @@ EC(dword cbSize = 0;)
       if (status == FALSE) FileClose(filehan, TRUE);
   }
   if (status == FALSE) {
-      
+
       free(cinfo);
       return 0;
   }
@@ -400,7 +401,7 @@ EC(dword cbSize = 0;)
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
-  /* Anything other than JPEG_HEADER_OK means there was an error reading the 
+  /* Anything other than JPEG_HEADER_OK means there was an error reading the
      header. */
   if (jpeg_read_header(cinfo) != JPEG_HEADER_OK)
       headerErr=TRUE;
@@ -409,7 +410,7 @@ EC(dword cbSize = 0;)
       /* give back size */
       picsize->XYS_width = cinfo->image_width;
       picsize->XYS_height = cinfo->image_height;
-      
+
       /* Attempt to estimate the amount of temporary storage for progressive mode */
       if(cinfo->progressive_mode)
       {
@@ -419,7 +420,7 @@ EC(dword cbSize = 0;)
       }
       else
 	  requiredTempMemory = 0;
-      
+
       if(cinfo->progressive_mode || cinfo->inputctl.has_multiple_scans) {
 	  headerErr=TRUE;
       }
@@ -575,10 +576,10 @@ EC(dword cbSize = 0;)
 #if SCANLINE_COMPRESS
   if (scanlineCompress) {
       /* create actual compressed bitmap for output */
-      HugeArrayLockDir(vmf, bmblock, &srcHeader);
+      HugeArrayLockDir(vmf, bmblock, (void**) &srcHeader);
       cbmblock = HugeArrayCreate(vmf, 0,
 				 srcHeader->EB_header.HAD_header.LMBH_offset);
-      HugeArrayLockDir(vmf, cbmblock, &destHeader);
+      HugeArrayLockDir(vmf, cbmblock, (void**) &destHeader);
       /* copy everything after HugeArrayDirectory header */
       memcpy(&(destHeader->EB_bm), &(srcHeader->EB_bm),
 	     (srcHeader->EB_header.HAD_header.LMBH_offset -
@@ -630,10 +631,10 @@ EC(dword cbSize = 0;)
 
   /* JSAMPLEs per row in output buffer */
   row_stride = cinfo->image_width * 3;
-  /* fjpeg always delivers RGB */ 
+  /* fjpeg always delivers RGB */
 
-  /* Make a 1-rows-high sample array 
-   * that is automatically freed when done with image 
+  /* Make a 1-rows-high sample array
+   * that is automatically freed when done with image
    */
   buffer =(JSAMPARRAY) smallocarr(cinfo, row_stride, 1);
 
@@ -653,7 +654,7 @@ EC(dword cbSize = 0;)
      * more than one scanline at a time if that's more convenient.
      */
     if(!jpeg_read_scanlines(cinfo, buffer, 1)) {
-    
+
         flag = TRUE;
         break;
     }
@@ -703,7 +704,7 @@ EC(dword cbSize = 0;)
 		/* create compressed scanline in dest huge bitmap */
 		HugeArrayAppend(vmf, bmblock, cScanSize, (byte *)lineptr+size);
 		/* update header with number of scanlines */
-		HugeArrayLockDir(vmf, bmblock, &destHeader);
+		HugeArrayLockDir(vmf, bmblock, (void**) &destHeader);
 		destHeader->EB_bm.CB_simple.B_height++;
 		HugeArrayDirty(destHeader);
 		HugeArrayUnlockDir(destHeader);
@@ -721,7 +722,7 @@ EC(dword cbSize = 0;)
 #if PROGRESS_DISPLAY
 	/* send out progress if desired number of scanlines have been seen */
 	if (importProgressDataP && importProgressDataP->IPD_callback &&
-	    (((cinfo->output_scanline % SLICE_HEIGHT) == 0) || 
+	    (((cinfo->output_scanline % SLICE_HEIGHT) == 0) ||
                  (cinfo->output_scanline == cinfo->image_height))) {
 	    importProgressDataP->IPD_bitmap = bmblock;
 	    importProgressDataP->IPD_iad.IAD_size.XYS_width = cinfo->image_width;
@@ -780,7 +781,7 @@ EC(dword cbSize = 0;)
   if(flag == FALSE)
         dataVMBlock = bmblock;
   else                        /* import failed: release bitmap right now */
-  {                           
+  {
         VMFreeVMChain(vmf, VMCHAIN_MAKE_FROM_VM_BLOCK(bmblock));
         dataVMBlock = 0;
   }

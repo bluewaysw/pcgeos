@@ -23,12 +23,6 @@
 #include "ttinterp.h"
 
 
-/* Add extensions definition */
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-#include "ttextend.h"
-#endif
-
-
 #ifdef __GEOS__
 extern TEngine_Instance engineInstance;
 #endif  /* __GEOS__ */
@@ -126,19 +120,17 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  pts          pointer to the target glyph zone record
  *
- *  Return :  Error code.
+ *  Return :  void.
  *
  *****************************************************************/
 
   static
-  TT_Error  Done_Glyph_Zone( PGlyph_Zone  pts )
+  void  Done_Glyph_Zone( PGlyph_Zone  pts )
   {
     FREE( pts->contours );
     FREE( pts->touch );
     FREE( pts->cur );
     FREE( pts->org );
-
-    return TT_Err_Ok;
   }
 
 
@@ -266,14 +258,14 @@ extern TEngine_Instance engineInstance;
  *  Function    :  Context_Destroy
  *
  *****************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Context_Destroy( void*  _context )
+  void  _near Context_Destroy( void*  _context )
   {
     PExecution_Context  exec = (PExecution_Context)_context;
 
     if ( !exec )
-      return TT_Err_Ok;
+      return;
 
     /* free composite load stack */
     FREE( exec->loadStack );
@@ -300,8 +292,8 @@ extern TEngine_Instance engineInstance;
     exec->instance = NULL;
     exec->face     = NULL;
 
-    return TT_Err_Ok;
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -309,9 +301,9 @@ extern TEngine_Instance engineInstance;
  *  Function    :  Context_Create
  *
  *****************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Context_Create( void*  _context, void*  _face )
+  TT_Error  _near Context_Create( void*  _context, void*  _face )
   {
     PExecution_Context  exec = (PExecution_Context)_context;
 
@@ -348,6 +340,7 @@ extern TEngine_Instance engineInstance;
     Context_Destroy( exec );
     return error;
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -508,7 +501,9 @@ extern TEngine_Instance engineInstance;
     exec->pts.n_points   = 0;
     exec->pts.n_contours = 0;
 
+#ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
+#endif    
 
     return TT_Err_Ok;
   }
@@ -521,8 +516,8 @@ extern TEngine_Instance engineInstance;
  *****************************************************************/
 
   LOCAL_FUNC
-  TT_Error  Context_Save( PExecution_Context  exec,
-                          PInstance           ins )
+  void  Context_Save( PExecution_Context  exec,
+                      PInstance           ins )
   {
     Int  i;
 
@@ -536,8 +531,6 @@ extern TEngine_Instance engineInstance;
 
     for ( i = 0; i < MAX_CODE_RANGES; ++i )
       ins->codeRangeTable[i] = exec->codeRangeTable[i];
-
-    return TT_Err_Ok;
   }
 
 
@@ -612,18 +605,18 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  _instance   the instance object to destroy
  *
- *  Output :  error code.
+ *  Output :  void.
  *
  ******************************************************************/
-
+#pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Instance_Destroy( void* _instance )
+  void  _near Instance_Destroy( void* _instance )
   {
     PInstance  ins = (PInstance)_instance;
 
 
     if ( !_instance )
-      return TT_Err_Ok;
+      return;
 
 
     FREE( ins->cvt );
@@ -648,8 +641,8 @@ extern TEngine_Instance engineInstance;
     ins->owner = NULL;
     ins->valid = FALSE;
 
-    return TT_Err_Ok;
   }
+#pragma code_seg()
 
 
 /*******************************************************************
@@ -665,9 +658,9 @@ extern TEngine_Instance engineInstance;
  *            released on error.
  *
  ******************************************************************/
-
+#pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Instance_Create( void*  _instance,
+  TT_Error  _near Instance_Create( void*  _instance,
                              void*  _face )
   {
     PInstance  ins  = (PInstance)_instance;
@@ -726,6 +719,7 @@ extern TEngine_Instance engineInstance;
     Instance_Destroy( ins );
     return error;
   }
+#pragma code_seg()
 
 
 /*******************************************************************
@@ -776,21 +770,22 @@ extern TEngine_Instance engineInstance;
       PIns_Metrics  metrics = &exec->metrics;
 
 
-      metrics->x_ppem    = 0;
-      metrics->y_ppem    = 0;
-      metrics->pointSize = 0;
-      metrics->x_scale1  = 0;
-      metrics->x_scale2  = 1;
-      metrics->y_scale1  = 0;
-      metrics->y_scale2  = 1;
+      metrics->x_ppem       = 0;
+      metrics->y_ppem       = 0;
+      metrics->pointSize    = 0;
+      metrics->x_scale1     = 0;
+      metrics->units_per_em = 1;
+      metrics->y_scale1     = 0;
 
-      metrics->ppem      = 0;
-      metrics->scale1    = 0;
-      metrics->scale2    = 1;
-      metrics->ratio     = 1L << 16;
+      metrics->ppem         = 0;
+      metrics->scale1       = 0;
+      metrics->scale2       = 1;
+      metrics->ratio        = 1L << 16;
     }
 
+#ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
+#endif
 
     exec->cvtSize = ins->cvtSize;
     exec->cvt     = ins->cvt;
@@ -869,23 +864,14 @@ extern TEngine_Instance engineInstance;
     if ( ins->metrics.x_ppem >= ins->metrics.y_ppem )
     {
       ins->metrics.scale1  = ins->metrics.x_scale1;
-      ins->metrics.scale2  = ins->metrics.x_scale2;
       ins->metrics.ppem    = ins->metrics.x_ppem;
-      ins->metrics.x_ratio = 1L << 16;
-      ins->metrics.y_ratio = TT_MulDiv( ins->metrics.y_ppem,
-                                        0x10000,
-                                        ins->metrics.x_ppem );
     }
     else
     {
       ins->metrics.scale1  = ins->metrics.y_scale1;
-      ins->metrics.scale2  = ins->metrics.y_scale2;
       ins->metrics.ppem    = ins->metrics.y_ppem;
-      ins->metrics.x_ratio = TT_MulDiv( ins->metrics.x_ppem,
-                                        0x10000,
-                                        ins->metrics.y_ppem );
-      ins->metrics.y_ratio = 1L << 16;
     }
+    ins->metrics.scale2 = ins->metrics.units_per_em;
 
     /* Scale the cvt values to the new ppem.          */
     /* We use by default the y ppem to scale the CVT. */
@@ -923,7 +909,9 @@ extern TEngine_Instance engineInstance;
 
     Clear_CodeRange( exec, TT_CodeRange_Glyph );
 
+#ifdef DEBUG_INTERPRETER
     exec->instruction_trap = FALSE;
+#endif
 
     exec->top     = 0;
     exec->callTop = 0;
@@ -971,28 +959,23 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  _face   typeless pointer to the face object to destroy
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Face_Destroy( void*  _face )
+  void  _near Face_Destroy( void*  _face )
   {
     PFace   face = (PFace)_face;
     UShort  n;
 
 
     if ( !face )
-      return TT_Err_Ok;
+      return;
 
     /* first of all, destroys the cached sub-objects */
     Cache_Destroy( &face->instances );
     Cache_Destroy( &face->glyphs );
-
-    /* destroy the extensions */
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    Extension_Destroy( face );
-#endif
 
     /* freeing table directory */
     FREE( face->dirTables );
@@ -1047,8 +1030,8 @@ extern TEngine_Instance engineInstance;
     Free_TrueType_Hdmx( face );
 #endif
 
-    return TT_Err_Ok;
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -1071,10 +1054,10 @@ extern TEngine_Instance engineInstance;
 #define LOAD_( table ) \
           (error = Load_TrueType_##table (face)) != TT_Err_Ok
 
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Face_Create( void*  _face,
-                         void*  _input )
+  TT_Error  _near Face_Create( void*  _face,
+                               void*  _input )
   {
     TFont_Input*  input = (TFont_Input*)_input;
     PFace         face  = (PFace)_face;
@@ -1132,18 +1115,13 @@ extern TEngine_Instance engineInstance;
 
       goto Fail;
 
-#ifdef TT_CONFIG_OPTION_EXTEND_ENGINE
-    if ( ( error = Extension_Create( face ) ) != TT_Err_Ok )
-      return error;
-#endif
-
     return TT_Err_Ok;
 
   Fail :
     Face_Destroy( face );
     return error;
   }
-
+#pragma code_seg()
 #undef LOAD_
 
 
@@ -1155,22 +1133,23 @@ extern TEngine_Instance engineInstance;
  *
  *  Input  :  _glyph  typeless pointer to the glyph record to destroy
  *
- *  Output :  Error code.
+ *  Output :  void.
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Glyph_Destroy( void*  _glyph )
+  void  _near Glyph_Destroy( void*  _glyph )
   {
     PGlyph  glyph = (PGlyph)_glyph;
 
 
     if ( !glyph )
-      return TT_Err_Ok;
+      return;
 
     glyph->outline.owner = TRUE;
-    return TT_Done_Outline( &glyph->outline );
+    TT_Done_Outline( &glyph->outline );
   }
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -1185,9 +1164,9 @@ extern TEngine_Instance engineInstance;
  *  Output :  Error code.
  *
  ******************************************************************/
-
+  #pragma code_seg(ttcache_TEXT)
   LOCAL_FUNC
-  TT_Error  Glyph_Create( void*  _glyph,
+  TT_Error  _near Glyph_Create( void*  _glyph,
                           void*  _face )
   {
     PFace     face  = (PFace)_face;
@@ -1207,7 +1186,7 @@ extern TEngine_Instance engineInstance;
                            glyph->face->maxContours,
                            &glyph->outline );
   }
-
+  #pragma code_seg()
 
 
 /*******************************************************************
@@ -1278,16 +1257,10 @@ extern TEngine_Instance engineInstance;
       goto Fail;
 
     /* create face cache */
-    error = Cache_Create( (PCache_Class)&objs_face_class, face_cache );
-    if ( error )
-      goto Fail;
-
+    Cache_Create( (PCache_Class)&objs_face_class, face_cache ); 
+    Cache_Create( (PCache_Class)&objs_exec_class, exec_cache );
+    
     engineInstance.objs_face_cache = face_cache;
-
-    error = Cache_Create( (PCache_Class)&objs_exec_class, exec_cache );
-    if ( error )
-      goto Fail;
-
     engineInstance.objs_exec_cache = exec_cache;
 
     engineInstance.objs_face_class      = (PCache_Class)&objs_face_class;
@@ -1319,7 +1292,7 @@ extern TEngine_Instance engineInstance;
  ******************************************************************/
 
   LOCAL_FUNC
-  TT_Error  TTObjs_Done( )
+  void  TTObjs_Done( )
   {
     /* destroy all active faces and contexts before releasing the */
     /* caches                                                     */
@@ -1329,8 +1302,6 @@ extern TEngine_Instance engineInstance;
     /* Now frees caches and cache classes */
     FREE( engineInstance.objs_exec_cache );
     FREE( engineInstance.objs_face_cache );
-
-    return TT_Err_Ok;
   }
 
 
