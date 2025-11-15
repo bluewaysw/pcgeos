@@ -25,21 +25,30 @@
 #
 ###############################################################################
 # Parse command line arguments
-TARGET=gbuild.ec
+TYPE=ec
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -n)
-      TARGET=gbuild.nc
+      TARGET=nec
       ;;
   esac
   shift
 done
+if [ ! -f ${LOCAL_ROOT}/.bbxxip/.bbxxip.nt.${TYPE} ]; then
+   echo "*** Target type ${TYPE} not built."
+   exit 1
+fi
+eval $(cat ${LOCAL_ROOT}/.bbxxip/.bbxxip.nt.${TYPE})
+if [ ! -f ${destdir}/localpc/ensemble/ensemble.bat ]; then
+   echo "*** Target at ${destdir} not usable."
+   exit 1
+fi
 if [ "$BASEBOX" = "" ]; then
     BASEBOX=dosbox
 fi
 OLD_PATH=$PWD
-cd ${LOCAL_ROOT}/${TARGET}/localpc
-rm $LOCAL_ROOT/${TARGET}/localpc/IPX_STAT.TXT
+cd ${destdir}/localpc
+rm ${destdir}/localpc/IPX_STAT.TXT
 rm ensemble/init.bat
 if [ "$GEOS_CENTRAL_STORAGE" != "" ]; then
    echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble/init.bat
@@ -60,6 +69,6 @@ set +m
 cd $OLD_PATH
 
 clear
-while [ ! -f $LOCAL_ROOT/${TARGET}/localpc/IPX_STAT.TXT ]; do sleep 1; printf "."; done
-IPX_PORT=$(grep "127.0.0.1 from port" $LOCAL_ROOT/${TARGET}/localpc/IPX_STAT.TXT | perl -e 'my $status = <>; $status =~  m/(\d+)\r/; printf("%04X", $1);')
+while [ ! -f ${destdir}/localpc/IPX_STAT.TXT ]; do sleep 1; printf "."; done
+IPX_PORT=$(grep "127.0.0.1 from port" ${destdir}/localpc/IPX_STAT.TXT | perl -e 'my $status = <>; $status =~  m/(\d+)\r/; printf("%04X", $1);')
 swat -net 00000000:7F000001${IPX_PORT}:003F
