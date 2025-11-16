@@ -881,22 +881,23 @@ DBCS <	dec	cx							>
 DBCS <	shr	cx, 1				; cx <- number of chars	>
 	LocalIsNull	bx			; is it a NULL?
 	jz	startCheck			; yes
-	inc	cx				; no, must check last char too
+checkFirstReplacement:
+	inc	dh
+EC<	cmp	dh, 0						>
+EC<	ERROR_Z	RESEDIT_INTERNAL_LOGIC_ERROR			>
+	jnz	next
+	;	Trap overflow beyond 255 occurrences; the counters are bytes stored in
+	;	RAD_stringArgs for StoreText/CheckItemForStringArgs validation.
+	jmp	clrDXThenFail
 
-startCheck:
-	LocalGetChar	bx, dsdi, NO_ADVANCE
-	LocalCmpChar	bx, C_CR		; is it a carriage return?
-	je      next
-	LocalCmpChar	bx, C_TAB		; is it a tab?
-	je      next
-	LocalCmpChar	bx, C_LF		; is it a newline?
-	je      next
-	LocalCmpChar	bx, '\1'		; UserStandardDialog arg 1
-	je	checkFirstReplacement
-	LocalCmpChar	bx, '\2'		; UserStandardDialog arg 2
-	je	checkSecondReplacement
-	LocalCmpChar	bx, C_SPACE		; is it below a space?
-	jb	failedCheck                     ;  it's a control char	
+checkSecondReplacement:
+	inc	dl
+EC<	cmp	dl, 0						>
+EC<	ERROR_Z	RESEDIT_INTERNAL_LOGIC_ERROR			>
+	jnz	next
+	;	Trap overflow beyond 255 occurrences.
+	jmp	clrDXThenFail
+
 
 	; SBCS - everthing from C_SPACE - 0xef is valid, except the delete char
 	; DBCS - 0xee## are also invalid characters

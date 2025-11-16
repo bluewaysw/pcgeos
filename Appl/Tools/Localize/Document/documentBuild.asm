@@ -1026,12 +1026,15 @@ PASS:		ds:di	- ResourceArrayElement
 RETURN:		carry set if a string arg is missing
 DESTROYED:	ax,bx,cx,dx,es
 
-PSEUDO CODE/STRATEGY:
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	cassie	2/ 5/93		Initial version
+	mov	di, es:[di]
+	pop	bx
+
+	; RAD_stringArgs stores the original '@1' count in DH and '@2' count in DL,
+	; captured by CheckIfText/StoreText when the source string was parsed.
+
+	clr	dh
+	mov	dl, bh				;dx <- # of string arg 1
+	clr	bh				;bx <- # of string arg 2
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckItemForStringArgs		proc	near 	
