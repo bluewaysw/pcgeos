@@ -1020,31 +1020,28 @@ SYNOPSIS:	Make sure translation item has proper number of
 
 CALLED BY:	CheckChunksCallback
 PASS:		ds:di	- ResourceArrayElement
-		dx	- file handle
-		cx	- group number
-		
-RETURN:		carry set if a string arg is missing
-DESTROYED:	ax,bx,cx,dx,es
+	push	ds:[di].RAE_data.RAD_stringArgs
+	mov	bx, dx
+	mov	ax, cx
+	mov	di, ds:[di].RAE_data.RAD_transItem
+	call	DBLock
+	pop	dx				;DH/DL <- '@1'/'@2' counts
+	; RAD_stringArgs stores '@1' occurrences in DH and '@2' in DL.
+	; CheckIfText keeps them as 8-bit tallies, so we must consume the
+	; translation using the same byte counters.
+SBCS <	cmp	{byte}es:[di], '1'		; is this string arg 1?	>
+DBCS <	cmp	{word}es:[di], C_DIGIT_ONE				>
+	jne	checkSecond
+	dec	dh				; yes, dec its counter
+SBCS <	cmp	{byte}es:[di], '2'		; is this string arg 2?	>
+DBCS <	cmp	{word}es:[di], C_DIGIT_TWO				>
+	jne	checkLoop
+	dec	dl				; yes, dec its counter
 
-	mov	di, es:[di]
-	pop	bx
-
-	; RAD_stringArgs stores the original '@1' count in DH and '@2' count in DL,
-	; captured by CheckIfText/StoreText when the source string was parsed.
-
-	clr	dh
-	mov	dl, bh				;dx <- # of string arg 1
-	clr	bh				;bx <- # of string arg 2
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-CheckItemForStringArgs		proc	near 	
-	uses	cx,dx,si,di
-	.enter	
-
-	; if not text, can't have string arguments
-	;
-	cmp	ds:[di].RAE_data.RAD_chunkType, mask CT_TEXT
-	clc
+	test	dh, dh			;were all string args 1 found?
+	jnz	failure
+	test	dl, dl			;were all string args 2 found?
+	jnz	failure
 	jne	done
 ;XXX fix this to check text monikers, too
 
