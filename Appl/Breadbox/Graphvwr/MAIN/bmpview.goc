@@ -47,16 +47,6 @@
 
 /**************************************************************************/
 
-extern VMChain  /*XXX*/
-	_pascal MyVMCopyVMChain(VMFileHandle sourceFile,
-		  VMChain sourceChain,
-		  VMFileHandle destFile);
-extern VMChain  /*XXX*/
-	_pascal MyVMFreeVMChain(VMFileHandle sourceFile,
-				  VMChain sourceChain);
-
-/**************************************************************************/
-
 typedef struct
 {
   FileDateAndTime BVFA_date;
@@ -1530,14 +1520,15 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
   VMFileHandle    transferFile;
   VMBlockHandle   transferItem;
   ClipboardItemHeader *ptr;
-  VMBlockHandle chain;
+  VMChain chain;
+  VMBlockHandle block;
   GStateHandle gstate;
 
   transferFile = ClipboardGetClipboardFile();
 
-  chain = MyVMCopyVMChain(bmpfile,
-						VMCHAIN_MAKE_FROM_VM_BLOCK(bmpblock)
-						, transferFile);
+  chain = VMCopyVMChain(bmpfile,
+						VMCHAIN_MAKE_FROM_VM_BLOCK(bmpblock),
+						transferFile);
   transferItem = VMAlloc(transferFile,
 								 sizeof(ClipboardItemHeader),
 								 0);
@@ -1553,11 +1544,11 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
 
   ptr->CIH_formats[1].CIFI_format =
 		 FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_BITMAP);
-  ptr->CIH_formats[1].CIFI_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(chain);
+  ptr->CIH_formats[1].CIFI_vmChain = chain;
   ptr->CIH_formats[1].CIFI_extra1 = 0;
   ptr->CIH_formats[1].CIFI_extra2 = 0;
 
-  gstate = GrCreateGString(transferFile, GST_VMEM, &chain);
+  gstate = GrCreateGString(transferFile, GST_VMEM, &block);
   GrSetGStringBounds(gstate, 0, 0, bmpwidth, bmpheight);
   GrSaveState(gstate);
   GrSaveTransform(gstate);
@@ -1574,7 +1565,7 @@ BuildBitmapTransferItem(FileHandle bmpfile, VMBlockHandle bmpblock,
 
   ptr->CIH_formats[0].CIFI_format =
 		 FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS, CIF_GRAPHICS_STRING);
-  ptr->CIH_formats[0].CIFI_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(chain);
+  ptr->CIH_formats[0].CIFI_vmChain = VMCHAIN_MAKE_FROM_VM_BLOCK(block);
   ptr->CIH_formats[0].CIFI_extra1 = bmpwidth;
   ptr->CIH_formats[0].CIFI_extra2 = bmpheight;
 
@@ -1612,7 +1603,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   ClipboardQueryArgs           query;
   ClipboardRequestArgs      request;
   ClipboardQuickNotifyFlags retVal;
-  VMBlockHandle bitmap;
+  VMChain bitmap;
   MemHandle mem;
   FileLongName name;
 
@@ -1638,7 +1629,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 		VMUnlock(mem);
 		ClipboardRequestItemFormat(BITMAP_FORMAT, query.CQA_header, &request);
 
-				bitmap = MyVMCopyVMChain(request.CRA_file, request.CRA_data,
+				bitmap = VMCopyVMChain(request.CRA_file, request.CRA_data,
 											  ClipboardGetClipboardFile());
 		if(bitmap != 0)
 		{
@@ -1998,7 +1989,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
   if(pself->BVWindow != 0)
 		 @call oself::MSG_META_EXPOSED(pself->BVWindow);
 
-  MyVMFreeVMChain(pself->BVBmpFile,
+  VMFreeVMChain(pself->BVBmpFile,
 	  VMCHAIN_MAKE_FROM_VM_BLOCK(pself->BVBmpBlock));
 
   if(pself->BVWindow != 0)
@@ -2313,7 +2304,7 @@ PasteCommon(ClipboardItemFlags transferFlags, optr oself, word bvattrs)
 	if(status == IBS_NO_ERROR)
 	{
 		bmpblock = GrCompactBitmap(para.IBP_dest, para.IBP_bitmap, para.IBP_dest);
-		MyVMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
+		VMFreeVMChain(para.IBP_dest, VMCHAIN_MAKE_FROM_VM_BLOCK(para.IBP_bitmap));
 		para.IBP_bitmap = bmpblock;
 
 		date = FileGetDateAndTime(pself->GDI_fileHandle) ;
@@ -2900,7 +2891,7 @@ ThumbDeleteItem(FileLongName name, dword size,
 		thumbnail = itemptr->BVTDBI_thumbnail;
 
 		 /* Thumbnail l�schen */
-		 MyVMFreeVMChain(BVThumbnailDB, VMCHAIN_MAKE_FROM_VM_BLOCK(thumbnail));
+		 VMFreeVMChain(BVThumbnailDB, VMCHAIN_MAKE_FROM_VM_BLOCK(thumbnail));
 
 		 /* item l�schen */
 		DBUnlock(itemptr);
@@ -3023,7 +3014,7 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
 
 	compact =  GrCompactBitmap(BVThumbnailDB, thumbnail,BVThumbnailDB);
 
-	MyVMFreeVMChain(BVThumbnailDB,
+	VMFreeVMChain(BVThumbnailDB,
 	  VMCHAIN_MAKE_FROM_VM_BLOCK( thumbnail));
 
 
