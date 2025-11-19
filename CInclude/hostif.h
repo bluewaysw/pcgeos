@@ -64,6 +64,7 @@ typedef WordFlags HostIfFunctions;
 #define HIF_SSL_GET_SSL_METHOD		HIF_SSL_BASE+13
 #define HIF_SSL_SET_CALLBACK		HIF_SSL_BASE+14
 #define HIF_SSL_SET_TLSEXT_HOST_NAME	HIF_SSL_BASE+15
+#define HIF_SSL_SET_SSL_METHOD		HIF_SSL_BASE+16
 #define HIF_SSL_END			1299
 
 #ifdef  __cplusplus
