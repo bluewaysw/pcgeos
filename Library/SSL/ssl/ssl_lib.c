@@ -2178,6 +2178,7 @@ SSL_CTX *ctx;
 		dword result = HostIfCall(
 			HIF_SSL_NEW, (dword) ctx, (dword) NULL, 0) >> 16;
 		return (SSL_CTX *) result;
+		return (SSL_CTX *) result;
 		}
 	return(NULL);
 	}
