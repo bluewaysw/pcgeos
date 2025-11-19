@@ -2176,7 +2176,7 @@ SSL_CTX *ctx;
 	if(hostApiAvailable)
 		{
 		dword result = HostIfCall(
-			HIF_SSL_NEW, (dword) ctx, (dword) NULL, 0);
+			HIF_SSL_NEW, (dword) ctx, (dword) NULL, 0) >> 16;
 		return (SSL_CTX *) result;
 		}
 	return(NULL);

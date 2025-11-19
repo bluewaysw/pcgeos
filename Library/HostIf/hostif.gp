@@ -38,11 +38,6 @@ type	library, process, single
 class HostIfProcessClass
 
 #
-# Library entry function
-#
-#entry HostIfEntry
-
-#
 # Import kernel routine definitions
 #
 library	geos
@@ -58,5 +53,3 @@ export HostIfDetect
 export HOSTIFDETECT
 export HostIfCall
 export HOSTIFCALL
-export HostIfCallAsync
-export HOSTIFCALLASYNC
