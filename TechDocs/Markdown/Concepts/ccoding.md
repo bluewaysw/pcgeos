@@ -317,12 +317,8 @@ typedef struct {
 } WordAndAHalf;
 ~~~
 
-Three special macros are also available to work with the **WWFixed** type. 
+Two special macros are also available to work with the **WWFixed** type. 
 These are listed below:
-
-+ **MakeWWFixed**  
-This macro creates a **WWFixed** structure from a given floating-point 
-number or dword number.
 
 + **WWFixedToFrac**  
 This macro produces the fractional portion of a **WWFixed** structure.
@@ -330,7 +326,11 @@ This macro produces the fractional portion of a **WWFixed** structure.
 + **WWFixedToInt**  
 This macro produces the integral portion of a **WWFixed** structure.
 
-Two other macros are provided for use with **WWFixedAsDword** structures:
+Three other macros are provided for use with **WWFixedAsDword** structures:
+
++ **MakeWWFixed**  
+This macro creates a **WWFixedAsDWord** value from a given floating-point 
+number or dword number.
 
 + **IntegerOf()**  
 This macro returns the integral portion of a **WWFixedAsDword** structure.
