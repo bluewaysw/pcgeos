@@ -1,9 +1,9 @@
 ## 3.5 Routines M-P
 ----------
 #### MakeWWFixed()
-    WWFixed MakeWWFixed(number);
+    WWFixedAsDWord MakeWWFixed(number);
 
-This macro casts a floating-point or integer number to a WWFixed value.
+This macro casts a floating-point or integer number to a WWFixedAsDWord value.
 
 **Include:** geos.h
 

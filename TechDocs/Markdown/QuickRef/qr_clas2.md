@@ -1175,7 +1175,7 @@
     MSG_GO_INIT_BASIC_DATA
     void MSG_GO_FLIP_HORIZ()
     void MSG_GO_FLIP_VERT()
-    void MSG_GO_ROTATE(WWFixed angle,
+    void MSG_GO_ROTATE(WWFixedAsDWord angle,
                 GrObjHandleSpecification center)
     void MSG_GO_UNTRANSFORM()
     void MSG_GO_MOVE(PointDWFixed *distance)

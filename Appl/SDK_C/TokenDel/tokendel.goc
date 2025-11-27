@@ -1,0 +1,447 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks 1997 -- All Rights Reserved.
+ *
+ * PROJECT:     GEOS Sample Applications
+ * MODULE:      Token Deleter
+ * FILE:        tokendel.goc
+ *
+ * AUTHOR:      Marcus Groeber
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *      NF      2/25/97         Made a "derivative work" - turned it
+ *                              into a sample application
+ *
+ * DESCRIPTION:
+ *      This sample application illustrates the use of the
+ *      token database routines. It allows the user to view and
+ *      delete the graphic icons associated with tokens. These
+ *      icons are displayed by GeoManager and stored in the
+ *      "Token Database" file.
+ *
+ *      To learn more about the Token.. routines see the C
+ *      Reference book.
+ *
+ *      This app was originally written by Marcus Groeber who
+ *      released the source code to the public domain.
+ *
+ * RCS STAMP:
+ *      $Id: tokendel.goc,v 1.2.1.1 97/06/16 19:01:28 eballot Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Include Files
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <token.h>
+    #include <gstring.h>
+    #include <Ansi/stdio.h>
+    #include <Ansi/stdlib.h>
+
+/********************************************************************
+ *              Constants
+ *******************************************************************/
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+    @class TokenDelProcessClass, GenProcessClass;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG)MSG_TOKEN_DEL_QUERY_TOKEN;
+    @message (GEN_ITEM_GROUP_APPLY_MSG)MSG_TOKEN_DEL_TOKEN_SELECTED;
+    @message void MSG_TOKEN_DEL_DELETE_TOKEN();
+    @endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+    @classdecl TokenDelProcessClass, neverSaved;
+
+/********************************************************************
+ *              Global Variables
+ *******************************************************************/
+      /*
+       * tokenListHandle - Handle of the list of tokens.
+       * tokenCount      - Number of tokens in the list.
+       */
+    MemHandle tokenListHandle;
+    word      tokenCount;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass TokenDelApp = {
+    GI_visMoniker = @list { @TextMoniker,
+                            @Moniker0,
+                            @Moniker1,
+                            @Moniker2 };
+    GI_comp = @TokenDelPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @TokenDelPrimary;
+}
+
+@visMoniker TextMoniker = "Token Deleter";
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass TokenDelPrimary = {
+    GI_comp = @TokenDelTokenCount,
+              @TokenDelMonikerList,
+              @TokenDelWhichToken,
+              @TokenDelDeleteTrigger;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+  /*
+   * Shows the total number of tokens.
+   */
+@object GenGlyphClass TokenDelTokenCount = {
+    GI_visMoniker = " ";
+}
+
+  /*
+   * Displays the list of token gstrings.
+   */
+@object GenDynamicListClass TokenDelMonikerList = {
+    GIGI_selection = 0;
+    GIGI_applyMsg = MSG_TOKEN_DEL_TOKEN_SELECTED;
+    GIGI_destination = process;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GDLI_numItems = 0;
+    GDLI_queryMsg = MSG_TOKEN_DEL_QUERY_TOKEN;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_INITIAL_SIZE = {
+        SST_PIXELS | 490,
+        SST_PIXELS | 60,
+        7
+    };
+}
+
+  /*
+   * Shows the token of the selected icon.
+   */
+@object GenGlyphClass TokenDelWhichToken = {
+    GI_visMoniker = " ";
+}
+
+  /*
+   * Button to delete the selected token.
+   */
+@object GenTriggerClass TokenDelDeleteTrigger = {
+    GI_visMoniker = "Delete";
+    GTI_actionMsg = MSG_TOKEN_DEL_DELETE_TOKEN;
+    GTI_destination = process;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+/********************************************************************
+ *              TokenDelMonikerResource Resource
+ * This is icon data for this application.
+ *******************************************************************/
+@start TokenDelMonikerResource, data;
+
+@include "Art/appicon.goh"
+
+@end TokenDelMonikerResource;
+
+/********************************************************************
+ *              Function Definitons
+ *******************************************************************/
+
+/********************************************************************
+ *              GetTokensFromDatabase
+ ********************************************************************
+ * SYNOPSIS:     Retrieve the list of tokens in the database and
+ *               set the display objects appropriately.
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     See if we should free the previous list of tokens.
+ *               Then create a new list of tokens, use that to
+ *               initialize the various UI objects (glyphs, lists).
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+void
+GetTokensFromDatabase( Boolean freeOld )
+  /*
+   * freeOld - TRUE to free the previous token list.
+   */
+{
+      /*
+       * tokenList - Return value from TokenListTokens (combination
+       *             of token count and mem handle).
+       * tempStr   - Temporary work buffer for building the
+       *             "number of tokens" string.
+       */
+    dword tokenList;
+    char  tempStr[20];
+
+      /*
+       * Should we free old token data?
+       */
+    if( freeOld ) {
+        MemFree( tokenListHandle );
+    }
+
+      /*
+       * Get the list of gstring tokens, as well as
+       * a count of the number of tokens.
+       */
+    tokenList = TokenListTokens( TRF_ONLY_GSTRING, 0, 0 );
+    tokenListHandle = TokenListTokensHandleFromDWord( tokenList );
+EC( ECCheckMemHandle( tokenListHandle ); )
+    tokenCount = TokenListTokensCountFromDWord( tokenList );
+
+      /*
+       * Build a string to show the number of tokens.
+       * Send this string to the GenGlyph object.
+       * Initialize the dynamic list object, too.
+       */
+    sprintf( tempStr, "Number of tokens: %u", tokenCount );
+    @call TokenDelTokenCount::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+        tempStr, VUM_DELAYED_VIA_APP_QUEUE );
+    @call TokenDelWhichToken::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+        "", VUM_DELAYED_VIA_APP_QUEUE );
+    @send TokenDelDeleteTrigger::MSG_GEN_SET_NOT_ENABLED(
+        VUM_DELAYED_VIA_APP_QUEUE );
+    @send TokenDelMonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+        tokenCount );
+} /* GetTokensFromDatabase */
+
+/********************************************************************
+ *              GetTokenFromList
+ ********************************************************************
+ * SYNOPSIS:     Return a pointer to a particular item in the list.
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Lock down the token list and get a pointer to the
+ *               particular item of interest. Return this token
+ *               to the caller. Unlock the block.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+void
+GetTokenFromList( word         item,
+                  GeodeToken * geodeToken )
+  /*
+   * item       - Item to get pointer to (in).
+   * geodeToken - Pointer to token structure (out).
+   */
+{
+      /*
+       * tokenListPtr - Points to beginning of token list.
+       */
+    GeodeToken * tokenListPtr;
+
+      /*
+       * Lock down the token list and get a pointer to it.
+       * Use the pointer to access a particular item
+       * and return the token for that item.
+       */
+    tokenListPtr = MemLock( tokenListHandle );
+EC( ECCheckBounds( tokenListPtr ); )
+    *geodeToken = tokenListPtr[ item ];
+    MemUnlock( tokenListHandle );
+} /* GetTokenFromList */
+
+/********************************************************************
+ *              Code for TokenDelProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_GEN_PROCESS_OPEN_APPLICATION
+ ********************************************************************
+ * SYNOPSIS:     Start the application going. We'll do some extra
+ *               work here.
+ * CALLED BY:    GEOS
+ * PARAMETERS:   AppAttachFlags attachFlags
+ *               MemHandle      launchBlock
+ *               MemHandle      extraState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass to perform the normal
+ *               application startup. Then retrieve a list of the
+ *               tokens currently in the token database.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+@method TokenDelProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+
+    @callsuper();
+    GetTokensFromDatabase( FALSE );
+} /* MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+/********************************************************************
+ *              MSG_GEN_PROCESS_CLOSE_APPLICATION
+ ********************************************************************
+ * SYNOPSIS:     Close down the application. We'll do some extra
+ *               clean-up steps here.
+ * CALLED BY:    GEOS
+ * PARAMETERS:   void
+ * RETURNS:      MemHandle - Extra state block.
+ * SIDE EFFECTS: none
+ * STRATEGY:     First free the token list, then call the superclass
+ *               to perform the normal application shutdown.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+@method TokenDelProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+    MemFree( tokenListHandle );
+    return( @callsuper() );
+} /* MSG_GEN_PROCESS_CLOSE_APPLICATION */
+
+/********************************************************************
+ *              MSG_TOKEN_DEL_TOKEN_SELECTED
+ ********************************************************************
+ * SYNOPSIS:     A token was selected so lets update the UI objects.
+ * CALLED BY:    TokenDelMonikerList
+ * PARAMETERS:   word selection
+ *               word numSelections
+ *               byte stateFlags
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Build a string to represent the selected token,
+ *               enabled the delete button, and display the token.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+@method TokenDelProcessClass, MSG_TOKEN_DEL_TOKEN_SELECTED
+{
+      /*
+       * geodeToken - Token from list which we'll display.
+       * tempStr    - Used to build the "current token" string.
+       */
+    GeodeToken geodeToken;
+    char       tempStr[20];
+
+      /*
+       * Enable the "delete" button for this token.
+       * Get the token from the list and build a string
+       * to represent it. Set the "which token" object
+       * to use this string.
+       */
+    @send TokenDelDeleteTrigger::MSG_GEN_SET_ENABLED(
+        VUM_DELAYED_VIA_APP_QUEUE );
+    GetTokenFromList( selection, &geodeToken );
+    sprintf( tempStr,
+             "Current Token: \"%c%c%c%c\",%u",
+             geodeToken.GT_chars[ 0 ],
+             geodeToken.GT_chars[ 1 ],
+             geodeToken.GT_chars[ 2 ],
+             geodeToken.GT_chars[ 3 ],
+             geodeToken.GT_manufID );
+    @call TokenDelWhichToken::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+        tempStr, VUM_DELAYED_VIA_APP_QUEUE );
+} /* MSG_TOKEN_DEL_TOKEN_SELECTED */
+
+/********************************************************************
+ *              MSG_TOKEN_DEL_QUERY_TOKEN
+ ********************************************************************
+ * SYNOPSIS:     Build a moniker to represent the list item.
+ * CALLED BY:    TokenDelMonikerList
+ * PARAMETERS:   optr list
+ *               word item
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Using the item parameter grab the token for that
+ *               item from the token list. Use this token to create
+ *               a moniker for the dynamic list object to use.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+@method TokenDelProcessClass, MSG_TOKEN_DEL_QUERY_TOKEN
+{
+      /*
+       * geodeToken - Token of item in question.
+       */
+    GeodeToken geodeToken;
+
+      /*
+       * Get the token of the item in question.
+       * Use this to build a moniker for the dynamic list.
+       */
+    GetTokenFromList( item, &geodeToken );
+    @call TokenDelMonikerList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+        item, 0, 30, 48, 0, VMDT_TOKEN, VMST_FPTR, (dword)&geodeToken );
+} /* MSG_TOKEN_DEL_QUERY_TOKEN */
+
+/********************************************************************
+ *              MSG_TOKEN_DEL_DELETE_TOKEN
+ ********************************************************************
+ * SYNOPSIS:     Delete the currently selected token.
+ * CALLED BY:    TokenDelDeleteToken
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Get the selected item from the dynamic list, use
+ *               that number to remove the token from the token
+ *               database. Then update our token list accordingly.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      MG      ?               Initial version
+ *******************************************************************/
+@method TokenDelProcessClass, MSG_TOKEN_DEL_DELETE_TOKEN
+{
+      /*
+       * item       - Item to be deleted from the list.
+       * geodeToken - Geode token of item to delete.
+       */
+    word       item;
+    GeodeToken geodeToken;
+
+      /*
+       * Get the currently selected item index.
+       * If there is a selection, then
+       * get the token from the token list,
+       * remove it from the token database,
+       * update the token list.
+       */
+    item = @call TokenDelMonikerList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( GIGS_NONE != item ) {
+        GetTokenFromList( item, &geodeToken );
+        TokenRemoveToken( TOKEN_CHARS( geodeToken.GT_chars[ 0 ],
+                                       geodeToken.GT_chars[ 1 ],
+                                       geodeToken.GT_chars[ 2 ],
+                                       geodeToken.GT_chars[ 3 ] ),
+                          geodeToken.GT_manufID );
+        GetTokensFromDatabase( TRUE );
+    }
+} /* MSG_TOKEN_DEL_DELETE_TOKEN */
+

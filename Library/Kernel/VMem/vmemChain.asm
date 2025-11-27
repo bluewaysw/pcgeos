@@ -160,7 +160,7 @@ atEnd:
 	call	VMUnlock
 
 	; check to see if this is a HugeArrayDirectory block, in which case
-	; we have some more work to do.  HugeArrays store VM block handles 
+	; we have some more work to do.  HugeArrays store VM block handles
 	; all over the place, and we'll need to fixup those handles.  Check
 	; the UserID for the block for SVMID_HA_DIR_ID.
 
@@ -419,7 +419,7 @@ REVISION HISTORY:
 
 VMFreeVMChain	proc	far	uses ax, cx, si, di, bp, ds, es, dx
 	.enter
-	
+
 EC <	call	ECVMCheckVMFile		; check bx parameter.	>
 
 	;
@@ -434,13 +434,13 @@ EC <	call	ECVMCheckVMFile		; check bx parameter.	>
 	; Disable file compression until the entire VM chain has been freed.
 	;
 	mov	cl, ds:[VMH_compressFlags]
-	and	cl, not mask VMCF_NO_COMPRESS
+	or	cl, mask VMCF_NO_COMPRESS
 	xchg	ds:[VMH_compressFlags], cl
 
 	segxchg	es, ds			; es <- header, ds <- kdata
 	call	FreeVMChainLow
 	segxchg	es, ds			; ds <- header, es <- kdata
-	
+
 	;
 	; Re-enable compression, if it was enabled before, and make sure the
 	; file is properly compressed.
@@ -544,9 +544,9 @@ blockLoop:
 	;
 	push	es:[VMH_blockTable].VMBH_memHandle
 	push	ax
-	push	es:[VMH_blockTable].VMBH_memHandle	
+	push	es:[VMH_blockTable].VMBH_memHandle
 	call	VMLock
-	call	MemDerefStackES	
+	call	MemDerefStackES
 	mov	ds, ax
 	mov	cx, ds:[VMCL_next]
 	cmp	cx, VM_CHAIN_TREE
@@ -588,7 +588,7 @@ done:
 
 	pop	di
 	call	ThreadReturnStackSpace
-		
+
 	.leave
 	ret
 
@@ -604,9 +604,9 @@ DESCRIPTION:	Compare two chains of VM blocks.  The override VM file
 CALLED BY:	GLOBAL
 
 PASS:
-	bx - VM file	
+	bx - VM file
 	ax:bp - VM chain
-	
+
 	dx - VM file
 	cx:di - VM chain
 
@@ -649,9 +649,9 @@ DESCRIPTION:	Compare two chains of VM blocks
 CALLED BY:	VMCompareVMChains
 
 PASS:
-	bx - VM file	
+	bx - VM file
 	ax:bp - VM chain
-	
+
 	dx - VM file
 	cx:di - VM chain
 
@@ -677,7 +677,7 @@ REVISION HISTORY:
 CompareChainsLow	proc	near
 	tst	bp
 	LONG jnz isDBItem
-	tst_clc	di			;If first file is VM chain, and 2nd 
+	tst_clc	di			;If first file is VM chain, and 2nd
 	jnz	done			; is DB, exit with carry clear
 next:
 	call	VMLock
@@ -693,7 +693,7 @@ next:
 	call	VMLock
 	xchg	bx, dx			;bx = source, dx = dest
 	mov	es, ax			;es = dest block
-	mov	ax, di			;ax = save UserID 
+	mov	ax, di			;ax = save UserID
 
 	; ds and es are VM blocks
 
@@ -939,10 +939,10 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	returns the number of blocks in vm chain, and the total size
 		of the chain in bytes
 
-CALLED BY:	
+CALLED BY:
 PASS:		bx	= vm file handle
 		ax:bp	= vm chain
-RETURN:		
+RETURN:
 		cxdx <- sum of sizes of VM blocks and DB items (in bytes)
 		si   <- number of VM blocks in chain
 		di   <- number of DB items in chain
@@ -950,7 +950,7 @@ RETURN:
 		carry set if error (bad block in chain)
 
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -968,7 +968,7 @@ VMInfoVMChain	proc	far
 	ForceRef VMInfoVMChain
 	ForceRef byteSizeBlocks
 	ForceRef byteSizeItems
-	ForceRef numBlocks		
+	ForceRef numBlocks
 	ForceRef numItems
 
 	uses	ax
@@ -1017,10 +1017,10 @@ PASS:		;bx is vm file
 RETURN:		update counts
 		carry set if an invalid block was found
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1147,7 +1147,7 @@ doChainsAndTrees:
 ;;;    	   just a tree		;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 doTree:
-	; 
+	;
 	; bp is mem handle of the block, the bp for locals is on the stack
 	;
 		mov_tr	ax, bp
