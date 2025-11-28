@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:	        ResEdit	
+MODULE:	        ResEdit
 FILE:		documentUpdate.asm
 
 AUTHOR:		Cassie Hartzog, Nov 19, 1992
@@ -11,81 +11,81 @@ AUTHOR:		Cassie Hartzog, Nov 19, 1992
 ROUTINES:
 	Name			Description
 	----			-----------
-	DocumentCommitUpdate	Reset translation file to not updated state 
-				(clear all chunk state flags and remove the 
-				"Deleted Chunks" resource. 
-	ClearState		Clear ChunkState flags in this element. 
-	DocumentUpdateTranslation	Creates the updated translation 
-				database from new localization file and geode, 
-				which is then merged with the existing 
-				translation file for this document. 
-	SetCommitTriggerState	Enables/Disables the CommitTrigger 
-				appropriately. 
-	MergeUpdateAndTrans	Enumerates all the elements in the new 
-				ResourceMap, merging the updated translation 
-				database into the existing one. 
-	MergeResource		For the passed updated resource, looks for a 
-				matching resource and matching elements in the 
-				existing translation database. 
-	FindUnmatchedElements	Enumerate an updated ResourceArray, looking for 
-				elements which were not matched by a chunk in 
-				the corresponding ResourceArray in the old 
-				translation database. 
-	FindUnmatchedElementsCallback	Enumerate this resource from the old 
-				translation file, trying to find a match for 
-				the passed ResourceArrayElement from the 
-				updated database. 
-	FindMatchingResource	Search by name for a matching resource in the 
-				translation file for this updated resource. 
-	FindMatchingElement	Look for an element in the passed translation 
-				database ResourceArray which matches (name and 
-				data) this element from the updated geode. 
-	VerifyElementsMatch	Check if two elements, one from the translation 
-				file and from the updated geode, contain the 
-				same chunk. 
-	CompareData		Compare the origItem from the old and new 
-				elements to check for matches. 
-	FindElementsInResource	Enumerate an updated ResourceArray's elements, 
-				looking for matches in the passed translation 
-				file's ResourceArray. 
-	FindElementsInResourceCallback	Look for a match for this element from 
-				the updated ResourceArray in the translation 
-				file's ResourceArray. 
-	DeleteGeodeGroups	Free all DBGroups used by this ResourceMap. 
-	FixChunkState		Any unmarked elements in this ResourceArray 
-				from the new ResourceMap are chunks that have 
-				been added to the geode since the translation 
-				file was created or last updated. Set their 
-				ChunkState to CS_ADDED. Clear the ChunkState of 
-				CS_UNCHANGED chunks so that the filtering code 
-				works properly. (Unchanged chunks are shown by 
-				default.) 
-	FinishUpdate		Mark all unmarked chunks as "new" (if in the 
-				new ResourceMap) or "delete" (if in the old 
-				ResourceMap). Copy the "deleted" chunks to a 
-				new resource in the updated database, called 
-				"Deleted_Chunks". 
-	FinishUpdateCallback	Copy unmarked elements from old DB to new 
-				"Deleted_Chunks" resource in updated DB. 
-	ChunkCountCallback	Count the number of new, changed chunks in this 
-				resource. 
-	MoveDeletedChunks	Move unmarked chunks to Deleted_Chunks resource 
-				in update. 
-	MoveDeletedChunksCallback	No match was found for this chunk in 
-				the updated database, so move it to the new 
-				resource in the update created just for this 
-				purpose. 
-	DisplayChunkStateCounts	Report the results of the update to user. 
-	BatchDisplayChunkStateCounts	Report the results of the change to the 
+	DocumentCommitUpdate	Reset translation file to not updated state
+				(clear all chunk state flags and remove the
+				"Deleted Chunks" resource.
+	ClearState		Clear ChunkState flags in this element.
+	DocumentUpdateTranslation	Creates the updated translation
+				database from new localization file and geode,
+				which is then merged with the existing
+				translation file for this document.
+	SetCommitTriggerState	Enables/Disables the CommitTrigger
+				appropriately.
+	MergeUpdateAndTrans	Enumerates all the elements in the new
+				ResourceMap, merging the updated translation
+				database into the existing one.
+	MergeResource		For the passed updated resource, looks for a
+				matching resource and matching elements in the
+				existing translation database.
+	FindUnmatchedElements	Enumerate an updated ResourceArray, looking for
+				elements which were not matched by a chunk in
+				the corresponding ResourceArray in the old
+				translation database.
+	FindUnmatchedElementsCallback	Enumerate this resource from the old
+				translation file, trying to find a match for
+				the passed ResourceArrayElement from the
+				updated database.
+	FindMatchingResource	Search by name for a matching resource in the
+				translation file for this updated resource.
+	FindMatchingElement	Look for an element in the passed translation
+				database ResourceArray which matches (name and
+				data) this element from the updated geode.
+	VerifyElementsMatch	Check if two elements, one from the translation
+				file and from the updated geode, contain the
+				same chunk.
+	CompareData		Compare the origItem from the old and new
+				elements to check for matches.
+	FindElementsInResource	Enumerate an updated ResourceArray's elements,
+				looking for matches in the passed translation
+				file's ResourceArray.
+	FindElementsInResourceCallback	Look for a match for this element from
+				the updated ResourceArray in the translation
+				file's ResourceArray.
+	DeleteGeodeGroups	Free all DBGroups used by this ResourceMap.
+	FixChunkState		Any unmarked elements in this ResourceArray
+				from the new ResourceMap are chunks that have
+				been added to the geode since the translation
+				file was created or last updated. Set their
+				ChunkState to CS_ADDED. Clear the ChunkState of
+				CS_UNCHANGED chunks so that the filtering code
+				works properly. (Unchanged chunks are shown by
+				default.)
+	FinishUpdate		Mark all unmarked chunks as "new" (if in the
+				new ResourceMap) or "delete" (if in the old
+				ResourceMap). Copy the "deleted" chunks to a
+				new resource in the updated database, called
+				"Deleted_Chunks".
+	FinishUpdateCallback	Copy unmarked elements from old DB to new
+				"Deleted_Chunks" resource in updated DB.
+	ChunkCountCallback	Count the number of new, changed chunks in this
+				resource.
+	MoveDeletedChunks	Move unmarked chunks to Deleted_Chunks resource
+				in update.
+	MoveDeletedChunksCallback	No match was found for this chunk in
+				the updated database, so move it to the new
+				resource in the update created just for this
+				purpose.
+	DisplayChunkStateCounts	Report the results of the update to user.
+	BatchDisplayChunkStateCounts	Report the results of the change to the
 				user while in batch mode.
-	SetUpdateState		Sets the update flag in the document and TMH. 
-	MyCopyDBItem		Copy a DBItem, fixing up es or ds. 
+	SetUpdateState		Sets the update flag in the document and TMH.
+	MyCopyDBItem		Copy a DBItem, fixing up es or ds.
 
 REVISION HISTORY:
 	Name	 Date		Description
 	----	 ----		-----------
         cassie	 11/19/92	Initial revision
-	canavese 10/9/95	Localization file now found automatically, 
+	canavese 10/9/95	Localization file now found automatically,
 				batch functionality added.
 
 DESCRIPTION:
@@ -95,7 +95,7 @@ DESCRIPTION:
 	The strategy here is to assume that all updates will be taking place
 	on geodes that were parsed using localiation VM files, so that the
 	resources and chunks have names (not just the generic Resource7 and
-	Chunk5 type of names).  
+	Chunk5 type of names).
 
 	When the user starts the Update, the geode for that localization
 	file will be opened and parsed into a ResourceMap/ResourceArray
@@ -103,13 +103,13 @@ DESCRIPTION:
 	original Map.  The new map will replace the old when when the update
 	is completed.
 
-	For every element in the new (updated) ResourceMapArray, look for a 
+	For every element in the new (updated) ResourceMapArray, look for a
 	element (resource) of the same name in the original map.
 
 	    If not found, mark the resource as a "new".
 
-	    For every element (chunk) in the updated resource's 
-	    ResourceArray, look for a chunk of the same name 
+	    For every element (chunk) in the updated resource's
+	    ResourceArray, look for a chunk of the same name
 	    in the original ResourceArray.
 
 		If found, compare data in the new and old chunks.
@@ -122,10 +122,10 @@ DESCRIPTION:
 		If not found, do a search through every ResourceArray in
 		the old map for a chunk containing the same data.
 
-		    If found, mark it as a match, copying the 
-		    translation item from the original element to the 
+		    If found, mark it as a match, copying the
+		    translation item from the original element to the
 		    new element.
-		    
+
 		    If not found, mark it as a new element.
 
 	After the matching process is completed, any unmarked
@@ -136,9 +136,9 @@ DESCRIPTION:
 	resource in the updated map, called "Deleted Chunks".  Any
 	empty resources are deleted.
 
-	At this point, the new map contains all information from both 
-	the old and the new versions of the geode, so the old ResourceMap 
-	and its ResourceArrays are deleted and the new ResourceMap is set 
+	At this point, the new map contains all information from both
+	the old and the new versions of the geode, so the old ResourceMap
+	and its ResourceArrays are deleted and the new ResourceMap is set
 	as the MapItem for the translation file.
 
 	$Id: documentUpdate.asm,v 1.1 97/04/04 17:14:12 newdeal Exp $
@@ -160,7 +160,7 @@ SYNOPSIS:	Reset translation file to not updated state
 CALLED BY:	DocumentUpdateTranslation
 PASS:		*ds:si	- document
 		ds:di	- document
-	
+
 RETURN:		nothing
 DESTROYED:	ax,bx,dx,bp
 
@@ -218,7 +218,7 @@ DocumentCommitUpdate		method  ResEditDocumentClass,
 	jnc	notFound
 
 	call	ChunkArrayElementToPtr		;ds:di <- DeletedChunks ResEle.
-	call	ChunkArrayDelete		
+	call	ChunkArrayDelete
 	call	DBDirty_DS
 	call	DBUnlock_DS
 
@@ -231,7 +231,7 @@ DocumentCommitUpdate		method  ResEditDocumentClass,
 
 	;
 	; Reinitialize the ResourceList with the possibly changed
-	; number of resources. 
+	; number of resources.
 	;
 	push	si
 	mov	cx, ds:[di].REDI_mapResources
@@ -265,12 +265,12 @@ DocumentCommitUpdate		method  ResEditDocumentClass,
 	call	DocumentChangeResourceAndChunk
 
 done:
-	; 
+	;
 	; Clear the NOT_COMMITTED flag
 	;
 	DerefDoc
 	mov	al, ds:[di].REDI_state
-	andnf	al, not (mask DS_UPDATE_NOT_COMMITTED) 
+	andnf	al, not (mask DS_UPDATE_NOT_COMMITTED)
 	call	SetUpdateState
 
 	call	MarkNotBusyAndResumeInput
@@ -348,7 +348,7 @@ PSEUDO CODE/STRATEGY:
 	geode, which is refered to as the destination in the TranslationFileFrame
 	structure, (this is necessary for ReadLocalizationFile).
 
-	Look for matching elements in the existing translation database, 
+	Look for matching elements in the existing translation database,
 	will be refered to as the the source Group, Item, Array in the
 	TranslationFileFrame structure.
 
@@ -383,17 +383,17 @@ DocumentUpdateTranslation		method dynamic ResEditDocumentClass,
 		call	MarkBusyAndHoldUpInput
 
 	; Allocate a DocumentHandlesStruct for use in parsing the geode
-	
+
 		call	AllocResourceHandleTable	; es <- DHS segment
 
 	; Allocate a new map item in the translation DB file
-	
+
 		call	GetFileHandle
 		call	AllocMapItem		;ax:di <- GIPtr of map block
 
 	; Set up TranslationFileFrame with the destination DBGroup/Item
-	; numbers for ReadLocalizationFile. 
-	
+	; numbers for ReadLocalizationFile.
+
 		sub	sp, size TranslationFileFrame
 		mov	bp, sp
 EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
@@ -412,9 +412,9 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		LONG jc	errorOpen
 		mov	ss:[bp].TFF_locFile, ax
 
-	; Commit any previous update - 
+	; Commit any previous update -
 	; clear ChunkState, delete "Deleted Chunks" resource.
-	
+
 		call	DocumentCommitUpdate
 
 	; Change to source geode directory.
@@ -424,11 +424,11 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		call	ObjCallInstanceNoLock
 
 	; Read the chunk data into the ResourceArrays.
-	
+
 		mov	ax, MSG_RESEDIT_DOCUMENT_READ_SOURCE_GEODE
 		call	ObjCallInstanceNoLock	; cx <- # editable resources
 		call	FilePopDir
-		jc	error	
+		jc	error
 
 	; Error if geode has no resources.
 
@@ -437,8 +437,8 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		jz	error
 
 	; Copy the localization file info into the ResourceArrays.
-	
-		call	ReadLocalizationFile		
+
+		call	ReadLocalizationFile
 		jc	error
 
 	; Merge the updated info with the translation file info
@@ -450,14 +450,16 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		push	ax, bx, dx		;save chunk state counts
 
 	; Set the document state to "updated but not commited"
-	
+
 		DerefDoc
 		mov	al, ds:[di].REDI_state
 		ornf	al, mask DS_UPDATE_NOT_COMMITTED
 		call	SetUpdateState
 
 	; Update the copyright interaction
+		push	cx
 		call	SetCopyrightInteraction
+		pop	cx
 
 	; Re-initialize the ResourceList w/new number of resources.
 
@@ -471,13 +473,13 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		pop	si, di
 
 	; Go to resource 0, chunk 0, the translation view.
-	; In order for this to work, REDI_curResource cannot equal 0.  
+	; In order for this to work, REDI_curResource cannot equal 0.
 	; If it does, the call to DocumentChangeResource will be skipped,
 	; and the new resource information will not get set in the document.
 
 	; Force the change of resource by setting REDI_curResource to
 	; something other than 0.
-	
+
 		mov	ds:[di].REDI_curResource, 1
 		clr	cx
 		clr	dx
@@ -485,7 +487,7 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		call	DocumentGoToResourceChunkTarget
 
 		mov	al, 1				; enable the commit trigger
-		call	SetCommitTriggerState		
+		call	SetCommitTriggerState
 
 		call	MarkNotBusyAndResumeInput
 
@@ -518,14 +520,14 @@ errorOpen:
 error:
 		call	MarkNotBusyAndResumeInput
 	; Close all files and free all blocks.
-	
+
 		mov	cx, ax			; ErrorValue.
 		call	CloseFilesAndFreeBlocks
 
 	; Was document committed (and a backup copy made)?
 	; recover the pre-committed version if so and restore the
 	; DS_UPDATE_NOT_COMMITTED flag.
-	
+
 		DerefDoc
 		test	ds:[di].REDI_state, mask DS_UPDATE_NOT_COMMITTED
 		pop	ax, di					;ax:di <- new map GIPtr
@@ -536,7 +538,7 @@ error:
 		pop	cx
 
 	; Reset the UPDATE_NOT_COMMITTED flag to its previous state.
-	
+
 		mov	al, ss:[bp].TFF_documentState
 		andnf	al, mask DS_UPDATE_NOT_COMMITTED	; clear other flags
 		DerefDoc
@@ -608,7 +610,7 @@ setState:
 ;	mov	ax, MSG_VIS_VUP_UPDATE_WIN_GROUP
 ;	mov	di, mask MF_FIXUP_DS
 ;	call 	ObjMessage
-	
+
 	.leave
 	ret
 SetCommitTriggerState		endp
@@ -620,7 +622,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Enumerates all the elements in the new ResourceMap, merging
-		the updated translation database into the existing one. 
+		the updated translation database into the existing one.
 
 CALLED BY:	DocumentUpdateTranslation
 
@@ -656,16 +658,16 @@ EC <		call	AssertIsResEditDocument			>
 		call	ChunkArrayEnum
 
 	; Lock the original ResourceMap
-	
+
 		segmov	es, ds
 		mov	di, es:[si]		;es:di <- new map block
 		mov	bx, ss:[bp].TFF_transFile
-		call	DBLockMap_DS	
+		call	DBLockMap_DS
 		mov	si, ds:[si]		;ds:si <- old map block
 
 	; Copy destination name from the old to the new map block
 
-		movdw	axdx, sidi	
+		movdw	axdx, sidi
 		lea	si, ds:[si].TMH_destName
 		lea	di, es:[di].TMH_destName
 		mov	cx, (FILE_LONGNAME_BUFFER_SIZE)
@@ -673,15 +675,24 @@ EC <		call	AssertIsResEditDocument			>
 
 	; Copy relative path from the old to the new map block
 
-		movdw	sidi, axdx	
+		movdw	sidi, axdx
 		lea	si, ds:[si].TMH_relativePath
 		lea	di, es:[di].TMH_relativePath
 		mov	cx, size PathName
 		rep	movsb
 
+	; Copy user notes from the old to the new map block
+
+		movdw	sidi, axdx
+		lea	si, ds:[si].TMH_userNotes
+		lea	di, es:[di].TMH_userNotes
+SBCS <		mov	cx, GFH_USER_NOTES_BUFFER_SIZE			>
+DBCS <		mov	cx, size FileUserNotes			>
+		rep	movsb
+
 	; Copy source name from the old to the new map block
 
-		movdw	sidi, axdx	
+		movdw	sidi, axdx
 		lea	si, ds:[si].TMH_sourceName
 		lea	di, es:[di].TMH_sourceName
 		mov	cx, size FileLongName
@@ -689,13 +700,13 @@ EC <		call	AssertIsResEditDocument			>
 
 	; Copy path length from old to new map block.
 
-		movdw	sidi, axdx	
+		movdw	sidi, axdx
 		mov	cx, ds:[si].TMH_pathLength
 		mov	es:[di].TMH_pathLength, cx
 
 	; Copy DOS name from old to new map block.
 
-		movdw	sidi, axdx	
+		movdw	sidi, axdx
 		lea	si, ds:[si].TMH_dosName
 		lea	di, es:[di].TMH_dosName
 		mov	cx, size DosDotFileName
@@ -749,10 +760,10 @@ DESTROYED:	es
 
 PSEUDO CODE/STRATEGY:
 	See if a resource of the same name exists in the translation file
-	If so, look for matching chunks in that resource.  
-	If not, mark this as a new resource.  
+	If so, look for matching chunks in that resource.
+	If not, mark this as a new resource.
 
-	For all unmatched chunks, now look through all resources 
+	For all unmatched chunks, now look through all resources
 	for matching chunks. (same data.  name?)
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -805,17 +816,17 @@ lockResArray:
 	mov	di, es:[di].RME_data.RMD_item
 	call	DBLock_DS			;*ds:si <- updated ResArray
 	popf
-	jnc	callCallback			;no matching resource, so 
+	jnc	callCallback			;no matching resource, so
 						; go through every resource
 
 	; save the OD for the translation file's ResourceMap
 	; since TFF_sourceArray is used by MergeElementsIntoResource
 	;
-	pushdw	ss:[bp].TFF_sourceArray	
+	pushdw	ss:[bp].TFF_sourceArray
 
 	;
-	; first look for matching chunks in the matching resource from 
-	; the translation file 
+	; first look for matching chunks in the matching resource from
+	; the translation file
 	; ss:[bp].TFF_destGroup - updated resource's group
 	; ss:[bp].TFF_sourceGroup - matching ResourceMapElement's group#
 	; ss:[bp].TFF_sourceItem - matching ResourceMapElement's ResArray item#
@@ -826,7 +837,7 @@ lockResArray:
 callCallback:
 	;
 	; Now *ds:si = ResourceArray for the updated geode.
-	; For each unmatched element in this array, find a 
+	; For each unmatched element in this array, find a
 	; matching element in the translation database.
 	;
 	mov	bx, cs
@@ -843,7 +854,7 @@ callCallback:
 	ret
 
 newResource:
-	; mark the updated ResourceMapElement as new, since no 
+	; mark the updated ResourceMapElement as new, since no
 	; match was found in the translation ResourceMap
 	;
 	movdw	esdi, ss:[bp].TFF_destArray
@@ -866,7 +877,7 @@ SYNOPSIS:	Enumerate an updated ResourceArray, looking for elements
 CALLED BY: 	MergeResource (via ChunkArrayEnum)
 
 PASS:		*ds:si	- updated ResourceArray
-		ds:di	- updated ResourceArrayElement 
+		ds:di	- updated ResourceArrayElement
 		ax	- element size
 		ss:bp	- TranslationFileFrame:
 			TFF_sourceArray - OD of translation file ResourceMap
@@ -950,7 +961,7 @@ FindUnmatchedElementsCallback	proc	far
 
 	push	ds:[LMBH_handle]
 
-	; lock the ResourceArray from the translation database	
+	; lock the ResourceArray from the translation database
 	;
 	mov	bx, ss:[bp].TFF_transFile
 	mov	ax, ds:[di].RME_data.RMD_group
@@ -1103,7 +1114,7 @@ done:
 
 found:
 	; Now es:di = parsed element data we are trying to find a match for,
-	; and dx:ax = data from the translation file element with the 
+	; and dx:ax = data from the translation file element with the
 	; same name.  See if they really match. (Consider it a match unless
 	; the chunk type has changed??)
 	; jmagasin: If they don't match, we still need to check the other
@@ -1121,13 +1132,13 @@ found:
 	xchg	bx, ax				;ax <- match #, bx <- MatchType
 	mov	dx, ax				; save match #
 	test	bx, mask MT_MATCH
-	jnz	dontTry	
+	jnz	dontTry
 	call	TryAllTranslationChunks
 	jc	dontTry				; it matches
         mov	bx, mask MT_DATA_MISMATCH	; name matches, but not data
 	mov	ax, dx				; restore the match #
 dontTry:
-	stc					
+	stc
 	jmp	done
 
 FindMatchingElement		endp
@@ -1146,10 +1157,10 @@ PASS:		es:di	- ResourceArrayElement
 RETURN:		carry set if match
 		ax	-  element number
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1196,13 +1207,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		VerifyElementsMatch
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Check if two elements, one from the translation file and 
+SYNOPSIS:	Check if two elements, one from the translation file and
 		from the updated geode, contain the same chunk.
 
 CALLED BY:	FindMatchingElement
 
 PASS:		dx:ax	- old ResourceArrayData
-		es:di	- updated ResourceArrayData 
+		es:di	- updated ResourceArrayData
 		ss:bp	- TranslationFileFrame
 
 RETURN:		ax 	- MatchType
@@ -1213,7 +1224,7 @@ DESTROYED:	cx,dx
 
 PSEUDO CODE/STRATEGY:
     Elements match only if they have the same ChunkType and the data
-    is exactly the same.  
+    is exactly the same.
 
     The chunk is considered to have changed if:
     	- ChunkType flags are different
@@ -1223,7 +1234,7 @@ PSEUDO CODE/STRATEGY:
     Everything else being equal, the elements match, even if their
     handles/numbers are different.  (the chunk may have moved without
     changing at all)
-	
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
@@ -1234,7 +1245,7 @@ REVISION HISTORY:
 VerifyElementsMatch	proc	near
 	uses	bx,si,di,ds,es
 	.enter
-	
+
 	; if the old element has been marked changed/unchanged,
 	; it has already been matched up with an updated chunk.
 	;
@@ -1265,7 +1276,7 @@ VerifyElementsMatch	proc	near
 
 handlesOK:
 	; get the item numbers for the chunks containing the original data
-	; 
+	;
 	mov	si, ds:[si].RAD_origItem
 EC <	tst	si						>
 EC <	ERROR_Z INVALID_ITEM					>
@@ -1368,7 +1379,7 @@ bytesMatch:
 	pop	cx,si,di
 
 	pop	ax
-	tst	bx				
+	tst	bx
 	jz	match
 	ornf	al, mask MT_DATA_MISMATCH
 ;	sub	cx, bx				;cx <- # of matches
@@ -1391,7 +1402,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FindElementsInResource
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Enumerate an updated ResourceArray's elements, looking for 
+SYNOPSIS:	Enumerate an updated ResourceArray's elements, looking for
 		matches in the passed translation file's ResourceArray.
 
 CALLED BY:	MergeResource
@@ -1418,7 +1429,7 @@ FindElementsInResource		proc	near
 	.enter
 
 	; lock the translation file's ResourceArray
-	; 
+	;
 	mov	bx, ss:[bp].TFF_transFile
 	mov	ax, ss:[bp].TFF_sourceGroup
 	mov	di, ss:[bp].TFF_sourceItem
@@ -1496,12 +1507,12 @@ DBCS <	push	bp				;need an extra register	>
 	segmov	es, ds 				;es:di <- new element
 	movdw	bxsi, ss:[bp].TFF_sourceArray
 	call	MemDerefDS			;*ds:si <- old ResArray
-	call	FindMatchingElement		;cx <- matching element #, 
+	call	FindMatchingElement		;cx <- matching element #,
 						;  ax <- MatchType
 	jnc	done				;no match was found in this
-						;  old ResourceArray 
+						;  old ResourceArray
 	;
-	; 
+	;
 	; get a pointer to the matching element in the old ResourceArray
 	;
 	push	ax, di
@@ -1535,7 +1546,7 @@ saveState:
 	; invalidating any stored pointers to it.
 	;
 	mov	di, ds:[si].RAE_data.RAD_transItem	;di <- source item
-	tst	di	
+	tst	di
 	jz	done
 
 	push	ds:[si].RAE_data.RAD_kbdShortcut	;save kbd shortcut
@@ -1588,7 +1599,7 @@ exit:
 	pop	bx
 	call	MemDerefES
 	clc					;clear so enum will continue
-	
+
 DBCS <	pop	bp							>
 	.leave
 	ret
@@ -1660,8 +1671,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FixChunkState
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Any unmarked elements in this ResourceArray from the 
-		new ResourceMap are chunks that have been added to the 
+SYNOPSIS:	Any unmarked elements in this ResourceArray from the
+		new ResourceMap are chunks that have been added to the
 		geode since the translation file was created or last
 		updated.  Set their ChunkState to CS_ADDED.  Clear the
 		ChunkState of CS_UNCHANGED chunks so that the filtering
@@ -1685,7 +1696,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 FixChunkState	proc 	near
-	
+
 	push	cx
 	call	ChunkArrayElementToPtr
 	tst	ds:[di].RAE_data.RAD_chunkState
@@ -1741,22 +1752,22 @@ FinishUpdate		proc	near
 
 		push	ds:[LMBH_handle], si
 
-	; Lock the updated ResourceMap and enumerate it to 
+	; Lock the updated ResourceMap and enumerate it to
 	; mark all unmarked elements with ChunkState = CS_ADDED
 
 		push	ax, di
 		mov	bx, ss:[bp].TFF_transFile
 		call	DBLock_DS	; *ds:si <- updated ResourceMap
 
-	; Add the new resource for the deleted chunks.  (AddNewResource 
+	; Add the new resource for the deleted chunks.  (AddNewResource
 	; adds a resource with the name ResourceN, where N = ax)
 	; Resource0 will not exist at this point, since it is always
 	; dgroup it is always deleted when the trans file is created.
 
-		clr	ax			; try adding "Resource0" 
+		clr	ax			; try adding "Resource0"
 		call	AddNewResource		; ax <- token of new element
 EC <		ERROR_C	RESEDIT_INTERNAL_LOGIC_ERROR			>
-	
+
 		call	ChunkArrayElementToPtr	; ds:di <- new ResourceMapElement
 		mov	ax, ds:[di].RME_data.RMD_group
 		mov	ss:[bp].TFF_destGroup, ax
@@ -1765,7 +1776,7 @@ EC <		ERROR_C	RESEDIT_INTERNAL_LOGIC_ERROR			>
 		call	DBDirty_DS		; dirty the new ResourceMap
 		call	DBUnlock_DS		; unlock it
 
-	; Copy unmarked chunks in the translation database to 
+	; Copy unmarked chunks in the translation database to
 	; Resource0 in the udpated database.
 
 		clr	ss:[bp].TFF_chunkNumber	; initialize the chunk number
@@ -1806,7 +1817,7 @@ EC <	ERROR_NC RESEDIT_INTERNAL_LOGIC_ERROR			>
 	call	DBLock_DS			;*ds:si <- Resource0's array
 	call	ChunkArrayGetCount		;cx <- #chunks in Resource0
 	call	DBUnlock_DS
-	pop	bx, si	
+	pop	bx, si
 	call	MemDerefDS			;*ds:si <- new ResourceMap
 
 	; if there are no chunks, delete the group it uses
@@ -1833,7 +1844,7 @@ noDeletedItems:
 	clr	cx, dx				; initialize counters
 	mov	bx, cs
 	mov	di, offset FinishUpdateCallback
-	call	ChunkArrayEnum			
+	call	ChunkArrayEnum
 	mov	ax, cx				; ax <- # changed chunks,
 						; dx <- # new chunks
 	call	ChunkArrayGetCount		; cx <- # non-empty resources
@@ -1844,7 +1855,7 @@ noDeletedItems:
 	pop	bx, si
 	call	MemDerefDS
 	mov	bx, di				; bx <- # of deleted chunks
-	
+
 	.leave
 	ret
 
@@ -1887,7 +1898,7 @@ FinishUpdateCallback		proc	far
 	mov	ax, ds:[di].RME_data.RMD_group
 	mov	di, ds:[di].RME_data.RMD_item
 	call	DBLock_DS			;*ds:si <- ResourceArray
-	
+
 	;
 	; count the number of new and changed chunks
 	;
@@ -1921,7 +1932,7 @@ FinishUpdateCallback		proc	far
 	call	DBDirty_DS			; dirty the new map
 
 noDelete:
-	
+
 	.leave
 	ret
 
@@ -1943,7 +1954,7 @@ PASS:		*ds:si	- ResourceArray
 		dx - cumulative count of new chunks
 
 RETURN:		cx, dx updated
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1975,7 +1986,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Move unmarked chunks to Deleted_Chunks resource in update.
-		
+
 CALLED BY:	FinishUpdate (via ChunkArrayEnum)
 
 PASS:		*ds:si	- ResourceMapArray from translation database file
@@ -2008,7 +2019,7 @@ MoveDeletedChunks		proc	far
 	mov	ss:[bp].TFF_sourceGroup, ax
 	mov	di, ds:[di].RME_data.RMD_item
 	call	DBLock_DS
-	
+
 	; move all of the unmarked chunks from this resource to the
 	; new Deleted_Chunks resource in the updated database
 	;
@@ -2062,19 +2073,19 @@ MoveDeletedChunksCallback	proc	far
 	.enter
 
 	; if this element has been marked (changed, unchanged)
-	; it is present in the updated database. 
+	; it is present in the updated database.
 	;
 	push	ds:[LMBH_handle]
 	tst	ds:[di].RAE_data.RAD_chunkState
 	LONG	jnz	done
-	
+
 	mov	cx, ax				;cx <- element size
 	mov	si, di				;ds:si <- source element
 
 	;
 	; copy element data (not name or element header) from old element
 	; to a buffer on the stack, pointed to by TFF_destArray
-	; 
+	;
 	sub	sp, size ResourceArrayData
 	movdw	ss:[bp].TFF_destArray, sssp
 
@@ -2087,7 +2098,7 @@ MoveDeletedChunksCallback	proc	far
 	pop	si, di
 
 	;
-	; mark the new element's ChunkState as deleted and 
+	; mark the new element's ChunkState as deleted and
 	; give it a new number so that no two chunks in this resource
 	; will have the same number
 	;
@@ -2096,9 +2107,9 @@ MoveDeletedChunksCallback	proc	far
 	inc	ax
 	mov	es:[di].RAD_number, ax
 	mov	ss:[bp].TFF_chunkNumber, ax
-	
+
 	;
-	; copy the original item, translation item and 
+	; copy the original item, translation item and
 	; instruction item into the new element's DBGroup
 	;
 	push	bp, di
@@ -2117,7 +2128,7 @@ EC <	ERROR_Z	INVALID_ITEM				>
 	clr	ax
 	push	bp, di
 	mov	di, ds:[si].RAD_transItem	 	;translation item
-	tst	di	
+	tst	di
 	jz	copyInst
 
 	mov	ax, ss:[bp].TFF_sourceGroup
@@ -2132,7 +2143,7 @@ copyInst:
 	clr	ax
 	push	bp, di
 	mov	di, ds:[si].RAD_instItem		;instruction item
-	tst	di	
+	tst	di
 	jz	noInfo
 
 	mov	ax, ss:[bp].TFF_sourceGroup
@@ -2253,10 +2264,10 @@ PASS:		ax	= number of changed chunks
 		dx	= number of new chunks
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2399,20 +2410,20 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Copy a DBItem, fixing up es or ds.
 
-CALLED BY:	
+CALLED BY:
 PASS: 		bx = Source file handle.
 		ax = group of source DB item
 		di = source item	(Offset to DBItemInfo in group block).
 		ds, es = segments containing ResourceArrays
 
-		bp = dest file handle 
+		bp = dest file handle
 		cx = destination group
 
 RETURN:		ax:di	- new item
 DESTROYED:	nothing, ds or es fixed up if pointing to DBItem block.
 
 	WARNING: MyCopyDBItem may move the destination group (in this
-	case, containing a ResourceArray) invalidating any stored 
+	case, containing a ResourceArray) invalidating any stored
 	pointers to any items in it.
 
 PSEUDO CODE/STRATEGY:
