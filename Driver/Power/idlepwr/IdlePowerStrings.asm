@@ -12,7 +12,7 @@ ROUTINES:
 	Name			Description
 	----			-----------
 
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -21,7 +21,7 @@ REVISION HISTORY:
 DESCRIPTION:
 	This is common battery code
 
-	$Id: nopowerStrings.asm,v 1.1 97/04/18 11:48:16 newdeal Exp $
+	$Id: IdlePowerStrings.asm,v 1.1 97/04/18 11:48:16 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 

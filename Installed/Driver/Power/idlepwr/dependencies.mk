@@ -1,5 +1,5 @@
-nopower.obj \
-nopower.eobj: geos.def heap.def lmem.def geode.def resource.def ec.def \
+IdlePower.obj \
+IdlePower.eobj: geos.def heap.def lmem.def geode.def resource.def ec.def \
                 Internal/heapInt.def Internal/semInt.def sysstats.def \
                 powerGeode.def driver.def initfile.def timer.def \
                 system.def localize.def sllang.def ui.def file.def vm.def \
@@ -28,6 +28,6 @@ nopower.eobj: geos.def heap.def lmem.def geode.def resource.def ec.def \
                 Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def \
                 Internal/interrup.def Internal/powerDr.def \
                 powerConstant.def powerVariable.def powerCode.asm \
-                powerBattery.asm powerUtils.asm nopowerStrings.asm
+                powerBattery.asm powerUtils.asm IdlePowerStrings.asm
 
-nopowerEC.geo nopower.geo : geos.ldf ui.ldf 
+idlepwrEC.geo idlepwr.geo : geos.ldf ui.ldf 

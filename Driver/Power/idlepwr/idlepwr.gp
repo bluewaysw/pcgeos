@@ -3,20 +3,20 @@
 #	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 #
 # PROJECT:	PC GEOS
-# MODULE:	NoPower power management driver
-# FILE:		nopower.gp
+# MODULE:	IdlePower power management driver
+# FILE:		IdlePower.gp
 #
 # AUTHOR:	Tony Requist, 4/22/93
 #
 # DESCRIPTION:	Contains the geode definitions
 #
-#	$Id: nopower.gp,v 1.1 97/04/18 11:48:16 newdeal Exp $
+#	$Id: IdlePower.gp,v 1.1 97/04/18 11:48:16 newdeal Exp $
 #
 ##############################################################################
 #
-name nopower.drvr
+name idlepwr.drvr
 #
-longname "Empty Power Management Driver"
+longname "Idle Power Management Driver"
 #
 type	driver, single, system
 #

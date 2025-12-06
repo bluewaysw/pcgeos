@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = nopower
-ASM_TO_OBJS     = nopower.asm
+GEODE           = idlepwr
+ASM_TO_OBJS     = IdlePower.asm
 UI_TO_RDFS      =
-SRCS            = nopowerStrings.asm nopower.asm
-OBJS            = nopower.obj
+SRCS            = IdlePowerStrings.asm IdlePower.asm
+OBJS            = IdlePower.obj
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

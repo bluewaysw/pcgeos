@@ -3,8 +3,8 @@ COMMENT @----------------------------------------------------------------------
 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		NoPower power management driver
-FILE:		nopower.asm
+MODULE:		IdlePower power management driver
+FILE:		IdlePower.asm
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -17,7 +17,7 @@ DESCRIPTION:
 	test for common functionality.
 
 RCS STAMP:
-	$Id: nopower.asm,v 1.1 97/04/18 11:48:16 newdeal Exp $
+	$Id: IdlePower.asm,v 1.1 97/04/18 11:48:16 newdeal Exp $
 
 ------------------------------------------------------------------------------@
 
@@ -46,12 +46,12 @@ BATTERY_POLL_INTERVAL =	4*60		; 4 seconds
 
 NO_POWER_DRIVER_UNSUPPORTED_FUNCTION	enum	Warnings
 
-PowerStrategy	equ	<NoPowerStrategy>
+PowerStrategy	equ	<IdlePowerStrategy>
 
 NEEDS_SERIAL_PASSIVE	= 1	; Sets SERIAL_PASSIVE in powerConstants.def
 include powerGeode.def
 
-include nopowerStrings.asm
+include IdlePowerStrings.asm
 
 ;------------------------------------------------------------------------------
 ;		Constants
@@ -64,7 +64,7 @@ include nopowerStrings.asm
 idata segment
 
 DriverTable	DriverInfoStruct <
-	NoPowerStrategy,
+	IdlePowerStrategy,
 	<>,
 	DRIVER_TYPE_POWER_MANAGEMENT
 >
@@ -101,7 +101,7 @@ Resident segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerStrategy
+FUNCTION:	IdlePowerStrategy
 
 DESCRIPTION:	Strategy routine
 
@@ -128,7 +128,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerStrategy	proc	far	uses ds, es
+IdlePowerStrategy	proc	far	uses ds, es
 	.enter
 
 	cmp	di, size functions
@@ -146,35 +146,35 @@ done:
 	.leave
 	ret
 
-NoPowerStrategy	endp
+IdlePowerStrategy	endp
 
 functions	nptr	\
-	NoPowerInit,
-	NoPowerExit,
-	NoPowerSuspend,
-	NoPowerUnsuspend,
-	NoPowerIdle,
-	NoPowerNotIdle,
-	NoPowerNotIdleOnInterruptCompletion,
-	NoPowerLongTermIdle,
-	NoPowerGetStatus,
-	NoPowerSetStatus,
-	NoPowerDeviceOnOff,
-	NoPowerSetPassword,
-	NoPowerVerifyPassword,
-	NoPowerRegisterPowerOnOffNotify,
-	NoPowerDisablePassword,
-	NoPowerRTCAck,
-	NoPowerOnOffUnregister,
-	NoPowerEscCommand
+	IdlePowerInit,
+	IdlePowerExit,
+	IdlePowerSuspend,
+	IdlePowerUnsuspend,
+	IdlePowerIdle,
+	IdlePowerNotIdle,
+	IdlePowerNotIdleOnInterruptCompletion,
+	IdlePowerLongTermIdle,
+	IdlePowerGetStatus,
+	IdlePowerSetStatus,
+	IdlePowerDeviceOnOff,
+	IdlePowerSetPassword,
+	IdlePowerVerifyPassword,
+	IdlePowerRegisterPowerOnOffNotify,
+	IdlePowerDisablePassword,
+	IdlePowerRTCAck,
+	IdlePowerOnOffUnregister,
+	IdlePowerEscCommand
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerInit
+FUNCTION:	IdlePowerInit
 
 DESCRIPTION:	Initialize the driver
 
-CALLED BY:	NoPowerStrategy (DR_INIT)
+CALLED BY:	IdlePowerStrategy (DR_INIT)
 
 PASS:
 	ds, es - idata
@@ -200,7 +200,7 @@ REVISION HISTORY:
 powerCat	char	'power', 0
 showDevicesKey	char	'showDevices', 0
 
-NoPowerInit	proc	near
+IdlePowerInit	proc	near
 
 	; Device specific initialization
 
@@ -224,18 +224,18 @@ devSpecDone:
 	clc						;no error
 	ret
 
-NoPowerInit	endp
+IdlePowerInit	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerExit
+FUNCTION:	IdlePowerExit
 
 DESCRIPTION:	Exit the driver
 
-CALLED BY:	NoPowerStrategy (DR_EXIT)
+CALLED BY:	IdlePowerStrategy (DR_EXIT)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 
 RETURN:
 	none
@@ -255,7 +255,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerExit	proc	near
+IdlePowerExit	proc	near
 
 	; Comon exit code
 
@@ -265,18 +265,18 @@ NoPowerExit	proc	near
 
 	ret
 
-NoPowerExit	endp
+IdlePowerExit	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerSuspend
+FUNCTION:	IdlePowerSuspend
 
 DESCRIPTION:	Suspend our control of the power-management
 
-CALLED BY:	NoPowerStrategy (DR_SUSPEND)
+CALLED BY:	IdlePowerStrategy (DR_SUSPEND)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 	cx:dx - buffer for error message if suspend refused
 
 RETURN:
@@ -297,29 +297,29 @@ REVISION HISTORY:
 	Tony	4/22/93		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerSuspend	proc	near	uses ax, bx, cx, dx, si, bp
+IdlePowerSuspend	proc	near	uses ax, bx, cx, dx, si, bp
 	.enter
 
 	; The common method for suspending/unsuspending the driver is to
 	; do the same thing as init/exit
 
-	call	NoPowerExit
+	call	IdlePowerExit
 
 	.leave
 	ret
 
-NoPowerSuspend	endp
+IdlePowerSuspend	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerUnsuspend
+FUNCTION:	IdlePowerUnsuspend
 
-DESCRIPTION:	NoPowerStrategy (DR_UNSUSPEND)
+DESCRIPTION:	IdlePowerStrategy (DR_UNSUSPEND)
 
 CALLED BY:	INTERNAL
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 
 RETURN:
 	none
@@ -339,31 +339,31 @@ REVISION HISTORY:
 	Tony	4/22/93		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerUnsuspend	proc	near	uses ax, bx, cx, dx, si, bp
+IdlePowerUnsuspend	proc	near	uses ax, bx, cx, dx, si, bp
 	.enter
 
 	; The common method for suspending/unsuspending the driver is to
 	; do the same thing as init/exit
 
-	call	NoPowerInit
+	call	IdlePowerInit
 
 	.leave
 	ret
 
-NoPowerUnsuspend	endp
+IdlePowerUnsuspend	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerIdle
+FUNCTION:	IdlePowerIdle
 
 DESCRIPTION:	Called during the idle (dispatch) loop when there are no
 		runnable threads.  The CPU can be turned off until the next
 		IRQ happens.
 
-CALLED BY:	NoPowerStrategy (DR_POWER_IDLE)
+CALLED BY:	IdlePowerStrategy (DR_POWER_IDLE)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 
 RETURN:
 	none
@@ -383,28 +383,28 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerIdle     proc    near
-        .enter
-        sti                     ; allow wake events
-        int     28h             ; optional: DOS idle hint for TSRs
-        hlt                     ; sleep until next interrupt
-        .leave
-        ret
-NoPowerIdle     endp
+IdlePowerIdle     proc    near
+	.enter
+		sti		; allow wake events
+		int	28h	; optional: DOS idle hint for TSRs
+		hlt		; sleep until next interrupt
+	.leave
+	ret
+IdlePowerIdle     endp
 
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerNotIdle
+FUNCTION:	IdlePowerNotIdle
 
 DESCRIPTION:	Called when an interrupt occurs and GEOS is in the idle state.
 		Drivers that slow (rather than stop) the clock on
 		DR_POWER_IDLE should speed it up again on DR_POWER_NOT_IDLE.
 
-CALLED BY:	NoPowerStrategy (DR_POWER_NOT_IDLE)
+CALLED BY:	IdlePowerStrategy (DR_POWER_NOT_IDLE)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 
 RETURN:
 	none
@@ -424,17 +424,17 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerNotIdle	proc	near
+IdlePowerNotIdle	proc	near
 	.enter
 
 	.leave
 	ret
 
-NoPowerNotIdle	endp
+IdlePowerNotIdle	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerNotIdleOnInterruptCompletion
+FUNCTION:	IdlePowerNotIdleOnInterruptCompletion
 
 DESCRIPTION:	Called when a thread has been woken up (usually as the result
 		of an IRQ).  If the CPU has been halted in the DR_POWER_IDLE
@@ -442,10 +442,10 @@ DESCRIPTION:	Called when a thread has been woken up (usually as the result
 		idle when the interrupt completes. (Generally meaning that
 		there is now a runnable thread.)
 
-CALLED BY:	NoPowerStrategy (DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION)
+CALLED BY:	IdlePowerStrategy (DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 
 RETURN:
 	none
@@ -465,26 +465,26 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerNotIdleOnInterruptCompletion	proc	near
+IdlePowerNotIdleOnInterruptCompletion	proc	near
 	.enter
 
 	.leave
 	ret
 
-NoPowerNotIdleOnInterruptCompletion	endp
+IdlePowerNotIdleOnInterruptCompletion	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerLongTermIdle
+FUNCTION:	IdlePowerLongTermIdle
 
 DESCRIPTION:	Called when the screen saver is about to be invoked, meaning
 		that the user has done nothing for the screen saver idle time
 		(typically one to five minutes).
 
-CALLED BY:	NoPowerStrategy (DR_POWER_LONG_TERM_IDLE)
+CALLED BY:	IdlePowerStrategy (DR_POWER_LONG_TERM_IDLE)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 
 RETURN:
 	carry - set if machine has been turned off and has been awakened
@@ -506,7 +506,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerLongTermIdle	proc	near
+IdlePowerLongTermIdle	proc	near
 	.enter
 
 	; *** This code is for demonstration and testing
@@ -526,18 +526,18 @@ NoPowerLongTermIdle	proc	near
 	.leave
 	ret
 
-NoPowerLongTermIdle	endp
+IdlePowerLongTermIdle	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerGetStatus
+FUNCTION:	IdlePowerGetStatus
 
 DESCRIPTION:	Return power management status
 
-CALLED BY:	NoPowerStrategy (DR_POWER_GET_STATUS)
+CALLED BY:	IdlePowerStrategy (DR_POWER_GET_STATUS)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 	ax - PowerGetStatusType
 
 RETURN:
@@ -559,7 +559,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerGetStatus	proc	near
+IdlePowerGetStatus	proc	near
 	.enter
 
 	; *** This code is for demonstration and testing
@@ -591,18 +591,18 @@ done:
 	.leave
 	ret
 
-NoPowerGetStatus	endp
+IdlePowerGetStatus	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerSetStatus
+FUNCTION:	IdlePowerSetStatus
 
 DESCRIPTION:	Set the power management status
 
-CALLED BY:	NoPowerStrategy (DR_POWER_SET_STATUS)
+CALLED BY:	IdlePowerStrategy (DR_POWER_SET_STATUS)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 	bx - PowerSetStatusType
 	dx:ax - value to set based on PowerSetStatusType
 
@@ -624,7 +624,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerSetStatus	proc	near
+IdlePowerSetStatus	proc	near
 	.enter
 
 	stc
@@ -632,19 +632,19 @@ NoPowerSetStatus	proc	near
 	.leave
 	ret
 
-NoPowerSetStatus	endp
+IdlePowerSetStatus	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerDeviceOnOff
+FUNCTION:	IdlePowerDeviceOnOff
 
 DESCRIPTION:	Called when a device is going to be used or is finished
 		being used.
 
-CALLED BY:	NoPowerStrategy (DR_POWER_DEVICE_ON_OFF)
+CALLED BY:	IdlePowerStrategy (DR_POWER_DEVICE_ON_OFF)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 	ax - PowerDeviceType
 	bx - unit number
 	cx - non-zero if turning on device, zero if turning off
@@ -668,7 +668,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-NoPowerDeviceOnOff	proc	near	uses si, di, bp
+IdlePowerDeviceOnOff	proc	near	uses si, di, bp
 	.enter
 
 	; handle PCMCIA stuff first.
@@ -729,18 +729,18 @@ done:
 	.leave
 	ret
 
-NoPowerDeviceOnOff	endp
+IdlePowerDeviceOnOff	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerSetPassword
+FUNCTION:	IdlePowerSetPassword
 
 DESCRIPTION:	Set the BIOS password (if the BIOS supports a password).
 
-CALLED BY:	NoPowerStrategy (DR_POWER_SET_PASSWORD)
+CALLED BY:	IdlePowerStrategy (DR_POWER_SET_PASSWORD)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 	cx:dx - password (size BIOS_PASSWORD_SIZE)
 
 RETURN:
@@ -761,7 +761,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerSetPassword	proc	near
+IdlePowerSetPassword	proc	near
 	.enter
 
 	stc
@@ -769,18 +769,18 @@ NoPowerSetPassword	proc	near
 	.leave
 	ret
 
-NoPowerSetPassword	endp
+IdlePowerSetPassword	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	NoPowerVerifyPassword
+FUNCTION:	IdlePowerVerifyPassword
 
 DESCRIPTION:	Verify the BIOS password (if the BIOS supports a password).
 
-CALLED BY:	NoPowerStrategy (DR_POWER_VERIFY_PASSWORD)
+CALLED BY:	IdlePowerStrategy (DR_POWER_VERIFY_PASSWORD)
 
 PASS:
-	ds, es - dgroup (from NoPowerStrategy)
+	ds, es - dgroup (from IdlePowerStrategy)
 	cx:dx - password to verify (size BIOS_PASSWORD_SIZE)
 
 RETURN:
@@ -802,7 +802,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-NoPowerVerifyPassword	proc	near
+IdlePowerVerifyPassword	proc	near
 	.enter
 
 	stc
@@ -810,16 +810,16 @@ NoPowerVerifyPassword	proc	near
 	.leave
 	ret
 
-NoPowerVerifyPassword	endp
+IdlePowerVerifyPassword	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NoPowerRegisterPowerOnOffNotify
+		IdlePowerRegisterPowerOnOffNotify
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing.
 
-CALLED BY:	NoPowerStrategy (DR_POWER_ON_OFF_NOTIFY)
+CALLED BY:	IdlePowerStrategy (DR_POWER_ON_OFF_NOTIFY)
 
 PASS:	dx:cx = fptr to call back routine
 
@@ -838,7 +838,7 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NoPowerRegisterPowerOnOffNotify	proc	near
+IdlePowerRegisterPowerOnOffNotify	proc	near
 		.enter
 
 		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
@@ -846,11 +846,11 @@ NoPowerRegisterPowerOnOffNotify	proc	near
 
 		.leave
 		ret
-NoPowerRegisterPowerOnOffNotify	endp
+IdlePowerRegisterPowerOnOffNotify	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NoPowerDisablePassword
+		IdlePowerDisablePassword
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing
@@ -869,7 +869,7 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NoPowerDisablePassword	proc	near
+IdlePowerDisablePassword	proc	near
 		.enter
 
 		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
@@ -877,11 +877,11 @@ NoPowerDisablePassword	proc	near
 
 		.leave
 		ret
-NoPowerDisablePassword	endp
+IdlePowerDisablePassword	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NoPowerRTCAck
+		IdlePowerRTCAck
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing.
@@ -900,7 +900,7 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NoPowerRTCAck	proc	near
+IdlePowerRTCAck	proc	near
 		.enter
 
 		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
@@ -908,11 +908,11 @@ NoPowerRTCAck	proc	near
 
 		.leave
 		ret
-NoPowerRTCAck	endp
+IdlePowerRTCAck	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NoPowerOnOffUnregister
+		IdlePowerOnOffUnregister
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing
@@ -933,7 +933,7 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NoPowerOnOffUnregister	proc	near
+IdlePowerOnOffUnregister	proc	near
 		.enter
 
 		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
@@ -941,11 +941,11 @@ NoPowerOnOffUnregister	proc	near
 
 		.leave
 		ret
-NoPowerOnOffUnregister	endp
+IdlePowerOnOffUnregister	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		NoPowerEscCommand
+		IdlePowerEscCommand
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing.
@@ -968,7 +968,7 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NoPowerEscCommand	proc	near
+IdlePowerEscCommand	proc	near
 		.enter
 
 		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
@@ -976,7 +976,7 @@ NoPowerEscCommand	proc	near
 
 		.leave
 		ret
-NoPowerEscCommand	endp
+IdlePowerEscCommand	endp
 
 
 Resident ends
