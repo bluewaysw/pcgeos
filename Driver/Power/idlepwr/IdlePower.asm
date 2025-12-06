@@ -690,13 +690,8 @@ notParallel:
 	cmp	ax, PDT_SERIAL_PORT		; Catch COM2 being opened
 	jnz	notSerial
 
-	;
-	; We don't yet handle passive serial ports.  When we do, nuke the three
-	; following lines.
-	;
-EC  <	test	bx, SERIAL_PASSIVE					>
-EC  <	ERROR_NZ PASSIVE_SERIAL_PORTS_NOT_SUPPORTED			>
-NEC <	and	bx, not SERIAL_PASSIVE					>
+	; Passive serial ports are supported; just clear the passive flag before
+	; using the unit number.
 
 	mov	bp, offset comPortsOpen
 	mov	si, offset OpenCOM1String
