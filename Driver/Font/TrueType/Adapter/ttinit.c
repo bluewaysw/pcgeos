@@ -687,7 +687,7 @@ static AdjustedWeight mapFontWeight( TT_Short weightClass )
 
 static TextStyle mapTextStyle( const char* subfamily )
 {
-        if ( strcmp( subfamily, "Regular" ) == 0 || strcmp( subfamily, "Medium" ) == 0 )
+        if ( strcmp( subfamily, "Regular" ) == 0 || strcmp( subfamily, "Medium" ) == 0 || strcmp( subfamily, "Roman" ) == 0 )
                 return 0x00;
         if ( strcmp( subfamily, "Bold" ) == 0 )
                 return TS_BOLD;
