@@ -6,7 +6,7 @@
 # MODULE:	IdlePower power management driver
 # FILE:		IdlePower.gp
 #
-# AUTHOR:	Tony Requist, 4/22/93
+# AUTHOR:	MeyerK 12/2025
 #
 # DESCRIPTION:	Contains the geode definitions
 #
@@ -24,8 +24,7 @@ tokenchars "PWRD"
 tokenid 0
 #
 library	geos
-library ui noload
-#library pcmcia noload
+# lib rary ui noload
 #
 # Resident (fixed) code
 #
@@ -33,4 +32,4 @@ resource Resident fixed code read-only shared
 #
 # Strings
 #
-resource StringsUI lmem read-only shared
+#resource StringsUI lmem read-only shared

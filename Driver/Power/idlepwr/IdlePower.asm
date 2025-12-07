@@ -9,17 +9,20 @@ FILE:		IdlePower.asm
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Tony	1/92		Initial version
+	Tony	1/92		Initial version of NoPower
+	MeyerK	12/25		Initial version of IdlePower, based on NoPower
 
 DESCRIPTION:
-	This is a power management driver that does nothing special.  It
-	is intended as a template for power management drivers and as a
-	test for common functionality.
-
-RCS STAMP:
-	$Id: IdlePower.asm,v 1.1 97/04/18 11:48:16 newdeal Exp $
+	This is a power management driver that does nothing special. It
+	puts the processor on HLT whenever GEOS is idle. This reduces the
+	amount of power drawn and fan noise significantly on modern systems
+	and when running under a host os (emulation).
 
 ------------------------------------------------------------------------------@
+
+;------------------------------------------------------------------------------
+;			Include files
+;------------------------------------------------------------------------------
 
 include geos.def
 include heap.def
@@ -31,31 +34,31 @@ include	ec.def
 include Internal/heapInt.def	; for ProcCallFixedOrMovable defs.
 
 ;------------------------------------------------------------------------------
-;			Include files
+;			Constants & more Include files
 ;------------------------------------------------------------------------------
 
-POLL_BATTERY	=	-1
-DISPLAY_MESSAGES =	-1
-PCMCIA_SUPPORT	equ	0		; attempt pcmcia support, please
+DISPLAY_MESSAGES 		=	FALSE
+PCMCIA_SUPPORT			equ	FALSE		; don't attempt pcmcia support
 
-NUMBER_OF_CUSTOM_POWER_WARNINGS = 1
-PW_NO_POWER_SAMPLE_CUSTOM_WARNING	equ	<PW_CUSTOM_1>
+NUMBER_OF_CUSTOM_POWER_WARNINGS = 	1
+PW_IDLE_POWER_CUSTOM_WARNING	equ	<PW_CUSTOM_1>
+IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION	enum	Warnings
 
-BATTERY_POLL_INITIAL_WAIT =	30*60	; 30 seconds
-BATTERY_POLL_INTERVAL =	4*60		; 4 seconds
+POLL_BATTERY			=	FALSE
+BATTERY_POLL_INITIAL_WAIT 	=	30*60	; 30 seconds
+BATTERY_POLL_INTERVAL 		=	4*60	; 4 seconds
 
-NO_POWER_DRIVER_UNSUPPORTED_FUNCTION	enum	Warnings
+PowerStrategy			equ	<IdlePowerStrategy>
 
-PowerStrategy	equ	<IdlePowerStrategy>
+NEEDS_SERIAL_PASSIVE		= FALSE	; No special SERIAL_PASSIVE handling in powerConstants.def
 
-NEEDS_SERIAL_PASSIVE	= 1	; Sets SERIAL_PASSIVE in powerConstants.def
 include powerGeode.def
 
-include IdlePowerStrings.asm
+;------------------------------------------------------------------------------
+;		ForceRefs to suppress warnings
+;------------------------------------------------------------------------------
 
-;------------------------------------------------------------------------------
-;		Constants
-;------------------------------------------------------------------------------
+ForceRef PowerDeviceOnOff
 
 ;------------------------------------------------------------------------------
 ;		Driver Information structure
@@ -84,11 +87,6 @@ notifyAboutDevices	BooleanByte	BB_TRUE
 idata ends
 
 udata	segment
-
-comPortsOpen	word	4 dup(?)
-comPPortsOpen	word	4 dup(?)
-lptPortsOpen	word	4 dup(?)
-
 udata	ends
 
 ;------------------------------------------------------------------------------
@@ -380,14 +378,16 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	Tony	1/31/92		Initial version
+	MeyerK	12/07/25	Initial version
 
 ------------------------------------------------------------------------------@
 IdlePowerIdle     proc    near
 	.enter
-		sti		; allow wake events
-		int	28h	; optional: DOS idle hint for TSRs
-		hlt		; sleep until next interrupt
+
+	sti		; allow wake events
+	int	28h	; optional: DOS idle hint for TSRs
+	hlt		; sleep until next interrupt
+
 	.leave
 	ret
 IdlePowerIdle     endp
@@ -509,19 +509,10 @@ REVISION HISTORY:
 IdlePowerLongTermIdle	proc	near
 	.enter
 
-	; *** This code is for demonstration and testing
-
-	push	ax, bx, di
-	mov	ax, SGIT_UI_PROCESS
-	call	SysGetInfo			;ax = ui handle
-	mov_tr	bx, ax
-
-	mov	ax, MSG_USER_PROMPT_FOR_PASSWORD
-	mov	di, mask MF_FORCE_QUEUE
-	call	ObjMessage
-	pop	ax, bx, di
-
-	stc
+	; we return with carry clear as we DON'T want any special treatment for
+	; the screen saver. The screen saver DOES increase processor load tho
+	; and maybe it would be a good idea to handle it differently...
+	clc
 
 	.leave
 	ret
@@ -568,7 +559,7 @@ IdlePowerGetStatus	proc	near
 	jnz	notPowerOn
 
 	mov	ax, 0				;return no warnings
-	mov	bx, mask PowerWarnings or mask PW_NO_POWER_SAMPLE_CUSTOM_WARNING
+	mov	bx, mask PowerWarnings or mask PW_IDLE_POWER_CUSTOM_WARNING
 	jmp	doneGood
 
 notPowerOn:
@@ -577,7 +568,7 @@ notPowerOn:
 	jnz	notPoll
 
 	mov	ax, 0				;return no warnings
-	mov	bx, mask PowerWarnings or mask PW_NO_POWER_SAMPLE_CUSTOM_WARNING
+	mov	bx, mask PowerWarnings or mask PW_IDLE_POWER_CUSTOM_WARNING
 	jmp	doneGood
 
 notPoll:
@@ -670,56 +661,6 @@ REVISION HISTORY:
 
 IdlePowerDeviceOnOff	proc	near	uses si, di, bp
 	.enter
-
-	; handle PCMCIA stuff first.
-
-	call	PowerDeviceOnOff
-
-	; *** This code is for demonstration and testing
-
-	tst	ds:[notifyAboutDevices]
-	jz	done
-
-	cmp	ax, PDT_PARALLEL_PORT		; Catch LPT1 being opened
-	jnz	notParallel
-	mov	si, offset OpenLPT1String
-	mov	bp, offset lptPortsOpen
-	jmp	displayString
-
-notParallel:
-	cmp	ax, PDT_SERIAL_PORT		; Catch COM2 being opened
-	jnz	notSerial
-
-	; Passive serial ports are supported; just clear the passive flag before
-	; using the unit number.
-
-	mov	bp, offset comPortsOpen
-	mov	si, offset OpenCOM1String
-	test	bx, SERIAL_PASSIVE
-	jz	computeSerialString
-	mov	bp, offset comPPortsOpen
-	mov	si, offset OpenPCOM1String
-computeSerialString:
-	and	bx, not SERIAL_PASSIVE
-
-displayString:
-	shl	bx
-	add	si, bx				; correct string => SI
-	add	bx, bp
-	mov	ax, cx
-	xchg	ds:[bx], ax
-	jcxz	done				; if turning off, do nothing
-	tst	ax
-	jnz	done				; was on before, so do nothing
-	mov	di, vseg DisplayMessage
-	mov	bp, offset DisplayMessage
-	mov	ax, mask CDBF_SYSTEM_MODAL or \
-			(CDT_NOTIFICATION shl offset CDBF_DIALOG_TYPE) or \
-			(GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE)
-	call	CallRoutineInUI
-notSerial:
-
-done:
 	clc			;Return no error
 	.leave
 	ret
@@ -816,11 +757,11 @@ SYNOPSIS:	Do nothing.
 
 CALLED BY:	IdlePowerStrategy (DR_POWER_ON_OFF_NOTIFY)
 
-PASS:	dx:cx = fptr to call back routine
+PASS:		dx:cx = fptr to call back routine
 
 		Routine called:
 			PASS:
-				ax = PowerNotifyChange
+			ax = PowerNotifyChange
 
 RETURN:		carry set if too many routines already registered
 DESTROYED:	nothing
@@ -836,7 +777,7 @@ REVISION HISTORY:
 IdlePowerRegisterPowerOnOffNotify	proc	near
 		.enter
 
-		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -867,7 +808,7 @@ REVISION HISTORY:
 IdlePowerDisablePassword	proc	near
 		.enter
 
-		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -898,7 +839,7 @@ REVISION HISTORY:
 IdlePowerRTCAck	proc	near
 		.enter
 
-		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -931,7 +872,7 @@ REVISION HISTORY:
 IdlePowerOnOffUnregister	proc	near
 		.enter
 
-		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -948,8 +889,8 @@ SYNOPSIS:	Do nothing.
 CALLED BY:	PowerStrategy (DR_POWER_ESC_COMMAND)
 
 PASS:
-	si	-> PowerEscCommand to execute
-	others	-> as command
+		si	-> PowerEscCommand to execute
+		others	-> as command
 
 RETURN:		carry set if EscCommand not supported
 
@@ -966,7 +907,7 @@ REVISION HISTORY:
 IdlePowerEscCommand	proc	near
 		.enter
 
-		WARNING NO_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave

@@ -1,12 +1,12 @@
 #
-# THIS FILE HAS BEEN GENERATED AUTOMATICALLY.
-#
-# If you edit it, you will lose your changes, should it be regenerated.
+# Handcrafted, don't call mkmf!
 #
 GEODE           = idlepwr
+LIBNAME		= power
+PROTOCONST	= POWER
 ASM_TO_OBJS     = IdlePower.asm
 UI_TO_RDFS      =
-SRCS            = IdlePowerStrings.asm IdlePower.asm
+SRCS            = IdlePower.asm
 OBJS            = IdlePower.obj
 LOBJS           =
 
