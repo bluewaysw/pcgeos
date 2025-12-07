@@ -1,14 +1,16 @@
 #
-# Handcrafted, don't call mkmf!
+# THIS FILE HAS BEEN GENERATED AUTOMATICALLY.
+#
+# If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = idlepwr
-LIBNAME		= power
-PROTOCONST	= POWER
 ASM_TO_OBJS     = IdlePower.asm
 UI_TO_RDFS      =
 SRCS            = IdlePower.asm
 OBJS            = IdlePower.obj
 LOBJS           =
+LIBNAME         = power
+PROTOCONST      = POWER
 
 SYSMAKEFILE     = geode.mk
 
