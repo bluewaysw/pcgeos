@@ -618,6 +618,7 @@ REVISION HISTORY:
 IdlePowerSetStatus	proc	near
 	.enter
 
+	;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 	stc
 
 	.leave
@@ -661,7 +662,9 @@ REVISION HISTORY:
 
 IdlePowerDeviceOnOff	proc	near	uses si, di, bp
 	.enter
+
 	clc			;Return no error
+
 	.leave
 	ret
 
@@ -700,6 +703,7 @@ REVISION HISTORY:
 IdlePowerSetPassword	proc	near
 	.enter
 
+	;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 	stc
 
 	.leave
@@ -741,6 +745,7 @@ REVISION HISTORY:
 IdlePowerVerifyPassword	proc	near
 	.enter
 
+	;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 	stc
 
 	.leave
@@ -777,7 +782,7 @@ REVISION HISTORY:
 IdlePowerRegisterPowerOnOffNotify	proc	near
 		.enter
 
-		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -808,7 +813,7 @@ REVISION HISTORY:
 IdlePowerDisablePassword	proc	near
 		.enter
 
-		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -839,7 +844,7 @@ REVISION HISTORY:
 IdlePowerRTCAck	proc	near
 		.enter
 
-		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -872,7 +877,7 @@ REVISION HISTORY:
 IdlePowerOnOffUnregister	proc	near
 		.enter
 
-		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
@@ -907,7 +912,7 @@ REVISION HISTORY:
 IdlePowerEscCommand	proc	near
 		.enter
 
-		WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
