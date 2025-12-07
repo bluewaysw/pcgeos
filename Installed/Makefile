@@ -176,7 +176,7 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts taskmax bnf sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
-		  etherodi etherpkt msnet cdados truetype
+		  etherodi etherpkt msnet cdados truetype \
 		  idlepwr
 
 printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
