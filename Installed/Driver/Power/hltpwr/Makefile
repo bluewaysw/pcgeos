@@ -3,11 +3,11 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = idlepwr
-ASM_TO_OBJS     = IdlePower.asm
+GEODE           = hltpwr
+ASM_TO_OBJS     = hltpwr.asm
 UI_TO_RDFS      =
-SRCS            = IdlePower.asm
-OBJS            = IdlePower.obj
+SRCS            = hltpwr.asm
+OBJS            = hltpwr.obj
 LOBJS           =
 LIBNAME         = power
 PROTOCONST      = POWER

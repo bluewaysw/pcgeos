@@ -3,19 +3,19 @@ COMMENT @----------------------------------------------------------------------
 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		IdlePower power management driver
-FILE:		IdlePower.asm
+MODULE:		HLT Power Management Driver
+FILE:		hltpwr.asm
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Tony	1/92		Initial version of NoPower
-	MeyerK	12/25		Initial version of IdlePower, based on NoPower
+	MeyerK	12/25		Initial version of hltpwr, based on NoPower
 
 DESCRIPTION:
-	This is a power management driver that does nothing special. It
-	puts the processor on HLT whenever GEOS is idle. This reduces the
-	amount of power drawn and fan noise significantly on modern systems
+	This power management driver puts the processor on HLT whenever
+	GEOS is idle. This reduces the amount of power drawn. Less cooling is
+	needed, and fan noise is significantly reduced on modern systems
 	and when running under a host os (emulation).
 
 ------------------------------------------------------------------------------@
@@ -41,14 +41,14 @@ DISPLAY_MESSAGES 		=	FALSE
 PCMCIA_SUPPORT			equ	FALSE		; don't attempt pcmcia support
 
 NUMBER_OF_CUSTOM_POWER_WARNINGS = 	1
-PW_IDLE_POWER_CUSTOM_WARNING	equ	<PW_CUSTOM_1>
-IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION	enum	Warnings
+PW_HLT_POWER_CUSTOM_WARNING	equ	<PW_CUSTOM_1>
+HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION	enum	Warnings
 
 POLL_BATTERY			=	FALSE
 BATTERY_POLL_INITIAL_WAIT 	=	30*60	; 30 seconds
 BATTERY_POLL_INTERVAL 		=	4*60	; 4 seconds
 
-PowerStrategy			equ	<IdlePowerStrategy>
+PowerStrategy			equ	<HLTPowerStrategy>
 
 NEEDS_SERIAL_PASSIVE		= FALSE	; No special SERIAL_PASSIVE handling in powerConstants.def
 
@@ -67,7 +67,7 @@ ForceRef PowerDeviceOnOff
 idata segment
 
 DriverTable	DriverInfoStruct <
-	IdlePowerStrategy,
+	HLTPowerStrategy,
 	<>,
 	DRIVER_TYPE_POWER_MANAGEMENT
 >
@@ -99,7 +99,7 @@ Resident segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerStrategy
+FUNCTION:	HLTPowerStrategy
 
 DESCRIPTION:	Strategy routine
 
@@ -126,7 +126,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerStrategy	proc	far	uses ds, es
+HLTPowerStrategy	proc	far	uses ds, es
 	.enter
 
 	cmp	di, size functions
@@ -144,35 +144,35 @@ done:
 	.leave
 	ret
 
-IdlePowerStrategy	endp
+HLTPowerStrategy	endp
 
 functions	nptr	\
-	IdlePowerInit,
-	IdlePowerExit,
-	IdlePowerSuspend,
-	IdlePowerUnsuspend,
-	IdlePowerIdle,
-	IdlePowerNotIdle,
-	IdlePowerNotIdleOnInterruptCompletion,
-	IdlePowerLongTermIdle,
-	IdlePowerGetStatus,
-	IdlePowerSetStatus,
-	IdlePowerDeviceOnOff,
-	IdlePowerSetPassword,
-	IdlePowerVerifyPassword,
-	IdlePowerRegisterPowerOnOffNotify,
-	IdlePowerDisablePassword,
-	IdlePowerRTCAck,
-	IdlePowerOnOffUnregister,
-	IdlePowerEscCommand
+	HLTPowerInit,
+	HLTPowerExit,
+	HLTPowerSuspend,
+	HLTPowerUnsuspend,
+	HLTPowerIdle,
+	HLTPowerNotIdle,
+	HLTPowerNotIdleOnInterruptCompletion,
+	HLTPowerLongTermIdle,
+	HLTPowerGetStatus,
+	HLTPowerSetStatus,
+	HLTPowerDeviceOnOff,
+	HLTPowerSetPassword,
+	HLTPowerVerifyPassword,
+	HLTPowerRegisterPowerOnOffNotify,
+	HLTPowerDisablePassword,
+	HLTPowerRTCAck,
+	HLTPowerOnOffUnregister,
+	HLTPowerEscCommand
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerInit
+FUNCTION:	HLTPowerInit
 
 DESCRIPTION:	Initialize the driver
 
-CALLED BY:	IdlePowerStrategy (DR_INIT)
+CALLED BY:	HLTPowerStrategy (DR_INIT)
 
 PASS:
 	ds, es - idata
@@ -198,7 +198,7 @@ REVISION HISTORY:
 powerCat	char	'power', 0
 showDevicesKey	char	'showDevices', 0
 
-IdlePowerInit	proc	near
+HLTPowerInit	proc	near
 
 	; Device specific initialization
 
@@ -222,18 +222,18 @@ devSpecDone:
 	clc						;no error
 	ret
 
-IdlePowerInit	endp
+HLTPowerInit	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerExit
+FUNCTION:	HLTPowerExit
 
 DESCRIPTION:	Exit the driver
 
-CALLED BY:	IdlePowerStrategy (DR_EXIT)
+CALLED BY:	HLTPowerStrategy (DR_EXIT)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 
 RETURN:
 	none
@@ -253,7 +253,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerExit	proc	near
+HLTPowerExit	proc	near
 
 	; Comon exit code
 
@@ -263,18 +263,18 @@ IdlePowerExit	proc	near
 
 	ret
 
-IdlePowerExit	endp
+HLTPowerExit	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerSuspend
+FUNCTION:	HLTPowerSuspend
 
 DESCRIPTION:	Suspend our control of the power-management
 
-CALLED BY:	IdlePowerStrategy (DR_SUSPEND)
+CALLED BY:	HLTPowerStrategy (DR_SUSPEND)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 	cx:dx - buffer for error message if suspend refused
 
 RETURN:
@@ -295,29 +295,29 @@ REVISION HISTORY:
 	Tony	4/22/93		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerSuspend	proc	near	uses ax, bx, cx, dx, si, bp
+HLTPowerSuspend	proc	near	uses ax, bx, cx, dx, si, bp
 	.enter
 
 	; The common method for suspending/unsuspending the driver is to
 	; do the same thing as init/exit
 
-	call	IdlePowerExit
+	call	HLTPowerExit
 
 	.leave
 	ret
 
-IdlePowerSuspend	endp
+HLTPowerSuspend	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerUnsuspend
+FUNCTION:	HLTPowerUnsuspend
 
-DESCRIPTION:	IdlePowerStrategy (DR_UNSUSPEND)
+DESCRIPTION:	HLTPowerStrategy (DR_UNSUSPEND)
 
 CALLED BY:	INTERNAL
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 
 RETURN:
 	none
@@ -337,31 +337,31 @@ REVISION HISTORY:
 	Tony	4/22/93		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerUnsuspend	proc	near	uses ax, bx, cx, dx, si, bp
+HLTPowerUnsuspend	proc	near	uses ax, bx, cx, dx, si, bp
 	.enter
 
 	; The common method for suspending/unsuspending the driver is to
 	; do the same thing as init/exit
 
-	call	IdlePowerInit
+	call	HLTPowerInit
 
 	.leave
 	ret
 
-IdlePowerUnsuspend	endp
+HLTPowerUnsuspend	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerIdle
+FUNCTION:	HLTPowerIdle
 
 DESCRIPTION:	Called during the idle (dispatch) loop when there are no
 		runnable threads.  The CPU can be turned off until the next
 		IRQ happens.
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_IDLE)
+CALLED BY:	HLTPowerStrategy (DR_POWER_IDLE)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 
 RETURN:
 	none
@@ -381,7 +381,7 @@ REVISION HISTORY:
 	MeyerK	12/07/25	Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerIdle     proc    near
+HLTPowerIdle     proc    near
 	.enter
 
 	sti		; allow wake events
@@ -390,21 +390,21 @@ IdlePowerIdle     proc    near
 
 	.leave
 	ret
-IdlePowerIdle     endp
+HLTPowerIdle     endp
 
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerNotIdle
+FUNCTION:	HLTPowerNotIdle
 
 DESCRIPTION:	Called when an interrupt occurs and GEOS is in the idle state.
 		Drivers that slow (rather than stop) the clock on
 		DR_POWER_IDLE should speed it up again on DR_POWER_NOT_IDLE.
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_NOT_IDLE)
+CALLED BY:	HLTPowerStrategy (DR_POWER_NOT_IDLE)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 
 RETURN:
 	none
@@ -424,17 +424,17 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerNotIdle	proc	near
+HLTPowerNotIdle	proc	near
 	.enter
 
 	.leave
 	ret
 
-IdlePowerNotIdle	endp
+HLTPowerNotIdle	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerNotIdleOnInterruptCompletion
+FUNCTION:	HLTPowerNotIdleOnInterruptCompletion
 
 DESCRIPTION:	Called when a thread has been woken up (usually as the result
 		of an IRQ).  If the CPU has been halted in the DR_POWER_IDLE
@@ -442,10 +442,10 @@ DESCRIPTION:	Called when a thread has been woken up (usually as the result
 		idle when the interrupt completes. (Generally meaning that
 		there is now a runnable thread.)
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION)
+CALLED BY:	HLTPowerStrategy (DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 
 RETURN:
 	none
@@ -465,26 +465,26 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerNotIdleOnInterruptCompletion	proc	near
+HLTPowerNotIdleOnInterruptCompletion	proc	near
 	.enter
 
 	.leave
 	ret
 
-IdlePowerNotIdleOnInterruptCompletion	endp
+HLTPowerNotIdleOnInterruptCompletion	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerLongTermIdle
+FUNCTION:	HLTPowerLongTermIdle
 
 DESCRIPTION:	Called when the screen saver is about to be invoked, meaning
 		that the user has done nothing for the screen saver idle time
 		(typically one to five minutes).
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_LONG_TERM_IDLE)
+CALLED BY:	HLTPowerStrategy (DR_POWER_LONG_TERM_IDLE)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 
 RETURN:
 	carry - set if machine has been turned off and has been awakened
@@ -506,7 +506,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerLongTermIdle	proc	near
+HLTPowerLongTermIdle	proc	near
 	.enter
 
 	; we return with carry clear as we DON'T want any special treatment for
@@ -517,18 +517,18 @@ IdlePowerLongTermIdle	proc	near
 	.leave
 	ret
 
-IdlePowerLongTermIdle	endp
+HLTPowerLongTermIdle	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerGetStatus
+FUNCTION:	HLTPowerGetStatus
 
 DESCRIPTION:	Return power management status
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_GET_STATUS)
+CALLED BY:	HLTPowerStrategy (DR_POWER_GET_STATUS)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 	ax - PowerGetStatusType
 
 RETURN:
@@ -550,7 +550,7 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerGetStatus	proc	near
+HLTPowerGetStatus	proc	near
 	.enter
 
 	; *** This code is for demonstration and testing
@@ -559,7 +559,7 @@ IdlePowerGetStatus	proc	near
 	jnz	notPowerOn
 
 	mov	ax, 0				;return no warnings
-	mov	bx, mask PowerWarnings or mask PW_IDLE_POWER_CUSTOM_WARNING
+	mov	bx, mask PowerWarnings or mask PW_HLT_POWER_CUSTOM_WARNING
 	jmp	doneGood
 
 notPowerOn:
@@ -568,7 +568,7 @@ notPowerOn:
 	jnz	notPoll
 
 	mov	ax, 0				;return no warnings
-	mov	bx, mask PowerWarnings or mask PW_IDLE_POWER_CUSTOM_WARNING
+	mov	bx, mask PowerWarnings or mask PW_HLT_POWER_CUSTOM_WARNING
 	jmp	doneGood
 
 notPoll:
@@ -582,18 +582,18 @@ done:
 	.leave
 	ret
 
-IdlePowerGetStatus	endp
+HLTPowerGetStatus	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerSetStatus
+FUNCTION:	HLTPowerSetStatus
 
 DESCRIPTION:	Set the power management status
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_SET_STATUS)
+CALLED BY:	HLTPowerStrategy (DR_POWER_SET_STATUS)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 	bx - PowerSetStatusType
 	dx:ax - value to set based on PowerSetStatusType
 
@@ -615,28 +615,28 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerSetStatus	proc	near
+HLTPowerSetStatus	proc	near
 	.enter
 
-	;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+	;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 	stc
 
 	.leave
 	ret
 
-IdlePowerSetStatus	endp
+HLTPowerSetStatus	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerDeviceOnOff
+FUNCTION:	HLTPowerDeviceOnOff
 
 DESCRIPTION:	Called when a device is going to be used or is finished
 		being used.
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_DEVICE_ON_OFF)
+CALLED BY:	HLTPowerStrategy (DR_POWER_DEVICE_ON_OFF)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 	ax - PowerDeviceType
 	bx - unit number
 	cx - non-zero if turning on device, zero if turning off
@@ -660,7 +660,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-IdlePowerDeviceOnOff	proc	near	uses si, di, bp
+HLTPowerDeviceOnOff	proc	near	uses si, di, bp
 	.enter
 
 	clc			;Return no error
@@ -668,18 +668,18 @@ IdlePowerDeviceOnOff	proc	near	uses si, di, bp
 	.leave
 	ret
 
-IdlePowerDeviceOnOff	endp
+HLTPowerDeviceOnOff	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerSetPassword
+FUNCTION:	HLTPowerSetPassword
 
 DESCRIPTION:	Set the BIOS password (if the BIOS supports a password).
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_SET_PASSWORD)
+CALLED BY:	HLTPowerStrategy (DR_POWER_SET_PASSWORD)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 	cx:dx - password (size BIOS_PASSWORD_SIZE)
 
 RETURN:
@@ -700,27 +700,27 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerSetPassword	proc	near
+HLTPowerSetPassword	proc	near
 	.enter
 
-	;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+	;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 	stc
 
 	.leave
 	ret
 
-IdlePowerSetPassword	endp
+HLTPowerSetPassword	endp
 
 COMMENT @----------------------------------------------------------------------
 
-FUNCTION:	IdlePowerVerifyPassword
+FUNCTION:	HLTPowerVerifyPassword
 
 DESCRIPTION:	Verify the BIOS password (if the BIOS supports a password).
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_VERIFY_PASSWORD)
+CALLED BY:	HLTPowerStrategy (DR_POWER_VERIFY_PASSWORD)
 
 PASS:
-	ds, es - dgroup (from IdlePowerStrategy)
+	ds, es - dgroup (from HLTPowerStrategy)
 	cx:dx - password to verify (size BIOS_PASSWORD_SIZE)
 
 RETURN:
@@ -742,25 +742,25 @@ REVISION HISTORY:
 	Tony	1/31/92		Initial version
 
 ------------------------------------------------------------------------------@
-IdlePowerVerifyPassword	proc	near
+HLTPowerVerifyPassword	proc	near
 	.enter
 
-	;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+	;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 	stc
 
 	.leave
 	ret
 
-IdlePowerVerifyPassword	endp
+HLTPowerVerifyPassword	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		IdlePowerRegisterPowerOnOffNotify
+		HLTPowerRegisterPowerOnOffNotify
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing.
 
-CALLED BY:	IdlePowerStrategy (DR_POWER_ON_OFF_NOTIFY)
+CALLED BY:	HLTPowerStrategy (DR_POWER_ON_OFF_NOTIFY)
 
 PASS:		dx:cx = fptr to call back routine
 
@@ -779,19 +779,19 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-IdlePowerRegisterPowerOnOffNotify	proc	near
+HLTPowerRegisterPowerOnOffNotify	proc	near
 		.enter
 
-		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
 		ret
-IdlePowerRegisterPowerOnOffNotify	endp
+HLTPowerRegisterPowerOnOffNotify	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		IdlePowerDisablePassword
+		HLTPowerDisablePassword
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing
@@ -810,19 +810,19 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-IdlePowerDisablePassword	proc	near
+HLTPowerDisablePassword	proc	near
 		.enter
 
-		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
 		ret
-IdlePowerDisablePassword	endp
+HLTPowerDisablePassword	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		IdlePowerRTCAck
+		HLTPowerRTCAck
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing.
@@ -841,19 +841,19 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-IdlePowerRTCAck	proc	near
+HLTPowerRTCAck	proc	near
 		.enter
 
-		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
 		ret
-IdlePowerRTCAck	endp
+HLTPowerRTCAck	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		IdlePowerOnOffUnregister
+		HLTPowerOnOffUnregister
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing
@@ -874,19 +874,19 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-IdlePowerOnOffUnregister	proc	near
+HLTPowerOnOffUnregister	proc	near
 		.enter
 
-		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
 		ret
-IdlePowerOnOffUnregister	endp
+HLTPowerOnOffUnregister	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		IdlePowerEscCommand
+		HLTPowerEscCommand
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do nothing.
@@ -909,15 +909,15 @@ REVISION HISTORY:
 	stevey	6/27/95		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-IdlePowerEscCommand	proc	near
+HLTPowerEscCommand	proc	near
 		.enter
 
-		;WARNING IDLE_POWER_DRIVER_UNSUPPORTED_FUNCTION
+		;WARNING HLT_POWER_DRIVER_UNSUPPORTED_FUNCTION
 		stc
 
 		.leave
 		ret
-IdlePowerEscCommand	endp
+HLTPowerEscCommand	endp
 
 
 Resident ends
