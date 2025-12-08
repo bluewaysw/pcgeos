@@ -2397,14 +2397,14 @@ check:
 	;
 	; Save and apply new position info
 	;
-	;push	ds, si
-	;mov	cx, cs
-	;mov	ds, cx
-	;mov	dx, offset taskBarPositionKey
-	;mov	si, offset taskBarPositionCategory
-	;mov	bp, bx
-	;call	InitFileWriteInteger			; update GEOS.INI
-	;pop	ds, si
+	push	ds, si
+	mov	cx, cs
+	mov	ds, cx
+	mov	dx, offset taskBarPositionKey
+	mov	si, offset taskBarPositionCategory
+	mov	bp, bx
+	call	InitFileWriteInteger			; update GEOS.INI
+	pop	ds, si
 
 	andnf	ds:[taskBarPrefs], not mask TBF_POSITION
 	shl	bx, offset TBF_POSITION
