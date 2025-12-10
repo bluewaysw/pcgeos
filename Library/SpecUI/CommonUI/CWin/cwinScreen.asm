@@ -189,12 +189,305 @@ EC<	call	VisCheckVisAssumption	; Make sure vis data exists >
 					; Children should NOT be geometrically
 					;	managed.
 	or	ds:[di].VCI_geoAttrs, mask VCGA_CUSTOM_MANAGE_CHILDREN
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListAdd
+
 	ret
 
 OLScreenSpecBuild	endm
 
-
 
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuedWinVisUnbuild -- MSG_SPEC_UNBUILD
+		for OLMenuedWinClass
+
+DESCRIPTION:	Visibly unbuilds & destroys a menued window
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		di 	- MSG_SPEC_UNBUILD
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, si, di, ds, es, bp
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	1/90		Initial version
+
+------------------------------------------------------------------------------@
+
+OLScreenSpecUnbuild	method dynamic OLScreenClass,
+						MSG_SPEC_UNBUILD
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListRemove
+
+	mov	di, offset OLScreenClass
+	GOTO	ObjCallSuperNoLock
+
+OLScreenSpecUnbuild	endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLScreenNotify
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Notification that a GWNT_HARD_ICON_BAR_FUNCTION or
+		GWNT_STARTUP_INDEXED_APP has occurred - do a
+		NukeExpressMenu.
+
+CALLED BY:	MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK
+
+PASS:		*ds:si	= OLApplicationClass object
+		ds:di	= OLApplicationClass instance data
+		es 	= segment of OLApplicationClass
+		ax	= MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK
+
+		cx	= ManufacturerId
+		dx	= NotificationType
+		bp	= data
+
+RETURN:		nothing
+
+ALLOWED TO DESTROY:
+		ax, cx, dx, bp
+		bx, si, di, ds, es
+
+SIDE EFFECTS:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	3/22/93  	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+idata	segment
+global screenWidth:word
+global screenHeight:word
+idata	ends
+
+OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
+	;
+	; make sure we've got what we're looking for
+	;
+	cmp	cx, MANUFACTURER_ID_GEOWORKS
+	jne	callSuper
+	cmp	dx, GWNT_HOST_DISPLAY_SIZE_CHANGE
+	jne	callSuper
+
+	push 	si, ds, di
+	; set the video mode again
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	mov	bx, ds:[di].GSCI_videoDriver	
+
+	; get driver strategy
+	push	bx
+	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
+
+	push    ax,bx,cx,dx,si,di,bp,es
+	mov	di, DR_VID_HIDEPTR
+	call	ds:[si].DIS_strategy
+	pop  	ax,bx,cx,dx,si,di,bp,es
+
+	; call update escape function
+	mov	di, VID_ESC_UPDATE_DEVICE 
+	call	ds:[si].DIS_strategy
+
+	;push    ax,bx,cx,dx,si,di,bp
+	;mov	di, DR_VID_SHOWPTR
+	;call	ds:[si].DIS_strategy
+	;pop 	ax,bx,cx,dx,si,di,bp
+
+	; update screen coordinates
+	pop	bx
+	pop	si, ds, di
+
+	push	si
+	push	ds
+					; Get info about driver
+	call	GeodeInfoDriver		; puts structure in ds:si
+
+	mov	cx, ds:[si].VDI_pageW	; x size
+	mov	dx, ds:[si].VDI_pageH	; y size
+
+	push	ds
+	mov	ax, segment screenWidth
+	mov	ds, ax
+	mov	ds:[screenWidth], cx
+	mov	ds:[screenHeight], dx
+	pop	ds
+
+	pop	ds
+	pop	si
+
+	mov	ax, MSG_VIS_SET_SIZE
+	call	ObjCallInstanceNoLock
+
+	push	ds, es, si
+;	push	cx, dx
+;	mov	cx, 1
+;	mov	ax, MSG_VIS_FIND_CHILD_AT_POSITION
+;	call	ObjCallInstanceNoLock
+;	mov	bx, cx
+;	mov	si, dx
+;	pop	cx, dx
+	;mov	ax, MSG_VIS_SET_SIZE
+
+;	push	ax, di
+;	mov	ax, MSG_VIS_SET_SIZE
+;	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+;	call	ObjMessage
+;	pop	ax, di
+
+	pop	ds, es, si
+
+	;
+	; record a message
+	;
+	push	ax, cx, dx, di, bx, bp
+	push	si
+	mov	bx, segment GenFieldClass
+	mov	si, offset GenFieldClass
+	mov	di, mask MF_RECORD
+	mov	ax, MSG_VIS_SET_SIZE
+	call	ObjMessage
+	pop	si
+
+	;
+	; send it to all our children
+	;
+	push	cx
+	mov	cx, di				;cx <- recorded message
+	mov	ax, MSG_VIS_SEND_TO_CHILDREN
+	call	ObjCallInstanceNoLock
+	pop	cx
+	pop	ax, cx, dx, di, bx, bp
+
+	push	ax, cx, dx, di, bx, bp
+	push	si
+	mov	bx, segment GenFieldClass
+	mov	si, offset GenFieldClass
+	mov	ax, MSG_VIS_MARK_INVALID
+	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH or mask VOF_GEOMETRY_INVALID or mask VOF_GEO_UPDATE_PATH
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	mov	di, mask MF_RECORD
+	call	ObjMessage
+	pop	si
+
+	;
+	; send it to all our children
+	;
+	push	cx
+	mov	cx, di				;cx <- recorded message
+	mov	ax, MSG_VIS_SEND_TO_CHILDREN
+	call	ObjCallInstanceNoLock
+	pop	cx
+	pop	ax, cx, dx, di, bx, bp
+
+	push	ax, cx, dx, di, bx, bp
+	mov	ax, MSG_META_NOTIFY
+	mov	cx, MANUFACTURER_ID_GEOWORKS
+	mov	dx, GWNT_HOST_SCREEN_FIELD_SIZE_CHANGE
+	mov	di, mask MF_RECORD
+	call	ObjMessage
+
+	; Send it to the GCN list
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	mov	cx, di		; event handle
+	clr	dx, bp		; no additional block sent
+				; not set status flag
+	call	GCNListSend
+	pop	ax, cx, dx, di, bx, bp
+
+	;push	ax, di
+	;mov	ax, MSG_VIS_MARK_INVALID
+	;mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH or mask VOF_GEOMETRY_INVALID or mask VOF_GEO_UPDATE_PATH
+	;mov	dl, VUM_NOW
+	;mov	di, mask MF_CALL
+	;call	ObjMessage
+	;pop	ax, di
+
+
+	mov	ax, MSG_VIS_MARK_INVALID
+	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH
+	mov	dl, VUM_NOW
+	call	ObjCallInstanceNoLock
+
+	;mov	ax, MSG_VIS_INVAL_TREE
+	;mov	dl, VUM_NOW
+	;call	ObjCallInstanceNoLock
+
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	mov	ax, ds:[di].GSCI_videoDriver	
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	bx, ds:[di].VCI_window
+	mov	cx, 0
+	mov	dx, 0
+	;ax	- handle of driver for window
+	;bx	- handle of window on which mouse moves
+	;cx	- x coordinate of pointer in window
+	;dx	- y coordinate of pointer in window
+	call	ImSetPtrWin
+
+	;
+	; if there is a mouse driver, make the pointer visible
+	;
+	mov	ax, GDDT_MOUSE
+	call	GeodeGetDefaultDriver
+	tst	ax
+	jz	done				; no mouse driver, no pointer
+
+
+	push 	si, ds, di
+	mov	di, ds:[si]
+	add	di, ds:[di].Gen_offset
+	mov	bx, ds:[di].GSCI_videoDriver	
+
+	; get driver strategy
+	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
+
+	push    ax,bx,cx,dx,si,di,bp
+	mov	di, DR_VID_SHOWPTR
+	call	ds:[si].DIS_strategy
+	mov	di, DR_VID_SHOWPTR
+	call	ds:[si].DIS_strategy
+	pop    ax,bx,cx,dx,si,di,bp
+	pop 	si, ds, di
+
+done:
+
+
+callSuper:
+	mov	di, offset OLScreenClass
+	GOTO	ObjCallSuperNoLock
+
+OLScreenNotify	endm
+
+
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLScreenOpenWin -- MSG_VIS_OPEN_WIN for OLScreenClass

@@ -2688,6 +2688,33 @@ OLApplicationNotify	method	dynamic	OLApplicationClass, MSG_META_NOTIFY,
 	;
 	cmp	cx, MANUFACTURER_ID_GEOWORKS
 	jne	callSuper
+if DYNAMIC_SCREENN_RESIZING
+	cmp	dx, GWNT_HOST_SCREEN_FIELD_SIZE_CHANGE
+	jne	handleExpress
+
+	mov	ax, MSG_OL_WIN_PREPARE_FIELD_SIZE_CHANGE
+	call	VisSendToChildren
+
+	;
+	;  Resize ourselves.
+	;
+	mov	ax, MSG_VIS_GET_SIZE
+	call	VisCallParent
+	
+
+	mov	ax, MSG_VIS_SET_SIZE
+	call	ObjCallInstanceNoLock
+	
+	;
+	;  Tell our primary windows to resize.
+	;
+	mov	ax, MSG_OL_WIN_FIELD_SIZE_CHANGED
+	call	VisSendToChildren
+
+	jmp	callSuper
+
+handleExpress:
+endif
 	cmp	dx, GWNT_STARTUP_INDEXED_APP
 	je	nukeExpress
 	cmp	dx, GWNT_HARD_ICON_BAR_FUNCTION

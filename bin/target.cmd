@@ -22,7 +22,7 @@ IF DEFINED GEOS_CDROM_DRIVE (
 IF EXIST ensemble\init.bat (
    echo swatgo >> ensemble\init.bat
 )
-start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole
+start %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf
 cd %OLD_PATH%
 @cls
 :waitForFile

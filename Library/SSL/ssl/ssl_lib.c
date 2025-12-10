@@ -653,7 +653,7 @@ SSL *s;
 	if(hostApiAvailable)
 		{
 		return (int) HostIfCall(
-			HIF_SSL_CONNECT, (dword) s, (dword) NULL, 0);
+			HIF_SSL_CONNECT, (dword) s, (dword) NULL, 0) >> 16;
 		}
 #endif
 	
@@ -1581,7 +1581,7 @@ SSL_METHOD *meth;
 		if(hostApiAvailable)
 			{
 			return (SSL_METHOD *) HostIfCall(
-				HIF_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
+				HIF_SSL_SET_SSL_METHOD, (dword) s, (dword) NULL, 0);
 			}
 	#endif
 
@@ -2146,8 +2146,9 @@ SSL_METHOD *meth;
 
 	if(hostApiAvailable)
 		{
-		return (SSL_CTX *) HostIfCall(
-			HIF_SSL_CTX_NEW, (dword) NULL, (dword) NULL, 0);
+		word result = HostIfCall(
+			HIF_SSL_CTX_NEW, (dword) NULL, (dword) NULL, 0) >> 16;
+		return (SSL_CTX *) result;
 		}
 	return(NULL);
 	}
@@ -2162,7 +2163,7 @@ SSL_CTX *a;
 	if(hostApiAvailable)
 		{
 		HostIfCall(
-			HIF_SSL_CTX_FREE, (dword) a, (dword) NULL, 0);
+			HIF_SSL_CTX_FREE, (dword) a, (dword) NULL, 0); 
 		return;
 		}
 	}
@@ -2174,8 +2175,9 @@ SSL_CTX *ctx;
 
 	if(hostApiAvailable)
 		{
-		return (SSL *) HostIfCall(
-			HIF_SSL_NEW, (dword) ctx, (dword) NULL, 0);
+		dword result = HostIfCall(
+			HIF_SSL_NEW, (dword) ctx, (dword) NULL, 0) >> 16;
+		return (SSL_CTX *) result;
 		}
 	return(NULL);
 	}
@@ -2216,8 +2218,9 @@ SSL *s;
 	
 	if(hostApiAvailable)
 		{
-		return (int) HostIfCall(
+		dword result =  HostIfCall(
 			HIF_SSL_CONNECT, (dword) s, (dword) NULL, 0);
+		return (int) (result >> 16);
 		}
 	
         return result;
@@ -2245,9 +2248,11 @@ int num;
 
 	if(hostApiAvailable)
 		{
-		return (int) HostIfCall(
+		dword result = HostIfCall(
 			HIF_SSL_READ, (dword) s, (dword) buf, num);
+		return (int) (result >> 16);
 		}
+
 
 	return report;
 }
@@ -2261,8 +2266,9 @@ int num;
 
 	if(hostApiAvailable)
 		{
-		return (int) HostIfCall(
+		dword result =  HostIfCall(
 			HIF_SSL_WRITE, (dword) s, (dword) buf, num);
+		return (int) (result >> 16);
 		}
 	return report;
 }
@@ -2277,7 +2283,7 @@ SSL_METHOD *meth;
 	if(hostApiAvailable)
 		{
 		return (SSL_METHOD *) HostIfCall(
-			HIF_SSL_GET_SSL_METHOD, (dword) s, (dword) NULL, 0);
+			HIF_SSL_SET_SSL_METHOD, (dword) s, (dword) NULL, 0);
 		}
 	return ret;
 	}

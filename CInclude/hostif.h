@@ -18,6 +18,18 @@
 
 #include <geos.h>
 
+typedef enum {
+	HIF_API_HOST=0,
+	HIF_API_VIDEO=1,
+	HIF_API_SSL=2,
+	HIF_API_SOCKET=3
+} HostIfAPI;
+
+typedef enum {
+	HIF_NOTIFY_DISPLAY_SIZE_CHANGE=1,
+	HIF_NOTIFY_SOCKET_STATE_CHANGE=2
+} HostIfNotifiation;
+
 typedef WordFlags HostIfFunctions;
 #define HIF_CHECK			1
 #define HIF_SET_RECEIVE_HANDLE		2
@@ -52,13 +64,14 @@ typedef WordFlags HostIfFunctions;
 #define HIF_SSL_GET_SSL_METHOD		HIF_SSL_BASE+13
 #define HIF_SSL_SET_CALLBACK		HIF_SSL_BASE+14
 #define HIF_SSL_SET_TLSEXT_HOST_NAME	HIF_SSL_BASE+15
+#define HIF_SSL_SET_SSL_METHOD		HIF_SSL_BASE+16
 #define HIF_SSL_END			1299
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
-extern word _pascal HostIfDetect();
+extern word _pascal HostIfDetect(HostIfAPI apiid);
 extern dword _pascal HostIfCall(HostIfFunctions func, 
 					dword data1, dword data2, word data3);
 

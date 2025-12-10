@@ -357,6 +357,94 @@ OLFieldVisClose	endm
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLFieldVisClose
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	This routine closes any opened BG files.
+
+CALLED BY:	GLOBAL
+PASS:		standard object junk (*ds:si, ds:bx, ds:di, etc).
+RETURN:		nada
+DESTROYED:	various important but undocumented things
+
+PSEUDO CODE/STRATEGY:
+		This page intentionally left blank
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	atw	7/23/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLFieldVisSetSize	method	dynamic OLFieldClass, MSG_VIS_SET_SIZE
+
+	push	bx, di
+	
+	push	di
+	mov	ax, MSG_VIS_SET_SIZE
+	mov	di, offset OLFieldClass
+	CallSuper	MSG_VIS_SET_SIZE
+	pop	di
+
+	push	si
+	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
+	tst	si
+	jz	done
+	
+	mov	bx, ds:[LMBH_handle]
+
+	push	cx
+
+	mov	ax, MSG_VIS_GET_SIZE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+
+	pop	cx
+
+	mov	ax, MSG_VIS_SET_SIZE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+
+	mov	ax, MSG_VIS_MARK_INVALID
+	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_GEOMETRY_INVALID
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	mov	di, mask MF_CALL  or mask MF_FIXUP_DS
+	call	ObjMessage
+
+	;mov	ax, MSG_TOOL_AREA_INIT_POSITION
+	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	;call	ObjMessage
+
+	;mov	ax, MSG_GEN_INTERACTION_INITIATE
+	;mov	di, mask MF_FORCE_QUEUE
+	;call	ObjMessage	
+
+	;mov	ax, MSG_SPEC_RESCAN_GEO_AND_UPDATE
+	;mov	cl, mask VOF_GEOMETRY_INVALID
+	;mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	;call	ObjMessage
+
+	;
+	; fixup window positions
+	;
+done:
+	pop	si
+	DoPop	di, bx
+	push	bp
+	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
+	mov	dx, MSG_OL_APP_APPLY_FIELD_SIZE_CHANGE
+	call	ObjCallInstanceNoLock
+	pop	bp
+
+	ret
+
+OLFieldVisSetSize	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OLFieldAboutToDetachComplete
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
