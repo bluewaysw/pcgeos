@@ -330,9 +330,8 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         /* load metrics */
                         TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
-                        /* compute scaled advance width for glyph and round it to neares 1/4 pixel */
+                        /* compute scaled advance width for glyph */
                         scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
-                        scaledWidth += 0x2000;
 
                         /* fill CharTableEntry */
                         charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
