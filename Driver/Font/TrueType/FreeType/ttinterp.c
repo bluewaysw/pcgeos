@@ -6726,7 +6726,11 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
         else
           goto LNo_Error_;
       }
+#ifdef DEBUG_INTERPRETER
     } while ( !CUR.instruction_trap );
+#else
+    } while ( TRUE );
+#endif
 
   LNo_Error_:
     CUR.error = TT_Err_Ok;

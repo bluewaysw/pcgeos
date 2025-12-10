@@ -2302,7 +2302,7 @@ This message flips the GrObj about its horizontal axis.
 ----------
 #### MSG_GO_ROTATE
     void    MSG_GO_ROTATE (
-            WWFixed                     angle,
+            WWFixedAsDWord              angle,
             GrObjHandleSpecification    center);
 
 This message rotates the GrObj about one of its handles.

@@ -177,12 +177,9 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         }
         else
         {      
-                /* Avoid widths or heights of 0 pixels */
+                /* Avoid heights of 0 pixels */
                 if( height == 0 && width > 0 )
                         height = 1;
-
-                if( width == 0 && height > 0 )
-                        width = 0;
 
                 size = height * ( ( width + 7 ) >> 3 ) + SIZE_CHAR_HEADER;
 

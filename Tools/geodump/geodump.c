@@ -1,7 +1,7 @@
 /*
         GEODUMP.C
 
-        by Marcus Gr�ber 1991-95
+        by Marcus Gröber 1991-95
 
         Creates structured dumps of PC/Geos files (Geodes, VM Files, fonts)
 */
@@ -39,9 +39,9 @@ unsigned ver;
 unsigned base;
 
 struct {                        /*** Segment-Beschreibung */
-  GEOSseglen len;               // L�nge
+  GEOSseglen len;               // Länge
   GEOSsegpos pos;               // Position in der Datei
-  GEOSsegfix fixlen;            // L�nge der Fixup-Tabelle
+  GEOSsegfix fixlen;            // Länge der Fixup-Tabelle
   GEOSsegflags flags;           // Flags
 } *segd;
 unsigned numexp,numseg;         // Anzahl Export-Routinen, Segmente
@@ -53,6 +53,8 @@ unsigned dodump,dolist,disasm_silent,engine_silent;
 int one_segment;                // if >=0, number of only segment to be dumped
 int one_pass;                   // if non-zero, indicates that listing is to
                                 // be generated in first pass
+
+char cmtChar;                   // ';' if creating disassembly
 
 unsigned global_inf_changed;
 
@@ -81,27 +83,27 @@ char *DispTok(char *buf,GEOStoken *tok)
 
         strncpy(t,tok->str,GEOS_TOKENLEN);
                                         // Token in Puffer
-        t[GEOS_TOKENLEN]='\0';          // Endnull anf�gen
+        t[GEOS_TOKENLEN]='\0';          // Endnull anfügen
         if(*t)                          // Token vorhanden?
           sprintf(buf,"%4s,%u",t,tok->num);
                                         // Token in Buffer formatieren
         else
           strcpy(buf,"-");              // Sonst nur Ersatz
-        return buf;                     // Zeiger auf Puffer zur�ck
+        return buf;                     // Zeiger auf Puffer zurück
 }
 
 char *DispRel(char *buf,GEOSrelease *rel)
 {
         sprintf(buf,"%u.%u  %u-%u",     // Release-Nummer formatieren
                     rel->versmaj,rel->versmin,rel->revmaj,rel->revmin);
-        return buf;                     // Zeiger auf Puffer zur�ck
+        return buf;                     // Zeiger auf Puffer zurück
 }
 
 char *DispPro(char *buf,GEOSprotocol *rel)
 {
         sprintf(buf,"%u.%03u",rel->vers,rel->rev);
                                         // Protokoll-Nummer formatieren
-        return buf;                     // Zeiger auf Puffer zur�ck
+        return buf;                     // Zeiger auf Puffer zurück
 }
 
 /******************************************************************************/
@@ -155,15 +157,15 @@ void DispHex(char *s,unsigned char *p,int n)
 {
         int i,j;
 
-        if(n<0) {                       // n negativ: Leerbereiche unterdr�cken
+        if(n<0) {                       // n negativ: Leerbereiche unterdrücken
           n=-n;
-          for(i=0;i<n && !p[i];i++)     // Pr�fen, ob alles Nullen
+          for(i=0;i<n && !p[i];i++)     // Prüfen, ob alles Nullen
             ;                           
           if(i==n) return;              // Nur Nullen: Nicht zeigen
         }
         for(i=0;i<n;i++) {              // Ganzen Buffer durchgehen
           if(i%16==0)                   // Neue Zeile?
-            printf("%14s ",i?"":s);     // Einr�ckung ausgeben
+            printf("%14s ",i?"":s);     // Einrückung ausgeben
           printf("%02x ",p[i]);         // Ein Byte ausgeben
           if(i%16==15 || i==n-1) {      // Zeilenende?
             for(j=i%16;j<15;j++)        // Evtl. bis zum rechten Rand fuellen
@@ -187,9 +189,9 @@ void DispFile(FILE *f,long pos,unsigned len,unsigned ofs,long hdl)
           fseek(f,pos,SEEK_SET);        // Ja: zum Anfang des Blocks
         for(x=0;x<len;x+=bs) {          // Segment lesen
           bs=len-x;                     // default: Ganzen Rest lesen
-          if(bs>16)                     // Zu gro� f�r Puffer?
+          if(bs>16)                     // Zu groß für Puffer?
             bs=16;                      // Nur einen Puffer lesen
-          if(hdl>-1)                    // Handle �bergeben?
+          if(hdl>-1)                    // Handle übergeben?
             sprintf(adr,"[%04X] %04X:",(unsigned)hdl,x+ofs);
                                         // Handle/Offset als Hexzahlen
           else
@@ -201,7 +203,8 @@ void DispFile(FILE *f,long pos,unsigned len,unsigned ofs,long hdl)
         }
 }
 
-void DisplayHeap(FILE *f,long pos,unsigned size)
+void DisplayHeap(FILE *f,long pos,unsigned size,
+                 char *segname,GEOSfixup *fix,unsigned fixlen,unsigned seg)
 {
         GEOSlocalheap lh;               // Kopf des lokalen Heaps
         GEOSObjLMemBlockHeader oh;      // additional obj block header
@@ -210,112 +213,113 @@ void DisplayHeap(FILE *f,long pos,unsigned size)
         unsigned short blksize;
         struct { unsigned blksize; unsigned nextofs; } freehead;
         unsigned ofs;
+        char buf[128];
+
+        struct MaskDesc_s lmemFlagMask[]={
+          {0x8000,0x8000,"LMF_HAS_FLAGS"},
+          {0x4000,0x4000,"LMF_IN_RESOURCE"},
+          {0x2000,0x2000,"LMF_DETACHABLE"},
+          {0x1000,0x1000,"LMF_DUPLICATED"},
+          {0x0800,0x0800,"LMF_RELOCATED"},
+          {0x0400,0x0400,"LMF_AUTO_FREE"},
+          {0x0200,0x0200,"LMF_IN_LMEM_ALLOC"},
+          {0x0100,0x0100,"LMF_IS_VM"},
+          {0x0080,0x0080,"LMF_NO_HANDLES"},
+          {0x0040,0x0040,"LMF_NO_ENLARGE"},
+          {0x0020,0x0020,"LMF_RETURN_ERRORS"},
+          {0,0,NULL}};
+
+        struct MaskDesc_s lmemTypeMask[]={
+          {0xFFFF,LMEM_TYPE_GENERAL,"LMEM_TYPE_GENERAL"},
+          {0xFFFF,LMEM_TYPE_WINDOW,"LMEM_TYPE_WINDOW"},
+          {0xFFFF,LMEM_TYPE_OBJ_BLOCK,"LMEM_TYPE_OBJ_BLOCK"},
+          {0xFFFF,LMEM_TYPE_GSTATE,"LMEM_TYPE_GSTATE"},
+          {0xFFFF,LMEM_TYPE_FONT_BLK,"LMEM_TYPE_FONT_BLK"},
+          {0xFFFF,LMEM_TYPE_GSTRING,"LMEM_TYPE_GSTRING"},
+          {0xFFFF,LMEM_TYPE_DB_ITEMS,"LMEM_TYPE_DB_ITEMS"},
+          {0,0,NULL}};
 
         GetStructP(lh,pos);             // Kopf des lokalen Heaps holen
+
+        // Dump fixed space after default LMem header as hex, if any
+        if(lh.hdllistofs > sizeof(lh))
+          DispFile(f,
+            pos + sizeof(lh), lh.hdllistofs-sizeof(lh),
+            sizeof(lh), -2);
+
         printf("\n"
-               " * LMem: Size: %5d Bytes   Handle list: @ 0x%04x   Entries: %d\n"
-               "         Free: %5d Bytes\n"
-               "        Flags: %04x\n"
-               "         Type: %04x\n",
-               lh.blocksize,lh.hdllistofs,lh.hdllistnum,lh.freesize,
-               lh.LMBH_flags,lh.LMBH_lmemType);
+               "%c * LMem: Size: %5d Bytes   Handle list: @ 0x%04x   Entries: %d\n"
+               "%c         Free: %5d Bytes\n"
+               "%c        Flags: %s\n",
+               cmtChar,lh.blocksize,lh.hdllistofs,lh.hdllistnum,
+               cmtChar,lh.freesize,
+               cmtChar,DispBitMask(buf,lh.LMBH_flags,lmemFlagMask,","));
+        printf("%c         Type: %s\n",
+               cmtChar,DispBitMask(buf,lh.LMBH_lmemType,lmemTypeMask,","));
                                         // Heap anzeigen
         if(lh.LMBH_lmemType==LMEM_TYPE_OBJ_BLOCK) {
           GetStruct(oh);                // Get object block header
-          printf(" * ObjBlock: inUseCount: %-5u\n"
-                 "      interactibleCount: %-5u\n"
-                 "                 output: %08lx\n"
-                 "           resourceSize: %-5u\n",
-                 oh.OLMBH_inUseCount,oh.OLMBH_interactibleCount,
-                 oh.OLMBH_output,oh.OLMBH_resourceSize);
+          printf("%c * ObjBlock: inUseCount: %-5u\n"
+                 "%c      interactibleCount: %-5u\n"
+                 "%c                 output: %08lx\n"
+                 "%c           resourceSize: %-5u\n",
+                 cmtChar, oh.OLMBH_inUseCount,
+                 cmtChar, oh.OLMBH_interactibleCount,
+                 cmtChar, oh.OLMBH_output,
+                 cmtChar, oh.OLMBH_resourceSize);
         }
         hdl=calloc(lh.hdllistnum,sizeof(hdl[0]));
-                                        // Platz f�r Handle-Liste reservieren
+                                        // Platz für Handle-Liste reservieren
         fseek(f,pos+lh.hdllistofs,SEEK_SET);
                                         // Zum Anfang der Handle-Liste im File
         fread(hdl,lh.hdllistnum,sizeof(hdl[0]),f);
                                         // Handle-Liste einlesen
-        for(i=0;i<lh.hdllistnum;i++) {  // Liste durchgehen
+
+        for(i=0;i<lh.hdllistnum;i++)    // Liste durchgehen
+        {
           if(hdl[i] && hdl[i]!=0xFFFF && hdl[i]>lh.hdllistofs && hdl[i]<size)
                                         // freie/falsche Handles nicht zeigen
-          {                             
-            GetStructP(blksize,pos+hdl[i]-2);
-                                        // Angeforderte L�nge des Blocks
-                                        // (tats�chlich belegte L�nge ist immer
+          {
+            if(dolist && *segname)
+            {
+              printf("\n_%s_%04x chunk byte\n",
+                     segname,lh.hdllistofs+i*sizeof(GEOSlocallist));
+              GetStructP(blksize,pos+hdl[i]-2);
+                                        // Angeforderte Länge des Blocks
+                                        // (tatsächlich belegte Länge ist immer
                                         // auf Vielfache von 4 aufgerundet)
-            if(blksize>2)               // Nur wenn Block wirklich gef�llt
-              DispFile(f,-1,blksize-2,
-                       hdl[i],lh.hdllistofs+i*sizeof(GEOSlocallist));
+              if(blksize>2)             // Nur wenn Block wirklich gefüllt
+                DispCode(f,-1,blksize-2,fix,fixlen,seg,hdl[i],disasm_silent);
                                         // Daten des Handles anzeigen
+              printf("_%s_%04x endc\n",
+                     segname,lh.hdllistofs+i*sizeof(GEOSlocallist));
+            }
+            else
+            {
+              GetStructP(blksize,pos+hdl[i]-2);
+                                        // Angeforderte Länge des Blocks
+                                        // (tatsächlich belegte Länge ist immer
+                                        // auf Vielfache von 4 aufgerundet)
+	      if(blksize>2)             // Nur wenn Block wirklich gefüllt
+                DispFile(f,-1,blksize-2,
+                         hdl[i],lh.hdllistofs+i*sizeof(GEOSlocallist));
+                                        // Daten des Handles anzeigen
+            }
           }
         }
+
         ofs=lh.freeofs;                 // Offset des ersten freien Blocks
-        while(ofs) {                    // Solange freien Bl�cke da sind
+        while(ofs) {                    // Solange freien Blöcke da sind
           GetStructP(freehead,pos+ofs-2);
                                         // Kopf des freien Blocks holen
-          printf("         %04X: *** free: %5d bytes\n",ofs,freehead.blksize);
+          printf("%c        %04X: *** free: %5d bytes\n",
+            cmtChar,ofs,freehead.blksize);
                                         // Freien Block anzeigen
-          ofs=freehead.nextofs;         // Zeiger auf n�chsten Block
+          ofs=freehead.nextofs;         // Zeiger auf nächsten Block
         }
-        free(hdl);                      // Handle-Liste nicht mehr n�tig
+        free(hdl);                      // Handle-Liste nicht mehr nötig
 }
 
-void DisassembleHeap(FILE *f,long pos,unsigned size,char *segname,
-                     GEOSfixup *fix,unsigned fixlen,unsigned seg)
-{
-        GEOSlocalheap lh;               // Kopf des lokalen Heaps
-        GEOSObjLMemBlockHeader oh;      // additional obj block header
-        GEOSlocallist *hdl;             // Maximal 256 Handles pro Heap
-        unsigned short i;
-        unsigned short blksize;
-
-        GetStructP(lh,pos);             // Kopf des lokalen Heaps holen
-
-/* display header of local heap */
-        printf("\n"
-               "; * LMem: Size: %5d Bytes   Handle list: @ 0x%04x   Entries: %d\n"
-               ";         Free: %5d Bytes\n",
-               lh.blocksize,lh.hdllistofs,lh.hdllistnum,lh.freesize);
-                                        // Heapkopf anzeigen
-        if(lh.LMBH_lmemType==LMEM_TYPE_OBJ_BLOCK) {
-          GetStructP(oh,pos+sizeof(lh));// Get object block header
-          printf("; * ObjBlock: inUseCount: %-5u\n"
-                 ";      interactibleCount: %-5u\n"
-                 ";                 output: %08lx\n"
-                 ";           resourceSize: %-5u\n",
-                 oh.OLMBH_inUseCount,oh.OLMBH_interactibleCount,
-                 oh.OLMBH_output,oh.OLMBH_resourceSize);
-                                        // Daten anzeigen (evtl. + 2 Pad Bytes)
-        }
-
-        hdl=calloc(lh.hdllistnum,sizeof(hdl[0]));
-                                        // Platz f�r Handle-Liste reservieren
-        fseek(f,pos+lh.hdllistofs,SEEK_SET);
-                                        // Zum Anfang der Handle-Liste im File
-        fread(hdl,lh.hdllistnum,sizeof(hdl[0]),f);
-                                        // Handle-Liste einlesen
-
-/* display data blocks of local heap */
-        for(i=0;i<lh.hdllistnum;i++) {  // Liste durchgehen
-          if(hdl[i] && hdl[i]!=0xFFFF && hdl[i]>lh.hdllistofs && hdl[i]<size)
-                                        // Unbenutzte Handles nicht zeigen
-          {
-            printf("\n_%s_%04x chunk byte\n",
-                   segname,lh.hdllistofs+i*sizeof(GEOSlocallist));
-            GetStructP(blksize,pos+hdl[i]-2);
-                                        // Angeforderte L�nge des Blocks
-                                        // (tats�chlich belegte L�nge ist immer
-                                        // auf Vielfache von 4 aufgerundet)
-            if(blksize>2)               // Nur wenn Block wirklich gef�llt
-              DispCode(f,-1,blksize-2,fix,fixlen,seg,hdl[i],disasm_silent);
-                                        // Daten des Handles anzeigen
-            printf("_%s_%04x endc\n",
-                   segname,lh.hdllistofs+i*sizeof(GEOSlocallist));
-          }
-        }
-
-        free(hdl);                      // Handle-Liste nicht mehr n�tig
-}
 
 void DisplaySegment(FILE *f,unsigned n,unsigned i)
 {
@@ -368,13 +372,13 @@ void DisplaySegment(FILE *f,unsigned n,unsigned i)
             printf("Resource %d:\n",i);
           printf("%c File offset: @ 0x0%-8lx Size: 0x0%04x     Relocs: %-4d\n"
                  "%c %s\n",
-                 dolist?';':' ',
+                 cmtChar,
                  segd[i].pos+base,segd[i].len,segd[i].fixlen/sizeof(*fix),
-                 dolist?';':' ',
+                 cmtChar,
                  DispBitMask(buf,segd[i].flags,segFlagMask,","));
         }
         if(dodump) {
-          fix=malloc(segd[i].fixlen);   // Platz f�r Fixups
+          fix=malloc(segd[i].fixlen);   // Platz für Fixups
           fseek(f,segd[i].pos+base+((segd[i].len+0xF)&0xFFF0),SEEK_SET);
                                         // Zu Fixups springen
           fread(fix,1,segd[i].fixlen,f);// Fixups lesen
@@ -383,7 +387,7 @@ void DisplaySegment(FILE *f,unsigned n,unsigned i)
           data_len = segd[i].len;
 
           if(segd[i].flags & 0x8) {
-            data_ofs = sizeof(lh)+      // Kopf �berspringen
+            data_ofs = sizeof(lh)+      // Kopf überspringen
               ((lh.LMBH_lmemType==LMEM_TYPE_OBJ_BLOCK)?
                sizeof(GEOSObjLMemBlockHeader):0);
             data_len = lh.hdllistofs - data_ofs;
@@ -394,7 +398,7 @@ void DisplaySegment(FILE *f,unsigned n,unsigned i)
               data_len=0;               // correct for invalid data area size
               if(!disasm_silent)
                 printf("%c Warning: Handle list position inconsistent.\n",
-                  dolist?';':' ');
+                  cmtChar);
             }
             if(dolist)
               if (fix[0].ofs==0)        // Fixup in Heap-Kopf immer vorhanden
@@ -416,13 +420,11 @@ void DisplaySegment(FILE *f,unsigned n,unsigned i)
             }
 
           if(!disasm_silent && (segd[i].flags & 0x8))
-            if(dolist)
-              DisassembleHeap(f,segd[i].pos+base,segd[i].len,segname,
+            DisplayHeap(f,segd[i].pos+base,segd[i].len,segname,
                               fix,segd[i].fixlen/sizeof(*fix),i);
-            else
-              DisplayHeap(f,segd[i].pos+base,segd[i].len);
 
-          if(!disasm_silent) {
+          if(!disasm_silent)
+          {
             for(x=0; x < segd[i].fixlen/sizeof(*fix); x++)
                                         // Alle Fixups durchgehen
               if(fix[x].ofs != 0xFFFF)  // Nur, wenn nicht im Listing
@@ -441,7 +443,7 @@ void DisplaySegment(FILE *f,unsigned n,unsigned i)
 
 void DisplayApplication(FILE *f)
 {
-        GEOSappheader ah;               // Zusatz-Dateikopf f�r Programme
+        GEOSappheader ah;               // Zusatz-Dateikopf für Programme
         char buf[80],buf2[80],*p;
         unsigned i;
         long segbase;
@@ -708,19 +710,19 @@ void DisplayVMFile(FILE *f)
         if(dolist) puts("%");
         puts("");
 
-        idx=0;                          // Laufender Z�hler f�r Handle-Rechnung
+        idx=0;                          // Laufender Zähler für Handle-Rechnung
         totalUsed=totalFree=0;
         for(i=(dh.dirsize-sizeof(dh))/sizeof(dr);i;i--) {
                                         // Alle DIR-Eintraege durchgehen
           GetStruct(dr);                // Einen Block-Eintrag holen
           printf("[%04x]: ",GeosIdx2Hdl(idx));
           if(dr.blocksize) {            // Belegter Block
-            totalUsed += dr.blocksize;  // Blockgr��e aufsummieren
+            totalUsed += dr.blocksize;  // Blockgröße aufsummieren
             printf("     @ 0x%06lx %5d bytes  MemHdl: %04x  UserID: %04x\n",
                    dr.blockptr+base,dr.blocksize,dr.used.hdl,dr.used.ID);
-            if(dr.used.flags!=0x00FF) { // Ungew�hnliche Flags?
+            if(dr.used.flags!=0x00FF) { // Ungewöhnliche Flags?
               printf("             Flags: %04x",dr.used.flags);
-                                        // Flags ausgeben und aufschl�sseln
+                                        // Flags ausgeben und aufschlüsseln
               if(dr.used.flags & 0x100) printf(", LMem heap");
               if(dr.used.flags & 0x200) printf(", unSAVEed");
               if(!(dr.used.flags & 4))  printf(", Changes in [%04x]",
@@ -735,24 +737,27 @@ void DisplayVMFile(FILE *f)
                   printf("        (Map block)\n");
                 if(GeosIdx2Hdl(idx)==dh.hdl_dbmap)
                   printf("        (DBMap block)\n");
-                                        // Map-Bl�cke markieren
+                                        // Map-Blöcke markieren
 
                 pos=ftell(f);           // Position merken
                 GetStructP(hdl,dr.blockptr+base);
                                         // erste Bytes des Blocks lesen
-                fseek(f,pos,SEEK_SET);  // Zur�ck zur Position in Tabelle
-                if(dr.used.flags&0x100) // Block mit lokalem Heap?
-                  DisplayHeap(f,dr.blockptr+base,dr.blocksize);
+                fseek(f,pos,SEEK_SET);  // Zurück zur Position in Tabelle
+                if(dr.used.flags&0x100)
+                                        // Block mit lokalem Heap?
+                  DisplayHeap(f,dr.blockptr+base,dr.blocksize,NULL,NULL,0,0);
                                         // Ja: Im Heap-Format ausdumpen
                 else if(GeosIdx2Hdl(idx)==dh.hdl_dbmap)
                                         // DBManager-Map Block
                   DisplayDbHdr(f,dr.blockptr+base,dr.blocksize);
+/*
                 else if(dr.used.ID==0xFF01)
                   DisplayIdx(f,dr.blockptr+base,dr.blocksize);
+*/
                 else
                   DispFile(f,dr.blockptr+base,dr.blocksize,0,-2);
                                         // Als Hexdatei ausdumpen
-                fseek(f,pos,SEEK_SET);  // Zur�ck zur Position in Tabelle
+                fseek(f,pos,SEEK_SET);  // Zurück zur Position in Tabelle
               }
               printf("\n");
             }
@@ -814,7 +819,7 @@ void DisplayGeosFile(FILE *f)
           printf("      Release: %-36s    Procotol: %s\n",DispRel(buf1,&hd.h1.release),DispPro(buf2,&hd.h1.protocol));
           printf("        Flags: %04x\n",hd.h1.flags);
           if(*hd.h1.info) {             // Evtl. Info ausgeben
-            strtrunc(hd.h1.info,60);    // Vor Ausgabe auf 60 Zeichen k�rzen
+            strtrunc(hd.h1.info,60);    // Vor Ausgabe auf 60 Zeichen kürzen
             printf("    User info: %s\n",hd.h1.info);
           }
           if(*hd.h1._copyright)  {      // Evtl. Copyright ausgeben
@@ -853,7 +858,7 @@ void DisplayGeosFile(FILE *f)
           printf("        Flags: %s\n",
             DispBitMask(buf1,hd.h2.flags,fileAttrMask,","));
           if(*hd.h2.info) {             // Evtl. Info ausgeben
-            strtrunc(hd.h2.info,60);    // Vor Ausgabe auf 60 Zeichen k�rzen
+            strtrunc(hd.h2.info,60);    // Vor Ausgabe auf 60 Zeichen kürzen
             printf("    User info: %s\n",hd.h2.info);
           }
           if(*hd.h2._copyright) {       // Evtl. Copyright ausgeben
@@ -863,7 +868,7 @@ void DisplayGeosFile(FILE *f)
 
           ver=2;                        // GW-Version
           base=sizeof(GEOS2header);
-          class=hd.h2.class;            // Dateityp zur�ckgeben
+          class=hd.h2.class;            // Dateityp zurückgeben
         }
         else
         {
@@ -893,7 +898,7 @@ void main(int argc,char *argv[])
         init_disasm();                  // initialize disassenbly module
 
         i=1;
-        while(argc>i && (argv[i][0]=='-')) {
+        while(argc>i && (argv[i][0]=='/' || argv[i][0]=='-')) {
           switch(toupper(argv[i][1])) {
           case 'L':
             dolist=1;                   // '/L'-Switch: Listing
@@ -909,39 +914,44 @@ void main(int argc,char *argv[])
             one_pass=1;
             break;
           }
-          i++;                          // Parameter �bergehen
+          i++;                          // Parameter übergehen
         }
         if(argc<=i) {                   // Zu wenig Parameter?
-          puts("\nGeoDump 0.5 -=- by Marcus Gr�ber, "__DATE__"\n"
+          puts("\nGeoDump 0.6 -=- by Marcus Groeber, "__DATE__"\n"
                  "Disassembly engine based on a module by Robin Hilliard\n\n"
                  "Analysis of PC/Geos file formats\n");
 
           puts("Syntax: GEODUMP [/D|/L] [/Rnn] [/1] filename\n"
-               "\t  -D      Dump contents of blocks/resources\n"
-               "\t  -L      List code resources or font outlines (includes /D)\n"
-               "\t  -Rnn    List/dump only resource number nn (dec.)\n"
-               "\t  -1      List in first pass"
+               "\t  /D      Dump contents of blocks/resources\n"
+               "\t  /L      List code resources or font outlines (includes /D)\n"
+               "\t  /Rnn    List/dump only resource number nn (dec.)\n"
+               "\t  /1      List in first pass"
           );
           exit(1);
         }
 
-	printf("argv[i]: %s\n", argv[i]);
         _splitpath(argv[i],drive,dir,name,ext);
+        strupr(name); strupr(ext);      // Dateinamen in Großbuchstaben
         if(*ext=='\0')                  // Extension fehlt: GEO annehmen
           strcpy(ext,".GEO");
         _makepath(path,drive,dir,name,ext);
 
-        if(!(f=fopen(path,"rb"))) {     // Datei zum Lesen �ffnen
+        if(!(f=fopen(path,"rb"))) {     // Datei zum Lesen öffnen
           puts("File not found.");
           exit(1);                      // Datei fehlt? Fehlermeldung
         }
 
         if(dolist)                      // Header wird auskommentiert
+        {
           puts("comment %");
+          cmtChar=';';                  // Create comment lines
+        }
+        else
+          cmtChar=' ';
         printf("\n\t\t\t    Dump of %s%s\n\n",name,ext);
-                                        // �berschrift
+                                        // Überschrift
         DisplayGeosFile(f);             // Datei anzeigen
-        fclose(f);                      // Datei schlie�en
+        fclose(f);                      // Datei schließen
 
         deinit_disasm();                // release data used by disassembly mod
 }

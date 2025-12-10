@@ -94,10 +94,11 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  socket dhcp borlandrtl ffile streamc mailhub mailsmtp \
 		  modemc mailpop3 lot123ss csv \
 		  parentc wmlib rtf \
-		  jpeg giflib gif htmlimpx n2txt inetmsg extui \
+		  jpeg giflib gif png htmlimpx n2txt inetmsg extui \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
-		  basicdb gridlib gsol treplib hostif ascii
+		  basicdb gridlib gsol treplib hostif ascii \
+		  rsftool bmptools
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
@@ -175,7 +176,8 @@ minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipoin
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts taskmax bnf sblaster comm spooltd \
 		  vmtree filedd logibus logiser dma mslf kbd_drivers \
-		  etherodi etherpkt msnet cdados truetype
+		  etherodi etherpkt msnet cdados truetype \
+		  hltpwr
 
 printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 		  canonbjc  epshi24 epson24 epson48 nec24 \
@@ -299,6 +301,9 @@ Installed/Library/Breadbox/Impex/JPEG: ui impex ansic ijgjpeg math MAKELIB
 
 gif : Installed/Library/Breadbox/Impex/GIF
 Installed/Library/Breadbox/Impex/GIF: ui impex ansic extgraph giflib MAKELIB
+
+png : Installed/Library/Breadbox/Impex/PNG
+Installed/Library/Breadbox/Impex/PNG: ui impex extgraph pnglib MAKELIB
 
 wmf : Installed/Library/Trans/Graphics/Vector/Wmf
 Installed/Library/Trans/Graphics/Vector/Wmf: ui impex ansic MAKELIB
@@ -890,6 +895,9 @@ Installed/Driver/Printer/DotMatrix/Epson9:	spool MAKEDRV
 
 propx24	: Installed/Driver/Printer/DotMatrix/Propx24
 Installed/Driver/Printer/DotMatrix/Propx24:	spool MAKEDRV
+
+hltpwr	: Installed/Driver/Power/hltpwr
+Installed/Driver/Power/hltpwr:			kernel MAKEDRV
 
 
 #appl
@@ -1823,3 +1831,11 @@ Installed/Library/Breadbox/Impex/VCImpex:	ui impex ansic math meta MAKELIB
 
 vconvert: Installed/Appl/Breadbox/VConvert
 Installed/Appl/Breadbox/VConvert:		ui ansic grobj text math meta MAKEAPPL
+
+# RabeSoft Libraries
+
+rsftool	: Installed/Library/RabeSoft/rsftool
+Installed/Library/RabeSoft/rsftool:		ansic ui MAKELIB
+
+bmptools	: Installed/Library/RabeSoft/bmptools
+Installed/Library/RabeSoft/bmptools:		ansic ui MAKELIB

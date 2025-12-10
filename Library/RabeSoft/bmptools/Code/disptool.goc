@@ -1,0 +1,590 @@
+/***********************************************************************
+ *
+ *	Code-File for Bitmap Tool Library
+ *
+ *      Made by RABE-Soft 10/2002 - 07/2025
+ *	Adapted for free PC/GEOS project 01/2024
+ *
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ *
+ ***********************************************************************/
+
+@include <stdlib.h>
+
+#include <string.h>
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+/*
+ ***************************************************************************
+ *		Bitmap tools: Support for drag rectangle
+ ***************************************************************************
+ */
+/***********************************************************************
+ *
+ *	The DragXXX() routines, together with the DragRectStruct structure,
+ *	provide the basis for simple implementation of a mouse-controlled
+ *	selection rectangle (drag rectangle), allowing a screen area to be
+ *	selected within a view. The view typically represents a graphic
+ *	(e.g., a bitmap) from which a specific area is to be selected.
+ *	Common use case: zooming into an image area — hence, drag rectangle.
+ *	The routines take into account that the graphic may not be drawn at
+ *	position (0,0) within the view, e.g., if the image is smaller than the
+ *	view area and is centered.
+ *
+ *	Standard implementation: see example in the header file
+ *
+ ***********************************************************************
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ *	Drag rectangle routines 1: High-level routines
+ *		These work only if dragRect->dragLevel != DR_DRAG_LEVEL_DISABLED,
+ *		allowing you to disable functionality via that flag
+ *
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+/*--------------------- DragCreateDragGState ---------------------
+ *	Purpose:        Create a GState that allows other routines to
+ *			draw directly on the screen.
+ *			The draw mode is set to XOR (this is important!)
+ *			and 'lineColor' is set as the rectangle's line color.
+ *			Only dragRect->dragGState is modified.
+ *	Note:		GState is only created if
+ *				dragRect->dragLevel != DR_DRAG_LEVEL_DISABLED
+ *	Parameters:	dragRect:  storage for the GState
+ *			genView:   GenView object to draw into
+ *			lineColor: color of the drag rectangle
+ *	Return:		- (dragRect->dragGState contains the new GState handle)
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragCreateDragGState(DragRectStruct *dragRect, optr genView, int lineColor) {
+WindowHandle wh;
+
+	if ( dragRect->dragLevel == DR_DRAG_LEVEL_DISABLED ) return;
+
+	wh = @call genView::MSG_GEN_VIEW_GET_WINDOW();
+	if (!wh) {
+		dragRect->dragGState  = 0;
+		return;
+		}
+	dragRect->dragGState  = GrCreateState(wh);
+	GrSetLineColor(dragRect->dragGState,CF_INDEX,lineColor,0,0);
+	GrSetMixMode(dragRect->dragGState,MM_XOR);
+}
+
+/*--------------------- DragDestroyDragGState ---------------------
+ *	Purpose:        Destroy the GState used to draw directly on the screen
+ *	Note:		GState is only destroyed if
+ *				dragRect->dragGState != DR_DRAG_LEVEL_DISABLED
+ *	Return:		- (dragRect->dragGState is set to null)
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragDestroyDragGState(DragRectStruct *dragRect) {
+    if ( dragRect->dragLevel == DR_DRAG_LEVEL_DISABLED ) return;
+    if (!dragRect->dragGState ) return;
+
+    GrDestroyState(dragRect->dragGState);
+    dragRect->dragGState = 0;
+}
+
+
+/*--------------------- DragPrepareForDragMode ---------------------
+ *	Purpose:        Standard handler for MSG_META_START_SELECT
+ *                      If an old drag rectangle is still present
+ *                      (DR_DRAG_LEVEL_RELEASED), it will be removed.
+ *			Then the drag rectangle is initialized with the current
+ *			coordinates and 'DR_DRAG_LEVEL_PREPARED' is activated.
+ *	Note:		Only works if
+ *				dragRect->dragGState != DR_DRAG_LEVEL_DISABLED
+ *	Parameters:	Drag rectangle parameters and mouse coordinates
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragPrepareForDragMode(DragRectStruct *dragRect, int xPosition, int yPosition) {
+   if ( dragRect->dragLevel == DR_DRAG_LEVEL_DISABLED ) return;
+   if ( dragRect->dragGState == 0 ) return;
+
+   if ( dragRect->dragLevel == DR_DRAG_LEVEL_RELEASED ) {
+	DragDrawDragRect(dragRect);
+	}
+
+   dragRect->x0 = dragRect->x1 = xPosition;
+   dragRect->y0 = dragRect->y1 = yPosition;
+   dragRect->dragLevel = DR_DRAG_LEVEL_PREPARED;
+
+}
+
+/*--------------------- DragEnterDragMode ---------------------
+ *	Purpose:        Standard handler for MSG_META_DRAG_SELECT
+ *                      Positions the drag rectangle
+ *			but does not yet draw it
+ *			Sets 'DR_DRAG_LEVEL_READY'
+ *	Note:		Only works if
+ *				dragRect->dragGState != DR_DRAG_LEVEL_DISABLED
+ *	Parameters:	Drag rectangle parameters and mouse coordinates
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragEnterDragMode(DragRectStruct *dragRect, int xPosition, int yPosition) {
+  if ( dragRect->dragGState == 0 ) return;
+  if ( dragRect->dragLevel != DR_DRAG_LEVEL_PREPARED) return;
+
+  dragRect->x1 = xPosition;
+  dragRect->y1 = yPosition;
+
+  dragRect->dragLevel = DR_DRAG_LEVEL_READY;
+  }
+
+
+/*--------------------- DragHandleMouseMove ---------------------
+ *	Purpose:        Standard handler for MSG_META_MOUSE_PTR
+ *			If the mouse is moved for the first time with the button held
+ *			(DR_DRAG_LEVEL_READY), the drag rectangle is drawn on the screen
+ *			and 'DR_DRAG_LEVEL_DRAGGING' is set.
+ *			If the drag rectangle is already active (DR_DRAG_LEVEL_DRAGGING),
+ *			it is repositioned.
+ *	Note:		Only works if
+ *				dragRect->dragGState != DR_DRAG_LEVEL_DISABLED
+ *	Parameters:	Drag rectangle parameters and mouse coordinates
+ *	Return:
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragHandleMouseMove(DragRectStruct *dragRect, int xPosition, int yPosition) {
+   if ( dragRect->dragLevel == DR_DRAG_LEVEL_DISABLED ) return;
+   if ( dragRect->dragGState == 0 ) return;
+
+   switch ( dragRect->dragLevel ) {
+	case DR_DRAG_LEVEL_DRAGGING:	/* remove rectangle */
+		DragDrawDragRect(dragRect);
+	case DR_DRAG_LEVEL_READY:	/* Position and draw rectangle */
+		dragRect->x1 = xPosition;
+		dragRect->y1 = yPosition;
+		DragDrawDragRect(dragRect);
+		dragRect->dragLevel = DR_DRAG_LEVEL_DRAGGING;
+		break;
+	}
+}
+
+/*--------------------- DragLeaveDragMode ---------------------
+ *	Purpose:        Standard handler for MSG_META_END_SELECT
+ *			Resets the drag level and, if needed, erases the
+ *			drag rectangle from the screen.
+ *			The drag level is usually set to 'DR_DRAG_LEVEL_NONE',
+ *			unless an existing drag rectangle is not erased due to
+ *			eraseDragRect == FALSE. In that case, the level is set to
+ *			'DR_DRAG_LEVEL_RELEASED'.
+ *	Parameters:	*dragRect: Drag rectangle parameters
+ *			eraseDragRect: erase the existing drag rectangle?
+ *				TRUE: erase it (if present)
+ *				FALSE: leave it and, if present,
+ *                      		set dragLevel to 'DR_DRAG_LEVEL_RELEASED'
+ *	Note:		Only works if
+ *				dragRect->dragGState != DR_DRAG_LEVEL_DISABLED
+ *	Return:		Info whether a drag rectangle was on screen
+ *				TRUE: one was present on screen
+ *				FALSE: none was present
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT DragLeaveDragMode(DragRectStruct *dragRect, Boolean eraseDragRect) {
+Boolean moved;
+   if ( dragRect->dragGState == 0 ) return FALSE;
+   if ( dragRect->dragLevel == DR_DRAG_LEVEL_DISABLED ) return FALSE;
+
+   /* MSG_META_END_SELECT is always called when the mouse button is released.
+    * At that point, dragLevel may be: DR_DRAG_LEVEL_DRAGGING, DR_DRAG_LEVEL_READY,
+    * and in rare exceptional cases also 'DR_DRAG_LEVEL_PREPARED' */
+
+   if ( dragRect->dragLevel == DR_DRAG_LEVEL_DRAGGING ) {
+	moved = TRUE;
+	if ( eraseDragRect ) {
+		DragDrawDragRect(dragRect);
+		dragRect->dragLevel = DR_DRAG_LEVEL_NONE;
+		}
+	else dragRect->dragLevel = DR_DRAG_LEVEL_RELEASED;
+	}
+   else {
+	moved = FALSE;
+	dragRect->dragLevel = DR_DRAG_LEVEL_NONE;
+	}
+
+   return moved;
+}
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ *	Part 3: Low-level routines and tools
+ *      	Work independently of dragRect->dragLevel
+ *
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+/*--------------------- DragSetBitmapSize ---------------------
+ *	Purpose:        Sets the fields dragRect->xSize and dragRect->ySize
+ *			with the dimensions of the given HugeBitmap.
+ *			Tool routine to simplify implementation
+ *	Parameters:	dragRect:  structure to be updated
+ *			file, bmp: file and VM handle of the HugeBitmap
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragSetBitmapSize(DragRectStruct *dragRect, VMFileHandle file, VMBlockHandle bmp) {
+    if ( !file || !bmp ) return;
+    BTGetMoreBitmapInfos(file, bmp, &(dragRect->xSize), &(dragRect->ySize), 0 );
+}
+
+
+/*--------------------- DragDrawDragRect ---------------------
+ *	Purpose:        Draws the drag rectangle (x0, y0, x1, y1) defined in
+ *			dragRect into the GState dragRect->dragGState.
+ *			Includes a safety check to ensure GState is not null
+ *	Parameters:      dragRect: rectangle and GState
+ *	Return:         -
+ ---------------------------------------------------------------------------*/
+extern void EXPORT DragDrawDragRect(DragRectStruct *dragRect) {
+    if (!dragRect->dragGState ) return;
+    GrDrawRect(dragRect->dragGState,
+	dragRect->x0, dragRect->y0, dragRect->x1, dragRect->y1);
+}
+
+/*--------------------- DragGetDragBounds ---------------------
+ *	Purpose:        Determine the current coordinates of the rectangle
+ *			enclosed by the drag frame.
+ *	Strategy:	The routine takes into account both the start position
+ *			of the image and its size, and returns only the
+ *			coordinates of the rectangle that lies within
+ *			the image.
+ *	Parameters:      dragRect:   Drag frame, image start and size
+ *			*retVal:    Return: Coordinates of the image region
+ *				    covered by the drag frame.
+ *				    - The coordinates are sorted if successful:
+ *				      R_left <= R_right, R_top <= R_bottom
+ *				    - If the drag frame does not cover the image,
+ *				      R_right = R_left - 1 and R_bottom = R_top - 1
+ *			*xSize:	    Return: Width of the enclosed image region
+ *				    Null if drag frame does not cover the image
+ *			*ySize:	    Return: Height of the enclosed image region
+ *				    Null if drag frame does not cover the image
+ *
+ *			Null pointers are allowed for retVal, xSize, and ySize
+ *
+ *	Conventions:	The selected rectangle is defined by the coordinates
+ *			of its top-left and bottom-right corners.
+ *			Example: A 640x480 pixel image region has the
+ *			coordinates ( 0,0 ) ... ( 639, 479 )
+ *			These values are stored in retVal.
+ *			The size of an image region (in pixels) is then:
+ *			xSize = retVal.R_right - retVal.R_left + 1
+ *			ySize = retVal.R_bottom - retVal.R_top + 1
+ *
+ *	Return:		Error flag: FALSE: everything OK
+ *				TRUE: drag frame does not cover the image
+ ---------------------------------------------------------------------------*/
+extern Boolean EXPORT DragGetDragBounds(DragRectStruct *dragRect, Rectangle *retVal, int *xSize, int *ySize) {
+int x0, y0, x1, y1;	// Koordinaten des Rectecks im Bild
+int tmp;
+Boolean err = FALSE;
+
+    x0 = dragRect->x0 - dragRect->xStart;
+    x1 = dragRect->x1 - dragRect->xStart;
+    y0 = dragRect->y0 - dragRect->yStart;
+    y1 = dragRect->y1 - dragRect->yStart;
+
+    /* sort coordinates */
+    if ( x0 > x1 ) { tmp = x0; x0 = x1; x1 = tmp; }
+    if ( y0 > y1 ) { tmp = y0; y0 = y1; y1 = tmp; }
+
+    /* Limit coordinates to the image boundaries */
+    if ( x0 < 0 ) x0 = 0;
+    if ( y0 < 0 ) y0 = 0;
+    if ( x1 >= dragRect->xSize ) x1 = dragRect->xSize - 1;
+    if ( y1 >= dragRect->ySize ) y1 = dragRect->ySize - 1;
+
+    /* If the drag frame (x0, x1, y0, y1) does not overlap the image at all,
+     * then at least one coordinate pair is now reversed */
+    if ( ( x0 > x1 ) || ( y0 > y1 ) ) {
+	/* Set coordinates so that a size calculation results in zero */
+
+	x1 = x0 - 1;
+	y1 = y0 - 1;
+	err = TRUE;
+	}
+
+    if ( retVal ) {
+	    retVal->R_left = x0;
+	    retVal->R_top = y0;
+	    retVal->R_right = x1;
+	    retVal->R_bottom = y1;
+	    }
+    if ( xSize ) *xSize = x1 - x0 + 1;
+    if ( ySize ) *ySize = y1 - y0 + 1;
+
+    return err;
+}
+
+/*
+ ***************************************************************************
+ *		Bitmap Tools: PictureDisplayClass
+ ***************************************************************************
+ */
+
+
+@classdecl PictureDisplayClass;
+
+/*--------------------- MSG_PD_SET_BITMAP ---------------------
+ *	Purpose:        Assign a bitmap to be displayed.
+ *			The object will redraw itself.
+ *			The graphic will be centered.
+ *	Note:		If the object has never been visible on screen when it
+ *			receives this message, the VisBounds are still null.
+ *			In that case, automatic positioning of the image won't work.
+ *			Fix: Only set the graphic once the object is already visible.
+ *	Parameters:	vmFile:		Handle to the VM file
+ *			bmpBlock:       Head block of the bitmap
+ *			frameSize:	Size of the border in pixels
+ *					The object's size will be recalculated.
+ *					(-1) means: no recalculation of size,
+ *					i.e. the border size results from
+ *					the image size and the object's size.
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_SET_BITMAP {
+int xSize, ySize, width, height;
+
+   pself->vmFile = vmFile;
+   pself->vmHandle = bmpBlock;
+   pself->pictIsGString = FALSE;
+   @call oself::MSG_PD_GET_SIZE(&xSize, &ySize);
+
+   if ( vmFile && bmpBlock ) {
+       BTGetMoreBitmapInfos(vmFile, bmpBlock, &width, &height, 0);
+
+       if ( frameSize >= 0 )
+	    {
+	    xSize = width + 2*frameSize;
+	    ySize = height + 2*frameSize;
+	    @call oself::MSG_PD_SET_DRAW_POSITION(frameSize, frameSize);
+	    @call oself::MSG_PD_SET_SIZE(xSize, ySize);
+	    }
+       else {
+	    @call oself::MSG_PD_SET_DRAW_POSITION((xSize-width)/2, (ySize-height)/2 );
+	    }
+       }
+   @call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
+   }
+
+/*--------------------- MSG_PD_SET_GSTRING ---------------------
+ *	Purpose:        Assign a GString to be displayed.
+ *			The object will redraw itself.
+ *			The graphic will be centered.
+ *	Note:		If the object has never been visible on screen when it
+ *			receives this message, the VisBounds are still null.
+ *			In that case, automatic positioning of the image won't work.
+ *			Fix: Only set the graphic once the object is already visible.
+ *	Parameters:	vmFile:		Handle to the VM file
+ *			gsBlock:        Head block of the GString
+ *			frameSize:	Size of the border in pixels
+ *					The object's size will be recalculated.
+ *					(-1) means: no recalculation of size,
+ *					i.e. the border size results from
+ *					the image size and the object's size.
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_SET_GSTRING {
+int xSize, ySize, width, height;
+Rectangle bounds;
+Handle		gstr;
+
+   pself->vmFile = vmFile;
+   pself->vmHandle = gsBlock;
+   pself->pictIsGString = TRUE;
+   @call oself::MSG_PD_GET_SIZE(&xSize, &ySize);
+
+   if ( vmFile && gsBlock ) {
+       gstr = GrLoadGString(vmFile, GST_VMEM, gsBlock);
+       GrGetGStringBounds(gstr, 0, 0, &bounds);
+       GrDestroyGString(gstr,NULL,GSKT_LEAVE_DATA);
+       width = bounds.R_right - bounds.R_left;
+       height = bounds.R_bottom - bounds.R_top;
+
+       if ( frameSize >= 0 )
+	    {
+	    xSize = width + 2*frameSize;
+	    ySize = height + 2*frameSize;
+	    @call oself::MSG_PD_SET_DRAW_POSITION(
+				frameSize - bounds.R_left,
+				frameSize - bounds.R_top);
+	    @call oself::MSG_PD_SET_SIZE(xSize, ySize);
+	    }
+       else {
+	    @call oself::MSG_PD_SET_DRAW_POSITION(((xSize-width)/2)- bounds.R_left,
+			((ySize-height)/2)- bounds.R_top);
+	    }
+       }
+
+   @call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
+   }
+
+/*--------------------- MSG_PD_SET_FRAME_COLOR ---------------------
+ *	Purpose:	Set colors for the border.
+ *			The object will NOT be redrawn.
+ *	Parameters:	topLeft, bottomRight: color indices
+ *			(-1) means: do not draw a border
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_SET_FRAME_COLOR {
+	pself->topLeftColor = topLeft;
+	pself->bottomRightColor = bottomRight;
+}
+
+/*--------------------- MSG_PD_GET_FRAME_COLOR ---------------------
+ *	Purpose:	Get the border colors.
+ *	Parameters:	*topLeft, *bottomRight: return: color indices
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_GET_FRAME_COLOR {
+	*topLeft = pself->topLeftColor;
+	*bottomRight = pself->bottomRightColor;
+}
+
+/*--------------------- MSG_PD_SET_DRAW_POSITION ---------------------
+ *	Purpose:	Set drawing position (offset) for the graphic.
+ *			The object will NOT be redrawn.
+ *	Parameters:	xPos, yPos: new position, in pixels
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_SET_DRAW_POSITION {
+	pself->xPos = xPos;
+	pself->yPos = yPos;
+}
+
+/*--------------------- MSG_PD_GET_DRAW_POSITION ---------------------
+ *	Purpose:	Get the current valid drawing position (offset) of the graphic.
+ *	Parameters:	*xPos, *yPos: return: current drawing offsets
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_GET_DRAW_POSITION {
+	*xPos = pself->xPos;
+	*yPos = pself->yPos;
+}
+
+/*--------------------- MSG_PD_GET_SIZE ---------------------
+ *	Aufgabe:	Liefert die aktuelle Gr”áe des Objekts, indem es die
+ *			VisBounds auswertet.
+ *	Anmerkung:	Wenn das Objekt beim Erhalten dieser Message noch nie
+ *			auf dem Schirm war, sind die VisBounds noch Null.
+ *			Folglich wird auch eine Null-Gr”áe geliefert!
+ *	Parameter:      *xSize, *ySize: Gr”áe des Objekts
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_GET_SIZE {
+Rectangle bounds;
+CompSizeHintArgs	*fixSize;
+
+
+    fixSize = ObjVarFindData(oself, HINT_FIXED_SIZE);
+    if ( fixSize )
+	do {
+	   if ( (fixSize->CSHA_width & SH_TYPE)== SST_PIXELS )
+			*xSize = fixSize->CSHA_width & SH_DATA;
+		else break;
+
+	   if ( (fixSize->CSHA_height & SH_TYPE)== SST_PIXELS )
+			*ySize = fixSize->CSHA_height & SH_DATA;
+		else break;
+
+	return;
+
+	} while (0);
+
+    /* No fixed size found. Retrieve VisBounds */
+
+   @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+   *xSize = bounds.R_right - bounds.R_left;
+   *ySize = bounds.R_bottom - bounds.R_top;
+
+}
+
+/*--------------------- MSG_PD_SET_SIZE ---------------------
+ *	Purpose:	Set a new size for the object
+ *	Parameter:	xSize, ySize: New size of the object
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_PD_SET_SIZE {
+CompSizeHintArgs  fixSize = { SST_PIXELS, SST_PIXELS, 0};
+
+	@call oself::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+	fixSize.CSHA_width |= xSize;
+	fixSize.CSHA_height |= ySize;
+
+	@call oself::MSG_META_ADD_VAR_DATA(
+		HINT_FIXED_SIZE | VDF_SAVE_TO_STATE,
+		sizeof(CompSizeHintArgs),
+		&fixSize);
+
+	@call oself::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *	Aufgabe:        Zeichnet die Grafik
+ *	Parameter:	gstate: GStateHandle, wohin zu zeichnen ist
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+@method PictureDisplayClass, MSG_VIS_DRAW {
+Rectangle bounds;
+int x, y;
+
+   GrSaveState(gstate);
+   @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+   GrSetClipRect(gstate,PCT_REPLACE,
+		bounds.R_left, bounds.R_top,
+		bounds.R_right + 1, bounds.R_bottom + 1);
+
+   x = bounds.R_left + pself->xPos;
+   y = bounds.R_top + pself->yPos;
+
+   if ( pself->vmFile ) if ( pself->vmHandle)
+	{
+	/* Draw graphic */
+	if ( pself->pictIsGString) {
+		Handle		gstr;
+		word		elem;	/* BUG!!! GStringElement is byte,
+					GrLoadGString returns a word ->
+					Under certain circumstances, data may be overwritten! */
+		gstr = GrLoadGString(pself->vmFile, GST_VMEM, pself->vmHandle);
+		GrDrawGString(gstate,gstr, x, y, 0, &elem);
+		GrDestroyGString(gstr,NULL,GSKT_LEAVE_DATA);
+		GrRestoreState(gstate);
+		GrSaveState(gstate);
+		}
+	   else	{
+		GrDrawHugeBitmap(gstate, x, y, pself->vmFile, pself->vmHandle);
+		}
+	}
+
+   /* draw borer */
+   if ( pself->topLeftColor >= 0 ) {
+	GrSetLineColor(gstate,CF_INDEX,pself->topLeftColor,0,0);
+	GrDrawHLine(gstate, bounds.R_left, bounds.R_top, bounds.R_right-1);
+	GrDrawVLine(gstate, bounds.R_left, bounds.R_top, bounds.R_bottom-1);
+	}
+   if ( pself->bottomRightColor >= 0 ) {
+	GrSetLineColor(gstate,CF_INDEX,pself->bottomRightColor,0,0);
+	GrDrawHLine(gstate, bounds.R_left+1, bounds.R_bottom-1, bounds.R_right-1);
+	GrDrawVLine(gstate, bounds.R_right-1, bounds.R_top+1, bounds.R_bottom-1);
+	}
+
+
+   GrRestoreState(gstate);
+
+}
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* -------------------------- end of file ------------------------- */
+

@@ -1,5 +1,5 @@
 cThumbV.obj \
-cThumbV.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+cThumbV.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -16,7 +16,7 @@ cThumbV.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh htmldrv.h ExtGraph.goh
+                Objects/helpCC.goh htmldrv.h
 cThumbV.obj \
 cThumbV.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -26,10 +26,10 @@ cThumbV.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h product.h \
-                math.h htmlfstr.h awatcher.h htmlprog.h Library.h \
+                math.h htmlfstr.h awatcher.h htmlprog.h extgraph.h \
                 Ansi/string.h
 popups.obj \
-popups.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+popups.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -57,7 +57,7 @@ popups.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
 mAlbum.obj \
-mAlbum.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+mAlbum.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -86,7 +86,7 @@ mAlbum.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
                 Ansi/stdio.h
 mImport.obj \
-mImport.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+mImport.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -113,7 +113,7 @@ mImport.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h product.h \
-                math.h htmlfstr.h awatcher.h htmlprog.h Library.h
+                math.h htmlfstr.h awatcher.h htmlprog.h
 AWATCHER.obj \
 AWATCHER.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -143,7 +143,7 @@ AWATCHER.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h awatcher.h
 pBmpOp.obj \
-pBmpOp.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+pBmpOp.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -160,7 +160,7 @@ pBmpOp.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ExtGraph.goh
+                Objects/helpCC.goh
 pBmpOp.obj \
 pBmpOp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -169,9 +169,9 @@ pBmpOp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h extgraph.h
 pCamera.obj \
-pCamera.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+pCamera.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -199,7 +199,7 @@ pCamera.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h photopc.h Ansi/stdio.h
 pMain.obj \
-pMain.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+pMain.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -216,7 +216,7 @@ pMain.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Objects/gViewCC.goh ExtGraph.goh
+                Objects/helpCC.goh Objects/gViewCC.goh
 pMain.obj \
 pMain.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -225,10 +225,10 @@ pMain.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/string.h library.h \
-                Ansi/stdio.h
+                parallDr.h hugearr.h fileEnum.h extgraph.h Ansi/string.h \
+                library.h Ansi/stdio.h
 pPrint.obj \
-pPrint.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+pPrint.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -245,7 +245,7 @@ pPrint.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ExtGraph.goh
+                Objects/helpCC.goh
 pPrint.obj \
 pPrint.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -254,9 +254,9 @@ pPrint.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h
+                parallDr.h hugearr.h fileEnum.h extgraph.h
 pSlide.obj \
-pSlide.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+pSlide.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -273,7 +273,7 @@ pSlide.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ExtGraph.goh
+                Objects/helpCC.goh
 pSlide.obj \
 pSlide.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -282,9 +282,9 @@ pSlide.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h Ansi/string.h
+                parallDr.h hugearr.h fileEnum.h extgraph.h Ansi/string.h
 pUtils.obj \
-pUtils.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+pUtils.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -312,7 +312,7 @@ pUtils.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
 uiMain.obj \
-uiMain.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+uiMain.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -344,7 +344,7 @@ uiMain.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
 uicVDLC.obj \
-uicVDLC.eobj: PicAlbum.goh StdApp.goh object.goh ui.goh \
+uicVDLC.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -371,5 +371,3 @@ uicVDLC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
-
-PicAlbumEC.geo PicAlbum.geo : geos.ldf ui.ldf spool.ldf ansic.ldf extgraph.ldf photopc.ldf 

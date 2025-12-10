@@ -1,31 +1,3 @@
-ASMMOD.obj \
-ASMMOD.eobj: ASMMOD/asmmodManager.asm \
-                stdapp.def geos.def geode.def resource.def ec.def lmem.def \
-                object.def graphics.def fontID.def font.def color.def \
-                gstring.def text.def char.def heap.def ui.def file.def \
-                vm.def win.def input.def hwr.def localize.def sllang.def \
-                Objects/processC.def Objects/metaC.def chunkarr.def \
-                geoworks.def gcnlist.def timedate.def \
-                Objects/Text/tCommon.def stylesh.def iacp.def \
-                Objects/uiInputC.def Objects/visC.def Objects/vCompC.def \
-                Objects/vCntC.def Internal/vUtils.def Objects/genC.def \
-                disk.def drive.def uDialog.def Objects/gInterC.def \
-                token.def Objects/clipbrd.def Objects/gSysC.def \
-                Objects/gProcC.def alb.def Objects/gFieldC.def \
-                Objects/gScreenC.def Objects/gFSelC.def \
-                Objects/gViewC.def Objects/gContC.def Objects/gCtrlC.def \
-                Objects/gDocC.def Objects/gDocCtrl.def \
-                Objects/gDocGrpC.def Objects/gEditCC.def \
-                Objects/gViewCC.def Objects/gToolCC.def \
-                Objects/gPageCC.def Objects/gPenICC.def \
-                Objects/gGlyphC.def Objects/gTrigC.def \
-                Objects/gBoolGC.def Objects/gItemGC.def \
-                Objects/gDListC.def Objects/gItemC.def Objects/gBoolC.def \
-                Objects/gDispC.def Objects/gDCtrlC.def Objects/gPrimC.def \
-                Objects/gAppC.def Objects/gTextC.def Objects/gGadgetC.def \
-                Objects/gValueC.def Objects/gToolGC.def \
-                Internal/gUtils.def Objects/helpCC.def Objects/eMenuC.def \
-                Objects/emomC.def Objects/emTrigC.def Internal/uProcC.def
 impbmp.obj \
 impbmp.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -142,9 +114,9 @@ imp_bmp.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/imp_bmp.h \
                 IMPBMP/ibcommon.h Ansi/string.h pnglib.h Ansi/stdio.h \
-                Ansi/stdlib.h zlib.h zconf.h IMPBMP/imppcx.h \
-                IMPBMP/impbmp.h jpeglib.h product.h htmlprog.h jconfig.h \
-                jmorecfg.h
+                Ansi/stdlib.h zlib.h zconf.h htmldrv.h product.h math.h \
+                htmlfstr.h awatcher.h htmlprog.h IMPBMP/imppcx.h \
+                IMPBMP/impbmp.h jpeglib.h jconfig.h jmorecfg.h
 bmpview.obj \
 bmpview.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
@@ -176,7 +148,9 @@ bmpview.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h IMPBMP/imp_bmp.h \
                 IMPBMP/ibcommon.h Ansi/string.h GRAPH/quant.h initfile.h \
-                library.h sem.h
+                pnglib.h Ansi/stdio.h Ansi/stdlib.h zlib.h zconf.h \
+                htmldrv.h product.h math.h htmlfstr.h awatcher.h \
+                htmlprog.h library.h sem.h
 quant.obj \
 quant.eobj: Ansi/string.h geos.h GRAPH/quant.h color.h heap.h
 

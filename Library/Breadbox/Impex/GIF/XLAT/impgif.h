@@ -3,7 +3,6 @@
 #define __IMPGIF_H
 
 #include <geos.h>
-#include "xlat\ibcommon.h"
 
 #define IG_HEADER_LEN 13
 #define IG_PICDESC_LEN 10

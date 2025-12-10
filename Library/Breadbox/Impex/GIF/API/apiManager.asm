@@ -6,18 +6,18 @@ include resource.def    ; idata/udata, ProcCallFixedOrMovable etc.
 include gstring.def
 
 UseLib math.def
-DefLib API/gif.def
 
+; make UI elements available to us
 include manager.rdef
 
-; global function implemented in C
-global  GIFIMPORT: far
-global  GIFTESTFILE: far
-global  GIFEXPORT: far
+IMPGIF_TEXT   segment public 'CODE'
+	extrn GIFIMPORT: far
+	extrn GIFTESTFILE: far
+IMPGIF_TEXT   ends
 
-; build up the right palette from gstring
-global  PALGSTRINGCOLELEMENT: far
-global  MY_GRPARSEGSTRING:far
+EXPGIF_TEXT   segment public 'CODE'
+	extrn GIFEXPORT: far
+EXPGIF_TEXT   ends
 
 	SetGeosConvention               ; set calling convention
 
@@ -216,7 +216,7 @@ iopt_err:
 	pop     bp                             ; 0239 5D
 	pop     bx                             ; 023A 5B
 	pop     cx                             ; 023B 59
-	pop     ax                             ; 023C 58 
+	pop     ax                             ; 023C 58
 	ret
 TransGetImportOptions endp
 
@@ -258,7 +258,7 @@ iopt_err:
         pop     bp                             ; 0239 5D
         pop     bx                             ; 023A 5B
         pop     cx                             ; 023B 59
-        pop     ax                             ; 023C 58 
+        pop     ax                             ; 023C 58
         ret
 TransGetExportOptions endp
 
@@ -281,7 +281,7 @@ ASM     ends
 InfoResource    segment lmem LMEM_TYPE_GENERAL,mask LMF_IN_RESOURCE
 
 		dw      fmt_1_name,fmt_1_mask
-		D_OPTR  0 
+		D_OPTR  0
 		D_OPTR  GifExportGroup
 		dw      0C000h     ; Currently we only support import
 
