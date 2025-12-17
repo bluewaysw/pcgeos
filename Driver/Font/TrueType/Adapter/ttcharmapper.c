@@ -251,7 +251,7 @@ word geosCharMap[] =
         C_LATIN_CAPITAL_LETTER_I_GRAVE, 
         C_LATIN_CAPITAL_LETTER_O_ACUTE, 
         C_LATIN_CAPITAL_LETTER_O_CIRCUMFLEX,  
-        //no character
+        0,  //no character
         C_LATIN_CAPITAL_LETTER_O_GRAVE, 
         C_LATIN_CAPITAL_LETTER_U_ACUTE, 
         C_LATIN_CAPITAL_LETTER_U_CIRCUMFLEX, 

@@ -4,30 +4,31 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = localize
-MAIN            = mainList.asm mainBatch.asm mainManager.asm\
+DOCUMENT        = documentBuild.asm documentClipboard.asm documentCount.asm\
+                  documentDB.asm documentDraw.asm documentImpExp.asm\
+                  documentInitfile.asm documentKeyboard.asm\
+                  documentList.asm documentManager.asm documentMisc.asm\
+                  documentMnemonic.asm documentOpenClose.asm\
+                  documentParse.asm documentPatch.asm documentPath.asm\
+                  documentPrint.asm documentResource.asm documentSearch.asm\
+                  documentSourceView.asm documentTransView.asm\
+                  documentUtilities.asm documentUpdate.asm
+MAIN            = mainBatch.asm mainList.asm mainManager.asm\
                   mainProcess.asm
 TEXT            = textDraw.asm textManager.asm
-DOCUMENT        = documentOpenClose.asm documentResource.asm\
-                  documentImpExp.asm documentTransView.asm documentDB.asm\
-                  documentSourceView.asm documentMnemonic.asm\
-                  documentInitfile.asm documentManager.asm\
-                  documentPatch.asm documentMisc.asm documentList.asm\
-                  documentPath.asm documentDraw.asm documentClipboard.asm\
-                  documentCount.asm documentBuild.asm documentPrint.asm\
-                  documentUtilities.asm documentUpdate.asm\
-                  documentParse.asm documentSearch.asm documentKeyboard.asm
-UI              = uiManager.asm uiDocument.ui uiMain.ui uiEdit.ui uiFile.ui\
-                  uiStrings.ui uiImpExp.ui uiAppMoniker.ui uiDisplay.ui\
-                  uiManager.ui uiPrint.ui uiProject.ui
+UI              = uiManager.asm uiAppMoniker.ui uiDisplay.ui uiDocument.ui\
+                  uiEdit.ui uiImpExp.ui uiMain.ui uiManager.ui uiPrint.ui\
+                  uiProject.ui uiStrings.ui uiFile.ui
 UI_TO_RDFS      = uiManager.ui
 OBJS            =
-COMMON          = localizeGeode.def localizeConstant.def localizeErrors.def\
-                  localizeGlobal.def localizeMacro.def localizeLoc.def\
-                  localizeText.def localizeProcess.def localizeContent.def\
-                  localizeConstant.uih localizeDocument.def
-MODULES         = Main Text Document UI
+COMMON          = localizeConstant.def localizeConstant.uih\
+                  localizeContent.def localizeDocument.def\
+                  localizeErrors.def localizeGeode.def localizeGlobal.def\
+                  localizeLoc.def localizeMacro.def localizeProcess.def\
+                  localizeText.def
+MODULES         = Document Main Text UI
 CMODULES        =
-SRCS            = $(MAIN) $(TEXT) $(DOCUMENT) $(UI) $(COMMON)
+SRCS            = $(DOCUMENT) $(MAIN) $(TEXT) $(UI) $(COMMON)
 LOBJS           =
 
 SYSMAKEFILE     = geode.mk

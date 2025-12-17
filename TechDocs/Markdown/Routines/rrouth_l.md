@@ -323,11 +323,12 @@ this element will be *numElem* bytes long.
             VMFileHandle    vmFile,
             VMBlockhandle   vmBlock,        /* Handle of directory block */
             dword           elemNum,        /* Element to lock */
-            void **         elemPtr);       /* Pointer to element is written 
+            void **         elemPtr,        /* Pointer to element is written 
                                              * here */
+            word *          elemSize);	    /* Size of element is written here */
 
 This routine locks an element in a Huge Array. It writes the element's 
-address to **elemPtr*. The dword returned indicates how many elements come 
+address to **elemPtr**. The dword returned indicates how many elements come 
 before and after the element in that block. The upper word indicates how 
 many elements come before the locked one, counting the locked element. The 
 lower word indicates how many elements come after the locked element, 
