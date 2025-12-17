@@ -387,6 +387,12 @@ OLFieldVisSetSize	method	dynamic OLFieldClass, MSG_VIS_SET_SIZE
 	mov	di, offset OLFieldClass
 	CallSuper	MSG_VIS_SET_SIZE
 	pop	di
+if TOOL_AREA_IS_TASK_BAR
+	push	ds					; save ds
+	segmov	ds, dgroup				; load dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TB_ENABLED is set
+	pop	ds					; restore ds
+	jz	hasNoTaskbar				; skip if no taskbar
 
 	push	si
 	mov	si, ds:[di].OLFI_toolArea	; get *ds:si = tool area
@@ -432,6 +438,8 @@ OLFieldVisSetSize	method	dynamic OLFieldClass, MSG_VIS_SET_SIZE
 	;
 done:
 	pop	si
+hasNoTaskbar:
+endif
 	DoPop	di, bx
 	push	bp
 	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
