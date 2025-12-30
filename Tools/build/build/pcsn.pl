@@ -14,6 +14,7 @@
 #   Name    Date        Description
 #   ----    ----        -----------
 #   timb    11/16/98    Initial Revision
+#   marcusg 12/30/24    Make work with FreeGEOS filetree
 #
 # DESCRIPTION:
 #      Copies a geode from the Installed directory to the demo tree based
@@ -57,12 +58,16 @@ while (($arg = $ARGV[$i]) ne "") {
 #
 # Hardcode the filetree file location
 #
-$arkFileName = $ROOT_DIR . "/Tools/build/product/Ark/ark.filetree";
+$arkFileName = $ROOT_DIR . "/Tools/build/product/bbxensem/bbxensem.filetree";
 open(FILETREE, $arkFileName);
 
 $LOCAL_ROOT = $ENV{'LOCAL_ROOT'};
 $LOCAL_ROOT =~ s/\\/\//g;
-push (@dir, $LOCAL_ROOT . "/gbuild/LOCALPC");
+if ($ec) {
+    push (@dir, $LOCAL_ROOT . "/gbuild.ec/localpc");
+} else {
+    push (@dir, $LOCAL_ROOT . "/gbuild.nc/localpc");
+}
 
 push (@currentCmd, "ROOT");
 $line = 0;
@@ -81,7 +86,8 @@ if ($fileToSend eq "") {
 sub FindCallBack
 {
     $fileName = $File::Find::name;
-    $File::Find::prune = 1;
+    $File::Find::prune = 1  # Don't recurse.
+        if $File::Find::name ne ".";
 
     if ($fileName =~ m/.+$pat/oi) {
 		($extension) = $fileName =~ /.+\.(.+)$/;
@@ -142,6 +148,18 @@ while (<FILETREE>) {
     }
 
     #
+    # if we encounter an ENGLISH or GERMAN command, push it on stack
+    #
+    if (m/\s*ENGLISH\s*{/) {
+        $commandParsed = 1;
+        push (@currentCmd, "ENGLISH");
+    }
+    if (m/\s*GERMAN\s*{/) {
+        $commandParsed = 1;
+        push (@currentCmd, "GERMAN");
+    }
+
+    #
     # if we encounter an ELSE command, push it on the stack
     #
     if (m/\s*ELSE\s*{/) {
@@ -171,7 +189,7 @@ while (<FILETREE>) {
         #
         # found a match for the file so stop
         #
-        last;
+        exit 0;
     }
 }
 
