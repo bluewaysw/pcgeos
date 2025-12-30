@@ -69,7 +69,16 @@ extern TEngine_Instance engineInstance;
 #define KERN_VALUE_DIVIDENT                 30
 
 #define STANDARD_GRIDSIZE                   1000
+
+/* Maximum number of glyphs supported per font.                */
+/* Fonts exceeding this limit are not registered by kernel     */
+/* and therefore do not appear in font selection.              */
 #define MAX_NUM_GLYPHS                      2000
+
+/* Maximum number of outline points supported per glyph.       */
+/* Fonts containing glyphs that exceed this limit are not      */
+/* registered by kernel and are unavailable in font selection. */
+#define MAX_NUM_OUTLINE_POINTS              600
 
 #define MIN_OS2_TABLE_VERSION               2
 

@@ -534,10 +534,11 @@ Fin:
  *                          requirements (unacceptable).
  *                    FALSE if the font is acceptable.
  * 
- * STRATEGY:       - Currently, the validation is based on two criteria:
+ * STRATEGY:       - Currently, the validation is based on following criteria:
  *                      1. The OS/2 table version must be at least 
  *                         MIN_OS2_TABLE_VERSION.
- *                      2. The number of glyphs must not exceed 
+ *                      2. The maximum number of outline points per glyph
+ *                      3. The number of glyphs must not exceed 
  *                         MAX_NUM_GLYPHS.
  *                 - The function is designed to be extensible so that 
  *                   further rejection criteria can be added later.
@@ -547,12 +548,16 @@ Fin:
  *      ----      ----      -----------
  *      19.12.23  JK        Initial Revision
  *      17.09.25  JK        Renamed and improved docs
+ *      28.12.25  JK        Added outline points check
  *******************************************************************/
 static Boolean isFontUnacceptable( TRUETYPE_VARS )
 {
         /* Additional rejection checks can be added here. */
         
         if ( FACE_PROPERTIES.os2->version < MIN_OS2_TABLE_VERSION )
+                return TRUE;
+
+        if ( FACE_PROPERTIES.max_Points > MAX_NUM_OUTLINE_POINTS )
                 return TRUE;
 
         return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;
