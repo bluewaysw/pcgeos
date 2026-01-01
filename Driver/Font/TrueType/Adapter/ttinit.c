@@ -340,6 +340,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         FontID                  fontID;
         Boolean                 mappedFont;
         sword                   availIndex;
+        char                    styleName[STYLE_NAME_LENGTH];
 
 
 EC(     ECCheckBounds( (void*)fileName ) );
@@ -364,7 +365,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )
                 goto Fail;
 
-        if ( getNameFromNameTable( trueTypeVars, STYLE_NAME, STYLE_NAME_ID ) == 0 )
+        if ( getNameFromNameTable( trueTypeVars, &styleName, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
         mappedFont = getFontID( trueTypeVars, &fontID );
@@ -437,7 +438,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
     
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
-                outlineDataEntry->ODE_style  = mapTextStyle( STYLE_NAME );
+                outlineDataEntry->ODE_style  = mapTextStyle( &styleName );
                 outlineDataEntry->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineDataEntry->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineDataEntry->ODE_first.OE_handle = fontHeaderChunk;
@@ -462,7 +463,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
 		while( outlineData < outlineDataEnd)
 		{
-                        if( ( mapTextStyle( STYLE_NAME ) == outlineData->ODE_style ) &&
+                        if( ( mapTextStyle( &styleName ) == outlineData->ODE_style ) &&
 	                    ( mapFontWeight( FACE_PROPERTIES.os2->usWeightClass ) == outlineData->ODE_weight ) )
 			{
 				goto Fail;
@@ -501,7 +502,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
                 outlineData = (OutlineDataEntry*) (fontInfo + 1);
-                outlineData->ODE_style  = mapTextStyle( STYLE_NAME );
+                outlineData->ODE_style  = mapTextStyle( &styleName );
                 outlineData->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineData->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineData->ODE_first.OE_handle = fontHeaderChunk;

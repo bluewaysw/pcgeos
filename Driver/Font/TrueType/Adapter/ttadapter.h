@@ -390,7 +390,6 @@ typedef struct
 {
     /* init fonts */
     char                        familyName[FID_NAME_LEN];
-    char                        styleName[STYLE_NAME_LENGTH];
 
     /* scaling */
     WWFixedAsDWord              scaleHeight;
@@ -425,7 +424,6 @@ typedef struct
 #define TRUETYPE_VARS           TrueTypeVars* trueTypeVars
 
 #define FAMILY_NAME             trueTypeVars->familyName
-#define STYLE_NAME              trueTypeVars->styleName
 #define FACE                    trueTypeVars->face
 #define FACE_PROPERTIES         trueTypeVars->faceProperties
 #define INSTANCE                trueTypeVars->instance
