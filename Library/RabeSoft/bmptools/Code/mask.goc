@@ -84,7 +84,7 @@ void LocalSetHiddenColor24Bit(byte *maskPtr, byte *dataPtr, int width, PaletteEn
  * Return:	VMBlockHandle of the new bitmap
  *		Null handle on error  (e.g. passed zero for destFile and source is compacted)
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle BTLIB_EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			int redOrIndex, int green, int blue, int variance,
 			optr progressText) {
 
@@ -203,7 +203,7 @@ byte *dataPtr;
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTCopyToBitmapWithMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle BTLIB_EXPORT BTCopyToBitmapWithMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			optr progressText) {
 
 int format, width, height, compact;
@@ -329,7 +329,7 @@ BitmapAccessRecord	srcBar, destBar;
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error (e.g. passed zero for dertFile and souce is compacted)
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle BTLIB_EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			optr progressText) {
 VMBlockHandle	newBmp;
 int format, width, height, compact;
@@ -434,7 +434,7 @@ BitmapAccessRecord	srcBar, monoBar;
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle BTLIB_EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			VMFileHandle maskFile, VMBlockHandle maskBitmap,
 			optr progressText) {
 VMBlockHandle	workBmp;
@@ -821,7 +821,7 @@ PaletteEntry *pixelPtr, rgbVal;
  *	Return:		VMBlockHandle of the new bitmap
  *			Null handle on error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle EXPORT BTCopyBitmapAndRemoveMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+extern VMBlockHandle BTLIB_EXPORT BTCopyBitmapAndRemoveMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
 			int redOrIndex, int green, int blue, optr progressText) {
 
 int format, width, height, compact;
@@ -973,7 +973,7 @@ PaletteEntry	rgbColor;
  *	Return:		FALSE if successful
  *			TRUE in any case of error
  ---------------------------------------------------------------------------*/
-extern Boolean EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, int makeSolid) {
+extern Boolean BTLIB_EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, int makeSolid) {
 int format, width, height, compact;
 int y, maskLen, val;
 byte *maskPtr;
@@ -1006,6 +1006,100 @@ BitmapAccessRecord	bar;
 
     return FALSE;
 
+}
+
+
+
+/*--------------------- BTSetColorForMaskedPixels ---------------------
+ * Purpose:	Take a masked and non compressed bitmap and set all masked
+ *		(invisible) pixels to a given color.
+ *
+ * Context:	Very often, masked pixels are not initialized.
+ *		They holds random colors then.
+ *
+ * Parameters:	vmFile, bmpBlock:	handle of the bitmap
+ *		progressText: optr of an text object to show progress
+ *			  if given, routine append dots  ('.') for every 16th line
+ *			  pass zero for no progress report
+ *
+ *	If a true-color bitmap has been passed
+ *		redOrIndex: red color value for transparent pixels
+ *		green:	    green color value for transparent pixels
+ *		blue:	    blue color value for transparent pixels
+ *
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed
+ *		redOrIndex: index of the color for transparent pixels
+ *			    for monochrome mitmaps this may be 0 or 1
+ *		green and blue will be ignored
+ *
+ * Return:	FALSE if everything is ok
+ *		TRUE  on error  (passed bitmap is compacted or has no mask)
+ ---------------------------------------------------------------------------*/
+extern Boolean BTLIB_EXPORT BTSetColorForMaskedPixels(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+			int redOrIndex, int green, int blue, optr progressText) {
+
+int format, width, height, compact;
+int n, maskLen;
+BitmapAccessRecord bar;
+byte *maskPtr, *dataPtr;
+PaletteEntry	color;
+
+
+    /*
+     * Check parameters
+     */
+    if ( (vmFile==0) || (bmpBlock==0) ) return TRUE;
+
+    /*
+     * Get information about the bitmap. Reject invalid bitmaps.
+     */
+    format = BTGetMoreBitmapInfos(vmFile, bmpBlock, &width, &height, &compact);
+    if ( compact ) return TRUE;
+    if ( (format & BMT_MASK) == 0 ) return TRUE;
+
+
+    /*
+     * Now, we can process the bitmap.
+     */
+    maskLen = (width+7)/8;
+    maskPtr = BTBitmapLock(vmFile, bmpBlock, &bar, 0);
+    dataPtr = maskPtr + maskLen;
+
+    for ( n = 0; n < height; n++ ) {
+
+	if ( progressText) {
+	    if ( (n & 0x0F) == 0 ) @call progressText::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+
+    	switch ( format & BMT_FORMAT ) {
+
+    	case BMF_MONO:
+    	    LocalSetHiddenColorMono(maskPtr, dataPtr, width, redOrIndex);
+    	    break;
+
+    	case BMF_4BIT:
+    	    LocalSetHiddenColor4Bit(maskPtr, dataPtr, width, redOrIndex);
+	    break;
+
+    	case BMF_8BIT:
+	    LocalSetHiddenColor8Bit(maskPtr, dataPtr, width, redOrIndex);
+	    break;
+
+    	case BMF_24BIT:
+	    color.rt = redOrIndex;
+	    color.gn = green;
+	    color.bl = blue;
+	    LocalSetHiddenColor24Bit(maskPtr, dataPtr, width, color);
+	    break;
+
+	}
+	maskPtr = BTBitmapNext(&bar, TRUE);
+	dataPtr = maskPtr + maskLen;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+    return FALSE;
 }
 
 
