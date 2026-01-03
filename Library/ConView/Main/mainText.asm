@@ -702,6 +702,10 @@ REVISION HISTORY:
 CTSelectStartAndMakeUndrawable	proc	near
 	uses	cx, dx, bp
 	.enter
+
+	mov	ax, MSG_VIS_INVALIDATE
+	call	ObjCallInstanceNoLock
+
 	;
 	; Make text not drawable.  Need to adjust scrollbars before
 	; drawing.
