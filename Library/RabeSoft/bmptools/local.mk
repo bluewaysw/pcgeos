@@ -16,6 +16,6 @@ XGOCFLAGS = -L bmptools
 # XCCOMFLAGS = -zc -zu
 
 # Create a Copyrigth-notice
-LINKFLAGS += -N "Made by RABE-Soft 01/2000-10/25"
+LINKFLAGS += -N "Made by RABE-Soft 01/2000-01/26"
 
 
