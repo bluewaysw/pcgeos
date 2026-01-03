@@ -584,7 +584,6 @@
     TCodeRangeTable  codeRangeTable;
 
     TGraphicsState   GS;
-    TGraphicsState   default_GS;
 
     UShort           cvtSize;   /* the scaled control value table */
     PLong            cvt;
@@ -682,8 +681,6 @@
     Bool            instruction_trap;  /* If True, the interpreter will */
 #endif                                 /* exit after each instruction   */
 
-    TGraphicsState  default_GS;    /* graphics state resulting from  */
-                                   /* the prep program               */
     Bool            is_composite;  /* ture if the glyph is composite */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
