@@ -218,13 +218,16 @@ extern TEngine_Instance engineInstance;
   typedef void  Function_Sweep_Step( RAS_ARGS Short y );
 
 
+#define PRECISION_BITS      10
+#define PRECISION_SHIFT     PRECISION_BITS - Pixel_Bits
+
 /* NOTE: These operations are only valid on 2's complement processors */
 
 #define FLOOR( x )    ( (x) & -ras.precision )
 #define CEILING( x )  ( ((x) + ras.precision - 1) & -ras.precision )
-#define TRUNC( x )    ( (signed long)(x) >> ras.precision_bits )
+#define TRUNC( x )    ( (signed long)(x) >> PRECISION_BITS )
 #define FRAC( x )     ( (x) & (ras.precision - 1) )
-#define SCALED( x )   ( ((x) << ras.precision_shift) - ras.precision_half )
+#define SCALED( x )   ( ((x) << PRECISION_SHIFT) - ras.precision_half )
 
 #ifdef DEBUG_RASTER
 #define DEBUG_PSET  Pset()
@@ -250,7 +253,6 @@ extern TEngine_Instance engineInstance;
     Int       precision_bits;       /* precision related variables */
     Int       precision;
     Int       precision_half;
-    Int       precision_shift;
     Int       precision_step;
 
     MemHandle buffer;               /* The profiles bufferblock     */
@@ -337,18 +339,17 @@ extern TEngine_Instance engineInstance;
   {
     if ( y_ppem < 24 )
     {
-      ras.precision_bits   = 10;
       ras.precision_step   = 128;
     }
     else
     {
-      ras.precision_bits   = 6;
       ras.precision_step   = 32;
     }
 
-    ras.precision       = 1 << ras.precision_bits;
+    ras.precision_bits   = 10;
+
+    ras.precision       = 1 << PRECISION_BITS;
     ras.precision_half  = ras.precision >> 1;
-    ras.precision_shift = ras.precision_bits - Pixel_Bits;
   }
 
 
@@ -1516,7 +1517,6 @@ extern TEngine_Instance engineInstance;
           /*           bit problem in the '7' of verdana 10pts, but   */
           /*           makes a new one in the 'C' of arial 14pts      */
 
-          /* if ( x2-x1 < ras.precision_half ) */
           {
             /* upper stub test */
 
