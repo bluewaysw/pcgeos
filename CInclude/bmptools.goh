@@ -20,13 +20,133 @@
 
 @deflib bmptools
 
-
-
 #define BTLIB_EXPORT _export _pascal
 
+/*###########################################################################
+ *
+ *	List of routines and structures in this library
+ *
+ *###########################################################################
+ *
+ *------ Create Offscreen Bitmaps  ----------------------------------------------
+ *
+ *    BTCreateOffscreenBitmap 	-- Create a HugeBitmap without using the system
+ *				   graphics routines.
+ *    BTGetMoreBitmapInfos 	-- Retrieve informations about the bitmap
+ *    BTBitmapToolLockHeader 	-- Lock the HugeBitmap header (low-level routine)
+ *    BTSetBitmapHeight		-- Change the height of the bitmap in the bitmap
+ *				   header
+ *
+ *
+ *------ Direct Access to Bitmaps  ----------------------------------------------
+ *
+ *    BitmapAccessRecord	-- Structure used with the BTBitmap~ routines
+ *
+ *    BTBitmapLock 		-- Lock a line in a HugeBitmap and initialize the
+ *				   BitmapAccessRecord for fast bitmap access
+ *    BTBitmapNext 		-- Returns a pointer to the next line of the bitmap
+ *    BTBitmapPrev 		-- Returns a pointer to the previous line of the bitmap
+ *    BTBitmapUnlock 		-- Unlock a bitmap previously locked via
+ *				   BTBitmapLock(), BTBitmapPrev(), or BTBitmapNext()
+ *    BTBitmapRelock 		-- Lock a line in a HugeBitmap after the
+ *				   BitmapAccessRecord was already initialized but
+ *			           then unlocked
+ *
+ *
+ *------ Working with Palettes ------------------------------------------------
+ *
+ *    PaletteEntry		-- Structure to hold a RGB value
+ *
+ *    BTGetBitmapPalette 	-- Copy the palette of a bitmap into a buffer
+ *    BTSetBitmapPalette 	-- Set the palette of a bitmap
+ *    BTLockGEOSStandardPalette -- Lock a chunk with the 256 color GEOS
+ *				   standard palette
+ *    BTUnlockGEOSStandardPalette -- Unlock the chunk with the 256 color
+ *				   GEOS standard palette
+ *    BTApproxRGBPaletteLinear  -- Find the "nearest" palette (index) color for a
+ *				   given RGB color
+ *
+ *
+ *------ Simple Bitmap Operations  ------------------------------------------------
+ *
+ *    BTCopyBitmap 		-- Copy a bitmap to (another) file
+ *    BTClipBitmap 		-- Cut out a part of a bitmap
+ *    BTInflateBitmap 		-- Upscale an uncompressed bitmap to double size
+ *    BTFlipBitmap 		-- Old routine, calls BTFlipBitmapV()
+ *    BTFlipBitmapV 		-- Flip an bitmap vertically (top to bottom)
+ *    BTFlipBitmapH 		-- Flip an bitmap horizontally (left to right)
+ *    BTRotateBitmap180 	-- Rotate the bitmap by 180 degrees.
+ *    BTRotateBitmap90 		-- Rotate the bitmap by 90 degrees clockwise.
+ *    BTRotateBitmap270 	-- Rotate the bitmap by 90 degrees counterclockwise.
+ *
+ *
+ *------ Working with the Clipboard  ------------------------------------------------
+ *
+ *    BTCopyBitmapToClipboard 	-- Copy a bitmap to clipboard
+ *    BTCopyGStringToClipboard 	-- Copy a gstring to clipboard
+ *    BTTestClipboardItem 	-- Check whether a specific format is in the
+ *				   clipboard
+ *    BTGetClipboardItem 	-- Copy data from the clipboard to a vm file
+ *
+ *
+ *------ Drawing GStrings and Bitmaps -----------------------------------------------
+ *
+ *    BTDrawBitmapWithMasks 	-- Draw a HugeBitmap into another with work arounds
+ *				   for some system bugs
+ *    BTDrawGString 		-- Draw a loaded gstring into a gstate while respecting
+ *				   the gstring's bounds
+ *    BTLoadAndDrawGString 	-- Draw an not yet loaded gstring into a gstate while
+ *				   respecting the gstring's bounds
+ *
+ *
+ *------ Editing the transparency mask -----------------------------------------------
+ *
+ *    BTCopyToBitmapWithMask 	-- Copies a bitmap and ensures that the copy has a transparency mask
+ *    BTExtractTransparencyMask -- Copies the transparency mask of a bitmap into a monochrome bitmap
+ *    BTApplyTransparencyMask 	-- Replaces the transparency mask of a bitmap
+ *    BTApplyTransparencyColor 	-- Set a all pixels that have a specified color to be transparent.
+ *    BTCopyBitmapAndRemoveMask -- Copies a bitmap and removes the transparency mask, if any
+ *    BTBitmapFillMask 		-- Makes the bitmap transparent or non transparent at all
+ *    BTSetColorForMaskedPixels -- set all masked (invisible) pixels of a bitmap to a given color.
+ *
+ *
+ *------ Other Tools  ------------------------------------------------
+ *	- Thumbnails
+ *	- Drag rectangle support
+ *	- PictureDispalyClass
+ *	- Debugging helper
+ *----
+ *    ThumbnailMakerStruct	-- Structure to use with
+ *    				   BTCreateThumbnailMakerStruct
+ *    BTCreateThumbnailMakerStruct -- Calculate the scan steps required to copy
+ *				   a bitmap into a smaller (thumbnail) bitmap.
+ *
+ *----
+ *    DragRectStruct		-- Control structure for mananging a drag rectangle
+ *
+ *    DragCreateDragGState 	-- Creates a GState through which the other routines
+ *				   can draw directly to the screen.
+ *    DragDestroyDragGState 	-- Destroys the GState used for direct screen drawing.
+ *    DragPrepareForDragMode 	-- Standard handler for MSG_META_START_SELECT.
+ *    DragEnterDragMode 	-- Standard handler for MSG_META_DRAG_SELECT.
+ *    DragHandleMouseMove 	-- Standard handler for MSG_META_MOUSE_PTR.
+ *    DragLeaveDragMode 	-- Standard handler for MSG_META_END_SELECT.
+ *
+ *    DragSetBitmapSize 	-- Sets the fields dragRect->xSize and dragRect->ySize
+ *    DragDrawDragRect 		-- Draws the drag rectangle
+ *    DragGetDragBounds 	-- Determines the current coordinates of the rectangle
+ *
+ *---
+ *    PictureDisplayClass	-- An object that can display images (HugeBitmaps and
+ *				   GStrings) in a simple way
+ *
+ *---
+ *    BTSetDebugText 		-- Enable debugging helper routines
+ *
+ ###########################################################################*/
 
-/*###########################################################################/*###########################################################################
- #
+
+/*###########################################################################
  #	Part 1: Creating and Managing Offscreen Bitmaps
  #		without Access via GStates
  #
@@ -66,6 +186,30 @@ typedef struct {       		/* Single palette entry in the palette */
 extern VMBlockHandle BTLIB_EXPORT BTCreateOffscreenBitmap(VMFileHandle fh, BMFormat format,
 	word width, word height, PaletteEntry *palette);
 
+/* -------------------- BTGetMoreBitmapInfos ----------------------------------------------------
+ *      Retrieve bitmap type info (color depth and more)
+ *		NULL pointers are allowed for width, height, mask,
+ *		if you are not interested one of in these informations
+ *	return: 	BMType (e.g., (BMT_MASK | BMF_8BIT) )
+ * ------------------------------------------------------------------------*/
+extern int BTLIB_EXPORT BTGetMoreBitmapInfos(VMFileHandle fh, VMBlockHandle vmBlock,
+	int *width, int *height, int *compact );
+
+
+/*--------------------- BTBitmapToolLockHeader ---------------------
+ *	Purpose:        Lock the HugeBitmap header. This is a low-level
+ *			routine and should be used with care.
+ *			Unlock with VMUnlock(), optionally preceded by VMDirty().
+ *	Parameters:	fh:	Handle of the VM file
+ *			bmpHandle: VM handle of the bitmap
+ *			*mh: 	Pointer to a MemHandle, used for VMDirty() and
+ *				VMUnlock()
+ *	Return:		Pointer to the locked CBitmap header
+ ---------------------------------------------------------------------------*/
+extern CBitmap* BTLIB_EXPORT BTBitmapToolLockHeader(VMFileHandle fh, VMBlockHandle bmpHandle,
+			MemHandle  *mh);
+
+
 /*--------------------- BTSetBitmapHeight ---------------------
  *	Purpose:        Change the height of the bitmap in the bitmap header.
  *			Used to update the bitmap height, for example when
@@ -80,29 +224,126 @@ extern VMBlockHandle BTLIB_EXPORT BTCreateOffscreenBitmap(VMFileHandle fh, BMFor
  ---------------------------------------------------------------------------*/
 extern void BTLIB_EXPORT BTSetBitmapHeight(VMFileHandle vmFile, VMBlockHandle bmpHandle, word height);
 
+/*###########################################################################
+ #
+ #	Part 2:	Access to Bitmaps without GStates
+ #		- Fast sequential access: Lock and unlock of lines
+ #		- Simple bitmap operations
+ #
+ #	Implemented in access.goc
+ #
+ ###########################################################################*/
 
-/* ------------------------------------------------------------------------
- * 	BTGetMoreBitmapInfos
- *      Retrieve bitmap type info (color depth and more)
- *		NULL pointers are allowed for width, height, mask,
- *		if you are not interested one of in these informations
- *	return: 	BMType (e.g., (BMT_MASK | BMF_8BIT) )
- * ------------------------------------------------------------------------*/
-extern int BTLIB_EXPORT BTGetMoreBitmapInfos(VMFileHandle fh, VMBlockHandle vmBlock,
-	int *width, int *height, int *compact );
 
-/*--------------------- BTBitmapToolLockHeader ---------------------
- *	Purpose:        Lock the HugeBitmap header. This is a low-level
- *			routine and should be used with care.
- *			Unlock with VMUnlock(), optionally preceded by VMDirty().
- *	Parameters:	fh:	Handle of the VM file
- *			bmpHandle: VM handle of the bitmap
- *			*mh: 	Pointer to a MemHandle, used for VMDirty() and
- *				VMUnlock()
- *	Return:		Pointer to the locked CBitmap header
+/* -----------------------------------------------------------------------
+ * Structure to control fast sequential access to bitmap lines.
+ * Principle: As long as there are lines left in the currently locked block,
+ * only the pointer (linePtr) is changed.
+ * Dirty handling: The block is only marked dirty when it is unlocked.
+ * Prior dirty requests are cached.
+ *
+ * The structure is designed so that the BTBitmap..() routines can be used
+ * without knowing the layout of BitmapAccessRecord.
+ *
+ * ----------------------------------------------------------------------- */
+typedef struct {
+	/* Public fields */
+	VMFileHandle	file;	/* File containing the HugeBitmap */
+	VMBlockHandle	handle;	/* VM block of the Huge Bitmap */
+	byte	*linePtr;	/* Pointer to the current line. Do not
+				 * modify, as it is used by BTBitmapNext()! */
+
+	/* The following fields are internal and should only be used in
+	 * exceptional cases */
+	byte	*unlockPtr;	/* for HugeArrayUnlock */
+	word	lineLen,	/* Length of a line */
+		numLines,	/* Total number of lines in the bitmap */
+		curLine,	/* Current line number */
+		linesLeft,	/* Additional lines still locked after current one */
+		linesLocked;	/* Total number of locked lines */
+	Boolean needDirty;
+	} BitmapAccessRecord;
+
+/*--------------------- BTBitmapLock ---------------------
+ *	Purpose:        Lock a line in a HugeBitmap and initialize the
+ *			BitmapAccessRecord for fast line access
+ *			via the other BTBitmap...() routines
+ *	Parameters:      file:	VM file containing the HugeBitmap
+ *			bmpBlock: VM handle of the bitmap
+ *			line:	line to lock
+ *			*baRecord: structure to initialize
+ *	Return:		Pointer to the locked line
+ *			Null pointer on error:
+ *			 - line number too large
+ *			 - bitmap is compressed
  ---------------------------------------------------------------------------*/
-extern CBitmap* BTLIB_EXPORT BTBitmapToolLockHeader(VMFileHandle fh, VMBlockHandle bmpHandle,
-			MemHandle  *mh);
+extern void* BTLIB_EXPORT BTBitmapLock(VMFileHandle file, VMBlockHandle bmpBlock,
+		BitmapAccessRecord *baRecord, word line);
+
+
+/*--------------------- BTBitmapNext ---------------------
+ *	Purpose:	Returns a pointer to the next line of the bitmap,
+ *			previously locked with BTBitmapLock().
+ *			Takes into account that further lines may be
+ *			available without prior unlock / new lock.
+ *	Parameters:      *baRecord: descriptor structure
+ *			makeDirty: call HugeArrayDirty()?
+ *				Note: For performance reasons,
+ *				HugeArrayDirty() may not be called yet,
+ *				but only during Unlock(). This does not
+ *				affect functionality.
+ *	Return:		Pointer to next line
+ *			Null pointer if there is no 'next' line
+ ---------------------------------------------------------------------------*/
+extern void* BTLIB_EXPORT BTBitmapNext(BitmapAccessRecord *baRecord, Boolean makeDirty);
+
+/*--------------------- BTBitmapPrev ---------------------
+ *	Purpose:	Returns a pointer to the previous line of the bitmap,
+ *			previously locked with BTBitmapLock().
+ *			Takes into account that further lines may be
+ *			available without prior unlock / new lock.
+ *	Parameters:      *baRecord: descriptor structure
+ *			makeDirty: call HugeArrayDirty()?
+ *				Note: For performance reasons,
+ *				HugeArrayDirty() may not be called yet,
+ *				but only during Unlock(). This does not
+ *				affect functionality.
+ *	Return:		Pointer to previous line
+ *			Null pointer if there is no 'previous' line
+ ---------------------------------------------------------------------------*/
+extern void* BTLIB_EXPORT BTBitmapPrev(BitmapAccessRecord *baRecord, Boolean makeDirty);
+
+
+/*--------------------- BTBitmapUnlock ---------------------
+ *	Purpose:	Unlock a bitmap previously locked via BTBitmapLock()
+ *			or BTBitmapNext(). baRecord->file and baRecord->handle
+ *			are retained, so that relocking with
+ *			BTBitmapRelock() is possible.
+ *	Parameters:	*baRecord: access control structure
+ *			makeDirty: call HugeArrayDirty()?
+ *	Return:
+ ---------------------------------------------------------------------------*/
+extern void BTLIB_EXPORT BTBitmapUnlock(BitmapAccessRecord *baRecord, Boolean makeDirty);
+
+/*--------------------- BTBitmapRelock ---------------------
+ *	Purpose:        Lock a line in a HugeBitmap after
+ *			the BitmapAccessRecord was already initialized
+ *			with BTBitmapLock(), but then unlocked via
+ *			BTBitmapUnlock().
+ *	Parameters:      line:	line to lock
+ *			*baRecord: BitmapAccessRecord initialized by BTBitmapLock()
+ *	Return:		Pointer to the locked line
+ *			Null pointer on error (line number too large)
+ ---------------------------------------------------------------------------*/
+extern void* BTLIB_EXPORT BTBitmapRelock(BitmapAccessRecord *baRecord, word line);
+
+
+/****************************************************************************
+ *
+ *	Part 3: Working with palettes
+ *
+ ****************************************************************************/
+
 
 /*--------------------- BTGetBitmapPalette ---------------------
  *	Purpose:        Copy the bitmap palette into a buffer
@@ -162,123 +403,24 @@ extern void BTLIB_EXPORT BTUnlockGEOSStandardPalette(void);
  ---------------------------------------------------------------------------*/
 extern int BTLIB_EXPORT BTApproxRGBPaletteLinear(PaletteEntry *palette, PaletteEntry color, int palEntries);
 
-/*###########################################################################
- #
- #	Part 2:	Access to Bitmaps without GStates
- #		- Fast sequential access: Lock and unlock of lines
- #		- Simple bitmap operations
- #
- #	Implemented in access.goc
- #
- ###########################################################################*/
-
-
-/* -----------------------------------------------------------------------
- * Structure to control fast sequential access to bitmap lines.
- * Principle: As long as there are lines left in the currently locked block,
- * only the pointer (linePtr) is changed.
- * Dirty handling: The block is only marked dirty when it is unlocked.
- * Prior dirty requests are cached.
- *
- * The structure is designed so that the BTBitmap..() routines can be used
- * without knowing the layout of BitmapAccessRecord.
- *
- * ----------------------------------------------------------------------- */
-typedef struct {
-	/* Public fields */
-	VMFileHandle	file;	/* File containing the HugeBitmap */
-	VMBlockHandle	handle;	/* VM block of the Huge Bitmap */
-	byte	*linePtr;	/* Pointer to the current line. Do not
-				 * modify, as it is used by BTBitmapNext()! */
-
-	/* The following fields are internal and should only be used in
-	 * exceptional cases */
-	byte	*unlockPtr;	/* for HugeArrayUnlock */
-	word	lineLen,	/* Length of a line */
-		numLines,	/* Total number of lines in the bitmap */
-		curLine,	/* Current line number */
-		linesLeft,	/* Additional lines still locked after current one */
-		linesLocked;	/* Total number of locked lines */
-	Boolean needDirty;
-	} BitmapAccessRecord;
-
-/*--------------------- BTBitmapLock ---------------------
- *	Purpose:        Lock a line in a HugeBitmap and initialize the
- *			BitmapAccessRecord for fast line access
- *			via the other BTBitmap...() routines
- *	Parameters:      file:	VM file containing the HugeBitmap
- *			bmpBlock: VM handle of the bitmap
- *			line:	line to lock
- *			*baRecord: structure to initialize
- *	Return:		Pointer to the locked line
- *			Null pointer on error:
- *			 - line number too large
- *			 - bitmap is compressed
- ---------------------------------------------------------------------------*/
-extern void* BTLIB_EXPORT BTBitmapLock(VMFileHandle file, VMBlockHandle bmpBlock,
-		BitmapAccessRecord *baRecord, word line);
-
-/*--------------------- BTBitmapUnlock ---------------------
- *	Purpose:	Unlock a bitmap previously locked via BTBitmapLock()
- *			or BTBitmapNext(). baRecord->file and baRecord->handle
- *			are retained, so that relocking with
- *			BTBitmapRelock() is possible.
- *	Parameters:	*baRecord: access control structure
- *			makeDirty: call HugeArrayDirty()?
- *	Return:
- ---------------------------------------------------------------------------*/
-extern void BTLIB_EXPORT BTBitmapUnlock(BitmapAccessRecord *baRecord, Boolean makeDirty);
-
-/*--------------------- BTBitmapRelock ---------------------
- *	Purpose:        Lock a line in a HugeBitmap after
- *			the BitmapAccessRecord was already initialized
- *			with BTBitmapLock(), but then unlocked via
- *			BTBitmapUnlock().
- *	Parameters:      line:	line to lock
- *			*baRecord: BitmapAccessRecord initialized by BTBitmapLock()
- *	Return:		Pointer to the locked line
- *			Null pointer on error (line number too large)
- ---------------------------------------------------------------------------*/
-extern void* BTLIB_EXPORT BTBitmapRelock(BitmapAccessRecord *baRecord, word line);
-
-/*--------------------- BTBitmapNext ---------------------
- *	Purpose:	Returns a pointer to the next line of the bitmap,
- *			previously locked with BTBitmapLock().
- *			Takes into account that further lines may be
- *			available without prior unlock / new lock.
- *	Parameters:      *baRecord: descriptor structure
- *			makeDirty: call HugeArrayDirty()?
- *				Note: For performance reasons,
- *				HugeArrayDirty() may not be called yet,
- *				but only during Unlock(). This does not
- *				affect functionality.
- *	Return:		Pointer to next line
- *			Null pointer if there is no 'next' line
- ---------------------------------------------------------------------------*/
-extern void* BTLIB_EXPORT BTBitmapNext(BitmapAccessRecord *baRecord, Boolean makeDirty);
-
-/*--------------------- BTBitmapPrev ---------------------
- *	Purpose:	Returns a pointer to the previous line of the bitmap,
- *			previously locked with BTBitmapLock().
- *			Takes into account that further lines may be
- *			available without prior unlock / new lock.
- *	Parameters:      *baRecord: descriptor structure
- *			makeDirty: call HugeArrayDirty()?
- *				Note: For performance reasons,
- *				HugeArrayDirty() may not be called yet,
- *				but only during Unlock(). This does not
- *				affect functionality.
- *	Return:		Pointer to previous line
- *			Null pointer if there is no 'previous' line
- ---------------------------------------------------------------------------*/
-extern void* BTLIB_EXPORT BTBitmapPrev(BitmapAccessRecord *baRecord, Boolean makeDirty);
-
 
 /****************************************************************************
  *
- *	simple bitmap operations
- *
+ *	Part 4: Simple bitmap operations
+ *	These routines works with monochrome, 4 bit, 8 bit and 24 bit bitmaps
+ *	The bitmaps may have a transparency mask and / or a palette or not.
+  *
  ****************************************************************************/
+
+/*--------------------- BTCopyBitmap ---------------------
+ *	Purpose:	Copy a bitmap to (another) file
+ *	Parameters:      srcFile: file containing the bitmap
+ *                      destFile: destination file, can be == srcFile
+ *			bmpBlock: handle of the bitmap
+ *	Return:		Handle of the new bitmap
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTCopyBitmap(VMFileHandle srcFile, VMFileHandle destFile, VMBlockHandle bmpBlock);
+
 
 /*--------------------- BTClipBitmap ---------------------
  *	Purpose:	Cut out a part of a bitmap
@@ -305,7 +447,7 @@ extern VMBlockHandle BTLIB_EXPORT BTInflateBitmap(VMFileHandle srcFile, VMBlockH
 
 /*--------------------- BTFlipBitmap ---------------------
  *	Purpose:	Flip an bitmap vertically (top to bottom)
- *			Old Routine. Please use BTFlipBitmapV() which has more options
+ *			Old Routine. Calls BTFlipBitmapV()
  *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
  *			destFile: 	file for the new bitmap
  *	Return: 	VMHandle of the new bitmap
@@ -313,14 +455,490 @@ extern VMBlockHandle BTLIB_EXPORT BTInflateBitmap(VMFileHandle srcFile, VMBlockH
  ---------------------------------------------------------------------------*/
 extern VMBlockHandle BTLIB_EXPORT BTFlipBitmap(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile);
 
-/*--------------------- BTCopyBitmap ---------------------
- *	Purpose:	Copy a bitmap to (another) file
- *	Parameters:      srcFile: file containing the bitmap
- *                      destFile: destination file, can be == srcFile
- *			bmpBlock: handle of the bitmap
- *	Return:		Handle of the new bitmap
+
+/*--------------------- BTFlipBitmapV ---------------------
+ *	Purpose:	Flip an  bitmap vertically (top to bottom)
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
  ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTCopyBitmap(VMFileHandle srcFile, VMFileHandle destFile, VMBlockHandle bmpBlock);
+extern VMBlockHandle BTLIB_EXPORT BTFlipBitmapV(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+/*--------------------- BTFlipBitmapH ---------------------
+ *	Purpose:	Flip an  bitmap horizontally (left to right)
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTFlipBitmapH(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+/*--------------------- BTRotateBitmap180 ---------------------
+ *	Purpose:	Rotate the bitmap by 180 degrees.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTRotateBitmap180(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+
+/*--------------------- BTRotateBitmap90 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees clockwise.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTRotateBitmap90(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+
+/*--------------------- BTRotateBitmap270 ---------------------
+ *	Purpose:	Rotate the bitmap by 90 degrees counterclockwise.
+ *			Does not compact the new bitmap, even if the source is compacted
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTRotateBitmap270(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
+
+
+/*
+ ***************************************************************************
+ *
+ *	Part 5: Working with Clipboard
+ *
+ ***************************************************************************
+ */
+/* When a bitmap is copied to the clipboard, there is also the option to create
+ * a matching GString (so that GeoWrite recognizes the bitmap) and to compress
+ * the bitmap. Large bitmaps must be compressed; otherwise, the bitmap format
+ * and the GString format will not both fit into the VM file at the same time. */
+
+/* --------- zur internen Verwendung ----------- */
+#define  BT_CLIP_COPYFLAG_COPY_BITMAP	1
+#define  BT_CLIP_COPYFLAG_ADD_GSTRING	2
+#define  BT_CLIP_COPYFLAG_COMPRESS	4
+#define  BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS	8
+
+/* ----- For passing to BTCopyBitmapToClipboard ------------------
+ * xxx              The bitmap remains uncompressed
+ * xxx_COMPRESS:    The bitmap is always compressed
+ * xxx_AUTO_COMPRESS:
+ *                  The bitmap is compressed if it exceeds the limit size
+ *                  in at least one direction. If it stays below this limit
+ *                  in both the x and y directions, it is not compressed.
+ *
+ * Recommended: BT_CLIP_COPY_ADD_GSTRING_AUTO_COMPRESS
+ */
+
+typedef enum {
+/* Create only a GString (CIF_GRAPHICS_STRING)
+ * in this case, compression is not possible! */
+   BT_CLIP_COPY_GS_ONLY 		= BT_CLIP_COPYFLAG_ADD_GSTRING,
+
+/* Create only a Bitmap (CIF_BITMAP) */
+   BT_CLIP_COPY_BITMAP_ONLY		= BT_CLIP_COPYFLAG_COPY_BITMAP,
+   BT_CLIP_COPY_BITMAP_ONLY_COMPRESS 	= (BT_CLIP_COPYFLAG_COPY_BITMAP |BT_CLIP_COPYFLAG_COMPRESS),
+   BT_CLIP_COPY_BITMAP_ONLY_AUTO_COMPRESS = (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS),
+
+/* Create bitmap and GString (CIF_GRAPHICS_STRING & CIF_BITMAP) */
+   BT_CLIP_COPY_ADD_GSTRING    	 	= (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_ADD_GSTRING),
+   BT_CLIP_COPY_ADD_GSTRING_COMPRESS    = (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_ADD_GSTRING|BT_CLIP_COPYFLAG_COMPRESS),
+   BT_CLIP_COPY_ADD_GSTRING_AUTO_COMPRESS = (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_ADD_GSTRING|BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS)
+
+   } BmpClipCopyMode;
+
+/* Limits at which compression is applied when using _AUTO_COMPRESS. */
+#define  BT_CLIP_MAX_UNCOMPRESSED_X_SIZE	825
+#define  BT_CLIP_MAX_UNCOMPRESSED_Y_SIZE	625
+
+
+
+/*--------------------- BTCopyBitmapToClipboard ---------------------
+ *	Aufgabe:        Kopieren eine HugeBitmap ins Clipboard
+ *	Parameter:	fh:	VMDatei mir der HugeBitmap
+ *			bmpBlock: VMBlock der Bitmap
+ *			copyMode: Entscheidung ob ein GString erzeugt werden
+ *				soll und ob die Bitmap komprimiert werden muss
+ *				Groáe Bitmaps mssen komprimiert werden, sonst
+ *				passen nicht Bitmap-Format und GString-Format
+ *				zugleich in die VM-Datei.
+ *	Return:		-
+ * Task:           Copy a HugeBitmap to the clipboard
+ * Parameters:     fh:        VM file containing the HugeBitmap
+ *                 bmpBlock:  VM block of the bitmap
+ *                 copyMode:  Determines whether a GString should be created
+ *                            and whether the bitmap must be compressed.
+ *                            Huge bitmaps should be compressed; otherwise,
+ *                            the bitmap format and the GString format may not
+ *                            both fit into the VM file at the same time.
+ * Return:         -
+ ---------------------------------------------------------------------------*/
+extern void BTLIB_EXPORT BTCopyBitmapToClipboard(VMFileHandle fh,	// bitmap file
+		VMBlockHandle bmpBlock,					// bitmap handle
+		BmpClipCopyMode copyMode);
+
+/*--------------------- BTCopyGStringToClipboard ---------------------
+ * Task:        Copy a GString to the clipboard
+ * Parameters:  fh:       Handle of the VM file containing the GString
+ *              gsBlock:  Handle of the GString
+ * Return:      -
+ ---------------------------------------------------------------------------*/
+extern void BTLIB_EXPORT BTCopyGStringToClipboard(VMFileHandle fh,	// graphic file
+		VMBlockHandle gsBlock);					// handle of the GString
+
+
+/*--------------------- BTTestClipboardItem ---------------------
+ * Task:        Test whether a specific format is present in the clipboard
+ * Parameters:  manufID:  Manufacturer ID of the format (0 == GEOWORKS)
+ *              format:   Format type (e.g. CIF_BITMAP)
+ * Return:      TRUE if present, FALSE if not
+ ---------------------------------------------------------------------------*/
+extern Boolean BTLIB_EXPORT BTTestClipboardItem(word manufID, word format);
+
+/*--------------------- BTGetClipboardItem ---------------------
+ * Task:        Copy the data of a specific entry
+ *              from the clipboard into a VM file
+ * Parameters:  manufID:  Manufacturer ID of the format (0 == GEOWORKS)
+ *              format:   Format type (e.g. CIF_BITMAP)
+ *              vmFile:   Destination VM file to which the data should be copied
+ * Return:      VMBlockHandle of the copied format data.
+ *              Null handle if the format is not present
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTGetClipboardItem(word manufID, word format, VMFileHandle vmFile);
+
+/*
+ ***************************************************************************
+ *
+ *	Part 6: Drawing GStrings and Bitmaps via GStates
+ *
+ ***************************************************************************
+ */
+
+
+/*--------------------- BTDrawBitmapWithMasks ---------------------
+ *	Purpose:	Draw a HugeBitmap into another using the system function
+ *			GrDrawHugeBitmap()
+ *
+ *	Workaround:	Handles existing masks properly
+ *	Workaround:	Fixes a bug when drawing masked bitmaps with negative offset
+ *
+ *	Strategy:	If the destination bitmap has a mask, the mask layer is
+ *			drawn first, then the image itself.
+ *			If the source bitmap has a mask and the x-offset is negative,
+ *			a workaround is used:
+ *			 -> The masked source bitmap is copied into an unmasked
+ *			    bitmap in the clipboard, which is then drawn.
+ *			Disadvantage: This method is slow and memory-intensive
+ *			(can crash for very large bitmaps). If the destination
+ *			image already contains a bitmap, visual artifacts may occur.
+ *			? Negative x-offsets should be avoided!
+ *
+ *	Note:	It is probably better to use direct-access drawing routines.
+ *
+ *	Parameters:
+ *		gstate:			Handle to the destination bitmap
+ *		destIsMasked:		TRUE if the destination bitmap uses a mask
+ *		xPos, yPos:		Position at which to draw the bitmap
+ *		bmpFile:		VM file of the bitmap to be drawn
+ *		bmpBlock:		Handle of the bitmap to be drawn
+ *
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void BTLIB_EXPORT BTDrawBitmapWithMasks(
+	GStateHandle gstate,	// Handle to destination bitmap
+	Boolean destIsMasked,	// destination uses a mask?
+	int xPos, int yPos,	// x- and y-Offset for placing the bitmap
+	VMFileHandle bmpFile,	// bitmap to draw into the GState
+	VMBlockHandle bmpBlock);
+
+
+/*--------------------- BTDrawGString ---------------------
+ *	Purpose:	Draws a GString into a GState while respecting the GString's
+ *			bounds ? only coordinates of the desired position are needed
+ *
+ *			Masked bitmaps are handled if destIsMasked is TRUE:
+ *			First the mask level is selected and the GString is drawn into it.
+ *			Special features like dithering or mix mode changes
+ *			are suppressed in this phase. Then the GString is drawn
+ *			normally into the bitmap again.
+ *
+ *	Note:		The GString must already be loaded.
+ *
+ *	Example:
+ *		Handle gstr = GrLoadGString(vmFile, GST_VMEM, gsDataBlock);
+ *		BTDrawGString(bitmapGState, TRUE, 0, 0, gstr);
+ *		GrDestroyGString(gstr,NULL,GSKT_LEAVE_DATA);
+ *
+ *	Parameters:
+ *		gstate:		Target GState
+ *		destIsMasked:	TRUE if the target GState uses a mask and the mask
+ *				should be set according to the GString
+ *				FALSE: draw into any generic GState
+ *		xPos, yPos:	Target position for the GString (bounds auto-handled)
+ *		gstr:		Handle of the loaded GString
+ *
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void BTLIB_EXPORT BTDrawGString(GStateHandle gstate, Boolean destIsMasked,
+		int xPos, int yPos, Handle gstr);
+
+
+/*--------------------- BTLoadAndDrawGString ---------------------
+ *	Purpose:	Load a GString, draw it at a specified position
+ *			(automatically considering its bounds), then unload it.
+ *
+ *	Strategy:	Uses BTDrawGString() internally
+ *
+ *	Parameters:
+ *		gstate:		Target GState
+ *		destIsMasked:	TRUE if the target GState is masked and the mask
+ *				should reflect the GString
+ *				FALSE: Target is a generic GState
+ *		xPos, yPos:	Position where the GString should appear
+ *		vmFile:		VM file with the unloaded GString
+ *		gsBlock:	Handle of the unloaded GString
+ *
+ *	Return:		-
+ ---------------------------------------------------------------------------*/
+extern void BTLIB_EXPORT BTLoadAndDrawGString(GStateHandle gstate, Boolean destIsMasked,
+		int xPos, int yPos, VMFileHandle vmFile, VMBlockHandle gsBlock);
+
+
+/*
+ ***************************************************************************
+ *
+ *	Part 7; Editing the transparency mask
+ *	These routines works with monochrome, 4 bit, 8 bit and 24 bit bitmaps
+ *	The bitmaps may have a palette or not.
+ *
+ ***************************************************************************
+ */
+
+/*--------------------- BTCopyToBitmapWithMask ---------------------
+ * 	Purpose:	Copies a bitmap and ensures that the copy has a transparency mask.
+ *			Also ensure that the copy is uncompressed.
+ *
+ * 	Parameters:	srcFile, bmpBlock: handles of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTCopyToBitmapWithMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			optr progressText);
+
+/*--------------------- BTExtractTransparencyMask ---------------------
+ *	Purpose:	Copies the transparency mask of a bitmap into a monochrome bitmap.
+ *			Transparent pixels will be white, not transparent pixels will be black.
+ *			If no transparency mask exists yet, the monochrome bitmap will be completely black.
+ *
+ *	Parameters:	srcFile, bmpBlock: handles of the bitmap
+ *			destFile: 	file for the new (monochrome) bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error (e.g. passed zero for dertFile and souce is compacted)
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			optr progressText);
+
+/*--------------------- BTApplyTransparencyMask ---------------------
+ *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken
+ *			from a monochrome bitmap.
+ *			If no transparency mask exists yet, it will be created.
+ *			The size of both bitmaps must be the same, or the result will be
+ *			unpredictable.
+ *
+ *	Tipp: 		To transfer (copy) a transparency mask form one colored bitmap to
+ *			another, use BTExtractTransparencyMask() first.
+ *
+ *	Parameters:	srcFile, bmpBlock: handles of the bitmap
+ *			destFile: file for the new bitmap
+ *				  Pass zero to modify the passed bitmap instead of copying it.
+ *				  Note! This will fail (return zero) if:
+ *				    - the bitmap does not yet have a transparency mask
+ *				    - the bitmap is compacted
+ *			maskFile, maskBitmap: handles of a monochrome bitmap that holds the new mask
+ *				White pixels become transparent, black pixels become opaque.
+ *				- if this bitmap is not monochrome, the result will be unpredictable
+ *				- if this bitmaps size does not fit to the size of image, the result
+ *				  will be unpredictable.
+ *				- if this bitmap also has a mask, picture bits and mask bits will be
+ *				  combinded with AND. This means that only black pixels that are not
+ * 				  masked out become opaque.
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			VMFileHandle maskFile, VMBlockHandle maskBitmap,
+			optr progressText);
+
+
+
+/*--------------------- BTApplyTransparencyColor ---------------------
+ * Purpose:	Set a all pixels that have a specified color to be transparent.
+ *		Pixels that are already transparent remain transparent.
+ *		If no transparency mask exists yet, it will be created.
+ *
+ * Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *		destFile: file for the new bitmap
+ *			  Pass zero to modify the passed bitmap instead of copying it.
+ *			  Note! This will fail (return zero) if:
+ *			    - the bitmap does not yet have a transparency mask
+ *			    - the bitmap is compacted
+ *		progressText: optr of an text object to show progress
+ *			  if given, routine append dots  ('.') for every 16th line
+ *			  pass zero for no progress report
+ *
+ *	If a true-color bitmap has been passed
+ *		redOrIndex: red color value for transparency color
+ *		green:	    green color value for transparency color
+ *		blue:	    blue color value for transparency color
+ *		variance:   Permitted difference between the real color value and
+ *			    the passed color value for red, green and blue.
+ *
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed
+ *		redOrIndex: index of the color to make transparent
+ *			    for monochrome mitmaps this may be 0 or 1
+ *		green, blue and variance will be ignored
+ *
+ * Example for variance:
+ *		Assuming you have passed the values red = 200, green = 150, blue = 0 and
+ *		a variance of 10. Then a pixel that fulfills the following conditions is
+ *		set to transparent: red 190...210 AND green 140..160 AND blue 0...10.
+ *
+ * Return:	VMBlockHandle of the new bitmap
+ *		Null handle on error  (e.g. passed zero for destFile and source is compacted)
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle BTLIB_EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			int redOrIndex, int green, int blue, int variance,
+			optr progressText);
+
+
+/*--------------------- BTCopyBitmapAndRemoveMask ---------------------
+ *	Purpose:	Copies a bitmap and removes the transparency mask, if any
+ *			Also ensure that the copy is uncompressed
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			destFile: 	file for the new bitmap
+ *			progressText: optr of an text object to show progress
+ *				if given, routine append dots  ('.') for every 16th line
+ *				pass zero for no progress report
+ *
+ *	If a true-color bitmap has been passed
+ *		redOrIndex: red value for pixels that were transparent before
+ *		green:	    geen value for pixels that were transparent before
+ *		blue:	    blue value for pixels that were transparent before
+ *
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed
+ *		redOrIndex: index value for pixels that were transparent before
+ *			    for monochrome mitmaps this may be 0 or 1
+ *		green and blue will be ignored
+ *
+ * 	Strategy:
+ *		- if the bitmap already has no transparency mask, make a simple copy
+ *		- if there is a transparency mask:
+ *		  * fetch the palette, if any
+ *		  * create a new non-masked bitmap of same size and color depth
+ *		  * copy data over. Replace color for formerly transparent pixels.
+ *	Return:		VMBlockHandle of the new bitmap
+ *			Null handle on error
+ ---------------------------------------------------------------------------*/
+ extern VMBlockHandle BTLIB_EXPORT BTCopyBitmapAndRemoveMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
+			int redOrIndex, int green, int blue, optr progressText);
+
+
+
+/*--------------------- BTBitmapFillMask ---------------------
+ *	Purpose:	Makes the bitmap transparent or non transparent at all
+ *			The bitmap must already have a transparency
+ *			mask and must be not compacted.
+ *
+ *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
+ *			makeSolid: pass zero to make the bitmap transparent at all
+ *				   pass non-zero to make the bitmap non-transparent at all
+ *
+ *	Return:		FALSE if successful
+ *			TRUE in any case of error
+ ---------------------------------------------------------------------------*/
+extern Boolean BTLIB_EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, int makeSolid);
+
+
+
+/*--------------------- BTSetColorForMaskedPixels ---------------------
+ * Purpose:	Take a masked and non compressed bitmap and set all masked
+ *		(invisible) pixels to a given color.
+ *
+ * Context:	Very often, masked pixels are not initialized.
+ *		They holds random colors then.
+ *
+ * Parameters:	vmFile, bmpBlock:	handle of the bitmap
+ *		progressText: optr of an text object to show progress
+ *			  if given, routine append dots  ('.') for every 16th line
+ *			  pass zero for no progress report
+ *
+ *	If a true-color bitmap has been passed
+ *		redOrIndex: red color value for transparent pixels
+ *		green:	    green color value for transparent pixels
+ *		blue:	    blue color value for transparent pixels
+ *
+ *	If a 8-bit, 4-bit or monochrome bitmap has been passed
+ *		redOrIndex: index of the color for transparent pixels
+ *			    for monochrome mitmaps this may be 0 or 1
+ *		green and blue will be ignored
+ *
+ * Return:	FALSE if everything is ok
+ *		TRUE  on error  (passed bitmap is compacted or has no mask)
+ ---------------------------------------------------------------------------*/
+extern Boolean BTLIB_EXPORT BTSetColorForMaskedPixels(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+			int redOrIndex, int green, int blue, optr progressText);
+
+
+/*###########################################################################
+ #
+ #	Part 8:	Other tools that do not directly operate on bitmaps,
+ #		but support working with them
+ #		- Thimbnails
+ #		- Drag routines: support for a simple clip/zoom frame
+ #		- PictureDisplayObject for simple image display
+ #		- Debugging helper
+ #
+ #	Mostly implemented in disptool.goc
+ #
+ ###########################################################################*/
+
 
 /***********************************************************************/
 /*	The task of calculating size and sampling offsets for the thumbnail
@@ -339,7 +957,8 @@ typedef struct {
 	} ThumbnailMakerStruct;
 
 /*--------------------- BTCreateThumbnailMakerStruct ---------------------
- *	Purpose:        Nomen est omen
+ *	Purpose:        Calculate the data required to copy a bitmap into
+ *			a smaller bitmap.
  *	Parameters:	tms:	pointer to structure created
  *			xSize, ySize: size of the original graphic
  *			maxThumbnnailSize: maximum size for thumbnail
@@ -350,24 +969,10 @@ extern void BTLIB_EXPORT BTCreateThumbnailMakerStruct( ThumbnailMakerStruct *tms
 
 
 
-
-/*###########################################################################
- #
- #	Part 3:	Tools that do not directly operate on bitmaps,
- #		but support working with them
- #		- Drag routines: support for a zoom frame
- #		- PictureDisplayObject for simple image display
- #
- #	Implemented in disptool.goc
- #
- ###########################################################################*/
-
-
-
 /***********************************************************************
  *
  *	The DragXXX() routines, together with the DragRectStruct structure,
- *	provide the foundation for simple implementation of a mouse-driven
+ *	provide the basis for simple implementation of a mouse-driven
  *	selection rectangle (drag frame, e.g. for cropping or zooming),
  *	allowing a user to select a screen area within a View.
  *	The View usually represents a graphic (e.g. bitmap) from which a specific
@@ -578,8 +1183,7 @@ extern Boolean BTLIB_EXPORT DragLeaveDragMode(DragRectStruct *dragRect, Boolean 
 
 /* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  *
- *	Part 3: Low-Level Routines and Tools
- *      	Operate independently of dragRect->dragLevel
+ *	Low-Level Draggung Routines and Tools
  *
  * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
 
@@ -677,209 +1281,6 @@ extern Boolean BTLIB_EXPORT DragGetDragBounds(DragRectStruct *dragRect, Rectangl
 @endc;
 
 
-/*###########################################################################
- #
- #	Teil 4:	Sonstige Routinen
- #		- Clipboardarbeit
- #		- Zeichen in GStates
- #		- Verwendung von GStrings
- #
- #	Implementiert in moretool.goc
- #
- ###########################################################################*/
-
-/*
- ***************************************************************************
- *		Bitmap-Tools: Clipboard-Arbeit
- ***************************************************************************
- */
-/* Wird eine Bitmap ins Clipboard kopiert, besteht die M”glichkeit auch einen
- * passenden GString mit anzulegen (so dass Write die Bitmap erkennt) und die
- * Bitmap zu komprimieren. Groáe Bitmaps mssen komprimiert werden, sonst
- * passen nicht Bitmap-Format und GString-Format zugleich in die VM-Datei. */
-
-/* --------- zur internen Verwendung ----------- */
-#define  BT_CLIP_COPYFLAG_COPY_BITMAP	1
-#define  BT_CLIP_COPYFLAG_ADD_GSTRING	2
-#define  BT_CLIP_COPYFLAG_COMPRESS	4
-#define  BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS	8
-
-/* ----- Zur šbergabe an BTCopyBitmapToClipboard ------------------
- * xxx 			Die Bitmap bleibt unkomprimiert
- * xxx_COMPRESS: 	Die Bitmap wird immer komprimiert
- * xxx_AUTO_COMPRESS:   Die Bitmap wird komprimiert, wenn sie mindestes in einer
- *			Richtung die Grenzgr”áe berschreitet. Bleibt sie sowohl
- *			in x- als auch in y-Richtung unter dieser Grenze, wird
- *			sie nicht komprimiert
- *
- *	empfohlen wird: BT_CLIP_COPY_ADD_GSTRING_AUTO_COMPRESS
- */
-
-typedef enum {
-   /* Nur einen GString anlegen (CIF_GRAPHICS_STRING)
-    * in diesem Fall ist keine Kompression m”glich! */
-   BT_CLIP_COPY_GS_ONLY 		= BT_CLIP_COPYFLAG_ADD_GSTRING,
-
-   /* nur eine Bitmap anlegen (CIF_BITMAP) */
-   BT_CLIP_COPY_BITMAP_ONLY		= BT_CLIP_COPYFLAG_COPY_BITMAP,
-   BT_CLIP_COPY_BITMAP_ONLY_COMPRESS 	= (BT_CLIP_COPYFLAG_COPY_BITMAP |BT_CLIP_COPYFLAG_COMPRESS),
-   BT_CLIP_COPY_BITMAP_ONLY_AUTO_COMPRESS = (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS),
-
-   /* Bitmap und GString anlegen (CIF_GRAPHICS_STRING & CIF_BITMAP) */
-   BT_CLIP_COPY_ADD_GSTRING    	 	= (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_ADD_GSTRING),
-   BT_CLIP_COPY_ADD_GSTRING_COMPRESS    = (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_ADD_GSTRING|BT_CLIP_COPYFLAG_COMPRESS),
-   BT_CLIP_COPY_ADD_GSTRING_AUTO_COMPRESS = (BT_CLIP_COPYFLAG_COPY_BITMAP|BT_CLIP_COPYFLAG_ADD_GSTRING|BT_CLIP_COPYFLAG_AUTO_DETECT_COMPRESS)
-
-   } BmpClipCopyMode;
-
-/* Grenzen, ab denen bei _AUTO_COMPRESS komprimiert wird */
-#define  BT_CLIP_MAX_UNCOMPRESSED_X_SIZE	825
-#define  BT_CLIP_MAX_UNCOMPRESSED_Y_SIZE	625
-
-
-
-/*--------------------- BTCopyBitmapToClipboard ---------------------
- *	Aufgabe:        Kopieren eine HugeBitmap ins Clipboard
- *	Parameter:	fh:	VMDatei mir der HugeBitmap
- *			bmpBlock: VMBlock der Bitmap
- *			copyMode: Entscheidung ob ein GString erzeugt werden
- *				soll und ob die Bitmap komprimiert werden muss
- *				Groáe Bitmaps mssen komprimiert werden, sonst
- *				passen nicht Bitmap-Format und GString-Format
- *				zugleich in die VM-Datei.
- *	Return:		-
- ---------------------------------------------------------------------------*/
-extern void BTLIB_EXPORT BTCopyBitmapToClipboard(VMFileHandle fh,	// Datei mit der Bitmap
-		VMBlockHandle bmpBlock,		// Handle der Bitmap
-		BmpClipCopyMode copyMode);
-
-/*--------------------- BTCopyGStringToClipboard ---------------------
- *	Aufgabe:	Kopieren eines GString ins Clipboard
- *	Parameter:	fh: Handle der VMDatei mit dem GString
- *			gsBlock: Handle des GString
- *	Return:		-
- ---------------------------------------------------------------------------*/
-extern void BTLIB_EXPORT BTCopyGStringToClipboard(VMFileHandle fh,	// Datei mit der Grafik
-		VMBlockHandle gsBlock);		// Handle des GString
-
-
-/*--------------------- BTTestClipboardItem ---------------------
- * Aufagbe:	Testen ob ein bestimmtes Format im Clipboard vorhanden ist
- * Parameter:	manufID:	Manufacturer-ID des Formats ( 0 == GEOWORKS )
- *		format:		Format-Type (z.B. CIF_BITMAP)
- * Return:	TRUE, wenn vorhanden, FALSE wenn nicht
- ---------------------------------------------------------------------------*/
-extern Boolean BTLIB_EXPORT BTTestClipboardItem(word manufID, word format);
-
-/*--------------------- BTGetClipboardItem ---------------------
- * Aufgabe:	Kopieren der Daten eines bestimmten Eintrags
- *		aus dem Clipboard in eine VM-Datei
- * Parameter:	manufID:	Manufacturer-ID des Formats ( 0 == GEOWORKS )
- *		format:		Format-Type (z.B. CIF_BITMAP)
- *		vmFile:		Wohin die Daten kopiert werden sollen
- * Return:	VMBlockHandle der kopierten Format-Daten.
- *		Nullhandle, wenn Format nicht vorhanden ist
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTGetClipboardItem(word manufID, word format, VMFileHandle vmFile);
-
-/*
- ***************************************************************************
- *
- *	Drawing GStrings and Bitmaps via GStates
- *
- ***************************************************************************
- */
-
-
-/*--------------------- BTDrawBitmapWithMasks ---------------------
- *	Purpose:	Draw a HugeBitmap into another using the system function
- *			GrDrawHugeBitmap()
- *
- *	Workaround:	Handles existing masks properly
- *	Workaround:	Fixes a bug when drawing masked bitmaps with negative offset
- *
- *	Strategy:	If the destination bitmap has a mask, the mask layer is
- *			drawn first, then the image itself.
- *			If the source bitmap has a mask and the x-offset is negative,
- *			a workaround is used:
- *			 -> The masked source bitmap is copied into an unmasked
- *			    bitmap in the clipboard, which is then drawn.
- *			Disadvantage: This method is slow and memory-intensive
- *			(can crash for very large bitmaps). If the destination
- *			image already contains a bitmap, visual artifacts may occur.
- *			? Negative x-offsets should be avoided!
- *
- *	Note:	It is probably better to use direct-access drawing routines.
- *
- *	Parameters:
- *		gstate:			Handle to the destination bitmap
- *		destIsMasked:		TRUE if the destination bitmap uses a mask
- *		xPos, yPos:		Position at which to draw the bitmap
- *		bmpFile:		VM file of the bitmap to be drawn
- *		bmpBlock:		Handle of the bitmap to be drawn
- *
- *	Return:		-
- ---------------------------------------------------------------------------*/
-extern void BTLIB_EXPORT BTDrawBitmapWithMasks(
-	GStateHandle gstate,	// Handle to destination bitmap
-	Boolean destIsMasked,	// destination uses a mask?
-	int xPos, int yPos,	// x- and y-Offset for placing the bitmap
-	VMFileHandle bmpFile,	// bitmap to draw into the GState
-	VMBlockHandle bmpBlock);
-
-
-/*--------------------- BTDrawGString ---------------------
- *	Purpose:	Draws a GString into a GState while respecting the GString's
- *			bounds ? only coordinates of the desired position are needed
- *
- *			Masked bitmaps are handled if destIsMasked is TRUE:
- *			First the mask level is selected and the GString is drawn into it.
- *			Special features like dithering or mix mode changes
- *			are suppressed in this phase. Then the GString is drawn
- *			normally into the bitmap again.
- *
- *	Note:		The GString must already be loaded.
- *
- *	Example:
- *		Handle gstr = GrLoadGString(vmFile, GST_VMEM, gsDataBlock);
- *		BTDrawGString(bitmapGState, TRUE, 0, 0, gstr);
- *		GrDestroyGString(gstr,NULL,GSKT_LEAVE_DATA);
- *
- *	Parameters:
- *		gstate:		Target GState
- *		destIsMasked:	TRUE if the target GState uses a mask and the mask
- *				should be set according to the GString
- *				FALSE: draw into any generic GState
- *		xPos, yPos:	Target position for the GString (bounds auto-handled)
- *		gstr:		Handle of the loaded GString
- *
- *	Return:		-
- ---------------------------------------------------------------------------*/
-extern void BTLIB_EXPORT BTDrawGString(GStateHandle gstate, Boolean destIsMasked,
-		int xPos, int yPos, Handle gstr);
-
-
-/*--------------------- BTLoadAndDrawGString ---------------------
- *	Purpose:	Load a GString, draw it at a specified position
- *			(automatically considering its bounds), then unload it.
- *
- *	Strategy:	Uses BTDrawGString() internally
- *
- *	Parameters:
- *		gstate:		Target GState
- *		destIsMasked:	TRUE if the target GState is masked and the mask
- *				should reflect the GString
- *				FALSE: Target is a generic GState
- *		xPos, yPos:	Position where the GString should appear
- *		vmFile:		VM file with the unloaded GString
- *		gsBlock:	Handle of the unloaded GString
- *
- *	Return:		-
- ---------------------------------------------------------------------------*/
-extern void BTLIB_EXPORT BTLoadAndDrawGString(GStateHandle gstate, Boolean destIsMasked,
-		int xPos, int yPos, VMFileHandle vmFile, VMBlockHandle gsBlock);
-
-
 /*
  ***************************************************************************
  *
@@ -895,281 +1296,7 @@ extern void BTLIB_EXPORT BTLoadAndDrawGString(GStateHandle gstate, Boolean destI
  ---------------------------------------------------------------------------*/
 extern void BTLIB_EXPORT BTSetDebugText(optr textObj);
 
-/*
- ***************************************************************************
- *
- *	Simple bitmap transformations
- *	These routines works with monochrome, 4 bit, 8 bit and 24 bit bitmaps
- *	The bitmaps may have a transparency mask and / or a palette or not.
- *
- ***************************************************************************
- */
 
-/*--------------------- BTFlipBitmapV ---------------------
- *	Purpose:	Flip an  bitmap vertically (top to bottom)
- *			Does not compact the new bitmap, even if the source is compacted
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTFlipBitmapV(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
-
-/*--------------------- BTFlipBitmapH ---------------------
- *	Purpose:	Flip an  bitmap horizontally (left to right)
- *			Does not compact the new bitmap, even if the source is compacted
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTFlipBitmapH(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
-
-/*--------------------- BTRotateBitmap180 ---------------------
- *	Purpose:	Rotate the bitmap by 180 degrees.
- *			Does not compact the new bitmap, even if the source is compacted
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTRotateBitmap180(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
-
-
-
-/*--------------------- BTRotateBitmap90 ---------------------
- *	Purpose:	Rotate the bitmap by 90 degrees clockwise.
- *			Does not compact the new bitmap, even if the source is compacted
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTRotateBitmap90(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
-
-/*--------------------- BTRotateBitmap270 ---------------------
- *	Purpose:	Rotate the bitmap by 90 degrees counterclockwise.
- *			Does not compact the new bitmap, even if the source is compacted
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTRotateBitmap270(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
-
-
-/*
- ***************************************************************************
- *
- *	Editing the transparency mask
- *	These routines works with monochrome, 4 bit, 8 bit and 24 bit bitmaps
- *	The bitmaps may have a palette or not.
- *
- ***************************************************************************
- */
-
-/*--------------------- BTCopyToBitmapWithMask ---------------------
- * 	Purpose:	Copies a bitmap and ensures that the copy has a transparency mask.
- *			Also ensure that the copy is uncompressed.
- *
- * 	Parameters:	srcFile, bmpBlock: handles of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTCopyToBitmapWithMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
-			optr progressText);
-
-/*--------------------- BTExtractTransparencyMask ---------------------
- *	Purpose:	Copies the transparency mask of a bitmap into a monochrome bitmap.
- *			Transparent pixels will be white, not transparent pixels will be black.
- *			If no transparency mask exists yet, the monochrome bitmap will be completely black.
- *
- *	Parameters:	srcFile, bmpBlock: handles of the bitmap
- *			destFile: 	file for the new (monochrome) bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error (e.g. passed zero for dertFile and souce is compacted)
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTExtractTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
-			optr progressText);
-
-/*--------------------- BTApplyTransparencyMask ---------------------
- *	Purpose:	Replaces the transparency mask of a bitmap. The new mask is taken
- *			from a monochrome bitmap.
- *			If no transparency mask exists yet, it will be created.
- *			The size of both bitmaps must be the same, or the result will be
- *			unpredictable.
- *
- *	Tipp: 		To transfer (copy) a transparency mask form one colored bitmap to
- *			another, use BTExtractTransparencyMask() first.
- *
- *	Parameters:	srcFile, bmpBlock: handles of the bitmap
- *			destFile: file for the new bitmap
- *				  Pass zero to modify the passed bitmap instead of copying it.
- *				  Note! This will fail (return zero) if:
- *				    - the bitmap does not yet have a transparency mask
- *				    - the bitmap is compacted
- *			maskFile, maskBitmap: handles of a monochrome bitmap that holds the new mask
- *				White pixels become transparent, black pixels become opaque.
- *				- if this bitmap is not monochrome, the result will be unpredictable
- *				- if this bitmaps size does not fit to the size of image, the result
- *				  will be unpredictable.
- *				- if this bitmap also has a mask, picture bits and mask bits will be
- *				  combinded with AND. This means that only black pixels that are not
- * 				  masked out become opaque.
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTApplyTransparencyMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
-			VMFileHandle maskFile, VMBlockHandle maskBitmap,
-			optr progressText);
-
-
-
-/*--------------------- BTApplyTransparencyColor ---------------------
- * Purpose:	Set a all pixels that have a specified color to be transparent.
- *		Pixels that are already transparent remain transparent.
- *		If no transparency mask exists yet, it will be created.
- *
- * Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *		destFile: file for the new bitmap
- *			  Pass zero to modify the passed bitmap instead of copying it.
- *			  Note! This will fail (return zero) if:
- *			    - the bitmap does not yet have a transparency mask
- *			    - the bitmap is compacted
- *		progressText: optr of an text object to show progress
- *			  if given, routine append dots  ('.') for every 16th line
- *			  pass zero for no progress report
- *
- *	If a true-color bitmap has been passed
- *		redOrIndex: red color value for transparency color
- *		green:	    green color value for transparency color
- *		blue:	    blue color value for transparency color
- *		variance:   Permitted difference between the real color value and
- *			    the passed color value for red, green and blue.
- *
- *	If a 8-bit, 4-bit or monochrome bitmap has been passed
- *		redOrIndex: index of the color to make transparent
- *			    for monochrome mitmaps this may be 0 or 1
- *		green, blue and variance will be ignored
- *
- * Example for variance:
- *		Assuming you have passed the values red = 200, green = 150, blue = 0 and
- *		a variance of 10. Then a pixel that fulfills the following conditions is
- *		set to transparent: red 190...210 AND green 140..160 AND blue 0...10.
- *
- * Return:	VMBlockHandle of the new bitmap
- *		Null handle on error  (e.g. passed zero for destFile and source is compacted)
- ---------------------------------------------------------------------------*/
-extern VMBlockHandle BTLIB_EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
-			int redOrIndex, int green, int blue, int variance,
-			optr progressText);
-
-
-/*--------------------- BTCopyBitmapAndRemoveMask ---------------------
- *	Purpose:	Copies a bitmap and removes the transparency mask, if any
- *			Also ensure that the copy is uncompressed
- *
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			destFile: 	file for the new bitmap
- *			progressText: optr of an text object to show progress
- *				if given, routine append dots  ('.') for every 16th line
- *				pass zero for no progress report
- *
- *	If a true-color bitmap has been passed
- *		redOrIndex: red value for pixels that were transparent before
- *		green:	    geen value for pixels that were transparent before
- *		blue:	    blue value for pixels that were transparent before
- *
- *	If a 8-bit, 4-bit or monochrome bitmap has been passed
- *		redOrIndex: index value for pixels that were transparent before
- *			    for monochrome mitmaps this may be 0 or 1
- *		green and blue will be ignored
- *
- * 	Strategy:
- *		- if the bitmap already has no transparency mask, make a simple copy
- *		- if there is a transparency mask:
- *		  * fetch the palette, if any
- *		  * create a new non-masked bitmap of same size and color depth
- *		  * copy data over. Replace color for formerly transparent pixels.
- *	Return:		VMBlockHandle of the new bitmap
- *			Null handle on error
- ---------------------------------------------------------------------------*/
- extern VMBlockHandle BTLIB_EXPORT BTCopyBitmapAndRemoveMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile,
-			int redOrIndex, int green, int blue, optr progressText);
-
-
-
-/*--------------------- BTBitmapFillMask ---------------------
- *	Purpose:	Makes the bitmap transparent or non transparent at all
- *			The bitmap must already have a transparency
- *			mask and must be not compacted.
- *
- *	Parameters:	srcFile, bmpBlock:	handle of the bitmap
- *			makeSolid: pass zero to make the bitmap transparent at all
- *				   pass non-zero to make the bitmap non-transparent at all
- *
- *	Return:		FALSE if successful
- *			TRUE in any case of error
- ---------------------------------------------------------------------------*/
-extern Boolean BTLIB_EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bmpBlock, int makeSolid);
-
-
-
-/*--------------------- BTSetColorForMaskedPixels ---------------------
- * Purpose:	Take a masked and non compressed bitmap and set all masked
- *		(invisible) pixels to a given color.
- *
- * Context:	Very often, masked pixels are not initialized.
- *		They holds random colors then.
- *
- * Parameters:	vmFile, bmpBlock:	handle of the bitmap
- *		progressText: optr of an text object to show progress
- *			  if given, routine append dots  ('.') for every 16th line
- *			  pass zero for no progress report
- *
- *	If a true-color bitmap has been passed
- *		redOrIndex: red color value for transparent pixels
- *		green:	    green color value for transparent pixels
- *		blue:	    blue color value for transparent pixels
- *
- *	If a 8-bit, 4-bit or monochrome bitmap has been passed
- *		redOrIndex: index of the color for transparent pixels
- *			    for monochrome mitmaps this may be 0 or 1
- *		green and blue will be ignored
- *
- * Return:	FALSE if everything is ok
- *		TRUE  on error  (passed bitmap is compacted or has no mask)
- ---------------------------------------------------------------------------*/
-extern Boolean BTLIB_EXPORT BTSetColorForMaskedPixels(VMFileHandle vmFile, VMBlockHandle bmpBlock,
-			int redOrIndex, int green, int blue, optr progressText);
 
 
 
