@@ -48,8 +48,8 @@ Build all the other SDK Tools:
 
 Build all PC/GEOS (target) components:
 
-    cd %ROOT_DIR%/Installed`
-    pmake`
+    cd %ROOT_DIR%/Installed
+    pmake
 
 Build the target environment:
 
