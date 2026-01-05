@@ -250,7 +250,6 @@ extern TEngine_Instance engineInstance;
 
   struct  TRaster_Instance_
   {
-    Int       precision_bits;       /* precision related variables */
     Int       precision;
     Int       precision_half;
     Int       precision_step;
@@ -335,7 +334,7 @@ extern TEngine_Instance engineInstance;
 /*                                                                      */
 /************************************************************************/
 
-  static void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
+  static inline void  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
   {
     if ( y_ppem < 24 )
     {
@@ -345,8 +344,6 @@ extern TEngine_Instance engineInstance;
     {
       ras.precision_step   = 32;
     }
-
-    ras.precision_bits   = 10;
 
     ras.precision       = 1 << PRECISION_BITS;
     ras.precision_half  = ras.precision >> 1;
