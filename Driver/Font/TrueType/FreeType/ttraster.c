@@ -219,15 +219,17 @@ extern TEngine_Instance engineInstance;
 
 
 #define PRECISION_BITS      10
-#define PRECISION_SHIFT     PRECISION_BITS - Pixel_Bits
+#define PRECISION_SHIFT     ( PRECISION_BITS - Pixel_Bits )
+#define PRECISION_HALF      ( PRECISION >> 1 )
+#define PRECISION           ( 1 << PRECISION_BITS )
 
 /* NOTE: These operations are only valid on 2's complement processors */
 
-#define FLOOR( x )    ( (x) & -ras.precision )
-#define CEILING( x )  ( ((x) + ras.precision - 1) & -ras.precision )
+#define FLOOR( x )    ( (x) & -PRECISION )
+#define CEILING( x )  ( ((x) + PRECISION - 1) & -PRECISION )
 #define TRUNC( x )    ( (signed long)(x) >> PRECISION_BITS )
-#define FRAC( x )     ( (x) & (ras.precision - 1) )
-#define SCALED( x )   ( ((x) << PRECISION_SHIFT) - ras.precision_half )
+#define FRAC( x )     ( (x) & (PRECISION - 1) )
+#define SCALED( x )   ( ((x) << PRECISION_SHIFT) - PRECISION_HALF )
 
 #ifdef DEBUG_RASTER
 #define DEBUG_PSET  Pset()
@@ -251,7 +253,6 @@ extern TEngine_Instance engineInstance;
   struct  TRaster_Instance_
   {
     Int       precision;
-    Int       precision_half;
     Int       precision_step;
 
     MemHandle buffer;               /* The profiles bufferblock     */
@@ -346,7 +347,6 @@ extern TEngine_Instance engineInstance;
     }
 
     ras.precision       = 1 << PRECISION_BITS;
-    ras.precision_half  = ras.precision >> 1;
   }
 
 
@@ -1963,7 +1963,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 >= 0 )
     {
-      if ( x2 - x1 >= ras.precision_half )
+      if ( x2 - x1 >= PRECISION_HALF )
         color = ras.grays[2];
       else
         color = ras.grays[1];
