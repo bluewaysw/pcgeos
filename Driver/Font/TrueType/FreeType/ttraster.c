@@ -323,30 +323,6 @@ extern TEngine_Instance engineInstance;
 #endif /* TT_STATIC_RASTER */
 
 
-/************************************************************************/
-/*                                                                      */
-/* Function:    Set_Resolution                                          */
-/*                                                                      */
-/* Description: Sets precision variables according to param flag.       */
-/*                                                                      */
-/* Input:       High     set to True for high precision (typically for  */
-/*                       ppem < 18), false otherwise.                   */
-/*                                                                      */
-/************************************************************************/
-
-  static inline void  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
-  {
-    if ( y_ppem < 24 )
-    {
-      ras.precision_step   = 128;
-    }
-    else
-    {
-      ras.precision_step   = 32;
-    }
-  }
-
-
 /****************************************************************************/
 /*                                                                          */
 /* Function:    New_Profile                                                 */
@@ -2315,7 +2291,7 @@ Scan_DropOuts :
     ras.nContours = glyph->n_contours;
     ras.coords    = glyph->points;
 
-    Set_Resolution( RAS_VARS glyph->y_ppem );
+    ras.precision_step = glyph->y_ppem < 24 ? 128 : 32;
     ras.dropOutControl = glyph->dropout_mode;
   }
 

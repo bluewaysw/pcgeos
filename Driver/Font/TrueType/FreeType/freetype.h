@@ -402,8 +402,8 @@
     TT_FWord   min_Left_Side_Bearing;  /* minimum left-sb       */
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
     TT_FWord   xMax_Extent;            /* xmax extents          */
-    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
