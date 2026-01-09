@@ -78,7 +78,7 @@ extern TEngine_Instance engineInstance;
 /* Maximum number of outline points supported per glyph.       */
 /* Fonts containing glyphs that exceed this limit are not      */
 /* registered by kernel and are unavailable in font selection. */
-#define MAX_NUM_OUTLINE_POINTS              600
+#define MAX_NUM_OUTLINE_POINTS              750
 
 #define MIN_OS2_TABLE_VERSION               2
 
