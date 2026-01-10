@@ -181,14 +181,6 @@ extern TEngine_Instance engineInstance;
           (( sizeof(TProfile)+sizeof(long)-1 ) / sizeof(long))
 
 
-  /* Left fill bitmask */
-  static const Byte  LMask[8] =
-    { 0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01 };
-
-  /* Right fill bitmask */
-  static const Byte  RMask[8] =
-    { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF };
-
   /* prototypes used for sweep function dispatch */
 #ifdef TT_CONFIG_OPTION_GRAY_SCALING
   typedef void  Function_Sweep_Init( RAS_ARGS Short*  min,
@@ -1419,15 +1411,15 @@ extern TEngine_Instance engineInstance;
 
       if ( c1 != c2 )
       {
-        *target |= LMask[e1 & 7];
+        *target |= (Byte)(0xFFu >> (e1 & 7));
 
         if ( c2 > c1 + 1 )
           MEM_Set( target + 1, 0xFF, c2 - c1 - 1 );
 
-        target[c2 - c1] |= RMask[e2 & 7];
+        target[c2 - c1] |= (Byte)(0xFFu << (7 - (e2 & 7)));
       }
       else
-        *target |= ( LMask[e1 & 7] & RMask[e2 & 7] );
+        *target |= (Byte)((0xFFu >> (e1 & 7)) & (0xFFu << (7 - (e2 & 7))));
     }
   }
 
