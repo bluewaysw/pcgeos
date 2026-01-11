@@ -891,7 +891,7 @@ REVISION HISTORY:
 
 OpenWinUpdateGeometry	method dynamic	OLWinClass, MSG_VIS_UPDATE_GEOMETRY
 	;first see if this is the first UPDATE_GEOMETRY:
-	
+
 if 0
 	mov	di, 1000
 	call	ThreadBorrowStackSpace

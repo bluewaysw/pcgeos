@@ -1,4 +1,4 @@
-saver.rdef: generic.uih product.uih saver.uih
+saver.rdef: saver.ui generic.uih product.uih saver.uih
 saverManager.obj \
 saverManager.eobj: stdapp.def geos.def geode.def resource.def ec.def lmem.def \
                 object.def graphics.def fontID.def font.def color.def \

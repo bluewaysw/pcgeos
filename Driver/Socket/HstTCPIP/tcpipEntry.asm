@@ -416,73 +416,6 @@ TcpipDoNothing	proc	far
 
 TcpipDoNothing	endp
 
-.ioenable
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	TcpipReceiveInterrupt
-
-DESCRIPTION:	Intercept the video mode interrupt and fix up the
-		power management.
-
-CALLED BY:	INT 10h
-
-PASS:
-	al - video mode
-
-RETURN:
-	none
-
-DESTROYED:
-	none
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Tony	1/31/92		Initial version
-
-------------------------------------------------------------------------------@
-TcpipReceiveInterrupt	proc	far
-
-	pushf
-
-	push	ax, bx, cx, dx, si, di, bp, ds, es
-	call	SysEnterInterrupt
-	cld					;clear direction flag
-	INT_ON
-
-EC <	call	ECCheckStack						>
-
-	; scheduled receiving data
-	mov	ax, MSG_TCPIP_START_RECEIVE_ASM
-		
-	push	bx
-	mov	bx, handle dgroup
-	call	MemDerefDS
-	mov	bx, ds:[driverThread]
-	
-EC <		Assert	thread	bx				>		
-
-	mov	cx, di			; cx = connection
-	mov	di, mask MF_FORCE_QUEUE
-	call	ObjMessage
-	pop	bx
-
-	call	SysExitInterrupt
-	pop	ax, bx, cx, dx, si, di, bp, ds, es
-	popf
-	ret
-
-TcpipReceiveInterrupt	endp
-
-
 
 TCPIPRECEIVESTART	proc	far	connection:word
 								uses	di, si, ds
@@ -696,14 +629,6 @@ TcpipInit	proc	far
 		je	straightError
 
 	;
-	; Hook into callback
-	;
-	;	segmov	es, <segment ResidentCode>
-	;	mov	bx, offset ResidentCode:TcpipReceiveInterrupt
-	;	mov	ax, HIF_SET_RECEIVE_HANDLE
-	;	call	HostIfCall
-
-	;
 	; Create the input queue.
 	;
 		mov	bx, handle dgroup
@@ -806,11 +731,6 @@ REVISION HISTORY:
 TcpipExit	proc	far
 
 	; Reset the callback interrupt
-
-		clr	bx
-		mov	es, bx
-		mov	ax, HIF_SET_RECEIVE_HANDLE
-		call	HostIfCall
 
 		mov	bx, handle dgroup
 		call	MemDerefDS		

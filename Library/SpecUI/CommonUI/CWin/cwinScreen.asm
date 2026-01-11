@@ -313,11 +313,6 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	mov	di, VID_ESC_UPDATE_DEVICE 
 	call	ds:[si].DIS_strategy
 
-	;push    ax,bx,cx,dx,si,di,bp
-	;mov	di, DR_VID_SHOWPTR
-	;call	ds:[si].DIS_strategy
-	;pop 	ax,bx,cx,dx,si,di,bp
-
 	; update screen coordinates
 	pop	bx
 	pop	si, ds, di
@@ -342,24 +337,6 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 
 	mov	ax, MSG_VIS_SET_SIZE
 	call	ObjCallInstanceNoLock
-
-	push	ds, es, si
-;	push	cx, dx
-;	mov	cx, 1
-;	mov	ax, MSG_VIS_FIND_CHILD_AT_POSITION
-;	call	ObjCallInstanceNoLock
-;	mov	bx, cx
-;	mov	si, dx
-;	pop	cx, dx
-	;mov	ax, MSG_VIS_SET_SIZE
-
-;	push	ax, di
-;	mov	ax, MSG_VIS_SET_SIZE
-;	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-;	call	ObjMessage
-;	pop	ax, di
-
-	pop	ds, es, si
 
 	;
 	; record a message
@@ -420,23 +397,10 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	call	GCNListSend
 	pop	ax, cx, dx, di, bx, bp
 
-	;push	ax, di
-	;mov	ax, MSG_VIS_MARK_INVALID
-	;mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH or mask VOF_GEOMETRY_INVALID or mask VOF_GEO_UPDATE_PATH
-	;mov	dl, VUM_NOW
-	;mov	di, mask MF_CALL
-	;call	ObjMessage
-	;pop	ax, di
-
-
 	mov	ax, MSG_VIS_MARK_INVALID
 	mov	cl, mask VOF_IMAGE_INVALID or mask VOF_WINDOW_INVALID or mask VOF_IMAGE_UPDATE_PATH
 	mov	dl, VUM_NOW
 	call	ObjCallInstanceNoLock
-
-	;mov	ax, MSG_VIS_INVAL_TREE
-	;mov	dl, VUM_NOW
-	;call	ObjCallInstanceNoLock
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset

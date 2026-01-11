@@ -31,10 +31,18 @@ typedef enum {
 } HostIfNotifiation;
 
 typedef WordFlags HostIfFunctions;
-#define HIF_CHECK			1
-#define HIF_SET_RECEIVE_HANDLE		2
-#define HIF_SET_SSL_CALLBACK		3
-	
+
+/*
+ * Check hostif.def for details on input, output and
+ * functional declaration of the functions.
+ */
+
+#define HIF_SET_VIDEO_PARAMS		4
+#define	HIF_SET_EVENT_INTERRUPT		5
+#define	HIF_GET_VIDEO_PARAMS		8
+#define HIF_GET_EVENT			9
+#define HIF_API_CHECK			98
+
 #define HIF_NETWORKING_BASE		1000
 #define HIF_NC_RESOLVE_ADDR		HIF_NETWORKING_BASE
 #define HIF_NC_ALLOC_CONNECTION		HIF_NETWORKING_BASE+1

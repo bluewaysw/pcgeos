@@ -689,7 +689,7 @@ afterAppMenuListEntry:
 noLawsuit:
 
 exit:
-if DYNAMIC_SCREENN_RESIZING
+if DYNAMIC_SCREEN_RESIZING
 	;
 	; add our self to dynamic screen size change notification
 	;
@@ -734,7 +734,7 @@ REVISION HISTORY:
 	Doug	1/90		Initial version
 
 ------------------------------------------------------------------------------@
-if DYNAMIC_SCREENN_RESIZING
+if DYNAMIC_SCREEN_RESIZING
 OLAppSpecUnbuild	method dynamic OLApplicationClass,
 						MSG_SPEC_UNBUILD
 

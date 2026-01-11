@@ -51,6 +51,10 @@ include Internal/heapInt.def
 
 DefLib hostif.def
 
+
+;------------------------------------------------------------------------------
+;			Constants
+;------------------------------------------------------------------------------
 HOST_API_INTERRUPT 	equ 	0xA0
 MAX_ASYNC_OP_SLOTS	equ	16
 
@@ -60,12 +64,19 @@ ASD_semaphore		Semaphore
 AsyncSlotData		ends
 
 
+;------------------------------------------------------------------------------
+;			Process class
+;------------------------------------------------------------------------------
 HostIfProcessClass	class	ProcessClass
 
 MSG_HOSTIF_PROCESS_EVENTS	message
 
 HostIfProcessClass	endc
 
+
+;------------------------------------------------------------------------------
+;			Variables
+;------------------------------------------------------------------------------
 idata   segment
 
 	asyncOpSem	Semaphore <1, 0>
@@ -76,7 +87,7 @@ idata   segment
 
 idata   ends
 
-
+;-----
 udata   segment
 
     	hostIfGeode		hptr
@@ -84,6 +95,7 @@ udata   segment
 udata   ends
 
 
+
 Resident	segment	resource
 
 HostIfProcessClass	mask CLASSF_NEVER_SAVED
@@ -124,13 +136,13 @@ HostIfInterrupt	proc	far
 	;pushf
 	push	ax, bx, cx, dx, si, di, bp, ds, es
 
-EC <		call	ECCheckStack						>
+EC <	call	ECCheckStack						>
 
 	cld					;clear direction flag
 	INT_ON
 
 	segmov	ds, dgroup
-	mov		bx, ds:hostIfGeode
+	mov	bx, ds:hostIfGeode
 
 	;mov_trash	ax, bx
 	mov	ax, MSG_HOSTIF_PROCESS_EVENTS
@@ -144,11 +156,11 @@ done:
 
 HostIfInterrupt	endp
 
-
 Resident	ends
 
-Code	segment	resource
 
+
+Code	segment	resource
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfProcEventProcess
@@ -252,6 +264,7 @@ done:
 HostIfProcEventProcess	endm
 
 
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfAttach
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -317,6 +330,7 @@ HostIfAttach	method dynamic HostIfProcessClass,
 	.leave
 	ret
 HostIfAttach	endm
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -410,12 +424,19 @@ HostIfDetect	proc	far
 done:
 		.leave
 		ret
-
 failed:
 		clr	ax
 		jmp	done
 
 HostIfDetect	endp
+
+HOSTIFDETECT	proc	far 	apiid:word	
+		.enter
+		mov	ax, apiid
+		.leave
+		GOTO	HostIfDetect
+HOSTIFDETECT	endp
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -440,13 +461,6 @@ REVISION HISTORY:
 	FR	12/21/23   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-
-HOSTIFDETECT	proc	far 	apiid:word	
-		.enter
-		mov	ax, apiid
-		.leave
-		GOTO	HostIfDetect
-HOSTIFDETECT	endp
 
 HostIfCall	proc	far
 
@@ -558,10 +572,8 @@ asyncOp:
 
 doneSync:	VSem	ds, asyncOpSem
 
-;done:
 		pop	ds
 		ret
-
 
 HostIfCall	endp
 
@@ -582,10 +594,9 @@ HOSTIFCALL		proc	far	func:word,
 		mov	ax, func
 		
 		call 	HostIfCall
-		;int	HOST_API_INTERRUPT
 
 		.leave
-		
+	
 		ret
 
 HOSTIFCALL		endp

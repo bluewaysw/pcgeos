@@ -2688,7 +2688,7 @@ OLApplicationNotify	method	dynamic	OLApplicationClass, MSG_META_NOTIFY,
 	;
 	cmp	cx, MANUFACTURER_ID_GEOWORKS
 	jne	callSuper
-if DYNAMIC_SCREENN_RESIZING
+if DYNAMIC_SCREEN_RESIZING
 	cmp	dx, GWNT_HOST_SCREEN_FIELD_SIZE_CHANGE
 	jne	handleExpress
 

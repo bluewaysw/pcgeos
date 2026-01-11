@@ -733,9 +733,6 @@ SAVisSetSize	method dynamic SaverApplicationClass, MSG_VIS_SET_SIZE
 		call	ObjCallSuperNoLock
 		pop	di
 
-		;mov	bp, ds:[di].SAI_parentWin
-		;mov	ax, MSG_SAVER_APP_SET_PARENT_WIN
-		;call	ObjCallInstanceNoLock	; bp <- window
 		mov	ds:[di].SAI_bounds.R_right, cx 
 		mov	ds:[di].SAI_bounds.R_bottom, dx
 
@@ -797,13 +794,6 @@ SAVisSetSize	method dynamic SaverApplicationClass, MSG_VIS_SET_SIZE
 		mov	di, mask MF_CALL or mask MF_FIXUP_DS or mask MF_STACK
 		call	ObjMessage
 		add	sp, size RectDWord
-
-		;mov	ax, MSG_SPEC_RESCAN_GEO_AND_UPDATE
-		;mov	cl, mask VOF_GEOMETRY_INVALID
-		;mov	dl, VUM_DELAYED_VIA_UI_QUEUE
-		;mov	di, mask MF_CALL or mask MF_FIXUP_DS
-		;call	ObjMessage
-
 notLocked:
 		pop	di
 
@@ -816,17 +806,11 @@ notLocked:
 		clr	ds:[di].SAI_curWindow
 		mov	ax, MSG_SAVER_APP_SET_WIN
 		call	UserCallApplication
-
-		;mov	ax, MSG_SAVER_APP_STOP
-		;call	ObjCallInstanceNoLock	; bp <- window
-
-		;mov	ax, MSG_SAVER_APP_START
-		;call	ObjCallInstanceNoLock	; bp <- window
-
 noWin:
 		.leave
 		ret
 SAVisSetSize	endm
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SAStart

@@ -6,10 +6,10 @@
 GEODE           = saver
 ASM_TO_OBJS     = saverManager.asm
 UI_TO_RDFS      = saver.ui
-SRCS            = saverApplication.asm saverBitmap.asm saverC.asm\
-                  saverCrypt.asm saverFades.asm saverInput.asm\
-                  saverManager.asm saverPassword.asm saverRandom.asm\
-                  saverStrings.asm saverUtils.asm saverVector.asm\
+SRCS            = saverStrings.asm saverPassword.asm saverUtils.asm\
+                  saverManager.asm saverVector.asm saverCrypt.asm\
+                  saverRandom.asm saverBitmap.asm saverApplication.asm\
+                  saverFades.asm saverInput.asm saverC.asm\
                   saverConstant.def saver.ui
 OBJS            = saverManager.obj
 LOBJS           =

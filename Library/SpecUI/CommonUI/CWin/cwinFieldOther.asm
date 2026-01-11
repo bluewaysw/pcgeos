@@ -419,20 +419,6 @@ if TOOL_AREA_IS_TASK_BAR
 	mov	di, mask MF_CALL  or mask MF_FIXUP_DS
 	call	ObjMessage
 
-	;mov	ax, MSG_TOOL_AREA_INIT_POSITION
-	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	;call	ObjMessage
-
-	;mov	ax, MSG_GEN_INTERACTION_INITIATE
-	;mov	di, mask MF_FORCE_QUEUE
-	;call	ObjMessage	
-
-	;mov	ax, MSG_SPEC_RESCAN_GEO_AND_UPDATE
-	;mov	cl, mask VOF_GEOMETRY_INVALID
-	;mov	dl, VUM_DELAYED_VIA_UI_QUEUE
-	;mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	;call	ObjMessage
-
 	;
 	; fixup window positions
 	;

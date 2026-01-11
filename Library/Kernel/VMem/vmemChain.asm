@@ -123,7 +123,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 CopyTreeLow	proc	near
 
-	mov	di, 2000
+	mov	di, 1000
 	call	ThreadBorrowStackSpace
 	push	di
 
