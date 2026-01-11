@@ -732,7 +732,9 @@ LWComputeGraphicBounds(optr oself,
 	 * error flag.
 	 */
 	GrDestroyGString(pself->LWCI_gstring, 0, GSKT_LEAVE_DATA);
+	pself->LWCI_gstring = NullHandle;
 	VMClose(file, FILE_NO_ERRORS);
+	pself->LWCI_file = NullHandle;
 	return FALSE;
     }
 
@@ -781,6 +783,7 @@ ComputeBorders(optr oself,
     LWApplicationInstance *pself = ObjDerefGen(oself);
     XYValueAsDWord coord;
     sword xmin, xmax, ymin, ymax;
+    GStateHandle tempState;
 
 #define SET_MAX_MIN(max, min, value)	if ((value) < min) {        \
 					    min = (value);          \
@@ -794,20 +797,24 @@ ComputeBorders(optr oself,
      * Grab the coords of the different corners to determine the
      * bounds.
      */
-    GrApplyRotation(pself->SAI_curGState, MakeWWFixed(pself->LWCI_angle));
+    GrSetDefaultTransform(pself->SAI_curGState);
 
-    coord = GrTransform(pself->SAI_curGState, width, 0);
+    tempState = GrCreateState(0);
+    GrApplyRotation(tempState, MakeWWFixed(pself->LWCI_angle));
+
+    coord = GrTransform(tempState, width, 0);
     SET_MAX_MIN(xmax, xmin, DWORD_X(coord));
     SET_MAX_MIN(ymax, ymin, DWORD_Y(coord));
 
-    coord = GrTransform(pself->SAI_curGState, width, height);
+    coord = GrTransform(tempState, width, height);
     SET_MAX_MIN(xmax, xmin, DWORD_X(coord));
     SET_MAX_MIN(ymax, ymin, DWORD_Y(coord));
 
-    coord = GrTransform(pself->SAI_curGState, 0, height);
+    coord = GrTransform(tempState, 0, height);
     SET_MAX_MIN(xmax, xmin, DWORD_X(coord));
     SET_MAX_MIN(ymax, ymin, DWORD_Y(coord));
 
+    GrDestroyState(tempState);
     /*
      * Using the minimum and maximum bounds that were just determined,
      * figure out the borders.
@@ -857,12 +864,16 @@ LWTimerStart(optr oself)
     /*
      * Fire up a one-shot timer.
      */
+    if (pself->LWCI_timerHandle) {
+	TimerStop(pself->LWCI_timerHandle, pself->LWCI_timerID);
+	pself->LWCI_timerHandle = NullHandle;
+    }
     pself->LWCI_timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT,
-					 oself,
-					 pself->LWCI_speed,
-					 MSG_LW_APP_DRAW,
-					 0,
-					 &(pself->LWCI_timerID));
+					oself,
+					pself->LWCI_speed,
+					MSG_LW_APP_DRAW,
+					0,
+					&(pself->LWCI_timerID));
 }
 
 
@@ -889,13 +900,17 @@ LWTimerStart(optr oself)
     /*
      * Stop the draw timer.
      */
-    TimerStop(pself->LWCI_timerHandle, pself->LWCI_timerID);
-
+    if (pself->LWCI_timerHandle) {
+	TimerStop(pself->LWCI_timerHandle, pself->LWCI_timerID);
+	pself->LWCI_timerHandle = NullHandle;
+    }
     /*
      * Nuke the random number generator, too.
      */
-    SaverEndRandom(pself->LWCI_randomToken);
-    pself->LWCI_randomToken = 0;
+    if (pself->LWCI_randomToken != 0) {
+	SaverEndRandom(pself->LWCI_randomToken);
+	pself->LWCI_randomToken = 0;
+    }
 
     /*
      * Close down the VM file, if we're drawing something out of it.
@@ -904,8 +919,14 @@ LWTimerStart(optr oself)
 	/*
 	 * Close that pup down.
 	 */
-	GrDestroyGString(pself->LWCI_gstring, 0, GSKT_LEAVE_DATA);
-	VMClose(pself->LWCI_file, FILE_NO_ERRORS);
+	if (pself->LWCI_gstring != NullHandle) {
+	    GrDestroyGString(pself->LWCI_gstring, 0, GSKT_LEAVE_DATA);
+	    pself->LWCI_gstring = NullHandle;
+	}
+	if (pself->LWCI_file != NullHandle) {
+	    VMClose(pself->LWCI_file, FILE_NO_ERRORS);
+	    pself->LWCI_file = NullHandle;
+	}
     }
 
     return @callsuper();

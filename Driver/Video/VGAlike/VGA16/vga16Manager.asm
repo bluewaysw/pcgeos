@@ -32,6 +32,7 @@ VIDEO_STACK_SIZE	equ	512	; set size of local stack
 
 include vidcomGeode.def			; common includes
 include initfile.def
+include hostif.def
 
 ;---------------------------------------------------------------------
 ;		Constants and Macros
@@ -88,6 +89,7 @@ include vidcomRegion.asm		; region drawing routine
 include vidcomXOR.asm			; xor region support
 include vidcomInfo.asm			; device naming/setting
 include vidcomEscape.asm		; support for some escape codes
+include vga16Escape.asm			; support vga16 specific escape codes
 include vidcomPalette.asm		; support for VidGetPixel
 include vga16Output.asm			; output routines
 include vga16GenChar.asm		; routines for larger characters
