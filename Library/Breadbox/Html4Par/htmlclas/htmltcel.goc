@@ -621,6 +621,8 @@ word IRegionRepositionResizeAndReflow(
     word longest ;
     word firstRegion ;
     word boundHeight ;
+    word lineCount ;
+    word charCount ;
 
     RegionPurgeCache(oself) ;
     if (width < REGION_MINIMUM_WIDTH)
@@ -711,17 +713,19 @@ word IRegionRepositionResizeAndReflow(
         }
         oldWidth = p_region->VLTRAE_size.XYS_width ;
         p_region->VLTRAE_size.XYS_width = width ;
+	lineCount = p_region->VLTRAE_lineCount;
+	charCount = p_region->VLTRAE_charCount;
+	/* Don't want to keep it in memory if we are going to move */
+	/* things around. */
+	RegionUnlock(p_region) ;
 
-        if (p_region->VLTRAE_charCount)  {
-	    /* Don't want to keep it in memory if we are going to move */
-	    /* things around. */
+        if (charCount)  {
             ProfPoint("IRegionRepositionResizeAndReflow--Pre") ;
 
             /* Only recalc if we are forced or if size matters. */
             /* (If we are going to a size where the longest line is not that big, we */
             /*  can cheat and just ignore it). */
             if ((sizeMatters) || (forcedRecalc))  {
-	        RegionUnlock(p_region) ;
                 @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
             } else {
                 HugeArrayLock(
@@ -732,23 +736,18 @@ word IRegionRepositionResizeAndReflow(
                     &size) ;
                 if (ILinesAdjustToNewWidth(
                         p_firstLine,
-                        p_region->VLTRAE_lineCount,
+                        lineCount,
                         oldWidth,
                         width))  {
                     /* Adjust failed.  Let's do the old fashion way */
-	            RegionUnlock(p_region) ;
                     @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
-                } else {
-	            RegionUnlock(p_region) ;
-                }
+		}
             }
             ProfPoint("IRegionRepositionResizeAndReflow--Post") ;
             RegionPurgeCache(oself) ;
-        } else {
-	    /* Don't want to keep it in memory if we are going to move */
-	    /* things around. */
-	    RegionUnlock(p_region) ;
-	}
+	    /* Purge seek cache: overflow regions may have been inserted */
+	    p_stack->LS_lastSeekedRegion = 0xFFFF ;
+        }
 
         /* We are now back.  All lines have been reformatted. */
         /* Insure we have access to the region */
