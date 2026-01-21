@@ -340,6 +340,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         FontID                  fontID;
         Boolean                 mappedFont;
         sword                   availIndex;
+        char                    styleName[STYLE_NAME_LENGTH];
 
 
 EC(     ECCheckBounds( (void*)fileName ) );
@@ -364,7 +365,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )
                 goto Fail;
 
-        if ( getNameFromNameTable( trueTypeVars, STYLE_NAME, STYLE_NAME_ID ) == 0 )
+        if ( getNameFromNameTable( trueTypeVars, &styleName, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
         mappedFont = getFontID( trueTypeVars, &fontID );
@@ -437,7 +438,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
     
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
-                outlineDataEntry->ODE_style  = mapTextStyle( STYLE_NAME );
+                outlineDataEntry->ODE_style  = mapTextStyle( &styleName );
                 outlineDataEntry->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineDataEntry->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineDataEntry->ODE_first.OE_handle = fontHeaderChunk;
@@ -462,7 +463,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
 		while( outlineData < outlineDataEnd)
 		{
-                        if( ( mapTextStyle( STYLE_NAME ) == outlineData->ODE_style ) &&
+                        if( ( mapTextStyle( &styleName ) == outlineData->ODE_style ) &&
 	                    ( mapFontWeight( FACE_PROPERTIES.os2->usWeightClass ) == outlineData->ODE_weight ) )
 			{
 				goto Fail;
@@ -501,7 +502,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
                 outlineData = (OutlineDataEntry*) (fontInfo + 1);
-                outlineData->ODE_style  = mapTextStyle( STYLE_NAME );
+                outlineData->ODE_style  = mapTextStyle( &styleName );
                 outlineData->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineData->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineData->ODE_first.OE_handle = fontHeaderChunk;
@@ -534,10 +535,11 @@ Fin:
  *                          requirements (unacceptable).
  *                    FALSE if the font is acceptable.
  * 
- * STRATEGY:       - Currently, the validation is based on two criteria:
+ * STRATEGY:       - Currently, the validation is based on following criteria:
  *                      1. The OS/2 table version must be at least 
  *                         MIN_OS2_TABLE_VERSION.
- *                      2. The number of glyphs must not exceed 
+ *                      2. The maximum number of outline points per glyph
+ *                      3. The number of glyphs must not exceed 
  *                         MAX_NUM_GLYPHS.
  *                 - The function is designed to be extensible so that 
  *                   further rejection criteria can be added later.
@@ -547,12 +549,16 @@ Fin:
  *      ----      ----      -----------
  *      19.12.23  JK        Initial Revision
  *      17.09.25  JK        Renamed and improved docs
+ *      28.12.25  JK        Added outline points check
  *******************************************************************/
 static Boolean isFontUnacceptable( TRUETYPE_VARS )
 {
         /* Additional rejection checks can be added here. */
         
         if ( FACE_PROPERTIES.os2->version < MIN_OS2_TABLE_VERSION )
+                return TRUE;
+
+        if ( FACE_PROPERTIES.max_Points > MAX_NUM_OUTLINE_POINTS )
                 return TRUE;
 
         return FACE_PROPERTIES.num_Glyphs > MAX_NUM_GLYPHS;

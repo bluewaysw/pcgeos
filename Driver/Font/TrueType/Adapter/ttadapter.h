@@ -69,7 +69,16 @@ extern TEngine_Instance engineInstance;
 #define KERN_VALUE_DIVIDENT                 30
 
 #define STANDARD_GRIDSIZE                   1000
+
+/* Maximum number of glyphs supported per font.                */
+/* Fonts exceeding this limit are not registered by kernel     */
+/* and therefore do not appear in font selection.              */
 #define MAX_NUM_GLYPHS                      2000
+
+/* Maximum number of outline points supported per glyph.       */
+/* Fonts containing glyphs that exceed this limit are not      */
+/* registered by kernel and are unavailable in font selection. */
+#define MAX_NUM_OUTLINE_POINTS              750
 
 #define MIN_OS2_TABLE_VERSION               2
 
@@ -381,7 +390,6 @@ typedef struct
 {
     /* init fonts */
     char                        familyName[FID_NAME_LEN];
-    char                        styleName[STYLE_NAME_LENGTH];
 
     /* scaling */
     WWFixedAsDWord              scaleHeight;
@@ -416,7 +424,6 @@ typedef struct
 #define TRUETYPE_VARS           TrueTypeVars* trueTypeVars
 
 #define FAMILY_NAME             trueTypeVars->familyName
-#define STYLE_NAME              trueTypeVars->styleName
 #define FACE                    trueTypeVars->face
 #define FACE_PROPERTIES         trueTypeVars->faceProperties
 #define INSTANCE                trueTypeVars->instance

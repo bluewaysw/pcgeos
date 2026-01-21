@@ -940,6 +940,8 @@
                                        UShort       point,
                                        TT_F26Dot6   distance )
   {
+    (void)exc;
+
     zone->cur[point].y += distance;
     zone->touch[point] |= TT_Flag_Touched_Y;
   }
@@ -965,7 +967,9 @@
                                                TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
+    
 
+    (void)exc;
 
     if ( distance >= 0 )
     {
@@ -1009,6 +1013,8 @@
     TT_F26Dot6  val;
 
 
+    (void)exc;
+
     if ( distance >= 0 )
     {
       val = (distance + compensation + 32) & (-64);
@@ -1045,6 +1051,8 @@
   {
     TT_F26Dot6  val;
 
+
+    (void)exc;
 
     if ( distance >= 0 )
     {
@@ -1120,6 +1128,8 @@
     TT_F26Dot6  val;
 
 
+    (void)exc;
+
     if ( distance >= 0 )
     {
       val = (distance + compensation + 63) & (-64);
@@ -1156,6 +1166,7 @@
   {
     TT_F26Dot6 val;
 
+    (void)exc;
 
     if ( distance >= 0 )
     {
@@ -1479,7 +1490,7 @@
  *  Output :  Returns distance in F26dot6 format.
  *
  *****************************************************************/
-
+/*
   static TT_F26Dot6 _near Free_Project( EXEC_OPS TT_Vector*  v1,
                                                  TT_Vector*  v2 )
   {
@@ -1492,7 +1503,7 @@
     ADD_64( T1, T2, T1 );
 
     return (TT_F26Dot6)DIV_64( T1, 0x4000L );
-  }
+  } */
 
 
 /*******************************************************************
@@ -1529,6 +1540,8 @@
   static TT_F26Dot6 _near Project_y( EXEC_OPS TT_Vector*  v1,
                                               TT_Vector*  v2 )
   {
+    (void)exc;
+
     return (v1->y - v2->y);
   }
 
@@ -3357,6 +3370,8 @@
 
   static Bool  SkipCode( EXEC_OP )
   {
+    (void)exc;
+
     CUR.IP += CUR.length;
 
     if ( CUR.IP < CUR.codeSize )
@@ -5677,6 +5692,9 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
   {
     /* look up the current instruction in our table */
     PDefRecord  def, limit;
+
+
+    (void)exc;
     
     def   = CUR.IDefs;
     limit = def + CUR.numIDefs;
