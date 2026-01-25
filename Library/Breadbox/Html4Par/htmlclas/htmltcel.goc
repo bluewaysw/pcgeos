@@ -41,7 +41,7 @@
 /* "-dc" causes vptrs for text constants if different code segments are used */
 #pragma option -dc-
 
-void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray) ;
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray, optr txtObj) ;
 
 typedef struct {
     Rectangle rect ;
@@ -1831,6 +1831,21 @@ EC( ECCheckStack(); )
 /* "-dc" causes vptrs for text constants if different code segments are used */
 #pragma option -dc-
 
+void ISetNumFormatedCells(
+    optr txtObj,
+    word numFormatedCells
+)
+{
+    HTMLTextInstance* pself ;
+    word *p_limit = ObjVarFindData(txtObj, ATTR_VIS_LARGE_TEXT_ONLY_DRAW_X_REGIONS) ;
+    if (p_limit) {
+	*p_limit = 0xFFFF;		/* defaults to all regions */
+    }
+
+    pself = ObjDerefVis(txtObj); 
+    pself->HTI_numFormattedCells = numFormatedCells;
+}
+
 /**************************************************************************
  * Routine:  ILayoutCellRegions
  **************************************************************************
@@ -2638,7 +2653,7 @@ T_layoutLevelTable *LayoutStackTableLevelAccess(T_layoutStack *p_stack, word lev
         0) ;
     LayoutStackUnlock(p_stack) ;
 
-    pself->HTI_numFormattedCells = 0 ;
+    ISetNumFormatedCells(oself, 0) ;
 
     /* Start the process */
     @send ,forceQueue ,checkDuplicate oself::MSG_HTML_TEXT_INTERNAL_LAYOUT_UPDATE_EVENT() ;
@@ -2764,7 +2779,7 @@ EC( word originalCellIndex; )
         }
 
         if (pself->HTI_layoutState & HTS_CELL_REGION_LINKS_INVALID)  {
-            ISetupRegionLinks(pself->HTI_cellArray, RegionArrayConstruct(oself, pself)) ;
+	    ISetupRegionLinks(pself->HTI_cellArray, RegionArrayConstruct(oself, pself), oself) ;
             pself->HTI_layoutState &= (~HTS_CELL_REGION_LINKS_INVALID) ;
         }
 
@@ -2841,7 +2856,7 @@ EC( word originalCellIndex; )
                     p_stack->LS_undoCell = p_stack->LS_cellLayoutStack[0] ;
 
                     /* Allow more cells to be shown now */
-                    pself->HTI_numFormattedCells = p_stack->LS_currentMasterCell ;
+                    ISetNumFormatedCells(oself, p_stack->LS_currentMasterCell) ;
                     IAdjustRegions(oself, pself, last, p_stack->LS_currentMasterCell) ;
 
                     /* If we have cross the first area of the page, then go ahead and show it */
