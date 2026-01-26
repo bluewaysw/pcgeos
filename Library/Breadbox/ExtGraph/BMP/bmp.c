@@ -15,7 +15,8 @@
 
 Boolean
 extGrFillMosaicLineReal(GStateHandle gstate, Rectangle *rect, int end, Boolean vert,
-	VMFileHandle file, VMBlockHandle block, EGMosaicSourceType srctype, EGError *error)
+	VMFileHandle file, VMBlockHandle block, EGMosaicSourceType srctype, EGError *error,
+	word bmpSizeX)
 {
 	Boolean clipStat = FALSE;
 	sword localPos, startPos, stepPoints/*, bandWidth*/;
@@ -61,7 +62,12 @@ extGrFillMosaicLineReal(GStateHandle gstate, Rectangle *rect, int end, Boolean v
 			loopCount = 0;
 			while(loopCount < toDo)
 			{
-				GrDrawHugeBitmap(gstate, rect->R_left, localPos + (loopCount * stepPoints), file, block);
+				word loopCount2 = 0;
+				word toDo2 = (rect->R_right-rect->R_left + bmpSizeX - 1) / bmpSizeX;
+				while(loopCount2 < toDo2) {
+					GrDrawHugeBitmap(gstate, rect->R_left+loopCount2*bmpSizeX, localPos + (loopCount * stepPoints), file, block);
+					loopCount2++;
+				}
 
 				loopCount++;
 			}
@@ -658,10 +664,12 @@ BmpCheckMaskType(VMFileHandle file, VMBlockHandle block, SizeAsDWord size)
 	word elemSize;
 	byte *elemPtr;
 	BMType bmType;
+	BMCompact bmCompact;
 
 	bmType = BmpGetBitmapType(file, block, 0);
+	bmCompact = BmpGetBitmapCompact(file, block, 0);
 
-	if(bmType & BMT_MASK)
+	if((bmType & BMT_MASK) && (bmCompact == BMC_UNCOMPACTED))
 	{
 		while(loopCount < DWORD_HEIGHT(size))
 		{
@@ -726,6 +734,9 @@ BmpCheckMaskType(VMFileHandle file, VMBlockHandle block, SizeAsDWord size)
 			HugeArrayUnlock(elemPtr);
 			loopCount++;
 		}
+	}
+	else {
+		retValue = EGBMT_PART;
 	}
 
 	return retValue;
@@ -903,7 +914,7 @@ ExtGrFillMosaic(
 
 			if(realDraw)
 			{
-				result = extGrFillMosaicLineReal(gstate, &visRect, x2, FALSE, file, block, srctype, &stat);
+				result = extGrFillMosaicLineReal(gstate, &visRect, x2, FALSE, file, block, srctype, &stat, bmpSizeX);
 			}
 			else
 			{
@@ -920,7 +931,7 @@ ExtGrFillMosaic(
 						if(realDraw)
 						{
 							extGrFillMosaicLineReal(gstate, &visRect, y2,
-								TRUE, file, block, srctype, &stat);
+								TRUE, file, block, srctype, &stat, bmpSizeX);
 						}
 						else
 						{
@@ -949,7 +960,7 @@ ExtGrFillMosaic(
 				loopX += bmpSizeX;
 				if(realDraw)
 				{
-					result = extGrFillMosaicLineReal(gstate, &visRect, y2, TRUE, file, block, srctype, &stat);
+					result = extGrFillMosaicLineReal(gstate, &visRect, y2, TRUE, file, block, srctype, &stat, bmpSizeX);
 				}
 				else
 				{
@@ -966,7 +977,7 @@ ExtGrFillMosaic(
 							if(realDraw)
 							{
 								extGrFillMosaicLineReal(gstate, &visRect, x2,
-									FALSE, block, file, srctype, &stat);
+									FALSE, block, file, srctype, &stat, bmpSizeX);
 							}
 							else
 							{
@@ -1010,7 +1021,7 @@ ExtGrFillMosaic(
 
 						if(realDraw)
 						{
-							extGrFillMosaicLineReal(gstate, &localRect, x2, FALSE, file, block, srctype, &stat);
+							extGrFillMosaicLineReal(gstate, &localRect, x2, FALSE, file, block, srctype, &stat, bmpSizeX);
 						}
 						else
 						{
