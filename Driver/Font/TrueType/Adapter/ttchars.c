@@ -238,7 +238,7 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
             bufSpec.TTCBS_weight = weight;
             bufSpec.TTCBS_stylesToImplement = stylesToImplement;
 
-            if( !(fontBuf->FB_flags & FBF_IS_COMPLEX) ) {
+            if( !(fontBuf->FB_flags & FBF_IS_COMPLEX) && pointSize <= MAX_CACHED_POINTSIZE ) {
                 TrueType_Cache_UpdateFontBlock(
                     trueTypeVars->cacheFile,
                     trueTypeVars->entry.TTOE_fontFileName, 
