@@ -689,9 +689,66 @@ afterAppMenuListEntry:
 noLawsuit:
 
 exit:
+if DYNAMIC_SCREEN_RESIZING
+	;
+	; add our self to dynamic screen size change notification
+	;
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	push	bx
+	mov	bx, cx
+EC <	call	ECCheckMemHandle				>
+	pop	bx
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListAdd
+endif
 	ret
 
 OLAppSpecBuild	endm
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLMenuedWinVisUnbuild -- MSG_SPEC_UNBUILD
+		for OLMenuedWinClass
+
+DESCRIPTION:	Visibly unbuilds & destroys a menued window
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		di 	- MSG_SPEC_UNBUILD
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, si, di, ds, es, bp
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	1/90		Initial version
+
+------------------------------------------------------------------------------@
+if DYNAMIC_SCREEN_RESIZING
+OLAppSpecUnbuild	method dynamic OLApplicationClass,
+						MSG_SPEC_UNBUILD
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListRemove
+
+	mov	di, offset OLApplicationClass
+	GOTO	ObjCallSuperNoLock
+
+OLAppSpecUnbuild	endm
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1604,6 +1661,13 @@ OLApplicationDetach	method dynamic	OLApplicationClass, MSG_META_DETACH
 
 ;freed when geode exits
 ;	call	AppFreeGCNListBlock
+
+	mov	cx, ds:[LMBH_handle]
+	mov	dx, si
+	mov	bx, MANUFACTURER_ID_GEOWORKS
+	mov	ax, GCNSLT_HOST_NOTIFICATIONS
+	call	GCNListRemove
+
 	ret
 
 OLApplicationDetach	endp

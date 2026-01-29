@@ -499,6 +499,23 @@ VidTestVESA_2048_1536_16	proc	near
 		ret
 VidTestVESA_2048_1536_16	endp
 		
+VidTestVESA_DPI72_16	proc	near
+		mov	ax, VD_VESA_DPI72_16
+		call	VidTestVESA
+		ret
+VidTestVESA_DPI72_16	endp
+
+VidTestVESA_DPI96_16	proc	near
+		mov	ax, VD_VESA_DPI96_16
+		call	VidTestVESA
+		ret
+VidTestVESA_DPI96_16	endp
+
+VidTestVESA_DPI120_16	proc	near
+		mov	ax, VD_VESA_DPI120_16
+		call	VidTestVESA
+		ret
+VidTestVESA_DPI120_16	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -534,6 +551,28 @@ VidTestVESA	proc	near
 		.enter
 
 		push	es
+
+		push	ax
+		mov	ax, HIF_API_VIDEO
+		call	HostIfDetect
+		mov	ss:[hostIfVersion], ax	; save it
+
+		cmp	ax, REQUIRED_HOSTIF_VIDEO_API
+		jb	noHost		; branch, if no compatible host found
+		
+		pop	ax
+
+		; save away the mode number
+		mov	ss:[vesaMode], ax	; save it
+
+		; if host video API is available
+		; we are able to use any compatible resolution we want
+		; so we just accept all of the defined device modes
+
+		mov	ax, DP_PRESENT		; yep, it's there
+		jmp	realDone
+noHost:
+		pop	ax
 if  NT_DRIVER
 	; Be lazy and only return true for the
 	; mode we know we support.
@@ -646,10 +685,10 @@ checkNext::
 		
 done:
 		; free allocated memory block
-
-		pop	es
-		call	MemFree
+		call	MemFree		; bx is handle to block to free
 endif  ; not NT_DRIVER
+realDone:
+		pop	es
 		.leave
 		ret
 
@@ -692,7 +731,12 @@ screenCategory	char	"screen0",0
 bigPointerKey	char	"bigMousePointer",0
 tvModeKey	char	"tvMode",0
 endif ; ALLOW_BIG_MOUSE_POINTER
-	
+
+VidSetVESAFar	proc	far
+		call VidSetVESA
+		ret
+VidSetVESAFar	endp
+
 VidSetVESA	proc	near
 		uses	ax,bx,cx,dx,ds,si,es
 		.enter
@@ -721,11 +765,71 @@ endif ; ALLOW_BIG_MOUSE_POINTER
 		; just use the BIOS extension
 
 if not NT_DRIVER
+		mov	bx, ss:[hostIfVersion] 	; mode number, clear memory
+		cmp	bx, REQUIRED_HOSTIF_VIDEO_API
+		jb	regularSetup
+
+		; send command
+		mov	ax, HIF_GET_VIDEO_PARAMS
+		call	HostIfCall
+		; ax - result status
+		; si - native width
+		; bx - native height
+		; cx - horizontal dpi
+		; dx - verical dpi
+		; di - unused
+		; This call doesn't define any error state 
+		mov	ax, bx
+
+		; send command
+		mov	bx, ss:[vesaMode]
+		mov	di, 72
+		cmp	bx, VD_VESA_DPI72_16
+		je	dpiMode
+		mov	di, 96
+		cmp	bx, VD_VESA_DPI96_16
+		je	dpiMode
+		mov	di, 120
+		cmp	bx, VD_VESA_DPI120_16
+		jne	regularMode
+
+dpiMode:
+		; calcuate required resolution based on DPI
+		; width = (mode_dpi * width) / output_dpi
+		push	ax, dx
+		mov	ax, di
+		push	ax
+		mul	si
+		div	cx
+		and	ax, 0xFFF8
+		mov	si, ax
+		pop	ax
+		pop	bx, cx
+
+		;mov	ax, 72
+		mul	bx
+		div	cx
+		mov	bx, ax		
+
+		jmp	setResolution
+regularMode:
+		mov	si, cs:[vesaWidth][bx]
+		mov	bx, cs:[vesaHeight][bx]
+setResolution:
+		mov	ax, HIF_SET_VIDEO_PARAMS
+		call	HostIfCall
+		; ax - result status
+		; bx - video mode number to use
+		; This call doesn't define any error state 
+
+		jmp	commonSetup
+regularSetup:
 		mov	ah, VESA_BIOS_EXT
 		mov	al, VESA_SET_MODE
 		mov	bx, ss:[vesaMode] 	; mode number, clear memory
 		int	VIDEO_BIOS
 
+commonSetup:
 		segmov	es, ss, di		; es -> dgroup
 		lea	di, ss:[vesaInfo]	; es:di -> info block
 		mov	ah, VESA_BIOS_EXT	; use VESA bios extensions
@@ -935,6 +1039,12 @@ ifndef PRODUCT_WIN_DEMO
 		word	1200		; VD_VESA_1920_1200_16
 		word	1440		; VD_VESA_1920_1440_16
 		word	1536		; VD_VESA_2048_1536_16
+
+		; all 0 for the DPI modes so regular VESA mode lookup
+		; will not find a match for those
+		word	0		; VD_VESA_DPI72_16
+		word	0		; VD_VESA_DPI96_16
+		word	0		; VD_VESA_DPI120_16
 endif
 
 vesaWidth	label	word
@@ -976,6 +1086,12 @@ ifndef PRODUCT_WIN_DEMO
 		word	1920		; VD_VESA_1920_1200_16
 		word	1920		; VD_VESA_1920_1440_16
 		word	2048		; VD_VESA_2048_1536_16
+
+		; all 0 for the DPI modes so regular VESA mode lookup
+		; will not find a match for those
+		word	0		; VD_VESA_DPI72_16
+		word	0		; VD_VESA_DPI96_16
+		word	0		; VD_VESA_DPI120_16
 endif
 
 VidEnds		Misc

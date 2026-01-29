@@ -519,6 +519,7 @@ totalCountDivBy1000 word	;this is the value kdata:totalCount
 				;divided by 1000 to make the number managable.
 				;(totalCount is what kdata:idleCount would
 				;be if the system were 100% idle.)
+totalCountPure		byte	; 0xFF if pure total is used
 
 tonyIndexTimes10 word
 

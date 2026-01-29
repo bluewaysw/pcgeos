@@ -79,6 +79,9 @@
 #ifdef COMPILE_OPTION_MAP_HEAP
 #include <MapHeap.h>
 #endif
+#ifdef COMPILE_OPTION_HOST_SERVICE
+#include <hostif.h>
+#endif
 #endif
 
 #ifndef COMPILE_OPTION_HOST_SERVICE_ONLY
@@ -179,7 +182,7 @@ int _far _pascal SSLLIBRARYENTRY(LibraryCallType ty, GeodeHandle client)
 #endif
 #endif
 #ifdef COMPILE_OPTION_HOST_SERVICE
-	hostApiAvailable = HostIfDetect() >= 1;
+	hostApiAvailable = HostIfDetect(HIF_API_SSL) >= 1;
 #endif
 		CRYPTO_thread_setup();
     } else if (ty == LCT_DETACH) {
@@ -556,7 +559,7 @@ Boolean hostApiAvailable = FALSE;
 int _far _pascal SSLLIBRARYENTRY(LibraryCallType ty, GeodeHandle client)
 {
     if (ty == LCT_ATTACH) {
-	hostApiAvailable = HostIfDetect() >= 1;
+	hostApiAvailable = HostIfDetect(HIF_API_SSL) >= 1;
     }
     return(0);
 }

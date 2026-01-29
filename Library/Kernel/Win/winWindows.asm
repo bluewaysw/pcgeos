@@ -679,10 +679,18 @@ endif
 
 	test	ss:[bp].WR_flags,mask WPF_ABS
 	jz	WR_relative
+	segmov	ax, es
+	tst	ax
+	jz	WR_parentIsRoot
 	mov	ax,es:[W_winRect].R_left
 	mov	ds:[W_winRect].R_left,ax
 	mov	ax,es:[W_winRect].R_top
 	mov	ds:[W_winRect].R_top,ax
+	jmp	WR_relative
+WR_parentIsRoot:
+	mov	ds:[W_winRect].R_left,ax
+	mov	ds:[W_winRect].R_top,ax
+
 WR_relative:
 
 	mov	dx,ss			; pass dx:cx = paramters
