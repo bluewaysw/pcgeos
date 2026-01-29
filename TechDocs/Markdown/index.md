@@ -3,7 +3,9 @@ nav_order: 0
 ---
 ## #FreeGEOS technical documentation
 
-#FreeGEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format. Its starting point is the GEOS SDK 2.0, which provides good coverage of the major architectural building blocks of the system, and includes the most comprehensive technical writing. It was originally published as a multi-volume library of physical books.
+#FreeGEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format. It is based on the GEOS SDK 2.0, which provides good coverage of the major architectural building blocks of the system, and includes the most comprehensive technical writing. It was originally published as a multi-volume library of physical books.
+
+![Screenshot showing a typical GEOS desktop](Art/title-screenshot.png)
 
 Here are some entry points to the main volumes:
 

@@ -702,6 +702,10 @@ REVISION HISTORY:
 CTSelectStartAndMakeUndrawable	proc	near
 	uses	cx, dx, bp
 	.enter
+
+	mov	ax, MSG_VIS_INVALIDATE
+	call	ObjCallInstanceNoLock
+
 	;
 	; Make text not drawable.  Need to adjust scrollbars before
 	; drawing.
@@ -776,6 +780,20 @@ newDimAttrs	local	word
 	call	MUCallView		
 	LONG	jcxz	done
 
+	push	bp
+	sub	sp, size PointDWord
+	mov	bp, sp
+	clr	dx
+	mov	ss:[bp].PD_x.low, dx
+	mov	ss:[bp].PD_y.low, dx
+	mov	ss:[bp].PD_x.high, dx
+	mov	ss:[bp].PD_y.high, dx
+	mov	cx, size PointDWord
+	mov	ax, MSG_GEN_VIEW_SET_ORIGIN
+	call	MUCallViewStack
+	add	sp, size PointDWord
+	pop	bp
+
 	mov	ss:textHeight, 0		;initialize for loop below
 	mov	ss:currentDimAttrs, 0		;initialize for loop below
 	mov	ss:newDimAttrs, -1		;initialize for loop below
@@ -846,9 +864,11 @@ haveWidth:
 	; Get new view win bounds, as it may have added or 
 	; removed scrollbars. 
 	; 
-	call	GetWinBounds			; ax <- view win width
-	mov	ss:viewWidth, ax		; save new view width
-	mov	ss:viewHeight, dx		; save new view width
+	mov	ax, MSG_CGV_GET_DOC_SIZE
+	call	MUCallView_SaveBP		;cx,dx = width, height
+	mov	ss:viewWidth, cx
+	mov	ss:viewHeight, dx
+
 	;
 	; Text width should be wider of widest graphic
 	; and current view win width
@@ -889,6 +909,9 @@ setSizes::
 	; Make text drawable.
 	;
 	call	CTMakeDrawableAndResetSelection
+
+	mov	ax, MSG_GEN_VIEW_REDRAW_CONTENT
+	call	MUCallView_SaveBP
 done:
 	.leave
 	ret
@@ -914,48 +937,6 @@ ObjCallInstanceNoLock_SaveBP	endp
 		
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		GetWinBounds
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Calculate the actual visible window bounds for the view
-		which this object is a vis descendant of.
-
-CALLED BY:	CTTellViewUpdateScrollbars, 
-PASS:		*ds:si - ContentTextClass
-RETURN:		ax - current view window width
-		dx - window height
-DESTROYED:	di
-
-PSEUDO CODE/STRATEGY:
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	cassie	3/17/95		Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-GetWinBounds		proc	near
-		uses	bx, cx, bp
-		.enter
-EC <		call	AssertIsCText					>
-		mov	ax, MSG_VIS_VUP_CREATE_GSTATE
-		call	ObjCallInstanceNoLock		;bp <- gstate
-EC <		ERROR_NC JM_SEE_BACKTRACE		>
-
-		mov_tr	di, bp
-		call	GrGetWinBounds
-EC <		ERROR_C JM_SEE_BACKTRACE		>
-		sub	cx, ax				;cx <- width
-		mov	ax, cx				;ax <- width
-		sub	dx, bx				;dx <- height
-		call	GrDestroyState
-
-		.leave
-		ret
-GetWinBounds		endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CTMakeDrawableAndResetSelection
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -979,21 +960,17 @@ CTMakeDrawableAndResetSelection		proc	near
 		class	VisTextClass
 		.enter
 	;
-	; Invalidate the text object, so that the entire thing is
-	; redrawn after loading a new page and scrolling to the top.
-	; There were cases where the bottom of the new page would be
-	; clipped, and this fixes that.
-	;
-		mov	ax, MSG_VIS_INVALIDATE
-		call	ObjCallInstanceNoLock
-	;
 	; Now make the text drawable.
 	;
 		mov	ax, MSG_VIS_SET_ATTRS
 		clr	cx
 		or	cl, mask VA_DRAWABLE
-		mov	dl, VUM_NOW
+		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 		call	ObjCallInstanceNoLock
+
+		mov	cl, mask VOF_IMAGE_INVALID
+		mov	dl, VUM_NOW
+		call	VisMarkInvalid
 
 	;
 	; Make sure the text knows it is hilited.  This is necessary because
@@ -1591,12 +1568,22 @@ REVISION HISTORY:
 CGVUpdateScrollbars	method dynamic ContentGenViewClass, 
 					MSG_CGV_UPDATE_SCROLLBARS
 
+		mov	ax, MSG_GEN_VIEW_GET_ATTRS
+		call	ObjCallInstanceNoLock_SaveBP 
+
+		mov	bh, 0
+		and	cx, mask GVA_SCALE_TO_FIT
+		jnz	noScrollbars
+		mov	bh, mask GVDA_SCROLLABLE
+noScrollbars:
+
 	;
 	; Get current dimension attrs.
 	;
 		mov	ax, MSG_GEN_VIEW_GET_DIMENSION_ATTRS
 		call	ObjCallInstanceNoLock_SaveBP 
-		mov	bx, cx				;bx = current dim attrs
+		xchg	bx, cx				;bx = current dim attrs
+							;ch = scroll flag
 	;
 	; Compare calc'd height with view's height.
 	;
@@ -1604,7 +1591,7 @@ CGVUpdateScrollbars	method dynamic ContentGenViewClass,
 		mov	ax, ss:[bp].USP_textHeight	;  vert scrollbar.
 		cmp	ax, ss:[bp].USP_viewHeight
 		jle	checkHorizontal
-		or	dl, mask GVDA_SCROLLABLE	;add vert scrollbar
+		or	dl, ch				;add vert scrollbar
 checkHorizontal:
 	;
 	; Compare calc'd width with view's width.
@@ -1613,7 +1600,7 @@ checkHorizontal:
 		mov	ax, ss:[bp].USP_viewWidth	;  horiz scrollbar.
 		cmp	ss:[bp].USP_textWidth, ax
 		jle	doUpdate
-		or	cl, mask GVDA_SCROLLABLE	;add horiz. scrollbar
+		or	cl, ch				;add horiz. scrollbar
 
 doUpdate:
 		mov	al, dl				;(copy)
@@ -1653,8 +1640,8 @@ setAttrs::
 	;
 		push	bp
 
-		mov	ax, MSG_CGV_IGNORE_UPDATE_SCROLLBARS
-		call	ObjCallInstanceNoLock
+		;mov	ax, MSG_CGV_IGNORE_UPDATE_SCROLLBARS
+		;call	ObjCallInstanceNoLock
 		
 		mov	ax, MSG_GEN_VIEW_SET_DIMENSION_ATTRS
 		mov	bp, VUM_NOW
@@ -1694,11 +1681,34 @@ REVISION HISTORY:
 CGVGetDocSize	method dynamic ContentGenViewClass, 
 					MSG_CGV_GET_DOC_SIZE
 	uses	bp
-	.enter
-	
-	mov	ax, MSG_VIS_GET_SIZE
-	call	ObjCallInstanceNoLock		;cx:dx has bounds
 
+visRect	local	RectDWord
+	.enter
+
+	mov	ax, MSG_GEN_VIEW_GET_ATTRS
+	call	ObjCallInstanceNoLock_SaveBP 
+
+	and	cx, mask GVA_SCALE_TO_FIT
+	jz	regular
+
+	mov	cx, CONTENT_GEN_VIEW_INITIAL_WIDTH
+	mov	dx, CONTENT_GEN_VIEW_INITIAL_HEIGHT
+	jmp	done
+
+regular:
+	;
+	; Get the rectangle (in document coordinates) that is visible to the
+	; user.
+	; 
+	mov	cx, ss
+	lea	dx, ss:[visRect]
+	mov	ax, MSG_GEN_VIEW_GET_VISIBLE_RECT
+	push	bp
+	call	ObjCallInstanceNoLock
+		
+	mov	cx, ss:[visRect].RD_right.low 
+	mov	dx, ss:[visRect].RD_bottom.low
+done:
 	.leave
 	ret
 CGVGetDocSize	endm

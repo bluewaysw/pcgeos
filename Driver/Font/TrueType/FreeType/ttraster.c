@@ -210,12 +210,12 @@ extern TEngine_Instance engineInstance;
   typedef void  Function_Sweep_Step( RAS_ARGS Short y );
 
 
-/* NOTE: These operations are only valid on 2's complement processors */
+#define PRECISION_BITS      10
+#define PRECISION_SHIFT     ( PRECISION_BITS - Pixel_Bits )
+#define PRECISION_HALF      ( PRECISION >> 1 )
+#define PRECISION           ( 1 << PRECISION_BITS )
 
-#define PRECISION_BITS  8
-#define PRECISION       ( 1 << PRECISION_BITS )
-#define PRECISION_HALF  ( PRECISION >> 1 )
-#define PRECISION_SHIFT ( PRECISION_BITS - Pixel_Bits )
+/* NOTE: These operations are only valid on 2's complement processors */
 
 #define FLOOR( x )    ( (x) & -PRECISION )
 #define CEILING( x )  ( ((x) + PRECISION - 1) & -PRECISION )
@@ -313,28 +313,6 @@ extern TEngine_Instance engineInstance;
 #define ras  (*raster)
 
 #endif /* TT_STATIC_RASTER */
-
-
-/************************************************************************/
-/*                                                                      */
-/* Function:    Set_Resolution                                          */
-/*                                                                      */
-/* Description: Sets precision variables according to param flag.       */
-/*                                                                      */
-/* Input:       High     set to True for high precision (typically for  */
-/*                       ppem < 18), false otherwise.                   */
-/*                                                                      */
-/************************************************************************/
-
-  static inline void _near  Set_Resolution( RAS_ARGS TT_UShort  y_ppem )
-  {
-    if ( y_ppem < 24 )
-      ras.precision_step   = 128;
-    else if ( y_ppem < 48 )
-      ras.precision_step   = 64;
-    else  
-      ras.precision_step   = 32;
-  }
 
 
 /****************************************************************************/
@@ -645,6 +623,7 @@ extern TEngine_Instance engineInstance;
 
     if ( y2 > maxy )
     {
+      /* x2 += FMulDiv( Dx, maxy - y2, Dy );  UNNECESSARY */
       e2  = TRUNC( maxy );
       f2  = 0;
     }
@@ -1415,7 +1394,7 @@ extern TEngine_Instance engineInstance;
 
     e1 = TRUNC( CEILING( x1 ) );
 
-    if ( x2-x1- PRECISION <= 1 )
+    if ( x2-x1-PRECISION <= 1 )
       e2 = e1;
     else
       e2 = TRUNC( FLOOR( x2 ) );
@@ -1904,7 +1883,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 > e2 )
     {
-      if ( e1 == e2 + ras.precision )
+      if ( e1 == e2 + PRECISION )
       {
         switch ( ras.dropOutControl )
         {
@@ -1949,7 +1928,7 @@ extern TEngine_Instance engineInstance;
 
     if ( e1 >= 0 )
     {
-      if ( x2 - x1 >= ras.precision_half )
+      if ( x2 - x1 >= PRECISION_HALF )
         color = ras.grays[2];
       else
         color = ras.grays[1];
@@ -2121,7 +2100,7 @@ extern TEngine_Instance engineInstance;
             e2 = CEILING( x2 );
 
             if ( ras.dropOutControl != 0 &&
-                 (e1 > e2 || e2 == e1 + PRECISION ) ) 
+                 (e1 > e2 || e2 == e1 + PRECISION) )
             {
               /* a drop out was detected */
 
@@ -2248,12 +2227,12 @@ Scan_DropOuts :
     Int    band_top = 0;
 
 
-    ras.top = MemDeref( ras.buffer );
-
     while ( band_top >= 0 )
     {
       ras.maxY = (Long)ras.band_stack[band_top].y_max * PRECISION;
       ras.minY = (Long)ras.band_stack[band_top].y_min * PRECISION;
+
+      ras.top = MemDeref( ras.buffer );
 
       ras.error = Raster_Err_None;
 
@@ -2304,7 +2283,7 @@ Scan_DropOuts :
     ras.nContours = glyph->n_contours;
     ras.coords    = glyph->points;
 
-    Set_Resolution( RAS_VARS glyph->y_ppem );
+    ras.precision_step = glyph->y_ppem < 24 ? 128 : 32;
     ras.dropOutControl = glyph->dropout_mode;
   }
 

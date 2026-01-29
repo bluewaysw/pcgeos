@@ -77,8 +77,8 @@ library	gopher
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
+resource AppResource ui-object
+resource Interface ui-object
 
 export	GserverThreadClass
 export	GserverTextClass

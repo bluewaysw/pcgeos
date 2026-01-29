@@ -208,14 +208,14 @@ VidSetDevice	proc	far
 		uses	bx, cx, ds, bp, si, ds, es
 		.enter
 		EnumerateDevice VideoDevices	; parse the passed string
-		jc	done
+		jc	notFound
 		call	MemUnlock		; unlock info resource
 		mov	ax, dgroup
 		mov	ds, ax
 		mov	ds:[DriverTable].VDI_device, di	; save it
 
 		; do any device-specific initialization
-
+alreadySet:
 		call	cs:[vidSetRoutines][di]
 		
 		; now that device-specific initialization is out of the way,
@@ -229,7 +229,15 @@ VidSetDevice	proc	far
 done:
 		.leave
 		ret
-VidSetDevice	endp
+notFound:	
+		mov	ax, dgroup
+		mov	ds, ax
+		mov	di, ds:[DriverTable].VDI_device
+		cmp	di, 0xFFFF
+		jne	alreadySet
+		jmp	done
+		
+		endp
 
 idata	segment
 VidSetPtrFar	proc	far
