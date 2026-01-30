@@ -82,7 +82,7 @@ extern TEngine_Instance engineInstance;
 
 /* Upper limit for caching rendered glyphs in the persistent   */
 /* TTF cache (point size in 16.16 fixed-point format).         */
-#define MAX_CACHED_POINTSIZE                ( 180 << 16 )
+#define MAX_CACHED_POINTSIZE                ( 180L << 16 )
 
 #define MIN_OS2_TABLE_VERSION               2
 
