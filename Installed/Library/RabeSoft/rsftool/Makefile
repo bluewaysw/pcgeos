@@ -11,7 +11,7 @@ UI              = toolui.goc toolui.goh
 UI_TO_RDFS      =
 OBJS            = dialogclass.obj filebuf.obj fselsup.obj ftmodi.obj\
                   ftpath.obj rsftool.obj rsftool2.obj toolui.obj
-COMMON          = rsftool.goh
+COMMON          =
 MODULES         =
 CMODULES        = Main UI
 SRCS            = $(MAIN) $(UI) $(COMMON)

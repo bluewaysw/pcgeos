@@ -9,7 +9,7 @@ CODE            = access.goc bmptools.goc disptool.goc mask.goc\
 UI_TO_RDFS      =
 OBJS            = access.obj bmptools.obj disptool.obj mask.obj\
                   moretool.obj transform.obj
-COMMON          = bmptools.goh
+COMMON          =
 MODULES         =
 CMODULES        = Code
 SRCS            = $(CODE) $(COMMON)
