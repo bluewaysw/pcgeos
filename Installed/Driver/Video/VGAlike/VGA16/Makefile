@@ -4,8 +4,6 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = vga16
-LIBNAME         = video
-PROTOCONST      = VIDEO
 ASM_TO_OBJS     = vga16Manager.asm
 UI_TO_RDFS      =
 SRCS            = vga16Admin.asm vga16Chars.asm vga16DevInfo.asm\
@@ -22,8 +20,8 @@ SRCS            = vga16Admin.asm vga16Chars.asm vga16DevInfo.asm\
                   vga16Macro.def vga16Variable.def
 OBJS            = vga16Manager.obj
 LOBJS           =
-
-PRODUCTS        = WIN32DBCS 
+LIBNAME         = video
+PROTOCONST      = VIDEO
 
 SYSMAKEFILE     = geode.mk
 
@@ -38,8 +36,4 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
-#endif
-
-#if exists(WIN32DBCS/$(DEPFILE))
-#include "WIN32DBCS/$(DEPFILE)"
 #endif
