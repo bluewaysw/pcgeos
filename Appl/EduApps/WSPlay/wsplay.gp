@@ -22,9 +22,6 @@ resource DocGroupResource object
 resource StringsResource data object
 resource LOGORESOURCE data object
 
-# platform
-platform geos201
-
 library geos
 library ui
 library ansic
