@@ -35,7 +35,7 @@ typedef struct {
 /* The TokenMonikerInfo structure is used by apps which call
    TokenLookupMoniker, store the information returned, and later use
    it to call TokenLockTokenMoniker.
-*/ 
+*/
 typedef struct {
     TokenDBItem         TMI_moniker;
     word                TMI_fileFlag;           /* 0 if token is in shared
@@ -44,14 +44,14 @@ typedef struct {
 						 */
 } TokenMonikerInfo;
 
-/* The TokenRangeFlags are used with TokenListTokens to describe the 
+/* The TokenRangeFlags are used with TokenListTokens to describe the
    range of tokens the caller would like to get.
 */
 typedef WordFlags TokenRangeFlags;
 #define TRF_ONLY_GSTRING	0x8000
 #define TRF_ONLY_PASSED_MANUFID	0x4000
 #define TRF_UNUSED		0x3fff
-    
+
 /* TokenOpenLocalTokenDB will return 0 on success or a VMStatus error
    code if it could not open an existing local token database. It will
    not create a new local token database; see TokenDefineToken.
@@ -93,7 +93,7 @@ extern Boolean
 			  word *blockSize,
 			  MemHandle *blockHandle);
 
-extern Boolean 
+extern Boolean
     _pascal TokenLoadMonikerChunk(dword tokenChars,
 			  ManufacturerID manufacturerID,
 			  DisplayType displayType,
@@ -102,7 +102,7 @@ extern Boolean
 			  word *chunkSize,
 			  ChunkHandle *chunkHandle);
 
-extern Boolean 
+extern Boolean
     _pascal TokenLoadMonikerBuffer(dword tokenChars,
 			   ManufacturerID manufacturerID,
 			   DisplayType displayType,
@@ -117,20 +117,20 @@ extern Boolean /*XXX*/
 extern void /*XXX*/
     _pascal TokenGetTokenStats(dword tokenChars, ManufacturerID manufacturerID);
 
-extern Boolean 
+extern Boolean
     _pascal TokenLoadTokenBlock(dword tokenChars,
 			ManufacturerID manufacturerID,
 			word *blockSize,
 			MemHandle *blockHandle);
 
-extern Boolean 
+extern Boolean
     _pascal TokenLoadTokenChunk(dword tokenChars,
 			ManufacturerID manufacturerID,
 			MemHandle lmemBlock,
 			word *chunkSize,
 			ChunkHandle *chunkHandle);
 
-extern Boolean 
+extern Boolean
     _pascal TokenLoadTokenBuffer(dword tokenChars,
 			 ManufacturerID manufacturerID,
 			 TokenEntry *buffer);
@@ -169,6 +169,13 @@ extern dword /*XXX*/
 #define TOKEN_CHARS(A, B, C, D) \
     (((dword)(A)) | (((dword)(B)) << 8) | (((dword)(C)) << 16) | (((dword)(D)) << 24))
 
+/*
+ * Advanced information about icons in a token
+ */
+extern int _export _pascal TokenTestIcon(int testVal);
+extern int _export _pascal TokenListIcons(int testVal);
+
+
 #ifdef __HIGHC__
 pragma Alias(TokenOpenLocalTokenDB, "TOKENOPENLOCALTOKENDB");
 pragma Alias(TokenCloseLocalTokenDB, "TOKENCLOSELOCALTOKENDB");
@@ -186,6 +193,9 @@ pragma Alias(TokenLoadTokenBuffer, "TOKENLOADTOKENBUFFER");
 pragma Alias(TokenLockTokenMoniker, "TOKENLOCKTOKENMONIKER");
 pragma Alias(TokenUnlockTokenMoniker, "TOKENUNLOCKTOKENMONIKER");
 pragma Alias(TokenListTokens, "TOKENLISTTOKENS");
+
+pragma Alias(TokenTestIcon, "TOKENTESTICON");
+pragma Alias(TokenListIcons, "TOKENLISTICONS");
 #endif
 
 #endif
