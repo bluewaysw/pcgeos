@@ -881,7 +881,7 @@ EC <		call	ECCheckSocketLow				>
 EC <		cmp	ds:[di].SI_state, ISS_CONNECTED			>
 EC <		ERROR_NE UNEXPECTED_SOCKET_STATE			>
 EC <		test	ds:[di].SI_flags, mask SF_RECV_ENABLE		>
-EC <		WARNING_Z REDUNDENT_CLOSE				>
+EC <		WARNING_Z REDUNDANT_CLOSE				>
 		and	ds:[di].SI_flags, not mask SF_RECV_ENABLE
 	;
 	; wake up anyone waiting for data or closure
