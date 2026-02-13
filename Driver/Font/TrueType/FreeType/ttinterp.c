@@ -217,41 +217,19 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        ; store sign of result
+        ; signed multiplication
         mov     eax, a
-        xor     eax, b
-        mov     esi, eax         ; esi = sign of result
+        imul    b
 
-        ; calculate |a|
-        mov     eax, a
-        cdq                      ; sign extend eax into edx
-        xor     eax, edx
-        sub     eax, edx
-        mov     ebx, eax         ; ebx = |a|
-
-        ; calculate |b|
-        mov     eax, b
-        cdq
-        xor     eax, edx
-        sub     eax, edx         ; eax = |b|
-
-        ; multiply |a| * |b|
-        mul     ebx              ; edx:eax = |a| * |b|
-
-        ; add 0x8000 (rounding factor)
+        ; rounding
         add     eax, 0x8000
-        adc     edx, 0           ; edx:eax += 0x8000
+        adc     edx, 0
 
-        ; divide by 0x10000 (shift right by 16)
+        ; fixed point scaling
         shrd    eax, edx, 16
-        shr     edx, 16          ; edx:eax >>= 16
 
-        ; apply sign using NEG if necessary
-        test    esi, 0x80000000  ; test the sign bit
-        jz      positive
-        neg     eax
-    positive:
-        mov     edx, eax         ; store result in dx:ax
+        ; return value alignment
+        mov     edx, eax 
         shr     edx, 16
     }
   #else
