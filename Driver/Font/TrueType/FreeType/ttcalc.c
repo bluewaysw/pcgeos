@@ -389,25 +389,25 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     esi, x                ; Load address of x into esi
-        mov     eax, [esi]            ; Load lower 32 bits of x into eax
-        mov     edx, [esi+4]          ; Load upper 32 bits of x into edx
-        mov     ebx, y                ; Load y into ebx
-        test    ebx, ebx              ; Check if y is zero
-        jz      divide_by_zero        ; Jump to divide_by_zero if y is zero
-        idiv    ebx                   ; Signed divide EDX:EAX by EBX
-        jmp     done                  ; Jump to done after division
+        mov     ecx, y                ; load divisor
+        test    ecx, ecx              ; check for zero
+        jz      overflow
 
-    divide_by_zero:
-        test    edx, edx              ; Check sign of dividend (upper 32 bits of x)
-        js      negative_dividend     ; Jump if dividend is negative
-        mov     eax, 0x7FFFFFFF       ; Load maximum positive 32-bit value
+        mov     esi, x                ; pointer to x
+        mov     eax, [esi]            ; low 32 bits
+        mov     edx, [esi+4]          ; high 32 bits
+        
+        idiv    ecx                   ; result in EAX
         jmp     done
-    negative_dividend:
-        mov     eax, 0x80000000       ; Load minimum negative 32-bit value
+
+    overflow:
+        mov     eax, [esi+4]          ; sign of dividend
+        sar     eax, 31               ; 0xFFFFFFFF if neg, 0 if pos
+        mov     edx, eax              ; temp storage
+        xor     eax, 0x7FFFFFFF       ; flip bits: 0x7FFFFFFF (pos) or 0x80000000 (neg)
 
     done:
-        mov     edx, eax              ; Store result in dx:ax
+        mov     edx, eax              ; store result in dx:ax
         shr     edx, 16
     }
   #else
