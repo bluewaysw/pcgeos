@@ -2602,7 +2602,7 @@ link::
 	; if the link is gone, clean up and exit
 	;
 abort:
-EC <		WARNING	REDUNDENT_CLOSE					>
+EC <		WARNING	REDUNDANT_CLOSE					>
 		add	sp, size PacketInfo
 		jmp	done
 	;

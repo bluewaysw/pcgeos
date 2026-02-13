@@ -448,16 +448,16 @@ EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstC
 void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         TT_Kerning        kerningDir;
-        word              table;
+        TT_UShort         table;
         TT_Kern_0_Pair*   pairs;
         LookupEntry*      indices;
         word              kernCount = 0;
-        
 
+        
         KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
         BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
-
-
+        
+EC(     ECCheckBounds( (void*)trueTypeVars) );
 EC(     ECCheckBounds( (void*)kernPair ) );
 EC(     ECCheckBounds( (void*)kernValue ) );
 
@@ -469,6 +469,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
                 return;
 
         /* get pointer to lookup table */
+EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
         indices = GEO_LOCK( LOOKUP_TABLE );
 EC(     ECCheckBounds( indices ) );
 
@@ -509,7 +510,6 @@ EC(             ECCheckBounds( pairs ) );
 
                                 ++kernPair;
                                 ++kernValue;
-
                                 ++kernCount;
                         }
                 }

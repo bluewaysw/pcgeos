@@ -1076,12 +1076,12 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
  * 
  * RETURNS:        char
  *                    The character to be used as the default. Returns 
- *                    DEFAULT_DEFAULT_CHAR if it exists in the font, 
+ *                    DEFAULT_CHAR if it exists in the font, 
  *                    otherwise returns firstChar.
  * 
- * STRATEGY:       - Check if the default character (DEFAULT_DEFAULT_CHAR) 
+ * STRATEGY:       - Check if the default character (DEFAULT_CHAR) 
  *                   is present in the font's character map.
- *                 - If it exists, return DEFAULT_DEFAULT_CHAR.
+ *                 - If it exists, return DEFAULT_CHAR.
  *                 - Otherwise, return the provided firstChar as the fallback.
  * 
  * REVISION HISTORY:
@@ -1092,10 +1092,10 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
 static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
 {
-        if ( !TT_Char_Index( CHAR_MAP, GeosCharToUnicode( DEFAULT_DEFAULT_CHAR ) ) )
+        if ( !TT_Char_Index( CHAR_MAP, GeosCharToUnicode( DEFAULT_CHAR ) ) )
                 return firstChar;  
 
-        return DEFAULT_DEFAULT_CHAR; 
+        return DEFAULT_CHAR; 
 }
 
 

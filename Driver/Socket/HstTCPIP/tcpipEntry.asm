@@ -440,18 +440,21 @@ closeLoop:
 	;		
 		push	ax, dx
 
+		mov	cx, SCT_HALF	; cx = SocketCloseType
+		cmp	bx, 0
+		je	useHalf
+		mov	cx, SCT_FULL
+useHalf:
 		mov	bx, handle dgroup
 		call	MemDerefES
-
 		mov	ax, si		; ax = connection
-		mov	cx, SCT_HALF	; cx = SocketCloseType
 
 		push	es
 		mov	di, SCO_CONNECTION_CLOSED
 		movdw	bxdx, es:[clients].TCI_data.CI_entry	
 		pushdw	bxdx
 		mov	bx, es:[clients].TCI_data.CI_domain
-		mov	dx, 11
+		mov	dx, 0
 		call	PROCCALLFIXEDORMOVABLE_PASCAL
 	
 		pop	es
@@ -625,9 +628,8 @@ TcpipInit	proc	far
 	;
 		mov	ax, HIF_API_SOCKET
 		call	HostIfDetect
-		cmp	ax, 0
-		je	straightError
-
+		cmp	ax, REQUIRED_HOSTIF_SOCKET_API
+		jb	straightError		; branch, if no compatible host found
 	;
 	; Create the input queue.
 	;
@@ -1291,6 +1293,7 @@ EC <		call	ECCheckIPAddr				>
 	; calling us back for anything.
 	;
 ok:
+		push	bx
 		mov	ax, bx
 		mov	bx, handle dgroup
 		call	MemDerefES
@@ -1298,6 +1301,11 @@ ok:
 		mov	bx, es:[clients].TCI_data.CI_domain
 		mov	di, SCO_CONNECT_CONFIRMED
 		call	PROCCALLFIXEDORMOVABLE_PASCAL
+		pop	bx
+
+		mov	si, bx
+		mov	ax, HIF_NC_CONNECTED
+		call	HostIfCall
 
 		clc
 		jmp	exit	
@@ -1462,38 +1470,56 @@ TcpipDisconnectRequest	proc	far
 
 		.enter
 
-		push	bx
-		
-		push	bp
-		mov	si, bx
-		mov	ax, HIF_NC_DISCONNECT		; async disconnect
-		call	HostIfCall
-		pop	bp		
-		pop	bx
-		
+		mov	cx, bx
+		mov	dx, ax
+
+		; word connection = cx
+		; SocketCloseType closeType = dx
+		mov	ax, MSG_TCPIP_CLOSE_CONNECTION_ASM
+
+		segmov	ds, dgroup
+		mov	bx, ds:[driverThread]
+
+		mov	di, mask MF_CALL
+		call	ObjMessage
+
 		cmp	ax, 0
 		jz	done
-		stc
-		jc	exit
-
-done:
-		mov	ax, bx
-		mov	di, SCO_CONNECTION_CLOSED
-
-		mov	bx, handle dgroup
-		call	MemDerefDS
-
-		mov	bx, ds:[clients].TCI_data.CI_domain
-		mov	dx, 0
-		pushdw	ds:[clients].TCI_data.CI_entry
-		call	PROCCALLFIXEDORMOVABLE_PASCAL
-		clc					
-exit:		
+		stc		; some error occured
+done:	
 		.leave
 		ret
 
 TcpipDisconnectRequest	endp
 
+	SetGeosConvention
+
+TCPIPDISCONNECT	proc	far	connection:word,
+				closeType:SocketCloseType
+
+			uses	di, si, ds
+		.enter
+
+		mov	ax, closeType
+		mov	si, connection
+
+		push	bp
+		mov	bx, 0
+		cmp	ax, SCT_HALF
+		je	doHalf
+		mov	bx, 0xFFFF
+doHalf:
+		mov	ax, HIF_NC_DISCONNECT		; async disconnect
+		call	HostIfCall
+		pop	bp		
+		
+		; ax result code
+		.leave
+		ret
+
+TCPIPDISCONNECT	endp
+
+	SetDefaultConvention
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

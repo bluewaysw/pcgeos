@@ -361,7 +361,7 @@
 
     Long         file_offset;
 
-    TT_Big_Glyph_Metrics  metrics;
+    TT_Glyph_Metrics  metrics;
 
     TGlyph_Zone  zone;
 
@@ -716,9 +716,9 @@
 
   struct TGlyph_
   {
-    PFace                 face;
-    TT_Big_Glyph_Metrics  metrics;
-    TT_Outline            outline;
+    PFace             face;
+    TT_Glyph_Metrics  metrics;
+    TT_Outline        outline;
   };
 
 

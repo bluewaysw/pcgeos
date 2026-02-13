@@ -230,6 +230,11 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
 
         /* cleanup */
         MemUnlock( bitmapHandle );
+
+        /* Only cache glyphs up to MAX_CACHED_POINTSIZE (currently 180pt).     */
+        /* Larger point sizes generate large glyph data while typically having */
+        /* a very low cache hit rate, making persistent caching inefficient.   */
+        if( pointSize <= MAX_CACHED_POINTSIZE )
         {
             TrueTypeCacheBufSpec   bufSpec;
 
@@ -238,7 +243,7 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
             bufSpec.TTCBS_weight = weight;
             bufSpec.TTCBS_stylesToImplement = stylesToImplement;
 
-            if( !(fontBuf->FB_flags & FBF_IS_COMPLEX) ) {
+            if( !( fontBuf->FB_flags & FBF_IS_COMPLEX ) ) {
                 TrueType_Cache_UpdateFontBlock(
                     trueTypeVars->cacheFile,
                     trueTypeVars->entry.TTOE_fontFileName, 

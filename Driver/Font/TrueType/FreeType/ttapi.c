@@ -713,10 +713,7 @@ extern TEngine_Instance engineInstance;
     if ( !_glyph )
       return TT_Err_Invalid_Glyph_Handle;
 
-    metrics->bbox     = _glyph->metrics.bbox;
-    metrics->bearingX = _glyph->metrics.horiBearingX;
-    metrics->bearingY = _glyph->metrics.horiBearingY;
-    metrics->advance  = _glyph->metrics.horiAdvance;
+    *metrics = _glyph->metrics;
 
     return TT_Err_Ok;
   }

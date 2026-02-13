@@ -37,8 +37,6 @@ heapspace 12k
 stack 14000
 #
 
-platform geos201
-
 # Libraries:
 library	geos
 library	ui
@@ -49,10 +47,6 @@ library spool
 library basicdb
 library gridlib
 library treplib
-
-exempt basicdb
-exempt gridlib
-exempt treplib
 
 # Resources:
 resource AppResource ui-object

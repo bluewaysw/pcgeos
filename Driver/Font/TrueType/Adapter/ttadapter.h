@@ -59,8 +59,8 @@ extern TEngine_Instance engineInstance;
 
 
 #define MAX_BITMAP_SIZE		                125
-#define MAX_FONTBUF_SIZE                    10 * 1024
-#define INITIAL_BITMAP_BLOCKSIZE            2 * 1024
+#define MAX_FONTBUF_SIZE                    ( 10 * 1024 )
+#define INITIAL_BITMAP_BLOCKSIZE            ( 2 * 1024 )
 #define REGION_SAFETY                       400
 
 #define FAMILY_NAME_LENGTH                  20
@@ -79,6 +79,10 @@ extern TEngine_Instance engineInstance;
 /* Fonts containing glyphs that exceed this limit are not      */
 /* registered by kernel and are unavailable in font selection. */
 #define MAX_NUM_OUTLINE_POINTS              750
+
+/* Upper limit for caching rendered glyphs in the persistent   */
+/* TTF cache (point size in 16.16 fixed-point format).         */
+#define MAX_CACHED_POINTSIZE                ( 180L << 16 )
 
 #define MIN_OS2_TABLE_VERSION               2
 
