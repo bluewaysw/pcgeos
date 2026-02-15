@@ -108,8 +108,7 @@ CC_IMPSRC = $(.IMPSRC:S/\//\\/g)
 	$(CC) -D_LINUX -bt=linux $(CFLAGS) \
 									 "$(CC_IMPSRC)" \
 									 -i="$(WATCOM)/lh" \
-									 -i="$(WATCOM)/h" \
-									 -d_WCI86FAR=__far
+									 -i="$(WATCOM)/h"
 
 #CC		= wcc386 -zq -zlf -ei
 CC		= wcc386 -zq -zlf -ei -d9 

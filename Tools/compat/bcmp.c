@@ -59,7 +59,7 @@ static char rcsid[] = "$Id$";
  *
  ***********************************************************************/
 int
-bcmp(genptr p1, genptr p2, unsigned len)
+bcmp(genptrparam p1, genptrparam p2, unsigned len)
 {
     return _compare(p1, p2, len);
 }
@@ -70,7 +70,7 @@ bcmp(genptr p1, genptr p2, unsigned len)
  * bcmp -- vax cmpc3 instruction
  */
 int
-bcmp(genptr b1, genptr b2, unsigned length)
+bcmp(genptrparam b1, genptrparam b2, unsigned length)
 {
 	register char *p1, *p2;
 

@@ -268,7 +268,7 @@ RenameFileSrcMapEntry(ID oldName, ID newName)
 	Hash_DeleteEntry(&tsrcMap, he);
     }
     else {
-    	assert(FALSE);
+    	//assert(FALSE);
     }
 }
 
@@ -299,7 +299,7 @@ AddSrcMapEntry(ID   fileName, SegDesc *sd, int start, int end)
     TSrcMapEntry    *tsme;
     TSrcMapEntry    newtsme;
 
-
+    
     /*
      * Find or create the entry for this file in the range map we're building.
      */

@@ -24,7 +24,7 @@
 ###############################################################################
 
 TYPE		= library
-CFLAGS		+= -g
+#CFLAGS		+= -g
 
 sun3OBJS	:= $(sun3OBJS:N*test*.o)
 isiOBJS		:= $(isiOBJS:N*test*.o)

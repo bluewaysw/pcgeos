@@ -63,7 +63,7 @@ static char rcsid[] =
  *
  ***********************************************************************/
 void
-bcopy(genptr src, genptr dst, unsigned len)
+bcopy(genptrparam src, genptrparam dst, unsigned len)
 {
     if (src + len > dst && src < dst) {
 	_move_right(src, dst, len);
@@ -91,7 +91,7 @@ typedef	int word;		/* "word" used for optimal copy speed */
  * (the portable versions of) bcopy, memcpy, and memmove.
  */
 void
-bcopy(genptr src0, genptr dst0, unsigned length)
+bcopy(genptrparam src0, genptrparam dst0, unsigned length)
 {
 	register char *dst = (char *) dst0;
 	register const char *src = src0;

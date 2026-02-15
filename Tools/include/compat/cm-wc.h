@@ -44,9 +44,9 @@
 //#include <io.h>
 
 #define HAVE_DIRENT
-#define HAVE_BCMP
-#define HAVE_BCOPY
-#define HAVE_BZERO
+//#define HAVE_BCMP
+//#define HAVE_BCOPY
+//#define HAVE_BZERO
 #define HAVE_ISINF
 #define HAVE_MKTEMP
 
