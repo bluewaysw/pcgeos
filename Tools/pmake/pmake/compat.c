@@ -897,3 +897,9 @@ Compat_Run(Lst targs)
 	Lst_ForEach(ENDNode->commands, CompatRunCommand, (ClientData)gn);
     }
 }
+
+void
+compat_bzero(void *dst, unsigned len)
+{
+    memset(dst, 0, len);
+}
