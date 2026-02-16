@@ -60,8 +60,9 @@
 #define LABEL_IN_STRUCT
 
 /* Borland doesn't allow arithmetic on void *. */
-typedef const char *genptr;
-typedef const void *genptrparam ;
+typedef char *genptr;
+typedef void *genptrparam ;
+typedef const void *genptrparamconst ;
 
 /* Borland doesn't support the inline keyword in any obvious way. */
 #define inline

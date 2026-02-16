@@ -40,10 +40,10 @@
   *
   ***********************************************************************/
 
- #ifndef HAVE_BZERO
- #define HAVE_BZERO
- #define bzero(b, length) ((void) memset((void *) (b), 0, (length)))
- #endif
+// #ifndef HAVE_BZERO
+// #define HAVE_BZERO
+// #define bzero(b, length) ((void) memset((void *) (b), 0, (length)))
+// #endif
 
  #define HAVE_TIMELOCAL
  #define timelocal mktime

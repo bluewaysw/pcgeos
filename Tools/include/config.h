@@ -123,11 +123,11 @@
 
 #if defined(unix) || defined(_LINUX)
 
-#define HAVE_BCMP
+//#define HAVE_BCMP
 
-#define HAVE_BCOPY
+//#define HAVE_BCOPY
 
-#define HAVE_BZERO
+//#define HAVE_BZERO
 
 #define HAVE_DIRENT /* opendir, readdir, rewinddir, closedir  */
 
@@ -282,15 +282,21 @@
  ***********************************************************************/
 
 #ifndef HAVE_BCMP
-extern int bcmp(genptrparam b1, genptrparam b2, unsigned len);
+extern int compat_bcmp(genptrparamconst  b1, genptrparamconst b2, unsigned len);
+#define bcmp(b1, b2, length) compat_bcmp(b1, b2, length)
+//#define bcmp comapat_bcmp
 #endif
 
 #ifndef HAVE_BCOPY
-extern void bcopy(genptrparam src0, genptrparam dst0, unsigned length);
+extern void compat_bcopy(genptrparamconst src0, genptrparam dst0, unsigned length);
+#define bcopy(src, dest, length) compat_bcopy(src, dest, length)
+//#define bcopy comapat_bcopy
 #endif
 
 #ifndef HAVE_BZERO
-extern void bzero(void *dst, unsigned len);
+extern void comapat_bzero(void *dst, unsigned len);
+#define bzero(b, length) compat_bzero(b, length)
+//#define bzero comapat_bzero
 #endif
 
 #ifndef HAVE_DIRENT

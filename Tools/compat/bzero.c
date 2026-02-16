@@ -44,13 +44,20 @@ DESCRIPTION:
  *
  ***********************************************************************/
 void
-bzero(void *dst, unsigned len)
+compat_bzero(void *dst, unsigned len)
 {
     genptr dst0 = (genptr) dst;
 
     _fill_char(dst0, len, 0);
 }
 
+#else
+
+void
+compat_bzero(void *dst, unsigned len)
+{
+    memset(dst, 0, len);
+}
 #endif /* __HIGHC__ */
 
 #endif /* !HAVE_BZERO */
