@@ -67,8 +67,8 @@
 #define LABEL_IN_STRUCT 0
 
 /* MSC doesn't allow arithmetic on void *. */
-typedef char *genptr;
-typedef void *genptrparam ;
+typedef const char *genptr;
+typedef const void *genptrparam ;
 
 /* microsoft supports _inline */
 #define inline _inline
