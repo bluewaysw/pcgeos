@@ -299,9 +299,7 @@ MainParseArgs (int argc, char** argv)
 
     optind = initOptInd;
 
-printf("BBB2\n");
     while((char)(c = getopt(argc, argv, OPTSTR)) != (char)-1) {
-printf("BBB3\n");
 	switch(c) {
 	    case 'B':
 		backwards = oldVars = TRUE;
@@ -504,7 +502,6 @@ printf("BBB3\n");
     if (backwards) {
 	oldVars = TRUE;
     }
-printf("BBB\n");
     /*
      * See if the rest of the arguments are variable assignments and perform
      * them if so. Else take them to be targets and stuff them on the end

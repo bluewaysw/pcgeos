@@ -18,6 +18,7 @@
  */
 #include <config.h>
 
+#if 0
 #ifndef unix
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -116,4 +117,5 @@ getopt2(int nargc, char **nargv, char *ostr)
 }
 
 
+#endif
 #endif
