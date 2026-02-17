@@ -14,6 +14,7 @@
  */
 #include <config.h>
 
+#if 0
 #ifndef lint
 static char rcsid[] = "$Id: strtol.c,v 1.2 96/06/24 15:04:34 tbradley Exp $ SPRITE (Berkeley)";
 #endif not lint
@@ -89,3 +90,4 @@ strtol(
     }
     return result;
 }
+#endif
