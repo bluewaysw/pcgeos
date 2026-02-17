@@ -294,7 +294,7 @@ extern void compat_bcopy(genptrparamconst src0, genptrparam dst0, unsigned lengt
 #endif
 
 #ifndef HAVE_BZERO
-extern void comapat_bzero(void *dst, unsigned len);
+extern void compat_bzero(void *dst, unsigned len);
 #define bzero(b, length) compat_bzero(b, length)
 //#define bzero comapat_bzero
 #endif
