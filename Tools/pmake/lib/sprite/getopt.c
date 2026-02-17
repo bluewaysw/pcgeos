@@ -46,12 +46,12 @@ char	*optarg;		/* argument associated with option */
 #define strrchr(str,char) strrchr(str,char)
 #endif
 
-getopt(int nargc, char **nargv, char *ostr)
+char
+getopt2(int nargc, char **nargv, char *ostr)
 {
 	static char *place = EMSG;		/* option letter processing */
 	register char *oli;			/* option letter list index */
 	char *p;
-
 	if (!*place) {				/* update scanning pointer */
 	    	if (optind >= nargc || 
 		     ((*(nargv[optind]) != '-') &&

@@ -60,6 +60,7 @@ extern time_t time(time_t *tm);
 
 #elif defined(__WATCOMC__)
 #	include    <signal.h>
+_WCRTLINK extern int getopt(int __argc, char* const __argv[], const char* __optstring);
 
 extern time_t time(time_t *tm);
 
@@ -298,7 +299,9 @@ MainParseArgs (int argc, char** argv)
 
     optind = initOptInd;
 
+printf("BBB2\n");
     while((char)(c = getopt(argc, argv, OPTSTR)) != (char)-1) {
+printf("BBB3\n");
 	switch(c) {
 	    case 'B':
 		backwards = oldVars = TRUE;
@@ -501,7 +504,7 @@ MainParseArgs (int argc, char** argv)
     if (backwards) {
 	oldVars = TRUE;
     }
-
+printf("BBB\n");
     /*
      * See if the rest of the arguments are variable assignments and perform
      * them if so. Else take them to be targets and stuff them on the end
@@ -658,12 +661,13 @@ main (int argc, char** argv)
 	/* printf("cwd = %s\n", GetCwd(tempcwd, MAX_PATH)); */
     }
 #endif
-
+printf("AAA\n");
     /*
      * See what the user calls us. If s/he calls us (yuck) "make", then
      * act like it. Otherwise act like our normal, cheerful self.
      */
     cp = Var_LastPathSep(argv[0]);
+printf("AAA2\n");
     if (cp != NULL) {
 	cp += 1;
     } else {
@@ -699,6 +703,7 @@ main (int argc, char** argv)
 #endif
     }
 
+printf("AAA3\n");
     /*
      * Initialize the parsing, directory and variable modules to prepare
      * for the reading of inclusion paths and variable settings on the
@@ -710,6 +715,7 @@ main (int argc, char** argv)
 				 * directories */
     Var_Init ();		/* As well as the lists of variables for
 				 * parsing arguments */
+printf("AAA4\n");
 
     /*
      * Initialize various variables.
@@ -731,6 +737,7 @@ main (int argc, char** argv)
      * (Note this is *not* MAKEFLAGS since /bin/make uses that and it's in
      * a different format).
      */
+printf("AAA5\n");
 #if defined(POSIX)
     Main_ParseArgLine(getenv("MAKEFLAGS"));
 #elif defined(unix)
@@ -752,8 +759,10 @@ main (int argc, char** argv)
     Main_ParseArgLine(pmakevar);
 }
 #endif
+printf("AAA6\n");
 
     MainParseArgs (argc, argv);
+printf("AAA7\n");
 
 #if defined(unix)
     /*
@@ -816,6 +825,7 @@ main (int argc, char** argv)
 
 #endif /* def unix */
 
+printf("AAA8\n");
     /*
      * Initialize archive, target and suffix modules in preparation for
      * parsing the makefile(s)
