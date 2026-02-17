@@ -62,7 +62,7 @@ extern time_t time(time_t *tm);
 #	include    <signal.h>
 _WCRTLINK extern int getopt(int __argc, char* const __argv[], const char* __optstring);
 
-extern time_t time(time_t *tm);
+//extern time_t time(time_t *tm);
 
 #elif defined(__HIGHC__)
 #	include	   <malloc.h>
@@ -661,13 +661,11 @@ main (int argc, char** argv)
 	/* printf("cwd = %s\n", GetCwd(tempcwd, MAX_PATH)); */
     }
 #endif
-printf("AAA\n");
     /*
      * See what the user calls us. If s/he calls us (yuck) "make", then
      * act like it. Otherwise act like our normal, cheerful self.
      */
     cp = Var_LastPathSep(argv[0]);
-printf("AAA2\n");
     if (cp != NULL) {
 	cp += 1;
     } else {
@@ -703,7 +701,6 @@ printf("AAA2\n");
 #endif
     }
 
-printf("AAA3\n");
     /*
      * Initialize the parsing, directory and variable modules to prepare
      * for the reading of inclusion paths and variable settings on the
@@ -715,7 +712,6 @@ printf("AAA3\n");
 				 * directories */
     Var_Init ();		/* As well as the lists of variables for
 				 * parsing arguments */
-printf("AAA4\n");
 
     /*
      * Initialize various variables.
@@ -737,7 +733,6 @@ printf("AAA4\n");
      * (Note this is *not* MAKEFLAGS since /bin/make uses that and it's in
      * a different format).
      */
-printf("AAA5\n");
 #if defined(POSIX)
     Main_ParseArgLine(getenv("MAKEFLAGS"));
 #elif defined(unix)
@@ -759,10 +754,8 @@ printf("AAA5\n");
     Main_ParseArgLine(pmakevar);
 }
 #endif
-printf("AAA6\n");
 
     MainParseArgs (argc, argv);
-printf("AAA7\n");
 
 #if defined(unix)
     /*
@@ -825,7 +818,6 @@ printf("AAA7\n");
 
 #endif /* def unix */
 
-printf("AAA8\n");
     /*
      * Initialize archive, target and suffix modules in preparation for
      * parsing the makefile(s)
