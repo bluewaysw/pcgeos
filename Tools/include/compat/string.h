@@ -37,4 +37,8 @@
 #error Your compiler/OS is not yet supported
 #endif
 
+#if defined(__WATCOMC__)
+#define strnicmp(a1, a2, len)  (len ? strnicmp(a1, a2, len) : 0)
+#endif
+
 #endif /* _STRING_H_ */
