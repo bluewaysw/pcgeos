@@ -9,6 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(__WATCOMC__)
+#ifndef _WCI86FAR
+#define _WCI86FAR __far
+#endif
+#endif
+
 #include <dos.h>
 #include <malloc.h>
 
