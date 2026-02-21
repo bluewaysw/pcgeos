@@ -1,0 +1,234 @@
+/***********************************************************************
+ *
+ * Copyright (c) 2026
+ *
+ * PROJECT:      Preferences
+ * MODULE:       PrefAppl
+ * FILE:         prefappl.goc
+ *
+ * DESCRIPTION:
+ *     Skeleton Preferences module for managing application visibility.
+ *     This contains tab and dynamic-list UI wiring with stub handlers.
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <config.goh>
+
+#define PREF_APPL_STUB_ITEM_COUNT 3
+
+@class PrefApplDialogClass, PrefDialogClass;
+
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_TAB_SELECTION_CHANGED;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LIST_MONIKER_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_LIST_APPLY;
+@message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_RESCAN;
+
+@endc
+
+@classdecl PrefApplDialogClass;
+
+optr _pascal PrefGetOptrBox(void);
+void _pascal PrefGetModuleInfo(PrefModuleInfo *info);
+
+word OldSelection = 0;
+
+@start MONIKERRESOURCE, data;
+
+@include <Art/moniker.goh>
+
+@visMoniker PrefApplTextMoniker = "Apps";
+
+@visMoniker PrefApplMonikerList = list {
+    @Moniker0,
+    @Moniker1,
+    @Moniker2,
+    @Moniker3,
+    @PrefApplTextMoniker
+};
+
+@end MONIKERRESOURCE;
+
+@start LISTMONIKERS, data;
+
+@visMoniker PrefApplItemMoniker0 = "CALENDAR.GEO";
+@visMoniker PrefApplItemMoniker1 = "GEOWRITE.GEO";
+@visMoniker PrefApplItemMoniker2 = "FILEMGR.GEO";
+
+@end LISTMONIKERS;
+
+@start BASEINTERFACE, notDetachable;
+
+@object PrefApplDialogClass BaseBox = {
+    GI_visMoniker = "Applications";
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @TabHolder;
+
+    HINT_INTERACTION_COMPLEX_PROPERTIES;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    ATTR_GEN_HELP_CONTEXT = "dbApps";
+    ATTR_GEN_INIT_FILE_CATEGORY = "prefappl";
+}
+
+@object GenInteractionClass TabHolder = {
+    GI_comp = @TabSelector, @TabGroup;
+
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenItemGroupClass TabSelector = {
+    GI_comp = @EnsembleAppsTab;
+    GIGI_selection = 0;
+    GIGI_destination = @BaseBox;
+    GIGI_applyMsg = MSG_PREF_APPL_TAB_SELECTION_CHANGED;
+
+    HINT_ITEM_GROUP_TAB_STYLE;
+    HINT_ITEM_GROUP_DONT_CENTER_TABBED_CHILDREN;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenItemClass EnsembleAppsTab = {
+    GI_visMoniker = "Ensemble Apps";
+    GII_identifier = 0;
+}
+
+@object GenInteractionClass TabGroup = {
+    GI_comp = @EnsembleAppsPage;
+
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_RIGHT | GRFI_BOTTOM };
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass EnsembleAppsPage = {
+    GI_comp = @MainRow;
+
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass MainRow = {
+    GI_comp = @AppList, @ActionColumn;
+
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass AppList = {
+    GI_visMoniker = "Applications:";
+
+    GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+    GIGI_selection = GIGS_NONE;
+    GIGI_numSelections = 0;
+
+    GIGI_destination = @BaseBox;
+    GIGI_applyMsg = MSG_PREF_APPL_LIST_APPLY;
+    GDLI_queryMsg = MSG_PREF_APPL_LIST_MONIKER_QUERY;
+    GDLI_numItems = PREF_APPL_STUB_ITEM_COUNT;
+
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_INITIAL_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 36,
+        SST_LINES_OF_TEXT | 12,
+        12
+    };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ActionColumn = {
+    GI_comp = @RescanTrigger;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass RescanTrigger = {
+    GI_visMoniker = "Rescan";
+    GTI_actionMsg = MSG_PREF_APPL_RESCAN;
+    GTI_destination = @BaseBox;
+}
+
+@end BASEINTERFACE;
+
+optr _export _pascal PrefGetOptrBox(void)
+{
+    return (@BaseBox);
+}
+
+void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
+{
+    modInfo->PMI_requiredFeatures = PMF_USER;
+    modInfo->PMI_prohibitedFeatures = 0;
+    modInfo->PMI_minLevel = UIIL_INTRODUCTORY;
+    modInfo->PMI_maxLevel = UIIL_MAX_LEVEL;
+
+    modInfo->PMI_monikerList = @PrefApplMonikerList;
+    modInfo->PMI_monikerToken.GT_chars[0] = 'P';
+    modInfo->PMI_monikerToken.GT_chars[1] = 'A';
+    modInfo->PMI_monikerToken.GT_chars[2] = 'P';
+    modInfo->PMI_monikerToken.GT_chars[3] = 'L';
+    modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
+{
+    optr tabPages[] = {
+        @EnsembleAppsPage
+    };
+
+    if (selection >= (sizeof(tabPages) / sizeof(tabPages[0]))) {
+        return;
+    }
+
+    if (selection == OldSelection) {
+        return;
+    }
+
+    @call tabPages[OldSelection]::MSG_GEN_SET_NOT_USABLE(
+        VUM_DELAYED_VIA_APP_QUEUE);
+    OldSelection = selection;
+    @call tabPages[selection]::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LIST_MONIKER_QUERY
+{
+    optr monikers[] = {
+        @PrefApplItemMoniker0,
+        @PrefApplItemMoniker1,
+        @PrefApplItemMoniker2
+    };
+
+    if (item >= (sizeof(monikers) / sizeof(monikers[0]))) {
+        return;
+    }
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item,
+                                                                monikers[item]);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LIST_APPLY
+{
+    /* Stub for future apply behavior. */
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
+{
+    /* Stub rescan: reinitialize the placeholder list entries. */
+    @call AppList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(PREF_APPL_STUB_ITEM_COUNT);
+}
