@@ -1,7 +1,7 @@
 ## 3.3 Structures G-G
 
 ----------
-#### GadgetSizeHintArgs
+### GadgetSizeHintArgs
     GadgetSizeHintArgs          struct
         GSHA_width          SpecWidth <>        ;Width of the composite
         GSHA_height         SpecHeight <>       ;Height of each child
@@ -10,7 +10,7 @@
 **Library:** Objects/genC.def
 
 ----------
-#### GCCFeatures
+### GCCFeatures
     GCCFeatures     record
         GCCF_HORIZONTAL_GUIDES          :1
         GCCF_VERTICAL_GUIDES            :1
@@ -19,7 +19,7 @@
 **Library:** ruler.def
 
 ----------
-#### GCMIcon
+### GCMIcon
     GCMIcon etype   byte, 0
         GCMI_NONE       enum GCMIcon
         GCMI_EXIT       enum GCMIcon
@@ -28,7 +28,7 @@
 **Library:** Objects/genC.def
 
 ----------
-#### GCM_info
+### GCM_info
     GCM_info    etype   word, 0, 2
         GCMI_MIN_X      enum GCM_info   ;min x (left side bearing)
         GCMI_MIN_Y      enum GCM_info   ;min y (descent)
@@ -38,7 +38,7 @@
 **Library:** font.def
 
 ----------
-#### GCNDriveChangeNotificationType
+### GCNDriveChangeNotificationType
     GCNDriveChangeNotificationType          etype word
         GCNDCNT_CREATED         enum GCNDriveChangeNotificationType
         GCNDCNT_DESTROYED       enum GCNDriveChangeNotificationType
@@ -46,7 +46,7 @@
 **Library:** gcnlist.def
 
 ----------
-#### GCNExpressMenuNotificationType
+### GCNExpressMenuNotificationType
     GCNExpressMenuNotificationType          etype word
         GCNEMNT_CREATED         enum GCNExpressMenuNotificationType
         GCNEMNT_DESTROYED       enum GCNExpressMenuNotificationType
@@ -54,7 +54,7 @@
 **Library:** gcnlist.def
 
 ----------
-#### GCNListBlockHeader
+### GCNListBlockHeader
     GCNListBlockHeader      struct
         GCNLBH_lmemHeader           LMemBlockHeader
         GCNLBH_listOfLists          lptr.GCNListOfListsHeader
@@ -65,7 +65,7 @@ This structure begins a kernel's GCN list block.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListElement
+### GCNListElement
     GCNListElement      struct
         GCNLE_item          optr
     GCNListElement      ends
@@ -75,7 +75,7 @@ This structure stores an element within a GCN list.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListHeader
+### GCNListHeader
     GCNListHeader       struct
         GCNLH_meta              ChunkArrayHeader
         GCNLH_statusEvent       hptr
@@ -103,7 +103,7 @@ process's queue when an object loses the target.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListMessageParams
+### GCNListMessageParams
     GCNListMessageParams            struct
         GCNLMP_ID               GCNListType
         GCNLMP_block            hptr.GCNDataBlockHeader
@@ -132,7 +132,7 @@ primitive routine.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListOfListsElement
+### GCNListOfListsElement
     GCNListOfListsElement           struct
         GCNLOLE_ID              GCNListType
         GCNLOLE_list            lptr.GCNListHeader
@@ -143,7 +143,7 @@ This structure defines an element in a GCN list of lists.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListOfListsHeader
+### GCNListOfListsHeader
     GCNListOfListsHeader            struct
         GCNLOL_meta             ChunkArrayHeader
         GCNLH_data              label GCNListOfListsElement
@@ -155,7 +155,7 @@ marks the start of multiple **GCNListOfListsElement** structures.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListParams
+### GCNListParams
     GCNListParams       struct
         GCNLP_ID            GCNListType
         GCNLP_optr          optr
@@ -169,7 +169,7 @@ and its associated Manufacturer list type.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListSendFlags
+### GCNListSendFlags
     GCNListSendFlags        record
         GCNLSF_SET_STATUS                       :1
         GCNLSF_IGNORE_IF_STATUS_TRANSITIONING   :1
@@ -208,7 +208,7 @@ sending the message.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListType
+### GCNListType
     GCNListType     struct
         GCNLT_manuf         ManufacturerID
         GCNLT_type          word
@@ -221,7 +221,7 @@ type defined for that manufactuer ID.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNListTypeFlags
+### GCNListTypeFlags
     GCNListTypeFlags        record
         ; high bits hold the list type.
                                 :15
@@ -232,7 +232,7 @@ type defined for that manufactuer ID.
 **Library:** Objects/metaC.def
 
 ----------
-#### GCNShutdownControlType
+### GCNShutdownControlType
     GCNShutdownControlType          etype word
         GCNSCT_SUSPEND          enum GCNShutdownControlType
         ; Task-switcher wishes to suspend the system.
@@ -244,7 +244,7 @@ type defined for that manufactuer ID.
 **Library:** gcnlist.def
 
 ----------
-#### GCNStandardListType
+### GCNStandardListType
     GCNStandardListType         etype word, 0, 2
         GCNSLT_FILE_SYSTEM          enum GCNStandardListType
         ; This notification is sent out when the file system changes.
@@ -252,7 +252,7 @@ type defined for that manufactuer ID.
 **Library:** gcnlist.def
 
 ----------
-#### GDCFeatures
+### GDCFeatures
     GDCFeatures     record
         GDCF_NEW                    :1  ;replaced with switch documents in
                                         ;transparent mode
@@ -275,7 +275,7 @@ type defined for that manufactuer ID.
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### GDCTask
+### GDCTask
     GDCTask etype byte
         GDCT_NONE               enum GDCTask
         GDCT_NEW                enum GDCTask
@@ -290,7 +290,7 @@ type defined for that manufactuer ID.
 **Library:** gDocCtrl.def
 
 ----------
-#### GDCToolboxFeatures
+### GDCToolboxFeatures
     GDCToolboxFeatures      record
         GDCTF_NEW_EMPTY         :1
         GDCTF_USE_TEMPLATE      :1
@@ -303,7 +303,7 @@ type defined for that manufactuer ID.
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### GDF_saved
+### GDF_saved
     GDF_saved       struct
         GDFS_nChars     word        ; Number of characters to draw
         GDFS_drawPos    PointWBFixed ; X/Y position to draw at
@@ -319,7 +319,7 @@ This structure stores information about a graphics string and is used in the
 **Library:** text.def
 
 ----------
-#### GDF_vars
+### GDF_vars
     GDF_vars        struct
         GDFV_saved              GDF_saved
         GDFV_styleCallback      fptr.far
@@ -357,7 +357,7 @@ Nothing
 **Library:** text.def
 
 ----------
-#### GDICFeatures
+### GDICFeatures
     GDICFeatures        record
         GDCF_OVERLAPPING_MAXIMIZED      :1
         GDCF_TILE                       :1
@@ -367,7 +367,7 @@ Nothing
 **Library:** Objects/gDCtrlC.def
 
 ----------
-#### GDICToolboxFeatures
+### GDICToolboxFeatures
     GDICToolboxFeatures         record
         GDCTF_OVERLAPPING_MAXIMIZED     :1
         GDCTF_TILE                      :1
@@ -377,7 +377,7 @@ Nothing
 **Library:** Objects/gDCtrlC.def
 
 ----------
-#### GECFeatures
+### GECFeatures
     GECFeatures     record
         GECF_UNDO           :1
         GECF_CUT            :1
@@ -390,7 +390,7 @@ Nothing
 **Library:** Objects/gEditCC.def
 
 ----------
-#### GECToolboxFeatures
+### GECToolboxFeatures
     GECToolboxFeatures      record
         GECTF_UNDO              :1
         GECTF_CUT               :1
@@ -403,7 +403,7 @@ Nothing
 **Library:** Objects/gEditCC.def
 
 ----------
-#### GenAppDoDialogParams
+### GenAppDoDialogParams
     GenAppDoDialogParams            struct
         GADDP_dialog        StandardDialogParams
         GADDP_finishOD      optr                ; OD to send method to.
@@ -413,7 +413,7 @@ Nothing
 **Library:** Objects/gAppC.def
 
 ----------
-#### GenAppIACPConnection
+### GenAppIACPConnection
     GenAppIACPConnection    struc
         GAIACPC_connection      IACPConnection
         ; The IACP connection
@@ -425,7 +425,7 @@ Nothing
 **Library:** 
 
 ----------
-#### GenAppUpdateFeaturesParams
+### GenAppUpdateFeaturesParams
     GenAppUpdateFeaturesParams              struct
         GAUFP_featuresOn        word
         GAUFP_featuresChanged   word
@@ -442,7 +442,7 @@ Nothing
 **Library:** Objects/gAppC.def
 
 ----------
-#### GenAppUsabilityCommand
+### GenAppUsabilityCommand
     GenAppUsabilityCommand          etype byte
         GAUC_USABILITY              enum GenAppUsabilityCommand
         GAUC_RECALC_CONTROLLER      enum GenAppUsabilityCommand
@@ -478,7 +478,7 @@ not-usable and then setting it usable.
 **Library:** gAppC.def
 
 ----------
-#### GenAppUsabilityTuple
+### GenAppUsabilityTuple
     GenAppUsabilityTuple            struct
         GAUT_flags              GenAppUsabilityTupleFlags
         GAUT_objChunk           lptr
@@ -488,7 +488,7 @@ not-usable and then setting it usable.
 **Library:** Objects/gAppC.def
 
 ----------
-#### GenAppUsabilityTupleFlags
+### GenAppUsabilityTupleFlags
     GenAppUsabilityTupleFlags               record
                                     :2
         GAUTF_END_OF_LIST           :1
@@ -499,7 +499,7 @@ not-usable and then setting it usable.
 **Library:** Objects/gAppC.def
 
 ----------
-#### GenAttrs
+### GenAttrs
     GenAttrs        record
         GA_SIGNAL_INTERACTION_COMPLETE          :1
         GA_INITIATES_BUSY_STATE                 :1
@@ -599,7 +599,7 @@ ATTR_GEN_VISIBILITY_DATA for more details.
 **Library:** Objects/genC.def
 
 ----------
-#### GenBranchInfo
+### GenBranchInfo
     GenBranchInfo       record
         GBI_USABLE              :1
         GBI_BRANCH_MINIMIZED    :1
@@ -616,7 +616,7 @@ SA_BRANCH_MINIMIZED in. (This flag is only valid if GBI_USABLE is set.)
 **Library:** Objects/visC.def
 
 ----------
-#### GenControlBuildFlags
+### GenControlBuildFlags
     GenControlBuildFlags            record
         GCBF_SUSPEND_ON_APPLY                               :1
         GCBF_USE_GEN_DESTROY                                :1
@@ -698,7 +698,7 @@ closed.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlBuildInfo
+### GenControlBuildInfo
     GenControlBuildInfo         struct
         ;
         ; General information
@@ -739,7 +739,7 @@ closed.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlChildFlags
+### GenControlChildFlags
     GenControlChildFlags            record
         GCCF_NOTIFY_WHEN_ADDING         :1
         GCCF_ALWAYS_ADD                 :1
@@ -749,7 +749,7 @@ closed.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlChildInfo
+### GenControlChildInfo
     GenControlChildInfo             struct
         GCCI_object             lptr
         GCCI_featureMask        word
@@ -762,7 +762,7 @@ a bitmask of the combination of tools that compose this object.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlFeatureFlags
+### GenControlFeatureFlags
     GenControlFeatureFlags          record
                                 :8
     GenControlFeatureFlags          end
@@ -770,7 +770,7 @@ a bitmask of the combination of tools that compose this object.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlFeaturesInfo
+### GenControlFeaturesInfo
     GenControlFeaturesInfo          struct
         GCFI_object             lptr
         GCFI_name               optr
@@ -785,7 +785,7 @@ reference to the name of the feature (if the feature is allowed be changed).
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlInteractableFlags
+### GenControlInteractableFlags
     GenControlInteractableFlags             record
         GCIF_CONTROLLER     :1  ;Controller object itself is interactable and
                                 ;may need to be enabled/disabled
@@ -797,7 +797,7 @@ reference to the name of the feature (if the feature is allowed be changed).
 **Library:** Objects/gCtlC.def
 
 ----------
-#### GenControlScalableUICommand
+### GenControlScalableUICommand
     GenControlScalableUICommand             etype byte
         CSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_ON enum GenControlScalableUICommand
         ; if (GCSUIE_appFeature is ON)
@@ -887,7 +887,7 @@ GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON.
 **Library:** gCtlC.def
 
 ----------
-#### GenControlScalableUIEntry
+### GenControlScalableUIEntry
     GenControlScalableUIEntry               struct
         GCSUIE_command          GenControlScalableUICommand
         GCSUIE_appFeature       word            ;feature bit to check.
@@ -897,7 +897,7 @@ GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlScanInfo
+### GenControlScanInfo
     GenControlScanInfo          struct
         GCSI_userAdded              word
         GCSI_userRemoved            word
@@ -908,7 +908,7 @@ GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlStatusChange
+### GenControlStatusChange
     GenControlStatusChange          record
                                                 :13
         GCSF_HIGHLIGHTED_TOOLGROUP_SELECTED     :1
@@ -930,7 +930,7 @@ This flag is set if normal features have been added or removed.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlUIType
+### GenControlUIType
     GenControlUIType        etype word
         GCUIT_NORMAL            enum    GenControlUIType
         GCUIT_TOOLBOX           enum    GenControlUIType
@@ -946,7 +946,7 @@ consists of "Tiny" sized triggers or items within popup lists.
 **Library:** gCtlC.def
 
 ----------
-#### GenControlUpdateUIParams
+### GenControlUpdateUIParams
     GenControlUpdateUIParams        struct
         GCUUIP_manufacturer             ManufacturerID
         GCUUIP_changeType               word
@@ -971,7 +971,7 @@ TEMP_GEN_CONTROL_INSTANCE).
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlUserData
+### GenControlUserData
     GenControlUserData          struc
         GCUD_flags                      GenControlUserFlags
         GCUD_userAddedUI                word
@@ -983,7 +983,7 @@ TEMP_GEN_CONTROL_INSTANCE).
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenControlUserFlags
+### GenControlUserFlags
     GenControlUserFlags         record
                                     :14
         GCUF_USER_TOOLBOX_UI        :1
@@ -993,7 +993,7 @@ TEMP_GEN_CONTROL_INSTANCE).
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### GenDefaultMonikerType
+### GenDefaultMonikerType
     GenDefaultMonikerType       etype word
         ; monikers used for various levels in the Set User Level dialog box.
         GDMT_LEVEL_0                enum GenDefaultMonikerType
@@ -1010,7 +1010,7 @@ TEMP_GEN_CONTROL_INSTANCE).
 **Library:** Objects/genC.def
 
 ----------
-#### GenDisplayAttrs
+### GenDisplayAttrs
     GenDisplayAttrs     record
         GDA_USER_DISMISSABLE        :1
                                     :7
@@ -1027,7 +1027,7 @@ system menu.
 **Library:** Objects/gDispC.def
 
 ----------
-#### GenDisplayControlAttributes
+### GenDisplayControlAttributes
     GenDisplayControlAttributes             record
         GDCA_MAXIMIZED_NAME_ON_PRIMARY          :1
                                                 :7
@@ -1040,7 +1040,7 @@ of the primary.
 **Library:** Objects/gDCtrlC.def
 
 ----------
-#### GenDocumentAttrs
+### GenDocumentAttrs
     GenDocumentAttrs        record
         ;
         ; These bits reflect permanent attributes of the document
@@ -1075,7 +1075,7 @@ of the primary.
 **Library:** Objects/gDocC.def
 
 ----------
-#### GenDocumentChangePasswordParams
+### GenDocumentChangePasswordParams
     GenDocumentChangePasswordParams                 struct
         GDCPP_password          char (MAX_PASSWORD_SIZE+2) dup (?)
     GenDocumentChangePasswordParams                 ends
@@ -1083,7 +1083,7 @@ of the primary.
 **Library:** Objects/gDocC.def
 
 ----------
-#### GenDocumentControlAttrs
+### GenDocumentControlAttrs
     GenDocumentControlAttrs         record
         ;
         ; File attributes
@@ -1112,7 +1112,7 @@ of the primary.
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### GenDocumentControlFeatures
+### GenDocumentControlFeatures
     GenDocumentControlFeatures              record
         ; File features
         GDCF_READ_ONLY_SUPPORTS_SAVE_AS_REVERT          :1
@@ -1139,7 +1139,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### GenDocumentControlMode
+### GenDocumentControlMode
     GenDocumentControlMode      etype byte
         GDCM_VIEWER                 enum GenDocumentControlMode
         GDCM_SHARED_SINGLE          enum GenDocumentControlMode
@@ -1148,7 +1148,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### GenDocumentGetVariableParams
+### GenDocumentGetVariableParams
     GenDocumentGetVariableParams                struct
         GDGVP_position          PointDWord              ;object position
         GDGVP_buffer            fptr.char               ;buffer for result
@@ -1159,7 +1159,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDocC.def
 
 ----------
-#### GenDocumentGroupAttrs
+### GenDocumentGroupAttrs
     GenDocumentGroupAttrs           record
         GDGA_VM_FILE                            :1  ;Documents stored in VM files
         GDGA_NATIVE                             :1  ;If document not in VM file,
@@ -1186,7 +1186,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDocGrpC.def
 
 ----------
-#### GenDocumentOperation
+### GenDocumentOperation
     GenDocumentOperation            etype word
         GDO_NORMAL              enum GenDocumentOperation
         GDO_SAVE_AS             enum GenDocumentOperation
@@ -1203,7 +1203,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDocC.def
 
 ----------
-#### GenDocumentType
+### GenDocumentType
     GenDocumentType     etype word
         GDT_NORMAL                  enum GenDocumentType
         GDT_READ_ONLY               enum GenDocumentType
@@ -1215,7 +1215,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDocC.def
 
 ----------
-#### GenDynamicListPosition
+### GenDynamicListPosition
     GenDynamicListPosition          etype word
         GDLP_FIRST          enum GenDynamicListPosition, 00000h
         GDLP_LAST           enum GenDynamicListPosition, 0ffffh
@@ -1223,7 +1223,7 @@ If set, the document control supports template documents.
 **Library:** Objects/gDListC.def
 
 ----------
-#### GeneralConsumerModeFlags
+### GeneralConsumerModeFlags
     GeneralConsumerModeFlags        record
                                         :2
         GCMF_LEFT_ICON      GCMIcon:3   ; Indicates which icon to show on 
@@ -1235,7 +1235,7 @@ If set, the document control supports template documents.
 **Library:** Objects/genC.def
 
 ----------
-#### GeneralEvent
+### GeneralEvent
     GeneralEvent        etype word, 0, 2
         GE_NO_EVENT                 enum GeneralEvent
         GE_END_OF_SONG              enum GeneralEvent
@@ -1274,7 +1274,7 @@ This event causes the stream to V the semaphore handle.
 **Library:** sound.def
 
 ----------
-#### GenFieldFlags
+### GenFieldFlags
     GenFieldFlags       record
         GFF_DETACHING               :1
         GFF_LOAD_BITMAP             :1
@@ -1325,7 +1325,7 @@ system was too busy - wait until a process exits, then try again.
 **Library:** Objects/gFieldC.def
 
 ----------
-#### GenFilePath
+### GenFilePath
     GenFilePath     struct
         GFP_disk        word SP_TOP
         GFP_path        PathName
@@ -1340,7 +1340,7 @@ be initialized to a **StandardPath** constant.
 **Library:** Objects/genC.def
 
 ----------
-#### GenFileSelectorEntryFlags
+### GenFileSelectorEntryFlags
     GenFileSelectorEntryFlags               record
         GFSEF_TYPE              GenFileSelectorEntryType:2
         GFSEF_OPEN              :1
@@ -1389,7 +1389,7 @@ entry (first entry).
 **Library:** Objects/gFSelC.def
 
 ----------
-#### GenFileSelectorEntryType
+### GenFileSelectorEntryType
     GenFileSelectorEntryType            etype byte, 0
         GFSET_FILE              enum GenFileSelectorEntryType
         GFSET_SUBDIR            enum GenFileSelectorEntryType
@@ -1398,7 +1398,7 @@ entry (first entry).
 **Library:** Objects/gFSelC.def
 
 ----------
-#### GenFileSelectorFileAttrs
+### GenFileSelectorFileAttrs
     GenFileSelectorFileAttrs                struct
         GFSFA_match         FileAttrs   ; Attributes that must match
         GFSFA_mismatch      FileAttrs   ; Attributes that must not match
@@ -1407,7 +1407,7 @@ entry (first entry).
 **Library:** Object/gFSelC.def
 
 ----------
-#### GenFileSelectorGeodeAttrs
+### GenFileSelectorGeodeAttrs
     GenFileSelectorGeodeAttrs               struct
         GFSGA_match         GeodeAttrs  ; Attributes that must match
         GFSGA_mismatch      GeodeAttrs  ; Attributes that must not match
@@ -1416,7 +1416,7 @@ entry (first entry).
 **Library:** Objects/gFSelC.def
 
 ----------
-#### GenFileSelectorScalableUICommand
+### GenFileSelectorScalableUICommand
     GenFileSelectorScalableUICommand                    etype byte
         GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON      enum 
         GenFileSelectorScalableUICommand
@@ -1432,7 +1432,7 @@ entry (first entry).
 **Library:** Objects/gFSelcC.def
 
 ----------
-#### GenFileSelectorScalableUIEntry
+### GenFileSelectorScalableUIEntry
     GenFileSelectorScalableUIEntry                  struct
         GFSSUIE_command             GenFileSelectorScalableUICommand
         GFSSUIE_appFeature          word
@@ -1442,7 +1442,7 @@ entry (first entry).
 **Library:** Objects/gFSelC.def
 
 ----------
-#### GenFileSelectorType
+### GenFileSelectorType
     GenFileSelectorType         etype byte
         GFST_DOCUMENTS              enum GenFileSelectorType
         GFST_EXECUTABLES            enum GenFileSelectorType
@@ -1452,7 +1452,7 @@ entry (first entry).
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### GenFindObjectWithMonikerFlags
+### GenFindObjectWithMonikerFlags
     GenFindObjectWithMonikerFlags               record
         GFOWMF_EXACT_MATCH              :1
         GFOWMF_SKIP_THIS_NODE           :1
@@ -1471,7 +1471,7 @@ it in the generic tree.
 **Library:** Objects/genC.def
 
 ----------
-#### GenGadgetAttributes
+### GenGadgetAttributes
     GenGadgetAttributes         record
         GGA_COMPOSITE       :1
                             :7
@@ -1484,7 +1484,7 @@ generic children will become visual children.
 **Library:** Objects/gGadgetC.def
 
 ----------
-#### GenInteractionAttrs
+### GenInteractionAttrs
     GenInteractionAttrs         record
         GIA_NOT_USER_INITIATABLE            :1
         GIA_INITIATED_VIA_USER_DO_DIALOG    :1
@@ -1525,7 +1525,7 @@ the system.
 **Library:** Objects/gInterC.def
 
 ----------
-#### GenInteractionDiscardInfo
+### GenInteractionDiscardInfo
     GenInteractionDiscardInfo       struct
         GIDI_inUse              word
         ; If non-zero, the interaction is onscreen, or is about to go
@@ -1538,7 +1538,7 @@ the system.
 **Library:** gInterC.def
 
 ----------
-#### GenInteractionGroupType
+### GenInteractionGroupType
     GenInteractionGroupType         etype byte
     GIGT_FILE_MENU          enum        GenInteractionGroupType
     ; Set to indicate that this GenInteraction is the File menu. Can
@@ -1603,7 +1603,7 @@ commands.
 **Library:** Objects/gInterC.def
 
 ----------
-#### GenInteractionType
+### GenInteractionType
     GenInteractionType      etype byte
         GIT_ORGANIZATIONAL          enum GenInteractionType
         GIT_PROPERTIES              enum GenInteractionType
@@ -1724,7 +1724,7 @@ with modal implementations of this type of GenInteraction.
 **Library:** Objects/gInterC.def
 
 ----------
-#### GenInteractionVisibility
+### GenInteractionVisibility
     GenInteractionVisibility            etype byte
         GIV_NO_PREFERENCE       enum GenInteractionVisibility
         GIV_POPUP               enum GenInteractionVisibility
@@ -1780,7 +1780,7 @@ interaction will be popped out upon startup.
 **Library:** Objects/gInterC.def
 
 ----------
-#### GenItemGroupBehaviorType
+### GenItemGroupBehaviorType
 GenItemGroupBehaviorType            etype byte, 0
 GIGBT_EXCLUSIVE                 enum GenItemGroupBehaviorType
 GIGBT_EXCLUSIVE_NONE            enum GenItemGroupBehaviorType
@@ -1824,7 +1824,7 @@ handle multiple selections.
 **Library:** Objects/gItemGC.def
 
 ----------
-#### GenItemGroupStateFlags
+### GenItemGroupStateFlags
     GenItemGroupStateFlags          record
         GIGSF_INDETERMINATE     :1
         GIGSF_MODIFIED          :1
@@ -1870,7 +1870,7 @@ this bit will be the value passed in that message.
 **Library:** Objects/gItemGC.def
 
 ----------
-#### GenItemGroupUpdateExtSelParams
+### GenItemGroupUpdateExtSelParams
     GenItemGroupUpdateExtSelParams                  struc
         GIGUESP_anchorItem      word        ;anchor item
         GIGUESP_extentItem      word        ;extent item
@@ -1886,7 +1886,7 @@ this bit will be the value passed in that message.
 **Library:** Objects/gItemGC.def
 
 ----------
-#### GenMonikerMessageFrame
+### GenMonikerMessageFrame
     GenMonikerMessageFrame          struct
         GMMF_xInset             word
         GMMF_yInset             word
@@ -1922,7 +1922,7 @@ for drawing the moniker.
 **Library:** Objects/genC.def
 
 ----------
-#### GenOptionsParams
+### GenOptionsParams
     GenOptionsParams        struct
         GOP_category    char INI_CATEGORY_BUFFER_SIZE dup (?)
         GOP_key         char INI_CATEGORY_BUFFER_SIZE dup (?)
@@ -1931,7 +1931,7 @@ for drawing the moniker.
 **Library:** Objects/genC.def
 
 ----------
-#### GenPathDiskRestoreArgs
+### GenPathDiskRestoreArgs
     GenPathDiskRestoreArgs      struct
         GPDRA_pathType              word
         GPDRA_savedDiskType         word
@@ -1956,7 +1956,7 @@ with a trailing ':'.
 **Library:** Objects/genC.def
 
 ----------
-#### GenSaveWindowInfo
+### GenSaveWindowInfo
     GenSaveWindowInfo       struct
         GSWI_winPosition            SpecWinSizePair
         GSWI_winSize                SpecWinSizePair
@@ -1966,7 +1966,7 @@ with a trailing ':'.
 **Library:** Objects/genC.def
 
 ----------
-#### GenScanItemsFlags
+### GenScanItemsFlags
     GenScanItemsFlags       record
         GSIF_FROM_START                         :1
         GSIF_FORWARD                            :1
@@ -2010,7 +2010,7 @@ list rather than returning the first or last item.
 **Library:** Objects/gItemGC.def
 
 ----------
-#### GenStates
+### GenStates
     GenStates       record
         GS_USABLE       :1
         GS_ENABLED      :1
@@ -2033,7 +2033,7 @@ is typically represented by "greying out" the object's moniker.
 **Library:** Objects/genC.def
 
 ----------
-#### GenTextAttrs
+### GenTextAttrs
     GenTextAttrs        record
         GTA_SINGLE_LINE_TEXT                :1
         GTA_USE_TAB_FOR_NAVIGATION          :1
@@ -2083,7 +2083,7 @@ automatically scrolling there.
 **Library:** Objects/gTextC.def
 
 ----------
-#### GenTextCustomMargins
+### GenTextCustomMargins
     GenTextCustomMargins            struc
         GTCM_lrMargin       byte    ;margin on the left and right of the text.
         GTCM_rbMargin       byte    ;margin on the top and bottom of the text.
@@ -2092,7 +2092,7 @@ automatically scrolling there.
 **Library:** Objects/gTextC.def
 
 ----------
-#### GenTextStateFlags
+### GenTextStateFlags
     GenTextStateFlags       record
         GTSF_INDETERMINATE      :1
         GTSF_MODIFIED           :1
@@ -2132,7 +2132,7 @@ will be passed in that message.
 **Library:** Objects/gTextC.def
 
 ----------
-#### GenUpwardQueryType
+### GenUpwardQueryType
     GenUpwardQueryType      etype word
         GUQT_UI_FOR_APPLICATION         enum GenUpwardQueryType
         GUQT_UI_FOR_SCREEN              enum GenUpwardQueryType
@@ -2142,7 +2142,7 @@ will be passed in that message.
 **Library:** Objects/genC.def
 
 ----------
-#### GenValueDisplayFormat
+### GenValueDisplayFormat
     GenValueDisplayFormat           etype byte
         GVDF_INTEGER                    enum GenValueDisplayFormat
         GVDF_DECIMAL                    enum GenValueDisplayFormat
@@ -2253,7 +2253,7 @@ ATTR_GEN_VALUE_DECIMAL_PLACES.
 **Library:** Objects/gValueC.def
 
 ----------
-#### GenValueIntervals
+### GenValueIntervals
     GenValueIntervals       struc
         GVI_numMajorIntervals   word    ; Total number of major intervals
                                         ; to display over the range.
@@ -2264,7 +2264,7 @@ ATTR_GEN_VALUE_DECIMAL_PLACES.
 **Library:** Objects/gValueC.def
 
 ----------
-#### GenValueStateFlags
+### GenValueStateFlags
     GenValueStateFlags      record
         GVSF_INDETERMINATE      :1
         GVSF_MODIFIED           :1
@@ -2332,7 +2332,7 @@ the GenValue has been modified.
 **Library:** Objects/gValueC.def
 
 ----------
-#### GenValueType
+### GenValueType
     GenValueType        etype word
         GVT_VALUE           enum GenValueType   ; The current value 
         GVT_MINIMUM         enum GenValueType   ; The minimum value
@@ -2352,7 +2352,7 @@ the GenValue has been modified.
 **Library:** Objects/gValueC.def
 
 ----------
-#### GenViewAttrs
+### GenViewAttrs
     GenViewAttrs        record
         ;
         ; General GenView Attributes
@@ -2510,7 +2510,7 @@ screen.
 **Library:** Objects/gViewC.def
 
 ----------
-#### GenViewControlAttrs
+### GenViewControlAttrs
     GenViewControlAttrs         record
         GVCA_ADJUST_ASPECT_RATIO        :1
         GVCA_APPLY_TO_ALL               :1
@@ -2522,14 +2522,14 @@ screen.
 **Library:** Objects/gViewCC.def
 
 ----------
-#### GenViewControlSpecialScaleFactor
+### GenViewControlSpecialScaleFactor
     GenViewControlSpecialScaleFactor            etype word
         GVCSSF_TO_FIT           enum GenViewControlSpecialScaleFactor
 
 **Library:** Objects/gViewCC.def
 
 ----------
-#### GenViewDimensionAttrs
+### GenViewDimensionAttrs
     GenViewDimensionAttrs           record
         GVDA_SCROLLABLE                     :1
         GVDA_SPLITTABLE                     :1
@@ -2589,7 +2589,7 @@ calculate the height; and vice versa for horizAttrs.
 **Library:** Objects/gViewC.def
 
 ----------
-#### GenViewInkType
+### GenViewInkType
     GenViewInkType      etype byte
         GVIT_PRESSES_ARE_NOT_INK            enum GenViewInkType
         GVIT_INK_WITH_STANDARD_OVERRIDE     enum GenViewInkType
@@ -2627,7 +2627,7 @@ output.
 **Library:** Objects/gViewC.def
 
 ----------
-#### GeodeAttrs
+### GeodeAttrs
     GeodeAttrs      record
         GA_PROCESS                      :1  ; Has initial thread
         GA_LIBRARY                      :1  ; Exports routines
@@ -2652,7 +2652,7 @@ output.
 **Library:** geode.def
 
 ----------
-#### GeodeDefaultDriverType
+### GeodeDefaultDriverType
     GeodeDefaultDriverType          etype word, 0, 2
         GDDT_FILE_SYSTEM        enum GeodeDefaultDriverType
         GDDT_KEYBOARD           enum GeodeDefaultDriverType
@@ -2665,7 +2665,7 @@ output.
 **Library:** driver.def
 
 ----------
-#### GeodeGetInfoType
+### GeodeGetInfoType
     GeodeGetInfoType        etype word, 0, 2
         GGIT_ATTRIBUTES             enum GeodeGetInfoType
         GGIT_TYPE                   enum GeodeGetInfoType
@@ -2678,7 +2678,7 @@ output.
 **Library:** geode.def
 
 ----------
-#### GeodeGrab
+### GeodeGrab
     GeodeGrab       struct
         GG_OD           optr
         GG_geode        hptr
@@ -2689,7 +2689,7 @@ This structure stores a top-level grab for controlling input flow to the geode.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### GeodeHeapVars
+### GeodeHeapVars
     GeodeHeapVars   struc
         GHV_heapSpace           word
         ;
@@ -2701,7 +2701,7 @@ This structure stores a top-level grab for controlling input flow to the geode.
 
 **Library:** geode.def
 ----------
-#### GeodeLoadError
+### GeodeLoadError
     GeodeLoadError      etype word
         GLE_PROTOCOL_IMPORTER_TOO_RECENT        enum GeodeLoadError
         GLE_PROTOCOL_IMPORTER_TOO_OLD           enum GeodeLoadError
@@ -2723,7 +2723,7 @@ This structure stores a top-level grab for controlling input flow to the geode.
 
 **Library:** geode.def
 ----------
-#### GeodeToken
+### GeodeToken
     GeodeToken      struct
         GT_chars            TokenChars
         GT_manufID          ManufacturerID
@@ -2739,7 +2739,7 @@ fields uniquely identify the application.
 **Library:** geode.def
 
 ----------
-#### GeosFileHeaderFlags
+### GeosFileHeaderFlags
     GeosFileHeaderFlags             record
         GFHF_TEMPLATE           :1
         GFHF_SHARED_MULTIPLE    :1  ; Also called "multi-user"
@@ -2757,7 +2757,7 @@ fields uniquely identify the application.
 **Library:** file.def
 
 ----------
-#### GeosFileType
+### GeosFileType
     GeosFileType        etype word
         GFT_NOT_GEOS_FILE   enum GeosFileType   ; Not a geos file. defined as 
                                                 ; 0 so one can reasonably 
@@ -2775,7 +2775,7 @@ fields uniquely identify the application.
 **Library:** file.def
 
 ----------
-#### GeoWorksGenAppGCNListType
+### GeoWorksGenAppGCNListType
     GeoWorksGenAppGCNListType               etype word, FIRST_GEN_APP_GCN_LIST_TYPE,2
         ;
         ; GenToolControl/GenControl communication related
@@ -3164,7 +3164,7 @@ changes within the application.
 **Library:** geoworks.def
 
 ----------
-#### GeoWorksMetaGCNListType
+### GeoWorksMetaGCNListType
     GeoWorksMetaGCNListType         etype word, FIRST_META_GCN_LIST_TYPE, 2
         MGCNLT_ACTIVE_LIST              enum GeoWorksMetaGCNListType
         MGCNLT_APP_STARTUP              enum GeoWorksMetaGCNListType
@@ -3208,7 +3208,7 @@ MSG_META_APP_SHUTDOWN are defined for MetaClass.
 **Library:** geoworks.def
 
 ----------
-#### GeoWorksNotificationType
+### GeoWorksNotificationType
     GeoWorksNotificationType            etype word
         GWNT_INK                                enum GeoWorksNotificationType
         GWNT_GEN_CONTROL_NOTIFY_STATUS_CHANGE   enum GeoWorksNotificationType
@@ -3641,7 +3641,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** geoworks.def
 
 ----------
-#### GeoWorksPrefDialogGCNListType
+### GeoWorksPrefDialogGCNListType
     GeoWorksPrefDialogGCNListType   etype word, first PrefDialogMessages, 2
         PDGCNLT_DIALOG_CHANGE           enum GeoWorksPrefDialogGCNListType
         ; MSG_PREF_NOTIFY_DIALOG_CHANGE sent out.
@@ -3649,7 +3649,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** config.def
 
 ----------
-#### GeoWorksVisContentGCNListType
+### GeoWorksVisContentGCNListType
     GeoWorksVisContentGCNListType               etype word , 
         FIRST_VIS_CONTENT_GCN_LIST_TYPE, 2
         VCGCNLT_TARGET_NOTIFY_TEXT_PARA_ATTR_CHANGE enum 
@@ -3659,7 +3659,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** geoworks.def
 
 ----------
-#### GestureType
+### GestureType
     GestureType     etype word
         GT_NO_GESTURE               enum GestureType
         GT_DELETE_CHARS             enum GestureType
@@ -3671,7 +3671,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** hwr.def
 
 ----------
-#### GetContextParams
+### GetContextParams
     GetContextParams        struct
         GCP_replyObj        optr    ;Output to reply to via MSG_META_CONTEXT
         GCP_numCharsToGet   word    ;Maximum number of characters to return
@@ -3682,7 +3682,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** Objects/vTextC.def
 
 ----------
-#### GetItemMonikerParams
+### GetItemMonikerParams
     GetItemMonikerParams        struct
         GIMP_identifier             word
         GIMP_bufferSize             word
@@ -3692,7 +3692,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** config.def
 
 ----------
-#### GetMaskType
+### GetMaskType
     GetMaskType     etype byte
         GMT_ENUM        enum GetMaskType
         GMT_BUFFER      enum GetMaskType
@@ -3700,7 +3700,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** graphics.def
 
 ----------
-#### GetPalType
+### GetPalType
     GetPalType      etype byte
         GPT_ACTIVE          enum GetPalType
         GPT_DEFAULT         enum GetPalType
@@ -3708,7 +3708,7 @@ Data type: **PCComReturnType** from the call to PCCOMEXIT.
 **Library:** color.def
 
 ----------
-#### GetPathType
+### GetPathType
     GetPathType     etype   word
         GPT_CURRENT     enum GetPathType    ; current path
         GPT_CLIP        enum GetPathType    ; clip path
@@ -3719,7 +3719,7 @@ Use this type with **GrGetPath** to determine which sort of path to get.
 **Library:** 
 
 ----------
-#### GetSearchSpellObjectParam
+### GetSearchSpellObjectParam
     GetSearchSpellObjectParam               record
         GSSOP_RELAYED_FLAG      :1
                                 :11
@@ -3729,7 +3729,7 @@ Use this type with **GrGetPath** to determine which sort of path to get.
 **Library:** Objects/vTextC.def
 
 ----------
-#### GetSearchSpellObjectType
+### GetSearchSpellObjectType
     GetSearchSpellObjectType            etype word
         GSSOT_FIRST_OBJECT              enum GetSearchSpellObjectType
         GSSOT_LAST_OBJECT               enum GetSearchSpellObjectType
@@ -3760,7 +3760,7 @@ of the chain, it should return 0:0.
 **Library:** Objects/vTextC.def
 
 ----------
-#### GetVarDataParams
+### GetVarDataParams
     GetVarDataParams        struct
         GVDP_buffer             fptr
         GVDP_bufferSize         word
@@ -3778,7 +3778,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** Objects/metaC.def
 
 ----------
-#### GFM_info
+### GFM_info
     GFM_info        etype word, 0, 2
         GFMI_HEIGHT                 enum GFM_info   ;height of font box
         GFMI_MEAN                   enum GFM_info   ;top of lowers
@@ -3805,7 +3805,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** font.def
 
 ----------
-#### GFSTempDataEntry
+### GFSTempDataEntry
     GFSTempDataEntry        struct
         GFSTDE_selectionNumber      word
         GFSTDE_selectionFlags       GenFileSelectorEntryFlags
@@ -3814,7 +3814,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** Objects/gFSelC.def
 
 ----------
-#### GOAACFeatures
+### GOAACFeatures
     GOAACFeatures       record
         GOAACF_MM_CLEAR             :1
         GOAACF_MM_COPY              :1
@@ -3830,7 +3830,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOArcCFeatures
+### GOArcCFeatures
     GOArcCFeatures      record
         GOACF_START_ANGLE           :1
         GOACF_END_ANGLE             :1
@@ -3841,7 +3841,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOATGCFeatures
+### GOATGCFeatures
     GOATGCFeatures      record
         GOATGCF_ALIGN_TO_GRID       :1
     GOATGCFeatures      end
@@ -3849,7 +3849,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOCCFeatures
+### GOCCFeatures
     GOCCFeatures        record
         GOCCF_CONVERT_TO_BITMAP         :1
         GOCCF_CONVERT_TO_GRAPHIC        :1
@@ -3859,7 +3859,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOCDCFeatures
+### GOCDCFeatures
     GOCDCFeatures       record
         GOCDCF_REPITITIONS      :1
         GOCDCF_MOVE             :1
@@ -3871,7 +3871,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOCSCFeatures
+### GOCSCFeatures
     GOCSCFeatures       record
         GOCSCF_NUM_POLYGON_SIDES        :1
         GOCSCF_POLYGON_RADIUS           :1
@@ -3882,7 +3882,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GODACFeatures
+### GODACFeatures
     GODACFeatures       record
         GODACF_SET_DEFAULT_ATTRIBUTES       :1
     GODACFeatures       end
@@ -3890,7 +3890,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GODepthCFeatures
+### GODepthCFeatures
     GODepthCFeatures        record
         GODepthCF_BRING_TO_FRONT            :1
         GoDepthCF_SEND_TO_BACK              :1
@@ -3901,7 +3901,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GODMCFeatures
+### GODMCFeatures
     GODMCFeatures       record
         GODMCF_DRAFT_MODE               :1
     GODMCFeatures       end
@@ -3909,7 +3909,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOFCFeatures
+### GOFCFeatures
     GOFCFeatures        record
         GOFCF_FLIP_HORIZONTALLY             :1
         GOFCF_FLIP_VERTICALLY               :1
@@ -3918,7 +3918,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOGCFeatures
+### GOGCFeatures
     GOGCFeatures        record
         GOGCF_GROUP             :1
         GOGCF_UNGROUP           :1
@@ -3927,7 +3927,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOHCFeatures
+### GOHCFeatures
     GOHCFeatures        record
         GOHCF_SMALL_HANDLES             :1
         GOHCF_MEDIUM_HANDLES            :1
@@ -3938,7 +3938,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOHSCFeatures
+### GOHSCFeatures
     GOHSCFeatures       record
         GOHSCF_HIDE         :1
         GOHSCF_SHOW         :1
@@ -3947,7 +3947,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOLACFeatures
+### GOLACFeatures
     GOLACFeatures       record
         GOLACF_WIDTH_INDEX          :1
         GOLACF_WIDTH_VALUE          :1
@@ -3959,7 +3959,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOLACToolboxFeatures
+### GOLACToolboxFeatures
     GOLACToolboxFeatures            record
         GOLACTF_WIDTH_INDEX             :1
         GOLACTF_STYLE                   :1
@@ -3968,7 +3968,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOPICFeatures
+### GOPICFeatures
     GOPICFeatures   record
         GOPICF_PASTE_INSIDE             :1
         GOPICF_BREAKOUT_PASTE_INSIDE    :1
@@ -3977,7 +3977,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOPICToolboxFeatures
+### GOPICToolboxFeatures
     GOPICToolboxFeatures    record
         GOPICTF_PASTE_INSIDE            :1
         GOPICTF_BREAKOUT_PASTE_INSIDE   :1
@@ -3986,7 +3986,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOTCFeatures
+### GOTCFeatures
     GOTCFeatures        record
         GOTCF_PTR               :1
         GOTCF_ROTATE_PTR        :1
@@ -4005,7 +4005,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GOTransformCFeatures
+### GOTransformCFeatures
     GOTransformCFeatures            record
         GOTCF_UNTRANSFORM               :1
     GOTransformCFeatures            end
@@ -4013,7 +4013,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GPCFeatures
+### GPCFeatures
     GPCFeatures         record
         GPCF_GOTO_PAGE              :1
         GPCF_NEXT_PAGE              :1
@@ -4023,7 +4023,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** gPageCC.def
 
 ----------
-#### GPCToolboxFeatures
+### GPCToolboxFeatures
     GPCToolboxFeatures      record
         GPCTF_PREVIOUS_PAGE         :1
         GPCTF_GOTO_PAGE             :1
@@ -4033,7 +4033,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** gPageCC.def
 
 ----------
-#### GPICFeatures
+### GPICFeatures
     GPICFeatures            record
         GPICF_KEYBOARD                      :1
         GPICF_CHAR_TABLE                    :1
@@ -4047,7 +4047,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** gPenICC.def
 
 ----------
-#### GPICToolboxFeatures
+### GPICToolboxFeatures
     GPICToolboxFeatures         record
         GPICTF_INITIATE     :1
     GPICToolboxFeatures         end
@@ -4055,7 +4055,7 @@ overflow). This must be set to zero if no buffer is passed.
 **Library:** grobj.def
 
 ----------
-#### GraphicPattern
+### GraphicPattern
     GraphicPattern      struct
         GP_type     PatternType
         GP_data     byte
@@ -4066,7 +4066,7 @@ This structure stores a system hatch pattern.
 **Library:** graphics.def
 
 ----------
-#### Grid
+### Grid
     Grid    struct
         G_x WWFixed         ;pixels between horiz gridlines
         G_y WWFixed         ;pixels between vert gridlines
@@ -4075,7 +4075,7 @@ This structure stores a system hatch pattern.
 **Library:** ruler.def
 
 ----------
-#### GridOptions
+### GridOptions
     GridOptions     record
         GO_SHOW_GRID            :1
         GO_SNAP_TO_GRID         :1
@@ -4085,7 +4085,7 @@ This structure stores a system hatch pattern.
 **Library:** ruler.def
 
 ----------
-#### GrInfoType
+### GrInfoType
     GrInfoType      etype word, 0, 2
         GIT_PRIVATE_DATA        enum GrInfoType
         GIT_WINDOW              enum GrInfoType
@@ -4093,7 +4093,7 @@ This structure stores a system hatch pattern.
 **Library:** graphics.def
 
 ----------
-#### GrObjActionModes
+### GrObjActionModes
     GrObjActionModes        record
         GOAM_RESIZE                 :1
         GOAM_MOVE                   :1
@@ -4108,7 +4108,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjActionNotificationStruct
+### GrObjActionNotificationStruct
     GrObjActionNotificationStruct               struct
         GOANS_suspendCount      word    ; If non-zero, then defer sending out 
                                         ; action notification.
@@ -4118,7 +4118,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjActionNotificationType
+### GrObjActionNotificationType
     GrObjActionNotificationType             etype word
         GOANT_NULL              enum GrObjActionNotificationType
                 ; Reserve zero as a special value
@@ -4150,7 +4150,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjAlignDistributeControlFeatures
+### GrObjAlignDistributeControlFeatures
     GrObjAlignDistributeControlFeatures record
         GOADCF_ALIGN_LEFT                               :1
         GOADCF_ALIGN_CENTER_HORIZONTALLY                :1
@@ -4173,7 +4173,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjAnchoredScaleData
+### GrObjAnchoredScaleData
     GrObjAnchoredScaleData          struct
         GOASD_scale             GrObjScaleData
         GOASD_scaleAnchor       GrObjHandleSpecification
@@ -4183,7 +4183,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjAnchoredSkewData
+### GrObjAnchoredSkewData
     GrObjAnchoredSkewData           struct
         GOASD_degrees           GrObjSkewData
         GOASD_skewAnchor        GrObjHandleSpecification
@@ -4193,7 +4193,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjAreaAttrElementType
+### GrObjAreaAttrElementType
     GrObjAreaAttrElementType            etype byte
         GOAAET_BASE             enum GrObjAreaAttrElementType
         ;GrObjBaseAreaAttrElement
@@ -4203,7 +4203,7 @@ This structure stores a system hatch pattern.
 **Library:** grobj.def
 
 ----------
-#### GrObjAreaAttrInfoRecord
+### GrObjAreaAttrInfoRecord
     GrObjAreaAttrInfoRecord         record
         GOAAIR_TRANSPARENT              :1
     GrObjAreaAttrInfoRecord         end
@@ -4215,7 +4215,7 @@ is no need to redraw the background behind the object.
 **Library:** grobj.def
 
 ----------
-#### GrObjAttrFlags
+### GrObjAttrFlags
     GrObjAttrFlags      record
                                                 :6
         GOAF_DONT_COPY_LOCKS                    :1
@@ -4271,7 +4271,7 @@ This type indicates how to wrap text with respect to the object.
 **Library:** grobj.def
 
 ----------
-#### GrObjAttributeManagerArrayDesc
+### GrObjAttributeManagerArrayDesc
     GrObjAttributeManagerArrayDesc                  struct
         GOAMAD_areaAttrArrayHandle          word
         GOAMAD_areaDefaultElement           word
@@ -4357,7 +4357,7 @@ created.
 **Library:** grobj.def
 
 ----------
-#### GrObjBaseAreaAttrDiffs
+### GrObjBaseAreaAttrDiffs
     GrObjBaseAreaAttrDiffs          record
         GOBAAD_MULTIPLE_ELEMENT_TYPES           :1
         GOBAAD_MULTIPLE_STYLE_ELEMENTS          :1
@@ -4381,7 +4381,7 @@ This flag indicates that this GrObj is the first one to receive this data buffer
 **Library:** grobj.def
 
 ----------
-#### GrObjBaseAreaAttrElement
+### GrObjBaseAreaAttrElement
     GrObjBaseAreaAttrElement            struct
         GOBAAE_styleElement     StyleSheetElementHeader
         GOBAAE_r                byte
@@ -4402,7 +4402,7 @@ This flag indicates that this GrObj is the first one to receive this data buffer
 **Library:** grobj.def
 
 ----------
-#### GrObjBaseLineAttrDiffs
+### GrObjBaseLineAttrDiffs
     GrObjBaseLineAttrDiffs          record
         GOBLAD_MULTIPLE_STYLE_ELEMENTS                  :1
         GOBLAD_MULTIPLE_ELEMENT_TYPES                   :1
@@ -4425,7 +4425,7 @@ This flag indicates that this GrObj is the first one to receive this data buffer
 **Library:** grobj.def
 
 ----------
-#### GrObjBaseLineAttrElement
+### GrObjBaseLineAttrElement
     GrObjBaseLineAttrElement            struct
         GOBLAE_styleElement         StyleSheetElementHeader
         GOBLAE_r                    byte
@@ -4447,7 +4447,7 @@ This flag indicates that this GrObj is the first one to receive this data buffer
 **Library:** grobj.def
 
 ----------
-#### GrObjBlockHandleElement
+### GrObjBlockHandleElement
     GrObjBlockHandleElement         struct
         GOBHE_blockHandle               hptr
         GOBHE_potentialSize             word
@@ -4456,7 +4456,7 @@ This flag indicates that this GrObj is the first one to receive this data buffer
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyAddGrObjFlags
+### GrObjBodyAddGrObjFlags
     GrObjBodyAddGrObjFlags          record
         GOBAGOF_DRAW_LIST_POSITION          :1
         GOBAGOF_REFERENCE                   :15
@@ -4470,7 +4470,7 @@ the reverse draw list.
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyCreateGrObjParams
+### GrObjBodyCreateGrObjParams
     GrObjBodyCreateGrObjParams              struct
         GBCGP_class     fptr.ClassStruct
         padding1        word        ; This padding ensures that width and 
@@ -4485,7 +4485,7 @@ the reverse draw list.
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyCustomDuplicateParams
+### GrObjBodyCustomDuplicateParams
     GrObjBodyCustomDuplicateParams                  struct
         GBCDP_repetitions       word
         GBCDP_move              PointDWFixed
@@ -4499,7 +4499,7 @@ the reverse draw list.
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyFlags
+### GrObjBodyFlags
     GrObjBodyFlags          record
         GBF_HAS_ACTION_NOTIFICATION     :1
         GBF_DEFAULT_TARGET              :1
@@ -4521,7 +4521,7 @@ upon a MSG_VIS_OPEN.
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyNotifyInstructionFlags
+### GrObjBodyNotifyInstructionFlags
     GrObjBodyNotifyInstructionFlags             struct
         GBNIF_flags             GrObjDrawFlags
         GBNIF_handleSize        byte    ;this field added post-Zoomer
@@ -4531,7 +4531,7 @@ upon a MSG_VIS_OPEN.
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyPasteCallBackStruct
+### GrObjBodyPasteCallBackStruct
     GrObjBodyPasteCallBackStruct            struct
         GOBPCBS_message             word
         GOBPCBS_optr                optr
@@ -4540,7 +4540,7 @@ upon a MSG_VIS_OPEN.
 **Library:** grobj.def
 
 ----------
-#### GrObjBodyUnsuspendOps
+### GrObjBodyUnsuspendOps
     GrObjBodyUnsuspendOps           record
         GBUO_UI_NOTIFY  GrObjUINotificationTypes: width GrObjUINotificationTypes
     GrObjBodyUnsuspendOps           end
@@ -4552,7 +4552,7 @@ suspend counts returns to zero.
 **Library:** grobj.def
 
 ----------
-#### GrObjCreateControlFeatures
+### GrObjCreateControlFeatures
     GrObjCreateControlFeatures              record
         GOCCF_RECTANGLE             :1
         GOCCF_ELLIPSE               :1
@@ -4569,7 +4569,7 @@ suspend counts returns to zero.
 **Library:** grobj.def
 
 ----------
-#### GrObjCreateGStateType
+### GrObjCreateGStateType
     GrObjCreateGStateType           etype word
         BODY_GSTATE     enum GrObjCreateGStateType,0    
                                 ;Has only translation to body upper left 
@@ -4583,7 +4583,7 @@ suspend counts returns to zero.
 **Library:** grobj.def
 
 ----------
-#### GrObjDefiningData
+### GrObjDefiningData
     GrObjDefiningData       struct
         GODD_attrFlags          GrObjAttrFlags
         GODD_locks              GrObjLocks
@@ -4598,7 +4598,7 @@ recover the object from a transfer item.
 **Library:** grobj.def
 
 ----------
-#### GrObjDrawFlags
+### GrObjDrawFlags
     GrObjDrawFlags              record
                                                 :7
         GODF_DRAW_QUICK_VIEW                    :1
@@ -4651,7 +4651,7 @@ If this flag is set, instructions should be printed.
 **Library:** grobj.def
 
 ----------
-#### GrObjDuplicateControlFeatures
+### GrObjDuplicateControlFeatures
     GrObjDuplicateControlFeatures       record
         GODCF_DUPLICATE             :1
         GODCF_DUPLICATE_IN_PLACE    :1
@@ -4660,7 +4660,7 @@ If this flag is set, instructions should be printed.
 **Library:** grobj.def
 
 ----------
-#### GrObjDuplicateControlToolboxFeatures
+### GrObjDuplicateControlToolboxFeatures
     GrObjDuplicateControlToolboxFeatures    record
         GODCTF_DUPLICATE                :1
         GODCTF_DUPLICATE_IN_PLACE       :1
@@ -4669,7 +4669,7 @@ If this flag is set, instructions should be printed.
 **Library:** 
 
 ----------
-#### GrObjEntryPointRelocation
+### GrObjEntryPointRelocation
     GrObjEntryPointRelocation               struct
         GOEPR_fullRelocation            EntryPointRelocation
         GOEPR_grObjEntryPoint           word
@@ -4678,7 +4678,7 @@ If this flag is set, instructions should be printed.
 **Library:** grobj.def
 
 ----------
-#### GrObjFileStatus
+### GrObjFileStatus
     GrObjFileStatus     record
         GOFS_MOUSE_GRAB     :1      ;True if body has mouse grab
         GOFS_SYS_TARGETED   :1      ;Body has the system target excl
@@ -4689,7 +4689,7 @@ If this flag is set, instructions should be printed.
 **Library:** grobj.def
 
 ----------
-#### GrObjFullAreaAttrElement
+### GrObjFullAreaAttrElement
     GrObjFullAreaAttrElement                struct
         GOFAAE_base     GrObjBaseAreaAttrElement
         GOFAAE_future   byte FUTURE_AREA_ATTR_ELEMENT_DATA_SIZE dup (?)
@@ -4701,7 +4701,7 @@ GrObjBaseAreaAttrElement structures.
 **Library:** grobj.def
 
 ----------
-#### GrObjFullLineAttrElement
+### GrObjFullLineAttrElement
     GrObjFullLineAttrElement                struct
         GOFLAE_base     GrObjBaseLineAttrElement
         GOFLAE_future   byte FUTURE_LINE_ATTR_ELEMENT_DATA_SIZE dup (?)
@@ -4713,7 +4713,7 @@ GrObjBaseLineAttrElement structures.
 **Library:** grobj.def
 
 ----------
-#### GrObjFunctionsActive
+### GrObjFunctionsActive
     GrObjFunctionsActive                record
         GOFA_RULER_HAS_SEEN_EVENT   :1
         GOFA_VIEW_ZOOMED            :1
@@ -4758,7 +4758,7 @@ Same as UIFA_EXTEND.
 **Library:** grobj.def
 
 ----------
-#### GrObjGradientAreaAttrElement
+### GrObjGradientAreaAttrElement
     GrObjGradientAreaAttrElement            struct
         GOGAAE_base             GrObjBaseAreaAttrElement
         GOGAAE_type             GrObjGradientType
@@ -4772,7 +4772,7 @@ Same as UIFA_EXTEND.
 **Library:** grobj.def
 
 ----------
-#### GrObjGradientAttrDiffs
+### GrObjGradientAttrDiffs
     GrObjGradientAttrDiffs              record
         GGAD_MULTIPLE_END_COLORS    :1
         GGAD_MULTIPLE_TYPES         :1
@@ -4788,7 +4788,7 @@ should clear it).
 **Library:** grobj.def
 
 ----------
-#### GrObjGradientFillControlFeatures
+### GrObjGradientFillControlFeatures
     GrObjGradientFillControlFeatures                record
         GOGFCF_HORIZONTAL_GRADIENT              :1
         GOGFCF_VERTICAL_GRADIENT                :1
@@ -4800,7 +4800,7 @@ should clear it).
 **Library:** grobj.def
 
 ----------
-#### GrObjGradientType
+### GrObjGradientType
     GrObjGradientType       etype byte
         GOGT_NONE                   enum GrObjGradientType
         GOGT_LEFT_TO_RIGHT          enum GrObjGradientType
@@ -4811,7 +4811,7 @@ should clear it).
 **Library:** grobj.def
 
 ----------
-#### GrObjHandleAnchorData
+### GrObjHandleAnchorData
     GrObjHandleAnchorData           struct
         GOHAD_anchor            PointDWFixed
         GOHAD_handle            GrObjHandleSpecification
@@ -4821,7 +4821,7 @@ should clear it).
 **Library:** grobj.def
 
 ----------
-#### GrObjHandleSpecification
+### GrObjHandleSpecification
     GrObjHandleSpecification            record
         GOHS_HANDLE_LEFT            :1
         GOHS_HANDLE_TOP             :1
@@ -4832,7 +4832,7 @@ should clear it).
 **Library:** grobj.def
 
 ----------
-#### GrObjInitializeData
+### GrObjInitializeData
     GrObjInitializeData         struct
         GOID_position       PointDWFixed
         GOID_width          WWFixed
@@ -4849,7 +4849,7 @@ parent coordinates.
 **Library:** grobj.def
 
 ----------
-#### GrObjInstructionControlFeatures
+### GrObjInstructionControlFeatures
     GrObjInstructionControlFeatures         record
         GOICF_DRAW                  :1
         GOICF_PRINT                 :1
@@ -4861,7 +4861,7 @@ parent coordinates.
 **Library:** grobj.def
 
 ----------
-#### GrObjLineAttrElementType
+### GrObjLineAttrElementType
     GrObjLineAttrElementType            etype byte
         GOLAET_BASE             enum GrObjLineAttrElementType
         ;GrObjBaseLineAttrElement
@@ -4869,7 +4869,7 @@ parent coordinates.
 **Library:** grobj.def
 
 ----------
-#### GrObjLineAttrInfoRecord
+### GrObjLineAttrInfoRecord
     GrObjLineAttrInfoRecord         record
         GOLAIR_ARROWHEAD_ON_START                       :1
         GOLAIR_ARROWHEAD_ON_END                         :1
@@ -4881,7 +4881,7 @@ parent coordinates.
 **Library:** grobj.def
 
 ----------
-#### GrObjLocks
+### GrObjLocks
     GrObjLocks      record
         GOL_COPY        :1  ;True if object may not be transferred to the 
                             ;clipboard
@@ -4907,7 +4907,7 @@ parent coordinates.
 **Library:** grobj.def
 
 ----------
-#### GrObjMessageOptimizationFlags
+### GrObjMessageOptimizationFlags
     GrObjMessageOptimizationFlags               record
         GOMOF_GET_DWF_SELECTION_HANDLE_BOUNDS_FOR_TRIVIAL_REJECT :1
         GOMOF_SPECIAL_RESIZE_CONSTRAIN                          :1
@@ -4977,7 +4977,7 @@ If set, sends MSG_GO_DRAW_BG.
 **Library:** grobj.def
 
 ----------
-#### GrObjMouseData
+### GrObjMouseData
     GrObjMouseData      struct
         GOMD_point          PointDWFixed        ; This field must be first.
         GOMD_buttonInfo     ButtonInfo          ; Copy of ButtonInfo
@@ -4989,7 +4989,7 @@ If set, sends MSG_GO_DRAW_BG.
 **Library:** grobj.def
 
 ----------
-#### GrObjMouseReturnType
+### GrObjMouseReturnType
     GrObjMouseReturnType            etype byte
         GOMRF_HANDLE    enum GrObjMouseReturnType   ;Mouse position is over a handle 
                                                     ;of a selected object.
@@ -5005,7 +5005,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjNotifyAreaAttrChange
+### GrObjNotifyAreaAttrChange
     GrObjNotifyAreaAttrChange           struct
         GNAAC_areaAttr              GrObjBaseAreaAttrElement
         GNAAC_areaAttrDiffs         GrObjBaseAreaAttrDiffs
@@ -5014,7 +5014,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjNotifyCurrentTool
+### GrObjNotifyCurrentTool
     GrObjNotifyCurrentTool          struct
         GONCT_toolClass         fptr.ClassStruct
         GONCT_specInitData      word
@@ -5023,7 +5023,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjNotifyGradientAttrChange
+### GrObjNotifyGradientAttrChange
     GrObjNotifyGradientAttrChange                   struct
         GONGAC_type             GrObjGradientType
         GONGAC_endR             byte                ;ending color red byte
@@ -5037,7 +5037,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjNotifyLineAttrChange
+### GrObjNotifyLineAttrChange
     GrObjNotifyLineAttrChange           struct
         GNLAC_lineAttr              GrObjBaseLineAttrElement
         GNLAC_lineAttrDiffs         GrObjBaseLineAttrDiffs
@@ -5046,7 +5046,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjNotifySelectionStateChange
+### GrObjNotifySelectionStateChange
     GrObjNotifySelectionStateChange             struct
         GONSSC_selectionState           GrObjSelectionState
         GONSSC_selectionStateDiffs      GrObjSelectionStateDiffs
@@ -5060,7 +5060,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjNudgeControlFeatures
+### GrObjNudgeControlFeatures
     GrObjNudgeControlFeatures               record
         GONCF_NUDGE_LEFT                :1
         GONCF_NUDGE_RIGHT               :1
@@ -5072,7 +5072,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjObjManipData
+### GrObjObjManipData
     GrObjObjManipData           struct
         GOOMD_actionGrObj               optr
         GOOMD_origMousePt               PointDWFixed
@@ -5086,7 +5086,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjObscureAttrControlFeatures
+### GrObjObscureAttrControlFeatures
     GrObjObscureAttrControlFeatures             record
         GOOACF_INSTRUCTIONS                 :1
         GOOACF_INSERT_OR_DELETE_MOVE        :1
@@ -5101,7 +5101,7 @@ remaining types.
 **Library:** grobj.def
 
 ----------
-#### GrObjOptimizationFlags
+### GrObjOptimizationFlags
     GrObjOptimizationFlags          record
         GOOF_ADDED_TO_BODY                      :1
         GOOF_IN_GROUP                           :1
@@ -5145,7 +5145,7 @@ dimensions.
 **Library:** grobj.def
 
 ----------
-#### GrObjPointerImageSituation
+### GrObjPointerImageSituation
     GrObjPointerImageSituation          etype byte
         GOPIS_NORMAL            enum GrObjPointerImageSituation
         GOPIS_EDIT              enum GrObjPointerImageSituation
@@ -5156,7 +5156,7 @@ dimensions.
 **Library:** grobj.def
 
 ----------
-#### GrObjResizeMouseData
+### GrObjResizeMouseData
     GrObjResizeMouseData            struct
         GORSMD_point        PointDWFixed            ; Must be first.
         GORSMD_anchor       GrObjHandleSpecification
@@ -5169,7 +5169,7 @@ dimensions.
 **Library:** grobj.def
 
 ----------
-#### GrObjRotateControlFeatures
+### GrObjRotateControlFeatures
     GrObjRotateControlFeatures              record
         GORCF_45_DEGREES_CW             :1
         GORCF_90_DEGREES_CW             :1
@@ -5184,7 +5184,7 @@ dimensions.
 **Library:** grobj.def
 
 ----------
-#### GrObjRotateMouseData
+### GrObjRotateMouseData
     GrObjRotateMouseData            struct
         GORMD_degrees           WWFixed
         GORMD_anchor            GrObjHandleSpecification
@@ -5198,7 +5198,7 @@ This structure is the stack frame passed with rotate message.
 **Library:** grobj.def
 
 ----------
-#### GrObjScaleControlFeatures
+### GrObjScaleControlFeatures
     GrObjScaleControlFeatures               record
         GOSCF_HALF_WIDTH                :1
         GOSCF_HALF_HEIGHT               :1
@@ -5210,7 +5210,7 @@ This structure is the stack frame passed with rotate message.
 **Library:** grobj.def
 
 ----------
-#### GrObjScaleData
+### GrObjScaleData
     GrObjScaleData      struct
         GOSD_xScale         WWFixed
         GOSD_yScale         WWFixed
@@ -5219,7 +5219,7 @@ This structure is the stack frame passed with rotate message.
 **Library:** grobj.def
 
 ----------
-#### GrObjSelectionState
+### GrObjSelectionState
     GrObjSelectionState     struct
         GSS_numSelected         word
         GSS_classSelected       fptr.ClassStruct
@@ -5232,7 +5232,7 @@ This structure is the stack frame passed with rotate message.
 **Library:** grobj.def
 
 ----------
-#### GrObjSelectionStateDiffs
+### GrObjSelectionStateDiffs
     GrObjSelectionStateDiffs            record
         GSSD_MULTIPLE_CLASSES               :1
         GSSD_MULTIPLE_ARC_CLOSE_TYPES       :1
@@ -5244,7 +5244,7 @@ This structure is the stack frame passed with rotate message.
 **Library:** grobj.def
 
 ----------
-#### GrObjSelectionStateFlags
+### GrObjSelectionStateFlags
     GrObjSelectionStateFlags            record
         GSSF_EDITING            :1  ;True if an object is being edited.
         GSSF_UNGROUPABLE        :1  ;True if at least one of the objects
@@ -5262,7 +5262,7 @@ This structure is the stack frame passed with rotate message.
 **Library:** grobj.def
 
 ----------
-#### GrObjsInRectData
+### GrObjsInRectData
     GrObjsInRectData        struct
         GOIRD_tempMessage           word
         GOIRD_tempMessageDX         word
@@ -5293,7 +5293,7 @@ resides within.
 **Library:** grobj.def
 
 ----------
-#### GrObjsInRectSpecial
+### GrObjsInRectSpecial
     GrObjsInRectSpecial         record
         GOIRS_IGNORE_TEMP           :1
         GOIRS_IGNORE_RECT           :1
@@ -5316,7 +5316,7 @@ Message will always be sent first.)
 **Library:** grobj.def
 
 ----------
-#### GrObjSkewControlFeatures
+### GrObjSkewControlFeatures
     GrObjSkewControlFeatures        record
         GOSCF_LEFT              :1
         GOSCF_RIGHT             :1
@@ -5328,7 +5328,7 @@ Message will always be sent first.)
 **Library:** grobj.def
 
 ----------
-#### GrObjSkewData
+### GrObjSkewData
     GrObjSkewData       struct
         GOSD_xDegrees           WWFixed
         GOSD_yDegress           WWFixed
@@ -5337,7 +5337,7 @@ Message will always be sent first.)
 **Library:** grobj.def
 
 ----------
-#### GrObjStyleElement
+### GrObjStyleElement
     GrObjStyleElement       struct
         GSE_meta                NameArrayElement
         GSE_baseStyle           word
@@ -5352,7 +5352,7 @@ Message will always be sent first.)
 **Library:** grobj.def
 
 ----------
-#### GrObjStyleFlags
+### GrObjStyleFlags
     GrObjStyleFlags             record
         GSF_AREA_COLOR_RELATIVE         :1
         GSF_AREA_MASK_RELATIVE          :1
@@ -5365,7 +5365,7 @@ Message will always be sent first.)
 **Library:** grobj.def
 
 ----------
-#### GrObjStylePrivateData
+### GrObjStylePrivateData
     GrObjStylePrivateData           struct
         GSPD_flags          GrObjStyleFlags
         GSPD_unused         byte 2 dup (0)
@@ -5374,7 +5374,7 @@ Message will always be sent first.)
 **Library:** grobj.def
 
 ----------
-#### GrObjTempModes
+### GrObjTempModes
     GrObjTempModes      record
         GOTM_SELECTED               :1
         GOTM_EDITED                 :1
@@ -5425,7 +5425,7 @@ the application target.)
 **Library:** grobj.def
 
 ----------
-#### GrObjTextArrays
+### GrObjTextArrays
     GrObjTextArrays         struct
         GOTA_charAttrArray          word
         GOTA_paraAttrArray          word
@@ -5438,7 +5438,7 @@ the application target.)
 **Library:** grobj.def
 
 ----------
-#### GrObjTiledDataFlags
+### GrObjTiledDataFlags
     GrObjTiledDataFlags     record
                                 :7
         GOTDF_VAR_DATA          :1
@@ -5447,7 +5447,7 @@ the application target.)
 **Library:** grobj.def
 
 ----------
-#### GrObjTransferBlockHeader
+### GrObjTransferBlockHeader
     GrObjTransferBlockHeader                struct
         GOTBH_meta              VMChainTree
         GOTBH_size              PointDWord  ; Width and height of the cut.
@@ -5468,7 +5468,7 @@ Cut/Copy/Paste operations.
 **Library:** grobj.def
 
 ----------
-#### GrObjTransferDataDirectory
+### GrObjTransferDataDirectory
     GrObjTransferDataDirectory              struct
         GOTDD_tiledDataFlags        GrObjTiledDataFlags
         GOTDD_protocol              byte
@@ -5477,7 +5477,7 @@ Cut/Copy/Paste operations.
 **Library:** grobj.def
 
 ----------
-#### GrObjTransferParams
+### GrObjTransferParams
     GrObjTransferParams         struct
         GTP_ssp                         StyleSheetParams
         GTP_textSSP                     VisTextSaveStyleSheetParams
@@ -5493,7 +5493,7 @@ Cut/Copy/Paste operations.
 **Library:** grobj.def
 
 ----------
-#### GrObjTransMatrix
+### GrObjTransMatrix
     GrObjTransMatrix        struct
         GTM_e11         WWFixed
         GTM_e12         WWFixed
@@ -5504,7 +5504,7 @@ Cut/Copy/Paste operations.
 **Library:** grobj.def
 
 ----------
-#### GrObjUINotificationTypes
+### GrObjUINotificationTypes
     GrObjUINotificationTypes            record
         GOUINT_STYLE        :1  ;True if style notification needs to be 
                                 ;sent
@@ -5522,7 +5522,7 @@ Cut/Copy/Paste operations.
 **Library:** grobj.def
 
 ----------
-#### GrObjUndoAppType
+### GrObjUndoAppType
     GrObjUndoAppType        struct
         GOUAT_freeMessage           word
         GOUAT_undoMessage           word
@@ -5531,7 +5531,7 @@ Cut/Copy/Paste operations.
 **Library:** grobj.def
 
 ----------
-#### GrObjVisGuardianCreateMode
+### GrObjVisGuardianCreateMode
     GrObjVisGuardianCreateMode              etype byte, 0
         GOVGCM_NO_CREATE            enum GrObjVisGuardianCreateMode
         GOVGCM_GUARDIAN_CREATE      enum GrObjVisGuardianCreateMode
@@ -5553,7 +5553,7 @@ sent to the ward.
 **Library:** grobj.def
 
 ----------
-#### GrObjVisGuardianFlags
+### GrObjVisGuardianFlags
     GrObjVisGuardianFlags           record
         GOVGF_VIS_BOUNDS_HAVE_CHANGED       :1
         GOVGF_LARGE                         :1
@@ -5585,7 +5585,7 @@ If set, the floater can edit existing objects in the document.
 **Library:** grobj.def
 
 ----------
-#### GrObjWrapTextType
+### GrObjWrapTextType
     GrObjWrapTextType       etype byte, 0
         GOWTT_DONT_WRAP             enum GrObjWrapTextType
         GOWTT_WRAP_AROUND_RECT      enum GrObjWrapTextType
@@ -5595,7 +5595,7 @@ If set, the floater can edit existing objects in the document.
 **Library:** grobj.def
 
 ----------
-#### GroupAddGrObjFlags
+### GroupAddGrObjFlags
     GroupAddGrObjFlags      record
         GAGOF_RELATIVE          :1
         GAGOF_REFERENCE         :15
@@ -5609,7 +5609,7 @@ and must be adjusted when it is added.
 **Library:** grobj.def
 
 ----------
-#### GroupUnsuspendOps
+### GroupUnsuspendOps
     GroupUnsuspendOps       record
         GUO_EXPAND      :1
     GroupUnsuspendOps       end
@@ -5621,7 +5621,7 @@ count reaches zero.
 **Library:** grobj.def
 
 ----------
-#### GSControl
+### GSControl
     GSControl       record
                         :6,
         GSC_PARTIAL     :1  ; Just do one element. If element is a complex
@@ -5641,7 +5641,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GSElemInfo
+### GSElemInfo
     GSElemInfo      struct
         GSEI_size           word
         GSEI_play           nptr
@@ -5651,7 +5651,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GSRefCountAndFlags
+### GSRefCountAndFlags
     GSRefCountAndFlags          record
         GSRCAF_USE_DOC_CLIP_REGION  :1  ;If set, then use GrSetDocClipRect
                                         ;instead of GrSetClipRect
@@ -5661,7 +5661,7 @@ count reaches zero.
 **Library:** Objects/vTextC.def
 
 ----------
-#### GSRetType
+### GSRetType
     GSRetType       etype word
         GSRT_COMPLETE   enum GSRetType
         GSRT_ONE        enum GSRetType
@@ -5678,7 +5678,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GStringElement
+### GStringElement
     GStringElement      etype byte, 0, 1
 
     DefGSElement    macro   \
@@ -5866,7 +5866,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GStringErrorType
+### GStringErrorType
     GStringErrorType        etype word
         GSET_NO_ERROR   enum GStringErrorType   ; there was no error
         GSET_DISK_FULL  enum GStringErrorType   ; disk became full, file truncated
@@ -5874,7 +5874,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GStringKillType
+### GStringKillType
     GStringKillType     etype byte
         GSKT_KILL_DATA      enum GStringKillType    ; delete the data too
         GSKT_LEAVE_DATA     enum GStringKillType    ; leave the data alone
@@ -5882,7 +5882,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GStringSetPosType
+### GStringSetPosType
     GStringSetPosType       etype byte
         GSSPT_SKIP_1    enum GStringSetPosType  ; advance 1 element
         GSSPT_RELATIVE  enum GStringSetPosType  ; advance N elements
@@ -5892,7 +5892,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GStringType
+### GStringType
     GStringType     etype byte
         GST_CHUNK   enum GStringType    ; write to a memory chunk
         GST_STREAM  enum GStringType    ; write to a stream
@@ -5904,7 +5904,7 @@ count reaches zero.
 **Library:** gstring.def
 
 ----------
-#### GTCFeatures
+### GTCFeatures
     GTCFeatures     record
         GTCF_TOOL_DIALOG        :1
     GTCFeatures     end
@@ -5912,7 +5912,7 @@ count reaches zero.
 **Library:** Objects/gToolCC.def
 
 ----------
-#### GTP_vars
+### GTP_vars
     GTP_vars        struct
         GTPL_style          TextMetricStyles    ; Must be first
         GTPL_object         dword               ; Object segment address
@@ -5926,7 +5926,7 @@ This structure is passed to **GrTextPosition**.
 **Library:** text.def
 
 ----------
-#### Guide
+### Guide
     Guide   struct
         Guide_location      DWFixed
     Guide   ends
@@ -5934,7 +5934,7 @@ This structure is passed to **GrTextPosition**.
 **Library:** ruler.def
 
 ----------
-#### GVCFeatures
+### GVCFeatures
     GVCFeatures     record
         GVCF_MAIN_100               :1
         GVCF_MAIN_SCALE_TO_FIT      :1
@@ -5956,7 +5956,7 @@ This structure is passed to **GrTextPosition**.
 **Library:** Objects/gViewCC.def
 
 ----------
-#### GVCToolboxFeatures
+### GVCToolboxFeatures
     GVCToolboxFeatures      record
         GVCTF_100                   :1
         GVCTF_SCALE_TO_FIT          :1

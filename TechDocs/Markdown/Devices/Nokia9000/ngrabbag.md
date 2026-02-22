@@ -1,8 +1,8 @@
-## Nokia 9000/9000i/9110 Communicator Fact Sheet
+# Nokia 9000/9000i/9110 Communicator Fact Sheet
 
 ![](Art/p_9000.gif)
 
-### Hardware
+## Hardware
 
 **The device dimensions are:**
 
@@ -76,7 +76,7 @@ The keyboard is a standard QWERTY keyboard. English, French German and Scandinav
 
 The Nokia 9110 Communicator uses a 1100 mAh Li-ion Battery that provides 3-6 hours of talk/data/fax, 60-200 hours of standby, up to 400 hours of standby when the phone is off, and takes 2 hours to charge.
 
-### Text
+## Text
 
 The following is a list of all the available fonts, their sizes, styles, and comments.
 
@@ -97,7 +97,7 @@ The following is a list of all the available fonts, their sizes, styles, and com
 | FID\_DTC\_URW\_ROMAN   | Any Size            | --                               | Outline font.                                                                                                                             |
 | FID\_BISON             | --                  | --                               | This font has only one character, '\*'. This is used for passwords.                                                                       |
 
-### Icons
+## Icons
 
 There are two types of icons: Status Pane Icons and File List Icons.
 
@@ -119,7 +119,7 @@ When creating a file list icon using the Icon Editor, use the following settings
 - Format Type: Icon
 - Display Size: Tiny
 
-### Communicator Grays
+## Communicator Grays
 
 Nokia 9000i Communicators support 4 levels of gray and the newer Nokia 9110 Communicators support 4-bit color, even though the display is grayscale (16 shades of gray). There are two different grayscale schemes used, one for visMonikers and icons, and the other for normal GEOS drawing routines.
 
@@ -147,7 +147,7 @@ Other graphics can make use of the 16 GEOS enumerated color types to choose the 
 | **C\_YELLOW, C\_BROWN**         | **White**            | **Light-light gray**  |
 | **C\_WHITE, C\_LIGHT\_GRAY**    |                      | **White**             |
 
-### Disk Space Warnings
+## Disk Space Warnings
 
 Often, it is useful to get a qualitative measure of the available free disk space to check whether the disk is dangerously full. The disk warning levels are:
 
@@ -155,7 +155,7 @@ The **Warning Level** is less than 50K.
 
 The **Critical Level** is less than 25K
 
-### UI Conventions: Triggers
+## UI Conventions: Triggers
 
 **Trigger Usage**
 
@@ -203,7 +203,7 @@ To create a menu trigger, follow the same steps for creating a normal trigger bu
 
 Ctrl-F2 corresponds to the menu button on the emulator.
 
-### Zoom Levels
+## Zoom Levels
 
 On versions 4.8.8 or later of the 9000i Communicator, the user can press an off-screen "Zoom" button to toggle between three text size settings -- "Zoom" levels -- and adjust the text size for comfortable reading.
 
@@ -222,7 +222,7 @@ Use `HINT_MAXIMUM_ZOOM_LEVEL` to determine the maximum size that a UI component 
 
 The higher the zoom level, the larger the font size, and the fewer the number of characters that will fit into a fixed pixel length field. Thus, if you use a `CreateVisMoniker...()` routine, you should use the routines `FoomZoomGetLevel()` and `FoamConvertToZoomedSize()` to take the zoom level into consideration and create a VisMoniker of appropriate size. (Refer to [Zoom Level UI](../../Nokia9000/UI/9000UI_zoom.htm) for more details.)
 
-### Nokia 9000i Emulator Keyboard Mapping
+## Nokia 9000i Emulator Keyboard Mapping
 
 **This only applies to US QWERTY keyboards**
 
@@ -270,21 +270,21 @@ Ctrl F3 - Detach application
 
 Ctrl F4 - Close application
 
-### Sound
+## Sound
 
 Communicator applications may play `StandardSoundType` sounds through the PDA-side speaker. If you write applications that use sounds, you will have to debug sounds on the actual device since the emulator does not provide sound support.
 
-### The Installer
+## The Installer
 
 The Nokia 9000i Communicator SDK comes with an installer application called **NServer.exe**. It uses an installation script that describes your application's name, version, and related files that will need to be transferred.
 
-### To Clear all RAM
+## To Clear all RAM
 
 To reset the Nokia 9000i Communicator and effectively erase every bit of data on the phone (except, of course, the factory settings and data) you must pull out the main battery, put it back in, then hold down the keys Shift-Esc-f. You will be prompted to format the RAM of the device and you can cancel here if you don't really want to erase the data.
 
 Once the phone has been reset you must re-enter all of the user data again, including your home country, name, and address.
 
-### Version Information
+## Version Information
 
 You can get version information from the INI file on the Nokia 9000i Communicator. The information is stored as a string in `[UI]swSerialNumber`. The string is 27 characters long. This same string can be seen on the last line of About this product. The whole string looks like this:
 
@@ -327,13 +327,13 @@ MemUnlock( OptrToHandle( @UICategory ) );
 }
 ```
 
-### Lid-closing Event
+## Lid-closing Event
 
 After the Nokia 9000i Communicator's lid is closed, the Communicator waits for 30 seconds and then turns off the CPU. Of course, the CPU will not turn off until all applications are idle.
 
 To receive notification that the lid is closed, an application should register on the GCN list `GCNSLT_RESPONDER_NOTIFICATIONS`. It should watch for `MSG_META_NOTIFY` with `notificationType == GWNT_RESPONDER_NOTIFICATION`, `manufID == MANUFACTURER_ID_GEOWORKS` and `data == RNT_LID_CLOSED`. (`ResponderNotificationType` is defined in N9000v20\\CInclude\\Internal\\respondr.goh)
 
-### Debugging an actual Nokia 9000i Communicator
+## Debugging an actual Nokia 9000i Communicator
 
 To debug on an actual Nokia 9000i Communicator, you need to attach your host PC to the device's 6-pin serial port. Then run the GEOS Setup program and change the "Communication Mode" to Remote and set the "Comm Speed" to 38400. Which "COMM Port" you use depends on which port on your PC you have used to connect to the phone. Remove the battery so the phone shuts down. Then replace the battery and press:
 

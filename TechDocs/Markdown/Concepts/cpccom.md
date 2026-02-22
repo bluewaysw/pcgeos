@@ -1,4 +1,4 @@
-## 22 PCCom Library
+# 22 PCCom Library
 
 The PCCom library provides a simple way to allow a geode to provide and 
 monitor a PCCom connection. If you are familiar with the SDK, you probably 
@@ -18,7 +18,7 @@ If you're not familiar with the **pccom** tool, you should probably read the
 pccom section of ["Using Tools," Chapter 10 of the Tools Book](../Tools/ttools.md)
 -perhaps not the whole section, but at least enough to understand basic usage.
 
-### 22.1 PCCom Library Abilities
+## 22.1 PCCom Library Abilities
 
 Your geode needn't do much to support PCCom. The PCCom library acts as a 
 passive pccom machine-it will only accept orders from a remote machine. 
@@ -27,7 +27,7 @@ All you need to do to support PCCom is start up a PCCom process, ideally
 freeing it when done. Geodes using the PCCom library have the option of 
 receiving notification when pccom would display text.
 
-### 22.2 What To Do
+## 22.2 What To Do
 
 PCCOMINIT(), PCCOMEXIT(), PCCOMABORT()
 
@@ -47,7 +47,7 @@ You may call the PCCOMABORT() routine at any time; this routine aborts any
 pccom file transfer that may be in progress, but leaves the PCCom connection 
 intact.
 
-### 22.3 Staying Informed
+## 22.3 Staying Informed
 
 The sections above tell you everything you need to let your geode interact 
 with pccom. It is possible to do more: your geode can receive notification 

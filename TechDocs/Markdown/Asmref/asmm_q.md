@@ -1,7 +1,7 @@
 ## 2.5 Routines M-Q
 
 ----------
-#### MemAlloc
+### MemAlloc
 Creates a block and assigns a handle to it. This block can be discardable, 
 swapable, fixed or movable. A passed flag determines whether heap 
 compaction or discarding of objects should be used to generate free space.
@@ -22,7 +22,7 @@ cx
 **Library:** heap.def
 
 ----------
-#### MemAllocLMem
+### MemAllocLMem
 Allocates a block within a local memory heap from scratch. To take an 
 existing block and create a local memory heap built on it, use 
 **LMemInitHeap**.
@@ -41,7 +41,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### MemAllocSetOwner
+### MemAllocSetOwner
 Creates a block, assigns a handle to it, and explicitly sets the owner of the 
 new block by passing the handle of the owning geode. Otherwise, it is 
 identical to **MemAlloc**.
@@ -63,7 +63,7 @@ cx
 **Library:** heap.def
 
 ----------
-#### MemDecRefCount
+### MemDecRefCount
 Decrements a reference count in a memory handle and immediately frees it 
 when the count reaches zero.
 
@@ -81,7 +81,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemDerefDS
+### MemDerefDS
 Returns the address of the block referenced by its block handle into the DS 
 register. The block must be locked before calling this routine. This routine is 
 useful in allocating a fixed or locked block.
@@ -98,7 +98,7 @@ Nothing. Flags preserved.
 **Library:** heap.def
 
 ----------
-#### MemDerefES
+### MemDerefES
 Returns the address of a block referenced by its block handle into the ES 
 register. the block must be locked before calling this routine.
 
@@ -114,7 +114,7 @@ Nothing. Flags preserved.
 **Library:** heap.def
 
 ----------
-#### MemDiscard
+### MemDiscard
 Throws away the contents of a discardable memory block.
 
 **Pass:**  
@@ -131,7 +131,7 @@ bx
 **Library:** heap.def
 
 ----------
-#### MemDowngradeExclLock
+### MemDowngradeExclLock
 Downgrades an exclusive lock to a shared lock, waking any shared lockers 
 blocked on the block.
 
@@ -147,7 +147,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemFree
+### MemFree
 Frees a memory block. The block may be locked at the time it is freed. 
 Therefore, make sure that no other thread has locked the block before freeing 
 it.
@@ -164,7 +164,7 @@ bx
 **Library:** heap.def
 
 ----------
-#### MemGetInfo
+### MemGetInfo
 Returns information about a memory block. Pass this routine the proper 
 **MemGetInfoType**. The return values depend on what information you 
 request.
@@ -195,7 +195,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemIncRefCount
+### MemIncRefCount
 Increments a reference count on a memory handle.
 
 **Pass:**  
@@ -210,7 +210,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemInitRefCount
+### MemInitRefCount
 Initializes a reference count for a memory handle.
 
 **Pass:**  
@@ -226,7 +226,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemLock
+### MemLock
 Locks the given block, returning the absolute address of the block of memory 
 pointed to by the given handle. Increments the lock count by one. Locked 
 memory blocks cannot be moved or discarded (though they may be freed). You 
@@ -245,7 +245,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemLockExcl
+### MemLockExcl
 
 Locks a memory block for exclusive read/write access. If no one has locked the 
 block, the thread will gain exclusive access; otherwise, the thread will block 
@@ -264,7 +264,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemLockFixedOrMovable
+### MemLockFixedOrMovable
 Given a virtual segment, locks the corresponding block down if the segment 
 is movable.
 
@@ -282,7 +282,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemLockShared
+### MemLockShared
 Locks a block down for shared (usually read-only) access.
 
 **Pass:**  
@@ -297,7 +297,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemModifyFlags
+### MemModifyFlags
 Modify the *HM_flags* associated with a memory block. The following bits may 
 be altered: HF_SHARABLE, HF_DISCARDABLE, HF_SWAPABLE, and 
 HF_LMEM.
@@ -316,7 +316,7 @@ ax
 **Library:** heap.def
 
 ----------
-#### MemModifyOtherInfo
+### MemModifyOtherInfo
 Modifies the *HM_otherInfo* field associated with a memory block.
 
 **Pass:**  
@@ -332,7 +332,7 @@ ax
 **Library:** heap.def
 
 ----------
-#### MemOwner
+### MemOwner
 Returns the owner field of a handle.
 
 **Pass:**  
@@ -348,7 +348,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemPLock
+### MemPLock
 Calls **HandleP** and **MemLock** in that order.
 
 **Pass:**  
@@ -363,7 +363,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemReAlloc
+### MemReAlloc
 Reallocates space within a given block, changing its size. Also used to 
 reallocate space for a block that has been discarded.
 
@@ -385,7 +385,7 @@ ax, cx
 **Library:** heap.def
 
 ----------
-#### MemSegmentToHandle
+### MemSegmentToHandle
 Returns the corresponding handle of a passed segment value.
 
 **Pass:**  
@@ -401,7 +401,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemThreadGrab
+### MemThreadGrab
 Locks a block and increments a semaphore on the block; the current thread 
 will be able to perform more **MemThreadGrab** operations but other threads 
 will block on **MemThreadGrab**. If another thread has the semaphore 
@@ -422,7 +422,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemThreadGrabNB
+### MemThreadGrabNB
 Performs the same function as **MemThreadGrab** (locks a block and 
 increments a semaphore on the block) except that it doesn't block if another 
 thread has the semaphore.
@@ -440,7 +440,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemThreadRelease
+### MemThreadRelease
 Releases a thread previously grabbed by **MemThreadGrab**.
 
 **Pass:**  
@@ -455,7 +455,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MemUnlock
+### MemUnlock
 Unlocks a given block of memory by decrementing its lock count. If the lock 
 count reaches zero then the block is subject to moving or discarding.
 
@@ -475,7 +475,7 @@ NULL_SEGMENT upon return from this procedure.)
 **Library:** heap.def
 
 ----------
-#### MemUnlockFixedOrMovable
+### MemUnlockFixedOrMovable
 Given a virtual segment, unlocks the corresponding block if the segment is 
 movable.
 
@@ -491,7 +491,7 @@ Nothing (flags preserved).
 **Library:** heap.def
 
 ----------
-#### MemUnlockShared
+### MemUnlockShared
 Unlocks a block that was locked by either **MemLockShared** or 
 **MemLockExcl**. 
 
@@ -507,7 +507,7 @@ Nothing (flags preserved).
 **Library:** heap.def
 
 ----------
-#### MemUnlockV
+### MemUnlockV
 Unlocks a block and releases a semaphore on that block. (Performs a 
 **MemUnlock** and a **HandleV** in that order.)
 
@@ -523,7 +523,7 @@ Nothing (flags preserved).
 **Library:** heap.def
 
 ----------
-#### MemUpgradeSharedLock
+### MemUpgradeSharedLock
 Upgrades a shared lock to an exclusive lock. If the block is shared by other 
 threads this will block and the memory block may move on the heap before 
 gaining exclusive access.
@@ -544,7 +544,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### MessageDispatch
+### MessageDispatch
 Dispatches a passed message without destroying the handle of the message 
 (event) to dispatch using **ObjMessage**.
 
@@ -563,7 +563,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### MessageProcess
+### MessageProcess
 Processes a message (event) dispatching it via a custom callback routine.
 
 **Pass:**  
@@ -595,7 +595,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### MessageSetDestination
+### MessageSetDestination
 Changes an event's destination optr.
 
 **Pass:**  
@@ -611,7 +611,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### MetaGrabFocusExclLow
+### MetaGrabFocusExclLow
 This routine grabs the focus exclusive for the object.
 
 **Pass:**  
@@ -630,7 +630,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### MetaGrabModelExclLow
+### MetaGrabModelExclLow
 This routine grabs the model exclusive for the object.
 
 **Pass:**  
@@ -649,7 +649,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### MetaGrabTargetExclLow
+### MetaGrabTargetExclLow
 This routine grabs the target exclusive for the object.
 
 **Pass:**  
@@ -668,7 +668,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### MetaReleaseFocusExclLow
+### MetaReleaseFocusExclLow
 This routine releases the focus exclusive for the object.
 
 **Pass:**  
@@ -687,7 +687,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### MetaReleaseFTExclLow
+### MetaReleaseFTExclLow
 This routine releases the focus and target exclusives for the object.
 
 **Pass:**  
@@ -706,7 +706,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### MetaRelaseModelExclLow
+### MetaRelaseModelExclLow
 This routine releases the model exclusive for the object.
 
 **Pass:**  
@@ -725,7 +725,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### MetaReleaseTargetExclLow
+### MetaReleaseTargetExclLow
 This routine releases the target exclusive for the object.
 
 **Pass:**  
@@ -744,7 +744,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### NameArrayAdd
+### NameArrayAdd
 Creates an element within a name array and copies the data and name into 
 it. If an element with the same name already exists, this routine will not 
 create a duplicate; if NAAF_SET_DATA_ON_REPLACE is passed, the newly 
@@ -770,7 +770,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### NameArrayChangeName
+### NameArrayChangeName
 Changes the element's name within the passed name array.
 
 This routine may resize the LMem block, moving it on the heap and 
@@ -791,7 +791,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### NameArrayCreate
+### NameArrayCreate
 Creates a name array with zero elements. Add elements with 
 **NameArrayAdd**.
 
@@ -814,7 +814,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### NameArrayFind
+### NameArrayFind
 
 Finds a name element within a name array.
 
@@ -834,7 +834,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ObjBlockGetOutput
+### ObjBlockGetOutput
 Returns the optr of the object set to receive output messages from all objects 
 within the object block. (This output optr is stored in an object block's 
 **ObjLMemBlockHeader**.)
@@ -851,7 +851,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjBlockSetOutput
+### ObjBlockSetOutput
 Sets the optr of the object set to receive output messages from all objects 
 within the object block. (This output optr is stored in an object block's 
 **ObjLMemBlockHeader**.)
@@ -869,7 +869,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjCallClassNoLock
+### ObjCallClassNoLock
 
 Sends a message (invokes a method) of the given class for an object. If the 
 message is not resident in the passed class, sends that message on to the 
@@ -920,7 +920,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjCallInstanceNoLock
+### ObjCallInstanceNoLock
 Invokes a message of the given instance's class, fixing up **ds** upon return. 
 
 This routine assumes that the object block containing the receiving object is 
@@ -967,7 +967,7 @@ Nothing. (Possibly **es**; see above.)
 **Library:** object.def
 
 ----------
-#### ObjCallInstanceNoLockES
+### ObjCallInstanceNoLockES
 Invokes a message of the given object instance's class, fixing up both **ds** and 
 **es** upon return.
 
@@ -1017,7 +1017,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjCallSuperNoLock
+### ObjCallSuperNoLock
 Invokes a message of the given object instance's superclass.
 
 This routine assumes that the object block containing the receiving object is 
@@ -1063,7 +1063,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjCompAddChild
+### ObjCompAddChild
 Adds a child object to the composite field of another, composite object.
 
 **Pass:**  
@@ -1085,7 +1085,7 @@ ax, bx, di, bp.
 **Library:** metaC.def
 
 ----------
-#### ObjCompFindChild
+### ObjCompFindChild
 Pass a message to the next sibling of a linkable object.
 
 **Pass:**  
@@ -1114,7 +1114,7 @@ Nothing.
 **Library:** metaC.def
 
 ----------
-#### ObjCompMoveChild
+### ObjCompMoveChild
 This routine performs a MSG_MOVE_CHILD for a composite object.
 
 This routine is used to move a child to a different location in the list of 
@@ -1149,7 +1149,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them.
 
 ----------
-#### ObjCompProcessChildren
+### ObjCompProcessChildren
 This routine processes the children of a composite object via a callback 
 routine or via several predefined callback routines.
 
@@ -1207,7 +1207,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them.
 
 ----------
-#### ObjCompRemoveChild
+### ObjCompRemoveChild
 This routine performs a MSG_REMOVE_CHILD for a composite object.
 
 This routine is used to remove a child from a composite. The child to be 
@@ -1241,7 +1241,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them.
 
 ----------
-#### ObjDecInUseCount
+### ObjDecInUseCount
 Decrements the in-use count for an object block, stored in the 
 **ObjLMemBlockHeader** structure at the from of an object block. The in-use 
 count ensures that an object block being used is not freed prematurely.
@@ -1261,7 +1261,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjDecInteractibleCount
+### ObjDecInteractibleCount
 Decrements the interactible count of the passed object block. This count 
 quantifies the number of objects in the block that are currently interactible 
 with the user.
@@ -1281,7 +1281,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjDoRelocation
+### ObjDoRelocation
 
 Relocates a single piece of data (word or double word) within an object block. 
 
@@ -1304,7 +1304,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjDoUnRelocation
+### ObjDoUnRelocation
 Unrelocates a single piece of data (word or double word) within an object 
 block.
 
@@ -1327,7 +1327,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjDuplicateMessage
+### ObjDuplicateMessage
 Duplicates an encapsulated message (event), returning a copy of the event.
 
 **Pass:**  
@@ -1342,7 +1342,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjDuplicateResource
+### ObjDuplicateResource
 Duplicates an object resource block (and any objects and chunks within that 
 object block), returning the handle of the newly-created block. 
 
@@ -1368,7 +1368,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjEnableDetach
+### ObjEnableDetach
 Acknowledge detach for an object.
 
 **Pass:**  
@@ -1388,7 +1388,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them
 
 ----------
-#### ObjFreeChunk
+### ObjFreeChunk
 Frees a chunk within an object block. (Chunks within resources will remain, 
 with their size resized to zero.)
 
@@ -1404,7 +1404,7 @@ ax
 **Library:** object.def
 
 ----------
-#### ObjFreeDuplicate
+### ObjFreeDuplicate
 Frees a block created by ObjDuplicateResource or saved with 
 ObjSaveBlock. 
 
@@ -1420,7 +1420,7 @@ bx
 **Library:** object.def
 
 ----------
-#### ObjFreeMessage
+### ObjFreeMessage
 Frees an event handle (and the event attached to that handle).
 
 **Pass:**  
@@ -1435,7 +1435,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjFreeObjBlock
+### ObjFreeObjBlock
 Frees an object block. Object blocks created with **ObjDuplicateBlock** or 
 **ObjSaveBlock** should use **ObjFreeDuplicate** instead.
 
@@ -1451,7 +1451,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjGetFlags
+### ObjGetFlags
 Returns the **ObjChunkFlags** associated with an object block's chunk.
 
 **Pass:**  
@@ -1468,7 +1468,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjGetMessageInfo
+### ObjGetMessageInfo
 Returns information about an event handle.
 
 **Pass:**  
@@ -1486,7 +1486,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjGotoSuperTailRecurse
+### ObjGotoSuperTailRecurse
 This is an optimized version of **ObjCallSuperNoLock** that only works in 
 the case of tail recursion.
 
@@ -1508,7 +1508,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjIncDetach
+### ObjIncDetach
 Increment the acknowledge count for a detaching object.
 
 **Pass:**  
@@ -1523,7 +1523,7 @@ Nothing.
 **Library:** metaC.def
 
 ----------
-#### ObjIncInUseCount
+### ObjIncInUseCount
 Increments the in-use count for an object block, stored in the 
 **ObjLMemBlockHeader** structure at the front of an object block. The in-use 
 count ensures that an object block being used is not freed prematurely.
@@ -1543,7 +1543,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjIncInteractibleCount
+### ObjIncInteractibleCount
 Increments the interactible count of the passed object block. This count 
 quantifies the number of objects in the block that are currently interactible 
 with the user.
@@ -1563,7 +1563,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjInitDetach
+### ObjInitDetach
 Prepare to detach an object.
 
 **Pass:**  
@@ -1587,7 +1587,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them
 
 ----------
-#### ObjInitializeMaster
+### ObjInitializeMaster
 Initializes a master part of an object.
 
 **Pass:**  
@@ -1604,7 +1604,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjInitializePart
+### ObjInitializePart
 Ensures that an object is expanded, and initialized if necessary, for all master 
 parts down through the part passed. This routine sends 
 MSG_META_RESOLVE_VARIANT_SUPERCLASS to any master parts above the 
@@ -1626,7 +1626,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjInstantiate
+### ObjInstantiate
 Instantiates (creates) an object of the passed class, allocating a chunk for the 
 object, initializing the chunk to zeroes, filling in the class pointer and passing 
 MSG_PROCESS_INSTANTIATE to the object (if it has no master classes).
@@ -1648,7 +1648,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjIsClassADescendant
+### ObjIsClassADescendant
 Test whether a given class is a subclass of another specified class.
 
 **Pass:**  
@@ -1665,7 +1665,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjIsObjectInClass
+### ObjIsObjectInClass
 Tests whether or not an object is of a given class. If a variant class is 
 encountered, the object will not be grown out past that class in the search. 
 
@@ -1685,7 +1685,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjLinkCallNextSibling
+### ObjLinkCallNextSibling
 Pass a message to the next sibling of a linkable object.
 
 **Pass:**  
@@ -1713,7 +1713,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them.
 
 ----------
-#### ObjLinkCallParent
+### ObjLinkCallParent
 Pass a message to the parent of a linkable object.
 
 **Pass:**  
@@ -1743,7 +1743,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them.
 
 ----------
-#### ObjLinkFindParent
+### ObjLinkFindParent
 Pass a method to the next sibling of a linkable object.
 
 **Pass:**  
@@ -1766,7 +1766,7 @@ invalidating stored segment pointers and current register or stored offsets to
 them.
 
 ----------
-#### ObjLockObjBlock
+### ObjLockObjBlock
 Locks an object block, loading in the resource if necessary. If the block is an 
 LMem heap but is not an object block, this routine acts like **MemLock**.
 
@@ -1782,7 +1782,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjMapSavedToState
+### ObjMapSavedToState
 Maps a saved/duplicated block to its corresponding VM block handle in the 
 process' state file.
 
@@ -1800,7 +1800,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjMapStateToSaved
+### ObjMapStateToSaved
 Maps a VM block ID from a state file to the corresponding memory block 
 handle for a process.
 
@@ -1819,7 +1819,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjMarkDirty
+### ObjMarkDirty
 Register-saving routine to mark an object dirty.
 
 **Pass:**  
@@ -1834,7 +1834,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjMessage
+### ObjMessage
 Sends a message to an object.
 
 **Pass:**  
@@ -1882,7 +1882,7 @@ bx, si, di, ds, es (and unused return registers above).
 **Library:** object.def
 
 ----------
-#### ObjProcBroadcastMessage
+### ObjProcBroadcastMessage
 Broadcasts an event to all threads with event queues.
 
 **Pass:**  
@@ -1897,7 +1897,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjRelocOrUnRelocSuper
+### ObjRelocOrUnRelocSuper
 Relocate or unrelocate an object's superclass structures and pointers.
 
 **Pass:**  
@@ -1914,7 +1914,7 @@ ax, dx, dx
 **Library:** object.def
 
 ----------
-#### ObjResizeMaster
+### ObjResizeMaster
 Resizes a master class part of an object.
 
 **Pass:**  
@@ -1931,7 +1931,7 @@ ax
 **Library:** object.def
 
 ----------
-#### ObjSaveBlock
+### ObjSaveBlock
 Sets up an LMem block to be saved to its owner's state file.
 
 **Pass:**  
@@ -1948,7 +1948,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjSetFlags
+### ObjSetFlags
 Sets the object flags (**ObjChunkFlags**) associated with a chunk.
 
 **Pass:**  
@@ -1966,7 +1966,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjSwapLock
+### ObjSwapLock
 This utility routine locks a new object block and saves the old object's block 
 handle. This is useful when using **ObjCallInstanceNoLock** is much more 
 desirable than using **ObjMessage** for repeated operations; for example, if an 
@@ -1987,7 +1987,7 @@ Nothing. Flags preserved.
 **Library:** object.def
 
 ----------
-#### ObjSwapLockParent
+### ObjSwapLockParent
 This utility routine locks the parent of an object and saves the child's block 
 handle. This is useful when using **ObjCallInstanceNoLock** is much more 
 desirable than using **ObjMessage** for repeated operations; for example, if an 
@@ -2011,7 +2011,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjSwapUnlock
+### ObjSwapUnlock
 This utility routine swaps a locked object block, unlocking it in the process, 
 with a new object block.
 
@@ -2029,7 +2029,7 @@ Nothing. Flags preserved.
 **Library:** object.def
 
 ----------
-#### ObjTestIfObjBlockRunByCurThread
+### ObjTestIfObjBlockRunByCurThread
 Determines if the current running thread owns a given object block. 
 
 **Pass:**  
@@ -2050,7 +2050,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarAddData
+### ObjVarAddData
 Adds a new vardata entry or replaces the existing data within an entry (with 
 zeroed data). This routine returns a pointer to the extra data section of the 
 vardata entry in order to allow you to initialize this data immediately.
@@ -2073,7 +2073,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarCopyDataRange
+### ObjVarCopyDataRange
 Copies a group of vardata entries (matching the specified range values) from 
 one object into another object. You can pass an identical start and end 
 vardata type value to copy a single vardata entry from one object another.
@@ -2096,7 +2096,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarDeleteData
+### ObjVarDeleteData
 Deletes a specified vardata entry field and associated extra data (if any) 
 within an object.
 
@@ -2115,7 +2115,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarDeleteDataAt
+### ObjVarDeleteDataAt
 Deletes a vardata entry field (specified at by the passed opaque pointer).
 
 **Pass:**  
@@ -2132,7 +2132,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarDeleteDataRange
+### ObjVarDeleteDataRange
 Deletes a group of vardata entries (matching the specified range values). You 
 may also specify that you only wish to delete vardata entries that are not 
 marked VDF_SAVE_TO_STATE.
@@ -2157,7 +2157,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarDerefData
+### ObjVarDerefData
 Returns either a pointer to a vardata entry's extra data section or an opaque 
 pointer to the vardata entry type passed. (If there is no extra data, it returns 
 a pointer to the data entry + offset *VDI_extraData*. This is used as an opaque 
@@ -2179,7 +2179,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarFindData
+### ObjVarFindData
 Searches an object's vardata section for a given vardata type. If found, this 
 routine returns a pointer to the appropriate vardata section (or an opaque 
 pointer if there is no extra data; this opaque pointer should be used before 
@@ -2204,7 +2204,7 @@ Nothing.
 **Library:** object.def
 
 ----------
-#### ObjVarScanData
+### ObjVarScanData
 Scans an object's vardata and calls all pertaining routines listed in a "vardata 
 handler" table.
 
@@ -2240,7 +2240,7 @@ ax, bx, si, di, es
 **Library:** object.def
 
 ----------
-#### ParserAddDependencies
+### ParserAddDependencies
 Adds a set of dependencies from a dependency block.
 
 **Pass:**  
@@ -2257,7 +2257,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserAddSingleDependency
+### ParserAddSingleDependency
 Adds a single dependency to a cell.
 
 **Pass:**  
@@ -2276,7 +2276,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserErrorMessage
+### ParserErrorMessage
 Returns a text-based error message string, when passed a 
 **ParserScannerEvaluatorError**.
 
@@ -2293,7 +2293,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserEvalExpression
+### ParserEvalExpression
 Evaluates a stream of parser tokens.
 
 **Pass:**  
@@ -2324,7 +2324,7 @@ ah
 **Library:** parse.def
 
 ----------
-#### ParserEvalForeachArg
+### ParserEvalForeachArg
 Calls a callback routine for each argument within an argument stack.
 
 **Pass:**  
@@ -2351,7 +2351,7 @@ CF - Set on error.
 **Library:** parse.def
 
 ----------
-#### ParserEvalPopNArgs
+### ParserEvalPopNArgs
 Pops a number of arguments off the argument stack. It is important to note 
 that this routine does not perform any sort of destructive acts to the 
 argument stack.
@@ -2370,7 +2370,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserEvalPropagateEvalError
+### ParserEvalPropagateEvalError
 Propagates an error up the argument stack.
 
 **Pass:**  
@@ -2390,7 +2390,7 @@ ax.
 **Library:** parse.def
 
 ----------
-#### ParserEvalPushArgument
+### ParserEvalPushArgument
 
 Pushes an argument onto the argument stack.
 **Pass:**  
@@ -2413,7 +2413,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserEvalPushCellReference
+### ParserEvalPushCellReference
 Pushes a cell reference on the argument stack.
 
 **Pass:**  
@@ -2433,7 +2433,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserEvalPushNumericConstant
+### ParserEvalPushNumericConstant
 Pushes a numeric constant on the argument stack.
 
 **Pass:**  
@@ -2454,7 +2454,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserEvalPushNumericConstantWord
+### ParserEvalPushNumericConstantWord
 Pushes a word-length numeric constant onto the argument stack.
 
 **Returns:**  
@@ -2472,7 +2472,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserEvalPushRange
+### ParserEvalPushRange
 Pushes a range on the argument stack.
 
 **Pass:**  
@@ -2491,7 +2491,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserEvalPushStringConstant
+### ParserEvalPushStringConstant
 Pushes a string constant on the argument stack.
 
 **Pass:**  
@@ -2511,7 +2511,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserEvalRangeIntersection
+### ParserEvalRangeIntersection
 Implements the range intersection operator on two passed ranges.
 
 **Pass:**  
@@ -2533,7 +2533,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### ParserForeachPrecedent
+### ParserForeachPrecedent
 Calls a routine for each entry within a precedent list. (Precedents are the 
 actual cells that an expression depends on.)
 
@@ -2562,7 +2562,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserForeachReference
+### ParserForeachReference
 Calls a routine for each reference within the given expression. (References 
 are the cells that are referred to in the expression; this may be either a cell 
 reference or a name.)
@@ -2595,7 +2595,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserForeachToken
+### ParserForeachToken
 Calls a routine for each token within the given expression. (A token is a 
 distinct, separate element within an expression; e.g. a number, operator, 
 function, etc.)
@@ -2628,7 +2628,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserFormatCellReference
+### ParserFormatCellReference
 Formats a single cell reference of the form AB123.
 
 **Pass:**  
@@ -2646,7 +2646,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserFormatColumnReference
+### ParserFormatColumnReference
 Formats a column reference in the form "AB."
 
 **Pass:**  
@@ -2663,7 +2663,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserFormatExpression
+### ParserFormatExpression
 Formats a parsed expression into a text string.
 
 **Pass:**  
@@ -2680,7 +2680,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserFormatRangeReference
+### ParserFormatRangeReference
 Formats a multiple (range) cell reference of the form AB123:CD456.
 
 **Pass:**  
@@ -2700,7 +2700,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserFormatRowReference
+### ParserFormatRowReference
 Formats a row reference in the form "123."
 
 **Pass:**  
@@ -2718,7 +2718,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserFormatWordConstant
+### ParserFormatWordConstant
 Formats a word constant.
 
 **Pass:**  
@@ -2736,7 +2736,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserGetFunctionArgs
+### ParserGetFunctionArgs
 Returns the arguments of a specified parser function. The arguments are 
 stored as a text string within the passed buffer.
 
@@ -2754,7 +2754,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserGetFunctionDescription
+### ParserGetFunctionDescription
 Returns a description of a specified parser function. The description string is 
 stored in the passed buffer.
 
@@ -2772,7 +2772,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserGetFunctionMoniker
+### ParserGetFunctionMoniker
 Returns the name of the specified parser function.
 
 **Pass:**  
@@ -2789,7 +2789,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserGetNumberOfFunctions
+### ParserGetNumberOfFunctions
 Returns the number of parser functions matching a particular function type.
 
 **Pass:**  
@@ -2804,7 +2804,7 @@ Nothing.
 **Library:** parse.def
 
 ----------
-#### ParserLocalizeFormats
+### ParserLocalizeFormats
 Re-initialize localization information.
 
 **Pass:**  
@@ -2819,7 +2819,7 @@ Nothing.
 Library: parse.def
 
 ----------
-#### ParserParseString
+### ParserParseString
 Parses a string.
 
 **Pass:**  
@@ -2839,7 +2839,7 @@ ah
 **Library:** parse.def
 
 ----------
-#### ParserRemoveDependencies
+### ParserRemoveDependencies
 Removes a set of dependencies from a dependency block.
 
 **Pass:**  
@@ -2856,7 +2856,7 @@ ax
 **Library:** parse.def
 
 ----------
-#### PrefTestVideoDevice
+### PrefTestVideoDevice
 Checks if the selected video driver is available on the machine.
 
 **Pass:**  
@@ -2876,7 +2876,7 @@ cx, dx, di
 **Library:** config.def
 
 ----------
-#### ProcCallFixedOrMovable
+### ProcCallFixedOrMovable
 Calls the routine specified by the passed virtual far pointer.
 
 **Pass:**  
@@ -2894,7 +2894,7 @@ All registers returned by called routine will be returned to the caller of
 **Library:** resource.def
 
 ----------
-#### ProcCallModuleRoutine
+### ProcCallModuleRoutine
 Calls a process' routine in another code resource. The stack usage of this 
 routine is guaranteed; the routine called will return two words of the return 
 address on the stack followed by any parameters that the caller may have 
@@ -2915,7 +2915,7 @@ All registers returned by called routine will be returned to the caller of
 **Library:** resource.def
 
 ----------
-#### ProcGetLibraryEntry
+### ProcGetLibraryEntry
 Returns the address of a routine within a library. You can pass the result 
 directly to **ProcCallFixedOrMovable** to call the routine.
 
@@ -2932,7 +2932,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### ProcInfo
+### ProcInfo
 Returns the contents of the *HM_otherInfo* field for a given process. This field 
 holds the first thread of this process.
 
@@ -2949,7 +2949,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### QueueGetMessage
+### QueueGetMessage
 Returns the next event from a given event queue; this routine blocks the 
 queue if it is currently empty until an event is added which can be returned.
 
@@ -2965,7 +2965,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### QueuePostMessage
+### QueuePostMessage
 Adds the passed event to the specified event queue.
 
 **Pass:**  

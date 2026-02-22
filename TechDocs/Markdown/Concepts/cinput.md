@@ -1,4 +1,4 @@
-## 11 Input
+# 11 Input
 
 Nearly all applications will in some way handle user input. User input can 
 come from a keyboard, a mouse, or a stylus. (Other types of input are 
@@ -20,7 +20,7 @@ passing. It is also suggested that you spend some time programming with
 generic and visible objects and getting used to the rest of the system before 
 handling input events.
 
-### 11.1 Input Flow
+## 11.1 Input Flow
 
 User input must flow in an orderly way from the user's device to the proper 
 GEOS object. In a multithreaded environment, just determining the 
@@ -78,7 +78,7 @@ additional information (e.g. the location of the mouse at the time). Each
 device has its own set of events-for example, keyboard presses induce 
 MSG_META_KBD_CHAR, and mouse moves induce MSG_META_MOUSE_PTR.
 
-#### 11.1.1 Devices and Drivers
+### 11.1.1 Devices and Drivers
 
 GEOS supports a number of input devices through the use of device drivers. 
 The basic GEOS system software supports mouse, keyboard, and stylus 
@@ -98,7 +98,7 @@ it into raw input events that the Input Manager will understand. Your
 objects will never receive these events; they are only sent to the Input 
 Manager for translation into pointer, button, or keyboard events.
 
-#### 11.1.2 Input Manager and GenSystem
+### 11.1.2 Input Manager and GenSystem
 
 The Input Manager is part of the User Interface and primarily assesses input 
 events in the context of the system. It takes a raw input event from the device 
@@ -110,7 +110,7 @@ The GenSystem object determines where the event should be passed.
 Typically, it will send the event on to whichever application is designated as 
 the active application.
 
-#### 11.1.3 Input Events
+### 11.1.3 Input Events
 
 GEOS uses three basic types of input events. These three types make up all 
 the events necessary for mouse, keyboard, and pen input. They are pointer 
@@ -152,7 +152,7 @@ completely separate manner. An object expecting Ink input must be aware
 when Ink events are being passed as opposed to normal mouse events. 
 Special flags are used for this; see [section 11.4](#114-pen-input-and-ink).
 
-#### 11.1.4 Input Hierarchies
+### 11.1.4 Input Hierarchies
 
 Because the entire User Interface of GEOS is implemented as a hierarchy 
 (tree) of objects, input messages naturally flow from the topmost object in the 
@@ -189,7 +189,7 @@ normal target, but it may still need to have similar properties. The Model
 hierarchy can be used to maintain this type of secondary or non-visible 
 selection.
 
-### 11.2 Mouse Input
+## 11.2 Mouse Input
 
 GEOS is built around the user's use of a mouse for most input. Although the 
 system has extensive keyboard navigation capabilities, the mouse is still the 
@@ -223,7 +223,7 @@ with the appropriate bounds) is adequate for most input needs. If you are
 using large documents or visible layers, you will have to subclass the 
 VisContent to handle these special cases.
 
-#### 11.2.1 Mouse Events
+### 11.2.1 Mouse Events
 
 Each time the user moves the mouse or clicks a mouse button, GEOS 
 generates a mouse event and passes it to the proper object. Mouse events are 
@@ -377,7 +377,7 @@ MSG_META_START_SELECT is inherently different from
 MSG_META_START_MOVE_COPY, even though they may pass the exact same 
 values.
 
-###### 11.2.1.1 Structure of Mouse Events
+#### 11.2.1.1 Structure of Mouse Events
 
 Each mouse event passes three items of data and one pointer to a return 
 structure. The three parameters are listed below; the fourth, the return 
@@ -472,7 +472,7 @@ This is the same bit as UIFA_EXTEND and UIFA_COPY, above.
 When UIFA_FEATURES is also set, this flag indicates the 
 "features" button has initiated pan-style scrolling.
 
-##### 11.2.1.2 Return Values for Mouse Events
+#### 11.2.1.2 Return Values for Mouse Events
 
 One of the parameters of every mouse event is a pointer to a 
 **MouseReturnParams** structure. This structure is passed empty; it is up to 
@@ -532,7 +532,7 @@ in the ptrImage field of the return structure. For full information on
 If you are not setting the pointer image, return a NullOptr in ptrImage. You 
 do not have to return anything in the unused field.
 
-#### 11.2.2 Gaining the Mouse Grab
+### 11.2.2 Gaining the Mouse Grab
 
 When no object has the active mouse grab, mouse events are passed to 
 whichever object is directly under the pointer's image. If any object has the 
@@ -604,7 +604,7 @@ MSG_META_POST_PASSIVE_END_FEATURES
 MSG_META_POST_PASSIVE_START_OTHER  
 MSG_META_POST_PASSIVE_END_OTHER  
 
-#### 11.2.3 Large Mouse Events
+### 11.2.3 Large Mouse Events
 
 Applications and visible objects that use large documents (32-bit coordinate 
 spaces) receive special versions of the mouse input messages. These special 
@@ -628,7 +628,7 @@ tree, see ["VisClass," Chapter 23 of the Object Reference Book](../Objects/ovis.
 information also applies to Process objects acting as the contents of 
 GenViews.)
 
-#### 11.2.4 Setting the Pointer Image
+### 11.2.4 Setting the Pointer Image
 
 The GEOS User Interface uses several default settings for the mouse pointer, 
 all defined by the Specific UI. 
@@ -640,7 +640,7 @@ after the move is completed; a graphics application could set the pointer to
 an image of whatever tool is currently in use. Another time an application 
 may change the mouse pointer is when a quick-transfer is in progress.
 
-##### 11.2.4.1 Defining the Pointer Image
+#### 11.2.4.1 Defining the Pointer Image
 
 The pointer is defined as a bitmap 16 pixels on each side. It has a "hot spot" 
 of five pixels that acts as the active point of the image. When the user clicks, 
@@ -704,7 +704,7 @@ _The mask determines how the image mixes with the background. The outline
 of the arrow is XORed with the background; the interior of the arrow is 
 always drawn black._
 
-##### 11.2.4.2 Setting the Pointer Image
+#### 11.2.4.2 Setting the Pointer Image
 
 You can set the pointer's image in three ways. First, you can send a message 
 to the GenView to set the pointer image whenever the pointer is over the 
@@ -735,7 +735,7 @@ This field gives the handle and chunk handle of the **PointerDef**
 structure that defines the pointer image to be set. The structure must be 
 in a sharable block; most likely you will have it set in a geode resource.
 
-### 11.3 Keyboard Input
+## 11.3 Keyboard Input
 
 Keyboard input is scanned by a device driver and passed on to the Input 
 Manager, just as mouse input is. The keyboard driver and Input Manager 
@@ -743,7 +743,7 @@ check the state of the modifier keys (shift, ctrl, alt, num lock, etc.) and pars
 each keypress as much as possible based on its context. Each keypress is 
 called a keyboard event and is passed in MSG_META_KBD_CHAR.
 
-#### 11.3.1 Keyboard Input Flow
+### 11.3.1 Keyboard Input Flow
 
 Each time the user presses a character (with or without modifier keys) on the 
 keyboard, the Input Manager generates a single keyboard event and passes 
@@ -783,7 +783,7 @@ HINT_DEFAULT_FOCUS for that object and all its parents up to the
 GenPrimary containing it. Otherwise, the generic UI does not know which 
 object should gain the default focus.
 
-#### 11.3.2 Keyboard Events
+### 11.3.2 Keyboard Events
 
 Each keyboard event your application and objects receive has gone through 
 preliminary parsing by the keyboard driver. Keyboard drivers are intelligent 
@@ -962,7 +962,7 @@ Code Display 11-1 Sample MSG_META_KBD_CHAR Handler
 }
 ~~~
 
-### 11.4 Pen Input and Ink
+## 11.4 Pen Input and Ink
 
 GEOS supports pen-based systems and applications by means of the Ink data 
 structure formats. Ink is simply a standard way of representing raw pen 
@@ -988,7 +988,7 @@ Because Ink events are not passed on immediately by the UI, the UI actually
 takes care of drawing them directly to the screen. This provides the user 
 direct, immediate feedback.
 
-#### 11.4.1 Ink Data Structures
+### 11.4.1 Ink Data Structures
 
 Ink input is stored in data blocks. The Input Manager stores up Ink events 
 into a data block and then transfers the block to the proper window or 
@@ -1034,7 +1034,7 @@ Actually a label indicating the beginning of the list of points.
 Following this label will be a number of **Point** structures, each 
 one detailing a single Ink point.
 
-#### 11.4.2 Ink Input Flow
+### 11.4.2 Ink Input Flow
 
 When the Input Manager receives a button event, it checks to see if that 
 event should be treated as Ink input. It first holds up input, putting the 
@@ -1043,7 +1043,7 @@ application with MSG_META_QUERY_IF_PRESS_IS_INK. Typically the
 application will pass the message down its object tree to the appropriate 
 visible or generic object that should initially have received the button event.
 
-##### 11.4.2.1 Determining if a Press Is Ink
+#### 11.4.2.1 Determining if a Press Is Ink
 
 It is up to the application or its visible object to determine whether the input 
 should be treated as Ink. If you don't ever handle Ink, you do not need to do 
@@ -1110,7 +1110,7 @@ MSG_META_QUERY_IF_PRESS_IS_INK handler. (Or if all objects running in
 the same GenView want this behavior, you can simply set the GenView's 
 GVIT_INK_WITH_STANDARD_OVERRIDE flag.)
 
-##### 11.4.2.2 Controlling the Ink
+#### 11.4.2.2 Controlling the Ink
 
 When an object requests Ink input by returning IRV_DESIRES_INK or 
 IRV_INK_WITH_STANDARD_OVERRIDE, it must also specify the eventual 
@@ -1169,7 +1169,7 @@ Virtual fptr to a callback routine to determine whether a stroke
 is a gesture or not. This callback routine will be passed to 
 ProcCallFixedOrMovable().
 
-##### 11.4.2.3 How Ink Is Stored and Passed On
+#### 11.4.2.3 How Ink Is Stored and Passed On
 
 When the user presses the pen to the screen and the input is determined to 
 be Ink, the Input Manager generates a mouse button press event and begins 
@@ -1202,7 +1202,7 @@ to the GenSystem object using MSG_META_NOTIFY_WITH_DATA_BLOCK
 with the identifier NT_INK. (For information on this and other notification 
 messages, see ["General Change Notification," Chapter 9](cgcn.md).)
 
-### 11.5 Input Hierarchies
+## 11.5 Input Hierarchies
 
 As previously mentioned in this chapter, the Input Manager channels input 
 events to particular objects. The objects are chosen based on the current 
@@ -1234,7 +1234,7 @@ a fourth, the controller, but it is used only internally by GEOS.) These
 hierarchies all function in the same manner but are used for different 
 purposes.
 
-#### 11.5.1 The Three Hierarchies
+### 11.5.1 The Three Hierarchies
 
 As stated above, GEOS offers three hierarchies you can use for input flow and 
 specification of message destinations. These hierarchies, with their basic 
@@ -1266,7 +1266,7 @@ extends from the GenSystem through the GenApplication and the
 document control objects. The Model hierarchy is described in full in 
 [section 11.5.5](#1155-using-model).
 
-#### 11.5.2 Common Hierarchy Basics
+### 11.5.2 Common Hierarchy Basics
 
 All three of the input hierarchies function in a similar manner. Each relies 
 on the basic tree structure of UI objects to build a path from the topmost 
@@ -1305,7 +1305,7 @@ be given to the leaf node specified without actually changing the object tree
 Note that the other hierarchies operate in a similar manner. The behavior 
 described is not unique to the target hierarchy.
 
-##### 11.5.2.1 Special Terminology
+#### 11.5.2.1 Special Terminology
 
 Before reading the in-depth sections on the individual hierarchies, you 
 should know how several terms are defined and used. These terms are listed 
@@ -1346,7 +1346,7 @@ the topmost node of an inactive path is given the exclusive at
 its level, the entire inactive path will automatically become the 
 active path.
 
-##### 11.5.2.2 Modifying the Active Path
+#### 11.5.2.2 Modifying the Active Path
 
 Each of the three hierarchies has messages understood by **MetaClass** that 
 alter the hierarchy's active path. The Specific UI takes care of most of the 
@@ -1368,7 +1368,7 @@ node will be notified that it has lost the exclusive at its level. See the
 discussions of the individual hierarchies for more detail on the messages 
 used.
 
-##### 11.5.2.3 Sending Classed Messages
+#### 11.5.2.3 Sending Classed Messages
 
 Any object can easily send messages to the object having the active exclusive 
 of a given hierarchy using MSG_META_SEND_CLASSED_EVENT. This 
@@ -1409,7 +1409,7 @@ object, the topmost object in the entire UI object tree. The classed event
 will be passed down the active path, using the GenSystem object as the 
 path's top node.
 
-#### 11.5.3 Using Focus
+### 11.5.3 Using Focus
 
 The specific UI handles most of the manipulation of the focus hierarchy. Most 
 specific UIs interpret keyboard and mouse events and know when to switch 
@@ -1448,7 +1448,7 @@ HINT_DEFAULT_FOCUS in its instance data. If no objects have this hint at a
 particular focus level, then the focus will be granted to the first focusable 
 child.
 
-##### 11.5.3.1 Grabbing and Releasing the Focus
+#### 11.5.3.1 Grabbing and Releasing the Focus
 
 To grab the focus exclusive in its level, a node should send itself 
 MSG_META_GRAB_FOCUS_EXCL. The default handler for this message grabs 
@@ -1470,7 +1470,7 @@ MSG_META_GET_FOCUS_EXCL may be sent to any focusable composite node
 to get the optr of the node's child having the exclusive. This message may be 
 used even on nodes in the inactive path.
 
-##### 11.5.3.2 Gaining and Losing the Focus
+#### 11.5.3.2 Gaining and Losing the Focus
 
 When an object gains the active focus exclusive and is a node in the active 
 path, it receives MSG_META_GAINED_FOCUS_EXCL. This indicates to the 
@@ -1478,7 +1478,7 @@ object that it will receive all keyboard input as the active keyboard object. At
 some point later, when the object has lost the focus exclusive, it will receive 
 MSG_META_LOST_FOCUS_EXCL.
 
-##### 11.5.3.3 Sending Classed Events to the Focus
+#### 11.5.3.3 Sending Classed Events to the Focus
 
 Frequently, you may wish to send messages to objects in the active Focus 
 path. The easiest way to deliver a message to an object in the focus hierarchy 
@@ -1541,7 +1541,7 @@ Code Display 11-2 Delivering Messages to the Focus
 }
 ~~~
 
-#### 11.5.4 Using Target
+### 11.5.4 Using Target
 
 The specific UI handles most of the manipulation of the target hierarchy. 
 Most specific UIs interpret keyboard and mouse events and know when to 
@@ -1589,7 +1589,7 @@ granted to the object with HINT_DEFAULT_TARGET in its instance data. If no
 object has this hint at a particular target level, then the target will be 
 granted to the first targetable object at that level.
 
-##### 11.5.4.1 Grabbing and Releasing the Target
+#### 11.5.4.1 Grabbing and Releasing the Target
 
 To grab the target exclusive in its level, a node should send itself 
 MSG_META_GRAB_TARGET_EXCL. The default handler for this message 
@@ -1611,7 +1611,7 @@ MSG_META_GET_TARGET_EXCL may be sent to any targetable composite
 node to get the optr of the node's child having the exclusive. This message 
 may be used even on nodes in the inactive path.
 
-##### 11.5.4.2 Gaining and Losing the Target
+#### 11.5.4.2 Gaining and Losing the Target
 
 When an object gains the active target exclusive and is a node in the active 
 path, it receives MSG_META_GAINED_TARGET_EXCL. This indicates to the 
@@ -1619,7 +1619,7 @@ object that it will receive all keyboard input as the active keyboard object. At
 some point later, when the object has lost the target exclusive, it will receive 
 MSG_META_LOST_TARGET_EXCL.
 
-##### 11.5.4.3 Sending Classed Events to the Target
+#### 11.5.4.3 Sending Classed Events to the Target
 
 Frequently, you may wish to send messages to objects in the active Target 
 path. The easiest way to deliver a message to an object in the target 
@@ -1684,7 +1684,7 @@ Code Display 11-3 Delivering Messages to the Target
 }
 ~~~
 
-#### 11.5.5 Using Model
+### 11.5.5 Using Model
 
 In some cases, you may need to send or receive information from some object 
 other than the focus or target. The Model hierarchy is provided as an 
@@ -1733,7 +1733,7 @@ This approach is desirable over using MSG_META_GET_MODEL_EXCL to
 return an optr for later use as the system may have corrupted the optr in the 
 meantime.
 
-##### 11.5.5.1 Changing the Model Exclusive
+#### 11.5.5.1 Changing the Model Exclusive
 
 To modify the Model hierarchy, use MSG_META_GRAB_MODEL_EXCL. To 
 remove the model exclusive from an object without setting it to another 
@@ -1752,7 +1752,7 @@ by this method as it may have been changed in the meantime. Use
 MSG_META_SEND_CLASSED_EVENT with the **TravelOption** TO_MODEL 
 instead.
 
-##### 11.5.5.2 Intercepting the Model
+#### 11.5.5.2 Intercepting the Model
 
 Your application may also wish to be notified when an object either gains or 
 loses its model properties. Whenever an object in GEOS gains the model of the 
@@ -1768,7 +1768,7 @@ superclass, however, to perform necessary default functionality. Within your
 message handlers for these messages, you may add whatever additional 
 behavior you require.
 
-#### 11.5.6 Extending the Hierarchies
+### 11.5.6 Extending the Hierarchies
 
 You may also extend or modify the hierarchies to add other objects that are 
 not active nodes by default. If custom objects wish to use the hierarchies, you 

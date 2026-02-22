@@ -1,10 +1,10 @@
-## 7 Icon Editor
+# 7 Icon Editor
 
 The Icon Editor tool allows you to create icons for your application, both file 
 icons used by file manager applications and simple tool monikers which you 
 may use to provide graphic monikers for a geode's UI gadgetry.
 
-### 7.1 Creating Icons
+## 7.1 Creating Icons
 
 The icons produced by the icon editor are stored in an "icon database" so that 
 they can be viewed and retrieved easily. The icon database is the Icon Editor's 
@@ -46,7 +46,7 @@ dialog will present 4 options for the type of icon. If you decide to create a
 custom icon, you should enter the height, width and color scheme for the icon 
 in the provided fields. 
 
-### 7.2 Importing Icons
+## 7.2 Importing Icons
 
 There are 2 other ways to create icons. You can import a graphic such as a 
 GIF, TIF, BMP or other supported file format for use as an icon, provided that 
@@ -58,7 +58,7 @@ moniker group from the token database, which is the cache of file monikers
 kept by GeoManager. Select "Token Database" from the Icon menu to get a 
 list of monikers that you may import. 
 
-### 7.3 Editing Icons
+## 7.3 Editing Icons
 
 There are a number of features that are useful when editing icons:
 
@@ -103,7 +103,7 @@ copies, or transformed copies, of one format to another.
     The "resize format" dialog changes the size and shape of a 
 single format.
 
-### 7.4 Writing Source Code
+## 7.4 Writing Source Code
 
 When the icon is finished, make sure it's saved (File->Save), and then choose 
 "Write Source Code" from the Icon Menu. Follow these steps to get source 
@@ -148,7 +148,7 @@ used as toolbox UI, to assist the specific UI in deciding how to draw them.
 graphics string data structures used to describe visual monikers are 
 described. (Esp programs include **gstring.def**.)
 
-### 7.5 Icon Databases
+## 7.5 Icon Databases
 
 The icon editor can work with more than one icon database at a time via the 
 Multiple Document Interface standard. Each database has its own window, 
@@ -185,7 +185,7 @@ This can only be done with the mouse.
 To get more room for editing, use the Options menu to temporarily hide the 
 database viewer or format list while editing. 
 
-### 7.6 Exporting to Database
+## 7.6 Exporting to Database
 
 This is the function that most people associate with an icon editor. the token 
 database is a cache of moniker lists used by GeoManager and other 

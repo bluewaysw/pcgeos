@@ -1,7 +1,7 @@
 ## 3.4 Structures H-M
 
 ----------
-#### HandleUpdateMode
+### HandleUpdateMode
     HandleUpdateMode        etype byte, 0
         HUM_NOW         enum HandleUpdateMode
         HUM_MANUAL      enum HandleUpdateMode
@@ -9,7 +9,7 @@
 **Library:** grobj.def
 
 ----------
-#### HatchDash
+### HatchDash
     HatchDash           struct
         HD_on       WWFixed     ; length of dash to be drawn
         HD_off      WWFixed     ; space to skip until next dash
@@ -21,7 +21,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** graphics.def
 
 ----------
-#### HatchLine
+### HatchLine
     HatchLine       struct
         HL_origin           PointWWFixed            ; origin of line
         HL_deltaX           WWFixed         ; X offset to next line
@@ -35,7 +35,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** graphics.def
 
 ----------
-#### HatchPattern
+### HatchPattern
     HatchPattern            struct
         HP_numLines     word            ; number of line records in this pattern
         HP_lineData     label HatchLine ; array of 1 or more hatch lines
@@ -47,7 +47,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** graphics.def
 
 ----------
-#### HCFeatures
+### HCFeatures
     HCFeatures      record
         HCF_LIST        :1
     HCFeatures      end
@@ -55,7 +55,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### HCToolboxFeatures
+### HCToolboxFeatures
     HCToolboxFeatures       record
         HCTF_TOGGLE     :1
     HCToolboxFeatures       end
@@ -63,7 +63,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### HeapAllocFlags
+### HeapAllocFlags
     HeapAllocFlags      record
         HAF_ZERO_INIT           :1  ; Initialize new memory to 0
         HAF_LOCK                :1  ; Return with block locked
@@ -82,7 +82,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** heap.def
 
 ----------
-#### HeapCongestion
+### HeapCongestion
     HeapCongestion          etype word, 0, 2
         HC_SCRUBBING    enum HeapCongestion ;Heap is being scrubbed. Might be a 
                                             ;good idea to free some things.
@@ -95,7 +95,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** heap.def
 
 ----------
-#### HeapFlags
+### HeapFlags
     HeapFlags       record
         HF_FIXED        :1  ; Block won't ever move
         HF_SHARABLE     :1  ; May be locked by other than owner
@@ -113,7 +113,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** heap.def
 
 ----------
-#### HeightJustification
+### HeightJustification
     HeightJustification         etype byte
         HJ_TOP_JUSTIFY_CHILDREN             enum HeightJustification
         HJ_BOTTOM_JUSTIFY_CHILDREN          enum HeightJustification
@@ -123,7 +123,7 @@ turn may contain zero or more **HatchDash** structures.
 **Library:** Objects/vCompC.def
 
 ----------
-#### HelpEntry
+### HelpEntry
     HelpEntry       struct
         HE_string       byte
     HelpEntry       ends
@@ -133,7 +133,7 @@ This structure defines a help chunk.
 **Library:** Objects/genC.def
 
 ----------
-#### HierarchicalGrab
+### HierarchicalGrab
     HierarchicalGrab        struct
         HG_OD           optr
         HG_flags        HierarchicalGrabFlags <>
@@ -142,7 +142,7 @@ This structure defines a help chunk.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### HierarchicalGrabFlags
+### HierarchicalGrabFlags
     HierarchicalGrabFlags           record
         HGF_SYS_EXCL            :1
         HGF_APP_EXCL            :1
@@ -176,7 +176,7 @@ for an object.
 **Library:** uiInputC.def
 
 ----------
-#### HoldUpInputFlags
+### HoldUpInputFlags
     HoldUpInputFlags        record
         HUIF_FLUSHING_QUEUE             :1
         HUIF_HOLD_UP_MODE_DISABLED      :1
@@ -197,7 +197,7 @@ that user can interact with it.
 **Library:** uiInputC.def
 
 ----------
-#### HugeArrayDirectory
+### HugeArrayDirectory
     HugeArrayDirectory          struct
         HAD_header      LMemBlockHeader <>      ; 
         HAD_data        word                    ; VM block link to first data block
@@ -212,7 +212,7 @@ This structure is allocated at the beginning of the directory block.
 **Library:** hugearr.def
 
 ----------
-#### HWRBoxData
+### HWRBoxData
     HWRBoxData      struct
         HWRBD_mode          HWRMode
         HWRBD_top           sword
@@ -222,7 +222,7 @@ This structure is allocated at the beginning of the directory block.
 **Library:** hwr.def
 
 ----------
-#### HWRContext
+### HWRContext
     HWRContext      union
         HWRC_none       HWRNoneData
         HWRC_lined      HWRLineData
@@ -233,7 +233,7 @@ This structure is allocated at the beginning of the directory block.
 **Library:** hwr.def
 
 ----------
-#### HWRGridData
+### HWRGridData
     HWRGridData     struct
         HWRGD_mode          HWRMode
         HWRGD_bounds        Rectangle
@@ -249,7 +249,7 @@ the ink data).
 **Library:** hwr.def
 
 ----------
-#### HWRLineData
+### HWRLineData
     HWRLineData     struct
         HWRLD_mode          HWRMode
         HWRLD_line          sword
@@ -258,7 +258,7 @@ the ink data).
 **Library:** hwr.def
 
 ----------
-#### HWRMode
+### HWRMode
     HWRMode etype word
         HM_NONE     enum HWRMode
         ; The user is writing in a multi-line object - no guidelines
@@ -272,7 +272,7 @@ the ink data).
 **Library:** hwr.def
 
 ----------
-#### HWRNoneData
+### HWRNoneData
     HWRNoneData     struct
         HWRND_mode      HWRMOde
     HWRNoneData     ends
@@ -280,7 +280,7 @@ the ink data).
 **Library:** hwr.def
 
 ----------
-#### HWRRoutine
+### HWRRoutine
     HWRRoutine      etype word
         HWRR_BEGIN_INTERACTION                  enum HWRRoutine
         HWRR_END_INTERACTION                    enum HWRRoutine
@@ -458,7 +458,7 @@ the ink data).
 **Library:** hwr.def
 
 ----------
-#### HyphenationPoints
+### HyphenationPoints
     HyphenationPoints           struct
         HP_wordLen          word
         HP_array            label byte
@@ -469,7 +469,7 @@ the ink data).
 **Library:** Objects/vTextC.def
 
 ----------
-#### HyphenFlags
+### HyphenFlags
     HyphenFlags     record
         HF_AUTO_HYPHEN  :1      ; set when auto-hyphen exists at EOL
     HyphenFlags     end
@@ -477,7 +477,7 @@ the ink data).
 **Library:** text.def
 
 ----------
-#### IACPConnectError
+### IACPConnectError
     IACPConnectError        etype word, GeodeLoadError
         IACPCE_CANNOT_FIND_SERVER   enum IACPConnectError
         IACPCE_NO_SERVER            enum IACPConnectError
@@ -492,7 +492,7 @@ Didn't ask IACP to start server, and no server is registered for the list.
 **Library:** iacp.def
 
 ----------
-#### IACPConnectFlags
+### IACPConnectFlags
     IACPConnectFlags        record
                                                 :10
         IACPCF_OBEY_LAUNCH_MODEL                :1
@@ -527,7 +527,7 @@ expected to support requests for lower-numbered modes.
 **Library:** iacp.def
 
 ----------
-#### IACPDocCloseAckParams
+### IACPDocCloseAckParams
     IACPDocCloseAckParams           struct
         IDCAP_docObj            optr
         IDCAP_connection        IACPConnection
@@ -538,7 +538,7 @@ expected to support requests for lower-numbered modes.
 **Library:** iacp.def
 
 ----------
-#### IACPDocOpenAckParams
+### IACPDocOpenAckParams
     IACPDocOpenAckParams        struct
         IDOAP_docObj                optr
         IDOAP_connection            IACPConnection
@@ -557,7 +557,7 @@ some other object).
 **Library:** iacp.def
 
 ----------
-#### IACPServerFlags
+### IACPServerFlags
     IACPServerFlags     record
         IACPSF_MULTIPLE_INSTANCES:1
         ; Set if application may have multiple instances of itself launched
@@ -567,7 +567,7 @@ some other object).
 **Library:** iacp.def
 
 ----------
-#### IACPServerMode
+### IACPServerMode
     IACPServerMode etype    byte
         IACPSM_NOT_USER_INTERACTIBLE        enum IACPServerMode
         IACPSM_IN_FLUX                      enum IACPServerMode
@@ -580,7 +580,7 @@ but the reverse is not true.
 **Library:** iacp.def
 
 ----------
-#### IACPSide
+### IACPSide
     IACPSide    etype word
         IACPS_CLIENT            enum IACPSide
         IACPS_SERVER            enum IACPSide
@@ -591,7 +591,7 @@ Specifies which side of an IACP connection is sending a message via
 **Library:** iacp.def
 
 ----------
-#### IEEE64
+### IEEE64
     IEEE64      struct
         IEEE64_wd0      word
         IEEE64_wd1      word
@@ -602,7 +602,7 @@ Specifies which side of an IACP connection is sending a message via
 **Library:** math.def
 
 ----------
-#### ImageBitSize
+### ImageBitSize
     ImageBitSize        etype byte
         IBS_1       enum ImageBitSize       ; 1 to 1 mapping
         IBS_2       enum ImageBitSize       ; 2 x 2 pixels
@@ -613,7 +613,7 @@ Specifies which side of an IACP connection is sending a message via
 **Library:** graphics.def
 
 ----------
-#### ImageFlags
+### ImageFlags
     ImageFlags      record
         IF_DRAW_IMAGE   :1,         ; reserved for internal use (set to zero)
         IF_HUGE         :1,         ; reserved for internal use (set to zero)
@@ -626,7 +626,7 @@ Specifies which side of an IACP connection is sending a message via
 **Library:** graphics.def
 
 ----------
-#### IMCFeatures
+### IMCFeatures
     IMCFeatures     record
                         :7
         IMCF_MAP        :1
@@ -635,7 +635,7 @@ Specifies which side of an IACP connection is sending a message via
 **Library:** impex.def
 
 ----------
-#### ImpexDataClasses
+### ImpexDataClasses
     ImpexDataClasses            record
         IDC_TEXT            :1
         IDC_GRAPHICS        :1
@@ -647,7 +647,7 @@ Specifies which side of an IACP connection is sending a message via
 **Library:** impex.def
 
 ----------
-#### ImpexFileSelectionData
+### ImpexFileSelectionData
     ImpexFileSelectionData          struct
         IFSD_selection          FileLongName
         IFSD_path               PathName
@@ -661,7 +661,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** impex.def
 
 ----------
-#### ImpexMapFileInfoHeader
+### ImpexMapFileInfoHeader
     ImpexMapFileInfoHeader          struc
         IMFTH_base              LMemBlockHeader
         IMFTH_fieldChunk        word
@@ -672,7 +672,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** impex.def
 
 ----------
-#### ImpexMapFlags
+### ImpexMapFlags
     ImpexMapFlags           record
         IMF_IMPORT      :1
         IMF_EXPORT      :1
@@ -682,7 +682,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** impex.def
 
 ----------
-#### ImpexTranslationParams
+### ImpexTranslationParams
     ImpexTranslationParams          struct
         ITP_impexOD             optr    ; OD of Import/ExportControl
         ITP_returnMsg           word    ; message to return to above
@@ -697,7 +697,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** ieCommon.def
 
 ----------
-#### ImportControlAttrs
+### ImportControlAttrs
     ImportControlAttrs      record
         ICA_IGNORE_INPUT            :1      ; ignore input while import occurs.
         ICA_NON_DOCUMENT_IMPORT     :1      ; non-document imports only
@@ -707,7 +707,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** impex.def
 
 ----------
-#### ImportControlFeatures
+### ImportControlFeatures
     ImportControlFeatures       record
         IMPORTCF_PREVIEW_TRIGGER    :1      ; not currently used
         IMPORTCF_IMPORT_TRIGGER     :1      ; import trigger
@@ -728,7 +728,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** impex.def
 
 ----------
-#### ImportControlToolboxFeatures
+### ImportControlToolboxFeatures
     ImportControlToolboxFeatures                record
         IMPORTCTF_DIALOG_BOX                :1
     ImportControlToolboxFeatures                end
@@ -736,7 +736,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** impex.def
 
 ----------
-#### InitFileCharConvert
+### InitFileCharConvert
     InitFileCharConvert         etype byte
         IFCC_INTACT     enum InitFileCharConvert    ; leave intact
         IFCC_UPCASE     enum InitFileCharConvert    ; upcase all chars
@@ -745,7 +745,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** initfile.def
 
 ----------
-#### InitFileReadFlags
+### InitFileReadFlags
     InitFileReadFlags       record
         IFRF_CHAR_CONVERT       InitFileCharConvert:2   ; character conversion
 
@@ -763,7 +763,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** initfile.def
 
 ----------
-#### InkBackgroundType
+### InkBackgroundType
     InkBackgroundType       etype word, 0, 2
         IBT_NO_BACKGROUND               enum InkBackgroundType
         IBT_NARROW_LINED_PAPER          enum InkBackgroundType
@@ -785,7 +785,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** pen.def
 
 ----------
-#### InkControlFeatures
+### InkControlFeatures
     InkControlFeatures      record
         ICF_PENCIL_TOOL             :1
         ICF_ERASER_TOOL             :1
@@ -795,7 +795,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** pen.def
 
 ----------
-#### InkControlToolboxFeatures
+### InkControlToolboxFeatures
     InkControlToolboxFeatures               record
         ICTF_PENCIL_TOOL                :1
         ICTF_ERASER_TOOL                :1
@@ -805,7 +805,7 @@ MSG_IMPORT_EXPORT_FILE_SELECTION_INFO.
 **Library:** pen.def
 
 ----------
-#### InkDBFrame
+### InkDBFrame
     InkDBFrame      struct
         IDBF_bounds             Rectangle
         IDBF_VMFile             hptr
@@ -827,7 +827,7 @@ create a new one).
 **Library:** pen.def
 
 ----------
-#### InkDestinationInfo
+### InkDestinationInfo
     InkDestinationInfo      struct
         IDI_destObj             optr
         IDI_gstate              hptr.GState
@@ -858,7 +858,7 @@ has entered multiple strokes.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### InkDestinationInfoParams
+### InkDestinationInfoParams
     InkDestinationInfoParams            struct
         IDIP_dest               optr
         IDIP_brushSize          word
@@ -874,7 +874,7 @@ has entered multiple strokes.
 **Library:** Objects/gViewC.def
 
 ----------
-#### InkFlags
+### InkFlags
     InkFlags    record
         IF_HAS_MOUSE_GRAB           :1
         IF_SELECTING                :1
@@ -921,7 +921,7 @@ Set if this object should be undoable.
 **Library:** pen.def
 
 ----------
-#### InkGrab
+### InkGrab
     InkGrab     struct
         IG_OD       optr
         IG_gState   hptr
@@ -932,7 +932,7 @@ This structure is used by the ink code within the Flow object.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### InkHeader
+### InkHeader
     InkHeader       struct
         IH_count            word
         IH_bounds           Rectangle
@@ -957,7 +957,7 @@ because it overlapped the screen. This field is set by the flow object.
 **Library:** Input.def
 
 ----------
-#### InkPoint
+### InkPoint
     InkPoint        struct
         IP_x    InkXCoord
         IP_y    word
@@ -966,7 +966,7 @@ because it overlapped the screen. This field is set by the flow object.
 **Library:** hwr.def
 
 ----------
-#### InkReturnValue
+### InkReturnValue
     InkReturnValue      etype word
         IRV_NO_REPLY                    enum InkReturnValue, 0
         IRV_NO_INK                      enum InkReturnValue
@@ -1008,7 +1008,7 @@ application object.
 **Library:** uiInputC.def
 
 ----------
-#### InkStrokeSize
+### InkStrokeSize
     InkStrokeSize           struct
         ISS_width       byte
         ISS_height      byte
@@ -1017,7 +1017,7 @@ application object.
 **Library:** pen.def
 
 ----------
-#### InkTool
+### InkTool
     InkTool etype word, 0, 2
         IT_PENCIL       enum InkTool        ;Default tool
         IT_ERASER       enum InkTool
@@ -1026,7 +1026,7 @@ application object.
 **Library:** pen.def
 
 ----------
-#### InkXCoord
+### InkXCoord
     InkXCoord       record
         IXC_TERMINATE_STROKE    :1
         IXC_X_COORD             :15
@@ -1035,7 +1035,7 @@ application object.
 **Library:** hwr.def
 
 ----------
-#### InsertChildFlags
+### InsertChildFlags
     InsertChildFlags        record
         ICF_MARK_DIRTY  :1,                 ;Marks chunk and modified object as 
                                             ; dirty
@@ -1046,7 +1046,7 @@ application object.
 **Library:** Objects/metaC.def
 
 ----------
-#### InsertChildOption
+### InsertChildOption
     InsertChildOption       etype byte
         ICO_FIRST               enum InsertChildOption
         ICO_LAST                enum InsertChildOption
@@ -1056,7 +1056,7 @@ application object.
 **Library:** Objects/metaC.def
 
 ----------
-#### InsertDeleteSpaceParams
+### InsertDeleteSpaceParams
     InsertDeleteSpaceParams         struct
         IDSP_position       PointDWFixed
         IDSP_space          PointDWFixed
@@ -1066,7 +1066,7 @@ application object.
 **Library:** Objects/visC.def
 
 ----------
-#### InsertDeleteSpaceTypes
+### InsertDeleteSpaceTypes
     InsertDeleteSpaceTypes          record
                                                                 :11 
         IDST_MOVE_OBJECTS_INSIDE_DELETED_SPACE_BY_AMOUNT_DELETED :1
@@ -1106,7 +1106,7 @@ space. In most uses of this message, this bit will be set.
 **Library:** Objects/visC.def
 
 ----------
-#### InstrumentPatch
+### InstrumentPatch
     InstrumentPatch     etype dword, 0, size InstrumentEnvelope
         ; MIDI patch    1 - 8 = Piano
         IP_ACOUSTIC_GRAND_PIANO                 enum InstrumentPatch
@@ -1310,7 +1310,7 @@ space. In most uses of this message, this bit will be set.
 **Library:** sound.def
 
 ----------
-#### InteractionCommand
+### InteractionCommand
     InteractionCommand      etype word
         IC_NULL                     enum InteractionCommand
         IC_DISMISS                  enum InteractionCommand
@@ -1400,7 +1400,7 @@ ATTR_GEN_TRIGGER_INTERACTION_COMMAND.
 **Library:** netware.def
 
 ----------
-#### JCFeatures
+### JCFeatures
     JCFeatures      record
         JCF_LEFT        :1
         JCF_RIGHT       :1
@@ -1411,7 +1411,7 @@ ATTR_GEN_TRIGGER_INTERACTION_COMMAND.
 **Library:** Objects/Text/tCtclC.def
 
 ----------
-#### JCToolboxFeatures
+### JCToolboxFeatures
     JCToolboxFeatures       record
         JCTF_LEFT       :1
         JCTF_RIGHT      :1
@@ -1422,7 +1422,7 @@ ATTR_GEN_TRIGGER_INTERACTION_COMMAND.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### JobStatus
+### JobStatus
     JobStatus       struct
         ; DO NOT CHANGE THE ORDER OF THESE FIRST FOUR ITEMS
         JS_fname            char 13 dup (?)
@@ -1451,7 +1451,7 @@ printing.)
 **Library:** spool.def
 
 ----------
-#### Justification
+### Justification
     Justification       etype byte
         J_LEFT              enum Justification
         J_RIGHT             enum Justification
@@ -1461,7 +1461,7 @@ printing.)
 **Library:** graphics.def
 
 ----------
-#### KbdGrab
+### KbdGrab
     KbdGrab     struct
         KG_OD           optr
         KG_unused       word
@@ -1470,7 +1470,7 @@ printing.)
 **Library:** Objects/uiInputC.def
 
 ----------
-#### KbdReturnFlags
+### KbdReturnFlags
     KbdReturnFlags      record
         KRF_PREVENT_PASS_THROUGH        :1
         KRF_UNUSED                      :15
@@ -1479,7 +1479,7 @@ printing.)
 **Library:** uiInputC.def
 
 ----------
-#### KeyboardOverride
+### KeyboardOverride
     KeyboardOverride        etype       word
         KO_NO_KEYBOARD              enum    KeyboardOverride
         KO_KEYBOARD_REQUIRED        enum    KeyboardOverride
@@ -1501,7 +1501,7 @@ needed.
 **Library:** genC.def
 
 ----------
-#### KeyboardShortcut
+### KeyboardShortcut
     KeyboardShortcut        record
         KS_PHYSICAL     :1          ;TRUE: match key, not character
         KS_ALT          :1          ;TRUE: <ALT> must be pressed
@@ -1513,7 +1513,7 @@ needed.
 **Library:** input.def
 
 ----------
-#### KeyboardType
+### KeyboardType
     KeyboardType            etype byte, 1, 1
         KT_NOT_EXTD     enum KeyboardType       ;84-key PC/AT
         KT_EXTD         enum KeyboardType       ;102-key PC/AT, PS/2
@@ -1522,7 +1522,7 @@ needed.
 **Library:** localize.def
 
 ----------
-#### KeyMapType
+### KeyMapType
     KeyMapType      etype word, 1, 1
         KEYMAP_US_EXTD              enum KeyMapType
         KEYMAP_US                   enum KeyMapType
@@ -1560,7 +1560,7 @@ needed.
 **Library:** localize.def
 
 ----------
-#### LanguageDialect
+### LanguageDialect
     LanguageDialect     record
                             :8
         LD_DEFAULT          :1
@@ -1576,7 +1576,7 @@ needed.
 **Library:** sllang.def
 
 ----------
-#### LargeMouseData
+### LargeMouseData
     LargeMouseData      struct
         ; LMD_location must be first entry
         LMD_location                PointDWFixed
@@ -1601,7 +1601,7 @@ holds going into the VisContentClass handler for the mouse event.
 **Library:** Objects/uiInput.def
 
 ----------
-#### LASCFeatures
+### LASCFeatures
     LASCFeatures        record
         LASCF_SINGLE                :1
         LASCF_ONE_AND_A_HALF        :1
@@ -1613,7 +1613,7 @@ holds going into the VisContentClass handler for the mouse event.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### LASCToolboxFeatures
+### LASCToolboxFeatures
     LASCToolboxFeatures         record
         LASCTF_SINGLE               :1
         LASCTF_ONE_AND_A_HALF       :1
@@ -1624,7 +1624,7 @@ holds going into the VisContentClass handler for the mouse event.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### LayerPriority
+### LayerPriority
     LayerPriority       etype byte
         LAYER_PRIO_MODAL        enum LayerPriority, 6   ; For system-modal dialog 
                                                         ; boxes, when layer is on 
@@ -1637,7 +1637,7 @@ holds going into the VisContentClass handler for the mouse event.
 **Library:** win.def
 
 ----------
-#### LibraryCallType
+### LibraryCallType
     LibraryCallType     etype word
         LCT_ATTACH                  enum LibraryCallType
         LCT_DETACH                  enum LibraryCallType
@@ -1649,7 +1649,7 @@ holds going into the VisContentClass handler for the mouse event.
 **Library:** library.def
 
 ----------
-#### LineAttr
+### LineAttr
     LineAttr        struct
         LA_colorFlag    ColorFlag CF_INDEX  ; RGB or INDEX
         LA_color        RGBValue <0,0,0>    ; RGB values or index
@@ -1666,7 +1666,7 @@ This structure is used with **GrSetLineAttr**.
 **Library:** graphics.def
 
 ----------
-#### LineEnd
+### LineEnd
     LineEnd etype byte
         LE_BUTTCAP          enum LineEnd        ; but cap
         LE_ROUNDCAP         enum LineEnd        ; round cap
@@ -1675,7 +1675,7 @@ This structure is used with **GrSetLineAttr**.
 **Library:** graphics.def
 
 ----------
-#### LineFlags
+### LineFlags
     LineFlags       record
         LF_STARTS_PARAGRAPH             :1
         LF_ENDS_PARAGRAPH               :1
@@ -1766,7 +1766,7 @@ Set if the line contains a non-kernel supported style.
 **Library:** text.def
 
 ----------
-#### LineInfo
+### LineInfo
     LineInfo        struct
         LI_flags            LineFlags
         LI_hgt              WBFixed
@@ -1800,7 +1800,7 @@ present.)
 **Library:** text.def
 
 ----------
-#### LineJoin
+### LineJoin
     LineJoin        etype byte
         LJ_MITERED              enum LineJoin       ; miter join
         LJ_ROUND                enum LineJoin       ; round join
@@ -1811,7 +1811,7 @@ present.)
 **Library:** graphics.def
 
 ----------
-#### LineStyle
+### LineStyle
     LineStyle       etype byte
         LS_SOLID        enum LineStyle      ; ___________   (solid)
         LS_DASHED       enum LineStyle      ; _ _ _ _ _ _   (dashed)
@@ -1823,7 +1823,7 @@ present.)
 **Library:** graphics.def
 
 ----------
-#### LinkPart
+### LinkPart
     LinkPart        struct
         LP_next         optr
     LinkPart        ends
@@ -1834,7 +1834,7 @@ indicate that the optr links a parent. (If 0, then object is not in a composite.
 **Library:** Objects/metaC.def
 
 ----------
-#### LMemBlockHeader
+### LMemBlockHeader
     LMemBlockHeader     struct
         LMBH_handle         hptr
         LMBH_offset         nptr.word
@@ -1876,7 +1876,7 @@ list of free chunks.
 **Library:** lmem.def
 
 ----------
-#### LMemType
+### LMemType
     LMemType        etype word
         LMEM_TYPE_GENERAL               enum LMemType
         LMEM_TYPE_WINDOW                enum LMemType
@@ -1889,7 +1889,7 @@ list of free chunks.
 **Library:** lmem.def
 
 ----------
-#### LocalCmpStringsDosToGeosFlags
+### LocalCmpStringsDosToGeosFlags
     LocalCmpStringsDosToGeosFlags               record
                                             :6
         LCSDTG_NO_CONVERT_STRING_2          :1
@@ -1899,7 +1899,7 @@ list of free chunks.
 **Library:** localize.def
 
 ----------
-#### LocalDistanceFlags
+### LocalDistanceFlags
     LocalDistanceFlags      record
         LDF_FULL_NAMES              :1
         LDF_PRINT_PLURAL_IF_NEEDED  :1
@@ -1911,7 +1911,7 @@ list of free chunks.
 **Library:** localize.def
 
 ----------
-#### LocalMemoryFlags
+### LocalMemoryFlags
     LocalMemoryFlags        record
         LMF_HAS_FLAGS       :1      ;True if block has a flags block
         LMF_IN_RESOURCE     :1      ;True if block is just loaded from resource
@@ -1942,7 +1942,7 @@ list of free chunks.
 **Library:** lmem.def
 
 ----------
-#### MakeRectVisibleFlags
+### MakeRectVisibleFlags
     MakeRectVisibleFlags            record
                                             :8
         MRVF_ALWAYS_SCROLL                  :1
@@ -1963,7 +1963,7 @@ rectangle.
 **Library:** Objects/gViewC.def
 
 ----------
-#### MakeRectVisibleMargin
+### MakeRectVisibleMargin
     MakeRectVisibleMargin           etype word
         MRVM_0_PERCENT      enum MakeRectVisibleMargin, 0
         MRVM_25_PERCENT     enum MakeRectVisibleMargin, 0ffffh/4
@@ -1998,7 +1998,7 @@ bottom edge of the screen.
 **Library:** Objects/gViewC.def
 
 ----------
-#### MakeRectVisibleParams
+### MakeRectVisibleParams
     MakeRectVisibleParams           struct
         MRVP_bounds         RectDWord
         MRVP_xMargin        MakeRectVisibleMargin
@@ -2015,14 +2015,14 @@ rectangle must be less than 65535 points high or wide.)
 **Library:** Objects/gViewC.def
 
 ----------
-#### ManufacturerID
+### ManufacturerID
     ManufacturerID      etype word
         MANUFACTURER_ID_GEOWORKS        enum ManufacturerID
 
 **Library:** geode.def
 
 ----------
-#### MapListBlockHeader
+### MapListBlockHeader
     MapListBlockHeader      struct
         MLBH_base               LMemBlockHeader
         MLBH_numDestFields      word
@@ -2032,7 +2032,7 @@ rectangle must be less than 65535 points high or wide.)
 **Library:** impex.def
 
 ----------
-#### MCFeatures
+### MCFeatures
     MCFeatures      record
         MCF_LEFT_MARGIN             :1
         MCF_PARA_MARGIN             :1
@@ -2042,14 +2042,14 @@ rectangle must be less than 65535 points high or wide.)
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### MCToolboxFeatures
+### MCToolboxFeatures
     MCToolboxFeatures       record
     MCToolboxFeatures       end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### MeasurementType
+### MeasurementType
     MeasurementType     etype byte
         MEASURE_US              enum MeasurementType
         MEASURE_METRIC          enum MeasurementType
@@ -2057,7 +2057,7 @@ rectangle must be less than 65535 points high or wide.)
 **Library:** localize.def
 
 ----------
-#### MediaType
+### MediaType
     MediaType       etype byte, 0
         MEDIA_NONEXISTENT       enum MediaType  ; used as error value
         MEDIA_160K              enum MediaType
@@ -2077,7 +2077,7 @@ rectangle must be less than 65535 points high or wide.)
 **Library:** drive.def
 
 ----------
-#### MemGetInfoType
+### MemGetInfoType
     MemGetInfoType      etype word, 0, 2
         MGIT_SIZE                       enum MemGetInfoType
         MGIT_FLAGS_AND_LOCK_COUNT       enum MemGetInfoType
@@ -2089,7 +2089,7 @@ rectangle must be less than 65535 points high or wide.)
 **Library:** heap.def
 
 ----------
-#### MenuSepFlags
+### MenuSepFlags
     MenuSepFlags        record
         MSF_SEP             :1
         MSF_USABLE          :1
@@ -2117,7 +2117,7 @@ its previous sibling or parent.
 **Library:** Objects/visC.def
 
 ----------
-#### MessageError
+### MessageError
     MessageError        etype word
         MESSAGE_NO_ERROR        enum MessageError
         MESSAGE_NO_HANDLES      enum MessageError   ; short on handles and
@@ -2127,7 +2127,7 @@ its previous sibling or parent.
 **Library:** object.def
 
 ----------
-#### MessageFlags
+### MessageFlags
     MessageFlags        record
         MF_CALL                     :1
         MF_FORCE_QUEUE              :1
@@ -2150,7 +2150,7 @@ its previous sibling or parent.
 **Library:** object.def
 
 ----------
-#### MetaAlterFTVMCExclFlags
+### MetaAlterFTVMCExclFlags
     MetaAlterFTVMCExclFlags     record
         MAEF_NOT_HERE               :1
         MAEF_SYS_EXCL               :1
@@ -2223,7 +2223,7 @@ menu-related object
 **Library:** uiInputC.def
 
 ----------
-#### MetaBase
+### MetaBase
     MetaBase        struct
         MB_class        fptr.ClassStruct        ; Instance's class
     MetaBase        ends
@@ -2233,7 +2233,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** Objects/metaC.def
 
 ----------
-#### MinIncrementType
+### MinIncrementType
     MinIncrementType        union
         MIT_US          MinUSMeasure
         MIT_METRIC      MinMetricMeasure
@@ -2244,7 +2244,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** ruler.def
 
 ----------
-#### MinMetricMeasure
+### MinMetricMeasure
     MinMetricMeasure        etype byte, 0
         MMM_MILLIMETER              enum    MinMetricMeasure
         MMM_HALF_CENTIMETER         enum    MinMetricMeasure
@@ -2253,7 +2253,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** 
 
 ----------
-#### MinPicaMeasure
+### MinPicaMeasure
     MinPicaMeasure      etype byte, 0
         MPM_PICA            enum MinPicaMeasure
         MPM_INCH            enum MinPicaMeasure
@@ -2261,7 +2261,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** ruler.def
 
 ----------
-#### MinPointMeasure
+### MinPointMeasure
     MinPointMeasure     etype byte, 0
         MPM_25_POINT            enum MinPointMeasure
         MPM_50_POINT            enum MinPointMeasure
@@ -2270,7 +2270,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** ruler.def
 
 ----------
-#### MinUSMeasure
+### MinUSMeasure
     MinUSMeasure        etype byte, 0
         MUSM_EIGHTH_INCH            enum MinUSMeasure
         MUSM_QUARTER_INCH           enum MinUSMeasure
@@ -2280,7 +2280,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** ruler.def
 
 ----------
-#### MixMode
+### MixMode
     MixMode etype byte
         MM_CLEAR        enum MixMode        ; dest <- 0
         MM_COPY         enum MixMode        ; dest <- src
@@ -2296,7 +2296,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** graphics.def
 
 ----------
-#### MonikerGroupEntry
+### MonikerGroupEntry
     MonikerGroupEntry       struct
         MGE_type        VisMonikerListEntryType
         MGE_group       word
@@ -2305,7 +2305,7 @@ This base structure is defined so Esp can build on it for all other classes.
 **Library:** token.def
 
 ----------
-#### MonikerMessageParams
+### MonikerMessageParams
     MonikerMessageParams            struct
         MMP_xInset          word
         MMP_yInset          word
@@ -2343,7 +2343,7 @@ used when drawing the moniker.
 **Library:** Objects/visC.def
 
 ----------
-#### MouseGrab
+### MouseGrab
     MouseGrab       struct
         MG_OD           optr
         MG_gWin         hptr
@@ -2355,7 +2355,7 @@ the window handle that mouse data should be translated into before sending.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### MouseReturnFlags
+### MouseReturnFlags
     MouseReturnFlags        record
         MRF_PROCESSED                   :1
         MRF_REPLAY                      :1

@@ -393,7 +393,7 @@ the Screen" in "VisClass," Chapter 23.
     }
 
 ----------
-### 9.3 Basic View Attributes
+## 9.3 Basic View Attributes
 
 The GenView has several instance data fields that it uses to maintain its 
 current status. It also has other attribute fields that determine its scrolling, 
@@ -945,7 +945,7 @@ This macro extracts the green component byte from the given dword.
 
 This macro extracts the blue component byte from the given dword.
 
-#### 9.3.4  The GVI_increment Attribute
+### 9.3.4  The GVI_increment Attribute
 GVI_increment, MSG_GEN_VIEW_GET_INCREMENT, 
 MSG_GEN_VIEW_SET_INCREMENT
 

@@ -1,4 +1,4 @@
-## 9 General Change Notification
+# 9 General Change Notification
 
 In a multitasking environment, threads may need to know of condition 
 changes that might affect them. In most cases where shared resources or 
@@ -12,7 +12,7 @@ processes and objects manually, the GCN mechanism eliminates the need to
 keep track of all processes that depend on the particular change and to keep 
 track of all messages sent out to the various processes and objects.
 
-### 9.1 Design Goals
+## 9.1 Design Goals
 
 General Change Notification allows you to keep track of both system and 
 application events. Objects or processes interested in a particular change 
@@ -37,7 +37,7 @@ objects may sign up for application-specific notification supported by
 **GenApplicationClass**. These application specific notifications should only 
 be sent to the GenApplication object.
 
-### 9.2 The Mechanics of GCN
+## 9.2 The Mechanics of GCN
 
 The basic GCN functionality manages lists of objects that are interested in 
 specific changes. For each particular change that needs to be monitored, a 
@@ -68,7 +68,7 @@ Many messages sent by the system expect a GCN mechanism to intercept
 them. Although you can intercept these messages manually, it is easier 
 to take advantage of GCN's built-in functions.
 
-### 9.3 System Notification
+## 9.3 System Notification
 
 GCNListAdd(), GCNListSend()
 
@@ -96,7 +96,7 @@ parties with **GCNListSend()**.
 If you need to perform some work related to this change, you should have 
 a message handler to intercept the system messages.
 
-#### 9.3.1 Registering for System Notification
+### 9.3.1 Registering for System Notification
 
 Whenever an object or process needs to be notified of some system change, it 
 must call the routine **GCNListAdd()** to add itself to the list for that 
@@ -227,7 +227,7 @@ Code Display 9-1 Adding a Process Object to a GCN List
 }
 ~~~
 
-#### 9.3.2 Handling System Notification
+### 9.3.2 Handling System Notification
 
 MSG_NOTIFY_FILE_CHANGE, MSG_NOTIFY_DRIVE_CHANGE, 
 MSG_NOTIFY_APP_STARTED, MSG_NOTIFY_APP_EXITED, 
@@ -364,7 +364,7 @@ occurs. MSG_NOTIFY_USER_DICT_CHANGED passes the MemHandle of the
 Spell Box causing the change and the MemHandle of the user dictionary 
 being changed, both of which you may access in your message handler.
 
-#### 9.3.3 Removal from a System List
+### 9.3.3 Removal from a System List
 
 You should use **GCNListRemove()** to remove an object from a system GCN 
 list. You must pass the notification ID (**GCNStandardListType** and 
@@ -391,7 +391,7 @@ Code Display 9-2 Removing a Process from a GCN list
 }
 ~~~
 
-### 9.4 Application Local GCN Lists
+## 9.4 Application Local GCN Lists
 
 The GCN mechanism not only allows you to keep track of system changes but 
 also allows you to keep track of changes within a specific application. These 
@@ -443,7 +443,7 @@ MSG_META_NOTIFY_WITH_DATA_BLOCK. If you need to perform some
 work related to this change, you should have a message handler to 
 intercept these messages.
 
-#### 9.4.1 Creating Types and Lists
+### 9.4.1 Creating Types and Lists
 
 It is a relatively simple matter to create your own notification types. Within 
 an appropriate company-specific file merely create your own types and lists. 
@@ -474,7 +474,7 @@ typedef enum {
 } <yourCompanyName>GenAppGCNListTypes;
 ~~~
 
-#### 9.4.2 Registering for Notification
+### 9.4.2 Registering for Notification
 
 MSG_META_GCN_LIST_ADD 
 
@@ -521,7 +521,7 @@ Code Display 9-4 Adding Yourself to a Custom GCN List
 }
 ~~~
 
-#### 9.4.3 Handling Application Notification
+### 9.4.3 Handling Application Notification
 
 MSG_META_NOTIFY, MSG_META_NOTIFY_WITH_DATA_BLOCK, 
 MSG_META_GCN_LIST_SEND
@@ -672,7 +672,7 @@ Code Display 9-7 Intercepting an Application Notification Change
 }
 ~~~
 
-#### 9.4.4 Removal from Application Lists
+### 9.4.4 Removal from Application Lists
 
 You should use MSG_META_GCN_LIST_REMOVE to remove an object from an 
 application GCN list. You must pass the routine the notification ID 
