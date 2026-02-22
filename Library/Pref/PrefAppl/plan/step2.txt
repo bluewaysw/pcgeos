@@ -1,7 +1,7 @@
 GOAL
 Make AppList in PrefAppl show all the apps in the SP_SYS_APPLICATION/DISTAPPL folder and mark
 those applications selected, that have at least one link in the SP_APPLICATION and/or
-SP_TOP/DESKTOP folders and/or their subfolders.
+SP_TOP/DESKTOP folder and/or their subfolders.
 
 STEP1
 On starting up, scan the SP_SYS_APPLICATION/DISTAPPL data directory for Geodes of
@@ -10,8 +10,8 @@ message and exit. Applications in the folder can be identified via FEA_FILE_TYPE
 FEA_GEODE_ATTR / GeodeAttrs / GA_APPLICATION.
 
 Create a list of the Geode names (GEOS long file name, FileLongName, FEA_NAME) and their GeodeToken
-in an LMem ChunkArray. Duplicate app tokens in DISTAPPL should never appear so we can ignore this
-special case. Assume that there will be no subdirectorys in DISTAPPL or ignore them.
+(FEA_TOKEN) in an LMem ChunkArray. Duplicate app tokens in DISTAPPL should never appear so we can
+ignore this special case. Ignore any subfolders in DISTAPPL.
 
 Once we have all applications in DISTAPPL, we need to sort them alphabetically by name via a
 helper function.
@@ -23,7 +23,7 @@ traversal in a helper with explicit safeguards:
 * Maximum depth constant (16)
 * Do not recurse into entries flagged as links (`FA_LINK`) to avoid link loops
 * Skip `.` and `..`
-* Gracefully continue on unreadable directories
+* Gracefully continue on unreadable sub-directories there
 * Keep traversal state in heap/LMem structures (avoid large stack frames)
 Add comments in `Library/Pref/PrefAppl` helper code documenting these guarantees and expected
 behavior when limit is hit.
@@ -50,7 +50,7 @@ require `GA_APPLICATION`. Only then call/read `FEA_TOKEN`. Store each link recor
 target token, with optional resolved path/disk for diagnostics.
 
 If multiple links to the same application are found, we still store all of them in a unique way in
-the list.
+the list. In a later implementation step, we will need this list to remove all links found.
 
 STEP3
 Go thru the list of applications from DISTAPPL and for each app, scan the
@@ -60,7 +60,7 @@ stop the search and mark that app in the DISTAPPL list as selected.
 The list of applications in DISTAPPL mmust be populated with the correct information. This list
 can now be used to provide the monikers for our AppList UI gadget. If an app is selected in
 DISTAPPL, it must also be selected in the AppList UI gadget. Refactor MSG_PREF_APPL_LIST_MONIKER_QUERY
-to query the DISTAPPL list for the GEOS long file name of the selected applications and show that
+to query the DISTAPPL list for the GEOS long file name of the applications and show that
 in the list as the requested moniker.
 
 NON_GOALS
