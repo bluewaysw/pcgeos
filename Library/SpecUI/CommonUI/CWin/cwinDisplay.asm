@@ -679,6 +679,8 @@ afterCopyName:
 	call	MemInitRefCount
 
 haveNotificationBlock:
+	clr 	cx
+	mov	es, cx
 	mov	cx, GAGCNLT_APP_TARGET_NOTIFY_DISPLAY_CHANGE
 	mov	dx, GWNT_DISPLAY_CHANGE
 	call	SendNotifyCommon

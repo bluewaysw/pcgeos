@@ -2701,7 +2701,21 @@ if DYNAMIC_SCREEN_RESIZING
 	mov	ax, MSG_VIS_GET_SIZE
 	call	VisCallParent
 	
+	; did size change?
+	push	cx
+	push	dx
 
+	mov	ax, MSG_VIS_GET_SIZE
+	call	ObjCallInstanceNoLock
+
+	pop	bx
+	pop	ax
+	cmp	ax, cx
+	jne	doLayout
+	cmp	bx, dx
+	je	noLayout
+
+doLayout:
 	mov	ax, MSG_VIS_SET_SIZE
 	call	ObjCallInstanceNoLock
 	
@@ -2710,7 +2724,7 @@ if DYNAMIC_SCREEN_RESIZING
 	;
 	mov	ax, MSG_OL_WIN_FIELD_SIZE_CHANGED
 	call	VisSendToChildren
-
+noLayout:
 	jmp	callSuper
 
 handleExpress:
