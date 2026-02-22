@@ -2117,6 +2117,8 @@ EC <	pop	bx							>
 	;
 	; close transfer VM file (saving normalTransferItem)
 	;
+	clr ax
+	mov	es, ax				; clear out segment for GPMI
 	mov	al, FILE_NO_ERRORS
 	call	VMClose
 
@@ -2157,6 +2159,8 @@ assume ds:dgroup
 	call	CheckTransferItem
 EC10:
 	call	Transfer_VMUnlock		; unlock map block
+	clr	ax
+	mov	es, ax				; clear out segment for GPMI
 	mov	al, FILE_NO_ERRORS
 	call	VMClose
 	call	FilePopDir
