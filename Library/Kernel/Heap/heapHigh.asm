@@ -1328,10 +1328,42 @@ if	ANALYZE_WORKING_SET
 endif
 
 	FastUnLock	ds, bx, ax, NO_NULL_SEG
-
+ifdef PROTECTED_MODE
+	mov	ax, ds:[bx].HM_addr
+	tst	ds:[bx].HM_lockCount
+endif
 	pop	ds
+ifdef PROTECTED_MODE
+	jnz	afterCheck
+	push	bx
+	mov	bx, ds
+	cmp	bx, ax
+	jne	checkES
+	clr	bx
+	mov	ds, bx
+checkES:
+	mov	bx, es
+	cmp	bx, ax
+	jne	checkFS
+	clr	bx
+	mov	es, bx
+checkFS:
+	mov	bx, fs
+	cmp	bx, ax
+	jne	checkGS
+	clr	bx
+	mov	fs, bx
+checkGS:
+	mov	bx, gs
+	cmp	bx, ax
+	jne	checkDone
+	clr	bx
+	mov	gs, bx
+checkDone:
+	pop	bx
+afterCheck:
+endif
 EC <	call	NullSegmentRegisters					>
-
 	; if "ec unlockMove" is on and lockCount is 0 then move the block
 	; (moved after the NullSegmentRegisters to before that happens if
 	; the block reaches a lock count of 0...)

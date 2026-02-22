@@ -933,7 +933,11 @@ doValidate:
 afterValidate:
 
 	call	FarVWinTree		; es <- idata
-
+ifdef PRODUCT_GEOS32
+	clr		di					; clean state segment for
+								; GPMI version
+	mov		ds, di
+endif
 	pop	di			; Get window handle
 	call	WinDecRefCount		; Acknowledge death for WinClose.
 					; If all death acknowledges have come

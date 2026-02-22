@@ -2355,6 +2355,12 @@ SysFreeDOSBlock proc	far
 		.leave
 		ret
 SysFreeDOSBlock endp
+
+else 
+
+NoPMSupportError proc 	far
+NoPMSupportError endp
+
 endif ; PRODUCT_GEOS32
 
 

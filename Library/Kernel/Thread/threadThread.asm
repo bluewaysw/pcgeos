@@ -639,7 +639,7 @@ REVISION HISTORY:
 	Doug	6/92		Added ability to pass "si" on through
 
 ------------------------------------------------------------------------------@
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 udata	segment
 threadDestroyTemp	word
 udata	ends
@@ -793,7 +793,7 @@ noQueue:
 	mov	si, ss:[TPD_blockHandle] ;si = stack handle
 	pop	bx			;recover current thread
 
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	pop	ax, di, es		;(ax, di, es) hold notification message
 else
 	INT_OFF
@@ -810,7 +810,7 @@ else
 endif
 	pop	cx, dx, bp		;recover exit code, OD
 
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	INT_OFF
 endif
 	pop	ds:[TPD_dataAX]		;get "data to pass in BP" into a 
