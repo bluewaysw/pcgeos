@@ -362,7 +362,7 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	mov	cx, di				;cx <- recorded message
 	mov	ax, MSG_VIS_SEND_TO_CHILDREN
 	call	ObjCallInstanceNoLock
-	pop	cx
+	pop	cx, dx
 	pop	ax, cx, dx, di, bx, bp
 
 	push	ax, cx, dx, di, bx, bp

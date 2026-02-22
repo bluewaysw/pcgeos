@@ -1157,6 +1157,9 @@ afterTransitionCheck:
 	mov	ss:[bp].GCNLMP_event, di
 	mov	ss:[bp].GCNLMP_flags, ax
 
+	clr	ax
+	mov	es, ax		; clean es for GPMI
+
 	mov	ax, MSG_META_GCN_LIST_SEND
 	mov	dx, size GCNListMessageParams
 
