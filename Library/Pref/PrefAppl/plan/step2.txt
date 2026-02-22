@@ -1,15 +1,19 @@
 GOAL
-Make AppList in PrefAppl show all the apps in the SP/DISTAPPL folder and mark
-applications selected that have at least one link in the SP_APPLICATION or
-SP_TOP/DESKTOP folders.
+Make AppList in PrefAppl show all the apps in the SP_SYS_APPLICATION/DISTAPPL folder and mark
+those applications selected, that have at least one link in the SP_APPLICATION and/or
+SP_TOP/DESKTOP folders and/or their subfolders.
 
 STEP1
 On starting up, scan the SP_SYS_APPLICATION/DISTAPPL data directory for Geodes of
-type GEOS application. These can be identified via FEA_FILE_TYPE of GFT_EXECUTABLE and
+type GEOS application. If SP_SYS_APPLICATION/DISTAPPL is not found, popup a clear error
+message and exit. Applications in the folder can be identified via FEA_FILE_TYPE of GFT_EXECUTABLE and
 FEA_GEODE_ATTR / GeodeAttrs / GA_APPLICATION.
 
-Create a list of the Geode names and their GeodeToken in an LMem ChunkArray.
-Assume that there will be no subdirectorys or ignore them.
+Create a list of the Geode names (GEOS long file name) and their GeodeToken in an LMem ChunkArray.
+Duplicate app tokens in DISTAPPL should never appear so we can ignore this special case. Assume that
+there will be no subdirectorys in DISTAPPL or ignore them.
+
+Once we have all applications in DISTAPPL, we need to sort them alphabetically by name.
 
 STEP2
 Afterwards, scan the SP_APPLICATION folder and the SP_TOP/DESKTOP folder. In these folders
@@ -27,7 +31,7 @@ For each link found, we will need to store the traversal root (SP_APPLICATION or
 directory under that root (no leading \, no . segments), plus the file name and the targets'
 GeodeToken in a separate ChunkArray.
 
-The GeodeToken of the application the link is pointing to is enough to identify the
+The GeodeToken of the application a link is pointing to is enough to identify the
 application from DISTAPPL later. In pcgeos, the GeodeToken for applications are unique
 across all manufacturers as long as both GT_chars and GT_manufID match.
 
@@ -38,24 +42,30 @@ We are not talking about links related to GPC_DESKTOP_LINKS_IN_INI in this conte
 GeosFileType/GFT_LINK seems not to be implemented and is not what we want.
 
 Use a strict two-call resolution path for each FA_LINK entry: call FileReadLink() to get the
-resolved target path and disk, then call FileGetPathExtAttributes(..., FEA_TOKEN, ...) on that
-target to obtain its GeodeToken. Store each link record as source location
+resolved target path and disk. Call `FileGetPathExtAttributes(..., FEA_FILE_TYPE, ...)` and
+require `GFT_EXECUTABLE`. Call `FileGetPathExtAttributes(..., FEA_GEODE_ATTR, ...)` and
+require `GA_APPLICATION`. Only then call/read `FEA_TOKEN`. Store each link record as source location
 (SP_APPLICATION or SP_TOP plus canonical relative path and link filename) plus resolved
 target token, with optional resolved path/disk for diagnostics.
 
+If multiple links to the same application are found, we still store all of them in a unique way in
+the list.
+
 STEP3
 Go thru the list of applications from DISTAPPL and for each app, scan the
-SP_APPLICATION and the SP_TOP/DESKTOP list for links to that application. If a link is found,
+SP_APPLICATION and the SP_TOP/DESKTOP list for links to that application. If any one link is found,
 stop the search and mark that app in the DISTAPPL list as selected.
 
 The list of applications in DISTAPPL mmust be populated with the correct information. This list
 can now be used to provide the monikers for our AppList UI gadget. If an app is selected in
-DISTAPPL, it must also be selected in the AppList UI gadget.
+DISTAPPL, it must also be selected in the AppList UI gadget. Refactor MSG_PREF_APPL_LIST_MONIKER_QUERY
+to query the DISTAPPL list for the GEOS long file name of the selected applications and show that
+in the list as the requested moniker.
 
 NON_GOALS
 In this step of the implementation, we are not interested in what happens when you change the
 selection of the AppList. In the future this will remove/add links to/from the SP_APPLICATION and
-SP_TOP/DESKTOP folders but we are not implementing this now. However, we must be sure that it
+SP_TOP/DESKTOP folders but we are not implementing this now. However, we must make sure that it
 can be safely and easily added later.
 
 DESIGN NOTES
