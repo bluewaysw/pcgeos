@@ -47,6 +47,7 @@ include timer.def
 include timedate.def
 include system.def
 include font.def
+include system.def
 
 ;necessary?
 

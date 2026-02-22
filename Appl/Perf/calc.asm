@@ -312,7 +312,7 @@ PerfCalcHeapAllocation  proc    near
 ;no longer necessary
 ;       add     ax, ds:[kernelSize]
 
-	call    MultAXBy10AndDivideBy64
+	call    MultAXBy10
 	mov     ds:[numericLast].PSS_heapAllocated, ax
 
 	;now calculate allocated size as ration of total heap size
@@ -367,7 +367,7 @@ PerfCalcHeapFixed       proc    near
 ;no longer necessary
 ;       add     ax, ds:[kernelSize]
 
-	call    MultAXBy10AndDivideBy64
+	call    MultAXBy10
 	mov     ds:[numericLast].PSS_heapFixed, ax
 
 	;now calculate allocated size as ration of total heap size
@@ -902,6 +902,43 @@ done:
 ;       mov     ax, es
 ;       mov     bx, ds:[heapSemOffset]  ;ax:bx = heapSem (really)
 ;       call    ThreadUnlockModule
+
+
+	; overwrite 
+	; mem size in 4K blocks, page granularity?
+	mov	ax, SGIT_PHYS_MEM_TOTAL
+	call	SysGetInfo
+
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+
+	mov	ds:[heapTotalMemSize], ax
+
+	mov	ax, SGIT_PHYS_MEM_USED
+	call	SysGetInfo
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	shrdw	dxax
+	
+	mov	ds:[heapAllocatedMemSize], ax
+	mov	ds:[heapFixedMemSize], ax
 
 	pop     es
 
