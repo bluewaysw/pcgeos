@@ -337,8 +337,15 @@ SGI_HeapFreeSize	endp
 
 
 SGI_PhysMemTotal	proc	near
+ifdef PROTECTED_MODE
+		mov	bx, GPMI_INFO_PHYS_MEM_TOTAL
+		call	GPMIGetInfoFar
+		mov	dx, bx
+		mov	ax, cx
+else
 		clr	dx
 		mov	ax, 50
+endif
 		ret
 SGI_PhysMemTotal	endp
 

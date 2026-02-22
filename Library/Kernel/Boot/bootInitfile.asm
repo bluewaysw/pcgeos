@@ -335,6 +335,12 @@ useDefault:
 	call	ProcessStartupList
 
 exit:
+ifdef PRODUCT_GEOS32
+	; ds is initialized to ini key value and the segments
+	; is going to be destroyed here, with will end in an
+	; protection fault.		
+	LoadVarSeg	ds,bx
+endif
 	call	DoneWithString
 	ret
 LoadFontDriver	endp
@@ -1150,8 +1156,8 @@ DoneWithString	proc	near
 	mov	bx, ds:[bootInitFileBufHan]
 	tst	bx
 	jz	done
-	call	MemFree
 	clr	ds:[bootInitFileBufHan]
+	call	MemFree
 done:
 	.leave
 	ret

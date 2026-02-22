@@ -119,9 +119,9 @@ resource C_Graphics code read-only shared
 resource GrWinBlt code read-only shared
 resource VMOpenCode code read-only shared
 resource BIOSSeg code read-only shared
-resource C_Common code read-only shared
+resource C_Common fixed code read-only shared
 resource C_System code read-only shared
-resource GraphicsObscure code read-only shared
+resource GraphicsObscure fixed code read-only shared
 resource GraphicsFonts code read-only shared
 resource FileenumCode code read-only shared
 resource GraphicsAllocBitmap code read-only shared
@@ -2572,4 +2572,14 @@ export SysAllocDOSBlock
 export SysFreeDOSBlock
 export SysAllocRealModeCallback
 export SysFreeRealModeCallback
+else
+export NoPMSupportError as SysMapRealSegment
+export NoPMSupportError as SysAllocCodeAlias
+export NoPMSupportError as SysFreeCodeAlias
+export NoPMSupportError as SysUnmapRealSegment
+export NoPMSupportError as SysRealInterrupt
+export NoPMSupportError as SysAllocDOSBlock
+export NoPMSupportError as SysFreeDOSBlock
+export NoPMSupportError as SysAllocRealModeCallback
+export NoPMSupportError as  SysFreeRealModeCallback
 endif

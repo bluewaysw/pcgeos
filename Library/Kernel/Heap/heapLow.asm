@@ -1298,12 +1298,16 @@ ifdef PRODUCT_GEOS32
 
 	andnf	cl, not (mask HF_DISCARDABLE or mask HF_SWAPABLE)
 	mov	ds:[bx].HM_flags, cl
+	push	ax, bx
 	mov	bx, ds:[bx][HM_addr]
 	shl	ax, 4			;ax = size (in bytes)
 	mov_tr	dx, ax
 	clr	cx			;cx:dx = size
 	call	GPMIMakePresent		;ax = code/data flag
-
+	pop	dx, bx
+	jc	skip
+	mov	ds:[bx][HM_size], dx	;store new size, ax = orig. size
+skip:
 	pop	dx, bx, di
 	jc	doneRestoreFlags
 
