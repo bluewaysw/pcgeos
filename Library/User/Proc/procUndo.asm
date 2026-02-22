@@ -398,6 +398,8 @@ SendUndoNotification	proc	near	uses	ax, bx, cx, dx, bp, di, es
 	mov	ax, MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST
 	call	GeodeGetProcessHandle
 	mov	di, mask MF_FIXUP_DS or mask MF_STACK
+	clr		di
+	mov		es, di
 	call	ObjMessage
 	add	sp, dx
 

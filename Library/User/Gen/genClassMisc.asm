@@ -1463,12 +1463,29 @@ LoadOrSaveOptions	proc	far
 	sub	sp, size GenOptionsParams
 	mov	bp, sp
 
+
 	push	si
 	mov	si, bx				;ds:si = source
 	segmov	es, ss
 	lea	di, ss:[bp].GOP_key
-	mov	cx, INI_CATEGORY_BUFFER_SIZE / 2
-	rep movsw
+
+
+	;mw 2007-09-21: fixed AX -> saved
+	;mw 2007-06-07: changed may not have extra data
+	push ax
+	VarDataFlagsPtr	ds, bx, ax
+	test ax, mask VDF_EXTRA_DATA
+	pop ax
+	jz noExtraData
+
+	; get extra data len
+	mov cx, ds:[si].VEDP_entrySize;
+	;mov	cx, INI_CATEGORY_BUFFER_SIZE / 2
+	rep movsb
+
+noExtraData:
+
+	mov es:[di], 0
 	pop	si
 
 		CheckHack <offset GOP_category eq 0>

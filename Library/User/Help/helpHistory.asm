@@ -556,10 +556,12 @@ allocCopy:
 	rep	movsb				;copy cx bytes
 	pop	si, cx
 	segmov	ds, es				;ds <- (new) seg addr of array
-EC <	push	ax				;>
-EC <	mov	ax, 0xa000			;>
-EC <	mov	es, ax				;>
-EC <	pop	ax				;>
+
+; not sure what this code is about, it is not operating for PM
+;EC <	push	ax				;>
+;EC <	mov	ax, 0xa000			;>
+;EC <	mov	es, ax				;>
+;EC <	pop	ax				;>
 	retn
 HHRecordHistory		endp
 

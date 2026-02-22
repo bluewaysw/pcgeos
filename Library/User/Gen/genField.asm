@@ -2926,6 +2926,10 @@ EC <	mov	es:[ALB_userLoadAckID],1234				>
 	mov	dx, bx		; Put block handle in dx
 	mov	si, bp		;Restore chunk handle of GenField object
 	pop	cx		; cx <- app #
+	
+	clr	ax
+	mov	es, ax		; avoid GPMI protection failure
+	
 	mov	ax, MSG_GEN_FIELD_RESTORE_APP
 	GOTO	ObjCallInstanceNoLock
 

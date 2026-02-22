@@ -3014,10 +3014,19 @@ haveMode:
 	je	HaveFilename	; if not, then use that in AppLaunchBlock.
 				; Copy filename into AppLaunchBlock.
 
-	mov	di, offset ALB_appRef.AIR_fileName
-	mov	cx, PATH_BUFFER_SIZE/2
-	rep	movsw		; Copy into block
-
+	segxchg	ds, es
+	mov	di, si				;es:di = source
+SBCS <	mov	cx, PATH_BUFFER_SIZE					>
+DBCS <	mov	cx, PATH_BUFFER_SIZE/2					>
+	LocalClrChar	ax			;find null term
+	LocalFindChar				;cx = size - (strlen + 1)
+	neg	cx				;cx = (strlen + 1) - size
+SBCS <	add	cx, PATH_BUFFER_SIZE					>
+DBCS <	add	cx, PATH_BUFFER_SIZE/2					>
+	segxchg	ds, es				;ds:si = source
+	mov	di, offset ALB_appRef.AIR_fileName	;es:di = dest
+	LocalCopyNString			;rep movsb/w
+	
 				; set disk handle from that passed 
 	mov	es:[ALB_appRef].AIR_diskHandle, dx
 HaveFilename:

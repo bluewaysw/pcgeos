@@ -211,7 +211,7 @@ HHSetTextHints		proc	near
 		(SST_PIXELS shl offset SW_TYPE) or HT_MIN_TEXT_HEIGHT
 	clr	ss:[bp].SSA_count		;no children
 	mov	ss:[bp].SSA_updateMode, VUM_NOW	;VisUpdateMode
-	mov	ax, MSG_GEN_SET_MINIMUM_SIZE
+	mov	ax, MSG_GEN_SET_MINIMUM_SIZE  
 	call	callObjMessage
 	add	sp, (size SetSizeArgs)
 	;
