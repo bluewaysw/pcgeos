@@ -2,20 +2,40 @@ GOAL: make AppList in PrefAppl show all the apps in the SP/DISTAPPL folder and m
 applications selected that have one or more link(s) in the SP_APPLICATION and/or
 SP_TOP/DESKTOP folders.
 
-STRATEGY:
+STEP1
 On starting up, scan the SP_SYS_APPLICATION/DISTAPPL data directory for Geodes of
-type GEOS application. These can be identified via FEA_FILE_TYPE of GFT_EXECUTABLE.
+type GEOS application. These can be identified via FEA_FILE_TYPE of GFT_EXECUTABLE. We
+can safely assume that each geode of type GFT_EXECUTABLE is an application and
+no further filtering is needed, as this directory will contain the "factory provided" applications
+and it will not be user modifieable.
 
-Create a list of the Geode names and tokens in an LMem ChunkArray.
+Create a list of the Geode names and their GeodeToken in an LMem ChunkArray.
 Assume that there will be no subdirectorys or ignore them.
 
+STEP2
 Afterwards, scan the SP_APPLICATION folder and the SP_TOP/DESKTOP folder. In these folders
-and their subfolders we are looking for links (FileAttrs, FA_LINK) to applications only.
-Store: StandardPath constant (e.g., SP_APPLICATION or SP_TOP), relative path string
-under that standard path, the link’s own name and the resolved targets GeodeToken in a
-separate ChunkArray.
+and their subfolders we are looking for links to applications only. Implement directory
+traversal in a helper with explicit safeguards:
+* Maximum depth constant (16)
+* Do not recurse into entries flagged as links (`FA_LINK`) to avoid link loops
+* Skip `.` and `..`
+* Gracefully continue on unreadable directories
+* Keep traversal state in heap/LMem structures (avoid large stack frames)
+Add comments in `Library/Pref/PrefAppl` helper code documenting these guarantees and expected
+behavior when limit is hit.
 
-In the next step, go thru the list of applications from DISTAPPL and for each app, scan the
+or each link found, store the standard-path + relative path canonicalized and the link’s own
+name as well as the resolved targets' GeodeToken in a separate ChunkArray. The GeodeToken of
+the application the link is pointing to is enough to ifentify the application from DISTAPPL later.
+In pcgeos, the GeodeToken for applications is unique.
+
+The Links feature in pcgeos is not well documented. Check Library/Kernel/File/fileLink.asm to see
+how that feature is implemented. Links can still be listed and filtered with FileEnum and filtering for
+FA_LINK in FileAttrs (see Appl/FFinder/FFProcess.goc). We are not talking about links related to
+GPC_DESKTOP_LINKS_IN_INI in this context.
+
+STEP3
+Go thru the list of applications from DISTAPPL and for each app, scan the
 SP_APPLICATION and the SP_TOP/DESKTOP list for links to that application. If a link is found,
 stop the search and mark that app in the DISTAPPL list as selected.
 
@@ -23,12 +43,14 @@ The list of applications in DISTAPPL mmust be populated with the correct informa
 can now be used to provide the monikers for our AppList UI gadget. If an app is selected in
 DISTAPPL, it must also be selected in the AppList UI gadget.
 
-DONE WHEN: We can be sure that the list of applications in DISTAPPL is correctly populated
-and displayed in the AppList UI widgetry.
+NON_GOALS:
+In this step of the implementation, we are not interested in what happens when you change the
+selection of the AppList. In the future this will remove/add links to/from the SP_APPLICATION and
+SP_TOP/DESKTOP folders but we are not implementing this now. However, we must be sure that it
+can be safely and easily added later.
 
-DESIGN: create a robust and reusable helper function for enumerating the DISTAPPL, SP_APPLICATION
+DESIGN NOTES
+Create a robust and reusable helper function for enumerating the DISTAPPL, SP_APPLICATION
 and SP_TOP/DESKTOP folders which scans either for application geodes or links to
 application geodes. Make sure to use LMem ChunkArray functions for memory management and don't
 forget the usual GEOS drill of MemLock/MemUnlock.
-
-API: use FileEnum for enumerating DISTAPPL, SP_APPLICATION and SP_TOP/DESKTOP folders.
