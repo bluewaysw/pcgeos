@@ -60,6 +60,7 @@ library ui
 # Define resources other than standard discardable code
 #
 nosort
+resource Resident               code read-only shared fixed
 resource SpoolInit 		code read-only shared discard-only preload
 resource PrintError		code read-only shared
 resource SpoolPaper		code read-only shared

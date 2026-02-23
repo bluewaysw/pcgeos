@@ -23,14 +23,12 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	This file contains the routines to lock and unlock the print queue.
-	They're placed in idata since they are small and are needed by both
-	the QueueManagement code and the PrintThread code.
 		
 	$Id: processLockQueue.asm,v 1.1 97/04/07 11:11:25 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-idata	segment
+Resident	segment resource
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -127,4 +125,4 @@ releaseQ:
 		ret
 UnlockQueue	endp
 
-idata	ends
+Resident	ends
