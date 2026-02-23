@@ -431,10 +431,6 @@ failed:
 		clr	ax
 		jmp	done
 
-failed:
-		clr	ax
-		jmp	done
-
 HostIfDetect	endp
 
 HOSTIFDETECT	proc	far 	apiid:word	
@@ -443,7 +439,6 @@ HOSTIFDETECT	proc	far 	apiid:word
 		.leave
 		GOTO	HostIfDetect
 HOSTIFDETECT	endp
-
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		HostIfDetect
