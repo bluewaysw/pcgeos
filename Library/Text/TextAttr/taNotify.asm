@@ -620,6 +620,10 @@ copyCommon:
 	pop	di
 
 	add	sp, size VisTextGenerateNotifyParams
+
+	mov	cx, NULL_SEGMENT	;prevent PM access violation
+	mov	es, cx
+
 	call	ThreadReturnStackSpace
 	ret
 
