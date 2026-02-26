@@ -13,8 +13,8 @@ Create a list of the Geode names (GEOS long file name, FileLongName, FEA_NAME) a
 (FEA_TOKEN) in an LMem ChunkArray. Duplicate app tokens in DISTAPPL should never appear so we can
 ignore this special case. Ignore any subfolders in DISTAPPL.
 
-Once we have all applications in DISTAPPL, we need to sort them alphabetically by name via a
-helper function.
+Once we have all applications in DISTAPPL, we need to sort them alphabetically by the GEOS long file
+name via a helper function.
 
 STEP2
 Afterwards, scan the SP_APPLICATION folder and the SP_TOP/DESKTOP folder. In these folders
@@ -45,10 +45,10 @@ GeosFileType/GFT_LINK seems not to be implemented and is not what we want.
 Use a strict two-call resolution path for each FA_LINK entry: call FileReadLink() to get the
 resolved target path and disk. Call `FileGetPathExtAttributes(..., FEA_FILE_TYPE, ...)` and
 require `GFT_EXECUTABLE`. Call `FileGetPathExtAttributes(..., FEA_GEODE_ATTR, ...)` and
-require `GA_APPLICATION`. Only then call/read `FEA_TOKEN`. Store each link record as source location
-(SP_APPLICATION or SP_TOP plus canonical relative path and link filename) plus resolved
-target token, with optional resolved path/disk for diagnostics.
+require `GA_APPLICATION`. Only then call/read `FEA_TOKEN`.
 
+Store each link record as source location (SP_APPLICATION or SP_TOP plus canonical relative
+path and link filename) plus resolved target token, with optional resolved path/disk for diagnostics.
 If multiple links to the same application are found, we still store all of them in a unique way in
 the list. In a later implementation step, we will need this list to remove all links found.
 
@@ -63,17 +63,20 @@ DISTAPPL, it must also be selected in the AppList UI gadget. Refactor MSG_PREF_A
 to query the DISTAPPL list for the GEOS long file name of the applications and show that
 in the list as the requested moniker.
 
-NON_GOALS
+NON-GOALS
 In this step of the implementation, we are not interested in what happens when you change the
-selection of the AppList. In the future this will remove/add links to/from the SP_APPLICATION and
+selection of the AppList. In the future this will remove/add links to/from the SP_APPLICATION and/or
 SP_TOP/DESKTOP folders but we are not implementing this now. However, we must make sure that it
 can be safely and easily added later.
 
 DESIGN NOTES
 Create a robust and reusable helper function for enumerating the DISTAPPL, SP_APPLICATION
 and SP_TOP/DESKTOP folders which scans either for application geodes or links to
-application geodes. Make sure to use LMem ChunkArray functions for memory management and don't
+application geodes.
+
+Make sure to use LMem ChunkArray functions for memory management and don't
 forget the usual GEOS drill of MemLock/MemUnlock. ChunkArrayAppend() invalidates existing
 pointers into the LMem heap, so never keep element pointers across any operation that may
 resize/compact (append/insert/resize). Prefer indices, or re-derive pointers each time.
+
 Put all helper functions in their own code file so prefappl.goc can be kept small.
