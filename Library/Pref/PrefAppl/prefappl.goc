@@ -22,6 +22,9 @@
 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LIST_MONIKER_QUERY;
 @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_LIST_APPLY;
 @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_RESCAN;
+@message void MSG_PREF_APPL_SHOW_SCAN_ERROR(PrefApplScanError scanError);
+@message void MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST();
+@message PrefApplScanError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
 
 @endc
 
@@ -37,10 +40,6 @@ static const char prefApplDistApplMissingText[] =
 static const char prefApplOutOfMemoryText[] =
     "PrefAppl ran out of memory while scanning applications.";
 static const char prefApplListLabelText[] = "Applications:";
-
-static void PrefApplShowScanError(PrefApplScanError scanError);
-static void PrefApplApplySelectedStateToList(void);
-static PrefApplScanError PrefApplRefreshListFromDisk(void);
 
 @start MONIKERRESOURCE, data;
 
@@ -151,12 +150,16 @@ static PrefApplScanError PrefApplRefreshListFromDisk(void);
 }
 
 @object GenInteractionClass ActionColumn = {
-    GI_comp = @RescanTrigger;
+    GI_comp = @StatusText, @RescanTrigger;
 
     HINT_ORIENT_CHILDREN_VERTICALLY;
     HINT_CENTER_CHILDREN_HORIZONTALLY;
     HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenGlyphClass StatusText = {
+    GI_visMoniker = "Status:";
 }
 
 @object GenTriggerClass RescanTrigger = {
@@ -166,6 +169,8 @@ static PrefApplScanError PrefApplRefreshListFromDisk(void);
 }
 
 @end BASEINTERFACE;
+
+@define Dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
 
 optr _export _pascal PrefGetOptrBox(void)
 {
@@ -187,29 +192,27 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
-static void
-PrefApplShowScanError(PrefApplScanError scanError)
+@method PrefApplDialogClass, MSG_PREF_APPL_SHOW_SCAN_ERROR
 {
-    const char *message;
+    const char *statusMessage;
 
-    message = NULL;
+    statusMessage = NULL;
     if (scanError == PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING) {
-        message = prefApplDistApplMissingText;
+        statusMessage = prefApplDistApplMissingText;
     } else if (scanError == PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY) {
-        message = prefApplOutOfMemoryText;
+        statusMessage = prefApplOutOfMemoryText;
     }
 
-    if (message == NULL) {
-        @call AppList::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(prefApplListLabelText,
-                                                        VUM_NOW);
+    if (statusMessage == NULL) {
+
+        @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(prefApplListLabelText, VUM_NOW);
         return;
     }
 
-    @call AppList::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(message, VUM_NOW);
+    @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(statusMessage, VUM_NOW);
 }
 
-static void
-PrefApplApplySelectedStateToList(void)
+@method PrefApplDialogClass, MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST
 {
     word appCount;
     MemHandle selectedItemsBlock;
@@ -223,7 +226,7 @@ PrefApplApplySelectedStateToList(void)
         return;
     }
 
-    @call AppList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
 
     selectedItemsBlock = MemAlloc(sizeof(word) * appCount,
                                   HF_DYNAMIC, HAF_STANDARD_NO_ERR);
@@ -249,7 +252,7 @@ PrefApplApplySelectedStateToList(void)
     }
 
     if (selectedCount != 0) {
-        @call AppList::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
+        @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
             selectedItems, selectedCount);
     }
 
@@ -257,8 +260,7 @@ PrefApplApplySelectedStateToList(void)
     MemFree(selectedItemsBlock);
 }
 
-static PrefApplScanError
-PrefApplRefreshListFromDisk(void)
+@method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_FROM_DISK
 {
     PrefApplScanError scanError;
     word appCount;
@@ -273,16 +275,16 @@ PrefApplRefreshListFromDisk(void)
         return scanError;
     }
 
-    @call AppList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
-    PrefApplApplySelectedStateToList();
+    @call @Dup(@AppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
+    @call oself::MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST();
     return scanError;
 }
 
 @method PrefApplDialogClass, MSG_GEN_INTERACTION_INITIATE
 {
     @callsuper();
-    @call TabSelector::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG();
-    PrefApplShowScanError(PREF_APPL_SCAN_ERROR_NONE);
+    @call @Dup(@TabSelector)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
+    @call oself::MSG_PREF_APPL_SHOW_SCAN_ERROR(PREF_APPL_SCAN_ERROR_NONE);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
@@ -326,5 +328,8 @@ PrefApplRefreshListFromDisk(void)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
 {
-    PrefApplShowScanError(PrefApplRefreshListFromDisk());
+    PrefApplScanError scanError;
+
+    scanError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    @call oself::MSG_PREF_APPL_SHOW_SCAN_ERROR(scanError);
 }
