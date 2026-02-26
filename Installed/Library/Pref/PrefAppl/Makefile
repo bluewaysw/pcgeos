@@ -6,8 +6,8 @@
 GEODE           = prefappl
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
-SRCS            = prefappl.goc
-OBJS            = prefappl.obj
+SRCS            = prefapplScan.h prefappl.goc prefapplScan.goc
+OBJS            = prefappl.obj prefapplScan.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = prefappl
