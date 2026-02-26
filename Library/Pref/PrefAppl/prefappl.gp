@@ -21,10 +21,10 @@ type library, single, c-api
 library geos
 library ui
 library config
+library ansic
 
 resource BASEINTERFACE object read-only shared discardable
 resource MONIKERRESOURCE lmem read-only shared
-resource LISTMONIKERS lmem read-only shared
 
 export PREFGETOPTRBOX
 export PREFGETMODULEINFO
