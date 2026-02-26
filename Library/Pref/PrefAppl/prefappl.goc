@@ -7,15 +7,14 @@
  * FILE:         prefappl.goc
  *
  * DESCRIPTION:
- *     Skeleton Preferences module for managing application visibility.
- *     This contains tab and dynamic-list UI wiring with stub handlers.
+ *     Preferences module for managing application visibility links.
  *
  ***********************************************************************/
 
 @include <stdapp.goh>
 @include <config.goh>
 
-#define PREF_APPL_STUB_ITEM_COUNT 3
+#include "prefapplScan.h"
 
 @class PrefApplDialogClass, PrefDialogClass;
 
@@ -31,7 +30,17 @@
 optr _pascal PrefGetOptrBox(void);
 void _pascal PrefGetModuleInfo(PrefModuleInfo *info);
 
-word OldSelection = 0;
+word OldSelection = GIGS_NONE;
+static const char prefApplDistApplMissingText[] =
+    "Required folder SP_SYS_APPLICATION\\DISTAPPL was not found.\n"
+    "PrefAppl cannot build the application list.";
+static const char prefApplOutOfMemoryText[] =
+    "PrefAppl ran out of memory while scanning applications.";
+static const char prefApplListLabelText[] = "Applications:";
+
+static void PrefApplShowScanError(PrefApplScanError scanError);
+static void PrefApplApplySelectedStateToList(void);
+static PrefApplScanError PrefApplRefreshListFromDisk(void);
 
 @start MONIKERRESOURCE, data;
 
@@ -48,14 +57,6 @@ word OldSelection = 0;
 };
 
 @end MONIKERRESOURCE;
-
-@start LISTMONIKERS, data;
-
-@visMoniker PrefApplItemMoniker0 = "CALENDAR.GEO";
-@visMoniker PrefApplItemMoniker1 = "GEOWRITE.GEO";
-@visMoniker PrefApplItemMoniker2 = "FILEMGR.GEO";
-
-@end LISTMONIKERS;
 
 @start BASEINTERFACE, notDetachable;
 
@@ -137,7 +138,7 @@ word OldSelection = 0;
     GIGI_destination = @BaseBox;
     GIGI_applyMsg = MSG_PREF_APPL_LIST_APPLY;
     GDLI_queryMsg = MSG_PREF_APPL_LIST_MONIKER_QUERY;
-    GDLI_numItems = PREF_APPL_STUB_ITEM_COUNT;
+    GDLI_numItems = 0;
 
     HINT_PLACE_MONIKER_ABOVE;
     HINT_ITEM_GROUP_SCROLLABLE;
@@ -159,7 +160,7 @@ word OldSelection = 0;
 }
 
 @object GenTriggerClass RescanTrigger = {
-    GI_visMoniker = "Rescan";
+    GI_visMoniker = "Refresh";
     GTI_actionMsg = MSG_PREF_APPL_RESCAN;
     GTI_destination = @BaseBox;
 }
@@ -186,6 +187,104 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
+static void
+PrefApplShowScanError(PrefApplScanError scanError)
+{
+    const char *message;
+
+    message = NULL;
+    if (scanError == PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING) {
+        message = prefApplDistApplMissingText;
+    } else if (scanError == PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY) {
+        message = prefApplOutOfMemoryText;
+    }
+
+    if (message == NULL) {
+        @call AppList::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(prefApplListLabelText,
+                                                        VUM_NOW);
+        return;
+    }
+
+    @call AppList::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(message, VUM_NOW);
+}
+
+static void
+PrefApplApplySelectedStateToList(void)
+{
+    word appCount;
+    MemHandle selectedItemsBlock;
+    word *selectedItems;
+    word appIndex;
+    word selectedCount;
+    PrefApplApplicationRecord record;
+
+    appCount = PrefApplGetApplicationCount();
+    if (appCount == 0) {
+        return;
+    }
+
+    @call AppList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    selectedItemsBlock = MemAlloc(sizeof(word) * appCount,
+                                  HF_DYNAMIC, HAF_STANDARD_NO_ERR);
+    if (selectedItemsBlock == NullHandle) {
+        return;
+    }
+
+    selectedItems = (word *)MemLock(selectedItemsBlock);
+    if (selectedItems == NULL) {
+        MemFree(selectedItemsBlock);
+        return;
+    }
+
+    selectedCount = 0;
+    for (appIndex = 0; appIndex < appCount; appIndex++) {
+        if (!PrefApplGetApplicationRecord(appIndex, &record)) {
+            continue;
+        }
+        if (record.PAAR_selected) {
+            selectedItems[selectedCount] = appIndex;
+            selectedCount++;
+        }
+    }
+
+    if (selectedCount != 0) {
+        @call AppList::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
+            selectedItems, selectedCount);
+    }
+
+    MemUnlock(selectedItemsBlock);
+    MemFree(selectedItemsBlock);
+}
+
+static PrefApplScanError
+PrefApplRefreshListFromDisk(void)
+{
+    PrefApplScanError scanError;
+    word appCount;
+
+    scanError = PREF_APPL_SCAN_ERROR_NONE;
+    if (!PrefApplRefreshApplicationData()) {
+        scanError = PrefApplGetLastScanError();
+    }
+
+    appCount = PrefApplGetApplicationCount();
+    if (appCount == 0) {
+        return scanError;
+    }
+
+    @call AppList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
+    PrefApplApplySelectedStateToList();
+    return scanError;
+}
+
+@method PrefApplDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    @callsuper();
+    @call TabSelector::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG();
+    PrefApplShowScanError(PREF_APPL_SCAN_ERROR_NONE);
+}
+
 @method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
 {
     optr tabPages[] = {
@@ -196,30 +295,28 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
         return;
     }
 
-    if (selection == OldSelection) {
+    if ((OldSelection != GIGS_NONE) && (selection == OldSelection)) {
         return;
     }
 
-    @call tabPages[OldSelection]::MSG_GEN_SET_NOT_USABLE(
-        VUM_DELAYED_VIA_APP_QUEUE);
+    if ((OldSelection != GIGS_NONE) &&
+        (OldSelection < (sizeof(tabPages) / sizeof(tabPages[0])))) {
+        @call tabPages[OldSelection]::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE);
+    }
     OldSelection = selection;
     @call tabPages[selection]::MSG_GEN_SET_USABLE(VUM_NOW);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_MONIKER_QUERY
 {
-    optr monikers[] = {
-        @PrefApplItemMoniker0,
-        @PrefApplItemMoniker1,
-        @PrefApplItemMoniker2
-    };
+    PrefApplApplicationRecord record;
 
-    if (item >= (sizeof(monikers) / sizeof(monikers[0]))) {
+    if (!PrefApplGetApplicationRecord(item, &record)) {
         return;
     }
 
-    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item,
-                                                                monikers[item]);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, record.PAAR_name);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_APPLY
@@ -229,6 +326,5 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
 {
-    /* Stub rescan: reinitialize the placeholder list entries. */
-    @call AppList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(PREF_APPL_STUB_ITEM_COUNT);
+    PrefApplShowScanError(PrefApplRefreshListFromDisk());
 }
