@@ -219,10 +219,8 @@ PrefApplCompareApplicationRecords(void *element1, void *element2, word ignored)
 static Boolean
 PrefApplScanDistApplDirectory(void)
 {
-    FileEnumParams distEnumParams;
     FileEnumParams enumParams;
     MemHandle enumBuffer;
-    PathName distApplName;
     word numNoFit;
     word numFound;
     word i;
@@ -230,7 +228,6 @@ PrefApplScanDistApplDirectory(void)
     GeosFileType fileType;
     GeodeAttrs geodeAttrs;
     GeodeToken token;
-    Boolean foundDistAppl;
     Boolean success;
 
     if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
@@ -239,72 +236,10 @@ PrefApplScanDistApplDirectory(void)
     }
 
     success = TRUE;
-    foundDistAppl = FALSE;
-    distApplName[0] = '\0';
 
     FilePushDir();
-    if (FileSetCurrentPath(SP_SYS_APPLICATION, "") == NullHandle) {
-        prefApplLastScanError = PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING;
-        FilePopDir();
-        return FALSE;
-    }
-
-    memset(&distEnumParams, 0, sizeof(distEnumParams));
-    distEnumParams.FEP_searchFlags = FILE_ENUM_ALL_FILE_TYPES | FESF_DIRS;
-    distEnumParams.FEP_returnAttrs = (FileExtAttrDesc *)FESRT_NAME_AND_ATTR;
-    distEnumParams.FEP_returnSize = sizeof(FENameAndAttr);
-    distEnumParams.FEP_bufSize = PREF_APPL_ENUM_BUFFER_ITEMS;
-    distEnumParams.FEP_skipCount = 0;
-
-    while (TRUE) {
-        enumBuffer = NullHandle;
-        numNoFit = 0;
-        numFound = FileEnum(&distEnumParams, &enumBuffer, &numNoFit);
-
-        if (enumBuffer == NullHandle) {
-            break;
-        }
-
-        entry = (FENameAndAttr *)MemLock(enumBuffer);
-        for (i = 0; i < numFound; i++) {
-            if (PrefApplIsDotOrDotDot(entry[i].FENAA_name)) {
-                continue;
-            }
-
-            if ((entry[i].FENAA_attr & FA_SUBDIR) == 0) {
-                continue;
-            }
-
-            if (LocalCmpStringsNoCase(entry[i].FENAA_name,
-                                      PREF_APPL_DISTAPPL_RELATIVE_PATH,
-                                      0) == 0) {
-                PrefApplSafeCopy(distApplName, sizeof(distApplName),
-                                 entry[i].FENAA_name);
-                foundDistAppl = TRUE;
-                break;
-            }
-        }
-
-        MemUnlock(enumBuffer);
-        MemFree(enumBuffer);
-
-        if (foundDistAppl) {
-            break;
-        }
-
-        distEnumParams.FEP_skipCount += numFound;
-        if ((numNoFit == 0) || (numFound == 0)) {
-            break;
-        }
-    }
-
-    if (!foundDistAppl) {
-        prefApplLastScanError = PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING;
-        FilePopDir();
-        return FALSE;
-    }
-
-    if (FileSetCurrentPath(0, distApplName) == NullHandle) {
+    if (FileSetCurrentPath(SP_SYS_APPLICATION,
+                           PREF_APPL_DISTAPPL_RELATIVE_PATH) == NullHandle) {
         prefApplLastScanError = PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING;
         FilePopDir();
         return FALSE;
@@ -704,16 +639,9 @@ PrefApplScanCurrentDirectory(PrefApplTraversalState *state,
     memset(&state->PATS_enumParams, 0, sizeof(state->PATS_enumParams));
     state->PATS_enumParams.FEP_searchFlags =
         FILE_ENUM_ALL_FILE_TYPES | FESF_DIRS;
-    state->PATS_enumParams.FEP_matchAttrs = NULL;
     state->PATS_enumParams.FEP_returnAttrs = (FileExtAttrDesc *)FESRT_NAME_AND_ATTR;
     state->PATS_enumParams.FEP_returnSize = sizeof(FENameAndAttr);
     state->PATS_enumParams.FEP_bufSize = PREF_APPL_ENUM_BUFFER_ITEMS;
-    state->PATS_enumParams.FEP_skipCount = 0;
-    state->PATS_enumParams.FEP_callback = NULL;
-    state->PATS_enumParams.FEP_callbackAttrs = NULL;
-    state->PATS_enumParams.FEP_cbData1 = 0;
-    state->PATS_enumParams.FEP_cbData2 = 0;
-    state->PATS_enumParams.FEP_headerSize = 0;
 
     while (TRUE) {
         enumBuffer = NullHandle;
