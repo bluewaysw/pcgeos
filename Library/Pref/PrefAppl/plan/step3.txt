@@ -1,5 +1,5 @@
 GOAL
-Implement end-to-end apply behavior for `MSG_PREF_APPL_LIST_APPLY` in `Library/Pref/PrefAppl`
+Implement end-to-end apply behavior for `MSG_PREF_APPL_LIST_SELECTED` in `Library/Pref/PrefAppl`
 so selecting apps creates links in `SP_APPLICATION`, and deselecting apps removes all existing links targeting those apps.
 New links are created **only** in `SP_APPLICATION` (never `SP_TOP\\DESKTOP`).
 
@@ -12,10 +12,10 @@ Keep behavior robust on partial failures (continue processing remaining items).
 STEP: Add reusable link operation helpers in scan/helper layer
 
 Add helper to create a link for an app record in `SP_APPLICATION` (exactly there, not in a subfolder)
-using `FileCreateLink`. If a link with this name already exists, skip. No filename normalization
+using `FileCreateLink`. If a link with this name already exists, skip silently. No filename normalization
 rules should be needed.
 
-The disk handle needed for `FileCreateLink` will always be SP_SYS_APPLICATION.
+The disk handle needed for `FileCreateLink` will always be SP_SYS_APPLICATION
 and the path will always be “SP_SYS_APPLICATION\\DISTAPPL”.
 So you can create links with:
 targetDiskHandle = SP_SYS_APPLICATION (standard path handle form),
@@ -25,12 +25,11 @@ Add helper to delete all scanned links that match an app token by iterating `Pre
 entries and removing each source link file (`FileSetCurrentPath` + `FileDelete`).
 Use existing token comparison semantics (`PrefApplTokensMatch`) and keep MemLock/MemUnlock discipline.
 
-STEP: Implement APPLY logic itself
+STEP: Implement SELECTED logic itself
 
-In `Library/Pref/PrefAppl/prefappl.goc`, implement `MSG_PREF_APPL_LIST_APPLY` as a
-reconciliation pass.
+In `Library/Pref/PrefAppl/prefappl.goc`, implement `MSG_PREF_APPL_LIST_SELECTED`.
 
-At the beginning of MSG_PREF_APPL_LIST_APPLY, disable (...NOT_ENABLED...) the AppList, so that
+At the beginning of MSG_PREF_APPL_LIST_SELECTED, disable (...NOT_ENABLED...) the AppList, so that
 no user interaction is possible while we are busy.
 
 Read current list selection using `MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS`
