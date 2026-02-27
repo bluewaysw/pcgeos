@@ -1,0 +1,48 @@
+Implement end-to-end apply behavior for `MSG_PREF_APPL_LIST_APPLY` in `Library/Pref/PrefAppl` so selecting apps creates links in `SP_APPLICATION`, and deselecting apps removes all existing links targeting those apps.
+
+1. **Define and document final policy (in comments near apply/link code):**
+
+   * New links are created **only** in `SP_APPLICATION` (never `SP_TOP\\DESKTOP`).
+   * Deselect cleanup walks scanned link records and removes token-matching links from the configured scan scope (at minimum `SP_APPLICATION`, optionally include legacy `SP_TOP\\DESKTOP` cleanup if desired).
+   * Keep behavior robust on partial failures (continue processing remaining items).
+
+2. **Extend app-record metadata to support link creation without rescanning:**
+
+   * In `Library/Pref/PrefAppl/prefapplScan.h`, extend `PrefApplApplicationRecord` with the target information needed by `FileCreateLink` (disk/path or equivalent resolvable target data from DISTAPPL scan).
+   * Populate these fields in `PrefApplScanDistApplDirectory` (`Library/Pref/PrefAppl/prefapplScan.goc`) while collecting app name/token.
+   * Ensure `PrefApplGetApplicationRecord` returns the augmented struct correctly.
+
+3. **Add reusable link operation helpers in scan/helper layer:**
+
+   * Add helper to create a link for an app record in `SP_APPLICATION` using `FileCreateLink`.
+   * Add helper to delete all scanned links that match an app token by iterating `PrefApplLinkRecord` entries and removing each source link file (`FileSetCurrentPath` + `FileDelete`).
+   * Use existing token comparison semantics (`PrefApplTokensMatch`) and keep MemLock/MemUnlock discipline.
+
+4. **Implement delta-based apply logic in UI method:**
+
+   * In `Library/Pref/PrefAppl/prefappl.goc`, implement `MSG_PREF_APPL_LIST_APPLY`:
+
+     * Read current UI selections (`MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS`, `MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS`).
+     * Build selection map by app index.
+     * Compare map to previous selected state from scanned app records.
+     * For each `FALSE -> TRUE`, invoke create-link helper.
+     * For each `TRUE -> FALSE`, invoke remove-links-for-token helper.
+   * After operations, refresh link/app scan state (`PrefApplRescanApplicationLinks` + selected marking path) so UI/model stay consistent.
+
+5. **Prevent unintended apply during programmatic selection sync:**
+
+   * Add a suppression flag around `MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST` list-setting calls.
+   * Make `MSG_PREF_APPL_LIST_APPLY` early-return when suppression is active.
+   * Clear suppression flag on all paths to avoid stale state.
+
+6. **Keep implementation GEOS-safe and maintainable:**
+
+   * C89 variable declarations at function top.
+   * Small stack footprint (use handles/chunk arrays for variable-size buffers).
+   * No recursion through link entries; preserve existing traversal safeguards.
+   * Continue-on-error where possible; surface concise status text only when useful.
+
+7. **Finalize with brief inline notes for future maintainers:**
+
+   * Add comments indicating where create-root and delete-scan scope are configured.
+   * Note assumptions for link naming/collision behavior in `SP_APPLICATION` so later enhancements are localized.
