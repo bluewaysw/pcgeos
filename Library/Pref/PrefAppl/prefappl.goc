@@ -198,29 +198,39 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
-static void
-PrefApplRefreshListMonikers(optr appList, word uiSelection)
+static Boolean
+PrefApplBuildListItemText(word item, TCHAR *buf, word bufSize)
 {
-    word appCount;
+    PrefApplApplicationRecord record;
 
-    appCount = PrefApplGetApplicationCount();
-    @call appList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
+    if ((buf == NULL) || (bufSize == 0)) {
+        return FALSE;
+    }
 
-    if (uiSelection == GIGS_NONE) {
-        @call appList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    buf[0] = '\0';
+    if (!PrefApplGetApplicationRecord(item, &record)) {
+        return FALSE;
+    }
+
+    if (record.PAAR_selected != 0) {
+        strcpy(buf, "\xA5\x20");
+    } else {
+        strcpy(buf, "\xCA\xCA");
+    }
+    strcat(buf, record.PAAR_name);
+    return TRUE;
+}
+
+static void
+PrefApplRefreshListItem(optr appList, word item)
+{
+    TCHAR buf[40] = {0};
+
+    if (!PrefApplBuildListItemText(item, buf, sizeof(buf))) {
         return;
     }
 
-    if (uiSelection >= appCount) {
-        @call appList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
-        return;
-    }
-
-    /*
-     * Keep the transient UI selection in sync with the user's click while
-     * the monikers are re-queried from the refreshed scan data.
-     */
-    @call appList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(uiSelection, FALSE);
+    @call appList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, buf);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_SHOW_ERROR
@@ -307,15 +317,12 @@ PrefApplRefreshListMonikers(optr appList, word uiSelection)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_MONIKER_QUERY
 {
-    PrefApplApplicationRecord record;
     TCHAR buf[40] = {0};
 
-    if (!PrefApplGetApplicationRecord(item, &record)) {
+    if (!PrefApplBuildListItemText(item, buf, sizeof(buf))) {
         return;
     }
 
-    (record.PAAR_selected != 0) ? strcpy(buf, "\xA5\x20") : strcpy(buf, "\xCA\xCA");
-    strcat(buf, record.PAAR_name);
     @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, buf);
 }
 
@@ -324,14 +331,12 @@ PrefApplRefreshListMonikers(optr appList, word uiSelection)
     PrefApplApplicationRecord record;
     word appCount;
     word workingSelection;
-    word uiSelection;
     Boolean hadErrors;
     Boolean newSelectedState;
     PrefApplError status;
 
     appCount = 0;
     workingSelection = selection;
-    uiSelection = selection;
     hadErrors = FALSE;
     newSelectedState = FALSE;
     status = PREF_APPL_OPERATION_SUCCESS;
@@ -350,7 +355,6 @@ PrefApplRefreshListMonikers(optr appList, word uiSelection)
         }
 
         workingSelection = pself->PADI_lastSelectedId;
-        pself->PADI_lastSelectedId = GIGS_NONE;
     }
 
     if ((workingSelection >= appCount) ||
@@ -384,7 +388,10 @@ PrefApplRefreshListMonikers(optr appList, word uiSelection)
     }
 
 updateList:
-    PrefApplRefreshListMonikers(@Dup(@AppList), uiSelection);
+    PrefApplRefreshListItem(@Dup(@AppList), workingSelection);
+    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+        workingSelection, FALSE);
+    pself->PADI_lastSelectedId = workingSelection;
     if (hadErrors) {
         status = PREF_APPL_OPERATION_PARTIAL_FAILURE;
     }
