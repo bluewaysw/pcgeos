@@ -15,6 +15,8 @@
 @include <config.goh>
 
 #include "prefapplScan.h"
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
 
 @class PrefApplDialogClass, PrefDialogClass;
 
@@ -130,7 +132,7 @@ static const char prefApplStatusTextOk[] = "Ok";
 @object GenDynamicListClass AppList = {
     GI_visMoniker = "Applications:";
 
-    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
     GIGI_selection = GIGS_NONE;
     GIGI_numSelections = 0;
 
@@ -221,6 +223,10 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     word selectedCount;
     PrefApplApplicationRecord record;
 
+
+    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+/*
     appCount = PrefApplGetApplicationCount();
     if (appCount == 0) {
         return;
@@ -258,6 +264,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
     MemUnlock(selectedItemsBlock);
     MemFree(selectedItemsBlock);
+*/
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_FROM_DISK
@@ -276,7 +283,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     }
 
     @call @Dup(@AppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
-    @call oself::MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST();
+    //@call oself::MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST();
     return scanError;
 }
 
@@ -316,23 +323,24 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_MONIKER_QUERY
 {
     PrefApplApplicationRecord record;
+    TCHAR buf[40] = {0};
 
     if (!PrefApplGetApplicationRecord(item, &record)) {
         return;
     }
 
-    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, record.PAAR_name);
+    (record.PAAR_selected != 0) ? strcpy(buf, "\xA5\x20") : strcpy(buf, "\xCA\xCA");
+    strcat(buf, record.PAAR_name);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, buf);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_SELECTED
 {
-    char buf[16] = {0};
-    word item;
-
-    item = @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM();
-    sprintf(buf, "%i", item);
-
-    @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, VUM_NOW);
+    // char buf[16] = {0};
+    // word item;
+    // item = @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM();
+    // sprintf(buf, "%i", item);
+    // @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, VUM_NOW);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
