@@ -25,10 +25,10 @@ prefappl.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h prefapplScan.h \
+                parallDr.h hugearr.h fileEnum.h prefapplLow.h \
                 Ansi/string.h Ansi/stdio.h
-prefapplScan.obj \
-prefapplScan.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+prefapplLow.obj \
+prefapplLow.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -46,8 +46,8 @@ prefapplScan.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh
-prefapplScan.obj \
-prefapplScan.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+prefapplLow.obj \
+prefapplLow.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -55,6 +55,6 @@ prefapplScan.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h \
-                prefapplScan.h
+                prefapplLow.h
 
 prefapplEC.geo prefappl.geo : geos.ldf ui.ldf config.ldf ansic.ldf 
