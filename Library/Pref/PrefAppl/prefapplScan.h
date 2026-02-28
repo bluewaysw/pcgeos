@@ -5,10 +5,10 @@
 #include <geode.h>
 
 typedef enum {
-    PREF_APPL_SCAN_ERROR_NONE = 0,
-    PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING = 1,
-    PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY = 2
-} PrefApplScanError;
+    PREF_APPL_ERROR_NONE,
+    PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING,
+    PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY
+} PrefApplError;
 
 typedef struct {
     GeodeToken PAAR_token;
@@ -35,6 +35,6 @@ Boolean PrefApplRefreshApplicationData(void);
 void PrefApplClearScannedApplications(void);
 word PrefApplGetApplicationCount(void);
 Boolean PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record);
-PrefApplScanError PrefApplGetLastScanError(void);
+PrefApplError PrefApplGetLastScanError(void);
 
 #endif
