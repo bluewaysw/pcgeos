@@ -1,59 +1,59 @@
 GOAL
-Implement end-to-end apply behavior for `MSG_PREF_APPL_LIST_SELECTED` in `Library/Pref/PrefAppl`
-so selecting apps creates links in `SP_APPLICATION`, and deselecting apps removes all existing links targeting those apps.
-New links are created **only** in `SP_APPLICATION` (never `SP_TOP\\DESKTOP`).
+Implement end-to-end apply behavior for MSG_PREF_APPL_LIST_SELECTED in Library/Pref/PrefAppl
+so selecting an app creates a link in SP_APPLICATION. New links are created only in
+SP_APPLICATION (never SP_TOP\\DESKTOP).
 
-Deselect cleanup walks scanned link list records and removes token-matching links from `SP_APPLICATION`,
-`SP_TOP\\DESKTOP` and all its subfolders. The link list should contain all currently existing links
+Deselecting an app removes all existing links targeting this app from SP_APPLICATION (and subfolders)
+and SP_TOP\\DESKTOP (and subfolders). The existing link list should contain all currently existing links
 in these folders.
 
 Keep behavior robust on partial failures (continue processing remaining items).
 
 STEP: Add reusable link operation helpers in scan/helper layer
 
-Add helper to create a link for an app record in `SP_APPLICATION` (exactly there, not in a subfolder)
-using `FileCreateLink`. If a link with this name already exists, skip silently. No filename normalization
-rules should be needed.
+Add a helper to create a link for an app record in SP_APPLICATION (exactly there, not in a subfolder)
+using FileCreateLink. If a link with this name already exists, skip silently. No filename normalization
+rules should be needed. You can create links with (pseudocode):
+FileSetStandardPath(SP_APPLICATION);
+FileCreateLink(record.PAAR_name,
+		SP_SYS_APPLICATION,
+		"DISTAPPL \ record.PAAR_name",
+		1);
 
-The disk handle needed for `FileCreateLink` will always be SP_SYS_APPLICATION
-and the path will always be “SP_SYS_APPLICATION\\DISTAPPL”.
-So you can create links with:
-targetDiskHandle = SP_SYS_APPLICATION (standard path handle form),
-targetPath = "DISTAPPL\\<long GEOS appname aka PAAR_name>".
-
-Add helper to delete all scanned links that match an app token by iterating `PrefApplLinkRecord`
-entries and removing each source link file (`FileSetCurrentPath` + `FileDelete`).
-Use existing token comparison semantics (`PrefApplTokensMatch`) and keep MemLock/MemUnlock discipline.
+Add a helper to delete all scanned links that match an app token by iterating PrefApplLinkRecord
+entries and removing each source link file (FileSetCurrentPath + FileDelete).
+Use existing token comparison semantics (PrefApplTokensMatch) and keep MemLock/MemUnlock discipline.
 
 STEP: Implement SELECTED logic itself
 
-In `Library/Pref/PrefAppl/prefappl.goc`, implement `MSG_PREF_APPL_LIST_SELECTED`.
+In Library/Pref/PrefAppl/prefappl.goc, implement MSG_PREF_APPL_LIST_SELECTED.
 
 At the beginning of MSG_PREF_APPL_LIST_SELECTED, disable (...NOT_ENABLED...) the AppList, so that
 no user interaction is possible while we are busy.
 
-Read current list selection using `MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS`
-and `MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS` and build a desired-selection map by app index.
-Call `PrefApplRescanApplicationLinks()` before making changes, so operations are based on
-actual current links, not cached assumptions. Loop through all app records
-(`PrefApplGetApplicationCount` + `PrefApplGetApplicationRecord`):
-If desired selected:
-- check scanned link list for a token match.
-- if none exists in `SP_APPLICATION`, create exactly one link via helper (see above). If
-an app is selected in UI and currently has links only in SP_TOP\DESKTOP (none in SP_APPLICATION),
-treat the desktop-only links as already satisfied (create nothing).
-If desired not selected:
-- delete all scanned links matching that app token.
+Read current list selection using the "selection" param. No call to PrefApplRescanApplicationLinks()
+is needed before making changes, we should be current. We are using GIGBT_EXCLUSIVE_NONE with ApplList.
+Add lastSelectedId as an instance field on PrefApplDialogClass (not global), initialized to GIGS_NONE.
+Reset lastSelectedId = GIGS_NONE whenever the list is rebuilt from disk (MSG_PREF_APPL_REFRESH_LIST_FROM_DISK)
+and on dialog initiate (MSG_GEN_INTERACTION_INITIATE), before status messages start flowing.
+In MSG_PREF_APPL_LIST_SELECTED:
+    If selection != GIGS_NONE: set lastSelectedId = selection and process as “selected”.
+    If selection == GIGS_NONE: only process deselection if lastSelectedId != GIGS_NONE and < PrefApplGetApplicationCount(). Otherwise no-op.
+    After handling that deselection path, immediately clear it: lastSelectedId = GIGS_NONE (prevents repeated deselect events acting on stale ID).
+On any “record lookup failed / id out of range” path, clear lastSelectedId and return safely.
 
-After all create/delete attempts, call `PrefApplRescanApplicationLinks()` again, then run
-the existing “mark selected from scanned links” path so `PAAR_selected` is authoritative again.
+If the list item (application) just got selected:
+    Check the scanned link list for a token match. If none exists, create exactly one link via helper (see above).
+    make sure that AppList re-reads its monikers
 
-Refresh list selection display with `MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST`.
+If the list item (application) just got deselected:
+    delete all links that are stored in the scanned links list matching that app token.
+    remove their entries from the link list
+    make sure that AppList re-reads its monikers
+
+Make sure to run MSG_PREF_APPL_SHOW_ERROR for each operation.
 
 Re-enable the AppList at the end, so that user interaction is possible again.
-
-Note: Continue-on-error for per-item operations; optionally set a short status message (StatusText) if
-any operation failed, but do not abort the whole reconcile pass.
 
 GENERAL CONSIDERATIONS:
 
@@ -61,5 +61,5 @@ C89 variable declarations at function top.
 Small stack footprint (use handles/chunk arrays for variable-size buffers).
 No recursion through link entries; preserve existing traversal safeguards.
 Continue-on-error where possible; surface concise status text only when useful.
-Keep create/delete logic in dedicated helpers in `Library/Pref/PrefAppl/prefapplScan.goc` so `prefappl.goc` stays orchestration-only.
+Keep create/delete logic in dedicated helpers in Library/Pref/PrefAppl/prefapplScan.goc so prefappl.goc stays orchestration-only.
 Add comments to help future maintainers.
