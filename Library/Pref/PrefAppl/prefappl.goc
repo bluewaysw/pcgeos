@@ -13,10 +13,12 @@
 
 @include <stdapp.goh>
 @include <config.goh>
+@include <token.h>
 
 #include "prefapplLow.h"
 #include <Ansi/string.h>
 #include <Ansi/stdio.h>
+#include <lmem.h>
 
 @class PrefApplDialogClass, PrefDialogClass;
     @instance word PADI_lastSelectedId = GIGS_NONE;
@@ -47,6 +49,9 @@ static const char prefApplOperationSuccessText[] =
     "Application link operation finished successfully.";
 static const char prefApplOperationPartialFailureText[] =
     "Application link operation finished with errors.";
+
+#define PREF_APPL_ICON_TEXT_SPACING 4
+#define PREF_APPL_MARKER_MONIKER_SPACING 2
 
 @start MONIKERRESOURCE, data;
 
@@ -304,13 +309,92 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_MONIKER_QUERY
 {
-    TCHAR buf[40] = {0};
+    PrefApplApplicationRecord record;
+    TCHAR fullText[40] = {0};
+    TCHAR markerText[3] = {0};
+    DisplayScheme displayScheme;
+    DisplayType displayType;
+    Handle destinationBlock;
+    GStateHandle uiGState;
+    GStateHandle listGString;
+    GStateHandle iconGString;
+    TokenMonikerInfo tokenMonikerInfo;
+    void *lockedMoniker;
+    VisMoniker *iconMoniker;
+    byte *iconData;
+    word markerWidth;
+    word iconX;
+    word textX;
+    word gstringChunk;
+    word element = 0;
+    Boolean foundToken;
 
-    if (!@call oself::MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(item, buf, sizeof(buf))) {
+    if (!PrefApplGetApplicationRecord(item, &record)) {
         return;
     }
 
-    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, buf);
+    if (record.PAAR_selected != 0) {
+        strcpy(markerText, "\xA5\x20");
+    } else {
+        strcpy(markerText, "\xCA\xCA");
+    }
+
+    strcpy(fullText, markerText);
+    strcat(fullText, record.PAAR_name);
+
+    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
+    displayType = displayScheme.DS_displayType;
+    destinationBlock = OptrToHandle(list);
+
+    foundToken = TokenLookupMoniker(
+        TOKEN_CHARS(record.PAAR_token.GT_chars[0],
+                    record.PAAR_token.GT_chars[1],
+                    record.PAAR_token.GT_chars[2],
+                    record.PAAR_token.GT_chars[3]),
+        record.PAAR_token.GT_manufID,
+        displayType,
+        VMSF_GSTRING | (VMS_TOOL << VMSF_STYLE_OFFSET),
+        &tokenMonikerInfo
+    );
+    if (!foundToken) {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fullText);
+        return;
+    }
+
+    lockedMoniker = TokenLockTokenMoniker(tokenMonikerInfo);
+    iconMoniker = (VisMoniker *)LMemDeref((optr)lockedMoniker);
+
+    uiGState = @call list::MSG_VIS_VUP_CREATE_GSTATE();
+    markerWidth = GrTextWidth(uiGState, markerText, 0);
+    GrDestroyState(uiGState);
+
+    listGString = GrCreateGString(destinationBlock, GST_CHUNK, &gstringChunk);
+    GrDrawText(listGString, 0, 1, markerText, 0);
+
+    iconData = (byte *)iconMoniker + sizeof(VisMonikerWithGString);
+    iconGString = GrLoadGString(PtrToSegment(iconData), GST_PTR, PtrToOffset(iconData));
+    iconX = markerWidth + PREF_APPL_MARKER_MONIKER_SPACING;
+    textX = iconX + iconMoniker->VM_width + PREF_APPL_ICON_TEXT_SPACING;
+    GrSaveState(listGString);
+    GrDrawGString(listGString, iconGString, iconX, 1, 0, &element);
+    GrRestoreState(listGString);
+    GrDestroyGString(iconGString, listGString, GSKT_LEAVE_DATA);
+    TokenUnlockTokenMoniker(lockedMoniker);
+
+    GrDrawText(listGString, textX, 1, record.PAAR_name, 0);
+    GrEndGString(listGString);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+        item,
+        0,
+        0,
+        0,
+        0,
+        VMDT_GSTRING,
+        VMST_OPTR,
+        ConstructOptr(destinationBlock, gstringChunk)
+    );
+    GrDestroyGString(listGString, 0, GSKT_KILL_DATA);
+    return;
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_SELECTED
