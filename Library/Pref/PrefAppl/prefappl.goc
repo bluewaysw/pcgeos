@@ -24,9 +24,8 @@
 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LIST_MONIKER_QUERY;
 @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PREF_APPL_LIST_SELECTED;
 @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_RESCAN;
-@message void MSG_PREF_APPL_SHOW_SCAN_ERROR(PrefApplScanError scanError);
-@message void MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST();
-@message PrefApplScanError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+@message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError scanError);
+@message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
 
 @endc
 
@@ -194,15 +193,20 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
-@method PrefApplDialogClass, MSG_PREF_APPL_SHOW_SCAN_ERROR
+@method PrefApplDialogClass, MSG_PREF_APPL_SHOW_ERROR
 {
-    const char *statusMessage;
+    const char *statusMessage = NULL;
 
-    statusMessage = NULL;
-    if (scanError == PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING) {
-        statusMessage = prefApplDistApplMissingText;
-    } else if (scanError == PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY) {
-        statusMessage = prefApplOutOfMemoryText;
+    switch (scanError) {
+        case PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING:
+            statusMessage = prefApplDistApplMissingText;
+            break;
+        case PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY:
+            statusMessage = prefApplOutOfMemoryText;
+            break;
+        default:
+            statusMessage = NULL;
+            break;
     }
 
     if (statusMessage == NULL) {
@@ -214,65 +218,12 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(statusMessage, VUM_NOW);
 }
 
-@method PrefApplDialogClass, MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST
-{
-    word appCount;
-    MemHandle selectedItemsBlock;
-    word *selectedItems;
-    word appIndex;
-    word selectedCount;
-    PrefApplApplicationRecord record;
-
-
-    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
-
-/*
-    appCount = PrefApplGetApplicationCount();
-    if (appCount == 0) {
-        return;
-    }
-
-    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
-
-    selectedItemsBlock = MemAlloc(sizeof(word) * appCount,
-                                  HF_DYNAMIC, HAF_STANDARD_NO_ERR);
-    if (selectedItemsBlock == NullHandle) {
-        return;
-    }
-
-    selectedItems = (word *)MemLock(selectedItemsBlock);
-    if (selectedItems == NULL) {
-        MemFree(selectedItemsBlock);
-        return;
-    }
-
-    selectedCount = 0;
-    for (appIndex = 0; appIndex < appCount; appIndex++) {
-        if (!PrefApplGetApplicationRecord(appIndex, &record)) {
-            continue;
-        }
-        if (record.PAAR_selected) {
-            selectedItems[selectedCount] = appIndex;
-            selectedCount++;
-        }
-    }
-
-    if (selectedCount != 0) {
-        @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_MULTIPLE_SELECTIONS(
-            selectedItems, selectedCount);
-    }
-
-    MemUnlock(selectedItemsBlock);
-    MemFree(selectedItemsBlock);
-*/
-}
-
 @method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_FROM_DISK
 {
-    PrefApplScanError scanError;
+    PrefApplError scanError;
     word appCount;
 
-    scanError = PREF_APPL_SCAN_ERROR_NONE;
+    scanError = PREF_APPL_ERROR_NONE;
     if (!PrefApplRefreshApplicationData()) {
         scanError = PrefApplGetLastScanError();
     }
@@ -283,18 +234,18 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     }
 
     @call @Dup(@AppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
-    //@call oself::MSG_PREF_APPL_APPLY_SELECTED_STATE_TO_LIST();
+    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
     return scanError;
 }
 
 @method PrefApplDialogClass, MSG_GEN_INTERACTION_INITIATE
 {
-    PrefApplScanError scanError;
+    PrefApplError scanError;
 
     @callsuper();
     @call @Dup(@TabSelector)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
     scanError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-    @call oself::MSG_PREF_APPL_SHOW_SCAN_ERROR(scanError);
+    @call oself::MSG_PREF_APPL_SHOW_ERROR(scanError);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
@@ -336,17 +287,13 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_SELECTED
 {
-    // char buf[16] = {0};
-    // word item;
-    // item = @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_GET_FOCUS_ITEM();
-    // sprintf(buf, "%i", item);
-    // @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buf, VUM_NOW);
+    // Stub
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
 {
-    PrefApplScanError scanError;
+    PrefApplError scanError;
 
     scanError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-    @call oself::MSG_PREF_APPL_SHOW_SCAN_ERROR(scanError);
+    @call oself::MSG_PREF_APPL_SHOW_ERROR(scanError);
 }
