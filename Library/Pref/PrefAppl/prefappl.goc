@@ -27,9 +27,7 @@
 @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_RESCAN;
 @message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError paError);
 @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-@message Boolean MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(word item, TCHAR *buf,
-                                                    word bufSize);
-@message void MSG_PREF_APPL_REFRESH_LIST_ITEM(optr appList, word item);
+@message Boolean MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(word item, TCHAR *buf, word bufSize);
 
 @endc
 
@@ -223,18 +221,6 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     return TRUE;
 }
 
-@method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_ITEM
-{
-    TCHAR buf[40] = {0};
-
-    if (!@call oself::MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(item, buf,
-                                                         sizeof(buf))) {
-        return;
-    }
-
-    @call appList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, buf);
-}
-
 @method PrefApplDialogClass, MSG_PREF_APPL_SHOW_ERROR
 {
     const char *statusMessage = NULL;
@@ -321,8 +307,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 {
     TCHAR buf[40] = {0};
 
-    if (!@call oself::MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(item, buf,
-                                                         sizeof(buf))) {
+    if (!@call oself::MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(item, buf, sizeof(buf))) {
         return;
     }
 
@@ -391,10 +376,8 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     }
 
 updateList:
-    @call oself::MSG_PREF_APPL_REFRESH_LIST_ITEM(@Dup(@AppList),
-                                                 workingSelection);
-    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
-        workingSelection, FALSE);
+    @call oself::MSG_PREF_APPL_LIST_MONIKER_QUERY(@Dup(@AppList), workingSelection);
+    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(workingSelection, FALSE);
     pself->PADI_lastSelectedId = workingSelection;
     if (hadErrors) {
         status = PREF_APPL_OPERATION_PARTIAL_FAILURE;
