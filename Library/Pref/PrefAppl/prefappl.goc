@@ -27,6 +27,9 @@
 @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_RESCAN;
 @message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError paError);
 @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+@message Boolean MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(word item, TCHAR *buf,
+                                                    word bufSize);
+@message void MSG_PREF_APPL_REFRESH_LIST_ITEM(optr appList, word item);
 
 @endc
 
@@ -198,8 +201,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
-static Boolean
-PrefApplBuildListItemText(word item, TCHAR *buf, word bufSize)
+@method PrefApplDialogClass, MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT
 {
     PrefApplApplicationRecord record;
 
@@ -221,12 +223,12 @@ PrefApplBuildListItemText(word item, TCHAR *buf, word bufSize)
     return TRUE;
 }
 
-static void
-PrefApplRefreshListItem(optr appList, word item)
+@method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_ITEM
 {
     TCHAR buf[40] = {0};
 
-    if (!PrefApplBuildListItemText(item, buf, sizeof(buf))) {
+    if (!@call oself::MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(item, buf,
+                                                         sizeof(buf))) {
         return;
     }
 
@@ -319,7 +321,8 @@ PrefApplRefreshListItem(optr appList, word item)
 {
     TCHAR buf[40] = {0};
 
-    if (!PrefApplBuildListItemText(item, buf, sizeof(buf))) {
+    if (!@call oself::MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(item, buf,
+                                                         sizeof(buf))) {
         return;
     }
 
@@ -388,7 +391,8 @@ PrefApplRefreshListItem(optr appList, word item)
     }
 
 updateList:
-    PrefApplRefreshListItem(@Dup(@AppList), workingSelection);
+    @call oself::MSG_PREF_APPL_REFRESH_LIST_ITEM(@Dup(@AppList),
+                                                 workingSelection);
     @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
         workingSelection, FALSE);
     pself->PADI_lastSelectedId = workingSelection;
