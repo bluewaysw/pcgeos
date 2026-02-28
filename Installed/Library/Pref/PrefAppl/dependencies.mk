@@ -25,7 +25,8 @@ prefappl.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 disk.h drive.h input.h char.h hwr.h win.h uDialog.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
-                parallDr.h hugearr.h fileEnum.h prefapplScan.h
+                parallDr.h hugearr.h fileEnum.h prefapplScan.h \
+                Ansi/string.h Ansi/stdio.h
 prefapplScan.obj \
 prefapplScan.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
