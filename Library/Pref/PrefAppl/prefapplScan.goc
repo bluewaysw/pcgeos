@@ -422,6 +422,54 @@ PrefApplAppendLinkRecord(StandardPath sourceRoot, const char *relativeDir,
                      targetPath);
 }
 
+static Boolean
+PrefApplBuildDistApplTargetPath(const PrefApplApplicationRecord *record,
+                                char *targetPath, word targetPathSize)
+{
+    if ((record == NULL) || (targetPath == NULL) || (targetPathSize == 0)) {
+        return FALSE;
+    }
+
+    return PrefApplBuildChildRelativePath(PREF_APPL_DISTAPPL_RELATIVE_PATH,
+                                          record->PAAR_name,
+                                          targetPath, targetPathSize);
+}
+
+static Boolean
+PrefApplDeleteStoredLinkRecord(const PrefApplLinkRecord *record)
+{
+    Boolean success;
+    DiskHandle disk;
+    word fileError;
+
+    if (record == NULL) {
+        return FALSE;
+    }
+
+    success = TRUE;
+    FilePushDir();
+
+    if (record->PALR_relativeDir[0] == '\0') {
+        FileSetStandardPath(record->PALR_sourceRoot);
+    } else {
+        disk = FileSetCurrentPath(record->PALR_sourceRoot,
+                                  record->PALR_relativeDir);
+        if (disk == NullHandle) {
+            success = FALSE;
+        }
+    }
+
+    if (success) {
+        fileError = FileDelete(record->PALR_linkName);
+        if ((fileError != 0) && (fileError != ERROR_FILE_NOT_FOUND)) {
+            success = FALSE;
+        }
+    }
+
+    FilePopDir();
+    return success;
+}
+
 static PrefApplTraversalState *
 PrefApplCreateTraversalState(MemHandle *stateHandleOut)
 {
@@ -865,6 +913,130 @@ PrefApplDidHitTraversalDepthLimit(void)
     return prefApplDepthLimitHit;
 }
 
+Boolean
+PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
+{
+    PathName targetPath;
+    word fileError;
+
+    if (!PrefApplBuildDistApplTargetPath(record, targetPath,
+                                         sizeof(targetPath))) {
+        return FALSE;
+    }
+
+    FilePushDir();
+    FileSetStandardPath(SP_APPLICATION);
+    fileError = FileCreateLink(record->PAAR_name, SP_SYS_APPLICATION,
+                               targetPath, 1);
+    FilePopDir();
+
+    if ((fileError != 0) && (fileError != ERROR_FILE_EXISTS)) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+Boolean
+PrefApplAddScannedApplicationLink(const PrefApplApplicationRecord *record)
+{
+    PathName targetPath;
+    word beforeCount;
+    word afterCount;
+
+    if ((record == NULL) ||
+        !PrefApplBuildDistApplTargetPath(record, targetPath,
+                                         sizeof(targetPath))) {
+        return FALSE;
+    }
+
+    if ((prefApplLinkDataBlock == NullHandle) || (prefApplLinkArray == NullChunk)) {
+        if (!PrefApplCreateLinkRecordArray()) {
+            return FALSE;
+        }
+    }
+
+    MemLock(prefApplLinkDataBlock);
+    beforeCount = ChunkArrayGetCountHandles(prefApplLinkDataBlock,
+                                            prefApplLinkArray);
+    PrefApplAppendLinkRecord(SP_APPLICATION, "", record->PAAR_name,
+                             &record->PAAR_token, SP_SYS_APPLICATION,
+                             targetPath);
+    afterCount = ChunkArrayGetCountHandles(prefApplLinkDataBlock,
+                                           prefApplLinkArray);
+    MemUnlock(prefApplLinkDataBlock);
+
+    return (afterCount == (beforeCount + 1));
+}
+
+Boolean
+PrefApplDeleteScannedLinksForToken(const GeodeToken *token)
+{
+    word index;
+    word linkCount;
+    PrefApplLinkRecord record;
+    Boolean success;
+
+    if (token == NULL) {
+        return FALSE;
+    }
+
+    success = TRUE;
+    linkCount = PrefApplGetScannedLinkCount();
+    for (index = 0; index < linkCount; index++) {
+        if (!PrefApplGetScannedLinkRecord(index, &record)) {
+            success = FALSE;
+            continue;
+        }
+
+        if (!PrefApplTokensMatch(token, &record.PALR_targetToken)) {
+            continue;
+        }
+
+        if (!PrefApplDeleteStoredLinkRecord(&record)) {
+            success = FALSE;
+        }
+    }
+
+    return success;
+}
+
+void
+PrefApplRemoveScannedLinksForToken(const GeodeToken *token)
+{
+    word index;
+    word linkCount;
+    PrefApplLinkRecord *record;
+
+    if ((token == NULL) ||
+        (prefApplLinkDataBlock == NullHandle) ||
+        (prefApplLinkArray == NullChunk)) {
+        return;
+    }
+
+    MemLock(prefApplLinkDataBlock);
+    linkCount = ChunkArrayGetCountHandles(prefApplLinkDataBlock,
+                                          prefApplLinkArray);
+    index = 0;
+    while (index < linkCount) {
+        record = (PrefApplLinkRecord *)
+            ChunkArrayElementToPtrHandles(prefApplLinkDataBlock,
+                                          prefApplLinkArray,
+                                          index, NULL);
+        if ((record != NULL) &&
+            PrefApplTokensMatch(token, &record->PALR_targetToken)) {
+            ChunkArrayDeleteRange(ConstructOptr(prefApplLinkDataBlock,
+                                                prefApplLinkArray),
+                                  index, 1);
+            linkCount--;
+            continue;
+        }
+
+        index++;
+    }
+    MemUnlock(prefApplLinkDataBlock);
+}
+
 void
 PrefApplClearScannedApplications(void)
 {
@@ -936,6 +1108,37 @@ PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record)
 
     ChunkArrayGetElementHandles(prefApplAppDataBlock, prefApplAppArray,
                                 index, record);
+    MemUnlock(prefApplAppDataBlock);
+    return TRUE;
+}
+
+Boolean
+PrefApplSetApplicationSelected(word index, Boolean selected)
+{
+    word count;
+    PrefApplApplicationRecord *record;
+
+    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
+        return FALSE;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    if (index >= count) {
+        MemUnlock(prefApplAppDataBlock);
+        return FALSE;
+    }
+
+    record = (PrefApplApplicationRecord *)
+        ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                      prefApplAppArray,
+                                      index, NULL);
+    if (record == NULL) {
+        MemUnlock(prefApplAppDataBlock);
+        return FALSE;
+    }
+
+    record->PAAR_selected = selected;
     MemUnlock(prefApplAppDataBlock);
     return TRUE;
 }
