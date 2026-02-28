@@ -19,6 +19,7 @@
 #include <Ansi/stdio.h>
 
 @class PrefApplDialogClass, PrefDialogClass;
+    @instance word PADI_lastSelectedId = GIGS_NONE;
 
 @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_TAB_SELECTION_CHANGED;
 @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LIST_MONIKER_QUERY;
@@ -41,6 +42,10 @@ static const char prefApplDistApplMissingText[] =
 static const char prefApplOutOfMemoryText[] =
     "PrefAppl ran out of memory while scanning applications.";
 static const char prefApplStatusTextOk[] = "Ok";
+static const char prefApplOperationSuccessText[] =
+    "Application link operation finished successfully.";
+static const char prefApplOperationPartialFailureText[] =
+    "Application link operation finished with errors.";
 
 @start MONIKERRESOURCE, data;
 
@@ -193,6 +198,31 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
+static void
+PrefApplRefreshListMonikers(optr appList, word uiSelection)
+{
+    word appCount;
+
+    appCount = PrefApplGetApplicationCount();
+    @call appList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
+
+    if (uiSelection == GIGS_NONE) {
+        @call appList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+        return;
+    }
+
+    if (uiSelection >= appCount) {
+        @call appList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+        return;
+    }
+
+    /*
+     * Keep the transient UI selection in sync with the user's click while
+     * the monikers are re-queried from the refreshed scan data.
+     */
+    @call appList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(uiSelection, FALSE);
+}
+
 @method PrefApplDialogClass, MSG_PREF_APPL_SHOW_ERROR
 {
     const char *statusMessage = NULL;
@@ -203,6 +233,12 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
             break;
         case PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY:
             statusMessage = prefApplOutOfMemoryText;
+            break;
+        case PREF_APPL_OPERATION_SUCCESS:
+            statusMessage = prefApplOperationSuccessText;
+            break;
+        case PREF_APPL_OPERATION_PARTIAL_FAILURE:
+            statusMessage = prefApplOperationPartialFailureText;
             break;
         default:
             statusMessage = NULL;
@@ -223,16 +259,13 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     PrefApplError paError;
     word appCount;
 
+    pself->PADI_lastSelectedId = GIGS_NONE;
     paError = PREF_APPL_ERROR_NONE;
     if (!PrefApplRefreshApplicationData()) {
         paError = PrefApplGetLastScanError();
     }
 
     appCount = PrefApplGetApplicationCount();
-    if (appCount == 0) {
-        return paError;
-    }
-
     @call @Dup(@AppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
     @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
     return paError;
@@ -242,6 +275,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 {
     PrefApplError paError;
 
+    pself->PADI_lastSelectedId = GIGS_NONE;
     @callsuper();
     @call @Dup(@TabSelector)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
     paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
@@ -287,7 +321,75 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LIST_SELECTED
 {
-    // Stub
+    PrefApplApplicationRecord record;
+    word appCount;
+    word workingSelection;
+    word uiSelection;
+    Boolean hadErrors;
+    Boolean newSelectedState;
+    PrefApplError status;
+
+    appCount = 0;
+    workingSelection = selection;
+    uiSelection = selection;
+    hadErrors = FALSE;
+    newSelectedState = FALSE;
+    status = PREF_APPL_OPERATION_SUCCESS;
+
+    @call @Dup(@AppList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    appCount = PrefApplGetApplicationCount();
+    if (workingSelection != GIGS_NONE) {
+        pself->PADI_lastSelectedId = workingSelection;
+    } else {
+        if ((pself->PADI_lastSelectedId == GIGS_NONE) ||
+            (pself->PADI_lastSelectedId >= appCount)) {
+            pself->PADI_lastSelectedId = GIGS_NONE;
+            @call @Dup(@AppList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+            return;
+        }
+
+        workingSelection = pself->PADI_lastSelectedId;
+        pself->PADI_lastSelectedId = GIGS_NONE;
+    }
+
+    if ((workingSelection >= appCount) ||
+        !PrefApplGetApplicationRecord(workingSelection, &record)) {
+        pself->PADI_lastSelectedId = GIGS_NONE;
+        @call @Dup(@AppList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        return;
+    }
+
+    newSelectedState = (record.PAAR_selected == FALSE);
+    if (!PrefApplSetApplicationSelected(workingSelection, newSelectedState)) {
+        hadErrors = TRUE;
+        goto updateList;
+    }
+    record.PAAR_selected = newSelectedState;
+
+    if (record.PAAR_selected) {
+        if (!PrefApplCreateApplicationLink(&record)) {
+            hadErrors = TRUE;
+            if (PrefApplSetApplicationSelected(workingSelection, FALSE)) {
+                record.PAAR_selected = FALSE;
+            }
+        } else if (!PrefApplAddScannedApplicationLink(&record)) {
+            hadErrors = TRUE;
+        }
+    } else {
+        if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
+            hadErrors = TRUE;
+        }
+        PrefApplRemoveScannedLinksForToken(&record.PAAR_token);
+    }
+
+updateList:
+    PrefApplRefreshListMonikers(@Dup(@AppList), uiSelection);
+    if (hadErrors) {
+        status = PREF_APPL_OPERATION_PARTIAL_FAILURE;
+    }
+    @call oself::MSG_PREF_APPL_SHOW_ERROR(status);
+    @call @Dup(@AppList)::MSG_GEN_SET_ENABLED(VUM_NOW);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_RESCAN

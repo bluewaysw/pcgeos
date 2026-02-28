@@ -7,7 +7,9 @@
 typedef enum {
     PREF_APPL_ERROR_NONE,
     PREF_APPL_SCAN_ERROR_DISTAPPL_MISSING,
-    PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY
+    PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY,
+    PREF_APPL_OPERATION_SUCCESS,
+    PREF_APPL_OPERATION_PARTIAL_FAILURE
 } PrefApplError;
 
 typedef struct {
@@ -30,11 +32,16 @@ void PrefApplClearScannedLinks(void);
 word PrefApplGetScannedLinkCount(void);
 Boolean PrefApplGetScannedLinkRecord(word index, PrefApplLinkRecord *record);
 Boolean PrefApplDidHitTraversalDepthLimit(void);
+Boolean PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record);
+Boolean PrefApplAddScannedApplicationLink(const PrefApplApplicationRecord *record);
+Boolean PrefApplDeleteScannedLinksForToken(const GeodeToken *token);
+void PrefApplRemoveScannedLinksForToken(const GeodeToken *token);
 
 Boolean PrefApplRefreshApplicationData(void);
 void PrefApplClearScannedApplications(void);
 word PrefApplGetApplicationCount(void);
 Boolean PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record);
+Boolean PrefApplSetApplicationSelected(word index, Boolean selected);
 PrefApplError PrefApplGetLastScanError(void);
 
 #endif
