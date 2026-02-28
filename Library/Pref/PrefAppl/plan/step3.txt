@@ -1,19 +1,21 @@
 GOAL
-Implement end-to-end apply behavior for MSG_PREF_APPL_LIST_SELECTED in Library/Pref/PrefAppl
-so selecting an app creates a link in SP_APPLICATION. New links are created only in
-SP_APPLICATION (never SP_TOP\\DESKTOP).
+Implement behavior for MSG_PREF_APPL_LIST_SELECTED in Library/Pref/PrefAppl/prefappl.goc
+so clicking an application item in AppList creates a link in SP_APPLICATION.
+New links are created only in SP_APPLICATION (never SP_TOP\\DESKTOP).
 
-Deselecting an app removes all existing links targeting this app from SP_APPLICATION (and subfolders)
-and SP_TOP\\DESKTOP (and subfolders). The existing link list should contain all currently existing links
+Clicking an app item in AppList again (Deselecting) will remove all existing links
+targeting this app from SP_APPLICATION (and subfolders) and SP_TOP\\DESKTOP (and subfolders).
+The existing link list should contain all currently existing links
 in these folders.
 
 Keep behavior robust on partial failures (continue processing remaining items).
 
-STEP: Add reusable link operation helpers in scan/helper layer
+STEP: Add reusable link operation helpers in scan/helper layer.
 
-Add a helper to create a link for an app record in SP_APPLICATION (exactly there, not in a subfolder)
-using FileCreateLink. If a link with this name already exists, skip silently. No filename normalization
-rules should be needed. You can create links with (pseudocode, check file.h for API):
+Add a helper to create a link for an app record from the DISTAPPL list in SP_APPLICATION
+(exactly there, not in a subfolder) using FileCreateLink. If a link with this name already
+exists, skip silently. No filename normalization rules should be needed. You can create
+links with (pseudocode, check file.h for exact API):
 FileSetStandardPath(SP_APPLICATION);
 FileCreateLink(record.PAAR_name,
 		SP_SYS_APPLICATION,
@@ -21,7 +23,9 @@ FileCreateLink(record.PAAR_name,
 		1);
 
 Add a helper to delete all scanned links that match an app token by iterating PrefApplLinkRecord
-entries and removing each source link file (FileSetCurrentPath + FileDelete).
+entries and removing each source link file (FileSetCurrentPath + FileDelete). Add a helper that
+removes all the PrefApplLinkRecord's that match this same app token from the list.
+
 Use existing token comparison semantics (PrefApplTokensMatch) and keep MemLock/MemUnlock discipline.
 
 STEP: Implement SELECTED logic itself
@@ -51,6 +55,7 @@ If PAAR_selected is now TRUE:
 - don't re-read the link list, we assume it is current and as PAAR_selected was FALSE before, we
 assume the application had no links
 - create exactly one link via helper (see above)
+- add matching PrefApplLinkRecord entry to the scanned links list
 - make sure that AppList re-reads its monikers
 
 If PAAR_selected is now FALSE:
