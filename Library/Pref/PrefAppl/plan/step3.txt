@@ -13,11 +13,11 @@ STEP: Add reusable link operation helpers in scan/helper layer
 
 Add a helper to create a link for an app record in SP_APPLICATION (exactly there, not in a subfolder)
 using FileCreateLink. If a link with this name already exists, skip silently. No filename normalization
-rules should be needed. You can create links with (pseudocode):
+rules should be needed. You can create links with (pseudocode, check file.h for API):
 FileSetStandardPath(SP_APPLICATION);
 FileCreateLink(record.PAAR_name,
 		SP_SYS_APPLICATION,
-		"DISTAPPL \ record.PAAR_name",
+		DISTAPPL \\ record.PAAR_name, (pseudocode!)
 		1);
 
 Add a helper to delete all scanned links that match an app token by iterating PrefApplLinkRecord
@@ -31,28 +31,36 @@ In Library/Pref/PrefAppl/prefappl.goc, implement MSG_PREF_APPL_LIST_SELECTED.
 At the beginning of MSG_PREF_APPL_LIST_SELECTED, disable (...NOT_ENABLED...) the AppList, so that
 no user interaction is possible while we are busy.
 
-Read current list selection using the "selection" param. No call to PrefApplRescanApplicationLinks()
-is needed before making changes, we should be current. We are using GIGBT_EXCLUSIVE_NONE with ApplList.
-Add lastSelectedId as an instance field on PrefApplDialogClass (not global), initialized to GIGS_NONE.
+Read the currently selected list item selection using the "selection" param.
+We are using GIGBT_EXCLUSIVE_NONE with ApplList. Add lastSelectedId as an instance
+field on PrefApplDialogClass (not global), initialized to GIGS_NONE.
 Reset lastSelectedId = GIGS_NONE whenever the list is rebuilt from disk (MSG_PREF_APPL_REFRESH_LIST_FROM_DISK)
 and on dialog initiate (MSG_GEN_INTERACTION_INITIATE), before status messages start flowing.
 In MSG_PREF_APPL_LIST_SELECTED:
-    If selection != GIGS_NONE: set lastSelectedId = selection and process as “selected”.
-    If selection == GIGS_NONE: only process deselection if lastSelectedId != GIGS_NONE and < PrefApplGetApplicationCount(). Otherwise no-op.
-    After handling that deselection path, immediately clear it: lastSelectedId = GIGS_NONE (prevents repeated deselect events acting on stale ID).
+- If selection != GIGS_NONE: set lastSelectedId = selection.
+- If selection == GIGS_NONE: set selection to lastSelectedId but only if lastSelectedId != GIGS_NONE
+and < PrefApplGetApplicationCount(). Otherwise no-op. Then immediately clear it: lastSelectedId = GIGS_NONE (prevents
+repeated deselect events acting on stale ID).
 On any “record lookup failed / id out of range” path, clear lastSelectedId and return safely.
 
-If the list item (application) just got selected:
-    check the scanned link list for a token match. If no entry for that token exists,
-    be it in SP_APPLICATION or SP_TOP/DESKTOP, create exactly one link via helper (see above).
-    make sure that AppList re-reads its monikers
+Once we have the currently selected / worked on application aka list item (selection), we can retrieve its
+PrefApplApplicationRecord and access the PAAR_selected Boolean. We toggle PAAR_selected and check
+it afterwards:
 
-If the list item (application) just got deselected:
-    delete all links that are stored in the scanned links list matching that app token.
-    remove their entries from the link list
-    make sure that AppList re-reads its monikers
+If PAAR_selected is now TRUE:
+- don't re-read the link list, we assume it is current and as PAAR_selected was FALSE before, we
+assume the application had no links
+- create exactly one link via helper (see above)
+- make sure that AppList re-reads its monikers
 
-Make sure to run MSG_PREF_APPL_SHOW_ERROR for each operation.
+If PAAR_selected is now FALSE:
+- delete all links that are stored in the scanned links list matching that app token, no matter if
+under SP_APPLICATION or SP_TOP\\DESKTOP and their respective subfolders
+- remove matching PrefApplLinkRecord entries from the the scanned links list matching that app token
+- make sure that AppList re-reads its monikers
+
+Make sure to call MSG_PREF_APPL_SHOW_ERROR for each selection handling pass, showing an aggregated error
+message at the end ("...operation finished with errors..." or "...operation finished successfully...").
 
 Re-enable the AppList at the end, so that user interaction is possible again.
 
@@ -62,5 +70,5 @@ C89 variable declarations at function top.
 Small stack footprint (use handles/chunk arrays for variable-size buffers).
 No recursion through link entries; preserve existing traversal safeguards.
 Continue-on-error where possible; surface concise status text only when useful.
-Keep create/delete logic in dedicated helpers in Library/Pref/PrefAppl/prefapplScan.goc so prefappl.goc stays orchestration-only.
+Keep any dedicated helpers in Library/Pref/PrefAppl/prefapplScan.goc so prefappl.goc stays orchestration-only.
 Add comments to help future maintainers.
