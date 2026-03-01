@@ -18,18 +18,22 @@
 #include "prefapplLow.h"
 #include <Ansi/string.h>
 #include <Ansi/stdio.h>
+#include <graphics.h>
+#include <gstring.h>
 #include <lmem.h>
 
 @class PrefApplDialogClass, PrefDialogClass;
-    @instance word PADI_lastSelectedId = GIGS_NONE;
-
     @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_TAB_SELECTION_CHANGED;
-    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LIST_MONIKER_QUERY;
-    @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PREF_APPL_LIST_SELECTED;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY;
+    @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PREF_APPL_LEFT_LIST_SELECTED;
+    @message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PREF_APPL_RIGHT_LIST_SELECTED;
+    @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_ADD_APPLICATION;
+    @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_REMOVE_APPLICATION;
     @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_RESCAN;
     @message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError paError);
     @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-    @message Boolean MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT(word item, TCHAR *buf, word bufSize);
+    @message void MSG_PREF_APPL_UPDATE_ACTION_STATES();
 
 @endc
 
@@ -49,9 +53,10 @@ static const char prefApplOperationSuccessText[] =
     "Application link operation finished successfully.";
 static const char prefApplOperationPartialFailureText[] =
     "Application link operation finished with errors.";
+static const char prefApplAlreadyLinkedText[] =
+    "The selected application is already linked.";
 
 #define PREF_APPL_ICON_TEXT_SPACING 4
-#define PREF_APPL_MARKER_MONIKER_SPACING 2
 
 @start MONIKERRESOURCE, data;
 
@@ -130,31 +135,39 @@ static const char prefApplOperationPartialFailureText[] =
 }
 
 @object GenInteractionClass MainRow = {
-    GI_comp = @AppList, @ActionColumn;
+    GI_comp = @AllAppsGroup, @ActionColumn, @LinkedAppsGroup;
 
     HINT_ORIENT_CHILDREN_HORIZONTALLY;
     HINT_MINIMIZE_CHILD_SPACING;
     HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
-@object GenDynamicListClass AppList = {
-    GI_visMoniker = "Applications:";
+@object GenInteractionClass AllAppsGroup = {
+    GI_comp = @AllAppsList, @RescanTrigger;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass AllAppsList = {
+    GI_visMoniker = "All:";
 
     GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
     GIGI_selection = GIGS_NONE;
     GIGI_numSelections = 0;
 
     GIGI_destination = @BaseBox;
-    GDLI_queryMsg = MSG_PREF_APPL_LIST_MONIKER_QUERY;
+    GDLI_queryMsg = MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY;
     GDLI_numItems = 0;
 
-    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_PREF_APPL_LIST_SELECTED;
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_PREF_APPL_LEFT_LIST_SELECTED;
     HINT_PLACE_MONIKER_ABOVE;
     HINT_ITEM_GROUP_SCROLLABLE;
     HINT_INITIAL_SIZE = {
-        SST_AVG_CHAR_WIDTHS | 36,
+        SST_AVG_CHAR_WIDTHS | 28,
         SST_LINES_OF_TEXT | 12,
         12
     };
@@ -162,7 +175,7 @@ static const char prefApplOperationPartialFailureText[] =
 }
 
 @object GenInteractionClass ActionColumn = {
-    GI_comp = @RescanTrigger;
+    GI_comp = @AddTrigger;
 
     HINT_ORIENT_CHILDREN_VERTICALLY;
     HINT_CENTER_CHILDREN_HORIZONTALLY;
@@ -170,9 +183,52 @@ static const char prefApplOperationPartialFailureText[] =
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
 }
 
+@object GenTriggerClass AddTrigger = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = "Add";
+    GTI_actionMsg = MSG_PREF_APPL_ADD_APPLICATION;
+    GTI_destination = @BaseBox;
+}
+
+@object GenInteractionClass LinkedAppsGroup = {
+    GI_comp = @LinkedAppsList, @RemoveTrigger;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass LinkedAppsList = {
+    GI_visMoniker = "Linked:";
+
+    GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+    GIGI_selection = GIGS_NONE;
+    GIGI_numSelections = 0;
+
+    GIGI_destination = @BaseBox;
+    GDLI_queryMsg = MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY;
+    GDLI_numItems = 0;
+
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_PREF_APPL_RIGHT_LIST_SELECTED;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_INITIAL_SIZE = {
+        SST_AVG_CHAR_WIDTHS | 28,
+        SST_LINES_OF_TEXT | 12,
+        12
+    };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
 @object GenTriggerClass RescanTrigger = {
     GI_visMoniker = "Refresh";
     GTI_actionMsg = MSG_PREF_APPL_RESCAN;
+    GTI_destination = @BaseBox;
+}
+
+@object GenTriggerClass RemoveTrigger = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = "Remove";
+    GTI_actionMsg = MSG_PREF_APPL_REMOVE_APPLICATION;
     GTI_destination = @BaseBox;
 }
 
@@ -204,26 +260,85 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     modInfo->PMI_monikerToken.GT_manufID = MANUFACTURER_ID_GEOWORKS;
 }
 
-@method PrefApplDialogClass, MSG_PREF_APPL_BUILD_LIST_ITEM_TEXT
+static void
+PrefApplReplaceListItemMoniker(optr list, word item,
+                               const PrefApplApplicationRecord *record)
 {
-    PrefApplApplicationRecord record;
+    DisplayScheme displayScheme;
+    DisplayType displayType;
+    Handle destinationBlock;
+    GStateHandle listGString;
+    GStateHandle iconGString;
+    TokenMonikerInfo tokenMonikerInfo;
+    void *lockedMoniker;
+    VisMoniker *iconMoniker;
+    byte *iconData;
+    word textX;
+    word gstringChunk;
+    word element;
+    Boolean foundToken;
 
-    if ((buf == NULL) || (bufSize == 0)) {
-        return FALSE;
+    if (record == NULL) {
+        return;
     }
 
-    buf[0] = '\0';
-    if (!PrefApplGetApplicationRecord(item, &record)) {
-        return FALSE;
+    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
+    displayType = displayScheme.DS_displayType;
+    destinationBlock = OptrToHandle(list);
+    element = 0;
+
+    foundToken = TokenLookupMoniker(
+        TOKEN_CHARS(record->PAAR_token.GT_chars[0],
+                    record->PAAR_token.GT_chars[1],
+                    record->PAAR_token.GT_chars[2],
+                    record->PAAR_token.GT_chars[3]),
+        record->PAAR_token.GT_manufID,
+        displayType,
+        VMSF_GSTRING | (VMS_TOOL << VMSF_STYLE_OFFSET),
+        &tokenMonikerInfo
+    );
+    if (!foundToken) {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
     }
 
-    if (record.PAAR_selected != 0) {
-        strcpy(buf, "\xA5\x20");
-    } else {
-        strcpy(buf, "\xCA\xCA");
+    lockedMoniker = TokenLockTokenMoniker(tokenMonikerInfo);
+    if (lockedMoniker == NULL) {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
     }
-    strcat(buf, record.PAAR_name);
-    return TRUE;
+
+    iconMoniker = (VisMoniker *)LMemDeref((optr)lockedMoniker);
+    if (iconMoniker == NULL) {
+        TokenUnlockTokenMoniker(lockedMoniker);
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
+    }
+
+    listGString = GrCreateGString(destinationBlock, GST_CHUNK, &gstringChunk);
+    iconData = (byte *)iconMoniker + sizeof(VisMonikerWithGString);
+    iconGString = GrLoadGString(PtrToSegment(iconData), GST_PTR,
+                                PtrToOffset(iconData));
+    textX = iconMoniker->VM_width + PREF_APPL_ICON_TEXT_SPACING;
+    GrSaveState(listGString);
+    GrDrawGString(listGString, iconGString, 0, 1, 0, &element);
+    GrRestoreState(listGString);
+    GrDestroyGString(iconGString, listGString, GSKT_LEAVE_DATA);
+    TokenUnlockTokenMoniker(lockedMoniker);
+
+    GrDrawText(listGString, textX, 1, record->PAAR_name, 0);
+    GrEndGString(listGString);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+        item,
+        0,
+        0,
+        0,
+        0,
+        VMDT_GSTRING,
+        VMST_OPTR,
+        ConstructOptr(destinationBlock, gstringChunk)
+    );
+    GrDestroyGString(listGString, 0, GSKT_KILL_DATA);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_SHOW_ERROR
@@ -261,16 +376,23 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 {
     PrefApplError paError;
     word appCount;
+    word linkedCount;
 
-    pself->PADI_lastSelectedId = GIGS_NONE;
     paError = PREF_APPL_ERROR_NONE;
     if (!PrefApplRefreshApplicationData()) {
         paError = PrefApplGetLastScanError();
     }
 
     appCount = PrefApplGetApplicationCount();
-    @call @Dup(@AppList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
-    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    linkedCount = PrefApplGetLinkedApplicationCount();
+    @call @Dup(@AllAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(appCount);
+    @call @Dup(@LinkedAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
+    @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    @call @Dup(@AllAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @call @Dup(@LinkedAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @call @Dup(@AddTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
     return paError;
 }
 
@@ -278,7 +400,6 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 {
     PrefApplError paError;
 
-    pself->PADI_lastSelectedId = GIGS_NONE;
     @callsuper();
     @call @Dup(@TabSelector)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
     paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
@@ -307,166 +428,191 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     @call tabPages[selection]::MSG_GEN_SET_USABLE(VUM_NOW);
 }
 
-@method PrefApplDialogClass, MSG_PREF_APPL_LIST_MONIKER_QUERY
+@method PrefApplDialogClass, MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY
 {
     PrefApplApplicationRecord record;
-    TCHAR fullText[40] = {0};
-    TCHAR markerText[3] = {0};
-    DisplayScheme displayScheme;
-    DisplayType displayType;
-    Handle destinationBlock;
-    GStateHandle uiGState;
-    GStateHandle listGString;
-    GStateHandle iconGString;
-    TokenMonikerInfo tokenMonikerInfo;
-    void *lockedMoniker;
-    VisMoniker *iconMoniker;
-    byte *iconData;
-    word markerWidth;
-    word iconX;
-    word textX;
-    word gstringChunk;
-    word element = 0;
-    Boolean foundToken;
 
     if (!PrefApplGetApplicationRecord(item, &record)) {
         return;
     }
 
-    if (record.PAAR_selected != 0) {
-        strcpy(markerText, "\xA5\x20");
-    } else {
-        strcpy(markerText, "\xCA\xCA");
-    }
-
-    strcpy(fullText, markerText);
-    strcat(fullText, record.PAAR_name);
-
-    @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
-    displayType = displayScheme.DS_displayType;
-    destinationBlock = OptrToHandle(list);
-
-    foundToken = TokenLookupMoniker(
-        TOKEN_CHARS(record.PAAR_token.GT_chars[0],
-                    record.PAAR_token.GT_chars[1],
-                    record.PAAR_token.GT_chars[2],
-                    record.PAAR_token.GT_chars[3]),
-        record.PAAR_token.GT_manufID,
-        displayType,
-        VMSF_GSTRING | (VMS_TOOL << VMSF_STYLE_OFFSET),
-        &tokenMonikerInfo
-    );
-    if (!foundToken) {
-        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fullText);
-        return;
-    }
-
-    lockedMoniker = TokenLockTokenMoniker(tokenMonikerInfo);
-    iconMoniker = (VisMoniker *)LMemDeref((optr)lockedMoniker);
-
-    uiGState = @call list::MSG_VIS_VUP_CREATE_GSTATE();
-    markerWidth = GrTextWidth(uiGState, markerText, 0);
-    GrDestroyState(uiGState);
-
-    listGString = GrCreateGString(destinationBlock, GST_CHUNK, &gstringChunk);
-    GrDrawText(listGString, 0, 1, markerText, 0);
-
-    iconData = (byte *)iconMoniker + sizeof(VisMonikerWithGString);
-    iconGString = GrLoadGString(PtrToSegment(iconData), GST_PTR, PtrToOffset(iconData));
-    iconX = markerWidth + PREF_APPL_MARKER_MONIKER_SPACING;
-    textX = iconX + iconMoniker->VM_width + PREF_APPL_ICON_TEXT_SPACING;
-    GrSaveState(listGString);
-    GrDrawGString(listGString, iconGString, iconX, 1, 0, &element);
-    GrRestoreState(listGString);
-    GrDestroyGString(iconGString, listGString, GSKT_LEAVE_DATA);
-    TokenUnlockTokenMoniker(lockedMoniker);
-
-    GrDrawText(listGString, textX, 1, record.PAAR_name, 0);
-    GrEndGString(listGString);
-    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
-        item,
-        0,
-        0,
-        0,
-        0,
-        VMDT_GSTRING,
-        VMST_OPTR,
-        ConstructOptr(destinationBlock, gstringChunk)
-    );
-    GrDestroyGString(listGString, 0, GSKT_KILL_DATA);
-    return;
+    PrefApplReplaceListItemMoniker(list, item, &record);
 }
 
-@method PrefApplDialogClass, MSG_PREF_APPL_LIST_SELECTED
+@method PrefApplDialogClass, MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY
 {
     PrefApplApplicationRecord record;
-    word appCount;
-    word workingSelection;
-    Boolean hadErrors;
-    Boolean newSelectedState;
-    PrefApplError status;
+    word appIndex;
 
-    appCount = 0;
-    workingSelection = selection;
-    hadErrors = FALSE;
-    newSelectedState = FALSE;
-    status = PREF_APPL_OPERATION_SUCCESS;
-
-    @call @Dup(@AppList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
-
-    appCount = PrefApplGetApplicationCount();
-    if (workingSelection != GIGS_NONE) {
-        pself->PADI_lastSelectedId = workingSelection;
-    } else {
-        if ((pself->PADI_lastSelectedId == GIGS_NONE) ||
-            (pself->PADI_lastSelectedId >= appCount)) {
-            pself->PADI_lastSelectedId = GIGS_NONE;
-            @call @Dup(@AppList)::MSG_GEN_SET_ENABLED(VUM_NOW);
-            return;
-        }
-
-        workingSelection = pself->PADI_lastSelectedId;
-    }
-
-    if ((workingSelection >= appCount) ||
-        !PrefApplGetApplicationRecord(workingSelection, &record)) {
-        pself->PADI_lastSelectedId = GIGS_NONE;
-        @call @Dup(@AppList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    if (!PrefApplMapLinkedIndexToApplicationIndex(item, &appIndex)) {
         return;
     }
 
-    newSelectedState = (record.PAAR_selected == FALSE);
-    if (!PrefApplSetApplicationSelected(workingSelection, newSelectedState)) {
-        hadErrors = TRUE;
-        goto updateList;
+    if (!PrefApplGetApplicationRecord(appIndex, &record)) {
+        return;
     }
-    record.PAAR_selected = newSelectedState;
+
+    PrefApplReplaceListItemMoniker(list, item, &record);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_UPDATE_ACTION_STATES
+{
+    word allSelection;
+    word linkedSelection;
+    word appCount;
+    word appIndex;
+
+    allSelection = @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    linkedSelection = @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    appCount = PrefApplGetApplicationCount();
+
+    if ((allSelection != GIGS_NONE) && (allSelection < appCount)) {
+        @call @Dup(@AddTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+        @call @Dup(@AddTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    if ((linkedSelection != GIGS_NONE) &&
+        PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex)) {
+        @call @Dup(@RemoveTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+        @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LEFT_LIST_SELECTED
+{
+    @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_RIGHT_LIST_SELECTED
+{
+    @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_ADD_APPLICATION
+{
+    PrefApplApplicationRecord record;
+    PrefApplError paError;
+    PrefApplError status;
+    word appIndex;
+    word linkedIndex;
+    word appCount;
+    Boolean hadErrors;
+    Boolean createSucceeded;
+    Boolean showAlreadyLinked;
+
+    appIndex = @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    appCount = PrefApplGetApplicationCount();
+    hadErrors = FALSE;
+    createSucceeded = FALSE;
+    showAlreadyLinked = FALSE;
+
+    if ((appIndex == GIGS_NONE) || (appIndex >= appCount) ||
+        !PrefApplGetApplicationRecord(appIndex, &record)) {
+        @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
+        return;
+    }
+
+    @call @Dup(@AllAppsList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@LinkedAppsList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@AddTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
 
     if (record.PAAR_selected) {
-        if (!PrefApplCreateApplicationLink(&record)) {
-            hadErrors = TRUE;
-            if (PrefApplSetApplicationSelected(workingSelection, FALSE)) {
-                record.PAAR_selected = FALSE;
-            }
-        } else if (!PrefApplAddScannedApplicationLink(&record)) {
-            hadErrors = TRUE;
-        }
+        showAlreadyLinked = TRUE;
     } else {
-        if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
+        createSucceeded = PrefApplCreateApplicationLink(&record);
+        if (!createSucceeded) {
             hadErrors = TRUE;
+        } else {
+            if (!PrefApplSetApplicationSelected(appIndex, TRUE)) {
+                hadErrors = TRUE;
+            }
+            if (!PrefApplAddScannedApplicationLink(&record)) {
+                hadErrors = TRUE;
+            }
         }
-        PrefApplRemoveScannedLinksForToken(&record.PAAR_token);
     }
 
-updateList:
-    @call oself::MSG_PREF_APPL_LIST_MONIKER_QUERY(@Dup(@AppList), workingSelection);
-    @call @Dup(@AppList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(workingSelection, FALSE);
-    pself->PADI_lastSelectedId = workingSelection;
-    if (hadErrors) {
-        status = PREF_APPL_OPERATION_PARTIAL_FAILURE;
+    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    if (paError == PREF_APPL_ERROR_NONE) {
+        if (appIndex < PrefApplGetApplicationCount()) {
+            @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(appIndex, FALSE);
+            if (PrefApplMapApplicationIndexToLinkedIndex(appIndex, &linkedIndex)) {
+                @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(linkedIndex, FALSE);
+            }
+        }
+        @call @Dup(@AllAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call @Dup(@LinkedAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
+        if (showAlreadyLinked) {
+            @call @Dup(@StatusText)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(prefApplAlreadyLinkedText,
+                                                                      VUM_NOW);
+        } else {
+            status = PREF_APPL_OPERATION_SUCCESS;
+            if (hadErrors) {
+                status = PREF_APPL_OPERATION_PARTIAL_FAILURE;
+            }
+            @call oself::MSG_PREF_APPL_SHOW_ERROR(status);
+        }
+    } else {
+        @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
     }
-    @call oself::MSG_PREF_APPL_SHOW_ERROR(status);
-    @call @Dup(@AppList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_REMOVE_APPLICATION
+{
+    PrefApplApplicationRecord record;
+    PrefApplError paError;
+    PrefApplError status;
+    word linkedSelection;
+    word appIndex;
+    word linkedIndex;
+    Boolean hadErrors;
+
+    linkedSelection = @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    hadErrors = FALSE;
+
+    if ((linkedSelection == GIGS_NONE) ||
+        !PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex) ||
+        !PrefApplGetApplicationRecord(appIndex, &record)) {
+        @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
+        return;
+    }
+
+    @call @Dup(@AllAppsList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@LinkedAppsList)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@AddTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
+        hadErrors = TRUE;
+    }
+    PrefApplRemoveScannedLinksForToken(&record.PAAR_token);
+    if (!PrefApplSetApplicationSelected(appIndex, FALSE)) {
+        hadErrors = TRUE;
+    }
+
+    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    if (paError == PREF_APPL_ERROR_NONE) {
+        if (appIndex < PrefApplGetApplicationCount()) {
+            @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(appIndex, FALSE);
+            if (PrefApplMapApplicationIndexToLinkedIndex(appIndex, &linkedIndex)) {
+                @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(linkedIndex, FALSE);
+            }
+        }
+        @call @Dup(@AllAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call @Dup(@LinkedAppsList)::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
+        status = PREF_APPL_OPERATION_SUCCESS;
+        if (hadErrors) {
+            status = PREF_APPL_OPERATION_PARTIAL_FAILURE;
+        }
+        @call oself::MSG_PREF_APPL_SHOW_ERROR(status);
+    } else {
+        @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+    }
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
