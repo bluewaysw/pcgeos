@@ -1,0 +1,96 @@
+GOAL:
+Refactor PrefAppl so the two-list model is explicitly “Disabled Applications” (left) and “Enabled Applications” (right),
+where moving left→right creates links and moving right→left removes links, with no “already linked in left list” behavior possible.
+
+Scope and files:
+Primary work is in Library/Pref/PrefAppl/prefappl.goc, with supporting data/model helpers
+in Library/Pref/PrefAppl/prefapplLow.goc and declarations in Library/Pref/PrefAppl/prefapplLow.h.
+
+What to change:
+
+Change the left-list semantics from “all apps” to “disabled apps only”.
+    Right now the left list is initialized from total app count and indexed
+    directly into the backing app array. Replace that with disabled-subset behavior
+    (records where PAAR_selected == FALSE). Keep the right list as enabled-subset
+    behavior (PAAR_selected == TRUE), preserving existing sort/order consistency
+    with the backing array.
+
+    Add low-level subset helpers for disabled apps, parallel to existing linked helpers.
+    In prefapplLow.goc/.h, add:
+        disabled app count helper
+        disabled visible index -> backing app index mapper
+        backing app index -> disabled visible index mapper (useful for post-refresh reselection)
+
+    Keep existing linked helpers and reuse patterns already used by
+    PrefApplGetLinkedApplicationCount and PrefApplMapLinkedIndexToApplicationIndex.
+
+    Update list initialization and moniker query handlers in the dialog class.
+
+    In MSG_PREF_APPL_REFRESH_LIST_FROM_DISK:
+        initialize left list with disabled count, right list with enabled count
+        clear both selections
+
+    Disable Add/Remove until valid selection events occur
+
+    In MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY:
+        map left visible item through disabled mapping before fetching record
+
+    In MSG_PREF_APPL_RIGHT_LIST_MONIKER_QUERY:
+        keep linked mapping behavior
+
+    Rework Add action to consume disabled-list selection only.
+    In MSG_PREF_APPL_ADD_APPLICATION:
+        read selected left list item
+        map left disabled index to backing app index
+        fetch record
+        create link via PrefApplCreateApplicationLink
+        on success mark selected TRUE via PrefApplSetApplicationSelected
+        add/track scanned link via PrefApplAddScannedApplicationLink
+        refresh lists and reselect appropriately
+        Remove dependence on “already linked” branch in normal flow, because linked items should not appear in the disabled list anymore.
+
+    Keep Remove action as enabled-list removal, but make reselection logic subset-aware.
+    In MSG_PREF_APPL_REMOVE_APPLICATION:
+        resolve selected right item via linked mapping
+        delete links by token via PrefApplDeleteScannedLinksForToken
+        remove scanned link records via PrefApplRemoveScannedLinksForToken
+        set selected FALSE via PrefApplSetApplicationSelected
+        refresh and reseat selection safely if item still resolvable
+        Preserve current broad deletion behavior (SP_APPLICATION plus desktop-related locations) exactly as implemented.
+
+    Keep action safety and state sync robust.
+    Before add/remove filesystem mutation:
+        disable both lists and both triggers
+
+    After operation (success or failure path):
+        refresh from disk
+        re-enable lists
+        recompute trigger states using current selections and current subset mappings
+        show concise status text (success vs partial failure)
+
+    Update UI wording to match product intent.
+    In object monikers and user-facing text in prefappl.goc:
+        left list label: “Disabled Applications”
+        right list label: “Enabled Applications”
+
+    Move the "Remove" button from under the right list to the ActionColumn. Update it
+    and use the following moniker structure:
+        GI_visMoniker = list {
+        @LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
+        }
+    These monikers must be included from file, see how that is done in "preffont.goc".
+    Copy the files from "Preffont/Art" to "PrefAppl/Art".
+
+    Call the "Add" button now "Enable" and the "Remove" button "Disable".
+
+    Ensure Add/Remove labels and status lines reflect enable/disable mental model,
+    check throughout the source for all uses of “add” and “remove” and change to “enable” and “disable” accordingly.
+    Remove or repurpose “already linked” status text if it becomes unreachable by design.
+
+    Keep implementation style constraints.
+    Use GOC/C89 style consistent with file:
+        declarations at top of function blocks
+        no new variable-introduction blocks
+        small stack footprint
+        existing GEOS memory/handle conventions
+        keep indentation and brace style matching surrounding code
