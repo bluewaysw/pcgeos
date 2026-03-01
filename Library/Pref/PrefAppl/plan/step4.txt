@@ -1,0 +1,176 @@
+GOAL: Refactor `Library/Pref/PrefAppl` from the current single-toggle-list model into
+a two-list model with this behavior:
+
+* Left list: always shows all applications found in `SP_SYS_APPLICATION\\DISTAPPL`.
+* Right list: shows only currently linked applications.
+* "Add" button: adds selected app from left into right by creating link(s) in `SP_APPLICATION`.
+* "Remove" button: removes selected app from right by deleting existing links
+(from `SP_APPLICATION` and `SP_TOP\\DESKTOP` trees, matching current delete semantics).
+* User must never feel that left-side source apps can be deleted.
+
+Primary files and anchors
+* `Library/Pref/PrefAppl/prefappl.goc`
+  * Current objects: `@MainRow`, `@AppList`, `@ActionColumn`, `@RescanTrigger`, `@StatusText`
+  * Current handlers: `MSG_PREF_APPL_LIST_MONIKER_QUERY`, `MSG_PREF_APPL_LIST_SELECTED`, `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`
+* `Library/Pref/PrefAppl/prefapplLow.goc`
+  * Existing helpers for scan/create/delete/update link records
+* `Library/Pref/PrefAppl/prefapplLow.h`
+  * Public helper declarations and record structs
+
+Implementation steps
+
+1. UI structure refactor in `prefappl.goc`
+
+* Replace the one-list row with a two-list layout:
+  * Left group:
+    * `All` dynamic list (source applications catalog)
+    * Under left list: "Refresh" trigger.
+  * Center group: `Add` trigger.
+  * Right group:
+    * `Linked Applications` dynamic list.
+    * Under right list: `Remove` trigger.
+  (* Get some inspiration for the UI layout from "preffont.goc")
+  * Keep @StatusText in place, at the bottom of the Tab.
+* Ensure both lists are single-selection GenDynamicLists.
+* Disable `Add` and `Remove` by default on init/refresh until valid selection exists.
+
+2. Message model split (new message handlers)
+
+* Add distinct query/status/action messages:
+
+  * left list moniker query
+  * right list moniker query
+  * left list selection changed
+  * right list selection changed
+  * add action
+  * remove action
+  * optional shared sync helper (refresh list counts + trigger states)
+
+* Wire object attributes:
+
+  * each list’s `GDLI_queryMsg` to its own query handler
+  * each list’s `ATTR_GEN_ITEM_GROUP_STATUS_MSG` to its own selection handler
+  * `Add` trigger to add handler
+  * `Remove` trigger to remove handler
+
+3. Remove old deselection complexity
+
+* Remove reliance on `PADI_lastSelectedId` and old “NONE selection fallback” behavior.
+* Selection handlers must only:
+  * update enabled/disabled state of `Add`/`Remove`
+* No file mutation in list status handlers.
+
+4. Data mapping model (critical)
+
+* Preserve one backing app record list from `PrefApplRefreshApplicationData()`.
+* Left list mapping:
+  * visible index maps directly to app record index.
+
+* Right list mapping:
+  * visible index must map to subset of app records where `PAAR_selected == TRUE`.
+  * implement helper to resolve right-list item -> backing app index.
+
+* Right list ordering must match left list ordering (name sort)
+
+* Add helper functions in `prefapplLow.goc`:
+  * count all apps
+  * count linked apps
+  * map right visible index to backing index
+  * optionally map left visible index explicitly for symmetry and safety
+
+5. Moniker rendering update
+
+* Remove marker-prefix approach used by old single-list model (`selected/unselected marker` chars).
+* For both lists, display app icon + app name.
+* If token moniker lookup fails, fallback to plain text name.
+* Keep icon rendering code shared where possible to avoid duplication.
+
+6. "Add" action behavior (left -> right)
+
+* On `Add`:
+
+  * read selected item from left list
+  * resolve backing app record
+  * if record already linked (`PAAR_selected == TRUE`), treat as no-op and show concise status
+  * else:
+    * call `PrefApplCreateApplicationLink(&record)`
+    * on success set `PAAR_selected = TRUE` via `PrefApplSetApplicationSelected`
+    * add scanned link record via `PrefApplAddScannedApplicationLink(&record)`
+  * Auto-select newly added right item
+  * Keep current left selection after "Add"
+
+* On partial failure:
+  * keep state consistent (avoid “linked in UI but not on disk” drift)
+  * use existing status reporter with success/partial-failure text
+
+7. "Remove" action behavior (right only)
+
+* On `Remove`:
+  * read selected item from right list
+  * resolve backing app record via linked-subset mapping
+  * delete all matching links by token:
+    * `PrefApplDeleteScannedLinksForToken(&record.PAAR_token)`
+    * `PrefApplRemoveScannedLinksForToken(&record.PAAR_token)`
+  * set app selected state FALSE via `PrefApplSetApplicationSelected`
+  * Keep current broad deletion (`SP_APPLICATION` + `SP_TOP\\DESKTOP` and subfolders) exactly as implemented now
+
+* Continue-on-error semantics:
+  * do not crash or leave disabled UI
+  * surface partial failure in status text
+
+8. Refresh/init/rescan synchronization
+
+* In `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`:
+  * keep scan refresh call (`PrefApplRefreshApplicationData`)
+  * initialize left list count to full app count
+  * initialize right list count to linked count
+  * clear both selections
+  * disable both action buttons
+
+* In `MSG_GEN_INTERACTION_INITIATE` and `MSG_PREF_APPL_RESCAN`:
+  * run refresh path
+  * update status text consistently
+
+9. UI enable/disable safety during actions
+
+* During `Add`/`Remove` action:
+  * disable both lists and both action triggers before filesystem operations
+  * re-enable predictably afterward (even on error paths)
+* Always end action by synchronizing list contents, counts, and trigger states.
+
+10. Status and UX text
+
+* Keep status concise:
+  * success
+  * partial failure
+  * optional “already linked” no-op
+
+* Ensure user-facing monikers reinforce source/target model:
+  * e.g. “All:” (left)
+  * “Linked:” (right)
+  * “Add” / “Remove”
+
+11. Keep low-level layer focused
+
+* Reuse existing APIs in `prefapplLow.goc/.h` as-is where possible.
+* Only add low-level helpers if a clear reuse case exists.
+* Keep UI orchestration in `prefappl.goc`.
+
+12. Constraints and coding discipline
+
+* Keep C89/GOC constraints:
+
+  * variable declarations at top of functions
+  * avoid extra stack-heavy locals
+  * use existing GEOS memory handling patterns
+  * Match project indentation/style in touched files.
+
+Acceptance criteria (functional)
+
+* Left list always displays complete DISTAPPL inventory after refresh.
+* Right list displays only currently linked apps.
+* Pressing `Add` never removes from left list.
+* Pressing `Remove` never removes from left list; only unlinks from right.
+* No “last selected” fallback logic needed.
+* UI remains responsive and recoverable after operation errors.
+* "Refresh" rebuilds both lists correctly and resets button state safely.
