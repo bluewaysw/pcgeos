@@ -391,6 +391,120 @@ PrefApplMarkLinkedApplicationsSelected(void)
     MemUnlock(prefApplAppDataBlock);
 }
 
+static word
+PrefApplGetSubsetApplicationCount(Boolean selectedState)
+{
+    word count;
+    word index;
+    word subsetCount;
+    PrefApplApplicationRecord *record;
+
+    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
+        return 0;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    subsetCount = 0;
+    for (index = 0; index < count; index++) {
+        record = (PrefApplApplicationRecord *)
+            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                          prefApplAppArray,
+                                          index, NULL);
+        if ((record != NULL) && (record->PAAR_selected == selectedState)) {
+            subsetCount++;
+        }
+    }
+    MemUnlock(prefApplAppDataBlock);
+
+    return subsetCount;
+}
+
+static Boolean
+PrefApplMapSubsetIndexToApplicationIndex(word subsetIndex, Boolean selectedState,
+                                         word *appIndexPtr)
+{
+    word count;
+    word index;
+    word currentSubsetIndex;
+    PrefApplApplicationRecord *record;
+
+    if ((appIndexPtr == NULL) ||
+        (prefApplAppDataBlock == NullHandle) ||
+        (prefApplAppArray == NullChunk)) {
+        return FALSE;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    currentSubsetIndex = 0;
+    for (index = 0; index < count; index++) {
+        record = (PrefApplApplicationRecord *)
+            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                          prefApplAppArray,
+                                          index, NULL);
+        if ((record == NULL) || (record->PAAR_selected != selectedState)) {
+            continue;
+        }
+
+        if (currentSubsetIndex == subsetIndex) {
+            *appIndexPtr = index;
+            MemUnlock(prefApplAppDataBlock);
+            return TRUE;
+        }
+
+        currentSubsetIndex++;
+    }
+
+    MemUnlock(prefApplAppDataBlock);
+    return FALSE;
+}
+
+static Boolean
+PrefApplMapApplicationIndexToSubsetIndex(word appIndex, Boolean selectedState,
+                                         word *subsetIndexPtr)
+{
+    word count;
+    word index;
+    word currentSubsetIndex;
+    PrefApplApplicationRecord *record;
+
+    if ((subsetIndexPtr == NULL) ||
+        (prefApplAppDataBlock == NullHandle) ||
+        (prefApplAppArray == NullChunk)) {
+        return FALSE;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    if (appIndex >= count) {
+        MemUnlock(prefApplAppDataBlock);
+        return FALSE;
+    }
+
+    currentSubsetIndex = 0;
+    for (index = 0; index <= appIndex; index++) {
+        record = (PrefApplApplicationRecord *)
+            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                          prefApplAppArray,
+                                          index, NULL);
+        if ((record == NULL) || (record->PAAR_selected != selectedState)) {
+            continue;
+        }
+
+        if (index == appIndex) {
+            *subsetIndexPtr = currentSubsetIndex;
+            MemUnlock(prefApplAppDataBlock);
+            return TRUE;
+        }
+
+        currentSubsetIndex++;
+    }
+
+    MemUnlock(prefApplAppDataBlock);
+    return FALSE;
+}
+
 static void
 PrefApplAppendLinkRecord(StandardPath sourceRoot, const char *relativeDir,
                          const char *linkName, const GeodeToken *token,
@@ -1093,32 +1207,15 @@ PrefApplGetApplicationCount(void)
 }
 
 word
+PrefApplGetDisabledApplicationCount(void)
+{
+    return PrefApplGetSubsetApplicationCount(FALSE);
+}
+
+word
 PrefApplGetLinkedApplicationCount(void)
 {
-    word count;
-    word index;
-    word linkedCount;
-    PrefApplApplicationRecord *record;
-
-    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
-        return 0;
-    }
-
-    MemLock(prefApplAppDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
-    linkedCount = 0;
-    for (index = 0; index < count; index++) {
-        record = (PrefApplApplicationRecord *)
-            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
-                                          prefApplAppArray,
-                                          index, NULL);
-        if ((record != NULL) && record->PAAR_selected) {
-            linkedCount++;
-        }
-    }
-    MemUnlock(prefApplAppDataBlock);
-
-    return linkedCount;
+    return PrefApplGetSubsetApplicationCount(TRUE);
 }
 
 Boolean
@@ -1146,86 +1243,32 @@ PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record)
 }
 
 Boolean
+PrefApplMapDisabledIndexToApplicationIndex(word disabledIndex,
+                                           word *appIndexPtr)
+{
+    return PrefApplMapSubsetIndexToApplicationIndex(disabledIndex, FALSE,
+                                                    appIndexPtr);
+}
+
+Boolean
 PrefApplMapLinkedIndexToApplicationIndex(word linkedIndex, word *appIndexPtr)
 {
-    word count;
-    word index;
-    word currentLinkedIndex;
-    PrefApplApplicationRecord *record;
+    return PrefApplMapSubsetIndexToApplicationIndex(linkedIndex, TRUE,
+                                                    appIndexPtr);
+}
 
-    if ((appIndexPtr == NULL) ||
-        (prefApplAppDataBlock == NullHandle) ||
-        (prefApplAppArray == NullChunk)) {
-        return FALSE;
-    }
-
-    MemLock(prefApplAppDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
-    currentLinkedIndex = 0;
-    for (index = 0; index < count; index++) {
-        record = (PrefApplApplicationRecord *)
-            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
-                                          prefApplAppArray,
-                                          index, NULL);
-        if ((record == NULL) || !record->PAAR_selected) {
-            continue;
-        }
-
-        if (currentLinkedIndex == linkedIndex) {
-            *appIndexPtr = index;
-            MemUnlock(prefApplAppDataBlock);
-            return TRUE;
-        }
-
-        currentLinkedIndex++;
-    }
-
-    MemUnlock(prefApplAppDataBlock);
-    return FALSE;
+Boolean
+PrefApplMapApplicationIndexToDisabledIndex(word appIndex, word *disabledIndexPtr)
+{
+    return PrefApplMapApplicationIndexToSubsetIndex(appIndex, FALSE,
+                                                    disabledIndexPtr);
 }
 
 Boolean
 PrefApplMapApplicationIndexToLinkedIndex(word appIndex, word *linkedIndexPtr)
 {
-    word count;
-    word index;
-    word currentLinkedIndex;
-    PrefApplApplicationRecord *record;
-
-    if ((linkedIndexPtr == NULL) ||
-        (prefApplAppDataBlock == NullHandle) ||
-        (prefApplAppArray == NullChunk)) {
-        return FALSE;
-    }
-
-    MemLock(prefApplAppDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
-    if (appIndex >= count) {
-        MemUnlock(prefApplAppDataBlock);
-        return FALSE;
-    }
-
-    currentLinkedIndex = 0;
-    for (index = 0; index <= appIndex; index++) {
-        record = (PrefApplApplicationRecord *)
-            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
-                                          prefApplAppArray,
-                                          index, NULL);
-        if ((record == NULL) || !record->PAAR_selected) {
-            continue;
-        }
-
-        if (index == appIndex) {
-            *linkedIndexPtr = currentLinkedIndex;
-            MemUnlock(prefApplAppDataBlock);
-            return TRUE;
-        }
-
-        currentLinkedIndex++;
-    }
-
-    MemUnlock(prefApplAppDataBlock);
-    return FALSE;
+    return PrefApplMapApplicationIndexToSubsetIndex(appIndex, TRUE,
+                                                    linkedIndexPtr);
 }
 
 Boolean
