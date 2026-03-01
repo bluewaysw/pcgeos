@@ -12,6 +12,11 @@ typedef enum {
     PREF_APPL_OPERATION_PARTIAL_FAILURE
 } PrefApplError;
 
+typedef enum {
+    PREF_APPL_SUBSET_DISABLED,
+    PREF_APPL_SUBSET_ENABLED
+} PrefApplSubset;
+
 typedef struct {
     GeodeToken PAAR_token;
     FileLongName PAAR_name;
@@ -40,15 +45,14 @@ void PrefApplRemoveScannedLinksForToken(const GeodeToken *token);
 Boolean PrefApplRefreshApplicationData(void);
 void PrefApplClearScannedApplications(void);
 word PrefApplGetApplicationCount(void);
-word PrefApplGetDisabledApplicationCount(void);
-word PrefApplGetLinkedApplicationCount(void);
+word PrefApplGetApplicationSubsetCount(PrefApplSubset subset);
 Boolean PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record);
-Boolean PrefApplMapDisabledIndexToApplicationIndex(word disabledIndex,
-                                                   word *appIndexPtr);
-Boolean PrefApplMapApplicationIndexToDisabledIndex(word appIndex,
-                                                   word *disabledIndexPtr);
-Boolean PrefApplMapLinkedIndexToApplicationIndex(word linkedIndex, word *appIndexPtr);
-Boolean PrefApplMapApplicationIndexToLinkedIndex(word appIndex, word *linkedIndexPtr);
+Boolean PrefApplMapSubsetIndexToApplicationIndex(word subsetIndex,
+                                                 PrefApplSubset subset,
+                                                 word *appIndexPtr);
+Boolean PrefApplMapApplicationIndexToSubsetIndex(word appIndex,
+                                                 PrefApplSubset subset,
+                                                 word *subsetIndexPtr);
 Boolean PrefApplSetApplicationSelected(word index, Boolean selected);
 PrefApplError PrefApplGetLastScanError(void);
 

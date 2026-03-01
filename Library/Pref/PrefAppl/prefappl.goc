@@ -320,26 +320,30 @@ PrefApplRestoreSelection(optr disabledList, optr linkedList, word appIndex,
     word linkedIndex;
 
     if (preferEnabled) {
-        if (PrefApplMapApplicationIndexToLinkedIndex(appIndex, &linkedIndex)) {
+        if (PrefApplMapApplicationIndexToSubsetIndex(
+                appIndex, PREF_APPL_SUBSET_ENABLED, &linkedIndex)) {
             @call linkedList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(linkedIndex,
                                                                       FALSE);
             return;
         }
 
-        if (PrefApplMapApplicationIndexToDisabledIndex(appIndex, &disabledIndex)) {
+        if (PrefApplMapApplicationIndexToSubsetIndex(
+                appIndex, PREF_APPL_SUBSET_DISABLED, &disabledIndex)) {
             @call disabledList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(disabledIndex,
                                                                         FALSE);
         }
         return;
     }
 
-    if (PrefApplMapApplicationIndexToDisabledIndex(appIndex, &disabledIndex)) {
+    if (PrefApplMapApplicationIndexToSubsetIndex(
+            appIndex, PREF_APPL_SUBSET_DISABLED, &disabledIndex)) {
         @call disabledList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(disabledIndex,
                                                                     FALSE);
         return;
     }
 
-    if (PrefApplMapApplicationIndexToLinkedIndex(appIndex, &linkedIndex)) {
+    if (PrefApplMapApplicationIndexToSubsetIndex(
+            appIndex, PREF_APPL_SUBSET_ENABLED, &linkedIndex)) {
         @call linkedList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(linkedIndex,
                                                                   FALSE);
     }
@@ -467,8 +471,8 @@ PrefApplReplaceListItemMoniker(optr list, word item,
         paError = PrefApplGetLastScanError();
     }
 
-    disabledCount = PrefApplGetDisabledApplicationCount();
-    linkedCount = PrefApplGetLinkedApplicationCount();
+    disabledCount = PrefApplGetApplicationSubsetCount(PREF_APPL_SUBSET_DISABLED);
+    linkedCount = PrefApplGetApplicationSubsetCount(PREF_APPL_SUBSET_ENABLED);
     @call @Dup(@AllAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
     @call @Dup(@LinkedAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
     @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
@@ -515,7 +519,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     PrefApplApplicationRecord record;
     word appIndex;
 
-    if (!PrefApplMapDisabledIndexToApplicationIndex(item, &appIndex)) {
+    if (!PrefApplMapSubsetIndexToApplicationIndex(item,
+                                                  PREF_APPL_SUBSET_DISABLED,
+                                                  &appIndex)) {
         return;
     }
 
@@ -531,7 +537,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     PrefApplApplicationRecord record;
     word appIndex;
 
-    if (!PrefApplMapLinkedIndexToApplicationIndex(item, &appIndex)) {
+    if (!PrefApplMapSubsetIndexToApplicationIndex(item,
+                                                  PREF_APPL_SUBSET_ENABLED,
+                                                  &appIndex)) {
         return;
     }
 
@@ -554,7 +562,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     appCount = PrefApplGetApplicationCount();
 
     if ((disabledSelection != GIGS_NONE) &&
-        PrefApplMapDisabledIndexToApplicationIndex(disabledSelection, &appIndex) &&
+        PrefApplMapSubsetIndexToApplicationIndex(disabledSelection,
+                                                 PREF_APPL_SUBSET_DISABLED,
+                                                 &appIndex) &&
         (appIndex < appCount)) {
         @call @Dup(@AddTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
     } else {
@@ -562,7 +572,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     if ((linkedSelection != GIGS_NONE) &&
-        PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex)) {
+        PrefApplMapSubsetIndexToApplicationIndex(linkedSelection,
+                                                 PREF_APPL_SUBSET_ENABLED,
+                                                 &appIndex)) {
         @call @Dup(@RemoveTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
     } else {
         @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
@@ -592,7 +604,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     hadErrors = FALSE;
 
     if ((disabledSelection == GIGS_NONE) ||
-        !PrefApplMapDisabledIndexToApplicationIndex(disabledSelection, &appIndex) ||
+        !PrefApplMapSubsetIndexToApplicationIndex(disabledSelection,
+                                                  PREF_APPL_SUBSET_DISABLED,
+                                                  &appIndex) ||
         !PrefApplGetApplicationRecord(appIndex, &record)) {
         @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
         return;
@@ -645,7 +659,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     hadErrors = FALSE;
 
     if ((linkedSelection == GIGS_NONE) ||
-        !PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex) ||
+        !PrefApplMapSubsetIndexToApplicationIndex(linkedSelection,
+                                                  PREF_APPL_SUBSET_ENABLED,
+                                                  &appIndex) ||
         !PrefApplGetApplicationRecord(appIndex, &record)) {
         @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
         return;

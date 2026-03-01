@@ -391,17 +391,30 @@ PrefApplMarkLinkedApplicationsSelected(void)
     MemUnlock(prefApplAppDataBlock);
 }
 
-static word
-PrefApplGetSubsetApplicationCount(Boolean selectedState)
+static Boolean
+PrefApplSubsetToSelectedState(PrefApplSubset subset)
+{
+    if (subset == PREF_APPL_SUBSET_ENABLED) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+word
+PrefApplGetApplicationSubsetCount(PrefApplSubset subset)
 {
     word count;
     word index;
     word subsetCount;
     PrefApplApplicationRecord *record;
+    Boolean selectedState;
 
     if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
         return 0;
     }
+
+    selectedState = PrefApplSubsetToSelectedState(subset);
 
     MemLock(prefApplAppDataBlock);
     count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
@@ -421,8 +434,9 @@ PrefApplGetSubsetApplicationCount(Boolean selectedState)
 }
 
 static Boolean
-PrefApplMapSubsetIndexToApplicationIndex(word subsetIndex, Boolean selectedState,
-                                         word *appIndexPtr)
+PrefApplMapSelectedSubsetIndexToApplicationIndex(word subsetIndex,
+                                                 Boolean selectedState,
+                                                 word *appIndexPtr)
 {
     word count;
     word index;
@@ -460,9 +474,18 @@ PrefApplMapSubsetIndexToApplicationIndex(word subsetIndex, Boolean selectedState
     return FALSE;
 }
 
+Boolean
+PrefApplMapSubsetIndexToApplicationIndex(word subsetIndex, PrefApplSubset subset,
+                                         word *appIndexPtr)
+{
+    return PrefApplMapSelectedSubsetIndexToApplicationIndex(
+        subsetIndex, PrefApplSubsetToSelectedState(subset), appIndexPtr);
+}
+
 static Boolean
-PrefApplMapApplicationIndexToSubsetIndex(word appIndex, Boolean selectedState,
-                                         word *subsetIndexPtr)
+PrefApplMapApplicationIndexToSelectedSubsetIndex(word appIndex,
+                                                 Boolean selectedState,
+                                                 word *subsetIndexPtr)
 {
     word count;
     word index;
@@ -503,6 +526,14 @@ PrefApplMapApplicationIndexToSubsetIndex(word appIndex, Boolean selectedState,
 
     MemUnlock(prefApplAppDataBlock);
     return FALSE;
+}
+
+Boolean
+PrefApplMapApplicationIndexToSubsetIndex(word appIndex, PrefApplSubset subset,
+                                         word *subsetIndexPtr)
+{
+    return PrefApplMapApplicationIndexToSelectedSubsetIndex(
+        appIndex, PrefApplSubsetToSelectedState(subset), subsetIndexPtr);
 }
 
 static void
@@ -1206,18 +1237,6 @@ PrefApplGetApplicationCount(void)
     return count;
 }
 
-word
-PrefApplGetDisabledApplicationCount(void)
-{
-    return PrefApplGetSubsetApplicationCount(FALSE);
-}
-
-word
-PrefApplGetLinkedApplicationCount(void)
-{
-    return PrefApplGetSubsetApplicationCount(TRUE);
-}
-
 Boolean
 PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record)
 {
@@ -1240,35 +1259,6 @@ PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record)
                                 index, record);
     MemUnlock(prefApplAppDataBlock);
     return TRUE;
-}
-
-Boolean
-PrefApplMapDisabledIndexToApplicationIndex(word disabledIndex,
-                                           word *appIndexPtr)
-{
-    return PrefApplMapSubsetIndexToApplicationIndex(disabledIndex, FALSE,
-                                                    appIndexPtr);
-}
-
-Boolean
-PrefApplMapLinkedIndexToApplicationIndex(word linkedIndex, word *appIndexPtr)
-{
-    return PrefApplMapSubsetIndexToApplicationIndex(linkedIndex, TRUE,
-                                                    appIndexPtr);
-}
-
-Boolean
-PrefApplMapApplicationIndexToDisabledIndex(word appIndex, word *disabledIndexPtr)
-{
-    return PrefApplMapApplicationIndexToSubsetIndex(appIndex, FALSE,
-                                                    disabledIndexPtr);
-}
-
-Boolean
-PrefApplMapApplicationIndexToLinkedIndex(word appIndex, word *linkedIndexPtr)
-{
-    return PrefApplMapApplicationIndexToSubsetIndex(appIndex, TRUE,
-                                                    linkedIndexPtr);
 }
 
 Boolean
