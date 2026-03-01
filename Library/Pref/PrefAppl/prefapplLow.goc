@@ -1092,6 +1092,35 @@ PrefApplGetApplicationCount(void)
     return count;
 }
 
+word
+PrefApplGetLinkedApplicationCount(void)
+{
+    word count;
+    word index;
+    word linkedCount;
+    PrefApplApplicationRecord *record;
+
+    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
+        return 0;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    linkedCount = 0;
+    for (index = 0; index < count; index++) {
+        record = (PrefApplApplicationRecord *)
+            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                          prefApplAppArray,
+                                          index, NULL);
+        if ((record != NULL) && record->PAAR_selected) {
+            linkedCount++;
+        }
+    }
+    MemUnlock(prefApplAppDataBlock);
+
+    return linkedCount;
+}
+
 Boolean
 PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record)
 {
@@ -1114,6 +1143,89 @@ PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record)
                                 index, record);
     MemUnlock(prefApplAppDataBlock);
     return TRUE;
+}
+
+Boolean
+PrefApplMapLinkedIndexToApplicationIndex(word linkedIndex, word *appIndexPtr)
+{
+    word count;
+    word index;
+    word currentLinkedIndex;
+    PrefApplApplicationRecord *record;
+
+    if ((appIndexPtr == NULL) ||
+        (prefApplAppDataBlock == NullHandle) ||
+        (prefApplAppArray == NullChunk)) {
+        return FALSE;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    currentLinkedIndex = 0;
+    for (index = 0; index < count; index++) {
+        record = (PrefApplApplicationRecord *)
+            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                          prefApplAppArray,
+                                          index, NULL);
+        if ((record == NULL) || !record->PAAR_selected) {
+            continue;
+        }
+
+        if (currentLinkedIndex == linkedIndex) {
+            *appIndexPtr = index;
+            MemUnlock(prefApplAppDataBlock);
+            return TRUE;
+        }
+
+        currentLinkedIndex++;
+    }
+
+    MemUnlock(prefApplAppDataBlock);
+    return FALSE;
+}
+
+Boolean
+PrefApplMapApplicationIndexToLinkedIndex(word appIndex, word *linkedIndexPtr)
+{
+    word count;
+    word index;
+    word currentLinkedIndex;
+    PrefApplApplicationRecord *record;
+
+    if ((linkedIndexPtr == NULL) ||
+        (prefApplAppDataBlock == NullHandle) ||
+        (prefApplAppArray == NullChunk)) {
+        return FALSE;
+    }
+
+    MemLock(prefApplAppDataBlock);
+    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
+    if (appIndex >= count) {
+        MemUnlock(prefApplAppDataBlock);
+        return FALSE;
+    }
+
+    currentLinkedIndex = 0;
+    for (index = 0; index <= appIndex; index++) {
+        record = (PrefApplApplicationRecord *)
+            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
+                                          prefApplAppArray,
+                                          index, NULL);
+        if ((record == NULL) || !record->PAAR_selected) {
+            continue;
+        }
+
+        if (index == appIndex) {
+            *linkedIndexPtr = currentLinkedIndex;
+            MemUnlock(prefApplAppDataBlock);
+            return TRUE;
+        }
+
+        currentLinkedIndex++;
+    }
+
+    MemUnlock(prefApplAppDataBlock);
+    return FALSE;
 }
 
 Boolean
