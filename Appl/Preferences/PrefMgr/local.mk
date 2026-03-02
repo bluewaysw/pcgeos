@@ -16,6 +16,9 @@ ASMFLAGS	+= -DMULTIPLE_PRINTER_DRIVER_TYPES
 .PATH.ui	: Art $(INSTALL_DIR)/Art
 UICFLAGS	+= -I../Common -I$(INSTALL_DIR:H)/Common \
                     -IArt -I$(INSTALL_DIR)/Art -DPREFMGR
+XCCOMFLAGS	+= -I../Common -I$(INSTALL_DIR:H)/Common \
+                    -IArt -I$(INSTALL_DIR)/Art -DPREFMGR \
+                    -DMULTIPLE_PRINTER_DRIVER_TYPES
 
 ASMFLAGS	+= -Wall
 
