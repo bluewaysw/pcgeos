@@ -34,6 +34,8 @@
     @message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError paError);
     @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
     @message void MSG_PREF_APPL_UPDATE_ACTION_STATES();
+    @instance Boolean PADI_refreshQueued = FALSE;
+    @instance Boolean PADI_refreshInProgress = FALSE;
 
 @endc
 
@@ -141,17 +143,11 @@ static const char prefApplDisablePartialFailureText[] =
 }
 
 @object GenInteractionClass EnsembleAppsPage = {
-    GI_comp = @IntroGlyph, @MainRow, @StatusText;
+    GI_comp = @MainRow, @StatusText;
 
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
     HINT_ORIENT_CHILDREN_VERTICALLY;
-}
-
-@object GenGlyphClass IntroGlyph = {
-    GI_visMoniker = "Enable / Disable built-in Ensemble applications.";
-
-    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
 }
 
 @object GenInteractionClass MainRow = {
@@ -201,14 +197,26 @@ static const char prefApplDisablePartialFailureText[] =
 }
 
 @object GenInteractionClass ActionColumn = {
-    GI_comp = @AddTrigger, @RemoveTrigger;
+    GI_comp = @EnableTriggerPadding, @DisableTriggerPadding;
 
-    HINT_CUSTOM_EXTRA_MARGINS = { 8, 1, 8, 1 };
     HINT_ORIENT_CHILDREN_VERTICALLY;
     HINT_MINIMIZE_CHILD_SPACING;
     HINT_CENTER_CHILDREN_HORIZONTALLY;
     HINT_CENTER_CHILDREN_VERTICALLY;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass EnableTriggerPadding = {
+    GI_comp = @EnableLabel, @AddTrigger;
+
+    HINT_CUSTOM_EXTRA_MARGINS = { 4, 1, 4, 1 };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass EnableLabel = {
+    GI_visMoniker = "Enable";
 }
 
 @object GenTriggerClass AddTrigger = {
@@ -217,15 +225,6 @@ static const char prefApplDisablePartialFailureText[] =
     }
     GI_states = @default & ~GS_ENABLED;
     GTI_actionMsg = MSG_PREF_APPL_ADD_APPLICATION;
-    GTI_destination = @BaseBox;
-}
-
-@object GenTriggerClass RemoveTrigger = {
-    GI_states = @default & ~GS_ENABLED;
-    GI_visMoniker = list {
-	    @LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
-    }
-    GTI_actionMsg = MSG_PREF_APPL_REMOVE_APPLICATION;
     GTI_destination = @BaseBox;
 }
 
@@ -256,6 +255,28 @@ static const char prefApplDisablePartialFailureText[] =
         12
     };
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass DisableTriggerPadding = {
+    GI_comp = @DisableLabel, @RemoveTrigger;
+
+    HINT_CUSTOM_EXTRA_MARGINS = { 4, 1, 4, 1 };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass DisableLabel = {
+    GI_visMoniker = "Disable";
+}
+
+@object GenTriggerClass RemoveTrigger = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = list {
+	    @LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
+    }
+    GTI_actionMsg = MSG_PREF_APPL_REMOVE_APPLICATION;
+    GTI_destination = @BaseBox;
 }
 
 @object GenGlyphClass StatusText = {
@@ -297,6 +318,31 @@ PrefApplSetStatusText(optr statusText, const char *statusMessage)
 }
 
 static void
+PrefApplQueueRefresh(optr dialog, PrefApplDialogInstance *pself)
+{
+    if ((dialog == NullOptr) || (pself == NULL) ||
+        pself->PADI_refreshQueued || pself->PADI_refreshInProgress) {
+        return;
+    }
+
+    pself->PADI_refreshQueued = TRUE;
+    @send, forceQueue, checkDuplicate dialog::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+}
+
+static Boolean
+PrefApplShouldRefreshForFileChange(FileChangeNotificationType notificationType)
+{
+    if ((notificationType == FCNT_CREATE) ||
+        (notificationType == FCNT_DELETE) ||
+        (notificationType == FCNT_RENAME) ||
+        (notificationType == FCNT_BATCH)) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void
 PrefApplSetControlState(optr disabledList, optr linkedList, optr addTrigger,
                         optr removeTrigger, Boolean enabled)
 {
@@ -320,30 +366,26 @@ PrefApplRestoreSelection(optr disabledList, optr linkedList, word appIndex,
     word linkedIndex;
 
     if (preferEnabled) {
-        if (PrefApplMapApplicationIndexToSubsetIndex(
-                appIndex, PREF_APPL_SUBSET_ENABLED, &linkedIndex)) {
+        if (PrefApplMapApplicationIndexToLinkedIndex(appIndex, &linkedIndex)) {
             @call linkedList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(linkedIndex,
                                                                       FALSE);
             return;
         }
 
-        if (PrefApplMapApplicationIndexToSubsetIndex(
-                appIndex, PREF_APPL_SUBSET_DISABLED, &disabledIndex)) {
+        if (PrefApplMapApplicationIndexToDisabledIndex(appIndex, &disabledIndex)) {
             @call disabledList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(disabledIndex,
                                                                         FALSE);
         }
         return;
     }
 
-    if (PrefApplMapApplicationIndexToSubsetIndex(
-            appIndex, PREF_APPL_SUBSET_DISABLED, &disabledIndex)) {
+    if (PrefApplMapApplicationIndexToDisabledIndex(appIndex, &disabledIndex)) {
         @call disabledList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(disabledIndex,
                                                                     FALSE);
         return;
     }
 
-    if (PrefApplMapApplicationIndexToSubsetIndex(
-            appIndex, PREF_APPL_SUBSET_ENABLED, &linkedIndex)) {
+    if (PrefApplMapApplicationIndexToLinkedIndex(appIndex, &linkedIndex)) {
         @call linkedList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(linkedIndex,
                                                                   FALSE);
     }
@@ -466,19 +508,22 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     word disabledCount;
     word linkedCount;
 
+    pself->PADI_refreshQueued = FALSE;
+    pself->PADI_refreshInProgress = TRUE;
     paError = PREF_APPL_ERROR_NONE;
     if (!PrefApplRefreshApplicationData()) {
         paError = PrefApplGetLastScanError();
     }
 
-    disabledCount = PrefApplGetApplicationSubsetCount(PREF_APPL_SUBSET_DISABLED);
-    linkedCount = PrefApplGetApplicationSubsetCount(PREF_APPL_SUBSET_ENABLED);
+    disabledCount = PrefApplGetDisabledApplicationCount();
+    linkedCount = PrefApplGetLinkedApplicationCount();
     @call @Dup(@AllAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
     @call @Dup(@LinkedAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
     @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
     @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
     PrefApplSetControlState(@Dup(@AllAppsList), @Dup(@LinkedAppsList),
                             @Dup(@AddTrigger), @Dup(@RemoveTrigger), TRUE);
+    pself->PADI_refreshInProgress = FALSE;
     return paError;
 }
 
@@ -490,6 +535,15 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     @call @Dup(@TabSelector)::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
     paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
     @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+}
+
+@method PrefApplDialogClass, MSG_NOTIFY_FILE_CHANGE
+{
+    if (PrefApplShouldRefreshForFileChange(notifyType)) {
+        PrefApplQueueRefresh(oself, pself);
+    }
+
+    @callsuper();
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
@@ -519,9 +573,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     PrefApplApplicationRecord record;
     word appIndex;
 
-    if (!PrefApplMapSubsetIndexToApplicationIndex(item,
-                                                  PREF_APPL_SUBSET_DISABLED,
-                                                  &appIndex)) {
+    if (!PrefApplMapDisabledIndexToApplicationIndex(item, &appIndex)) {
         return;
     }
 
@@ -537,9 +589,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     PrefApplApplicationRecord record;
     word appIndex;
 
-    if (!PrefApplMapSubsetIndexToApplicationIndex(item,
-                                                  PREF_APPL_SUBSET_ENABLED,
-                                                  &appIndex)) {
+    if (!PrefApplMapLinkedIndexToApplicationIndex(item, &appIndex)) {
         return;
     }
 
@@ -562,9 +612,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     appCount = PrefApplGetApplicationCount();
 
     if ((disabledSelection != GIGS_NONE) &&
-        PrefApplMapSubsetIndexToApplicationIndex(disabledSelection,
-                                                 PREF_APPL_SUBSET_DISABLED,
-                                                 &appIndex) &&
+        PrefApplMapDisabledIndexToApplicationIndex(disabledSelection, &appIndex) &&
         (appIndex < appCount)) {
         @call @Dup(@AddTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
     } else {
@@ -572,9 +620,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     if ((linkedSelection != GIGS_NONE) &&
-        PrefApplMapSubsetIndexToApplicationIndex(linkedSelection,
-                                                 PREF_APPL_SUBSET_ENABLED,
-                                                 &appIndex)) {
+        PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex)) {
         @call @Dup(@RemoveTrigger)::MSG_GEN_SET_ENABLED(VUM_NOW);
     } else {
         @call @Dup(@RemoveTrigger)::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
@@ -604,9 +650,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     hadErrors = FALSE;
 
     if ((disabledSelection == GIGS_NONE) ||
-        !PrefApplMapSubsetIndexToApplicationIndex(disabledSelection,
-                                                  PREF_APPL_SUBSET_DISABLED,
-                                                  &appIndex) ||
+        !PrefApplMapDisabledIndexToApplicationIndex(disabledSelection, &appIndex) ||
         !PrefApplGetApplicationRecord(appIndex, &record)) {
         @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
         return;
@@ -619,6 +663,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
         statusMessage = prefApplAlreadyEnabledText;
     } else {
         statusMessage = prefApplEnabledText;
+        pself->PADI_refreshInProgress = TRUE;
         if (!PrefApplCreateApplicationLink(&record)) {
             hadErrors = TRUE;
         } else {
@@ -646,6 +691,14 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 }
 
+@method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
+{
+    PrefApplError paError;
+
+    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+}
+
 @method PrefApplDialogClass, MSG_PREF_APPL_REMOVE_APPLICATION
 {
     PrefApplApplicationRecord record;
@@ -659,9 +712,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     hadErrors = FALSE;
 
     if ((linkedSelection == GIGS_NONE) ||
-        !PrefApplMapSubsetIndexToApplicationIndex(linkedSelection,
-                                                  PREF_APPL_SUBSET_ENABLED,
-                                                  &appIndex) ||
+        !PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex) ||
         !PrefApplGetApplicationRecord(appIndex, &record)) {
         @call oself::MSG_PREF_APPL_UPDATE_ACTION_STATES();
         return;
@@ -670,6 +721,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     PrefApplSetControlState(@Dup(@AllAppsList), @Dup(@LinkedAppsList),
                             @Dup(@AddTrigger), @Dup(@RemoveTrigger), FALSE);
     statusMessage = prefApplDisabledText;
+    pself->PADI_refreshInProgress = TRUE;
 
     if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
         hadErrors = TRUE;
@@ -691,12 +743,4 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     } else {
         @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
     }
-}
-
-@method PrefApplDialogClass, MSG_PREF_APPL_RESCAN
-{
-    PrefApplError paError;
-
-    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-    @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
 }
