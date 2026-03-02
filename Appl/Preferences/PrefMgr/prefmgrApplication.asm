@@ -404,6 +404,8 @@ PrefMgrAppNotifyFileChange method dynamic PrefMgrApplicationClass,
 
 		uses	ax, dx, bp, es
 		.enter
+
+		call	PrefMgrAppForwardFileChangeToCurrentModule
 		
 		mov	bx, bp
 		call	MemLock
@@ -430,6 +432,61 @@ done:
 		GOTO	ObjCallSuperNoLock
 
 PrefMgrAppNotifyFileChange	endm
+
+
+SBCS <prefApplModuleName	char	"prefappl"				>
+DBCS <prefApplModuleName	wchar	"prefappl"				>
+
+PrefMgrAppForwardFileChangeToCurrentModule	proc	near
+		uses	ax,bx,cx,dx,si,di,bp,ds,es
+moduleName	local	FileLongName
+		.enter
+
+		cmp	dx, FCNT_CREATE
+		je	checkCurrentModule
+		cmp	dx, FCNT_DELETE
+		je	checkCurrentModule
+		cmp	dx, FCNT_RENAME
+		je	checkCurrentModule
+		cmp	dx, FCNT_BATCH
+		jne	done
+
+checkCurrentModule:
+		segmov	es, dgroup, ax
+		tst	es:[moduleHandle]
+		jz	done
+		tst	es:[moduleUI].handle
+		jz	done
+
+		mov	bx, es:[moduleHandle]
+		segmov	es, ss, ax
+		lea	di, ss:[moduleName]
+		mov	ax, GGIT_PERM_NAME_ONLY
+		call	GeodeGetInfo
+SBCS <		mov	{char} ss:[moduleName+GEODE_NAME_SIZE], 0		>
+DBCS <		mov	{wchar} ss:[moduleName+(GEODE_NAME_SIZE*2)], 0		>
+
+		segmov	ds, ss, ax
+		lea	si, ss:[moduleName]
+		segmov	es, cs, ax
+		mov	di, offset prefApplModuleName
+SBCS <		mov	cx, GEODE_NAME_SIZE					>
+SBCS <		repe	cmpsb							>
+DBCS <		mov	cx, GEODE_NAME_SIZE					>
+DBCS <		repe	cmpsw							>
+		jne	done
+
+		segmov	es, dgroup, ax
+		mov	bx, es:[moduleUI].handle
+		mov	si, es:[moduleUI].offset
+		mov	ax, MSG_NOTIFY_FILE_CHANGE
+		clr	di
+		call	ObjMessage
+
+done:
+		.leave
+		ret
+PrefMgrAppForwardFileChangeToCurrentModule	endp
 
 
 
