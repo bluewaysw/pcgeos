@@ -1,0 +1,95 @@
+GOAL:
+remove dependence on manual "Refresh" by wiring PrefAppl to file-system notifications,
+while keeping `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` as the single authoritative rebuild path.
+
+Scope:
+
+* `Library/Pref/PrefAppl/prefappl.goc`
+* `Library/Pref/PrefAppl/prefapplLow.goc`
+* `Library/Pref/PrefAppl/prefapplLow.h`
+
+Implementation plan:
+
+STEP: Add watched-folder ID storage to low-level scan module (`prefapplLow.goc`)
+
+* Introduce an internal deduplicated container for watched path IDs (dword `FilePathID` values)
+using LMem/ChunkArray patterns consistent with existing code.
+
+* Add helpers:
+  * clear watched IDs
+  * add watched ID (dedupe)
+  * query watched ID membership
+* Tie lifetime to scan lifetime (same style as scanned-link arrays).
+
+STEP: Capture folder IDs during existing traversal (no extra tree walk)
+
+* In `PrefApplScanRoot(...)`, right after successful `FileSetCurrentPath(sourceRoot, node.PATN_relativePath)`,
+fetch current path IDs (`FileGetCurrentPathIDs`) and record `FPID_id` in watched set.
+
+* Keep using existing roots:
+  * `SP_APPLICATION` with `""`
+  * `SP_TOP` with `PREF_APPL_TOP_DESKTOP_RELATIVE_PATH`
+* Ensure every visited directory in both subtrees becomes watched.
+
+STEP: Rebuild watched IDs on each full rescan
+
+* In `PrefApplRescanApplicationLinks()`, clear old watched IDs before traversal and rebuild during that traversal.
+* In `PrefApplClearScannedLinks()`, clear watched IDs too.
+* Result: watched set always matches the latest known folder topology; newly created subfolders
+become watched after next refresh.
+
+STEP: Expose minimal query API in header (`prefapplLow.h`)
+
+* Add exported function for notification filtering, e.g.:
+  * `Boolean PrefApplIsWatchedPathID(dword pathID);`
+
+* Keep API minimal; UI layer should not manage watched-set internals.
+
+STEP: Register PrefAppl for file-system notifications (`prefappl.goc`)
+
+* Add lifecycle registration to `GCNSLT_FILE_SYSTEM` via `GCNListAdd`.
+* Add matching unregistration via `GCNListRemove` on close/detach.
+* Use a small state flag so add/remove is not performed redundantly.
+
+STEP: Add `MSG_NOTIFY_FILE_CHANGE` handling in PrefAppl
+
+* Parse `FCNT_BATCH` notifications (`FileChangeBatchNotificationData` / `FileChangeBatchNotificationItem`).
+* Only consider `FCNT_CREATE`, `FCNT_DELETE`, `FCNT_RENAME`.
+* For each relevant item, check `FCBNI_id` using `PrefApplIsWatchedPathID(...)`.
+* On first match, queue one refresh and stop scanning the batch.
+
+STEP: Prevent refresh storms (self-generated + burst events)
+
+* Add `refreshQueued`/`refreshInProgress` guard in PrefAppl UI/process state.
+* In notify handler, do not queue another refresh while one is pending.
+* Queue refresh message with duplicate suppression (`MF_CHECK_DUPLICATE`) and app-queue semantics.
+* Clear guard when refresh processing completes.
+* Ensure refresh handler is read-only (scan/rebuild lists only), so no feedback loop writes.
+
+STEP: Keep one source of truth for list contents
+
+* Preserve `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` as the canonical rebuild path.
+* Simplification: remove incremental “scanned link cache mutation” calls from add/remove handlers
+if they are immediately followed by full refresh anyway (avoid dual state updates).
+* Keep selection restore and status text behavior intact.
+
+STEP: UI cleanup
+
+* Remove manual `RescanTrigger` (“Refresh”) once automatic watch-refresh is stable.
+* Keep existing add/remove trigger behavior unchanged.
+
+STEP: Acceptance criteria
+
+* PrefAppl updates automatically when links are created/deleted/renamed anywhere under `SP_APPLICATION` and SP_TOP/PREF_APPL_TOP_DESKTOP_RELATIVE_PATH subtree.
+* No infinite refresh loop: self-generated file events cause at most one coalesced refresh.
+* No frequent rescans from unrelated filesystem activity.
+* Add/remove operations still end in correct Enabled/Disabled list state.
+* Existing error/status reporting remains functional.
+
+Implementation notes for coding style:
+
+* Use GOC/C89 style already present in files.
+* Keep variable declarations at top of functions.
+* Avoid large stack allocations; use MemAlloc/MemLock/MemUnlock/MemFree patterns.
+* Follow existing naming conventions and message patterns in PrefAppl code for consistency.
+* file-system notification patterns can be found in the TrayApps application
