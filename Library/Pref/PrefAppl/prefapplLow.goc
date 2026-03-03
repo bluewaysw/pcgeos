@@ -18,7 +18,6 @@
 #include <fileEnum.h>
 #include <geode.h>
 #include <lmem.h>
-#include <localize.h>
 #include <Ansi/string.h>
 
 #include "prefapplLow.h"
@@ -34,17 +33,22 @@ typedef struct {
 } PrefApplTraversalNode;
 
 typedef struct {
+    StandardPath PALR_sourceRoot;
+    GeodeToken PALR_targetToken;
+    PathName PALR_relativeDir;
+    FileLongName PALR_linkName;
+} PrefApplLinkRecord;
+
+typedef struct {
     MemHandle PATS_stackBlock;
     ChunkHandle PATS_stackArray;
     FileEnumParams PATS_enumParams;
     PathName PATS_joinPath;
     PathName PATS_targetPath;
-    Boolean PATS_depthLimitHit;
 } PrefApplTraversalState;
 
 static MemHandle prefApplLinkDataBlock = NullHandle;
 static ChunkHandle prefApplLinkArray = NullChunk;
-static Boolean prefApplDepthLimitHit = FALSE;
 static MemHandle prefApplAppDataBlock = NullHandle;
 static ChunkHandle prefApplAppArray = NullChunk;
 static PrefApplError prefApplLastScanError = PREF_APPL_ERROR_NONE;
@@ -460,55 +464,9 @@ PrefApplMapSubsetIndexToApplicationIndex(word subsetIndex, Boolean selectedState
     return FALSE;
 }
 
-static Boolean
-PrefApplMapApplicationIndexToSubsetIndex(word appIndex, Boolean selectedState,
-                                         word *subsetIndexPtr)
-{
-    word count;
-    word index;
-    word currentSubsetIndex;
-    PrefApplApplicationRecord *record;
-
-    if ((subsetIndexPtr == NULL) ||
-        (prefApplAppDataBlock == NullHandle) ||
-        (prefApplAppArray == NullChunk)) {
-        return FALSE;
-    }
-
-    MemLock(prefApplAppDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
-    if (appIndex >= count) {
-        MemUnlock(prefApplAppDataBlock);
-        return FALSE;
-    }
-
-    currentSubsetIndex = 0;
-    for (index = 0; index <= appIndex; index++) {
-        record = (PrefApplApplicationRecord *)
-            ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
-                                          prefApplAppArray,
-                                          index, NULL);
-        if ((record == NULL) || (record->PAAR_selected != selectedState)) {
-            continue;
-        }
-
-        if (index == appIndex) {
-            *subsetIndexPtr = currentSubsetIndex;
-            MemUnlock(prefApplAppDataBlock);
-            return TRUE;
-        }
-
-        currentSubsetIndex++;
-    }
-
-    MemUnlock(prefApplAppDataBlock);
-    return FALSE;
-}
-
 static void
 PrefApplAppendLinkRecord(StandardPath sourceRoot, const char *relativeDir,
-                         const char *linkName, const GeodeToken *token,
-                         DiskHandle targetDisk, const char *targetPath)
+                         const char *linkName, const GeodeToken *token)
 {
     PrefApplLinkRecord *record;
 
@@ -526,14 +484,11 @@ PrefApplAppendLinkRecord(StandardPath sourceRoot, const char *relativeDir,
 
     memset(record, 0, sizeof(*record));
     record->PALR_sourceRoot = sourceRoot;
-    record->PALR_targetDisk = targetDisk;
     memcpy(&record->PALR_targetToken, token, sizeof(*token));
     PrefApplSafeCopy(record->PALR_relativeDir, sizeof(record->PALR_relativeDir),
                      relativeDir);
     PrefApplSafeCopy(record->PALR_linkName, sizeof(record->PALR_linkName),
                      linkName);
-    PrefApplSafeCopy(record->PALR_targetPath, sizeof(record->PALR_targetPath),
-                     targetPath);
 }
 
 static Boolean
@@ -713,16 +668,13 @@ PrefApplPopTraversalNode(PrefApplTraversalState *state,
 static Boolean
 PrefApplResolveApplicationLink(PrefApplTraversalState *state,
                                const char *linkName,
-                               GeodeToken *tokenOut,
-                               DiskHandle *targetDiskOut,
-                               const char **targetPathOut)
+                               GeodeToken *tokenOut)
 {
     DiskHandle targetDisk;
     GeosFileType fileType;
     GeodeAttrs geodeAttrs;
 
-    if ((state == NULL) || (linkName == NULL) || (tokenOut == NULL) ||
-        (targetDiskOut == NULL) || (targetPathOut == NULL)) {
+    if ((state == NULL) || (linkName == NULL) || (tokenOut == NULL)) {
         return FALSE;
     }
 
@@ -773,9 +725,6 @@ PrefApplResolveApplicationLink(PrefApplTraversalState *state,
     }
 
     FilePopDir();
-
-    *targetDiskOut = targetDisk;
-    *targetPathOut = state->PATS_targetPath;
     return TRUE;
 }
 
@@ -791,8 +740,6 @@ PrefApplScanCurrentDirectory(PrefApplTraversalState *state,
     FENameAndAttr *entry;
     PrefApplTraversalNode childNode;
     GeodeToken targetToken;
-    DiskHandle targetDisk;
-    const char *targetPath;
 
     if ((state == NULL) || (currentNode == NULL)) {
         return;
@@ -823,15 +770,11 @@ PrefApplScanCurrentDirectory(PrefApplTraversalState *state,
             if (entry[i].FENAA_attr & FA_LINK) {
                 if (PrefApplResolveApplicationLink(state,
                                                    entry[i].FENAA_name,
-                                                   &targetToken,
-                                                   &targetDisk,
-                                                   &targetPath)) {
+                                                   &targetToken)) {
                     PrefApplAppendLinkRecord(sourceRoot,
                                              currentNode->PATN_relativePath,
                                              entry[i].FENAA_name,
-                                             &targetToken,
-                                             targetDisk,
-                                             targetPath);
+                                             &targetToken);
                 }
                 continue;
             }
@@ -847,11 +790,9 @@ PrefApplScanCurrentDirectory(PrefApplTraversalState *state,
              * - "." and ".." are ignored before this point
              *
              * If the depth cap is hit we keep scanning the current directory
-             * but skip pushing deeper nodes, and record that truncation
-             * happened for diagnostics.
+             * but skip pushing deeper nodes.
              */
             if (currentNode->PATN_depth >= PREF_APPL_MAX_TRAVERSAL_DEPTH) {
-                state->PATS_depthLimitHit = TRUE;
                 continue;
             }
 
@@ -936,7 +877,7 @@ PrefApplCreateLinkRecordArray(void)
     return TRUE;
 }
 
-void
+static void
 PrefApplClearScannedLinks(void)
 {
     if (prefApplLinkDataBlock != NullHandle) {
@@ -944,10 +885,9 @@ PrefApplClearScannedLinks(void)
     }
     prefApplLinkDataBlock = NullHandle;
     prefApplLinkArray = NullChunk;
-    prefApplDepthLimitHit = FALSE;
 }
 
-Boolean
+static Boolean
 PrefApplRescanApplicationLinks(void)
 {
     MemHandle stateHandle;
@@ -973,58 +913,10 @@ PrefApplRescanApplicationLinks(void)
     PrefApplScanRoot(state, SP_TOP, PREF_APPL_TOP_DESKTOP_RELATIVE_PATH);
     FilePopDir();
 
-    prefApplDepthLimitHit = state->PATS_depthLimitHit;
-
     MemUnlock(prefApplLinkDataBlock);
     PrefApplDestroyTraversalState(stateHandle, state);
 
     return TRUE;
-}
-
-word
-PrefApplGetScannedLinkCount(void)
-{
-    word count;
-
-    if ((prefApplLinkDataBlock == NullHandle) || (prefApplLinkArray == NullChunk)) {
-        return 0;
-    }
-
-    MemLock(prefApplLinkDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplLinkDataBlock, prefApplLinkArray);
-    MemUnlock(prefApplLinkDataBlock);
-
-    return count;
-}
-
-Boolean
-PrefApplGetScannedLinkRecord(word index, PrefApplLinkRecord *record)
-{
-    word count;
-
-    if ((record == NULL) ||
-        (prefApplLinkDataBlock == NullHandle) ||
-        (prefApplLinkArray == NullChunk)) {
-        return FALSE;
-    }
-
-    MemLock(prefApplLinkDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplLinkDataBlock, prefApplLinkArray);
-    if (index >= count) {
-        MemUnlock(prefApplLinkDataBlock);
-        return FALSE;
-    }
-
-    ChunkArrayGetElementHandles(prefApplLinkDataBlock, prefApplLinkArray,
-                                index, record);
-    MemUnlock(prefApplLinkDataBlock);
-    return TRUE;
-}
-
-Boolean
-PrefApplDidHitTraversalDepthLimit(void)
-{
-    return prefApplDepthLimitHit;
 }
 
 Boolean
@@ -1056,106 +948,48 @@ PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
 }
 
 Boolean
-PrefApplAddScannedApplicationLink(const PrefApplApplicationRecord *record)
-{
-    PathName targetPath;
-    word beforeCount;
-    word afterCount;
-
-    if ((record == NULL) ||
-        !PrefApplBuildDistApplTargetPath(record, targetPath,
-                                         sizeof(targetPath))) {
-        return FALSE;
-    }
-
-    if ((prefApplLinkDataBlock == NullHandle) || (prefApplLinkArray == NullChunk)) {
-        if (!PrefApplCreateLinkRecordArray()) {
-            return FALSE;
-        }
-    }
-
-    MemLock(prefApplLinkDataBlock);
-    beforeCount = ChunkArrayGetCountHandles(prefApplLinkDataBlock,
-                                            prefApplLinkArray);
-    PrefApplAppendLinkRecord(SP_APPLICATION, "", record->PAAR_name,
-                             &record->PAAR_token, SP_SYS_APPLICATION,
-                             targetPath);
-    afterCount = ChunkArrayGetCountHandles(prefApplLinkDataBlock,
-                                           prefApplLinkArray);
-    MemUnlock(prefApplLinkDataBlock);
-
-    return (afterCount == (beforeCount + 1));
-}
-
-Boolean
 PrefApplDeleteScannedLinksForToken(const GeodeToken *token)
 {
     word index;
     word linkCount;
-    PrefApplLinkRecord record;
-    Boolean success;
-
-    if (token == NULL) {
-        return FALSE;
-    }
-
-    success = TRUE;
-    linkCount = PrefApplGetScannedLinkCount();
-    for (index = 0; index < linkCount; index++) {
-        if (!PrefApplGetScannedLinkRecord(index, &record)) {
-            success = FALSE;
-            continue;
-        }
-
-        if (!PrefApplTokensMatch(token, &record.PALR_targetToken)) {
-            continue;
-        }
-
-        if (!PrefApplDeleteStoredLinkRecord(&record)) {
-            success = FALSE;
-        }
-    }
-
-    return success;
-}
-
-void
-PrefApplRemoveScannedLinksForToken(const GeodeToken *token)
-{
-    word index;
-    word linkCount;
     PrefApplLinkRecord *record;
+    PrefApplLinkRecord storedRecord;
+    Boolean success;
 
     if ((token == NULL) ||
         (prefApplLinkDataBlock == NullHandle) ||
         (prefApplLinkArray == NullChunk)) {
-        return;
+        return FALSE;
     }
 
+    success = TRUE;
     MemLock(prefApplLinkDataBlock);
     linkCount = ChunkArrayGetCountHandles(prefApplLinkDataBlock,
                                           prefApplLinkArray);
-    index = 0;
-    while (index < linkCount) {
+    for (index = 0; index < linkCount; index++) {
         record = (PrefApplLinkRecord *)
             ChunkArrayElementToPtrHandles(prefApplLinkDataBlock,
                                           prefApplLinkArray,
                                           index, NULL);
-        if ((record != NULL) &&
-            PrefApplTokensMatch(token, &record->PALR_targetToken)) {
-            ChunkArrayDeleteRange(ConstructOptr(prefApplLinkDataBlock,
-                                                prefApplLinkArray),
-                                  index, 1);
-            linkCount--;
+        if (record == NULL) {
             continue;
         }
 
-        index++;
+        if (!PrefApplTokensMatch(token, &record->PALR_targetToken)) {
+            continue;
+        }
+
+        memcpy(&storedRecord, record, sizeof(storedRecord));
+        if (!PrefApplDeleteStoredLinkRecord(&storedRecord)) {
+            success = FALSE;
+        }
     }
     MemUnlock(prefApplLinkDataBlock);
+
+    return success;
 }
 
-void
+static void
 PrefApplClearScannedApplications(void)
 {
     if (prefApplAppDataBlock != NullHandle) {
@@ -1188,22 +1022,6 @@ PrefApplRefreshApplicationData(void)
     (void) PrefApplRescanApplicationLinks();
     PrefApplMarkLinkedApplicationsSelected();
     return TRUE;
-}
-
-word
-PrefApplGetApplicationCount(void)
-{
-    word count;
-
-    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
-        return 0;
-    }
-
-    MemLock(prefApplAppDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
-    MemUnlock(prefApplAppDataBlock);
-
-    return count;
 }
 
 word
@@ -1255,51 +1073,6 @@ PrefApplMapLinkedIndexToApplicationIndex(word linkedIndex, word *appIndexPtr)
 {
     return PrefApplMapSubsetIndexToApplicationIndex(linkedIndex, TRUE,
                                                     appIndexPtr);
-}
-
-Boolean
-PrefApplMapApplicationIndexToDisabledIndex(word appIndex, word *disabledIndexPtr)
-{
-    return PrefApplMapApplicationIndexToSubsetIndex(appIndex, FALSE,
-                                                    disabledIndexPtr);
-}
-
-Boolean
-PrefApplMapApplicationIndexToLinkedIndex(word appIndex, word *linkedIndexPtr)
-{
-    return PrefApplMapApplicationIndexToSubsetIndex(appIndex, TRUE,
-                                                    linkedIndexPtr);
-}
-
-Boolean
-PrefApplSetApplicationSelected(word index, Boolean selected)
-{
-    word count;
-    PrefApplApplicationRecord *record;
-
-    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
-        return FALSE;
-    }
-
-    MemLock(prefApplAppDataBlock);
-    count = ChunkArrayGetCountHandles(prefApplAppDataBlock, prefApplAppArray);
-    if (index >= count) {
-        MemUnlock(prefApplAppDataBlock);
-        return FALSE;
-    }
-
-    record = (PrefApplApplicationRecord *)
-        ChunkArrayElementToPtrHandles(prefApplAppDataBlock,
-                                      prefApplAppArray,
-                                      index, NULL);
-    if (record == NULL) {
-        MemUnlock(prefApplAppDataBlock);
-        return FALSE;
-    }
-
-    record->PAAR_selected = selected;
-    MemUnlock(prefApplAppDataBlock);
-    return TRUE;
 }
 
 PrefApplError
