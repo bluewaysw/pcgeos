@@ -197,12 +197,12 @@ GetTokensFromDatabase( Boolean freeOld )
        *             "number of tokens" string.
        */
     dword tokenList;
-    char  tempStr[20];
+    char  tempStr[32] = {0};
 
       /*
        * Should we free old token data?
        */
-    if( freeOld ) {
+    if( freeOld && tokenListHandle ) {
         MemFree( tokenListHandle );
     }
 
@@ -263,6 +263,15 @@ GetTokenFromList( word         item,
        * Use the pointer to access a particular item
        * and return the token for that item.
        */
+    if( !tokenListHandle || (item >= tokenCount) ) {
+        geodeToken->GT_chars[ 0 ] = 0;
+        geodeToken->GT_chars[ 1 ] = 0;
+        geodeToken->GT_chars[ 2 ] = 0;
+        geodeToken->GT_chars[ 3 ] = 0;
+        geodeToken->GT_manufID = 0;
+        return;
+    }
+
     tokenListPtr = MemLock( tokenListHandle );
 EC( ECCheckBounds( tokenListPtr ); )
     *geodeToken = tokenListPtr[ item ];
@@ -318,7 +327,9 @@ EC( ECCheckBounds( tokenListPtr ); )
 @method TokenDelProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
 {
 
-    MemFree( tokenListHandle );
+    if( tokenListHandle ) {
+        MemFree( tokenListHandle );
+    }
     return( @callsuper() );
 } /* MSG_GEN_PROCESS_CLOSE_APPLICATION */
 
@@ -346,7 +357,7 @@ EC( ECCheckBounds( tokenListPtr ); )
        * tempStr    - Used to build the "current token" string.
        */
     GeodeToken geodeToken;
-    char       tempStr[20];
+    char       tempStr[32] = {0};
 
       /*
        * Enable the "delete" button for this token.
@@ -444,4 +455,3 @@ EC( ECCheckBounds( tokenListPtr ); )
         GetTokensFromDatabase( TRUE );
     }
 } /* MSG_TOKEN_DEL_DELETE_TOKEN */
-
