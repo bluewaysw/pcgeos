@@ -16,8 +16,6 @@
 @include <token.h>
 
 #include "prefapplLow.h"
-#include <Ansi/string.h>
-#include <Ansi/stdio.h>
 #include <graphics.h>
 #include <gstring.h>
 #include <lmem.h>
@@ -53,10 +51,6 @@ static const char prefApplOutOfMemoryText[] =
     "PrefAppl ran out of memory while scanning applications.";
 static const char prefApplStatusTextOk[] =
     "Ready.";
-static const char prefApplOperationPartialFailureText[] =
-    "Application enable/disable finished with errors.";
-static const char prefApplAlreadyEnabledText[] =
-    "The selected application is already enabled.";
 static const char prefApplEnabledText[] =
     "Application enabled.";
 static const char prefApplEnablePartialFailureText[] =
@@ -98,7 +92,6 @@ static const char prefApplDisablePartialFailureText[] =
     GI_states = @default & ~GS_USABLE;
     GI_comp = @TabHolder;
 
-    //HINT_INTERACTION_COMPLEX_PROPERTIES;
     HINT_ORIENT_CHILDREN_VERTICALLY;
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
@@ -311,12 +304,6 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
             break;
         case PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY:
             statusMessage = prefApplOutOfMemoryText;
-            break;
-        case PREF_APPL_OPERATION_SUCCESS:
-            statusMessage = prefApplStatusTextOk;
-            break;
-        case PREF_APPL_OPERATION_PARTIAL_FAILURE:
-            statusMessage = prefApplOperationPartialFailureText;
             break;
         default:
             statusMessage = NULL;
@@ -613,26 +600,13 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
-
-    if (record.PAAR_selected) {
-        statusMessage = prefApplAlreadyEnabledText;
-    } else {
-        statusMessage = prefApplEnabledText;
-        pself->PADI_refreshInProgress = TRUE;
-        if (!PrefApplCreateApplicationLink(&record)) {
-            hadErrors = TRUE;
-        } else {
-            if (!PrefApplSetApplicationSelected(appIndex, TRUE)) {
-                hadErrors = TRUE;
-            }
-            if (!PrefApplAddScannedApplicationLink(&record)) {
-                hadErrors = TRUE;
-            }
-        }
-
-        if (hadErrors) {
-            statusMessage = prefApplEnablePartialFailureText;
-        }
+    statusMessage = prefApplEnabledText;
+    pself->PADI_refreshInProgress = TRUE;
+    if (!PrefApplCreateApplicationLink(&record)) {
+        hadErrors = TRUE;
+    }
+    if (hadErrors) {
+        statusMessage = prefApplEnablePartialFailureText;
     }
 
     paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
@@ -666,10 +640,6 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     pself->PADI_refreshInProgress = TRUE;
 
     if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
-        hadErrors = TRUE;
-    }
-    PrefApplRemoveScannedLinksForToken(&record.PAAR_token);
-    if (!PrefApplSetApplicationSelected(appIndex, FALSE)) {
         hadErrors = TRUE;
     }
     if (hadErrors) {
