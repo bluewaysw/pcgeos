@@ -1,0 +1,127 @@
+# Investigate And Reuse INI-Driven Initial Link Seeding
+
+**Summary**
+
+The current tree already contains an INI-driven link seeding mechanism, but it is for the **Desktop**, not `WORLD`.
+
+Verified facts from the codebase:
+
+- `CommonDesktop` supports INI-driven link creation behind `GPC_DESKTOP_LINKS_IN_INI` in [cmainInit.asm](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/CMain/cmainInit.asm#L2803).
+- This product family enables that feature for `_NDO2000/_BBX2001` in [product.def](/home/konstantinmeyer/pcgeos/Include/product.def#L88) and [cdesktopGeode.def](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/cdesktopGeode.def#L468).
+- The existing runtime section name is `[fileManager] desktopLinks`, with guard key `[fileManager] linksDone`, defined in [cmainInit.asm](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/CMain/cmainInit.asm#L3311).
+- `NDInitDesktop` explicitly changes to the Desktop directory before enumerating `desktopLinks`, so the created links are desktop links, not `WORLD` links, in [cmainInit.asm](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/CMain/cmainInit.asm#L2777).
+- The callback format is generic: token chars, manufacturer ID, `StandardPath`, relative target path, WOT, link name, in [cmainInit.asm](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/CMain/cmainInit.asm#L3079). This is flexible enough to point at application files, not just folders.
+- Existing template data already proves executable entries are supported: app-like `desktopLinks` entries use WOT value `12`, folder links use WOT value `18`, in [Template/DBCS/net.ini](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/Template/DBCS/net.ini#L142).
+- Rerun is not automatic. After one successful pass, `linksDone` is written `TRUE` in [cmainInit.asm](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/CMain/cmainInit.asm#L2819). The only confirmed reset path is Setup writing `FALSE` in [setupUI.asm](/home/konstantinmeyer/pcgeos/Appl/Preferences/Setup/setupUI.asm#L424).
+- Cleanup on rerun is limited. The existing callback only deletes links automatically for empty **system-folder** targets via `checkSysFolderEmpty`, in [cmainInit.asm](/home/konstantinmeyer/pcgeos/Appl/FileMgrs/CommonDesktop/CMain/cmainInit.asm#L3258). It does not generally prune or rebuild stale executable links.
+
+**Conclusion**
+
+There is **no existing confirmed INI path that seeds `WORLD` directly**. The reusable base is the Desktop-only `desktopLinks` mechanism.
+
+Recommended direction: add a parallel INI-driven `WORLD` seeding pass instead of overloading `desktopLinks`.
+
+**Implementation Plan**
+
+1. Add a new `WORLD`-specific INI mechanism in `CommonDesktop`.
+   Create a new pass alongside `NDInitDesktop`, with separate constants:
+   `worldLinksCat = "fileManager"`, `worldLinksKey = "worldLinks"`, `worldLinksDoneKey = "worldLinksDone"`.
+
+2. Keep the existing `desktopLinks` path unchanged.
+   Do not retarget or reuse `[fileManager] desktopLinks` for `WORLD`.
+   Reason: current behavior is explicitly Desktop-scoped and already used by product templates.
+
+3. Implement a new initialization routine, e.g. `NDInitWorldLinks`.
+   Sequence:
+   - `FilePushDir`
+   - `FileSetStandardPath(SP_APPLICATION)` or equivalent `WORLD` current directory setup
+   - read `[fileManager] worldLinksDone`
+   - if missing or `FALSE`, enumerate `[fileManager] worldLinks`
+   - after successful pass, write `[fileManager] worldLinksDone = TRUE`
+   - `FilePopDir`
+
+4. Reuse the existing record syntax from `desktopLinks`.
+   Each `worldLinks` entry should remain:
+   `token chars, manufacturer ID, StandardPath, relative target path, WOT, link name`
+   This avoids inventing a second serialization format.
+
+5. Reuse the existing parser structure, but use a separate callback for `WORLD`.
+   Duplicate the logic of `createDesktopLinkCallback` into a `createWorldLinkCallback` variant rather than adding destination-branching into the existing callback.
+   Reason: the target directory for created links is different, and the lifecycle rules should remain isolated.
+
+6. Change rerun behavior from “skip forever” to explicit one-shot per domain.
+   Desktop seeding remains guarded by `linksDone`.
+   `WORLD` seeding uses its own `worldLinksDone`.
+   This prevents desktop resets from unexpectedly rebuilding `WORLD`, and vice versa.
+
+7. Implement explicit stale-link handling for `WORLD` executable links.
+   The current `desktopLinks` code only self-prunes empty `WOT_SYSTEM_FOLDER` links.
+   For `WORLD`, add deterministic behavior:
+   - if a link named by a `worldLinks` entry already exists and is a link, delete it before recreating it
+   - if the target does not exist, delete the existing link of that name and do not recreate it
+   - if a non-link file of the same name exists, leave it untouched and skip that entry
+   This makes second-run cleanup reliable for app links, which the current desktop code does not do.
+
+8. Target `DISTAPPL` directly for initial application links.
+   Because real app payloads now live in `SP_SYSTEM\\DISTAPPL`, `worldLinks` app entries should point there, not to old `WORLD` payload locations.
+   Use `StandardPath = SP_SYSTEM` and relative path `DISTAPPL\\<geode-name>`.
+   Keep link files themselves created in `SP_APPLICATION`.
+
+9. Seed the product templates with `worldLinks`.
+   Template placement:
+   - non-DBCS product: add `[fileManager] worldLinks` directly to [Template/geos.ini](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/Template/geos.ini#L95)
+   - DBCS product: add `[fileManager] worldLinks` to [Template/DBCS/net.ini](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/Template/DBCS/net.ini#L107), because [Template/DBCS/geos.ini](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/Template/DBCS/geos.ini#L14) delegates runtime INI loading to `net.ini` and `net2.ini`
+
+10. Start with a small seed set, not the entire former `WORLD` taxonomy.
+   Seed only the initial app links that should appear in `WORLD` after first boot.
+   Do not attempt to encode every folder policy or secondary desktop shortcut in the first pass.
+   Keep the list aligned with the new `DISTAPPL` reality.
+
+**Important Changes Or Additions To Public APIs / Interfaces / Types**
+
+No public external API changes.
+
+Internal/runtime interface additions:
+
+- New INI key: `[fileManager] worldLinks`
+- New INI key: `[fileManager] worldLinksDone`
+
+No change to the existing `desktopLinks` syntax or semantics.
+
+**Test Cases And Scenarios**
+
+1. Fresh boot with `worldLinksDone` missing:
+   `WORLD` link entries from `[fileManager] worldLinks` are created.
+
+2. Second boot with `worldLinksDone = TRUE`:
+   no duplicate `WORLD` links are created.
+
+3. Manual rerun by setting `worldLinksDone = FALSE`:
+   existing named links are recreated from the current INI data.
+
+4. Target removed from `DISTAPPL` before rerun:
+   stale `WORLD` link is deleted and not recreated.
+
+5. Existing non-link file in `WORLD` with same name as planned link:
+   file is preserved; seeding skips that entry.
+
+6. Existing link target changed in INI:
+   rerun deletes old link and recreates it to the new target.
+
+7. Desktop seeding remains unchanged:
+   `[fileManager] desktopLinks` still populates Desktop only, with existing `linksDone` behavior.
+
+8. DBCS runtime path:
+   entries in `Template/DBCS/net.ini` are honored through the `ini = ..\\geos2000\\net.ini ..\\geos2000\\net2.ini` indirection in [Template/DBCS/geos.ini](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/Template/DBCS/geos.ini#L14).
+
+9. Non-DBCS runtime path:
+   entries added directly to [Template/geos.ini](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/Template/geos.ini#L95) are read without `net.ini` indirection.
+
+**Assumptions And Defaults**
+
+- Treat current `desktopLinks` as Desktop-only and leave it untouched.
+- Do not rely on the current `linksDone` key for `WORLD`; use a separate `worldLinksDone`.
+- Use the existing `desktopLinks` record format unchanged for `worldLinks`.
+- Use direct `SP_SYSTEM -> DISTAPPL\\...` targets for app links.
+- Require explicit delete/recreate logic for rerun cleanup, because the current `checkSysFolderEmpty` logic is insufficient for executable app links.
+- Assume the desired outcome is controlled first-boot seeding plus deliberate rerun support, not continuous self-healing on every launch.
