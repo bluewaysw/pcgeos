@@ -1,0 +1,33 @@
+Implement a single cleanup pass across `Library/Pref/PrefAppl/prefappl.goc` and `Library/Pref/PrefAppl/prefapplLow.goc`, explicitly leaving all tab-selection/tab-UI logic unchanged.
+
+1. Remove redundant refresh-state assignments in action handlers:
+   * In `MSG_PREF_APPL_ADD_APPLICATION` and `MSG_PREF_APPL_REMOVE_APPLICATION` (`prefappl.goc`), delete the manual `pself->PADI_refreshInProgress = TRUE;` lines.
+   * Keep `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` as the sole owner of refresh lifecycle state transitions (`queued/in-progress`).
+
+2. Make queued refresh coalescing lossless:
+   * In `MSG_PREF_APPL_QUEUE_REFRESH`, if a refresh is already in progress, still record that another refresh is needed (`PADI_refreshQueued = TRUE`) rather than dropping the event.
+   * In `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`, after finishing and clearing `PADI_refreshInProgress`, check whether `PADI_refreshQueued` was set during execution and queue exactly one follow-up refresh.
+   * Ensure duplicate notifications are coalesced (many file events -> one pending follow-up refresh), but never silently lost.
+
+3. Tighten control-state correctness on error paths:
+   * In `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`, do not unconditionally re-enable all controls.
+   * Only call full enable-state restoration when refresh data is valid (`PREF_APPL_ERROR_NONE`).
+   * On scan failure, keep lists/triggers in a conservative disabled state so users cannot act on stale/partial model data.
+   * Preserve existing status/error text behavior via `MSG_PREF_APPL_SHOW_ERROR` / `MSG_PREF_APPL_SET_STATUS_TEXT`.
+
+4. Trim low-value narrative comments, keep only invariants:
+
+   * In `prefapplLow.goc`, shorten verbose explanatory comments in traversal/link-resolution areas.
+   * Retain comments that communicate non-obvious contracts/invariants (depth cap, no link recursion, tolerant scan behavior), and remove commentary that simply repeats line-by-line code flow.
+
+5. Validate consistency and compile with the shiny skill:
+
+   * Use `rg` to confirm removed symbols/assignments are not left dangling.
+   * Verify all refresh-state transitions still have clear single ownership and no contradictory writes.
+   * Ensure no tab-related methods/objects were altered.
+
+6. Keep implementation minimal:
+
+   * Prefer deletion and consolidation over introducing new abstractions.
+   * Do not add new features, flags, config knobs, or compatibility layers.
+   * Maintain current UI behavior and message contracts, except for the intended fixes above.
