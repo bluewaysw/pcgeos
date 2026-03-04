@@ -207,6 +207,24 @@ static const char prefApplDisablePartialFailureText[] =
     GTI_destination = @BaseBox;
 }
 
+@object GenInteractionClass DisableTriggerPadding = {
+    GI_comp = @RemoveTrigger;
+
+    HINT_CUSTOM_EXTRA_MARGINS = { 4, 1, 4, 1 };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTriggerClass RemoveTrigger = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = list {
+	    @LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
+    }
+    GTI_actionMsg = MSG_PREF_APPL_REMOVE_APPLICATION;
+    GTI_destination = @BaseBox;
+}
+
 @object GenInteractionClass LinkedAppsGroup = {
     GI_comp = @LinkedAppsList;
 
@@ -233,24 +251,6 @@ static const char prefApplDisablePartialFailureText[] =
         12
     };
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
-}
-
-@object GenInteractionClass DisableTriggerPadding = {
-    GI_comp = @RemoveTrigger;
-
-    HINT_CUSTOM_EXTRA_MARGINS = { 4, 1, 4, 1 };
-    HINT_ORIENT_CHILDREN_VERTICALLY;
-    HINT_CENTER_CHILDREN_HORIZONTALLY;
-    HINT_CENTER_CHILDREN_VERTICALLY;
-}
-
-@object GenTriggerClass RemoveTrigger = {
-    GI_states = @default & ~GS_ENABLED;
-    GI_visMoniker = list {
-	    @LeftArrowSCMoniker, @LeftArrowSMMoniker, @LeftArrowSCGAMoniker
-    }
-    GTI_actionMsg = MSG_PREF_APPL_REMOVE_APPLICATION;
-    GTI_destination = @BaseBox;
 }
 
 @object GenGlyphClass StatusText = {
@@ -311,7 +311,12 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_QUEUE_REFRESH
 {
-    if (pself->PADI_refreshQueued || pself->PADI_refreshInProgress) {
+    if (pself->PADI_refreshInProgress) {
+        pself->PADI_refreshQueued = TRUE;
+        return;
+    }
+
+    if (pself->PADI_refreshQueued) {
         return;
     }
 
@@ -324,6 +329,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     PrefApplError paError;
     word disabledCount;
     word linkedCount;
+    Boolean queueFollowupRefresh;
 
     pself->PADI_refreshQueued = FALSE;
     pself->PADI_refreshInProgress = TRUE;
@@ -332,8 +338,14 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
         paError = PrefApplGetLastScanError();
     }
 
-    disabledCount = PrefApplGetDisabledApplicationCount();
-    linkedCount = PrefApplGetLinkedApplicationCount();
+    if (paError == PREF_APPL_ERROR_NONE) {
+        disabledCount = PrefApplGetDisabledApplicationCount();
+        linkedCount = PrefApplGetLinkedApplicationCount();
+    } else {
+        disabledCount = 0;
+        linkedCount = 0;
+    }
+
     @call @Dup(@AllAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
     @call @Dup(@LinkedAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
     if (disabledCount != 0) {
@@ -346,8 +358,19 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     } else {
         @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
     }
-    @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(TRUE);
+
+    if (paError == PREF_APPL_ERROR_NONE) {
+        @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(TRUE);
+    } else {
+        @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
+    }
+
     pself->PADI_refreshInProgress = FALSE;
+    queueFollowupRefresh = pself->PADI_refreshQueued;
+    if (queueFollowupRefresh) {
+        @send, forceQueue, checkDuplicate oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+    }
+
     return paError;
 }
 
@@ -597,7 +620,6 @@ PrefApplReplaceListItemMoniker(optr list, word item,
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
     statusMessage = prefApplEnabledText;
-    pself->PADI_refreshInProgress = TRUE;
     if (!PrefApplCreateApplicationLink(&record)) {
         hadErrors = TRUE;
     }
@@ -633,7 +655,6 @@ PrefApplReplaceListItemMoniker(optr list, word item,
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
     statusMessage = prefApplDisabledText;
-    pself->PADI_refreshInProgress = TRUE;
 
     if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
         hadErrors = TRUE;
