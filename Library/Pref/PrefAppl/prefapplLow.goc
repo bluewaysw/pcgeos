@@ -679,13 +679,7 @@ PrefApplResolveApplicationLink(PrefApplTraversalState *state,
         return FALSE;
     }
 
-    /*
-     * Strict link resolution path for PrefAppl:
-     * 1) resolve with FileReadLink()
-     * 2) require executable file type
-     * 3) require GA_APPLICATION in geode attrs
-     * 4) then fetch token.
-     */
+    /* Only treat links to executable applications as valid targets. */
     targetDisk = FileReadLink(linkName, state->PATS_targetPath);
     if (targetDisk == NullHandle) {
         return FALSE;
@@ -784,15 +778,7 @@ PrefApplScanCurrentDirectory(PrefApplTraversalState *state,
                 continue;
             }
 
-            /*
-             * Traversal guarantees:
-             * - hard depth cap at PREF_APPL_MAX_TRAVERSAL_DEPTH (16)
-             * - links are never recursed into
-             * - "." and ".." are ignored before this point
-             *
-             * If the depth cap is hit we keep scanning the current directory
-             * but skip pushing deeper nodes.
-             */
+            /* Stop descending past PREF_APPL_MAX_TRAVERSAL_DEPTH; never recurse into links. */
             if (currentNode->PATN_depth >= PREF_APPL_MAX_TRAVERSAL_DEPTH) {
                 continue;
             }
@@ -843,10 +829,7 @@ PrefApplScanRoot(PrefApplTraversalState *state, StandardPath sourceRoot,
     }
 
     while (PrefApplPopTraversalNode(state, &node)) {
-        /*
-         * Unreadable folders are expected in some installations.
-         * Continue scanning sibling folders instead of aborting.
-         */
+        /* Tolerate unreadable folders and continue with sibling paths. */
         if (FileSetCurrentPath(sourceRoot, node.PATN_relativePath) == NullHandle) {
             continue;
         }
@@ -933,10 +916,7 @@ PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
 
     FilePushDir();
     FileSetStandardPath(SP_APPLICATION);
-    /*
-     * Application links must inherit the target geode's attrs so the link
-     * carries the executable token/type instead of generic defaults.
-     */
+    /* Preserve the target geode's token/type on the created link. */
     fileError = FileCreateLink(record->PAAR_name,
                                PREF_APPL_DISTAPPL_STANDARD_PATH,
                                targetPath, 0);
@@ -1017,10 +997,7 @@ PrefApplRefreshApplicationData(void)
         return FALSE;
     }
 
-    /*
-     * Link scan failure should not hide the app list. Keep all apps visible
-     * and just leave everything unselected if link traversal cannot run.
-     */
+    /* Link traversal is best-effort: keep apps visible but unselected on failure. */
     (void) PrefApplRescanApplicationLinks();
     PrefApplMarkLinkedApplicationsSelected();
     return TRUE;
