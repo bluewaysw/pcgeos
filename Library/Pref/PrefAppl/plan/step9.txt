@@ -1,0 +1,132 @@
+# PrefAppl Incremental Enable/Disable Without Full Rescan
+
+## Summary
+Replace post-action full rebuilds in `PrefAppl` with an incremental fast path for single-app enable/disable operations.
+While an action is mutating links, `MSG_NOTIFY_FILE_CHANGE` will be ignored.
+No fallback rescan will run after action completion (by your choice).
+Model updates happen only on full operation success.
+
+## Implementation Changes
+
+## 1. `prefappl.goc`: add explicit mutation-notification suppression state
+1. Add one new dialog instance field in `PrefApplDialogClass`:
+`Boolean PADI_ignoreFileChanges = FALSE;`
+2. Update `MSG_NOTIFY_FILE_CHANGE` handler:
+- If `PADI_ignoreFileChanges == TRUE`, do not queue refresh.
+- Still call `@callsuper()` to preserve superclass behavior.
+- If not ignoring, keep current relevant-type behavior (`FCNT_CREATE/DELETE/RENAME/BATCH -> MSG_PREF_APPL_QUEUE_REFRESH`).
+
+## 2. `prefapplLow.h/.goc`: add incremental model mutation API
+1. Add exported helper APIs in `prefapplLow.h`:
+- `Boolean PrefApplSetApplicationSelectedByToken(const GeodeToken *token, Boolean selected);`
+- `Boolean PrefApplAddScannedLinkRecordForToken(const GeodeToken *token, const char *linkName);`
+- `Boolean PrefApplRemoveScannedLinkRecordsForToken(const GeodeToken *token);`
+- `Boolean PrefApplHasScannedLinkRecordForToken(const GeodeToken *token, const char *linkName);`
+2. Implement in `prefapplLow.goc`:
+- `PrefApplSetApplicationSelectedByToken`: find app by token in app array, set `PAAR_selected`.
+- `PrefApplHasScannedLinkRecordForToken`: search link array for exact tuple:
+  `sourceRoot=SP_APPLICATION`, `relativeDir=""`, matching `linkName`, matching token.
+- `PrefApplAddScannedLinkRecordForToken`:
+  - Ensure link array exists (create if missing).
+  - No-op success if exact record already exists.
+  - Append one record with `SP_APPLICATION`, empty relative path, given link name, token.
+- `PrefApplRemoveScannedLinkRecordsForToken`:
+  - Delete matching link records from link array (iterate reverse).
+  - Return success even if none found.
+3. Keep existing scan/refresh APIs unchanged.
+
+## 3. `prefappl.goc`: add local UI-sync helper that does not touch disk
+1. Add one private static helper, e.g. `PrefApplSyncListsFromCurrentModel(void)`:
+- Read current `disabledCount` and `linkedCount` from low-level getters.
+- Reinitialize both dynamic lists with those counts.
+- Selection policy: select first item if count > 0, else none.
+- Re-enable controls via `MSG_PREF_APPL_SET_CONTROL_STATE(TRUE)`.
+2. Do not call `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` from this helper.
+
+## 4. `MSG_PREF_APPL_ADD_APPLICATION`: convert to incremental flow
+1. Keep existing selection lookup and `record` fetch.
+2. Set controls disabled (`MSG_PREF_APPL_SET_CONTROL_STATE(FALSE)`).
+3. Set `PADI_ignoreFileChanges = TRUE` before mutation.
+4. Preflight in-memory link-record append:
+- Call `PrefApplAddScannedLinkRecordForToken(&record.PAAR_token, record.PAAR_name)`.
+- If this fails, treat action as failed, skip file create.
+5. Perform file op:
+- Call `PrefApplCreateApplicationLink(&record)`.
+6. Success path (both steps succeeded):
+- Set app selected in model: `PrefApplSetApplicationSelectedByToken(..., TRUE)`.
+- Clear ignore flag.
+- Call `PrefApplSyncListsFromCurrentModel()`.
+- Set status text to enabled-success string.
+7. Failure path:
+- If in-memory link record was added but file create failed, remove it with `PrefApplRemoveScannedLinkRecordsForToken` only for this token plus exact-name check logic in implementation (remove only the record just added).
+- Do not flip selected state.
+- Clear ignore flag.
+- Re-enable controls from current model via `PrefApplSyncListsFromCurrentModel()`.
+- Show partial-failure status string.
+8. Do not call `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`.
+
+## 5. `MSG_PREF_APPL_REMOVE_APPLICATION`: convert to incremental flow
+1. Keep existing selection lookup and `record` fetch.
+2. Set controls disabled.
+3. Set `PADI_ignoreFileChanges = TRUE`.
+4. Perform file op:
+- Call existing `PrefApplDeleteScannedLinksForToken(&record.PAAR_token)`.
+5. Success path:
+- Remove token link records from in-memory link array:
+  `PrefApplRemoveScannedLinkRecordsForToken(&record.PAAR_token)`.
+- Mark app unselected:
+  `PrefApplSetApplicationSelectedByToken(..., FALSE)`.
+- Clear ignore flag.
+- `PrefApplSyncListsFromCurrentModel()`.
+- Set disabled-success status string.
+6. Failure path:
+- Do not mutate in-memory selected/link-record state.
+- Clear ignore flag.
+- `PrefApplSyncListsFromCurrentModel()` (just re-enable and normalize selection).
+- Show partial-failure status string.
+7. Do not call `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`.
+
+## 6. Keep full-scan path for non-action events
+1. Keep `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` unchanged for:
+- initial dialog open
+- external notifications when not suppressed
+2. Keep refresh queue/in-progress logic intact as-is.
+
+## Public API / Interface / Type Changes
+1. `PrefApplDialogClass` instance data:
+- Added `PADI_ignoreFileChanges`.
+2. `prefapplLow.h` exported functions:
+- Added 4 incremental model-mutation/query APIs listed above.
+3. No protocol/message ID changes to PrefMgr forwarding.
+4. No GP exports or external geode interface changes.
+
+## Test Cases and Scenarios
+1. Enable one disabled app:
+- Link is created.
+- App moves to enabled list immediately.
+- No call path through `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`.
+2. Disable one enabled app:
+- All scanned links for token are deleted.
+- App moves to disabled list immediately.
+- No full rescan.
+3. Self-generated notifications during action:
+- `MSG_NOTIFY_FILE_CHANGE` receives events but does not queue refresh while ignore flag is set.
+4. External notification when idle:
+- Normal queue-refresh behavior remains active.
+5. Enable failure before/at file create:
+- Model remains unchanged.
+- Partial-failure status shown.
+6. Disable failure:
+- Model remains unchanged (per chosen policy).
+- Partial-failure status shown.
+7. Reopen PrefAppl after several actions:
+- Full refresh still reconstructs the same state from disk.
+8. Build/regression:
+- Rebuild PrefAppl and PrefMgr with current tree process and verify no tab/UI behavior changes.
+
+## Assumptions and Defaults
+1. Single-action model: only one enable/disable operation at a time.
+2. Selection behavior after action: select first item in each list (current behavior parity).
+3. Consistency policy during mutation window: ignore notifications completely, no automatic post-action rescan.
+4. Error policy: update in-memory model only on full operation success.
+5. Accepted tradeoff: external changes during ignore window may be missed until a later full-refresh trigger (for example reopening module or later non-suppressed notification).
