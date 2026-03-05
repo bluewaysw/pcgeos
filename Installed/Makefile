@@ -570,6 +570,10 @@ Installed/Library/Pref/Prefts:		ui config MAKELIB
 prefvid	: Installed/Library/Pref/Prefvid
 Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
+prefappl : Installed/Library/Pref/PrefAppl
+Installed/Library/Pref/PrefAppl:	ui config MAKELIB
+
+
 prefpntc	: Installed/Library/Pref/PrefPntC
 Installed/Library/Pref/PrefPntC:	ui config parentc MAKELIB
 
