@@ -102,7 +102,8 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
-		  prefintl prefcomp prefbg prefpntc preffont configui
+		  prefintl prefcomp prefbg prefpntc preffont configui \
+		  prefappl
 
 # prefs not used preflvl prefuic prefui prefts prefspui prefsock preflink preflang
 
