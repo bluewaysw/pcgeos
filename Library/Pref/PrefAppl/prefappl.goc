@@ -423,14 +423,20 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_NOTIFY_FILE_CHANGE
 {
-    if ((notifyType == FCNT_CREATE) ||
-        (notifyType == FCNT_DELETE) ||
-        (notifyType == FCNT_RENAME) ||
-        (notifyType == FCNT_BATCH)) {
+    Boolean shouldQueueRefresh;
+
+    shouldQueueRefresh = ((notifyType == FCNT_CREATE) ||
+                          (notifyType == FCNT_DELETE) ||
+                          (notifyType == FCNT_RENAME) ||
+                          (notifyType == FCNT_BATCH));
+    /*
+     * Notifications are forwarded by PrefMgr while it still owns the
+     * notification data block (BP). Do not call MetaClass here, or it would
+     * attempt to dec-ref a handle owned by the forwarder.
+     */
+    if (shouldQueueRefresh) {
         @call oself::MSG_PREF_APPL_QUEUE_REFRESH();
     }
-
-    @callsuper();
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
