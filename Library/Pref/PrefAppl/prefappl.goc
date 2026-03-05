@@ -50,12 +50,12 @@ static const char prefApplStatusTextOk[] =
     "Ready.";
 static const char prefApplEnabledText[] =
     "Application enabled.";
-static const char prefApplEnablePartialFailureText[] =
-    "Application enable finished with errors.";
+static const char prefApplEnableFailedText[] =
+    "Application enable failed.";
 static const char prefApplDisabledText[] =
     "Application disabled.";
-static const char prefApplDisablePartialFailureText[] =
-    "Application disable finished with errors.";
+static const char prefApplDisableFailedText[] =
+    "Application disable failed.";
 
 #define PREF_APPL_ICON_TEXT_SPACING 4
 #define PREF_APPL_MAX_ICON_WIDTH 20
@@ -612,10 +612,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     const char *statusMessage;
     word disabledSelection;
     word appIndex;
-    Boolean hadErrors;
+    Boolean actionSucceeded;
 
     disabledSelection = @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    hadErrors = FALSE;
 
     if ((disabledSelection == GIGS_NONE) ||
         !PrefApplMapDisabledIndexToApplicationIndex(disabledSelection, &appIndex) ||
@@ -624,12 +623,10 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
-    statusMessage = prefApplEnabledText;
-    if (!PrefApplCreateApplicationLink(&record)) {
-        hadErrors = TRUE;
-    }
-    if (hadErrors) {
-        statusMessage = prefApplEnablePartialFailureText;
+    actionSucceeded = PrefApplCreateApplicationLink(&record);
+    statusMessage = prefApplEnableFailedText;
+    if (actionSucceeded) {
+        statusMessage = prefApplEnabledText;
     }
 
     paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
@@ -647,10 +644,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     const char *statusMessage;
     word linkedSelection;
     word appIndex;
-    Boolean hadErrors;
+    Boolean actionSucceeded;
 
     linkedSelection = @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
-    hadErrors = FALSE;
 
     if ((linkedSelection == GIGS_NONE) ||
         !PrefApplMapLinkedIndexToApplicationIndex(linkedSelection, &appIndex) ||
@@ -659,13 +655,10 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
-    statusMessage = prefApplDisabledText;
-
-    if (!PrefApplDeleteScannedLinksForToken(&record.PAAR_token)) {
-        hadErrors = TRUE;
-    }
-    if (hadErrors) {
-        statusMessage = prefApplDisablePartialFailureText;
+    statusMessage = prefApplDisableFailedText;
+    actionSucceeded = PrefApplDeleteScannedLinksForToken(&record.PAAR_token);
+    if (actionSucceeded) {
+        statusMessage = prefApplDisabledText;
     }
 
     paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
