@@ -16,8 +16,6 @@
 @include <token.h>
 
 #include "prefapplLow.h"
-#include <graphics.h>
-#include <gstring.h>
 #include <lmem.h>
 
 @class PrefApplDialogClass, PrefDialogClass;
@@ -468,15 +466,9 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     DisplayScheme displayScheme;
     DisplayType displayType;
     Handle destinationBlock;
-    GStateHandle listGString;
-    GStateHandle iconGString;
-    TokenMonikerInfo tokenMonikerInfo;
-    void *lockedMoniker;
-    VisMoniker *iconMoniker;
-    byte *iconData;
-    word textX;
-    word gstringChunk;
-    word element;
+    ChunkHandle iconMonikerChunk;
+    optr combinedMoniker;
+    word iconMonikerSize;
     Boolean foundToken;
 
     if (record == NULL) {
@@ -486,9 +478,8 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     @call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
     displayType = displayScheme.DS_displayType;
     destinationBlock = OptrToHandle(list);
-    element = 0;
 
-    foundToken = TokenLookupMoniker(
+    foundToken = TokenLoadMonikerChunk(
         TOKEN_CHARS(record->PAAR_token.GT_chars[0],
                     record->PAAR_token.GT_chars[1],
                     record->PAAR_token.GT_chars[2],
@@ -496,50 +487,40 @@ PrefApplReplaceListItemMoniker(optr list, word item,
         record->PAAR_token.GT_manufID,
         displayType,
         VMSF_GSTRING | (VMS_TOOL << VMSF_STYLE_OFFSET),
-        &tokenMonikerInfo
+        destinationBlock,
+        &iconMonikerSize,
+        &iconMonikerChunk
     );
     if (!foundToken) {
         @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
         return;
     }
 
-    lockedMoniker = TokenLockTokenMoniker(tokenMonikerInfo);
-    if (lockedMoniker == NULL) {
+    combinedMoniker = UserCreateIconTextMoniker(
+        (optr)record->PAAR_name,
+        ConstructOptr(destinationBlock, iconMonikerChunk),
+        destinationBlock,
+        PREF_APPL_ICON_TEXT_SPACING,
+        CITMF_TEXT_IS_FPTR
+    );
+
+    if (combinedMoniker == 0) {
+        LMemFree(ConstructOptr(destinationBlock, iconMonikerChunk));
         @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
         return;
     }
 
-    iconMoniker = (VisMoniker *)LMemDeref((optr)lockedMoniker);
-    if (iconMoniker == NULL) {
-        TokenUnlockTokenMoniker(lockedMoniker);
-        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
-        return;
-    }
-
-    listGString = GrCreateGString(destinationBlock, GST_CHUNK, &gstringChunk);
-    iconData = (byte *)iconMoniker + sizeof(VisMonikerWithGString);
-    iconGString = GrLoadGString(PtrToSegment(iconData), GST_PTR,
-                                PtrToOffset(iconData));
-    textX = iconMoniker->VM_width + PREF_APPL_ICON_TEXT_SPACING;
-    GrSaveState(listGString);
-    GrDrawGString(listGString, iconGString, 0, 1, 0, &element);
-    GrRestoreState(listGString);
-    GrDestroyGString(iconGString, listGString, GSKT_LEAVE_DATA);
-    TokenUnlockTokenMoniker(lockedMoniker);
-
-    GrDrawText(listGString, textX, 1, record->PAAR_name, 0);
-    GrEndGString(listGString);
     @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
         item,
         0,
         0,
         0,
         0,
-        VMDT_GSTRING,
+        VMDT_VIS_MONIKER,
         VMST_OPTR,
-        ConstructOptr(destinationBlock, gstringChunk)
+        (dword)combinedMoniker
     );
-    GrDestroyGString(listGString, 0, GSKT_KILL_DATA);
+    LMemFree(combinedMoniker);
 }
 
 @method PrefApplDialogClass, MSG_PREF_APPL_LEFT_LIST_MONIKER_QUERY
