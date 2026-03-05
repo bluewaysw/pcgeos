@@ -1,0 +1,47 @@
+Create a new geode under `Appl/Startup/WorldSeed` (or repo-conventional startup location) that runs headlessly during startup/update orchestration and is independent from `PrefAppl`.
+
+1. Add a startup entry module (`main` process) that:
+
+   * loads previous state from a hidden file (e.g., `lastInstalled` token set),
+   * scans `DISTAPPL` for launchable apps,
+   * extracts each app’s `GeodeToken`,
+   * computes `newTokens = scannedTokens - storedTokens`,
+   * attempts link creation in top-level WORLD (flat placement) for each new token,
+   * persists updated state only after processing.
+
+2. Reuse/adapt existing app-discovery logic currently used by `PrefAppl` (search for DISTAPPL iteration code in `Library/Pref/PrefAppl`), but keep WorldSeed fully decoupled from PrefAppl UI classes.
+
+3. Implement state-file helpers (`WorldSeedStateRead`, `WorldSeedStateWrite`) with robust format:
+
+   * header with magic + version + record count,
+   * records keyed by `GeodeToken`,
+   * optional stored target geode filename/path for diagnostics,
+   * atomic write (temp file then replace),
+   * treat missing/corrupt file as first-run (`storedTokens = empty`).
+
+4. Implement link creation helper (`WorldSeedEnsureLinkForToken`) with idempotent behavior:
+
+   * if matching link already exists, treat as success,
+   * if missing, create link,
+   * on failure (missing target, collision, API error), do not add token to persisted set.
+
+5. Persist only successfully handled new tokens:
+
+   * `updatedTokens = storedTokens U succeededNewTokens`,
+   * never add failed tokens, so they are retried on next run,
+   * never remove tokens from state just because app/link disappeared later.
+
+6. Keep non-destructive guarantees:
+
+   * do not reorder/move/rename/delete existing WORLD items,
+   * do not recreate links for tokens already in stored state,
+   * no suppression logic required (deleted old links remain deleted because token remains in stored state).
+
+7. Integrate into startup/update sequence under `Appl/Startup` so it runs on fresh install and after upgrades, with minimal/no user-visible UI and no coupling to PrefAppl dialogs.
+
+8. Add code comments documenting explicit policy:
+
+   * source of truth for “newness” is `storedTokens` vs current DISTAPPL scan,
+   * identity is `GeodeToken`,
+   * placement is flat WORLD by design,
+   * state advances only on successful link handling.
