@@ -58,6 +58,8 @@ static const char prefApplDisablePartialFailureText[] =
     "Application disable finished with errors.";
 
 #define PREF_APPL_ICON_TEXT_SPACING 4
+#define PREF_APPL_MAX_ICON_WIDTH 20
+#define PREF_APPL_MAX_ICON_HEIGHT 20
 
 @start MONIKERRESOURCE, data;
 
@@ -467,6 +469,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     DisplayType displayType;
     Handle destinationBlock;
     ChunkHandle iconMonikerChunk;
+    VisMonikerWithGString *iconMoniker;
     optr combinedMoniker;
     word iconMonikerSize;
     Boolean foundToken;
@@ -492,6 +495,21 @@ PrefApplReplaceListItemMoniker(optr list, word item,
         &iconMonikerChunk
     );
     if (!foundToken) {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
+        return;
+    }
+
+    iconMoniker = (VisMonikerWithGString *)
+        LMemDerefHandles(destinationBlock, iconMonikerChunk);
+    if ((iconMoniker == NULL) ||
+        !(iconMoniker->VMWGS_common.VM_type & VMT_GSTRING) ||
+        (iconMonikerSize == 0) ||
+        (iconMoniker->VMWGS_common.VM_width == 0) ||
+        (iconMoniker->VMWGS_height == 0) ||
+        (iconMoniker->VMWGS_common.VM_width > PREF_APPL_MAX_ICON_WIDTH) ||
+        (iconMoniker->VMWGS_height > PREF_APPL_MAX_ICON_HEIGHT) ||
+        (iconMoniker->VMWGS_common.VM_width > (iconMoniker->VMWGS_height * 2))) {
+        LMemFree(ConstructOptr(destinationBlock, iconMonikerChunk));
         @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, (char *)record->PAAR_name);
         return;
     }
