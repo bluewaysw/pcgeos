@@ -909,6 +909,8 @@ Boolean
 PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
 {
     PathName targetPath;
+    PathName existingTargetPath;
+    DiskHandle targetDisk;
     word fileError;
 
     if (!PrefApplBuildDistApplTargetPath(record, targetPath,
@@ -922,9 +924,22 @@ PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
     fileError = FileCreateLink(record->PAAR_name,
                                PREF_APPL_DISTAPPL_STANDARD_PATH,
                                targetPath, 0);
+
+    if (fileError == ERROR_FILE_EXISTS) {
+        targetDisk = FileReadLink(record->PAAR_name, existingTargetPath);
+        FilePopDir();
+        if (targetDisk == NullHandle) {
+            return FALSE;
+        }
+        return (FileComparePaths(existingTargetPath, targetDisk,
+                                 targetPath,
+                                 PREF_APPL_DISTAPPL_STANDARD_PATH) ==
+                PCT_EQUAL);
+    }
+
     FilePopDir();
 
-    if ((fileError != 0) && (fileError != ERROR_FILE_EXISTS)) {
+    if (fileError != 0) {
         return FALSE;
     }
 
