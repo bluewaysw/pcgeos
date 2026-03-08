@@ -1,252 +1,46 @@
-GOAL
-Create a dedicated startup/update geode that seeds and incrementally updates
-WORLD (SP_APPLICATION) application links (shortcuts) from a built-in list.
-This fixes the fresh-install case where no links exist yet,
-and supports upgrades by adding only newly introduced links while preserving
-any user rearrangements.
+### FirstRun WORLD Link Seeder - Implementation Plan
 
-SCOPE / NON-GOALS
+**Summary**
+- Build a new headless startup application in `Appl/FirstRun` that seeds and incrementally updates WORLD (`SP_APPLICATION`) links from the in-app chunk array in [appSeedList.goh](/home/konstantinmeyer/pcgeos/Appl/FirstRun/appSeedList.goh).
+- Use `firstRun:lastReleaseLevel` in `GEOS.INI` as the only persisted progress marker.
+- Keep `PrefAppl` read-only; only copy/adapt relevant low-level helper logic from [prefapplLow.goc](/home/konstantinmeyer/pcgeos/Library/Pref/PrefAppl/prefapplLow.goc).
+- Remove only `firstrun.geo` from `ui:execOnStartup` at the end of each run (always, regardless of errors).
 
-* In scope: A new geode under Appl/FirstRun/... that owns WORLD link seeding (initial + incremental).
-* Out of scope: Library/Pref/PrefAppl must NOT be used as the automatic startup/update seeder and
-should only be used as a read-only inspriation only. It may NOT be changed in any way.
-* Do not reorder, delete, or modify existing links that were introduced in earlier versions.
-* Do not touch unrelated links/items in WORLD.
+**Implementation Changes**
+- Create a minimal non-UI app geode (process class + app object) under `Appl/FirstRun` with `MSG_GEN_PROCESS_OPEN_APPLICATION` as entrypoint.
+- In the startup method, execute this deterministic sequence: read `lastReleaseLevel` (default `0`), process seed records, write updated `lastReleaseLevel`, remove `firstrun.geo` from `execOnStartup`, commit INI, quit app.
+- Add a seed-runner module that iterates `AppSeedRecords` and filters to `ASR_releaseLevel > lastReleaseLevel`.
+- Add EC/NC target-name resolver for record names: NC uses stored name, EC transforms by rule (`<8 => +ec`, `==8 => replace char 8 with e`).
+- For each candidate record, compute target path under `SP_SYSTEM\DISTAPPL`, verify target exists and is executable app, and read `FEA_NAME` to get link display name.
+- Resolve destination folder in WORLD: empty folder means root; non-empty means ensure folder exists under `SP_APPLICATION` (create if missing; skip silently if creation fails).
+- Implement `EnsureLinkExists` behavior: if an existing link in destination folder already resolves to the same target path, treat as success and do nothing; otherwise attempt create via `FileCreateLink`.
+- Handle collisions/errors exactly as non-fatal skip: missing target app, create-link API failure, non-link item with desired display name, unresolved/invalid link target.
+- Track highest release level with at least one successful record in this run and write that value back as `lastReleaseLevel` (partial-advance policy).
+- Add startup cleanup helper that enumerates `ui:execOnStartup` string sections and deletes sections exactly equal to `firstrun.geo`.
+- Add product integration entry in [bbxensem.filetree](/home/konstantinmeyer/pcgeos/Tools/build/product/bbxensem/bbxensem.filetree) so `firstrun.geo` is included in the shipped image (place with other startup/system apps, not in WORLD links).
 
-TERMS
+**Public Interfaces / Contracts**
+- `GEOS.INI` contract:
+  - Category: `firstRun`
+  - Key: `lastReleaseLevel` (`word` integer; invalid/missing => `0`)
+- Startup cleanup contract:
+  - Category: `ui`
+  - Key: `execOnStartup`
+  - Remove string section value: `firstrun.geo` only
+- Seed schema remains `AppSeedRecord { releaseLevel, folder, name }`; records are append-only across releases.
 
-* "WORLD": the top-level desktop folder tree (with subfolders like Extras, Games, etc.) aka SP_APPLICATION
-* "Link": a link created with FileCreateLink, see fileLink.asm for source and the PrefAppl Pref module
-for usage details.
+**Test Plan**
+- Fresh install test: no `firstRun:lastReleaseLevel`, empty WORLD app links, run FirstRun, verify all release `>0` entries are linked into expected folders and INI updated.
+- Upgrade test: set `lastReleaseLevel` to prior value, include new higher-level records, run FirstRun, verify only new levels are considered and old links remain untouched.
+- Idempotency test: run twice with unchanged record list and same INI value, verify second run produces no filesystem changes.
+- Existing-link test: precreate matching link target in destination folder, verify record is treated as success with no duplicate link.
+- Missing-folder test: remove `Desk Accessories/Games/Extras`, verify creation is attempted and seeding continues if creation fails.
+- Missing-target test: remove one `DISTAPPL` target geode, verify skip without dead link and run continues.
+- Name-collision test: create non-link item using desired display name, verify no overwrite/delete and run continues.
+- Partial-advance test: mix success/failure within same release level, verify `lastReleaseLevel` advances to highest level with at least one success.
+- Startup-cleanup test: add `firstrun.geo` to `ui:execOnStartup`, run app, verify entry removed even when some seed operations fail.
 
-DATA MODEL (IN-APP RECORD LIST)
-Store the complete list of seedable application links as an in-app @chunkArray (resource data),
-NOT as external text/config files.
-
-Define a record struct (minimum fields):
-
-* releaseLevel: monotonically increasing integer (word) indicating the distribution version where
-this link first appears
-* folder: which WORLD folder receives the link (e.g., Extras, Games, ...) if it does not already exist
-* name: the permanent name of the geode to link to, written in a notation like this:
-"clock" (it is the name used in GEOS *.gp files with the "name" keyword)
-
-Record list requirements:
-
-* Records must be stable and deterministic.
-* Multiple records may share the same releaseLevel (of course).
-
-PERSISTED STATE (GEOS.INI CONTRACT)
-Persist progress in GEOS.INI so the seeder can be re-run safely and can decide what to add.
-
-Define:
-
-* Category: firstRun
-* Key: lastReleaseLevel (integer) - this is what we installed last
-
-Default behavior:
-
-* If the key is missing or invalid, treat as 0 (fresh install). That causes all records with releaseLevel > 0
-to be considered.
-
-INSTALL / UPDATE SEMANTICS (CORE ALGORITHM)
-On each run:
-
-1. Read releaseLevel from GEOS.INI (default 0).
-2. Iterate the in-app record list and consider only records where releaseLevel > lastReleaseLevel.
-3. For each such record, attempt to ensure the link exists in the requested WORLD subfolder:
-   * If the link already exists (same target), treat as success and do nothing.
-   * If it does not exist, create it.
-   * see PrefAppl on how to create links, with one difference: the link target must be the permanent geos name
-   we stored in the list. Hower we can't use it directly because we must check if we are running under
-   EC or NC builds of the software. In NC builds we can use it directly, but in EC we must convert it
-   like this (ncBase = name):
-     if len(ncBase) < 8: return ncBase + "ec"
-     if len(ncBase) == 8: return ncBase[0:7] + "e"   // 8.3-style compromise
-    We use the GEOS long file name as the name for the link. The GEOS long file name canbe determined by getting
-    the files extended attributes from the application file in the DISTAPPL folder (see PrefAppl)
-4. Do NOT modify any record/link with releaseLevel <= lastReleaselevel (no recreate, no rename, no reorder, no moving).
-5. After processing, write back lastReleaseLevel according to the partial-success policy below.
-6. Finally, no matter if errors occured, remove the application from the execOnStartup INI key - the app should only
-ever run once automatically.
-
-IDEMPOTENCY
-
-* Running the geode multiple times at the same system version must result in no changes after the first successful run.
-* Creating a link must be safe against duplicates; do not create a second link if an identical one already exists.
-
-ERROR HANDLING + PARTIAL-SUCCESS POLICY
-Define behavior for these cases (must be implemented deterministically):GOAL
-Create a dedicated startup/update geode that seeds and incrementally updates
-WORLD (SP_APPLICATION) application links (shortcuts) from a built-in list.
-This fixes the fresh-install case where no links exist yet,
-and supports upgrades by adding only newly introduced links while preserving
-any user rearrangements.
-
-SCOPE / NON-GOALS
-
-* In scope: A new geode under Appl/FirstRun/... that owns WORLD link seeding (initial + incremental).
-* Out of scope: Library/Pref/PrefAppl must NOT be used as the automatic startup/update seeder and
-should only be used as a read-only inspriation only. It may NOT be changed in any way.
-* Do not reorder, delete, or modify existing links that were introduced in earlier versions.
-* Do not touch unrelated links/items in WORLD.
-
-TERMS
-
-* "WORLD": the top-level desktop folder tree (with subfolders like Extras, Games, etc.) aka SP_APPLICATION
-* "Link": a link created with FileCreateLink, see fileLink.asm for source and the PrefAppl Pref module
-for usage details.
-
-DATA MODEL (IN-APP RECORD LIST)
-Store the complete list of seedable application links as an in-app @chunkArray (resource data),
-NOT as external text/config files.
-
-Define a record struct (minimum fields):
-
-* releaseLevel: monotonically increasing integer (word) indicating the distribution version where
-this link first appears
-* folder: which WORLD folder receives the link (e.g., Extras, Games, ...) if it does not already exist
-* name: the permanent name of the geode to link to, written in a notation like this:
-"clock" (it is the name used in GEOS *.gp files with the "name" keyword)
-
-Record list requirements:
-
-* Records must be stable and deterministic.
-* Multiple records may share the same releaseLevel (of course).
-
-PERSISTED STATE (GEOS.INI CONTRACT)
-Persist progress in GEOS.INI so the seeder can be re-run safely and can decide what to add.
-
-Define:
-
-* Category: firstRun
-* Key: lastReleaseLevel (integer) - this is what we installed last
-
-Default behavior:
-
-* If the key is missing or invalid, treat as 0 (fresh install). That causes all records with releaseLevel > 0
-to be considered.
-
-INSTALL / UPDATE SEMANTICS (CORE ALGORITHM)
-On each run:
-
-1. Read releaseLevel from GEOS.INI (default 0).
-2. Iterate the in-app record list and consider only records where releaseLevel > lastReleaseLevel.
-3. For each such record, attempt to ensure the link exists in the requested WORLD subfolder:
-   * If the link already exists (same target), treat as success and do nothing.
-   * If it does not exist, create it.
-   * see PrefAppl on how to create links, with one difference: the link target must be the permanent geos name
-   we stored in the list. Hower we can't use it directly because we must check if we are running under
-   EC or NC builds of the software. In NC builds we can use it directly, but in EC we must convert it
-   like this (ncBase = name):
-     if len(ncBase) < 8: return ncBase + "ec"
-     if len(ncBase) == 8: return ncBase[0:7] + "e"   // 8.3-style compromise
-    We use the GEOS long file name as the name for the link. The GEOS long file name canbe determined by getting
-    the files extended attributes from the application file in the DISTAPPL folder (see PrefAppl)
-4. Do NOT modify any record/link with releaseLevel <= lastReleaselevel (no recreate, no rename, no reorder, no moving).
-5. After processing, write back lastReleaseLevel according to the partial-success policy below.
-6. Finally, no matter if errors occured, remove the application from the execOnStartup INI key - the app should only
-ever run once automatically.
-
-IDEMPOTENCY
-
-* Running the geode multiple times at the same system version must result in no changes after the first successful run.
-* Creating a link must be safe against duplicates; do not create a second link if an identical one already exists.
-
-ERROR HANDLING + PARTIAL-SUCCESS POLICY
-Define behavior for these cases (must be implemented deterministically):
-* Target WORLD subfolder missing: this should never happen, so we don't care about that.
-* missing subfolders in WORLD should be created, if we can't create them, skip silently.
-* Target geode missing/unavailable:
-  * Do not create a dead/broken link, continue.
-* Link creation fails (API error):
-  * Ignore, Continue
-* Name collision (a non-link item already exists with the desired displayName):
-  * Do not overwrite or delete the existing item, continue
-
-Version advancement policy (single lastReleaseLevel number):
-* If any record for version V fails, advance. It is okay to silently skip.
-* Update lastReleaseVersion to the app with the highest releaseLevel that succeeded.
-  On mixed success/failure in same releaseLevel advance to the highest releaseLevel.
-
-USER EXPERIENCE / LOGGING
-
-* No console logging. The geode is headless and should not be coupled to the PrefAppl UI. It should run silently
-and exit on completion.
-
-INTEGRATION TRIGGER POINT
-
-* No UI integration, i will add this application manually to execOnStartup.
-
-ACCEPTANCE CRITERIA
-
-1. Fresh install (no links exist):
-   * After executing the FirtRun application, WORLD contains the predefined links in the intended subfolders
-   for all records up to current distribution version.
-   * lastReleaseLevel is written and reflects the highest fully processed releaseLevel.
-2. Upgrade from an older install:
-   * Only links with releaseLevel > stored lastReleaseLevel are added.
-   * Any existing user-rearranged older links remain untouched (no moves, no renames, no reorder, no recreate).
-3. Re-run behavior:
-   * Re-running with unchanged record list and same lastReleaseLevel performs no changes.
-4. Failure behavior:
-   * If a record for version V cannot be installed, skip.
-
-FILE-LEVEL IMPLEMENTATION MAP (PROPOSED)
-
-* New geode directory: Appl/FirstRun
-* Core files:
-  * main process module: handles startup entry, calls seed routine, exits
-  * record list resource: @chunkArray containing AppSeedRecord entries
-  * helper module: helpers for reading/writing lastReleaseLevel,
-    locate/create WORLD subfolders, detect existing link, create links etc.
-    Copy helpers from PrefAppl/prefapplLow.goc to FirstRun if needed.
-* Keep PrefAppl unchanged.
-
-* Target WORLD subfolder missing: this should never happen, so we don't care about that.
-* missing subfolders in WORLD should be created, if we can't create them, skip silently.
-* Target geode missing/unavailable:
-  * Do not create a dead/broken link, continue.
-* Link creation fails (API error):
-  * Ignore, Continue
-* Name collision (a non-link item already exists with the desired displayName):
-  * Do not overwrite or delete the existing item, continue
-
-Version advancement policy (single lastReleaseLevel number):
-* If any record for version V fails, advance. It is okay to silently skip.
-* Update lastReleaseVersion to the app with the highest releaseLevel that succeeded.
-  On mixed success/failure in same releaseLevel advance to the highest releaseLevel.
-
-USER EXPERIENCE / LOGGING
-
-* No console logging. The geode is headless and should not be coupled to the PrefAppl UI. It should run silently
-and exit on completion.
-
-INTEGRATION TRIGGER POINT
-
-* No UI integration, i will add this application manually to execOnStartup.
-
-ACCEPTANCE CRITERIA
-
-1. Fresh install (no links exist):
-   * After executing the FirtRun application, WORLD contains the predefined links in the intended subfolders
-   for all records up to current distribution version.
-   * lastReleaseLevel is written and reflects the highest fully processed releaseLevel.
-2. Upgrade from an older install:
-   * Only links with releaseLevel > stored lastReleaseLevel are added.
-   * Any existing user-rearranged older links remain untouched (no moves, no renames, no reorder, no recreate).
-3. Re-run behavior:
-   * Re-running with unchanged record list and same lastReleaseLevel performs no changes.
-4. Failure behavior:
-   * If a record for version V cannot be installed, skip.
-
-FILE-LEVEL IMPLEMENTATION MAP (PROPOSED)
-
-* New geode directory: Appl/FirstRun
-* Core files:
-  * main process module: handles startup entry, calls seed routine, exits
-  * record list resource: @chunkArray containing AppSeedRecord entries
-  * helper module: helpers for reading/writing lastReleaseLevel,
-    locate/create WORLD subfolders, detect existing link, create links etc.
-    Copy helpers from PrefAppl/prefapplLow.goc to FirstRun if needed.
-* Keep PrefAppl unchanged.
+**Assumptions**
+- Removal from startup is exact-match on `firstrun.geo` only, per your instruction.
+- Version policy is partial advance (selected): advance INI to the highest release level with any successful record in the run.
+- No logging/UI reporting is added; app runs silently and exits.
