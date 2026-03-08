@@ -76,11 +76,11 @@ FirstRunSafeCopy(char *dest, word destSize, const char *src)
 }
 
 static void
-FirstRunBuildTargetDosNames(const char *seedName,
-                            char *targetDosName,
-                            word targetDosNameSize,
-                            char *ecTargetDosName,
-                            word ecTargetDosNameSize)
+FirstRunBuildCandidateTargetDosNames(const char *seedName,
+                                     char *targetDosName,
+                                     word targetDosNameSize,
+                                     char *ecTargetDosName,
+                                     word ecTargetDosNameSize)
 {
     word targetCoreLen;
 
@@ -108,11 +108,11 @@ FirstRunBuildTargetDosNames(const char *seedName,
 }
 
 static Boolean
-FirstRunResolveDistApplTarget(char *targetDosName,
-                              word targetDosNameSize,
-                              const char *ecTargetDosName,
-                              PathName targetPath,
-                              FileLongName linkName)
+FirstRunResolveDistApplLinkTarget(char *targetDosName,
+                                  word targetDosNameSize,
+                                  const char *ecTargetDosName,
+                                  PathName targetPath,
+                                  FileLongName linkName)
 {
     Boolean resolved = FALSE;
     GeosFileType fileType;
@@ -280,7 +280,7 @@ FirstRunEnsureApplicationFolder(const char *folderPath, PathName normalizedFolde
 }
 
 static Boolean
-FirstRunCreateWorldLink(FileLongName linkName,
+FirstRunEnsureWorldLink(FileLongName linkName,
                         PathName targetPath,
                         PathName normalizedFolderPath)
 {
@@ -324,7 +324,7 @@ FirstRunCreateWorldLink(FileLongName linkName,
 }
 
 static word
-FirstRunSeedPendingApplications(word lastReleaseLevel)
+FirstRunSeedPendingAppLinks(word lastReleaseLevel)
 {
     word newReleaseLevel;
     word index;
@@ -361,19 +361,19 @@ FirstRunSeedPendingApplications(word lastReleaseLevel)
 
             // Probe the likely DOS filenames in DISTAPPL using the seed
             // name directly first, then the EC-adjusted DOS core form.
-            FirstRunBuildTargetDosNames(record->ASR_name,
-                                        targetDosName,
-                                        sizeof(targetDosName),
-                                        ecTargetDosName,
-                                        sizeof(ecTargetDosName));
+            FirstRunBuildCandidateTargetDosNames(record->ASR_name,
+                                                 targetDosName,
+                                                 sizeof(targetDosName),
+                                                 ecTargetDosName,
+                                                 sizeof(ecTargetDosName));
 
             // Validate that the resolved DISTAPPL target exists and is an
             // executable application before creating a WORLD link for it.
-            if (!FirstRunResolveDistApplTarget(targetDosName,
-                                               sizeof(targetDosName),
-                                               ecTargetDosName,
-                                               targetPath,
-                                               linkName)) {
+            if (!FirstRunResolveDistApplLinkTarget(targetDosName,
+                                                   sizeof(targetDosName),
+                                                   ecTargetDosName,
+                                                   targetPath,
+                                                   linkName)) {
                 break;
             }
 
@@ -386,7 +386,7 @@ FirstRunSeedPendingApplications(word lastReleaseLevel)
 
             // Create the WORLD link in the destination folder, or accept
             // an existing link only when it already targets this app.
-            if (!FirstRunCreateWorldLink(linkName,
+            if (!FirstRunEnsureWorldLink(linkName,
                                          targetPath,
                                          normalizedFolderPath)) {
                 break;
@@ -424,7 +424,7 @@ FirstRunSeedPendingApplications(word lastReleaseLevel)
         lastReleaseLevel = 0;
     }
 
-    newReleaseLevel = FirstRunSeedPendingApplications(lastReleaseLevel);
+    newReleaseLevel = FirstRunSeedPendingAppLinks(lastReleaseLevel);
 
     // Persist the highest completed release level and stop auto-running after
     // this seeding pass.
