@@ -13,6 +13,7 @@
 #include <chunkarr.h>
 #include <fileEnum.h>
 #include <geode.h>
+#include <geoMisc.h>
 #include <initfile.h>
 #include <Ansi/string.h>
 
@@ -22,6 +23,20 @@
 #define FIRST_RUN_UI_EXEC_ON_STARTUP "execOnStartup"
 #define FIRST_RUN_GEODE_NAME "firstrun.geo"
 #define FIRST_RUN_DISTAPPL_RELATIVE_PATH "DISTAPPL"
+
+typedef enum {
+    FIRST_RUN_WARNING_DISTAPPL_PATH_FAILED = 1,
+    FIRST_RUN_WARNING_DISTAPPL_ENUM_FAILED,
+    FIRST_RUN_WARNING_TARGET_NOT_FOUND,
+    FIRST_RUN_WARNING_TARGET_PATH_TOO_LONG,
+    FIRST_RUN_WARNING_TARGET_FILE_TYPE_ATTR_FAILED,
+    FIRST_RUN_WARNING_TARGET_NOT_EXECUTABLE,
+    FIRST_RUN_WARNING_TARGET_GEODE_ATTR_FAILED,
+    FIRST_RUN_WARNING_TARGET_NOT_APPLICATION,
+    FIRST_RUN_WARNING_TARGET_NAME_ATTR_FAILED,
+    FIRST_RUN_WARNING_FOLDER_SETUP_FAILED,
+    FIRST_RUN_WARNING_LINK_SETUP_FAILED
+} FirstRunWarningCode;
 
 @class FirstRunProcessClass, GenProcessClass;
 @endc;
@@ -34,7 +49,7 @@
     GI_visMoniker = @list { @FirstRunTextMoniker };
 }
 
-@visMoniker FirstRunTextMoniker = "First Run Seeder";
+@visMoniker FirstRunTextMoniker = "FirstRun";
 
 @end AppResource;
 
@@ -60,348 +75,422 @@ FirstRunSafeCopy(char *dest, word destSize, const char *src)
     dest[destSize - 1] = '\0';
 }
 
-static Boolean
-FirstRunBuildChildPath(const char *basePath, const char *childName,
-                       char *destPath, word destSize)
-{
-    word baseLen;
-    word childLen;
-    word needed;
-
-    if ((destPath == NULL) || (destSize == 0) || (childName == NULL)) {
-        return FALSE;
-    }
-
-    if (basePath == NULL) {
-        basePath = "";
-    }
-
-    baseLen = strlen(basePath);
-    childLen = strlen(childName);
-
-    if (childLen == 0) {
-        return FALSE;
-    }
-
-    needed = childLen + 1;
-    if (baseLen != 0) {
-        needed = baseLen + 1 + childLen + 1;
-    }
-
-    if (needed > destSize) {
-        return FALSE;
-    }
-
-    if (baseLen == 0) {
-        strcpy(destPath, childName);
-    } else {
-        strcpy(destPath, basePath);
-        strcat(destPath, "\\");
-        strcat(destPath, childName);
-    }
-
-    return TRUE;
-}
-
 static void
-FirstRunResolveTargetName(const AppSeedRecord *record, FileLongName targetName)
+FirstRunBuildSeedDosCore(const AppSeedRecord *record,
+                         char *seedDosCore,
+                         word seedDosCoreSize,
+                         Boolean reserveEcSuffix)
 {
-    word len = 0;
+    word maxLen;
 
-    FirstRunSafeCopy(targetName, sizeof(FileLongName), record->ASR_name);
-
-#if ERROR_CHECK
-    len = strlen(targetName);
-    if (len < DOS_FILE_NAME_CORE_LENGTH) {
-        strcat(targetName, "ec");
-    } else if (len == DOS_FILE_NAME_CORE_LENGTH) {
-        targetName[DOS_FILE_NAME_CORE_LENGTH - 1] = 'e';
-    }
-#else
-    (void)len;
-#endif
-}
-
-static Boolean
-FirstRunLoadTargetInfo(const AppSeedRecord *record,
-                       PathName targetPath,
-                       FileLongName displayName)
-{
-    FileLongName targetName;
-    GeosFileType fileType;
-    GeodeAttrs geodeAttrs;
-
-    FirstRunResolveTargetName(record, targetName);
-    if (!FirstRunBuildChildPath(FIRST_RUN_DISTAPPL_RELATIVE_PATH,
-                                targetName,
-                                targetPath,
-                                sizeof(PathName))) {
-        return FALSE;
+    if ((seedDosCore == NULL) || (seedDosCoreSize == 0)) {
+        return;
     }
 
-    FilePushDir();
-    if (FileSetCurrentPath(SP_SYSTEM, FIRST_RUN_DISTAPPL_RELATIVE_PATH) == NullHandle) {
-        FilePopDir();
-        return FALSE;
-    }
-
-    if (FileGetPathExtAttributes(targetName,
-                                 FEA_FILE_TYPE,
-                                 &fileType,
-                                 sizeof(fileType)) != 0) {
-        FilePopDir();
-        return FALSE;
-    }
-    if (fileType != GFT_EXECUTABLE) {
-        FilePopDir();
-        return FALSE;
-    }
-
-    if (FileGetPathExtAttributes(targetName,
-                                 FEA_GEODE_ATTR,
-                                 &geodeAttrs,
-                                 sizeof(geodeAttrs)) != 0) {
-        FilePopDir();
-        return FALSE;
-    }
-    if ((geodeAttrs & GA_APPLICATION) == 0) {
-        FilePopDir();
-        return FALSE;
-    }
-
-    if (FileGetPathExtAttributes(targetName,
-                                 FEA_NAME,
-                                 displayName,
-                                 sizeof(FileLongName)) != 0) {
-        FilePopDir();
-        return FALSE;
-    }
-
-    FilePopDir();
-    return TRUE;
-}
-
-static Boolean
-FirstRunEnsureFolderExists(const char *relativeFolder)
-{
-    PathName pathCopy;
-    char *cursor;
-    char *next;
-
-    if ((relativeFolder == NULL) || (relativeFolder[0] == '\0')) {
-        return TRUE;
-    }
-
-    FirstRunSafeCopy(pathCopy, sizeof(PathName), relativeFolder);
-
-    cursor = pathCopy;
-    while (*cursor != '\0') {
-        if (*cursor == '/') {
-            *cursor = '\\';
-        }
-        cursor++;
-    }
-
-    FilePushDir();
-    FileSetStandardPath(SP_APPLICATION);
-
-    if (FileSetCurrentPath(0, pathCopy) != NullHandle) {
-        FilePopDir();
-        return TRUE;
-    }
-
-    cursor = pathCopy;
-    while (*cursor != '\0') {
-        while (*cursor == '\\') {
-            cursor++;
-        }
-
-        if (*cursor == '\0') {
-            break;
-        }
-
-        next = strchr(cursor, '\\');
-        if (next != NULL) {
-            *next = '\0';
-        }
-
-        if (FileSetCurrentPath(0, cursor) == NullHandle) {
-            if (FileCreateDir(cursor) != 0) {
-                FilePopDir();
-                return FALSE;
-            }
-            if (FileSetCurrentPath(0, cursor) == NullHandle) {
-                FilePopDir();
-                return FALSE;
-            }
-        }
-
-        if (next == NULL) {
-            break;
-        }
-
-        cursor = next + 1;
-    }
-
-    FilePopDir();
-    return TRUE;
-}
-
-static Boolean
-FirstRunSetDestinationFolder(const char *relativeFolder)
-{
-    if ((relativeFolder == NULL) || (relativeFolder[0] == '\0')) {
-        FileSetStandardPath(SP_APPLICATION);
-        return TRUE;
-    }
-
-    if (!FirstRunEnsureFolderExists(relativeFolder)) {
-        return FALSE;
-    }
-
-    FileSetStandardPath(SP_APPLICATION);
-    return (FileSetCurrentPath(0, relativeFolder) != NullHandle);
-}
-
-static Boolean
-FirstRunEnsureLinkExists(const char *relativeFolder,
-                         const char *linkName,
-                         const char *targetPath)
-{
-    word fileError;
-    PathName existingTargetPath;
-    DiskHandle existingTargetDisk;
-
-    FilePushDir();
-    if (!FirstRunSetDestinationFolder(relativeFolder)) {
-        FilePopDir();
-        return FALSE;
-    }
-
-    fileError = FileCreateLink(linkName, SP_SYSTEM, targetPath, 0);
-
-    if (fileError == ERROR_FILE_EXISTS) {
-        existingTargetDisk = FileReadLink(linkName, existingTargetPath);
-        FilePopDir();
-
-        if (existingTargetDisk == NullHandle) {
-            return FALSE;
-        }
-
-        return (FileComparePaths(existingTargetPath,
-                                 existingTargetDisk,
-                                 targetPath,
-                                 SP_SYSTEM) == PCT_EQUAL);
-    }
-
-    FilePopDir();
-    return (fileError == 0);
-}
-
-static Boolean
-FirstRunProcessRecord(const AppSeedRecord *record)
-{
-    PathName targetPath;
-    FileLongName linkName;
-
+    seedDosCore[0] = '\0';
     if (record == NULL) {
-        return FALSE;
+        return;
     }
 
-    if (!FirstRunLoadTargetInfo(record, targetPath, linkName)) {
-        return FALSE;
+    maxLen = DOS_FILE_NAME_CORE_LENGTH;
+    if (reserveEcSuffix && (maxLen > 2)) {
+        maxLen -= 2;
     }
 
-    if (!FirstRunEnsureFolderExists(record->ASR_folder)) {
-        return FALSE;
+    FirstRunSafeCopy(seedDosCore, seedDosCoreSize, record->ASR_name);
+    if (strlen(seedDosCore) > maxLen) {
+        seedDosCore[maxLen] = '\0';
     }
-
-    return FirstRunEnsureLinkExists(record->ASR_folder,
-                                    linkName,
-                                    targetPath);
 }
 
-static word
-FirstRunRunSeeder(word lastReleaseLevel)
+static Boolean
+FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
 {
-    word index;
-    word count;
-    word highestSucceededLevel;
-    AppSeedRecord *record;
-
-    highestSucceededLevel = lastReleaseLevel;
-
-    if (MemLock(HandleOf(@AppSeedRecords)) == NullHandle) {
-        return lastReleaseLevel;
-    }
-
-    count = ChunkArrayGetCount(@AppSeedRecords);
-    for (index = 0; index < count; index++) {
-        record = (AppSeedRecord *)ChunkArrayElementToPtr(@AppSeedRecords,
-                                                         index,
-                                                         NULL);
-        if (record == NULL) {
-            continue;
-        }
-
-        if (record->ASR_releaseLevel <= lastReleaseLevel) {
-            continue;
-        }
-
-        if (!FirstRunProcessRecord(record)) {
-            continue;
-        }
-
-        if (record->ASR_releaseLevel > highestSucceededLevel) {
-            highestSucceededLevel = record->ASR_releaseLevel;
-        }
-    }
-
-    MemUnlock(HandleOf(@AppSeedRecords));
-
-    return highestSucceededLevel;
-}
-
-static word
-FirstRunReadLastReleaseLevel(void)
-{
-    word lastReleaseLevel;
-
-    if (InitFileReadInteger(FIRST_RUN_INI_CATEGORY,
-                            FIRST_RUN_INI_KEY_LAST_RELEASE,
-                            &lastReleaseLevel)) {
-        return 0;
-    }
-
-    return lastReleaseLevel;
-}
-
-static void
-FirstRunWriteLastReleaseLevel(word newReleaseLevel)
-{
-    InitFileWriteInteger(FIRST_RUN_INI_CATEGORY,
-                         FIRST_RUN_INI_KEY_LAST_RELEASE,
-                         newReleaseLevel);
-}
-
-static void
-FirstRunRemoveSelfFromStartup(void)
-{
-    UserRemoveAutoExec(FIRST_RUN_GEODE_NAME);
+    EC_WARNING(warningCode);
+    (void)warningCode;
+    return FALSE;
 }
 
 @method FirstRunProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
     word lastReleaseLevel;
     word newReleaseLevel;
+    word index;
+    word count;
+    AppSeedRecord *record;
 
     @callsuper();
 
-    lastReleaseLevel = FirstRunReadLastReleaseLevel();
-    newReleaseLevel = FirstRunRunSeeder(lastReleaseLevel);
+    // Read the last completed release level; a missing key means nothing has
+    // been seeded yet.
+    if (InitFileReadInteger(FIRST_RUN_INI_CATEGORY,
+                            FIRST_RUN_INI_KEY_LAST_RELEASE,
+                            &lastReleaseLevel)) {
+        lastReleaseLevel = 0;
+    }
 
-    FirstRunWriteLastReleaseLevel(newReleaseLevel);
-    FirstRunRemoveSelfFromStartup();
+    newReleaseLevel = lastReleaseLevel;
+
+    if (MemLock(HandleOf(@AppSeedRecords)) != NullHandle) {
+        count = ChunkArrayGetCount(@AppSeedRecords);
+        for (index = 0; index < count; index++) {
+            PathName targetPath;
+            FileLongName linkName;
+            PathName normalizedFolderPath;
+            Boolean recordSucceeded = FALSE;
+
+            record = (AppSeedRecord *)ChunkArrayElementToPtr(@AppSeedRecords,
+                                                             index,
+                                                             NULL);
+            if (record == NULL) {
+                continue;
+            }
+
+            if (record->ASR_releaseLevel <= lastReleaseLevel) {
+                continue;
+            }
+
+            do {
+                FileEnumParams enumParams;
+                MemHandle enumBuffer = NullHandle;
+                FileLongName *enumNames = NULL;
+                word enumCount;
+                word enumIndex;
+                word numNoFit = 0;
+                Boolean found = FALSE;
+                char dosName[DOS_DOT_FILE_NAME_LENGTH_ZT];
+                FileLongName targetName;
+                GeosFileType fileType;
+                GeodeAttrs geodeAttrs;
+                word baseLen;
+                word childLen;
+                word needed;
+                word fileError;
+                PathName existingTargetPath;
+                DiskHandle existingTargetDisk;
+                char *cursor;
+                char *next;
+
+                // Locate the target executable in DISTAPPL and validate that it
+                // is still an application before creating a WORLD link for it.
+                FilePushDir();
+                if (FileSetCurrentPath(SP_SYSTEM,
+                                       FIRST_RUN_DISTAPPL_RELATIVE_PATH) ==
+                    NullHandle) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_DISTAPPL_PATH_FAILED);
+                    break;
+                }
+
+                memset(&enumParams, 0, sizeof(enumParams));
+                enumParams.FEP_searchFlags = FESF_GEOS_EXECS;
+                enumParams.FEP_returnAttrs = (FileExtAttrDesc *)FESRT_NAME;
+                enumParams.FEP_returnSize = sizeof(FileLongName);
+                enumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;
+
+                enumCount = FileEnum(&enumParams, &enumBuffer, &numNoFit);
+                if ((enumCount == 0) && (enumBuffer == NullHandle)) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_DISTAPPL_ENUM_FAILED);
+                    break;
+                }
+
+                if (enumBuffer != NullHandle) {
+                    enumNames = (FileLongName *)MemLock(enumBuffer);
+                }
+
+                if (enumNames != NULL) {
+                    for (enumIndex = 0; enumIndex < enumCount; enumIndex++) {
+                        char dosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
+                        char normalizedDosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
+                        char seedDosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
+                        char seedEcDosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
+                        word dosCoreLen = 0;
+
+                        if (FileGetPathExtAttributes(enumNames[enumIndex],
+                                                     FEA_GEODE_ATTR,
+                                                     &geodeAttrs,
+                                                     sizeof(geodeAttrs)) != 0) {
+                            continue;
+                        }
+
+                        if ((geodeAttrs & GA_APPLICATION) == 0) {
+                            continue;
+                        }
+
+                        if (FileGetPathExtAttributes(enumNames[enumIndex],
+                                                     FEA_DOS_NAME,
+                                                     dosName,
+                                                     sizeof(dosName)) != 0) {
+                            continue;
+                        }
+
+                        // Match the seed against the long name, DOS core, and
+                        // an optional EC-stripped DOS core.
+                        if (strcmpi(record->ASR_name, enumNames[enumIndex]) != 0) {
+                            while ((dosName[dosCoreLen] != '\0') &&
+                                   (dosName[dosCoreLen] != '.') &&
+                                   (dosCoreLen < (sizeof(dosCore) - 1))) {
+                                dosCore[dosCoreLen] = dosName[dosCoreLen];
+                                dosCoreLen++;
+                            }
+                            dosCore[dosCoreLen] = '\0';
+
+                            if (dosCore[0] == '\0') {
+                                continue;
+                            }
+
+                            FirstRunBuildSeedDosCore(record,
+                                                     seedDosCore,
+                                                     sizeof(seedDosCore),
+                                                     FALSE);
+                            if ((strcmpi(record->ASR_name, dosCore) != 0) &&
+                                (strcmpi(seedDosCore, dosCore) != 0)) {
+                                FirstRunSafeCopy(normalizedDosCore,
+                                                 sizeof(normalizedDosCore),
+                                                 dosCore);
+                                if ((dosCoreLen >= 2) &&
+                                    (((normalizedDosCore[dosCoreLen - 2] == 'e') ||
+                                      (normalizedDosCore[dosCoreLen - 2] == 'E')) &&
+                                     ((normalizedDosCore[dosCoreLen - 1] == 'c') ||
+                                      (normalizedDosCore[dosCoreLen - 1] == 'C')))) {
+                                    normalizedDosCore[dosCoreLen - 2] = '\0';
+                                }
+
+                                if (normalizedDosCore[0] == '\0') {
+                                    continue;
+                                }
+
+                                FirstRunBuildSeedDosCore(record,
+                                                         seedEcDosCore,
+                                                         sizeof(seedEcDosCore),
+                                                         TRUE);
+                                if ((strcmpi(record->ASR_name,
+                                             normalizedDosCore) != 0) &&
+                                    (strcmpi(seedDosCore,
+                                             normalizedDosCore) != 0) &&
+                                    (strcmpi(seedEcDosCore,
+                                             normalizedDosCore) != 0)) {
+                                    continue;
+                                }
+                            }
+                        }
+
+                        FirstRunSafeCopy(targetName,
+                                         sizeof(targetName),
+                                         enumNames[enumIndex]);
+                        found = TRUE;
+                        break;
+                    }
+
+                    MemUnlock(enumBuffer);
+                }
+
+                if (enumBuffer != NullHandle) {
+                    MemFree(enumBuffer);
+                }
+
+                if (!found) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_NOT_FOUND);
+                    break;
+                }
+
+                // Build "DISTAPPL\\<target>" after checking that the combined
+                // path still fits in a PathName buffer.
+                baseLen = strlen(FIRST_RUN_DISTAPPL_RELATIVE_PATH);
+                childLen = strlen(targetName);
+                needed = baseLen + 1 + childLen + 1;
+                if ((childLen == 0) || (needed > sizeof(targetPath))) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_PATH_TOO_LONG);
+                    break;
+                }
+                strcpy(targetPath, FIRST_RUN_DISTAPPL_RELATIVE_PATH);
+                strcat(targetPath, "\\");
+                strcat(targetPath, targetName);
+
+                if (FileGetPathExtAttributes(targetName,
+                                             FEA_FILE_TYPE,
+                                             &fileType,
+                                             sizeof(fileType)) != 0) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_FILE_TYPE_ATTR_FAILED);
+                    break;
+                }
+                if (fileType != GFT_EXECUTABLE) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_NOT_EXECUTABLE);
+                    break;
+                }
+
+                if (FileGetPathExtAttributes(targetName,
+                                             FEA_GEODE_ATTR,
+                                             &geodeAttrs,
+                                             sizeof(geodeAttrs)) != 0) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_GEODE_ATTR_FAILED);
+                    break;
+                }
+                if ((geodeAttrs & GA_APPLICATION) == 0) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_NOT_APPLICATION);
+                    break;
+                }
+
+                if (FileGetPathExtAttributes(targetName,
+                                             FEA_NAME,
+                                             linkName,
+                                             sizeof(linkName)) != 0) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_TARGET_NAME_ATTR_FAILED);
+                    break;
+                }
+
+                FilePopDir();
+
+                normalizedFolderPath[0] = '\0';
+
+                // Ensure the destination folder exists under SP_APPLICATION,
+                // creating any missing intermediate directories in order.
+                if ((record->ASR_folder != NULL) &&
+                    (record->ASR_folder[0] != '\0')) {
+                    PathName folderPathCopy;
+                    Boolean folderReady = TRUE;
+
+                    FirstRunSafeCopy(normalizedFolderPath,
+                                     sizeof(normalizedFolderPath),
+                                     record->ASR_folder);
+
+                    cursor = normalizedFolderPath;
+                    while (*cursor != '\0') {
+                        if (*cursor == '/') {
+                            *cursor = '\\';
+                        }
+                        cursor++;
+                    }
+
+                    FilePushDir();
+                    FileSetStandardPath(SP_APPLICATION);
+
+                    if (FileSetCurrentPath(0, normalizedFolderPath) ==
+                        NullHandle) {
+                        FirstRunSafeCopy(folderPathCopy,
+                                         sizeof(folderPathCopy),
+                                         normalizedFolderPath);
+
+                        cursor = folderPathCopy;
+                        while (*cursor != '\0') {
+                            while (*cursor == '\\') {
+                                cursor++;
+                            }
+
+                            if (*cursor == '\0') {
+                                break;
+                            }
+
+                            next = strchr(cursor, '\\');
+                            if (next != NULL) {
+                                *next = '\0';
+                            }
+
+                            if (FileSetCurrentPath(0, cursor) == NullHandle) {
+                                if (FileCreateDir(cursor) != 0) {
+                                    folderReady = FALSE;
+                                    break;
+                                }
+                                if (FileSetCurrentPath(0, cursor) ==
+                                    NullHandle) {
+                                    folderReady = FALSE;
+                                    break;
+                                }
+                            }
+
+                            if (next == NULL) {
+                                break;
+                            }
+
+                            cursor = next + 1;
+                        }
+                    }
+
+                    FilePopDir();
+
+                    if (!folderReady) {
+                        (void)FirstRunWarningAndReturnFalse(
+                            FIRST_RUN_WARNING_FOLDER_SETUP_FAILED);
+                        break;
+                    }
+                }
+
+                // Create the WORLD link in the destination folder, or accept
+                // an existing link only when it already targets this app.
+                FilePushDir();
+                FileSetStandardPath(SP_APPLICATION);
+                if ((normalizedFolderPath[0] != '\0') &&
+                    (FileSetCurrentPath(0, normalizedFolderPath) ==
+                     NullHandle)) {
+                    FilePopDir();
+                    (void)FirstRunWarningAndReturnFalse(
+                        FIRST_RUN_WARNING_LINK_SETUP_FAILED);
+                    break;
+                }
+
+                fileError = FileCreateLink(linkName, SP_SYSTEM, targetPath, 0);
+
+                if (fileError == ERROR_FILE_EXISTS) {
+                    existingTargetDisk = FileReadLink(linkName,
+                                                      existingTargetPath);
+                    FilePopDir();
+
+                    if ((existingTargetDisk == NullHandle) ||
+                        (FileComparePaths(existingTargetPath,
+                                          existingTargetDisk,
+                                          targetPath,
+                                          SP_SYSTEM) != PCT_EQUAL)) {
+                        (void)FirstRunWarningAndReturnFalse(
+                            FIRST_RUN_WARNING_LINK_SETUP_FAILED);
+                        break;
+                    }
+                } else {
+                    FilePopDir();
+                    if (fileError != 0) {
+                        (void)FirstRunWarningAndReturnFalse(
+                            FIRST_RUN_WARNING_LINK_SETUP_FAILED);
+                        break;
+                    }
+                }
+
+                recordSucceeded = TRUE;
+            } while (0);
+
+            if (!recordSucceeded) {
+                continue;
+            }
+
+            if (record->ASR_releaseLevel > newReleaseLevel) {
+                newReleaseLevel = record->ASR_releaseLevel;
+            }
+        }
+
+        MemUnlock(HandleOf(@AppSeedRecords));
+    }
+
+    // Persist the highest completed release level and stop auto-running after
+    // this seeding pass.
+    InitFileWriteInteger(FIRST_RUN_INI_CATEGORY,
+                         FIRST_RUN_INI_KEY_LAST_RELEASE,
+                         newReleaseLevel);
+    UserRemoveAutoExec(FIRST_RUN_GEODE_NAME);
     InitFileCommit();
 
     @send, forceQueue application::MSG_META_QUIT();
