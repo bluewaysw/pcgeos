@@ -181,13 +181,15 @@ PrefApplCreateApplicationRecordArray(void)
 }
 
 static Boolean
-PrefApplAppendApplicationRecord(const char *appName, const GeodeToken *token)
+PrefApplAppendApplicationRecord(const char *appName, const char *linkName,
+                                const GeodeToken *token)
 {
     PrefApplApplicationRecord *record;
 
     if ((prefApplAppDataBlock == NullHandle) ||
         (prefApplAppArray == NullChunk) ||
         (appName == NULL) ||
+        (linkName == NULL) ||
         (token == NULL)) {
         return FALSE;
     }
@@ -201,6 +203,8 @@ PrefApplAppendApplicationRecord(const char *appName, const GeodeToken *token)
     memset(record, 0, sizeof(*record));
     memcpy(&record->PAAR_token, token, sizeof(*token));
     PrefApplSafeCopy(record->PAAR_name, sizeof(record->PAAR_name), appName);
+    PrefApplSafeCopy(record->PAAR_linkName, sizeof(record->PAAR_linkName),
+                     linkName);
     record->PAAR_selected = FALSE;
     return TRUE;
 }
@@ -233,6 +237,7 @@ PrefApplScanDistApplDirectory(void)
     GeosFileType fileType;
     GeodeAttrs geodeAttrs;
     GeodeToken token;
+    DosDotFileName dosName;
     Boolean success;
 
     if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
@@ -298,7 +303,13 @@ PrefApplScanDistApplDirectory(void)
                 continue;
             }
 
-            if (!PrefApplAppendApplicationRecord(entry[i].FENAA_name, &token)) {
+            if (FileGetPathExtAttributes(entry[i].FENAA_name, FEA_DOS_NAME,
+                                         &dosName, sizeof(dosName)) != 0) {
+                continue;
+            }
+
+            if (!PrefApplAppendApplicationRecord(entry[i].FENAA_name, dosName,
+                                                 &token)) {
                 prefApplLastScanError = PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY;
                 success = FALSE;
                 break;
@@ -503,8 +514,28 @@ PrefApplBuildDistApplTargetPath(const PrefApplApplicationRecord *record,
     }
 
     return PrefApplBuildChildRelativePath(PREF_APPL_DISTAPPL_RELATIVE_PATH,
-                                          record->PAAR_name,
+                                          record->PAAR_linkName,
                                           targetPath, targetPathSize);
+}
+
+static Boolean
+PrefApplSetApplicationLinkDisplayName(const PrefApplApplicationRecord *record)
+{
+    word fileError;
+
+    if (record == NULL) {
+        return FALSE;
+    }
+
+    FilePushDir();
+    FileSetStandardPath(SP_APPLICATION);
+    fileError = FileSetPathExtAttributes(record->PAAR_linkName,
+                                         FEA_NAME,
+                                         record->PAAR_name,
+                                         sizeof(record->PAAR_name));
+    FilePopDir();
+
+    return (fileError == 0);
 }
 
 static Boolean
@@ -921,12 +952,12 @@ PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
     FilePushDir();
     FileSetStandardPath(SP_APPLICATION);
     /* Preserve the target geode's token/type on the created link. */
-    fileError = FileCreateLink(record->PAAR_name,
+    fileError = FileCreateLink(record->PAAR_linkName,
                                PREF_APPL_DISTAPPL_STANDARD_PATH,
                                targetPath, 0);
 
     if (fileError == ERROR_FILE_EXISTS) {
-        targetDisk = FileReadLink(record->PAAR_name, existingTargetPath);
+        targetDisk = FileReadLink(record->PAAR_linkName, existingTargetPath);
         FilePopDir();
         if (targetDisk == NullHandle) {
             return FALSE;
@@ -943,7 +974,7 @@ PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record)
         return FALSE;
     }
 
-    return TRUE;
+    return PrefApplSetApplicationLinkDisplayName(record);
 }
 
 Boolean

@@ -1,0 +1,25 @@
+# PrefAppl Permanent-Name Link Filenames
+
+## Summary
+Change `PrefAppl` only so links created in `SP_APPLICATION` use the app’s DOS name (FEA_DOS_NAME) as the link filename, while the UI continues to display the GEOS long filename from `FEA_NAME`.
+
+## Key Changes
+- Keep `PAAR_name` as the GEOS long filename used for:
+  - list display text/monikers
+  - sorting
+- Extend the internal app record type in `prefapplLow.h` with a second filename field, (`PAAR_linkName`), to store the permanent-name link filename.
+- In the `DISTAPPL` scan in `prefapplLow.goc`, after validating `GFT_EXECUTABLE`, `GA_APPLICATION`, and `FEA_TOKEN`, extract FEA_DOS_NAME
+and set PAAR_linkName to it.
+- Leave the UI layer in `prefappl.goc` unchanged, it continues to consume `PAAR_name` as display text; do not surface `PAAR_linkName` in either list.
+- Update `PrefApplCreateApplicationLink` so:
+  - the target path becomes `DISTAPPL\\PAAR_linkName`
+  - the created link name stays `PAAR_name`
+  - the existing-link collision/readback path also uses `PAAR_linkName`
+- Do not change link scanning or deletion behavior. Existing links remain identified by resolved target token, so both old long-name links and new permanent-name links stay visible/removable.
+
+## Interfaces / Types
+- No exported module API changes.
+- Internal type change: `PrefApplApplicationRecord` gains a permanent-name link field alongside the existing long-name field.
+
+## Assumptions
+- Scope is limited to `PrefAppl`; `FirstRun` is not touched.
