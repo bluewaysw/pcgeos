@@ -31,6 +31,7 @@
     @message void MSG_PREF_APPL_QUEUE_REFRESH();
     @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
     @message void MSG_PREF_APPL_SET_CONTROL_STATE(Boolean enabled);
+    @instance Boolean PADI_ignoreFileChanges = FALSE;
     @instance Boolean PADI_refreshQueued = FALSE;
     @instance Boolean PADI_refreshInProgress = FALSE;
 
@@ -261,6 +262,32 @@ static const char prefApplDisableFailedText[] =
 
 @define Dup(obj) ConstructOptr(OptrToHandle(oself), OptrToChunk(obj))
 
+static void
+PrefApplSyncListsFromCurrentModel(optr dialog, optr allAppsList,
+                                  optr linkedAppsList)
+{
+    word disabledCount;
+    word linkedCount;
+
+    disabledCount = PrefApplGetDisabledApplicationCount();
+    linkedCount = PrefApplGetLinkedApplicationCount();
+
+    @call allAppsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
+    @call linkedAppsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
+    if (disabledCount != 0) {
+        @call allAppsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    } else {
+        @call allAppsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    }
+    if (linkedCount != 0) {
+        @call linkedAppsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    } else {
+        @call linkedAppsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    }
+
+    @call dialog::MSG_PREF_APPL_SET_CONTROL_STATE(TRUE);
+}
+
 optr _export _pascal PrefGetOptrBox(void)
 {
     return (@BaseBox);
@@ -424,6 +451,10 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 @method PrefApplDialogClass, MSG_NOTIFY_FILE_CHANGE
 {
     Boolean shouldQueueRefresh;
+
+    if (pself->PADI_ignoreFileChanges) {
+        return;
+    }
 
     shouldQueueRefresh = ((notifyType == FCNT_CREATE) ||
                           (notifyType == FCNT_DELETE) ||
@@ -613,6 +644,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     word disabledSelection;
     word appIndex;
     Boolean actionSucceeded;
+    Boolean modelUpdated;
 
     disabledSelection = @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
@@ -623,17 +655,39 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
+    pself->PADI_ignoreFileChanges = TRUE;
     actionSucceeded = PrefApplCreateApplicationLink(&record);
     statusMessage = prefApplEnableFailedText;
     if (actionSucceeded) {
-        statusMessage = prefApplEnabledText;
-    }
+        modelUpdated = PrefApplSetApplicationSelectedByToken(&record.PAAR_token,
+                                                             TRUE);
+        if (modelUpdated) {
+            modelUpdated = PrefApplAddScannedLinkRecord(&record.PAAR_token,
+                                                        SP_APPLICATION,
+                                                        "",
+                                                        record.PAAR_linkName);
+        }
 
-    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-    if (paError == PREF_APPL_ERROR_NONE) {
+        if (modelUpdated) {
+            statusMessage = prefApplEnabledText;
+        } else {
+            actionSucceeded = FALSE;
+        }
+    }
+    pself->PADI_ignoreFileChanges = FALSE;
+
+    if (actionSucceeded) {
+        PrefApplSyncListsFromCurrentModel(oself,
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)));
         @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
     } else {
-        @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+        paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+        if (paError == PREF_APPL_ERROR_NONE) {
+            @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+        } else {
+            @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+        }
     }
 }
 
@@ -645,6 +699,7 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     word linkedSelection;
     word appIndex;
     Boolean actionSucceeded;
+    Boolean modelUpdated;
 
     linkedSelection = @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_GET_SELECTION();
 
@@ -655,16 +710,32 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     }
 
     @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
+    pself->PADI_ignoreFileChanges = TRUE;
     statusMessage = prefApplDisableFailedText;
     actionSucceeded = PrefApplDeleteScannedLinksForToken(&record.PAAR_token);
     if (actionSucceeded) {
-        statusMessage = prefApplDisabledText;
+        PrefApplRemoveScannedLinkRecordsForToken(&record.PAAR_token);
+        modelUpdated = PrefApplSetApplicationSelectedByToken(&record.PAAR_token,
+                                                             FALSE);
+        if (modelUpdated) {
+            statusMessage = prefApplDisabledText;
+        } else {
+            actionSucceeded = FALSE;
+        }
     }
+    pself->PADI_ignoreFileChanges = FALSE;
 
-    paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
-    if (paError == PREF_APPL_ERROR_NONE) {
+    if (actionSucceeded) {
+        PrefApplSyncListsFromCurrentModel(oself,
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)));
         @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
     } else {
-        @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+        paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
+        if (paError == PREF_APPL_ERROR_NONE) {
+            @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
+        } else {
+            @call oself::MSG_PREF_APPL_SHOW_ERROR(paError);
+        }
     }
 }
