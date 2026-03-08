@@ -19,6 +19,13 @@ typedef struct {
 
 Boolean PrefApplCreateApplicationLink(const PrefApplApplicationRecord *record);
 Boolean PrefApplDeleteScannedLinksForToken(const GeodeToken *token);
+Boolean PrefApplSetApplicationSelectedByToken(const GeodeToken *token,
+                                              Boolean selected);
+Boolean PrefApplAddScannedLinkRecord(const GeodeToken *token,
+                                     StandardPath sourceRoot,
+                                     const char *relativeDir,
+                                     const char *linkName);
+void PrefApplRemoveScannedLinkRecordsForToken(const GeodeToken *token);
 
 Boolean PrefApplRefreshApplicationData(void);
 word PrefApplGetDisabledApplicationCount(void);
