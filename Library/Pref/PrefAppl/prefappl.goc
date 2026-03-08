@@ -266,13 +266,18 @@ static const char prefApplDisableFailedText[] =
 
 static void
 PrefApplSyncListsFromCurrentModel(optr dialog, optr allAppsList,
-                                  optr linkedAppsList)
+                                  optr linkedAppsList, Boolean enabled)
 {
     word disabledCount;
     word linkedCount;
 
-    disabledCount = PrefApplGetDisabledApplicationCount();
-    linkedCount = PrefApplGetLinkedApplicationCount();
+    if (enabled) {
+        disabledCount = PrefApplGetDisabledApplicationCount();
+        linkedCount = PrefApplGetLinkedApplicationCount();
+    } else {
+        disabledCount = 0;
+        linkedCount = 0;
+    }
 
     @call allAppsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
     @call linkedAppsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
@@ -287,7 +292,7 @@ PrefApplSyncListsFromCurrentModel(optr dialog, optr allAppsList,
         @call linkedAppsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
     }
 
-    @call dialog::MSG_PREF_APPL_SET_CONTROL_STATE(TRUE);
+    @call dialog::MSG_PREF_APPL_SET_CONTROL_STATE(enabled);
 }
 
 optr _export _pascal PrefGetOptrBox(void)
@@ -356,8 +361,6 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 @method PrefApplDialogClass, MSG_PREF_APPL_REFRESH_LIST_FROM_DISK
 {
     PrefApplError paError;
-    word disabledCount;
-    word linkedCount;
     Boolean queueFollowupRefresh;
 
     pself->PADI_refreshQueued = FALSE;
@@ -377,32 +380,10 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
         paError = PrefApplGetLastScanError();
     }
 
-    if (paError == PREF_APPL_ERROR_NONE) {
-        disabledCount = PrefApplGetDisabledApplicationCount();
-        linkedCount = PrefApplGetLinkedApplicationCount();
-    } else {
-        disabledCount = 0;
-        linkedCount = 0;
-    }
-
-    @call @Dup(@AllAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(disabledCount);
-    @call @Dup(@LinkedAppsList)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(linkedCount);
-    if (disabledCount != 0) {
-        @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
-    } else {
-        @call @Dup(@AllAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
-    }
-    if (linkedCount != 0) {
-        @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
-    } else {
-        @call @Dup(@LinkedAppsList)::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
-    }
-
-    if (paError == PREF_APPL_ERROR_NONE) {
-        @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(TRUE);
-    } else {
-        @call oself::MSG_PREF_APPL_SET_CONTROL_STATE(FALSE);
-    }
+    PrefApplSyncListsFromCurrentModel(oself,
+        ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
+        ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)),
+        (paError == PREF_APPL_ERROR_NONE));
 
     pself->PADI_refreshInProgress = FALSE;
     queueFollowupRefresh = pself->PADI_refreshQueued;
@@ -700,7 +681,8 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     if (actionSucceeded) {
         PrefApplSyncListsFromCurrentModel(oself,
             ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
-            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)));
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)),
+            TRUE);
         @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
     } else {
         paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
@@ -749,7 +731,8 @@ PrefApplReplaceListItemMoniker(optr list, word item,
     if (actionSucceeded) {
         PrefApplSyncListsFromCurrentModel(oself,
             ConstructOptr(OptrToHandle(oself), OptrToChunk(@AllAppsList)),
-            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)));
+            ConstructOptr(OptrToHandle(oself), OptrToChunk(@LinkedAppsList)),
+            TRUE);
         @call oself::MSG_PREF_APPL_SET_STATUS_TEXT(statusMessage);
     } else {
         paError = @call oself::MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();

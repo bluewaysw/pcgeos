@@ -30,7 +30,6 @@ void PrefApplRemoveScannedLinkRecordsForToken(const GeodeToken *token);
 Boolean PrefApplLoadApplicationCatalog(void);
 Boolean PrefApplRefreshLinkSelections(void);
 void PrefApplResetCachedApplicationData(void);
-Boolean PrefApplRefreshApplicationData(void);
 word PrefApplGetDisabledApplicationCount(void);
 word PrefApplGetLinkedApplicationCount(void);
 Boolean PrefApplGetApplicationRecord(word index, PrefApplApplicationRecord *record);
