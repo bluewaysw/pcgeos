@@ -1,0 +1,408 @@
+/**********************************************************************
+ *
+ * PROJECT:     FirstRun
+ * FILE:        firstrun.goc
+ *
+ * DESCRIPTION:
+ *   Headless startup app that seeds WORLD links from AppSeedRecords.
+ *
+ **********************************************************************/
+
+@include <stdapp.goh>
+
+#include <chunkarr.h>
+#include <fileEnum.h>
+#include <geode.h>
+#include <initfile.h>
+#include <Ansi/string.h>
+
+#define FIRST_RUN_INI_CATEGORY "firstRun"
+#define FIRST_RUN_INI_KEY_LAST_RELEASE "lastReleaseLevel"
+#define FIRST_RUN_UI_CATEGORY "ui"
+#define FIRST_RUN_UI_EXEC_ON_STARTUP "execOnStartup"
+#define FIRST_RUN_GEODE_NAME "firstrun.geo"
+#define FIRST_RUN_DISTAPPL_RELATIVE_PATH "DISTAPPL"
+
+@class FirstRunProcessClass, GenProcessClass;
+@endc;
+
+@classdecl FirstRunProcessClass, neverSaved;
+
+@start AppResource;
+
+@object GenApplicationClass FirstRunApp = {
+    GI_visMoniker = @list { @FirstRunTextMoniker };
+}
+
+@visMoniker FirstRunTextMoniker = "First Run Seeder";
+
+@end AppResource;
+
+@start SeedResource, data;
+
+@include "appSeedList.goh"
+
+@end SeedResource;
+
+static void
+FirstRunSafeCopy(char *dest, word destSize, const char *src)
+{
+    if ((dest == NULL) || (destSize == 0)) {
+        return;
+    }
+
+    if (src == NULL) {
+        dest[0] = '\0';
+        return;
+    }
+
+    strncpy(dest, src, destSize - 1);
+    dest[destSize - 1] = '\0';
+}
+
+static Boolean
+FirstRunBuildChildPath(const char *basePath, const char *childName,
+                       char *destPath, word destSize)
+{
+    word baseLen;
+    word childLen;
+    word needed;
+
+    if ((destPath == NULL) || (destSize == 0) || (childName == NULL)) {
+        return FALSE;
+    }
+
+    if (basePath == NULL) {
+        basePath = "";
+    }
+
+    baseLen = strlen(basePath);
+    childLen = strlen(childName);
+
+    if (childLen == 0) {
+        return FALSE;
+    }
+
+    needed = childLen + 1;
+    if (baseLen != 0) {
+        needed = baseLen + 1 + childLen + 1;
+    }
+
+    if (needed > destSize) {
+        return FALSE;
+    }
+
+    if (baseLen == 0) {
+        strcpy(destPath, childName);
+    } else {
+        strcpy(destPath, basePath);
+        strcat(destPath, "\\");
+        strcat(destPath, childName);
+    }
+
+    return TRUE;
+}
+
+static void
+FirstRunResolveTargetName(const AppSeedRecord *record, FileLongName targetName)
+{
+    word len = 0;
+
+    FirstRunSafeCopy(targetName, sizeof(FileLongName), record->ASR_name);
+
+#if ERROR_CHECK
+    len = strlen(targetName);
+    if (len < DOS_FILE_NAME_CORE_LENGTH) {
+        strcat(targetName, "ec");
+    } else if (len == DOS_FILE_NAME_CORE_LENGTH) {
+        targetName[DOS_FILE_NAME_CORE_LENGTH - 1] = 'e';
+    }
+#else
+    (void)len;
+#endif
+}
+
+static Boolean
+FirstRunLoadTargetInfo(const AppSeedRecord *record,
+                       PathName targetPath,
+                       FileLongName displayName)
+{
+    FileLongName targetName;
+    GeosFileType fileType;
+    GeodeAttrs geodeAttrs;
+
+    FirstRunResolveTargetName(record, targetName);
+    if (!FirstRunBuildChildPath(FIRST_RUN_DISTAPPL_RELATIVE_PATH,
+                                targetName,
+                                targetPath,
+                                sizeof(PathName))) {
+        return FALSE;
+    }
+
+    FilePushDir();
+    if (FileSetCurrentPath(SP_SYSTEM, FIRST_RUN_DISTAPPL_RELATIVE_PATH) == NullHandle) {
+        FilePopDir();
+        return FALSE;
+    }
+
+    if (FileGetPathExtAttributes(targetName,
+                                 FEA_FILE_TYPE,
+                                 &fileType,
+                                 sizeof(fileType)) != 0) {
+        FilePopDir();
+        return FALSE;
+    }
+    if (fileType != GFT_EXECUTABLE) {
+        FilePopDir();
+        return FALSE;
+    }
+
+    if (FileGetPathExtAttributes(targetName,
+                                 FEA_GEODE_ATTR,
+                                 &geodeAttrs,
+                                 sizeof(geodeAttrs)) != 0) {
+        FilePopDir();
+        return FALSE;
+    }
+    if ((geodeAttrs & GA_APPLICATION) == 0) {
+        FilePopDir();
+        return FALSE;
+    }
+
+    if (FileGetPathExtAttributes(targetName,
+                                 FEA_NAME,
+                                 displayName,
+                                 sizeof(FileLongName)) != 0) {
+        FilePopDir();
+        return FALSE;
+    }
+
+    FilePopDir();
+    return TRUE;
+}
+
+static Boolean
+FirstRunEnsureFolderExists(const char *relativeFolder)
+{
+    PathName pathCopy;
+    char *cursor;
+    char *next;
+
+    if ((relativeFolder == NULL) || (relativeFolder[0] == '\0')) {
+        return TRUE;
+    }
+
+    FirstRunSafeCopy(pathCopy, sizeof(PathName), relativeFolder);
+
+    cursor = pathCopy;
+    while (*cursor != '\0') {
+        if (*cursor == '/') {
+            *cursor = '\\';
+        }
+        cursor++;
+    }
+
+    FilePushDir();
+    FileSetStandardPath(SP_APPLICATION);
+
+    if (FileSetCurrentPath(0, pathCopy) != NullHandle) {
+        FilePopDir();
+        return TRUE;
+    }
+
+    cursor = pathCopy;
+    while (*cursor != '\0') {
+        while (*cursor == '\\') {
+            cursor++;
+        }
+
+        if (*cursor == '\0') {
+            break;
+        }
+
+        next = strchr(cursor, '\\');
+        if (next != NULL) {
+            *next = '\0';
+        }
+
+        if (FileSetCurrentPath(0, cursor) == NullHandle) {
+            if (FileCreateDir(cursor) != 0) {
+                FilePopDir();
+                return FALSE;
+            }
+            if (FileSetCurrentPath(0, cursor) == NullHandle) {
+                FilePopDir();
+                return FALSE;
+            }
+        }
+
+        if (next == NULL) {
+            break;
+        }
+
+        cursor = next + 1;
+    }
+
+    FilePopDir();
+    return TRUE;
+}
+
+static Boolean
+FirstRunSetDestinationFolder(const char *relativeFolder)
+{
+    if ((relativeFolder == NULL) || (relativeFolder[0] == '\0')) {
+        FileSetStandardPath(SP_APPLICATION);
+        return TRUE;
+    }
+
+    if (!FirstRunEnsureFolderExists(relativeFolder)) {
+        return FALSE;
+    }
+
+    FileSetStandardPath(SP_APPLICATION);
+    return (FileSetCurrentPath(0, relativeFolder) != NullHandle);
+}
+
+static Boolean
+FirstRunEnsureLinkExists(const char *relativeFolder,
+                         const char *linkName,
+                         const char *targetPath)
+{
+    word fileError;
+    PathName existingTargetPath;
+    DiskHandle existingTargetDisk;
+
+    FilePushDir();
+    if (!FirstRunSetDestinationFolder(relativeFolder)) {
+        FilePopDir();
+        return FALSE;
+    }
+
+    fileError = FileCreateLink(linkName, SP_SYSTEM, targetPath, 0);
+
+    if (fileError == ERROR_FILE_EXISTS) {
+        existingTargetDisk = FileReadLink(linkName, existingTargetPath);
+        FilePopDir();
+
+        if (existingTargetDisk == NullHandle) {
+            return FALSE;
+        }
+
+        return (FileComparePaths(existingTargetPath,
+                                 existingTargetDisk,
+                                 targetPath,
+                                 SP_SYSTEM) == PCT_EQUAL);
+    }
+
+    FilePopDir();
+    return (fileError == 0);
+}
+
+static Boolean
+FirstRunProcessRecord(const AppSeedRecord *record)
+{
+    PathName targetPath;
+    FileLongName linkName;
+
+    if (record == NULL) {
+        return FALSE;
+    }
+
+    if (!FirstRunLoadTargetInfo(record, targetPath, linkName)) {
+        return FALSE;
+    }
+
+    if (!FirstRunEnsureFolderExists(record->ASR_folder)) {
+        return FALSE;
+    }
+
+    return FirstRunEnsureLinkExists(record->ASR_folder,
+                                    linkName,
+                                    targetPath);
+}
+
+static word
+FirstRunRunSeeder(word lastReleaseLevel)
+{
+    word index;
+    word count;
+    word highestSucceededLevel;
+    AppSeedRecord *record;
+
+    highestSucceededLevel = lastReleaseLevel;
+
+    if (MemLock(HandleOf(@AppSeedRecords)) == NullHandle) {
+        return lastReleaseLevel;
+    }
+
+    count = ChunkArrayGetCount(@AppSeedRecords);
+    for (index = 0; index < count; index++) {
+        record = (AppSeedRecord *)ChunkArrayElementToPtr(@AppSeedRecords,
+                                                         index,
+                                                         NULL);
+        if (record == NULL) {
+            continue;
+        }
+
+        if (record->ASR_releaseLevel <= lastReleaseLevel) {
+            continue;
+        }
+
+        if (!FirstRunProcessRecord(record)) {
+            continue;
+        }
+
+        if (record->ASR_releaseLevel > highestSucceededLevel) {
+            highestSucceededLevel = record->ASR_releaseLevel;
+        }
+    }
+
+    MemUnlock(HandleOf(@AppSeedRecords));
+
+    return highestSucceededLevel;
+}
+
+static word
+FirstRunReadLastReleaseLevel(void)
+{
+    word lastReleaseLevel;
+
+    if (InitFileReadInteger(FIRST_RUN_INI_CATEGORY,
+                            FIRST_RUN_INI_KEY_LAST_RELEASE,
+                            &lastReleaseLevel)) {
+        return 0;
+    }
+
+    return lastReleaseLevel;
+}
+
+static void
+FirstRunWriteLastReleaseLevel(word newReleaseLevel)
+{
+    InitFileWriteInteger(FIRST_RUN_INI_CATEGORY,
+                         FIRST_RUN_INI_KEY_LAST_RELEASE,
+                         newReleaseLevel);
+}
+
+static void
+FirstRunRemoveSelfFromStartup(void)
+{
+    UserRemoveAutoExec(FIRST_RUN_GEODE_NAME);
+}
+
+@method FirstRunProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    word lastReleaseLevel;
+    word newReleaseLevel;
+
+    @callsuper();
+
+    lastReleaseLevel = FirstRunReadLastReleaseLevel();
+    newReleaseLevel = FirstRunRunSeeder(lastReleaseLevel);
+
+    FirstRunWriteLastReleaseLevel(newReleaseLevel);
+    FirstRunRemoveSelfFromStartup();
+    InitFileCommit();
+
+    @send, forceQueue application::MSG_META_QUIT();
+}
