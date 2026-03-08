@@ -61,6 +61,254 @@ FirstRunSafeCopy(char *dest, word destSize, const char *src)
     dest[destSize - 1] = '\0';
 }
 
+static void
+FirstRunBuildTargetDosNames(const char *seedName,
+                            char *targetDosName,
+                            word targetDosNameSize,
+                            char *ecTargetDosName,
+                            word ecTargetDosNameSize)
+{
+    word targetCoreLen;
+
+    FirstRunSafeCopy(targetDosName, targetDosNameSize, seedName);
+    if (strlen(targetDosName) > DOS_FILE_NAME_CORE_LENGTH) {
+        targetDosName[DOS_FILE_NAME_CORE_LENGTH] = '\0';
+    }
+    strcat(targetDosName, ".geo");
+
+    FirstRunSafeCopy(ecTargetDosName, ecTargetDosNameSize, seedName);
+    if (strlen(ecTargetDosName) > DOS_FILE_NAME_CORE_LENGTH) {
+        ecTargetDosName[DOS_FILE_NAME_CORE_LENGTH] = '\0';
+    }
+    targetCoreLen = strlen(ecTargetDosName);
+#if ERROR_CHECK
+    if (targetCoreLen <= (DOS_FILE_NAME_CORE_LENGTH - 2)) {
+        strcat(ecTargetDosName, "ec");
+    } else if (targetCoreLen == (DOS_FILE_NAME_CORE_LENGTH - 1)) {
+        strcat(ecTargetDosName, "e");
+    } else if (targetCoreLen == DOS_FILE_NAME_CORE_LENGTH) {
+        ecTargetDosName[DOS_FILE_NAME_CORE_LENGTH - 1] = 'e';
+    }
+#endif
+    strcat(ecTargetDosName, ".geo");
+}
+
+static Boolean
+FirstRunResolveDistApplTarget(char *targetDosName,
+                              word targetDosNameSize,
+                              const char *ecTargetDosName,
+                              PathName targetPath,
+                              FileLongName linkName)
+{
+    Boolean resolved = FALSE;
+    GeosFileType fileType;
+    GeodeAttrs geodeAttrs;
+    word baseLen;
+    word childLen;
+    word needed;
+
+    FilePushDir();
+
+    do {
+        if (FileSetCurrentPath(SP_SYSTEM, FIRST_RUN_DISTAPPL_RELATIVE_PATH) ==
+            NullHandle) {
+            EC_WARNING(-1); /* DISTAPPL path failed */
+            break;
+        }
+
+        if (FileGetPathExtAttributes(targetDosName,
+                                     FEA_FILE_TYPE,
+                                     &fileType,
+                                     sizeof(fileType)) != 0) {
+#if ERROR_CHECK
+            if ((strcmpi(targetDosName, ecTargetDosName) != 0) &&
+                (FileGetPathExtAttributes(ecTargetDosName,
+                                          FEA_FILE_TYPE,
+                                          &fileType,
+                                          sizeof(fileType)) == 0)) {
+                FirstRunSafeCopy(targetDosName,
+                                 targetDosNameSize,
+                                 ecTargetDosName);
+            } else
+#endif
+            {
+                EC_WARNING(-1); /* target not found */
+                break;
+            }
+        }
+
+        // Build "DISTAPPL\\<target>" after checking that the combined
+        // path still fits in a PathName buffer.
+        baseLen = strlen(FIRST_RUN_DISTAPPL_RELATIVE_PATH);
+        childLen = strlen(targetDosName);
+        needed = baseLen + 1 + childLen + 1;
+        if ((childLen == 0) || (needed > sizeof(PathName))) {
+            EC_WARNING(-1); /* target path too long */
+            break;
+        }
+        strcpy(targetPath, FIRST_RUN_DISTAPPL_RELATIVE_PATH);
+        strcat(targetPath, "\\");
+        strcat(targetPath, targetDosName);
+
+        if (fileType != GFT_EXECUTABLE) {
+            EC_WARNING(-1); /* target not executable */
+            break;
+        }
+
+        if (FileGetPathExtAttributes(targetDosName,
+                                     FEA_GEODE_ATTR,
+                                     &geodeAttrs,
+                                     sizeof(geodeAttrs)) != 0) {
+            EC_WARNING(-1); /* target geode attr failed */
+            break;
+        }
+        if ((geodeAttrs & GA_APPLICATION) == 0) {
+            EC_WARNING(-1); /* target not application */
+            break;
+        }
+
+        if (FileGetPathExtAttributes(targetDosName,
+                                     FEA_NAME,
+                                     linkName,
+                                     sizeof(FileLongName)) != 0) {
+            EC_WARNING(-1); /* target name attr failed */
+            break;
+        }
+
+        resolved = TRUE;
+    } while (0);
+
+    FilePopDir();
+
+    return resolved;
+}
+
+static Boolean
+FirstRunEnsureApplicationFolder(const char *folderPath, PathName normalizedFolderPath)
+{
+    Boolean folderReady = TRUE;
+    PathName folderPathCopy;
+    char *cursor;
+    char *next;
+
+    normalizedFolderPath[0] = '\0';
+
+    if ((folderPath == NULL) || (folderPath[0] == '\0')) {
+        return TRUE;
+    }
+
+    FirstRunSafeCopy(normalizedFolderPath,
+                     sizeof(PathName),
+                     folderPath);
+
+    cursor = normalizedFolderPath;
+    while (*cursor != '\0') {
+        if (*cursor == '/') {
+            *cursor = '\\';
+        }
+        cursor++;
+    }
+
+    FilePushDir();
+
+    do {
+        FileSetStandardPath(SP_APPLICATION);
+
+        if (FileSetCurrentPath(0, normalizedFolderPath) != NullHandle) {
+            break;
+        }
+
+        FirstRunSafeCopy(folderPathCopy,
+                         sizeof(folderPathCopy),
+                         normalizedFolderPath);
+
+        cursor = folderPathCopy;
+        while (*cursor != '\0') {
+            while (*cursor == '\\') {
+                cursor++;
+            }
+
+            if (*cursor == '\0') {
+                break;
+            }
+
+            next = strchr(cursor, '\\');
+            if (next != NULL) {
+                *next = '\0';
+            }
+
+            if (FileSetCurrentPath(0, cursor) == NullHandle) {
+                if (FileCreateDir(cursor) != 0) {
+                    folderReady = FALSE;
+                    break;
+                }
+                if (FileSetCurrentPath(0, cursor) == NullHandle) {
+                    folderReady = FALSE;
+                    break;
+                }
+            }
+
+            if (next == NULL) {
+                break;
+            }
+
+            cursor = next + 1;
+        }
+    } while (0);
+
+    FilePopDir();
+
+    if (!folderReady) {
+        EC_WARNING(-1); /* folder setup failed */
+    }
+
+    return folderReady;
+}
+
+static Boolean
+FirstRunCreateWorldLink(FileLongName linkName,
+                        PathName targetPath,
+                        PathName normalizedFolderPath)
+{
+    Boolean linkReady = FALSE;
+    word fileError;
+    PathName existingTargetPath;
+    DiskHandle existingTargetDisk;
+
+    FilePushDir();
+
+    do {
+        FileSetStandardPath(SP_APPLICATION);
+        if ((normalizedFolderPath[0] != '\0') &&
+            (FileSetCurrentPath(0, normalizedFolderPath) == NullHandle)) {
+            EC_WARNING(-1); /* link setup failed */
+            break;
+        }
+
+        fileError = FileCreateLink(linkName, SP_SYSTEM, targetPath, 0);
+        if (fileError == ERROR_FILE_EXISTS) {
+            existingTargetDisk = FileReadLink(linkName, existingTargetPath);
+            if ((existingTargetDisk == NullHandle) ||
+                (FileComparePaths(existingTargetPath,
+                                  existingTargetDisk,
+                                  targetPath,
+                                  SP_SYSTEM) != PCT_EQUAL)) {
+                EC_WARNING(-1); /* link setup failed */
+                break;
+            }
+        } else if (fileError != 0) {
+            EC_WARNING(-1); /* link setup failed */
+            break;
+        }
+
+        linkReady = TRUE;
+    } while (0);
+
+    FilePopDir();
+
+    return linkReady;
+}
+
 @method FirstRunProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 {
     word lastReleaseLevel;
@@ -103,228 +351,38 @@ FirstRunSafeCopy(char *dest, word destSize, const char *src)
             do {
                 char targetDosName[DOS_DOT_FILE_NAME_LENGTH_ZT];
                 char ecTargetDosName[DOS_DOT_FILE_NAME_LENGTH_ZT];
-                GeosFileType fileType;
-                GeodeAttrs geodeAttrs;
-                word targetCoreLen;
-                word baseLen;
-                word childLen;
-                word needed;
-                word fileError;
-                PathName existingTargetPath;
-                DiskHandle existingTargetDisk;
-                char *cursor;
-                char *next;
 
                 // Probe the likely DOS filenames in DISTAPPL using the seed
                 // name directly first, then the EC-adjusted DOS core form.
-                FirstRunSafeCopy(targetDosName, sizeof(targetDosName),
-                                 record->ASR_name);
-                if (strlen(targetDosName) > DOS_FILE_NAME_CORE_LENGTH) {
-                    targetDosName[DOS_FILE_NAME_CORE_LENGTH] = '\0';
-                }
-                strcat(targetDosName, ".geo");
-
-                FirstRunSafeCopy(ecTargetDosName, sizeof(ecTargetDosName),
-                                 record->ASR_name);
-                if (strlen(ecTargetDosName) > DOS_FILE_NAME_CORE_LENGTH) {
-                    ecTargetDosName[DOS_FILE_NAME_CORE_LENGTH] = '\0';
-                }
-                targetCoreLen = strlen(ecTargetDosName);
-#if ERROR_CHECK
-                if (targetCoreLen <= (DOS_FILE_NAME_CORE_LENGTH - 2)) {
-                    strcat(ecTargetDosName, "ec");
-                } else if (targetCoreLen == (DOS_FILE_NAME_CORE_LENGTH - 1)) {
-                    strcat(ecTargetDosName, "e");
-                } else if (targetCoreLen == DOS_FILE_NAME_CORE_LENGTH) {
-                    ecTargetDosName[DOS_FILE_NAME_CORE_LENGTH - 1] = 'e';
-                }
-#endif
-                strcat(ecTargetDosName, ".geo");
+                FirstRunBuildTargetDosNames(record->ASR_name,
+                                            targetDosName,
+                                            sizeof(targetDosName),
+                                            ecTargetDosName,
+                                            sizeof(ecTargetDosName));
 
                 // Validate that the resolved DISTAPPL target exists and is an
                 // executable application before creating a WORLD link for it.
-                FilePushDir();
-                if (FileSetCurrentPath(SP_SYSTEM,
-                                       FIRST_RUN_DISTAPPL_RELATIVE_PATH) ==
-                    NullHandle) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* DISTAPPL path failed */
+                if (!FirstRunResolveDistApplTarget(targetDosName,
+                                                   sizeof(targetDosName),
+                                                   ecTargetDosName,
+                                                   targetPath,
+                                                   linkName)) {
                     break;
                 }
-
-                if (FileGetPathExtAttributes(targetDosName,
-                                             FEA_FILE_TYPE,
-                                             &fileType,
-                                             sizeof(fileType)) != 0) {
-#if ERROR_CHECK
-                    if ((strcmpi(targetDosName, ecTargetDosName) != 0) &&
-                        (FileGetPathExtAttributes(ecTargetDosName,
-                                                  FEA_FILE_TYPE,
-                                                  &fileType,
-                                                  sizeof(fileType)) == 0)) {
-                        FirstRunSafeCopy(targetDosName,
-                                         sizeof(targetDosName),
-                                         ecTargetDosName);
-                    } else
-#endif
-                    {
-                        FilePopDir();
-                        EC_WARNING(-1); /* target not found */
-                        break;
-                    }
-                }
-
-                // Build "DISTAPPL\\<target>" after checking that the combined
-                // path still fits in a PathName buffer.
-                baseLen = strlen(FIRST_RUN_DISTAPPL_RELATIVE_PATH);
-                childLen = strlen(targetDosName);
-                needed = baseLen + 1 + childLen + 1;
-                if ((childLen == 0) || (needed > sizeof(targetPath))) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* target path too long */
-                    break;
-                }
-                strcpy(targetPath, FIRST_RUN_DISTAPPL_RELATIVE_PATH);
-                strcat(targetPath, "\\");
-                strcat(targetPath, targetDosName);
-
-                if (fileType != GFT_EXECUTABLE) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* target not executable */
-                    break;
-                }
-
-                if (FileGetPathExtAttributes(targetDosName,
-                                             FEA_GEODE_ATTR,
-                                             &geodeAttrs,
-                                             sizeof(geodeAttrs)) != 0) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* target geode attr failed */
-                    break;
-                }
-                if ((geodeAttrs & GA_APPLICATION) == 0) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* target not application */
-                    break;
-                }
-
-                if (FileGetPathExtAttributes(targetDosName,
-                                             FEA_NAME,
-                                             linkName,
-                                             sizeof(linkName)) != 0) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* target name attr failed */
-                    break;
-                }
-
-                FilePopDir();
-
-                normalizedFolderPath[0] = '\0';
 
                 // Ensure the destination folder exists under SP_APPLICATION,
                 // creating any missing intermediate directories in order.
-                if ((record->ASR_folder != NULL) &&
-                    (record->ASR_folder[0] != '\0')) {
-                    PathName folderPathCopy;
-                    Boolean folderReady = TRUE;
-
-                    FirstRunSafeCopy(normalizedFolderPath,
-                                     sizeof(normalizedFolderPath),
-                                     record->ASR_folder);
-
-                    cursor = normalizedFolderPath;
-                    while (*cursor != '\0') {
-                        if (*cursor == '/') {
-                            *cursor = '\\';
-                        }
-                        cursor++;
-                    }
-
-                    FilePushDir();
-                    FileSetStandardPath(SP_APPLICATION);
-
-                    if (FileSetCurrentPath(0, normalizedFolderPath) ==
-                        NullHandle) {
-                        FirstRunSafeCopy(folderPathCopy,
-                                         sizeof(folderPathCopy),
-                                         normalizedFolderPath);
-
-                        cursor = folderPathCopy;
-                        while (*cursor != '\0') {
-                            while (*cursor == '\\') {
-                                cursor++;
-                            }
-
-                            if (*cursor == '\0') {
-                                break;
-                            }
-
-                            next = strchr(cursor, '\\');
-                            if (next != NULL) {
-                                *next = '\0';
-                            }
-
-                            if (FileSetCurrentPath(0, cursor) == NullHandle) {
-                                if (FileCreateDir(cursor) != 0) {
-                                    folderReady = FALSE;
-                                    break;
-                                }
-                                if (FileSetCurrentPath(0, cursor) ==
-                                    NullHandle) {
-                                    folderReady = FALSE;
-                                    break;
-                                }
-                            }
-
-                            if (next == NULL) {
-                                break;
-                            }
-
-                            cursor = next + 1;
-                        }
-                    }
-
-                    FilePopDir();
-
-                    if (!folderReady) {
-                        EC_WARNING(-1); /* folder setup failed */
-                        break;
-                    }
+                if (!FirstRunEnsureApplicationFolder(record->ASR_folder,
+                                                     normalizedFolderPath)) {
+                    break;
                 }
 
                 // Create the WORLD link in the destination folder, or accept
                 // an existing link only when it already targets this app.
-                FilePushDir();
-                FileSetStandardPath(SP_APPLICATION);
-                if ((normalizedFolderPath[0] != '\0') &&
-                    (FileSetCurrentPath(0, normalizedFolderPath) ==
-                     NullHandle)) {
-                    FilePopDir();
-                    EC_WARNING(-1); /* link setup failed */
+                if (!FirstRunCreateWorldLink(linkName,
+                                             targetPath,
+                                             normalizedFolderPath)) {
                     break;
-                }
-
-                fileError = FileCreateLink(linkName, SP_SYSTEM, targetPath, 0);
-
-                if (fileError == ERROR_FILE_EXISTS) {
-                    existingTargetDisk = FileReadLink(linkName,
-                                                      existingTargetPath);
-                    FilePopDir();
-
-                    if ((existingTargetDisk == NullHandle) ||
-                        (FileComparePaths(existingTargetPath,
-                                          existingTargetDisk,
-                                          targetPath,
-                                          SP_SYSTEM) != PCT_EQUAL)) {
-                        EC_WARNING(-1); /* link setup failed */
-                        break;
-                    }
-                } else {
-                    FilePopDir();
-                    if (fileError != 0) {
-                        EC_WARNING(-1); /* link setup failed */
-                        break;
-                    }
                 }
 
                 recordSucceeded = TRUE;
