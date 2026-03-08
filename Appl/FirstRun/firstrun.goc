@@ -24,20 +24,6 @@
 #define FIRST_RUN_GEODE_NAME "firstrun.geo"
 #define FIRST_RUN_DISTAPPL_RELATIVE_PATH "DISTAPPL"
 
-typedef enum {
-    FIRST_RUN_WARNING_DISTAPPL_PATH_FAILED = 1,
-    FIRST_RUN_WARNING_DISTAPPL_ENUM_FAILED,
-    FIRST_RUN_WARNING_TARGET_NOT_FOUND,
-    FIRST_RUN_WARNING_TARGET_PATH_TOO_LONG,
-    FIRST_RUN_WARNING_TARGET_FILE_TYPE_ATTR_FAILED,
-    FIRST_RUN_WARNING_TARGET_NOT_EXECUTABLE,
-    FIRST_RUN_WARNING_TARGET_GEODE_ATTR_FAILED,
-    FIRST_RUN_WARNING_TARGET_NOT_APPLICATION,
-    FIRST_RUN_WARNING_TARGET_NAME_ATTR_FAILED,
-    FIRST_RUN_WARNING_FOLDER_SETUP_FAILED,
-    FIRST_RUN_WARNING_LINK_SETUP_FAILED
-} FirstRunWarningCode;
-
 @class FirstRunProcessClass, GenProcessClass;
 @endc;
 
@@ -73,42 +59,6 @@ FirstRunSafeCopy(char *dest, word destSize, const char *src)
 
     strncpy(dest, src, destSize - 1);
     dest[destSize - 1] = '\0';
-}
-
-static void
-FirstRunBuildSeedDosCore(const AppSeedRecord *record,
-                         char *seedDosCore,
-                         word seedDosCoreSize,
-                         Boolean reserveEcSuffix)
-{
-    word maxLen;
-
-    if ((seedDosCore == NULL) || (seedDosCoreSize == 0)) {
-        return;
-    }
-
-    seedDosCore[0] = '\0';
-    if (record == NULL) {
-        return;
-    }
-
-    maxLen = DOS_FILE_NAME_CORE_LENGTH;
-    if (reserveEcSuffix && (maxLen > 2)) {
-        maxLen -= 2;
-    }
-
-    FirstRunSafeCopy(seedDosCore, seedDosCoreSize, record->ASR_name);
-    if (strlen(seedDosCore) > maxLen) {
-        seedDosCore[maxLen] = '\0';
-    }
-}
-
-static Boolean
-FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
-{
-    EC_WARNING(warningCode);
-    (void)warningCode;
-    return FALSE;
 }
 
 @method FirstRunProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
@@ -151,17 +101,11 @@ FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
             }
 
             do {
-                FileEnumParams enumParams;
-                MemHandle enumBuffer = NullHandle;
-                FileLongName *enumNames = NULL;
-                word enumCount;
-                word enumIndex;
-                word numNoFit = 0;
-                Boolean found = FALSE;
-                char dosName[DOS_DOT_FILE_NAME_LENGTH_ZT];
-                FileLongName targetName;
+                char targetDosName[DOS_DOT_FILE_NAME_LENGTH_ZT];
+                char ecTargetDosName[DOS_DOT_FILE_NAME_LENGTH_ZT];
                 GeosFileType fileType;
                 GeodeAttrs geodeAttrs;
+                word targetCoreLen;
                 word baseLen;
                 word childLen;
                 word needed;
@@ -171,188 +115,105 @@ FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
                 char *cursor;
                 char *next;
 
-                // Locate the target executable in DISTAPPL and validate that it
-                // is still an application before creating a WORLD link for it.
+                // Probe the likely DOS filenames in DISTAPPL using the seed
+                // name directly first, then the EC-adjusted DOS core form.
+                FirstRunSafeCopy(targetDosName, sizeof(targetDosName),
+                                 record->ASR_name);
+                if (strlen(targetDosName) > DOS_FILE_NAME_CORE_LENGTH) {
+                    targetDosName[DOS_FILE_NAME_CORE_LENGTH] = '\0';
+                }
+                strcat(targetDosName, ".geo");
+
+                FirstRunSafeCopy(ecTargetDosName, sizeof(ecTargetDosName),
+                                 record->ASR_name);
+                if (strlen(ecTargetDosName) > DOS_FILE_NAME_CORE_LENGTH) {
+                    ecTargetDosName[DOS_FILE_NAME_CORE_LENGTH] = '\0';
+                }
+                targetCoreLen = strlen(ecTargetDosName);
+#if ERROR_CHECK
+                if (targetCoreLen <= (DOS_FILE_NAME_CORE_LENGTH - 2)) {
+                    strcat(ecTargetDosName, "ec");
+                } else if (targetCoreLen == (DOS_FILE_NAME_CORE_LENGTH - 1)) {
+                    strcat(ecTargetDosName, "e");
+                } else if (targetCoreLen == DOS_FILE_NAME_CORE_LENGTH) {
+                    ecTargetDosName[DOS_FILE_NAME_CORE_LENGTH - 1] = 'e';
+                }
+#endif
+                strcat(ecTargetDosName, ".geo");
+
+                // Validate that the resolved DISTAPPL target exists and is an
+                // executable application before creating a WORLD link for it.
                 FilePushDir();
                 if (FileSetCurrentPath(SP_SYSTEM,
                                        FIRST_RUN_DISTAPPL_RELATIVE_PATH) ==
                     NullHandle) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_DISTAPPL_PATH_FAILED);
+                    EC_WARNING(-1); /* DISTAPPL path failed */
                     break;
                 }
 
-                memset(&enumParams, 0, sizeof(enumParams));
-                enumParams.FEP_searchFlags = FESF_GEOS_EXECS;
-                enumParams.FEP_returnAttrs = (FileExtAttrDesc *)FESRT_NAME;
-                enumParams.FEP_returnSize = sizeof(FileLongName);
-                enumParams.FEP_bufSize = FE_BUFSIZE_UNLIMITED;
-
-                enumCount = FileEnum(&enumParams, &enumBuffer, &numNoFit);
-                if ((enumCount == 0) && (enumBuffer == NullHandle)) {
-                    FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_DISTAPPL_ENUM_FAILED);
-                    break;
-                }
-
-                if (enumBuffer != NullHandle) {
-                    enumNames = (FileLongName *)MemLock(enumBuffer);
-                }
-
-                if (enumNames != NULL) {
-                    for (enumIndex = 0; enumIndex < enumCount; enumIndex++) {
-                        char dosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
-                        char normalizedDosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
-                        char seedDosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
-                        char seedEcDosCore[DOS_FILE_NAME_CORE_LENGTH + 1];
-                        word dosCoreLen = 0;
-
-                        if (FileGetPathExtAttributes(enumNames[enumIndex],
-                                                     FEA_GEODE_ATTR,
-                                                     &geodeAttrs,
-                                                     sizeof(geodeAttrs)) != 0) {
-                            continue;
-                        }
-
-                        if ((geodeAttrs & GA_APPLICATION) == 0) {
-                            continue;
-                        }
-
-                        if (FileGetPathExtAttributes(enumNames[enumIndex],
-                                                     FEA_DOS_NAME,
-                                                     dosName,
-                                                     sizeof(dosName)) != 0) {
-                            continue;
-                        }
-
-                        // Match the seed against the long name, DOS core, and
-                        // an optional EC-stripped DOS core.
-                        if (strcmpi(record->ASR_name, enumNames[enumIndex]) != 0) {
-                            while ((dosName[dosCoreLen] != '\0') &&
-                                   (dosName[dosCoreLen] != '.') &&
-                                   (dosCoreLen < (sizeof(dosCore) - 1))) {
-                                dosCore[dosCoreLen] = dosName[dosCoreLen];
-                                dosCoreLen++;
-                            }
-                            dosCore[dosCoreLen] = '\0';
-
-                            if (dosCore[0] == '\0') {
-                                continue;
-                            }
-
-                            FirstRunBuildSeedDosCore(record,
-                                                     seedDosCore,
-                                                     sizeof(seedDosCore),
-                                                     FALSE);
-                            if ((strcmpi(record->ASR_name, dosCore) != 0) &&
-                                (strcmpi(seedDosCore, dosCore) != 0)) {
-                                FirstRunSafeCopy(normalizedDosCore,
-                                                 sizeof(normalizedDosCore),
-                                                 dosCore);
-                                if ((dosCoreLen >= 2) &&
-                                    (((normalizedDosCore[dosCoreLen - 2] == 'e') ||
-                                      (normalizedDosCore[dosCoreLen - 2] == 'E')) &&
-                                     ((normalizedDosCore[dosCoreLen - 1] == 'c') ||
-                                      (normalizedDosCore[dosCoreLen - 1] == 'C')))) {
-                                    normalizedDosCore[dosCoreLen - 2] = '\0';
-                                }
-
-                                if (normalizedDosCore[0] == '\0') {
-                                    continue;
-                                }
-
-                                FirstRunBuildSeedDosCore(record,
-                                                         seedEcDosCore,
-                                                         sizeof(seedEcDosCore),
-                                                         TRUE);
-                                if ((strcmpi(record->ASR_name,
-                                             normalizedDosCore) != 0) &&
-                                    (strcmpi(seedDosCore,
-                                             normalizedDosCore) != 0) &&
-                                    (strcmpi(seedEcDosCore,
-                                             normalizedDosCore) != 0)) {
-                                    continue;
-                                }
-                            }
-                        }
-
-                        FirstRunSafeCopy(targetName,
-                                         sizeof(targetName),
-                                         enumNames[enumIndex]);
-                        found = TRUE;
+                if (FileGetPathExtAttributes(targetDosName,
+                                             FEA_FILE_TYPE,
+                                             &fileType,
+                                             sizeof(fileType)) != 0) {
+#if ERROR_CHECK
+                    if ((strcmpi(targetDosName, ecTargetDosName) != 0) &&
+                        (FileGetPathExtAttributes(ecTargetDosName,
+                                                  FEA_FILE_TYPE,
+                                                  &fileType,
+                                                  sizeof(fileType)) == 0)) {
+                        FirstRunSafeCopy(targetDosName,
+                                         sizeof(targetDosName),
+                                         ecTargetDosName);
+                    } else
+#endif
+                    {
+                        FilePopDir();
+                        EC_WARNING(-1); /* target not found */
                         break;
                     }
-
-                    MemUnlock(enumBuffer);
-                }
-
-                if (enumBuffer != NullHandle) {
-                    MemFree(enumBuffer);
-                }
-
-                if (!found) {
-                    FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_NOT_FOUND);
-                    break;
                 }
 
                 // Build "DISTAPPL\\<target>" after checking that the combined
                 // path still fits in a PathName buffer.
                 baseLen = strlen(FIRST_RUN_DISTAPPL_RELATIVE_PATH);
-                childLen = strlen(targetName);
+                childLen = strlen(targetDosName);
                 needed = baseLen + 1 + childLen + 1;
                 if ((childLen == 0) || (needed > sizeof(targetPath))) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_PATH_TOO_LONG);
+                    EC_WARNING(-1); /* target path too long */
                     break;
                 }
                 strcpy(targetPath, FIRST_RUN_DISTAPPL_RELATIVE_PATH);
                 strcat(targetPath, "\\");
-                strcat(targetPath, targetName);
+                strcat(targetPath, targetDosName);
 
-                if (FileGetPathExtAttributes(targetName,
-                                             FEA_FILE_TYPE,
-                                             &fileType,
-                                             sizeof(fileType)) != 0) {
-                    FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_FILE_TYPE_ATTR_FAILED);
-                    break;
-                }
                 if (fileType != GFT_EXECUTABLE) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_NOT_EXECUTABLE);
+                    EC_WARNING(-1); /* target not executable */
                     break;
                 }
 
-                if (FileGetPathExtAttributes(targetName,
+                if (FileGetPathExtAttributes(targetDosName,
                                              FEA_GEODE_ATTR,
                                              &geodeAttrs,
                                              sizeof(geodeAttrs)) != 0) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_GEODE_ATTR_FAILED);
+                    EC_WARNING(-1); /* target geode attr failed */
                     break;
                 }
                 if ((geodeAttrs & GA_APPLICATION) == 0) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_NOT_APPLICATION);
+                    EC_WARNING(-1); /* target not application */
                     break;
                 }
 
-                if (FileGetPathExtAttributes(targetName,
+                if (FileGetPathExtAttributes(targetDosName,
                                              FEA_NAME,
                                              linkName,
                                              sizeof(linkName)) != 0) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_TARGET_NAME_ATTR_FAILED);
+                    EC_WARNING(-1); /* target name attr failed */
                     break;
                 }
 
@@ -426,8 +287,7 @@ FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
                     FilePopDir();
 
                     if (!folderReady) {
-                        (void)FirstRunWarningAndReturnFalse(
-                            FIRST_RUN_WARNING_FOLDER_SETUP_FAILED);
+                        EC_WARNING(-1); /* folder setup failed */
                         break;
                     }
                 }
@@ -440,8 +300,7 @@ FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
                     (FileSetCurrentPath(0, normalizedFolderPath) ==
                      NullHandle)) {
                     FilePopDir();
-                    (void)FirstRunWarningAndReturnFalse(
-                        FIRST_RUN_WARNING_LINK_SETUP_FAILED);
+                    EC_WARNING(-1); /* link setup failed */
                     break;
                 }
 
@@ -457,15 +316,13 @@ FirstRunWarningAndReturnFalse(FirstRunWarningCode warningCode)
                                           existingTargetDisk,
                                           targetPath,
                                           SP_SYSTEM) != PCT_EQUAL)) {
-                        (void)FirstRunWarningAndReturnFalse(
-                            FIRST_RUN_WARNING_LINK_SETUP_FAILED);
+                        EC_WARNING(-1); /* link setup failed */
                         break;
                     }
                 } else {
                     FilePopDir();
                     if (fileError != 0) {
-                        (void)FirstRunWarningAndReturnFalse(
-                            FIRST_RUN_WARNING_LINK_SETUP_FAILED);
+                        EC_WARNING(-1); /* link setup failed */
                         break;
                     }
                 }
