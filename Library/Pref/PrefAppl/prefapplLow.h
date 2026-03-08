@@ -13,6 +13,7 @@ typedef enum {
 typedef struct {
     GeodeToken PAAR_token;
     FileLongName PAAR_name;
+    DosDotFileName PAAR_linkName;
     Boolean PAAR_selected;
 } PrefApplApplicationRecord;
 
