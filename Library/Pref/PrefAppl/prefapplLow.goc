@@ -1192,25 +1192,55 @@ PrefApplClearScannedApplications(void)
 }
 
 Boolean
-PrefApplRefreshApplicationData(void)
+PrefApplLoadApplicationCatalog(void)
 {
     prefApplLastScanError = PREF_APPL_ERROR_NONE;
 
-    PrefApplClearScannedApplications();
+    PrefApplResetCachedApplicationData();
     if (!PrefApplCreateApplicationRecordArray()) {
         prefApplLastScanError = PREF_APPL_SCAN_ERROR_OUT_OF_MEMORY;
         return FALSE;
     }
 
     if (!PrefApplScanDistApplDirectory()) {
-        PrefApplClearScannedLinks();
+        PrefApplResetCachedApplicationData();
         return FALSE;
     }
+
+    return TRUE;
+}
+
+Boolean
+PrefApplRefreshLinkSelections(void)
+{
+    if ((prefApplAppDataBlock == NullHandle) || (prefApplAppArray == NullChunk)) {
+        return FALSE;
+    }
+
+    prefApplLastScanError = PREF_APPL_ERROR_NONE;
 
     /* Link traversal is best-effort: keep apps visible but unselected on failure. */
     (void) PrefApplRescanApplicationLinks();
     PrefApplMarkLinkedApplicationsSelected();
     return TRUE;
+}
+
+void
+PrefApplResetCachedApplicationData(void)
+{
+    prefApplLastScanError = PREF_APPL_ERROR_NONE;
+    PrefApplClearScannedLinks();
+    PrefApplClearScannedApplications();
+}
+
+Boolean
+PrefApplRefreshApplicationData(void)
+{
+    if (!PrefApplLoadApplicationCatalog()) {
+        return FALSE;
+    }
+
+    return PrefApplRefreshLinkSelections();
 }
 
 word
