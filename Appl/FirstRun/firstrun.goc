@@ -24,6 +24,20 @@
 #define FIRST_RUN_GEODE_NAME "firstrun.geo"
 #define FIRST_RUN_DISTAPPL_RELATIVE_PATH "DISTAPPL"
 
+typedef enum {
+    FIRSTRUN_WARNING_DISTAPPL_PATH_UNAVAILABLE,
+    FIRSTRUN_WARNING_TARGET_NOT_FOUND,
+    FIRSTRUN_WARNING_TARGET_PATH_TOO_LONG,
+    FIRSTRUN_WARNING_TARGET_NOT_EXECUTABLE,
+    FIRSTRUN_WARNING_TARGET_GEODE_ATTR_READ_FAILED,
+    FIRSTRUN_WARNING_TARGET_NOT_APPLICATION,
+    FIRSTRUN_WARNING_TARGET_NAME_READ_FAILED,
+    FIRSTRUN_WARNING_FOLDER_SETUP_FAILED,
+    FIRSTRUN_WARNING_LINK_FOLDER_UNAVAILABLE,
+    FIRSTRUN_WARNING_EXISTING_LINK_TARGET_MISMATCH,
+    FIRSTRUN_WARNING_LINK_CREATION_FAILED
+} Warnings;
+
 @class FirstRunProcessClass, GenProcessClass;
 @endc;
 
@@ -112,7 +126,7 @@ FirstRunResolveDistApplTarget(char *targetDosName,
     do {
         if (FileSetCurrentPath(SP_SYSTEM, FIRST_RUN_DISTAPPL_RELATIVE_PATH) ==
             NullHandle) {
-            EC_WARNING(-1); /* DISTAPPL path failed */
+            EC_WARNING(FIRSTRUN_WARNING_DISTAPPL_PATH_UNAVAILABLE);
             break;
         }
 
@@ -132,7 +146,7 @@ FirstRunResolveDistApplTarget(char *targetDosName,
             } else
 #endif
             {
-                EC_WARNING(-1); /* target not found */
+                EC_WARNING(FIRSTRUN_WARNING_TARGET_NOT_FOUND);
                 break;
             }
         }
@@ -143,7 +157,7 @@ FirstRunResolveDistApplTarget(char *targetDosName,
         childLen = strlen(targetDosName);
         needed = baseLen + 1 + childLen + 1;
         if ((childLen == 0) || (needed > sizeof(PathName))) {
-            EC_WARNING(-1); /* target path too long */
+            EC_WARNING(FIRSTRUN_WARNING_TARGET_PATH_TOO_LONG);
             break;
         }
         strcpy(targetPath, FIRST_RUN_DISTAPPL_RELATIVE_PATH);
@@ -151,7 +165,7 @@ FirstRunResolveDistApplTarget(char *targetDosName,
         strcat(targetPath, targetDosName);
 
         if (fileType != GFT_EXECUTABLE) {
-            EC_WARNING(-1); /* target not executable */
+            EC_WARNING(FIRSTRUN_WARNING_TARGET_NOT_EXECUTABLE);
             break;
         }
 
@@ -159,11 +173,11 @@ FirstRunResolveDistApplTarget(char *targetDosName,
                                      FEA_GEODE_ATTR,
                                      &geodeAttrs,
                                      sizeof(geodeAttrs)) != 0) {
-            EC_WARNING(-1); /* target geode attr failed */
+            EC_WARNING(FIRSTRUN_WARNING_TARGET_GEODE_ATTR_READ_FAILED);
             break;
         }
         if ((geodeAttrs & GA_APPLICATION) == 0) {
-            EC_WARNING(-1); /* target not application */
+            EC_WARNING(FIRSTRUN_WARNING_TARGET_NOT_APPLICATION);
             break;
         }
 
@@ -171,7 +185,7 @@ FirstRunResolveDistApplTarget(char *targetDosName,
                                      FEA_NAME,
                                      linkName,
                                      sizeof(FileLongName)) != 0) {
-            EC_WARNING(-1); /* target name attr failed */
+            EC_WARNING(FIRSTRUN_WARNING_TARGET_NAME_READ_FAILED);
             break;
         }
 
@@ -259,7 +273,7 @@ FirstRunEnsureApplicationFolder(const char *folderPath, PathName normalizedFolde
     FilePopDir();
 
     if (!folderReady) {
-        EC_WARNING(-1); /* folder setup failed */
+        EC_WARNING(FIRSTRUN_WARNING_FOLDER_SETUP_FAILED);
     }
 
     return folderReady;
@@ -281,7 +295,7 @@ FirstRunCreateWorldLink(FileLongName linkName,
         FileSetStandardPath(SP_APPLICATION);
         if ((normalizedFolderPath[0] != '\0') &&
             (FileSetCurrentPath(0, normalizedFolderPath) == NullHandle)) {
-            EC_WARNING(-1); /* link setup failed */
+            EC_WARNING(FIRSTRUN_WARNING_LINK_FOLDER_UNAVAILABLE);
             break;
         }
 
@@ -293,11 +307,11 @@ FirstRunCreateWorldLink(FileLongName linkName,
                                   existingTargetDisk,
                                   targetPath,
                                   SP_SYSTEM) != PCT_EQUAL)) {
-                EC_WARNING(-1); /* link setup failed */
+                EC_WARNING(FIRSTRUN_WARNING_EXISTING_LINK_TARGET_MISMATCH);
                 break;
             }
         } else if (fileError != 0) {
-            EC_WARNING(-1); /* link setup failed */
+            EC_WARNING(FIRSTRUN_WARNING_LINK_CREATION_FAILED);
             break;
         }
 
