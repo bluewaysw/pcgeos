@@ -31,6 +31,8 @@
     @message void MSG_PREF_APPL_QUEUE_REFRESH();
     @message PrefApplError MSG_PREF_APPL_REFRESH_LIST_FROM_DISK();
     @message void MSG_PREF_APPL_SET_CONTROL_STATE(Boolean enabled);
+    @instance Boolean PADI_appCatalogLoaded = FALSE;
+    @instance Boolean PADI_appCatalogScanAttempted = FALSE;
     @instance Boolean PADI_ignoreFileChanges = FALSE;
     @instance Boolean PADI_refreshQueued = FALSE;
     @instance Boolean PADI_refreshInProgress = FALSE;
@@ -361,7 +363,17 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
     pself->PADI_refreshQueued = FALSE;
     pself->PADI_refreshInProgress = TRUE;
     paError = PREF_APPL_ERROR_NONE;
-    if (!PrefApplRefreshApplicationData()) {
+    if (!pself->PADI_appCatalogScanAttempted) {
+        pself->PADI_appCatalogScanAttempted = TRUE;
+        if (!PrefApplLoadApplicationCatalog()) {
+            paError = PrefApplGetLastScanError();
+        } else {
+            pself->PADI_appCatalogLoaded = TRUE;
+            (void) PrefApplRefreshLinkSelections();
+        }
+    } else if (pself->PADI_appCatalogLoaded) {
+        (void) PrefApplRefreshLinkSelections();
+    } else {
         paError = PrefApplGetLastScanError();
     }
 
@@ -443,6 +455,15 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 {
     if (command == IC_APPLY) {
         command = IC_DISMISS;
+    }
+
+    if (command == IC_DISMISS) {
+        pself->PADI_appCatalogLoaded = FALSE;
+        pself->PADI_appCatalogScanAttempted = FALSE;
+        pself->PADI_ignoreFileChanges = FALSE;
+        pself->PADI_refreshQueued = FALSE;
+        pself->PADI_refreshInProgress = FALSE;
+        PrefApplResetCachedApplicationData();
     }
 
     return @callsuper();
