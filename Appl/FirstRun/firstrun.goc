@@ -229,7 +229,8 @@ FirstRunResolveDistApplLinkTarget(char *targetDosName,
 }
 
 static Boolean
-FirstRunEnsureApplicationFolder(PathName normalizedFolderPath)
+FirstRunEnsureDestinationFolder(StandardPath standardPath,
+                                PathName normalizedFolderPath)
 {
     Boolean folderReady = TRUE;
     PathName folderPathCopy;
@@ -239,7 +240,7 @@ FirstRunEnsureApplicationFolder(PathName normalizedFolderPath)
     FilePushDir();
 
     do {
-        FileSetStandardPath(SP_APPLICATION);
+        FileSetStandardPath(standardPath);
 
         if (FileSetCurrentPath(0, normalizedFolderPath) != NullHandle) {
             break;
@@ -293,9 +294,10 @@ FirstRunEnsureApplicationFolder(PathName normalizedFolderPath)
 }
 
 static Boolean
-FirstRunSetCurrentApplicationFolder(PathName normalizedFolderPath)
+FirstRunSetCurrentDestinationFolder(StandardPath standardPath,
+                                    PathName normalizedFolderPath)
 {
-    FileSetStandardPath(SP_APPLICATION);
+    FileSetStandardPath(standardPath);
     if ((normalizedFolderPath[0] != '\0') &&
         (FileSetCurrentPath(0, normalizedFolderPath) == NullHandle)) {
         EC_WARNING(FIRSTRUN_WARNING_LINK_FOLDER_UNAVAILABLE);
@@ -353,12 +355,14 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
     word count;
     AppSeedRecord *record;
     PathName currentFolderPath;
+    StandardPath currentStandardPath;
 
     newReleaseLevel = lastReleaseLevel;
     freshInstall = (lastReleaseLevel == 0);
     currentFolderReady = FALSE;
     haveCurrentFolder = FALSE;
     currentFolderPath[0] = '\0';
+    currentStandardPath = SP_NOT_STANDARD_PATH;
 
     if (MemLock(HandleOf(@AppSeedRecords)) == NullHandle) {
         return newReleaseLevel;
@@ -408,19 +412,23 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
             FirstRunNormalizeFolderPath(record->ASR_folder,
                                         normalizedFolderPath);
             if (!haveCurrentFolder ||
+                (currentStandardPath != record->ASR_standardPath) ||
                 (strcmp(currentFolderPath, normalizedFolderPath) != 0)) {
                 FirstRunSafeCopy(currentFolderPath,
                                  sizeof(PathName),
                                  normalizedFolderPath);
                 haveCurrentFolder = TRUE;
+                currentStandardPath = record->ASR_standardPath;
 
                 // Re-enter the destination folder only when the seed list
-                // changes folders so grouped records reuse the same cwd.
+                // changes destination so grouped records reuse the same cwd.
                 currentFolderReady =
-                    FirstRunEnsureApplicationFolder(normalizedFolderPath);
+                    FirstRunEnsureDestinationFolder(record->ASR_standardPath,
+                                                   normalizedFolderPath);
                 if (currentFolderReady) {
                     currentFolderReady =
-                        FirstRunSetCurrentApplicationFolder(
+                        FirstRunSetCurrentDestinationFolder(
+                            record->ASR_standardPath,
                             normalizedFolderPath);
                 }
             }
