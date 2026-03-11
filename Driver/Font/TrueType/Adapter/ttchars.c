@@ -533,33 +533,29 @@ EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove  - 1) 
  * REVISION HISTORY:
  *      Date      Name      Description
  *      ----      ----      -----------
- *      12/23/22  JK        Initial Revision
+ *      23.12.22  JK        Initial Revision
+ *      26.02.26  JK        Refactoring to avoid some MemReAlloc() calls
  *******************************************************************/
 
 static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
 {
-        void* bitmapData = MemLock( bitmapHandle );
+    void* bitmapData;
+    word  currentSize;
 
-        if( bitmapData == NULL )
-        {
-                MemReAlloc( bitmapHandle, MAX( size, INITIAL_BITMAP_BLOCKSIZE ), HAF_NO_ERR );
-                bitmapData = MemLock( bitmapHandle );
-        } else {
-                word  bitmapBlockSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
+    /* round up to 256 bytes */
+    if (size < INITIAL_BITMAP_BLOCKSIZE)
+        size = INITIAL_BITMAP_BLOCKSIZE;
+    else
+        size = (size + 255) & 0xFF00;
 
-                if( bitmapBlockSize < size )
-                {
-                        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
-                        bitmapData = MemLock( bitmapHandle );
-                }
-                
-                if( size < INITIAL_BITMAP_BLOCKSIZE && bitmapBlockSize > INITIAL_BITMAP_BLOCKSIZE )
-                {
-                        MemReAlloc( bitmapHandle, INITIAL_BITMAP_BLOCKSIZE, HAF_NO_ERR );
-                        bitmapData = MemLock( bitmapHandle );
-                }
-        }
+    bitmapData = MemLock( bitmapHandle );
+    currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );
 
-        memset( bitmapData, 0, size );
-        return bitmapData;
+    if ( currentSize != size )
+    {
+        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+        bitmapData = MemLock( bitmapHandle );
+    }
+
+    return memset( bitmapData, 0, size );
 }
