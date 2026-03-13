@@ -57,7 +57,6 @@ extern TEngine_Instance engineInstance;
 #define SUPERSCRIPT_OFFSET                  0x00006000
 #define SUBSCRIPT_OFFSET                    0x00001a00
 
-
 #define MAX_BITMAP_SIZE		                125
 #define MAX_FONTBUF_SIZE                    ( 10 * 1024 )
 #define INITIAL_BITMAP_BLOCKSIZE            ( 2 * 1024 )
@@ -86,7 +85,6 @@ extern TEngine_Instance engineInstance;
 
 #define MIN_OS2_TABLE_VERSION               2
 
-#define BASELINE_CORRECTION                 1
 #define MIN_BITMAP_DIMENSION                1
 
 
@@ -361,6 +359,7 @@ typedef struct
 /* This data type is used as part of the cache files structures.
  * If changes are needed here, take care to update the cache file protocol.
  */
+#if 0    
 typedef struct
 {
     Boolean                     FH_initialized;
@@ -387,6 +386,34 @@ typedef struct
     sword                       FH_maxBSB;          //maximum bottom side bound
     sword                       FH_maxRSB;          //maximum right side bound
     word                        FH_kernCount;       //num of kerning pairs
+} FontHeader;
+#endif
+
+typedef struct
+{
+    Boolean     FH_initialized;     // Flag: Is the structure initialized?
+/*    word        FH_avgwidth;        // Average width of all characters
+    word        FH_maxwidth;        // Width of the widest character in the font
+    word        FH_height;          // Total height of the font bounding box
+    word        FH_accent;          // Height of accent marks above the cap height
+    word        FH_mean;            // Mean line height (usually the x-height)
+    word        FH_baselinePos;     // Distance from top of box to baseline
+    word        FH_descent;         // Distance from baseline to bottom of descent
+    word        FH_underPos;        // Vertical offset for the underline
+    word        FH_underThickness;  // Thickness of the underline stroke
+    word        FH_strikePos;       // Vertical offset for the strikethrough
+    word        FH_aboveBox;        // Max. extension above the nominal font box
+    word        FH_belowBox;        // Max. extension below the nominal font box
+    sword       FH_minLSB;          // Min. Left Side Bearing
+    sword       FH_minTSB;          // Min. Top Side Bearing
+    sword       FH_maxBSB;          // Max. Bottom Side Bearing
+    sword       FH_maxRSB;          // Max. Right Side Bearing
+    word        FH_pixHeight;       // Height in pixels for the current size */
+    word        FH_kernCount;       // Number of available kerning pairs
+    word        FH_numChars;        // Number of characters defined in the font
+    char        FH_firstChar;       // GEOS char code of the first defined char
+    char        FH_lastChar;        // GEOS char code of the last defined char
+    char        FH_defaultChar;     // GEOS char code for undefined glyphs
 } FontHeader;
 
 

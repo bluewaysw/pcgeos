@@ -158,6 +158,9 @@ MemHandle _pascal TrueType_Gen_Widths(
         TransformMatrix*       transMatrix;
         TrueTypeCacheBufSpec   bufSpec;
 
+        /* TEST */
+//        WWFixedAsDWord ttfElement;
+
 EC(     ECCheckMemHandle( fontHandle ) );
 EC(     ECCheckBounds( (void*)fontMatrix ) );
 EC(     ECCheckBounds( (void*)fontInfo ) );
@@ -222,6 +225,191 @@ EC(             ECCheckBounds( (void*) fontBuf ) );
 
                 /* convert FontHeader and fill FontBuf structure */
                 ConvertHeader( trueTypeVars, fontHeader, fontBuf );
+
+
+#if 0
+                /* TEST Win/Typo */
+                #define WIN
+
+                /* FB_avgwidth (WBFixed) = OS/2.xAvgCharWidth (Typo/Win)*/
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->xAvgCharWidth, SCALE_WIDTH );
+                fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+                fontBuf->FB_avgwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+                /* FB_maxwidth (WBFixed) = hhea.advanceWidthMax oder max über hmtx.advanceWidth (Typo/Win) */
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->advance_Width_Max, SCALE_WIDTH );
+                fontBuf->FB_maxwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+                fontBuf->FB_maxwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+                /* FB_baselinePos (WBFixed) (Top→Baseline)
+                        Typo:		OS/2.sTypoAscender (fallback hhea.ascent)
+                        Win:		OS/2.usWinAscent */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->sTypoAscender, SCALE_WIDTH );
+                #endif
+                fontBuf->FB_baselinePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 );
+                fontBuf->FB_baselinePos.WBF_frac = 0; //FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+
+                /* FB_descent (WBFixed) (Baseline→Bottom, als positiver Betrag)
+                        Typo:		abs(OS/2.sTypoDescender) (fallback abs(hhea.descent))
+                        Win:		desc = OS/2.usWinDescent */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinDescent, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( ABS( FACE_PROPERTIES.os2->sTypoDescender ), SCALE_WIDTH );
+                #endif
+                fontBuf->FB_descent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+                fontBuf->FB_descent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+
+                /* FB_height (WBFixed) (Top→Bottom der “Standard-Box”)
+                        Typo:		OS/2.sTypoAscender + abs(OS/2.sTypoDescender)
+                        Win:		OS/2.usWinAscent + OS/2.usWinDescent */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->sTypoAscender + ABS( FACE_PROPERTIES.os2->sTypoDescender ), SCALE_WIDTH );
+                #endif
+                fontBuf->FB_height.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+                fontBuf->FB_height.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+
+                /* FB_accent (WBFixed) (Position vom Top aus; Kernel nutzt Ascent = baselinePos − accent)
+                        Typo/Win:	cap = OS/2.sCapHeight (wenn vorhanden; sonst Fallback)
+
+                        Umrechnung über BaselinePos:
+	                        FB_accent = FB_baselinePos − cap // FB_BaselinePos = OS/2.usWinAscent
+	                        (Wenn kein sCapHeight: Fallback z.B. cap ≈ OS/2.sTypoAscender oder aus Glyphen messen) 
+                                
+                        Typo    FB_accent = OS/2.sTypoAscender − OS/2.sCapHeight
+                        Win:    FB_accent = OS/2.usWinAscent − OS/2.sCapHeight */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent - FACE_PROPERTIES.os2->sCapHeight, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->sTypoAscender - FACE_PROPERTIES.os2->sCapHeight, SCALE_WIDTH );
+                #endif
+                fontBuf->FB_accent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+                fontBuf->FB_accent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+
+                /* FB_mean (WBFixed) (Meanline/x-height, Position vom Top aus)
+                        Typo/Win:	xH = OS/2.sxHeight
+
+	                FB_mean = FB_baselinePos − xH 
+                        
+                        Type:   FB_mean = OS/2.sTypoAscender − OS/2.sxHeight 
+                        Win:    FB_mean = OS/2.usWinAscent − OS/2.sxHeight */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent - FACE_PROPERTIES.os2->sxHeight, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->sTypoAscender - FACE_PROPERTIES.os2->sxHeight, SCALE_WIDTH );
+                #endif
+                fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+                fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+                
+
+                /* FB_aboveBox (WBFixed)
+                        Typo:   	max(0, head.yMax − OS/2.sTypoAscender) 
+                        Win:		max(0, head.yMax − OS/2.usWinAscent) XXX */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( MAX( 0, FACE_PROPERTIES.header->yMax - (int)FACE_PROPERTIES.os2->usWinAscent ), SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( MAX( 0, FACE_PROPERTIES.header->yMax - (int)FACE_PROPERTIES.os2->sTypoAscender ), SCALE_WIDTH );
+                #endif
+                fontBuf->FB_aboveBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );   // runden???
+                fontBuf->FB_aboveBox.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+
+                /* FB_belowBox (WBFixed)
+                        Typo: 		max(0, OS/2.sTypoDescender − head.yMin)
+                        Win:		max(0, (-OS/2.usWinDescent) − head.yMin) */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( MAX( 0, -(int)FACE_PROPERTIES.os2->usWinDescent - (int)FACE_PROPERTIES.header->yMin ), SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( MAX( 0, FACE_PROPERTIES.os2->sTypoDescender - (int)FACE_PROPERTIES.header->yMin ), SCALE_WIDTH );
+                #endif
+                fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );   // runden???
+                fontBuf->FB_belowBox.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+
+
+                /* FB_heightAdjust (WBFixed)
+                        Typo/Win:	0 */
+                fontBuf->FB_heightAdjust.WBF_int  = 0;
+                fontBuf->FB_heightAdjust.WBF_frac = 0;
+
+
+                /* FB_baseAdjust (WBFixed)
+                        Typo/Win:	0 */
+                fontBuf->FB_baseAdjust.WBF_int  = 0;
+                fontBuf->FB_baseAdjust.WBF_frac = 0;                
+
+
+                /* FB_minLSB (Pixel)
+                        Typo/Win:	hhea.minLeftSideBearing (oder min über hmtx.lsb) */
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->min_Left_Side_Bearing, SCALE_WIDTH );
+                fontBuf->FB_minLSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );   // runden???
+
+
+                /*FB_maxRSB (Pixel)
+                        pro Glyph:
+			        rsb = advanceWidth − (leftSideBearing + (xMax − xMin))
+			        FB_maxRSB = max(rsb) */
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->advance_Width_Max - (FACE_PROPERTIES.horizontal->min_Left_Side_Bearing + (FACE_PROPERTIES.header->xMax - FACE_PROPERTIES.header->xMin)), SCALE_WIDTH );
+                fontBuf->FB_maxRSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );   // runden???
+
+
+                /* FB_minTSB (Pixel) (Top Side Bearing: braucht deine Top-Referenz → Typo vs Win)
+                        Definiere pro Glyph:
+                                Typo:		topRef = OS/2.sTypoAscender
+                                Win:		topRef = OS/2.usWinAscent
+	                                        dann:	tsb = topRef − glyph.yMax
+			        
+                                FB_minTSB = min(tsb) → Pixel 
+                                
+                                Typo:           FB_minTSB = OS/2.sTypoAscender - FACE_PROPERTIES.header->yMax 
+                                Win:            FB_minTSB = OS/2.usWinAscent - FACE_PROPERTIES.header->yMax */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent - FACE_PROPERTIES.header->yMax, SCALE_WIDTH );
+                #else  
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->sTypoAscender - FACE_PROPERTIES.header->yMax, SCALE_WIDTH );
+                #endif
+                fontBuf->FB_minTSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 );   // runden???
+
+
+                /* FB_maxBSB (Pixel) (Bottom Side Bearing: braucht Bottom-Referenz → Typo vs Win)
+                        Definiere pro Glyph:
+                                Typo:		bsb = glyph.yMin − OS/2.sTypoDescender
+                                Win:		bsb = glyph.yMin − ( -OS/2.usWinDescent )
+			
+			        FB_maxBSB = max(bsb) → Pixel *
+                                
+                                Typo:           FB_maxBSB = FACE_PROPERTIES.header->yMin - OS/2.sTypoDescender 
+                                Win:            FB_maxBSB = FACE_PROPERTIES.header->yMin + OS/2.usWinDescent */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.header->yMin + FACE_PROPERTIES.os2->usWinDescent, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.header->yMin - FACE_PROPERTIES.os2->sTypoDescender, SCALE_WIDTH );
+                #endif
+                fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );   // runden???
+
+
+                /* FB_pixHeight (Pixel) 
+                        Typo:		cellUnits = (OS/2.sTypoAscender + abs(OS/2.sTypoDescender)) + FB_aboveBox + FB_belowBox
+                        Win: 		cellUnits = (OS/2.usWinAscent + OS/2.usWinDescent) + FB_aboveBox + FB_belowBox
+	                                
+                                FB_pixHeight = round_to_pixels(cellUnits) mit deiner Rasterizer-Logik (ppem/Hinting/Matrix) */
+                #ifdef WIN
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent, SCALE_WIDTH );
+                #else
+                ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->sTypoAscender + ABS( FACE_PROPERTIES.os2->sTypoDescender ), SCALE_WIDTH );
+                #endif
+                fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement ) + fontBuf->FB_aboveBox.WBF_int + fontBuf->FB_belowBox.WBF_int;   // runden???
+#endif
+
+                /* TEST ENDE */
 
                 /* fill kerning pairs and kerning values */
                 ConvertKernPairs( trueTypeVars, fontBuf );
@@ -345,10 +533,10 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         if( GLYPH_BBOX.xMin < 0 )
                                 charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
                         
-                        if( -GLYPH_BBOX.yMin > fontHeader->FH_descent )
+                        if( -GLYPH_BBOX.yMin > FACE_PROPERTIES.os2->usWinDescent )
                                 charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
-                        if( GLYPH_BBOX.yMax > fontHeader->FH_ascent )
+                        if( GLYPH_BBOX.yMax > FACE_PROPERTIES.os2->usWinAscent )
                                 charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
                 }
 
@@ -816,75 +1004,79 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
 
 
         /* Fill elements in FontBuf structure.                               */
-        ttfElement = SCALE_WORD( fontHeader->FH_avgwidth, scaleWidth );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->xAvgCharWidth, scaleWidth );
         fontBuf->FB_avgwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_avgwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxwidth, scaleWidth );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->advance_Width_Max, scaleWidth );
         fontBuf->FB_maxwidth.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_maxwidth.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleHeight );
-        fontBuf->FB_heightAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_heightAdjust.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
+        /*
+        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleHeight ); */
+        fontBuf->FB_heightAdjust.WBF_int  = 0;
+        fontBuf->FB_heightAdjust.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_height, scaleHeight );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent, scaleHeight );
         fontBuf->FB_height.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_height.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_accent, scaleHeight );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent - FACE_PROPERTIES.os2->sCapHeight, scaleHeight );
         fontBuf->FB_accent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_accent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
  
-        ttfElement = SCALE_WORD( fontHeader->FH_x_height, scaleHeight );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent - FACE_PROPERTIES.os2->sxHeight, scaleHeight );
         fontBuf->FB_mean.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_mean.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
  
-        ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleHeight );
-        fontBuf->FB_baseAdjust.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+ //       ttfElement = SCALE_WORD( fontHeader->FH_baseAdjust, scaleHeight );
+        fontBuf->FB_baseAdjust.WBF_int  = 0;
         fontBuf->FB_baseAdjust.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_ascent + fontHeader->FH_accent, scaleHeight );
-        fontBuf->FB_baselinePos.WBF_int  = ROUND_WWFIXED( ttfElement );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent, scaleHeight );
+        fontBuf->FB_baselinePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 ); // round to the next pixel
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_descent, scaleHeight );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinDescent, scaleHeight );
         fontBuf->FB_descent.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_descent.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
         fontBuf->FB_extLeading.WBF_int  = 0;
         fontBuf->FB_extLeading.WBF_frac = 0;
 
-        ttfElement = SCALE_WORD( fontHeader->FH_underPos, scaleHeight );
-        fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement ) + BASELINE_CORRECTION;
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent + DEFAULT_UNDER_POSITION( UNITS_PER_EM ), scaleHeight );
+        fontBuf->FB_underPos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_underPos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_underThick, scaleHeight );
+        ttfElement = DEFAULT_UNDER_THICK( UNITS_PER_EM ); //SCALE_WORD( fontHeader->FH_underThick, scaleHeight );
         fontBuf->FB_underThickness.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_underThickness.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_accent + fontHeader->FH_ascent - fontHeader->FH_strikePos, scaleHeight );
+        ttfElement = SCALE_WORD( DEFAULT_STRIKE_POSITION( FACE_PROPERTIES.os2->usWinAscent ), scaleHeight );
         fontBuf->FB_strikePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_strikePos.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_minTSB, scaleHeight );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent - FACE_PROPERTIES.header->yMax, scaleHeight );
+        fontBuf->FB_minTSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0xffff ); // round up to the next pixel
+        
+        ttfElement = SCALE_WORD( MAX( 0, FACE_PROPERTIES.header->yMax - (int)FACE_PROPERTIES.os2->usWinAscent ), SCALE_WIDTH );
         fontBuf->FB_aboveBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
-        fontBuf->FB_aboveBox.WBF_frac = 0;
-        fontBuf->FB_minTSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
+        fontBuf->FB_aboveBox.WBF_frac = FRACTION_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxBSB, scaleHeight );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.header->yMin + FACE_PROPERTIES.os2->usWinDescent, scaleHeight );
         fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
         fontBuf->FB_belowBox.WBF_frac = 0;
         fontBuf->FB_maxBSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_minLSB, scaleWidth );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->min_Left_Side_Bearing, scaleWidth );
         fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement ); 
 
-        ttfElement = SCALE_WORD( fontHeader->FH_maxRSB, scaleWidth );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->advance_Width_Max - (FACE_PROPERTIES.horizontal->min_Left_Side_Bearing + (FACE_PROPERTIES.header->xMax - FACE_PROPERTIES.header->xMin)), scaleWidth );
         fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement );
 
-        ttfElement = SCALE_WORD( fontHeader->FH_height, scaleHeight );
-        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement ) + fontBuf->FB_minTSB;
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent, scaleHeight );
+        fontBuf->FB_pixHeight = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 ) + fontBuf->FB_aboveBox.WBF_int + fontBuf->FB_belowBox.WBF_int;
+
 }
 
 
@@ -913,9 +1105,6 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
  * STRATEGY:       - The function adjusts font metrics and transformation
  *                   values based on whether complex transformations
  *                   (e.g., scaling, rotation) are applied.
- *                 - The initial height (`TM_heightY`) is set based on
- *                   the baseline position with a correction factor
- *                   (`BASELINE_CORRECTION`).
  *                 - If the `FontMatrix` flags indicate a complex 
  *                   transformation, additional scaling and adjustments
  *                   are applied to various metrics.
@@ -932,7 +1121,7 @@ static void AdjustFontBuf( TransformMatrix* transMatrix,
                            FontMatrix*      fontMatrix,         
                            FontBuf*         fontBuf )
 {
-        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int + BASELINE_CORRECTION;
+        transMatrix->TM_heightY = fontBuf->FB_baselinePos.WBF_int;
 
         /* transformation if rotated or scaled */
         if( fontMatrix->FM_flags & TF_COMPLEX )
