@@ -300,14 +300,29 @@ sub GenerateDefaultBuildStamp {
     my $hash = "unknown";
     my $rootDir = $ENV{ROOT_DIR};
 
-    if ( "$rootDir" && -d "$rootDir" ) {
+    if ( defined($rootDir) && $rootDir ne "" && -d "$rootDir" ) {
 	my $nullDevice = &IsUnix() ? "/dev/null" : "nul";
-	my $gitHash = `git -C "$rootDir" rev-parse --short HEAD 2>$nullDevice`;
+	my @gitCommands = (
+	    ["git", "-C", $rootDir, "rev-parse", "--short", "HEAD"],
+	    ["git", "--git-dir", "$rootDir/.git", "--work-tree", $rootDir,
+	     "rev-parse", "--short", "HEAD"],
+	);
 
-	if ( defined($gitHash) ) {
-	    $gitHash =~ s/[\r\n]+$//;
-	    if ( $gitHash =~ /^[0-9a-fA-F]+$/ ) {
-		$hash = $gitHash;
+	# Keep build output clean when git is unavailable or root isn't a repo.
+	local *STDERR;
+	open(STDERR, ">$nullDevice");
+
+	foreach my $gitCommand (@gitCommands) {
+	    my $gitHash;
+	    if ( open(GIT_HASH, "-|", @$gitCommand) ) {
+		$gitHash = <GIT_HASH>;
+		if ( close(GIT_HASH) && defined($gitHash) ) {
+		    $gitHash =~ s/[\r\n]+$//;
+		    if ( $gitHash =~ /^[0-9a-fA-F]+$/ ) {
+			$hash = $gitHash;
+			last;
+		    }
+		}
 	    }
 	}
     }
