@@ -47,6 +47,7 @@ library net noload
 #library	pcmcia noload
 library	sound
 library	wav
+library	ansic
 
 #
 # Desktop-related things
@@ -179,7 +180,7 @@ resource UserCStubXIP			code fixed read-only shared
 resource UIControlInfoXIP		read-only shared
 endif
 resource EMOMCommon			code read-only shared
-resource EMTriggerCommon		code read-only shared 
+resource EMTriggerCommon		code read-only shared
 resource UserSaveDocName		code read-only shared
 
 
@@ -785,3 +786,11 @@ incminor UIHideMinimize
 incminor TriggerRGB
 
 incminor UIStandardTimedDialog
+
+incminor
+# export TokenListIcons	<- Error D:/G6/PCGEOS/Library/User/ui.gp 791: TokenListIcons undefined4
+export TOKENLISTICONS
+
+# export TokenTestIcon
+export TOKENTESTICON
+
