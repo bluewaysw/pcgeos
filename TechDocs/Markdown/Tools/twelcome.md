@@ -1,4 +1,4 @@
-## 1 Welcome
+# 1 Welcome
 
 This manual provides full information about the GEOS 
 development tools. It also details your system 

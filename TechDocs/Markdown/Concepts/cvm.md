@@ -1,4 +1,4 @@
-## 18 Virtual Memory
+# 18 Virtual Memory
 
 Most disk-operating systems provide minimal file functionality. A file is 
 simply treated as a sequence of bytes; applications can copy data from files to 
@@ -18,7 +18,7 @@ and ["Memory Management," Chapter 15](cmemory.md). You should also be familiar w
 the GEOS file system; you should have at least skimmed ["File System," 
 Chapter 17](cfile.md), although you need not have read it in depth.
 
-### 18.1 Design Philosophy
+## 18.1 Design Philosophy
 
 The GEOS Virtual Memory file management system is designed to provide 
 features not easily available with standard file systems. Designed primarily 
@@ -60,7 +60,7 @@ can take care of opening, closing, and saving all data files which are
 based on VM files. Furthermore, data structures can be designed which 
 can be added at will into any VM file.
 
-### 18.2 VM Structure
+## 18.2 VM Structure
 
 Virtual memory can be thought of as a heap stored in a disk file. Like the 
 global heap, it is divided into blocks which are 64K or smaller; each block is 
@@ -91,7 +91,7 @@ block's location in the file. Usually, the Block Table contains entries for bloc
 that haven't been created yet; when all of these handles have been used, the 
 VM Manager expands the block table. For details, see [section 18.2.3](#1822-vm-handles).
 
-#### 18.2.1 The VM Manager
+### 18.2.1 The VM Manager
 
 The VM manager can be thought of as a memory manager for a disk-based 
 heap, providing all the services a memory manager would and more. The VM 
@@ -153,7 +153,7 @@ data. These libraries are based on the LMem library. Each item of data
 has its own DB handle as well as a VM Block handle. Database items are 
 discussed in depth in ["Database Library," Chapter 19](cdb.md).
 
-#### 18.2.3 Virtual Memory Blocks
+### 18.2.3 Virtual Memory Blocks
 
 Most file systems treat files as a string of bytes. A user can read a file 
 sequentially or can start reading at a specified distance into the file. This 
@@ -167,7 +167,7 @@ a sequence of bytes, and other operating systems can copy the file normally.
 However, GEOS geodes can access the file much more conveniently by 
 specifying the blocks they wish to access.
 
-##### 18.2.3.1 The Nature of VM Blocks
+#### 18.2.3.1 The Nature of VM Blocks
 
 A VM block is a sequence of bytes in a VM file. It must be small enough to fit 
 in a global memory block (i.e. 64K or less, preferably 2K-6K). It may move 
@@ -195,7 +195,7 @@ changed at will with the routine **VMModifyUserID()**. Note that all user IDs
 from 0xff00 to 0xffff are reserved for system use. You can find a block with a 
 specific user ID by calling **VMFind()**.
 
-##### 18.2.3.2 Creating and Using VM Blocks
+#### 18.2.3.2 Creating and Using VM Blocks
 
 There are two ways you can create a VM block. The first is to request a VM 
 block: You specify the size of the block, the block is created, and you are 
@@ -224,7 +224,7 @@ memory block, and saving it back to the disk.
 These techniques are described in detail in ["Creating and Freeing Blocks"]
 (#1834-creating-and-freeing-blocks) and ["Attaching Memory Blocks"](#1835-attaching-memory-blocks).
 
-##### 18.2.3.3 File Compaction
+#### 18.2.3.3 File Compaction
 
 When a VM block is freed, the VM manager will note that there is empty 
 space in the file. It will use that space when new blocks are allocated. 
@@ -263,7 +263,7 @@ Note that if a file is in "backup mode," the file will be compacted only on call
 to **VMSave()**, **VMSaveAs()**, or **VMRevert()**. If the file is not in backup 
 mode, it can be compacted on any call to **VMUpdate()**. 
 
-##### 18.2.3.4 File Updating and Backup
+#### 18.2.3.4 File Updating and Backup
 
 When a block is locked into memory, the VM manager copies the data from 
 the disk block to the global memory block. When the block is unlocked, the 
@@ -304,7 +304,7 @@ create a new file, which does not contain the backup blocks; that is, it
 contains the file as it currently exists. It will then revert the original file to 
 its last-saved version and close it.
 
-#### 18.2.4 VM File Attributes
+### 18.2.4 VM File Attributes
 
 VMAttributes
 
@@ -363,7 +363,7 @@ VMA_NO_DISCARD_IF_IN_USE, and
 VMA_SINGLE_THREAD_ACCESS. All of these attributes must 
 be set if the file contains object blocks. 
 
-### 18.3 Using Virtual Memory
+## 18.3 Using Virtual Memory
 
 The most common way applications will use Virtual Memory is for their data 
 files. However, there are other uses; for example, VM provides a convenient 
@@ -404,7 +404,7 @@ try to update blocks whenever they are unlocked.)
 Use **VMClose()** when you are done with the file. It will update the file 
 and close it.
 
-#### 18.3.2 Opening or Creating a VM File
+### 18.3.2 Opening or Creating a VM File
 
 VMOpen(), VMOpenTypes, VMAccessFlags
 
@@ -549,7 +549,7 @@ VM_WRITE_PROTECTED
 **VMOpen()** was passed VMAF_FORCE_READ_WRITE, but the 
 file or disk was write-protected.
 
-#### 18.3.3 Changing VM File Attributes
+### 18.3.3 Changing VM File Attributes
 
 VMGetAttributes(), VMSetAttributes()
 
@@ -563,7 +563,7 @@ takes three arguments: the file handle (which may be overridden), a set of
 bits which should be turned on, and a set of bits which should be turned off. 
 It returns the new **VMAttributes** flags.
 
-#### 18.3.4 Creating and Freeing Blocks
+### 18.3.4 Creating and Freeing Blocks
 
 VMAlloc(), VMAllocLMem(), VMFree()
 
@@ -623,7 +623,7 @@ freed, even if it is locked. Any associated memory will also be freed. If you
 want to keep the memory, detach the global memory block from the file (with 
 **VMDetach()**) before you free the block.
 
-#### 18.3.5 Attaching Memory Blocks
+### 18.3.5 Attaching Memory Blocks
 
 VMAttach(), VMDetach()
 
@@ -667,7 +667,7 @@ return the memory block's handle. If the VM block was dirty, the block will be
 updated to the file before it is detached. The next time the VM block is locked, 
 a new global memory block will be allocated for it.
 
-#### 18.3.6 Accessing and Altering VM Blocks
+### 18.3.6 Accessing and Altering VM Blocks
 
 VMLock(), VMUnlock(), VMDirty(), VMFind(), 
 VMModifyUserID(), VMPreserveBlocksHandle()
@@ -735,7 +735,7 @@ the VM file handle and the VM block handle. It sees to it that the specified VM
 block will remain attached to the same global block until the VM block is 
 specifically detached (or reattached).
 
-#### 18.3.7 VM Block Information
+### 18.3.7 VM Block Information
 
 VMVMBlockToMemBlock(), VMMemBlockToVMBlock(), VMInfo()
 
@@ -781,7 +781,7 @@ typedef struct {
 } VMInfoStruct;
 ~~~
 
-#### 18.3.8 Updating and Saving Files
+### 18.3.8 Updating and Saving Files
 
 VMUpdate(), VMSave(), VMSaveAs(), VMRevert(), 
 VMGetDirtyState() VMSave()
@@ -870,7 +870,7 @@ have backup-capability, both bytes will always be equal. Note that
 **VMUpdate()** even if the file might be clean, rather than checking the 
 dirty-state with **VMGetDirtyState()**. 
 
-#### 18.3.9 Closing Files
+### 18.3.9 Closing Files
 
 VMClose()
 
@@ -898,7 +898,7 @@ is next opened. That means, for example, that the next time you open the file,
 you can continue working on it normally, or you can immediately revert it to 
 its condition as of the last time it was saved (in the earlier GEOS session).
 
-#### 18.3.10 The VM File's Map Block
+### 18.3.10 The VM File's Map Block
 
 VMGetMapBlock(), VMSetMapBlock()
 
@@ -925,7 +925,7 @@ In addition to setting a map block, you can set a map database item with the
 command **DBSetMap()**. For details, see [section 19.2.5 of chapter 19]
 (cdb.md#1925-the-db-map-item).
 
-#### 18.3.11 File-Access Synchronization
+### 18.3.11 File-Access Synchronization
 
 VMGrabExclusive(), VMReleaseExclusive()
 
@@ -1041,7 +1041,7 @@ When a thread is done accessing a file, it should release its exclusive access
 by calling **VMReleaseExclusive()**. The routine takes one argument, 
 namely the file handle. It does not return anything.
 
-#### 18.3.12 Other VM Utilities
+### 18.3.12 Other VM Utilities
 
 VMCopyVMBlock(), VMSetReloc()
 
@@ -1087,7 +1087,7 @@ unrelocating object, not by the VM manager.
 Using the routine **VMSetReloc()**, you can instruct the VM manager to call 
 your relocation routine whenever appropriate.
 
-### 18.4 VM Chains
+## 18.4 VM Chains
 
 A VM file is just a collection of blocks. These blocks are not kept in any 
 particular order. If the application wants to keep the blocks in some kind of 
@@ -1104,7 +1104,7 @@ special "tree blocks," which may have links to any number of child blocks. By
 using these blocks, an application can set up VM trees of unlimited 
 complexity.
 
-#### 18.4.1 Structure of a VM Chain
+### 18.4.1 Structure of a VM Chain
 
 A VM chain is composed of two kinds of blocks: chain blocks (which are linked 
 to at most one other block), and tree blocks (which may be linked to any 
@@ -1167,7 +1167,7 @@ changing VMCT_count.
 _This is a sample VM tree block. It contains links to four other link (or chain) 
 blocks, and enough extra space for 0x100 bytes of data._
 
-#### 18.4.2 VM Chain Utilities
+### 18.4.2 VM Chain Utilities
 
 VMChainHandle, VMFreeVMChain(), VMCompareVMChains(), 
 VMCopyVMChain(), VMCHAIN_IS_DBITEM(), 
@@ -1230,7 +1230,7 @@ identifies a VM chain. It returns the VM handle (i.e. the more significant word
 of the structure). Finally, the macro VMCHAIN_MAKE_FROM_VM_BLOCK() 
 takes a **VMBlockHandle** value and casts it to type **VMChain**.
 
-### 18.5 Huge Arrays
+## 18.5 Huge Arrays
 
 Sometimes a geode needs to work with an array that can get very large. 
 Chunk arrays are very convenient, but they are limited to the size of an 
@@ -1265,7 +1265,7 @@ Huge arrays may have fixed-size or variable-sized elements. If elements are
 variable-sized, there is a slight increase in memory overhead, but no 
 significant slowdown in data-access time.
 
-#### 18.5.1 Structure of a Huge Array
+### 18.5.1 Structure of a Huge Array
 
 The huge array has two different type of blocks: a single directory block, and 
 zero or more data blocks. The blocks are linked together in a simple (i.e., 
@@ -1346,7 +1346,7 @@ means you cannot use a VM chain utility when any block in the chain is
 locked or while any thread might be accessing the array. If more than one 
 thread might be using the array, you should not use the chain utilities.
 
-#### 18.5.2 Basic Huge Array Routines
+### 18.5.2 Basic Huge Array Routines
 
 HugeArrayCreate(), HugeArrayDestroy(), HugeArrayLock(), 
 HugeArrayUnlock(), HugeArrayDirty(), HugeArrayAppend(), 
@@ -1519,7 +1519,7 @@ handle and the handle of the Huge Array. The routine returns the number of
 elements in the array. Since array indices begin at zero, if 
 **HugeArrayGetCount()** returns, the last element in the array has index [x-1].
 
-#### 18.5.3 Huge Array Utilities
+### 18.5.3 Huge Array Utilities
 
 HugeArrayNext(), HugeArrayPrev(), HugeArrayExpand(), 
 HugeArrayContract(), HugeArrayEnum(), 

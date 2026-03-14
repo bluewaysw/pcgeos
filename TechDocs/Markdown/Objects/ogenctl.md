@@ -2574,7 +2574,7 @@ This message sets the draw mask stored in *CSI_drawMask*.
 
 ----------
 
-####MSG_COLOR_SELECTOR_GET_PATTERN
+#### MSG_COLOR_SELECTOR_GET_PATTERN
     GraphicPattern MSG_COLOR_SELECTOR_GET_PATTERN();
 
 This message returns the pattern set in *CSI_pattern*.

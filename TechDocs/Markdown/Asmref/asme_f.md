@@ -1,7 +1,7 @@
 ## 2.2 Routines E-F
 
 ----------
-#### ECCheckBounds
+### ECCheckBounds
 Verifies that a pointer is in bounds (**ds** is a valid segment and **si** is a valid 
 offset).
 
@@ -17,7 +17,7 @@ Nothing.
 **Library:** ec.def
 
 ----------
-#### ECCheckClass
+### ECCheckClass
 Checks that the pointer actually points at a class definition.
 
 **Pass:**  
@@ -32,7 +32,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckDriverHandle
+### ECCheckDriverHandle
 Checks that the passed handle actually references a valid driver.
 
 **Pass:**  
@@ -47,7 +47,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckEventHandle
+### ECCheckEventHandle
 Checks that the passed handle references a valid **EventHandle**.
 
 **Pass:**  
@@ -62,7 +62,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckGeodeHandle
+### ECCheckGeodeHandle
 Checks that the passed handle actually references a valid geode.
 
 **Pass:**  
@@ -77,7 +77,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckGStateHandle
+### ECCheckGStateHandle
 Makes sure the passed handle actually references a valid GState.
 
 **Pass:**  
@@ -92,7 +92,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckLibraryHandle
+### ECCheckLibraryHandle
 Makes sure the passed handle actually references a valid library.
 
 **Pass:**  
@@ -107,7 +107,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckLMemHandle
+### ECCheckLMemHandle
 Ensures that the passed handle references a valid, sharable local memory 
 block.
 
@@ -123,7 +123,7 @@ Nothing.
 **Library:** ec.def
 
 ----------
-#### ECCheckLMemHandleNS
+### ECCheckLMemHandleNS
 Ensures that the passed handle references a valid local memory block, 
 ignoring issues of sharing.
 
@@ -139,7 +139,7 @@ Nothing.
 **Library:** ec.def
 
 ----------
-#### ECCheckLMemObject
+### ECCheckLMemObject
 Makes sure that the given pointer points to an object within an object block. 
 Will not allow the pointer to point to a Process object. (If it does, this routine 
 will call **FatalError**.)
@@ -156,7 +156,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckLMemOD
+### ECCheckLMemOD
 Makes sure that the given optr points to an object within an object block. Will 
 not allow the pointer to point to a Process object.
 
@@ -172,7 +172,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckLMemODCXDX
+### ECCheckLMemODCXDX
 Checks that the passed **cx:dx** is a valid optr to an LMem-based object (not a 
 Process).
 
@@ -188,7 +188,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### ECCheckMemHandle
+### ECCheckMemHandle
 Checks the validity of a passed global memory handle.
 
 **Pass:**  
@@ -203,7 +203,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckMemHandleNS
+### ECCheckMemHandleNS
 Checks the validity of the passed memory handle, ignoring sharing violation 
 errors (when a block should be sharable but is not).
 
@@ -220,7 +220,7 @@ routine was called.
 **Library:** ec.def
 
 ----------
-#### ECCheckObject
+### ECCheckObject
 Ensures that the locked object is valid. This routine can check both local 
 memory objects and Process objects.
 
@@ -237,7 +237,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckOD
+### ECCheckOD
 Ensures that the optr passed references an object. This routine considers 
 Process objects valid, unlike **ECCheckLMemOD**.
 
@@ -253,7 +253,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckODCXDX
+### ECCheckODCXDX
 Checks to see if the passed **cx:dx** is a valid optr.
 
 **Pass:**  
@@ -268,7 +268,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### ECCheckProcessHandle
+### ECCheckProcessHandle
 Checks that the passed handle actually references a valid Process.
 
 **Pass:**  
@@ -283,7 +283,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckQueueHandle
+### ECCheckQueueHandle
 Checks that the passed handle actually references a valid event queue.
 
 **Pass:**  
@@ -298,7 +298,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckResourceHandle
+### ECCheckResourceHandle
 Checks that the passed handle actually references a valid resource (device).
 
 **Pass:**  
@@ -313,7 +313,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckSegment
+### ECCheckSegment
 Checks that the passed segment value actually points to a locked block.
 
 **Pass:**  
@@ -328,7 +328,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckThreadHandle
+### ECCheckThreadHandle
 Checks that the passed handle actually references a valid thread.
 
 **Pass:**  
@@ -343,7 +343,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ECCheckUILMemOD
+### ECCheckUILMemOD
 Checks that the passed optr references a valid UI-run object (not a Process).
 
 **Pass:**  
@@ -358,7 +358,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### ECCheckUILMemODCXDX
+### ECCheckUILMemODCXDX
 Checks that the passed cx:dx is a valid optr pointing to a UI-run object in an 
 object block (not a Process).
 
@@ -374,7 +374,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### ECCheckWindowHandle
+### ECCheckWindowHandle
 Checks that the passed handle actually references a valid window.
 
 **Pass:**  
@@ -389,7 +389,7 @@ Nothing. Flags are preserved.
 **Library:** ec.def
 
 ----------
-#### ElementArrayAddElement
+### ElementArrayAddElement
 Add an element to a given element array. If the element already exists, its 
 reference count will be incremented.
 
@@ -427,7 +427,7 @@ CF - Set if the elements are equal.
 dereference all stored pointers after a call to this routine.
 
 ----------
-#### ElementArrayAddReference
+### ElementArrayAddReference
 Increments the reference count for an element in an element array.
 
 **Pass:**  
@@ -443,7 +443,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ElementArrayCreate
+### ElementArrayCreate
 Creates a new element array in the specified chunk. The new array will have 
 no elements.
 
@@ -467,7 +467,7 @@ Nothing.
 stored pointers must be dereferenced.
 
 ----------
-#### ElementArrayDelete
+### ElementArrayDelete
 Deletes an element regardless of its reference count.
 
 **Pass:**  
@@ -483,7 +483,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ElementArrayElementChanged
+### ElementArrayElementChanged
 Checks to see if a recently changed element is now equal to another element 
 If the element is now a duplicate, it will be combined with the other element, 
 and the other element's reference count will be incremented.
@@ -516,7 +516,7 @@ CF  Set if elements are equal, clear otherwise.
 **Library:** chunkarr.def
 
 ----------
-#### ElementArrayGetUsedCount
+### ElementArrayGetUsedCount
 Returns the number of elements in the array that actually hold data.
 
 **Pass:**  
@@ -545,7 +545,7 @@ otherwise.
 **Library:** chunkarr.def
 
 ----------
-#### ElementArrayRemoveReference
+### ElementArrayRemoveReference
 Removes a reference to the specified element, removing the element itself if 
 the reference count drops to zero.
 
@@ -573,7 +573,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ElementArrayTokenToUsedIndex
+### ElementArrayTokenToUsedIndex
 Returns the index of an element with respect to used elements in the array, 
 given its token.
 
@@ -604,7 +604,7 @@ CF - Set if the element qualifies as "used."
 **Library:** chunkarr.def
 
 ----------
-#### ElementArrayUsedIndexToToken
+### ElementArrayUsedIndexToToken
 Returns the token of an element given its index with respect to used elements 
 in the array.
 
@@ -636,7 +636,7 @@ CF - Set if the element passed qualifies as "used."
 **Library:** chunkarr.def
 
 ----------
-#### FatalError
+### FatalError
 Indicates that a fatal error has been encountered within an application. Note 
 that it is impossible to return from a fatal error. This routine is meant to 
 identify what precipitated the fatal error.
@@ -654,7 +654,7 @@ Not applicable
 **Library:** ec.def
 
 ----------
-#### FileAddStandardPathDirectory
+### FileAddStandardPathDirectory
 Adds the specified directory to the standard path table.
 
 **Pass:**  
@@ -672,7 +672,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileClose
+### FileClose
 Close an open file.
 
 **Pass:**  
@@ -690,7 +690,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCommit
+### FileCommit
 Commits a file to the disk by forcing all changes to be written out.
 
 **Pass:**  
@@ -708,7 +708,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileComparePaths
+### FileComparePaths
 Compares two paths, returning their relationship.
 
 **Pass:**  
@@ -736,7 +736,7 @@ deal with links; call **FileConstructActualPath** on each path if you suspect
 either involves links.
 
 ----------
-#### FileConstructActualPath
+### FileConstructActualPath
 Similar to **FileConstructFullPath**, this routine also replaces links with 
 their actual targets. It creates a full path string from the passed information.
 
@@ -773,7 +773,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileConstructFullPath
+### FileConstructFullPath
 Constructs a full path given a standard path constant and a path relative to 
 the standard path. This routine does not resolve links; instead, use 
 **FileConstructActualPath**.
@@ -811,7 +811,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCopy
+### FileCopy
 Copies a source file into a destination file. If the destination file does not 
 already exist, it will be created. Any existing destination file with the same 
 name will be truncated and overwritten.
@@ -842,7 +842,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCopyExtAttributes
+### FileCopyExtAttributes
 Copies all the extended file attributes from an open file into another named 
 file.
 
@@ -860,7 +860,7 @@ ax, if not returned.
 **Library:** file.def
 
 ----------
-#### FileCopyLocal
+### FileCopyLocal
 Copies the source file to the destination file. If the destination file does not 
 exist, this routine will create it; if the destination file already exists, it will be 
 truncated to accommodate the new source.
@@ -894,7 +894,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCopyPathExtAttributes
+### FileCopyPathExtAttributes
 Copies the extended attributes of a file to another file without opening either 
 file.
 
@@ -914,7 +914,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCreate
+### FileCreate
 Creates a new file or truncates an existing file.
 
 **Pass:**  
@@ -947,7 +947,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCreateDir
+### FileCreateDir
 Creates a new directory.
 
 **Pass:**  
@@ -965,7 +965,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileCreateTempFile
+### FileCreateTempFile
 Creates a temporary file with a unique name.
 
 **Pass:**  
@@ -988,7 +988,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileDelete
+### FileDelete
 Deletes the specified file.
 
 **Pass:**  
@@ -1007,7 +1007,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileDeleteDir
+### FileDeleteDir
 Deletes a directory and all the files and subdirectories within it.
 
 **Pass:**  
@@ -1027,7 +1027,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileDeleteStandardPathDirectory
+### FileDeleteStandardPathDirectory
 Deletes the specified directory from the standard path table.
 
 **Pass:**  
@@ -1045,7 +1045,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileDuplicateHandle
+### FileDuplicateHandle
 Duplicates the passed handle, returning a new handle referring to the same 
 file.
 
@@ -1063,7 +1063,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileEnum
+### FileEnum
 Enumerates all files in a directory, calling a callback routine for each. This 
 routine receives its parameters on the stack; the parameter structure is not 
 returned on the stack but is instead popped during the routine's execution.
@@ -1138,7 +1138,7 @@ the callback routine.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumLocateAttr
+### FileEnumLocateAttr
 Locates an extended attribute within an array of **FileExtAttrDesc** 
 structures. This routine usually acts as a "helper" of **FileEnum** callback 
 routines.
@@ -1161,7 +1161,7 @@ es, di if attribute searched for was not found.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumPtr
+### FileEnumPtr
 This routine performs an enumeration identical to **FileEnum** except that it 
 accepts a pointer to a **FileEnumParams** structure rather than needing all 
 of the parameters passed on the stack. It is, therefore, somewhat simpler to 
@@ -1204,7 +1204,7 @@ the callback routine.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumWildcard
+### FileEnumWildcard
 Checks if the virtual name of the current file matches the pattern passed to 
 **FileEnum** in *FEP_cbData1*. In this case, *FEP_cbData1* is cast to a far pointer 
 to the name string. This routine acts as a **FileEnum** "helper" routine.
@@ -1228,7 +1228,7 @@ Nothing.
 **Library:** fileEnum.def
 
 ----------
-#### FileGetAttributes
+### FileGetAttributes
 Retrieves a file's attributes.
 
 **Pass:**  
@@ -1247,7 +1247,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileGetCurrentPath
+### FileGetCurrentPath
 Returns the thread's current directory. If the directory is a standard path, the 
 returned disk handle (**bx**) will actually be a **StandardPath** constant and the 
 buffer will contain a relative path. To retrieve a full path, use 
@@ -1274,7 +1274,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileGetCurrentPathIDs
+### FileGetCurrentPathIDs
 Returns an array of **FilePathID** structures for the current path. These IDs 
 may be used in handling file change notification messages.
 
@@ -1293,7 +1293,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileGetDateAndTime
+### FileGetDateAndTime
 Returns the modification date and time of an open file.
 
 **Pass:**  
@@ -1309,7 +1309,7 @@ ax
 **Library:** file.def
 
 ----------
-#### FileGetDiskHandle
+### FileGetDiskHandle
 Retrieves the disk handle of an open file.
 
 **Pass:**  
@@ -1325,7 +1325,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileGetHandleExtAttributes
+### FileGetHandleExtAttributes
 Retrieves one or more extended attributes of the specified open file. This 
 routine is similar to **FileGetPathExtAttributes** except that the file must 
 be open.
@@ -1359,7 +1359,7 @@ Nothing. (**ax** destroyed if CF clear).
 **Library:** file.def
 
 ----------
-#### FileGetPathExtAttributes
+### FileGetPathExtAttributes
 Retrieves one or more extended attributes from the file whose path is 
 specified. This routine is similar to **FileGetHandleExtAttributes** but 
 specifies the file by its path rather than its handle.
@@ -1394,7 +1394,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileLockRecord
+### FileLockRecord
 Locks a region of a file. The region may later be unlocked with 
 **FileUnlockRecord**. This routine does not keep other threads from using or 
 writing to the file; it only keeps others from locking the same region.
@@ -1414,7 +1414,7 @@ Nothing. (**ax** destroyed if CF clear).
 **Library:** file.def
 
 ----------
-#### FileMove
+### FileMove
 Moves a file or subdirectory from one place in the file system to another. Some 
 file systems will allow directories to be moved across volumes, but other file 
 systems will return an error in this case. Files, however, will always be 
@@ -1454,7 +1454,7 @@ source or destination. To fix this, call **FileConstructActualPath** on either
 or both paths before calling **FileMove**.
 
 ----------
-#### FileOpen
+### FileOpen
 Opens an existing file.
 
 **Pass:**  
@@ -1480,7 +1480,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileOpenAndRead
+### FileOpenAndRead
 Opens a file and reads its contents into a memory block.
 
 **Pass:**  
@@ -1503,7 +1503,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileParseStandardPath
+### FileParseStandardPath
 Constructs the best combination of a **StandardPath** constant and a relative 
 path. If the file system on which GEOS resides is case-insensitive, then the 
 passed path must be in all upper case for it to be properly recognized.
@@ -1526,7 +1526,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FilePos
+### FilePos
 Sets an open file's read/write position.
 
 **Pass:**  
@@ -1549,7 +1549,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileRead
+### FileRead
 Reads a number of bytes from an open file.
 
 **Pass:**  
@@ -1573,7 +1573,7 @@ Nothing. (ax is destroyed if CF is set.)
 **Library:** file.def
 
 ----------
-#### FileRename
+### FileRename
 Renames the specified file. This routine may not be used for moving a file to 
 a new directory; use **FileMove** for that purpose.
 
@@ -1595,7 +1595,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileResolveStandardPath
+### FileResolveStandardPath
 Given a path and the current directory (set to a **StandardPath**), searches 
 the sub-directories of the standard path and returns both the full path of the 
 desired file and its disk handle.
@@ -1625,7 +1625,7 @@ ah, cx (bx if CF is set)
 **Library:** file.def
 
 ----------
-#### FileSetAttributes
+### FileSetAttributes
 Sets a file's FileAttrs record.
 
 **Pass:**  
@@ -1649,7 +1649,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileSetCurrentPath
+### FileSetCurrentPath
 Sets the current directory of the calling thread.
 
 **Pass:**  
@@ -1674,7 +1674,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileSetDateAndTime
+### FileSetDateAndTime
 Sets an open file's modification date and time attributes.
 
 **Pass:**  
@@ -1693,7 +1693,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileSetHandleExtAttributes
+### FileSetHandleExtAttributes
 Sets one or more of an open file's extended attributes, given the file's handle. 
 This is similar to **FileSetPathExtAttributes** except it specifies the file by 
 its handle rather than its name.
@@ -1722,7 +1722,7 @@ Nothing. (ax is destroyed if CF is clear.)
 **Library:** file.def
 
 ----------
-#### FileSetPathExtAttributes
+### FileSetPathExtAttributes
 Sets one or more of a file's extended attributes, given the file's path. This is 
 similar to **FileSetHandleExtAttributes** except it specifies the file by its 
 name rather than its handle.
@@ -1752,7 +1752,7 @@ Nothing. (ax is destroyed if CF is returned clear.)
 **Library:** file.def
 
 ----------
-#### FileSetStandardPath
+### FileSetStandardPath
 Changes the thread's current directory to one of the standard system paths.
 
 **Pass:**  
@@ -1767,7 +1767,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileSize
+### FileSize
 Returns the size of an open file, in bytes.
 
 **Pass:**  
@@ -1782,7 +1782,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileStdPathCheckIfSubDir
+### FileStdPathCheckIfSubDir
 Checks if the given **StandardPath** constant is actually a subdirectory of 
 another **StandardPath**.
 
@@ -1801,7 +1801,7 @@ Nothing.
 **Library:** file.def
 
 ----------
-#### FileTruncate
+### FileTruncate
 Truncates the given file to the passed length.
 
 **Pass:**  
@@ -1821,7 +1821,7 @@ cx, dx
 **Library:** file.def
 
 ----------
-#### FileUnlockRecord
+### FileUnlockRecord
 Unlocks a region of an open file previously locked with **FileLockRecord**.
 
 **Pass:**  
@@ -1839,7 +1839,7 @@ Nothing. (ax is destroyed if CF is clear.)
 **Library:** file.def
 
 ----------
-#### FileWrite
+### FileWrite
 Writes a string of bytes from a buffer to an open file.
 
 **Pass:**  
@@ -1866,7 +1866,7 @@ Nothing. (ax is destroyed if CF is clear.)
 there or append bytes to the end of the file.
 
 ----------
-#### FloatAsciiToFloat
+### FloatAsciiToFloat
 Converts a number represented in an ASCII text format into a GEOS FP 
 number. The routine recognizes two flags:
 
@@ -1894,7 +1894,7 @@ error-checking on the string is performed.
 **Library:** math.def
 
 ----------
-#### FloatComp
+### FloatComp
 Compares the top two FP numbers on the current floating point stack.
 
 **Pass:**  
@@ -1915,7 +1915,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatCompAndDrop
+### FloatCompAndDrop
 Compares the top two FP numbers on the current floating point stack.
 
 **Pass:**  
@@ -1936,7 +1936,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatCompESDI
+### FloatCompESDI
 Compares the top number of the FP stack with a number pointed at by 
 **es:di**. 
 
@@ -1954,7 +1954,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatCompPtr
+### FloatCompPtr
 Compares the top two FP numbers.
 
 **Pass:**  
@@ -1972,7 +1972,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatDateNumberGetMonthAndDay
+### FloatDateNumberGetMonthAndDay
 Given a GEOS date number, extracts the month and day.
 
 **Pass:**  
@@ -1989,7 +1989,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatDwordToFloat
+### FloatDwordToFloat
 Converts a signed double-word integer into a floating point number. The 
 floating point number is placed on the FP stack.
 
@@ -2005,7 +2005,7 @@ ax, dx
 **Library:** math.def
 
 ----------
-#### FloatEq0
+### FloatEq0
 Checks whether the number on top of the FP stack is equivalent to zero.
 
 **Pass:**  
@@ -2021,7 +2021,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatExit
+### FloatExit
 Frees the floating point stack for the current thread.
 
 **Pass:**  
@@ -2036,7 +2036,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatFloatToAscii
+### FloatFloatToAscii
 Converts a GEOS floating point number into an ASCII string. The FP number 
 on top of the FP stack is operated on unless 
 *FFA_stackFrame*.FFA_FROM_ADDR is passed a value of 1.
@@ -2061,7 +2061,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatFloatToAscii_StdFormat
+### FloatFloatToAscii_StdFormat
 Converts an FP number into an ASCII string using the format passed in al. 
 This routine provides a means of converting a GEOS FP number into an ASCII 
 string without having to set up the *FFA_stackFrame* required in 
@@ -2118,7 +2118,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatGeos80ToIEEE32
+### FloatGeos80ToIEEE32
 Converts a GEOS 80 bit FP number into a 32 bit IEEE-standard FP number.
 
 **Pass:**  
@@ -2133,7 +2133,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatGeos80ToIEEE64
+### FloatGeos80ToIEEE64
 Converts a GEOS FP number into a 64 bit IEEE-standard FP number and 
 pushes it onto the FP stack.
 
@@ -2149,7 +2149,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatGetDateNumber
+### FloatGetDateNumber
 Creates a GEOS date number for the given date.
 
 **Pass:**  
@@ -2168,7 +2168,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatGetDaysInMonth
+### FloatGetDaysInMonth
 This utility routine calculates the number of days in a month when also given 
 its year.
 
@@ -2185,7 +2185,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatGetStackDepth
+### FloatGetStackDepth
 Returns the current depth (in number of elements) of the floating point stack.
 
 **Pass:**  
@@ -2200,7 +2200,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatGetTimeNumber
+### FloatGetTimeNumber
 Calculates a GEOS time number given integral time data. GEOS time 
 numbers are consecutive decimal values that correspond to times from 
 midnight (0.000000) through 11:59:59 PM (0.999988).
@@ -2221,7 +2221,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatGt0
+### FloatGt0
 Checks whether the number on top of the FP stack is greater than zero.
 
 **Pass:**  
@@ -2237,7 +2237,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatIEEE32ToGeos80
+### FloatIEEE32ToGeos80
 Converts a 32 bit IEEE-standard FP number into a GEOS 80 bit FP number.
 
 **Pass:**  
@@ -2252,7 +2252,7 @@ ax, dx
 **Library:** math.def
 
 ----------
-#### FloatIEEE64ToGeos80
+### FloatIEEE64ToGeos80
 Converts a 64 bit IEEE-standard FP number into a GEOS 80 bit FP number.
 
 **Pass:**  
@@ -2268,7 +2268,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatInit
+### FloatInit
 Initializes a floating point stack for the current thread. This routine allocates 
 a block of memory for this purpose and makes note of it in 
 **ThreadPrivateData**.
@@ -2291,7 +2291,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatLt0
+### FloatLt0
 Checks whether the number on top of the FP stack is less than zero.
 
 **Pass:**  
@@ -2307,7 +2307,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatPick
+### FloatPick
 Selects an FP number on the floating point stack, copies it, and pushes it on 
 top of the FP stack. The entire stack is pushed in the process. For example, 
 **FloatPick** passed with a value of 3 would copy the contents of the third 
@@ -2327,7 +2327,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatPopNumber
+### FloatPopNumber
 Pops a floating point number off the FP stack into a passed location.
 
 **Pass:**  
@@ -2342,7 +2342,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatPushNumber
+### FloatPushNumber
 Pushes an FP number onto the top of the FP stack for the current thread 
 from a passed buffer. The number must be already set up in 80 bit, FP 
 format.
@@ -2359,7 +2359,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatRandomize
+### FloatRandomize
 Primes the random number generator, in preparation for a call to 
 **FloatRandom** or **FloatRandomN**. If **FloatRandomize** is passed the 
 flag RGIF_USE_SEED, the routine must also pass a developer supplied seed.
@@ -2380,7 +2380,7 @@ ax, dx
 **Library:** math.def
 
 ----------
-#### FloatRoll
+### FloatRoll
 Pushes a selected FP number onto the top of the stack, removing it from its 
 previous location in the process. **FloatRoll** passed with a value of 3 would 
 move the FP number in the third stack position onto the top of the stack, 
@@ -2400,7 +2400,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatRollDown
+### FloatRollDown
 Performs the inverse operation of **FloatRoll**, popping the top stack value 
 into a specified location on the stack. **FloatRollDown** passed with a value 
 of 3 would move the FP number on top of the stack into the third stack 
@@ -2419,7 +2419,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatRound
+### FloatRound
 Rounds the top FP stack number to a given number of decimal places. 
 **FloatRound** passed with zero as an argument rounds the top FP number 
 to the nearest integer, rounding up if greater than or equal to .5, rounding 
@@ -2438,7 +2438,7 @@ ax
 **Library:** math.def
 
 ----------
-#### FloatSetStackDepth
+### FloatSetStackDepth
 Sets the depth of the FP stack.
 
 **Pass:**  
@@ -2453,7 +2453,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatSetStackPointer
+### FloatSetStackPointer
 Sets the floating point stack pointer to a previous position saved with 
 **FloatGetStackPointer**. This routine must be passed a value that is 
 greater than or equal to the current value of the stack pointer. (I.e. you 
@@ -2471,7 +2471,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatSetStackSize
+### FloatSetStackSize
 Sets the size of the FP stack.
 
 **Pass:**  
@@ -2486,7 +2486,7 @@ Nothing.
 **Library:** math.def
 
 ----------
-#### FloatStringGetDateNumber
+### FloatStringGetDateNumber
 Parses a string containing a date and returns its date number.
 
 **Pass:**  
@@ -2503,7 +2503,7 @@ ax - **DateTimeFormat** used.
 **Library:** math.def
 
 ----------
-#### FloatStringGetTimeNumber
+### FloatStringGetTimeNumber
 Parses a string containing a time and returns its time number.
 
 **Pass:**  
@@ -2519,7 +2519,7 @@ al - (If CF is set) error code (FLOAT_GEN_ERR).
 **Library:** math.def
 
 ----------
-#### FloatWordToFloat
+### FloatWordToFloat
 Converts a signed integer (word value) into a GEOS 80 bit floating point 
 number on the FP stack.
 
@@ -2535,7 +2535,7 @@ ax, dx
 **Library:** math.def
 
 ----------
-#### FlowCheckKbdShortcut
+### FlowCheckKbdShortcut
 Determines whether the key-press event maps to a shortcut.
 
 **Pass:**  
@@ -2558,7 +2558,7 @@ Nothing.
 **Library:** uiInputC.def
 
 ----------
-#### FlowDispatchSendOnOrDestroyClassedEvent
+### FlowDispatchSendOnOrDestroyClassedEvent
 This utility routine relays a classed routine.
 
 **Pass:**  
@@ -2593,7 +2593,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### FlowGetTargetAtTargetLevel
+### FlowGetTargetAtTargetLevel
 This routine retrieves the target within the current level of the target 
 hierarchy.
 
@@ -2629,7 +2629,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### FlowGetUIButtonFlags
+### FlowGetUIButtonFlags
 Returns the current **UIButtonFlags**.
 
 **Pass:**  
@@ -2644,7 +2644,7 @@ Nothing.
 **Library:** uiInputC.def
 
 ----------
-#### FlowReleaseGrab
+### FlowReleaseGrab
 Releases the grab of the current OD if it matches that passed. The object is 
 sent a MSG_META_LOST_..._EXCL (if specified) and the OD and data word are 
 zeroed out to indicate that there is no current grab.
@@ -2677,7 +2677,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### FlowRequestGrab
+### FlowRequestGrab
 This routine grants the grab to the OD passed if there is no active grab. If the 
 OD passed matches that in existence then the data word is updated and no 
 message is sent.
@@ -2711,7 +2711,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### FlowTranslatePassiveButton
+### FlowTranslatePassiveButton
 This routine translates a MSG_META_PRE_PASSIVE_BUTTON or 
 MSG_META_POST_PASSIVE_BUTTON to a generic message.
 
@@ -2733,7 +2733,7 @@ Nothing.
 **Library:** uiInputC.def
 
 ----------
-#### FlowUpdateHierarchicalGrab
+### FlowUpdateHierarchicalGrab
 Update exclusive based on passed message.
 
 **Pass:**  

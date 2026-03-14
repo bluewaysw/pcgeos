@@ -1,10 +1,10 @@
-## 2 Setting Up
+# 2 Setting Up
 
 Setting up your system involves setting up your hardware and installing 
 software on it. This chapter explains how to do both and then provides a 
 sequence of steps and troubleshooting tips to test your setup.
 
-### 2.1 What You'll Need
+## 2.1 What You'll Need
 
 This development kit includes much of the software you will need to write 
 and debug GEOS applications. It does not, however, include a C compiler or 
@@ -49,7 +49,7 @@ Gender Changers and/or Adapters for Serial Cables
 Depending on the cables and connectors you have, you may 
 need one or more serial line gender changers or other adapters.
 
-#### 2.1.2 Software You'll Need
+### 2.1.2 Software You'll Need
 
 As stated above, this kit does not provide all the software you'll need. Both 
 the host and target machines must be loaded with some version of DOS, and 
@@ -63,7 +63,7 @@ You may also want to use a task-switching environment on the host machine
 to make switching between coding, compiling, and debugging easier and 
 quicker.
 
-### 2.2 Setting Up the Hardware
+## 2.2 Setting Up the Hardware
 
 First, set up your two PCs according to their included instructions (if any). 
 Keep in mind that you will be switching frequently between the two 
@@ -82,7 +82,7 @@ in Figure 1-1.
 *__Figure 1-1__ Workstation Setup
 The test and development PCs communicate via a null modem serial connection.*
 
-#### 2.3 Installing the Software
+## 2.3 Installing the Software
 
 Once you have finished setting up your machines and have connected the 
 serial cable, you must install the GEOS development kit. Place the SDK 
@@ -127,7 +127,7 @@ does not work, check that you are using the proper hardware configurations.
 If one or both of the two GEOS directories does not exist, try reinstalling the 
 target disks.
 
-### 2.4 Testing the Configuration
+## 2.4 Testing the Configuration
 
 Once you have finished installing all the software, your system should be 
 ready for you to begin programming. To check it, however, run through the 

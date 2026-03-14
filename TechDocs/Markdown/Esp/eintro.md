@@ -1,4 +1,4 @@
-## 1 Introduction to Esp
+# 1 Introduction to Esp
 
 This software development kit is geared towards C programmers. The SDK is 
 based around the GEOS-specific language Goc, which is based on C. Very few 
@@ -11,7 +11,7 @@ assembly. Furthermore, the SDK is not intended to teach assembly language;
 you should be familiar with 80x86 assembly before you attempt to program 
 in Esp.
 
-### 1.1 What is Esp?
+## 1.1 What is Esp?
 
 Esp is an 80x86 assembly language specially designed for GEOS 
 programming. In many ways, it is very similar to other common 80x86 
@@ -43,7 +43,7 @@ in Goc and Esp. In particular, they will let you compare Esp and Goc
 techniques for creating structures and classes, and compare Goc and Espire 
 techniques for creating objects and classes.
 
-### 1.2 Should I Use Esp?
+## 1.2 Should I Use Esp?
 
 Not everyone will want to use Esp. For many programmers, assembly 
 language is much harder to use than high-level languages like Goc. You may 
@@ -70,7 +70,7 @@ new object classes, you can write the message handlers in Esp; any
 application that uses those objects will be able to take advantage of the added 
 efficiency of Esp, even if the application is written in Goc.
 
-### 1.3 Roadmap to the Esp Book
+## 1.3 Roadmap to the Esp Book
 
 The Esp book is fairly short. This is because its main role is to help you 
 integrate knowledge you already have. You should already know how to 

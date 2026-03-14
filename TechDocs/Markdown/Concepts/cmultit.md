@@ -1,4 +1,4 @@
-## B Threads and Semaphores
+# B Threads and Semaphores
 
 One of the most impressive features of GEOS is its ability to perform 
 several tasks simultaneously, even on the least powerful PCs. Of course, the 
@@ -22,7 +22,7 @@ application, be careful not to send a message with **@call** from an object run
 by a user interface thread to an object run by any other thread of the 
 application.
 
-### B.1 Multitasking Goals
+## B.1 Multitasking Goals
 
 The GEOS multitasking system is one of the most sophisticated available 
 for PCs today. It was designed with the latest available technology and was 
@@ -51,7 +51,7 @@ GEOS (by designing a program to perform more than one task
 concurrently) the system is designed to make this as simple and 
 efficient as possible.
 
-### B.2 Two Models of Multitasking
+## B.2 Two Models of Multitasking
 
 Many operating systems provide the ability to carry out multiple tasks at 
 the same time. While each operating system has its own unique way of 
@@ -138,7 +138,7 @@ programmers need not concern themselves with it.
 This is exactly how GEOS coordinates its resources, as you shall see in the 
 following sections.
 
-### B.3 GEOS Multitasking
+## B.3 GEOS Multitasking
 
 GEOS implements a preemptive multitasking scheme. Application 
 programs are required to follow certain "good citizen" rules and are 
@@ -292,7 +292,7 @@ on each other must keep track of each other's progress in order to avoid
 this; when potential problems are identified, use semaphores to keep the 
 threads in line (see [section B.5](#b5-synchronizing-threads)).
 
-### B.4 Using Multiple Threads
+## B.4 Using Multiple Threads
 
 It is possible for an application to create additional threads for a variety of 
 purposes. For example, a terminal emulation program might have a thread 
@@ -499,7 +499,7 @@ same messages as described above. You may write a special handler for
 MSG_META_DETACH when you subclass **ProcessClass**, but be sure to end 
 the handler with **@callsuper()** so the thread exits properly.
 
-### B.5 Synchronizing Threads
+## B.5 Synchronizing Threads
 
 Because GEOS is a preemptive multitasking environment, it needs a way 
 to prevent two threads from accessing system resources (or other shared 

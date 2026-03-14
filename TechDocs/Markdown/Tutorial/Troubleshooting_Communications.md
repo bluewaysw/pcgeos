@@ -1,4 +1,4 @@
-## Troubleshooting Communications
+# Troubleshooting Communications
 
 The SDK install scripts work well for those programmers who know which 
 COM ports and IRQ levels their machines will use when communicating. 

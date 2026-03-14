@@ -1,6 +1,6 @@
 ## 4.3 Data Structures L-Z
 ----------
-#### Language
+### Language
     typedef ByteEnum Language;
         #define L_DEFAULT               0
         #define L_GRAPHIC               0
@@ -13,7 +13,7 @@
         #define L_DUTCH                 7
 
 ----------
-#### LargeMouseData
+### LargeMouseData
     typedef struct {
         PointDWFixed                LMD_location;
         byte                        LMD_buttonInfo;
@@ -21,7 +21,7 @@
     } LargeMouseData;
 
 ----------
-#### LayerPriority
+### LayerPriority
     typedef ByteEnum LayerPriority;
         #define LAYER_PRIO_MODAL                 6
         #define LAYER_PRIO_ON_TOP                8
@@ -29,7 +29,7 @@
         #define LAYER_PRIO_ON_BOTTOM            14
 
 ----------
-#### LexicalOrder
+### LexicalOrder
     typedef ByteEnum LexicalOrder;
         #define LEX_SPACE                   0x20
         #define LEX_NONBRKSPACE             1
@@ -257,7 +257,7 @@
         #define LEX_CARON                   223
 
 ----------
-#### LexFirstOrder
+### LexFirstOrder
     typedef ByteEnum Lex1stOrder;
         #define LEX1_SPACE                  0x20
         #define LEX1_EXCLAMATION            1
@@ -382,7 +382,7 @@
         #define LEX1_CARON              120
 
 ----------
-#### LibraryCallType
+### LibraryCallType
     typedef enum /* word */ {
         LCT_ATTACH,             /* The library was just loaded. */
         LCT_DETACH,             /* The library is about to be unloaded. */
@@ -399,7 +399,7 @@ take a value of this enumerated type to determine what, if anything, is to be
 done.
 
 ----------
-#### LineAttr
+### LineAttr
     typedef struct {
         byte            LA_colorFlag;
         RGBValue        LA_color;
@@ -412,7 +412,7 @@ done.
     } LineAttr;
 
 ----------
-#### LineEnd
+### LineEnd
     typedef ByteEnum LineEnd;
         #define LE_BUTTCAP              0
         #define LE_ROUNDCAP             1
@@ -423,7 +423,7 @@ Line ends determine how the graphics system will draw the end of a line
 segment.
 
 ----------
-#### LineJoin
+### LineJoin
     typedef ByteEnum LineJoin;
         #define LJ_MITERED                  0
         #define LJ_ROUND                    1
@@ -434,7 +434,7 @@ This enumerated type determines how the graphics system will draw corners
 of rectangles and polylines.
 
 ----------
-#### LineStyle
+### LineStyle
     typedef ByteEnum LineStyle;
         #define LS_SOLID                    0
         #define LS_DASHED                   1
@@ -448,7 +448,7 @@ The **LineStyle** type describes a line's "dottedness." Lines using custom
 dashes will work with the **DashPairArray** structure.
 
 ----------
-#### LMemBlockHeader
+### LMemBlockHeader
     typedef struct {
         MemHandle       LMBH_handle;
         word            LMBH_offset;
@@ -507,7 +507,7 @@ automatically maintained by the LMem routines.
 **See Also:** LMemInitHeap()
 
 ----------
-#### LMemType
+### LMemType
     typdef enum {
         LMEM_TYPE_GENERAL,
         LMEM_TYPE_WINDOW,
@@ -568,19 +568,19 @@ DB routines, which see to it that the blocks are created.
 **Include:** lmem.h
 
 ----------
-#### LocalDistanceFlags
+### LocalDistanceFlags
     typedef WordFlags LocalDistanceFlags;
         #define LDF_FULL_NAMES                      0x8000
         #define LDF_PRINT_PLURAL_IF_NEEDED          0x4000
 
 ----------
-#### LocalCmpStringsDosToGeosFlags
+### LocalCmpStringsDosToGeosFlags
     typedef ByteFlags LocalCmpStringsDosToGeosFlags;
         #define LCSDTG_NO_CONVERT_STRING_2              0x02
         #define LCSDTGF_NO_CONVERT_STRING_1             0x01
 
 ----------
-#### LocalCurrencyFormat
+### LocalCurrencyFormat
     typedef struct {
         byte    CurrencyFormatFlags;
         byte    currencyDigits;
@@ -590,7 +590,7 @@ DB routines, which see to it that the blocks are created.
     } LocalCurrencyFormat;
 
 ----------
-#### LocalMemoryFlags
+### LocalMemoryFlags
     typedef WordFlags LocalMemoryFlags;
         #define LMF_HAS_FLAGS               0x8000
         #define LMF_IN_RESOURCE             0x4000
@@ -691,7 +691,7 @@ blocks.
 **Include:** lmem.h
 
 ----------
-#### LocalNumericFormat
+### LocalNumericFormat
     typedef struct {
         byte    numberFormatFlags;
         byte    decimalDigits;
@@ -701,7 +701,7 @@ blocks.
     } LocalNumericFormat;
 
 ----------
-#### LocalQuotes
+### LocalQuotes
     typedef struct {
         word    frontSingle;
         word    endSingle;
@@ -710,13 +710,13 @@ blocks.
     } LocalQuotes;
 
 ----------
-#### ManufacturerID
+### ManufacturerID
     typedef enum { /* word */
         MANUFACTURER_ID_GEOWORKS
     } ManufacturerID;
 
 ----------
-#### MapColorToMono
+### MapColorToMono
     typedef ByteEnum MapColorToMono;
         #define CMT_CLOSEST             0
         #define CMT_DITHER              1
@@ -726,7 +726,7 @@ in an unavailable color. It will either draw in the closest color, or else mix t
 or more close colors to get as close as possible overall.
 
 ----------
-#### MapListBlockHeader
+### MapListBlockHeader
     typedef struct {
         LMemBlockHeader         MLBH_base;
         word                    MLBH_numDestFields;
@@ -734,7 +734,7 @@ or more close colors to get as close as possible overall.
     } MapListBlockHeader;
 
 ----------
-#### MarginDimensions
+### MarginDimensions
     typedef struct {
         int     leftMargin;
         int     topMargin;
@@ -743,13 +743,13 @@ or more close colors to get as close as possible overall.
     } MarginDimensions;
 
 ----------
-#### MeasurementType
+### MeasurementType
     typedef ByteEnum MeasurementType;
         #define MEASURE_US              0
         #define MEASURE_METRIC          1
 
 ----------
-#### MediaType
+### MediaType
     typedef enum /* byte */ {
         #define MEDIA_NONEXISTENT       0
         #define MEDIA_160K              1
@@ -770,7 +770,7 @@ routines (e.g. **DriveGetDefaultMedia()**). A **MediaType** value is also
 passed to **DiskFormat()**, indicating how the disk should be formatted.
 
 ----------
-#### MemGetInfoType
+### MemGetInfoType
     typedef enum /* word */ {
         MGIT_SIZE=0,                    /* size in bytes */
         MGIT_FLAGS_AND_LOCK_COUNT=2,    /* use MGI_LOCK_COUNT and MGI_FLAGS */
@@ -781,15 +781,15 @@ passed to **DiskFormat()**, indicating how the disk should be formatted.
     } MemGetInfoType;
 
 ----------
-#### MemHandle
+### MemHandle
     typedef Handle MemHandle;
 
 ----------
-#### Message
+### Message
     typedef word Message;
 
 ----------
-#### MessageError
+### MessageError
     typedef enum /* word */ {
          MESSAGE_NO_ERROR,          /* no error was encountered */
          MESSAGE_NO_HANDLES         /* no handle could be allocated
@@ -802,7 +802,7 @@ whether the message was successfully sent. This is not encountered by C
 applications.
 
 ----------
-#### MessageFlags
+### MessageFlags
     typedef WordFlags MessageFlags;
         #define MF_CALL                     0x8000      /* @call */
         #define MF_FORCE_QUEUE              0x4000
@@ -825,15 +825,15 @@ of these flags are set properly by Goc and the kernel in C. See the reference
 entries for the Goc keywords **@call** and **@send**.
 
 ----------
-#### MessageHandle
+### MessageHandle
     typedef Handle MessageHandle;
 
 ----------
-#### MessageMethod
+### MessageMethod
     typedef void     MessageMethod();
 
 ----------
-#### MinIncrementType
+### MinIncrementType
     typedef union {
         MinUSMeasure                MIT_US;
         MinMetricMeasure            MIT_METRIC;
@@ -842,27 +842,27 @@ entries for the Goc keywords **@call** and **@send**.
     } MinIncrementType;
 
 ----------
-#### MinMetricMeasure
+### MinMetricMeasure
     typedef ByteEnum MinMetricMeasure;
         #define MMM_MILLIMETER                  0
         #define MMM_HALF_CENTIMETER             1
         #define MMM_CENTIMETER                  2
 
 ----------
-#### MinPicaMeasure
+### MinPicaMeasure
     typedef ByteEnum MinPicaMeasure;
         #define MPM_PICA                    0
         #define MPM_INCH                    1
 
 ----------
-#### MinPointMeasure
+### MinPointMeasure
     typedef ByteEnum MinPointMeasure;
         #define MPM_25_POINT                    0
         #define MPM_50_POINT                    1
         #define MPM_100_POINT                   2
 
 ----------
-#### MinUSMeasure
+### MinUSMeasure
     typedef ByteEnum MinUSMeasure;
         #define MUSM_EIGHTH_INCH                0
         #define MUSM_QUARTER_INCH               1
@@ -870,7 +870,7 @@ entries for the Goc keywords **@call** and **@send**.
         #define MUSM_ONE_INCH                   3
 
 ----------
-#### MixMode
+### MixMode
     typedef ByteEnum MixMode;
         #define MM_CLEAR        0   /* clear destination */
         #define MM_COPY         1   /* new drawing is opaque */
@@ -885,13 +885,13 @@ The **MixMode** determines what the graphics system will do when drawing
 one thing on top of another.
 
 ----------
-#### MonoTransfer
+### MonoTransfer
     typedef struct {
         byte MT_gray[256];
     } MonoTransfer;
 
 ----------
-#### MouseReturnFlags
+### MouseReturnFlags
     typedef WordFlags MouseReturnFlags;
         #define MRF_PROCESSED                       0x8000
         #define MRF_REPLAY                          0x4000
@@ -903,7 +903,7 @@ These flags are used in various parts of the system that work with mouse
 input. Which values are appropriate to pass will vary based on context.
 
 ----------
-#### MouseReturnParams
+### MouseReturnParams
     typedef struct {
         word                    unused;
         MouseReturnFlags        flags;
@@ -914,18 +914,18 @@ This structure is used in certain areas of the system which work with mouse
 input.
 
 ----------
-#### NameArrayAddFlags
+### NameArrayAddFlags
     typedef WordFlags NameArrayAddFlags;
         #define NAAF_SET_DATA_ON_REPLACE 0x8000
 
 ----------
-#### NameArrayElement
+### NameArrayElement
     typedef struct {
         RefElementHeader NAE_meta;
     } NameArrayElement;
 
 ----------
-#### NameArrayHeader
+### NameArrayHeader
     typedef struct{
         ElementArrayHeader      NAH_meta;
         word                    NAH_dataSize;   /* Size of data section of
@@ -940,7 +940,7 @@ of every element is. Applications may examine this field, but they must not
 change it.
 
 ----------
-#### NameArrayMaxElement
+### NameArrayMaxElement
     typedef struct {
         RefElementHeader NAME_meta;
         byte NAME_data[NAME_ARRAY_MAX_DATA_SIZE];
@@ -952,59 +952,59 @@ change it.
     #define NO_ERROR_RETURNED               0
 
 ----------
-#### NoteType
+### NoteType
     typedef ByteEnum NoteType;
         #define NT_INK          0
         #define NT_TEXT         1
 
 ----------
-#### NotificationType
+### NotificationType
     typedef struct {
         ManufacturerID          NT_manuf;
         word            NT_type;
     } NotificationType;
 
 ----------
-#### NotifyInkHasTarget
+### NotifyInkHasTarget
     typedef struct {
         optr    NIHT_optr;
     } NotifyInkHasTarget;
 
 ----------
-#### NULL
+### NULL
     #undef NULL
     #define NULL        0
 
 ----------
-#### NullChunk
+### NullChunk
     #define NullChunk       ((ChunkHandle) 0)
 
 ----------
-#### NullClass
+### NullClass
     #define NullClass       ((ClassStruct *) 0)
 
 ----------
-#### NullHandle
+### NullHandle
     #define NullHandle      ((Handle) 0)
 
 ----------
-#### NullOptr
+### NullOptr
     #define NullOptr        ((optr) 0)
 
 ----------
-#### NumberFormatFlags
+### NumberFormatFlags
     typedef ByteFlags NumberFormatFlags;
         #define NFF_LEADING_ZERO                0x01
 
 ----------
-#### NumberType
+### NumberType
     typedef ByteEnum NumberType;
         #define NT_VALUE                0
         #define NT_BOOLEAN              1
         #define NT_DATE_TIME            2
 
 ----------
-#### ObjChunkFlags
+### ObjChunkFlags
     typedef ByteFlags ObjChunkFlags;
         #define OCF_VARDATA_RELOC           0x10
         #define OCF_DIRTY                   0x08
@@ -1016,7 +1016,7 @@ This record is stored at the beginning of each chunk and gives specific
 information about the chunk. The flags are internal.
 
 ----------
-#### ObjLMemBlockHeader
+### ObjLMemBlockHeader
     typedef struct {
         LMemBlockHeader     OLMBH_header;   /* standard LMem block header */
         word                OLMBH_inUseCount;
@@ -1053,14 +1053,14 @@ Messages may also be sent to this output object via the
 The size of the object block (resource).
 
 ----------
-#### ObjRelocation
+### ObjRelocation
     typedef struct {
         ObjRelocationType       OR_type;
         word                    OR_offset;
     } ObjRelocation;
 
 ----------
-#### ObjRelocationSource
+### ObjRelocationSource
     typedef ByteEnum ObjRelocationSource;
         #define ORS_NULL                            0
         #define ORS_OWNING_GEODE                    1
@@ -1075,7 +1075,7 @@ The size of the object block (resource).
         #define RID_SOURCE_OFFSET                   12
 
 ----------
-#### ObjRelocationType
+### ObjRelocationType
     typedef ByteEnum ObjRelocationType;
         #define RELOC_END_OF_LIST                       0
         #define RELOC_RELOC_HANDLE                      1
@@ -1083,14 +1083,14 @@ The size of the object block (resource).
         #define RELOC_RELOC_ENTRY_POINT                 3
 
 ----------
-#### OperatorStackElement
+### OperatorStackElement
     typedef struct {
         EvalStackOperatorType OSE_type;
         EvalStackOperatorType OSE_data;
     } OperatorStackElement;
 
 ----------
-#### OperatorType
+### OperatorType
     typedef ByteEnum OperatorType;
         #define OP_RANGE_SEPARATOR                      0
         #define OP_NEGATION                             1
@@ -1119,11 +1119,11 @@ The size of the object block (resource).
 ----------
 
 ----------
-#### optr
+### optr
     typedef dword optr;
 
 ----------
-#### PageLayout
+### PageLayout
     typedef union {
         PageLayoutPaper             PL_paper;
         PageLayoutEnvelope          PL_envelope;
@@ -1131,27 +1131,27 @@ The size of the object block (resource).
     } PageLayout;
 
 ----------
-#### PageLayoutEnvelope
+### PageLayoutEnvelope
     typedef WordFlags PageLayoutEnvelope;
         #define PLE_PATH                0x0040
         #define PLE_ORIENTATION         0x0010
         #define PLE_TYPE                0x0004
 
 ----------
-#### PageLayoutLabel
+### PageLayoutLabel
     typedef WordFlags PageLayoutLabel;
         #define PLL_ROWS            0x7e00          /* labels down */
         #define PLL_COLUMNS         0x01f8          /* labels across */
         #define PLL_TYPE            0x0004          /* PT_LABEL */
 
 ----------
-#### PageLayoutPaper
+### PageLayoutPaper
     typedef WordFlags PageLayoutPaper;
         #define PLP_ORIENTATION         0x0008
         #define PLP_TYPE                0x0004
 
 ----------
-#### PageSize
+### PageSize
     typedef struct {
         word            unused;
         word            PS_width;
@@ -1160,21 +1160,21 @@ The size of the object block (resource).
     } PageSize;
 
 ----------
-#### PageSizeCtrlAttrs
+### PageSizeCtrlAttrs
     typedef WordFlags PageSizeCtrlAttrs;
         #define PZCA_ACT_LIKE_GADGET            0x8000
         #define PZCA_PAPER_SIZE                 0x4000
         #define PZCA_INITIALIZE                 0x2000
 
 ----------
-#### PageSizeCtrlFeatures
+### PageSizeCtrlFeatures
     typedef ByteFlags PageSizeControlFeatures;
         #define PSIZECF_MARGINS             0x04
         #define PSIZECF_ALL                 0x02
         #define PSIZECF_PAGE_TYPE           0x01
 
 ----------
-#### PageSizeReport
+### PageSizeReport
     typedef struct {
         dword               PSR_width;
         dword               PSR_height;
@@ -1183,7 +1183,7 @@ The size of the object block (resource).
     } PageSizeReport:
 
 ----------
-#### PageType
+### PageType
     typedef enum {
         PT_PAPER,
         PT_ENVELOPE,
@@ -1191,13 +1191,13 @@ The size of the object block (resource).
     } PageType;
 
 ----------
-#### PaperOrientation
+### PaperOrientation
     typedef ByteEnum PaperOrientation;
         #define PO_PORTRAIT             0x00
         #define PO_LANDSCAPE            0x01
 
 ----------
-#### ParallelUnit
+### ParallelUnit
     typedef enum
         {
             PARALLEL_LPT1 = 0,
@@ -1207,7 +1207,7 @@ The size of the object block (resource).
         } ParallelUnit;
 
 ----------
-#### ParserFlags
+### ParserFlags
     typedef ByteFlags ParserFlags;
         #define PF_HAS_LOOKAHEAD                0x80
         #define PF_CONTAINS_DISPLAY_FUNC        0x40
@@ -1219,7 +1219,7 @@ The size of the object block (resource).
         #define PF_NEW_NAMES                    0x01
 
 ----------
-#### ParserParameters
+### ParserParameters
     typedef struct {
         CommonParameters    PP_common;
         word                PP_parserBufferSize;
@@ -1233,7 +1233,7 @@ The size of the object block (resource).
     } ParserParameters;
 
 ----------
-#### ParserScannerEvaluatorError
+### ParserScannerEvaluatorError
     typedef ByteEnum ParserScannerEvaluatorError;
         /*
          * Scanner errors
@@ -1297,13 +1297,13 @@ The size of the object block (resource).
     } ParserToken;
 
 ----------
-#### ParserTokenCellData
+### ParserTokenCellData
     typedef struct {
         CellReference           PTCD_cellRef;
     } ParserTokenCellData;
 
 ----------
-#### ParserTokenData
+### ParserTokenData
     typedef union {
         ParserTokenNumberData               PTD_number;
         ParserTokenStringData               PTD_string;
@@ -1314,37 +1314,37 @@ The size of the object block (resource).
     } ParserTokenData;
 
 ----------
-#### ParserTokenFunctionData
+### ParserTokenFunctionData
     typedef struct {
         word        PTFD_functionID;
     } ParserTokenFunctionData;
 
 ----------
-#### ParserTokenNameData
+### ParserTokenNameData
     typedef struct {
         word        PTND_name;
     } ParserTokenNameData;
 
 ----------
-#### ParserTokenNumberData
+### ParserTokenNumberData
     typedef struct {
         FloatNum        PTND_value;
     } ParserTokenNumberData;
 
 ----------
-#### ParserTokenOperatorData
+### ParserTokenOperatorData
     typedef struct {
         OperatorType            PTOD_operatorID;
     } ParserTokenOperatorData;
 
 ----------
-#### ParserTokenStringData
+### ParserTokenStringData
     typedef struct {
         word        PTSD_length;
     } ParserTokenStringData;
 
 ----------
-#### ParserTokenType
+### ParserTokenType
     typedef ByteEnum ParserTokenType;
         #define PARSER_TOKEN_NUMBER                 0
         #define PARSER_TOKEN_STRING                 1
@@ -1359,7 +1359,7 @@ The size of the object block (resource).
         #define PARSER_TOKEN_OPERATOR               10
 
 ----------
-#### PathCombineType
+### PathCombineType
     typedef enum /* word */ {
         PCT_NULL,           /* wipe out old path */
         PCT_REPLACE,        /* replace old path with upcoming path */
@@ -1368,11 +1368,11 @@ The size of the object block (resource).
     } PathCombineType;
 
 ----------
-#### PathName
+### PathName
     typedef char PathName[PATH_BUFFER_SIZE];
 
 ----------
-#### PatternType
+### PatternType
     typedef ByteEnum PatternType;
         #define PT_SOLID                    0
         #define PT_SYSTEM_HATCH             1
@@ -1383,7 +1383,7 @@ The size of the object block (resource).
         #define PT_CUSTOM_BITMAP            6
 
 ----------
-#### PCDocSizeParams
+### PCDocSizeParams
     typedef struct {
         dword   PCDSP_width;
         dword   PCDSP_height;
@@ -1392,7 +1392,7 @@ The size of the object block (resource).
 Use this structure to communicate document sizes to a Print Control.
 
 ----------
-#### PCMarginParams
+### PCMarginParams
     typedef struct {
         word    PCMP_left;          /* left margin */
         word    PCMP_top;           /* top margin */
@@ -1403,7 +1403,7 @@ Use this structure to communicate document sizes to a Print Control.
 This structure holds information about a document's or printer's margins.
 
 ----------
-#### PCProgressType
+### PCProgressType
     typedef enum {
         PCPT_PAGE,
         PCPT_PERCENT,
@@ -1411,28 +1411,28 @@ This structure holds information about a document's or printer's margins.
     } PCProgressType;
 
 ----------
-#### Point
+### Point
     typedef struct {
         sword P_x;
         sword P_y;
     } Point;
 
 ----------
-#### PointDWord
+### PointDWord
     typedef struct {
         sdword PD_x;
         sdword PD_y;
     } PointDWord;
 
 ----------
-#### PointDWFixed
+### PointDWFixed
     typedef struct {
         DWFixed PDF_x;
         DWFixed PDF_y;
     } PointDWFixed;
 
 ----------
-#### PointerDef
+### PointerDef
     typedef struct {
         sbyte   PD_hotX;
         sbyte   PD_hotY;
@@ -1444,7 +1444,7 @@ This structure holds information about a document's or printer's margins.
 This structure defines a mouse pointer.
 
 ----------
-#### PointWWFixed
+### PointWWFixed
     typedef struct {
         WWFixed     PF_x;
         WWFixed     PF_y;
@@ -1455,7 +1455,7 @@ structure to use depends on size of the coordinate space and accuracy
 required.
 
 ----------
-#### PrintControlAttrs
+### PrintControlAttrs
     typedef WordFlags PrintControlAttrs;
         #define PCA_MARK_APP_BUSY       0x2000      /* mark busy while printing */
         #define PCA_VERIFY_PRINT        0x1000      /* verify before printing */
@@ -1472,26 +1472,26 @@ required.
         #define PCA_DEFAULT_QUALITY     0x0002      /* default print quality */
 
 ----------
-#### PrintControlFeatures
+### PrintControlFeatures
         typedef ByteFlags PrintControlFeatures;
         #define PRINTCF_PRINT_TRIGGER   0x02    /* wants a print trigger */
         #define PRINTCF_FAX_TRIGGER     0x01    /* wants a fax trigger */
 
 ----------
-#### PrintControlStatus
+### PrintControlStatus
     typedef enum {
         PCS_PRINT_BOX_VISIBLE,
         PCS_PRINT_BOX_NOT_VISIBLE
     } PrintControlStatus;
 
 ----------
-#### PrintControlToolboxFeatures
+### PrintControlToolboxFeatures
     typedef ByteFlags PrintControlToolboxFeatures;
         #define PRINTCTF_PRINT_TRIGGER  0x02    /* wants a print tool trigger */
         #define PRINTCTF_FAX_TRIGGER    0x01    /* wants a fax tool trigger */
 
 ----------
-#### PrinterDriverType
+### PrinterDriverType
     typedef enum PrinterDriverType;
         PDT_PRINTER,
         PDT_PLOTTER,
@@ -1504,7 +1504,7 @@ This enumerated type indicates the type of printer driver that we are
 dealing with.
 
 ----------
-#### PrinterOutputModes
+### PrinterOutputModes
     typedef ByteFlags PrinterOutputModes;
         #define POM_GRAPHICS_LOW        0x10
         #define POM_GRAPHICS_MEDIUM     0x08
@@ -1516,7 +1516,7 @@ dealing with.
         #define PRINT_TEXT = (POM_TEXT_DRAFT | POM_TEXT_NLQ)
 
 ----------
-#### PrintQualityEnum
+### PrintQualityEnum
     typedef enum {
         PQT_HIGH,
         PQT_MEDIUM,
@@ -1524,7 +1524,7 @@ dealing with.
     } PrintQualityEnum;
 
 ----------
-#### ProtocolNumber
+### ProtocolNumber
     typedef struct {
         word    PN_major;
         word    PN_minor;
@@ -1537,11 +1537,11 @@ they are incompatible. If the minor protocol is different, they may or may not
 be incompatible.
 
 ----------
-#### QueueHandle
+### QueueHandle
     typedef Handle QueueHandle;
 
 ----------
-#### QuickSortParameters
+### QuickSortParameters
     typedef struct _QuickSortParameters {
         word _pascal (*QSP_compareCallback) (void *     el1, 
                                              void *     el2,
@@ -1590,7 +1590,7 @@ If there are fewer than *QSP_medianLimit* elements in a sublist,
 instead of searching for the median element.
 
 ----------
-#### RangeEnumCallbackParams
+### RangeEnumCallbackParams
     typedef struct {
         RangeEnumParams     *RECP_params;
         word                RECP_row;
@@ -1601,7 +1601,7 @@ instead of searching for the median element.
 This structure is passed to the callback routine for **RangeEnum()**.
 
 ----------
-#### RangeEnumFlags
+### RangeEnumFlags
     typedef ByteFlags RangeEnumFlags;
         #define REF_ALL_CELLS                   0x80
         #define REF_NO_LOCK                     0x40
@@ -1615,7 +1615,7 @@ This structure is passed to the callback routine for **RangeEnum()**.
 These flags are used by RangeEnum().
 
 ----------
-#### RangeEnumParams
+### RangeEnumParams
     typedef struct {
         PCB(RANGE_ENUM_CALLBACK_RETURN_TYPE, REP_callback,
                                         (RangeEnumCallbackParams));
@@ -1638,7 +1638,7 @@ The callback routine, if any, should be declared _pascal.
 **Include:** cell.h
 
 ----------
-#### RangeInsertParams
+### RangeInsertParams
     typedef struct {
         Rectangle       RIP_bounds;
         Point           RIP_delta;
@@ -1660,27 +1660,27 @@ don't have to initialize this; the routine will do so automatically.
 **See Also:** RangeInsert()
 
 ----------
-#### RangeSortError
+### RangeSortError
     typedef enum /* word */ {
         RSE_NO_ERROR,
         RSE_UNABLE_TO_ALLOC,
     } RangeSortError;
 
 ----------
-#### RangeSortCellExistFlags
+### RangeSortCellExistFlags
     typedef ByteFlags RangeSortCellExistsFlags;
         #define RSCEF_SECOND_CELL_EXISTS    0x02
         #define RSCEF_FIRST_CELL_EXISTS     0x01
 
 ----------
-#### RangeSortFlags
+### RangeSortFlags
     typedef ByteFlags RangeSortFlags;
         #define RSF_SORT_ROWS               0x80
         #define RSF_SORT_ASCENDING          0x40
         #define RSF_IGNORE_CASE             0x20
 
 ----------
-#### RangeSortParams
+### RangeSortParams
     typedef struct {
         Rectangle       RSP_range;
         Point           RSP_active;
@@ -1695,7 +1695,7 @@ don't have to initialize this; the routine will do so automatically.
     } RangeSortParams;
 
 ----------
-#### Rectangle
+### Rectangle
     typedef struct {
         sword   R_left;
         sword   R_top;
@@ -1706,7 +1706,7 @@ don't have to initialize this; the routine will do so automatically.
 This structure represents a graphics rectangle.
 
 ----------
-#### RectDWord
+### RectDWord
     typedef struct {
         sdword  RD_left;
         sdword  RD_top;
@@ -1717,7 +1717,7 @@ This structure represents a graphics rectangle.
 This structure represents a graphics rectangle.
 
 ----------
-#### RectRegion
+### RectRegion
     typedef struct {
         word    RR_y1M1;
         word    RR_eo1;     /* EOREGREC */
@@ -1729,13 +1729,13 @@ This structure represents a graphics rectangle.
     } RectRegion;
 
 ----------
-#### RefElementHeader
+### RefElementHeader
     typedef struct {
          WordAndAHalf REH_refCount;
     } RefElementHeader;
 
 ----------
-#### Region
+### Region
     typedef word Region;
         #define EOREGREC                0x8000
         #define EOREG_HIGH               0x80
@@ -1770,7 +1770,7 @@ number corresponds to the first column in which the pixel is on; the next
 number is the first subsequent column in which the pixel is off; and so on.
 
 ----------
-#### RegionFillRule
+### RegionFillRule
     typedef ByteEnum RegionFillRule;
         #define ODD_EVEN            0
         #define WINDING             1
@@ -1780,7 +1780,7 @@ Winding fill is more versatile, but requires that the path or polygon's edges
 run in the correct direction.
 
 ----------
-#### ReleaseNumber
+### ReleaseNumber
     typedef struct {
         word    RN_major;
         word    RN_minor;
@@ -1793,13 +1793,13 @@ release level; the most significant numbers are *RN_major* and *RN_minor*. The
 other fields are typically used only internally to a manufacturer.
 
 ----------
-#### ResolveStandardPathFlags
+### ResolveStandardPathFlags
     typedef WordFlags FileResolveStandardPathFlags;
         #define FRSPF_ADD_DRIVE_NAME            0x0002
         #define FRSPF_RETURN_FIRST_DIR          0x0001
 
 ----------
-#### RGBColorAsDWord
+### RGBColorAsDWord
     typedef dword RGBColorAsDWord;
         RGB_RED(val) ( val & 0xff)
         RGB_GREEN(val) ( (val >> 8) & 0xff )
@@ -1809,7 +1809,7 @@ other fields are typically used only internally to a manufacturer.
 See the **ColorQuad** data structure to find out the meanings of the fields.
 
 ----------
-#### RGBDelta
+### RGBDelta
     typedef struct {
         byte    RGBD_red;
         byte    RGBD_green;
@@ -1817,7 +1817,7 @@ See the **ColorQuad** data structure to find out the meanings of the fields.
     } RGBDelta;
 
 ----------
-#### RGBTransfer
+### RGBTransfer
     typedef struct {
         byte    RGBT_red[256];
         byte    RGBT_green[256];
@@ -1825,7 +1825,7 @@ See the **ColorQuad** data structure to find out the meanings of the fields.
     } RGBTransfer;
 
 ----------
-#### RGBValue
+### RGBValue
     typedef struct {
         byte    RGB_red;
         byte    RGB_green;
@@ -1833,14 +1833,14 @@ See the **ColorQuad** data structure to find out the meanings of the fields.
     } RGBValue;
 
 ----------
-#### SampleFormat
+### SampleFormat
     typedef struct {
         DACSampleFormat SMID_format:15;
         DACReferenceByte SMID_reference:1;
     } SampleFormat;
 
 ----------
-#### SampleFormatDescription
+### SampleFormatDescription
     typedef struct {
          word   SFD_manufact;
          word   SFD_format;
@@ -1852,30 +1852,30 @@ This structure acts as a header for a sampled sound, giving format
 information needed to properly interpret the sound data.
 
 ----------
-#### SansFace
+### SansFace
     typedef byte SansFace;
         #define SF_A_CLOSED 0x0080
         #define SF_A_OPEN 0x0000
 
 ----------
-#### sbyte
+### sbyte
     typedef char sbyte;
 
 ----------
-#### ScannerToken
+### ScannerToken
     typedef struct {
         ScannerTokenType                ST_type;
         ScannerTokenData                ST_data;
     } ScannerToken;
 
 ----------
-#### ScannerTokenCellData
+### ScannerTokenCellData
     typedef struct {
         CellReference           STCD_cellRef;
     } ScannerTokenCellData;
 
 ----------
-#### ScannerTokenData
+### ScannerTokenData
     typedef union {
         ScannerTokenNumberData                  STD_number;
         ScannerTokenStringData                  STD_string;
@@ -1885,32 +1885,32 @@ information needed to properly interpret the sound data.
     } ScannerTokenData;
 
 ----------
-#### ScannerTokenIdentifierData
+### ScannerTokenIdentifierData
     typedef struct {
         word        STID_start;
     } ScannerTokenIdentifierData;
 
 ----------
-#### ScannerTokenNumberData
+### ScannerTokenNumberData
     typedef struct {
         FloatNum        STND_value;
     } ScannerTokenNumberData;
 
 ----------
-#### ScannerTokenOperatorData
+### ScannerTokenOperatorData
     typedef struct {
         OperatorType            STOD_operatorID;
     } ScannerTokenOperatorData;
 
 ----------
-#### ScannerTokenStringData
+### ScannerTokenStringData
     typedef struct {
         word    STSD_start;
         word    STSD_length;
     } ScannerTokenStringData;
 
 ----------
-#### ScannerTokenType
+### ScannerTokenType
     typedef ByteEnum ScannerTokenType;
         #define SCANNER_TOKEN_NUMBER                        0
         #define SCANNER_TOKEN_STRING                        1
@@ -1923,7 +1923,7 @@ information needed to properly interpret the sound data.
         #define SCANNER_TOKEN_LIST_SEPARATOR                8
 
 ----------
-#### ScriptAttrAsWord
+### ScriptAttrAsWord
     typedef word ScriptAttrAsWord;
         /*  High byte is a vertical offset, as a fraction of the font size.
             Low byte is a fractional scale to use.
@@ -1934,21 +1934,21 @@ This structure specifies the offset and scale factor with which sub- and
 superscript characters should draw.
 
 ----------
-#### ScriptFace
+### ScriptFace
     typedef byte ScriptFace;
         #define SF_CURSIVE 0x0080
         #define SF_CALLIGRAPHIC 0x0000
 
 ----------
-#### sdword
+### sdword
     typedef long sdword;
 
 ----------
-#### segment
+### segment
     typedef word segment;
 
 ----------
-#### SemaphoreError
+### SemaphoreError
     typedef enum {
         SE_NO_ERROR,            /* No error occurred */
         SE_TIMEOUT,             /* The semaphore timed out before
@@ -1961,7 +1961,7 @@ Determines the error encountered by semaphore and threadlock routines
 such as **ThreadPSem()** and **ThreadPTimedSem()**.
 
 ----------
-#### SerialBaud
+### SerialBaud
     typedef enum
         {
             SERIAL_BAUD_115200          = 1,
@@ -1982,7 +1982,7 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
         } SerialBaud;
 
 ----------
-#### SerialFormat
+### SerialFormat
     typedef ByteFlags SerialFormat;
         #define SERIAL_FORMAT_DLAB_OFFSET       (7)
         #define SERIAL_FORMAT_DLAB              (0x01 << SERIAL_FORMAT_DLAB_OFFSET)
@@ -2001,7 +2001,7 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
         #define SERIAL_FORMAT_LENGTH            (0x03 << SERIAL_FORMAT_LENGTH_OFFSET)
 
 ----------
-#### SerialMode
+### SerialMode
     typedef enum {
             SERIAL_MODE_RAW,
             SERIAL_MODE_RARE,
@@ -2009,7 +2009,7 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
     } SerialMode;
 
 ----------
-#### SerialModem
+### SerialModem
     typedef ByteFlags SerialModem;
         #define SERIAL_MODEM_OUT2_OFFSET    (3)
         #define SERIAL_MODEM_OUT2           (0x01 << SERIAL_MODEM_OUT2_OFFSET)
@@ -2024,7 +2024,7 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
         #define SERIAL_MODEM_DTR            (0x01 << SERIAL_MODEM_DTR_OFFSET)
 
 ----------
-#### SerialPortNum
+### SerialPortNum
     typedef enum
         {
             SERIAL_COM1         = 0,
@@ -2038,7 +2038,7 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
         } SerialPortNum;
 
 ----------
-#### SerialUnit
+### SerialUnit
     typedef enum
         {
             SERIAL_COM1         = 0,
@@ -2052,11 +2052,11 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
         } SerialUnit;
 
 ----------
-#### SemaphoreHandle
+### SemaphoreHandle
     typedef Handle SemaphoreHandle;
 
 ----------
-#### SerifFace
+### SerifFace
     typedef byte SerifFace;
         #define SF_SLAB     0x00c0
         #define SF_MODERN   0x0080
@@ -2064,13 +2064,13 @@ such as **ThreadPSem()** and **ThreadPTimedSem()**.
         #define SF_OLD      0x0000
 
 ----------
-#### SetPalType
+### SetPalType
     typedef ByteEnum SetPalType;
         #define SPT_DEFAULT             0
         #define SPT_CUSTOM              1
 
 ----------
-#### ShiftState
+### ShiftState
     typedef ByteFlags ShiftState;
         #define SS_LALT                 0x80
         #define SS_RALT                 0x40
@@ -2087,7 +2087,7 @@ bits will only be set if not already accounted for; that is, if you are passed t
 character "E", the shift modifiers of this structure will not be marked.
 
 ----------
-#### SoundDriverCapability
+### SoundDriverCapability
     typedef WordFlags SoundDriverCapability;
         #define SDC_NOISE               0x8000
         #define SDC_WAVEFORM            0x6000
@@ -2118,12 +2118,12 @@ These fields encode information about what the sound driver is capable of in
 terms of music synthesis.
 
 ----------
-#### SoundPlayFlags
+### SoundPlayFlags
     typedef WordFlags SoundPlayFlags;
         #define SPF_HIGH_PRIORITY               0x8000
 
 ----------
-#### SoundPriority
+### SoundPriority
     typedef enum {
          SP_SYSTEM_LEVEL=10,        /* most urgent */
          SP_ALARM=20,
@@ -2143,7 +2143,7 @@ The highest priority sound you may construct using these values is
 (SP_BACKGROUND + SP_THEME).
 
 ----------
-#### SoundSteamDeltaTimeType
+### SoundSteamDeltaTimeType
     typedef enum {
          SSDTT_MSEC=8,                  /* wait for N mili seconds */
          SSDTT_TICKS=10,                /* wait for N ticks */
@@ -2159,7 +2159,7 @@ milliseconds, timer "ticks" (each 1/60 second), or by means of an
 independently supplied tempo.
 
 ----------
-#### SoundStreamEvents
+### SoundStreamEvents
     typedef enum {
          SSE_VOICE_ON=0,            /* turn on voice event */
          SSE_VOICE_OFF=2,           /* turn off voice event */
@@ -2190,7 +2190,7 @@ independently supplied tempo.
 These are the "events" that make up a music buffer. 
 
 ----------
-#### SoundStreamSize
+### SoundStreamSize
     typedef word SoundStreamSize;
         #define SSS_ONE_SHOT 128    /* 128 bytes (very small) */
         #define SSS_SMALL 256       /* 256 bytes */
@@ -2198,14 +2198,14 @@ These are the "events" that make up a music buffer.
         #define SSS_LARGE 1024 
 
 ----------
-#### SoundStreamType
+### SoundStreamType
     #define SST_ONE_SHOT        128
     #define SST_SMALL           256
     #define SST_MEDIUM          512
     #define SST_LARGE           1024
 
 ----------
-#### SpecialFunctions
+### SpecialFunctions
     typedef enum /* word */ {
         SF_FILENAME,
         SF_PAGE,
@@ -2213,7 +2213,7 @@ These are the "events" that make up a music buffer.
     } SpecialFunctions;
 
 ----------
-#### SpoolError
+### SpoolError
     typedef enum /* word */ {
         SERROR_NO_SPOOL_FILE,
         SERROR_NO_PRINT_DRIVER,
@@ -2233,7 +2233,7 @@ These are the "events" that make up a music buffer.
     } SpoolError;
 
 ----------
-#### SpoolFileName
+### SpoolFileName
     typedef struct {
         char    SFN_base[5];
         char    SFN_num[3];
@@ -2241,14 +2241,14 @@ These are the "events" that make up a music buffer.
     } SpoolFileName;
 
 ----------
-#### SpoolInfoType
+### SpoolInfoType
     typedef enum /* word */ {
         SIT_JOB_INFO,
         SIT_QUEUE_INFO
     } SpoolInfoType;
 
 ----------
-#### SpoolOpStatus
+### SpoolOpStatus
     typedef enum /* word */ {
         SPOOL_OPERATION_SUCCESSFUL,
         SPOOL_JOB_NOT_FOUND,
@@ -2260,7 +2260,7 @@ These are the "events" that make up a music buffer.
     } SpoolOpStatus;
 
 ----------
-#### SpoolTimeStruct
+### SpoolTimeStruct
     typedef struct {
         byte    STS_second;         /* second of the minute (0-59) */
         byte    STS_minute;         /* minute of the hour (0-59) */
@@ -2268,7 +2268,7 @@ These are the "events" that make up a music buffer.
     } SpoolTimeStruct;
 
 ----------
-#### SpoolVerifyAction
+### SpoolVerifyAction
     typedef enum {
         SVA_NO_MESSAGE,
         SVA_WARNING,
@@ -2276,7 +2276,7 @@ These are the "events" that make up a music buffer.
     } SpoolVerifyAction;
 
 ----------
-#### StandardDialogBoxType
+### StandardDialogBoxType
     typedef enum {
         SDBT_FILE_NEW_CANNOT_CREATE_TEMP_NAME,
         SDBT_FILE_NEW_INSUFFICIENT_DISK_SPACE,
@@ -2313,7 +2313,7 @@ These are the "events" that make up a music buffer.
     } StandardDialogBoxType;
 
 ----------
-#### StandardDialogParams
+### StandardDialogParams
     typedef struct {
         word                                 SDP_customFlags;
         char                                *SDP_customString;
@@ -2323,7 +2323,7 @@ These are the "events" that make up a music buffer.
     } StandardDialogParams;
 
 ----------
-#### StandardDialogOptrParams
+### StandardDialogOptrParams
     typedef struct {
         word    SDOP_customFlags;
         optr    SDOP_customString;
@@ -2333,21 +2333,21 @@ These are the "events" that make up a music buffer.
     } StandardDialogOptrParams;
 
 ----------
-#### StandardDialogResponseTriggerEntry
+### StandardDialogResponseTriggerEntry
     typedef struct {
         optr    SDRTE_moniker;
         word    SDRTE_responseValue;
     } StandardDialogResponseTriggerEntry;
 
 ----------
-#### StandardDialog1ResponseTriggerTable
+### StandardDialog1ResponseTriggerTable
     typedef struct {
          word                                   SD1RTT_numTriggers;
          StandardDialogResponseTriggerEntry     SD1RTT_trigger1;
     } StandardDialog1ResponseTriggerTable;
 
 ----------
-#### StandardDialog2ResponseTriggerTable
+### StandardDialog2ResponseTriggerTable
     typedef struct {
          word                                   SD2RTT_numTriggers;
          StandardDialogResponseTriggerEntry     SD2RTT_trigger1;
@@ -2355,7 +2355,7 @@ These are the "events" that make up a music buffer.
     } StandardDialog2ResponseTriggerTable;
 
 ----------
-#### StandardDialog3ResponseTriggerTable
+### StandardDialog3ResponseTriggerTable
     typedef struct {
          word                                   SD3RTT_numTriggers;
          StandardDialogResponseTriggerEntry     SD3RTT_trigger1;
@@ -2364,7 +2364,7 @@ These are the "events" that make up a music buffer.
     } StandardDialog3ResponseTriggerTable;
 
 ----------
-#### StandardDialog4ResponseTriggerTable
+### StandardDialog4ResponseTriggerTable
     typedef struct {
          word                                   SD4RTT_numTriggers;
          StandardDialogResponseTriggerEntry     SD4RTT_trigger1;
@@ -2374,7 +2374,7 @@ These are the "events" that make up a music buffer.
     } StandardDialog4ResponseTriggerTable;
 
 ----------
-#### StandardPath
+### StandardPath
     typedef enum /* word */ {
         SP_NOT_STANDARD_PATH=0,
         SP_TOP=1,
@@ -2416,7 +2416,7 @@ applications may not make any assumption about how the standard paths
 are arranged.
 
 ----------
-#### StandardSoundType
+### StandardSoundType
     typedef enum /* word */ {
         SST_ERROR,                  /* Sound produced when an Error box comes up. */
         SST_WARNING,                /* General warning beep sound */
@@ -2433,14 +2433,14 @@ are arranged.
     } StandardSoundType;
 
 ----------
-#### StreamBlocker
+### StreamBlocker
     typedef enum{
             STREAM_BLOCK            = 2,
             STREAM_NO_BLOCK         = 0
     } StreamBlocker;
 
 ----------
-#### StreamError
+### StreamError
     typedef enum{
             STREAM_WOULD_BLOCK,
             STREAM_CLOSING,
@@ -2451,18 +2451,18 @@ are arranged.
     } StreamError;
 
 ----------
-#### StreamOpenFlags
+### StreamOpenFlags
     typedef enum {
             STREAM_OPEN_NO_BLOCK                = 0x01,
             STREAM_OPEN_TIMEOUT             = 0x02
     } StreamOpenFlags
 
 ----------
-#### StreamToken
+### StreamToken
     typedef Handleword StreamToken;
 
 ----------
-#### StreamRoles
+### StreamRoles
     typedef enum {
             STREAM_ROLES_WRITER             = 0,
             STREAM_ROLES_READER             = -1,
@@ -2470,7 +2470,7 @@ are arranged.
     } StreamRoles;
 
 ----------
-#### StyleChunkDesc
+### StyleChunkDesc
     typedef struct {
         VMFileHandle        SCD_vmFile;
         word                SCD_vmBlockOrMemHandle;
@@ -2478,12 +2478,12 @@ are arranged.
     } StyleChunkDesc;
 
 ----------
-#### StyleElementFlags
+### StyleElementFlags
     typedef WordFlags StyleElementFlags;
         #define SEF_DISPLAY_IN_TOOLBOX                      0x8000
 
 ----------
-#### StyleElementHeader
+### StyleElementHeader
     typedef struct {
         NameArrayElement        SEH_meta;
         word                    SEH_baseStyle;
@@ -2492,14 +2492,14 @@ are arranged.
     } StyleElementHeader;
 
 ----------
-#### StyleSheetElementHeader
+### StyleSheetElementHeader
     typedef struct {
          RefElementHeader           SSEH_meta;
          word                       SSEH_style;
     } StyleSheetElementHeader;
 
 ----------
-#### SupportedEnvelopeFormat
+### SupportedEnvelopeFormat
     typedef enum {
          SEF_NO_FORMAT,
          SEF_SBI_FORMAT,
@@ -2510,11 +2510,11 @@ These values specify how a sound device can simulate musical instruments,
 if it can at all.
 
 ----------
-#### sword
+### sword
     typedef signed short sword;
 
 ----------
-#### SysConfigFlags
+### SysConfigFlags
     typedef ByteFlags SysConfigFlags;
         #define SCF_UNDER_SWAT          0x80
         #define SCF_2ND_IC              0x40
@@ -2530,17 +2530,17 @@ may be set at a time; if a flag is set, the description is true. These flags are
 used by the kernel and can be retrieved with **SysGetConfig()**.
 
 ----------
-#### SysDrawMask
+### SysDrawMask
     typedef ByteFlags SysDrawMask;
         #define SDM_INVERSE             0x80
         #define SDM_MASK                0x7f
 
 ----------
-#### SysGetInfoType
+### SysGetInfoType
 **See:** SysGetInfo().
 
 ----------
-#### SysMachineType
+### SysMachineType
     typedef ByteEnum SysMachineType;
         #define SMT_UNKNOWN             0
         #define SMT_PC                  1
@@ -2559,11 +2559,11 @@ A byte-sized value indicating the type of machine running GEOS. This value
 can be retrieved with **SysGetConfig()**.
 
 ----------
-#### SysNotifyFlags
+### SysNotifyFlags
 **See:** SysNotify().
 
 ----------
-#### SysProcessorType
+### SysProcessorType
     typedef ByteEnum SysProcessorType;
         #define SPT_8088                0
         #define SPT_8086                0
@@ -2576,11 +2576,11 @@ This enumerated type is a byte that indicates the type of processor on the
 system running GEOS. It can be retrieved with **SysGetConfig()**.
 
 ----------
-#### SysShutdownType
+### SysShutdownType
 **See:** SysShutdown().
 
 ----------
-#### SysStats
+### SysStats
     typedef struct {
         dword           SS_idleCount;       /* Idle ticks in the last second. */
         SysSwapInfo     SS_swapOuts;        /* Outward-bound swap activity. */
@@ -2595,7 +2595,7 @@ This structure is returned by **SysStatistics()** and represents the current
 performance statistics of GEOS.
 
 ----------
-#### SysSwapInfo
+### SysSwapInfo
     typedef struct {
         word    SSI_paragraphs;     /* Number of paragraphs swapped. */
         word    SSI_blocks;         /* Number of blocks swapped. */
@@ -2604,7 +2604,7 @@ performance statistics of GEOS.
 Structure used to represent current swap activity in **SysStats** structure.
 
 ----------
-#### SystemDrawMask
+### SystemDrawMask
     typedef ByteEnum SystemDrawMask;
         #define SDM_TILE                0
         #define SDM_SHADED_BAR          1
@@ -2629,7 +2629,7 @@ Structure used to represent current swap activity in **SysStats** structure.
         #define SET_CUSTOM_PATTERN      SDM_CUSTOM
 
 ----------
-#### SystemHatch
+### SystemHatch
     typedef ByteEnum SystemHatch;
         #define SH_VERTICAL             0
         #define SH_HORIZONTAL           1
@@ -2639,7 +2639,7 @@ Structure used to represent current swap activity in **SysStats** structure.
         #define SH_SLANTED_BRICK        5
 
 ----------
-#### TargetLevel
+### TargetLevel
     typedef enum /* word */ {
         TL_TARGET                   = 0,
         TL_CONTENT,
@@ -2656,14 +2656,14 @@ Structure used to represent current swap activity in **SysStats** structure.
     } TargetLevel;
 
 ----------
-#### TestRectReturnType
+### TestRectReturnType
     typedef ByteEnum TestRectReturnType;
         #define TRRT_OUT            0
         #define TRRT_PARTIAL        1
         #define TRRT_IN             2
 
 ----------
-#### TextAttr
+### TextAttr
     typedef struct {
         byte                TA_colorFlag;
         RGBValue            TA_color;
@@ -2680,7 +2680,7 @@ Structure used to represent current swap activity in **SysStats** structure.
     } TextAttr;
 
 ----------
-#### TextMode
+### TextMode
     typedef ByteFlags TextMode;
         #define TM_TRACK_KERN                       0x40
         #define TM_PAIR_KERN                        0x20
@@ -2691,7 +2691,7 @@ Structure used to represent current swap activity in **SysStats** structure.
         #define TM_DRAW_OPTIONAL_HYPHENS            0x01
 
 ----------
-#### TextStyle
+### TextStyle
     typedef ByteFlags TextStyle;
         #define TS_OUTLINE                  0x40
         #define TS_BOLD                     0x20
@@ -2702,7 +2702,7 @@ Structure used to represent current swap activity in **SysStats** structure.
         #define TS_UNDERLINE                0x01
 
 ----------
-#### ThreadException
+### ThreadException
     typedef enum {
         TE_DIVIDE_BY_ZERO=0,
         TE_OVERFLOW=4,
@@ -2716,7 +2716,7 @@ Processor exceptions used primarily for debugging, these are used with
 **ThreadHandleException()**.
 
 ----------
-#### ThreadGetInfoType
+### ThreadGetInfoType
     typedef enum {
         TGIT_PRIORITY_AND_USAGE,    /* high byte is thread's recent CPU usage
                                      * low byte is thread's base priority */
@@ -2730,15 +2730,15 @@ TGI_RECENT_CPU_USAGE to separate the TGIT_PRIORITY_AND_USAGE
 value into its components.
 
 ----------
-#### ThreadHandle
+### ThreadHandle
     typedef Handle ThreadHandle;
 
 ----------
-#### ThreadLockHandle
+### ThreadLockHandle
     typedef Handle ThreadLockHandle;
 
 ----------
-#### ThreadModifyFlags
+### ThreadModifyFlags
     typedef ByteFlags ThreadModifyFlags;
         #define TMF_BASE_PRIO               0x80
         #define TMF_ZERO_USAGE              0x40
@@ -2747,14 +2747,14 @@ Used with **ThreadModify()**, these flags determine what aspect of the thread
 is modified.
 
 ----------
-#### TimerCompressedDate
+### TimerCompressedDate
     typedef WordFlags TimerCompressedDate;
         #define TCD_YEAR        0xfe00  /* years since 1980; e.g. 1988 is `8' */
         #define TCD_MONTH       0x01e0  /* months (1 - 12) (0 illegal) */
         #define TCD_DAY         0x001f  /* days (1-31) (0 illegal) */
 
 ----------
-#### TimerDateAndTime
+### TimerDateAndTime
     typedef struct {
         word            TDAT_year;      /* Year based on 1980. (10 => 1990) */
         word            TDAT_month;     /* Number of month (1 through 12) */
@@ -2768,15 +2768,15 @@ is modified.
 This structure is used to keep track of the current time and date.
 
 ----------
-#### TimerHandle
+### TimerHandle
     typedef Handle TimerHandle;
 
 ----------
-#### TimerType
+### TimerType
 **See:** TimerStart().
 
 ----------
-#### ToggleState
+### ToggleState
     typedef ByteFlags ToggleState;
         #define TS_CAPSLOCK             0x80
         #define TS_NUMLOCK              0x40
@@ -2787,15 +2787,15 @@ input is interpreted. These toggles correspond to the caps lock, num lock, and
 scroll lock keys.
 
 ----------
-#### TokenChars
+### TokenChars
     typedef char TokenChars[TOKEN_CHARS_LENGTH]; /* TOKEN_CHARS_LENGTH=4 */
 
 ----------
-#### TokenDBItem
+### TokenDBItem
     typedef DBGroupAndItem TokenDBItem;
 
 ----------
-#### TokenEntry
+### TokenEntry
     typedef struct {
         GeodeToken      TE_token;       /* A GeodeToken structure for this file */
         TokenDBItem     TE_monikerList; /* A list of monikers for this token */
@@ -2810,7 +2810,7 @@ identifies the structures and other information of each token. The
 chunks of the token.
 
 ----------
-#### TokenFlags
+### TokenFlags
     typedef WordFlags TokenFlags;
         #define TF_NEED_RELOCATION              0x8000
 
@@ -2819,7 +2819,7 @@ token has fields which must be relocated when the token is loaded or
 unloaded.
 
 ----------
-#### TokenGroupEntry
+### TokenGroupEntry
     typedef struct {
         TokenIndexType  TGE_type;           /* The type of structure this is. */
         GroupType       TGE_groupType;      /* The type of the group item. */
@@ -2830,7 +2830,7 @@ unloaded.
 Used to index token groups in the token database.
 
 ----------
-#### TokenGroupType
+### TokenGroupType
     typedef enum {
         TGT_MAP_GROUP,              /* The TokenGroupEntry is a map group. */
         TGT_MONIKER_LIST_GROUP,     /* The TokenGroupEntry is a moniker list group. */
@@ -2845,7 +2845,7 @@ This enumerated type describes which type of moniker group is stored in the
 particular chunk.
 
 ----------
-#### TokenIndexType
+### TokenIndexType
     typedef enum {
         TIT_TOKEN_ENTRY,        /* The type is a TokenEntry structure. */
         TIT_GROUP_ENTRY,        /* The type is a GroupEntry structure. */
@@ -2855,7 +2855,7 @@ Used to indicate the types of structures that may be stored in the token
 database's map item.
 
 ----------
-#### TokenMonikerInfo
+### TokenMonikerInfo
     typedef struct {
         TokenDBItem TMI_moniker;
         word        TMI_fileFlag;   /* 0 if token is in shared token DB file; 
@@ -2863,14 +2863,14 @@ database's map item.
     } TokenMonikerInfo;
 
 ----------
-#### TokenRangeFlags
+### TokenRangeFlags
     typedef WordFlags TokenRangeFlags;
         #define TRF_ONLY_GSTRING            0x8000
         #define TRF_ONLY_PASSED_MANUFID     0x4000
         #define TRF_UNUSED                  0x3fff
 
 ----------
-#### TransError
+### TransError
     typedef enum {
          TE_NO_ERROR, /* No error */
          TE_ERROR, /* General error */
@@ -2895,7 +2895,7 @@ This enumerated type contains error values the impex library may wish to
 generate when translating.
 
 ----------
-#### TransErrorInfo
+### TransErrorInfo
     typedef struct {
          TransError     transError; 
          /* NOTE: customMsgHandle will be valid only if transError is TE_CUSTOM. */  
@@ -2903,14 +2903,14 @@ generate when translating.
     } TransErrorInfo; 
 
 ----------
-#### TransferBlockID
+### TransferBlockID
     typedef dword TransferBlockID;
         #define BlockIDFromFileAndBlock(f,b)    (((dword)(f) << 16) | (b))
         #define FileFromTransferBlockID(id)     ((VMFileHandle) ((id) >> 16))
         #define BlockFromTransferBlockID(id)    ((VMBlockHandle) (id))
 
 ----------
-#### TransMatrix
+### TransMatrix
     typedef struct {
         WWFixed         TM_e11;
         WWFixed         TM_e12;
@@ -2923,7 +2923,7 @@ generate when translating.
 The six variable elements of a coordinate transformation matrix.
 
 ----------
-#### TravelOption
+### TravelOption
     typedef enum {
          TO_NULL,
          TO_SELF,
@@ -2953,12 +2953,12 @@ that the values set up in the **TravelOption**, **VisTravelOption**, and
 **GenTravelOption** have been set up as discrete values.
 
 ----------
-#### TRUE
+### TRUE
     #define TRUE        -1  /* use as return value, not for comparisons */
     #define FALSE        0
 
 ----------
-#### UIFunctionsActive
+### UIFunctionsActive
     typedef ByteFlags UIFunctionsActive;
         #define UIFA_SELECT             0x80
         #define UIFA_MOVE_COPY          0x40
@@ -2979,7 +2979,7 @@ These flags describe the context of the user's input, providing some modal
 information. 
 
 ----------
-#### UIInterfaceLevel
+### UIInterfaceLevel
     typedef enum /* word */ {
         UIIL_NOVICE,
         UIIL_BEGINNING_INTERMEDIATE,
@@ -2989,21 +2989,21 @@ information.
     } UIInterfaceLevel;
 
 ----------
-#### UndoActionDataFlags
+### UndoActionDataFlags
     typedef struct {
         dword       UADF_flags;
         word        UADF_extraflags;
     } UndoActionDataFlags;
 
 ----------
-#### UndoActionDataPtr
+### UndoActionDataPtr
     typedef struct {
         void        *UADP_ptr;
         word        UADP_size;
     } UndoActionDataPtr;
 
 ----------
-#### UndoActionDataType
+### UndoActionDataType
     typedef enum /* word */ {
         UADT_FLAGS,
         UADT_PTR,
@@ -3011,7 +3011,7 @@ information.
     } UndoActionDataType;
 
 ----------
-#### UndoActionDataUnion
+### UndoActionDataUnion
     typedef union {
         /* To find out the type of data stored in this
          * union, check the value of the UndoActionStruct's
@@ -3023,7 +3023,7 @@ information.
     #define NULL_UNDO_CONTEXT 0
 
 ----------
-#### UndoActionDataVMChain
+### UndoActionDataVMChain
     typedef struct {
         /* This structure is filled in by the code for
          * MSG_META_UNDO. VMChains passed to 
@@ -3035,7 +3035,7 @@ information.
     } UndoActionDataVMChain;
 
 ----------
-#### UndoActionStruct
+### UndoActionStruct
     typedef struct {
         UndoActionDataType          UAS_dataType;
         UndoActionDataUnion         UAS_data;
@@ -3043,20 +3043,20 @@ information.
     } UndoActionStruct;
 
 ----------
-#### UtilAsciiToHexError
+### UtilAsciiToHexError
     typedef enum /* word */ {
         UATH_NON_NUMERIC_DIGIT_IN_STRING,
         UATH_CONVERT_OVERFLOW,
     } UtilAsciiToHexError;
 
 ----------
-#### UtilHexToAsciiFlags
+### UtilHexToAsciiFlags
     typedef WordFlags UtilHexToAsciiFlags;
         #define UHTAF_INCLUDE_LEADING_ZEROS     0x0002
         #define UHTAF_NULL_TERMINATE            0x0001
 
 ----------
-#### VarDataCHandler
+### VarDataCHandler
     typedef struct {
         word    VDCH_dataType;
         void    (*VDCH_handler) (MemHandle mh, ChunkHandle ch,
@@ -3069,7 +3069,7 @@ which acts as the entry's index in the handler table. The second field is a far
 pointer to the handler routine.
 
 ----------
-#### VarDataEntry
+### VarDataEntry
     typedef struct {
         word    VDE_dataType;   /* vardata data type */
         word    VDE_entrySize;  /* size of extra data; this field only exists
@@ -3082,7 +3082,7 @@ will be no *VDE_entrySize* field. The extra data begins at offset
 *VDE_extraData*, defined above.
 
 ----------
-#### VarDataFlags
+### VarDataFlags
     typedef WordFlags VarDataFlags;
         #define VDF_TYPE            0xfffc  /* 14-bit data type */
         #define VDF_EXTRA_DATA      0x0002  /* set if has extra data */
@@ -3092,18 +3092,18 @@ This is a word record containing three fields. This word is stored in the
 vardata structure's VDE_dataType field (see VarDataEntry, above).
 
 ----------
-#### VarDataKey
+### VarDataKey
     typedef word VardataKey;
 
 ----------
-#### VarObjRelocation
+### VarObjRelocation
     typedef struct {
         VarDataFlags    VOR_type;       /* type and tag */
         word            VOR_offset;
     } VarObjRelocation;
 
 ----------
-#### VChar
+### VChar
     typedef ByteEnum VChar;
         #define VC_NULL                 0x0 /* NULL */
         #define VC_CTRL_A               0x1 /* <ctrl>-A */
@@ -3226,7 +3226,7 @@ vardata structure's VDE_dataType field (see VarDataEntry, above).
         #define VC_ENTER                VC_CTRL_M
 
 ----------
-#### VisRulerType
+### VisRulerType
     typedef ByteEnum VisRulerType;
         #define VRT_INCHES              0
         #define VRT_CENTIMETERS         1
@@ -3237,7 +3237,7 @@ vardata structure's VDE_dataType field (see VarDataEntry, above).
         #define VRT_DEFAULT             SYSTEM_DEFAULT
 
 ----------
-#### VisTextVariableType
+### VisTextVariableType
     typedef enum {
          VTVT_PAGE_NUMBER,
          VTVT_PAGE_NUMBER_IN_SECTION,
@@ -3252,13 +3252,13 @@ vardata structure's VDE_dataType field (see VarDataEntry, above).
     } VisTextVariableType;
 
 ----------
-#### VisTravelOption
+### VisTravelOption
 The **VisClass** defines an enumerated value to be used in the place of a 
 standard **TravelOption**. See the entry for **TravelOption** to see all possible 
 values.
 
 ----------
-#### VisUpdateMode
+### VisUpdateMode
     typedef ByteEnum VisUpdateMode;
         #define VUM_MANUAL                          0
         #define VUM_NOW                             1
@@ -3266,7 +3266,7 @@ values.
         #define VUM_DELAYED_VIA_APP_QUEUE           3
 
 ----------
-#### VMAccessFlags
+### VMAccessFlags
     typedef ByteFlags VMAccessFlags;
         #define VMAF_FORCE_READ_ONLY                            0x80
         #define VMAF_FORCE_READ_WRITE                           0x40
@@ -3276,7 +3276,7 @@ values.
         #define VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION            0x04
 
 ----------
-#### VMAttributes
+### VMAttributes
     typedef ByteFlags VMAttributes;
         #define VMA_SYNC_UPDATE                     0x80
         #define VMA_BACKUP                          0x40
@@ -3293,21 +3293,21 @@ values.
                                      VMA_SINGLE_THREAD_ACCESS)
 
 ----------
-#### VMBlockHandle
+### VMBlockHandle
     typedef word VMBlockHandle;
 
 ----------
-#### VMChain
+### VMChain
     typedef dword VMChain;
 
 ----------
-#### VMChainLink
+### VMChainLink
     typedef struct {
         VMBlockHandle           VMC_next;
     } VMChainLink;
 
 ----------
-#### VMChainTree
+### VMChainTree
     typedef struct {
         VMChainLink     VMCT_meta;
         word            VMCT_offset;
@@ -3315,11 +3315,11 @@ values.
     } VMChainTree;
 
 ----------
-#### VMFileHandle
+### VMFileHandle
     typedef Handle VMFileHandle;
 
 ----------
-#### VMInfoStruct
+### VMInfoStruct
     typedef struct {
         MemHandle       mh;
         word            size;
@@ -3327,7 +3327,7 @@ values.
     } VMInfoStruct;
 
 ----------
-#### VMOpenType
+### VMOpenType
     typedef ByteEnum VMOpenType;
         #define VMO_OPEN                        0
         #define VMO_TEMP_FILE                   1
@@ -3337,7 +3337,7 @@ values.
         #define VMO_NATIVE_WITH_EXT_ATTRS       0x80
 
 ----------
-#### VMOperation
+### VMOperation
     typedef enum {
         VMO_READ,
         VMO_INTERNAL,
@@ -3349,7 +3349,7 @@ values.
     } VMOperation;
 
 ----------
-#### VMRelocType
+### VMRelocType
     typedef enum {
         VMRT_UNRELOCATE_BEFORE_WRITE,
         VMRT_RELOCATE_AFTER_READ,
@@ -3359,7 +3359,7 @@ values.
     } VMRelocType;
 
 ----------
-#### VMStartExclusiveReturnValue
+### VMStartExclusiveReturnValue
     typedef enum {
          VMSERV_NO_CHANGES,
          VMSERV_CHANGES,
@@ -3383,26 +3383,26 @@ This call to **VMGrabExclusive()** failed and timed out without
 getting access to the file.
 
 ----------
-#### VolumeName
+### VolumeName
     typedef char VolumeName[VOLUME_BUFFER_SIZE];
 
 ----------
-#### WBFixed
+### WBFixed
     typedef struct {
         byte    WBF_frac;
         word    WBF_int;
     } WBFixed;
 
 ----------
-#### wchar
+### wchar
     typedef unsigned int wchar;
 
 ----------
-#### WindowHandle
+### WindowHandle
     typedef Handle WindowHandle;
 
 ----------
-#### WinInfoType
+### WinInfoType
     typedef enum /* word */ {
         WIT_PRIVATE_DATA =0,
         WIT_COLOR =2,
@@ -3420,13 +3420,13 @@ getting access to the file.
     } WinInfoType;
 
 ----------
-#### WinInvalFlag
+### WinInvalFlag
     typedef ByteEnum WinInvalFlag;
         #define WIF_INVALIDATE                  0
         #define WIF_DONT_INVALIDATE             1
 
 ----------
-#### WinPassFlags
+### WinPassFlags
     typedef WordFlags WinPassFlags;
         #define WPF_CREATE_GSTATE               0x8000
         #define WPF_ROOT                        0x4000
@@ -3439,7 +3439,7 @@ getting access to the file.
         #define WPF_PRIORITY                    0x00ff
 
 ----------
-#### WinPriority
+### WinPriority
     typedef ByteEnum WinPriority;
         #define WIN_PRIO_POPUP                   4
         #define WIN_PRIO_MODAL                   6
@@ -3449,33 +3449,33 @@ getting access to the file.
         #define WIN_PRIO_ON_BOTTOM              14
 
 ----------
-#### word
+### word
     typedef unsigned int word;
 
 ----------
-#### WordAndAHalf
+### WordAndAHalf
     typedef struct {
         word    WAAH_low;
         byte    WAAH_high;
     } WordAndAHalf;
 
 ----------
-#### WordFlags
+### WordFlags
     typedef word WordFlags;
 
 ----------
-#### WWFixed
+### WWFixed
     typedef struct {
         word    WWF_frac;
         word    WWF_int;
     } WWFixed;
 
 ----------
-#### WWFixedAsDWord
+### WWFixedAsDWord
     typedef dword WWFixedAsDWord
 
 ----------
-#### XYOffset
+### XYOffset
     typedef struct {
         sword   XYO_x;
         sword   XYO_y;
@@ -3484,7 +3484,7 @@ getting access to the file.
 A graphics coordinate offset.
 
 ----------
-#### XYSize
+### XYSize
     typedef struct {
         word    XYS_width;
         word    XYS_height;
@@ -3493,7 +3493,7 @@ A graphics coordinate offset.
 A graphics size, in two dimensions.
 
 ----------
-#### XYValueAsDWord
+### XYValueAsDWord
     typedef dword XYValueAsDWord;
 
 A graphics size, in two dimensions, expressed as a DWord.

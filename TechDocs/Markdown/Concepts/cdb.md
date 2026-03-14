@@ -1,4 +1,4 @@
-## 19 Database Library
+# 19 Database Library
 
 Some applications need to keep track of many small pieces of data. For 
 example, a database might use thousands of items of data, each of them only 
@@ -15,7 +15,7 @@ and ["Memory Management", Chapter 15](cmemory.md). You should also be familiar w
 basic LMem principles (see ["Local Memory", Chapter 16](clmem.md)) and with Virtual 
 Memory files (see ["Virtual Memory", Chapter 18](cvm.md)).
 
-### 19.1 Design Philosophy
+## 19.1 Design Philosophy
 
 A database manager should be flexible, allowing applications to store a 
 variety of data items. It should be efficient, with minimal overhead in 
@@ -53,14 +53,14 @@ Since DB items are stored in VM files, the files can be shared between
 applications. All of the standard VM synchronization routines work for 
 DB files.
 
-### 19.2 Database Structure
+## 19.2 Database Structure
 
 The Database Library uses a Database Manager to access and create DB 
 items. These items are stored in a standard VM file. This chapter will 
 sometimes refer to a "Database File"; this simply means a VM file which 
 contains DB items.
 
-#### 19.2.1 DB Items
+### 19.2.1 DB Items
 
 The basic unit of data is the item. Items are simply chunks in special LMem 
 heaps which are managed by the DB Manager; these heaps are called item 
@@ -83,7 +83,7 @@ Since DB items are chunks, their addresses are somewhat volatile. If you allocat
 an item in a group, other items in that group may move even if they are locked. 
 (See [section 16.2.2 of chapter 16](clmem.md#1622-chunks-and-chunk-handles).)
 
-#### 19.2.2 DB Groups
+### 19.2.2 DB Groups
 
 Each DB item is a member of a DB group. The DB group is a collection of VM 
 blocks; the group comprises a single group block and zero or more item 
@@ -116,7 +116,7 @@ according to the first letter of the last name, thus speeding up alphabetical
 access. If you have no logical way to group items, see ["Ungrouped DB Items"]
 (#1924-ungrouped-db-items).
 
-#### 19.2.3 Allocating Groups and Items
+### 19.2.3 Allocating Groups and Items
 
 When you need a new DB group, call the DB routine DBGroupAlloc() (see 
 [19.3.2 Allocating and Freeing Groups](#1932-allocatin-and-freeing-groups). 
@@ -146,7 +146,7 @@ Once an item has been allocated, it will stay in the same item block (and have
 the same chunk handle) until it is freed or resized. If it is resized to a larger 
 size, it may be moved to a different item block belonging to the same group.
 
-#### 19.2.4 Ungrouped DB Items
+### 19.2.4 Ungrouped DB Items
 
 Sometimes there is no natural way to group DB items. For these situations, 
 the DB manager allows you to allocate ungrouped items. These items actually 
@@ -170,7 +170,7 @@ Ungrouped Items"](#1937-routines-for-ungrouped-items). This section also
 describes macros which combine a group-handle and item-handle into a 
 **DBGroupAndItem** and which break a **DBGroupAndItem** into its constituent parts.
 
-#### 19.2.5 The DB Map Item
+### 19.2.5 The DB Map Item
 
 You can designate a "map item" for a VM file with the routine **DBSetMap()**. 
 You can recover the map item's group and handle at will by calling 
@@ -180,7 +180,7 @@ locked, and changed independently.
 
 The map routines are described in detail in [section 19.3.6](#1936-setting-and-using-the-map-item).
 
-### 19.3 Using Database Routines
+## 19.3 Using Database Routines
 
 GEOS provides a wide range of routines for working with databases. The 
 routines all require that the calling thread have the VM file open. Most 
@@ -197,7 +197,7 @@ on DB items. Simply cast the **DBGroupAndItem** structure to type
 (**VMCopyVMChain()** will allocate the duplicate item as "ungrouped.") For 
 more information about **VMChain** routines, see [section 18.4 of chapter 18](cvm.md#184-vm-chains).
 
-#### 19.3.1 General Rules to Follow
+### 19.3.1 General Rules to Follow
 
 There are certain rules of "memory etiquette" you should follow when using 
 DB files. For the most part, these rules are the same as the general rules of 
@@ -229,7 +229,7 @@ keep items from getting too large. If individual items get into the
 multi-kilobyte range, you should consider storing them a different way; for 
 example, you could make each f the larger items a VM block or a VM chain.
 
-#### 19.3.2 Allocating and Freeing Groups
+### 19.3.2 Allocating and Freeing Groups
 
 DBGroupAlloc(), DBGroupFree()
 
@@ -249,7 +249,7 @@ blocks will also be freed. Naturally, all items in the group will be freed as
 well. You can free a group even if some of its items are locked; those items will 
 be freed immediately.
 
-#### 19.3.3 Allocating and Freeing Items
+### 19.3.3 Allocating and Freeing Items
 
 DBAlloc(), DBFree()
 
@@ -277,7 +277,7 @@ block will never be unlocked). Always unlock an item before freeing it. (You
 need not, however, unlock items before freeing their group; when a group is 
 freed, all of its items are automatically freed, whether they are locked or not.)
 
-#### 19.3.4 Accessing DB Items
+### 19.3.4 Accessing DB Items
 
 DBLock(), DBLockGetRef(), DBDeref(), DBUnlock(), DBDirty()
 
@@ -329,7 +329,7 @@ the item-block containing that item. As with VM blocks, you must dirty the
 item before you unlock it, as the memory manager can discard any clean 
 block from memory as soon as it is unlocked.
 
-#### 19.3.5 Resizing DB Items
+### 19.3.5 Resizing DB Items
 
 DBReAlloc(), DBInsertAt(), DBDeleteAt()
 
@@ -369,7 +369,7 @@ takes five arguments: the file handle, the group-handle, the item-handle, the
 offset (within the item) of the first byte to delete, and the number of bytes to 
 delete. The routine does not return anything.
 
-#### 19.3.6 Setting and Using the Map Item
+### 19.3.6 Setting and Using the Map Item
 
 DBSetMap(), DBGetMap(), DBLockMap()
 
@@ -394,7 +394,7 @@ routine **DBLockMap()**. This routine takes one argument, namely the
 file handle. It locks the map item and returns the map's address. When 
 you are done with the map item, unlock it normally with a call to **DBUnlock()**.
 
-#### 19.3.7 Routines for Ungrouped Items
+### 19.3.7 Routines for Ungrouped Items
 
 DBAllocUngrouped(), DBFreeUngrouped(), DBLockUngrouped(), 
 DBLockGetRefUngrouped(), DBReAllocUngrouped(), 
@@ -424,7 +424,7 @@ Conversely, if you allocate a normal "grouped" item, you are free to combine
 the two handles into a DBGroupAndItem token and pass that token to the 
 "ungrouped" routines.
 
-#### 19.3.8 Other DB Utilities
+### 19.3.8 Other DB Utilities
 
 DBCopyDBItem(), DBCopyDBItemUngrouped(), 
 DBGroupFromGroupAndItem(), DBItemFromGroupAndItem(), 
@@ -466,7 +466,7 @@ the component handles from a **DBGroupAndItem** value, use the macros
 These macros are passed a **DBGroupAndItem** value and return the 
 appropriate component.
 
-### 19.4 The Cell Library
+## 19.4 The Cell Library
 
 The database library lets applications organize data into groups. This is an 
 intuitive way to organize data for many applications. However, for some 
@@ -489,7 +489,7 @@ correspondence between cell files and the VM files which contain them.
 However, this correspondence is optional. There is nothing to stop an 
 application from maintaining several distinct cell files in a single VM file.
 
-#### 19.4.1 Structure and Design
+### 19.4.1 Structure and Design
 
 Most of the internal structure of a cell file is transparent to the geode which 
 uses it. A geode can, for example, lock a cell with **CellLock()**, specifying the 
@@ -581,14 +581,14 @@ one row) than to shift the rest of the column down (which involves accessing
 every visible row). Similarly, you can access groups of cells faster if they 
 belong to the same row block.
 
-#### 19.4.2 Using the Cell Library
+### 19.4.2 Using the Cell Library
 
 The cell library is versatile. The basic cell access routines are very simple, 
 but more advanced utilities give you a wide range of actions. This section will 
 explain the techniques used to set up and use a cell file, as well as the more 
 advanced techniques available.
 
-##### 19.4.2.1 The CellFunctionParameters Structure
+#### 19.4.2.1 The CellFunctionParameters Structure
 
 The cell library needs to have certain information about any cell file on which 
 it acts; for example, it needs to know the handles of the VM file and of the row 
@@ -655,7 +655,7 @@ the structure be an ungrouped item. Remember, all the cells are ungrouped
 DB items; allocating or resizing a cell can potentially move any or all of the 
 ungrouped DB items in that file.
 
-##### 19.4.2.2 Basic Cell Array Routines
+#### 19.4.2.2 Basic Cell Array Routines
 
 CellReplace(), CellLock(), CellLockGetRef(), CellDirty(), 
 CellGetDBItem(), CellGetExtent()
@@ -748,7 +748,7 @@ typedef struct {
 } Rectangle;
 ~~~
 
-##### 19.4.2.3 Actions on a Range of Cells
+#### 19.4.2.3 Actions on a Range of Cells
 
 RangeExists(), RangeInsert(), RangeEnum(), RangeSort(), 
 RangeInsertParams

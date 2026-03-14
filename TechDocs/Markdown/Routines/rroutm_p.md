@@ -1,6 +1,6 @@
 ## 3.5 Routines M-P
 ----------
-#### MakeWWFixed()
+### MakeWWFixed()
     WWFixedAsDWord MakeWWFixed(number);
 
 This macro casts a floating-point or integer number to a WWFixedAsDWord value.
@@ -8,7 +8,7 @@ This macro casts a floating-point or integer number to a WWFixedAsDWord value.
 **Include:** geos.h
 
 ----------
-#### malloc()
+### malloc()
     void    * malloc(
             size_t      blockSize);         /* # of bytes to allocate*/
 
@@ -45,7 +45,7 @@ free the memory as quickly as possible.
 **See Also:** calloc(), free(), GeoMalloc(), realloc()
 
 ----------
-#### ManufacturerFromFormatID
+### ManufacturerFromFormatID
     word    ManufacturerFromFormatID(id);
             ClipboardItemFormatID id;
 
@@ -53,7 +53,7 @@ This macro extracts the word-sized manufacturer ID (of type
 **ManufacturerIDs**) from a **ClipboardInfoFormatID** argument.
 
 ----------
-#### MemAlloc()
+### MemAlloc()
     MemHandle MemAlloc(
             word            byteSize,       /* Size of block in bytes */
             HeapFlags       hfFlags,        /* Type of block */
@@ -146,7 +146,7 @@ accessed or altered by a less privileged entity.
 **See Also:** MemAllocSetOwner(), MemReAlloc(), MemDeref()
 
 ----------
-#### MemAllocLMem()
+### MemAllocLMem()
         MemHandle MemAllocLMem(
             LMemType    type,               /* type of LMem block */
             word        headerSize);        /* size of header structure */
@@ -166,7 +166,7 @@ heap.
 **See Also:** LMemInitHeap()
 
 ----------
-#### MemAllocSetOwner()
+### MemAllocSetOwner()
     MemHandle MemAllocSetOwner(
             GeodeHandle     owner,              /* Handle of block's owner */
             word            byteSize,           /* Size of block in bytes */
@@ -181,7 +181,7 @@ owner of the global memory block created.
 **See Also:** MemAlloc()
 
 ----------
-#### MemDecRefCount()
+### MemDecRefCount()
     void    MemDecRefCount(
             MemHandle       mh);            /* handle of affected block */
 
@@ -196,7 +196,7 @@ may only use this routine if the block has had a reference count set up with
 **Include:** heap.h
 
 ----------
-#### MemDeref()
+### MemDeref()
     void    * MemDeref(
             MemHandle   mh);    /* Handle of locked block to dereference */
 
@@ -221,7 +221,7 @@ without a warning, even though that block may move at any time.
 **See Also:** MemGetInfo(), MemModifyFlags()
 
 ----------
-#### MemDowngradeExclLock()
+### MemDowngradeExclLock()
     void    MemDowngradeExclLock(
             MemHandle       mh);        /* handle of affected block */
 
@@ -231,7 +231,7 @@ shared lock with this routine. It does not otherwise affect the block.
 **Include:** heap.h
 
 ----------
-#### MemFree()
+### MemFree()
     void    MemFree(
             MemHandle       mh);        /* handle of block to be freed */
 
@@ -244,7 +244,7 @@ unlocked.
 try to free a bad handle, routine may fatal-error.
 
 ----------
-#### MemGetInfo()
+### MemGetInfo()
     word    MemGetInfo( /* return value depends on flag passed */
             MemHandle       mh,     /* Handle of block to get info about */
             MemGetInfoType  info);  /* Type of information to get */
@@ -293,7 +293,7 @@ if any.
 HandleModifyOwner()
 
 ----------
-#### MemIncRefCount()
+### MemIncRefCount()
     void    MemIncRefCount(
             MemHandle       mh);        /* handle of affected block */
 
@@ -307,7 +307,7 @@ may only use this routine if the block has had a reference count set up with
 **Include:** heap.h
 
 ----------
-#### MemInitRefCount()
+### MemInitRefCount()
     void    MemInitRefCount(
             MemHandle   mh,             /* handle of affected block */
             word        count);         /* initial reference count */
@@ -324,7 +324,7 @@ count routines on the same block.
 **Include:** heap.h
 
 ----------
-#### MemLock()
+### MemLock()
     void    * MemLock(
             MemHandle       mh);        /* Handle of block to lock */
 
@@ -346,7 +346,7 @@ threads, you should use the synchronization routines.
 **See Also:** MemDeref()
 
 ----------
-#### MemLockExcl()
+### MemLockExcl()
     void    * MemLockExcl(
             MemHandle       mh);        /* Handle of block to grab */
 
@@ -399,7 +399,7 @@ attempt to lock the block, and fixed blocks cannot be locked. Instead, use the
 **See Also:** MemLockShared(), MemUnlockExcl(), MemUnlockShared()
 
 ----------
-#### MemLockFixedOrMovable()
+### MemLockFixedOrMovable()
     void    * MemLockFixedOrMovable(
             void    * ptr);     /* virtual segment */
 
@@ -411,7 +411,7 @@ will designate them as virtual segments.
 **Include:** heap.h
 
 ----------
-#### MemLockShared()
+### MemLockShared()
     void    * MemLockShared(
             MemHandle       mh);            /* Handle of block to grab */
 
@@ -442,7 +442,7 @@ attempt to lock the block, and fixed blocks cannot be locked. Instead, use the
 **See Also:** MemLockExcl(), MemUnlockExcl(), MemUnlockShared()
 
 ----------
-#### MemModifyFlags()
+### MemModifyFlags()
     void    MemModifyFlags(
             MemHandle       mh,             /* Handle of block to modify */
             HeapFlags       bitsToSet,      /* HeapFlags to turn on */
@@ -465,7 +465,7 @@ routine will change inappropriate bits of the handle table entry.
 **See Also:** MemGetInfo(), HandleModifyOwner(), MemModifyOtherInfo()
 
 ----------
-#### MemModifyOtherInfo()
+### MemModifyOtherInfo()
     void    MemModifyOtherInfo(
             MemHandle   mh,             /* Handle of block to modify */
             word        otherInfo);     /* New value of HM_otherInfo word */
@@ -479,7 +479,7 @@ data-access synchronization routines use this word.
 **See Also:** MemGetInfo(), MemModifyFlags(), HandleModifyOwner()
 
 ----------
-#### MemOwner()
+### MemOwner()
 
 GeodeHandle MemOwner(
 
@@ -492,7 +492,7 @@ belongs to a VM file, the owner of the VM file will be returned (unlike
 **Include:** heap.h
 
 ----------
-#### MemPLock()
+### MemPLock()
     void    * MemPLock(
             MemHandle       mh);        /* Handle of block to lock */
 
@@ -530,7 +530,7 @@ fixed blocks cannot be locked. Instead, use **HandleP()**.
 **See Also:** HandleP(), MemUnlockV(), HandleV()
 
 ----------
-#### MemPtrToHandle()
+### MemPtrToHandle()
     MemHandle MemPtrToHandle(
             void    * ptr);     /* pointer to locked block */
 
@@ -539,7 +539,7 @@ This routine returns the global handle of the locked block.
 **Include:** heap.h
 
 ----------
-#### MemReAlloc()
+### MemReAlloc()
     MemHandle   MemReAlloc(
             MemHandle       mh,                 /* Handle of block */
             word            byteSize,           /* New size of the block */
@@ -568,7 +568,7 @@ the synchronization routines.
 **See Also:** MemAlloc(), MemDeref()
 
 ----------
-#### MemThreadGrab()
+### MemThreadGrab()
     void    * MemThreadGrab(
             MemHandle       mh);        /* Handle of block to grab */
 
@@ -605,7 +605,7 @@ routines.
 **See Also:** MemThreadGrabNB(), MemThreadRelease()
 
 ----------
-#### MemThreadGrabNB()
+### MemThreadGrabNB()
     void    * MemThreadGrabNB(
             MemHandle       mh);    /* handle of block to grab */
 
@@ -643,7 +643,7 @@ fixed block, use the **HandleP()** and **HandleV()** routines.
 **See Also:** MemThreadGrab(), MemThreadRelease()
 
 ----------
-#### MemThreadRelease()
+### MemThreadRelease()
     void    MemThreadRelease(
             MemHandle       mh);    /* handle of locked block to release */
 
@@ -671,7 +671,7 @@ routine will fatal-error.
 **See Also:** MemThreadGrab(), MemThreadGrabNB()
 
 ----------
-#### MemUnlock()
+### MemUnlock()
     void    MemUnlock(
             MemHandle       mh);        /* Handle of block to unlock */
 
@@ -682,7 +682,7 @@ or discarded). Do not try to unlock a block that has not been locked.
 **Include:** heap.h
 
 ----------
-#### MemUnlockExcl()
+### MemUnlockExcl()
     void    MemUnlockExcl(
             memHandle       mh);        /* Handle of block to release */
 
@@ -711,7 +711,7 @@ fatal-error.
 **See Also:** MemLockExcl(), MemLockShared(), MemUnlockShared()
 
 ----------
-#### MemUnlockFixedOrMovable()
+### MemUnlockFixedOrMovable()
     void    MemUnlockFixedOrMovable(
             void    * ptr);     /* virtual segment */
 
@@ -722,7 +722,7 @@ blocks locked with **MemLockFixedOrMovable()**.
 **Include:** heap.h
 
 ----------
-#### MemUnlockShared()
+### MemUnlockShared()
     void    MemUnlockShared(
             MemHandle       mh);        /* Handle of block to release */
 
@@ -752,7 +752,7 @@ fatal-error.
 **See Also:** MemLockExcl(), MemLockShared(), MemUnlockExcl()
 
 ----------
-#### MemUnlockV()
+### MemUnlockV()
     void    MemUnlockV(
             MemHandle       mh);        /* Handle of block to release */
 
@@ -782,7 +782,7 @@ fixed blocks cannot be locked or unlocked. Instead, call **HandleV()** directly.
 **See Also:** MemPLock(), HandleP(), HandleV()
 
 ----------
-#### MemUpgradeSharedLock()
+### MemUpgradeSharedLock()
     void    * MemUpgradeSharedLock(
             MemHandle       mh);        /* handle of locked block */
 
@@ -799,7 +799,7 @@ granting of access.
 **See Also:** MemLockExcl(), MemLockShared(), MemDowngradeExclLock()
 
 ----------
-#### MessageSetDestination()
+### MessageSetDestination()
     void    MessageSetDestination(
             EventHandle     event,      /* handle of the event to be modified */
             optr            dest);      /* new destination for the event */
@@ -809,7 +809,7 @@ This routine sets the destination of an event to the optr passed.
 **Include:** object.h
 
 ----------
-#### NameArrayAdd()
+### NameArrayAdd()
     word    NameArrayAdd(
             optr                arr,        /* optr of name array */
             const char          * nameToAdd,/* Name of new element */
@@ -851,7 +851,7 @@ heap are invalidated.
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayAddHandles()
+### NameArrayAddHandles()
     dword   NameArrayAddHandles(
             MemHandle           mh,         /* Handle of LMem heap */
             ChunkHandle         arr,        /* Chunk handle of name array */
@@ -870,7 +870,7 @@ LMem heap are invalidated.
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayChangeName()
+### NameArrayChangeName()
     void    NameArrayChangeName(
             optr        array,          /* optr of name array */
             word        token,          /* Token of element to be changed */
@@ -887,7 +887,7 @@ all pointers to within the LMem heap.
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayChangeNameHandles()
+### NameArrayChangeNameHandles()
     dword   NameArrayChangeNameHandles(
             MemHandle       mh,             /* Handle of LMem heap */
             ChunkHandle     array,          /* Chunk handle of name array */
@@ -907,7 +907,7 @@ all pointers to within the LMem heap.
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayCreate()
+### NameArrayCreate()
     ChunkHandle     NameArrayCreate(
             MemHandle   mh,             /* Global handle of LMem heap */
             word        dataSize,       /* Size of data section for
@@ -938,7 +938,7 @@ fixed). If you pass a header size, make sure it is larger than
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayCreateAt()
+### NameArrayCreateAt()
     ChunkHandle     NameArrayCreateAt(
             optr    array,      /* Turn this chunk into a name array */
             word    dataSize,   /* Size of data section of each element */
@@ -956,7 +956,7 @@ pointers to chunks in that block.
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayCreateAtHandles()
+### NameArrayCreateAtHandles()
     ChunkHandle     NameArrayCreateAtHandles(
             MemHandle       mh,         /* Global handle of LMem heap */
             ChunkHandle     chunk,      /* the chunk for the array */
@@ -976,7 +976,7 @@ pointers to chunks in that block.
 **Include:** chunkarr.h
 
 ----------
-#### NameArrayFind()
+### NameArrayFind()
     word    NameArrayFind(
             optr        array,          /* optr to name array */
             const char  * nameToFind,   /* Find element with this name */
@@ -1005,7 +1005,7 @@ CA_NULL_ELEMENT. The routine takes the following arguments:
 element's data portion; otherwise, data after the buffer will be overwritten.
 
 ----------
-#### NameArrayFindHandles()
+### NameArrayFindHandles()
     word    NameArrayFindHandles(
             MemHandle       mh,             /* Handle of LMem heap */
             ChunkHandle     array,          /* Handle of name array */
@@ -1021,7 +1021,7 @@ array is specified by its global and chunk handles (instead of with an optr).
 **Include:** chunkarr.h
 
 ----------
-#### NEC()
+### NEC()
     NEC(line)
 
 This macro defines a line of code that will only be compiled into the 
@@ -1033,7 +1033,7 @@ compiled, the line will be ignored.
 **Include:** ec.h
 
 ----------
-#### ObjBlockGetOutput()
+### ObjBlockGetOutput()
     optr    ObjBlockGetOutput(
             MemHandle   mh);        /* handle of the subject object block */
 
@@ -1047,7 +1047,7 @@ returned.
 **See Also:** ObjLMemBlockHeader
 
 ----------
-#### ObjBlockSetOutput()
+### ObjBlockSetOutput()
     void    ObjBlockSetOutput(
             MemHandle   mh,         /* handle of the subject object block */
             optr        o);         /* optr of the new output object */
@@ -1060,7 +1060,7 @@ header. The optr passed in *o* will be set as the block's output.
 **See Also:** ObjLMemBlockHeader
 
 ----------
-#### ObjCompAddChild()
+### ObjCompAddChild()
     void    ObjCompAddChild(
             optr    obj,            /* optr of parent composite */
             optr    objToAdd,       /* optr of new child */
@@ -1102,7 +1102,7 @@ thereby invalidating all segment addresses and pointers.
 **See Also:** MSG_VIS_ADD_CHILD, MSG_GEN_ADD_CHILD
 
 ----------
-#### ObjCompFindChildByNumber()
+### ObjCompFindChildByNumber()
     optr    ObjCompFindChildByNumber(
             optr    obj,            /* parent's optr */
             word    childToFind,    /* zero-based child number */
@@ -1135,7 +1135,7 @@ field.
 **See Also:** MSG_GEN_FIND_CHILD, MSG_VIS_FIND_CHILD
 
 ----------
-#### ObjCompFindChildByOptr()
+### ObjCompFindChildByOptr()
     word    ObjCompFindChildByOptr(
             optr    obj,            /* parent's optr */
             optr    childToFind,    /* optr of child to find */
@@ -1170,7 +1170,7 @@ field.
 **See Also:** MSG_GEN_FIND_CHILD, MSG_VIS_FIND_CHILD
 
 ----------
-#### ObjCompMoveChild()
+### ObjCompMoveChild()
     void    ObjCompMoveChild(
             optr    obj,            /* parent's optr */
             optr    objToMove,      /* optr of child to move */
@@ -1211,7 +1211,7 @@ their chunks, thereby invalidating any segment addresses or pointers.
 **See Also:** MSG_GEN_MOVE_CHILD, MSG_VIS_MOVE_CHILD
 
 ----------
-#### ObjCompProcessChildren()
+### ObjCompProcessChildren()
     Boolean ObjCompProcessChildren(
             optr            obj,            /* parent's optr */
             optr            firstChild,     /* optr of first child to process */
@@ -1317,7 +1317,7 @@ Counts the number of children rather than calling each.
 **See Also:** @send, @call, MSG_META_SEND_CLASSED_EVENT
 
 ----------
-#### ObjCompRemoveChild()
+### ObjCompRemoveChild()
     void    ObjCompRemoveChild(
             optr    obj,            /* parent's optr */
             optr    objToRemove     /* optr of child to be removed */
@@ -1349,7 +1349,7 @@ field.
 **Include:** metaC.goh
 
 ----------
-#### ObjDecInteractibleCount()
+### ObjDecInteractibleCount()
     void    ObjDecInteractibleCount(
             MemHandle mh);          /* subject object block */
 
@@ -1363,7 +1363,7 @@ interactable count in their MSG_VIS_CLOSE handlers.
 **See Also:** ObjIncInteractibleCount(), MSG_VIS_CLOSE, ObjLMemBlockHeader
 
 ----------
-#### ObjDecInUseCount()
+### ObjDecInUseCount()
     void    ObjDecInUseCount(
             MemHandle mh);      /* subject object block */
 
@@ -1380,7 +1380,7 @@ result.
 **See Also:** ObjIncInUseCount(), ObjDecInteractibleCount(), ObjLMemBlockHeader
 
 ----------
-#### ObjDeref()
+### ObjDeref()
     void    * ObjDeref(
             optr    obj             /* optr to dereference */
             word    masterLevel);   /* specific master level to dereference */
@@ -1413,7 +1413,7 @@ the Gen master part.
 **See Also:** ObjDeref1(), ObjDeref2()
 
 ----------
-#### ObjDerefHandles()
+### ObjDerefHandles()
     void    * ObjDerefHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -1425,7 +1425,7 @@ is specified as its separate handles.
 **Include:** object.h
 
 ----------
-#### ObjDeref1()
+### ObjDeref1()
     void    * ObjDeref1(
             optr obj);          /* optr of object to be dereferenced */
 
@@ -1438,7 +1438,7 @@ master part of an object. Visible objects should use this routine or
 **See Also:** ObjDeref(), ObjDeref2()
 
 ----------
-#### ObjDeref1Handles()
+### ObjDeref1Handles()
     void    *ObjDeref1Handles(
             MemHandle       mh,         /* handle portion of optr */
             ChunkHandle     ch,);       /* chunk handle portion of optr */
@@ -1449,7 +1449,7 @@ specified as its separate handles.
 **Include:** object.h
 
 ----------
-#### ObjDeref2()
+### ObjDeref2()
     void    * ObjDeref2(
             optr    obj);       /* optr of object to be dereferenced */
 
@@ -1462,7 +1462,7 @@ second master part of an object. Generic objects should use this routine or
 **See Also:** ObjDeref(), ObjDeref1()
 
 ----------
-#### ObjDeref2Handles()
+### ObjDeref2Handles()
     void    * ObjDeref2Handles(
             MemHandle       mh,/            /* handle portion of optr */
             ChunkHandle     ch);            /* chunk portion of optr */
@@ -1473,7 +1473,7 @@ specified as its separate handles.
 **Include:** object.h
 
 ----------
-#### ObjDerefGen()
+### ObjDerefGen()
     void    * ObjDerefGen(
             optr    obj);           /* generic object to be dereferenced */
 
@@ -1485,7 +1485,7 @@ master part of a generic object.
 **See Also:** ObjDeref(), ObjDeref2()
 
 ----------
-#### ObjDerefVis()
+### ObjDerefVis()
     void    * ObjDerefVis(
             optr    obj);           /* visible object to be dereferenced */
 
@@ -1497,7 +1497,7 @@ master part of a visible object or a visibly-realized generic object.
 **See Also:** ObjDeref(), ObjDeref1()
 
 ----------
-#### ObjDoRelocation()
+### ObjDoRelocation()
     Boolean ObjDoRelocation( /* returns true if error */
             ObjRelocationType   type,           /* type of relocation */
             MemHandle           block,          /* handle of info block */
@@ -1552,7 +1552,7 @@ The relocation done by this routine can be undone with
 **Include:** object.h
 
 ----------
-#### ObjDoUnRelocation()
+### ObjDoUnRelocation()
     Boolean ObjDoUnRelocation( /* returns true if error */
             ObjRelocationType   type,           /* type of relocation */
             MemHandle           block,          /* handle of info block */
@@ -1573,7 +1573,7 @@ will be returned pointed to by the *destData* pointer.
 **See Also:** ObjDoRelocation()
 
 ----------
-#### ObjDuplicateMessage()
+### ObjDuplicateMessage()
     EventHandle ObjDuplicateMessage(
             EventHandle msg);               /* event to duplicate */
 
@@ -1586,7 +1586,7 @@ change information about the event with **ObjSetMessageDestination()**.
 **See Also:** ObjSetEventInfo()
 
 ----------
-#### ObjDuplicateResource()
+### ObjDuplicateResource()
     MemHandle ObjDuplicateResource(
             MemHandle       blockToDup,     /* handle of resource; must
                                              * not be loaded */
@@ -1623,7 +1623,7 @@ which will be unlocked and may or may not be resident in memory.
 **See Also:** ObjFreeDuplicate(), MSG_META_BLOCK_FREE, ObjLockObjBlock()
 
 ----------
-#### ObjEnableDetach()
+### ObjEnableDetach()
     void    ObjEnableDetach(
             optr    obj);       /* object calling this routine */
 
@@ -1644,7 +1644,7 @@ invalidating all pointers and segment addresses.
 **See Also:** MSG_META_DETACH, ObjInitDetach(), ObjIncDetach(), MSG_META_ACK
 
 ----------
-#### ObjFreeChunk()
+### ObjFreeChunk()
     void    ObjFreeChunk(
             optr    o);     /* optr of chunk to be freed */
 
@@ -1661,7 +1661,7 @@ MSG_META_OBJ_FREE.
 **See Also:** MSG_META_DETACH, MSG_META_OBJ_FREE, ObjInstantiate()
 
 ----------
-#### ObjFreeChunkHandles()
+### ObjFreeChunkHandles()
     void    ObjFreeChunkHandles(
             MemHandle       mh,         /* handle portion of optr */
             ChunkHandle     ch);        /* chunk portion of optr */
@@ -1672,7 +1672,7 @@ handles rather than by an optr.
 **Include:** object.h
 
 ----------
-#### ObjFreeDuplicate()
+### ObjFreeDuplicate()
     void    ObjFreeDuplicate(
             MemHandle mh);      /* handle of duplicate block to be freed */
 
@@ -1689,7 +1689,7 @@ the block's in-use count and interactable count should be zero.
 **See Also:** ObjDuplicateResource(), ObjSaveBlock(), ObjLMemBlockHeader
 
 ----------
-#### ObjFreeMessage()
+### ObjFreeMessage()
     void    ObjFreeMessage(
             EventHandle event);         /* event to be freed */
 
@@ -1700,7 +1700,7 @@ free events after they have been handled.
 **Include:** object.h
 
 ----------
-#### ObjFreeObjBlock()
+### ObjFreeObjBlock()
     void    ObjFreeObjBlock(
             MemHandle block);   /* handle of the object block to be freed */
 
@@ -1719,7 +1719,7 @@ be handled by a remote call in the object block's thread.
 **See Also:** ObjFreeDuplicate(), MSG_META_BLOCK_FREE
 
 ----------
-#### ObjGetFlags()
+### ObjGetFlags()
     ObjChunkFlags ObjGetFlags(
             optr    o);     /* optr of subject object */
 
@@ -1732,7 +1732,7 @@ is specified by the passed optr, and the flags are stored in the object's
 **See Also:** ObjSetFlags(), ObjChunkFlags
 
 ----------
-#### ObjGetFlagsHandles()
+### ObjGetFlagsHandles()
     ObjChunkFlags ObjGetFlagsHandles(
             Memhandle       mh,         /* handle portion of optr */
             ChunkHandle     ch);        /* chunk portion of optr */
@@ -1743,7 +1743,7 @@ its handles rather than with its optr.
 **Include:** object.h
 
 ----------
-#### ObjGetMessageInfo()
+### ObjGetMessageInfo()
     Message ObjGetMessageInfo(
             EventHandle     event,      /* event to be queried */
             optr            * dest);    /* buffer for destination optr */
@@ -1756,7 +1756,7 @@ object.
 **Include:** object.h
 
 ----------
-#### ObjIncDetach()
+### ObjIncDetach()
     void    ObjIncDetach(
             optr    obj);       /* optr of calling object */
 
@@ -1776,7 +1776,7 @@ the optr of the calling object.
 **See Also:** MSG_META_DETACH, ObjInitDetach(), ObjEnableDetach(), MSG_META_ACK
 
 ----------
-#### ObjIncInteractibleCount()
+### ObjIncInteractibleCount()
     void    ObjIncInteractibleCount(
             MemHandle mh);          /* handle of object block */
 
@@ -1797,7 +1797,7 @@ into **VisClass**.
 ObjLMemBlockHeader
 
 ----------
-#### ObjIncInUseCount()
+### ObjIncInUseCount()
     void    ObjIncInUseCount(
             MemHandle mh);          /* handle of object block */
 
@@ -1815,7 +1815,7 @@ decremented with **ObjDecInUseCount()**.
 **See Also:** ObjDecInUseCount(), ObjIncInteractibleCount(), ObjLMemBlockHeader
 
 ----------
-#### ObjInitDetach()
+### ObjInitDetach()
     void    ObjInitDetach(
             MetaMessages    msg,
             optr            obj         /* object being detached */
@@ -1844,7 +1844,7 @@ acknowledgment notification of the detach.
 ObjIncDetach(), ObjEnableDetach(), MSG_META_ACK
 
 ----------
-#### ObjInitializeMaster()
+### ObjInitializeMaster()
     void    ObjInitializeMaster(
             optr            obj,        /* object to be initialized */
             ClassStruct     * class);   /* class in master group */
@@ -1866,7 +1866,7 @@ invalidating pointers and segment addresses.
 **See Also:** ObjResizeMaster(), ObjInitializePart(), ClassStruct
 
 ----------
-#### ObjInitializeMasterHandles()
+### ObjInitializeMasterHandles()
     void    ObjInitializeMasterHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -1878,7 +1878,7 @@ object via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjInitializePart()
+### ObjInitializePart()
     void    ObjInitializePart(
             optr    obj,            /* object to have a part initialized */
             word    masterOffset);  /* offset to master offset in chunk */
@@ -1903,7 +1903,7 @@ invalidating pointers and segment addresses.
 MSG_META_RESOLVE_VARIANT_SUPERCLASS
 
 ----------
-#### ObjInitializePartHandles()
+### ObjInitializePartHandles()
     void    ObjInitializePartHandles(
             Memhandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -1915,7 +1915,7 @@ object via its handles rather than an optr.
 **Include:** object.h
 
 ----------
-#### ObjInstantiate()
+### ObjInstantiate()
     optr    ObjInstantiate(
             MemHandle       block,      /* block in which new object
                                          * will be instantiated */
@@ -1951,7 +1951,7 @@ addresses. Be sure to dereference pointers after calls to this routine.
 **Include:** metaC.goh
 
 ----------
-#### ObjIsClassADescendant()
+### ObjIsClassADescendant()
     Boolean ObjIsClassADescendant(
             ClassStruct     * class1,           /* proposed ancestor */
             ClassStruct     * class2);          /* proposed descendant */
@@ -1961,7 +1961,7 @@ This routine checks if *class2* is a descendant of *class1* and returns *true* i
 **Include:** object.h
 
 ----------
-#### ObjIsObjectInClass()
+### ObjIsObjectInClass()
     Boolean ObjIsObjectInClass(
             optr            obj,            /* object to check */
             ClassStruct     * class);       /* proposed class */
@@ -1982,7 +1982,7 @@ it is not.
 **Include:** object.h
 
 ----------
-#### ObjIsObjectInClassHandles()
+### ObjIsObjectInClassHandles()
     Boolean ObjIsObjectInClassHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -1994,7 +1994,7 @@ via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjLinkFindParent()
+### ObjLinkFindParent()
     optr    ObjLinkFindParent(
             optr    obj,            /* child's optr */
             word    masterOffset,   /* offset to master part with link field */
@@ -2016,7 +2016,7 @@ group's offset (the value that would appear in the
 **See Also:** MSG_VIS_FIND_PARENT, MSG_GEN_FIND_PARENT
 
 ----------
-#### ObjLockObjBlock()
+### ObjLockObjBlock()
     void    * ObjLockObjBlock(
             MemHandle mh);          /* handle of object block */
 
@@ -2032,7 +2032,7 @@ address. When the caller is done using the block, it should unlock it with
 **See Also:** MemLock(), MemUnlock()
 
 ----------
-#### ObjMapSavedToState()
+### ObjMapSavedToState()
     VMBlockHandle ObjMapSavedToState(
         MemHandle mh);          /* handle of object block */
 
@@ -2043,7 +2043,7 @@ equivalent, a null handle is returned.
 **Include:** object.h
 
 ----------
-#### ObjMapStateToSaved()
+### ObjMapStateToSaved()
     MemHandle ObjMapStateToSaved(
             VMBlockHandle   vmbh,   /* VM block handle of state block */
             GeodeHandle     gh);    /* handle of geode owning block */
@@ -2062,7 +2062,7 @@ block is not found, it returns a null handle.
 **Include:** object.h
 
 ----------
-#### ObjMarkDirty()
+### ObjMarkDirty()
     void    ObjMarkDirty(
             optr    o);         /* object to be marked dirty */
 
@@ -2079,7 +2079,7 @@ you should use this routine.
 **See Also:** ObjChunkFlags, ObjSetFlags()
 
 ----------
-#### ObjMarkDirtyHandles()
+### ObjMarkDirtyHandles()
     void    ObjMarkDirtyHandles(
             MemHandle       mh,         /* handle portion of optr */
             ChunkHandle     ch);        /* chunk portion of optr */
@@ -2088,7 +2088,7 @@ This routine is the same as **ObjMarkDirty()** except that it specifies the
 object via handles rather than an optr.
 
 ----------
-#### ObjProcBroadcastMessage()
+### ObjProcBroadcastMessage()
     void    ObjProcBroadcastMessage(
             EventHandle event);         /* the event to be broadcast */
 
@@ -2100,12 +2100,12 @@ purposes.
 **Include:** metaC.goh
 
 ----------
-#### ObjRelocateEntryPoint()
+### ObjRelocateEntryPoint()
     void *  ObjRelocateEntryPoint(
             EntryPointRelocation *          relocData);
 
 ----------
-#### ObjRelocOrUnRelocSuper()
+### ObjRelocOrUnRelocSuper()
     void    ObjRelocOrUnRelocSuper(
             optr            oself,
             ClassStruct     *class,
@@ -2116,7 +2116,7 @@ Call this routine to relocate an object's superclass.
 **Include:** object.h
 
 ----------
-#### ObjResizeMaster()
+### ObjResizeMaster()
     void    ObjResizeMaster(
             optr    obj,            /* object to have its master part resized */
             word    masterOffset,   /* master offset of proper master part */
@@ -2144,7 +2144,7 @@ invalidating stored segment addresses and pointers.
 **See Also:** ClassStruct, ObjInitializeMaster(), ObjInitializePart()
 
 ----------
-#### ObjResizeMasterHandles()
+### ObjResizeMasterHandles()
     void    ObjResizeMasterHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2157,7 +2157,7 @@ specified with its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjSaveBlock()
+### ObjSaveBlock()
     void    ObjSaveBlock(
             MemHandle   mh);    /*handle of block to be marked for saving */
 
@@ -2170,7 +2170,7 @@ block.
 **See Also:** ObjMapSavedToState(), ObjMapStateToSaved()
 
 ----------
-#### ObjSetEventInfo()
+### ObjSetEventInfo()
     void    ObjSetEventInfo(
             EventHandle     event,      /* handle of the event to be modified */
             Message         msg,        /* the new message for the event */
@@ -2194,7 +2194,7 @@ same destination object, you must first retrieve it with
 **See Also:** ObjGetEventInfo()
 
 ----------
-#### ObjSetFlags()
+### ObjSetFlags()
     void    ObjSetFlags(
             optr            o,              /* object whose flags will be set */
             ObjChunkFlags   bitsToSet,      /* flags to set */
@@ -2210,7 +2210,7 @@ let the kernel maintain the object's flags.
 **See Also:** ObjGetFlags(), ObjChunkFlags
 
 ----------
-#### ObjSetFlagsHandles()
+### ObjSetFlagsHandles()
     void    ObjSetFlagsHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2223,7 +2223,7 @@ via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjTestIfObjBlockRunByCurThread()
+### ObjTestIfObjBlockRunByCurThread()
     Boolean ObjTestIfObjBlockRunByCurThread(
             MemHandle   mh);        /* handle of object block */
 
@@ -2239,13 +2239,13 @@ thread runs the block, the return is *false* (zero).
 **Include:** object.h
 
 ----------
-#### ObjUnrelocateEntryPoint()
+### ObjUnrelocateEntryPoint()
     void    ObjUnrelocateEntryPoint(
             EntryPointRelocation *      relocData,
             void *                      entryPoint);
 
 ----------
-#### ObjVarAddData()
+### ObjVarAddData()
     void    * ObjVarAddData(
             optr        obj,            /* object to add vardata to */
             VardataKey  dataType,       /* vardata type */
@@ -2282,7 +2282,7 @@ operate on other objects' vardata remotely, use messages provided by
 **See Also:** MSG_META_ADD_VAR_DATA, ObjVarDeleteDataAt()
 
 ----------
-#### ObjVarAddDataHandles()
+### ObjVarAddDataHandles()
     void    * ObjVarAddDataHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2295,7 +2295,7 @@ specified via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjVarCopyDataRange()
+### ObjVarCopyDataRange()
     void    ObjVarCopyDataRange(
             optr    source,     /* the optr of the source object */
             optr    dest,       /* the optr of the destination (calling) object */
@@ -2313,7 +2313,7 @@ doctrine for one object to alter another's instance data.
 **Include:** object.h
 
 ----------
-#### ObjVarDeleteData()
+### ObjVarDeleteData()
     Boolean ObjVarDeleteData(
             optr        obj,            /* object to delete from */
             VardataKey  dataType);      /* data type to delete */
@@ -2341,7 +2341,7 @@ operate on other objects' vardata remotely, use messages provided by
 **See Also:** MSG_META_DELETE_VAR_DATA, ObjVarDeleteDataAt()
 
 ----------
-#### ObjVarDeleteDataHandles()
+### ObjVarDeleteDataHandles()
     Boolean ObjVarDeleteDataHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2353,7 +2353,7 @@ specified via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjVarDeleteDataAt()
+### ObjVarDeleteDataAt()
     void    ObjVarDeleteDataAt(
             optr    obj,                /* object to delete from */
             word    extraDataOffset);   /* offset to extra data to delete */
@@ -2372,7 +2372,7 @@ operate on other objects' vardata remotely, use messages provided by
 **See Also:** MSG_META_DELETE_VAR_DATA, ObjVarDeleteData()
 
 ----------
-#### ObjVarDeleteDataAtHandles()
+### ObjVarDeleteDataAtHandles()
     void    ObjVarDeleteDataAtHandles(
             MemHandle       mh,         /* handle portion of optr */
             ChunkHandle     ch,         /* chunk portion of optr */
@@ -2384,7 +2384,7 @@ specified via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjVarDeleteDataRange()
+### ObjVarDeleteDataRange()
     void    ObjVarDeleteDataRange(
             optr        obj,                /* object to delete from */
             word        rangeStart,         /* start of range */
@@ -2419,7 +2419,7 @@ operate on other objects' vardata remotely, use messages provided by
 **See Also:** MSG_META_DELETE_VAR_DATA
 
 ----------
-#### ObjVarDeleteDataRangeHandles()
+### ObjVarDeleteDataRangeHandles()
     void    ObjVarDeleteDataRangeHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2433,7 +2433,7 @@ object is specified via its handles rather than its optr.
 **Include:** object.h
 
 ----------
-#### ObjVarDerefData()
+### ObjVarDerefData()
     void    * ObjVarDerefData(
             optr            obj,            /* object having data type */
             VardataKey      dataType);      /* data type to dereference */
@@ -2448,7 +2448,7 @@ results are unpredictable.
 **See Also:** ObjVarFindData()
 
 ----------
-#### ObjVarDerefDataHandles()
+### ObjVarDerefDataHandles()
     void    * ObjVarDerefDataHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2460,7 +2460,7 @@ specified via its handles rather than its optr.
 **Include:** object.h 
 
 ----------
-#### ObjVarFindData()
+### ObjVarFindData()
     void    * ObjVarFindData(
             optr            obj,            /* object to be checked */
             VardataKey      dataType);      /* data type to find */
@@ -2490,7 +2490,7 @@ operate on other objects' vardata remotely, use messages provided by
 **See Also:** MSG_META_FIND_VAR_DATA
 
 ----------
-#### ObjVarFindDataHandles()
+### ObjVarFindDataHandles()
     void    * ObjVarFindDataHandles(
             MemHandle       mh,             /* handle portion of optr */
             ChunkHandle     ch,             /* chunk portion of optr */
@@ -2502,7 +2502,7 @@ specified via its handles rather than its optr.
 **Include:** object.h 
 
 ----------
-#### ObjVarScanData()
+### ObjVarScanData()
     void    ObjVarScanData(
             optr                obj,            /* object to be scanned */
             word                numHandlers,    /* number of handlers in table */
@@ -2569,7 +2569,7 @@ the type.
 **Include:** object.h 
 
 ----------
-#### ObjVarScanDataHandles()
+### ObjVarScanDataHandles()
     void    ObjVarScanDataHandles(
             MemHandle           mh,             /* handle portion of optr */
             ChunkHandle         ch,             /* chunk portion of optr */
@@ -2583,14 +2583,14 @@ specified via its handles rather than its optr.
 **Include:** object.h 
 
 ----------
-#### offsetof()
+### offsetof()
     word    offsetof(struc, field);
 
 This macro returns the offset of the specified field within the specified 
 structure.
 
 ----------
-#### OptrToChunk()
+### OptrToChunk()
     ChunkHandle OptrToChunk(op);
             optr    op;
 
@@ -2599,7 +2599,7 @@ This macro extracts the chunk handle portion of the given optr.
 **See Also:** ConstructOptr(), OptrToHandle()
 
 ----------
-#### OptrToHandle()
+### OptrToHandle()
     MemHandle OptrToHandle(op);
             optr    op;
 
@@ -2608,7 +2608,7 @@ This macro extracts the MemHandle portion of the given optr.
 **See Also:** ConstructOptr(), OptrToChunk()
 
 ----------
-#### ParallelClose()
+### ParallelClose()
     StreamError ParallelClose(
             GeodeHandle         driver,
             ParallelUnit        unit,
@@ -2619,7 +2619,7 @@ Close the stream to a parallel port.
 **Include:** streamC.h 
 
 ----------
-#### ParallelOpen()
+### ParallelOpen()
     StreamError ParallelOpen(
             GeodeHandle         driver,
             ParallelUnit        unit,
@@ -2650,7 +2650,7 @@ member of the **StreamError** enumerated type.
 **Include:** streamC.h 
 
 ----------
-#### ParallelWrite()
+### ParallelWrite()
     StreamError ParallelWrite(
             GeodeHandle         driver,
             ParallelUnit        unit,
@@ -2664,7 +2664,7 @@ Write data to a parallel port.
 **Include:** streamC.h 
 
 ----------
-#### ParallelWriteByte()
+### ParallelWriteByte()
     StreamError ParallelWrite(
             GeodeHandle         driver,
             ParallelUnit        unit,
@@ -2677,7 +2677,7 @@ Write one byte of data to a parallel port.
 **Include:** streamC.h 
 
 ----------
-#### PCB()
+### PCB()
     #define PCB(return_type, pointer_name, args) \
             return_type _pascal (*pointer_name) args
 
@@ -2694,7 +2694,7 @@ which would be expanded to
 **See Also:** CCB()
 
 ----------
-#### PCCOMABORT()
+### PCCOMABORT()
     void PCCOMABORT(void);
 
 This routine aborts the current file transfer operation being carried out by 
@@ -2703,7 +2703,7 @@ the PCCom library. It is the third entry point in the PCCom library.
 **Include:** pccom.goh 
 
 ----------
-#### PCCOMEXIT()
+### PCCOMEXIT()
     PCComReturnType PCCOMEXIT();
 
 This routine kills a pccom thread such as those started by PCCOMINIT(). It is 
@@ -2721,7 +2721,7 @@ the second entry point in the PCCom library.
 **Include:** pccom.goh 
 
 ----------
-#### PCCOMINIT()
+### PCCOMINIT()
     PCComReturnType PCCOMINIT(
             SerialPortNum       port,
             SerialBaud          baud,
@@ -2771,7 +2771,7 @@ determine what sort of notifications will be sent.
 **Include:** pccom.goh 
 
 ----------
-#### ProcCallFixedOrMovable_cdecl()
+### ProcCallFixedOrMovable_cdecl()
     dword   ProcCallFixedOrMovable_cdecl(
             void    (*routine),
             ...)
@@ -2783,7 +2783,7 @@ conventions.
 **Include:** resource.h 
 
 ----------
-#### ProcCallFixedOrMovable_pascal()
+### ProcCallFixedOrMovable_pascal()
     dword   ProcCallFixedOrMovable_pascal(
             ...,
             void    (*routine))
@@ -2795,7 +2795,7 @@ conventions.
 **Include:** resource.h 
 
 ----------
-#### ProcGetLibraryEntry()
+### ProcGetLibraryEntry()
     void *  ProcGetLibraryEntry(
             GeodeHandle     library,
             word            entryNumber)
@@ -2805,7 +2805,7 @@ This routine returns the pointer to a library's entry-point.
 **Include:** resource.h 
 
 ----------
-#### ProcInfo()
+### ProcInfo()
     ThreadHandle ProcInfo(
             GeodeHandle gh);        /* handle of geode to check */
 
@@ -2815,7 +2815,7 @@ geode is not a process, the routine will return a null handle.
 **Include:** geode.h 
 
 ----------
-#### PtrToOffset()
+### PtrToOffset()
     word    PtrToOffset(ptr);
             dword   ptr;
 
@@ -2823,7 +2823,7 @@ This macro returns just the lower 16 bits of the given dword. It is most useful
 for extracting the offset portion of a far pointer.
 
 ----------
-#### PtrToSegment()
+### PtrToSegment()
     word    PtrToSegment(ptr);
             dword   ptr;
 

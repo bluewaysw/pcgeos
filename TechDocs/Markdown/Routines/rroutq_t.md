@@ -1,6 +1,6 @@
 ## 3.6 Routines Q-T
 ----------
-#### qsort
+### qsort
     extern void _pascal qsort(
             void *array, 
             word count, 
@@ -11,7 +11,7 @@ This is a standard quicksort routine. The callback routine must be decared
 _pascal.
 
 ----------
-#### QueueGetInfo()
+### QueueGetInfo()
     word    QueueGetInfo(
             QueueHandle qh);            /* queue to query */
 
@@ -23,7 +23,7 @@ currently in the queue.
 **Include:** geode.h
 
 ----------
-#### QueueGetMessage()
+### QueueGetMessage()
     EventHandle QueueGetMessage(
             QueueHandle qh);            /* queue to query */
 
@@ -35,7 +35,7 @@ almost exclusively by the kernel.
 **Include:** geode.h
 
 ----------
-#### QueuePostMessage()
+### QueuePostMessage()
     void    QueuePostMessage(
             QueueHandle     qh,         /* queue to add event to */
             EventHandle     event,      /* event to be added to queue */
@@ -48,7 +48,7 @@ first spot of the queue.
 **Include:** geode.h
 
 ----------
-#### RangeEnum()
+### RangeEnum()
     Boolean RangeEnum(
             CellFunctionParameters  * cfp,      /* cell function parameters */
             RangeEnumParams         * params);  /* special other parameters */
@@ -94,7 +94,7 @@ wants to abort the **RangeEnum()**, it should return *true*.
 **Include:** cell.h
 
 ----------
-#### RangeExists()
+### RangeExists()
     Boolean RangeExists( /* returns non-zero if there are cells in range */
             CellFunctionParameters  * cfp,          /* see RangeEnum() */
             word                    firstRow,       /* range delimiters */
@@ -110,7 +110,7 @@ of the range to check.
 **Include:** cell.h
 
 ----------
-#### RangeInsert()
+### RangeInsert()
     void    RangeInsert(
             CellFunctionParameters  * cfp,      /* see RangeEnum() */
             RangeInsertParams       * rep);     /* parameters structure */
@@ -150,7 +150,7 @@ an explanation of the "visible" and "scratch-pad" portions of a cell file, see
 Section 19.4.1 of the Concepts book.
 
 ----------
-#### realloc()
+### realloc()
     void *  realloc(
             void *      blockPtr,       /* address of memory to resize */
             size_t      newSize);       /* New size of memory in bytes */
@@ -189,7 +189,7 @@ the memory. If you pass a different address, the results are undefined.
 **See Also:** calloc(), free(), malloc(), GeoReAlloc()
 
 ----------
-#### SerialClose()
+### SerialClose()
     StreamError SerialClose(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -198,7 +198,7 @@ the memory. If you pass a different address, the results are undefined.
 Close the stream to a serial port.
 
 ----------
-#### SerialCloseWithoutReset()
+### SerialCloseWithoutReset()
     StreamError SerialClose(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -207,7 +207,7 @@ Close the stream to a serial port.
 Close the stream to a serial port, without actually resetting the port.
 
 ----------
-#### SerialFlush()
+### SerialFlush()
     StreamError SerialFlush(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -217,7 +217,7 @@ Flush all data pending in a serial port's input or output buffer (depending on
 the value of *roles*).
 
 ----------
-#### SerialGetFormat()
+### SerialGetFormat()
     StreamError SerialGetFormat(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -228,7 +228,7 @@ the value of *roles*).
 Get the format of a stream to a specified serial port.
 
 ----------
-#### SerialGetModem()
+### SerialGetModem()
     StreamError SerialGetModem(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -237,7 +237,7 @@ Get the format of a stream to a specified serial port.
 Read a modem's hardware flow control bits.
 
 ----------
-#### SerialOpen()
+### SerialOpen()
     StreamError SerialOpen(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -268,7 +268,7 @@ If the routine is successful, it returns zero. If it is unsuccessful, it returns
 member of the **StreamError** enumerated type.
 
 ----------
-#### SerialQuery()
+### SerialQuery()
     StreamError SerialQuery(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -279,7 +279,7 @@ Find out how much space is available in a serial buffer, or how much data is
 waiting to be read.
 
 ----------
-#### SerialRead()
+### SerialRead()
     StreamError SerialRead (
             GeodeHandle     driver,
             SerialUnit      unit,
@@ -291,7 +291,7 @@ waiting to be read.
 Read data from a serial port and write it to a passed buffer.
 
 ----------
-#### SerialReadByte()
+### SerialReadByte()
     StreamError SerialReadByte (
             GeodeHandle     driver,
             SerialUnit      unit,
@@ -302,7 +302,7 @@ Read data from a serial port and write it to a passed buffer.
 Read a byte of data from a serial port and write it to a passed variable.
 
 ----------
-#### SerialSetFormat()
+### SerialSetFormat()
     StreamError SerialSetFormat(
             GeodeHandle         driver,
             SerialUnit      unit,
@@ -313,7 +313,7 @@ Read a byte of data from a serial port and write it to a passed variable.
 Set the format for a stream to a specified serial port.
 
 ----------
-#### SerialSetModem()
+### SerialSetModem()
     StreamError SerialSetModem(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -322,7 +322,7 @@ Set the format for a stream to a specified serial port.
 Set a modem's hardware flow control bits.
 
 ----------
-#### SerialWrite()
+### SerialWrite()
     StreamError SerialWrite(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -334,7 +334,7 @@ Set a modem's hardware flow control bits.
 Write data to a serial port.
 
 ----------
-#### SerialWriteByte()
+### SerialWriteByte()
     StreamError SerialWrite(
             GeodeHandle         driver,
             SerialUnit          unit,
@@ -345,7 +345,7 @@ Write data to a serial port.
 Write one byte of data to a serial port.
 
 ----------
-#### SGC_MACHINE
+### SGC_MACHINE
     byte    SGC_MACHINE(val);
             dword   val;
 
@@ -355,7 +355,7 @@ return value.
 **Include:** system.goh
 
 ----------
-#### SGC_PROCESSOR
+### SGC_PROCESSOR
     byte    SGC_PROCESSOR(val);
             dword   val;
 
@@ -365,7 +365,7 @@ return value.
 **Include:** system.goh
 
 ----------
-#### SoundAllocMusic()
+### SoundAllocMusic()
     MemHandle   SoundAllocMusic(
             const word      *song, 
             word            voices );
@@ -378,7 +378,7 @@ set up one of these buffers of music, see "Sound Library," Chapter 13 of the
 Concepts book. The *voices* argument is the number of voices in the buffer. 
 
 ----------
-#### SoundAllocMusicNote()
+### SoundAllocMusicNote()
     MemHandle SoundAllocMusicNote(
             word _far       instrument, 
             word            frequency, 
@@ -403,7 +403,7 @@ delta type is SSDTT_TICKS and *duration* is 30, then the note will sound for
 half a second.
 
 ----------
-#### SoundAllocMusicStream()
+### SoundAllocMusicStream()
     MemHandle   SoundAllocMusicStream(
             word        streamType,
             word        priority,
@@ -420,7 +420,7 @@ done. You must specify how many voices there are in the music buffer. You
 must also pass a starting *tempo* for the music stream.
 
 ----------
-#### SoundAllocSampleStream()
+### SoundAllocSampleStream()
     MemHandle SoundAllocSampleStream(void);
 
 This routine allocates a sample stream handle. If the returned handle is *null*, 
@@ -428,7 +428,7 @@ the library was unavailable (i.e. some other thread has grabbed exclusive
 access).
 
 ----------
-#### SoundDisableSampleStream()
+### SoundDisableSampleStream()
     void    SoundDisableSampleStream(
             MemHandle       mh);
 
@@ -437,7 +437,7 @@ Before you play more sounds using the handle, you will have to call
 **SoundEnableSampleStream()** again. 
 
 ----------
-#### SoundEnableSampleStream()
+### SoundEnableSampleStream()
     Boolean     SoundEnableSampleStream(
             MemHandle       mh,
             word            priority,
@@ -453,7 +453,7 @@ playing on the DAC device: the *priority* with which to grab the DAC player
 identified by a *manufacturerID* and a **DACSampleFormat** value).
 
 ----------
-#### SoundFreeMusic()
+### SoundFreeMusic()
     void    SoundFreeMusic(
             MemHandle       mh);
 
@@ -462,7 +462,7 @@ This routine frees up a music handle. The music must not be playing; call
 after calling this routine on it.
 
 ----------
-#### SoundFreeMusicNote()
+### SoundFreeMusicNote()
     void SoundFreeMusicNote(
             MemHandle       mh);
 
@@ -471,7 +471,7 @@ when you call this routine; call **SoundStopMusicNote()** if you are not sure.
 You should not try to use the note's handle after freeing it.
 
 ----------
-#### SoundFreeMusicStream()
+### SoundFreeMusicStream()
     void SoundFreeMusicStream(
             MemHandle       mh);
 
@@ -480,7 +480,7 @@ the stream; call **SoundDisableMusicStream()** if you are not sure. Do not
 try to use the stream after calling this routine on it.
 
 ----------
-#### SoundFreeSampleStream()
+### SoundFreeSampleStream()
     void    SoundFreeSampleStream(
             MemHandle       mh);
 
@@ -488,7 +488,7 @@ This routine frees the passed sampled sound handle. You must not try to use
 this handle after calling this routine on it.
 
 ----------
-#### SoundGetExclusive()
+### SoundGetExclusive()
     void    SoundGetExclusive(void);
 
 This routine grabs the exclusive semaphore for the sound library; if another 
@@ -499,7 +499,7 @@ to play new sounds. When done with the sound library exclusive, call
 **SoundReleaseExclusive()**.
 
 ----------
-#### SoundGetExclusiveNB()
+### SoundGetExclusiveNB()
     Boolean SoundGetExclusiveNB(void);
 
 This routine grabs the exclusive semaphore for the sound library, doing so 
@@ -512,7 +512,7 @@ When done with the sound library exclusive, call
 **SoundReleaseExclusive()**. 
 
 ----------
-#### SoundInitMusic()
+### SoundInitMusic()
     void SoundInitMusic(
             MemHandle       mh, 
             byte            voices);
@@ -523,7 +523,7 @@ instead. This allows a music buffer stored in a block referenced by a pointer
 to be playable using **SoundPlayMusic()**.
 
 ----------
-#### SoundPlayMusic()
+### SoundPlayMusic()
     Boolean     SoundPlayMusic(
             MemHandle       mh, 
             word            priority,
@@ -547,7 +547,7 @@ handle before you may use it to play music.
 **Include:** sound.h
 
 ----------
-#### SoundPlayMusicNote()
+### SoundPlayMusicNote()
     Boolean     SoundPlayMusicNote(
             MemHandle       mh,             /* handle of note */
             word            priority, 
@@ -570,7 +570,7 @@ thread had grabbed the sound exclusive).
 **Include:** sound.h
 
 ----------
-#### SoundPlayToMusicStream()
+### SoundPlayToMusicStream()
     Boolean     SoundPlayToMusicStream(
             MemHandle                   mh,
             const word                  * sample,
@@ -589,7 +589,7 @@ If you don't know the size of the buffer, it may be all right - any data in the
 buffer after the GE_END_OF_SONG will be ignored.
 
 ----------
-#### SoundPlayToSampleStream()
+### SoundPlayToSampleStream()
     Boolean SoundPlayToSampleStream(
             MemHandle                   mh,
             word _far                   * sample,
@@ -606,7 +606,7 @@ the *format* information which will determine how the DAC player handles the
 data.
 
 ----------
-#### SoundReallocMusic()
+### SoundReallocMusic()
     Boolean     SoundReallocMusic(
             MemHandle       mh,
             word _far       * song);
@@ -619,7 +619,7 @@ handle if you are not sure. See "Sound Library," Chapter 13 of the Concepts
 book to find out how to set up the buffer of music.
 
 ----------
-#### SoundReallocMusicNote()
+### SoundReallocMusicNote()
     Boolean     SoundReallocMusicNote(
             MemHandle       mh,
             word            freq,
@@ -633,7 +633,7 @@ handle. Do not call this routine with the handle of a note that may be playing;
 call **SoundStopMusicNote()** on the handle if you are not sure. 
 
 ----------
-#### SoundReleaseExclusive()
+### SoundReleaseExclusive()
     void    SoundReleaseExclusive(void);
 
 This routine releases the sound library exclusive semaphore. You will not 
@@ -643,7 +643,7 @@ sounds. If another thread called **SoundGrabExclusive()** while your thread
 had the exclusive, it will now grab the exclusive.
 
 ----------
-#### SoundStopMusic()
+### SoundStopMusic()
     Boolean     SoundStopMusic(
             MemHandle       mh);        /* Handle of music buffer */
 
@@ -651,7 +651,7 @@ This routine stops the playing of a simple music buffer. It returns *true* if th
 library was unavailable (i.e. some other thread has grabbed the exclusive).
 
 ----------
-#### SoundStopMusicNote()
+### SoundStopMusicNote()
     Boolean     SoundStopMusicNote(
             MemHandle       mh);
 
@@ -661,7 +661,7 @@ sound library was unavailable (i.e. some other thread has grabbed the
 exclusive). 
 
 ----------
-#### SoundStopMusicStream()
+### SoundStopMusicStream()
     Boolean     SoundStopMusicStream(
             MemHandle       mh);
 
@@ -670,7 +670,7 @@ flushed from the stream. It takes one argument, the token of the sound
 stream, as returned by **SoundAllocMusicStream()**.
 
 ----------
-#### SoundStopSampleStream()
+### SoundStopSampleStream()
     void    SoundStopSampleStream(
             MemHandle       mh);
 
@@ -678,7 +678,7 @@ This routine stops a sound playing through a previously allocated sampled
 sound stream.
 
 ----------
-#### SpoolConvertPaperSize()
+### SpoolConvertPaperSize()
     word    SpoolConvertPaperSize(
             int         width,          /* width of paper */
             int         height,         /* height of paper */
@@ -689,7 +689,7 @@ This routine converts a width and height into a page size number.
 **Include:** spool.goh
 
 ----------
-#### SpoolCreatePaperSize()
+### SpoolCreatePaperSize()
     Boolean     SpoolCreatePaperSize( /* Returns true if failed */
             word        * retValue, /* returns paper size value */
             char        * name,     /* name of paper size */
@@ -702,7 +702,7 @@ This routine defines and stores a new paper size for later use by the user.
 **Include:** spool.goh
 
 ----------
-#### SpoolCreatePrinter()
+### SpoolCreatePrinter()
     Boolean SpoolCreatePrinter(     /* Returns true if error 
                                        (printer already exists) */
             char                *name,      /* name of printer */
@@ -716,7 +716,7 @@ Preferences manager. Returns *true* if the printer already exists.
 **Include:** spool.goh
 
 ----------
-#### SpoolDeletePaperSize()
+### SpoolDeletePaperSize()
     Boolean     SpoolDeletePaperSize(
             word    size);      /* size number to delete */
 
@@ -725,7 +725,7 @@ This routine deletes a user-defined paper size.
 **Include:** spool.goh
 
 ----------
-#### SpoolDeletePrinter()
+### SpoolDeletePrinter()
     void    SpoolDeletePrinter(
             int     prtrNum);       /* printer number to delete */
 
@@ -734,7 +734,7 @@ Deletes the requested printer from the system.
 **Include:** spool.goh
 
 ----------
-#### SpoolGetDefaultPrinter()
+### SpoolGetDefaultPrinter()
     int     SpoolGetDefaultPrinter(); /* Returns printer number */
 
 Returns the system-default printer, which is used (for example) by the 
@@ -743,7 +743,7 @@ Returns the system-default printer, which is used (for example) by the
 **Include:** spool.goh
 
 ----------
-#### SpoolGetNumPaperSizes()
+### SpoolGetNumPaperSizes()
     int     SpoolGetNumPaperSizes(
             PageType    type);      /* type of page */
 
@@ -753,7 +753,7 @@ user-defined, that should appear in a paper size list.
 **Include:** spool.goh
 
 ----------
-#### SpoolGetNumPrinters()
+### SpoolGetNumPrinters()
     int     SpoolGetNumPrinters(
             PrinterDriverType       type);          /* driver type */
 
@@ -773,7 +773,7 @@ This routine returns the number of installed printers with the given type.
 **Include:** spool.goh
 
 ----------
-#### SpoolGetPaperSize()
+### SpoolGetPaperSize()
     XYSizeAsDWord SpoolGetPaperSize(
             int         size,       /* This must be between 0 and the return 
                                      * value of SpoolGetNumPaperSizes() */
@@ -785,7 +785,7 @@ Use this routine to determine the dimensions of a paper size.
 **Include:** spool.goh
 
 ----------
-#### SpoolGetPaperSizeOrder()
+### SpoolGetPaperSizeOrder()
     dword   SpoolGetPaperSizeOrder( /* High byte is number of unused sizes;
                                      * Low byte is # of ordered sizes */
             PageType    type,
@@ -799,7 +799,7 @@ Use this routine to determine the dimensions of a paper size.
                                      * array of user paper sizes. */
 
 ----------
-#### SpoolGetPaperSizeString()
+### SpoolGetPaperSizeString()
     Boolean     SpoolGetPaperSizeString( /* true if error*/
             char        * retValue, /* buffer for returned value */
             int         size,       /* Must be between 0 and the return
@@ -814,7 +814,7 @@ couldn't be found, the returned value will be *true*.
 **Include:** spool.goh
 
 ----------
-#### SpoolGetPrinterString()
+### SpoolGetPrinterString()
     Boolean SpoolGetPrinterString( /* Returns true if error */
             int     *retValue,  /* On return, will point to length of string */
             char    *string,    /* returned name string */
@@ -827,7 +827,7 @@ error).
 **Include:** spool.goh
 
 ----------
-#### SpoolSetDefaultPrinter()
+### SpoolSetDefaultPrinter()
     void    SpoolSetDefaultPrinter(
             int prtrNum);       /* printer number */
 
@@ -838,7 +838,7 @@ Preferences manager.
 **Include:** spool.goh
 
 ----------
-#### SpoolSetDocSize()
+### SpoolSetDocSize()
     void    SpoolSetDocSize(
             Boolean         open;           /* false if document is closed */
             PageSizeInfo    * psr);         /* NULL if document is closed */
@@ -849,7 +849,7 @@ size.
 **Include:** spool.goh
 
 ----------
-#### SpoolSetPaperSizeOrder()
+### SpoolSetPaperSizeOrder()
     void    SpoolSetPaperSizeOrder(
             void    * ptr,      /* Array of PageSizeOrder entries */
             word    number);    /* number of entries in array */
@@ -859,7 +859,7 @@ This routine resets the order in which paper sizes are displayed to the user.
 **Include:** spool.goh
 
 ----------
-#### SpreadsheetInitFile()
+### SpreadsheetInitFile()
     VMBlockHandle SpreadsheetInitFile(
             const SpreadsheetInitFileData           * ifd);
 
@@ -889,7 +889,7 @@ containing the file handle and the number of rows and columns to allocate.
 **Include:** ssheet.goh
 
 ----------
-#### StreamClose()
+### StreamClose()
     StreamError StreamClose (
             GeodeHandle         driver,
             StreamToken         stream,
@@ -909,7 +909,7 @@ If the routine is successful, it returns zero. If it is unsuccessful, it returns
 member of the **StreamError** enumerated type.
 
 ----------
-#### StreamFlush()
+### StreamFlush()
     StreamError StreamFlush (
             GeodeHandle         driver,
             StreamToken         stream);
@@ -925,7 +925,7 @@ If the routine is successful, it returns zero. If it is unsuccessful, it returns
 member of the **StreamError** enumerated type.
 
 ----------
-#### StreamOpen()
+### StreamOpen()
     StreamError  StreamOpen (
             GeodeHandle         driver,
             word                buffSize,
@@ -950,7 +950,7 @@ to **stream*. If it is unsuccessful, it returns a member of the **StreamError**
 enumerated type.
 
 ----------
-#### StreamQuery()
+### StreamQuery()
     StreamError StreamQuery (
             GeodeHandle         driver,
             StreamToken         stream,
@@ -977,7 +977,7 @@ If the routine is successful, it returns zero. If it is unsuccessful, it returns
 member of the **StreamError** enumerated type.
 
 ----------
-#### StreamRead()
+### StreamRead()
     StreamError StreamRead (
             GeodeHandle         driver,
             StreamToken         stream,
@@ -1008,7 +1008,7 @@ not read all the data requested from the stream, it returns a member of the
 *StreamError* enumerated type.
 
 ----------
-#### StreamReadByte()
+### StreamReadByte()
     StreamError StreamWriteByte (
             GeodeHandle         driver,
             StreamToken         stream,
@@ -1031,7 +1031,7 @@ If the routine is successful, it returns zero. If it is unsuccessful, it returns
 member of the **StreamError** enumerated type.
 
 ----------
-#### StreamWrite()
+### StreamWrite()
     StreamError StreamWrite (
             GeodeHandle         driver,
             StreamToken         stream,
@@ -1063,7 +1063,7 @@ not write all the data to the stream, it returns a member of the **StreamError**
 enumerated type.
 
 ----------
-#### StreamWriteByte()
+### StreamWriteByte()
     StreamError StreamWriteByte (
             GeodeHandle         driver,
             StreamToken         stream,
@@ -1086,7 +1086,7 @@ If the routine is successful, it returns zero. If it is unsuccessful, it returns
 member of the **StreamError** enumerated type.
 
 ----------
-#### SysGetConfig()
+### SysGetConfig()
     dword   SysGetConfig();
 
 This routine returns a set of values defining the system configuration. The 
@@ -1122,7 +1122,7 @@ from the returned dword.
 **Include:** system.h
 
 ----------
-#### SysGetDosEnvironment()
+### SysGetDosEnvironment()
     Boolean SysGetDosEnvironment( /* true if error (not found) */
             const char      * variable,     /* environment variable */
             char            * buffer,       /* buffer for return value */
@@ -1146,7 +1146,7 @@ If the variable is not found, the error flag returned will be true.
 **Include:** system.h
 
 ----------
-#### SysGetECLevel()
+### SysGetECLevel()
     ErrorCheckingFlags SysGetECLevel(
             MemHandle * checksumBlock);
 
@@ -1159,7 +1159,7 @@ which the checksum will be done.
 **Include:** ec.h
 
 ----------
-#### SysGetInfo()
+### SysGetInfo()
     dword   SysGetInfo(
             SysGetInfoType info);       /* type of information to retrieve */
 
@@ -1217,7 +1217,7 @@ SGIT_UI_PROCESS
 **Include:** sysstats.h
 
 ----------
-#### SysGetPenMode()
+### SysGetPenMode()
     Boolean SysGetPenMode();
 
 This routine returns true if GEOS is running on a pen-based system, false if 
@@ -1226,7 +1226,7 @@ it is not.
 **Include:** system.h
 
 ----------
-#### SysLocateFileInDosPath()
+### SysLocateFileInDosPath()
     DiskHandle SysLocateFileInDosPath( /* sets thread's error value */
             const char      * fname,        /* file name */
             char            * buffer);      /* returned path of file */
@@ -1248,7 +1248,7 @@ with **ThreadGetError()**.
 **Include:** system.h
 
 ----------
-#### SysNotify()
+### SysNotify()
     word    SysNotify(
             SysNotifyFlags      flags,          /* options to offer user */
             const char          * string1,      /* first string to display */
@@ -1300,13 +1300,13 @@ user selects this option, the routine will not return.
 **Include:** system.h
 
 ----------
-#### SysRegisterScreen()
+### SysRegisterScreen()
     void    SysRegisterScreen(
             GeodeHandle     driver,
             WindowHandle        root);
 
 ----------
-#### SysSetECLevel()
+### SysSetECLevel()
     void    SysSetECLevel(
             ErrorCheckingFlags  flags,          /* level of error checking */
             MemHandle           checksumBlock); /* block to check, if any */
@@ -1319,13 +1319,13 @@ also pass the handle of a block on which the checksum will be performed.
 **Include:** ec.h
 
 ----------
-#### SysSetExitFlags()
+### SysSetExitFlags()
     word    SysGetExitFlags(
             ExitFlags       bitsToSet,
             ExitFlags       bitsToClear);
 
 ----------
-#### SysShutdown()
+### SysShutdown()
     Boolean SysShutdown(
             SysShutdownType     type,
             ...);
@@ -1461,7 +1461,7 @@ continued, FALSE if the shutdown should be aborted.
 with extreme care.
 
 ----------
-#### SysStatistics()
+### SysStatistics()
     void    SysStatistics(
             SysStats * stats);          /* returned statistics */
 
@@ -1481,11 +1481,11 @@ empty **SysStats** structure; the routine will fill in the appropriate fields.
 **Include:** sysstats.h
 
 ----------
-#### SysUnlockBIOS()
+### SysUnlockBIOS()
     void    SysUnlockBIOS(void);
 
 ----------
-#### TextSearchInString()
+### TextSearchInString()
     char *  TextSearchInSTring(
             const char      *str1,
             conat char      *startPtr,
@@ -1520,7 +1520,7 @@ word itself is returned by the routine.)
 **Include:** Objects/vTextC.goh
 
 ----------
-#### TextSearchInHugeArray()
+### TextSearchInHugeArray()
     dword   TextSearchInSTring(
             char            *str2,
             word            str2Size,
@@ -1559,7 +1559,7 @@ word itself is returned by the routine.)
 **Include:** Objects/vTextC.goh
 
 ----------
-#### TGI_PRIORITY()
+### TGI_PRIORITY()
     byte    TGI_PRIORITY(val);
             word    val;
 
@@ -1567,7 +1567,7 @@ This macro extracts the thread priority from the value returned by
 **ThreadGetInfo()**.
 
 ----------
-#### TGI_RECENT_CPU_USAGE()
+### TGI_RECENT_CPU_USAGE()
     byte    TGI_RECENT_CPU_USAGE(val);
             word    val;
 
@@ -1575,7 +1575,7 @@ This macro extracts the recent CPU usage from the value returned by
 **ThreadGetInfo()**.
 
 ----------
-#### ThreadAllocSem()
+### ThreadAllocSem()
     SemaphoreHandle ThreadAllocSem(
             word    value);         /* allowable locks on the semaphore */
 
@@ -1588,7 +1588,7 @@ will be one. The routine returns the handle of the new semaphore.
 **Include:** sem.h
 
 ----------
-#### ThreadAllocThreadLock()
+### ThreadAllocThreadLock()
     ThreadLockHandle ThreadAllocThreadLock();
 
 This routine allocates a special semaphore called a thread lock. With a 
@@ -1603,7 +1603,7 @@ In all other aspects, however, the thread lock resembles a normal semaphore.
 **Include:** sem.h
 
 ----------
-#### ThreadAttachToQueue()
+### ThreadAttachToQueue()
     void    ThreadAttachToQueue(
             QueueHandle     qh,             /* queue to attach */
             ClassStruct     * class);       /* primary class of thread */
@@ -1625,7 +1625,7 @@ threads, and it is nearly always taken care of automatically by
 **Include:** thread.h
 
 ----------
-#### ThreadCreate()
+### ThreadCreate()
     ThreadHandle ThreadCreate(
             word    priority,       /* Initial base priority of new thread */
             word    valueToPass,    /* Optional data to pass to new thread */
@@ -1706,7 +1706,7 @@ take any amount of time to complete.
 **Include:** thread.h
 
 ----------
-#### ThreadDestroy()
+### ThreadDestroy()
     void    ThreadDestroy(
             word    errorCode,  /* Error code to indicate cause of destruction */
             optr    ackObject,  /* Object to receive destruction acknowledgment */
@@ -1734,7 +1734,7 @@ clean up after itself.
 **Include:** thread.h
 
 ----------
-#### ThreadFreeSem()
+### ThreadFreeSem()
     void    ThreadFreeSem(
             SemaphoreHandle sem);           /* semaphore to be freed */
 
@@ -1746,7 +1746,7 @@ could cause illegal handle errors or worse.
 **Include:** sem.h
 
 ----------
-#### ThreadFreeThreadLock()
+### ThreadFreeThreadLock()
     void    ThreadFreeThreadLock(
             ThreadLockHandle sem);              /* thread lock to be freed */
 
@@ -1758,13 +1758,13 @@ or release the thread lock could cause illegal handle errors.
 **Include:** sem.h
 
 ----------
-#### ThreadGetError()
+### ThreadGetError()
     word    ThreadGetError(void)
 
 This routine returns the thread's current error value.
 
 ----------
-#### ThreadGetInfo()
+### ThreadGetInfo()
     word    ThreadGetInfo(
             ThreadHandle        th,     /* thread to get information about */
             ThreadGetInfoType   info);  /* type of information to get */
@@ -1796,7 +1796,7 @@ event-driven, a null queue handle will be returned.
 **Include:** thread.h
 
 ----------
-#### ThreadGrabThreadLock()
+### ThreadGrabThreadLock()
     void    ThreadGrabThreadLock(
             ThreadLockHandle sem);              /* thread lock to grab */
 
@@ -1815,7 +1815,7 @@ grabbed in the same order to minimize the potential for deadlock.
 **Include:** sem.h
 
 ----------
-#### ThreadHandleException()
+### ThreadHandleException()
     void    ThreadHandleException(
             ThreadHandle        th,         /* thread to handle the exception */
             ThreadExceptions    exception,  /* exception to handle */
@@ -1845,7 +1845,7 @@ pointer to use the GEOS default exception handler.
 **Include:** thread.h
 
 ----------
-#### ThreadModify()
+### ThreadModify()
     void    ThreadModify(
             ThreadHandle        th,                 /* thread to modify */
             word                newBasePriority,    /* thread's new base priority */
@@ -1872,7 +1872,7 @@ zero.
 **Include:** thread.h
 
 ----------
-#### ThreadPrivAlloc()
+### ThreadPrivAlloc()
     word    ThreadPrivAlloc(
             word            wordsRequested,     /* number of words to allocate */
             GeodeHandle     owner);             /* handle of geode to own data */
@@ -1886,7 +1886,7 @@ geodes (loaded and yet-to-be loaded). It is exactly the same as
 **See Also:** GeodePrivAlloc()
 
 ----------
-#### ThreadPrivFree()
+### ThreadPrivFree()
     void    ThreadPrivFree(
             word    range,              /* offset to first word to be freed */
             word    wordsRequested);    /* number of words to free */
@@ -1900,7 +1900,7 @@ the entry for that routine for full information.
 **See Also:** GeodePrivFree()
 
 ----------
-#### ThreadPSem()
+### ThreadPSem()
     SemaphoreError ThreadPSem(
             SemaphoreHandle sem);               /* semaphore to grab */
 
@@ -1928,7 +1928,7 @@ lock instead (see **ThreadAllocThreadLock()** for more information).
 **Include:** sem.h
 
 ----------
-#### ThreadPTimedSem()
+### ThreadPTimedSem()
     SemaphoreError ThreadPTimedSem(
             SemaphoreHandle     sem,        /* semaphore to grab */
             word                timeout);   /* ticks before timeout */
@@ -1974,7 +1974,7 @@ lock instead, though there is no timeout equivalent for thread locks (see
 **Include:** sem.h
 
 ----------
-#### ThreadReleaseThreadLock()
+### ThreadReleaseThreadLock()
     void    ThreadReleaseThreadLock(
             ThreadLockHandle sem);              /* threadlock to release */
 
@@ -1988,7 +1988,7 @@ results are unpredictable.
 **Include:** sem.h
 
 ----------
-#### ThreadVSem()
+### ThreadVSem()
     void    ThreadVSem(
             SemaphoreHandle sem);               /* semaphore to release */
 
@@ -2002,7 +2002,7 @@ one of the above routines. The results are unpredictable.
 **Include:** sem.h
 
 ----------
-#### TimerGetCount()
+### TimerGetCount()
     dword   TimerGetCount();
 
 This routine returns the value of the system counter. The returned value is 
@@ -2011,7 +2011,7 @@ the number of ticks since GEOS started.
 **Include:** timer.h
 
 ----------
-#### TimerGetDateAndTime()
+### TimerGetDateAndTime()
     void    TimerGetDateAndTime(
             TimerDateAndTime * dateAndTime);    /* buffer for returned values */
 
@@ -2021,7 +2021,7 @@ This routine returns the current time and date. Pass it a pointer to an empty
 **Include:** timedate.h
 
 ----------
-#### TimerSetDateAndTime()
+### TimerSetDateAndTime()
     void    TimerSetDateAndTime(
             word                    flags,          /* which item to set */
             const TimerDateAndTime  * dateAndTime); /* new values */
@@ -2039,7 +2039,7 @@ information to be set.
 **Include:** timedate.h
 
 ----------
-#### TimerSleep()
+### TimerSleep()
     void    TimerSleep(
             word    ticks);     /* number of ticks the thread should sleep */
 
@@ -2053,7 +2053,7 @@ synchronization.
 **Include:** timer.h
 
 ----------
-#### TimerStart()
+### TimerStart()
     TimerHandle TimerStart(
             TimerType   timerType,      /* type of timer to start */
             optr        destObject,     /* object to receive notification
@@ -2128,7 +2128,7 @@ wake a sleeping machine.
 **Include:** timer.h
 
 ----------
-#### TimerStop()
+### TimerStop()
     Boolean TimerStop(
             TimerHandle     th,     /* handle of timer to be stopped */
             word            id);    /* timer ID (returned by TimerStart() */
@@ -2148,7 +2148,7 @@ destination an "all-safe" message with the MF_FORCE_QUEUE flag.
 **Include:** timer.h
 
 ----------
-#### TocDBLock()
+### TocDBLock()
     void * TocDBLock(
             DBGroupAndItem      thing);
 
@@ -2157,7 +2157,7 @@ Use this routine to lock a name array maintained by a PrefTocList object.
 **Include:** config.goh
 
 ----------
-#### TocDBLockGetRef()
+### TocDBLockGetRef()
     void * TocDBLockGetRef(
             DBGroupAndItem      thing,
             optr                *refPtr);
@@ -2168,7 +2168,7 @@ returning the item's pointer and optr.
 **Include:** config.goh
 
 ----------
-#### TocFindCategory()
+### TocFindCategory()
     Boolean TocFindCategory(
             TocCategoryStruct       *cat);
 
@@ -2187,7 +2187,7 @@ This routine searches a PrefTocList object's name list for a given token.
 **Include:** config.goh
 
 ----------
-#### TocGetFileHandle()
+### TocGetFileHandle()
     word TocGetFileHandle();
 
 Use this routine to get the handle of the file used by PrefTocLists to store 
@@ -2196,7 +2196,7 @@ their name array data.
 **Include:** config.goh
 
 ----------
-#### TocNameArrayAdd()
+### TocNameArrayAdd()
     word TocNameArrayAdd(
             DBGroupAndItem      array, 
             const char          *nameToFind,
@@ -2208,7 +2208,7 @@ object.
 **Include:** config.h
 
 ----------
-#### TocNameArrayFind()
+### TocNameArrayFind()
     word TocNameArrayGetElement(
             DBGroupAndItem      array, 
             word                element,
@@ -2220,7 +2220,7 @@ object.
 **Include:** config.goh
 
 ----------
-#### TocNameArrayGetElement()
+### TocNameArrayGetElement()
     word TocNameArrayGetElement(
             DBGroupAndItem      array, 
             word        element,
@@ -2232,7 +2232,7 @@ by a PrefTocList object.
 **Include:** config.goh
 
 ----------
-#### TocSortedNameArrayAdd()
+### TocSortedNameArrayAdd()
     word TocSortedNameArrayAdd(
             word                arr, 
             const char          *nameToAdd,
@@ -2250,7 +2250,7 @@ PrefTocList object.
 **Include:** config.goh
 
 ----------
-#### TocSortedNameArrayFind()
+### TocSortedNameArrayFind()
     Boolean TocSortedNameArrayFind(
             word                        arr, 
             const char                  *nameToFind,
@@ -2269,7 +2269,7 @@ PrefTocList object.
 **Include:** config.goh
 
 ----------
-#### TocUpdateCategory()
+### TocUpdateCategory()
     void TocUpdateCategory(
             TocUpdateCategoryParams *params);
 
@@ -2295,7 +2295,7 @@ directory with a given token.
 **Include:** config.goh
 
 ----------
-#### TOKEN_CHARS()
+### TOKEN_CHARS()
     dword   TOKEN_CHARS(a, b, c, d);
             char    a, b, c, d;
 
@@ -2303,7 +2303,7 @@ This macro creates a single dword value from four given characters. This is
 useful when creating a token characters value for a specific token.
 
 ----------
-#### TokenDefineToken()
+### TokenDefineToken()
     word    TokenDefineToken(
             dword           tokenChars,         /* four token characters */
             ManufacturerID  manufacturerID,     /* manufacturer ID for token */
@@ -2334,7 +2334,7 @@ thereby invalidating all pointers to token database items.
 **Include:** token.h
 
 ----------
-#### TokenGetTokenInfo()
+### TokenGetTokenInfo()
     Boolean TokenGetTokenInfo(
             dword           tokenChars,         /* four characters of token */
             ManufacturerID  manufacturerID,     /* manufacturer ID of token */
@@ -2359,7 +2359,7 @@ found in the token database. It returns zero if successful.
 **Include:** token.h
 
 ----------
-#### TokenListTokens()
+### TokenListTokens()
     dword   TokenListTokens(
             TokenRangeFlags     tokenRangeFlags,
             word                headerSize,
@@ -2378,7 +2378,7 @@ handle of the newly-allocated block and can be extracted with the macro
 **Include:** token.h
 
 ----------
-#### TokenListTokensCountFromDWord()
+### TokenListTokensCountFromDWord()
     word    TokenListTokensCountFromDWord(d);
             dword   d;
 
@@ -2386,7 +2386,7 @@ This macro extracts the number of tokens from the value returned by
 **TokenListTokens()**.
 
 ----------
-#### TokenListTokensHandleFromDWord()
+### TokenListTokensHandleFromDWord()
     word    TokenListTokensHandleFromDWord(d);
             dword   d;
 
@@ -2394,7 +2394,7 @@ This routine extracts the MemHandle from the value returned by
 **TokenListTokens()**.
 
 ----------
-#### TokenLoadMonikerBlock()
+### TokenLoadMonikerBlock()
     Boolean TokenLoadMonikerBlock(
             dword                   tokenChars,     /* four characters of token */
             ManufacturerID          manufacturerID, /* manufacturer ID of token */
@@ -2434,7 +2434,7 @@ returned.
 **Include:** token.h
 
 ----------
-#### TokenLoadMonikerBuffer()
+### TokenLoadMonikerBuffer()
     Boolean TokenLoadMonikerBuffer(
             dword                   tokenChars,         /* four characters of token */
             ManufacturerID          manufacturerID,     /* manufacturer ID of token */
@@ -2475,7 +2475,7 @@ moniker that may be returned.
 **Include:** token.h
 
 ----------
-#### TokenLoadMonikerChunk()
+### TokenLoadMonikerChunk()
     Boolean TokenLoadMonikerChunk(
             dword                   tokenChars,     /* four characters of token */
             ManufacturerID          manufacturerID, /* manufacturer ID of token */
@@ -2520,7 +2520,7 @@ pointers to any chunk in the block.
 **Include:** token.h
 
 ----------
-#### TokenLoadTokenBlock()
+### TokenLoadTokenBlock()
     Boolean TokenLoadTokenBlock(
             dword           tokenChars,         /* four characters of token */
             ManufacturerID  manufacturerID,     /* manufacturer ID of token */
@@ -2549,7 +2549,7 @@ newly-allocated block will be returned.
 **Include:** token.h
 
 ----------
-#### TokenLoadTokenBuffer()
+### TokenLoadTokenBuffer()
     Boolean TokenLoadTokenBuffer(
             dword           tokenChars,         /* four characters of token */
             ManufacturerID  manufacturerID,     /* manufacturer ID of token */
@@ -2572,7 +2572,7 @@ will be copied.
 **Include:** token.h
 
 ----------
-#### TokenLoadTokenChunk()
+### TokenLoadTokenChunk()
     Boolean TokenLoadTokenChunk(
             dword           tokenChars,         /* four characters of token */
             ManufacturerID  manufacturerID,     /* manufacturer ID of token */
@@ -2609,7 +2609,7 @@ pointers to any chunk in the block.
 **Include:** token.h
 
 ----------
-#### TokenLockTokenMoniker()
+### TokenLockTokenMoniker()
     void    * TokenLockTokenMoniker(
             TokenMonikerInfo    tokenMonikerInfo);  /* The DB group and item numbers
                                  * as returned by TokenLookupMoniker() */
@@ -2624,7 +2624,7 @@ drawing it.
 **Include:** token.h
 
 ----------
-#### TokenLookupMoniker()
+### TokenLookupMoniker()
     Boolean TokenLookupMoniker(
             dword                   tokenChars,         /* four characters of token */
             ManufacturerID          manufacturerID,     /* manufacturer ID of token */
@@ -2658,13 +2658,13 @@ in the token database, *false* otherwise.
 **Include:** token.h
 
 ----------
-#### TokenCloseLocalTokenDB()
+### TokenCloseLocalTokenDB()
     void    TokenCloseLocalTokenDB()
 
 This routine closes the local token database.
 
 ----------
-#### TokenListTokens()
+### TokenListTokens()
     dword TokenListTokens(
             TokenRangeFlags     tokenRangeFlags,
             word                headerSize,
@@ -2676,7 +2676,7 @@ is the number of matching tokens found; the lower word is the handle of the
 block which was allocated.
 
 ----------
-#### TokenOpenLocalTokenDB()
+### TokenOpenLocalTokenDB()
     word    TokenOpenLocalTokenDB()
 
 This routine opens the local token database. It returns zero on success, and 
@@ -2685,7 +2685,7 @@ a **VMStatus** error code on failure.
 **Include:** token.h
 
 ----------
-#### TokenRemoveToken
+### TokenRemoveToken
     Boolean TokenRemoveToken(
             dword           tokenChars,         /* four characters of token */
             ManufacturerID  manufacturerID,     /* manufacturer ID of token */
@@ -2704,7 +2704,7 @@ for the token database entry.
 **Include:** token.h
 
 ----------
-#### TokenUnlockTokenMoniker()
+### TokenUnlockTokenMoniker()
     void    TokenUnlockTokenMoniker(
             void * moniker);
 
@@ -2715,7 +2715,7 @@ the locking routine.
 **Include:** token.h
 
 ----------
-#### TypeFromFormatID()
+### TypeFromFormatID()
     word    TypeFromFormatID(id);
             ClipboardItemFormatID   id;
 

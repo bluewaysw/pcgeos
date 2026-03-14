@@ -1,7 +1,7 @@
 ## 3.6 Structures S-S
 
 ----------
-#### SampleFormat
+### SampleFormat
     SampleFormat        record
         SMID_format         DAC_SampleFormat:15
         SMID_refernce       DAC_ReferenceByte:1
@@ -10,7 +10,7 @@
 **Library:** sound.def
 
 ----------
-#### SampleFormatDescription
+### SampleFormatDescription
     SampleFormatDescription         struct
         SFD_manufact            ManufacturerID
         SFD_format              SampleFormat
@@ -21,7 +21,7 @@
 **Library:** sound.def
 
 ----------
-#### SamplesStruc
+### SamplesStruc
     SamplesStruc        struc
         SS_sample1Str       char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
         SS_sample2Str       char FLOAT_TO_ASCII_HUGE_BUF_LEN dup (?)
@@ -32,7 +32,7 @@
 **Library:** math.def
 
 ----------
-#### SansFace
+### SansFace
     SansFace        etype byte
         SF_A_OPEN           enum SansFace, 0
         SF_A_CLOSED         enum SansFace, 0x80
@@ -45,7 +45,7 @@ the bottom, and an extra stem on top).
 **Library:** fontID.def
 
 ----------
-#### ScaleChangedParams
+### ScaleChangedParams
     ScaleChangedParams          struct
         SCP_scaleFactor     PointWWFixed    ;new scale factor
         SCP_window          lptr Window     ;window of view
@@ -54,7 +54,7 @@ the bottom, and an extra stem on top).
 **Library:** Objects/gViewC.def
 
 ----------
-#### ScaleViewParams
+### ScaleViewParams
     ScaleViewParams     struct
         SVP_scaleFactor     PointWWFixed        ;new, absolute scale factor
         SVP_unused          byte
@@ -65,7 +65,7 @@ the bottom, and an extra stem on top).
 **Library:** Objects/gViewC.def
 
 ----------
-#### ScaleViewType
+### ScaleViewType
     ScaleViewType       etype byte
         SVT_AROUND_UPPER_LEFT           enum ScaleViewType
         SVT_AROUND_CENTER               enum ScaleViewType
@@ -83,7 +83,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** Objects/gViewC.def
 
 ----------
-#### ScannerToken
+### ScannerToken
     ScannerToken        struct
         ST_type     ScannerTokenType    ; The type of token
         ST_data     ScannerTokenData    ; The data associated with the token
@@ -92,7 +92,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenCellData
+### ScannerTokenCellData
     ScannerTokenCellData            struct
         STCD_cellRef            CellReference <>
     ScannerTokenCellData            ends
@@ -100,7 +100,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenData
+### ScannerTokenData
     ScannerTokenData    union
         STD_number          ScannerTokenNumberData
         STD_string          ScannerTokenStringData
@@ -112,7 +112,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenIdentifierData
+### ScannerTokenIdentifierData
     ScannerTokenIdentifierData              struct
         STID_start      word    ; The offset to the start of the identifier
     ScannerTokenIdentifierData              ends
@@ -120,7 +120,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenNumberData
+### ScannerTokenNumberData
     ScannerTokenNumberData          struct
         STND_value          FloatNum        ; 8 byte constant
     ScannerTokenNumberData          ends
@@ -128,7 +128,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenOperatorData
+### ScannerTokenOperatorData
     ScannerTokenOperatorData                struct
         STOD_operatorID     OperatorType    ; Identifier for this operator
     ScannerTokenOperatorData                ends
@@ -136,7 +136,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenStringData
+### ScannerTokenStringData
     ScannerTokenStringData      struct
         STSD_start      word        ; Offset to start of string
         STSD_length     word        ; Length of the string
@@ -145,7 +145,7 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScannerTokenType
+### ScannerTokenType
     ScannerTokenType        etype byte, 0, 1
         SCANNER_TOKEN_NUMBER            enum ScannerTokenType
         SCANNER_TOKEN_STRING            enum ScannerTokenType
@@ -165,14 +165,14 @@ Point specified in *SVP_point* is kept fixed as we scale.
 **Library:** parse.def
 
 ----------
-#### ScriptFace
+### ScriptFace
     ScriptFace      etype byte
         SF_CALLIGRAPHIC enum ScriptFace, 0      ; variable thickness stroke
         SF_CURSIVE      enum ScriptFace, 0x80   ; single thickness stroke
 
 **Library:** fontID.def
 ----------
-#### ScrollAction
+### ScrollAction
     ScrollAction        etype byte
         SA_NOTHING                  enum ScrollAction
         SA_TO_BEGINNING             enum ScrollAction
@@ -241,7 +241,7 @@ Any scrolling that's required as a result of the view size change
 **Library:** Objects/gViewC.def
 
 ----------
-#### ScrollFlags
+### ScrollFlags
     ScrollFlags     record
         SF_VERTICAL                 :1
         SF_ABSOLUTE                 :1
@@ -287,7 +287,7 @@ routines.
 **Library:** Objects/gViewC.def
 
 ----------
-#### SearchFromOffsetFlags
+### SearchFromOffsetFlags
 
 SearchFromOffsetFlags           record
 
@@ -301,7 +301,7 @@ Set (internally) if this search has wrapped around.
 **Library:** Objects/vTextC.def
 
 ----------
-#### SearchFromOffsetReturnStruct
+### SearchFromOffsetReturnStruct
     SearchFromOffsetReturnStruct                struct
         SFORS_object            optr (?)
         SFORS_offset            dword (?)
@@ -319,7 +319,7 @@ Set (internally) if this search has wrapped around.
 **Library:** Objects/vTextC.def
 
 ----------
-#### SearchFromOffsetStruct
+### SearchFromOffsetStruct
     SearchFromOffsetStruct          struct
         SFOS_data           hptr.SearchReplaceStruct
         SFOS_startObject    optr
@@ -351,7 +351,7 @@ start search. (This value can range from 0 to <text size>).
 **Library:** Objects/vTextC.def
 
 ----------
-#### SearchOptions
+### SearchOptions
     SearchOptions       record
                                                 :2
         SO_NO_WILDCARDS                         :1
@@ -389,7 +389,7 @@ replacing it).
 **Library:** Objects/vTextC.def
 
 ----------
-#### SearchReplaceEnableFlags
+### SearchReplaceEnableFlags
     SearchReplaceEnableFlags            record
         SREF_SEARCH     :1  ; Set if the object can handle searches
         SREF_REPLACE    :1  ; Set if the object can handle replaces
@@ -398,7 +398,7 @@ replacing it).
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### SearchReplaceFocusInfo
+### SearchReplaceFocusInfo
     SearchReplaceFocusInfo          etype byte
         SRFI_SEARCH_TEXT                enum SearchReplaceFocusInfo
     SRFI_REPLACE_TEXT               enum SearchReplaceFocusInfo
@@ -406,7 +406,7 @@ replacing it).
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### SearchReplaceStruct
+### SearchReplaceStruct
     SearchReplaceStruct     struct
         SRS_searchSize          word
         SRS_replaceSize         word
@@ -435,7 +435,7 @@ was not found.
 **Library:** Objects/vTextC.def
 
 ----------
-#### SelectionDataType
+### SelectionDataType
     SelectionDataType       etype word
         SDT_TEXT                enum SelectionDataType
         SDT_GRAPHICS            enum SelectionDataType
@@ -446,7 +446,7 @@ was not found.
 **Library:** Objects/gEditCC.def
 
 ----------
-#### SelectionType
+### SelectionType
     SelectionType       etype byte
         ST_DOING_CHAR_SELECTION             enum SelectionType
         ST_DOING_WORD_SELECTION             enum SelectionType
@@ -456,7 +456,7 @@ was not found.
 **Library:** Objects/vTextC.def
 
 ----------
-#### SemaphoreError
+### SemaphoreError
     SemaphoreError      etype word
         SE_NO_ERROR                 enum SemaphoreError
         SE_TIMEOUT                  enum SemaphoreError
@@ -465,7 +465,7 @@ was not found.
 **Library:** sem.def
 
 ----------
-#### SerifFace
+### SerifFace
     SerifFace       etype byte, 0
         SF_OLD          enum SerifFace, 0
         SF_TRANS        enum SerifFace, 0x40
@@ -494,7 +494,7 @@ are usually unbracketed
 **Library:** fontID.def
 
 ----------
-#### SetDateTimeParams
+### SetDateTimeParams
     SetDateTimeParams       record
         SDTP_SET_DATE           :1  ;TRUE: set date (must be bit 7)
         SDTP_SET_TIME           :1  ;TRUE: set time (must be bit 6)
@@ -504,7 +504,7 @@ are usually unbracketed
 **Library:** timedate.def
 
 ----------
-#### SetPalElement
+### SetPalElement
     SetPalElement        struct
         SPE_entry       byte            ; palette entry number
         SPE_color       RGBValue <>     ; color to set that entry
@@ -515,7 +515,7 @@ This structure is passed to GrSetPalette.
 **Library:** color.def
 
 ----------
-#### SetSizeArgs
+### SetSizeArgs
     SetSizeArgs     struct
         SSA_width       SpecWidth <>    ;Width of the composite
         SSA_height      SpecHeight <>   ;Height of each child
@@ -528,7 +528,7 @@ This structure is passed to GrSetPalette.
 **Library:** Objects/genC.def
 
 ----------
-#### ShadowAnchor
+### ShadowAnchor
     ShadowAnchor        etype byte
         SA_TOP_LEFT             enum ShadowAnchor
         SA_TOP_RIGHT            enum ShadowAnchor
@@ -538,7 +538,7 @@ This structure is passed to GrSetPalette.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### ShiftState
+### ShiftState
     ShiftState      record
         SS_LALT             :1  ;Set if left ALT modifier
         SS_RALT             :1  ;Set if right ALT modifier
@@ -553,7 +553,7 @@ This structure is passed to GrSetPalette.
 **Library:** input.def
 
 ----------
-#### SortableArrayElement
+### SortableArrayElement
     SortableArrayElement            struct
         SAE_OD      optr
         SAE_key     DWFixed
@@ -562,7 +562,7 @@ This structure is passed to GrSetPalette.
 **Library:** grobj.def
 
 ----------
-#### SortableArrayHeader
+### SortableArrayHeader
     SortableArrayHeader         struct
         SAH_CAH                     ChunkArrayHeader
         SAH_originalArray           optr
@@ -571,7 +571,7 @@ This structure is passed to GrSetPalette.
 **Library:** grobj.def
 
 ----------
-#### SortedNameArrayFindFlags
+### SortedNameArrayFindFlags
     SortedNameArrayFindFlags            record
         SNAFF_IGNORE_CASE           :1
     SortedNameArrayFindFlags            end
@@ -579,7 +579,7 @@ This structure is passed to GrSetPalette.
 **Library:** config.def
 
 ----------
-#### SoundBasicStatus
+### SoundBasicStatus
     SoundBasicStatus        struct
         SBS_blockHandle     word 0              ; handle of block
         SBS_ID              word SOUND_ID       ; Says this struct is a sound
@@ -595,7 +595,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundControl
+### SoundControl
     SoundControl        struct
         SC_status           SoundBasicStatus
         SC_format           SoundFormatStatus
@@ -606,7 +606,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:**        sound.def
 
 ----------
-#### SoundDACStatus
+### SoundDACStatus
     SoundDACStatus      struct
         SDACS_rate          word 0              ; sample rate of sound
         SDACS_format        DACSampleFormat 0   ; sample format of sound
@@ -616,7 +616,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundErrors
+### SoundErrors
     SoundErrors                 etype   word, 0, 2
         SOUND_ERROR_NO_ERROR                        enum    SoundErrors
         SOUND_ERROR_EXCLUSIVE_ACCESS_GRANTED        enum    SoundErrors
@@ -631,7 +631,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundFMStatus
+### SoundFMStatus
     SoundFMStatus       struct
         SFMS_timerHandle    hptr 0      ; current timer handle
         SFMS_timerID        word 0      ; current timer ID
@@ -643,7 +643,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundFormatStatus
+### SoundFormatStatus
     SoundFormatStatus       union
         SFS_fm      SoundFMStatus
         SFS_dac     SoundDACStatus
@@ -652,7 +652,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundFunction
+### SoundFunction
     SoundFunction       etype word, DriverFunction, 2
         DR_SOUND_ENTER_LIBRARY_ROUTINE  enum SoundFunction
         DR_SOUND_EXIT_LIBRARY_ROUTINE   enum SoundFunction
@@ -679,7 +679,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundPositionStatus
+### SoundPositionStatus
     SoundPositionStatus         union
         SSS_simple      SoundSimpleStatus
         SSS_stream      SoundStreamStatus
@@ -688,7 +688,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundPriority
+### SoundPriority
     SoundPriority       etype word, 10, 10
         SP_SYSTEM_LEVEL     enum SoundPriority
         SP_ALARM            enum SoundPriority
@@ -702,7 +702,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundSimpleStatus
+### SoundSimpleStatus
     SoundSimpleStatus           struct
         SSS_songBuffer      fptr 0          ; fptr to song buffer
         SSS_songPointer     nptr 0          ; current place in song
@@ -711,7 +711,7 @@ all sounds. This structure is an entry within the basic Sound structure.
 **Library:** sound.def
 
 ----------
-#### SoundStreamDeltaTimeType
+### SoundStreamDeltaTimeType
     SoundStreamDeltaTimeType        etype word, SoundStreamEvent, 2
         SSDTT_MSEC          enum SoundStreamDeltaTimeType
         SSDTT_TICKS         enum SoundStreamDeltaTimeType
@@ -725,7 +725,7 @@ seconds, in ticks (giving a maximum delay of ~18 minutes, or in 1/64th notes
 **Library:** sound.def
 
 ----------
-#### SoundStreamEvent
+### SoundStreamEvent
     SoundStreamEvent        etype word, 0, 2
         SSE_VOICE_ON            enum SoundStreamEvent
         SSE_VOICE_OFF           enum SoundStreamEvent
@@ -737,7 +737,7 @@ A sound stream is just made up of a bunch of events.
 **Library:** sound.def
 
 ----------
-#### SoundStreamSize
+### SoundStreamSize
     SoundStreamSize     etype   word
         SSS_ONE_SHOT        enum    SoundStreamSize, 128; bytes
         SSS_SMALL           enum    SoundStreamSize, 256; bytes
@@ -747,7 +747,7 @@ A sound stream is just made up of a bunch of events.
 **Library:** sound.def
 
 ----------
-#### SoundStreamState
+### SoundStreamState
     SoundStreamState    record
         SSS_active          :1  ; does a reader exist?
         SSS_destroying      :1  ; is it being destroyed?
@@ -758,7 +758,7 @@ A sound stream is just made up of a bunch of events.
 **Library:** sound.def
 
 ----------
-#### SoundStreamStatus
+### SoundStreamStatus
     SoundStreamStatus       struct
         SSS_streamToken         word 0              ; stream handle
         SSS_streamSegment       word 0              ; stream segment
@@ -774,7 +774,7 @@ A sound stream is just made up of a bunch of events.
 **Library:** sound.def
 
 ----------
-#### SoundType
+### SoundType
     SoundType       etype word, 0, 2
         ST_SIMPLE_FM            enum SoundType
         ST_STREAM_FM            enum SoundType
@@ -791,7 +791,7 @@ analog.
 **Library:** sound.def
 
 ----------
-#### SoundVoiceStatus
+### SoundVoiceStatus
     SoundVoiceStatus        struct
         SVS_instrument          fptr.InstrumentEnvelope 0
         SVS_physicalVoice       word 0
@@ -811,7 +811,7 @@ The **SoundVoiceStatus** structure stores these two pieces of information.
 **Library:** sound.def
 
 ----------
-#### SpecAttrs
+### SpecAttrs
     SpecAttrs       record
         SA_ATTACHED                     :1
         SA_REALIZABLE                   :1
@@ -891,7 +891,7 @@ send a recursive MSG_SPEC_BUILD_BRANCH down the tree.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecBuildFlags
+### SpecBuildFlags
     SpecBuildFlags      record
         SBF_IN_UPDATE_WIN_GROUP                         :1
         SBF_WIN_GROUP                                   :1
@@ -983,7 +983,7 @@ VisUpdateMode to use.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecChildCount
+### SpecChildCount
     SpecChildCount      record
         SCC_DATA        :16
     SpecChildCount      end
@@ -991,7 +991,7 @@ VisUpdateMode to use.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecHeight
+### SpecHeight
     SpecHeight      record
         SH_TYPE         SpecSizeType:6
         SH_DATA         :10
@@ -1000,7 +1000,7 @@ VisUpdateMode to use.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecialChar
+### SpecialChar
     SpecialChar     etype word, 0, 2
         SC_WILDCARD             enum    SpecialChar
         SC_WILDCHAR             enum    SpecialChar
@@ -1012,7 +1012,7 @@ VisUpdateMode to use.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### SpecialFunction
+### SpecialFunction
     SpecialFunction     etype word, 0, 2
         SF_FILENAME         enum SpecialFunction
         SF_PAGE             enum SpecialFunction
@@ -1021,7 +1021,7 @@ VisUpdateMode to use.
 **Library:** parse.def
 
 ----------
-#### SpecQueryVisParentType
+### SpecQueryVisParentType
     SpecQueryVisParentType              etype word
         SQT_VIS_PARENT_FOR_FIELD        enum SpecQueryVisParentType
         SQT_VIS_PARENT_FOR_APPLICATION  enum SpecQueryVisParentType
@@ -1034,7 +1034,7 @@ VisUpdateMode to use.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecSizeArgs
+### SpecSizeArgs
     SpecSizeArgs        struct
         SSA_minWidth            sword       ; HINT_MINIMUM_SIZE
         SSA_minHeight           sword
@@ -1059,7 +1059,7 @@ suggested size arguments in various ways.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecSizeSpec
+### SpecSizeSpec
     SpecSizeSpec            record
         SSS_TYPE        SpecSizeType:6
         SSS_DATA        :10
@@ -1068,7 +1068,7 @@ suggested size arguments in various ways.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecSizeType
+### SpecSizeType
     SpecSizeType        etype byte
         SST_PIXELS                      enum SpecSizeType
         SST_COUNT                       enum SpecSizeType
@@ -1145,13 +1145,13 @@ lines of text are normally only handled by the text object.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecUINavigationID
+### SpecUINavigationID
     SpecUINavigationID      etype word, NAVIGATION_ID_UI_START
 
 **Library:** Objects/genC.def
 
 ----------
-#### SpecWidth
+### SpecWidth
     SpecWidth           record
         SW_TYPE     SpecSizeType:6
         SW_DATA     :10
@@ -1160,7 +1160,7 @@ lines of text are normally only handled by the text object.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecWinSizePair
+### SpecWinSizePair
     SpecWinSizePair     struct
         SWSP_x  SpecWinSizeSpec
         SWSP_y  SpecWinSizeSpec
@@ -1173,7 +1173,7 @@ object.
 **Library:** Objects/visC.def
 
 ----------
-#### SpecWinSizeSpec
+### SpecWinSizeSpec
     SpecWinSizeSpec     record
         SWSS_RATIO      :1      ;TRUE if value is ratio. If FALSE,
                                 ;bits 14-0 contain signed pixel value.
@@ -1186,7 +1186,7 @@ object.
 **Library:** Objects/visC.def
 
 ----------
-#### SpellCheckFromOffsetFlags
+### SpellCheckFromOffsetFlags
     SpellCheckFromOffsetFlags               record
         SCFOF_CHECK_NUM_CHARS           :1
     SpellCheckFromOffsetFlags               end
@@ -1198,7 +1198,7 @@ number of characters.
 **Library:** Objects/vTextC.def
 
 ----------
-#### SpellCheckFromOffsetStruct
+### SpellCheckFromOffsetStruct
     SpellCheckFromOffsetStruct              struct
         SCFOS_ICBuff                hptr
         SCFOS_flags                 SpellCheckFromOffsetFlags
@@ -1225,7 +1225,7 @@ SPELL_CHECK_COMPLETED) should be sent to.
 **Library:** Objects/vTextC.def
 
 ----------
-#### SpoolFileName
+### SpoolFileName
     SpoolFileName       struct
         SFN_base    char "spool"
         SFN_num     char "000"
@@ -1237,7 +1237,7 @@ This structure stores the default names to attach to spool files.
 **Library:** spool.def
 
 ----------
-#### SpoolInfoType
+### SpoolInfoType
     SpoolInfoType       etype word, 0, 2
         SIT_JOB_INFO                enum SpoolInfoType
         SIT_QUEUE_INFO              enum SpoolInfoType
@@ -1245,7 +1245,7 @@ This structure stores the default names to attach to spool files.
 **Library:** spool.def
 
 ----------
-#### SpoolOpStatus
+### SpoolOpStatus
     SpoolOpStatus       etype word, 0, 1
         SPOOL_OPERATION_SUCCESSFUL          enum SpoolOpStatus
         SPOOL_JOB_NOT_FOUND                 enum SpoolOpStatus
@@ -1258,7 +1258,7 @@ This structure stores the default names to attach to spool files.
 **Library:** spool.def
 
 ----------
-#### SpoolTimeStruct
+### SpoolTimeStruct
     SpoolTimeStruct     struct
         STS_second      byte        ; second of the minute (0-59)
         STS_minute      byte        ; minute of the hour (0-59)
@@ -1270,7 +1270,7 @@ This structure holds the time stamp for a print spool job.
 **Library:** spool.def
 
 ----------
-#### SRCFeatures
+### SRCFeatures
     SRCFeatures     record
         SRCF_CLOSE                      :1
         SRCF_FIND_NEXT                  :1
@@ -1287,7 +1287,7 @@ This structure holds the time stamp for a print spool job.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### SRCToolboxFeatures
+### SRCToolboxFeatures
     SRCToolboxFeatures      record
         SRCTF_SEARCH_REPLACE        :1
     SRCToolboxFeatures      end
@@ -1295,7 +1295,7 @@ This structure holds the time stamp for a print spool job.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### StandardArrowheadType
+### StandardArrowheadType
     StandardArrowheadType           record
         SAT_LENGTH                          :6
         SAT_FILLED                          :1
@@ -1306,7 +1306,7 @@ This structure holds the time stamp for a print spool job.
 **Library:** grobj.def
 
 ----------
-#### StandardDialogOptrParams
+### StandardDialogOptrParams
     StandardDialogOptrParams                struct
         SDOP_customFlags            CustomDialogBoxFlags
         SDOP_customString           optr
@@ -1323,7 +1323,7 @@ routine. These entries must be in the same order as
 **Library:** uDialog.def
 
 ----------
-#### StandardDialogParams
+### StandardDialogParams
     StandardDialogParams            struct
         SDP_customFlags         CustomDialogBoxFlags
         SDP_customString        fptr
@@ -1339,7 +1339,7 @@ MSG_GEN_APPLICATION_DO_STANDARD_DIALOG.
 **Library:** uDialog.def
 
 ----------
-#### StandardDialogResponseTriggerEntry
+### StandardDialogResponseTriggerEntry
     StandardDialogResponseTriggerEntry  struct
         SDRTE_moniker               optr
         SDRTE_responseValue         word
@@ -1359,7 +1359,7 @@ value.
 **Library:** uDialog.def
 
 ----------
-#### StandardDialogResponseTriggerTable
+### StandardDialogResponseTriggerTable
     StandardDialogResponseTriggerTable  struct
         SDRTT_numTriggers       word
         SDRTT_triggers          label StandardDialogResponseTriggerEntry
@@ -1372,7 +1372,7 @@ of type GIT_MULTIPLE_RESPONSE initiated through
 **Library:** uDialog.def
 
 ----------
-#### StandardLanguage
+### StandardLanguage
     StandardLanguage        etype byte, 0, 1
         SL_UNIVERSAL            enum StandardLanguage,0 ; Universal Language code
 
@@ -1419,7 +1419,7 @@ of type GIT_MULTIPLE_RESPONSE initiated through
 **Library:** sllang.def
 
 ----------
-#### StandardPath
+### StandardPath
     StandardPath        etype word, 1, 2
         SP_NOT_STANDARD_PATH        enum StandardPath,0
         SP_TOP                      enum StandardPath,1
@@ -1546,7 +1546,7 @@ his is where backup files go. Default is PRIVDATA/BACKUP.
 **Library:** file.def
 
 ----------
-#### StandardPathByte
+### StandardPathByte
     StandardPathByte        record
         SPB_SP      StandardPath:8
     StandardPathByte        end
@@ -1554,7 +1554,7 @@ his is where backup files go. Default is PRIVDATA/BACKUP.
 **Library:** file.def
 
 ----------
-#### StandardSoundType
+### StandardSoundType
     StandardSoundType       etype word
         SST_ERROR               enum StandardSoundType
         SST_WARNING             enum StandardSoundType
@@ -1607,7 +1607,7 @@ PRIORITY = SYSTEM_IMMEDIATE.
 **Library:** ui.def
 
 ----------
-#### StartUndoChainStruct
+### StartUndoChainStruct
     StartUndoChainStruct            struct
         SUCS_owner          optr
         SUCS_title          optr
@@ -1622,7 +1622,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** Objects/gProcC.def
 
 ----------
-#### SubscriptPosition
+### SubscriptPosition
     SubscriptPosition       etype byte
         SBP_CHEMICAL                enum SubscriptPosition, 30
         SBP_DENOMINATOR             enum SubscriptPosition, 0
@@ -1631,7 +1631,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** font.def
 
 ----------
-#### SubscriptSize
+### SubscriptSize
     SubscriptSize       etype byte
         SBS_CHEMICAL                enum SubscriptSize, 65
         SBS_DENOMINATOR             enum SubscriptSize, 60
@@ -1640,7 +1640,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** font.def
 
 ----------
-#### SuperscriptPosition
+### SuperscriptPosition
     SuperscriptPosition         etype byte
         SPP_DISPLAY         enum SuperscriptPosition, 50
         SPP_FOOTNOTE        enum SuperscriptPosition, 40
@@ -1651,7 +1651,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** font.def
 
 ----------
-#### SuperscriptSize
+### SuperscriptSize
     SuperscriptSize     etype byte
         SPS_DISPLAY         enum SuperscriptSize, 55
         SPS_FOOTNOTE        enum SuperscriptSize, 65
@@ -1662,7 +1662,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** font.def
 
 ----------
-#### SysConfigFlags
+### SysConfigFlags
     SysConfigFlags      record
         SCF_UNDER_SWAT  :1, ; Non-zero if kernel started by Swat stub
         SCF_2ND_IC      :1, ; Non-zero if second 8259 present
@@ -1677,7 +1677,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** system.def
 
 ----------
-#### SysDrawMask
+### SysDrawMask
     SysDrawMask     record
         SDM_INVERSE     :1                  ; bit 7: 0 for mask as is
                                             ; 1 for inverse of mask
@@ -1688,7 +1688,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** graphics.def
 
 ----------
-#### SysGetInfoType
+### SysGetInfoType
     SysGetInfoType      etype word, 0, 2
         SGIT_TOTAL_HANDLES          enum SysGetInfoType
         SGIT_HEAP_SIZE              enum SysGetInfoType
@@ -1706,7 +1706,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** sysstats.def
 
 ----------
-#### SysInitialTextMode
+### SysInitialTextMode
     SysInitialTextMode      etype   byte, 0
         SITM_UNKNOWN                enum SysInitialTextMode, 0
         SITM_TEXT_80_25_16_COLOR    enum SysInitialTextMode, 3
@@ -1715,7 +1715,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** system.def
 
 ----------
-#### SysMachineType
+### SysMachineType
     SysMachineType      etype byte, 0
         SMT_UNKNOWN         enum SysMachineType
         SMT_PC              enum SysMachineType
@@ -1733,7 +1733,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** system.def
 
 ----------
-#### SysNotifyFlags
+### SysNotifyFlags
     SysNotifyFlags          record
         SNF_RETRY       :1, ; Retry the operation.
         SNF_EXIT        :1, ; Shutdown the system.
@@ -1753,7 +1753,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** system.def
 
 ----------
-#### SysProcessorType
+### SysProcessorType
     SysProcessorType        etype byte, 0
         SPT_8088            enum SysProcessorType
         SPT_8086            enum SysProcessorType, SPT_8088
@@ -1765,7 +1765,7 @@ MSG_GEN_PROCESS_UNDO_START_CHAIN.
 **Library:** system.def
 
 ----------
-#### SysShutdownType
+### SysShutdownType
     SysShutdownType     etype word
         SST_CLEAN           enum SysShutdownType
         SST_CLEAN_FORCED    enum SysShutdownType
@@ -1872,7 +1872,7 @@ cx - 0 to deny the shutdown.
 **Library:** system.def
 
 ----------
-#### SysSimpleGraphicsMode
+### SysSimpleGraphicsMode
     SysSimpleGraphicsMode   etype   byte, 0
         SSGM_NONE               enum    SysSimpleGraphicsMode, 0
         SSGM_VGA                enum    SysSimpleGraphicsMode, 1
@@ -1886,7 +1886,7 @@ cx - 0 to deny the shutdown.
 **Library:** system.def
 
 ----------
-#### SysStats
+### SysStats
     SysStats        struct
         SS_idleCount            dword
         SS_swapOuts             SysSwapInfo
@@ -1917,7 +1917,7 @@ second.
 **Library:** sysstats.def
 
 ----------
-#### SysSwapInfo
+### SysSwapInfo
     SysSwapInfo     struct
         SSI_paragraphs      word
         SSI_blocks          word
@@ -1933,7 +1933,7 @@ information is used in the **SysStats** structure.
 **Library:** sysstats.def
 
 ----------
-#### SystemAttrs
+### SystemAttrs
     SystemAttrs     record
         SA_NOT                  :1  ;Any following set bits must be OFF for hints
                                     ;to be included, rather than on.
@@ -1957,13 +1957,13 @@ information is used in the **SysStats** structure.
 **Library:** genC.def
 
 ----------
-#### SystemBitmap
+### SystemBitmap
     SystemBitmap        etype byte
 
 **Library:** graphics.def
 
 ----------
-#### SystemDrawMask
+### SystemDrawMask
     SystemDrawMask       etype byte
         SDM_TILE        enum SystemDrawMask     ; tile pattern
         SDM_SHADED_BAR  enum SystemDrawMask     ; shaded bar
@@ -1991,7 +1991,7 @@ information is used in the **SysStats** structure.
 **Library:** graphics.def
 
 ----------
-#### SystemHatch
+### SystemHatch
     SystemHatch     etype byte
     SH_VERTICAL         enum SystemHatch    ; vertical lines
     SH_HORIZONTAL       enum SystemHatch    ; horizontal lines
@@ -2003,7 +2003,7 @@ information is used in the **SysStats** structure.
 **Library:** graphics.def
 
 ----------
-#### SystemVMID
+### SystemVMID
     SystemVMID      etype word, 0xff00
         SVMID_RANGE_DBASE   equ 0xff00          ;Reserved for DB code
 

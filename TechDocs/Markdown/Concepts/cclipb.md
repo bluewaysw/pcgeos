@@ -1,4 +1,4 @@
-## 7 The Clipboard
+# 7 The Clipboard
 
 For an application to survive in the GUI world today, it must support at least 
 the ever-present "Cut, Copy, and Paste" functions to which users have grown 
@@ -15,7 +15,7 @@ of mouse input. However, the concepts of the Clipboard and quick-transfer
 mechanisms are simple and may be understood without having read those 
 sections.
 
-### 7.1 Overview
+## 7.1 Overview
 
 The user understands two ways to cut and paste information: The first is to 
 use the Edit menu and the Cut, Copy, and Paste functions. The second is to 
@@ -34,7 +34,7 @@ if you are not familiar with the features and rules governing the Edit menu
 and the quick-transfer operations, you most likely will want to read this 
 section.
 
-#### 7.1.1 Cut, Copy, and Paste
+### 7.1.1 Cut, Copy, and Paste
 
 Even the simplest, text-using applications provide an Edit menu with the 
 Cut, Copy, and Paste options. A sample Edit menu is shown in Figure 7-1.
@@ -72,7 +72,7 @@ this is where the cursor was last placed); if something is already selected, the
 selection will be replaced with the pasted material. If there is nothing on the 
 Clipboard, then there is nothing to paste; therefore, the option is disabled.
 
-#### 7.1.2 Quick-Transfer
+### 7.1.2 Quick-Transfer
 
 The user can copy and move selected items without using the Edit menu; he 
 simply drags the item using the quick-transfer button of his mouse, and the 
@@ -110,7 +110,7 @@ changes. For example, a drawing program may wish to alter the shape or
 color of an object while it is being quick-moved but leave it normal during a 
 quick-copy or no-operation transfer.
 
-### 7.2 Transfer Data Structures
+## 7.2 Transfer Data Structures
 
 Both the Clipboard and quick-transfer mechanisms use similar structures to 
 accomplish data transfer. These data structures are owned and managed by 
@@ -132,7 +132,7 @@ and graphics strings are special formats that are described below. Geodes can
 create their own specific formats; for example, GeoManager uses a special 
 format for quick-transfer of files between disks and directories.
 
-#### 7.2.1 The Transfer VM File Format
+### 7.2.1 The Transfer VM File Format
 
 The Transfer VM File is a normal VM file, managed by the UI. It contains several 
 components, each of which is accessed through special routines that take care of 
@@ -215,7 +215,7 @@ Clipboard and one for the quick-transfer mechanism (see Figure 7-3). When
 calling **ClipboardQueryItem()**, the requesting geode must specify which 
 item it wants. See [section 7.3](#73-using-the-clipboard) and [section 7.4](#74-using-quick-transfer).
 
-#### 7.2.2 ClipboardItemFormatInfo
+### 7.2.2 ClipboardItemFormatInfo
 
 This structure contains information about a specific format of the transfer 
 item. The Transfer VM File will support up to ten formats of a given item at 
@@ -293,7 +293,7 @@ word TypeFromFormatID(type);
 This macro extracts the format ID from the given clipboard format ID and 
 manufacturer value.
 
-#### 7.2.3 Transfer Data Structures
+### 7.2.3 Transfer Data Structures
 
 Two structures are used with specific routines when dealing with the transfer 
 mechanisms. The **ClipboardQueryArgs** structure is returned by 
@@ -356,7 +356,7 @@ This macro extracts the file handle from the given **TransferBlockID** value.
 ~~~
 This macro extracts the block handle from the given **TransferBlockID** value.
 
-#### 7.2.4 Clipboard Item Formats
+### 7.2.4 Clipboard Item Formats
 
 There are several built-in transfer formats that many GEOS applications 
 may support; each of these types is an enumeration of 
@@ -399,7 +399,7 @@ To create a custom format, simply define these two items as appropriate (your
 Manufacturer ID should be set already). Then define your format to fit within 
 the structures used by the Clipboard (shown above).
 
-### 7.3 Using The Clipboard
+## 7.3 Using The Clipboard
 
 ClipboardQueryItem(), ClipboardRegisterItem(), 
 ClipboardDoneWithItem()
@@ -452,7 +452,7 @@ should use **ClipboardQueryItem()**. Since you have no changes to register,
 you must later use **ClipboardDoneWithItem()** to give up your exclusive 
 access to the transfer VM file.
 
-#### 7.3.1 Registering with the Clipboard
+### 7.3.1 Registering with the Clipboard
 
 ClipboardAddToNotificationList()
 
@@ -470,7 +470,7 @@ handler. If the object handling the Clipboard operations is the application's
 Process object, however, it may call **ClipboardAddToNotificationList()** in 
 its MSG_GEN_PROCESS_OPEN_APPLICATION handler.
 
-#### 7.3.2 Managing the Edit Menu
+### 7.3.2 Managing the Edit Menu
 
 MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED, 
 ClipboardTestItemFormat()
@@ -600,7 +600,7 @@ Code Display 7-5 Handling Clipboard Changes
 }
 ~~~
 
-#### 7.3.3 The GenEditControl
+### 7.3.3 The GenEditControl
 
 As stated above, most applications will simply let a GenEditControl object 
 create and maintain their Edit menu. **GenEditControlClass** is a subclass 
@@ -693,7 +693,7 @@ typedef WordFlags GECToolboxFeatures;
     @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
 ~~~
 
-#### 7.3.4 Handling Cut and Copy
+### 7.3.4 Handling Cut and Copy
 
 MSG_META_CLIPBOARD_CUT, MSG_META_CLIPBOARD_COPY
 
@@ -834,7 +834,7 @@ Code Display 7-8 MSG_META_CLIPBOARD_COPY
 }
 ~~~
 
-#### 7.3.5 Handling Paste
+### 7.3.5 Handling Paste
 
 ClipboardRequestItemFormat(), MSG_META_CLIPBOARD_PASTE
 
@@ -942,7 +942,7 @@ Code Display 7-9 MSG_META_CLIPBOARD_PASTE
 }
 ~~~
 
-#### 7.3.6 Unregistering with the Clipboard
+### 7.3.6 Unregistering with the Clipboard
 
 ClipboardRemoveFromNotificationList()
 
@@ -954,7 +954,7 @@ MSG_GEN_PROCESS_CLOSE_APPLICATION handler you should make a call
 to the routine **ClipboardRemoveFromNotificationList()**, which removes 
 the passed object from the notification list.
 
-#### 7.3.7 Implementing Undo
+### 7.3.7 Implementing Undo
 
 For the most part, implementation of Undo is left up to the application. This 
 is due to the fact that operations that may be undone are typically very 
@@ -964,7 +964,7 @@ MSG_META_UNDO. For more information on Undo and how it works in
 GEOS, see ["UI Messages" of "System Classes," Chapter 1 of the 
 Object Reference Book](../Objects/osyscla.md#1133-ui-messages).
 
-#### 7.3.8 Transfer File Information
+### 7.3.8 Transfer File Information
 
 ClipboardTestItemFormat(), ClipboardEnumItemFormats(), 
 ClipboardGetItemInfo(), ClipboardGetNormalItemInfo(), 
@@ -1000,7 +1000,7 @@ item header for the "Undo" transfer item.
 Return the VM file handle of the UI transfer file (the one 
 typically used when copying, cutting, and pasting).
 
-#### 7.3.9 Undoing a Clipboard Change
+### 7.3.9 Undoing a Clipboard Change
 
 ClipboardUnregisterItem()
 
@@ -1010,7 +1010,7 @@ more than one change to the clipboard. This routine can not "undo" itself;
 that is, calling this routine twice in a row will leave the clipboard in a state 
 other than the original state.
 
-### 7.4 Using Quick-Transfer
+## 7.4 Using Quick-Transfer
 
 An application must understand the Clipboard and its structure before being 
 able to support the quick-transfer feature of the UI. However, because 
@@ -1028,7 +1028,7 @@ a quick transfer is made with the flag CIF_QUICK. When passed to the
 transfer mechanism's routines, this flag indicates that the quick-transfer 
 item should be accessed and the Clipboard data should remain intact.
 
-#### 7.4.1 Supporting Quick-Transfer
+### 7.4.1 Supporting Quick-Transfer
 
 In order for an application to support the quick-transfer mechanism, it must 
 be able to handle several situations. The list below enumerates all the tasks 
@@ -1069,7 +1069,7 @@ of a quick-transfer:
 + Transfers in a format not supported by the destination are "no operation" 
 transfers.
 
-#### 7.4.2 Quick-Transfer Procedure
+### 7.4.2 Quick-Transfer Procedure
 
 Although applications must handle several situations to support the 
 quick-transfer mechanism, the procedure involved in a quick-transfer is 
@@ -1135,14 +1135,14 @@ quick-transfer and must know when the transfer is concluded. If the
 operation is a quick-move, the source must delete the information or 
 object that was moved.
 
-#### 7.4.3 Quick-Transfer Data Structures
+### 7.4.3 Quick-Transfer Data Structures
 
 The quick-transfer mechanism uses the same structures as the Clipboard. 
 However, there are special data structures that are used exclusively by the 
 quick-transfer mechanism. These data structures are used by individual UI 
 routines and are documented with those routines.
 
-#### 7.4.4 Source Object Responsibility
+### 7.4.4 Source Object Responsibility
 
 MSG_META_START_MOVE_COPY, ClipboardStartQuickTransfer(), 
 MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_FEEDBACK
@@ -1208,7 +1208,7 @@ extra visual feedback to the user. This behavior is not required of the source
 object but can be beneficial to your application. It is also supplemental to the 
 destination-related feedback that must be provided.
 
-##### 7.4.4.1 Responsibilities of a Potential Destination
+#### 7.4.4.1 Responsibilities of a Potential Destination
 
 ClipboardGetQuickTransferStatus(), 
 ClipboardSetQuickTransferFeedback(), 
@@ -1272,7 +1272,7 @@ The object then becomes oblivious to future quick-transfer events until the
 pointer returns to its window (or unless it was registered for notification of 
 quick-transfer conclusion).
 
-##### 7.4.4.2 Responsibilities of the Destination Object
+#### 7.4.4.2 Responsibilities of the Destination Object
 
 MSG_META_END_MOVE_COPY, ClipboardEndQuickTransfer()
 
@@ -1293,13 +1293,13 @@ notification to be sent to the transfer's source and allow it to complete its
 actions properly. To finish the transfer, the object should call 
 **ClipboardEndQuickTransfer()**.
 
-##### 7.4.4.3 Getting More Information
+#### 7.4.4.3 Getting More Information
 
 In addition to the routines above, you can use one other to retrieve 
 information about a quick-transfer item. **ClipboardGetQuickItemInfo()** 
 returns a set of handles for the transfer VM file and the file's header block.
 
-##### 7.4.4.4 When the Transfer Is Concluded
+#### 7.4.4.4 When the Transfer Is Concluded
 
 MSG_META_CLIPBOARD_NOTIFY_QUICK_TRANSFER_CONCLUDED
 
@@ -1311,7 +1311,7 @@ indicating what type of operation the transfer ended up being. The source
 object should then follow the rules of quick transfer and act appropriately 
 (e.g. delete the source object on a quick-move operation).
 
-### 7.5 Shutdown Issues
+## 7.5 Shutdown Issues
 
 ClipboardClearQuickTransferNotification(), 
 ClipboardAbortQuickTransfer(), 
