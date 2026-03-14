@@ -882,10 +882,7 @@ SocketSendClose	proc	near
 	;
 		mov	dx, ds:[si].SSI_connection.CE_link
 		call	SocketFindLinkByHandle
-	;
-	; update the state
-	;
-		and	ds:[si].SI_flags, not mask SF_SEND_ENABLE
+EC <		ERROR_C CORRUPT_SOCKET					>
 	;
 	; check driver type
 	;
@@ -922,7 +919,15 @@ sendit:
 		call	SocketControlStartWrite
 		pop	bx
 		clr	ax
+
+	;
+	; update the state
+	;
+updateState:
+		mov	si, ds:[bx]
+		and	ds:[si].SI_flags, not mask SF_SEND_ENABLE
 		jmp	done
+
 	;
 	; if socket is already half-closed and linger flag is set, do
 	; full close instead
@@ -946,13 +951,13 @@ sendDisconnect:
 		call	SocketControlStartWrite
 		pop	bx
 		mov	ax, SE_NORMAL
-		jnc	done
+		jnc	updateState
+
 	;
-	; we got an error - restore old socket state
+	; we got an error - keep old socket state
 	;
-restore::
-		mov	si, ds:[bx]
-		or	ds:[si].SI_flags, mask SF_SEND_ENABLE
+keepState::
+
 	;
 	; see what the error was
 	;

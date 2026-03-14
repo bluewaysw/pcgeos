@@ -416,73 +416,6 @@ TcpipDoNothing	proc	far
 
 TcpipDoNothing	endp
 
-.ioenable
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	TcpipReceiveInterrupt
-
-DESCRIPTION:	Intercept the video mode interrupt and fix up the
-		power management.
-
-CALLED BY:	INT 10h
-
-PASS:
-	al - video mode
-
-RETURN:
-	none
-
-DESTROYED:
-	none
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Tony	1/31/92		Initial version
-
-------------------------------------------------------------------------------@
-TcpipReceiveInterrupt	proc	far
-
-	pushf
-
-	push	ax, bx, cx, dx, si, di, bp, ds, es
-	call	SysEnterInterrupt
-	cld					;clear direction flag
-	INT_ON
-
-EC <	call	ECCheckStack						>
-
-	; scheduled receiving data
-	mov	ax, MSG_TCPIP_START_RECEIVE_ASM
-		
-	push	bx
-	mov	bx, handle dgroup
-	call	MemDerefDS
-	mov	bx, ds:[driverThread]
-	
-EC <		Assert	thread	bx				>		
-
-	mov	cx, di			; cx = connection
-	mov	di, mask MF_FORCE_QUEUE
-	call	ObjMessage
-	pop	bx
-
-	call	SysExitInterrupt
-	pop	ax, bx, cx, dx, si, di, bp, ds, es
-	popf
-	ret
-
-TcpipReceiveInterrupt	endp
-
-
 
 TCPIPRECEIVESTART	proc	far	connection:word
 								uses	di, si, ds
@@ -497,7 +430,7 @@ closeLoop:
 		mov	ax, HIF_NC_RECV_NEXT_CLOSE	; get next receive close socket
 		call	HostIfCall
 
-		cmp	cx, 0
+		cmp	si, 0
 		je	recvLoop			; branch, no more closed links
 
 	; send close to socket library
@@ -507,18 +440,21 @@ closeLoop:
 	;		
 		push	ax, dx
 
+		mov	cx, SCT_HALF	; cx = SocketCloseType
+		cmp	bx, 0
+		je	useHalf
+		mov	cx, SCT_FULL
+useHalf:
 		mov	bx, handle dgroup
 		call	MemDerefES
-
-		mov	ax, cx			; ax = connection
-		mov	cx, SCT_HALF	; cx = SocketCloseType
+		mov	ax, si		; ax = connection
 
 		push	es
 		mov	di, SCO_CONNECTION_CLOSED
 		movdw	bxdx, es:[clients].TCI_data.CI_entry	
 		pushdw	bxdx
 		mov	bx, es:[clients].TCI_data.CI_domain
-		mov	dx, 11
+		mov	dx, 0
 		call	PROCCALLFIXEDORMOVABLE_PASCAL
 	
 		pop	es
@@ -536,11 +472,11 @@ recvLoop:
 		call	HostIfCall
 
 	; done if size 0 or below
-		cmp	cx, 0
+		cmp	si, 0
 		je	done
 
 doRecv:
-		mov	ax, cx	; size now in ax
+		mov	ax, si	; size now in ax
 
 	; alloc buffer
 
@@ -573,18 +509,23 @@ doRecv:
 	; Copy packetSize bytes of input data into the new buffer.
 	;
 		push	ax, dx				
-		push 	di
+		push 	di, bx, dx
 		add	di, size SequencedPacketHeader	; es:di = place for data
 		; ax is size in bytes
 
-		mov	cx, ax
+		mov	si, ax
 		mov	ax, HIF_NC_RECV_NEXT		; get recv buf size
+		; si = size
+		;   = segment
+		mov bx,es
+		;   = offset
+		mov cx,di
 		call	HostIfCall
 
-		pop	di
+		pop	di, bx, dx
 
 		; fill in link
-		mov	es:[di].SPH_link, dx	
+		mov	es:[di].SPH_link, si	
 
 		movdw	bxdx, newBuffer
 		call	HugeLMemUnlock
@@ -685,25 +626,10 @@ TcpipInit	proc	far
 	;	
 	; Check host call if network interface is available
 	;
+		mov	ax, HIF_API_SOCKET
 		call	HostIfDetect
-		cmp	ax, 0
-		je	straightError
-
-		mov	ax, HIF_CHECK
-		mov	cx, 1	; check function group networking
-		call	HostIfCall
-
-		cmp	ax, 0
-		jne	error
-
-	;
-	; Hook into callback
-	;
-		segmov	es, <segment ResidentCode>
-		mov	bx, offset ResidentCode:TcpipReceiveInterrupt
-		mov	ax, HIF_SET_RECEIVE_HANDLE
-		call	HostIfCall
-
+		cmp	ax, REQUIRED_HOSTIF_SOCKET_API
+		jb	straightError		; branch, if no compatible host found
 	;
 	; Create the input queue.
 	;
@@ -807,11 +733,6 @@ REVISION HISTORY:
 TcpipExit	proc	far
 
 	; Reset the callback interrupt
-
-		clr	bx
-		mov	es, bx
-		mov	ax, HIF_SET_RECEIVE_HANDLE
-		call	HostIfCall
 
 		mov	bx, handle dgroup
 		call	MemDerefDS		
@@ -1133,18 +1054,23 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipAllocConnection	proc	far
 
-		push	bx
+		push	bx,cx,dx,si
 EC <		call	ECCheckCallerThread				>
 EC <		call	ECCheckClientHandle				>
 
 		;call	TSocketCreateConnection		; ax = error or handle
 		mov	ax, HIF_NC_ALLOC_CONNECTION
 		call	HostIfCall
-		cmp	bx, 0
+		cmp	ax, 0
 		je	success
 		mov	ax, SDE_INSUFFICIENT_MEMORY
+		stc
+		jmp	done
 success:
-		pop	bx
+		clc
+		mov	ax, si
+done:
+		pop	bx,cx,dx,si
 		ret
 TcpipAllocConnection	endp
 
@@ -1345,11 +1271,18 @@ EC <		call	ECCheckIPAddr				>
 	; Have driver's thread establish the connection.
 	;
 		push	bx
+		mov	cx, dx
+		mov	dx, bx
+		; sibx = host address
+		; cx   = port
+		; dx   = handle
+		mov	bx, si
+		mov	si, di
 		mov	ax, HIF_NC_CONNECT_REQUEST	; async connect
-		call	HostIfCallAsync
+		call	HostIfCall
 		pop	bx
 
-		cmp	ax, 0
+		cmp	al, 0
 		jz	ok
 		stc
 		jc	errorDestroy
@@ -1360,6 +1293,7 @@ EC <		call	ECCheckIPAddr				>
 	; calling us back for anything.
 	;
 ok:
+		push	bx
 		mov	ax, bx
 		mov	bx, handle dgroup
 		call	MemDerefES
@@ -1367,6 +1301,11 @@ ok:
 		mov	bx, es:[clients].TCI_data.CI_domain
 		mov	di, SCO_CONNECT_CONFIRMED
 		call	PROCCALLFIXEDORMOVABLE_PASCAL
+		pop	bx
+
+		mov	si, bx
+		mov	ax, HIF_NC_CONNECTED
+		call	HostIfCall
 
 		clc
 		jmp	exit	
@@ -1531,37 +1470,56 @@ TcpipDisconnectRequest	proc	far
 
 		.enter
 
-		push	bx
-		
-		push	bp
-		mov	ax, HIF_NC_DISCONNECT		; async disconnect
-		call	HostIfCallAsync
-		pop	bp		
-		pop	bx
-		
+		mov	cx, bx
+		mov	dx, ax
+
+		; word connection = cx
+		; SocketCloseType closeType = dx
+		mov	ax, MSG_TCPIP_CLOSE_CONNECTION_ASM
+
+		segmov	ds, dgroup
+		mov	bx, ds:[driverThread]
+
+		mov	di, mask MF_CALL
+		call	ObjMessage
+
 		cmp	ax, 0
 		jz	done
-		stc
-		jc	exit
-
-done:
-		mov	ax, bx
-		mov	di, SCO_CONNECTION_CLOSED
-
-		mov	bx, handle dgroup
-		call	MemDerefDS
-
-		mov	bx, ds:[clients].TCI_data.CI_domain
-		mov	dx, 0
-		pushdw	ds:[clients].TCI_data.CI_entry
-		call	PROCCALLFIXEDORMOVABLE_PASCAL
-		clc					
-exit:		
+		stc		; some error occured
+done:	
 		.leave
 		ret
 
 TcpipDisconnectRequest	endp
 
+	SetGeosConvention
+
+TCPIPDISCONNECT	proc	far	connection:word,
+				closeType:SocketCloseType
+
+			uses	di, si, ds
+		.enter
+
+		mov	ax, closeType
+		mov	si, connection
+
+		push	bp
+		mov	bx, 0
+		cmp	ax, SCT_HALF
+		je	doHalf
+		mov	bx, 0xFFFF
+doHalf:
+		mov	ax, HIF_NC_DISCONNECT		; async disconnect
+		call	HostIfCall
+		pop	bp		
+		
+		; ax result code
+		.leave
+		ret
+
+TCPIPDISCONNECT	endp
+
+	SetDefaultConvention
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1603,7 +1561,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 TcpipSendData	proc	far
 savebp		local	word	push	bp
-		uses	bx, cx, dx, ds
+		uses	bx, cx, dx, ds, si
 		.enter
 
 EC <		call	ECCheckCallerThread			>
@@ -1640,8 +1598,15 @@ EC <		call	ECCheckCallerThread			>
 
 		; es:si ptr to data to sent
 		; bx connection handle
-		pop	bx
+		mov	dx, cx
+		mov	bx, es
+		mov	cx, si
+		pop	si
 		mov	ax, HIF_NC_SEND_DATA
+
+		; si    = connection handle
+		; bx:cx = data address
+		; dx	= size
 		call	HostIfCall
 errDone:
 		pop	dx
@@ -4096,6 +4061,13 @@ EC <		Assert	thread	bx				>
 		mov	ax, GCNSLT_ACCESS_POINT_CHANGE
 		call	GCNListAdd
 		clc
+
+		mov	cx, ds:[driverThread]
+		clr	dx
+		mov	bx, MANUFACTURER_ID_GEOWORKS
+		mov	ax, GCNSLT_HOST_NOTIFICATIONS
+		call	GCNListAdd
+		clc
 done:
 		.leave
 		ret
@@ -4140,6 +4112,12 @@ TcpipDestroyThreadAndTimer	proc	near
 	; Remove ourselves from the GCN list for access point netmask
 	; changes.
 	;
+		mov	cx, es:[driverThread]
+		clr	dx
+		mov	bx, MANUFACTURER_ID_GEOWORKS
+		mov	ax, GCNSLT_HOST_NOTIFICATIONS
+		call	GCNListRemove
+
 		mov	cx, es:[driverThread]
 		clr	dx
 		mov	bx, MANUFACTURER_ID_GEOWORKS
@@ -4626,26 +4604,28 @@ doQuery:
 	; Query address from resolver.
 	; 
 		push	bx
+		push	si, di
+		mov	bx, si
+		mov	si, ds
 		mov	ax, HIF_NC_RESOLVE_ADDR		; resolve address
 							; dxbp = addr or
 							;  dx = ResolverError
 		call	HostIfCall
-		
-		;lahf
+		mov	dx, si
+		pop	si, di
 
-		;sahf
-		;mov	ax, bp				; dxax = resolved addr
 		clc
-		cmp	bx, 0
+		cmp	al, 0
 		je	noC
 		stc
 noC:
+		mov	ax, bx
 		pop 	bx
 		jnc	checkValid
 	;
 	; Convert ResolverError to SocketDrError.
 	;
-		;mov	ax, SDE_DESTINATION_UNREACHABLE
+		mov	ax, SDE_DESTINATION_UNREACHABLE
 		;cmp	dx, size ResolverToSDETable
 		;jae	setC
 

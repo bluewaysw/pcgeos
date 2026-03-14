@@ -25,6 +25,7 @@ type	driver, single, system
 # Import kernel routine definitions
 #
 library	geos
+library hostif
 #
 # Desktop-related things
 #

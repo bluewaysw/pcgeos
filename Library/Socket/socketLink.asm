@@ -546,7 +546,7 @@ CALLED BY:	(EXTERNAL) FreeListenQueueCallback, SocketConnectionClosed,
 PASS:		bx	- domain
 		ax	- connection handle
 		dx	- SocketDrError
-RETURN:		carry set on error (redundent close)
+RETURN:		carry set on error (redundant close)
 DESTROYED:	nothing
 SIDE EFFECTS:	
 
@@ -642,7 +642,7 @@ delete:
 		call	SocketRemoveDomain
 		clc
 done::
-EC <		WARNING_C REDUNDENT_CLOSE				>
+EC <		WARNING_C REDUNDANT_CLOSE				>
 		.leave
 		ret
 		
@@ -2000,7 +2000,7 @@ SocketRemoveLink	proc	near
 		mov	cx,bx
 		mov_tr	dx,ax
 		call	SocketFindLinkByHandle
-EC <		WARNING_C REDUNDENT_CLOSE		>
+EC <		WARNING_C REDUNDANT_CLOSE		>
 		jc	done
 	;
 	; delete it from the domain

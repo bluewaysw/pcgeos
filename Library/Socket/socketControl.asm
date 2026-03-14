@@ -1070,7 +1070,7 @@ EC <		mov	ds:[si].SI_type, CCT_SOCKET_INFO		>
 	;
 EC <		mov	ds:[si].SSI_error, bx				>
 EC <		mov	ds:[si].SSI_connection.CE_domain, bx		>
-EC <		mov	ds:[si].SSI_connection.CE_link, bx		>
+		mov	ds:[si].SSI_connection.CE_link, bx
 EC <		movdw	ds:[si].SSI_connection.CE_port, bxbx		>
 		jmp	done
 	;
@@ -2602,7 +2602,7 @@ link::
 	; if the link is gone, clean up and exit
 	;
 abort:
-EC <		WARNING	REDUNDENT_CLOSE					>
+EC <		WARNING	REDUNDANT_CLOSE					>
 		add	sp, size PacketInfo
 		jmp	done
 	;

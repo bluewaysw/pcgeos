@@ -59,8 +59,8 @@ extern TEngine_Instance engineInstance;
 
 
 #define MAX_BITMAP_SIZE		                125
-#define MAX_FONTBUF_SIZE                    10 * 1024
-#define INITIAL_BITMAP_BLOCKSIZE            2 * 1024
+#define MAX_FONTBUF_SIZE                    ( 10 * 1024 )
+#define INITIAL_BITMAP_BLOCKSIZE            ( 2 * 1024 )
 #define REGION_SAFETY                       400
 
 #define FAMILY_NAME_LENGTH                  20
@@ -69,7 +69,20 @@ extern TEngine_Instance engineInstance;
 #define KERN_VALUE_DIVIDENT                 30
 
 #define STANDARD_GRIDSIZE                   1000
+
+/* Maximum number of glyphs supported per font.                */
+/* Fonts exceeding this limit are not registered by kernel     */
+/* and therefore do not appear in font selection.              */
 #define MAX_NUM_GLYPHS                      2000
+
+/* Maximum number of outline points supported per glyph.       */
+/* Fonts containing glyphs that exceed this limit are not      */
+/* registered by kernel and are unavailable in font selection. */
+#define MAX_NUM_OUTLINE_POINTS              750
+
+/* Upper limit for caching rendered glyphs in the persistent   */
+/* TTF cache (point size in 16.16 fixed-point format).         */
+#define MAX_CACHED_POINTSIZE                ( 180L << 16 )
 
 #define MIN_OS2_TABLE_VERSION               2
 
@@ -381,7 +394,6 @@ typedef struct
 {
     /* init fonts */
     char                        familyName[FID_NAME_LEN];
-    char                        styleName[STYLE_NAME_LENGTH];
 
     /* scaling */
     WWFixedAsDWord              scaleHeight;
@@ -416,7 +428,6 @@ typedef struct
 #define TRUETYPE_VARS           TrueTypeVars* trueTypeVars
 
 #define FAMILY_NAME             trueTypeVars->familyName
-#define STYLE_NAME              trueTypeVars->styleName
 #define FACE                    trueTypeVars->face
 #define FACE_PROPERTIES         trueTypeVars->faceProperties
 #define INSTANCE                trueTypeVars->instance

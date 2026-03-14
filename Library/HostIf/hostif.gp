@@ -30,7 +30,12 @@ tokenid 0
 #
 # Specify geode type
 #
-type	library, single
+type	library, process, single
+
+#
+# Specify the process class
+#
+class HostIfProcessClass
 
 #
 # Import kernel routine definitions
@@ -38,7 +43,8 @@ type	library, single
 library	geos
 
 
-resource Code 	fixed code read-only shared
+resource Code 		fixed code read-only shared
+resource Resident	fixed, code, read-only
 
 #
 # Exported routines (and classes)
@@ -47,5 +53,3 @@ export HostIfDetect
 export HOSTIFDETECT
 export HostIfCall
 export HOSTIFCALL
-export HostIfCallAsync
-export HOSTIFCALLASYNC

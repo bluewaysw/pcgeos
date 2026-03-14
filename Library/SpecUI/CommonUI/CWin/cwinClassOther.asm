@@ -363,6 +363,8 @@ OpenWinPrepForReOpen	proc	near
 	;
 	call	UpdateWinPosSize
 done:
+	mov	ax, MSG_OL_WIN_PREPARE_FIELD_SIZE_CHANGE
+	call	ObjCallInstanceNoLock
 	ret
 OpenWinPrepForReOpen	endp
 

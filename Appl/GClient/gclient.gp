@@ -77,10 +77,10 @@ library streamc
 # object blocks, fixed code resources, or data resources that are read-only.
 # Standard discardable code resources do not need to be mentioned.
 #
-resource APPRESOURCE ui-object
-resource INTERFACE ui-object
-resource GCLIENTRESOURCE ui-object
-resource ITEMTEXT read-only, data
+resource AppResource ui-object
+resource Interface ui-object
+resource GClientResource ui-object
+resource ItemText read-only, data
 
 # export the newly created classes
 export	GClientClass

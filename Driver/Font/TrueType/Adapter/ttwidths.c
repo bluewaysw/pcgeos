@@ -330,9 +330,8 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         /* load metrics */
                         TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
 
-                        /* compute scaled advance width for glyph and round it to neares 1/4 pixel */
+                        /* compute scaled advance width for glyph */
                         scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
-                        scaledWidth += 0x2000;
 
                         /* fill CharTableEntry */
                         charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
@@ -449,16 +448,16 @@ EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstC
 void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         TT_Kerning        kerningDir;
-        word              table;
+        TT_UShort         table;
         TT_Kern_0_Pair*   pairs;
         LookupEntry*      indices;
         word              kernCount = 0;
-        
 
+        
         KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
         BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
-
-
+        
+EC(     ECCheckBounds( (void*)trueTypeVars) );
 EC(     ECCheckBounds( (void*)kernPair ) );
 EC(     ECCheckBounds( (void*)kernValue ) );
 
@@ -470,6 +469,7 @@ EC(     ECCheckBounds( (void*)kernValue ) );
                 return;
 
         /* get pointer to lookup table */
+EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
         indices = GEO_LOCK( LOOKUP_TABLE );
 EC(     ECCheckBounds( indices ) );
 
@@ -510,7 +510,6 @@ EC(             ECCheckBounds( pairs ) );
 
                                 ++kernPair;
                                 ++kernValue;
-
                                 ++kernCount;
                         }
                 }

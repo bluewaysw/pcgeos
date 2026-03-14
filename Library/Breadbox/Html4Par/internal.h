@@ -278,6 +278,7 @@ extern dword textpos;
 
 extern word            currentFlags;
 extern VisTextCharAttr currentCS;
+extern VisTextCharAttr parentCS;
 extern VisTextParaAttr currentS;
 extern sword           currentBaseFont;
 

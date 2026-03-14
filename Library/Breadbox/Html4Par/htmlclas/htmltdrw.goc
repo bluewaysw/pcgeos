@@ -822,30 +822,48 @@ HTMLTextInstance *ISetRegionLimit(optr textObj, HTMLTextInstance *pself)
     word *p_limit ;
     word lastCell ;
     word lastRegion = 0 ;
-    HTMLcellData *p_cell ;
     word size ;
 
     p_limit = ObjVarFindData(textObj, ATTR_VIS_LARGE_TEXT_ONLY_DRAW_X_REGIONS) ;
     if (!p_limit)  {
         p_limit = ObjVarAddData(textObj, ATTR_VIS_LARGE_TEXT_ONLY_DRAW_X_REGIONS, sizeof(word)) ;
         pself = ObjDerefVis(textObj) ;
+	if (p_limit) {
+	    *p_limit = 0xFFFF;		/* defaults to all regions */
+	}
     }
-    if (p_limit)  {
+    if (p_limit && (*p_limit == 0xFFFF))  {
         /* Do we have cells?  If we do, figure out the last valid region, else set to 0 */
         if (pself->HTI_cellArray)  {
             lastCell = pself->HTI_numFormattedCells ;
 
-            /* Find the last cell with a region */
-            while (lastCell)  {
-                CellLock(pself->HTI_cellArray, lastCell-1, &p_cell, &size) ;
-                lastRegion = p_cell->HCD_region+1 ;
-                CellUnlock(p_cell) ;
-                if (lastRegion)
-                    break ;
-                lastCell-- ;
-            }
+	    if (lastCell) {
+		word numRegions ;
+		optr regArray ;
+		VisLargeTextRegionArrayElement *p_region ;
+
+		/* there might be more regions in this cell, we need to check for 
+		* followup regions to use as last to rendered */
+		regArray = RegionArrayConstruct(textObj, pself) ;
+		numRegions = RegionArrayGetCount(regArray) ;
+		if (lastRegion < numRegions)  {
+		    RegionLock(regArray, 0, &p_region, &size) ;
+
+		    while (lastRegion < numRegions)  {
+			lastRegion++;
+			/* Have we passed into a new cell (we usually do) */
+			if (p_region->VLTRAE_section == lastCell)  {
+				/* stop if region is using cell after last */
+				lastRegion--;
+				break;
+	 		}
+			RegionNext(&p_region, &size) ;
+		    }
+		    RegionUnlock(p_region) ;
+		}
+	    }
         }
-        *p_limit = lastRegion ;
+	*p_limit = lastRegion ; /* actually set the new region count */
     }
 
     return pself ;

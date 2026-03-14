@@ -2335,6 +2335,98 @@ callSuper:
 done:
 	ret
 ToolAreaStartSelect	endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ToolAreaEndSelect
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Handle end select after move of taskbar
+
+CALLED BY:	MSG_META_END_SELECT
+PASS:		*ds:si	= ToolAreaClass object
+		es 	= segment of ToolAreaClass
+		ax	= message #
+RETURN:		none
+DESTROYED:	ax, cx, dx, bp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ToolAreaEndSelect	method dynamic ToolAreaClass,
+					MSG_META_END_SELECT
+
+	; get pointer screen y position
+
+	; check if it above or below the middle line
+	call	VisQueryWindow		; get window, if up
+	tst	di
+	jz	done
+
+	push	ax
+	call	GrCreateState
+	mov	ax, cx
+	mov	bx, dx
+	call	GrTransform		; doc -> screen coords
+	call	GrDestroyState
+	pop	ax
+
+	push	cx, dx
+	; in:	ds - fixupable object block
+	; out:  cx, dx - screen width and height
+	call	OpenGetScreenDimensions 		; get field dimensions in cx = width, dx = height
+	mov	bp, dx
+	shr	bp, 1					; shr 1 = divide height by two => upper and lower half of screen?
+	pop	cx, dx	
+
+	cmp	bx, bp
+	jb	top					; top
+	mov	bx, TBP_BOTTOM
+	jmp	check
+top:
+	mov	bx, TBP_TOP
+check:
+	push	ds, ax, dx				; save ds
+	segmov	ds, dgroup				; get dgroup
+	mov	ax, ds:[taskBarPrefs]			; load taskBarPrefs in ax
+	andnf	ax, mask TBF_POSITION			; mask out everything but the position bits
+	shr	ax, offset TBF_POSITION			; retrieve position value
+	
+	cmp	ax, bx
+
+	je	unchanged				; branch if position unchanged (top or bottom)
+
+	;
+	; Save and apply new position info
+	;
+	push	ds, si
+	mov	cx, cs
+	mov	ds, cx
+	mov	dx, offset taskBarPositionKey
+	mov	si, offset taskBarPositionCategory
+	mov	bp, bx
+	call	InitFileWriteInteger			; update GEOS.INI
+	pop	ds, si
+
+	andnf	ds:[taskBarPrefs], not mask TBF_POSITION
+	shl	bx, offset TBF_POSITION
+	ornf	ds:[taskBarPrefs], bx			; update Taskbar Position flag
+	pop	ds, ax, dx
+
+	push	ax, dx
+	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
+	mov	dx, MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
+	call	VisCallParent
+	pop	ax, dx
+
+	jmp	done
+
+unchanged:
+	pop	ds, ax, dx
+
+done:
+	mov	di, offset ToolAreaClass
+	GOTO	ObjCallSuperNoLock
+ToolAreaEndSelect	endm
+
 endif
 
 
@@ -2390,14 +2482,13 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	sub	ds:[di].VI_bounds.R_left, cx
 	sub	ds:[di].VI_bounds.R_right, cx
 
+	; in:	ds - fixupable object block
+	; out:  cx, dx - screen width and height
 	call	OpenGetScreenDimensions 		; get field dimensions in cx = width, dx = height
-	mov	bp, dx
-	shr	bp, 1					; shr 1 = divide height by two => upper and lower half of screen?
 
-	cmp	ds:[di].VI_bounds.R_top, bp		; compare taskbar y position with half of screen
-	jg	bottom					; if greater than half of screen, position taskbar at bottom
+	cmp	ax, TBP_TOP
+	jne	bottom					; if greater than half of screen, position taskbar at bottom
 							; otherwise, on top
-
 ;top:
 	test	bl, mask TASF_AUTO_HIDE
 	jnz	topHide
@@ -2405,20 +2496,14 @@ ToolAreaVisMoveResizeWin	method dynamic ToolAreaClass,
 	clr	cx
 	xchg	cx, ds:[di].VI_bounds.R_top
 	sub	ds:[di].VI_bounds.R_bottom, cx
-	mov	bp, TBP_TOP
-	cmp	ax, bp					; compare old and new position
-	je	callSuper				; jump if already top position
-	jmp	updatePosition				; otherwise, update
+	jmp	callSuper				; jump if already top position
 
 topHide:
 	mov	cx, 1					; need one pixel on-screen
 	xchg	cx, ds:[di].VI_bounds.R_bottom
 	dec	cx					; need one pixel on-screen
 	sub	ds:[di].VI_bounds.R_top, cx
-	mov	bp, TBP_TOP
-	cmp	ax, bp					; compare old and new position
-	je	callSuper				; jump if already top position
-	jmp	updatePosition				; otherwise, update
+	jmp	callSuper				; jump if already top position
 
 bottom:
 	test	bl, mask TASF_AUTO_HIDE
@@ -2427,40 +2512,13 @@ bottom:
 	sub	dx, ds:[di].VI_bounds.R_bottom
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-	mov	bp, TBP_BOTTOM
-	cmp	ax, bp					; compare old and new position
-	je	callSuper				; jump if already at bottom position
-	jmp	updatePosition				; otherwise, update
+	jmp	callSuper				; jump if already at bottom position
 
 bottomHide:
 	dec	dx					; need one pixel on-screen
 	sub	dx, ds:[di].VI_bounds.R_top
 	add	ds:[di].VI_bounds.R_top, dx
 	add	ds:[di].VI_bounds.R_bottom, dx
-	mov	bp, TBP_BOTTOM
-	cmp	ax, bp					; compare old and new position
-	je	callSuper				; jump if already at bottom position
-
-updatePosition:
-	push	ds, si
-	mov	cx, cs
-	mov	ds, cx
-	mov	dx, offset taskBarPositionKey
-	mov	si, offset taskBarPositionCategory
-	call	InitFileWriteInteger			; update GEOS.INI
-
-	segmov	ds, dgroup
-	andnf	ds:[taskBarPrefs], not mask TBF_POSITION
-	shl	bp, offset TBF_POSITION
-	ornf	ds:[taskBarPrefs], bp			; update Taskbar Position flag
-	pop	ds, si
-
-	;
-	; fixup window positions
-	;
-	mov	ax, MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
-	mov	dx, MSG_OL_APP_UPDATE_WINDOWS_FOR_TASK_BAR
-	call	VisCallParent
 
 callSuper:
 	mov	ax, MSG_VIS_MOVE_RESIZE_WIN
@@ -3182,7 +3240,6 @@ DESTROYED:	ax, cx, dx, bp
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if TOOL_AREA_IS_TASK_BAR
 OLFieldSendToGenApplications	method dynamic OLFieldClass,
 					MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS
 
@@ -3213,6 +3270,5 @@ genAppLoop:
 done:
 	ret
 OLFieldSendToGenApplications	endm
-endif
 
 HighUncommon	ends

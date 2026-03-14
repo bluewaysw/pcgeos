@@ -161,7 +161,8 @@
 
 #define SKIP_Code()     SkipCode( EXEC_ARG )
 
-#define GET_ShortIns()  GetShortIns( EXEC_ARG )
+#define GET_SHORT_INS()            ( (CUR.IP += 2), \
+                                     (Short)((CUR.code[CUR.IP - 2] << 8) | CUR.code[CUR.IP - 1]) )
 
 #define COMPUTE_Funcs() Compute_Funcs( EXEC_ARG )
 
@@ -182,11 +183,11 @@
 
 #define CUR_Func_round( d, c )     CUR.func_round( EXEC_ARGS d, c )
 
-#define CUR_Func_read_cvt( index )  CUR.func_read_cvt( EXEC_ARGS index )
+#define WRITE_CVT( index, value )  (CUR.cvt[(index)] = (value))
 
-#define CUR_Func_write_cvt( index, val ) CUR.func_write_cvt( EXEC_ARGS index, val )
+#define MOVE_CVT( index, value )   (CUR.cvt[(index)] += (value))
 
-#define CUR_Func_move_cvt( index, val ) CUR.func_move_cvt( EXEC_ARGS index, val )
+#define READ_CVT( index )          (CUR.cvt[(index)])
 
 #define CURRENT_Ratio()  Current_Ratio( EXEC_ARG )
 #define CURRENT_Ppem()   Current_Ppem( EXEC_ARG )
@@ -205,7 +206,7 @@
   /* Instruction dispatch function, as used by the interpreter */
   typedef void (_near *TInstruction_Function)( INS_ARG );
 
-#define BOUNDS( x, n )  ( (x) >= (n) )
+#define BOUNDS( x, n )    ( (unsigned short)(x) >= (unsigned short)(n) )
 
 #ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
 #pragma code_seg(InterpEntry)
@@ -217,41 +218,19 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        ; store sign of result
+        ; signed multiplication
         mov     eax, a
-        xor     eax, b
-        mov     esi, eax         ; esi = sign of result
+        imul    b
 
-        ; calculate |a|
-        mov     eax, a
-        cdq                      ; sign extend eax into edx
-        xor     eax, edx
-        sub     eax, edx
-        mov     ebx, eax         ; ebx = |a|
-
-        ; calculate |b|
-        mov     eax, b
-        cdq
-        xor     eax, edx
-        sub     eax, edx         ; eax = |b|
-
-        ; multiply |a| * |b|
-        mul     ebx              ; edx:eax = |a| * |b|
-
-        ; add 0x8000 (rounding factor)
+        ; rounding
         add     eax, 0x8000
-        adc     edx, 0           ; edx:eax += 0x8000
+        adc     edx, 0
 
-        ; divide by 0x10000 (shift right by 16)
+        ; fixed point scaling
         shrd    eax, edx, 16
-        shr     edx, 16          ; edx:eax >>= 16
 
-        ; apply sign using NEG if necessary
-        test    esi, 0x80000000  ; test the sign bit
-        jz      positive
-        neg     eax
-    positive:
-        mov     edx, eax         ; store result in dx:ax
+        ; return value alignment
+        mov     edx, eax 
         shr     edx, 16
     }
   #else
@@ -636,7 +615,7 @@
  *
  *****************************************************************/
 
-  static TT_F26Dot6  FUnits_To_Pixels( EXEC_OPS Short  distance )
+  static inline TT_F26Dot6  FUnits_To_Pixels( EXEC_OPS Short  distance )
   {
     return TT_MulDiv( distance,
                       CUR.metrics.scale1,
@@ -685,42 +664,6 @@
   }
 
 
-  static TT_F26Dot6  _near Read_CVT( EXEC_OPS UShort  index )
-  {
-    return CUR.cvt[index];
-  }
-
-#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static TT_F26Dot6  _near Read_CVT_Stretched( EXEC_OPS UShort  index )
-  {
-    return TT_MulFix( CUR.cvt[index], CURRENT_Ratio() );
-  }
-#endif
-
-  static void  _near Write_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
-  {
-    CUR.cvt[index] = value;
-  }
-
-#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static void  _near Write_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
-  {
-    CUR.cvt[index] = TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
-  }
-#endif
-
-  static void  _near Move_CVT( EXEC_OPS UShort  index, TT_F26Dot6  value )
-  {
-    CUR.cvt[index] += value;
-  }
-
-#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-  static void  __near Move_CVT_Stretched( EXEC_OPS UShort  index, TT_F26Dot6  value )
-  {
-    CUR.cvt[index] += TT_MulDiv( value, 0x10000, CURRENT_Ratio() );
-  }
-#endif
-
 /******************************************************************
  *
  *  Function    :  Calc_Length
@@ -729,7 +672,7 @@
  *
  *****************************************************************/
 
-  static Bool  Calc_Length( EXEC_OP )
+ static Bool  Calc_Length( EXEC_OP )
   {
     CUR.opcode = CUR.code[CUR.IP];
 
@@ -782,29 +725,6 @@
       return FAILURE;
 
     return SUCCESS;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  GetShortIns
- *
- *  Description :  Returns a short integer taken from the instruction
- *                 stream at address IP.
- *
- *  Input  :  None
- *
- *  Output :  Short read at Code^[IP..IP+1]
- *
- *  Notes  :  This one could become a Macro in the C version.
- *
- *****************************************************************/
-
-  static Short  GetShortIns( EXEC_OP )
-  {
-    /* Reading a byte stream so there is no endianess (DaveP) */
-    CUR.IP += 2;
-    return (Short)((CUR.code[CUR.IP - 2] << 8) | CUR.code[CUR.IP - 1]);
   }
 
 
@@ -923,9 +843,11 @@
  *******************************************************************/
 
   static void _near Direct_Move_X( EXEC_OPS PGlyph_Zone  zone,
-                                       UShort       point,
-                                       TT_F26Dot6   distance )
+                                            UShort       point,
+                                            TT_F26Dot6   distance )
   {
+    (void)exc;
+
     zone->cur[point].x += distance;
     zone->touch[point] |= TT_Flag_Touched_X;
   }
@@ -940,6 +862,8 @@
                                        UShort       point,
                                        TT_F26Dot6   distance )
   {
+    (void)exc;
+
     zone->cur[point].y += distance;
     zone->touch[point] |= TT_Flag_Touched_Y;
   }
@@ -965,7 +889,9 @@
                                                TT_F26Dot6  compensation )
   {
     TT_F26Dot6  val;
+    
 
+    (void)exc;
 
     if ( distance >= 0 )
     {
@@ -1009,6 +935,8 @@
     TT_F26Dot6  val;
 
 
+    (void)exc;
+
     if ( distance >= 0 )
     {
       val = (distance + compensation + 32) & (-64);
@@ -1045,6 +973,8 @@
   {
     TT_F26Dot6  val;
 
+
+    (void)exc;
 
     if ( distance >= 0 )
     {
@@ -1083,6 +1013,8 @@
     TT_F26Dot6  val;
 
 
+    (void)exc;
+
     if ( distance >= 0 )
     {
       val = (distance + compensation) & (-64);
@@ -1120,6 +1052,8 @@
     TT_F26Dot6  val;
 
 
+    (void)exc;
+
     if ( distance >= 0 )
     {
       val = (distance + compensation + 63) & (-64);
@@ -1156,6 +1090,7 @@
   {
     TT_F26Dot6 val;
 
+    (void)exc;
 
     if ( distance >= 0 )
     {
@@ -1393,23 +1328,6 @@
     CUR.func_move(EXEC_ARGS zone, point, distance);
   }
 
-#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
-#pragma code_seg(InterpEntry)
-#endif
-
-  static TT_F26Dot6 _far FarCUR_Func_read_cvt(EXEC_OPS UShort index)
-  {
-    return CUR.func_read_cvt(EXEC_ARGS index);
-  }
-
-  static void _far FarCUR_Func_move_cvt(EXEC_OPS UShort index, TT_F26Dot6  value)
-  {
-    CUR.func_move_cvt(EXEC_ARGS index, value);
-  }
-
-#ifdef TT_CONFIG_GEOS_REAL_MODE_SEGMENTING
-#pragma code_seg()
-#endif
 
 /*******************************************************************
  *
@@ -1479,7 +1397,7 @@
  *  Output :  Returns distance in F26dot6 format.
  *
  *****************************************************************/
-
+/*
   static TT_F26Dot6 _near Free_Project( EXEC_OPS TT_Vector*  v1,
                                                  TT_Vector*  v2 )
   {
@@ -1492,7 +1410,7 @@
     ADD_64( T1, T2, T1 );
 
     return (TT_F26Dot6)DIV_64( T1, 0x4000L );
-  }
+  } */
 
 
 /*******************************************************************
@@ -1510,6 +1428,8 @@
   static TT_F26Dot6 _near Project_x( EXEC_OPS TT_Vector*  v1,
                                               TT_Vector*  v2 )
   {
+    (void)exc;
+
     return (v1->x - v2->x);
   }
 
@@ -1529,6 +1449,8 @@
   static TT_F26Dot6 _near Project_y( EXEC_OPS TT_Vector*  v1,
                                               TT_Vector*  v2 )
   {
+    (void)exc;
+
     return (v1->y - v2->y);
   }
 
@@ -1618,99 +1540,64 @@
  *  Input  :  Vx, Vy    input vector
  *            R         normed unit vector
  *
- *  Output :  Returns FAILURE if a vector parameter is zero.
+ *  Output :  void
  *
  *****************************************************************/
 
-  static Bool  Normalize( TT_F26Dot6      Vx,
-                          TT_F26Dot6      Vy,
-                          TT_UnitVector*  R )
+  static void Normalize(TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R)
   {
     TT_F26Dot6  W;
-    Bool        S1, S2;
+    Bool        s1 = FALSE, s2 = FALSE;
 
 
-    if ( ABS( Vx ) < 0x10000L && ABS( Vy ) < 0x10000L )
+    /* Extract signs to work with absolute values and simplify logic */
+    if (Vx < 0) { Vx = -Vx; s1 = TRUE; }
+    if (Vy < 0) { Vy = -Vy; s2 = TRUE; }
+
+    /* Handle small vectors by scaling up to maintain precision */
+    if (Vx < 0x10000L && Vy < 0x10000L)
     {
-      Vx *= 0x100;
-      Vy *= 0x100;
+        if ((Vx | Vy) == 0) return;
 
-      W = Norm( Vx, Vy );
-
-      if ( W == 0 )
-      {
-        /* XXX : UNDOCUMENTED! It seems that it's possible to try  */
-        /*       to normalize the vector (0,0). Return immediately */
-        return SUCCESS;
-      }
-
-      R->x = (TT_F2Dot14)TT_MulDiv( Vx, 0x4000L, W );
-      R->y = (TT_F2Dot14)TT_MulDiv( Vy, 0x4000L, W );
-
-      return SUCCESS;
+        W = Norm(Vx << 8, Vy << 8);
+        Vx = (TT_F26Dot6)TT_MulDiv(Vx << 8, 0x4000L, W);
+        Vy = (TT_F26Dot6)TT_MulDiv(Vy << 8, 0x4000L, W);
     }
-
-    W = Norm( Vx, Vy );
-
-    Vx = TT_MulDiv( Vx, 0x4000L, W );
-    Vy = TT_MulDiv( Vy, 0x4000L, W );
+    else
+    {
+        W = Norm(Vx, Vy);
+        Vx = (TT_F26Dot6)TT_MulDiv(Vx, 0x4000L, W);
+        Vy = (TT_F26Dot6)TT_MulDiv(Vy, 0x4000L, W);
+    }
 
     W = Vx * Vx + Vy * Vy;
 
-    /* Now, we want that Sqrt( W ) = 0x4000 */
-    /* Or 0x1000000 <= W < 0x1004000        */
-
-    if ( Vx < 0 )
+    /* Incrementally adjust W to reach 0x1000000 <= W < 0x1004000     */
+    /* Uses (n+1)^2 = n^2 + 2n + 1 to avoid expensive multiplications */
+    while (W < 0x1000000L)
     {
-      Vx = -Vx;
-      S1 = TRUE;
-    }
-    else
-      S1 = FALSE;
-
-    if ( Vy < 0 )
-    {
-      Vy = -Vy;
-      S2 = TRUE;
-    }
-    else
-      S2 = FALSE;
-
-    while ( W < 0x1000000L )
-    {
-      /* We need to increase W, by a minimal amount */
-      if ( Vx < Vy )
-        ++Vx;
-      else
-        ++Vy;
-
-      W = Vx * Vx + Vy * Vy;
+        if (Vx < Vy) {
+            W += (Vx << 1) + 1;
+            ++Vx;
+        } else {
+            W += (Vy << 1) + 1;
+            ++Vy;
+        }
     }
 
-    while ( W >= 0x1004000L )
+    while (W >= 0x1004000L)
     {
-      /* We need to decrease W, by a minimal amount */
-      if ( Vx < Vy )
-        --Vx;
-      else
-        --Vy;
-
-      W = Vx * Vx + Vy * Vy;
+        if (Vx < Vy) {
+            W -= (Vx << 1) - 1;
+            --Vx;
+        } else {
+            W -= (Vy << 1) - 1;
+            --Vy;
+        }
     }
 
-    /* Note that in various cases, we can only  */
-    /* compute a Sqrt(W) of 0x3FFF, eg. Vx = Vy */
-
-    if ( S1 )
-      Vx = -Vx;
-
-    if ( S2 )
-      Vy = -Vy;
-
-    R->x = (TT_F2Dot14)Vx;   /* Type conversion */
-    R->y = (TT_F2Dot14)Vy;   /* Type conversion */
-
-    return SUCCESS;
+    R->x = (TT_F2Dot14)(s1 ? -Vx : Vx);
+    R->y = (TT_F2Dot14)(s2 ? -Vy : Vy);
   }
 
 
@@ -2189,56 +2076,22 @@
 #endif
 
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
 #define DO_RCVT  \
    {                                                            \
-     UShort  I = (UShort)args[0];                                 \
-     if ( BOUNDS( I, CUR.cvtSize ) )                            \
-     {                                                          \
-       if ( CUR.pedantic_hinting )                              \
-       {                                                        \
-         ARRAY_BOUND_ERROR;                                     \
-       }                                                        \
-       else                                                     \
-         args[0] = 0;                                           \
-     }                                                          \
-     else                                                       \
-       args[0] = CUR_Func_read_cvt(I);                          \
-   }
-#else
-#define DO_RCVT  \
-   {                                                            \
-     UShort  I = (UShort)args[0];                                 \
+     UShort  I = (UShort)args[0];                               \
      if ( BOUNDS( I, CUR.cvtSize ) )                            \
          args[0] = 0;                                           \
      else                                                       \
-       args[0] = CUR_Func_read_cvt(I);                          \
+       args[0] = READ_CVT(I);                                   \
    }
-#endif
 
 
-#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
-#define DO_WCVTP                             \
-   {                                                            \
-     UShort  I = (UShort)args[0];                                 \
-     if ( BOUNDS( I, CUR.cvtSize ) )                            \
-     {                                                          \
-       if ( CUR.pedantic_hinting )                              \
-       {                                                        \
-         ARRAY_BOUND_ERROR;                                     \
-       }                                                        \
-     }                                                          \
-     else                                                       \
-       CUR_Func_write_cvt( I, args[1] );                        \
-   }
-#else
-#define DO_WCVTP                             \
+#define DO_WCVTP                                                \
    {                                                            \
      UShort  I = (UShort)args[0];                               \
      if ( ! BOUNDS( I, CUR.cvtSize ) )                          \
-       CUR_Func_write_cvt( I, args[1] );                        \
+       WRITE_CVT( I, args[1] );                                 \
    }
-#endif
 
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
@@ -3340,6 +3193,8 @@
   {
     Long temp = args[2];
 
+    (void)exc;
+
     args[2] = args[0];
     args[0] = args[1];
     args[1] = temp;
@@ -3366,7 +3221,6 @@
     CUR.error = TT_Err_Code_Overflow;
     return FAILURE;
   }
-
 
 
 /*******************************************/
@@ -3793,7 +3647,7 @@
     CUR.IP += 2;
 
     for ( K = 0; K < L; ++K )
-      args[K] = GET_ShortIns();
+      args[K] = GET_SHORT_INS();
 
     CUR.step_ins = FALSE;
     CUR.new_top += L;
@@ -3847,7 +3701,7 @@
     CUR.IP++;
 
     for ( K = 0; K < L; ++K )
-      args[K] = GET_ShortIns();
+      args[K] = GET_SHORT_INS();
 
     CUR.step_ins = FALSE;
   }
@@ -4781,7 +4635,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     /* twilight zone. This is a bad hack, but it seems   */
     /* to work.                                          */
 
-    distance = FarCUR_Func_read_cvt( EXEC_ARGS cvtEntry );
+    distance = READ_CVT( EXEC_ARGS cvtEntry );
 
     if ( CUR.GS.gep0 == 0 )   /* If in twilight zone */
     {
@@ -4924,7 +4778,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     if ( !cvtEntry )
       cvt_dist = 0;
     else
-      cvt_dist = FarCUR_Func_read_cvt( EXEC_ARGS cvtEntry - 1 );
+      cvt_dist = READ_CVT( EXEC_ARGS cvtEntry - 1 );
 
     /* single width test */
 
@@ -5639,7 +5493,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
             ++B;
           B = (B << 6) / (1L << CUR.GS.delta_shift);
 
-          FarCUR_Func_move_cvt( EXEC_ARGS A, B );
+          MOVE_CVT( EXEC_ARGS A, B );
         }
       }
     }
@@ -5665,6 +5519,8 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
 
   static void  Ins_GETINFO( INS_ARG )
   {
+    (void)exc;
+
     /* Return the Windows 3.1 version number for the font scaler */
     args[0] = (args[0] & 1) ? 3 : 0;
   }
@@ -5677,6 +5533,9 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
   {
     /* look up the current instruction in our table */
     PDefRecord  def, limit;
+
+
+    (void)exc;
     
     def   = CUR.IDefs;
     limit = def + CUR.numIDefs;
@@ -6048,24 +5907,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
     cur = *exc;
 #endif
 
-    /* set CVT functions */
     CUR.metrics.ratio = 0;
-#ifdef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-    if ( CUR.metrics.x_ppem != CUR.metrics.y_ppem )
-    {
-      /* non-square pixels, use the stretched routines */
-      CUR.func_read_cvt  = Read_CVT_Stretched;
-      CUR.func_write_cvt = Write_CVT_Stretched;
-      CUR.func_move_cvt  = Move_CVT_Stretched;
-    }
-    else
-#endif /* TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS */
-    {
-      /* square pixels, use normal routines */
-      CUR.func_read_cvt  = Read_CVT;
-      CUR.func_write_cvt = Write_CVT;
-      CUR.func_move_cvt  = Move_CVT;
-    }
 
     COMPUTE_Funcs();
     Compute_Round( EXEC_ARGS (Byte)exc->GS.round_state );
@@ -6409,11 +6251,11 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
           DO_FLIPOFF
           break;
 
+  #ifdef TT_CONFIG_OPTION_SUPPORT_OBSOLET_INSTRUCTIONS
         case 0x4F:  /* DEBUG */
-        #ifdef TT_CONFIG_OPTION_SUPPORT_OBSOLET_INSTRUCTIONS
           DO_DEBUG
-        #endif
           break;
+  #endif
 
         case 0x50:  /* LT */
           DO_LT

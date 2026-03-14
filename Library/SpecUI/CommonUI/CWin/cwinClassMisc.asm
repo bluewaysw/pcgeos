@@ -2144,6 +2144,122 @@ OLWinRotateDisplay	endm
 
 endif	; RECTANGULAR_ROTATION
 
+OLWinSpecSetAttrs	method	dynamic	OLWinClass, MSG_SPEC_SET_ATTRS
+	test	ax, mask SA_REALIZABLE
+	jz	cont
+	call	VisCheckIfSpecBuilt
+	jnc	cont
+	push	ax, cx, dx, bp
+	call	ConvertSpecWinSizePairsToPixels
+	call	UpdateWinPosSize
+	pop	ax, cx, dx, bp
+cont:
+	mov	ax, MSG_SPEC_SET_ATTRS
+	mov	di, offset OLWinClass
+	GOTO	ObjCallSuperNoLock
+OLWinSpecSetAttrs	endm
+
+OLWinPrepareFieldSizeChange	method dynamic OLWinClass, MSG_OL_WIN_PREPARE_FIELD_SIZE_CHANGE
+		.enter
+
+	test	ds:[di].OLWI_winPosSizeState, mask WPSS_HAS_MOVED_OR_RESIZED
+	jne	noConvert
+
+	push	ax
+	mov	ax, ds:[di].VI_bounds.R_right
+	sub	ax, ds:[di].VI_bounds.R_left
+	test	ax, mask RSA_CHOOSE_OWN_SIZE
+	pop	ax
+	jnz	noConvert
+	push	di
+
+
+
+	push	ds:[di].OLWI_winPosSizeState
+	push	ds:[di].VI_bounds.R_bottom
+	push	ds:[di].VI_bounds.R_right
+	push	ds:[di].VI_bounds.R_top
+	push	ds:[di].VI_bounds.R_left
+
+	mov	bp, sp			;set ss:bp = structure on stack
+
+	push	di
+	call	ConvertPixelBoundsToSpecWinSizePairs
+	pop	di
+
+	test	ds:[di].OLWI_winPosSizeFlags, mask WPSF_POSITION_TYPE
+	jnz	posNotRatio
+	mov	ax, ss:[bp].GSWI_winPosition.SWSP_x
+	mov	ds:[di].VI_bounds.R_left, ax
+	mov	ax, ss:[bp].GSWI_winPosition.SWSP_y
+	mov	ds:[di].VI_bounds.R_top, ax
+	ORNF	ds:[di].OLWI_winPosSizeState, mask WPSS_VIS_POS_IS_SPEC_PAIR
+posNotRatio:
+	mov	al, byte ptr ds:[di].OLWI_winPosSizeFlags
+	and	al, mask WPSF_SIZE_TYPE
+	cmp	al, WST_AS_RATIO_OF_FIELD
+	je	sizeIsRatio
+	cmp	al, WST_AS_RATIO_OF_PARENT
+	jne	sizeNotRatio
+sizeIsRatio:
+	mov	ax, ss:[bp].GSWI_winSize.SWSP_x
+	mov	ds:[di].VI_bounds.R_right, ax
+	mov	ax, ss:[bp].GSWI_winSize.SWSP_y
+	mov	ds:[di].VI_bounds.R_bottom, ax
+
+	ORNF	ds:[di].OLWI_winPosSizeState, mask WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT
+	;mov	ax, ss:[bp].GSWI_winPosSizeState
+	;mov	ds:[di].OLWI_winPosSizeState, ax
+sizeNotRatio:
+	add	sp, size GenSaveWindowInfo
+
+	pop di
+noConvert:
+
+		.leave
+		ret
+OLWinPrepareFieldSizeChange	endm
+
+
+OLWinFieldSizeChanged	method dynamic OLWinClass, MSG_OL_WIN_FIELD_SIZE_CHANGED
+		.enter
+	;
+	;  Set flag for OpenWinSaveState, so it'll save new window
+	;  position and size in case application is shut down.
+	;
+		;andnf	ds:[di].OLWI_winPosSizeState, \
+		;		not mask WPSS_HAS_MOVED_OR_RESIZED
+
+	;
+	;  Set the Magic Flag that will cause our Window to be sized
+	;  the same as the parent, plus all the other necessary shme.
+	;
+		ornf	ds:[di].OLWI_winPosSizeState, mask WPSS_SIZE_INVALID or mask WPSS_POSITION_INVALID
+
+		mov	ax, MSG_VIS_MOVE_RESIZE_WIN
+		call	ObjCallInstanceNoLock
+
+noWindow:
+	;
+	;  Invalidate children.
+	;
+		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+		mov	ax, MSG_VIS_INVAL_ALL_GEOMETRY
+		call	ObjCallInstanceNoLock
+	;
+	;  Force redraw.
+	;
+		mov	cl, mask VOF_GEOMETRY_INVALID \
+				or mask VOF_WINDOW_INVALID \
+				or mask VOF_IMAGE_INVALID
+		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+		mov	ax, MSG_VIS_MARK_INVALID
+		call	ObjCallInstanceNoLock
+
+		.leave
+		ret
+OLWinFieldSizeChanged	endm
+
 WinMethods ends
 
 

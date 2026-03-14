@@ -230,8 +230,14 @@ CalcTonyIndex	proc	near
 	mov	ax, SGIT_TOTAL_COUNT
 	call	SysGetInfo
 
+	mov	bl, 0xFF
+	tst	dx
+	jz	pur
 	mov	bx, 1000
 	div	bx			;ax = dx:ax / 1000
+	mov	bl, 0
+pur:
+	mov	ds:[totalCountPure], bl
 	mov	ds:[totalCountDivBy1000], ax
 
 	;calculate the TonyIndex

@@ -32,7 +32,7 @@
 #include "tableint.h"
 
 void fprintf(FileHandle file, char *fmt, ...) ;
-void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray) ;
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray, optr txtObj) ;
 word IFastCellGetNextIndex(HTMLTextInstance *pself, word cellIndex) ;
 
 /**************************************************************************
@@ -463,7 +463,7 @@ EC( ECCheckStack(); )
         if (((viewWidth != pself->HTI_formattedWidth) || 
                 (pself->HTI_layoutState & HTS_LAYOUT_DIRTY)) 
                 && (maxViewHeight))  {
-            /* Record these settings and we'll go from here */
+	    /* Record these settings and we'll go from here */
             pself->HTI_formattedWidth = viewWidth ;
 @ifdef COMPILE_OPTION_VERTICAL_SCROLLBARS_ON
             /* Always show scroll bars */
@@ -478,7 +478,7 @@ EC( ECCheckStack(); )
             /* buffer starting the iterative process. */
             CellArrayStartAccess(cellArray) ;
             RegionPurgeCache(oself) ;
-            ISetupRegionLinks(pself->HTI_cellArray, regArray) ;
+            ISetupRegionLinks(pself->HTI_cellArray, regArray, oself) ;
             RegionPurgeCache(oself) ;
             CalculateCellArrayLongestLines(regArray, cellArray, oself, 0, 0xFFFF) ;
             CellArrayEndAccess(cellArray) ;
@@ -865,7 +865,7 @@ word IEdgeGetTopLeftAndRight(
  *     LES  04/10/00  Created.
  *
  **************************************************************************/
-void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray)
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray, optr txtObj)
 {
     word lastCell = 0xFFFF ;
     VisLargeTextRegionArrayElement *p_region ;
@@ -875,7 +875,8 @@ void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionAr
     word regionIndex = 0 ;
     word cellIndex ;
     word numCells ;
-
+    word *p_limit ;
+    
     numCells = CellArrayGetCount(cellArray) ;
     for (cellIndex=0; cellIndex<numCells; cellIndex++)  {
         CellLock(cellArray, cellIndex, &p_cell, &size) ;
@@ -902,6 +903,12 @@ void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionAr
         }
         RegionUnlock(p_region) ;
     }
+    
+    p_limit = ObjVarFindData(txtObj, ATTR_VIS_LARGE_TEXT_ONLY_DRAW_X_REGIONS) ;
+    if (p_limit)  {
+	*p_limit = 0xFFFF;		/* defaults to all regions */
+    }
+
     ProfPoint("ISetupRegionLinks") ;
 }
 

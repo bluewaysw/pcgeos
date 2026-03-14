@@ -648,6 +648,61 @@ done:
 	mov	di, offset DesktopViewClass
 	GOTO	ObjCallSuperNoLock
 NDDesktopViewSpecBuildBranch	endm
+
+
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		NDDesktopViewInvalAllGeometry -- 
+		MSG_VIS_INVAL_ALL_GEOMETRY for NDDesktopViewClass
+
+DESCRIPTION:	Invalidates all geometry in this win group.
+
+PASS:		*ds:si 	- instance data
+		es     	- segment of MetaClass
+		ax 	- MSG_VIS_INVAL_ALL_GEOMETRY
+
+RETURN:		nothing
+		ax, cx, dx, bp - destroyed
+
+ALLOWED TO DESTROY:	
+		bx, si, di, ds, es
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	1/27/93         	Initial Version
+
+------------------------------------------------------------------------------@
+
+NDDesktopViewInvalAllGeometry	method dynamic	NDDesktopViewClass, \
+						MSG_VIS_INVAL_ALL_GEOMETRY
+
+
+		push	ax
+		mov	ax, MSG_GEN_VIEW_SUSPEND_UPDATE
+		call	ObjCallInstanceNoLock
+
+		push	si
+		mov	ax, MSG_FOLDER_UNSUSPEND_WINDOW
+		movdw	bxsi, ds:[di].GVI_content	; ^lbx:si = Folder
+		mov	di, mask MF_FORCE_QUEUE
+		call	ObjMessage
+		pop	si
+
+		pop	ax
+
+		mov	di, offset NDDesktopViewClass
+		GOTO	ObjCallSuperNoLock
+
+NDDesktopViewInvalAllGeometry	endm
+
 endif ; _NEWDESK
 
 FolderCode	ends

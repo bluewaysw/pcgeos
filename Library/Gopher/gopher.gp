@@ -47,8 +47,8 @@ library streamc
 library socket
 
 # this resource holds the gopher object data
-resource	GOPHERSERIALCONSTANTDATA	shared, lmem, read-only
-resource	GOPHERSOCKETCONSTANTDATA	shared, lmem, read-only
+resource	GopherSerialConstantData	shared, lmem, read-only
+resource	GopherSocketConstantData	shared, lmem, read-only
 
 #
 # Export classes

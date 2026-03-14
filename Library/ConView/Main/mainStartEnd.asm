@@ -752,8 +752,8 @@ FXIP 	<	call	MemDerefES					>
 	;
 	; inc the ignore count so that this view size change is ignored
 	;	
-		mov	ax, MSG_CGV_IGNORE_UPDATE_SCROLLBARS
-		call	MUCallView
+		;mov	ax, MSG_CGV_IGNORE_UPDATE_SCROLLBARS
+		;call	MUCallView
 done:	
 		.leave
 		ret

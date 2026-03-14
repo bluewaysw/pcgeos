@@ -218,13 +218,6 @@
 
 
 /*************************************************************************/
-/* Define TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS if you want to      */
-/* support displays with non square pixels.                              */
-
-#undef TT_CONGIG_OPTION_SUPPORT_NON_SQUARE_PIXELS
-
-
-/*************************************************************************/
 /* Define TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING if you want to use   */
 /* TrueType-compliant interpreter. Under PC/GEOS we use the more relaxed */
 /* verion of bytecode interperter.                                       */

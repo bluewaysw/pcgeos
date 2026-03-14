@@ -41,7 +41,7 @@
 /* "-dc" causes vptrs for text constants if different code segments are used */
 #pragma option -dc-
 
-void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray) ;
+void ISetupRegionLinks(T_cellArrayHandle cellArray, T_regionArrayHandle regionArray, optr txtObj) ;
 
 typedef struct {
     Rectangle rect ;
@@ -621,10 +621,12 @@ word IRegionRepositionResizeAndReflow(
     word longest ;
     word firstRegion ;
     word boundHeight ;
+    word lineCount ;
+    word charCount ;
 
     RegionPurgeCache(oself) ;
     if (width < REGION_MINIMUM_WIDTH)
-	width = REGION_MINIMUM_WIDTH ;
+        width = REGION_MINIMUM_WIDTH ;
     if (width>MAXIMUM_COLUMN_WIDTH) {
         width = MAXIMUM_COLUMN_WIDTH ;
     }
@@ -711,17 +713,19 @@ word IRegionRepositionResizeAndReflow(
         }
         oldWidth = p_region->VLTRAE_size.XYS_width ;
         p_region->VLTRAE_size.XYS_width = width ;
+        lineCount = p_region->VLTRAE_lineCount;
+        charCount = p_region->VLTRAE_charCount;
+        /* Don't want to keep it in memory if we are going to move */
+        /* things around. */
+        RegionUnlock(p_region) ;
 
-        if (p_region->VLTRAE_charCount)  {
-	    /* Don't want to keep it in memory if we are going to move */
-	    /* things around. */
+        if (charCount)  {
             ProfPoint("IRegionRepositionResizeAndReflow--Pre") ;
 
             /* Only recalc if we are forced or if size matters. */
             /* (If we are going to a size where the longest line is not that big, we */
             /*  can cheat and just ignore it). */
             if ((sizeMatters) || (forcedRecalc))  {
-	        RegionUnlock(p_region) ;
                 @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
             } else {
                 HugeArrayLock(
@@ -732,23 +736,18 @@ word IRegionRepositionResizeAndReflow(
                     &size) ;
                 if (ILinesAdjustToNewWidth(
                         p_firstLine,
-                        p_region->VLTRAE_lineCount,
+                        lineCount,
                         oldWidth,
                         width))  {
                     /* Adjust failed.  Let's do the old fashion way */
-	            RegionUnlock(p_region) ;
                     @call oself::MSG_VIS_TEXT_INVALIDATE_RANGE(&range);
-                } else {
-	            RegionUnlock(p_region) ;
                 }
             }
             ProfPoint("IRegionRepositionResizeAndReflow--Post") ;
             RegionPurgeCache(oself) ;
-        } else {
-	    /* Don't want to keep it in memory if we are going to move */
-	    /* things around. */
-	    RegionUnlock(p_region) ;
-	}
+            /* Purge seek cache: overflow regions may have been inserted */
+            p_stack->LS_lastSeekedRegion = 0xFFFF ;
+        }
 
         /* We are now back.  All lines have been reformatted. */
         /* Insure we have access to the region */
@@ -1832,6 +1831,21 @@ EC( ECCheckStack(); )
 /* "-dc" causes vptrs for text constants if different code segments are used */
 #pragma option -dc-
 
+void ISetNumFormatedCells(
+    optr txtObj,
+    word numFormatedCells
+)
+{
+    HTMLTextInstance* pself ;
+    word *p_limit = ObjVarFindData(txtObj, ATTR_VIS_LARGE_TEXT_ONLY_DRAW_X_REGIONS) ;
+    if (p_limit) {
+	*p_limit = 0xFFFF;		/* defaults to all regions */
+    }
+
+    pself = ObjDerefVis(txtObj); 
+    pself->HTI_numFormattedCells = numFormatedCells;
+}
+
 /**************************************************************************
  * Routine:  ILayoutCellRegions
  **************************************************************************
@@ -2639,7 +2653,7 @@ T_layoutLevelTable *LayoutStackTableLevelAccess(T_layoutStack *p_stack, word lev
         0) ;
     LayoutStackUnlock(p_stack) ;
 
-    pself->HTI_numFormattedCells = 0 ;
+    ISetNumFormatedCells(oself, 0) ;
 
     /* Start the process */
     @send ,forceQueue ,checkDuplicate oself::MSG_HTML_TEXT_INTERNAL_LAYOUT_UPDATE_EVENT() ;
@@ -2746,10 +2760,6 @@ EC( word originalCellIndex; )
     }
 
     if (pself->HTI_layoutStack)  {
-        if (pself->HTI_layoutState & HTS_CELL_REGION_LINKS_INVALID)  {
-            ISetupRegionLinks(pself->HTI_cellArray, RegionArrayConstruct(oself, pself)) ;
-            pself->HTI_layoutState &= (~HTS_CELL_REGION_LINKS_INVALID) ;
-        }
         p_stack = LayoutStackLock(pself->HTI_layoutStack) ;
     EC( originalCellIndex = p_stack->LS_nextCellIndex ; )
 
@@ -2766,6 +2776,11 @@ EC( word originalCellIndex; )
             ILayoutCalculateCell(p_stack) ;
         } else {
             ILayoutCalculateTable(p_stack) ;
+        }
+
+        if (pself->HTI_layoutState & HTS_CELL_REGION_LINKS_INVALID)  {
+	    ISetupRegionLinks(pself->HTI_cellArray, RegionArrayConstruct(oself, pself), oself) ;
+            pself->HTI_layoutState &= (~HTS_CELL_REGION_LINKS_INVALID) ;
         }
 
         /* Check to see if we need to start the formatting over from the top */
@@ -2841,7 +2856,7 @@ EC( word originalCellIndex; )
                     p_stack->LS_undoCell = p_stack->LS_cellLayoutStack[0] ;
 
                     /* Allow more cells to be shown now */
-                    pself->HTI_numFormattedCells = p_stack->LS_currentMasterCell ;
+                    ISetNumFormatedCells(oself, p_stack->LS_currentMasterCell) ;
                     IAdjustRegions(oself, pself, last, p_stack->LS_currentMasterCell) ;
 
                     /* If we have cross the first area of the page, then go ahead and show it */

@@ -22,8 +22,9 @@ library         ui
 
 
 resource DataResource      lmem read-only shared
+resource PaletteResource   lmem read-only shared
 
-usernotes	"International version 1.0.6"
+usernotes	"International version 1.0.7"
 
 
 
@@ -96,3 +97,9 @@ export BTCOPYTOBITMAPWITHMASK
 export BTAPPLYTRANSPARENCYCOLOR
 export BTCOPYBITMAPANDREMOVEMASK
 export BTBITMAPFILLMASK
+
+#incminor
+export BTSETCOLORFORMASKEDPIXELS
+export BTLOCKGEOSSTANDARDPALETTE
+export BTUNLOCKGEOSSTANDARDPALETTE
+export BTAPPROXRGBPALETTELINEAR

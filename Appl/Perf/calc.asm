@@ -222,6 +222,11 @@ PerfCalcCPUUsage        proc    near
 	mov     ax, ds:[lastStats].SS_idleCount.low
 	mov     dx, ds:[lastStats].SS_idleCount.high
 
+	tst	ds:[totalCountPure]
+	jz	noPure
+	mov	dx, 1000
+	mul	dx
+noPure:
 	;calculate idle amount as ratio of totalCount, then multiply by
 	;1000, so that we get a result between 0 and 999.
 
@@ -250,7 +255,22 @@ notZero:
 
 	mov     ax, 1000                ;set to MAX value
 
-10$:    ;convert from idle time to used time (0 to 1000)
+10$:    
+	tst	ds:[totalCountPure]
+	jz	pure
+
+	mov	dx, 12
+	mul	dx
+	shr	ax, 3
+pure:
+	cmp     ax, 1001                ;too big?
+	jb      11$                     ;skip if not...
+
+	mov     ax, 1000                ;set to MAX value
+
+11$:    
+
+	;convert from idle time to used time (0 to 1000)
 	sub     ax, 1000                ;convert from idle time to usage time
 	neg     ax
 
