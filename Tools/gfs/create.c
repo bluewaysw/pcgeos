@@ -446,7 +446,8 @@ CompareDirEntries(const void *x, const void *y)
     sp = ((DIRENT *)x)->d_name;
     dp = ((DIRENT *)y)->d_name;
     while (*sp == *dp) {
-	if (*sp == '0') {
+	/* Stop when both strings hit NUL terminator. */
+	if (*sp == '\0') {
 	    return(0);
 	}
 	sp++;   dp++;
