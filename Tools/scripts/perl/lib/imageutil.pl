@@ -656,10 +656,13 @@ sub ConstructXIPArgs {
 #
 ##############################################################################
 sub ConstructGFSArgs {
-    local($args) = "create -a";
+    local($args) = "create";
 
     if ( $imgInfo{"gfsalignsize"} ne "" ){
-	$args .= $imgInfo{"gfsalignsize"};
+	$args .= " -a" . $imgInfo{"gfsalignsize"};
+    } elsif ( $imgInfo{"xip"} ){
+	# Alignment is required for paged/XIP images.
+	$args .= " -a";
     }
     if ( $imgInfo{"gfsusedatachecksum"} ){
 	$args .= " -x";
@@ -705,10 +708,13 @@ sub ConstructGFSArgs {
 #
 ##############################################################################
 sub ConstructLangGFSArgs {
-    local($args) = "create -a";
+    local($args) = "create";
 
     if ( $imgInfo{"gfsalignsize"} ne "" ){
-	$args .= $imgInfo{"gfsalignsize"};
+	$args .= " -a" . $imgInfo{"gfsalignsize"};
+    } elsif ( $imgInfo{"xip"} ){
+	# Alignment is required for paged/XIP images.
+	$args .= " -a";
     }
     if ( $imgInfo{"gfsusedatachecksum"} ){
 	$args .= " -x";
