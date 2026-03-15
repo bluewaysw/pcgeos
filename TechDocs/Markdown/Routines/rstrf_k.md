@@ -1,25 +1,25 @@
 ## 4.2 Data Structures F-K
 ----------
-#### FALSE
+### FALSE
     #define FALSE        0
     #define TRUE        (~0)    /* use as return value, not for comparisons */
 
 ----------
-#### FFFieldMessageBlock
+### FFFieldMessageBlock
     typedef struct {
         char    textBuffer[100];
         int     startOffset;
     } FFFieldMessageBlock;
 
 ----------
-#### FileAccess
+### FileAccess
     typedef ByteEnum FileAccess
         #define FA_READ_ONLY                0
         #define FA_WRITE_ONLY               1
         #define FA_READ_WRITE               2
 
 ----------
-#### FileAccessFlags
+### FileAccessFlags
     typedef ByteFlags FileAccessFlags;
         #define FILE_DENY_RW        0x10
         #define FILE_DENY_W         0x20
@@ -70,11 +70,11 @@ access while prohibiting other geodes from writing to the file, you would pass
 the flags "(FILE_ACCESS_R | FILE_DENY_W)".
 
 ----------
-#### FileAccessRights
+### FileAccessRights
     typedef char FileAccessRights[FILE_RIGHTS_SIZE];
 
 ----------
-#### FileAttrs
+### FileAttrs
     typedef ByteFlags FileAttrs;
         #define FA_ARCHIVE                      0x20
         #define FA_SUBDIR                       0x10
@@ -125,7 +125,7 @@ This flag is set if the file is read-only.
 **Include:** file.h
 
 ----------
-#### FileChangeNotificationData
+### FileChangeNotificationData
     typedef struct {
         PathName            FCND_pathname;
         DiskHandle          FCND_diskHandle;
@@ -133,7 +133,7 @@ This flag is set if the file is read-only.
     } FileChangeNotificationData;
 
 ----------
-#### FileChangeType
+### FileChangeType
     typedef ByteEnum FileChangeType;
         #define FCT_CREATE              0
         #define FCT_DELETE              1
@@ -142,18 +142,18 @@ This flag is set if the file is read-only.
         #define FCT_DISK_FORMAT         4
 
 ----------
-#### FileCopyrightNotice
+### FileCopyrightNotice
     typedef char FileCopyrightNotice[GFH_NOTICE_SIZE];
 
 ----------
-#### FileCreateFlags
+### FileCreateFlags
     typedef WordFlags FileCreateFlags;
         #define FCF_NATIVE      0x8000
         #define FCF_MODE        0x0300 /* Filled with FILE_CREATE_* constant */
         #define FCF_ACCESS      0x00ff /* Filled with FileAccessFlags */
 
 ----------
-#### FileDateAndTime
+### FileDateAndTime
     typedef DWordFlags FileDateAndTime;
         #define FDAT_HOUR                       0xf8000000
         #define FDAT_MINUTE                     0x07e00000
@@ -235,19 +235,19 @@ Macros are provided to extract values from each of the fields of a
 **Include:** file.h
 
 ----------
-#### FileDesktopInfo
+### FileDesktopInfo
     typedef char FileDesktopInfo[FILE_DESKTOP_INFO_SIZE];
 
 ----------
-#### FileDirID
+### FileDirID
     typedef dword FileDirID;
 
 ----------
-#### FileFileID
+### FileFileID
     typedef dword FileFileID;
 
 ----------
-#### FileExclude
+### FileExclude
     typedef ByteEnum FileExclude;
         #define FE_EXCLUSIVE            1
         #define FE_DENY_WRITE           2
@@ -255,7 +255,7 @@ Macros are provided to extract values from each of the fields of a
         #define FE_NONE                 4
 
 ----------
-#### FileExtAttrDesc
+### FileExtAttrDesc
     typedef struct {
         FileExtendedAttribute   FEAD_attr;  /* Attribute to get or set */
         void        *FEAD_value;        /* Pointer to buffer/new value */
@@ -283,7 +283,7 @@ FEA_END_OF_LIST.
 **Include:** file.h
 
 ----------
-#### FileExtendedAttribute
+### FileExtendedAttribute
     typedef enum /* word */ {
         FEA_MODIFICATION,
         FEA_FILE_ATTR,
@@ -326,46 +326,46 @@ Section 17.5.3 of the Concepts book.
 **Include:** file.h
 
 ----------
-#### FileHandle
+### FileHandle
     typedef Handle FileHandle;
 
 ----------
-#### FileLongName
+### FileLongName
     typedef char FileLongName[FILE_LONGNAME_BUFFER_SIZE];
 
 ----------
-#### FileOwnerName
+### FileOwnerName
     typedef char FileOwnerName[FILE_OWNER_NAME_SIZE];
 
 ----------
-#### FilePassword
+### FilePassword
     typedef char FilePassword[FILE_PASSWORD_SIZE];
 
 ----------
-#### FilePosMode
+### FilePosMode
     typedef ByteEnum FilePosMode;
         #define FILE_POS_START              0
         #define FILE_POS_RELATIVE           1
         #define FILE_POS_END                2
 
 ----------
-#### FileUserNotes
+### FileUserNotes
     typedef char FileUserNotes[GFH_USER_NOTES_BUFFER_SIZE];
 
 ----------
-#### FindNoteHeader
+### FindNoteHeader
     typedef struct {
         word    FNH_count;      /* The number of matching notes we've found */
     } FindNoteHeader;
 
 ----------
-#### FloatExponent
+### FloatExponent
     typedef WordFlags FloatExponent;
         #define FE_SIGN         0x8000
         #define FE_EXPONENT     0x7fff
 
 ----------
-#### FloatNum
+### FloatNum
     typedef struct {
         word                    F_mantissa_wd0;
         word                    F_mantissa_wd1;
@@ -375,7 +375,7 @@ Section 17.5.3 of the Concepts book.
     } FloatNum;
 
 ----------
-#### FontAttrs
+### FontAttrs
     typedef ByteFlags FontAttrs;
         #define FA_FIXED_WIDTH          0x40
         #define FA_ORIENT               0x20
@@ -386,7 +386,7 @@ Section 17.5.3 of the Concepts book.
 **Include:** font.h
 
 ----------
-#### FontEnumFlags
+### FontEnumFlags
     typedef ByteFlags FontEnumFlags;
         #define FEF_ALPHABETIZE     0x80    /* Alphabetize returned list of fonts */
         #define FEF_FIXED_WIDTH     0x20    /* Return only fixed-width fonts */
@@ -399,7 +399,7 @@ Section 17.5.3 of the Concepts book.
 **Include:** font.h
 
 ----------
-#### FontEnumStruct
+### FontEnumStruct
     typedef struct {
          FontIDs        FES_ID;
          char           FES_name[FID_NAME_LEN];
@@ -408,7 +408,7 @@ Section 17.5.3 of the Concepts book.
 **Include:** font.h
 
 ----------
-#### FontFamily
+### FontFamily
     typedef byte FontFamily;
         #define FF_NON_PORTABLE         0x0007
         #define FF_SPECIAL              0x0006
@@ -422,7 +422,7 @@ Section 17.5.3 of the Concepts book.
 **Include:** fontID.h
 
 ----------
-#### FontGroup
+### FontGroup
     typedef enum /* word */ {
         #define FG_NON_PORTABLE         0x0e00
         #define FG_SPECIAL              0x0c00
@@ -437,7 +437,7 @@ Section 17.5.3 of the Concepts book.
 **Include:** fontID.h
 
 ----------
-#### FontIDRecord
+### FontIDRecord
     typedef WordFlags FontIDRecord;
         #define FIDR_maker              0xf000
         #define FIDR_ID             0x0fff
@@ -447,7 +447,7 @@ Section 17.5.3 of the Concepts book.
 **Include:** font.h
 
 ----------
-#### FontID
+### FontID
     typedef word FontID;
         #define FID_PRINTER_20CPI                           0xfa05
         #define FID_PRINTER_17CPI                           0xfa04
@@ -1624,7 +1624,7 @@ Fonts are normally referenced by FontID.
 **Include:** fontID.h
 
 ----------
-#### FontMaker
+### FontMaker
     typedef word FontMaker;
         #define FM_PRINTER              0xf000
         #define FM_MICROLOGIC           0xe000
@@ -1639,7 +1639,7 @@ Fonts are normally referenced by FontID.
 **Include:** fontID.h
 
 ----------
-#### FontMap
+### FontMap
     typedef byte FontMap;
         #define FM_DONT_USE             0x00ff
         #define FM_EXACT                0x0000
@@ -1647,7 +1647,7 @@ Fonts are normally referenced by FontID.
 **Include:** fontID.h
 
 ----------
-#### FontWeight
+### FontWeight
     typedef ByteEnum FontWeight;
         #define FW_ULTRA_LIGHT              0
         #define FW_EXTRA_LIGHT              1
@@ -1663,7 +1663,7 @@ Fonts are normally referenced by FontID.
 **Include:** font.h
 
 ----------
-#### FontWidth
+### FontWidth
     typedef     ByteEnum FontWidth;
         #define FWI_NARROW                  0
         #define FWI_CONDENSED               1
@@ -1674,11 +1674,11 @@ Fonts are normally referenced by FontID.
 **Include:** font.h
 
 ----------
-#### FormatArray
+### FormatArray
     typedef ClipboardItemFormatInfo FormatArray[CLIPBOARD_MAX_FORMATS];
 
 ----------
-#### FormatError
+### FormatError
     typedef ByteEnum FormatError;
         #define FMT_DONE                                        0
         #define FMT_READY                                       1
@@ -1704,7 +1704,7 @@ Fonts are normally referenced by FontID.
         #define FMT_ERR_DISK_UNAVAILABLE                        21
 
 ----------
-#### FunctionID
+### FunctionID
     typedef enum /* word */ {
         FUNCTION_ID_ABS,
         FUNCTION_ID_ACOS,
@@ -1807,7 +1807,7 @@ Fonts are normally referenced by FontID.
     } FunctionID;
 
 ----------
-#### GCM_info
+### GCM_info
     typedef enum /* word */ {
         GCMI_MIN_X,
         GCMI_MIN_X_ROUNDED,
@@ -1820,34 +1820,34 @@ Fonts are normally referenced by FontID.
     } GCM_info;
 
 ----------
-#### GCNDriveChangeNotificationType
+### GCNDriveChangeNotificationType
     typedef enum {
         GCNDCNT_CREATED,
         GCNDCNT_DESTROYED
     } GCNDriveChangeNotificationType;
 
 ----------
-#### GCNExpressMenuNotificationType
+### GCNExpressMenuNotificationType
     typedef enum {
         GCNEMNT_CREATED,
         GCNEMNT_DESTROYED
     } GCNExpressMenuNotificationType;
 
 ----------
-#### GCNListBlockHeader
+### GCNListBlockHeader
     typedef struct {
         LMemBlockHeader         GCNLBH_lmemHeader;
         ChunkHandle             GCNLBH_listOfLists;
     } GCNListBlockHeader;
 
 ----------
-#### GCNListElement
+### GCNListElement
     typedef struct {
         optr    GCNLE_item;
     } GCNListElement;
 
 ----------
-#### GCNListHeader
+### GCNListHeader
     typedef struct {
         ChunkArrayHeader        GCNLH_meta;
         word                    GCNLH_statusEvent;
@@ -1857,46 +1857,46 @@ Fonts are normally referenced by FontID.
     } GCNListHeader;
 
 ----------
-#### GCNListOfListsElement
+### GCNListOfListsElement
     typedef struct {
         GCNListType         GCNLOLE_ID;
         ChunkHandle         GCNLOLE_list;
     } GCNListOfListsElement;
 
 ----------
-#### GCNListOfListsHeader
+### GCNListOfListsHeader
     typedef struct {
         ChunkArrayHeader                GCNLOL_meta;
         /* Start of GCNListOfListsElements */
     } GCNListOfListsHeader;
 
 ----------
-#### GCNListParams
+### GCNListParams
     typedef struct {
         GCNListType     GCNLP_ID;
         optr            GCNLP_optr;
     } GCNListParams;
 
 ----------
-#### GCNListSendFlags
+### GCNListSendFlags
     typedef WordFlags GCNListSendFlags;
         #define GCNLSF_SET_STATUS                       0x8000
         #define GCNLSF_IGNORE_IF_STATUS_TRANSITIONING   0x4000
 
 ----------
-#### GCNListType
+### GCNListType
     typedef struct {
         word    GCNLT_manuf;
         word    GCNLT_type;
     } GCNListType;
 
 ----------
-#### GCNListTypeFlags
+### GCNListTypeFlags
     typedef WordFlags GCNListTypeFlags;
         #define GCNLTF_SAVE_TO_STATE            0x8000
 
 ----------
-#### GCNShutdownControlType
+### GCNShutdownControlType
     typedef enum {
         GCNSCT_SUSPEND,
         GCNSCT_SHUTDOWN,
@@ -1904,7 +1904,7 @@ Fonts are normally referenced by FontID.
     } GCNShutdownControlType;
 
 ----------
-#### GCNStandardListType
+### GCNStandardListType
     typedef enum {
         GCNSLT_FILE_SYSTEM,
         GCNSLT_APPLICATION,
@@ -1915,7 +1915,7 @@ Fonts are normally referenced by FontID.
     } GCNStandardListType;
 
 ----------
-#### GenAppGCNListTypes
+### GenAppGCNListTypes
     typedef enum /* word */ {
         GAGCNLT_GEN_CONTROL_OBJECTS,
         GAGCNLT_GEN_CONTROL_NOTIFY_STATUS_CHANGE,
@@ -1947,7 +1947,7 @@ Fonts are normally referenced by FontID.
     } GenAppGCNListTypes;
 
 ----------
-#### GeneralEvent
+### GeneralEvent
     typedef enum {
         GE_NO_EVENT=0,                  /* dummy event (NOP) */
         GE_END_OF_SONG=2,               /* marks end of song */
@@ -1961,12 +1961,12 @@ These represent some of the miscellaneous events which can make up a
 music buffer.
 
 ----------
-#### GenTravelOption
+### GenTravelOption
 The **GenClass** defines some values meant to be used in the place of a 
 **TravelOption** enumerated value. See **TravelOption**.
 
 ----------
-#### GeodeAttrs
+### GeodeAttrs
     typedef WordFlags GeodeAttrs;
         #define GA_PROCESS                          0x8000
         #define GA_LIBRARY                          0x4000
@@ -1984,7 +1984,7 @@ The **GenClass** defines some values meant to be used in the place of a
         #define GA_ENTRY_POINTS_IN_C                0x0004
 
 ----------
-#### GeodeDefaultDriverType
+### GeodeDefaultDriverType
     typedef enum {
         GDDT_FILE_SYSTEM = 0,           /* File system driver */
         GDDT_KEYBOARD = 2,              /* Keyboard driver */
@@ -2000,7 +2000,7 @@ This type is used with **GeodeGetDefaultDriver()** and
 **GeodeSetDefaultDriver()**.
 
 ----------
-#### GeodeGetInfoType
+### GeodeGetInfoType
     typedef enum /* word */ {
         GGIT_ATTRIBUTES=0,
         GGIT_TYPE=2,
@@ -2012,20 +2012,20 @@ This type is used with **GeodeGetDefaultDriver()** and
     } GeodeGetInfoType;
 
 ----------
-#### GeodeHandle
+### GeodeHandle
     typedef Handle GeodeHandle;
 
 A standard handle that contains information about a loaded geode. When a 
 geode has been loaded, it is referred to by its handle.
 
 ----------
-#### GeodeHeapVars
+### GeodeHeapVars
     typedef struct {
         word        GHV_heapSpace;
     } GeodeHeapVars;
 
 ----------
-#### GeodeLoadError
+### GeodeLoadError
     typedef enum {
         GLE_PROTOCOL_IMPORTER_TOO_RECENT,
         GLE_PROTOCOL_IMPORTER_TOO_OLD,
@@ -2050,7 +2050,7 @@ These errors may be returned by routines that load geodes, including
 **GeodeLoad()**.
 
 ----------
-#### GeodeToken
+### GeodeToken
     typedef struct {
         TokenChars              GT_chars;
         ManufacturerID          GT_manufID;
@@ -2061,14 +2061,14 @@ the token; *GT_manufID* is the identifying number of the manufacturer of the
 item being referenced.
 
 ----------
-#### GeosFileHeaderFlags
+### GeosFileHeaderFlags
     typedef WordFlags GeosFileHeaderFlags;
         #define GFHF_TEMPLATE                   0x8000
         #define GFHF_SHARED_MULTIPLE            0x4000
         #define GFHF_SHARED_SINGLE              0x2000
 
 ----------
-#### GeosFileType
+### GeosFileType
     typedef enum /* word */ {
         GFT_NOT_GEOS_FILE,
         GFT_EXECUTABLE,
@@ -2103,7 +2103,7 @@ GFT_LINK
 The file is a symbolic link (not yet implemented).
 
 ----------
-#### GeoWorksGenAppGCNListType
+### GeoWorksGenAppGCNListType
     typedef enum /* word */ {
         GAGCNLT_SELF_LOAD_OPTIONS = 0x6800,
         GAGCNLT_GEN_CONTROL_NOTIFY_STATUS_CHANGE,
@@ -2184,14 +2184,14 @@ The file is a symbolic link (not yet implemented).
     } GeoWorksGenAppGCNListType;
 
 ----------
-#### GeoWorksMetaGCNListType
+### GeoWorksMetaGCNListType
     typedef enum /* word */ {
         MGCNLT_ACTIVE_LIST = 0x00,
         MGCNLT_APP_STARTUP = 0x02
     } GeoWorksMetaGCNListType;
 
 ----------
-#### GeoWorksNotificationType
+### GeoWorksNotificationType
     typedef enum {
         GWNT_INK,
         GWNT_GEN_CONTROL_NOTIFY_STATUS_CHANGE,
@@ -2289,27 +2289,27 @@ The file is a symbolic link (not yet implemented).
     } GeoWorksNotificationType;
 
 ----------
-#### GeoWorksVisContentGCNListType
+### GeoWorksVisContentGCNListType
     typedef enum {
         VCGCNLT_TARGET_NOTIFY_TEXT_PARA_ATTR_CHANGE = 0x4a00,
         PADDING_VCGCNLT_INVALID_ITEM_000
     } GeoWorksVisContentGCNListType;
 
 ----------
-#### GetMaskType
+### GetMaskType
     typedef ByteEnum GetMaskType;
         #define GMT_ENUM                0
         #define GMT_BUFFER              1
 
 ----------
-#### GetPalType
+### GetPalType
     typedef ByteEnum GetPalType;
         #define GPT_ACTIVE              0
         #define GPT_CUSTOM              1
         #define GPT_DEFAULT             2
 
 ----------
-#### GFM_info
+### GFM_info
     typedef enum /* word */ {
          GFMI_HEIGHT=0, /* 0 */
          GFMI_HEIGHT_ROUNDED=1,
@@ -2349,14 +2349,14 @@ The file is a symbolic link (not yet implemented).
     } GFM_info;
 
 ----------
-#### GraphicPattern
+### GraphicPattern
     typedef struct { 
         PatternType     HP_type;
         byte            HP_data;
     } GraphicPattern;
 
 ----------
-#### GSControl
+### GSControl
     typedef WordFlags GSControl;
         #define GSC_PARTIAL             0x0200
         #define GSC_ONE                 0x0100
@@ -2370,7 +2370,7 @@ The file is a symbolic link (not yet implemented).
         #define GSC_PATH                0x0001
 
 ----------
-#### GSRetType
+### GSRetType
     typedef ByteEnum GSRetType;
         #define GSRT_COMPLETE               0
         #define GSRT_FORM_FEED              1
@@ -2381,12 +2381,12 @@ The file is a symbolic link (not yet implemented).
         #define GSRT_FAULT                  0xff
 
 ----------
-#### GState
+### GState
 GStates are always referenced by means of GStateHandles, and are 
 documented there.
 
 ----------
-#### GStateHandle
+### GStateHandle
     typedef Handle GStateHandle;
 
 GStates, or graphics states, are used to interpret graphics commands. Any 
@@ -2407,7 +2407,7 @@ GStateHandle representing a bitmap or graphics string will affect the data
 structure instead of being drawn to screen.
 
 ----------
-#### GString
+### GString
     typedef void GString;
 
 A GString (short for "Graphics Strings") represents a string of graphics 
@@ -2433,7 +2433,7 @@ Thus, these macros just represent data, though they look like normal kernel
 graphics commands.
 
 ----------
-#### GStringElement
+### GStringElement
     typedef ByteEnum GStringElement;
         /* The following elements are defined :
                 (Miscellaneous GString opcodes:)
@@ -2582,20 +2582,20 @@ graphics commands.
         GR_SET_STROKE_PATH                                  */
 
 ----------
-#### GStringErrorType
+### GStringErrorType
     typedef enum /* word */ {
         GSET_NO_ERROR,
         GSET_DISK_FULL
     } GStringErrorType;
 
 ----------
-#### GStringKillType
+### GStringKillType
     typedef ByteEnum GStringKillType;
         #define GSKT_KILL_DATA          0
         #define GSKT_LEAVE_DATA         1
 
 ----------
-#### GStringSetPosType
+### GStringSetPosType
     typedef ByteEnum GStringSetPosType;
         #define GSSPT_SKIP_1                0
         #define GSSPT_RELATIVE              1
@@ -2603,7 +2603,7 @@ graphics commands.
         #define GSSPT_END                   3
 
 ----------
-#### GStringType
+### GStringType
     typedef ByteEnum GStringType;
         #define GST_CHUNK               0
         #define GST_STREAM              1
@@ -2612,18 +2612,18 @@ graphics commands.
         #define GST_PATH                4
 
 ----------
-#### Handle
+### Handle
     typedef word Handle;
 
 ----------
-#### HatchDash
+### HatchDash
     typedef struct {
         WWFixed     HD_on;
         WWFixed     HD_off;
     } HatchDash;
 
 ----------
-#### HatchLine
+### HatchLine
     typedef struct {
         PointWWFixed    HL_origin;
         WWFixed         HL_deltaX;
@@ -2635,14 +2635,14 @@ graphics commands.
     } HatchLine;
 
 ----------
-#### HatchPattern
+### HatchPattern
     typedef struct {
         word HP_numLines;
             /* array of HatchLine structures follows here */
     } HatchPattern;
 
 ----------
-#### HeapAllocFlags
+### HeapAllocFlags
     typedef ByteFlags HeapAllocFlags;
         #define HAF_ZERO_INIT               0x80
         #define HAF_LOCK                    0x40
@@ -2658,7 +2658,7 @@ graphics commands.
         #define HAF_STANDARD_NO_ERR_LOCK    (HAF_NO_ERR | HAF_LOCK)
 
 ----------
-#### HeapCongestion
+### HeapCongestion
     typedef enum /* word */ {
         HC_SCRUBBING,
         HC_CONGESTED,
@@ -2666,7 +2666,7 @@ graphics commands.
     } HeapCongestion;
 
 ----------
-#### HeapFlags
+### HeapFlags
     typedef ByteFlags HeapFlags;
         #define HF_FIXED                0x80
         #define HF_SHARABLE             0x40
@@ -2679,7 +2679,7 @@ graphics commands.
         #define HF_DYNAMIC              HF_SWAPABLE
 
 ----------
-#### HugeArrayDirectory
+### HugeArrayDirectory
     typedef struct {
         LMemBlockHeader         HAD_header;
         VMBlockHandle           HAD_data;
@@ -2690,7 +2690,7 @@ graphics commands.
     } HugeArrayDirectory;
 
 ----------
-#### IACPConnectFlags
+### IACPConnectFlags
     typedef WordFlags IACPConnectFlags;
         #define IACPCF_OBEY_LAUNCH_MODEL            0x0020
         #define IACPCF_CLIENT_OD_SPECIFIED          0x0010
@@ -2700,14 +2700,14 @@ graphics commands.
 **Include:** iacp.goh
 
 ----------
-#### IACPServerFlags
+### IACPServerFlags
     typedef ByteFlags IACPServerFlags;
         #define IACPSF_MULTIPLE_INSTANCES                       0x80
 
 **Include:** iacp.goh
 
 ----------
-#### IACPServerMode
+### IACPServerMode
     typedef ByteEnum IACPServerMode;
         #define IACPSM_NOT_USER_INTERACTIBLE        0
         #define IACPSM_IN_FLUX                      1
@@ -2716,7 +2716,7 @@ graphics commands.
 **Include:** iacp.goh
 
 ----------
-#### IACPSide
+### IACPSide
     typedef enum {
         IACPS_CLIENT,
         IACPS_SERVER
@@ -2725,7 +2725,7 @@ graphics commands.
 **Include:** iacp.goh
 
 ----------
-#### ImageFlags
+### ImageFlags
     typedef ByteFlags ImageFlags;
         #define IF_IGNORE_MASK      0x10
         #define IF_BORDER           0x08
@@ -2737,7 +2737,7 @@ graphics commands.
         #define IBS_16          4
 
 ----------
-#### IMCFeatures
+### IMCFeatures
     typedef ByteFlags IMCFeatures;
         #define IMCF_MAP                        0x01
         #define IMC_DEFAULT_FEATURES            IMCF_MAP
@@ -2745,7 +2745,7 @@ graphics commands.
         #define IMC_MAP_MONIKER_SIZE            1024
 
 ----------
-#### ImpexDataClasses
+### ImpexDataClasses
     typedef WordFlags ImpexDataClasses;
         #define IDC_TEXT                0x8000
         #define IDC_GRAPHICS            0x4000
@@ -2753,7 +2753,7 @@ graphics commands.
         #define IDC_FONT                0x1000
 
 ----------
-#### ImpexFileSelectionData
+### ImpexFileSelectionData
     typedef struct {
         FileLongName                IFSD_selection;
         PathName                    IFSD_path;
@@ -2762,13 +2762,13 @@ graphics commands.
     } ImpexFileSelectionData;
 
 ----------
-#### ImpexMapFlags
+### ImpexMapFlags
     typedef ByteFlags ImpexMapFlags;
         #define IMF_IMPORT              0x80
         #define IMF_EXPORT              0x40
 
 ----------
-#### ImpexMapFileInfoHeader
+### ImpexMapFileInfoHeader
     typedef struct {
         LMemBlockHeader         IMFIH_base;
         word                    IMFIH_fieldChunk;
@@ -2776,7 +2776,7 @@ graphics commands.
     } ImpexMapFileInfoHeader;
 
 ----------
-#### ImpexTranslationParams
+### ImpexTranslationParams
     typedef struct {
         optr            ITP_impexOD;
         Message         ITP_returnMsg;
@@ -2787,17 +2787,17 @@ graphics commands.
     } ImpexTranslationParams;
 
 ----------
-#### ImportControlAttrs
+### ImportControlAttrs
     typedef WordFlags ImportControlAttrs;
         #define ICA_IGNORE_INPUT 0x8000 /* ignore input while import occurs */
 
 ----------
-#### ImportControlToolboxFeatures
+### ImportControlToolboxFeatures
     typedef ByteFlags ImportControlToolboxFeatures;
         #define IMPORTCTF_DIALOG_BOX                    0x01
 
 ----------
-#### InitFileCharConvert
+### InitFileCharConvert
     typedef ByteEnum InitFileCharConvert;
         #define IFCC_INTACT         0   /* Leave all characters unchanged. */
         #define IFCC_UPCASE         1   /* Make all characters upper case. */
@@ -2807,7 +2807,7 @@ This enumerated type describes how **InitFileRead...()** routines should
 handle incoming strings.
 
 ----------
-#### InitFileReadFlags
+### InitFileReadFlags
     typedef WordFlags InitFileReadFlags;
         #define IFRF_CHAR_CONVERT   0xc000  /* 2 bits: InitFileCharConvert type */
         #define IFRF_READ_ALL       0x2000
@@ -2825,7 +2825,7 @@ When setting this record, make sure you shift the IFRF_CHAR_CONVERT
 value left an offset of IFRF_CHAR_CONVERT_OFFSET.
 
 ----------
-#### InkBackgroundType
+### InkBackgroundType
     typedef enum {
         IBT_NO_BACKGROUND = 0,
         IBT_NARROW_LINED_PAPER = 2,
@@ -2849,19 +2849,19 @@ This enumerated type is a set of standard background pictures for use with
 the Ink Database routines.
 
 ----------
-#### InkControlFeatures
+### InkControlFeatures
     typedef ByteFlags InkControlFeatures;
         #define ICF_PENCIL_TOOL             0x02
         #define ICF_ERASER_TOOL             0x01
 
 ----------
-#### InkControlToolboxFeatures
+### InkControlToolboxFeatures
     typedef ByteFlags InkControlToolboxFeatures;
         #define ICTF_PENCIL_TOOL                0x02
         #define ICTF_ERASER_TOOL                0x01
 
 ----------
-#### InkDBDisplayInfo
+### InkDBDisplayInfo
     typedef struct {
         dword   IDBDI_dword1;
         dword   IDBDI_dword2;
@@ -2869,7 +2869,7 @@ the Ink Database routines.
     } InkDBDisplayInfo;
 
 ----------
-#### InkDBFrame
+### InkDBFrame
     typedef struct {
         Rectangle IDBF_bounds;              /* bounds of data to save or coord at
                                              * which to load data */
@@ -2879,7 +2879,7 @@ the Ink Database routines.
     } InkDBFrame;
 
 ----------
-#### InkFlags
+### InkFlags
     typedef ByteFlags InkFlags;
         #define IF_HAS_TARGET                   0x20
         #define IF_DIRTY                        0x10
@@ -2889,7 +2889,7 @@ the Ink Database routines.
         #define IF_HAS_UNDO                     0x01
 
 ----------
-#### InkReturnValue
+### InkReturnValue
     typedef enum {
         IRV_NO_REPLY,
         /* VisComp objects use VisCallChildUnderPoint to send
@@ -2913,7 +2913,7 @@ This enumerated type is used by objects to let the system know whether
 incoming pointer events should be interpreted as mouse or pen data.
 
 ----------
-#### InsertChildFlags
+### InsertChildFlags
     typedef WordFlags InsertChildFlags
         #define ICF_MARK_DIRTY          0x8000
         #define ICF_OPTIONS             0x0003
@@ -2921,7 +2921,7 @@ incoming pointer events should be interpreted as mouse or pen data.
 This record specifies how children are to be added to an object tree.
 
 ----------
-#### InsertChildOption
+### InsertChildOption
     typedef ByteEnum InsertChildOption
         #define ICO_FIRST                   0
         #define ICO_LAST                    1
@@ -2932,7 +2932,7 @@ This enumerated type determines how a child is added and is used with the
 **InsertChildFlags** record. It has four enumerations, as shown above.
 
 ----------
-#### InstrumentPatch
+### InstrumentPatch
     typedef enum { 
         #define IP_ACOUSTIC_GRAND_PIANO     0
         #define IP_BRIGHT_ACOUSTIC_PIANO    1
@@ -3135,7 +3135,7 @@ This enumerated type determines how a child is added and is used with the
 These are standard simulated instruments. 
 
 ----------
-#### InstrumentTable
+### InstrumentTable
     typedef enum {
         IT_STANDARD_TABLE=0             /* default table */
     } InstrumentTable;
@@ -3144,7 +3144,7 @@ The sound library uses this enumerated type to keep track of which table of
 simulated musical instruments to use.
 
 ----------
-#### JobStatus
+### JobStatus
     typedef struct {
         char            JS_fname[13];       /* std DOS (8.3) spool filename */
         char            JS_parent[FILE_LONGNAME_LENGTH+1];
@@ -3157,7 +3157,7 @@ simulated musical instruments to use.
     } JobStatus;
 
 ----------
-#### Justification
+### Justification
     typedef ByteEnum Justification;
         #define J_LEFT          0
         #define J_RIGHT         1
@@ -3165,7 +3165,7 @@ simulated musical instruments to use.
         #define J_FULL          3
 
 ----------
-#### KeyboardShortcut
+### KeyboardShortcut
     typedef WordFlags KeyboardShortcut;
         #define KS_PHYSICAL             0x8000
         #define KS_ALT                  0x4000
@@ -3177,14 +3177,14 @@ simulated musical instruments to use.
         #define KS_CHAR_OFFSET          0
 
 ----------
-#### KeyboardType
+### KeyboardType
     typedef ByteEnum KeyboardType;
         #define KT_NOT_EXTD         1
         #define KT_EXTD             2
         #define KT_BOTH             3
 
 ----------
-#### KeyMapType
+### KeyMapType
         typedef enum /* word */ {
         KEYMAP_US_EXTD=1,
         KEYMAP_US,

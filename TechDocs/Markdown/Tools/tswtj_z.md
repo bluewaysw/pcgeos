@@ -1,4 +1,4 @@
-### 4.3 Swat Reference J-Z
+## 4.3 Swat Reference J-Z
 
 ----------
 
@@ -81,7 +81,7 @@ repeatCommand, top-level-read.
 
 ### length
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -144,7 +144,7 @@ help-fetch.
 
 ### list
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -1046,7 +1046,7 @@ This command causes a RET to be placed at the start of a routine.
 
 ### patient
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2355,7 +2355,7 @@ state. "asm" and "src" modes also print this.
 
 ### proc
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2392,7 +2392,7 @@ objwatch, mwatch, objmessagebrk, pobject.
 
 ### protect
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2913,7 +2913,7 @@ Stop the debugger and exit.
 
 ### range
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -3160,7 +3160,7 @@ finish, backtrace.
 
 ### return
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -3343,7 +3343,7 @@ the current patient is used.
 
 ### scan
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -3617,7 +3617,7 @@ AX register when unassembling a message call.
 
 ----------
 
-###skip
+### skip
 
 **Usage:**  
 `skip [<number of instructions>]`
@@ -3718,7 +3718,7 @@ Defaults to "any".
 
 ### source
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -3775,7 +3775,7 @@ this again.
 
 ### src
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4196,7 +4196,7 @@ protect, source, file.
 
 ### string
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4246,7 +4246,7 @@ the PC.
 
 ### symbol
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4365,7 +4365,7 @@ gentree, impliedgrab.
 
 ### table
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4578,7 +4578,7 @@ freeze.
 
 ### thread
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4782,7 +4782,7 @@ List all the timers in GEOS.
 
 ### type
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4988,7 +4988,7 @@ addr-parse, assign, field.
 
 ### var
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 

@@ -1,4 +1,4 @@
-## 14 Handles
+# 14 Handles
 
 One of the most important data types in GEOS is the handle. There are many 
 different types of handles serving many different purposes. However, they all 
@@ -14,7 +14,7 @@ principles of memory usage and data manipulation. These topics are covered
 in greater detail in other chapters in this book, particularly in the chapters 
 on ["Memory Management," Chapter 15](cmemory.md) and ["Local Memory," Chapter 16](clmem.md).
 
-### 14.1 Design Philosophy
+## 14.1 Design Philosophy
 
 GEOS handles play many different roles. The most fundamental of these is 
 memory access. GEOS moves memory in the global heap and swaps memory 
@@ -78,7 +78,7 @@ Such handles are offsets into handle tables which may be stored in
 memory blocks or VM files. These handles persist as long as the entity 
 containing the handle table does.
 
-### 14.2 The Global Handle Table
+## 14.2 The Global Handle Table
 
 Many handles refer to things which are managed by the kernel. These things 
 include global memory blocks, disk volumes, files, and many other things. 
@@ -99,7 +99,7 @@ will need to synchronize their access to it. They can arrange this by using the
 synchronize access to a global memory block; for this reason, they are 
 documented in [section 15.3.6 of "Memory Management," Chapter 15](cmemory.md#1536-memory-management).
 
-### 14.3 Local Handles
+## 14.3 Local Handles
 
 Many handles are not kept in the global handle table. For example, a block 
 of memory may be declared as a "local-memory (LMem) heap." An LMem 

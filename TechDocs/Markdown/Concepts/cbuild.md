@@ -1,4 +1,4 @@
-## 2 Building Your Application
+# 2 Building Your Application
 
 The GEOS system is complex and provides so many services that the 
 documentation at first may seem rather daunting. This chapter is meant to 
@@ -9,7 +9,7 @@ This chapter is by no means a comprehensive list of all functions supported
 by GEOS. It is intended to be a guide to the chapters that cover some of the 
 more widely-used functions and features.
 
-### 2.1 What Everyone Should Read
+## 2.1 What Everyone Should Read
 
 Anyone who wants to program a GEOS application should read at least the 
 first several chapters of the Concepts Book. Among the chapters you should 
@@ -44,13 +44,13 @@ user to drag them around the screen. The sample application also
 illustrates how to create your own objects from the base GEOS visual 
 classes.
 
-### 2.2 Topics Listing
+## 2.2 Topics Listing
 
 Listed below are many of the topics related to creating an application. 
 Accompanying the topic is a list of chapters you will probably want to read to 
 fully understand that topic.
 
-#### 2.2.1 Defining Your User Interface
+### 2.2.1 Defining Your User Interface
 
 ["The GEOS User Interface", Chapter 10](cuiover.md), gives an overview of the User 
 Interface and which objects you will want to use. Many user interface 
@@ -124,7 +124,7 @@ Library", Chapter 15 of the Object Reference Book](../Objects/ohelp.md).
 Many applications may want to track mouse or keyboard input. Input 
 management is discussed in ["Input", Chapter 11](cinput.md).
 
-#### 2.2.2 Providing Other User Interface
+### 2.2.2 Providing Other User Interface
 
 Besides the generic UI functions and objects described above, GEOS provides 
 a number of sophisticated graphics commands and powerful graphic objects. 
@@ -153,7 +153,7 @@ know how to position, resize, and draw themselves as well as handle user
 input. This library is described in ["Drawing Graphics", Chapter 24](cshapes.md) and 
 ["Graphic Object Library", Chapter 18 of the Object Reference Book](../Objects/ogrobj.md).
 
-#### 2.2.3 Documents and Data Structures
+### 2.2.3 Documents and Data Structures
 
 Applications that save files, print documents, or display multiple documents 
 will be concerned with several of the topics listed below.
@@ -195,7 +195,7 @@ Chapter 20 of the Object Reference Book](../Objects/ossheet.md).
 If your application will print anything to a printer or to a file, you should 
 read ["The Spool Library", Chapter 17 of the Object Reference Book](../Objects/oprint.md).
 
-#### 2.2.4 Accessing Hardware
+### 2.2.4 Accessing Hardware
 
 GEOS is designed to allow applications to be as device-independent as 
 possible. Some applications will need to access hardware directly, however.
@@ -220,7 +220,7 @@ In general, GEOS takes care of all video driver operations; applications
 deal with the graphics system, which sends commands to the video 
 drivers. For more information, see ["Graphics Environment", Chapter 23](cgraph.md).
 
-#### 2.2.5 Programming Topics
+### 2.2.5 Programming Topics
 
 A number of programming topics specific to Goc are described in ["GEOS 
 Programming", Chapter 5](ccoding.md). This chapter discusses the various Goc keywords 
@@ -231,7 +231,7 @@ chapter if you plan on programming for GEOS using the C programming language.
 For information on programming in assembly, see the Esp manual. It 
 explains GEOS's extensions to standard 80x86 assembly-language programming
 
-#### 2.2.6 Other Topics
+### 2.2.6 Other Topics
 
 Many other topics are discussed throughout the documentation. Some of 
 those more commonly used are listed below.

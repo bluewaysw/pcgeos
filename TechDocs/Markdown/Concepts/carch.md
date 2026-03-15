@@ -1,4 +1,4 @@
-## 3 System Architecture
+# 3 System Architecture
 
 This chapter describes the structure of GEOS and the various system 
 components and services used by applications. Nearly all programmers will 
@@ -6,7 +6,7 @@ want at least to browse this chapter before continuing with GEOS application
 development. The structures and architectures of the 8088 and 80x86 
 processors are reviewed in [Appendix A](chardw.md).
 
-### 3.1 GEOS Overview
+## 3.1 GEOS Overview
 
 GEOS is a state-of-the-art graphical operating system combining the latest 
 software technology with numerous innovations. Its tightly coded assembly 
@@ -57,7 +57,7 @@ developer's kit. This chapter provides the background information necessary,
 however, to take full advantage of all that GEOS has to offer the application 
 developer.
 
-### 3.2 The System Architecture
+## 3.2 The System Architecture
 
 The GEOS system as a whole consists of several layers. The topmost layer 
 contains applications. Users interact directly with these applications, which 
@@ -79,7 +79,7 @@ and libraries. Note that this is a simplified diagram, and not all system
 components are represented._
 
 
-#### 3.2.1 Applications
+### 3.2.1 Applications
 
 A GEOS application can take advantage of the various kernel and UI 
 mechanisms to provide some set of functionality to the user. An application 
@@ -88,7 +88,7 @@ interface using objects and functions provided by the User Interface Library.
 The second part consists of the code of the application including procedures, 
 functions, and object-specific code.
 
-#### 3.2.2 Libraries
+### 3.2.2 Libraries
 
 GEOS libraries are bodies of code or collections of objects that are 
 dynamically loaded into memory when called for by applications or by other 
@@ -102,7 +102,7 @@ developers. Among these are a text object library, a graphic object library, a
 an import/export library and others. In addition, developers can easily create 
 their own libraries with the developer kit tools.
 
-#### 3.2.3 The Kernel
+### 3.2.3 The Kernel
 
 The GEOS kernel is the core of the operating system, providing all the basic 
 services needed by the system. It provides multitasking, memory 
@@ -112,7 +112,7 @@ dispatching, and scores of basic graphic primitives. The kernel provides
 nearly 1000 routines usable by applications and libraries, though most 
 applications will use only a portion of them.
 
-#### 3.2.4 Device Drivers
+### 3.2.4 Device Drivers
 
 GEOS device drivers isolate the system and applications from the specific 
 needs and foibles of a user's hardware. Drivers translate the generic actions 
@@ -130,7 +130,7 @@ able to develop their own drivers for new hardware and file systems.
 Most applications and libraries will access drivers through kernel calls. 
 Drivers are also accessible to applications and libraries directly.
 
-#### 3.2.5 The User Interface
+### 3.2.5 The User Interface
 
 The GEOS User Interface (UI) is a special entity. While it consists primarily 
 of dynamic libraries, it can be thought of as a user interface driver.
@@ -165,7 +165,7 @@ For example, a dialog box that has three buttons within it may have the hint
 HINT_ORIENT_CHILDREN_VERTICALLY to indicate the buttons should 
 appear in a column rather than a row.
 
-### 3.3 Object-Oriented Programming
+## 3.3 Object-Oriented Programming
 
 Object-Oriented Programming (OOP) is a popular way of organizing 
 programs, especially programs using graphical user interfaces. GEOS is an 
@@ -208,7 +208,7 @@ implemented again and again. Instead, one version of the code can exist
 in a particular class and be inherited by other classes, thus reducing 
 coding and debugging time.
 
-#### 3.3.1 Objects, Messages, and Methods
+### 3.3.1 Objects, Messages, and Methods
 
 Procedural programming uses routines that act with globally-accessible or 
 locally-defined data. Those routines must know about other routines in the 
@@ -324,7 +324,7 @@ Requestor then does other tasks while the Calculator performs the calculation
 (State B). When the calculation is finished, the Calculator sends the result 
 back to the Requestor with MSG_RETURN_RESULT (State C)._
 
-#### 3.3.2 Classes and Inheritance
+### 3.3.2 Classes and Inheritance
 
 If every object had to be coded and debugged once for each time it was used, 
 OOP would provide few benefits over standard procedural programming. 
@@ -389,7 +389,7 @@ not initially know what their superclass is; instead, the superclass is
 determined by context for each instance of the variant class. This is a 
 complicated topic that is discussed later in the documentation.
 
-### 3.4 Multitasking and Multithreading
+## 3.4 Multitasking and Multithreading
 
 Multitasking is the ability to have multiple processes running 
 simultaneously on a single system. In actuality, PCs have only one processor 
@@ -434,7 +434,7 @@ can make the application appear to be extraordinarily fast; the user can
 continue to navigate menus and use other UI gadgetry while the application 
 is also doing something else.
 
-### 3.5 The GEOS User Interface
+## 3.5 The GEOS User Interface
 
 The GEOS User Interface (UI) maintains the interaction between each 
 application and the user. It provides several necessary and many extra 
@@ -442,7 +442,7 @@ services for applications, relieving programmers from building much of the
 basic UI functionality into their applications. The structure, components, and 
 services of the GEOS UI are outlined below.
 
-#### 3.5.1 The Generic User Interface
+### 3.5.1 The Generic User Interface
 
 A User Interface (UI) specification is, essentially, a set of rules and 
 conventions used to determine the interaction between a user and an 
@@ -478,7 +478,7 @@ each generic object (for example, a GenPrimary window object can have
 special sizing restrictions suggested with various hints such as 
 HINT_FIXED_SIZE and HINT_INITIAL_SIZE).
 
-##### 3.5.1.1 Attributes
+#### 3.5.1.1 Attributes
 
 Attributes represent objective information which does not change with the 
 specific UI in use. In general, attributes determine the basic functionality of 
@@ -494,7 +494,7 @@ specifying whether it is scrollable or not. Attributes are used, therefore,
 primarily for determining the object's functionality rather than its 
 appearance.
 
-##### 3.5.1.2 Hints
+#### 3.5.1.2 Hints
 
 Hints represent subjective or contextual information about objects. Hints are 
 different from attributes in two main aspects: First, hints may be ignored by 
@@ -510,7 +510,7 @@ fewer hints use less memory. Attributes, on the other hand, must exist in the
 object's instance data whether they are used or not, and they therefore 
 require a given amount of memory.
 
-##### 3.5.1.3 The Generic UI Classes
+#### 3.5.1.3 The Generic UI Classes
 
 The Generic UI Library contains a number of object classes that implement 
 nearly all the UI functions an application will ever need. For a full description 
@@ -518,7 +518,7 @@ of the API of each of these classes, see the [Objects Book](../objects.md). Some
 the more common implementations (e.g. menus, dialog boxes, and scrolling views) of 
 these objects are outlined in the sections below.
 
-#### 3.5.2 The Scalable User Interface
+### 3.5.2 The Scalable User Interface
 
 As application technology advances, applications gain more and more 
 features. Despite recent improvements in user-friendliness, however, 
@@ -530,7 +530,7 @@ application, each version at a different level of complexity. Scalability of
 applications is shown in Geoworks Pro-the appliances are all created from 
 exactly the same source code as the advanced versions of those applications.
 
-#### 3.5.3 Windows and Window Management
+### 3.5.3 Windows and Window Management
 
 A window is an object that defines an area on the screen in which drawing 
 and user interaction can occur. Windows may be resizable and movable, and 
@@ -562,7 +562,7 @@ in order to ensure the proper portion of the data is drawn. Additionally,
 applications can modify any of the scrolling, scaling, or sizing behavior with 
 a little effort to provide custom functionality.
 
-#### 3.5.4 Input
+### 3.5.4 Input
 
 GEOS has an input manager that tracks the mouse, gets keyboard input, and 
 passes the input events on to the proper windows and objects on the screen. 
@@ -589,7 +589,7 @@ applications likely will want to filter certain input or handle special cases.
 Simple applications or utilities will probably not have to deal with input 
 (keyboard or mouse events) directly at all.
 
-#### 3.5.5 Menus and Dialog Boxes
+### 3.5.5 Menus and Dialog Boxes
 
 Among the generic objects of the GEOS UI library is GenInteraction. This 
 object can be used to implement menus, dialog boxes, and error boxes, and it 
@@ -608,7 +608,7 @@ The sections below outline some of the practical functionality of these objects;
 for a full description of what these do and how they can be used, see the 
 Object Reference Book.
 
-##### 3.5.5.1 Menus
+#### 3.5.5.1 Menus
 
 Menus in GEOS are subject to the rules and conventions of the specific UI in 
 use by the user. However, several basic concepts are supported. (See 
@@ -669,7 +669,7 @@ given the ability to be pinned in place and moved around the screen.
 Because this is a function of the specific UI, applications are completely 
 unaware of the fact.
 
-##### 3.5.5.2 Dialog Boxes
+#### 3.5.5.2 Dialog Boxes
 
 Dialog boxes are standard ways of having an application interact with the 
 user. For example, a dialog box may contain a number of controls that 
@@ -721,7 +721,7 @@ includes several standard dialog box types accessible through the use of
 UI routines. These include errors, warnings, and questions. Also, you can 
 call up custom dialog boxes with special kernel routines.
 
-#### 3.5.6 Scrolling Views
+### 3.5.6 Scrolling Views
 
 Although the basic generic objects provided by GEOS are powerful and useful 
 in many situations, applications still need a way to display their own specific 
@@ -793,7 +793,7 @@ This can, however, be set to any RGB value or to any GEOS color index.
 This is used, for example, in Solitaire to create the green background (so 
 the application does not have to draw green under all the other objects).
 
-#### 3.5.7 Visible Object Classes
+### 3.5.7 Visible Object Classes
 
 Many applications will need to create objects that draw themselves and 
 interact directly with the user. Rather than forcing the programmer to create 
@@ -803,7 +803,7 @@ application needs a visible object, it simply defines a subclass of one of these
 visible classes, thus ensuring that his object will handle all the UI messages 
 that may be sent to it.
 
-#### 3.5.8 Geometry Manager
+### 3.5.8 Geometry Manager
 
 The GEOS User Interface includes a sophisticated Geometry Manager that 
 does all the calculations for organization of objects on the screen. The 
@@ -811,7 +811,7 @@ Geometry Manager manages the positions of generic UI objects in dialog
 boxes and windows, for example, and it can be used to automatically position 
 visible objects within a view.
 
-#### 3.5.9 Lists
+### 3.5.9 Lists
 
 The GenItem, GenItemGroup, GenBoolean, GenBooleanGroup, and 
 GenDynamicList objects can be used to provide several different types and 
@@ -839,7 +839,7 @@ Non-exclusive lists with an override have a non-exclusive list with an
 additional element that overrides all the others (an example is the text 
 styles menu-the "Plain" option overrides each of the others).
 
-#### 3.5.10 Other Gadgets
+### 3.5.10 Other Gadgets
 
 Besides the objects listed above, the generic UI supplies a number of other 
 gadgets. These include
@@ -872,7 +872,7 @@ The GenFileSelector provides all the features of a file selector dialog box
 that allows the user to traverse their file system's directories and select 
 a file.
 
-#### 3.5.11 Managing Documents and Files
+### 3.5.11 Managing Documents and Files
 
 Most applications will save data files. GEOS provides a convenient storage 
 format for data files and an even more convenient mechanism for managing 
@@ -890,7 +890,7 @@ take basic functionality common to most applications and implement it in the
 system software. Using a Document Control for your data file management 
 can save weeks of coding and debugging time.
 
-#### 3.5.12 Multiple Document Interface
+### 3.5.12 Multiple Document Interface
 
 Some applications may benefit from allowing the user to have multiple data 
 files open at any given time. GeoWrite and GeoDraw, for example, allow the 
@@ -905,7 +905,7 @@ proper data files are being operated on at all times. The Display Control also
 creates and maintains the Window menu, just as the Document Control 
 creates and maintains the File menu.
 
-#### 3.5.13 Clipboard and Quick-Transfer
+### 3.5.13 Clipboard and Quick-Transfer
 
 A common feature of GUIs is the Clipboard. Users can copy or cut data out of 
 documents for pasting into other documents (or even the same document) 
@@ -927,7 +927,7 @@ automatically by all text edit and display objects. Applications may define
 their own custom data formats (transfer items) for use with both the 
 Clipboard and the quick-transfer mechanism.
 
-#### 3.5.14 General Change Notification
+### 3.5.14 General Change Notification
 
 In a multithreaded system, one thread may change some information that 
 another thread depends on. In this case, the thread that makes the change 
@@ -943,7 +943,7 @@ network game depended on each user knowing a certain status flag,
 automatic notification could be set up to notify all the users whenever any 
 user changed it.
 
-#### 3.5.15 Help Object
+### 3.5.15 Help Object
 
 On-line help is a convenient and powerful way to provide documentation to 
 your users. Because graphical user interfaces are easy to understand, many 
@@ -957,14 +957,14 @@ defined by the application. The application simply has to provide the help
 text and a few other attributes of the help object, and the system will take 
 care of displaying the help when the user requests it.
 
-### 3.6 System Services
+## 3.6 System Services
 
 GEOS provides a number of services useful or necessary to applications. 
 These services range from dynamic memory management to an item 
 database to a sophisticated graphics system and a print spooler. Many of the 
 most useful or integral services are described in this section.
 
-#### 3.6.1 Memory
+### 3.6.1 Memory
 
 GEOS uses all RAM available to the system, even expanded and extended 
 memory. Memory is managed by the kernel and is accessed in the segmented 
@@ -976,7 +976,7 @@ The GEOS Memory Manager is sophisticated. It uses dynamic allocation and
 access of blocks on a global heap to provide high performance, optimized to 
 run very efficiently even on systems with only 640 K.
 
-##### 3.6.1.1 Handles
+#### 3.6.1.1 Handles
 
 GEOS maintains control of all the memory, objects, and other entities in the 
 system through the Handle Table. The Handle Table is a section of memory 
@@ -999,7 +999,7 @@ single execution of GEOS. Applications and libraries may allocate handles
 dynamically for most of the above-mentioned purposes (e.g. memory and file 
 reference).
 
-##### 3.6.1.2 The Global Heap
+#### 3.6.1.2 The Global Heap
 
 A certain amount of memory is set aside for the file system (DOS, typically), 
 the GEOS kernel (approximately 64 K), and any TSRs the user may have 
@@ -1037,7 +1037,7 @@ Swapable blocks may be swapped at any time by the Memory Manager.
 When a subsequent access is made to a swapped block, the Memory 
 Manager will automatically read the block back into memory.
 
-##### 3.6.1.3 Allocating Memory
+#### 3.6.1.3 Allocating Memory
 
 The GEOS kernel provides several routines to allocate memory. Some 
 memory is allocated automatically, such as memory for code resources as 
@@ -1062,7 +1062,7 @@ When an application is done with a memory block, it can free the block with
 the routine **MemFree()**. This will allow the Memory Manager to free up that 
 memory space and re-use the block's handle if required.
 
-##### 3.6.1.4 Accessing Memory
+#### 3.6.1.4 Accessing Memory
 
 If a block is allocated as fixed, an application can use a far pointer to access 
 any byte within the block. However, because fixed blocks are not always 
@@ -1077,7 +1077,7 @@ far pointer to the block. When access to the block is finished, the thread that
 locked the block must call **MemUnlock()**, which marks the block as 
 unlocked so it may once again be moved or swapped.
 
-#### 3.6.2 Virtual Memory
+### 3.6.2 Virtual Memory
 
 GEOS implements a powerful virtual memory concept to accomplish both 
 memory block swapping and data file storage. Virtual memory (VM) can be 
@@ -1090,7 +1090,7 @@ memory and locks it on the global heap.
 VM is extremely useful for data file storage; indeed, the Document Control 
 objects use it extensively.
 
-#### 3.6.3 Local Memory and Object Blocks
+### 3.6.3 Local Memory and Object Blocks
 
 Often applications will want to store large numbers of very small data items. 
 In these cases, it's cumbersome and inefficient to allocate a global handle and 
@@ -1120,7 +1120,7 @@ global handle and chunk handle of an object is known as the Object Pointer
 (optr) of the object. The optr is used to identify the object uniquely in the 
 system for all types of access.
 
-#### 3.6.4 Item Database Library
+### 3.6.4 Item Database Library
 
 The GEOS database library allows applications to use LMem heaps and VM 
 files together easily and cleanly. The database library allows applications to 
@@ -1136,14 +1136,14 @@ Additionally, items may be allocated as "ungrouped," in which case the
 database manager will intelligently distribute these items among the various 
 VM blocks in the database file for efficient access.
 
-#### 3.6.5 Graphics System
+### 3.6.5 Graphics System
 
 The graphics system provided in the GEOS kernel is extremely powerful and 
 is designed to make creating graphics simple and fast for applications. It 
 includes some advanced concepts and state-of-the-art technology that make 
 GEOS rise well above most other GUIs.
 
-##### 3.6.5.1 The Coordinate Space
+#### 3.6.5.1 The Coordinate Space
 
 The GEOS graphics system uses a single imaging model like that used by 
 PostScript. Applications and libraries draw their graphics on a generic 
@@ -1162,7 +1162,7 @@ can be up to 900 miles on a side! Large documents, however, can incur a
 certain amount of additional overhead; if you do not need to use large 
 documents, you probably should not.
 
-##### 3.6.5.2 Graphic States
+#### 3.6.5.2 Graphic States
 
 To simplify complex drawing, the graphics system maintains a graphics 
 state, or GState. GStates can be created or destroyed dynamically to allow 
@@ -1185,7 +1185,7 @@ Programs may apply transformations to GStates-rotation, translation, or
 scaling. You can also define custom transformation matrixes to apply to your 
 GStates if complex operations (e.g. shearing) are required.
 
-##### 3.6.5.3 Graphic Primitives and Graphic Objects
+#### 3.6.5.3 Graphic Primitives and Graphic Objects
 
 GEOS provides a complete set of graphics drawing primitives including lines, 
 arcs, B\E9zier curves, splines, outline-defined text, rectangles, ellipses, 
@@ -1198,7 +1198,7 @@ and to resize, reshape, reposition, and rotate themselves. These objects are
 available to all applications and other libraries, and they provide a powerful 
 base of user-interactive graphics tools.
 
-##### 3.6.5.4 Paths
+#### 3.6.5.4 Paths
 
 A graphics path in GEOS is a continuous trail that defines the outline of an 
 area. A path is an outline description of an arbitrarily shaped area, useful 
@@ -1210,14 +1210,14 @@ One example of the powerful application of paths is creation of arbitrary
 clipping regions. It is possible, for example, to clip drawings to an ellipse, to 
 a bezier curve, or even to text.
 
-##### 3.6.5.5 Regions
+#### 3.6.5.5 Regions
 
 Regions perform essentially the same function as paths-definition of an 
 arbitrarily shaped area or clipping region. However, because regions are 
 defined as resolution-dependent, they are typically used only for optimized 
 drawing of UI gadgetry.
 
-##### 3.6.5.6 Graphics Strings
+#### 3.6.5.6 Graphics Strings
 
 A graphics string (or GString) is a collection of graphics commands; GStrings 
 are useful for saving complex graphic operations and playing them back 
@@ -1233,7 +1233,7 @@ the GString data format for cut, copy, and paste operations. GStrings are also
 flexible-they may contain comments and may be set up to be executed with 
 parameters.
 
-##### 3.6.5.7 Bitmaps
+#### 3.6.5.7 Bitmaps
 
 Bitmaps are pixel-by-pixel images defined at a specific resolution; they are 
 automatically scaled to match the resolution of the display. Bitmaps are used 
@@ -1244,7 +1244,7 @@ be created off-screen and may be edited with standard graphics system
 commands. Bitmaps are used mainly as monikers of generic objects and as 
 icons for applications and data files.
 
-##### 3.6.5.8 Color
+#### 3.6.5.8 Color
 
 GEOS allows applications to specify colors in two ways: with the system 
 palette and with RGB values. The palette contains 256 entries, each of which 
@@ -1254,7 +1254,7 @@ than 256 colors, it can specify any RGB value for any given graphics
 operation. The palette may also be expanded to support other color models. 
 If the system palette is not sufficient, each application may create its own.
 
-#### 3.6.6 Text
+### 3.6.6 Text
 
 Text in GEOS is handled by the Text Object, a sophisticated and powerful 
 object that is the base for both the GenText and the VisText classes. The Text 
@@ -1302,7 +1302,7 @@ the UI and handles the cut, copy, and paste commands of the Edit menu.
 For full feature listings and how to use the text object, see ["The Text 
 Objects," Chapter 10 of the Object Reference Book](../Objects/otext.md).
 
-#### 3.6.7 Print Spooler and Printing
+### 3.6.7 Print Spooler and Printing
 
 GEOS contains a print spooler that manages printing for all applications in 
 the system. The spooler executes in its own threads and manages a print 
@@ -1322,7 +1322,7 @@ necessary to print the document properly. For example, a document eleven
 inches by seventeen inches will be rotated and printed on two standard-sized 
 sheets of paper.
 
-#### 3.6.8 Timers
+### 3.6.8 Timers
 
 The GEOS kernel allows applications and libraries to set up different types of 
 timers that can be used for various purposes. When a timer ticks, it calls a 
@@ -1345,7 +1345,7 @@ of time.
 (if the thread does not gain the semaphore in the given length 
 of time, it is removed from the queue).
 
-#### 3.6.9 Streams
+### 3.6.9 Streams
 
 Streams are like one-way pipes that allow a thread to send data to or receive 
 data from another thread or I/O port. Typically, streams are used when 
@@ -1356,7 +1356,7 @@ GEOS has a Stream Driver that manages input to and output from streams.
 Additionally, a Parallel Driver manages output to a parallel port, and a Serial 
 Driver manages input from and output to a serial port.
 
-#### 3.6.10 Math support
+### 3.6.10 Math support
 
 GEOS has a number of routines that accomplish complex mathematical 
 calculations. There are also routines that do matrix manipulation and 
@@ -1364,7 +1364,7 @@ complicated linear algebra operations. In addition, the system provides a
 library of routines to implement simple fixed-point math and complicated 
 floating-point operations.
 
-#### 3.6.11 International Support
+### 3.6.11 International Support
 
 International markets are extremely important to Geoworks due to the large 
 number of PCs in use in countries other than the United States. Therefore, 
@@ -1381,7 +1381,7 @@ to access different DOS character sets. These routines ensure that an
 English-language program will work on machines with different DOS 
 character sets.
 
-### 3.7 Libraries
+## 3.7 Libraries
 
 The use of dynamically-linkable libraries is key to the efficiency of GEOS 
 applications. Several libraries are included in addition to the libraries 
@@ -1419,7 +1419,7 @@ functionality of a spreadsheet application.
 The CD ROM Library ("cdrom") provides all the routines necessary to 
 interface with standard Microsoft CD ROM extensions.
 
-### 3.8 Device Drivers
+## 3.8 Device Drivers
 
 GEOS does as much as possible to isolate applications from the hardware in 
 use. Not only does this allow applications to run with thousands of different 

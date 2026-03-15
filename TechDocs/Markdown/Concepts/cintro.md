@@ -1,4 +1,4 @@
-## 1 Introduction
+# 1 Introduction
 
 Congratulations on taking the first step towards programming for GEOS. 
 This system will most likely be unlike anything you have programmed for 
@@ -6,14 +6,14 @@ before; among the main goals of the system design were to simplify
 development of applications and to incorporate many common application 
 and User Interface features within the system software.
 
-### 1.1 Overview of The Documentation
+## 1.1 Overview of The Documentation
 
 These manuals represent the initial non-Beta release of technical 
 documentation for the GEOS operating system. These manuals should 
 provide you with all the knowledge, both conceptual and reference, to write 
 programs for GEOS.
 
-#### 1.1.1 What You Will Learn
+### 1.1.1 What You Will Learn
 
 This documentation provides everything you need to write a complete GEOS 
 application. It includes in-depth conceptual and reference material about 
@@ -24,7 +24,7 @@ from file management to messaging to object creation and destruction. If you
 read everything in these books, you should be able to create the source code 
 for not only simple applications but even applications of medium complexity.
 
-#### 1.1.2 What You Are Expected To Know
+### 1.1.2 What You Are Expected To Know
 
 This documentation relies heavily on the reader's knowledge of the C 
 programming language and of Object-Oriented Programming (OOP) 
@@ -37,7 +37,7 @@ the features of the system from the user's perspective. In addition, many
 User Interface concepts are illustrated with examples from the retail 
 products.
 
-#### 1.1.3 Roadmap to the Development Kit
+### 1.1.3 Roadmap to the Development Kit
 
 The developer kit documentation is separated into several books. Each of 
 these books has a primary purpose; together, they should give you all the 
@@ -96,7 +96,7 @@ information, but rather all the pass and return and definition
 information for all the object classes in GEOS. It should be used after 
 you've become familiar with the concepts of the system.
 
-#### 1.1.4 Typographical Cues
+### 1.1.4 Typographical Cues
 
 Throughout these manuals, you will see several words in bold or italics, and 
 you will read several code examples. For the most part, there are four types 
@@ -123,12 +123,12 @@ Monospace font is used for all code samples and illustrations of
 commands. It is also used as a subheading for sections that describe 
 particular routines, messages, and data structures.
 
-### 1.2 Chapters in the Books
+## 1.2 Chapters in the Books
 
 This section of this chapter lists all the chapters in each of the main books of 
 this documentation.
 
-#### 1.2.1 The Concepts Book
+### 1.2.1 The Concepts Book
 
 The Concepts Book describes not only the concepts of the GEOS system but 
 also the steps and components of applications. Typically, a reader will read 
@@ -272,7 +272,7 @@ the PC architecture. The second gives an in-depth discussion of threads and
 thread management. The third describes how to create GEOS libraries. The 
 fourth describes the GEOS floating-point math library.
 
-#### 1.2.2 The Object Reference Book
+### 1.2.2 The Object Reference Book
 
 The Object Reference Book is a hybrid of traditional conceptual and 
 traditional reference books. Each chapter gives both in-depth conceptual and 
@@ -425,7 +425,7 @@ directly by application programmers. They are provided here, however, to
 give reference information about the messages that can be sent to them. 
 Included in this chapter are GenSystem, GenScreen, and GenField.
 
-#### 1.2.3 The Tools Reference Manual
+### 1.2.3 The Tools Reference Manual
 
 The Tools Reference manual describes many things about the tools and the 
 development station setup that you will need to know throughout your 
@@ -473,7 +473,7 @@ by GEOS.
 This details all the other tools in the system, including the 
 communications utilities, the make utilities, GOC, Glue, and others.
 
-#### 1.2.4 The Esp Book
+### 1.2.4 The Esp Book
 
 The Esp book describes how to use Esp, the GEOS object-oriented assembly 
 language. You can use this language to recode computation-intensive 
@@ -497,7 +497,7 @@ frames and sending messages.
 This chapter describes UIC, a tool for generating object-blocks for Esp 
 programs.
 
-### 1.3 Suggestions for Study
+## 1.3 Suggestions for Study
 
 If you are unfamiliar with programming, you will most likely not be able to 
 follow this documentation well. You should have working familiarity with the 

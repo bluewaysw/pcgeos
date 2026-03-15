@@ -1,6 +1,6 @@
 ## 3.7 Routines U-Z
 ----------
-#### UserAddAutoExec()
+### UserAddAutoExec()
     void    UserAddAutoExec(
             const char *        appName);
 
@@ -14,7 +14,7 @@ SP_APPLICATION or SP_SYS_APPLICATION.
 **Include:** ui.goh
 
 ----------
-#### UserCreateDialog()
+### UserCreateDialog()
     optr    UserCreateDialog(
             optr    dialogBox);
 
@@ -32,7 +32,7 @@ dialog box.
 **See Also:** UserDestroyDialog()
 
 ----------
-#### UserCreateInkDestinationInfo()
+### UserCreateInkDestinationInfo()
     MemHandle   UserCreateInkDestinationInfo(
             optr                dest,
             GStateHandle        gs,
@@ -53,7 +53,7 @@ declared _pascal.
         word numStrokes);
 
 ----------
-#### UserDestroyDialog()
+### UserDestroyDialog()
     void    UserDestroyDialog(
             optr    dialogBox);
 
@@ -66,7 +66,7 @@ routine to destroy dialogs created with **UserCreateDialog()**.
 **See Also:** UserCreateDialog()
 
 ----------
-#### UserDoDialog()
+### UserDoDialog()
     InteractionCommand UserDoDialog(
             optr    dialogBox);
 
@@ -106,7 +106,7 @@ messages from the response triggers.
 **See Also:** UserStandardDialog(), UserStandardDialogOptr()
 
 ----------
-#### UserGetInterfaceLevel()
+### UserGetInterfaceLevel()
     UIInterfaceLevel UserGetInterfaceLevel(void)
 
 This routine returns the current **UIInterfaceLevel**. This is a word-sized 
@@ -121,7 +121,7 @@ enumerated type. It has the following values:
 **Include:** ui.goh
 
 ----------
-#### UserLoadApplication
+### UserLoadApplication
     extern  GeodeHandle UserLoadApplication(
             AppLaunchFlags      alf,
             Message             attachMethod,
@@ -136,7 +136,7 @@ launched into the AppLaunchBlock, so that information needed to restore
 this application instance will be around later if needed.
 
 ----------
-#### UserRemoveAutoExec()
+### UserRemoveAutoExec()
     void    UserRemoveAutoExec(
             const char *        appName);
 
@@ -149,7 +149,7 @@ name of the application.
 **Include:** ui.goh
 
 ----------
-#### UserStandardDialog()
+### UserStandardDialog()
     word    UserStandardDialog(
             char *                  helpContext,
             char *                  customTriggers,
@@ -190,7 +190,7 @@ If the **CustomDialogType** is GIT_MULTIPLE_RESPONSE, you must also set
 up a Response Trigger Table with several trigger parameters.
 
 ----------
-#### UserStandardDialogOptr()
+### UserStandardDialogOptr()
     word    UserStandardDialogOptr(
             char                    *helpContext,
             optr                    customTriggers,
@@ -207,7 +207,7 @@ blocks.
 **See Also:** UserStandardDialog(), UserDoDialog() 
 
 ----------
-#### UserStandardSound()
+### UserStandardSound()
     void    UserStandardSound(
             StandardSoundType       type,
             ...);
@@ -260,7 +260,7 @@ played. You must provide one further argument, the handle of
 the note (such as returned by **SoundAllocNote()**).
 
 ----------
-#### UtilAsciiToHex32()
+### UtilAsciiToHex32()
     Boolean UtilAsciiToHex32(
             const char *        string,
             dword *             value);
@@ -286,7 +286,7 @@ signed 32-bit integer.
 **Include:** system.h
 
 ----------
-#### UtilHex32ToAscii()
+### UtilHex32ToAscii()
     word    UtilHex32ToAscii(
             char *                      buffer,
             sdword                      value, 
@@ -318,7 +318,7 @@ ten bytes long.
 **Include:** system.h
 
 ----------
-#### VarDataFlagsPtr()
+### VarDataFlagsPtr()
     VarDataFlags    VarDataFlagsPtr(
             void *  ptr);
 
@@ -333,7 +333,7 @@ returned.
 space.
 
 ----------
-#### VarDataSizePtr()
+### VarDataSizePtr()
     word    VarDataSizePtr(
             void *  ptr);
 
@@ -346,7 +346,7 @@ the extra data for the type.
 space.
 
 ----------
-#### VarDataTypePtr()
+### VarDataTypePtr()
     word    VarDataTypePtr(
             void *  ptr);
 
@@ -360,11 +360,11 @@ flags outside the VDF_TYPE section will be cleared.
 space.
 
 ----------
-#### VisObjectHandlesInkReply()
+### VisObjectHandlesInkReply()
     void    VisObjectHandlesInkReply(void);
 
 ----------
-#### VisTextGraphicCompressGraphic()
+### VisTextGraphicCompressGraphic()
     extern VMChain VisTextGraphicCompressGraphic(
             VisTextGraphic      *graphic,
             FileHandle          sourceFile,
@@ -376,7 +376,7 @@ space.
 This routine compresses the bitmaps in a VisTextGraphic.
 
 ----------
-#### VMAlloc()
+### VMAlloc()
     VMBlockHandle   VMAlloc(
             VMFileHandle    file,           
             word            size,       /* Size of a file in bytes */
@@ -393,7 +393,7 @@ assigned with **VMAttach()**.
 **See Also:** VMAllocLMem(), VMAttach()
 
 ----------
-#### VMAllocLMem()
+### VMAllocLMem()
     VMBlockHandle   VMAllocLmem(
             VMFileHandle    file,               
             LMemType        ltype,          /* Type of LMem heap to create */
@@ -419,7 +419,7 @@ to the LMem routines (not the block's VM handle).
 **See Also:** LMemInitHeap(), VMAlloc(), VMAttach()
 
 ----------
-#### VMAttach()
+### VMAttach()
     VMBlockHandle   VMAttach(
             VMFileHandle        file,
             VMBlockHandle       vmBlock,
@@ -447,7 +447,7 @@ undefined.
 **Include:** vm.h
 
 ----------
-#### VMCheckForModifications()
+### VMCheckForModifications()
 Boolean VMCheckForModifications(
             VMFileHandle        file);
 
@@ -457,7 +457,7 @@ last full save.
 **Include:** vm.h
 
 ----------
-#### VMClose()
+### VMClose()
     word    VMClose(
             VMFileHandle        file,
             Boolean             noErrorFlag);
@@ -475,7 +475,7 @@ update and close the file.
 **Include:** vm.h
 
 ----------
-#### VMCompareVMChains()
+### VMCompareVMChains()
     Boolean VMCompareVMChains(
             VMFileHandle        sourceFile,
             VMChain             sourceChain,
@@ -488,7 +488,7 @@ are identical; otherwise it returns *false*.
 **Include:** vm.h
 
 ----------
-#### VMCopyVMBlock()
+### VMCopyVMBlock()
     VMBlockHandle   VMCopyVMBlock(
             VMFileHandle        sourceFile,
             VMBlockHandle       sourceBlock,
@@ -501,7 +501,7 @@ handle. The duplicate will have the same user ID as the original block.
 **Include:** vm.h
 
 ----------
-#### VMCopyVMChain()
+### VMCopyVMChain()
     VMChain     VMCopyVMChain(
             VMFileHandle        sourceFile,
             VMChain             sourceChain,
@@ -515,7 +515,7 @@ same user ID numbers as the corresponding original blocks.
 **Include:** vm.h
 
 ----------
-#### VMDetach()
+### VMDetach()
     MemHandle   VMDetach(
             VMFileHandle    file,
             VMBlockHandle   block,
@@ -530,7 +530,7 @@ the block to the file before detaching it.
 **Include:** vm.h
 
 ----------
-#### VMDirty()
+### VMDirty()
     void    VMDirty(
             MemHandle       mh);
 
@@ -539,7 +539,7 @@ This routine marks a locked VM block as dirty.
 **Include:** vm.h
 
 ----------
-#### VMFind()
+### VMFind()
     VMBlockHandle   VMFind(
             VMFileHandle        file,
             VMBlockHandle       startBlock,
@@ -554,7 +554,7 @@ order).
 **Include:** vm.h
 
 ----------
-#### VMFree()
+### VMFree()
     void    VMFree(
             VMFileHandle        file,
             VMBlockHandle       block);
@@ -565,7 +565,7 @@ currently attached to the VM block, it is freed too.
 **Include:** vm.h
 
 ----------
-#### VMFreeVMChain()
+### VMFreeVMChain()
     void    VMFreeVMChain(
             VMFileHandle        file,
             VMChain             chain);
@@ -576,7 +576,7 @@ all blocks in the chain will be freed.
 **Include:** vm.h
 
 ----------
-#### VMGetAttributes()
+### VMGetAttributes()
     word    VMGetAttributes(
             VMFileHandle        file);
 
@@ -591,7 +591,7 @@ the attributes appropriately.
 **See Also:** VMSetAttributes()
 
 ----------
-#### VMGetDirtyState()
+### VMGetDirtyState()
     word    VMGetDirtyState(
             VMFileHandle        file);
 
@@ -608,7 +608,7 @@ to call **VMUpdate()** than it is to first check the dirty state, then call
 **VMUpdate()** only if the file is dirty.
 
 ----------
-#### VMGetMapBlock()
+### VMGetMapBlock()
     VMBlockHandle   VMGetMapBlock(
             VMFIleHandle        file);
 
@@ -617,7 +617,7 @@ This routine returns the VM block handle of the file's map block.
 **Include:** vm.h
 
 ----------
-#### VMGrabExclusive()
+### VMGrabExclusive()
     VMStartExclusiveReturnValue VMGrabExclusive(
             VMFileHandle        file,
             word                timeout,
@@ -629,7 +629,7 @@ This routine gets exclusive access to a VM file for this thread.
 **Include:** vm.h
 
 ----------
-#### VMInfo()
+### VMInfo()
     Boolean VMInfo(
             VMFileHandle        file,
             VMBlockHandle       block,
@@ -641,7 +641,7 @@ block. It returns *false* if the handle is invalid or free.
 **Include:** vm.h
 
 ----------
-#### VMLock()
+### VMLock()
     void *  VMLock(
             VMFileHandle        file,
             VMBlockHandle       block,
@@ -653,7 +653,7 @@ address.
 **Include:** vm.h
 
 ----------
-#### VMMemBlockToVMBlock()
+### VMMemBlockToVMBlock()
     VMBlockHandle   VMMemBlockToVMBlock(
             MemHandle           mh,
             VMFileHandle*       file);
@@ -667,7 +667,7 @@ to a VM file. If it is not, the results are undefined.
 **Include:** vm.h
 
 ----------
-#### VMModifyUserID()
+### VMModifyUserID()
     void    VMModifyUserID(
             VMFileHandle        file,
             VMBlockHandle       block,
@@ -678,7 +678,7 @@ This routine changes a VM block's user ID number.
 **Include:** vm.h
 
 ----------
-#### VMOpen()
+### VMOpen()
     VMFileHandle    VMOpen(
             char *          name,           /* Name of file to open/create */
             VMAccessFlags   flags,
@@ -813,7 +813,7 @@ necessary; you will not need to call **VMOpen()**.
 **See Also:** FileOpen()
 
 ----------
-#### VMPreserveBlocksHandle()
+### VMPreserveBlocksHandle()
     void    VMPreserveBlocksHandle(
             VMFileHandle        file,
             VMBlockHandle       block);
@@ -824,7 +824,7 @@ explicitly detached or the VM block is freed.
 **Include:** vm.h
 
 ----------
-#### VMReleaseExclusive()
+### VMReleaseExclusive()
     void VMReleaseExclusive(
             VMFileHandle        file);
 
@@ -833,7 +833,7 @@ This routine releases a thread's exclusive access to a VM file.
 **Include:** vm.h
 
 ----------
-#### VMRevert()
+### VMRevert()
     void    VMRevert(
             VMFileHandle        file,);
 
@@ -842,7 +842,7 @@ This routine reverts a file to its last-saved state.
 **Include:** vm.h
 
 ----------
-#### VMSave()
+### VMSave()
     void    VMSave(
             VMFileHandle        file);
 
@@ -851,7 +851,7 @@ This routine updates and saves a file, freeing all backup blocks.
 **Include:** vm.h
 
 ----------
-#### VMSaveAs()
+### VMSaveAs()
     VMFileHandle VMSaveAs(
             VMFileHandle        file,
             const char          *name,
@@ -865,7 +865,7 @@ last-saved condition.
 **Include:** vm.h
 
 ----------
-#### VMSetAttributes()
+### VMSetAttributes()
     word    VMSetAttributes(
             VMFileHandle    file,
             VMAttributes    attrToSet,      /* Turn these flags on... */
@@ -885,7 +885,7 @@ the attributes appropriately.
 **See Also:** VMGetAttributes()
 
 ----------
-#### VMSetExecThread()
+### VMSetExecThread()
     void    VMSetExecThread(
             VMFileHandle        file,
             ThreadHandle        thread);
@@ -895,7 +895,7 @@ Set which thread will execute methods of all objects in the file.
 **Include:** vm.h
 
 ----------
-#### VMSetMapBlock()
+### VMSetMapBlock()
     void    VMSetMapBlock(
             VMFileHandle        file,
             VMBlockHandle       block);
@@ -905,7 +905,7 @@ This routine sets the map block for a VM file.
 **Include:** vm.h
 
 ----------
-#### VMSetReloc()
+### VMSetReloc()
     void    VMSetReloc(
             VMFileHandle    file,
             void (*reloc)   (VMFileHandle       file,
@@ -919,7 +919,7 @@ This routine sets a data-relocation routine for the VM file.
 **Include:** vm.h
 
 ----------
-#### VMUnlock()
+### VMUnlock()
     void    VMUnlock(
             MemHandle       mh);
 
@@ -929,7 +929,7 @@ handle is passed (not its VM handle).
 **Include:** vm.h
 
 ----------
-#### VMUpdate()
+### VMUpdate()
     word    VMUpdate(
             VMFileHandle        file);
 
@@ -943,7 +943,7 @@ is to check the dirty state and then call **VMUpdate()** only if the file is
 actually dirty.
 
 ----------
-#### VMVMBlockToMemBlock()
+### VMVMBlockToMemBlock()
     MemHandle   VMVMBlockToMemBlock(
             VMFileHandle        file,
             VmBlockHandle       block);
@@ -955,7 +955,7 @@ attach one.
 **Include:** vm.h
 
 ----------
-#### WinAckUpdate()
+### WinAckUpdate()
     void    WinAckUpdate(
             WindowHandle        win);
 
@@ -966,7 +966,7 @@ updating.
 **Include:** win.h
 
 ----------
-#### WinApplyRotation()
+### WinApplyRotation()
     void    WinApplyRotation(
             WindowHandle        win,
             WWFixedAsDWord      angle,
@@ -978,7 +978,7 @@ matrix.
 **Include:** win.h
 
 ----------
-#### WinApplyScale()
+### WinApplyScale()
     void    WinApplyScale(
             WindowHandle        win,
             WWFixedAsDWord      xScale,
@@ -991,7 +991,7 @@ matrix.
 **Include:** win.h
 
 ----------
-#### WinApplyTranform()
+### WinApplyTranform()
     void    WinApplyTransform(
             WindowHandle            win,
             const TransMatrix *     tm,
@@ -1004,7 +1004,7 @@ transformation matrix.
 **Include:** win.h
 
 ----------
-#### WinApplyTranslation()
+### WinApplyTranslation()
     void    WinApplyTranslation(
             WindowHandle        win,
             WWFixedAsDWord      xTrans,
@@ -1017,7 +1017,7 @@ matrix.
 **Include:** win.h
 
 ----------
-#### WinApplyTranslationDWord()
+### WinApplyTranslationDWord()
     void    WinApplyExtTranslation(
             WindowHandle        win,
             sdword              xTrans,
@@ -1030,7 +1030,7 @@ matrix. The translations are specified as 32-bit integers.
 **Include:** win.h
 
 ----------
-#### WinChangeAck()
+### WinChangeAck()
     WindowHandle WinChangeAck(
             WindowHandle        win,
             sword               x,
@@ -1039,7 +1039,7 @@ matrix. The translations are specified as 32-bit integers.
             Include:            win.h
 
 ----------
-#### WinChangePriority()
+### WinChangePriority()
     void    WinChangePriority(
             WindowHandle        win,
             WinPassFlags        flags,
@@ -1050,7 +1050,7 @@ This routine changes the priority for the specified window.
 **Include:** win.h
 
 ----------
-#### WinClose()
+### WinClose()
     void    WinClose(
             WindowHandle        win);
 
@@ -1059,20 +1059,20 @@ This routine closes and frees the specified window.
 **Include:** win.h
 
 ----------
-#### WinDecRefCount()
+### WinDecRefCount()
     void    WinDecRefCount(
             WindowHandle        win);
 
 This routine is part of the window closing mechanism.
 
 ----------
-#### WinEnsureChangeNotification()
+### WinEnsureChangeNotification()
     void    WinEnsureChangeNotification(void);
 
 **Include:** win.h
 
 ----------
-#### WinGeodeGetInputObj()
+### WinGeodeGetInputObj()
     optr    WinGeodeGetInputObj(
             GeodeHandle     obj);
 
@@ -1082,7 +1082,7 @@ there is no such object, it returns a null optr.
 **Include:** win.h
 
 ----------
-#### WinGeodeGetParentObj()
+### WinGeodeGetParentObj()
     optr    WinGeodeGetParentObj(
             GeodeHandle     obj);
 
@@ -1092,7 +1092,7 @@ there is no such object, it returns a null optr.
 **Include:** win.h
 
 ----------
-#### WinGeodeSetActiveWin()
+### WinGeodeSetActiveWin()
     void    WinGeodeSetActiveWin(
             GeodeHandle         gh,
             WindowHandle        win);
@@ -1102,7 +1102,7 @@ This routine sets the active window for the specified geode.
 **Include:** win.h
 
 ----------
-#### WinGeodeSetInputObj()
+### WinGeodeSetInputObj()
     void    WinGeodeSetInputObj(
             GeodeHandle     gh,
             optr            iObj);
@@ -1112,7 +1112,7 @@ This routine sets the input object for the specified geode.
 **Include:** win.h
 
 ----------
-#### WinGeodeSetParentObj()
+### WinGeodeSetParentObj()
     void    WinGeodeSetParentObj(
             GeodeHandle     gh,
             optr            pObj);
@@ -1122,7 +1122,7 @@ This routine sets the parent object for the specified geode.
 **Include:** win.h
 
 ----------
-#### WinGeodeSetPtrImage()
+### WinGeodeSetPtrImage()
     void    WinGeodeSetPtrImage(
             GeodeHandle     gh,
             optr            ptrCh);
@@ -1132,7 +1132,7 @@ This routine sets the pointer image for the specified geode.
 **Include:** win.h
 
 ----------
-#### WinGetInfo()
+### WinGetInfo()
     dword   WinGetInfo(
             WindowHandle        win,
             WinInfoTypes        type,
@@ -1143,7 +1143,7 @@ This routine retrieves the private data from a GState.
 **Include:** win.h
 
 ----------
-#### WinGetTransform()
+### WinGetTransform()
     void    WinGetTransform(
             WindowHandle        win,
             TransMatrix *       tm);
@@ -1154,7 +1154,7 @@ writes the matrix to *tm.
 **Include:** win.h
 
 ----------
-#### WinGetWinScreenBounds()
+### WinGetWinScreenBounds()
     void    WinGetWinScreenBounds(
             WindowHandle        win,
             Rectangle *         bounds);
@@ -1165,7 +1165,7 @@ This routine returns the bounds of the on-screen portion of a window
 **Include:** win.h
 
 ----------
-#### WinGrabChange()
+### WinGrabChange()
     Boolean WinGrabChange(
             WindowHandle        win,
             optr                newObj);
@@ -1176,7 +1176,7 @@ successful; otherwise it returns non-zero.
 **Include:** win.h
 
 ----------
-#### WinInvalReg()
+### WinInvalReg()
     void    WinInvalReg(
             WindowHandle        win,
             const Region *      reg,
@@ -1190,7 +1190,7 @@ This routine invalidates the specified region or rectangle.
 **Include:** win.h
 
 ----------
-#### WinMove()
+### WinMove()
     void    WinMove(
             WindowHandle        win,
             sword       xMove,
@@ -1204,7 +1204,7 @@ window's new position is specified relative to its current position.
 **Include:** win.h
 
 ----------
-#### WinOpen()
+### WinOpen()
     WindowHandle WinOpen(
             Handle          parentWinOrVidDr,
             optr            inputRecipient,
@@ -1228,7 +1228,7 @@ GState.
 **Include:** win.h
 
 ----------
-#### WinReleaseChange()
+### WinReleaseChange()
     void    WinReleaseChange(
             WindowHandle        win,
             optr        obj);
@@ -1238,7 +1238,7 @@ This routine releases an object's grab on the change OD.
 **Include:** win.h
 
 ----------
-#### WinResize()
+### WinResize()
     void    WinResize(
             WindowHandle        win,
             const Region *      reg,
@@ -1252,7 +1252,7 @@ This routine resizes a window. It can move it as well.
 **Include:** win.h
 
 ----------
-#### WinScroll()
+### WinScroll()
     void    WinScroll(
             WindowHandle        win,
             WWFixedAsDWord      xMove,
@@ -1264,7 +1264,7 @@ This routine scrolls a window.
 **Include:** win.h
 
 ----------
-#### WinSetInfo()
+### WinSetInfo()
     void    WinSetInfo(
             WindowHandle        win,
             WinInfoType         type,
@@ -1275,7 +1275,7 @@ This routine sets some data for the specified window.
 **Include:** win.h
 
 ----------
-#### WinSetNullTransform()
+### WinSetNullTransform()
     void    WinSetNullTransform(
             WindowHandle        win,
             WinInvalFlag        flag);
@@ -1286,7 +1286,7 @@ identity) matrix.
 **Include:** win.h
 
 ----------
-#### WinSetPtrImage()
+### WinSetPtrImage()
     void    WinSetPtrImage(
             WindowHandle            win,
             WinSetPtrImageLevel     ptrLevel,
@@ -1298,7 +1298,7 @@ window.
 **Include:** win.h
 
 ----------
-#### WinSetTransform()
+### WinSetTransform()
     void    WinSetTransform(
             WindowHandle            win,
             const TransMatrix *     tm,
@@ -1310,7 +1310,7 @@ passed in **tm*.
 **Include:** win.h
 
 ----------
-#### WinSuspendUpdate()
+### WinSuspendUpdate()
     void    WinSuspendUpdate(
             WindowHandle        win);
 
@@ -1320,7 +1320,7 @@ messages will be sent when **WinUnSuspendUpdate()** is called.
 **Include:** win.h
 
 ----------
-#### WinTransform()
+### WinTransform()
     XYValueAsDWord  WinTransform(
             WindowHandle        win,
             sword               x,
@@ -1332,7 +1332,7 @@ coordinates.
 **Include:** win.h
 
 ----------
-#### WinTransformDWord()
+### WinTransformDWord()
     void    WinTransformDWord(
             WindowHandle        win,
             sdword              xCoord,
@@ -1345,7 +1345,7 @@ coordinates. The translated coordinates are written to **screenCoordinates*.
 **Include:** win.h
 
 ----------
-#### WinUnSuspendUpdate()
+### WinUnSuspendUpdate()
     void    WinUnSuspendUpdate(
             WindowHandle        win);
 
@@ -1354,7 +1354,7 @@ This routine cancels a previous **WinSuspendUpdate()** call.
 **Include:** win.h
 
 ----------
-#### WinUntransform
+### WinUntransform
     XYValueAsDWord  WinUntransform(
             WindowHandle        win,
             sword               x,
@@ -1366,7 +1366,7 @@ coordinates.
 **Include:** win.h
 
 ----------
-#### WinUnTransformDWord()
+### WinUnTransformDWord()
     void    WinTransformDWord(
             WindowHandle        win,
             sdword              xCoord,
@@ -1380,7 +1380,7 @@ coordinates. The translated coordinates are written to
 **Include:** win.h
 
 ----------
-#### WWFixedToFrac
+### WWFixedToFrac
     word    WWFixedToFrac(WWFixed wwf)
 
 This macro lets you address the fractional portion of a **WWFixed** value. It is 
@@ -1393,7 +1393,7 @@ is perfectly legal.
 **Include:** geos.h
 
 ----------
-#### WWFixedToInt
+### WWFixedToInt
     word    WWFixedToInt(WWFixed wwf)
 
 This macro lets you address the intetgral portion of a **WWFixed** value. It is 

@@ -1,4 +1,4 @@
-## C Libraries
+# C Libraries
 
 If you write more than one application, you may find yourself repeating a 
 lot of effort. You may end up writing the same routines several times, or 
@@ -14,7 +14,7 @@ GEOS; you should have successfully written a simple GEOS application. You
 should also be very familiar with the material in ["First Steps: Hello World," 
 Chapter 4](cgetsta.md) and ["GEOS Programming," Chapter 5](ccoding.md).
 
-### C.1 Design Philosophy
+## C.1 Design Philosophy
 
 GEOS libraries are designed to make code-sharing simple and efficient. 
 They allow several different applications to make use of the same routines 
@@ -53,7 +53,7 @@ Writing a library is very much like writing an application. There are only
 a few differences, which are covered in this appendix. You should already 
 be familiar with writing applications before you try to write a library.
 
-### C.2 Library Basics
+## C.2 Library Basics
 
 A library is a geode, much like an application geode. However, its behavior 
 is slightly different. In particular, libraries do not have any threads of their 
@@ -101,7 +101,7 @@ object classes, the header file should be a Goc header file with the suffix
 .goh; otherwise it should be a standard C header file with the suffix .h. The 
 header file is described in more detail in [section C.5](#c5-header-files).
 
-### C.3 The Library Entry Point
+## C.3 The Library Entry Point
 
 LibraryEntry(), LibraryCallType
 
@@ -196,7 +196,7 @@ entry point should not change the working directory; instead, it should use
 **FilePushDir()** and **FilePopDir()** to make temporary changes to the 
 working directory.
 
-### C.4 Exported Routines and Classes
+## C.4 Exported Routines and Classes
 
 Writing routines for a library is very much like writing them for an 
 application. Simply export the routine in the .gp file and any geode which 
@@ -229,7 +229,7 @@ Such "hidden" classes need not be exported. However, the classes must be
 fully declared in the header files so the subclasses can be defined accurately 
 and consistently.
 
-### C.5 Header Files
+## C.5 Header Files
 
 Every library should have at least one header file. This file contains 
 declarations and definitions which are needed by each of the geodes which 
@@ -259,7 +259,7 @@ with the libraries they describe. As a rule, a library will include each one
 of those headers; that helps to keep all the files compatible. Nevertheless, 
 you must be careful whenever changing a library.
 
-### C.6 Compiler Directives
+## C.6 Compiler Directives
 
 Libraries have to be compiled slightly differently from applications. Since 
 library routines are run under application threads, they must treat global 

@@ -1,7 +1,7 @@
 ## 3.8 Structures V-Z
 
 ----------
-#### VarDataCHandler
+### VarDataCHandler
     VarDataCHandler     struct
         VDCH_dataType           word
         VDCH_handler            fptr.far
@@ -15,7 +15,7 @@ table, specific vardata routines will call the *VDCH_handler* routine with the
 **Library:** object.def
 
 ----------
-#### VarDataEntry
+### VarDataEntry
     VarDataEntry        struct
         VDE_dataType            word
         VDE_entrySize           word
@@ -34,7 +34,7 @@ otherwise, this field is left null.
 **Library:** object.def
 
 ----------
-#### VarDataFlags
+### VarDataFlags
     VarDataFlags        record
                             :14
         VDF_EXTRA_DATA      :1      ; set if data entry has extra data
@@ -45,7 +45,7 @@ otherwise, this field is left null.
 **Library:** object.def
 
 ----------
-#### VarDataHandler
+### VarDataHandler
     VarDataHandler      struct
         VDH_dataType        word        ; data type for this handler
         VDH_handler         nptr.far    ; handler routine
@@ -56,7 +56,7 @@ This structure defines a handler in a **VarDataHandlerTable**.
 **Library:** object.def
 
 ----------
-#### VarGeoData
+### VarGeoData
     VarGeoData      struct
         VGD_lineWidth           word
         VGD_centerOffset        word
@@ -66,7 +66,7 @@ This structure defines a handler in a **VarDataHandlerTable**.
 **Library:** Objects/visC.def
 
 ----------
-#### VarObjRelocation
+### VarObjRelocation
     VarObjRelocation        struct
         VOR_type        VarObjRelocationType
         VOR_offset      word
@@ -75,7 +75,7 @@ This structure defines a handler in a **VarDataHandlerTable**.
 **Library:** object.def
 
 ----------
-#### VarObjRelocationType
+### VarObjRelocationType
     VarObjRelocationType            record
         VORT_DATA_TYPE      :14     ; high 14 bits of VarData type constant.
         VORT_RELOC_TYPE     ObjRelocationType:2
@@ -84,7 +84,7 @@ This structure defines a handler in a **VarDataHandlerTable**.
 **Library:** object.def
 
 ----------
-#### VChar
+### VChar
     VChar   etype byte
         VC_NULL             enum VChar, 0x0     ;NULL
         VC_CTRL_A           enum VChar, 0x1     ;<ctrl>-A
@@ -225,7 +225,7 @@ high byte is CS_CONTROL.
 **Library:** input.def
 
 ----------
-#### VCR_param
+### VCR_param
     VCR_param       struct
         VCR_routine         dword
         VCR_BP_param            word
@@ -238,7 +238,7 @@ This structure stores stack parameters used in MSG_VIS_CALL_ROUTINE.
 **Library:** Objects/visC.def
 
 ----------
-#### ViewCommandType
+### ViewCommandType
     ViewCommandType     etype   word
         VCT_ZOOM_IN         enum ViewCommandType    ;no other data
         VCT_ZOOM_OUT        enum ViewCommandType    ;no other data
@@ -247,7 +247,7 @@ This structure stores stack parameters used in MSG_VIS_CALL_ROUTINE.
 **Library:** ui.def
 
 ----------
-#### ViewSize
+### ViewSize
     ViewSize        etype word, 8000h
     VS_TYPICAL  enum ViewSize       ;choose size typical of the specific UI
     VS_SMALL    enum ViewSize       ;choose a small size
@@ -256,7 +256,7 @@ This structure stores stack parameters used in MSG_VIS_CALL_ROUTINE.
 **Library:** Objects/gViewC.def
 
 ----------
-#### ViewTargetInfo
+### ViewTargetInfo
     ViewTargetInfo          struct
         VTI_target  TargetReference     ; Final target object within content
         VTI_content TargetReference     ; The content object itself
@@ -265,7 +265,7 @@ This structure stores stack parameters used in MSG_VIS_CALL_ROUTINE.
 **Library:** Objects/gViewC.def
 
 ----------
-#### VisAddRectFlags
+### VisAddRectFlags
     VisAddRectFlags     record
         VARF_NOT_IF_ALREADY_INVALID     :1
         VARF_ONLY_REDRAW_MARGINS        :1
@@ -290,7 +290,7 @@ reasonable (and fast) thing to do.
 **Library:** Objects/visC.def
 
 ----------
-#### VisAddRectParams
+### VisAddRectParams
     VisAddRectParams        struct
         VARP_bounds     Rectangle           ;rect to invalidate
         VARP_flags      VisAddRectFlags
@@ -300,7 +300,7 @@ reasonable (and fast) thing to do.
 **Library:** Objects/visC.def
 
 ----------
-#### VisAttrs
+### VisAttrs
     VisAttrs    record
         VA_VISIBLE                  :1
         VA_FULLY_ENABLED            :1
@@ -376,7 +376,7 @@ set by MSG_VIS_SET_ATTR.
 **Library:** Objects/visC.def
 
 ----------
-#### VisCompGeoAttrs
+### VisCompGeoAttrs
     VisCompGeoAttrs     record
         VCGA_ORIENT_CHILDREN_VERTICALLY         :1
         VCGA_INCLUDE_ENDS_IN_CHILD_SPACING      :1
@@ -445,7 +445,7 @@ margins (that isn't the color of the background).
 **Library:** Objects/vCompC.def
 
 ----------
-#### VisCompGeoDimensionAttrs
+### VisCompGeoDimensionAttrs
     VisCompGeoDimensionAttrs            record
         VCGDA_WIDTH_JUSTIFICATION           WidthJustification:2
         VCGDA_EXPAND_WIDTH_TO_FIT_PARENT    :1
@@ -488,7 +488,7 @@ children can cooperate (the size can only be suggested).
 **Library:** Objects/vCompC.def
 
 ----------
-#### VisCompSpacingMarginsInfo
+### VisCompSpacingMarginsInfo
     VisCompSpacingMarginsInfo               record
         VCSMI_USE_THIS_INFO             :1
         VCSMI_LEFT_MARGIN               :3
@@ -522,7 +522,7 @@ use in lieu of MSG_VIS_COMP_GET_CHILD_SPACING.
 **Library:** Objects/vCompC.def
 
 ----------
-#### VisContentAttrs
+### VisContentAttrs
     VisContentAttrs     record
         VCNA_SAMW_WIDTH_AS_VIEW                         :1
         VCNA_SAME_HEIGHT_AS_VIEW                        :1
@@ -606,7 +606,7 @@ in the view.
 **Library:** Objects/vCntC.def
 
 ----------
-#### VisGeoAttrs
+### VisGeoAttrs
     VisGeoAttrs     record
         ;
         ; Geometry state flags
@@ -672,7 +672,7 @@ another.
 **Library:** Objects/visC.def
 
 ----------
-#### VisInputFlowGrabFlags
+### VisInputFlowGrabFlags
     VisInputFlowGrabFlags           record
         VIFGF_NOT_HERE      :1
                             :1
@@ -728,7 +728,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/visC.def
 
 ----------
-#### VisInputFlowGrabType
+### VisInputFlowGrabType
     VisInputFlowGrabType            etype byte
         VIFGT_ACTIVE            enum VisInputFlowGrabType
         VIFGT_PRE_PASSIVE       enum VisInputFlowGrabType
@@ -737,7 +737,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/visC.def
 
 ----------
-#### VisLargeTextAttrs
+### VisLargeTextAttrs
     VisLargeTextAttrs       record
         VLTA_EXACT_HEIGHT       :1
                                 :15
@@ -746,7 +746,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/vLTextC.def
 
 ----------
-#### VisLargeTextDisplayModes
+### VisLargeTextDisplayModes
     VisLargeTextDisplayModes            etype word
         VLTDM_PAGE                  enum VisLargeTextDisplayModes
         ;
@@ -792,7 +792,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/vLTextC.def
 
 ----------
-#### VisLargeTextFlags
+### VisLargeTextFlags
     VisLargeTextFlags       record
         VLTF_HEIGHT_NOTIFY_PENDING      :1
                                         :15
@@ -801,7 +801,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/vLTextC.def
 
 ----------
-#### VisLargeTextRegionArrayElement
+### VisLargeTextRegionArrayElement
     VisLargeTextRegionArrayElement          struct
         VLTRAE_charCount            dword       ;# characters in region
         VLTRAE_lineCount            dword       ;# lines in region
@@ -818,7 +818,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/vLTextC.def
 
 ----------
-#### VisLargeTextRegionFlags
+### VisLargeTextRegionFlags
     VisLargeTextRegionFlags         record
         VLTRF_ENDED_BY_COLUMN_BREAK     :1
         VLTRF_EMPTY                     :1
@@ -828,7 +828,7 @@ If VIFGF_MOUSE, set if ptr events need to be sent.
 **Library:** Objects/vLTextC.def
 
 ----------
-#### VisMoniker
+### VisMoniker
     VisMoniker      struct
         VM_type         VisMonikerType <>
         VM_width        word
@@ -852,7 +852,7 @@ Otherwise a **VisMonikerText** structure starts here.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerCachedWidth
+### VisMonikerCachedWidth
     VisMonikerCachedWidth   record
         VMCW_HINTED             :1 ;If set then low 15 bits are cache info
         VMCW_BERKELEY_9         :7 ;Cached width for Berkeley 9
@@ -862,7 +862,7 @@ Otherwise a **VisMonikerText** structure starts here.
 **Library:** visC.def
 
 ----------
-#### VisMonikerDataType
+### VisMonikerDataType
     VisMonikerDataType      etype byte
         VMDT_NULL               enum VisMonikerDataType
         VMDT_VIS_MONIKER        enum VisMonikerDataType
@@ -914,7 +914,7 @@ Database.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerGString
+### VisMonikerGString
     VisMonikerGString       struct
         VMGS_height             word        ;cached gstring height
         VMGS_gstring            label byte  ;start of gstring
@@ -926,7 +926,7 @@ visual moniker is a graphics string.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerListEntry
+### VisMonikerListEntry
     VisMonikerListEntry         struct
         VMLE_type           VisMonikerListEntryType <>
         VMLE_moniker        optr
@@ -943,7 +943,7 @@ search to find a desired moniker.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerListEntryType
+### VisMonikerListEntryType
     VisMonikerListEntryType             record
                                     :2
         VMLET_GS_SIZE               DisplaySize:2
@@ -981,7 +981,7 @@ If is a GString, color requirements of GString.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerSearchFlags
+### VisMonikerSearchFlags
     VisMonikerSearchFlags           record
         VMSF_STYLE              VMStyle:4
                                 :1
@@ -1012,7 +1012,7 @@ True if a gstring moniker is expected (i.e. a
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerSourceType
+### VisMonikerSourceType
     VisMonikerSourceType            etype byte
         VMST_FPTR           enum VisMonikerSourceType
         VMST_OPTR           enum VisMonikerSourceType
@@ -1034,7 +1034,7 @@ within the block.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerText
+### VisMonikerText
     VisMonikerText          struct
         VMT_mnemonicOffset      byte            ;offset to mnemonic, -1 if none
         VMT_text                label byte      ;start of null-terminated text
@@ -1046,7 +1046,7 @@ monikers.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMonikerType
+### VisMonikerType
     VisMonikerType      record
         VMT_MONIKER_LIST        :1
         VMT_GSTRING             :1
@@ -1071,7 +1071,7 @@ Color requirements of GString.
 **Library:** Objects/visC.def
 
 ----------
-#### VisMouseGrab
+### VisMouseGrab
     VisMouseGrab        struct
         VMG_object          optr
         VMG_gWin            hptr.Window <>
@@ -1098,7 +1098,7 @@ amount before being sent out.
 **Library:** Objects/vCntC.def
 
 ----------
-#### VisOptFlags
+### VisOptFlags
     VisOptFlags         record
         VOF_GEOMETRY_INVALID        :1
         VOF_GEO_UPDATE_PATH         :1
@@ -1153,7 +1153,7 @@ knowing how to update an object.
 **Library:** Objects/visC.def
 
 ----------
-#### VisRulerAttributes
+### VisRulerAttributes
     VisRulerAttributes      record
         VRA_IGNORE_ORIGIN       :1
         VRA_SHOW_GUIDES         :1
@@ -1167,7 +1167,7 @@ knowing how to update an object.
 **Library:** ruler.def
 
 ----------
-#### VisRulerConstrainStrategy
+### VisRulerConstrainStrategy
     VisRulerConstrainStrategy               record
         VRCS_OVERRIDE                                   :1
                                                         :1
@@ -1190,7 +1190,7 @@ knowing how to update an object.
 **Library:** ruler.def
 
 ----------
-#### VisRulerNotifyGuideChangeBlockHeader
+### VisRulerNotifyGuideChangeBlockHeader
     VisRulerNotifyGuideChangeBlockHeader    struct
         VRNGCBH_header                  LMemBlockHeader
         VRNGCBH_vertGuideArray          word
@@ -1200,7 +1200,7 @@ knowing how to update an object.
 **Library:** ruler.def
 
 ----------
-#### VisRulerType
+### VisRulerType
     VisRulerType        etype byte, 0
         VRT_INCHES          enum VisRulerType
         VRT_CENTIMETERS     enum VisRulerType
@@ -1213,7 +1213,7 @@ knowing how to update an object.
 **Library:** ruler.def
 
 ----------
-#### VisTextAddNameParams
+### VisTextAddNameParams
     VisTextAddNameParams            struct
         VTANP_name          fptr.char       ; pointer to name
         VTANP_size          word            ; length of name (0 if null-terminated)
@@ -1224,7 +1224,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextCachedRunInfo
+### VisTextCachedRunInfo
     VisTextCachedRunInfo            struct
         VTCRI_lastCharAttrRun           dword
         VTCRI_lastParaAttrRun           dword
@@ -1235,7 +1235,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextCachedUndoInfo
+### VisTextCachedUndoInfo
     VisTextCachedUndoInfo           struct
         VTCUI_vmChain           dword
         VTCUI_file              hptr
@@ -1244,7 +1244,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextCharAttr
+### VisTextCharAttr
     VisTextCharAttr     struct
         VTCA_meta               StyleSheetElementHeader
         VTCA_fontID             FontID
@@ -1266,7 +1266,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextCharAttrDiffs
+### VisTextCharAttrDiffs
     VisTextCharAttrDiffs            struct
         VTCAD_diffs             VisTextCharAttrFlags
         VTCAD_extendedStyles    VisTextExtendedStyles
@@ -1277,7 +1277,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextCharAttrFlags
+### VisTextCharAttrFlags
     VisTextCharAttrFlags            record
         VTCAF_MULTIPLE_FONT_IDS         :1  ;Set if more than one font
         VTCAF_MULTIPLE_POINT_SIZES      :1  ;Set if more than one point size
@@ -1298,7 +1298,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextClearAllTabsParams
+### VisTextClearAllTabsParams
     VisTextClearAllTabsParams               struct
         VTCATP_range            VisTextRange
     VisTextClearAllTabsParams               ends
@@ -1306,7 +1306,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextClearTabParams
+### VisTextClearTabParams
     VisTextClearTabParams           struct
         VTCTP_range         VisTextRange
         VTCTP_position      word            ; In units of points * 8
@@ -1315,7 +1315,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextContextType
+### VisTextContextType
     VisTextContextType      etype byte
         VTCT_TEXT               enum VisTextContextType
         VTCT_CATEGORY           enum VisTextContextType
@@ -1327,7 +1327,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextCursorPositionChange
+### VisTextCursorPositionChange
     VisTextCursorPositionChange     struct
         VTCPC_lineNumber        dword
         VTCPC_rowNumber         dword
@@ -1336,7 +1336,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextCustomFilterData
+### VisTextCustomFilterData
     VisTextCustomFilterData         struct
         VTCFD_startOfRange              word
         VTCFD_endOfRange                word
@@ -1345,7 +1345,7 @@ knowing how to update an object.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextDefaultCharAttr
+### VisTextDefaultCharAttr
     VisTextDefaultCharAttr          record
         VTDCA_UNDERLINE     :1
         VTDCA_BOLD          :1
@@ -1359,7 +1359,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextDefaultDefaultTab
+### VisTextDefaultDefaultTab
     VisTextDefaultDefaultTab            etype byte
         VTDDT_NONE          enum VisTextDefaultDefaultTab
         VTDDT_HALF_INCH     enum VisTextDefaultDefaultTab
@@ -1369,7 +1369,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextDefaultFont
+### VisTextDefaultFont
     VisTextDefaultFont      etype byte
         VTDF_BERKELEY               enum VisTextDefaultFont ;Bitmap font
         VTDF_CHICAGO                enum VisTextDefaultFont ;Bitmap font
@@ -1388,7 +1388,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextDefaultParaAttr
+### VisTextDefaultParaAttr
     VisTextDefaultParaAttr          record
         VTDPA_JUSTIFICATION     Justification:2
         VTDPA_DEFAULT_TABS      VisTextDefaultDefaultTab:2
@@ -1401,7 +1401,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextDefaultSize
+### VisTextDefaultSize
     VisTextDefaultSize      etype byte
         VTDS_8      enum VisTextDefaultSize
         VTDS_9      enum VisTextDefaultSize
@@ -1415,7 +1415,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextDropCapInfo
+### VisTextDropCapInfo
     VisTextDropCapInfo          record
         VTDCI_CHAR_COUNT    :4 = 1-1    ; # characters for drop cap charAttr
         VTDCI_LINE_COUNT    :4 = 3-1    ; # lines for drop cap
@@ -1427,7 +1427,7 @@ knowing how to update an object.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextExtendedFilterType
+### VisTextExtendedFilterType
     VisTextExtendedFilterType               etype byte
         VTEFT_REPLACE_PARAMS            enum VisTextExtendedFilterType
         VTEFT_CHARACTER_LEVELER_LEVEL   enum VisTextExtendedFilterType
@@ -1448,7 +1448,7 @@ be sent.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextExtendedStyles
+### VisTextExtendedStyles
     VisTextExtendedStyles           record
         VTES_BOXED              :1
         VTES_BUTTON             :1
@@ -1464,7 +1464,7 @@ be sent.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextFeatures
+### VisTextFeatures
     VisTextFeatures     record
         VTF_NO_WORD_WRAPPING            :1  ; Set: no word-wrapping is desired.
         VTF_AUTO_HYPHENATE              :1  ; Set: if we want to auto hyphenate.
@@ -1490,7 +1490,7 @@ be sent.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextFilters
+### VisTextFilters
     VisTextFilters      record
         VTF_NO_SPACES       :1          ;no spaces allowed
         VTF_NO_TABS         :1          ;no tabs
@@ -1502,7 +1502,7 @@ be sent.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextFilterClass
+### VisTextFilterClass
     VisTextFilterClass      etype byte
         VTFC_NO_FILTER              enum VisTextFilterClass ;no filter
         VTFC_ALPHA                  enum VisTextFilterClass ;alpha chars only
@@ -1525,7 +1525,7 @@ be sent.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextFindNameParams
+### VisTextFindNameParams
     VisTextFindNameParams           struct
         VTFNP_name      fptr.char           ; pointer to name to find
         VTFNP_size      word                ; length of name (0 if null-terminated)
@@ -1537,7 +1537,7 @@ This structure is passed with MSG_VIS_TEXT_FIND_NAME.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextFollowHyperlinkParams
+### VisTextFollowHyperlinkParams
     VisTextFollowHyperlinkParams                struct
         VTFHLP_range    VisTextRange    ; range of characters in the selection
     VisTextFollowHyperlinkParams                ends
@@ -1545,7 +1545,7 @@ This structure is passed with MSG_VIS_TEXT_FIND_NAME.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGenerateNotifyParams
+### VisTextGenerateNotifyParams
     VisTextGenerateNotifyParams             struct
         VTGNP_notificationTypes     VisTextNotificationFlags
         VTGNP_sendFlags             VisTextNotifySendFlags
@@ -1555,7 +1555,7 @@ This structure is passed with MSG_VIS_TEXT_FIND_NAME.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetAttrFlags
+### VisTextGetAttrFlags
     VisTextGetAttrFlags         record
         VTGAF_MERGE_WITH_PASSED     :1  ;If set then merge the attributes for
                                         ;this object with the passed attributes
@@ -1565,7 +1565,7 @@ This structure is passed with MSG_VIS_TEXT_FIND_NAME.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetAttrParams
+### VisTextGetAttrParams
     VisTextGetAttrParams            struct
         VTGAP_range     VisTextRange
         VTGAP_attr      fptr                ; attribute structure
@@ -1576,7 +1576,7 @@ This structure is passed with MSG_VIS_TEXT_FIND_NAME.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetGraphicAtPositionParams
+### VisTextGetGraphicAtPositionParams
     VisTextGetGraphicAtPositionParams                   struct
         VTGGAPP_position                dword
         VTGGAPP_retPtr                  fptr.VisTextGraphic
@@ -1585,7 +1585,7 @@ This structure is passed with MSG_VIS_TEXT_FIND_NAME.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetLineInfoParameters
+### VisTextGetLineInfoParameters
     VisTextGetLineInfoParameters                struct
         VTGLIP_buffer   fptr.LineInfo   ;pointer to buffer to store results
         VTGLIP_bsize    word            ; size of buffer
@@ -1599,7 +1599,7 @@ followed by a variable number of **FieldInfo** structures.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetLineOffsetAndFlagsParameters
+### VisTextGetLineOffsetAndFlagsParameters
     VisTextGetLineOffsetAndFlagsParameters struct
         VTGLOAFP_line       dword           ; line to get information about
         ;
@@ -1613,7 +1613,7 @@ followed by a variable number of **FieldInfo** structures.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetRunBoundsParams
+### VisTextGetRunBoundsParams
     VisTextGetRunBoundsParams       struct
         VTGRBP_position dword               ; Position to check for run around
         VTGRBP_type     word                ; Run offset
@@ -1624,7 +1624,7 @@ followed by a variable number of **FieldInfo** structures.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetTextRangeFlags
+### VisTextGetTextRangeFlags
     VisTextGetTextRangeFlags            record
         VTGTRF_ALLOCATE         :1
         VTGTRF_ALLOCATE_ALWAYS  :1
@@ -1647,7 +1647,7 @@ large enough to hold the text and no larger.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGetTextRangeParameters
+### VisTextGetTextRangeParameters
     VisTextGetTextRangeParameters                   struct
         VTGTRP_range            VisTextRange        ; range to get
         VTGTRP_textReference    TextReference       ; Reference to the text
@@ -1658,7 +1658,7 @@ large enough to hold the text and no larger.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGraphic
+### VisTextGraphic
     VisTextGraphic          struct
         VTG_meta        RefElementHeader        ; basic element header
         VTG_vmChain     dword
@@ -1683,7 +1683,7 @@ size is determined dynamically.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGraphicData
+### VisTextGraphicData
     VisTextGraphicData          union
         VTGD_gstring        VisTextGraphicGString
         VTGD_variable       VisTextGraphicVariable
@@ -1693,7 +1693,7 @@ size is determined dynamically.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGraphicFlags
+### VisTextGraphicFlags
     VisTextGraphicFlags     record
         VTGF_DRAW_FROM_BASELINE :1  ;If set then draw from baseline else
                                     ;draw from top
@@ -1704,7 +1704,7 @@ size is determined dynamically.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGraphicGString
+### VisTextGraphicGString
     VisTextGraphicGString           struct
         VTGG_tmatrix            TransMatrix
         VTGG_drawOffset         XYOffset
@@ -1713,7 +1713,7 @@ size is determined dynamically.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGraphicType
+### VisTextGraphicType
     VisTextGraphicType      etype byte
         VTGT_GSTRING            enum VisTextGraphicType
         VTGT_VARIABLE           enum VisTextGraphicType
@@ -1721,7 +1721,7 @@ size is determined dynamically.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextGraphicVariable
+### VisTextGraphicVariable
     VisTextGraphicVariable          struct
         VTGV_manufacturerID ManufacturerID
         VTGV_type           VisTextVariableType
@@ -1731,7 +1731,7 @@ size is determined dynamically.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextHWRFlags
+### VisTextHWRFlags
     VisTextHWRFlags     record
         VTHWRF_NO_CONTEXT               :1
         VTHWRF_USE_PASSED_CONTEXT       :1
@@ -1746,7 +1746,7 @@ of the object is not useful information for the recognizer.
 **Library:** 
 
 ----------
-#### VisTextHyphenationInfo
+### VisTextHyphenationInfo
     VisTextHyphenationInfo          record
         VTHI_HYPHEN_MAX_LINES           :4 = 3-1
         VTHI_HYPHEN_SHORTEST_WORD       :4 = 5-1
@@ -1757,7 +1757,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextIntFlags
+### VisTextIntFlags
     VisTextIntFlags     record
         VTIF_HAS_LINES              :1  ;Object has valid line structures.
         VTIF_SUSPENDED              :1  ;Set if calculation suspended
@@ -1773,7 +1773,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextIntSelFlags
+### VisTextIntSelFlags
     VisTextIntSelFlags      record
         VTISF_IS_TARGET             :1  ; Set if the object is the target.
         VTISF_IS_FOCUS              :1  ; Set if the object is the focus.
@@ -1790,7 +1790,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextKeepInfo
+### VisTextKeepInfo
     VisTextKeepInfo     record
         VTKI_TOP_LINES      :4      ; # lines at start of PP to keep together
         VTKI_BOTTOM_LINES   :4      ; # lines at end of PP to keep together
@@ -1799,7 +1799,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextKeyFunction
+### VisTextKeyFunction
     VisTextKeyFunction      etype word, 0, 6
         VTKF_FORWARD_LINE                       enum    VisTextKeyFunction
         VTKF_BACKWARD_LINE                      enum    VisTextKeyFunction
@@ -1855,7 +1855,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextLoadFromDBWithStylesParams
+### VisTextLoadFromDBWithStylesParams
     VisTextLoadFromDBWithStylesParams       struct
         VTLFDBWSP_params    fptr.StyleSheetParams
         VTLFDBWSP_dbItem    dword               ; DB item to load from
@@ -1865,7 +1865,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextMaxParaAttr
+### VisTextMaxParaAttr
     VisTextMaxParaAttr      struct
         VTMPA_paraAttr          VisTextParaAttr
         VTMPA_tabs              Tab VIS_TEXT_MAX_TABS dup (<>)
@@ -1874,7 +1874,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextMinimumDimensionsParameters
+### VisTextMinimumDimensionsParameters
     VisTextMinimumDimensionsParameters  struc
         VTMDP_height            WBFixed
         VTMDP_width             WBFixed
@@ -1883,7 +1883,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextMoveTabParams
+### VisTextMoveTabParams
     VisTextMoveTabParams            struct
         VTMTP_range             VisTextRange
         VTMTP_destPosition      word            ; in units of points * 8
@@ -1893,7 +1893,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNameArrayElement
+### VisTextNameArrayElement
     VisTextNameArrayElement         struc
         VTNAE_meta          NameArrayElement
         VTNAE_data          VisTextNameData
@@ -1902,7 +1902,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNameCommonParams
+### VisTextNameCommonParams
     VisTextNameCommonParams         struct
         VTNCP_data      VisTextNameData
         VTNCP_index     word            ; index of name
@@ -1912,7 +1912,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNameData
+### VisTextNameData
     VisTextNameData     struct
         VTND_type           VisTextNameType
         VTND_contextType    VisTextContextType
@@ -1923,7 +1923,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNameType
+### VisTextNameType
     VisTextNameType     etype byte
         VTNT_CONTEXT        enum VisTextNameType
         VTNT_FILE           enum VisTextNameType
@@ -1931,7 +1931,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotificationFlags
+### VisTextNotificationFlags
     VisTextNotificationFlags            record
         VTNF_SELECT_STATE           :1
         VTNF_CHAR_ATTR              :1
@@ -1951,7 +1951,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotifyCharAttrChange
+### VisTextNotifyCharAttrChange
     VisTextNotifyCharAttrChange             struct
         VTNCAC_charAttr             VisTextCharAttr
         VTNCAC_charAttrToken        word
@@ -1961,7 +1961,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotifyCountChange
+### VisTextNotifyCountChange
     VisTextNotifyCountChange            struct
         VTNCC_charCount             dword
         VTNCC_wordCount             dword
@@ -1971,7 +1971,7 @@ of the object is not useful information for the recognizer.
 
 **Library:** Objects/vTextC.def
 ----------
-#### VisTextNotifyNameChange
+### VisTextNotifyNameChange
     VisTextNotifyNameChange         struct
         VTNNC_count         word
     VisTextNotifyNameChange         ends
@@ -1979,7 +1979,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotifyParaAttrChange
+### VisTextNotifyParaAttrChange
     VisTextNotifyParaAttrChange             struct
         VTNPAC_paraAttr                 VisTextMaxParaAttr
         VTNPAC_paraAttrToken            word
@@ -1992,7 +1992,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotifySelectionChange
+### VisTextNotifySelectionChange
     VisTextNotifySelectionChange                struct
         VTNSC_selectStart           dword
         VTNSC_selectEnd             dword
@@ -2006,7 +2006,7 @@ of the object is not useful information for the recognizer.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotifySendFlags
+### VisTextNotifySendFlags
     VisTextNotifySendFlags          record
         VTNSF_UPDATE_APP_TARGET_GCN_LISTS       :1
         VTNSF_NULL_STATUS                       :1
@@ -2044,7 +2044,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNotifyTypeChange
+### VisTextNotifyTypeChange
     VisTextNotifyTypeChange         struct
         VTNTC_type              VisTextType
         VTNTC_typeToken         word
@@ -2055,7 +2055,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextNumberType
+### VisTextNumberType
     VisTextNumberType       etype word
         VTNT_NUMBER                 enum VisTextNumberType
         VTNT_LETTER_UPPER_A         enum VisTextNumberType
@@ -2102,7 +2102,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextParaAttrAttributes
+### VisTextParaAttrAttributes
     VisTextParaAttrAttributes               record
         VTPAA_JUSTIFICATION             Justification:2
         VTPAA_KEEP_PARA_WITH_NEXT       :1
@@ -2119,7 +2119,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextParaAttrBorderFlags
+### VisTextParaAttrBorderFlags
     VisTextParaAttrBorderFlags          record
         VTPABF_MULTIPLE_BORDER_LEFT         :1      ;Match with VTPBF_LEFT
         VTPABF_MULTIPLE_BORDER_TOP          :1      ;Match with VTPBF_TOP
@@ -2140,7 +2140,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextParaAttrDiffs
+### VisTextParaAttrDiffs
     VisTextParaAttrDiffs            struct
         VTPAD_diffs             VisTextParaAttrFlags
         VTPAD_diffs2            VisTextParaAttrFlags2
@@ -2155,7 +2155,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextParaAttrFlags
+### VisTextParaAttrFlags
     VisTextParaAttrFlags            record
         VTPAF_MULTIPLE_LEFT_MARGINS             :1
         VTPAF_MULTIPLE_RIGHT_MARGINS            :1
@@ -2178,7 +2178,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextParaAttrFlags2
+### VisTextParaAttrFlags2
     VisTextParaAttrFlags2           record
         VTPAF2_MULTIPLE_LANGUAGES       :1
                                         :15
@@ -2187,7 +2187,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextParaBorderFlags
+### VisTextParaBorderFlags
     VisTextParaBorderFlags          record
         VTPBF_LEFT              :1      ;Set if a border on the left
         VTPBF_TOP               :1      ;Set if a border on the top
@@ -2203,7 +2203,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** tCommon.def
 
 ----------
-#### VisTextRange
+### VisTextRange
     VisTextRange        struct
         VTR_start   dword       ; start of range
         VTR_end     dword       ; end of range
@@ -2212,7 +2212,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextRangeContext
+### VisTextRangeContext
     VisTextRangeContext         record
         VTRC_PARAGRAPH_CHANGE           :1  ;Change done on paragraph level.
         VTRC_CHAR_ATTR_CHANGE           :1  ; Used for a charAttr change (include 
@@ -2225,7 +2225,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextReplaceFlags
+### VisTextReplaceFlags
     VisTextReplaceFlags         record
         VTRF_FILTER                     :1      ;Set to filter replacement
         VTRF_KEYBOARD_INPUT             :1      ;Set if data is coming from the 
@@ -2244,7 +2244,7 @@ responsible for relaying the message to multiple text objects.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextReplaceParameters
+### VisTextReplaceParameters
     VisTextReplaceParameters            struct
         VTRP_range                  VisTextRange
         VTRP_insCount               dword           ; number of characters to 
@@ -2259,7 +2259,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextReplaceWithHWRParams
+### VisTextReplaceWithHWRParams
     VisTextReplaceWithHWRParams             struct
         VTRWHWRP_range              VisTextRange
         VTRWHWRP_flags              VisTextHWRFlags
@@ -2270,7 +2270,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSaveDBFlags
+### VisTextSaveDBFlags
     VisTextSaveDBFlags          record
         VTSDBF_TEXT         :1                  ;set if text is saved 
                                                 ; (0 means null text)
@@ -2287,7 +2287,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSaveStyleSheetParams
+### VisTextSaveStyleSheetParams
     VisTextSaveStyleSheetParams     struct
         VTSSSP_common               StyleSheetParams
         VTSSSP_graphicsElements     word        ;VM block of graphics elements
@@ -2298,7 +2298,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSaveToDBWithStylesParams
+### VisTextSaveToDBWithStylesParams
     VisTextSaveToDBWithStylesParams         struct
         VTSTDBWSP_params    fptr.VisTextSaveStyleSheetParams
         VTSTDBWSP_dbItem    dword
@@ -2311,7 +2311,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSaveType
+### VisTextSaveType
     VisTextSaveType     etype byte
         VTST_NONE               enum VisTextSaveType    ;nothing saved
         VTST_SINGLE_CHUNK       enum VisTextSaveType    ;single attr structure
@@ -2321,7 +2321,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetBorderBitsParams
+### VisTextSetBorderBitsParams
     VisTextSetBorderBitsParams              struct
         VTSBBP_range                VisTextRange
         VTSBBP_bitsToSet            VisTextParaBorderFlags
@@ -2331,7 +2331,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetBorderWidthParams
+### VisTextSetBorderWidthParams
     VisTextSetBorderWidthParams         struct
         VTSBWP_range            VisTextRange
         VTSBWP_width            byte
@@ -2341,7 +2341,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetCharAttrByDefaultParams
+### VisTextSetCharAttrByDefaultParams
     VisTextSetCharAttrByDefaultParams           struct
         VTSCABDP_range              VisTextRange
         VTSCABDP_charAttr           VisTExtDefaultCharAttr
@@ -2350,7 +2350,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetCharAttrByTokenParams
+### VisTextSetCharAttrByTokenParams
     VisTextSetCharAttrByTokenParams                 struct
         VTSCABTP_range                  VisTextRange
         VTSCABTP_charAttr               word
@@ -2359,7 +2359,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetCharAttrParams
+### VisTextSetCharAttrParams
     VisTextSetCharAttrParams            struct
         VTSCAP_range            VisTextRange
     VTSCAP_charAttr             fptr.VisTextCharAttr
@@ -2368,7 +2368,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetColorParams
+### VisTextSetColorParams
     VisTextSetColorParams           struct
         VTSCP_range         VisTextRange
         VTSCP_color         ColorQuad
@@ -2377,7 +2377,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetContextFlags
+### VisTextSetContextFlags
     VisTextSetContextFlags          record
                         :7
         VTCF_TOKEN      :1      ;TRUE: context and hyperlink are tokens
@@ -2386,7 +2386,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetContextParams
+### VisTextSetContextParams
     VisTextSetContextParams         struct
         VTSCXP_range            VisTextRange
         VTSCXP_context          word
@@ -2397,7 +2397,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetDefaultTabsParams
+### VisTextSetDefaultTabsParams
     VisTextSetDefaultTabsParams             struct
         VTSDTP_range                VisTextRange
         VTSDTP_defaultTabs          word
@@ -2406,7 +2406,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetDropCapPParams
+### VisTextSetDropCapPParams
     VisTextSetDropCapPParams            struct
         VTSDCP_range                VisTextRange
         VTSDCP_bitsToSet            word
@@ -2416,7 +2416,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetFontIDParams
+### VisTextSetFontIDParams
     VisTextSetFontIDParams          struct
         VTSFIDP_range           VisTextRange
         VTSFIDP_fontID          FontID
@@ -2425,7 +2425,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetFontWeightParams
+### VisTextSetFontWeightParams
     VisTextSetFontWeightParams              struct
         VTSFWP_range                VisTextRange
         VTSFWP_fontWeight           byte
@@ -2435,7 +2435,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetFontWidthParams
+### VisTextSetFontWidthParams
     VisTextSetFontWidthParams               struct
         VTSFWIP_range               VisTextRange
         VTSFWIP_fontWidth           byte
@@ -2445,7 +2445,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetGrayScreenParams
+### VisTextSetGrayScreenParams
     VisTextSetGrayScreenParams              struct
         VTSGSP_range                VisTextRange
         VTSGSP_grayScreen           SystemDrawMask
@@ -2455,7 +2455,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetHyperlinkParams
+### VisTextSetHyperlinkParams
     VisTextSetHyperlinkParams               struct
         VTSHLP_range                VisTextRange
         VTSHLP_context              word
@@ -2467,7 +2467,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetHyphenationPParams
+### VisTextSetHyphenationPParams
     VisTextSetHyphenationPParams                struct
         VTSHP_range                 VisTextRange
         VTSHP_bitsToSet             VisTextHyphenationInfo
@@ -2477,7 +2477,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetKeepPParams
+### VisTextSetKeepPParams
     VisTextSetKeepPParams           struct
         VTSKP_range             VisTextRange
         VTSKP_bitsToSet         word
@@ -2487,7 +2487,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetLargerPointSizeParams
+### VisTextSetLargerPointSizeParams
     VisTextSetLargerPointSizeParams                 struct
         VTSLPSP_range                   VisTextRange
         VTSLPSP_maximumSize             word
@@ -2496,7 +2496,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetLeadingParams
+### VisTextSetLeadingParams
     VisTextSetLeadingParams         struct
         VTSLP_range             VisTextRange
         VTSLP_leading           word
@@ -2505,7 +2505,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetLineSpacingParams
+### VisTextSetLineSpacingParams
     VisTextSetLineSpacingParams             struct
         VTSLSP_range                    VisTextRange
         VTSLSP_lineSpacing              BBFixed
@@ -2514,7 +2514,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetMarginParams
+### VisTextSetMarginParams
     VisTextSetMarginParams          struct
         VTSMP_range             VisTextRange
         VTSMP_position          word
@@ -2523,7 +2523,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetParaAttrAttributesParams
+### VisTextSetParaAttrAttributesParams
     VisTextSetParaAttrAttributesParams      struct
         VTSPAAP_range                   VisTextRange
         VTSPAAP_bitsToSet               VisTextParaAttrAttributes
@@ -2533,7 +2533,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetParaAttrByDefaultParams
+### VisTextSetParaAttrByDefaultParams
     VisTextSetParaAttrByDefaultParams                   struct
         VTSPABDP_range                  VisTextRange
         VTSPABDP_paraAttr               VisTextDefaultParaAttr
@@ -2542,7 +2542,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetParaAttrByTokenParams
+### VisTextSetParaAttrByTokenParams
     VisTextSetParaAttrByTokenParams                 struct
         VTSPABTP_range                  VisTextRange
         VTSPABTP_paraAttr               word
@@ -2551,7 +2551,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetParaAttrParams
+### VisTextSetParaAttrParams
     VisTextSetParaAttrParams            struct
         VTSPAP_range                VisTextRange
         VTSPAP_paraAttr             fptr.VisTextParaAttr
@@ -2560,7 +2560,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetParagraphNumberParams
+### VisTextSetParagraphNumberParams
     VisTextSetParagraphNumberParams                 struct
         VTSPNP_range                        VisTextRange
         VTSPNP_startingParaNumber           word
@@ -2569,7 +2569,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetPatternParams
+### VisTextSetPatternParams
     VisTextSetPatternParams         struct
         VTSHAP_range            VisTextRange
         VTSHAP_hatch            GraphicPattern
@@ -2578,7 +2578,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetPointSizeParams
+### VisTextSetPointSizeParams
     VisTextSetPointSizeParams               struct
         VTSPSP_range                VisTextRange
         VTSPSP_pointSize            WWFixed
@@ -2587,7 +2587,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetPrependCharsParams
+### VisTextSetPrependCharsParams
     VisTextSetPrependCharsParams                struct
         VTSPCP_range            VisTextRange
         VTSPCP_chars            char 4 dup (0)
@@ -2596,7 +2596,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetSmallerPointSizeParams
+### VisTextSetSmallerPointSizeParams
     VisTextSetSmallerPointSizeParams                    struct
         VTSSPSP_range                   VisTextRange
         VTSSPSP_minimumSize             word
@@ -2605,7 +2605,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSpaceOnTBParams
+### VisTextSpaceOnTBParams
     VisTextSpaceOnTBParams          struct
         VTSSOTBP_range          VisTextRange
         VTSSOTBP_spacing        BBFixed
@@ -2614,7 +2614,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetTabParams
+### VisTextSetTabParams
     VisTextSetTabParams         struct
         VTSTP_range         VisTextRange
         VTSTP_tab           Tab
@@ -2623,7 +2623,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetTextStyleParams
+### VisTextSetTextStyleParams
     VisTextSetTextStyleParams               struct
         VTSTSP_range                    VisTextRange
         VTSTSP_styleBitsToSet           word
@@ -2635,7 +2635,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSetTrackKerningParams
+### VisTextSetTrackKerningParams
     VisTextSetTrackKerningParams                struct
         VTSTKP_range                    VisTextRange
         VTSTKP_trackKerning             BBFixed
@@ -2645,7 +2645,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextShowSelectionArgs
+### VisTextShowSelectionArgs
     VisTextShowSelectionArgs            struct
         VTSSA_params            MakeRectVisibleParams
         VTSSA_flags             VisTextShowSelectionFlags
@@ -2654,7 +2654,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextShowSelectionFlags
+### VisTextShowSelectionFlags
     VisTextShowSelectionFlags               record
         VTSSF_DRAGGING          :1
                                 :15
@@ -2663,7 +2663,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextStates
+### VisTextStates
     VisTextStates       record
         VTS_EDITABLE                        :1  ; Set: text is editable.
         VTS_SELECTABLE                      :1  ; Set: text is selectable.
@@ -2682,7 +2682,7 @@ This structure is passed with MSG_VIS_TEXT_REPLACE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextStorageFlags
+### VisTextStorageFlags
     VisTextStorageFlags         record
         VTSF_LARGE                      :1
         VTSF_MULTIPLE_CHAR_ATTRS        :1
@@ -2720,7 +2720,7 @@ use default paraAttr.
 **Library:** Objects/Text/tCommon.def
 
 ----------
-#### VisTextSubstAttrTokenParams
+### VisTextSubstAttrTokenParams
     VisTextSubstAttrTokenParams         struct
         VTSATP_oldToken                     word
         VTSATP_newToken                     word
@@ -2733,7 +2733,7 @@ use default paraAttr.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextSuspendData
+### VisTextSuspendData
     VisTextSuspendData      struct
         VTSD_count              word
         VTSD_recalcRange        VisTextRange    ; range to recalculate
@@ -2745,7 +2745,7 @@ use default paraAttr.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextType
+### VisTextType
     VisTextType     struct
         VTT_meta                RefElementHeader
         VTT_hyperlinkName       word        ; name array element (-1 if none)
@@ -2757,7 +2757,7 @@ use default paraAttr.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextTypeDiffs
+### VisTextTypeDiffs
     VisTextTypeDiffs        record
         VTTD_MULTIPLE_HYPERLINKS    :1
         VTTD_MULTIPLE_CONTEXTS      :1
@@ -2767,7 +2767,7 @@ use default paraAttr.
 **Library:** Objects/vTextC.def
 
 ----------
-#### VisTextVariableType
+### VisTextVariableType
     VisTextVariableType         etype word
         VTVT_PAGE_NUMBER                    enum VisTextVariableType
             ; private data: first word is VisTextNumberType
@@ -2807,7 +2807,7 @@ use default paraAttr.
 **Library:** geoworks.def
 
 ----------
-#### VisTypeFlags
+### VisTypeFlags
     VisTypeFlags        record
         VTF_IS_COMPOSITE                    :1
         VTF_IS_WINDOW                       :1
@@ -2897,7 +2897,7 @@ have this flag set.
 **Library:** Objects/visC.def
 
 ----------
-#### VisUpdateImageFlags
+### VisUpdateImageFlags
     VisUpdateImageFlags         record
         VUIF_ALREADY_INVALIDATED    :1
         VUIF_SEND_TO_ALL_CHILDREN   :1
@@ -2925,7 +2925,7 @@ Internal flag.
 **Library:** Objects/visC.def
 
 ----------
-#### VisUpdateMode
+### VisUpdateMode
     VisUpdateMode       etype byte
         VUM_MANUAL                  enum VisUpdateMode  ;don't update. 
         VUM_NOW                     enum VisUpdateMode  ;update NOW.
@@ -2937,7 +2937,7 @@ Internal flag.
 **Library:** Objects/visC.def
 
 ----------
-#### VisUpwardQueryType
+### VisUpwardQueryType
     VisUpwardQueryType      etype word
         SPEC_VIS_QUERY_START    equ 2000    ; offset to first specific UI query type
         APP_VIS_QUERY_START     equ 4000    ; offset to first app UI query type
@@ -2977,7 +2977,7 @@ Internal flag.
 **Library:** Objects/visC.def
 
 ----------
-#### VisWardMouseEventType
+### VisWardMouseEventType
     VisWardMouseEventType           etype byte, 0
         VWMET_SMALL         enum VisWardMouseEventType
         VWMET_LARGE         enum VisWardMouseEventType
@@ -2985,7 +2985,7 @@ Internal flag.
 **Library:** grobj.def
 
 ----------
-#### VisWardToolActiveStatus
+### VisWardToolActiveStatus
     VisWardToolActiveStatus         etype byte, 0
         VWTAS_ACTIVE            enum VisWardToolActiveStatus
         VWTAS_INACTIVE          enum VisWardToolActiveStatus
@@ -2993,7 +2993,7 @@ Internal flag.
 **Library:** grobj.def
 
 ----------
-#### VMAccessFlags
+### VMAccessFlags
     VMAccessFlags       record
         VMAF_FORCE_READ_ONLY                    :1
         VMAF_FORCE_READ_WRITE                   :1
@@ -3041,7 +3041,7 @@ mark the file SHARED_MULTIPLE, close it, and reopen it again.
 **Library:** vm.def
 
 ----------
-#### VMAttributes
+### VMAttributes
     VMAttributes        record
         VMA_SYNC_UPDATE                 :1
         VMA_BACKUP                      :1
@@ -3087,7 +3087,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMChainLink
+### VMChainLink
     VMChainLink     struct
         VMCL_next       word
     VMChainLink     ends
@@ -3095,7 +3095,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMChainTree
+### VMChainTree
     VMChainTree     struct
         VMCT_meta           VMChainLink
         VMCT_offset         nptr        ;offset to first chain
@@ -3105,7 +3105,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMLinkAndGrObjRelocation
+### VMLinkAndGrObjRelocation
     VMLinkAndGrObjRelocation            struct
         VMLAGOR_link                VMChainLink
         VMLAGOR_relocation          GrObjEntryPointRelocation
@@ -3114,7 +3114,7 @@ optimizations in **VMLock**.
 **Library:** grobj.def
 
 ----------
-#### VMOpenType
+### VMOpenType
     VMOpenType      etype byte
         VMO_OPEN            enum VMOpenType ; Open existing
         VMO_TEMP_FILE       enum VMOpenType ; Create temp file -- name is 
@@ -3128,7 +3128,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMOperation
+### VMOperation
     VMOperation     etype word
         VMO_READ        enum VMOperation    ;default state -- allows
                                             ;readers not to modify the file
@@ -3144,7 +3144,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMRelocType
+### VMRelocType
     VMRelocType     etype word
         VMRT_UNRELOCATE_BEFORE_WRITE        enum VMRelocType
         VMRT_RELOCATE_AFTER_READ            enum VMRelocType
@@ -3155,7 +3155,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMStartExclusiveReturnValue
+### VMStartExclusiveReturnValue
     VMStartExclusiveReturnValue             etype word
         VMSERV_NO_CHANGES           enum VMStartExclusiveReturnValue
         VMSERV_CHANGES              enum VMStartExclusiveReturnValue
@@ -3164,7 +3164,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMStatus
+### VMStatus
     VMStatus        etype word, 256
         VM_OPEN_OK_READ_ONLY                enum VMStatus
         VM_OPEN_OK_TEMPLATE                 enum VMStatus
@@ -3195,7 +3195,7 @@ optimizations in **VMLock**.
 **Library:** vm.def
 
 ----------
-#### VMStyle
+### VMStyle
     VMStyle etype byte
         VMS_TEXT            enum VMStyle    ; normal text moniker
         VMS_ABBREV_TEXT     enum VMStyle    ; abbreviated text moniker i.e. a 
@@ -3211,7 +3211,7 @@ optimizations in **VMLock**.
 **Library:** Objects/visC.def
 
 ----------
-#### VupAlterInputFlowData
+### VupAlterInputFlowData
     VupAlterInputFlowData           struct
         VAIFD_flags             VisInputFlowGrabFlags
         VAIFD_grabType          VisInputFlowGrabType
@@ -3229,13 +3229,13 @@ applied to all mouse data (for mouse grabs only).
 **Library:** Objects/visC.def
 
 ----------
-#### Warnings
+### Warnings
     Warnings        etype word, 0
 
 **Library:** ec.def
 
 ----------
-#### WBFixed
+### WBFixed
     WBFixed struct
         WBF_frac        byte        ;8 bits fraction
         WBF_int         word        ;16 bits integer
@@ -3244,7 +3244,7 @@ applied to all mouse data (for mouse grabs only).
 **Library:** geos.def
 
 ----------
-#### WidthJustification
+### WidthJustification
     WidthJustification      etype byte
         WJ_LEFT_JUSTIFY_CHILDREN                    enum WidthJustification
         WJ_RIGHT_JUSTIFY_CHILDREN                   enum WidthJustification
@@ -3254,7 +3254,7 @@ applied to all mouse data (for mouse grabs only).
 **Library:** Objects/vCompC.def
 
 ----------
-#### WildCard
+### WildCard
     WildCard    etype byte
         WC_MATCH_SINGLE_CHAR            enum WildCard, 0x10
         WC_MATCH_MULTIPLE_CHARS         enum WildCard, 0x11
@@ -3263,7 +3263,7 @@ applied to all mouse data (for mouse grabs only).
 **Library:** Objects/vTextC.def
 
 ----------
-#### WinColorFlags
+### WinColorFlags
     WinColorFlags       record
         WCF_RGB             :1
         WCF_TRASNPARENT     :1
@@ -3290,7 +3290,7 @@ Graphics color mapping mode.
 **Library:** win.def
 
 ----------
-#### WinConstrainType
+### WinConstrainType
     WinConstrainType        etype byte
         WCT_NONE                            enum WinConstrainType
         WCT_KEEP_PARTIALLY_VISIBLE          enum WinConstrainType
@@ -3315,7 +3315,7 @@ WCT_KEEP_VISIBLE_WITH_MARGIN
 **Library:** Objects/visC.def
 
 ----------
-#### WinError
+### WinError
     WinError        etype word, 0, 1
         WE_COORD_OVERFLOW       enum WinError   ; 16-bit coordinate overflow
         WE_WINDOW_CLOSING       enum WinError   ; window is closing
@@ -3324,7 +3324,7 @@ WCT_KEEP_VISIBLE_WITH_MARGIN
 **Library:** win.def
 
 ----------
-#### WinInfoType
+### WinInfoType
     WinInfoType     etype word, 0, 2
         WIT_PRIVATE_DATA        enum WinInfoType
         WIT_COLOR               enum WinInfoType
@@ -3343,7 +3343,7 @@ WCT_KEEP_VISIBLE_WITH_MARGIN
 **Library:** win.def
 
 ----------
-#### WinInvalFlag
+### WinInvalFlag
     WinInvalFlag        etype byte, 0, 1
         WIF_INVALIDATE          enum WinInvalFlag   ; -invalidate the win
         WIF_DONT_INVALIDATE     enum WinInvalFlag   ; -don't
@@ -3351,7 +3351,7 @@ WCT_KEEP_VISIBLE_WITH_MARGIN
 **Library:** win.def
 
 ----------
-#### WinPassFlags
+### WinPassFlags
     WinPassFlags        record
         WPF_CREATE_GSTATE           :1
         WPF_ROOT                    :1
@@ -3404,7 +3404,7 @@ Whether size/offset passed is absolute or relative to current
 **Library:** win.def
 
 ----------
-#### WinPositionType
+### WinPositionType
     WinPositionType     etype byte
         WPT_AT_RATIO                    enum WinPositionType
         WPT_STAGGER                     enum WinPositionType
@@ -3447,7 +3447,7 @@ Reserved for specific-UI use.
 **Library:** Objects/visC.def
 
 ----------
-#### WinPosSizeFlag
+### WinPosSizeFlag
     WinPosSizeFlags     record
         WPSF_PERSIST                                :1
         WPSF_HINT_FOR_ICON                          :1
@@ -3495,7 +3495,7 @@ indicates what sizing algorithm should be used.
 **Library:** Objects/visC.def
 
 ----------
-#### WinPriority
+### WinPriority
     WinPriority     etype byte
         WIN_PRIO_POPUP              enum WinPriority, 4
         WIN_PRIO_MODAL              enum WinPriority, 6
@@ -3525,7 +3525,7 @@ Window stays on bottom.
 **Library:** win.def
 
 ----------
-#### WinPriorityData
+### WinPriorityData
     WinPriorityData     record
         WPD_LAYER   LayerPriority   :4
         WPD_WIN     WinPriority     :4      ; priority value for window.
@@ -3534,7 +3534,7 @@ Window stays on bottom.
 **Library:** win.def
 
 ----------
-#### WinPtrFlags
+### WinPtrFlags
     WinPtrFlags     record
         WPF_PTR_IN_UNIV     :1      ; pointer in universe of window. (RAW)
                                     ; this is not synchronous with the UI 
@@ -3548,7 +3548,7 @@ Window stays on bottom.
 **Library:** win.def
 
 ----------
-#### WinRegFlags
+### WinRegFlags
     WinRegFlags     record
         WRF_DELAYED_WASH        :1
         WRF_DELAYED_V           :1
@@ -3590,7 +3590,7 @@ entire window is already invalidated.
 **Library:** win.def
 
 ----------
-#### WinSizeType
+### WinSizeType
     WinSizeType     etype byte
         WST_AS_RATIO_OF_PARENT              enum WinSizeType
         WST_AS_RATIO_OF_FIELD               enum WinSizeType
@@ -3623,7 +3623,7 @@ window. The margin is determined by the specific UI.
 **Library:** Objects/visC.def
 
 ----------
-#### WordAndAHalf
+### WordAndAHalf
     WordAndAHalf        struct
         WAAH_low            word
         WAAH_high           byte
@@ -3632,7 +3632,7 @@ window. The margin is determined by the specific UI.
 **Library:** geos.def
 
 ----------
-#### WWFixed
+### WWFixed
     WWFixed struct
         WWF_frac        word        ;16 bits fraction
         WWF_int         word        ;16 bits integer
@@ -3641,7 +3641,7 @@ window. The margin is determined by the specific UI.
 **Library:** geos.def
 
 ----------
-#### XYOffset
+### XYOffset
     XYOffset        struct
         XYO_x   sword
         XYO_y   sword
@@ -3650,7 +3650,7 @@ window. The margin is determined by the specific UI.
 **Library:** graphics.def
 
 ----------
-#### XYSize
+### XYSize
     XYSize  struct
         XYS_width       word
         XYS_height      word

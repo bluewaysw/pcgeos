@@ -2770,7 +2770,7 @@ MSG_GEN_DOCUMENT_PHYSICAL_REVERT) if they wish to implement
 save-as/revert functionality. 
 
 ----------
-####MSG_GEN_DOCUMENT_PHYSICAL_REVERT
+#### MSG_GEN_DOCUMENT_PHYSICAL_REVERT
     Boolean MSG_GEN_DOCUMENT_PHYSICAL_REVERT(
             word *          error,
             FileHandle      file);
