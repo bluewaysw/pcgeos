@@ -8,7 +8,7 @@ following chapter.
 ## 3.1 Routines A-D
 
 ----------
-#### ArrayQuickSort()
+### ArrayQuickSort()
     void    ArrayQuickSort(
             void    *array,     /* Pointer to start of array */
             word    count,      /* Number of elements in array */
@@ -68,14 +68,14 @@ chunks or allocate other chunks in the same LMem heap.
 **See Also:** QuickSortParameters, ChunkArraySort()
 
 ----------
-#### BlockFromTransferBlockID
+### BlockFromTransferBlockID
     VMBlockHandle BlockFromTransferBlockID(id);
             TransferBlockID     id;
 
 This macro extracts the VMBlockHandle from a **TransferBlockID**.
 
 ----------
-#### BlockIDFromFileAndBlock
+### BlockIDFromFileAndBlock
     TransferBlockID BlockIDFromFileAndBlock(file, block);
             VMFileHandle    file;
             VMBlockHandle   block;
@@ -84,7 +84,7 @@ This macro creates the dword type **TransferBlockID** from a VMFileHandle
 and a VMBlockHandle.
 
 ----------
-#### bsearch()
+### bsearch()
     extern void *_pascal bsearch(
             const void      *key, 
             const void      *array,
@@ -96,7 +96,7 @@ This is a standard binary search routine. The callback routine must be
 declared _pascal.
 
 ----------
-#### calloc()
+### calloc()
     void *  calloc(
             word        n,          /* number of structures to allocate */
             size_t      size);      /* size of each structure in bytes */
@@ -129,7 +129,7 @@ smaller than 64K.
 **See Also:** malloc(), free(), GeoMalloc(), realloc()
 
 ----------
-#### CCB()
+### CCB()
     #define CCB(return_type, pointer_name, args) \
             return_type _cdecl (*pointer_name) args
 
@@ -146,7 +146,7 @@ which would be expanded to
 **See Also:** PCB()
 
 ----------
-#### CellDeref()
+### CellDeref()
     void *  CellDeref(
             optr    CellRef);
 
@@ -154,7 +154,7 @@ This routine translates an optr to a cell into the cell's address. The routine i
 simply a synonym for **LMemDeref()**.
 
 ----------
-#### CellDirty()  
+### CellDirty()  
     void    CellDirty(
             void *      ptr);   /* pointer to anywhere in locked cell */
 
@@ -171,7 +171,7 @@ in the cell. This is useful if you have incremented the pointer to the cell.
 **See Also:** Section 19.4.2.2 of the Concepts book
 
 ----------
-#### CellGetDBItem()
+### CellGetDBItem()
     DBGroupAndItem  CellGetDBItem(
             CellFunctionParameters *    cfp,
             word    row,        /* Get handles of cell in this row */
@@ -190,7 +190,7 @@ change it in any way.
 **See Also:** DBGroupAndItem, Section 19.4.2.2 of the Concepts book
 
 ----------
-#### CellGetExtent()
+### CellGetExtent()
     void    CellGetExtent(
             CellFunctionParameters *    cfp, 
             RangeEnumParams *   rep); /* write boundaries in REP_bounds field */
@@ -210,7 +210,7 @@ to -1.
 **See Also:** Section 19.4.2.2 of the Concepts book
 
 ----------
-#### CellLock()
+### CellLock()
     void *  CellLock(
             CellFunctionParameters*     cfp,
             word        row,        /* Lock cell in this row... */
@@ -225,7 +225,7 @@ pointer to it.
 **See Also:** CellLockGetRef(), Section 19.4.2.2 of the Concepts book
 
 ----------
-#### CellLockGetRef()
+### CellLockGetRef()
     void *  CellLockGetRef(
             CellFunctionParameters*     cfp,
             word        row,        /* Lock cell in this row... */
@@ -245,7 +245,7 @@ translate the optr structure into a pointer by passing it to **CellDeref()**.
 **See Also:** CellGetDBItem(). CellLock(), Section 19.4.2.2 of the Concepts book
 
 ----------
-#### CellReplace()
+### CellReplace()
     void    CellReplace{
             CellFunctionParameters *    cfp,
             word            row,        /* Insert/replace cell at this row... */
@@ -273,7 +273,7 @@ item block will not have its lock count decremented, which will prevent the
 block from being unlocked.
 
 ----------
-#### CellUnlock()
+### CellUnlock()
     void    CellUnlock(
             void *  ptr); /* pointer to anywhere in locked cell */
 
@@ -292,7 +292,7 @@ it. This is useful if you have incremented the pointer to the cell.
 **Be Sure To:** If you change the cell, dirty it (with CellDirty()) *before* you unlock it.
 
 ----------
-#### CFatalError()
+### CFatalError()
     void    CFatalError(
             word    code)
 
@@ -300,7 +300,7 @@ This routine generates a fatal error. It stores an error code passed for use by
 the debugger.
 
 ----------
-#### ChunkArrayAppend()
+### ChunkArrayAppend()
     void *  ChunkArrayAppend(
             optr    array,          /* optr to chunk array */
             word    elementSize)    /* Size of new element (ignored if 
@@ -325,7 +325,7 @@ invalidated.
 **See Also:** ChunkArrayInsertAt(), ChunkArrayDelete(), ChunkArrayResize()
 
 ----------
-#### ChunkArrayAppendHandles()
+### ChunkArrayAppendHandles()
     void *  ChunkArrayAppendHandles(
             MemHandle       mh,     /* Handle of LMem heap's block */
             ChunkHandle     ch,     /* Handle of chunk array */
@@ -346,7 +346,7 @@ invalidated.
 **See Also:** ChunkArrayInsertAt(), ChunkArrayDelete(), ChunkArrayResize()
 
 ----------
-#### ChunkArrayCreate()
+### ChunkArrayCreate()
     ChunkHandle  ChunkArrayCreate(
             MemHandle   mh,     /* Handle of LMem heap's block */
             word    elementSize,/* Size of each element (or zero if elements are
@@ -388,7 +388,7 @@ chunk, it can cause heap compaction or resizing; all pointers to within the
 block are invalidated.
 
 ----------
-#### ChunkArrayCreateAt()
+### ChunkArrayCreateAt()
     ChunkHandle     ChunkArrayCreateAt(
         optr    array,          /* Create chunk array in this chunk */
         word    elementSize,    /* Size of each element (or zero if elements are
@@ -407,7 +407,7 @@ heap.
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayCreateAtHandles()
+### ChunkArrayCreateAtHandles()
     ChunkHandle     ChunkArrayCreateAtHandles(
             MemHandle       mh,
             ChunkHandle     ch,
@@ -426,7 +426,7 @@ LMem heap.
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayDelete()
+### ChunkArrayDelete()
     void    ChunkArrayDelete(
             optr    array,      /* optr to chunk array */
             void *  element);   /* Address of element to delete */
@@ -452,7 +452,7 @@ address of an element in the array, results are undefined.
 ChunkArrayZero()
 
 ----------
-#### ChunkArrayDeleteHandle()
+### ChunkArrayDeleteHandle()
     void    ChunkArrayDeleteHandle(
             ChunkHandle     ch,     /* Handle of chunk array */
             void *          el);    /* Address of element to delete */
@@ -467,7 +467,7 @@ to the element.
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayDeleteRange()
+### ChunkArrayDeleteRange()
     void    ChunkArrayDeleteRange(
             optr    array,          /* optr to chunk array */
             word    firstElement,   /* index of first element to delete */
@@ -481,7 +481,7 @@ to cause heap compaction or resizing; thus, pointers to other elements in the
 array will remain valid.
 
 ----------
-#### ChunkArrayElementResize()
+### ChunkArrayElementResize()
     void    ChunkArrayElementResize(
             optr    array,      /* optr to chunk array */
             word    element,    /* Index of element to resize */
@@ -505,7 +505,7 @@ within the LMem heap will be invalidated.
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayElementResizeHandles()
+### ChunkArrayElementResizeHandles()
     void    ChunkArrayElementResizeHandles(
             Memhandle       mh,     /* Global handle of LMem heap */
             ChunkHandle     ch,     /* Chunk handle of chunk array */
@@ -525,7 +525,7 @@ thus, all pointers to within the LMem heap will be invalidated.
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayElementToPtr()
+### ChunkArrayElementToPtr()
     void *  ChunkArrayElementToPtr(
             optr        array,          /* optr to chunk array */
             word        elementNumber,  /* Element to get address of */
@@ -553,7 +553,7 @@ argument.
 CA_NULL_ELEMENT (i.e. 0xffff, or -1).
 
 ----------
-#### ChunkArrayElementToPtrHandles()
+### ChunkArrayElementToPtrHandles()
     void *  ChunkArrayElementToPtrHandles(
             Memhandle   mh,             /* Handle of LMem heap's block */
             ChunkHandle chunk,          /* Handle of chunk array */
@@ -577,7 +577,7 @@ fourth argument.
 CA_NULL_ELEMENT (i.e. 0xffff, or -1).
 
 ----------
-#### ChunkArrayEnum()
+### ChunkArrayEnum()
     Boolean ChunkArrayEnum(
             optr        array,      /* optr to chunk array */
             void*       enumData,   /* This is passed to callback routine */
@@ -606,7 +606,7 @@ declared _pascal.
 **Be Sure To:** Lock the LMem heap's block on the global heap (unless it is fixed).
 
 ----------
-#### ChunkArrayEnumHandles()
+### ChunkArrayEnumHandles()
     Boolean ChunkArrayEnumHandles(
             MemHandle       mh,         /* Handle of LMem heap's block */
             ChunkHandle     ch,         /* Handle of chunk array */
@@ -620,7 +620,7 @@ array is specified by its global and chunk handles (instead of with an optr).
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayEnumRange()
+### ChunkArrayEnumRange()
     Boolean     ChunkArrayEnumRange(
             optr    array,          /* optr to chunk array */
             word    startElement,   /* Start enumeration with this element */
@@ -646,7 +646,7 @@ passing a *count* of CA_LAST_ELEMENT.
 **See Also:** ChunkArrayEnum()
 
 ----------
-#### ChunkArrayEnumRangeHandles()
+### ChunkArrayEnumRangeHandles()
     Boolean     ChunkArrayEnumRangeHandles(
             MemHandle   mh,         /* Handle of LMem heap's block */
             ChunkHandle ch,         /* Handle of chunk array */
@@ -661,7 +661,7 @@ chunk array is specified by its global and chunk handles (instead of with an
 optr).
 
 ----------
-#### ChunkArrayGetCount()
+### ChunkArrayGetCount()
     word    ChunkArrayGetCount(
             optr    array);             /* optr of chunk array */
 
@@ -679,7 +679,7 @@ of elements in the chunk array.
 **See Also:** ChunkArrayHeader
 
 ----------
-#### ChunkArrayGetCountHandles()
+### ChunkArrayGetCountHandles()
     word    ChunkArrayGetCountHandles(
             MemHandle       mh,     /* Handle of LMem heap's block */
             ChunkHandle     ch);    /* Handle of chunk array */
@@ -690,7 +690,7 @@ array is specified by its global and local handles (instead of with an optr).
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayGetElement()
+### ChunkArrayGetElement()
     void    ChunkArrayGetElement(
             optr    array,          /* optr to chunk array */
             word    elementNumber,  /* Index of element to copy */
@@ -708,7 +708,7 @@ the buffer is large enough to hold the element.
 **See Also:** ChunkArrayPtrToElement(), ChunkArrayElementToPtr()
 
 ----------
-#### ChunkArrayGetElementHandles()
+### ChunkArrayGetElementHandles()
     void    ChunkArrayGetElementHandles(
             Memhandle       mh,             /* Handle of LMem heap's block */
             ChunkHandle     array,          /* Handle of chunk array */
@@ -726,7 +726,7 @@ the buffer is large enough to hold the element.
 **See Also:** ChunkArrayPtrToElement(), ChunkArrayElementToPtr()
 
 ----------
-#### ChunkArrayInsertAt()
+### ChunkArrayInsertAt()
     void *  ChunkArrayInsertAt(
             optr    array,          /* Handle of chunk array */
             void *  insertPointer,  /* Address at which to insert
@@ -757,7 +757,7 @@ resizing; all pointers within the block are invalidated.
 **See Also:** ChunkArrayAppend(), ChunkArrayDelete(), ChunkArrayResize()
 
 ----------
-#### ChunkArrayInsertAtHandle()
+### ChunkArrayInsertAtHandle()
     void *  ChunkArrayInsertAtHandle(
             ChunkHandle chunk,          /* Handle of chunk array */
             void *      insertPointer,  /* Address at which to insert
@@ -772,7 +772,7 @@ pointer passed.)
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayPtrToElement()
+### ChunkArrayPtrToElement()
     word    ChunkArrayPtrToElement(
             optr    array,      /* Handle of chunk array */
             void *  element);   /* Address of element */
@@ -793,7 +793,7 @@ results are unpredictable.
 **See Also:** ChunkArrayElementToPtr()
 
 ----------
-#### ChunkArrayPtrToElementHandle()
+### ChunkArrayPtrToElementHandle()
     word    ChunkArrayPtrToElementHandle(
             ChunkHandle     array,      /* chunk handle of chunk array */
             void *          element);   /* Pointer to element to delete */
@@ -803,7 +803,7 @@ chunk array is indicated by its chunk handle. (The global block is implicit in
 the pointer passed.)
 
 ----------
-#### ChunkArraySort()
+### ChunkArraySort()
     void    ChunkArraySort(
             optr        array,              /* optr to chunk array */
             word        valueForCallback,   /* Passed to callback routine */
@@ -848,7 +848,7 @@ pointers to the array (such as allocate a new chunk or element).
 **See Also:** ArrayQuickSort()
 
 ----------
-#### ChunkArraySortHandles()
+### ChunkArraySortHandles()
     void    ChunkArraySortHandles(
             MemHandle       memHandle,          /* Handle of LMem heap's block */
             ChunkHandle     chunkHandle,        /* Handle chunk array */
@@ -862,7 +862,7 @@ array is specified by its global and chunk handles (instead of by an optr).
 **Include:** chunkarr.h
 
 ----------
-#### ChunkArrayZero()
+### ChunkArrayZero()
     void    ChunkArrayZero(
             optr    array);     /* optr to chunk array */
 
@@ -878,7 +878,7 @@ chunks remain valid.
 **See Also:** ChunkArrayDelete()
 
 ----------
-#### ChunkArrayZeroHandles()
+### ChunkArrayZeroHandles()
     void    ChunkArrayZeroHandles(
             MemHandle       mh      /* Global handle of LMem heap */
             ChunkHandle     ch);    /* Chunk handle of chunk array */
@@ -890,7 +890,7 @@ optr).
 **Include:** chunkarr.h
 
 ----------
-#### ClipboardAbortQuickTransfer()
+### ClipboardAbortQuickTransfer()
     void    ClipboardAbortQuickTransfer(void);
 
 This routine cancels a quick-transfer operation in progress. It is typically 
@@ -901,7 +901,7 @@ object or Process which initiated the quick-transfer.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardAddToNotificationList()
+### ClipboardAddToNotificationList()
     void    ClipboardAddToNotificationList(
             optr    notificationOD);
 
@@ -916,7 +916,7 @@ object or the geode handle if the Process object should be registered.
 **See Also:** ClipboardRemoveFromNotificationList()
 
 ----------
-#### ClipboardClearQuickTransferNotification()
+### ClipboardClearQuickTransferNotification()
     void    ClipboardClearQuickTransferNotification(
             optr    notificationOD);
 
@@ -934,7 +934,7 @@ when detaching and possibly abort it if there is one.
 **See Also:** **clipbrd.goh**
 
 ----------
-#### ClipboardDoneWithItem()
+### ClipboardDoneWithItem()
     void    ClipboardDoneWithItem(
             TransferBlockID header);
 
@@ -945,7 +945,7 @@ had previously called **ClipboardQueryItem()**.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardEndQuickTransfer()
+### ClipboardEndQuickTransfer()
     void    ClipboardEndQuickTransfer(
             ClipboardQuickNotifyFlags       flags);
 
@@ -967,7 +967,7 @@ the originator can then respond if necessary.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardEnumItemFormats()
+### ClipboardEnumItemFormats()
     word    ClipboardEnumItemFormats(
             TransferBlockID         header,
             word                    maxNumFormats,
@@ -1002,7 +1002,7 @@ routine will also return the passed buffer filled with that number of
 **See Also:** ClipboardTestItemFormat()
 
 ----------
-#### ClipboardGetClipboardFile()
+### ClipboardGetClipboardFile()
     VMFileHandle ClipboardGetClipboardFile(void);
 
 This routine returns the VM file handle of the current default transfer VM 
@@ -1011,7 +1011,7 @@ file.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardGetItemInfo()
+### ClipboardGetItemInfo()
     optr    ClipboardGetItemInfo(
             TransferBlockID header);
 
@@ -1022,7 +1022,7 @@ transfer item. Pass the transfer item's header returned by
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardGetNormalItemInfo()
+### ClipboardGetNormalItemInfo()
     TransferBlockID ClipboardGetNormalItemInfo(void);
 
 This routine returns information about the normal transfer item. It returns 
@@ -1036,7 +1036,7 @@ To extract the file handle from the return value, use the macro
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardGetQuickItemInfo()
+### ClipboardGetQuickItemInfo()
     TransferBlockID ClipboardGetQuickItemInfo(void);
 
 This routine returns information about the quick-transfer transfer item. It 
@@ -1050,7 +1050,7 @@ To extract the file handle from the return value, use the macro
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardGetQuickTransferStatus()
+### ClipboardGetQuickTransferStatus()
     Boolean ClipboardGetQuickTransferStatus(void);
 
 This routine returns true if a quick-transfer operation is in progress, false 
@@ -1060,7 +1060,7 @@ order to abort any quick-transfers originated by the caller.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardGetUndoItemInfo()
+### ClipboardGetUndoItemInfo()
     TransferBlockID ClipboardGetUndoItemInfo(void);
 
 This routine returns information about the undo transfer item. It returns a 
@@ -1074,7 +1074,7 @@ To extract the file handle from the return value, use the macro
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardQueryItem()
+### ClipboardQueryItem()
     void    ClipboardQueryItem(
             ClipboardItemFlags      flags,
             ClipboardQueryArgs *    retValues);
@@ -1119,7 +1119,7 @@ VM file.
 **See Also:** ClipboardRequestItemFormat(), ClipboardDoneWithItem()
 
 ----------
-#### ClipboardRegisterItem()
+### ClipboardRegisterItem()
     Boolean ClipboardRegisterItem(
             TransferBlockID     header,
             ClipboardItemFlags  flags);
@@ -1147,7 +1147,7 @@ TIF_NORMAL) indicates the item is a normal clipboard item.
 **See Also:** ClipboardRequestItemFormat()
 
 ----------
-#### ClipboardRemoveFromNotificationList()
+### ClipboardRemoveFromNotificationList()
     Boolean ClipboardRemoveFromNotificationList(
             optr    notificationOD);
 
@@ -1165,7 +1165,7 @@ from the list.
 **See Also:** ClipboardAddToNotificationList()
 
 ----------
-#### ClipboardRequestItemFormat()
+### ClipboardRequestItemFormat()
     void    ClipboardRequestItemFormat(
             ClipboardItemFormatID       format,
             TransferBlockID             header,
@@ -1209,7 +1209,7 @@ zero.
 **See Also:** ClipboardRegisterItem(), ClipboardQueryItem()
 
 ----------
-#### ClipboardSetQuickTransferFeedback()
+### ClipboardSetQuickTransferFeedback()
     void    ClipboardSetQuickTransferFeedback(
             ClipboardQuickTransferFeedback      cursor,
             UIFunctionsActive                   buttonFlags);
@@ -1241,7 +1241,7 @@ operation" cursor.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardStartQuickTransfer()
+### ClipboardStartQuickTransfer()
     Boolean ClipboardStartQuickTransfer(
             ClipboardQuickTransferFlags         flags,
             ClipboardQuickTransferFeedback      initialCursor,
@@ -1323,7 +1323,7 @@ flag will be *false*.
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardTestItemFormat()
+### ClipboardTestItemFormat()
     Boolean ClipboardTestItemFormat(
             TransferBlockID     header,
             ClipboardFormatID   format);
@@ -1348,7 +1348,7 @@ this parameter from its individual parts using the macro
 **Include:** clipbrd.goh
 
 ----------
-#### ClipboardUnregisterItem()
+### ClipboardUnregisterItem()
     void    ClipboardUnregisterItem(
             optr    owner);
 
@@ -1364,7 +1364,7 @@ previous state.
 **Include:** clipbrd.goh
 
 ----------
-#### ConstructOptr()
+### ConstructOptr()
     optr    ConstructOptr(
             Handle      han,
             ChunkHandle         ch);
@@ -1375,7 +1375,7 @@ MemHandle) and chunk handle.
 **See Also:** HandleToOptr(), OptrToHandle(), OptrToChunk()
 
 ----------
-#### DBAlloc()
+### DBAlloc()
     DBItem  DBAlloc(
             VMFileHandle    file,
             DBGroup         group,
@@ -1392,7 +1392,7 @@ new item's item-handle.
 **See Also:** DBAllocUngrouped()
 
 ----------
-#### DBAllocUngrouped()
+### DBAllocUngrouped()
     DBGroupAndItem  DBAllocUngrouped(
             VMFileHandle    file,           
             word            size);
@@ -1408,7 +1408,7 @@ handle of the file which will contain the new item. It returns the item's
 **See Also:** DBAlloc()
 
 ----------
-#### DBCombineGroupAndItem()
+### DBCombineGroupAndItem()
     DBGroupAndItem  DBCombineGroupAndItem(
             DBGroup     group,
             DBItem      item);
@@ -1421,7 +1421,7 @@ This macro combines group and item handles into a dword-sized
 **See Also:** DBGroupFromGroupAndItem(), DBItemFromGroupAndItem()
 
 ----------
-#### DBCopyDBItem()
+### DBCopyDBItem()
     DBItem  DBCopyDBItem(
             VMFileHandle    srcFile,
             DBGroup         srcGroup,
@@ -1441,7 +1441,7 @@ a copy of the DB item and returns its **DBItem** handle.
 **See Also:** VMCopyVMChain()
 
 ----------
-#### DBCopyDBItemUngrouped()
+### DBCopyDBItemUngrouped()
     DBGroupAndItem  DBCopyDBItemUngrouped(
             VMFileHandle        srcFile, 
             DBGroupAndItem      srcID,      /* source item */
@@ -1462,7 +1462,7 @@ handles into a **DBGroupAndItem** value by calling the macro
 **See Also:** VMCopyVMChain()
 
 ----------
-#### DBDeleteAt()
+### DBDeleteAt()
     void    DBDeleteAt(
             VMFileHandle    file,
             DBGroup         group,
@@ -1479,7 +1479,7 @@ within the item, starting with the byte at the specified offset.
 **Include:** dbase.h
 
 ----------
-#### DBDeleteAtUngrouped()
+### DBDeleteAtUngrouped()
     void    DBDeleteAtUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id,
@@ -1493,7 +1493,7 @@ does not invalidate pointers to other items.
 **Include:** dbase.h
 
 ----------
-#### DBDeref()
+### DBDeref()
     void *  DBDeref(
             optr        *ref);
 
@@ -1505,7 +1505,7 @@ address of the item.
 **Include:** dbase.h
 
 ----------
-#### DBDirty()
+### DBDirty()
     void    DBUnlock(
             const void *        ptr);
 
@@ -1521,7 +1521,7 @@ in the item. This is useful if you have incremented the pointer to the item.
 **Include:** dbase.h
 
 ----------
-#### DBFree()
+### DBFree()
     void    DBFree(
             VMFileHandle    file,
             DBGroup         group,
@@ -1540,7 +1540,7 @@ properly unlocked.
 **See Also:** DBFreeUngrouped()
 
 ----------
-#### DBFreeUngrouped()
+### DBFreeUngrouped()
     void    DBFreeUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id);
@@ -1558,7 +1558,7 @@ block from ever being properly unlocked.
 **See Also:** DBFree()
 
 ----------
-#### DBGetMap()
+### DBGetMap()
     DBGroupAndItem  DBGetmap(
             VMFileHandle        file);
 
@@ -1570,7 +1570,7 @@ map item. If there is no map item, it returns a null handle.
 **See Also:** DBSetMap(), DBLockMap()
 
 ----------
-#### DBGroupAlloc()
+### DBGroupAlloc()
     DBGroup DBGroupAlloc(
             VMFileHandle        file);
 
@@ -1581,7 +1581,7 @@ handle.
 **Include:** dbase.h
 
 ----------
-#### DBGroupFree()
+### DBGroupFree()
     void    DBGroupFree(
             VMFileHandle        file,
             DBGroup     group);
@@ -1594,7 +1594,7 @@ those locked items will also be freed.
 **Include:** dbase.h
 
 ----------
-#### DBGroupFromGroupAndItem()
+### DBGroupFromGroupAndItem()
     DBGroup DBGroupFromGroupAndItem(
             DBGroupAndItem      id);
 
@@ -1603,7 +1603,7 @@ This macro returns the **DBGroup** portion of a **DBGroupAndItem** value.
 **Include:** dbase.h
 
 ----------
-#### DBInsertAt()
+### DBInsertAt()
     void    DBInsertAt(
             VMFileHandle    file,
             DBGroup         group,
@@ -1623,7 +1623,7 @@ inserted bytes.
 **Include:** dbase.h
 
 ----------
-#### DBInsertAtUngrouped()
+### DBInsertAtUngrouped()
     void    DBInsertAtUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id,
@@ -1638,7 +1638,7 @@ This routine is just like **DBInsertAt()**, except it is passed a
 **Include:** dbase.h
 
 ----------
-#### DBItemFromGroupAndItem()
+### DBItemFromGroupAndItem()
     DBItem  DBItemFromGroupAndItem(
             DBGroupAndItem      id);
 
@@ -1647,7 +1647,7 @@ This macro returns the **DBItem** portion of a **DBGroupAndItem** value.
 **Include:** dbase.h
 
 ----------
-#### DBLock()
+### DBLock()
     void *  DBLock(
             VMFileHandle    file,
             DBGroup         group,
@@ -1662,7 +1662,7 @@ null pointer.
 **See Also:** DBLockGetRef(), DBLockUngrouped()
 
 ----------
-#### DBLockGetRef()
+### DBLockGetRef()
     void *  DBLockGetRef(
             VMFileHandle    file,
             DBGroup         group,
@@ -1677,7 +1677,7 @@ passed address.
 **Warnings:** The optr is only valid until the DB item is unlocked.
 
 ----------
-#### DBLockGetRefUngrouped()
+### DBLockGetRefUngrouped()
     void *  DBLockGetRefUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id,
@@ -1689,7 +1689,7 @@ This routine is the same as **DBLockGetRef()**, except that it is passed a
 **Include:** dbase.h
 
 ----------
-#### DBLockMap()
+### DBLockMap()
     void *  DBLockMap(
             VMFileHandle        file);
 
@@ -1701,7 +1701,7 @@ unlock the map item, call **DBUnlock()** normally.
 **See Also:** DBUnlock()
 
 ----------
-#### DBLockUngrouped()
+### DBLockUngrouped()
     void *  DBLockUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id);
@@ -1712,7 +1712,7 @@ This routine is the same as **DBLock()**, except that it is passed a
 **Include:** dbase.h
 
 ----------
-#### DBReAlloc()
+### DBReAlloc()
     void    DBReAlloc(
             VMFileHandle    file,
             DBGroup         group,
@@ -1730,7 +1730,7 @@ invalidated. Space added is not zero-initialized.
 **Include:** dbase.h
 
 ----------
-#### DBReAllocUngrouped()
+### DBReAllocUngrouped()
     void    DBReAllocUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id,
@@ -1745,7 +1745,7 @@ invalidated. Space added is not zero-initialized.
 **Include:** dbase.h
 
 ----------
-#### DBSetMap()
+### DBSetMap()
     void    DBSetMap(
             VMFileHandle    file,
             DBGroup         group,
@@ -1759,7 +1759,7 @@ map item; it does not return anything.
 **Include:** dbase.h
 
 ----------
-#### DBSetMapUngrouped()
+### DBSetMapUngrouped()
     void    DBSetMapUngrouped(
             VMFileHandle        file,
             DBGroupAndItem      id);
@@ -1770,7 +1770,7 @@ This routine is just like **DBSetMap()**, except it is passed a
 **Include:** dbase.h
 
 ----------
-#### DBUnlock()
+### DBUnlock()
     void    DBUnlock(
             void *  ptr); /* address of item to unlock */
 
@@ -1785,7 +1785,7 @@ unlock it.
 **Include:** dbase.h
 
 ----------
-#### DiskCheckInUse()
+### DiskCheckInUse()
     Boolean DiskCheckInUse(
             DiskHandle      disk);
 
@@ -1801,7 +1801,7 @@ in use).
 **Include:** disk.h
 
 ----------
-#### DiskCheckUnnamed()
+### DiskCheckUnnamed()
     Boolean DiskCheckUnnamed(   /* returns true if disk is unnamed */
             DiskHandle      disk);
 
@@ -1819,7 +1819,7 @@ about the disk containing the main **geos.ini** file.
 **Include:** disk.h
 
 ----------
-#### DiskCheckWritable()
+### DiskCheckWritable()
     Boolean DiskCheckWritable(
             DiskHandle      disk);
 
@@ -1833,7 +1833,7 @@ about the disk containing the main **geos.ini** file.
 **Include:** disk.h
 
 ----------
-#### DiskCopy()
+### DiskCopy()
     DiskCopyError   DiskCopy(
             word        source,
             word        dest,
@@ -1937,7 +1937,7 @@ ERR_CANT_FORMAT_DEST
 **Include:** disk.h
 
 ----------
-#### DiskFind()
+### DiskFind()
     DiskHandle  DiskFind(
             const char *        fname,  /* Null-terminated volume name */
             DiskFindResult *    code);  /* DiskFindResult written here */
@@ -1971,7 +1971,7 @@ disk handle was returned.
 **Include:** disk.h
 
 ----------
-#### DiskForEach()
+### DiskForEach()
     DiskHandle  DiskForEach(
             Boolean _pascal (* callback) (DiskHandle disk))
 
@@ -1991,7 +1991,7 @@ routine simply returns *true*, and **DiskForEach()** returns the disk's handle.
 **Include:** disk.h
 
 ----------
-#### DiskFormat()
+### DiskFormat()
     FormatError     DiskFormat(
             word        driveNumber,
             MediaType   media,      /* Format to this size */
@@ -2064,7 +2064,7 @@ constants:
 **Include:** disk.h
 
 ----------
-#### DiskGetDrive()
+### DiskGetDrive()
     word    DiskGetDrive(
             DiskHandle      dh);
 
@@ -2080,7 +2080,7 @@ about the disk containing the main **geos.ini** file.
 **Include:** disk.h
 
 ----------
-#### DiskGetVolumeFreeSpace()
+### DiskGetVolumeFreeSpace()
     dword   DiskGetVolumeFreeSpace( 
             DiskHandle      dh);
 
@@ -2098,7 +2098,7 @@ about the disk containing the main **geos.ini** file.
 **Include:** disk.h
 
 ----------
-#### DiskGetVolumeInfo()
+### DiskGetVolumeInfo()
     word    DiskGetVolumeInfo(  /* Returns 0 if successful */
             DiskHandle      dh,
             DiskInfoStruct  *info);     /* Routine fills this structure */
@@ -2136,7 +2136,7 @@ about the disk containing the main **geos.ini** file.
 **Include:** disk.h
 
 ----------
-#### DiskGetVolumeName()
+### DiskGetVolumeName()
     void    DiskGetVolumeName(
             DiskHandle  dh,
             char *      buffer);    /* Must be VOLUME_NAME_LENGTH_ZT bytes
@@ -2156,7 +2156,7 @@ about the disk containing the main **geos.ini** file.
 **See Also:** DiskGetVolumeInfo(), DiskSetVolumeName()
 
 ----------
-#### DiskRegisterDisk()
+### DiskRegisterDisk()
     DiskHandle  DiskRegisterDisk(
                 word    driveNumber); 
 This routine registers a disk in the specified drive and assigns it a disk 
@@ -2180,7 +2180,7 @@ want to get the disk handle for the disk in a specific drive, you can simply cal
 **Include:** disk.h
 
 ----------
-#### DiskRegisterDiskSilently()
+### DiskRegisterDiskSilently()
     DiskHandle  DiskRegisterDiskSilently(
                 word        driveNumber);
 
@@ -2193,7 +2193,7 @@ temporary name to the disk, it will not present an alert box to the user.
 **Include:** disk.h
 
 ----------
-#### DiskRestore()
+### DiskRestore()
     DiskHandle  DiskRestore(
             void *      buffer,         /* buffer written by DiskSave() */
             DiskRestoreError _pascal (*callback)    
@@ -2272,7 +2272,7 @@ The appropriate drive is busy with a time-consuming operation
 **Include:** disk.h
 
 ----------
-#### DiskSave()
+### DiskSave()
     Boolean DiskSave(
             DiskHandle  disk,
             void *      buffer,         /* data will be written here */
@@ -2295,7 +2295,7 @@ other reason, it will return false and set **bufferSize* to zero.
 **Include:** disk.h
 
 ----------
-#### DiskSetVolumeName()
+### DiskSetVolumeName()
     word    DiskSetVolumeName(
             DiskHandle      dh,
             const char *    name);      /* Change the name to this */
@@ -2318,7 +2318,7 @@ only happens with network drives.
 **Include:** disk.h
 
 ----------
-#### DosExec()
+### DosExec()
     word    DosExec(
             const char *        prog,
             DiskHandle          progDisk,
@@ -2365,7 +2365,7 @@ ERROR_ARGS_TOO_LONG.
 **Include:** system.h
 
 ----------
-#### DriveGetDefaultMedia()
+### DriveGetDefaultMedia()
     MediaType   DriveGetDefaultMedia(
                 word        driveNumber);
 
@@ -2381,7 +2381,7 @@ default media type of MEDIA_1M44, but it can read from, write to, and format
 **Include:** drive.h
 
 ----------
-#### DriveGetExtStatus()
+### DriveGetExtStatus()
     word    DriveGetExtStatus(
             word        driveNumber);
 
@@ -2410,7 +2410,7 @@ If an error condition exists, **DriveGetExtStatus()** returns zero.
 **Include:** drive.h
 
 ----------
-#### DriveGetName()
+### DriveGetName()
     char *  DriveGetName(
             word    driveNumber,    /* Get name of this drive */
             char *  buffer,         /* Write name to this buffer */
@@ -2425,7 +2425,7 @@ not exist, or the buffer is too small, **DriveGetName()** returns a null pointer
 **Include:** drive.h
 
 ----------
-#### DriveGetStatus()
+### DriveGetStatus()
     word    DriveGetStatus(
             word    driveNumber);
 
@@ -2452,7 +2452,7 @@ If an error condition exists, **DriveGetStatus()** returns zero.
 **Include:** drive.h
 
 ----------
-#### DriveTestMediaSupport()
+### DriveTestMediaSupport()
     Boolean DriveTestMediaSupport(
             word        DriveNumber,            
             MediaType   media);         /* Desired disk size */

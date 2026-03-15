@@ -3202,7 +3202,7 @@ This message retrieves the text object's **VisTextFeatures** (*VTI_features*).
 
 **Interception:** Generally not intercepted.
 
-#### 10.5.2 VisText States
+### 10.5.2 VisText States
     VTI_state, VisTextStates, MSG_VIS_TEXT_GET_STATE, 
     MSG_VIS_TEXT_GET_USER_MODIFIED_STATE, 
     MSG_VIS_TEXT_SET_NOT_USER_MODIFIED, 
@@ -3719,7 +3719,7 @@ in an upcoming release.
 
 **Interception:** Generally not intercepted.
 
-#### 10.5.6 Setting Text Confines
+### 10.5.6 Setting Text Confines
     MSG_VIS_TEXT_GET_MAX_LENGTH, MSG_VIS_TEXT_SET_MAX_LENGTH, 
     MSG_VIS_TEXT_GET_LR_MARGIN, MSG_VIS_TEXT_SET_LR_MARGIN, 
     MSG_VIS_TEXT_GET_TB_MARGIN, MSG_VIS_TEXT_SET_TB_MARGIN
@@ -3995,7 +3995,7 @@ This message is sent when the text object gains the focus of the application.
 **Interception:** Intercept to receive notification of when the text object gains the focus.
 
 ----------
-#### ###MSG_META_TEXT_LOST_TARGET
+#### SG_META_TEXT_LOST_TARGET
     @importMessage MetaTextMessages, void MSG_META_TEXT_LOST_TARGET(
                 optr        obj);
 
@@ -4654,7 +4654,7 @@ affect the stored text.
 **Interception:** Generally not intercepted.
 
 ----------
-####MSG_GEN_TEXT_SET_MODIFIED_STATE
+#### MSG_GEN_TEXT_SET_MODIFIED_STATE
     void    MSG_GEN_TEXT_SET_MODIFIED_STATE(
             Boolean modifiedState);
 
@@ -4692,7 +4692,7 @@ indeterminate, *false* otherwise).
 **Interception:** Generally not intercepted.
 
 ----------
-####MSG_GEN_TEXT_IS_MODIFIED
+#### MSG_GEN_TEXT_IS_MODIFIED
     Boolean MSG_GEN_TEXT_IS_MODIFIED();
 
 This message checks whether a GenText object has been modified.
@@ -5632,7 +5632,7 @@ controllers and were described earlier.) These messages common to both
 controllers are listed and described here.
 
 ----------
-####MSG_REPLACE_CURRENT
+#### MSG_REPLACE_CURRENT
     @importMessage MetaSearchSpellMessages, void MSG_REPLACE_CURRENT(
                 MemHandle       replaceInfo);
 

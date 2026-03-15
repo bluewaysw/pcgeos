@@ -1,8 +1,8 @@
-## 2 System Configuration
+# 2 System Configuration
 
 This chapter details how your software layout should look after installation. This information is provided both so that you can confirm your setup and so that you can make appropriate modifications later.
 
-### 2.1 Development Directories and Files
+## 2.1 Development Directories and Files
 
 The installation program will install a large number of tool files, debugging files, and sample applications on to the development machine. These are arranged in the directory of your choice (with name specified in the ROOT_DIR environment variable). Most developers will use \PCGEOS as the root directory of their development tree, and this is the name assumed throughout this section.
 
@@ -62,7 +62,7 @@ The subdirectories of the \PCGEOS\APPL directory are
 
 The EXTRA directory in this directory contains additional Tcl scripts that are both undocumented and unsupported. They are provided because you might find them useful even though they are unsupported.
 
-### 2.2 Target Directories and Files
+## 2.2 Target Directories and Files
 
 The target machine install will set up a standard GEOS environment. It will set up the proper directory structure; note that this structure is important-the pcs tool, which automatically downloads geodes to their proper directory assumes that those proper directories exist. Also note that the install program will set up two trees: one with error-checking code, and one with normal code. When the instructions tell you to do something from the top-level target directory, then you should be in the top-level EC directory if using error checking code and the top-level normal directory when testing regular code.
 
@@ -140,7 +140,7 @@ The standard GEOS setup includes the following directories:
 
 >Utilities  Contains utility applications that are not desk accessories. GeoManager, the icon editor, Preferences, and the screen dumper are all examples of utility applications; these should all be installed on your system.
 
-### 2.3 Environment Variables
+## 2.3 Environment Variables
 
 To make development easier, the environment variables on your 
 development machine should have the following additions.
@@ -159,7 +159,7 @@ where comPort is the number of the development machine's serial port you are usi
 
 Your target machine needs only one extra environment variable-a PTTY variable to control the target machine's side of communications with the development machine. It is set up in the same way as the development machine. However, you should use the number of the COM port by which the target machine is connected.
 
-### 2.4 System Files
+## 2.4 System Files
 
 The \AUTOEXEC.BAT and \CONFIG.SYS files on the development machine should have certain changes made to them for the tools to function properly. These changes are normally invoked by the installation program, but they are listed below for reference.
 
@@ -167,7 +167,7 @@ The AUTOEXEC.BAT file should define the PATH, ROOT_DIR, and PTTY environment var
 
 The CONFIG.SYS file on the host machine defines the number of files and buffers DOS can have open at one time. For best results, the FILES should be set to something larger than 80, and BUFFERS should be set to something larger than 30. On the target machine, set them to similar numbers. The exact numbers best for your system may be different. See your DOS manual for more information on these items.
 
-### 2.5 Sample C Applications
+## 2.5 Sample C Applications
 
 In your development machine's \PCGEOS\APPL\SDK_C directory, there should be a number of sample applications. The documentation will refer to these applications to illustrate certain points, but you may find a brief description of each useful if you wish to browse.
 
@@ -316,7 +316,7 @@ VTEXT   Demonstrates simple use of a visible text object.
 
 WAVSAMP This sample application, meant for the Zoomer only, shows how to use the wav library to play sample sounds.
 
-### 2.6 Sample Esp Programs
+## 2.6 Sample Esp Programs
 
 The SDK_ASM directory contains a number of Esp sample programs. For the most part, these programs are Esp versions of previously described C sample programs. They are listed below.
 

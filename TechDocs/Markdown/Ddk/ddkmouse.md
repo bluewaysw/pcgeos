@@ -1,11 +1,11 @@
-## 2 Mouse Driver
+# 2 Mouse Driver
 
 Most GEOS platforms will use some kind of pointing device. On desktop
 machines, this is most commonly a mouse; in any event, these pointing
 devices share many similarities with mice. Accordingly, all these devices are
 driven by drivers known collectively as mouse drivers.
 
-### 2.1 Mouse Driver Basics
+## 2.1 Mouse Driver Basics
 Most mouse drivers behave in very similar ways. For this reason, most GEOS
 mouse drivers share a lot of code. This code is provided in the SDK in the files
 \OMNIGO\DRIVER\DDK\MOUSE\MOUSECOM.ASM and
@@ -14,7 +14,7 @@ mouse drivers; these demonstrate how the drivers actually use the common
 code to perform such tasks as send mouse movements to the system, handle
 strategy-routine requests, etc.
 
-#### 2.1.1 Data Structures
+### 2.1.1 Data Structures
 All mouse drivers must be extended drivers, even if they support only one
 kind of mouse. A mouse driver’s dgroup segment must begin with the
 MouseDriverInfoStruct structure. This structure is based on the
@@ -73,7 +73,7 @@ This field should contain the factory-set default value.
 ``MEI_CALIBRATE``  
 Set if this mouse can be calibrated within GEOS.
 
-#### 2.1.2 Functions
+### 2.1.2 Functions
 
 Mouse drivers must be able to handle all four functions defined by
 DriverFunction, and both functions defined by

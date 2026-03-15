@@ -1,4 +1,4 @@
-## 9 The INI File
+# 9 The INI File
 
 Most programmers are familiar with the structure and function of an 
 initialization file, or INI file. GEOS uses one or more INI files depending on 
@@ -11,7 +11,7 @@ as the specific UI expected and information about the type of display and
 input devices used. It may also be used by applications for storing their 
 configuration information as set by the user.
 
-### 9.1 How to Use the INI File
+## 9.1 How to Use the INI File
 
 As a software developer, you will have two uses for the INI file. First, the INI 
 file controls your system configuration to a certain extent. For example, if you 
@@ -31,7 +31,7 @@ combinations are described in the special add-on documents that describe
 developing for each system. For more information, contact Geoworks 
 Developer Support.
 
-### 9.2 Categories in the INI File
+## 9.2 Categories in the INI File
 
 Code Display 9-1 shows a short list, without description, of all the categories 
 and keys available in the INI file. Following the display are explanations of 

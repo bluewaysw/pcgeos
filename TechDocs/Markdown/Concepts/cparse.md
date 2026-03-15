@@ -1,4 +1,4 @@
-## 20 Parse Library
+# 20 Parse Library
 
 The Parse Library was originally created to provide a parser for a 
 spreadsheet language. However, it will also fit the needs of a programmer 
@@ -29,7 +29,7 @@ be familiar with the parsing of context-free grammars. A good book to look at
 is Compilers: Principles, Techniques, and Tools by Aho, Sethi, and Ullman 
 (a.k.a. "The Red Dragon Book").
 
-### 20.1 Parse Library Behavior
+## 20.1 Parse Library Behavior
 
 The Parse Library takes a string of characters and evaluates it. In many 
 ways, it acts like a compiler; it translates a string into tokens, evaluates the 
@@ -110,7 +110,7 @@ section will just describe this in general terms; for example, "the Evaluator
 uses the callback to find out the value of a cell." The advanced section 
 provides a more detailed explanation.
 
-#### 20.1.1 The Scanner
+### 20.1.1 The Scanner
 
 The scanner translates a text string into a sequence of tokens. The tokens 
 can then be processed by the parser. Every token is associated with some data.
@@ -124,7 +124,7 @@ reason, it will not notice if, for example, parentheses are not balanced. It
 returns errors only if it is passed a string which does not scan as a sequence 
 of tokens.
 
-##### 20.1.1.1 Scanner Tokens
+#### 20.1.1.1 Scanner Tokens
 
 The scanner recognizes the tokens listed below. Note that applications will 
 never directly encounter the scanner tokens; the tokens translates them into 
@@ -143,7 +143,7 @@ their names) is given in [section 20.1.2.2](#20112-strings).
 |LIST_SEPARATOR    |This is a comma, i.e. ",". It is used to separate arguments to functions. There is no data section associated with this token.|
 |IDENTIFIER        |This is a sequence of characters, not in quotation marks, which does not match the format for cell references. Identifiers may be functions (built-in or application-defined) or variables; see [section 20.1.1.5](#20115-identifiers). The data section is a string containing the identifier.|
 
-##### 20.1.1.2 Strings
+#### 20.1.1.2 Strings
 
 The string passed to the scanner may, itself, contain strings. These inner 
 strings are not further analyzed; rather, their contents are associated with 
@@ -163,7 +163,7 @@ Backslash-codes include the following:
 |\\   |This code represents a backslash character (i.e. ASCII 0x5C, or "\").         |
 |\nnn |This code is a literal octal value. The backslash must be followed by three digits, making up an octal integer in the range 0-177o (i.e. 0-255). The byte specified is inserted directly into the string. Thus, for example, "\134" is functionally identical to "\\".|
 
-##### 20.1.1.3 Cell References
+#### 20.1.1.3 Cell References
 
 The parse library is often used in conjunction with cell files; for example, the 
 spreadsheet objects use the two libraries together. For this reason, the 
@@ -195,7 +195,7 @@ historically, spreadsheets have had the first row be row number 1. Therefore,
 if the parser encounters a reference to cell A1, it will translate this into a cell 
 reference which specifies row zero, column zero.
 
-##### 20.1.1.4 Operators
+#### 20.1.1.4 Operators
 
 The scanner recognizes a number of built-in operators. Neither the scanner 
 nor the parser does any simplification or evaluation of operator expressions; 
@@ -365,7 +365,7 @@ Note that cell ranges must be rectangular; there is, therefore,
 no "range-union" operator. The data portion of this token is 
 OP_RANGE_INTERSECTION.
 
-##### 20.1.1.5 Identifiers
+#### 20.1.1.5 Identifiers
 
 Any unbroken alphanumeric character sequence which does not appear in 
 quotes, and which is not in the format for a cell reference, is presumed to be 
@@ -380,7 +380,7 @@ routine which will perform this function. If its position indicates that it is a
 identifier, the parser will request the value associated with the identifier; 
 this may be a string, a number, or a cell reference.
 
-#### 20.1.2 The Parser
+### 20.1.2 The Parser
 
 Applications will never call the scanner directly. Instead, if they access the 
 parse library directly (instead of through the spreadsheet objects), they will 
@@ -405,7 +405,7 @@ If the parser is not passed a well-formed expression, or if it is unable to
 successfully parse the string for some other reason, it returns an error code. 
 The error codes are described at length in the advanced section.
 
-##### 20.1.2.1 The Parser's Grammar
+#### 20.1.2.1 The Parser's Grammar
 
 The parser uses a context-free grammar to make sure the string is 
 well-formed. The grammar is listed below. The basic units of the grammar 
@@ -437,7 +437,7 @@ STRING
 CELL_REF  
 IDENTIFIER
 
-##### 20.1.2.2 Parser Tokens
+#### 20.1.2.2 Parser Tokens
 
 The parser does not return scanner tokens; instead, it returns a sequence of 
 parser tokens. The parser tokens are almost directly analogous to the 
@@ -491,7 +491,7 @@ replaces that with an "end-of-argument" token; when it reaches the closing
 parenthesis for the function call, it replaces that with a "close-function" 
 token.
 
-##### 20.1.2.3 An Example of Scanning and Parsing
+#### 20.1.2.3 An Example of Scanning and Parsing
 
 Suppose that you call the parser on the text string 
 "3 + SUM(6.5, 3 ^ (4 - 1), C5...F9)". The parser will evaluate the string, one 
@@ -555,7 +555,7 @@ The application does not need to save the original text string. Instead, it can
 save the buffer containing the parser tokens, and use the formatter to 
 translate the token sequence back into a character string.
 
-#### 20.1.3 Evaluator
+### 20.1.3 Evaluator
 
 The evaluator simplifies a token string returned by the parser. If the input 
 token sequence was well-formed (as are all token sequences generated by the 
@@ -651,7 +651,7 @@ name; act on the value appropriately.
 Evaluate the Operator stack until it is empty; the result will be 
 on the top of the Argument stack.
 
-#### 20.1.4 Formatter
+### 20.1.4 Formatter
 
 In order to display a token sequence, you must call the Formatter. The 
 formatter is very straightforward. It is passed a buffer containing a token 
@@ -662,7 +662,7 @@ local language and the user's Preferences settings.
 If the token sequence consists of an error token, the formatter will generate 
 an appropriate error string.
 
-### 20.2 Parser Functions
+## 20.2 Parser Functions
 
 The Parse library provides many built-in functions. Furthermore, each 
 application can define its own functions. Every function is associated with a 
@@ -694,7 +694,7 @@ function is responsible for popping all the arguments off the stack and
 pushing the result. It can also push an error message on the stack. All of this 
 is discussed at length in the advanced section.
 
-#### 20.2.1 Internal Functions
+### 20.2.1 Internal Functions
 
 The Parse library provides many internal functions, and more are 
 continually being added. Any application which uses the parse library 
@@ -787,7 +787,7 @@ description of each one.
 |UPPER     |Converts all letters in string to uppercase |
 |VALUE     |Converts string to number                   |
 
-#### 20.2.2 External Functions
+### 20.2.2 External Functions
 
 Applications which use the Parse library may write their own functions. 
 Whenever the formatter encounters a function name which it does not 
@@ -797,13 +797,13 @@ arguments and the function ID. The application should return a single value.
 If it cannot produce a value, it should return an error code. The error codes 
 are described in [section 20.3.2](#2032-evaluating-a-token-sequence).
 
-### 20.3 Coding with the Parse Library
+## 20.3 Coding with the Parse Library
 
 This section describes how to use the Parser directly, instead of using 
 intermediaries (like the Spreadsheet library). Most applications will not need 
 to use these routines.
 
-#### 20.3.1 Parsing a String
+### 20.3.1 Parsing a String
 
 ParserParseString()
 
@@ -864,7 +864,7 @@ the callback routine would not provide an ID for it.
 **PSEE_GENERAL**  
 General parser error.
 
-#### 20.3.2 Evaluating a Token Sequence
+### 20.3.2 Evaluating a Token Sequence
 
 ParserEvalExpression()
 
@@ -961,7 +961,7 @@ The application may also define its own error codes, beginning with the
 constant PSEE_FIRST_APPLICATION_ERROR. All internal functions, and all 
 operators, always propagate application-defined errors.
 
-#### 20.3.3 Formatting a Token Sequence
+### 20.3.3 Formatting a Token Sequence
 
 ParserFormatExpression()
 

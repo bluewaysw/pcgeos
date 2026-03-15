@@ -1,4 +1,4 @@
-## D The Math Library
+# D The Math Library
 
 The Math Library allows high precision computations not available 
 through standard integer operations. Floating Point (FP) numbers use 
@@ -25,7 +25,7 @@ Use of math.goh is optional, depending on the purpose of the application.
 A spreadsheet application, for example, might want to allow the user to 
 format FP numbers. Other applications might not want to include this file.
 
-### D.1 Basic Math Functions
+## D.1 Basic Math Functions
 
 The Math Library includes many routines and structures that make the 
 manipulation of FP numbers possible. Most of these are transparent to a C 
@@ -251,7 +251,7 @@ Code Display D-3 Creating a Random Number
 }
 ~~~
 
-### D.2 Conversions to Other Types
+## D.2 Conversions to Other Types
 
 In many cases, FP numbers will need to be converted to different types for 
 use in different parts of an application. For example, floating point 
@@ -612,7 +612,7 @@ return one as the number of digits.
 
 FloatStringGetDateNumber(), FloatStringGetTimeNumber()
 
-### D.3 Float Formats
+## D.3 Float Formats
 
 FP numbers can be displayed in many ways. For example, as we have seen, 
 an FP number may actually represent a date-time. When we display the FP 
@@ -794,7 +794,7 @@ typedef struct {
 } FormatEntry;
 ~~~
 
-### D.4 Direct FP Operations
+## D.4 Direct FP Operations
 
 The Math Library allows your application to use floating point (FP) 
 numbers. C Developers will find little reason to make direct calls to 

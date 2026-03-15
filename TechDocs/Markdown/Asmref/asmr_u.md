@@ -1,7 +1,7 @@
 ## 2.6 Routines R-U
 
 ----------
-#### RangeEnum
+### RangeEnum
 Enumerate all cells in a range of cells, calling a callback routine on each.
 
 **Pass:**  
@@ -106,7 +106,7 @@ change the data pointed at by *REP_columnFlagsArray* and return the flag
 REF_COLUMN_FLAGS_MODIFIED.
 
 ----------
-#### RangeExists
+### RangeExists
 Check for the existence of cells in a given range.
 
 **Pass:**  
@@ -124,7 +124,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### RangeInsert
+### RangeInsert
 Insert or delete a range of cells.
 
 **Pass:**  
@@ -149,7 +149,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### RangeSort
+### RangeSort
 Sort a range of cells either in ascending order or via callback routine.
 
 **Pass:**  
@@ -192,7 +192,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### RowGetFlags
+### RowGetFlags
 Get flags for specified row.
 
 **Pass:**  
@@ -209,7 +209,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### RowSetFlags
+### RowSetFlags
 Set the flags for a given row.
 
 **Pass:**  
@@ -226,7 +226,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### RulerScaleDocToWinCoords
+### RulerScaleDocToWinCoords
 Scale a ruler point in document coordinates to window coordinates.
 
 **Pass:**  
@@ -242,7 +242,7 @@ Nothing.
 **Library:** ruler.def
 
 ----------
-#### RulerScaleWinToDocCoords
+### RulerScaleWinToDocCoords
 Scale a ruler point in window coordinates to document coordinates.
 
 **Pass:**  
@@ -258,7 +258,7 @@ Nothing.
 **Library:** ruler.def
 
 ----------
-#### SoundAllocMusic
+### SoundAllocMusic
 Allocate a handle to play FM sounds from fixed memory
 
 **Pass:**  
@@ -278,7 +278,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundAllocMusicNote
+### SoundAllocMusicNote
 Allocate a note and return its handle.
 
 **Pass:**  
@@ -300,7 +300,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundAllocMusicStream
+### SoundAllocMusicStream
 Allocate a stream to play FM sounds on.
 
 **Pass:**  
@@ -321,7 +321,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundAllocNote
+### SoundAllocNote
 Allocate a note structure, define it, and return its handle. A note is a simple 
 sound that has a pre-defined sound buffer. The handle returned may be used 
 with other sound routines to play or free the sound.
@@ -345,7 +345,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundAllocSampleStream
+### SoundAllocSampleStream
 Allocate a sound handle for the sound.
 
 **Pass:**  
@@ -362,7 +362,7 @@ bx or ax - See above.
 **Library:** sound.def
 
 ----------
-#### SoundAllocSimple
+### SoundAllocSimple
 Allocate a handle to play FM sounds from fixed memory
 
 **Pass:**  
@@ -382,7 +382,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundAllocSimpleFM
+### SoundAllocSimpleFM
 Allocate space on the global heap for a simple, frequency-modulated sound 
 stream for a song. The song should already be created and located in fixed or 
 locked memory. The handle returned references a block containing the sound 
@@ -405,7 +405,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundChangeOwner
+### SoundChangeOwner
 Change the owner of a sound.
 
 **Pass:**  
@@ -421,7 +421,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundChangeOwnerMusic
+### SoundChangeOwnerMusic
 Change the owner of a sound.
 
 **Pass:**  
@@ -437,7 +437,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundChangeOwnerSimple
+### SoundChangeOwnerSimple
 Change the owner of a sound.
 
 **Pass:**  
@@ -453,7 +453,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundChangeOwnerStream
+### SoundChangeOwnerStream
 Change the owner of a sound stream.
 
 **Pass:**  
@@ -469,7 +469,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundDisableSampleStream
+### SoundDisableSampleStream
 Removes the association of DAC and the sound.
 
 **Pass:**  
@@ -484,7 +484,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundEnableSampleStream
+### SoundEnableSampleStream
 Associate a real DAC device to a sound.
 
 **Pass:**  
@@ -504,7 +504,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundFreeMusic
+### SoundFreeMusic
 Free up a simple FM sound stream.
 
 **Pass:**  
@@ -519,7 +519,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundFreeMusicNote
+### SoundFreeMusicNote
 Free up an allocated music note.
 
 **Pass:**  
@@ -534,7 +534,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundFreeMusicStream
+### SoundFreeMusicStream
 Free an FM sound stream.
 
 **Pass:**  
@@ -549,7 +549,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundFreeNote
+### SoundFreeNote
 Free the given note originally allocated with **SoundAllocNote**; the note 
 must not be playing when it is freed. If the note may be playing, call 
 **SoundStopNote** before freeing it.
@@ -566,7 +566,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundFreeSampleStream
+### SoundFreeSampleStream
 Frees up the Sound structure of the sound.
 
 **Pass:**  
@@ -581,7 +581,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundFreeSimple
+### SoundFreeSimple
 Free up a simple FM sound stream.
 
 **Pass:**  
@@ -596,7 +596,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundFreeSimpleFM
+### SoundFreeSimpleFM
 Free a simple frequency-modulated sound originally allocated with 
 **SoundAllocSimpleFM**. The sound must not be playing; if it may be playing, 
 call **SoundStopStream** before freeing it.
@@ -613,7 +613,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundGetExclusive
+### SoundGetExclusive
 Get exclusive access to the sound driver, blocking if it is currently in use. 
 Generally, applications will call the higher level sound routines rather than 
 access the sound driver's strategy routine directly. If you do call this routine, 
@@ -633,7 +633,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundGetExclusiveNB
+### SoundGetExclusiveNB
 Get exclusive access to the sound driver, returning with the carry flag set if 
 it is currently in use. Generally, applications will call the higher level sound 
 routines rather than access the sound driver's strategy routine directly. If 
@@ -656,7 +656,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundInitMusic
+### SoundInitMusic
 Initialize a pre-defined simple FM sound structure.
 
 **Pass:**  
@@ -672,7 +672,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundInitSimple
+### SoundInitSimple
 Initialize a pre-defined simple FM sound structure.
 
 **Pass:**  
@@ -688,7 +688,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundInitSimpleFM
+### SoundInitSimpleFM
 Initialize a pre-defined simple frequency-modulated sound structure. This 
 routine is automatically called when a note is allocated with 
 **SoundAllocNote** or **SoundAllocSimpleFM**.
@@ -706,7 +706,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundPlayMusic
+### SoundPlayMusic
 Play a simple FM sound.
 
 **Pass:**  
@@ -725,7 +725,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundPlayMusicNote
+### SoundPlayMusicNote
 Play a note of music.
 
 **Pass:**  
@@ -744,7 +744,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundPlayNote
+### SoundPlayNote
 Play the given note according to the other parameters. If the note is currently 
 playing, it will be stopped and immediately restarted. This routine is 
 identical to **SoundPlaySimpleFM**.
@@ -766,7 +766,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundPlaySimple
+### SoundPlaySimple
 Play a note of music.
 
 **Pass:**  
@@ -785,7 +785,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundPlaySimpleFM
+### SoundPlaySimpleFM
 Play the given note according to the other parameters. If the sound is 
 currently playing, it will be restarted at the beginning with the new tempo 
 and priority.
@@ -807,7 +807,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundPlayToMusicStream
+### SoundPlayToMusicStream
 Play an FM sound to a stream.
 
 **Pass:**  
@@ -825,7 +825,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundPlayToSampleStream
+### SoundPlayToSampleStream
 Play a given piece of DAC data to the DAC device.
 
 **Pass:**  
@@ -844,7 +844,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundReallocMusic
+### SoundReallocMusic
 Change the song setting for a simple stream.
 
 **Pass:**  
@@ -861,7 +861,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundReallocMusicNote
+### SoundReallocMusicNote
 Change the settings of the given note. The note must not be playing; if it may 
 be, call SoundStopNote before reallocating the note.
 
@@ -883,7 +883,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundReallocNote
+### SoundReallocNote
 Change the settings of the given note. The note must not be playing; if it may 
 be, call **SoundStopNote** before reallocating the note.
 
@@ -904,7 +904,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundReallocSimple
+### SoundReallocSimple
 Change the song setting for a simple stream.
 
 **Pass:**  
@@ -921,7 +921,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundReallocSimpleFM
+### SoundReallocSimpleFM
 Change the settings for a simple note or simple song's stream. This routine 
 restarts the song with the new sound buffer, but it leaves the voices in the 
 state they were in at the end of the last song. This allows playing a very long 
@@ -944,7 +944,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundReleaseExclusive
+### SoundReleaseExclusive
 Release exclusive access to the sound library and sound driver routines. Any 
 thread that calls **SoundGrabExclusive** or **SoundGrabExclusiveNB** 
 must call this routine after grabbing the exclusive. In general, a thread 
@@ -962,7 +962,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundSampleDriverInfo
+### SoundSampleDriverInfo
 Get information on Sample Driver.
 
 **Pass:**  
@@ -978,7 +978,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundStopMusic
+### SoundStopMusic
 Stop a simple stream.
 
 **Pass:**  
@@ -994,7 +994,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundStopMusicNote
+### SoundStopMusicNote
 Stop a music note.
 
 **Pass:**  
@@ -1010,7 +1010,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundStopMusicStream
+### SoundStopMusicStream
 Stop a music stream.
 
 **Pass:**  
@@ -1026,7 +1026,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundStopNote
+### SoundStopNote
 Stop a note that is playing. This routine should be called before freeing, 
 changing, or reallocating a note if that note could be playing at the time.
 
@@ -1043,7 +1043,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SoundStopSimple
+### SoundStopSimple
 Stop a music stream.
 
 **Pass:**  
@@ -1059,7 +1059,7 @@ See above.
 **Library:** sound.def
 
 ----------
-#### SoundStopSimpleFM
+### SoundStopSimpleFM
 Stop a simple frequency-modulated sound from playing. This is similar in 
 usage to **SoundStopNote**.
 
@@ -1073,7 +1073,7 @@ ax - On error, a **SoundErrors** value; otherwise destroyed.
 **Library:** sound.def
 
 ----------
-#### SoundSynthDriverInfo
+### SoundSynthDriverInfo
 Get information on the synthesizer driver.
 
 **Pass:**  
@@ -1090,7 +1090,7 @@ Nothing.
 **Library:** sound.def
 
 ----------
-#### SpoolAddJob
+### SpoolAddJob
 Add the passed job (a GString file) to the print queue. If the spooler thread 
 has not started, or if there is no queue for the desired device and port, this 
 routine will start them.
@@ -1111,7 +1111,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolConvertPaperSize
+### SpoolConvertPaperSize
 Convert a width and height pair to a paper size index. This is the complement 
 to **SpoolGetPaperSize**.
 
@@ -1131,7 +1131,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolCreatePaperSize
+### SpoolCreatePaperSize
 Create a new paper size index and store it in the GEOS.INI file.
 
 **Pass:**  
@@ -1152,7 +1152,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolCreatePrinter
+### SpoolCreatePrinter
 Create a new printer, adding it to the end of the list of installed printers. This 
 routine does not initialize all the information for the printer but only adds it 
 to the installed list.
@@ -1172,7 +1172,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolCreateSpoolFile
+### SpoolCreateSpoolFile
 Create and open a new, unique spool file in the SP_SPOOL directory.
 
 **Pass:**  
@@ -1190,7 +1190,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolDelJob
+### SpoolDelJob
 Delete a job from the spooler queue, given a job ID.
 
 **Pass:**  
@@ -1205,7 +1205,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolDelayJob
+### SpoolDelayJob
 Move the specified job to the end of the spooler queue.
 
 **Pass:**  
@@ -1220,7 +1220,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolDeletePaperSize
+### SpoolDeletePaperSize
 Delete a paper size from the paper size list.
 
 **Pass:**  
@@ -1236,7 +1236,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolDeletePrinter
+### SpoolDeletePrinter
 Delete a printer from the list of currently installed printers.
 
 **Pass:**  
@@ -1251,7 +1251,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetDefaultPageSizeInfo
+### SpoolGetDefaultPageSizeInfo
 Return the default page information for the spooler.
 
 **Pass:**  
@@ -1272,7 +1272,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetNumPaperSizes
+### SpoolGetNumPaperSizes
 Return the number of defined paper sizes for the given type.
 
 **Pass:**  
@@ -1288,7 +1288,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetNumPrinters
+### SpoolGetNumPrinters
 Return the number of printers installed for the given driver type.
 
 **Pass:**  
@@ -1306,7 +1306,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetPaperSize
+### SpoolGetPaperSize
 Return the dimensions of the requested paper size. This is the complement 
 to **SpoolConvertPageSize**.
 
@@ -1325,7 +1325,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetPaperSizeOrder
+### SpoolGetPaperSizeOrder
 Return the paper size order array for the given page type.
 
 **Pass:**  
@@ -1358,7 +1358,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetPaperString
+### SpoolGetPaperString
 Return the paper size string for the specified paper size and page type.
 
 **Pass:**  
@@ -1379,7 +1379,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolGetPrinterString
+### SpoolGetPrinterString
 Return the printer name string for the specified printer.
 
 **Pass:**  
@@ -1401,7 +1401,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolHurryJob
+### SpoolHurryJob
 Move the given print job to the front of the spooler's queue.
 
 **Pass:**  
@@ -1416,7 +1416,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolInfo
+### SpoolInfo
 Return information about either the spooler's jobs or the spooler's queue.
 
 **Pass:**  
@@ -1461,7 +1461,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolMapToPrinterFont
+### SpoolMapToPrinterFont
 Map the GEOS font passed to the closest printer font available.
 
 **Pass:**  
@@ -1488,7 +1488,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolModifyPriority
+### SpoolModifyPriority
 Modify the priority of a spool queue's thread.
 
 **Pass:**  
@@ -1505,7 +1505,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolSetDefaultPageSizeInfo
+### SpoolSetDefaultPageSizeInfo
 Set the default page information for the system.
 
 **Pass:**  
@@ -1521,7 +1521,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolSetDefaultPrinter
+### SpoolSetDefaultPrinter
 Set the printer to be used as the system default.
 
 **Pass:**  
@@ -1536,7 +1536,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolSetDocSize
+### SpoolSetDocSize
 Set the document size for a given application.
 
 **Pass:**  
@@ -1554,7 +1554,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolSetPaperSizeOrder
+### SpoolSetPaperSizeOrder
 Set a new order in which paper sizes should be displayed, for a particular 
 page type.
 
@@ -1577,7 +1577,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolUpdateTranslationTable
+### SpoolUpdateTranslationTable
 Initialize the translation table in the passed  -  structure. This routine 
 is called any time a change in font or country occurs resulting in a change in 
 the ISO substitutions. It is also called once on startup of any print job. This 
@@ -1598,7 +1598,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SpoolVerifyPrinterPort
+### SpoolVerifyPrinterPort
 Verify the existence of a printer port.
 
 **Pass:**  
@@ -1614,7 +1614,7 @@ Nothing.
 **Library:** spool.def
 
 ----------
-#### SysGetDosEnvironment
+### SysGetDosEnvironment
 Retrieve the value of a DOS environment variable from the environment 
 buffer.
 
@@ -1634,7 +1634,7 @@ Nothing.
 **Library:** system.def
 
 ----------
-#### SysGetECLevel
+### SysGetECLevel
 Return the current **ErrorCheckingFlags** record set for the system and the 
 block, if ECF_BLOCK_CHECKSUM is set. For full information, see the 
 reference entry for **ErrorCheckingFlags**.
@@ -1653,7 +1653,7 @@ Nothing.
 **Library:** ec.def
 
 ----------
-#### SysGetInfo
+### SysGetInfo
 Return general system information dependent on the type passed.
 
 **Pass:**  
@@ -1692,7 +1692,7 @@ dx, if not returning value.
 **Library:** sysstats.def
 
 ----------
-#### SysLocateFileInDosPath
+### SysLocateFileInDosPath
 Search for a file along the path specified in the DOS PATH environment 
 variable.
 
@@ -1716,7 +1716,7 @@ Nothing.
 **Library:** system.def
 
 ----------
-#### SysLockBIOS
+### SysLockBIOS
 Gain exclusive access to the BIOS or DOS. Use of this routine is strongly 
 discouraged.
 
@@ -1735,7 +1735,7 @@ Flags are destroyed.
 This is a dangerous routine.
 
 ----------
-#### SysNotify
+### SysNotify
 Put the **SysNotify** dialog box (the white box with black borders) on the 
 screen. The dialog may have two strings printed in it, which are passed with 
 this routine. This box is typically used for unrecoverable errors, but it may be 
@@ -1773,7 +1773,7 @@ Nothing (except SNF_REBOOT).
 **Library:** system.def
 
 ----------
-#### SysRegisterScreen
+### SysRegisterScreen
 
 Register a new screen with the error mechanism, creating a new window and 
 GState. Use of this routine is strongly discouraged.
@@ -1791,7 +1791,7 @@ Nothing.
 **Library:** system.def
 
 ----------
-#### SysSetECLevel
+### SysSetECLevel
 Set the current error-checking flags.
 
 **Pass:**  
@@ -1811,7 +1811,7 @@ Nothing.
 **Library:** ec.def
 
 ----------
-#### SysSetExitFlags
+### SysSetExitFlags
 Set the record of exit flags for use with task-switching drivers. The exit flags 
 are also used for other purposes. Use of this routine is strongly discouraged. 
 For full information on the flags, see the reference entry for **ExitFlags**.
@@ -1839,7 +1839,7 @@ bh is destroyed.
 This is a dangerous routine.
 
 ----------
-#### SysShutdown
+### SysShutdown
 Cause the system to exit based on the **SysShutdownType** passed.
 **Pass:**  
 ax - **SysShutDownType**. Each shutdown type takes its own 
@@ -1936,7 +1936,7 @@ ax, bx, cx, dx, bp
 **Library:** system.def
 
 ----------
-#### SysStatistics
+### SysStatistics
 Return system performance statistics.
 
 **Pass:**  
@@ -1959,7 +1959,7 @@ Nothing.
 **Library:** sysstats.def
 
 ----------
-#### SysUnlockBIOS
+### SysUnlockBIOS
 Relinquish exclusive access to BIOS or DOS, originally gained with 
 **SysLockBIOS**. Use of these routines is strongly discouraged.
 
@@ -1975,7 +1975,7 @@ Nothing (flags preserved).
 **Library:** system.def
 
 ----------
-#### TextAllocClipboardObject
+### TextAllocClipboardObject
 This utility routine allocates a temporary object associated with the 
 clipboard file for purposes of producing a transfer item. 
 
@@ -1993,7 +1993,7 @@ Nothing.
 **Library:** vTextC.def
 
 ----------
-#### TextFindDefaultCharAttr
+### TextFindDefaultCharAttr
 Given an **VisTextCharAttr** structure, determine if it is one of the default 
 character attributes.
 
@@ -2010,7 +2010,7 @@ Nothing.
 **Library:** vTextC.def
 
 ----------
-#### TextFinishWithClipboardObject
+### TextFinishWithClipboardObject
 Finish with an object created by TextAllocClipboardObject.
 
 **Pass:**  
@@ -2028,7 +2028,7 @@ Nothing
 **Library:** vTextC.def
 
 ----------
-#### TextGetSystemCharAttrRun
+### TextGetSystemCharAttrRun
 This routine returns the system character attribute run for this object's 
 specific UI. 
 
@@ -2055,7 +2055,7 @@ This routine may resize LMem or object blocks, moving them on the heap and
 invalidating stored segment pointers to them.
 
 ----------
-#### TextSearchInHugeArray
+### TextSearchInHugeArray
 This routine finds an occurrence of a string within another string.
 
 **Pass:**  
@@ -2087,7 +2087,7 @@ Nothing.
 **Library:** vTextC.def
 
 ----------
-#### TextSearchInString
+### TextSearchInString
 This routine finds an occurrence of a string within another string (both 
 strings must be less than 64K in size. 
 
@@ -2128,7 +2128,7 @@ Nothing.
 **Library:** vTextC.def
 
 ----------
-#### TextSetSpellLibrary
+### TextSetSpellLibrary
 This routine sets the handle of the spell library to make calls to. 
 
 **Pass:**  
@@ -2143,7 +2143,7 @@ Nothing.
 **Library:** vTextC.def
 
 ----------
-#### ThreadAllocSem
+### ThreadAllocSem
 Allocate a semaphore with the initial passed value. The initial value is the 
 number of locks the semaphore can legally have before it causes users to 
 block. This number is nearly always one.
@@ -2160,7 +2160,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadAllocThreadLock
+### ThreadAllocThreadLock
 Allocate a thread lock semaphore; this type of semaphore allows a single 
 thread to lock it multiple times without hitting deadlock.
 
@@ -2176,7 +2176,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadAttachToQueue
+### ThreadAttachToQueue
 Attach a thread to an event queue, blocking on the queue until an event is 
 received by it.
 
@@ -2198,7 +2198,7 @@ Does not return.
 **Library:** thread.def
 
 ----------
-#### ThreadCreate
+### ThreadCreate
 Create a new procedural thread. When the thread is started, it begins 
 execution at the routine specified. If you really want to create an event thread 
 (one that runs objects), send MSG_PROCESS_CREATE_EVENT_THREAD to 
@@ -2257,7 +2257,7 @@ ax, dx, si, di, bp
 **Library:** thread.def
 
 ----------
-#### ThreadDestroy
+### ThreadDestroy
 Exit the current process or thread and destroy it.
 
 **Pass:**  
@@ -2280,7 +2280,7 @@ Does not return.
 **Library:** thread.def
 
 ----------
-#### ThreadFreeSem
+### ThreadFreeSem
 Free a semaphore allocated with **ThreadAllocSem**.
 
 **Pass:**  
@@ -2295,7 +2295,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadFreeThreadLock
+### ThreadFreeThreadLock
 Free a semaphore allocated with **ThreadGrabThreadLock**.
 
 **Pass:**  
@@ -2310,7 +2310,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadGetDGroupDS
+### ThreadGetDGroupDS
 Load the **ds** register with the segment of the current thread's dgroup.
 
 **Pass:**  
@@ -2325,7 +2325,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### ThreadGetInfo
+### ThreadGetInfo
 Return information about a thread, depending on the type passed.
 
 **Pass:**  
@@ -2347,7 +2347,7 @@ Nothing.
 **Library:** thread.def
 
 ----------
-#### ThreadGrabThreadLock
+### ThreadGrabThreadLock
 Grab a thread lock (like doing a "P" on a semaphore). A thread that grabs a 
 thread lock it already holds will not deadlock. A thread that grabs a thread 
 lock held by another thread will block until the thread lock is available.
@@ -2365,7 +2365,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadHandleException
+### ThreadHandleException
 Define a handler function so a thread may handle one of the processor 
 exceptions.
 
@@ -2391,7 +2391,7 @@ Nothing.
 **Library:** thread.def
 
 ----------
-#### ThreadModify
+### ThreadModify
 Change a thread's base priority, and/or set the thread's recent CPU usage to 
 zero.
 
@@ -2413,7 +2413,7 @@ ax
 **Library:** thread.def
 
 ----------
-#### ThreadPrivAlloc
+### ThreadPrivAlloc
 Allocate a block of contiguous words in the thread's private data area.
 
 **Pass:**  
@@ -2431,7 +2431,7 @@ Nothing.
 **Library:** thread.def
 
 ----------
-#### ThreadPrivFree
+### ThreadPrivFree
 Free a range of thread-private space owned by the geode. This space must 
 have been allocated with **ThreadPrivAlloc**.
 
@@ -2449,7 +2449,7 @@ Nothing.
 **Library:** thread.def
 
 ----------
-#### ThreadPSem
+### ThreadPSem
 Grab a semaphore (perform a "P" operation on it). If another thread has the 
 semaphore, the caller will block until the semaphore is available. If the 
 calling thread has the semaphore, the thread will deadlock. This routine 
@@ -2469,7 +2469,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadPTimedSem
+### ThreadPTimedSem
 Grab a semaphore as with **ThreadPSem**, except return an error if the 
 semaphore is not available within a certain time limit. If the timeout is 
 returned, the caller should not proceed with the protected action but should 
@@ -2491,7 +2491,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadReleaseThreadLock
+### ThreadReleaseThreadLock
 Release a thread lock grabbed with **ThreadGrabThreadLock**. A thread 
 should call this routine once and only once for each time it grabbed the thread 
 lock.
@@ -2508,7 +2508,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### ThreadVSem
+### ThreadVSem
 Release a semaphore (perform a "V" operation on it). This routine should be 
 called once and only once for each call to **ThreadPSem** on the semaphore by 
 the calling thread.
@@ -2527,7 +2527,7 @@ Nothing.
 **Library:** sem.def
 
 ----------
-#### TimerGetCount
+### TimerGetCount
 Return the system time counter, reflecting the total number of ticks since 
 GEOS was started.
 
@@ -2544,7 +2544,7 @@ Nothing (flags preserved).
 **Library:** timer.def
 
 ----------
-#### TimerGetDateAndTime
+### TimerGetDateAndTime
 Return the current date and time.
 
 **Pass:**  
@@ -2565,7 +2565,7 @@ Nothing.
 **Library:** timedate.def
 
 ----------
-#### TimerSetDateAndTime
+### TimerSetDateAndTime
 Set the system's date and time. This routine should not normally be called by 
 any application other than the GEOS Preferences Manager.
 
@@ -2589,7 +2589,7 @@ ax, bx, cx, dx
 **Library:** timedate.def
 
 ----------
-#### TimerSleep
+### TimerSleep
 Block the calling thread for the given length of time. This routine is not an 
 acceptable substitute for the use of semaphores when synchronizing threads.
 
@@ -2605,7 +2605,7 @@ Nothing.
 **Library:** timer.def
 
 ----------
-#### TimerStart
+### TimerStart
 Start an event or routine timer, either continual or one-shot. A routine timer 
 calls a specified routine when time is up; an event timer sends a specified 
 message. A one-shot timer counts only once; a continual timer counts until 
@@ -2669,7 +2669,7 @@ Nothing. Interrupts are in the same state as before.
 **Library:** timer.def
 
 ----------
-#### TimerStartSetOwner
+### TimerStartSetOwner
 This routine is exactly the same as **TimerStart**, above, except that it allows 
 the caller to set the timer's owner. All other aspects of the timer are the same. 
 See **TimerStart** for complete details.
@@ -2687,7 +2687,7 @@ See **TimerStart**.
 **Library:** timer.def
 
 ----------
-#### TimerStop
+### TimerStop
 Stop a timer and remove it. This routine is typically called for continual 
 timers. Note that a continual event timer may have sent one or more events 
 that may be in the recipient's event queue; therefore, you can not assume 
@@ -2707,7 +2707,7 @@ ax, bx
 **Library:** timer.def
 
 ----------
-#### TocAddDisk
+### TocAddDisk
 Add a disk to the disk array
 
 **Pass:**  
@@ -2723,7 +2723,7 @@ Nothing
 **Library:** config.def
 
 ----------
-#### TocCreateNewFile
+### TocCreateNewFile
 create a new TOC file in the current working directory. All subsequent TOC 
 routines will operate on this new file.
 
@@ -2740,7 +2740,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocDBlock
+### TocDBlock
 Lock a DB item in the config library's TOC file.
 
 **Pass:**  
@@ -2755,7 +2755,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocFindCategory
+### TocFindCategory
 Find a category in the Toc file. 
 
 **Pass:**  
@@ -2770,7 +2770,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocGetFileHandle
+### TocGetFileHandle
 Return the TOC file handle.
 
 **Pass:**  
@@ -2785,7 +2785,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocNameArrayAdd
+### TocNameArrayAdd
 Add an element to a TOC name array.
 
 **Pass:**  
@@ -2803,7 +2803,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocNameArrayFind
+### TocNameArrayFind
 Find a name in the passed name array. 
 
 **Pass:**  
@@ -2821,7 +2821,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocNameArrayGetElement
+### TocNameArrayGetElement
 Return data about an element, given its number. 
 
 **Pass:**  
@@ -2839,7 +2839,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocSortedNameArrayAdd
+### TocSortedNameArrayAdd
 Add an element to the name array, inserting it in the proper order.
 
 **Pass:**  
@@ -2857,7 +2857,7 @@ Nothing
 **Library:** config.def
 
 ----------
-#### TocSortedNameArrayFind
+### TocSortedNameArrayFind
 Find a name in a sorted name array.
 
 **Pass:**  
@@ -2877,7 +2877,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TocUpdateCategory
+### TocUpdateCategory
 Create the category if it doesn't exist, and update the file lists by scanning 
 the current directory for files.
 
@@ -2894,7 +2894,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### TokenDefineToken
+### TokenDefineToken
 This routine adds a new token and moniker list to the token database. If the 
 token already exists in the token database, the old token will be replaced. 
 This routine may only be called by the thread capable of locking the block 
@@ -2917,7 +2917,7 @@ items), invalidating any stored segment pointers to them.
 **Library:** token.def
 
 ----------
-#### TokenExitTokenDB
+### TokenExitTokenDB
 Close the token database file.
 
 **Pass:**  
@@ -2932,7 +2932,7 @@ Nothing
 **Library:** token.def
 
 ----------
-#### TokenGetTokenInfo
+### TokenGetTokenInfo
 Get information about a token. 
 
 **Pass:**  
@@ -2948,7 +2948,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenInitTokenDB
+### TokenInitTokenDB
 Open the local token database file read/write and, if the path for a globally 
 shared token database appears in the .INI file, open that file shared-multiple 
 read-only.
@@ -2969,7 +2969,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenListTokens
+### TokenListTokens
 Make a list of the tokens in the token.db file and return it in a memory block 
 as an array of **GeodeToken** structures. Along with the list, the number of 
 items in the list is returned. Because groups are mixed in with tokens, we 
@@ -2994,7 +2994,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenLoadMoniker
+### TokenLoadMoniker
 This routine loads a specified token's moniker. 
 
 If you ask that this routine create an LMem block for you, and ds or es is 
@@ -3036,7 +3036,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenLoadToken
+### TokenLoadToken
 Load **TokenEntry** structure for a token into a buffer. 
 
 If you ask that this routine create an LMem block for you, and **ds** or **es** is 
@@ -3068,7 +3068,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenLockTokenMoniker
+### TokenLockTokenMoniker
 Lock moniker for drawing. 
 
 **Pass:**  
@@ -3085,7 +3085,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenLookupMoniker
+### TokenLookupMoniker
 Get the specific moniker for a token, given display type and other attributes. 
 
 **Pass:**  
@@ -3107,7 +3107,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenRemoveToken
+### TokenRemoveToken
 Get information about a token. 
 
 **Pass:**  
@@ -3123,7 +3123,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### TokenUnlockTokenMoniker
+### TokenUnlockTokenMoniker
 This routine unlocks a moniker that had been locked with 
 **TokenLockMoniker**(). Pass a pointer to the locked moniker, as returned by 
 the locking routine. 
@@ -3140,7 +3140,7 @@ Nothing.
 **Library:** token.def
 
 ----------
-#### UserAddAutoExec
+### UserAddAutoExec
 Add an application to the list of those that are to be loaded when the system 
 is booted. This works with the "execOnStartup" field of the initialization 
 field. Welcome is an example of an application that might be executed on 
@@ -3159,7 +3159,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserAddItemToGroup
+### UserAddItemToGroup
 Add a font GenItem to the list, set it usable and set its action/data
 
 **Pass:**  
@@ -3177,7 +3177,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserAllocObjBlock
+### UserAllocObjBlock
 Allocate a block on the heap, to be used for holding UI objects.
 
 **Pass:**  
@@ -3192,7 +3192,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserCallApplication
+### UserCallApplication
 Call application object of process which owns block passed.
 
 **Pass:**  
@@ -3212,7 +3212,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserCallFlow
+### UserCallFlow
 Call the UI flow object.
 
 **Pass:**  
@@ -3231,7 +3231,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserCheckAcceleratorChar
+### UserCheckAcceleratorChar
 Returns carry set if passed an accelerator-type character.
 
 **Pass:**  
@@ -3249,7 +3249,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserCheckInsertableCtrlChar
+### UserCheckInsertableCtrlChar
 Checks passed key to see if it is a control character that maps to an insertable 
 ASCII character.
 
@@ -3268,7 +3268,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserCopyChunkOut
+### UserCopyChunkOut
 This routine copies part of a local memory chunk to another location.
 
 **Pass:**  
@@ -3302,7 +3302,7 @@ bx, dx, di, bp.
 **Library:** ui.def
 
 ----------
-#### UserCreateDialog
+### UserCreateDialog
 Duplicates a template dialog block, attaches the dialog to an application 
 object, and sets it fully usable. The dialog at this point may be used with 
 **UserDoDialog()**. The dialog should be removed and destroyed by the caller 
@@ -3327,7 +3327,7 @@ and invalidating stored segment pointers to them.
 **Library:** ui.def
 
 ----------
-#### UserCreateInkDestinationInfo
+### UserCreateInkDestinationInfo
 This routine creates an **InkDestinationInfo** structure to be returned with 
 MSG_META_QUERY_IF_PRESS_IS_INK.
 
@@ -3349,7 +3349,7 @@ Nothing
 **Library:** ui.def
 
 ----------
-#### UserCreateItem
+### UserCreateItem
 Create a GenItem for a given string.
 
 **Pass:**  
@@ -3370,7 +3370,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserDestroyDialog
+### UserDestroyDialog
 Duplicates a template dialog block, attaches the dialog to an application 
 object, and sets it fully usable. The dialog at this point may be used with 
 **UserDoDialog()**. The dialog should be removed and destroyed by the caller 
@@ -3388,7 +3388,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserDiskRestore
+### UserDiskRestore
 Front-end for **DiskRestore** that automatically passes a callback function to 
 prompt for the disk, if **DiskRestore** can't do it by itself.
 
@@ -3406,7 +3406,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserDoDialog
+### UserDoDialog
 This routine allows the application to invoke a dialog (GenInteraction set up 
 to be a modal dialog) and block until the user responds. The passed object 
 must be linked into a generic tree and be fully usable. Where possible, use 
@@ -3428,7 +3428,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserGetDefaultMonikerFont
+### UserGetDefaultMonikerFont
 Get the UI moniker font, size for the passed object.
 
 **Pass:**  
@@ -3446,7 +3446,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserGetDisplayType
+### UserGetDisplayType
 Get the display type for the passed object. Currently reads the global variable 
 **uiDisplayType**, set by GenScreen in 
 MSG_GEN_SCREEN_SET_VIDEO_DRIVER.
@@ -3467,7 +3467,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserGetInitFileCategory
+### UserGetInitFileCategory
 Utility routine to fetch .ini category for an object. Test application 
 optimization flag for single category, to avoid recursive search if possible.
 
@@ -3484,7 +3484,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserGetKbdAcceleratorMode
+### UserGetKbdAcceleratorMode
 Returns keyboard accelerator mode status.
 
 **Pass:**  
@@ -3499,7 +3499,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserGetOverstrikeMode
+### UserGetOverstrikeMode
 Returns overstrike mode status.
 
 **Pass:**  
@@ -3514,7 +3514,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserGetSpecUIProtocolRequirement
+### UserGetSpecUIProtocolRequirement
 Returns any protocol number that should be passed to **GeodeUseLibrary** in 
 any attempt to load a specific user interface for use with this geode.
 
@@ -3531,7 +3531,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserHaveProcessCopyChunkIn
+### UserHaveProcessCopyChunkIn
 This routine figures out which process runs the destination block and sends 
 MSG_PROCESS_COPY_CHUNK_IN to it.
 
@@ -3550,7 +3550,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserHaveProcessCopyChunkOut
+### UserHaveProcessCopyChunkOut
 This routine figures out which process runs the source block and sends 
 MSG_PROCESS_COPY_CHUNK_OUT to it. The source optr must be in an 
 object block (the **otherInfo** field must be a thread handle).
@@ -3570,7 +3570,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserHaveProcessCopyChunkOver
+### UserHaveProcessCopyChunkOver
 This routine figures out which process runs the destination block and sends 
 MSG_PROCESS_COPY_CHUNK_OVER to it.
 
@@ -3589,7 +3589,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserLoadApplication
+### UserLoadApplication
 Loads a GEOS application. Changes to standard application directory before 
 attempting GeodeLoad on filename passed. Stores the filename being 
 launched into the **AppLaunchBlock**, so that information needed to restore 
@@ -3654,7 +3654,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserLoadExtendedDriver
+### UserLoadExtendedDriver
 Load an extended driver given the category of the .INI file in which to find the 
 "device" and "driver" keys for the thing.
 
@@ -3677,7 +3677,7 @@ cx, dx, di, si.
 **Library:** ui.def
 
 ----------
-#### UserMessageIM
+### UserMessageIM
 Send a message to the input manager.
 
 **Pass:**  
@@ -3696,7 +3696,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserRegisterForTextContext
+### UserRegisterForTextContext
 Registers the passed object to receive context data.
 
 **Pass:**  
@@ -3711,7 +3711,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserRemoveAutoExec
+### UserRemoveAutoExec
 Remove an application from the list of those to be launched on start-up.
 
 **Pass:**  
@@ -3726,7 +3726,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserScreenRegister
+### UserScreenRegister
 Register another screen for GenScreen.
 
 **Pass:**  
@@ -3742,7 +3742,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserSendToApplicationViaProcess
+### UserSendToApplicationViaProcess
 Call the application object, but only after a method has been passed fully 
 through the owning application's process.
 
@@ -3761,7 +3761,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserSetDefaultMonikerFont
+### UserSetDefaultMonikerFont
 Set the font and font size to use when drawing UI monikers.
 
 **Pass:**  
@@ -3777,7 +3777,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserSetOverstrikeMode
+### UserSetOverstrikeMode
 Sets the overstrike mode in the initialization file.
 
 **Pass:**  
@@ -3792,7 +3792,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UserStandardSound
+### UserStandardSound
 Play a standard sound.
 
 **Pass:**  
@@ -3814,7 +3814,7 @@ di.
 **Library:** ui.def
 
 ----------
-#### UserUnregisterForTextContext
+### UserUnregisterForTextContext
 Unregisters the passed object to receive context data.
 
 **Pass:**  
@@ -3829,7 +3829,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UtilAsciiToHex32
+### UtilAsciiToHex32
 Converts a null-terminated ASCII string into a dword. The string may be 
 signed or unsigned.
 
@@ -3847,7 +3847,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### UtilHex32ToAscii
+### UtilHex32ToAscii
 Converts 32-bit unsigned number to its ASCII representation. The number 
 may be signed or unsigned.
 
