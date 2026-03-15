@@ -1,4 +1,4 @@
-## 17 File System
+# 17 File System
 
 Every operating system needs a way to interact with files. Files are used to 
 hold both data and executable code. They are also the simplest way of 
@@ -29,7 +29,7 @@ Before reading this section, you should have read ["System Architecture",
 Chapter 3](carch.md), and ["First Steps: Hello World", Chapter 4](cgetsta.md). 
 You should also be familiar with GEOS handles (discussed in ["Handles", Chapter 14](chandle.md)).
 
-### 17.1 Design Philosophy
+## 17.1 Design Philosophy
 
 The GEOS file system was designed to meet two goals. First, the file system 
 should insulate geodes from differences in hardware, making them device 
@@ -76,7 +76,7 @@ the raw files. If a geode wants to access any file as a sequence of bytes (the
 DOS model), it may do so. Similarly, geodes may work with physical DOS 
 directories if they wish to.
 
-### 17.2 File System Overview
+## 17.2 File System Overview
 
 The GEOS file system manages all access to files on any type of storage. 
 Whenever a geode needs to access a data file, it calls a file system routine. 
@@ -180,7 +180,7 @@ directory at a time, regardless of how many drives you have. If you need to
 switch back and forth between directories on different drives, you can use the 
 directory stack (see [section 17.4.2](#1742-current-path-and-directory-stack)).
 
-### 17.3 Disks and Drives
+## 17.3 Disks and Drives
 
 GEOS provides an easy interface to storage devices. Every drive (or analogous 
 storage device) is identified by a token. Every volume is also identified by a 
@@ -198,7 +198,7 @@ navigate among disks and directories; when the user selects a file, the
 document control will automatically open the file and return its handle to the 
 application.
 
-#### 17.3.1 Accessing Drives
+### 17.3.1 Accessing Drives
 
 DriveGetStatus(), DriveGetExtStatus(), 
 DriveGetDefaultMedia(), DriveTestMediaSupport(), 
@@ -336,14 +336,14 @@ buffer as a null-terminated string; it returns a pointer to that trailing null. 
 the buffer was not large enough, or the drive does not exist, it returns a null 
 pointer.
 
-#### 17.3.2 Accessing Disks
+### 17.3.2 Accessing Disks
 
 Applications will work with disks more than they will work with drives. Once 
 a geode knows a disk's handle, it can ignore such questions as whether the 
 disk is in a drive; it need merely provide the disk's handle. If necessary, the 
 system will prompt the user to insert the disk in the appropriate drive.
 
-##### 17.3.2.1 Registering Disks
+#### 17.3.2.1 Registering Disks
 
 DiskRegisterDisk(), DiskRegisterDiskSilently()
 
@@ -385,7 +385,7 @@ label. You can suppress this notification by calling the system routine
 **DiskRegisterDiskSilently()**. This routine has the same arguments and 
 return values as **DiskRegisterDisk()**.
 
-##### 17.3.2.2 Getting Information about a Disk
+#### 17.3.2.2 Getting Information about a Disk
 
 DiskGetVolumeInfo(), DiskGetVolumeFreeSpace(), 
 DiskGetDrive(), DiskGetVolumeName(), DiskFind(), 
@@ -507,7 +507,7 @@ information the file-system stores about all registered disks. This means that
 course, the callback routine may need to examine the disks, in which case the 
 user will be prompted when necessary.
 
-##### 17.3.2.3 Saving and Restoring a Disk Handle
+#### 17.3.2.3 Saving and Restoring a Disk Handle
 
 DiskSave(), DiskRestore(), DiskRestoreError
 
@@ -609,7 +609,7 @@ DRE_REMOVABLE_DRIVE_IS_BUSY
 The appropriate drive exists but is unavailable due to some 
 time-consuming operation (e.g. a disk format).
 
-##### 17.3.2.4 Other Disk Utilities
+#### 17.3.2.4 Other Disk Utilities
 
 DiskSetVolumeName(), DiskFormat(), DiskCopy(), FormatError, 
 DiskCopyCallback, DiskCopyError
@@ -809,7 +809,7 @@ non-zero value, thus aborting the copy.
 
 ERR_CANT_FORMAT_DEST   
 
-### 17.4 Directories and Paths
+## 17.4 Directories and Paths
 
 Information, whether code or data, is always stored in files. However, storage 
 volumes are not simply collections of files. Rather, they are organized into 
@@ -859,7 +859,7 @@ usage; an application might, for example, keep a certain data file in the
 standard PRIVDATA directory, leaving the user to decide where that 
 PRIVDATA directory may be. This is covered in detail in the following section.
 
-#### 17.4.1 Standard Paths
+### 17.4.1 Standard Paths
 
 The GEOS system is designed to run on a wide variety of architectures. For 
 example, it can be stored on a hard disk, recorded in ROM chips, or resident 
@@ -1031,7 +1031,7 @@ SP_BACKUP
 This directory contains backup files made by the document 
 control. It is commonly \PRIVDATA\BACKUP.
 
-#### 17.4.2 Current Path and Directory Stack
+### 17.4.2 Current Path and Directory Stack
 
 FileSetCurrentPath(), FileGetCurrentPath(), 
 FileConstructFullPath(), FileParseStandardPath(), 
@@ -1157,7 +1157,7 @@ Files are often specified "by their paths." This simply means specifying them
 with a string containing the directory path and ending with the file name. 
 This path may be either relative or absolute. 
 
-#### 17.4.3 Creating and Deleting Directories
+### 17.4.3 Creating and Deleting Directories
 
 FileCreateDir(), FileDeleteDir()
 
@@ -1235,7 +1235,7 @@ The drive that disk was on has been removed.
 ERROR_DISK_UNAVAILABLE  
 The validation of the disk in that drive was aborted by the user.
 
-### 17.5 Files
+## 17.5 Files
 
 When data is not actually in a computer's memory, it needs to be grouped 
 together in a manageable form. Most storage devices group data together 
@@ -1252,7 +1252,7 @@ Operations" (section 17.5.6) is important only if you will be using DOS files or
 GEOS byte files. Most applications will work with GEOS Virtual Memory (VM) 
 files.
 
-#### 17.5.1 DOS Files and GEOS Files
+### 17.5.1 DOS Files and GEOS Files
 
 Most file systems have a simple convention of what a file is. Applications 
 treat files as if they were a sequence of bytes. They can read the bytes in order 
@@ -1309,7 +1309,7 @@ information is stored in a special header which is transparent to geodes. If
 you use one of the bytewise file operations, you will not be able to affect the 
 header.
 
-#### 17.5.2 Files and File Handles
+### 17.5.2 Files and File Handles
 
 FileDuplicateHandle()
 
@@ -1338,7 +1338,7 @@ handle; that is, it can be used on the handles of DOS files, GEOS byte files, or
 VM files. Note that the duplicate handle will have the same read/write 
 position as the original.
 
-#### 17.5.3 GEOS Extended Attributes
+### 17.5.3 GEOS Extended Attributes
 
 FileGetHandleExtAttributes(), FileGetPathExtAttributes(), 
 FileSetHandleExtAttributes(), FileSetPathExtAttributes(), 
@@ -1754,7 +1754,7 @@ This attribute contains the **DriveExtendedStatus** word for the drive
 containing the file. The **DriveExtendedStatus** value is described in [section 
 17.3.1](#1731-accessing-drives).
 
-#### 17.5.4 File Utilities
+### 17.5.4 File Utilities
 
 FileDelete(), FileRename(), FileCopy(), 
 FileMove(),FileGetDiskHandle()
@@ -1841,7 +1841,7 @@ disk handle with **FileGetDiskHandle()**, then save that handle with **DiskSave(
 this information (and the file name), the geode will be able to reopen the file 
 when it restarts.
 
-#### 17.5.5 FileEnum()
+### 17.5.5 FileEnum()
 
 FileEnum(), FileEnumLocateAttr(), FileEnumWildcard(), 
 FileEnumAttrs, FileEnumSearchFlags, 
@@ -2133,7 +2133,7 @@ the letters "doc" and ends with a period, whereas a DOS wildcard string
 "doc*." would match only those files whose name start with "doc" and which 
 have no extension.
 
-#### 17.5.6 Bytewise File Operations
+### 17.5.6 Bytewise File Operations
 
 There are several routines designed for working with files as a string of bytes. 
 These routines may be used to work with DOS files or with GEOS byte files. 
@@ -2143,7 +2143,7 @@ however, be aware that if you make any changes to such files, you could
 invalidate them. For this reason, if you open a VM or executable file for 
 byte-level access, you should open it for read-only use.
 
-##### 17.5.6.1 Opening and Closing Files
+#### 17.5.6.1 Opening and Closing Files
 
 FileOpen(), FileCreate(), FileCreateTempFile(), 
 FileClose(), FileAccessFlags
@@ -2323,7 +2323,7 @@ successfully close the file. (This should only be used during development; the
 flag should never be passed in a finished program.) The routine returns zero 
 if successful; otherwise, it returns a **FileError** value.
 
-##### 17.5.6.2 Reading From and Writing To Files
+#### 17.5.6.2 Reading From and Writing To Files
 
 FileRead(), FileWrite(), FilePos(), FileCommit()
 
@@ -2412,7 +2412,7 @@ after the move (relative to the start of the file). To find out the current file
 position without changing it, call **FilePos()** with mode FILE_POS_RELATIVE 
 and offset zero.
 
-##### 17.5.6.3 Getting and Setting Information about a Byte File
+#### 17.5.6.3 Getting and Setting Information about a Byte File
 
 FileGetDateAndTime(), FileSetDateAndTime(), 
 FileGetAttributes(), FileSetAttributes()
@@ -2446,7 +2446,7 @@ of a null-terminated path string and a **FileAttrs** record. It returns zero if 
 successful; otherwise, it returns an error condition. Note that a file's attributes 
 cannot be changed if the file is open.
 
-##### 17.5.6.4 Data-Access Synchronization
+#### 17.5.6.4 Data-Access Synchronization
 
 FileLockRecord(), FileUnlockRecord()
 

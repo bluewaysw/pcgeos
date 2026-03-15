@@ -1,4 +1,4 @@
-## 12 Managing UI Geometry
+# 12 Managing UI Geometry
 
 One of the more difficult aspects of programming a graphically oriented 
 application is positioning the user interface components on the screen. 
@@ -19,7 +19,7 @@ Interface in general and the generic UI in specific. For most of this chapter,
 information; for other sections, you should at least read ["The GEOS User 
 Interface," Chapter 10](cuiover.md).
 
-### 12.1 Geometry Manager Overview
+## 12.1 Geometry Manager Overview
 
 The GEOS geometry manager is an algorithmic mechanism which interacts 
 directly with the UI to position and size objects of all types. The geometry 
@@ -47,7 +47,7 @@ you can apply to window objects, see [section 12.3](#123-positioning-and-sizing-
 For descriptions of managing the geometry of visible object trees and composites, see 
 ["VisClass," Chapter 23 of the Object Reference Book](../Objects/ovis.md).
 
-#### 12.1.1 Geometry Manager Features
+### 12.1.1 Geometry Manager Features
 
 The geometry manager, used effectively, can take nearly all the work out of 
 displaying, sizing, and positioning objects on the screen. Many of the tasks 
@@ -97,7 +97,7 @@ The system does all the dirty work of drawing and managing the objects on
 the screen, leaving you free to work on your application rather than on its 
 graphical screen representation.
 
-#### 12.1.2 How Geometry Is Managed
+### 12.1.2 How Geometry Is Managed
 
 The geometry manager is one part of the system that draws objects on the 
 screen and redraws them when necessary. This system is called the "visual 
@@ -201,7 +201,7 @@ on the attributes of the view. For example, if the view is set to follow the siz
 of its content, it will grow, bumping the size of its parent in the process. If the 
 view is scrollable, it likely will stay the same size.
 
-### 12.2 Arranging Your Generic Objects
+## 12.2 Arranging Your Generic Objects
 
 The process of arranging user interface elements for a GEOS application 
 differs drastically from that of traditional user interface programming 
@@ -220,7 +220,7 @@ positions in the generic object tree; GEOS does the rest, determining the
 position and visual effects of each object. You can even fine-tune the 
 appearance of each object with the use of hints.
 
-#### 12.2.1 General Geometry Rules
+### 12.2.1 General Geometry Rules
 
 You may feel at first that the use of generic UI components limits your control 
 over the UI of your application. Actually, just the opposite is true: Your 
@@ -250,14 +250,14 @@ Third, an object's behavior can be fine-tuned through the use of hints. Hints
 may or may not be implemented for each object that has them, and they 
 control less strictly how the object works.
 
-##### 12.2.1.1 Generic Tree Structure
+#### 12.2.1.1 Generic Tree Structure
 
 As stated above, the structure of your application's generic object tree 
 determines how the generic UI objects will be organized. A simple example of 
 a generic tree including a menu, a dialog box, and a GenView can be found in 
 ["First Steps: Hello World," Chapter 4](cgetsta.md).
 
-##### 12.2.1.2 How Hints Work
+#### 12.2.1.2 How Hints Work
 
 Nearly all geometry of generic UI objects is determined by hints. You can 
 position, size, and limit generic objects with different hints. All these hints 
@@ -283,7 +283,7 @@ this chapter follows a series of examples accompanied with diagrams. For the
 most part, you should be able to "plug and play" the examples in the following 
 sections.
 
-#### 12.2.2 Orienting Children
+### 12.2.2 Orienting Children
 
 HINT_ORIENT_CHILDREN_HORIZONTALLY, 
 HINT_ORIENT_CHILDREN_VERTICALLY, 
@@ -410,7 +410,7 @@ Code Display 12-2 A Complex Dialog Box
 }
 ~~~
 
-#### 12.2.3 Justifying and Centering Children
+### 12.2.3 Justifying and Centering Children
 
 Although child justification defaults to whatever the specific UI normally 
 uses, you can set the justification of a composite's children with several 
@@ -420,7 +420,7 @@ Typically, horizontal composites will have their children top-justified and
 vertical composites will have left-justified children (as shown in the previous 
 examples).
 
-##### 12.2.3.1 Edge Justification
+#### 12.2.3.1 Edge Justification
 
 HINT_TOP_JUSTIFY_CHILDREN, HINT_BOTTOM_JUSTIFY_CHILDREN, 
 HINT_LEFT_JUSTIFY_CHILDREN, HINT_RIGHT_JUSTIFY_CHILDREN
@@ -439,7 +439,7 @@ justification are shown in Figure 12-3.
 _From left to right (clockwise): Left justification, right justification, top 
 justification, bottom justification._
 
-##### 12.2.3.2 Edge Alignment with Other Objects
+#### 12.2.3.2 Edge Alignment with Other Objects
 
 HINT_ALIGN_LEFT_EDGE_WITH_OBJECT, 
 HINT_ALIGN_TOP_EDGE_WITH_OBJECT, 
@@ -451,7 +451,7 @@ object; the optr of the other object is the hint's argument. The other object
 does not necessarily have to be a direct sibling or parent, but the result must 
 not cause the object to stray outside its parent's bounds. 
 
-##### 12.2.3.3 Centering Children
+#### 12.2.3.3 Centering Children
 
 HINT_CENTER_CHILDREN_VERTICALLY, 
 HINT_CENTER_CHILDREN_HORIZONTALLY
@@ -468,7 +468,7 @@ _Vertically oriented composites may be centered
 horizontally; horizontally-oriented composites may be 
 centered vertically._
 
-##### 12.2.3.4 Full Justification
+#### 12.2.3.4 Full Justification
 
 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY, 
 HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY, 
@@ -503,7 +503,7 @@ spacing is also typically not turned on by default; you can ensure that added
 spacing will not be included (where possible) by applying the hint 
 HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING to your composite.
 
-#### 12.2.4 Sizing Objects
+### 12.2.4 Sizing Objects
 
 Sizing can occur in essentially one of two ways: First, the composite can size 
 itself based on its children. Second, the children can size themselves based 
@@ -517,7 +517,7 @@ _The reply bar interaction object is specified as horizontally full-justified. I
 the upper example, it does not include ends in child spacing; in the lower 
 example, it does. Unchanged portions of the dialog box are cut out._
 
-##### 12.2.4.1 Sizing the Parent
+#### 12.2.4.1 Sizing the Parent
 
 HINT_NO_TALLER_THAN_CHILDREN_REQUIRE, 
 HINT_NO_WIDER_THAN_CHILDREN_REQUIRE
@@ -528,7 +528,7 @@ keep them from growing into any extra space in their parents. You can set the
 width and height restrictions independently; to set them both, use both hints 
 in the composite.
 
-##### 12.2.4.2 Sizing the Children
+#### 12.2.4.2 Sizing the Children
 
 HINT_EXPAND_HEIGHT_TO_FIT_PARENT, 
 HINT_EXPAND_WIDTH_TO_FIT_PARENT, 
@@ -641,7 +641,7 @@ total size of the children and then attempt to divide up its children's space,
 rather than the maximum allotted size for the parent, which is probably not 
 desired.
 
-##### 12.2.4.3 Maximum, Minimum, Fixed, and Initial Sizes
+#### 12.2.4.3 Maximum, Minimum, Fixed, and Initial Sizes
 
 HINT_INITIAL_SIZE, HINT_MAXIMINUM_SIZE, HINT_MINIMUM_SIZE, 
 HINT_FIXED_SIZE
@@ -717,7 +717,7 @@ HINT_MINIMUM_SIZE = {
         0 };
 ~~~
 
-#### 12.2.5 Outlining the Composite
+### 12.2.5 Outlining the Composite
 
 HINT_DRAW_IN_BOX
 
@@ -732,7 +732,7 @@ bounds as shown in Figure 12-8.
 _When HINT_DRAW_IN_BOX is used for the upper composites, the object 
 groupings become much easier to distinguish._
 
-#### 12.2.6 Using Monikers
+### 12.2.6 Using Monikers
 
 Nearly all generic objects will have visual monikers (usually text labels) that 
 get drawn somewhere in or near the object. The moniker helps the user 
@@ -740,7 +740,7 @@ distinguish between different objects; for example, each trigger should have
 a text (or graphical) moniker giving some indication of what happens when 
 the trigger is pressed.
 
-##### 12.2.6.1 Placing Monikers in Relation to Children
+#### 12.2.6.1 Placing Monikers in Relation to Children
 
 HINT_PLACE_MONIKER_ABOVE, HINT_PLACE_MONIKER_BELOW, 
 HINT_PLACE_MONIKER_TO_LEFT, HINT_PLACE_MONIKER_TO_RIGHT, 
@@ -785,7 +785,7 @@ moniker edge coincides with the left edge of the first child below that
 moniker. This is usually the default behavior anyway, but different specific 
 UIs may have different default behavior.
 
-##### 12.2.6.2 Justifying or Centering on Monikers
+#### 12.2.6.2 Justifying or Centering on Monikers
 
 HINT_CENTER_CHILDREN_ON_MONIKERS, 
 HINT_LEFT_JUSTIFY_MONIKERS
@@ -810,7 +810,7 @@ Note that the two hints HINT_CENTER_CHILDREN_ON_MONIKERS and
 HINT_LEFT_JUSTIFY_MONIKERS are valid only for composites with one or 
 more child composites, all of which have monikers placed to their left.
 
-##### 12.2.6.3 Removing Moniker Borders
+#### 12.2.6.3 Removing Moniker Borders
 
 HINT_NO_BORDERS_ON_MONIKERS
 
@@ -821,7 +821,7 @@ these borders. It may be useful in cases where a custom border should be
 implemented, but in general should not be used to override the specific UI, as 
 this may confuse the user.
 
-#### 12.2.7 Using Custom Child Spacing
+### 12.2.7 Using Custom Child Spacing
 
 HINT_CUSTOM_CHILD_SPACING, 
 HINT_CUSTOM_CHILD_SPACING_IF_LIMITED_SPACE, 
@@ -890,7 +890,7 @@ HINT_MINIMIZE_CHILD_SPACING ensures that child spacing is kept to an
 absolute minimum, even if this means that object's edges will touch (in color 
 systems) or even overlap (in black and white systems). 
 
-#### 12.2.8 Allowing Children to Wrap
+### 12.2.8 Allowing Children to Wrap
 
 HINT_ALLOW_CHILDREN_TO_WRAP, HINT_WRAP_AFTER_CHILD_COUNT, 
 HINT_DONT_ALLOW_CHILDREN_TO_WRAP, 
@@ -936,7 +936,7 @@ allows you to allow child wrapping based on whether or not the screen is
 "vertical." If the screen is taller than it is wide, this hint will have an effect 
 like HINT_WRAP_AFTER_CHILD_COUNT; if not, the hint will have no effect.
 
-#### 12.2.9 Object Placement
+### 12.2.9 Object Placement
 
 As we have seen, generic objects can be arranged and distributed in several 
 ways. You may also place generic objects within certain areas of your user 
@@ -946,7 +946,7 @@ or "Apply" are located. You may specify objects to generically place
 themselves within such a reply bar, even though you may not know the exact 
 location of that reply bar as the specific UI creates it.
 
-##### 12.2.9.1 Reply Bars
+#### 12.2.9.1 Reply Bars
 
 HINT_MAKE_REPLY_BAR, HINT_SEEK_REPLY_BAR
 
@@ -999,7 +999,7 @@ to seek placement in the dialog box's reply bar. The specific UI will try to
 place the trigger in the reply bar of the first dialog box GenInteraction it finds 
 that is not GIT_ORGANIZATIONAL.
 
-##### 12.2.9.2 Placing Objects in Menu Bars
+#### 12.2.9.2 Placing Objects in Menu Bars
 
 HINT_SEEK_MENU_BAR, HINT_AVOID_MENU_BAR
 
@@ -1009,7 +1009,7 @@ window's menu bar by placing HINT_SEEK_MENU_BAR on that object.
 Similarly, you can place HINT_AVOID_MENU_BAR on an object to suggest 
 that it not be placed within the window's menu bar.
 
-##### 12.2.9.3 Placing Objects in Scroller Areas
+#### 12.2.9.3 Placing Objects in Scroller Areas
 
 HINT_SEEK_X_SCROLLER_AREA, HINT_SEEK_Y_SCROLLER_AREA, 
 HINT_SEEK_LEFT_OF_VIEW, HINT_SEEK_TOP_OF_VIEW, 
@@ -1027,7 +1027,7 @@ HINT_SEEK_LEFT_OF_VIEW, HINT_SEEK_TOP_OF_VIEW,
 HINT_SEEK_RIGHT_OF_VIEW and HINT_SEEK_BOTTOM_OF_VIEW suggest 
 that the generic object be placed alongside the respective side of the GenView.
 
-##### 12.2.9.4 Placing Objects in Window Title Bars
+#### 12.2.9.4 Placing Objects in Window Title Bars
 
 HINT_SEEK_TITLE_BAR_LEFT, HINT_SEEK_TITLE_BAR_RIGHT
 
@@ -1037,7 +1037,7 @@ objects involved should fit within the title bar area (i.e., be equivalent to to
 bar icons). For each window with a title bar, only one object may have each of 
 these hints, and the object must be a direct child of the windowed object.
 
-##### 12.2.9.5 Placement of Objects Popped Up
+#### 12.2.9.5 Placement of Objects Popped Up
 
 HINT_POPS_UP_TO_RIGHT, HINT_POPS_UP_BELOW
 
@@ -1051,7 +1051,7 @@ This hint instructs the specific UI to bring up the object below
 its activating gadget. This is usually the default behavior for 
 objects that are popped up.
 
-### 12.3 Positioning and Sizing Windows
+## 12.3 Positioning and Sizing Windows
 
 A generic object that appears as a window, such as an 
 independently-displayable GenInteraction or a GenPrimary, has special 
@@ -1117,7 +1117,7 @@ and one:
 To specify a constant offset, just use that offset, not setting the SWSS_RATIO 
 flag. Not all windows will use the **SpecWinSizePair** structure.
 
-#### 12.3.1 Window Positioning
+### 12.3.1 Window Positioning
 
 HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT, 
 HINT_POSITION_WINDOW_AT_MOUSE, HINT_STAGGER_WINDOW, 
@@ -1169,7 +1169,7 @@ This hint removes all constraints upon the positioning of a
 window. It should only be used as the final attempt to position 
 the window if other methods do not work to your satisfaction.
 
-#### 12.3.2 Determining Initial Size
+### 12.3.2 Determining Initial Size
 
 HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT, 
 HINT_EXTEND_WINDOW_NEAR_BOTTOM_RIGHT, 
@@ -1216,7 +1216,7 @@ This hint instructs the window to come on-screen with its
 original values rather than the state of the window when it was 
 saved to state.
 
-#### 12.3.3 On-Screen Behavior
+### 12.3.3 On-Screen Behavior
 
 HINT_KEEP_INITIALLY_ONSCREEN, 
 HINT_DONT_KEEP_INITIALLY_ONSCREEN, 
@@ -1261,7 +1261,7 @@ HINT_NOT_MOVABLE
 This hint instructs the specific UI to make the windowed object 
 not movable. This hint should be avoided if at all possible. 
 
-#### 12.3.4 Window Look and Feel
+### 12.3.4 Window Look and Feel
 
 HINT_WINDOW_NO_TITLE_BAR, HINT_WINDOW_NO_SYS_MENU
 

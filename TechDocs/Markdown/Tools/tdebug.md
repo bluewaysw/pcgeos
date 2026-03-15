@@ -1,4 +1,4 @@
-## 6 Debug Utility
+# 6 Debug Utility
 
 The Debug application allows the user to quickly change the debugging 
 environment on the target machine. It works with the target's .ini to simulate 
@@ -14,7 +14,7 @@ system files (e.g., to test a Zoomer program, use the ZOOM target directory).
 If your program is meant to work on a particular type of device, you should 
 run some tests on that device as well.
 
-### 6.1 Changing Platforms
+## 6.1 Changing Platforms
 
 Select the "Platform" item of the Options menu to change to another 
 platform. Debug allows the target machine to simulate different platforms by 
@@ -38,7 +38,7 @@ directory. The platform descriptions are stored in the notes field of the
 [system] category in the .ini file. See one of the provided .ini files for an 
 example of this.
 
-### 6.2 Switching Kernels
+## 6.2 Switching Kernels
 
 The "Profile" item of the Options menu allows you to switch between the 
 regular and profiling GEOS kernels. The profiling kernel runs slower than the 

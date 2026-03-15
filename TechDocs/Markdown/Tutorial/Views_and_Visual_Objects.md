@@ -1,4 +1,4 @@
-## 6 Views and Visual Objects
+# 6 Views and Visual Objects
 
 In this chapter, we'll learn about some more common program activities, such 
 as drawing shapes and working with VM files. We'll see an example of the 
@@ -7,7 +7,7 @@ can make using Swat easier by creating a SWAT.RC script file.
 
 ![](Art/tutorial-mychart_visual_objects.png)
 
-### 6.1 Making the Changes
+## 6.1 Making the Changes
 
 Make the changes to MCHRT.GOC and MCHRT.GP as indicated in Code 
 Display 4-1 and Code Display 4-2. As before, these changes are marked by 
@@ -26,7 +26,7 @@ After making the changes to the files, remake the executable with pmake.
 Send the remade geode to the target machine using pcs or the send Swat 
 command.
 
-### 6.2 The Application So Far
+## 6.2 The Application So Far
 
 The application now draws a bar chart within a view window. It saves the list 
 of data within a file, and can retain that data after closing and re-opening the 
@@ -64,7 +64,7 @@ application's ability to save data, set up a list of data, exit to DOS, and
 then restart GEOS. To learn more about working with VM files, see 
 "Virtual Memory," Chapter 18 of the Concepts book.
 
-### 6.3 MCHRT.GP
+## 6.3 MCHRT.GP
 
 We've added a few new lines to the geode parameters file to accommodate the 
 addition of the object managing the bar chart.
@@ -92,7 +92,7 @@ line for the other class we've created for the application, MCProcessClass.
 The file's "class" line automatically signals that the class named on that line 
 should be exported. All other created classes must have an "export" line.
 
-### 6.4 MCHRT.GOC: Classes & Constants
+## 6.4 MCHRT.GOC: Classes & Constants
 
 There have been several changes made to the MCHRT.GOC file. Here we'll 
 take a look at the new code and examine the changes.
@@ -168,7 +168,7 @@ DataBlockHeader         *dataBlockHeader;                       /* Header info o
 
 We set up a global variable to store a pointer to the block header. 
 
-### 6.5 MCHRT.GOC: New Objects
+## 6.5 MCHRT.GOC: New Objects
 
 ~~~
 @object GenPrimaryClass MCPrimary = {
@@ -314,7 +314,7 @@ INTERFACE resource; this is quite legal. Generally it's more readable not to
 do so, and normally we'd keep the INTERFACE resource in one place, but we'll 
 leave things organized this way just to remind you that it's legal.
 
-### 6.6 MCProcessClass Code
+## 6.6 MCProcessClass Code
 
 ~~~
 @method MCListInsertDataItem, MCProcessClass, MSG_MCP_INSERT_DATA_ITEM {
@@ -517,7 +517,7 @@ since that's the only block in the file.
 As we did in the previous version of the program, we now close the data file 
 and call the superclass. 
 
-### 6.7 Graphics and Drawing
+## 6.7 Graphics and Drawing
 
 ~~~
 @method MCChartClass, MSG_VIS_DRAW {
@@ -609,7 +609,7 @@ the GrFillRect() routine which takes a GState and four coordinates. To find
 out about other things you can draw, see "Drawing Graphics," Chapter 24 of 
 the Concepts book.
 
-### 6.8 Maintaining the Chart Data
+## 6.8 Maintaining the Chart Data
 
 ~~~
 @method MCChartClass, MSG_MCC_INSERT_BAR {
@@ -698,7 +698,7 @@ waiting for the thread to handle all the previously-arrived messages.
 These message handlers work in much the same way as that for 
 MSG_MCC_INSERT_BAR.
 
-### 6.9 SWAT.RC: Automating Swat
+## 6.9 SWAT.RC: Automating Swat
 
 This file contains some Swat commands we learned about in the last chapter.
 

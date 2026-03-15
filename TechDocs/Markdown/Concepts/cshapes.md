@@ -1,4 +1,4 @@
-## 24 Drawing Graphics
+# 24 Drawing Graphics
 
 This chapter describes the commands used to draw things on a display. 
 ["Graphics Environment," Chapter 23](cgraph.md), explains how to set up the display 
@@ -8,7 +8,7 @@ You must have read the previous chapter; in particular, you should be
 familiar with GStates. To use certain commands, you should also be familiar 
 with the GEOS fixed point number formats.
 
-### 24.1 Drawing Goals
+## 24.1 Drawing Goals
 
 The graphics system has a set of graphic commands capable of describing 
 anything that might ever be drawn; at the same time, the command set 
@@ -20,7 +20,7 @@ graphics commands whether you are drawing to a display, describing a
 GString (which can be sent to a printer), drawing to a bitmap, or describing 
 a path. This simplifies graphics programming a great deal.
 
-### 24.2 Shapes
+## 24.2 Shapes
 
 Depending on how much experience you have with the GEOS graphics 
 system, you may have some idea already about what sorts of shapes can be 
@@ -48,7 +48,7 @@ these routines to draw the outline of any conceivable two-dimensional shape.
 To create a precise, filled shape, use these routines to describe a path and 
 then fill the path.
 
-#### 24.2.1 Dots
+### 24.2.1 Dots
 
 GrDrawPoint(), GrDrawPointAtCP()
 
@@ -64,7 +64,7 @@ _A point is defined by its coordinates._
 **GrDrawPoint()** draws a point at the passed coordinate pair.  
 **GrDrawPointAtCP()** draws a point at the current pen position.
 
-#### 24.2.2 Lines
+### 24.2.2 Lines
 
 GrDrawLine(), GrDrawLineTo(), GrDrawRelLineTo(), 
 GrDrawHLine(), GrDrawHLineTo(), GrDrawVLine(), 
@@ -93,7 +93,7 @@ current pen position to a passed y coordinate. The **GrDrawH...()** and
 at the specified x and y offset from the starting position. This routine takes 
 very precise coordinates, and is useful for describing paths.
 
-#### 24.2.3 Rectangles
+### 24.2.3 Rectangles
 
 GrDrawRect(), GrDrawRectTo(), GrFillRect(), GrFillRectTo()
 
@@ -116,7 +116,7 @@ you want a bordered rectangle, call **GrFillRect()** and follow it with
 **GrDrawRect()**. Note that if the order of these operations if reversed, the fill 
 may obscure the draw.
 
-#### 24.2.4 Ellipses
+### 24.2.4 Ellipses
 
 GrDrawEllipse(), GrFillEllipse()
 
@@ -132,7 +132,7 @@ _An ellipse with its bounding rectangle._
 drawing attributes. **GrFillEllipse()** fills the ellipse's area using the current 
 area attributes.
 
-#### 24.2.5 Elliptical Arcs
+### 24.2.5 Elliptical Arcs
 
 GrDrawArc(), GrFillArc()
 
@@ -150,7 +150,7 @@ are two ways to fill an arc: you can fill in the wedge described by the arc, or
 you can fill just the region between the arc and its chord; set the style with 
 an **ArcCloseType** value. 
 
-#### 24.2.6 Three-Point Arcs
+### 24.2.6 Three-Point Arcs
 
 GrDrawArc3Point(), GrDrawArc3PointTo(), GrFillArc3Point(), 
 GrFillArc3PointTo(), GrDrawRelArc3PointTo()
@@ -192,7 +192,7 @@ _The elliptical arc doesn't start quite where the line leaves off, perhaps due t
 a poorly calculated angle. The three-point arc, defined in terms of its 
 endpoints, is certain to have an endpoint in common with the line._
 
-#### 24.2.7 Rounded Rectangles
+### 24.2.7 Rounded Rectangles
 
 GrDrawRoundRect(), GrDrawRoundRectTo(), GrFillRoundRect(), 
 GrFillRoundRectTo()
@@ -218,7 +218,7 @@ rectangle with passed bounding rectangle and corner radius using the
 current area attributes. **GrFillRoundRectTo()** fills a rounded rectangle 
 that has the current position as one corner of the bounding rectangle.
 
-#### 24.2.8 Polylines and Polygons
+### 24.2.8 Polylines and Polygons
 
 GrDrawPolyline(), GrDrawPolygon(), GrFillPolygon(), 
 GrBrushPolyline(), GrTestPointInPolygon()
@@ -267,7 +267,7 @@ where speed is a top priority.
 To find out whether a given point falls within a polygon, call 
 **GrTestPointInPolygon()**.
 
-#### 24.2.9 Bézier Curves and Splines
+### 24.2.9 Bézier Curves and Splines
 
 GrDrawCurve(), GrDrawCurveTo(), GrDrawSpline(), 
 GrDrawSplineTo(), GrDrawRelCurveTo()
@@ -344,7 +344,7 @@ non-smooth derivatives are called "semi smooth", analogous to  continuity.
 ![](Art/figure_24-11.png)  
 **Figure 24-11** Levels of Smoothness
 
-#### 24.2.10 Drawing Bitmaps
+### 24.2.10 Drawing Bitmaps
 
 GrDrawBitmap(), GrDrawBitmapAtCP, GrFillBitmap(), 
 GrFillBitmapAtCP(), GrDrawHugeBitmap(), 
@@ -402,7 +402,7 @@ The image-drawing routines take an **ImageFlags** structure which holds a
 flag to specify whether borders should be drawn between the pixels of the 
 bitmap and a bit size field which specifies the magnification to use.
 
-#### 24.2.11 Paths
+### 24.2.11 Paths
 
 GrDrawPath(), GrFillPath()
 
@@ -434,7 +434,7 @@ _When drawing a path formed by union or intersection, both paths are drawn,
 perhaps not what was expected. The effects of a union or intersection aren't 
 apparent unless the paths are filled (or used to define clip regions)._
 
-#### 24.2.12 Regions
+### 24.2.12 Regions
 
 GrGetPathRegion(), GrDrawRegion(), GrDrawRegionAtCP(), 
 GrMoveReg(), GrGetPtrRegBounds(), GrTestPointInReg(), 
@@ -550,7 +550,7 @@ of a region are set incorrectly, the rows are given out of order, or an incorrec
 Figure 24-17 shows a complicated region which uses parametrized 
 coordinates.
 
-#### 24.2.13 Text
+### 24.2.13 Text
 
 Programs normally display text with UI gadgetry such as GenText, VisText, 
 and GenGlyph objects. For those times when a geode will display text as part 
@@ -568,7 +568,7 @@ parameter. Remember that the coordinate 5000h is not absolute but
 corresponds to the first parameter, and all coordinates between 4000h and 
 5FFFh will be relative to this coordinate._
 
-##### 24.2.13.1 Displaying Text
+#### 24.2.13.1 Displaying Text
 
 GrDrawText(), GrDrawTextAtCP(), GrDrawChar(), 
 GrDrawCharAtCP(), GrDrawTextField()
@@ -586,7 +586,7 @@ draws a text string at the current position. **GrDrawChar()** and
 non-printing character. **GrDrawTextField()** draws a field of text-however, 
 this routine is only available in Assembly language. 
 
-##### 24.2.13.2 Special Text Attributes
+#### 24.2.13.2 Special Text Attributes
 
 GrGetTextStyle(), GrSetTextStyle(), GrGetTextMode(), 
 GrSetTextMode(), GrGetTextSpacePad(), GrSetTextSpacePad(), 
@@ -674,7 +674,7 @@ offset sub- or superscript characters; the low byte is the percentage of font
 size to use for the sub- or superscript character 0x0064 (decimal 100) would 
 be full-sized with no displacement.
 
-##### 24.2.13.3 Accessing Available Fonts
+#### 24.2.13.3 Accessing Available Fonts
 
 GrEnumFonts(), GrCheckFontAvail(), 
 GrFindNearestPointsize(), GrGetDefFontID(), GrGetFontName()
@@ -732,7 +732,7 @@ To find out the ASCII name of a string for which you have the **FontID**, call
 otherwise it will fill a passed buffer with the name of the font. The passed 
 buffer should be FID_NAME_LEN bytes long.
 
-##### 24.2.13.4 Text Metrics
+#### 24.2.13.4 Text Metrics
 
 GrTextWidth(), GrTextWidthWBFixed(), GrCharWidth(), 
 GrFontMetrics(), GrCharMetrics()
@@ -890,7 +890,7 @@ The character's topmost bound. This is the distance the
 character extends above the baseline. It is sometimes called the 
 character's "ascent."
 
-### 24.3 Shape Attributes
+## 24.3 Shape Attributes
 
 GrSetAreaAttr(), GrSetLineAttr(), GrSetTextAttr()
 
@@ -905,7 +905,7 @@ areas at once, call **GrSetAreaAttr()**. Call **GrSetLineAttr()** to set all
 attributes to use when drawing lines. Use **GrSetTextAttr()** to set all 
 text-rendering attributes.
 
-#### 24.3.1 Color
+### 24.3.1 Color
 
 If your geode displays graphics, you can probably make its graphical display 
 more effective by using color. Your geode can have as much control over color 
@@ -979,7 +979,7 @@ typedef ByteEnum    ColorFlag;
  */
 ~~~
 
-##### 24.3.1.1 Using Available Colors
+#### 24.3.1.1 Using Available Colors
 
 GrGetAreaColor(), GrSetAreaColor(), GrGetLineColor(), 
 GrSetLineColor(), GrGetTextColor(), GrSetTextColor()
@@ -1038,7 +1038,7 @@ palette indexes instead of RGB values, it is possible to change the RGB value
 of palette entry 02 so that the C_GREEN constant actually refers to, for 
 example, a shade of magenta.
 
-##### 24.3.1.2 When the Color Isn't in the Palette
+#### 24.3.1.2 When the Color Isn't in the Palette
 
 GrSetLineColorMap(), GrSetAreaColorMap(), 
 GrSetTextColorMap(), GrGetLineColorMap(), 
@@ -1073,7 +1073,7 @@ use the **GrMapColorIndex()** routine to find the RGB value associated with
 an index. The **GrMapColorRGB()** routine returns the index and true RGB 
 color of the palette entry that most closely matches the values passed.
 
-##### 24.3.1.3 Custom Palettes
+#### 24.3.1.3 Custom Palettes
 
 GrCreatePalette(), GrDestroyPalette(), GrSetPaletteEntry(), 
 GrSetPalette(), GrGetPalette()
@@ -1115,7 +1115,7 @@ array with 256 entries (one for each color), each entry consisting of three
 bytes. The first byte of each entry is the color's red component, the second is 
 the color's green component, and the third is the color's blue component.
 
-#### 24.3.2 Patterns and Hatching
+### 24.3.2 Patterns and Hatching
 
 GrSetAreaPattern(), GrSetAreaPatternCustom(), 
 GrSetTextPattern(), GrSetTextPatternCustom(), 
@@ -1289,7 +1289,7 @@ static HatchDash dash3 = {
 To find out the current area or text pattern, call GrGetAreaPattern() or 
 GrGetTextPattern().
 
-#### 24.3.3 Mix Mode
+### 24.3.3 Mix Mode
 
 GrGetMixMode(), GrSetMixMode()
 
@@ -1366,7 +1366,7 @@ overwrite whatever was underneath. When drawing a checkerboard with
 individual black squares, the background would show through no matter 
 what background because there's nothing drawn between the squares.
 
-#### 24.3.4 Masks
+### 24.3.4 Masks
 
 GrSetAreaMaskSys(), GrSetAreaMaskCustom(), GrGetAreaMask(), 
 GrSetLineMaskSys(), GrSetLineMaskCustom(), GrGetLineMask(), 
@@ -1428,7 +1428,7 @@ fill and 25 to a 100% fill. Several SDM_- constants have been set up with the
 more commonly used system draw patterns. For a list of constants, see the 
 Routines manual.
 
-#### 24.3.5 Line-Specific Attributes
+### 24.3.5 Line-Specific Attributes
 
 GrGetLineWidth(), GrSetLineWidth(), GrGetLineJoin(), 
 GrSetLineJoin(), GrGetLineEnd(), GrSetLineEnd(), 

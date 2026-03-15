@@ -1,6 +1,6 @@
 ## 3.2 Routines E-F
 ----------
-#### EC()
+### EC()
     void    EC(line);
 
 This macro defines a line of code that will only be compiled into the 
@@ -10,7 +10,7 @@ will be treated as a normal line of code; when the non-EC version is compiled,
 the line will be ignored.
 
 ----------
-#### EC_BOUNDS()
+### EC_BOUNDS()
     void    EC_BOUNDS(addr);
 
 This macro adds an address check to the error-checking version of a program. 
@@ -25,7 +25,7 @@ to **FatalError()**.
 **See Also:** ECCheckBounds()
 
 ----------
-#### EC_ERROR()
+### EC_ERROR()
     void    EC_ERROR(code);
 
 This macro inserts a call to **FatalError()** in the error-checking version of the 
@@ -35,7 +35,7 @@ specified error *code*. If a condition should be checked before calling
 **FatalError()**, you can use EC_ERROR_IF() instead.
 
 ----------
-#### EC_ERROR_IF()
+### EC_ERROR_IF()
     void    EC_ERROR_IF(test, code);
 
 This macro inserts a conditional call to **FatalError()** in the error-checking 
@@ -44,7 +44,7 @@ parameter is a Boolean value that, if *true*, will cause the **FatalError()** ca
 to be made. If test is *false*, **FatalError()** will not be called.
 
 ----------
-#### EC_WARNING()
+### EC_WARNING()
     EC_WARNING(word warningCode);
 
 This macro generates a warning for the debugger when executed by 
@@ -53,7 +53,7 @@ error-checking code; it has no effect when in non-EC code.
 **Include:** ec.h
 
 ----------
-#### EC_WARNING_IF()
+### EC_WARNING_IF()
     EC_WARNING_IF(<expr>, word warningCode)
 
 When this macro is executed in error-checking code, it tests <*expr*>; if  <*expr*> 
@@ -64,7 +64,7 @@ In non-EC code, the macro has no effect (and <*expr*> is not evaluated).
 **Include:** ec.h
 
 ----------
-#### ECCheckBounds()
+### ECCheckBounds()
     void    ECCheckBounds(
             void    *address);
 
@@ -74,7 +74,7 @@ into which it points. If assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckChunkArray()
+### ECCheckChunkArray()
     void    ECCheckChunkArray(
             optr    o);
 
@@ -84,7 +84,7 @@ fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckChunkArrayHandles()
+### ECCheckChunkArrayHandles()
     void    ECCheckChunkArrayHandles(
             MemHandle mh,
             ChunkHandle ch);
@@ -95,7 +95,7 @@ fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckClass()
+### ECCheckClass()
     void    ECCheckClass(
             ClassStruct *class);
 
@@ -105,7 +105,7 @@ definition. If the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckDriverHandle()
+### ECCheckDriverHandle()
     void    ECCheckDriverHandle(
             GeodeHandle gh);
 
@@ -115,7 +115,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckEventHandle()
+### ECCheckEventHandle()
     void    ECCheckEventHandle(
             EventHandle eh);
 
@@ -125,7 +125,7 @@ message. If the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckFileHandle()
+### ECCheckFileHandle()
     void    ECCheckFileHandle(
             FileHandle file);
 
@@ -135,7 +135,7 @@ references a file. If the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckGeodeHandle()
+### ECCheckGeodeHandle()
     void    ECCheckGeodeHandle(
             GeodeHandle gh);
 
@@ -145,7 +145,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckGStateHandle()
+### ECCheckGStateHandle()
     void    ECCheckGStateHandle(
             GStateHandle gsh);
 
@@ -155,7 +155,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckHugeArray()
+### ECCheckHugeArray()
     void    ECCheckHugeArray(
             VMFileHandle        vmFile,
             VMBlockHandle       vmBlock);
@@ -166,7 +166,7 @@ is not the directory block of a Huge Array, the routine fails.
 **Include:** ec.h
 
 ----------
-#### ECCheckLibraryHandle()
+### ECCheckLibraryHandle()
     void    ECCheckLibraryHandle(
             GeodeHandle gh);
 
@@ -176,7 +176,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemChunk()
+### ECCheckLMemChunk()
     void    ECCheckLMemChunk(
             void * chunkPtr);
 
@@ -186,7 +186,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemHandle()
+### ECCheckLMemHandle()
     void    ECCheckLMemHandle(
             MemHandle mh);
 
@@ -196,7 +196,7 @@ references a local memory block. If the assertions fail, a fatal error will occu
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemHandleNS()
+### ECCheckLMemHandleNS()
     void    ECCheckLMemHandleNS(
             MemHandle mh);
 
@@ -208,7 +208,7 @@ fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemObject()
+### ECCheckLMemObject()
     void    ECCheckLMemObject(
             optr    obj);
 
@@ -218,7 +218,7 @@ stored in an object block. If the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemObjectHandles()
+### ECCheckLMemObjectHandles()
     void    ECCheckLMemObjectHandles(
             MemHandle mh,
             ChunkHandle ch);
@@ -229,7 +229,7 @@ stored in an object block. If the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemOD()
+### ECCheckLMemOD()
     void    ECCheckLMemOD(
             optr    o);
 
@@ -239,7 +239,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckLMemODHandles()
+### ECCheckLMemODHandles()
     void    ECCheckLMemODHandles(
             MemHandle objHan,
             ChunkHandle objCh);
@@ -250,7 +250,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckMemHandle()
+### ECCheckMemHandle()
     void    ECCheckMemHandle(
             MemHandle mh);
 
@@ -260,7 +260,7 @@ references a memory block. If the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckMemHandleNS()
+### ECCheckMemHandleNS()
     void    ECCheckMemHandleNS(
             MemHandle mh);
 
@@ -272,7 +272,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckObject()
+### ECCheckObject()
     void    ECCheckObject(
             optr    obj);
 
@@ -282,7 +282,7 @@ fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckObjectHandles()
+### ECCheckObjectHandles()
     void    ECCheckObjectHandles(
             Memhandle mh,
             ChunkHandle ch);
@@ -291,7 +291,7 @@ This routine checks the validity of the given locked object. If the assertions
 fail, a fatal error will occur.
 
 ----------
-#### ECCheckOD()
+### ECCheckOD()
     void    ECCheckOD(
             optr    obj);
 
@@ -300,7 +300,7 @@ This routine checks the validity of the given object. Unlike
 specified. If assertions fail, a fatal error will occur.
 
 ----------
-#### ECCheckODHandles()
+### ECCheckODHandles()
     void    ECCheckODHandles(
             MemHandle objHan,
             ChunkHandle objCh);
@@ -312,7 +312,7 @@ specified. If assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckProcessHandle()
+### ECCheckProcessHandle()
     void    ECCheckProcessHandle(
             GeodeHandle gh);
 
@@ -322,7 +322,7 @@ the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckQueueHandle()
+### ECCheckQueueHandle()
     void    ECCheckQueueHandle(
             QueueHandle qh);
 
@@ -332,7 +332,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckResourceHandle()
+### ECCheckResourceHandle()
     void    ECCheckResourceHandle(
             MemHandle mh);
 
@@ -342,7 +342,7 @@ the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckStack()
+### ECCheckStack()
     void    ECCheckStack();
 
 This routine checks to make sure the current stack has not overflown (and is 
@@ -352,7 +352,7 @@ bottom and the stack pointer. If assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckThreadHandle()
+### ECCheckThreadHandle()
     void    ECCheckThreadHandle(
             ThreadHandle th);
 
@@ -362,7 +362,7 @@ the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECCheckWindowHandle()
+### ECCheckWindowHandle()
     void    ECCheckWindowHandle(
             WindowHandle wh);
 
@@ -372,7 +372,7 @@ the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECLMemExists()
+### ECLMemExists()
     void    ECLMemExists(
             optr    o);
 
@@ -383,7 +383,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECLMemExistsHandles()
+### ECLMemExistsHandles()
     void    ECLMemExistsHandles(
             MemHandle mh,
             ChunkHandle ch);
@@ -395,7 +395,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECLMemValidateHandle()
+### ECLMemValidateHandle()
     void    ECLMemValidateHandle(
             optr    o);
 
@@ -405,7 +405,7 @@ the assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECLMemValidateHandleHandles()
+### ECLMemValidateHandleHandles()
     void    ECLMemValidateHandleHandles(
             MemHandle mh,
             ChunkHandle ch);
@@ -416,7 +416,7 @@ reference a local memory chunk. If the assertions fail, a fatal error will occur
 **Include:** ec.h
 
 ----------
-#### ECLMemValidateHeap()
+### ECLMemValidateHeap()
     void    ECLMemValidateHeap(
             MemHandle mh);
 
@@ -426,7 +426,7 @@ internally and should not be needed by application programmers.
 **Include:** ec.h
 
 ----------
-#### ECMemVerifyHeap()
+### ECMemVerifyHeap()
     void    ECMemVerifyHeap()
 
 This routine makes sure the global heap is in a consistent state. If the 
@@ -436,7 +436,7 @@ by anything other than the EC kernel.
 **Include:** ec.h
 
 ----------
-#### ECVMCheckMemHandle()
+### ECVMCheckMemHandle()
     void    ECVMCheckMemHandle(
             MemHandle han);
 
@@ -446,7 +446,7 @@ block handle. If assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECVMCheckVMBlockHandle()
+### ECVMCheckVMBlockHandle()
     void    ECVMCheckVMBlockHandle(
             VMFileHandle file,
             VMBlockHandle block);
@@ -457,7 +457,7 @@ assertions fail, a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ECVMCheckVMFile()
+### ECVMCheckVMFile()
     void    ECVMCheckVMFile(
         VMFileHandle file);
 
@@ -467,7 +467,7 @@ a fatal error will occur.
 **Include:** ec.h
 
 ----------
-#### ElementArrayAddElement ()
+### ElementArrayAddElement ()
     word    ElementArrayAddElement(
             optr    arr,            /* Handle of element array */
             void *  element,        /* Element to add (if necessary) */
@@ -504,7 +504,7 @@ reference count by calling **ElementArrayAddReference()**.
 **See Also:** ElementArrayAddReference()
 
 ----------
-#### ElementArrayAddElementHandles()
+### ElementArrayAddElementHandles()
     word    ElementArrayAddElementHandles(
             MemHandle       mh,             /* Global handle of LMem heap */
             ChunkHandle     chunk           /* Chunk handle of element array */
@@ -527,7 +527,7 @@ reference count by calling **ElementArrayAddReferenceHandles()**.
 **See Also:** ElementArrayAddReferenceHandles()
 
 ----------
-#### ElementArrayAddReference()
+### ElementArrayAddReference()
     void    ElementArrayAddReference(
             optr    arr,        /* optr to element array */
             word    token);     /* Index number of element */
@@ -539,7 +539,7 @@ This routine increments the reference count of a member of an element array.
 **See Also:** ElementArrayAddElement()
 
 ----------
-#### ElementArrayAddReferenceHandles()
+### ElementArrayAddReferenceHandles()
     void    ElementArrayAddReferenceHandles(
             MemHandle       mh,         /* Handle of LMem heap's block */
             ChunkHandle     ch,         /* Handle of element array */
@@ -552,7 +552,7 @@ of with an optr).
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayCreate()
+### ElementArrayCreate()
     ChunkHandle ElementArrayCreate(
             MemHandle   mh,             /* Handle of LMem heap's block */
             word        elementSize,    /* Size of each element, or zero
@@ -586,7 +586,7 @@ fixed). If you pass a header size, make sure it is larger than
 **sizeof(ElementArrayHeader)**.
 
 ----------
-#### ElementArrayCreateAt
+### ElementArrayCreateAt
     ChunkHandle     ElementArrayCreateAt(
             optr    arr,            /* optr of chunk for array */
             word    elementSize,    /* Size of each element, or zero
@@ -603,7 +603,7 @@ will be overwritten.
 pointers to chunks in that block.
 
 ----------
-#### ElementArrayCreateAtHandles
+### ElementArrayCreateAtHandles
     ChunkHandle     ElementArrayCreateAtHandles(
             MemHandle   mh,             /* Handle of LMem heap */
             ChunkHandle ch              /* Create array in this chunk */
@@ -621,7 +621,7 @@ with an optr).
 pointers to chunks in that block.
 
 ----------
-#### ElementArrayDelete()
+### ElementArrayDelete()
     void    ElementArrayDelete(
             optr    arr,        /* optr to element array */
             word    token);     /* index of element to delete */
@@ -641,7 +641,7 @@ elements are preserved.
 **See Also:** ElementArrayRemoveReference()
 
 ----------
-#### ElementArrayDeleteHandles()
+### ElementArrayDeleteHandles()
     void    ElementArrayDeleteHandles(
             MemHandle   mh,         /* Handle of LMem heap */
             ChunkHandle ch,         /* Chunk handle of element array */
@@ -658,7 +658,7 @@ optr).
 **See Also:** ElementArrayRemoveReference()
 
 ----------
-#### ElementArrayElementChanged()
+### ElementArrayElementChanged()
     void    ElementArrayElementChanged(
             optr    arr,                /* optr to element array */
             word    token,              /* Index number of element */
@@ -687,7 +687,7 @@ do a bytewise comparison of the elements.
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayElementChangedHandles()
+### ElementArrayElementChangedHandles()
     void    ElementArrayElementChangedHandles(
             MemHandle       memHandle,      /* Handle of LMem heap's block */
             ChunkHandle     chunkHandle,    /* Chunk handle of element array */
@@ -706,7 +706,7 @@ except that the element array is specified by its global and chunk handles
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayGetUsedCount()
+### ElementArrayGetUsedCount()
     word    ElementArrayGetUsedCount(
             optr    arr,            /* optr to element array */
             dword   callbackData,           /* This is passed to callback routine */
@@ -729,7 +729,7 @@ pointer.
 **See Also:** ElementArrayTokenToUsedIndex(), ElementArrayUsedIndexToToken()
 
 ----------
-#### ElementArrayGetUsedCountHandles()
+### ElementArrayGetUsedCountHandles()
     void    ElementArrayGetUsedCountHandles(
             MemHandle   mh,             /* Handle of LMem heap's block */
             ChunkHandle ch,             /* Chunk handle of element array */
@@ -744,7 +744,7 @@ of with an optr).
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayRemoveReference()
+### ElementArrayRemoveReference()
     void    ElementArrayRemoveReference(
             optr    arr,            /* optr of element array */
             word    token,          /* Index of element to unreference */
@@ -771,7 +771,7 @@ elements are preserved.
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayRemoveReferenceHandles()
+### ElementArrayRemoveReferenceHandles()
     void    ElementArrayRemoveReferenceHandles(
             MemHandle   mh,             /* Handle of LMem heap */
             ChunkHandle ch,             /* Chunk handle of element array */
@@ -787,7 +787,7 @@ except that the element array is specified by its global and chunk handles
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayTokenToUsedIndex()
+### ElementArrayTokenToUsedIndex()
     word    ElementArrayTokenToUsedIndex(
             optr    arr,                /* Handle of element array */
             word    token,              /* Index of element to unreference */
@@ -807,7 +807,7 @@ passed, every used element will be counted.
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayTokenToUsedIndexHandles()
+### ElementArrayTokenToUsedIndexHandles()
     word    ElementArrayTokenToUsedIndexHandles(
             MemHandle   mh,             /* Handle of LMem heap */
             ChunkHandle ch,             /* Chunk handle of element array */
@@ -824,7 +824,7 @@ except that the element array is specified by its global and chunk handles
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayUsedIndexToToken()
+### ElementArrayUsedIndexToToken()
     word    ElementArrayUsedIndexToToken(
             optr    arr,                /* optr to element array */
             word    index,              /* Find token of element with this index */
@@ -848,7 +848,7 @@ returns CA_NULL_ELEMENT.
 **Include:** chunkarr.h
 
 ----------
-#### ElementArrayUsedIndexToTokenHandles()
+### ElementArrayUsedIndexToTokenHandles()
     word    ElementArrayUsedIndexToTokenHandles(
             MemHandle   mh,             /* Handle of LMem heap's block */
             ChunkHandle     ch,         /* Handle of element array */
@@ -864,7 +864,7 @@ except that the element array is specified by its global and chunk handles
 **Include:** chunkarr.h
 
 ----------
-#### EvalExpression()
+### EvalExpression()
     int EvalExpression(
             byte    * tokenBuffer,      /* Pointer to the parsed expression */
             byte    * scratchBuffer,    /* Pointer to the base of a scratch buffer
@@ -881,14 +881,14 @@ portion of the parse library and will be used only rarely by applications.
 **Include:** parse.h
 
 ----------
-#### FatalError()
+### FatalError()
     void    FatalError(
             word errorCode);
 
 This routine causes a fatal error, leaving *errorCode* for the debugger.
 
 ----------
-#### FileClose()
+### FileClose()
     word    FileClose( /* returns error */
             FileHandle  fh,             /* File to close */
             Boolean     noErrorFlag);   /* Set if app. can't handle
@@ -904,7 +904,7 @@ member of the **FileError** enumerated type. If the routine fails and
 **Include:** file.h
 
 ----------
-#### FileCommit()
+### FileCommit()
     word    FileCommit( /* returns error */
             FileHandle  fh,
             Boolean     noErrorFlag);   /* set if can't handle errors */
@@ -919,7 +919,7 @@ non-zero), the routine will fatal-error.
 **Include:** file.h
 
 ----------
-#### FileConstructFullPath()
+### FileConstructFullPath()
     DiskHandle  FileConstructFullPath(
             char        * * buffer,     /* Path string is written here */
             word        bufSize,        /* Length of buffer (in bytes) */
@@ -970,7 +970,7 @@ path string will begin with the drive's name and a colon.
 **Include:** file.h
 
 ----------
-#### FileCopy()
+### FileCopy()
     word    FileCopy( /* returns error */
             const char  * source,       /* Source path and file name */
             const char  * dest,         /* Destination path and file name */
@@ -1010,7 +1010,7 @@ There was not enough room on the destination disk.
 **Include:** file.h
 
 ----------
-#### FileCreate()
+### FileCreate()
     FileHandle  FileCreate( /* sets thread's error value */
             const char      * name,         /* relative to working directory */
             FileCreateFlags flags,          /* see below */
@@ -1107,7 +1107,7 @@ format, or vice versa.
 **Include:** file.h
 
 ----------
-#### FileCreateDir()
+### FileCreateDir()
     word    FileCreateDir( /* Returns error & sets thread's error value */
             const char * name);     /* Relative path of new directory */
 
@@ -1136,7 +1136,7 @@ The volume is write-protected.
 **Include:** file.h
 
 ----------
-#### FileCreateTempFile()
+### FileCreateTempFile()
     FileHandle FileCreateTempFile( /* Sets thread's error value */
             char        * dir,      /* directory, relative to working dir.;
                                      * file name replaces 14 trailing null
@@ -1161,7 +1161,7 @@ value to a member of the **FileError** enumerated type.
 **Include:** file.h
 
 ----------
-#### FileDelete()
+### FileDelete()
     word    FileDelete( /* returns error */
             const char  * name);   /* path relative to working directory */
 
@@ -1186,7 +1186,7 @@ Some geode has that file open.
 **Include:** file.h
 
 ----------
-#### FileDeleteDir()
+### FileDeleteDir()
     word    FileDeleteDir( /* Returns error & sets thread's error value */
             const char * name);   /* Relative path of directory to delete */
 
@@ -1221,7 +1221,7 @@ before it can be deleted.
 **Include:** file.h
 
 ----------
-#### FileDuplicateHandle()
+### FileDuplicateHandle()
     FileHandle FileDuplicateHandle( /* Sets thread's error value */
             FileHandle fh);
 
@@ -1234,7 +1234,7 @@ thread's error value.
 **Include:** file.h
 
 ----------
-#### FileEnum()
+### FileEnum()
     word    FileEnum( /* returns number of files returned */
             FileEnumParams  * params,       /* described below */
             MemHandle       * bufCreated,   /* FileEnum will allocate a return-
@@ -1496,7 +1496,7 @@ constant might nevertheless be SP_TOP.
 **Include:** fileEnum.h
 
 ----------
-#### FileEnumLocateAttr()
+### FileEnumLocateAttr()
     void *  FileEnumLocateAttr( /* returns NULL if attr not found */
             FileEnumCallbackData*   fecd,   /* Passed to callback routine */
             FileExtendedAttribute   attr,   /* Search for this attribute */
@@ -1513,7 +1513,7 @@ array, **FileEnumLocateAttr()** will return a null pointer.
 **Include:** fileEnum.h
 
 ----------
-#### FileEnumWildcard()
+### FileEnumWildcard()
     Boolean FileEnumWildcard(
             FileEnumCallbackData    * fecd,     /* Passed to callback routine */
             word                    frame);     /* Inherited stack frame */
@@ -1534,14 +1534,14 @@ Otherwise, it returns *false*.
 **Include:** fileEnum.h
 
 ----------
-#### FileFromTransferBlockID()
+### FileFromTransferBlockID()
     VMFileHandle     FileFromTransferBlockID(id);
             TransferBlockID id;
 
 This macro extracts a VMFileHandle from a value of type **TransferBlockID**.
 
 ----------
-#### FileGetAttributes()
+### FileGetAttributes()
     FileAttrs   FileGetAttributes( /* Sets thread's error value */
             const char * path);     /* file's path relative to current
                                      * working directory */
@@ -1556,7 +1556,7 @@ this routine sets the thread's error.
 **Include:** file.h
 
 ----------
-#### FileGetCurrentPath()
+### FileGetCurrentPath()
     DiskHandle FileGetCurrentPath(
             char *  buffer,         /* Path string is written here */
             word    bufferSize);    /* Size of buffer in bytes */
@@ -1570,7 +1570,7 @@ will be returned.
 **Include:** file.h
 
 ----------
-#### FileGetDateAndTime()
+### FileGetDateAndTime()
     FileDateAndTime     FileGetDateAndTime( /* sets thread's error value */
             FileHandle fh);
 
@@ -1584,7 +1584,7 @@ FEA_MODIFICATION. If unsuccessful, it sets the thread's error value.
 **Include:** file.h
 
 ----------
-#### FileGetDiskHandle()
+### FileGetDiskHandle()
     DiskHandle FileGetDiskHandle( /* sets thread's error value */
             FileHandle fh);
 
@@ -1594,7 +1594,7 @@ unsuccessful, it sets the thread's error value.
 **Include:** file.h
 
 ----------
-#### FileGetHandleExtAttributes()
+### FileGetHandleExtAttributes()
     word    FileGetHandleExtAttributes(
             FileHandle              fh,         /* open file's handle */
             FileExtendedAttribute   attr,       /* attribute to get */
@@ -1633,7 +1633,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 **Include:** file.h
 
 ----------
-#### FileGetPathExtAttributes()
+### FileGetPathExtAttributes()
     word    FileGetPathExtAttributes(
             const char              * path,     /* path relative to current
                                                  * working directory */
@@ -1672,7 +1672,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 **Include:** file.h
 
 ----------
-#### FileLockRecord()
+### FileLockRecord()
     word    FileLockRecord(     /* returns error */
             FileHandle      fh,
             dword           filePos,    /* lock starting at this position... */
@@ -1691,7 +1691,7 @@ applications use this mechanism, they have to make sure to call
 **See Also:** FileUnlockRecord(), HandleP()
 
 ----------
-#### FileMove()
+### FileMove()
     word    FileMove( /* Returns error */
             const char      * source,   /* source path and file name */
             const char      * dest,     /* destination path and file name */
@@ -1734,7 +1734,7 @@ There was not enough room on the destination disk.
 **Include:** file.h
 
 ----------
-#### FileOpen()
+### FileOpen()
     FileHandle FileOpen( /* sets thread's error value */
             const char          * name,     /* relative to working dir */
             FileAccessFlags     flags);     /* Permissions/exclusions */
@@ -1773,7 +1773,7 @@ write-protected volume.
 **Include:** file.h
 
 ----------
-#### FileParseStandardPath()
+### FileParseStandardPath()
     StandardPath FileParseStandardPath(
             DiskHandle      disk,
             const char      ** path);
@@ -1791,7 +1791,7 @@ be returned, and the pointer will not be changed.
 **Include:** file.h
 
 ----------
-#### FilePopDir()
+### FilePopDir()
     void    FilePopDir();
 
 **FilePopDir()** pops the top directory off the thread's directory stack and 
@@ -1802,7 +1802,7 @@ makes it the current working directory.
 **Include:** file.h
 
 ----------
-#### FilePos()
+### FilePos()
     dword   FilePos( /* Sets thread's error value */
             FileHandle      fh,
             dword           posOrOffset,
@@ -1835,7 +1835,7 @@ mode FILE_POS_RELATIVE and offset zero.
 **Include:** file.h
 
 ----------
-#### FilePushDir()
+### FilePushDir()
     void    FilePushDir();
 
 **FilePushDir()** pushes the current working directory onto the thread's 
@@ -1846,7 +1846,7 @@ directory stack. It does not change the current working directory.
 **Include:** file.h
 
 ----------
-#### FileRead()
+### FileRead()
     word    FileRead( /* sets thread's error value */
             FileHandle      fh,             /* handle of open file */
             void            * buf,          /* copy data to this buffer */
@@ -1870,7 +1870,7 @@ fatal-error if an error occurs (including an ERROR_SHORT_READ_WRITE).
 **Include:** file.h
 
 ----------
-#### FileRename()
+### FileRename()
     word    FileRename(
             const char * oldName,       /* Relative to working directory */
             const char * newName);      /* Name only, without path */
@@ -1901,7 +1901,7 @@ file, and the name was not an appropriate native name.
 **Include:** file.h
 
 ----------
-#### FileResolveStandardPath()
+### FileResolveStandardPath()
     DiskHandle FileResolveStandardPath(
             char        ** buffer,              /* Write path here; update pointer
                          * to point to end of path */
@@ -1931,7 +1931,7 @@ and return accordingly.
 **Include:** file.h
 
 ----------
-#### FileSetAttributes()
+### FileSetAttributes()
     word    FileSetAttributes( /* returns error value */
             const char  * path,     /* file's path relative to current
                                      * working directory */
@@ -1946,7 +1946,7 @@ attribute FEA_FILE_ATTR.
 **Include:** file.h
 
 ----------
-#### FileSetCurrentPath()
+### FileSetCurrentPath()
     DiskHandle FileSetCurrentPath(
             DiskHandle      disk,       /* May be a standard path constant */
             const char      * path);    /* path string, null-terminated */
@@ -1969,7 +1969,7 @@ current path; this may be a standard path constant. If
 **Include:** file.h
 
 ----------
-#### FileSetDateAndTime()
+### FileSetDateAndTime()
     word    FileSetDateAndTime( /* returns error */
             FileHandle          fh,             /* handle of open file */
             FileDateAndTime     dateAndTime);   /* new modification time */
@@ -1985,7 +1985,7 @@ the thread's error value.
 **Include:** file.h
 
 ----------
-#### FileSetHandleExtAttributes()
+### FileSetHandleExtAttributes()
     word    FileGetPathExtAttributes( /* returns error */
             FileHandle              fh,         /* handle of open file */
             FileExtendedAttribute   attr,       /* attribute to get */
@@ -2027,7 +2027,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 **Include:** file.h
 
 ----------
-#### FileSetPathExtAttributes()
+### FileSetPathExtAttributes()
     word    FileSetPathExtAttributes(
             const char              * path,     /* path relative to current
                                                  * working directory */
@@ -2071,7 +2071,7 @@ FEA_MULTIPLE, and using a **FileExtAttrDesc** to describe the attribute.
 **Include:** file.h
 
 ----------
-#### FileSetStandardPath()
+### FileSetStandardPath()
     void    FileSetStandardPath(
             StandardPath path);         /* StandardPath to set */
 
@@ -2081,7 +2081,7 @@ StandardPath directories. Pass a standard path.
 **Include:** file.h
 
 ----------
-#### FileSize()
+### FileSize()
     dword   FileSize(
             FileHandle fh);     /* handle of open file */
 
@@ -2090,7 +2090,7 @@ This routine returns the size of the open file specified.
 **Include:** file.h
 
 ----------
-#### FileTruncate()
+### FileTruncate()
     word    FileTruncate(
             FileHandle      fh,         /* handle of open file */
             dword           offset);    /* offset at which to truncate */
@@ -2101,7 +2101,7 @@ parameter can also be thought of as the desired file size.
 **Include:** file.h
 
 ----------
-#### FileUnlockRecord()
+### FileUnlockRecord()
     word    FileUnlockRecord( /* returns error */
             FileHandle      fh,             /* handle of open file
             dword       filePos,                /* Release lock that starts here */
@@ -2115,7 +2115,7 @@ previously placed with **FileLockRecord()**.
 **Include:** file.h
 
 ----------
-#### FileWrite()
+### FileWrite()
     word    FileWrite( /* sets thread's error value */
             FileHandle      fh,             /* handle of open file */
             const void      * buf,          /* Copy from here into file */
@@ -2141,7 +2141,7 @@ fatal-error if an error occurs.
 **Include:** file.h
 
 ----------
-#### FormatIDFromManufacturerAndType
+### FormatIDFromManufacturerAndType
     dword   FormatIDFromManufacturerAndType(mfr, type);
             ManufacturerIDs             mfr;
             ClipboardItemFormat             type;
@@ -2151,7 +2151,7 @@ combines them into a dword argument of the type
 **ClipboardItemFormatID**.
 
 ----------
-#### free()
+### free()
     void    free(
             void * blockPtr);       /* address of memory to free */
 
@@ -2179,7 +2179,7 @@ actions, including possibly erasing other memory or crashing the system.
 **See Also:** calloc(), malloc(), GeoFree(), realloc()
 
 ----------
-#### FractionOf()
+### FractionOf()
     word    FractionOf(
             WWFixedAsDWord      wwf);
 

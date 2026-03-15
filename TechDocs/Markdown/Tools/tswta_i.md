@@ -1,4 +1,4 @@
-## 4 Swat Reference
+# 4 Swat Reference
 
 This chapter is intended to provide documentation for the majority of useful 
 Swat commands. The general structure of the descriptions in this chapter 
@@ -734,7 +734,7 @@ alias, unbind-key.
 
 ### break
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -770,7 +770,7 @@ brk, irq.
 
 ### brk
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -864,7 +864,7 @@ words, dwords, imem, assign.
 
 ### cache
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -968,17 +968,17 @@ cdr.
 ----------
 ### case
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 ### catch
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 ### cbrk
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -1124,7 +1124,7 @@ top-level-read.
 ----------
 ### concat
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 ### condenseSmall
@@ -1227,9 +1227,9 @@ systemobj, gentree, impliedgrab.
 
 ----------
 
-###continue
+### continue
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -1255,7 +1255,7 @@ step-patient.
 
 ----------
 
-###cup
+### cup
 
 **Usage:**  
 `cup <class>`  
@@ -1640,7 +1640,7 @@ help.
 
 ### defsubr
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2279,13 +2279,13 @@ elist, eqlist, eqfind, pevent.
 
 ### error
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
 ### eval
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2298,7 +2298,7 @@ Chapter 5.
 
 ### exec
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2412,7 +2412,7 @@ foreach, index, range.
 
 ### expr
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2526,7 +2526,7 @@ Print the address of the target machine's current top-most field window.
 
 ### file
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -2893,19 +2893,19 @@ pfont, pfontinfo, pusage, pchar, pfontinfo.
 
 ### for
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
 ### foreach
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
 #### format
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -3471,7 +3471,7 @@ addr-parse, addr-preprocess.
 
 ### global
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -3560,7 +3560,7 @@ gentree, vup, vistree, impliedgrab.
 
 ### handle
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4067,7 +4067,7 @@ Number of instructions to skip when using the ^D and ^U commands of ibrk.
 
 ### if
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
@@ -4244,13 +4244,13 @@ command if they properly cast the handle.
 
 ### index
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 
 ### info
 
-This is a Tcl primitive. See "Tool Command Language," Chapter 5.
+This is a Tcl primitive. See [Tool Command Language](ttcl.md).
 
 ----------
 

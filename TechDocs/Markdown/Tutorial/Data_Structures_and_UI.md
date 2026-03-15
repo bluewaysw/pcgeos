@@ -1,4 +1,4 @@
-## 5 Data Structures and UI
+# 5 Data Structures and UI
 
 In this chapter we add some UI gadgetry to the application. By creating some 
 objects and writing some procedural code, we will construct a cluster of 
@@ -8,7 +8,7 @@ We will explore the application's new code, both examining blocks of the
 source code to see what they do and going through a debugging session 
 during which we set some breakpoints and do some stepping through code.
 
-### 5.1 Editing the Application
+## 5.1 Editing the Application
 
 At the end of this chapter you will find a complete code listing for this stage 
 of the application. Pieces of code which have been added or changed since the 
@@ -25,7 +25,7 @@ before: if you still have Swat attached, then use the send Swat command;
 otherwise, make sure that the pccom tool is running on the target machine 
 and invoke pcs on the host machine.
 
-### 5.2 The Application so Far
+## 5.2 The Application so Far
 
 Our application has sprouted a scrolling list, three buttons, and a place to 
 input a numerical value. The buttons allow the user to add, remove, and 
@@ -76,7 +76,7 @@ resources we will work with each time. Since our application will
 eventually support multiple documents, we may never bother to do the 
 cleaning up necessary to make it multi-launchable.
 
-### 5.3 MCHRT.GP Change
+## 5.3 MCHRT.GP Change
 
 We changed one line of the MCHRT.GP file to let glue know that our 
 application is now single-launchable instead of multi-launchable.
@@ -88,7 +88,7 @@ type appl, process, single
 Our new addition, the "single" keyword, signals that the application is 
 single-launchable.
 
-### 5.4 MCHRT.GOC: Data & Structures
+## 5.4 MCHRT.GOC: Data & Structures
 
 Our additions to MCHRT.GOC fall into three basic categories. First, we will 
 declare global variables and set up prototypes for routines and messages. 
@@ -208,7 +208,7 @@ our local memory block, the block which will act as the "mini-heap". We will
 use the MemHandle to access the local memory block while that block is 
 loaded into memory. 
 
-### 5.5 MCHRT.GOC: New Objects
+## 5.5 MCHRT.GOC: New Objects
 
 ~~~
 @object GenPrimaryClass MCPrimary = {   
@@ -353,7 +353,7 @@ automatically.
 For more information about GenValue objects, see "GenValue," Chapter 8 of 
 the Object Reference Book.
 
-### 5.6 MCHRT.GOC: Procedural Code
+## 5.6 MCHRT.GOC: Procedural Code
 
 The last part of our additions is procedural code which we will use to manage 
 our data structures and coordinate updates between objects.
@@ -941,7 +941,7 @@ retHandle = @callsuper();
 return retHandle;
 ~~~
 
-### 5.7 Swat: Breakpoints and More
+## 5.7 Swat: Breakpoints and More
 
 Now that our application has some procedural code, we'll be able to use Swat 
 for some of the more traditional uses of a debugger: setting breakpoints and 

@@ -1,4 +1,4 @@
-## 1 Introduction
+# 1 Introduction
 
 This book will help you set up your development 
 stations, install your development kit software, and 
