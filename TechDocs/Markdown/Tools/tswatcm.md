@@ -1,4 +1,4 @@
-## 3 Swat Introduction
+# 3 Swat Introduction
 
 Most programmers are familiar with the process of debugging code. Many, 
 however, will not be familiar with the issues of debugging programs in an 
@@ -74,7 +74,7 @@ As you gain familiarity with Swat while using Swat with the sample
 applications and with your own programs, you will discover your own 
 preferred methods of debugging.
 
-### 3.1 DOS Command Line Options
+## 3.1 DOS Command Line Options
 
 To use Swat, you must have the pccom tool running on the target machine. 
 You may then invoke Swat on the development machine. Swat takes the 
@@ -121,7 +121,7 @@ specify a fifth directory in which to look for geodes. You may specify absolute
 pathnames in this file; if you give relative paths, they will be assumed to start 
 at the directory specified with your ROOT_DIR variable.
 
-### 3.2 Notation
+## 3.2 Notation
 
 The rest of this chapter is devoted to interacting with Swat once you have it running. Most of this is done by means of commands typed at a prompt. Some Swat commands may have subcommands, some may have flag options, and 
 some combine the two. Others may have special options; all, however, are 
@@ -153,7 +153,7 @@ or more repetitions of the construct may be used. For example, `unalias <word>*`
 can be the `unalias` command by itself, or it can be followed by 
 a list of words to be unaliased.
 
-### 3.3 Address Expressions
+## 3.3 Address Expressions
 
 Address expressions are used as arguments to any Swat command that 
 accesses memory. For example, the `pobject` command takes an address 
@@ -252,7 +252,7 @@ Much of the time the type of data stored at the address given by the address exp
 
 the data at `ds:14h` will be treated as a double word.
 
-### 3.4 On-line Help
+## 3.4 On-line Help
 
 Swat provides on-line help, both for looking up Swat topics and GEOS 
 reference material.
@@ -363,7 +363,7 @@ fast help on a particular command. (See Swat Display 3-2.)
 
 
 
-### 3.5 Essential Commands
+## 3.5 Essential Commands
 
 This section covers the function and usage of some of the most important 
 Swat commands. These commands fall into the following command groups:
@@ -389,7 +389,7 @@ aforementioned groups.
 
 A complete list of the Swat commands is contained in the Reference chapter.
 
-#### 3.5.1 Cycle of Development
+### 3.5.1 Cycle of Development
 
     send, run, exit, patient-default
 
@@ -434,7 +434,7 @@ Use this command to set a default patient to use with the **send** and **run**
 commands. The send and run commands will operate on this patient if they 
 are not passed arguments.
 
-#### 3.5.2 Attaching and Detaching
+### 3.5.2 Attaching and Detaching
 
     attach, att, detach, quit, cont, Ctrl-C
 
@@ -593,7 +593,7 @@ pressing the c key. It is used to stop GEOS in order to set a breakpoint,
 examine memory, or to get a command line prompt.
 
 
-#### 3.5.3 Breakpoints and Code Stepping
+### 3.5.3 Breakpoints and Code Stepping
 
 The commands in this group are used to stop at specified breakpoints in an 
 application's code and then step through the code line by line if necessary. 
@@ -906,7 +906,7 @@ This finishes the current stack frame, stops, and remains in step mode.
 This skips the current instruction, does not execute it, and goes on to the 
 next instruction in step mode.
 
-#### 3.5.4 Examining and Modifying Memory
+### 3.5.4 Examining and Modifying Memory
 
 The commands in this section all deal with the examination, manipulation, 
 or modification of the memory used by an application. Memory from 
@@ -1588,7 +1588,7 @@ The **why** command prints the error code for an occurrence of a fatal error.
 This command is useful because it can give a good idea of why GEOS crashed.
 
 
-### 3.6 Additional Features
+## 3.6 Additional Features
 
 This section covers the features of Swat that make it easier to use when 
 debugging an application.

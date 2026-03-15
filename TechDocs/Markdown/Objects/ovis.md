@@ -3878,7 +3878,7 @@ VUM_MANUAL is not allowed.
 
 **Interception:** Generally not intercepted.
 
-#### 23.5.3 Getting Visible Tree Information
+### 23.5.3 Getting Visible Tree Information
     MSG_VIS_FIND_CHILD, MSG_VIS_FIND_CHILD_AT_POSITION, 
     MSG_VIS_COUNT_CHILDREN, MSG_VIS_FIND_PARENT
 
@@ -4755,7 +4755,7 @@ object and then drag-scroll too far. To prevent this from happening, the
 visible object must call MSG_VIS_VUP_SET_MOUSE_INTERACTION_BOUNDS 
 to set a temporary boundary on drag scrolling.
 
-### 23.7 VisClass Error Checking
+## 23.7 VisClass Error Checking
     MSG_VIS_VUP_EC_ENSURE_WINDOW_NOT_REFERENCED, 
     MSG_VIS_VUP_EC_ENSURE_OBJ_BLOCK_NOT_REFERENCED, 
     MSG_VIS_VUP_EC_ENSURE_OD_NOT_REFERENCED

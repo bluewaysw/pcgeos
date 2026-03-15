@@ -1,4 +1,4 @@
-## Zoomer Programmer's Guide
+# Zoomer Programmer's Guide
 
 This booklet is a storehouse of advice for Zoomer 
 programmers. We assume you know a reasonable 

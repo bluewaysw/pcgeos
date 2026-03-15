@@ -1,4 +1,4 @@
-## 6 Applications and Geodes
+# 6 Applications and Geodes
 
 This chapter discusses the life of an application as well as several topics most 
 application programmers will want to cover at one time or another. Before 
@@ -39,7 +39,7 @@ change another application's data dynamically-the recipient
 application is automatically started if it is not already running. (This is 
 an advanced topic; most programmers will not need to read this section.)
 
-### 6.1 Geodes
+## 6.1 Geodes
 
 Geode is the term used to describe a GEOS executable. Just as DOS has 
 executables (programs) that reside in files on a disk, so too does GEOS. GEOS 
@@ -136,7 +136,7 @@ block list (e.g. a geode is being loaded while it has just been freed), GEOS
 maintains an internal semaphore. The geode loading and freeing routines 
 automatically maintain this semaphore.
 
-#### 6.1.1 Geode Components and Structures
+### 6.1.1 Geode Components and Structures
 
 A geode is simply a special type of GEOS file. It has a special file header that 
 gets loaded in as the geode's core block. This file header contains the geode's 
@@ -197,7 +197,7 @@ keep the import and export specifics available. Additionally, each geode
 must keep track of the resources it owns. All this information is stored in 
 tables referenced from within the core block.
 
-##### 6.1.1.1 Geode Attributes
+#### 6.1.1.1 Geode Attributes
 
 Each geode has in its core block a record of type **GeodeAttrs**. This record 
 defines several things about the geode, including which aspects it uses and 
@@ -260,13 +260,13 @@ GA_ENTRY_POINTS_IN_C
 This geode has its library entry routine in C rather than 
 assembly language.
 
-##### 6.1.1.2 Geode Token
+#### 6.1.1.2 Geode Token
 
 As stated above, every geode is associated with a token in the token database. 
 This token is defined by the use of a **GeodeToken** structure. This structure 
 and its uses are discussed in [section 6.2](#62-creating-icons).
 
-#### 6.1.2 Launching an Application
+### 6.1.2 Launching an Application
 
 GeodeLoad(), UserLoadApplication(), 
 MSG_GEN_PROCESS_OPEN_APPLICATION
@@ -347,7 +347,7 @@ MSG_GEN_PROCESS_OPEN_APPLICATION-two others are received (when
 restoring from state and when opening in engine mode), but they should not 
 be intercepted.
 
-#### 6.1.3 Shutting Down an Application
+### 6.1.3 Shutting Down an Application
 
 MSG_GEN_PROCESS_CLOSE_APPLICATION, 
 MSG_GEN_PROCESS_CLOSE_ENGINE, 
@@ -400,7 +400,7 @@ for notification on the notification list GCNSLT_SHUTDOWN_CONTROL
 When the system shuts down or task-switches, the object will then receive a 
 MSG_META_CONFIRM_SHUTDOWN, at which time the object must call **SysShutdown()**.
 
-#### 6.1.4 Saving and Restoring State
+### 6.1.4 Saving and Restoring State
 
 ObjMarkDirty(), ObjSaveBlock()
 
@@ -494,7 +494,7 @@ instead; it will erase the backup and lock in the user's changes to the
 document.) If you are not using GEOS VM files, it is up to you how and if you 
 will save the document's state.
 
-#### 6.1.5 Using Other Geodes
+### 6.1.5 Using Other Geodes
 
 Often, geodes will have to use other geodes. For example, a communications 
 program will use the Serial Driver, and a draw application will use the 
@@ -505,7 +505,7 @@ Other times, however, an application will have to load libraries or drivers on
 the fly and then free them some time later. This section describes how to load, 
 use, and free libraries and drivers.
 
-##### 6.1.5.1 Using Libraries
+#### 6.1.5.1 Using Libraries
 
 GeodeUseLibrary(), GeodeFreeLibrary()
 
@@ -525,7 +525,7 @@ increment the library's reference count. When you are done using a library
 loaded with **GeodeUseLibrary()**, you must free the library's instance with 
 **GeodeFreeLibrary()**.
 
-##### 6.1.5.2 Using Drivers
+#### 6.1.5.2 Using Drivers
 
 GeodeUseDriver(), GeodeInfoDriver(), 
 GeodeGetDefaultDriver(), GeodeSetDefaultDriver(), GeodeFreeDriver()
@@ -686,7 +686,7 @@ geode handle and a driver type and sets the system default for that type.
 Typically, system defaults will be set only by the Preferences Manager 
 application.
 
-#### 6.1.6 Writing Your Own Libraries
+### 6.1.6 Writing Your Own Libraries
 
 Creating a library geode is a simple step beyond creating a normal 
 application. Libraries can have their own process threads or not; most 
@@ -743,7 +743,7 @@ type driver, library, single
 entry SoundEntry
 ~~~
 
-#### 6.1.7 Working with Geodes
+### 6.1.7 Working with Geodes
 
 The system provides a number of utility routines for getting information and 
 setting attributes of geodes. These are loosely organized throughout the 
@@ -816,7 +816,7 @@ owns the code block from which it was called.
 
 **ProcInfo()** returns the thread handle of the first thread of a given process.
 
-##### 6.1.7.3 Managing Geode Event Queues
+#### 6.1.7.3 Managing Geode Event Queues
 
 GeodeAllocQueue(), GeodeFreeQueue(), GeodeInfoQueue(), 
 GeodeFlushQueue(), ObjDispatchMessage(), QueueGetMessage(), 
@@ -846,7 +846,7 @@ it's handling a message.
 
 **QueuePostMessage()** adds an event to the specified queue. 
 
-#### 6.1.8 Geode Protocols and Release Levels
+### 6.1.8 Geode Protocols and Release Levels
 
 Every GEOS geode and VM file has both a release level and a protocol level as 
 extended attributes of the file. These two items help ease the transitions for 
@@ -855,7 +855,7 @@ drivers, system software, etc. To control release and protocol numbers, use
 the GREV tool and a REV file as described in "Grev" on page 444 of "Using 
 Tools," Chapter 10 of the Tools Reference Manual.
 
-##### 6.1.8.1 Release Numbers
+#### 6.1.8.1 Release Numbers
 
 The release number is a **ReleaseNumber** structure which consists of four 
 components: The RN_major and RN_minor numbers are the most significant. 
@@ -882,7 +882,7 @@ To retrieve the release number of a given geode, use the routine
 **GeodeGetInfo()**. Release levels should be set at compile time and are not 
 changeable at run-time.
 
-##### 6.1.8.2 Protocol Numbers
+#### 6.1.8.2 Protocol Numbers
 
 The protocol number is a structure of type **ProtocolNumber** stored in the 
 file's FEA_PROTOCOL extended attribute. Each GEOS geode and data file has 
@@ -959,7 +959,7 @@ increment the major protocol.
 major protocol. Otherwise, the flags will be restored from the state file 
 and will override the changes you made.
 
-#### 6.1.9 Temporary Geode Memory
+### 6.1.9 Temporary Geode Memory
 
 GeodePrivAlloc(), GeodePrivFree(), GeodePrivWrite(), 
 GeodePrivRead()
@@ -1004,7 +1004,7 @@ know that other geodes are also using the same routines.
 data. It needs to be passed only the number of words to be freed and the tag 
 as returned by **GeodePrivAlloc()**.
 
-### 6.2 Creating Icons
+## 6.2 Creating Icons
 
 Every geode can have an icon associated with it. Typically, only applications 
 will have special icons; other geodes (libraries and drivers) generally use one 
@@ -1018,7 +1018,7 @@ The GEOS development kit includes an icon editor tool so you can easily
 create icons of various color and resolution characteristics and install them 
 into your applications.
 
-#### 6.2.1 The Token Database
+### 6.2.1 The Token Database
 
 TokenOpenLocalTokenDB(), TokenCloseLocalTokenDB()
 
@@ -1162,7 +1162,7 @@ returns a dword. The lower word of the return value is the handle of the
 global memory block; the upper word is the number of **GeodeToken** 
 structures in that block.
 
-### 6.3 Saving User Options
+## 6.3 Saving User Options
 
 Almost all users enjoy configuring their systems to their own tastes, whether 
 it's setting the background bitmap or choosing a default font. Most 
@@ -1176,7 +1176,7 @@ However, sometimes you will want to set additional options not managed by
 UI objects. This is not difficult to do in GEOS: You can have your application 
 save its options directly to the local initialization file, GEOS.INI.
 
-#### 6.3.1 Saving Generic Object Options
+### 6.3.1 Saving Generic Object Options
 
 All appropriate generic UI objects have the ability to save their options. For 
 example, a properties GenInteraction could save which of its options are on 
@@ -1242,7 +1242,7 @@ Code Display 6-2 Saving Generic Object Options
 }
 ~~~
 
-#### 6.3.2 The GEOS.INI File
+### 6.3.2 The GEOS.INI File
 
 GEOS can use multiple initialization files in network situations, but only the 
 local GEOS.INI is editable. The local GEOS.INI (referred to hereafter simply 
@@ -1254,7 +1254,7 @@ then in any others in the order they were loaded. When it reaches what it
 wants, it stops searching. Thus, multiple entries are allowed but are not 
 used, and the local INI file has precedence over all others.
 
-##### 6.3.2.1 Configuration of the INI File
+#### 6.3.2.1 Configuration of the INI File
 
 The GEOS.INI file has a very specific format and syntax. It is segmented into 
 categories, each of which contains several keys that determine how GEOS will 
@@ -1343,7 +1343,7 @@ blob of text with curly
 brace ({,\}) characters \}\} in it}
 ~~~
 
-##### 6.3.2.2 Managing the INI File
+#### 6.3.2.2 Managing the INI File
 
 InitFileSave(), InitFileRevert(), 
 InitFileGetTimeLastModified(), InitFileCommit()
@@ -1373,7 +1373,7 @@ the last time GEOS.INI was modified.
 modified and flushes them to disk. This commits all the changes and should 
 be used only from the kernel. It should not be used by applications.
 
-##### 6.3.2.3 Writing Data to the INI File
+#### 6.3.2.3 Writing Data to the INI File
 
 InitFileWriteData(), InitFileWriteString(), 
 InitFileWriteStringSection(), InitFileWriteInteger(), 
@@ -1415,7 +1415,7 @@ with a text editor, the Boolean value will appear as a text string of either
 "true" or "false"; it will, however, be interpreted as a Boolean rather than a 
 text string.
 
-##### 6.3.2.4 Getting Data from the INI File
+#### 6.3.2.4 Getting Data from the INI File
 
 InitFileReadDataBuffer(), InitFileReadDataBlock(), 
 InitFileReadStringBuffer(), InitFileReadStringBlock(), 
@@ -1470,7 +1470,7 @@ routine if you don't know the approximate size of the string section.
 **InitFileEnumStringSection()** enumerates the specified blob, executing a 
 specified callback routine on each string section within the blob.
 
-##### 6.3.2.5 Deleting Items from the INI File
+#### 6.3.2.5 Deleting Items from the INI File
 
 InitFileDeleteEntry(), InitFileDeleteCategory(), 
 InitFileDeleteStringSection()
@@ -1488,14 +1488,14 @@ blob as well as the index of the string section, and it deletes the string secti
 If the string section does not exist or if either the key or category can not be 
 found, the routine will return an error flag.
 
-### 6.4 General System Utilities
+## 6.4 General System Utilities
 
 The kernel provides a number of routines that fulfill general needs for system 
 utilities. These range from setting the system's date and time to retrieving 
 the amount of swap memory used to shutting down the system in order to 
 execute a DOS-based program.
 
-#### 6.4.1 Changing the System Clock
+### 6.4.1 Changing the System Clock
 
 TimerGetDateAndTime(), TimerSetDateAndTime()
 
@@ -1506,7 +1506,7 @@ minute, and second. **TimerSetDateAndTime()** sets the current date and
 time to the values in the passed structure. It is unusual for any application 
 other than the Preferences Manager to change the system clock.
 
-#### 6.4.2 Using Timers
+### 6.4.2 Using Timers
 
 TimerStart(), TimerStop(), TimerSleep(), TimerGetCount()
 
@@ -1552,7 +1552,7 @@ An additional routine, **TimerGetCount()**, returns the current system
 counter. The system counter contains the number of ticks counted since 
 GEOS was started.
 
-#### 6.4.3 System Statistics and Utilities
+### 6.4.3 System Statistics and Utilities
 
 SysStatistics(), SysGetInfo(), SysGetConfig(), 
 SysGetPenMode(), SysGetDosEnvironment()
@@ -1586,7 +1586,7 @@ pen-based machine.
 variable. It is passed a string representing the variable name and returns a 
 string representing the value.
 
-#### 6.4.4 Shutting the System Down
+### 6.4.4 Shutting the System Down
 
 DosExec(), SysShutdown()
 
@@ -1631,7 +1631,7 @@ with SST_CONFIRM_END to release exclusive access). This is useful if your
 application or library has an ongoing operation and wants to verify the 
 shutdown with the user.
 
-### 6.5 The Error-Checking Version
+## 6.5 The Error-Checking Version
 
 GEOS has two versions of its system software. The normal version as shipped 
 retail is the "non-error-checking" version. The other, used for debugging 
@@ -1647,7 +1647,7 @@ their entries in the Routine Reference Book. In addition to the full error
 checking provided by the EC versions of the system geodes, you can add your 
 own error-checking code to your programs. 
 
-#### 6.5.1 Adding EC Code to Your Program
+### 6.5.1 Adding EC Code to Your Program
 
 When compiling your code, you can include certain extra lines in either the 
 EC version or the non-EC version of your program. For example, during 
@@ -1717,7 +1717,7 @@ Code Display 6-4 EC Macros
      EC_BOUNDS(myPointer)
 ~~~
 
-#### 6.5.2  Special EC Routines
+### 6.5.2  Special EC Routines
 
 SysGetECLevel(), SysSetECLevel(), SysNotify(), EC-(), 
 CFatalError(), CWarningNotice()
@@ -1744,7 +1744,7 @@ Swat, causes Swat to hit a breakpoint so you can debug the error.
 **CWarningNotice()** may be put in error-checking code to make the compiler 
 put up a compile-time warning note.
 
-### 6.6 Inter-Application Communication
+## 6.6 Inter-Application Communication
 
 Applications do not usually need to communicate with each other. Most 
 applications will interact only with the kernel and with libraries; such 
@@ -1769,7 +1769,7 @@ The GEOS Inter-Application Communications Protocol (IACP) specifies how
 to open communications with another application, and how to send messages 
 back and forth.
 
-#### 6.6.1 IACP Overview
+### 6.6.1 IACP Overview
 
 There is a major difference between sending a message within an 
 application, and sending one to a different application. When you send a 
@@ -1843,7 +1843,7 @@ every server for a list is assigned a distinct **ServerNumber**. If it chooses t
 a client can specify that a message be sent only to the server with a specific 
 number.
 
-#### 6.6.2 GenApplicationClass Behavior
+### 6.6.2 GenApplicationClass Behavior
 
 **GenApplicationClass** is built to support IACP automatically. If a server or 
 client object is subclassed from GenApplicationClass, most of the work of 
@@ -1893,7 +1893,7 @@ down all IACP links the Application object has open, whether it is a client
 or a server on those links. You can subclass this message if you need to 
 take some additional action when the IACP connections are severed.
 
-#### 6.6.3 Messages Across an IACP Link
+### 6.6.3 Messages Across an IACP Link
 
 IACPSendMessage(), IACPSendMessageToServer()
 
@@ -1941,13 +1941,13 @@ returns the number of times the message was dispatched. This will
 ordinarily be one; however, if the specified server is no longer registered, it 
 will be zero.
 
-#### 6.6.4 Being a Client
+### 6.6.4 Being a Client
 
 Any object can register as a client for an IACP server list. When an object is 
 a client, it can send messages to the server list, which will pass them along 
 to the servers for that list.
 
-##### 6.6.4.1 Registering as a Client
+#### 6.6.4.1 Registering as a Client
 
 IACPConnect(), IACPCreateDefaultLaucnhBlock()
 
@@ -2083,7 +2083,7 @@ instruct it to print the file. To make the server open a document, pass the
 document's name in ALB_dataFile. The server will open the file when you 
 register, and close it when you unregister.
 
-##### 6.6.4.2 Unregistering as a Client
+#### 6.6.4.2 Unregistering as a Client
 
 IACPShutdown(), IACPShutdownAll()
 
@@ -2107,7 +2107,7 @@ objects on the other side of the link; that is, if a client calls
 The Application object automatically calls this routine when the application 
 is exiting.
 
-#### 6.6.5 Being a Server
+### 6.6.5 Being a Server
 
 Every time an application is launched, its Application object automatically 
 registers as a server for the server list that shares its **GeodeToken**. The 
@@ -2121,7 +2121,7 @@ of object, **MetaClass** does not come with handlers for these messages; if the
 server is not subclassed from **GenApplicationClass**, you will have to write 
 the handlers yourself. This is discussed below.
 
-##### 6.6.5.1 Registering and Unregistering a Server
+#### 6.6.5.1 Registering and Unregistering a Server
 
 IACPRegisterServer(), IACPUnregisterServer()
 
@@ -2185,7 +2185,7 @@ server object can find out its server number by calling
 **GeodeToken** of the server list, and the optr to the server object. It returns 
 the object's server number.
 
-##### 6.6.5.2 Non-Application Servers and Clients
+#### 6.6.5.2 Non-Application Servers and Clients
 
 MSG_META_IACP_PROCESS_MESSAGE, IACPProcessMessage(), 
 MSG_META_IACP_NEW_CONNECTION, 

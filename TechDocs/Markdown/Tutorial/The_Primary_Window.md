@@ -1,4 +1,4 @@
-## 4 The Primary Window
+# 4 The Primary Window
 
 In this chapter, we will explore our first stage in constructing a charting 
 application. This first stage consists of a primary window, which we will use 
@@ -11,7 +11,7 @@ and later explore the program itself using the Swat debugger.
 
 ![](Art/tutorial-mychart_primary_window.png)
 
-### 4.1 README
+## 4.1 README
 
 You are about to start typing in the source code of a new program. Before we 
 tell you exactly what to do, we're going to spell out some miscellaneous 
@@ -30,7 +30,7 @@ sending files between the machines using the pccom tool, you might try
 either reducing your communication speed or consulting 
 "Troubleshooting Communications," Appendix A of this book.
 
-### 4.2 Creating the Application
+## 4.2 Creating the Application
 
 We set up our files in a subdirectory of \PCGEOS\APPL (we'll use 
 \PCGEOS\APPL\MCHRT) on the host machine. The files are MCHRT.GP 
@@ -152,7 +152,7 @@ icon.
 The window pictured on the first page of this chapter should appear on your 
 screen.
 
-### 4.3 The Application So Far
+## 4.3 The Application So Far
 
 Right now, application basically consists of a Primary Window. You might 
 think that the application looks rather plain, and it does. However, note the 
@@ -178,7 +178,7 @@ was before.
 
 ![](Art/tutorial-mychart_multi_lunchable.png)
 
-### 4.4 MCHRT.GP: Geode Parameters
+## 4.4 MCHRT.GP: Geode Parameters
 
 The geode parameters file tells the Glue linker about our application's 
 general organization. You can get complete information about all of the 
@@ -298,7 +298,7 @@ user will get valuable feedback that their actions are being acknowledged,
 even if our program isn't fast enough to do all of the underlying calculations 
 quickly.
 
-### 4.5 MCHRT.GOC: Source Code
+## 4.5 MCHRT.GOC: Source Code
 
 This file contains the source code for the application. Right now, there's 
 nothing that you would recognize as procedural code. All there is to this 
@@ -469,7 +469,7 @@ will do).
 We're done putting things into the INTERFACE resource for now. In fact, we're 
 done with the program. 
 
-### 4.6 Exploring With Swat
+## 4.6 Exploring With Swat
 
 Right now, the application doesn't have any procedural code. In fact, there 
 isn't very much code to the application at all. Chances are the program has 

@@ -1,11 +1,11 @@
-## 10 Using Tools
+# 10 Using Tools
 
 This chapter gives a reference of the tools included in this development kit. 
 This chapter is not intended to teach you how to use the tools; it provides a 
 reference only. To learn how to use most of the tools, see the Tutorial included 
 in the development kit and the First Steps chapter in the Concepts book.
 
-### 10.1 Tools Summary
+## 10.1 Tools Summary
 
 The tools provided in this kit are listed below. Each is described in full in the 
 following sections.
@@ -65,7 +65,7 @@ transferring it to any directory on the development machine.
 GEOS debugger. This program runs on the development machine, 
 monitoring GEOS programs running on the target machine.
 
-### 10.2 Typical Development Session
+## 10.2 Typical Development Session
 
 The Tutorial shows in detail how to write, compile, download, and debug an 
 application. As a quick guide, however, the following list recaps the steps in 
@@ -96,7 +96,7 @@ directions provided by the MAKEFILE.
 6. To test the geode, either run it on the target machine or run swat from 
 the development machine to debug it.
 
-### 10.3 File Types
+## 10.3 File Types
 
 You may be curious to know what sorts of files you'll be working with. If you 
 have to work with someone else's code, then being able to find your away 
@@ -265,7 +265,7 @@ After you have made your geode the first time (creating a makefile with
 
 + Geodes: .geo files.
 
-### 10.4 Esp
+## 10.4 Esp
 
 Esp (pronounced "esp") is the GEOS assembler. It creates object files from Esp 
 code - said code using a superset of MASM syntax. These object files may then 
@@ -330,7 +330,7 @@ dependencies.
 **-d** - Activate's Esp debugging mode. Useful only when trying to track down a 
 bug in Esp.
 
-### 10.5 Glue
+## 10.5 Glue
 
 Glue is the GEOS linker. It creates GEOS or DOS executables from object files. 
 (It can also create GEOS VM and font files, if you have the appropriate tools.) 
@@ -466,7 +466,7 @@ lock down or dereference the handle of the returned optr.
 
 **-z** - Output localization information.
 
-### 10.6 Goc
+## 10.6 Goc
 
 Goc is the GEOS C preprocessor, which will turn your .goc file into something 
 a regular C compiler can understand. It will traverse the .goc file, detect Goc 
@@ -528,7 +528,7 @@ what @default means).
 
 **-p** - For Geoworks use only.
 
-### 10.7 Grev
+## 10.7 Grev
 
 GEOS supports two version numbers for each geode. The first of these is the 
 release number, used to uniquely identify the release of the geode. The 
@@ -662,7 +662,7 @@ changes to file. The **-R** option works as stated above.
 **help**   
 Print out a detailed help.
  
-### 10.8 mkmf
+## 10.8 mkmf
 
 The mkmf tool exists to create a file named MAKEFILE. The **pmake** program 
 will use this file as a sort of script, using it to determine how to compile and 
@@ -696,7 +696,7 @@ intermediate step towards making the whole geode.  If you do not wish
 the files in a subdirectory to be incorporated in the program, create a file 
 in the directory called NO_MKMF. This file need have no contents.
 
-### 10.9 pccom
+## 10.9 pccom
 
 The pccom tool manages communication between the development and 
 target machines. It assumes that the machines are connected by a single 
@@ -707,7 +707,7 @@ Note that it is possible to use some features of pccom from within GEOS. For
 more information about this, see "PCCom Library," Chapter 22 of the 
 Concepts Book.
 
-#### 10.9.1 PCCOM Background
+### 10.9.1 PCCOM Background
 
 PCCOM is used in two primary situations. First, it is used by GEOS software 
 developers when transferring files or when debugging an application. In this 
@@ -720,7 +720,7 @@ Zoomer devices or other devices that require remote file manipulation. In this
 case, the host machine runs a program which copies escape character 
 sequences to the appropriate serial port, prompting PCCOM to act.
 
-#### 10.9.2 Running PCCOM on the Target
+### 10.9.2 Running PCCOM on the Target
 
 PCCOM is a DOS program that monitors the serial port and responds to 
 commands received on the line. All I/O is interrupt driven with XON/XOFF 
@@ -753,7 +753,7 @@ numbers of the interrupt(s) to be ignored, in hexadecimal.
 parameter is rarely required. The irq parameter is the number 
 of the IRQ level to be used.
 
-##### 10.9.2.1 Quitting PCCOM
+#### 10.9.2.1 Quitting PCCOM
 
 PCCOM may be quit either directly or remotely. To quit PCCOM directly, 
 simply hit the Enter key (or the q key) on the machine on which PCCOM is 
@@ -763,7 +763,7 @@ To quit PCCOM remotely, issue the quit escape sequence <Esc>EX through
 the serial line from the host machine. See below for a description of the 
 commands that can be issued remotely.
 
-##### 10.9.2.2 Remote PCCOM Commands
+#### 10.9.2.2 Remote PCCOM Commands
 
 PCCOM doesn't care what machine originates a remote command; its sole 
 purpose is to evaluate and execute commands received through the serial 
@@ -821,7 +821,7 @@ exclamation points in their names.
 
     Exit PCCOM      <Esc>EX             Exit PCCOM on the remote machine.
 
-##### 10.9.2.3 Sending and Receiving Files
+#### 10.9.2.3 Sending and Receiving Files
 
 If you are using the GEOS SDK, you will do most of your file sending and 
 receiving using the programs PCS, PCSEND, and PCGET. These programs 
@@ -990,7 +990,7 @@ Typing
 would download both HGCEC.GEO and LOGIBUSE.GEO to their proper 
 directories. A listing of all the supported tokens can be found in the SEND file.
 
-#### 10.9.3 File Transfer Protocol of PCCOM
+### 10.9.3 File Transfer Protocol of PCCOM
 
 If you need to create your own file transfer program or module, you can use 
 the basic PCCOM commands and a special transfer protocol to send or receive 
@@ -998,7 +998,7 @@ files over the serial link. This is useful, for example, if you have an existing
 Windows or DOS program to which you would like the to add the ability to 
 transfer files to or from the Zoomer (or another unit running PCCOM).
 
-##### 10.9.3.1 Sending a File to the Remote Machine
+#### 10.9.3.1 Sending a File to the Remote Machine
 
 Sending a file to the remote machine involves the steps below. A file may be 
 sent by any program that can access the serial port.
@@ -1102,7 +1102,7 @@ entire file.
 To make it absolutely clear that the file transfer has finished, send two 
 zero bytes.
 
-##### 10.9.3.2 Retrieving a File Remotely
+#### 10.9.3.2 Retrieving a File Remotely
 
 Retrieving a file from a machine running PCCOM is straightforward and uses 
 the same file transfer protocol shown above for sending a file. The sequence 
@@ -1162,7 +1162,7 @@ These make it clear that the file transfer has been completed.
 **10** - Send an ACK byte.  
 This acknowledges the end of the file transfer.
 
-##### 10.9.3.3 Calculating Checksum Values
+#### 10.9.3.3 Calculating Checksum Values
 
 The CRC word that accompanies each block of transferred data must be 
 calculated using the same code as PCCOM or you will probably have only 
@@ -1238,7 +1238,7 @@ BLOCK_QUOTE, or BLOCK_END characters in your calculations.
 
 
 
-### 10.10 pcget
+## 10.10 pcget
 
 Once you have pccom running on the target machine, you can invoke **pcget** 
 on the development machine to yank a file from the target machine to the 
@@ -1260,7 +1260,7 @@ flags, as you did when invoking the **pccom** tool. The /b flag sets the baud ra
 the IRQ level (e.g. "/I:3"). Note that these flags may be indicated with "-" 
 instead of "/").
 
-### 10.11 pcs
+## 10.11 pcs
 
 Once you have pccom running on the target machine, invoke **pcs** on the 
 development machine to send your geode's executable to the proper place on 
@@ -1350,7 +1350,7 @@ DRIVER\MOUSE\LOGIBUS\LOGIBUSE.GEO (or LOGIBUS.GEO).
     *\DOCUMENT\*                        *       DOCUMENT
     *\DOSAPPL\*                         *       .
 
-### 10.12 pcsend
+## 10.12 pcsend
 
 The **pcsend** tool sends files from the development machine to the target 
 machine (assuming that the target machine is running pccom). Normally you 
@@ -1373,7 +1373,7 @@ may use "-" instead of "/" when passing these flags.)
 
 `pcsend sendslow.com /b:2400`
 
-### 10.13 pmake
+## 10.13 pmake
 
 The **pmake** program is a make utility. This means that it takes a directory 
 of sources and a makefile which contains knowledge of how to turn these 
@@ -1416,7 +1416,7 @@ directory so that all applications may use it, then signal this to **pmake**:
 The **pmake** program does have command-line arguments, but these are used 
 only rarely; they are detailed below.
 
-#### 10.13.1 Copyright Notice and Acknowledgment
+### 10.13.1 Copyright Notice and Acknowledgment
 
 The **pmake** tool comes under the following copyright notice:
 
@@ -1434,7 +1434,7 @@ provided "as is" without express or implied warranty.
 The **pmake** program for the PC uses the SPAWNO routines by Ralf Brown to 
 minimize memory use while shelling to DOS and running other programs.
 
-#### 10.13.2 How to Customize pmake
+### 10.13.2 How to Customize pmake
 
 For most applications, executing **mkmf** will generate a perfect makefile. 
 However, you may be creating an unusual geode or have some makefile 
@@ -1517,7 +1517,7 @@ things you can do without learning too much about makefiles.
 
 ----------
 
-#### 10.13.3 Command Line Arguments
+### 10.13.3 Command Line Arguments
 
 The **pmake** program comes with a wide variety of flags to choose from. They 
 must be passed in the following order: flags (if any), variable assignments (if 
@@ -1602,7 +1602,7 @@ conditionals, which are described in section 10.13.5.2 below.
 **-W** - Suppresses **pmake**'s warnings. Note that tools which **pmake** invokes 
 (Goc, Glue, etc.) may still print out warnings of their own.
 
-#### 10.13.4 Contents of a Makefile
+### 10.13.4 Contents of a Makefile
 
 The **pmake** program takes as input a file that tells
 
@@ -1631,7 +1631,7 @@ Any line may be continued over multiple lines by ending it with a backslash
 following line are compressed into a single space before the input line is 
 examined by pmake.
 
-##### 10.13.4.1 Dependency Lines
+#### 10.13.4.1 Dependency Lines
 
 In any system, there are dependencies between the files that make up the 
 system. For instance, in a program made up of several C source files and one 
@@ -1746,7 +1746,7 @@ characters between a and z), or both. It matches any single character
 contained in the list. E.g. [A-Za-z] will match all letters, while 
 [0123456789] will match all numbers.
 
-##### 10.13.4.2 Shell Commands
+#### 10.13.4.2 Shell Commands
 
 At this point, you may be wondering how files are re-created. The re-creation 
 is accomplished by commands you place in the makefile. These commands 
@@ -1816,7 +1816,7 @@ ignored and **pmake** keeps going.
 If the system call should be made through the DOS COMMAND.COM, precede 
 the shell command with a backquote (`).
 
-##### 10.13.4.3 Variables
+#### 10.13.4.3 Variables
 
 The **pmake** program has the ability to save text in variables to be recalled 
 later at your convenience. Variables in **pmake** are used much like variables 
@@ -2016,13 +2016,13 @@ You might use the above sequence to set up an argument list in the CL
 environment variable if your compiler (invoked with CCOM) needed its 
 arguments in such a variable and was unable to take arguments in a file.
 
-##### 10.13.4.4 Comments
+#### 10.13.4.4 Comments
 
 Comments in a makefile start with a "#" character and extend to the end of 
 the line. They may appear anywhere you want them, except where they 
 might be misinterpreted as a shell command.
 
-##### 10.13.4.5 Transformation Rules
+#### 10.13.4.5 Transformation Rules
 
 As you know, a file's name consists of two parts: a base name, which gives 
 some hint as to the contents of the file, and a suffix, which usually indicates 
@@ -2222,7 +2222,7 @@ transformation, this is what **pmake** printed for the rest of the process:
     --- JIVE.EXE ---
     bcc -o JIVE.EXE JIVE.OBJ
 
-##### 10.13.4.6 Including Other Makefiles
+#### 10.13.4.6 Including Other Makefiles
 
 Just as for programs, it is often useful to extract certain parts of a makefile 
 into another file and just include it in other makefiles somehow. Many 
@@ -2272,14 +2272,14 @@ won't work; instead use the following:
     SYSTEM= command.mk
     #include <$(SYSTEM)>
 
-##### 10.13.4.7 Saving Commands
+#### 10.13.4.7 Saving Commands
 
 There may come a time when you will want to save certain commands to be 
 executed when everything else is done, by inserting an ellipsis "-" in the 
 Makefile. Commands saved in this manner are only executed if **pmake** 
 manages to re-create everything without an error.
 
-##### 10.13.4.8 Target Attributes
+#### 10.13.4.8 Target Attributes
 
 The **pmake** tool allows you to give attributes to targets by means of special 
 sources. Like everything else **pmake** uses, these sources begin with a period 
@@ -2346,7 +2346,7 @@ applied (as stored in the .ALLSRC variable for the target) as its
 system makefile) make use of these .USE rules to make developing easier 
 (they're in the default, system makefile directory).
 
-##### 10.13.4.9 Special Targets
+#### 10.13.4.9 Special Targets
 
 There are certain targets that have special meaning to **pmake**. When you 
 use one on a dependency line, it is the only target that may appear on the 
@@ -2439,7 +2439,7 @@ In addition to these targets, a line of the form
 
 applies the attribute to all the targets listed as sources .
 
-##### 10.13.4.10 Modifying Variable Expansion
+#### 10.13.4.10 Modifying Variable Expansion
 
 Variables need not always be expanded verbatim. The **pmake** program 
 defines several modifiers that may be applied to a variable's value before it is 
@@ -2550,7 +2550,7 @@ In addition, another style of substitution is also supported. This looks like:
 It must be the last modifier in the chain. The search is anchored at the end 
 of each word, so only suffixes or whole words may be replaced.
 
-#### 10.13.5 Advanced pmake Techniques
+### 10.13.5 Advanced pmake Techniques
 
 This section is devoted to those facilities in **pmake** that allow you to do a 
 great deal in a makefile with very little work, as well as do some things you 
@@ -2558,7 +2558,7 @@ couldn't do in make without a great deal of work (and perhaps the use of other
 programs). The problem with these features is that they must be handled 
 with care, or you will end up with a mess.
 
-##### 10.13.5.1 Search Paths
+#### 10.13.5.1 Search Paths
 
 The **pmake** tool supports the dispersal of files into multiple directories by 
 allowing you to specify places to look for sources with .PATH targets in the 
@@ -2612,7 +2612,7 @@ will not be noted when searching for implicit sources, nor will they be found
 when **pmake** attempts to discover when the file was last modified, unless the 
 file was created in the current directory. 
 
-##### 10.13.5.2 Conditional Statements
+#### 10.13.5.2 Conditional Statements
 
 Like a C compiler, **pmake** allows you to configure the makefile using 
 conditional statements. A conditional looks like this:
@@ -2703,7 +2703,7 @@ two functions to each term. They are as follows:
 There are also the "else if" forms: elif, elifdef, elifndef, elifmake, and 
 elifnmake.
 
-#### 10.13.6 The Way Things Work
+### 10.13.6 The Way Things Work
 
 When **pmake** reads the makefile, it parses sources and targets into nodes in 
 a graph. The graph is directed only in the sense that **pmake** knows which 
@@ -2749,7 +2749,7 @@ targets are left to be made), there is a cycle in the graph. The **pmake**
 program does a depth-first traversal of the graph to find all the targets that 
 weren't made and prints them out one by one.
 
-### 10.14 Swat Stub
+## 10.14 Swat Stub
 
 The swat stub runs on the target machine, passing information between a 
 running GEOS session and Swat on the host machine. It has one flag:

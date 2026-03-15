@@ -1,4 +1,4 @@
-## 10 The GEOS User Interface
+# 10 The GEOS User Interface
 
 The GEOS user interface (UI) is an integral part of the system software and 
 does an amazing amount of work for applications. The UI is a sophisticated 
@@ -16,7 +16,7 @@ This chapter will provide an overview of the specifics of the GEOS User
 Interface. For a general overview of the UI and a high-level description of its 
 components, see ["System Architecture", Chapter 3](carch.md).
 
-### 10.1 The GUI
+## 10.1 The GUI
 
 Ever since the first text-based computer application was created, computer 
 users have looked for easier, more intuitive interfaces to their programs. If 
@@ -52,7 +52,7 @@ language. And, since most of the user interface is managed and drawn by
 GEOS, applications written for the system automatically take advantage of 
 this speed.
 
-### 10.2 The GEOS User Interface
+## 10.2 The GEOS User Interface
 
 Most programmers who write applications for GEOS will have worked with 
 other GUI systems. Some will even have worked with object-oriented 
@@ -103,7 +103,7 @@ _All the classes shown have the properties of VisClass and can be used in an
 application's visible object tree. Visible objects are more flexible but require 
 more programming than do generic objects._
 
-### 10.3 Using the Generic Classes
+## 10.3 Using the Generic Classes
 
 Most of your application's UI needs will be satisfied by the use of generic UI 
 objects. Many applications may need only the generic classes. Generic UI 
@@ -162,7 +162,7 @@ look-and-feel specifications; this is desirable to the programmer because he
 only has to code the application once to receive the benefits of several 
 different GUIs.
 
-#### 10.3.1 The Generic Class Tree
+### 10.3.1 The Generic Class Tree
 
 Generic objects have a tremendous amount of built-in functionality. Much of 
 this is built into **GenClass**, the topmost class in the generic class tree. For 
@@ -213,7 +213,7 @@ not encouraged, however, as it can cause a specific UI library to give
 unpredictable results. For a diagram of all the generic classes in their class 
 hierarchy, see Figure 10-1.
 
-##### 10.3.1.1 GenClass
+#### 10.3.1.1 GenClass
 
 **GenClass** provides the functionality basic to all generic objects. **GenClass** 
 is not used directly by any applications and has no visible representation. 
@@ -237,13 +237,13 @@ finish.
 **GenClass** also implements scores of hints that can affect UI geometry, visual 
 representation, data structures, and functions.
 
-##### 10.3.1.2 GenApplicationClass
+#### 10.3.1.2 GenApplicationClass
 
 **GenApplicationClass** provides the basic functionality to open and close 
 applications within GEOS. An object of this class serves as the top object in 
 any application for GEOS.
 
-##### 10.3.1.3 GenPrimaryClass
+#### 10.3.1.3 GenPrimaryClass
 
 **GenPrimaryClass** is a subclass of **GenDisplayClass**. The GenPrimary is 
 the chief UI grouping object of an application, and it usually appears as the 
@@ -252,14 +252,14 @@ all controls and output areas that are invoked when an application is first
 launched. You will usually create a GenPrimary as the sole child of your 
 GenApplication object.
 
-##### 10.3.1.4 GenTriggerClass
+#### 10.3.1.4 GenTriggerClass
 
 A GenTrigger is a simple pushbutton that executes an action when activated 
 by the user. Typically, the trigger will have a moniker displayed within it and 
 will be activated by a mouse click or by a special keystroke sequence. 
 GenTriggers are very common in applications.
 
-##### 10.3.1.5 GenInteractionClass
+#### 10.3.1.5 GenInteractionClass
 
 GenInteraction objects are essentially grouping mechanisms. 
 GenInteractions are the key objects for creating both menus and dialog 
@@ -268,7 +268,7 @@ Typically, a GenInteraction will have a number of children, each of which will
 appear within the interaction on the screen. The Interaction itself may or 
 may not have a visible representation.
 
-##### 10.3.1.6 GenViewClass
+#### 10.3.1.6 GenViewClass
 
 The GenView object provides a scrollable window in which the application 
 has complete drawing control. Most applications will use a GenView, and 
@@ -278,7 +278,7 @@ automatically. A View can even be splittable or linked to other views. The
 GenView can display either normal graphic documents or hierarchies of 
 visible objects. 
 
-##### 10.3.1.7 List Classes
+#### 10.3.1.7 List Classes
 
 Together, GenBoolean, GenBooleanGroup, GenItem, **GenItemGroup**, and 
 GenDynamicList provide many different types of lists. List objects may be 
@@ -286,14 +286,14 @@ used to create lists that are dynamic or static; scrollable or not; exclusive,
 non-exclusive, or otherwise. List objects may appear within menus or dialog 
 boxes as well as within an application's primary window.
 
-##### 10.3.1.8 GenValueClass
+#### 10.3.1.8 GenValueClass
 
 The GenValue object allows the user to set a value within a particular range. 
 This may be implemented as a slider, a spinner, or a pair of up/down buttons 
 next to the value. Ranges may use scalar or distance values and can have 
 their maximum and minimum values set by the application.
 
-##### 10.3.1.9 GenTextClass
+#### 10.3.1.9 GenTextClass
 
 **GenTextClass** is tremendously versatile and can be used for text displays or 
 text-edit fields. The GenText is used by nearly every application that either 
@@ -307,7 +307,7 @@ manual leading, and character kerning, as well as several other features. The
 text library also provides several controllers that work with the GenText to 
 allow the user to set all these features.
 
-##### 10.3.1.10 Document and Document Control Classes
+#### 10.3.1.10 Document and Document Control Classes
 
 Together, **GenDocumentClass**, **GenDocumentGroupClass**, and 
 **GenDocumentControlClass** provide all the functions necessary to create, 
@@ -321,7 +321,7 @@ GenDocument objects are created and managed automatically by the
 GenDocumentGroup. Each document object represents a single file which 
 has been opened or newly created by the user.
 
-##### 10.3.1.11 Display and Display Control Classes
+#### 10.3.1.11 Display and Display Control Classes
 
 Together, the GenDisplay, GenDisplayGroup, and GenDisplayControl 
 provide display windows and the UI gadgetry to manage them. Typically, 
@@ -334,7 +334,7 @@ Window menu to allow the user to operate on the individual displays. If your
 application will have multiple documents or multiple displays open, you will 
 want to use these objects.
 
-##### 10.3.1.12 GenControlClass and UI Controllers
+#### 10.3.1.12 GenControlClass and UI Controllers
 
 **GenControlClass** is used to create UI controller objects. Applications will 
 most likely not use **GenControlClass** directly, though some object libraries 
@@ -351,7 +351,7 @@ and displays UI gadgetry to set color information; and
 **GenViewControlClass**, which creates and maintains a View menu 
 allowing the user to set scaling and scrolling behavior.
 
-##### 10.3.1.13 GenToolControlClass
+#### 10.3.1.13 GenToolControlClass
 
 **GenToolControlClass** lets the user select which of an application's tools 
 are available and where they should be placed (in a toolbox, in a menu, etc.). 
@@ -360,19 +360,19 @@ controllers will provide several tool areas and a GenToolControl; the
 GenToolControl will automatically create all the UI gadgetry to let the user 
 select which tools are active and where they will appear.
 
-##### 10.3.1.14 GenFileSelectorClass
+#### 10.3.1.14 GenFileSelectorClass
 
 The GenFileSelector provides user interface to allow the user to navigate 
 through his or her file system. It is used most often by the document control 
 objects and is used directly by only some applications.
 
-##### 10.3.1.15 GenGlyphClass
+#### 10.3.1.15 GenGlyphClass
 
 GenGlyph displays simple text or graphics strings. Text displayed by a Glyph 
 object is not selectable or editable; these objects are typically used for 
 labeling areas or items on the screen.
 
-##### 10.3.1.16 GenContentClass
+#### 10.3.1.16 GenContentClass
 
 **GenContentClass** is used with a GenView to display other generic UI 
 objects within a scrollable window. The GenContent is rarely used because 
@@ -380,7 +380,7 @@ having some of an application's UI objects not visible can confuse some users.
 More often, a GenDocument is used as the view's content; 
 GenDocumentClass is subclassed from the GenContent.
 
-#### 10.3.2 Creating a Generic Object Tree
+### 10.3.2 Creating a Generic Object Tree
 
 You don't have to understand all the generic object classes to create a 
 complete generic object tree for your application. For insight into and an 
@@ -388,14 +388,14 @@ example of creating a generic tree (including the primary window, a menu, a
 dialog box, and a scrolling view window), see ["First Steps: Hello World", 
 Chapter 4](cgetsta.md).
 
-### 10.4 Using the Visible Classes
+## 10.4 Using the Visible Classes
 
 The visible classes in GEOS provide custom objects that can be used for any 
 number of purposes. There are many visible object classes and they are so 
 versatile that everything from spreadsheets to drawing programs to 
 interactive games can be created from them.
 
-#### 10.4.1 Visible Objects and the GenView
+### 10.4.1 Visible Objects and the GenView
 
 Visible objects are designed for flexibility and for interacting with the user. 
 Typically, visible objects will reside in an object tree, the root of which is a 
@@ -420,7 +420,7 @@ events are expected or required, and the view will notify the VisContent
 whenever the window has been invalidated and the document needs 
 redrawing.
 
-#### 10.4.2 The Visible Object Document
+### 10.4.2 The Visible Object Document
 
 Visible objects exist in an object tree and draw themselves in the GEOS 
 graphic space. Every visible object knows where in the graphic coordinate 
@@ -454,7 +454,7 @@ within its bounds).
 For examples of visible objects that know their bounds and that handle 
 MSG_VIS_DRAW, see ["A UI Example"](#105-a-ui-example).
 
-#### 10.4.3 Visible Object Abilities
+### 10.4.3 Visible Object Abilities
 
 Visible objects can be used in innumerable situations; with a little work from 
 the application developer, they provide dozens of useful features including
@@ -504,7 +504,7 @@ about clipping or scrolling or even determining what type of input event is
 taking place. All this is somewhat automatic and can, for the most part, be 
 ignored.
 
-#### 10.4.4 The Vis Class Tree
+### 10.4.4 The Vis Class Tree
 
 There are four base visible classes on which the other object libraries are 
 founded. **VisClass** is the most basic and at the root of the visible class tree. 
@@ -537,7 +537,7 @@ the VisContent interacts with the GenView to handle input and drawing.
 The content can interact with the view to determine sizing behavior as 
 well as input behavior.
 
-#### 10.4.5 Creating a Visible Object Tree
+### 10.4.5 Creating a Visible Object Tree
 
 You can create a visible object tree either in your Goc source code or at 
 run-time. As stated earlier, the visible tree is linked to the generic UI object 
@@ -564,7 +564,7 @@ object is ever to be shown on the screen: Since visible objects can have any
 application-defined visible representation, you must write the 
 MSG_VIS_DRAW handler yourself; this can be done only in a subclass.
 
-#### 10.4.6 Working with Visible Object Trees
+### 10.4.6 Working with Visible Object Trees
 
 Working with visible object trees is quite easy and provides immense 
 flexibility to your applications. Entire groups of objects can be added to, 
@@ -601,12 +601,12 @@ object of the proper class, where they will be handled.
 information about the visible tree. They also have messages for altering the 
 visible tree's structure.
 
-### 10.5 A UI Example
+## 10.5 A UI Example
 
 This section uses the sample application TicTac, a simple Tic Tac Toe board 
 and pieces that can be moved around the board.
 
-#### 10.5.1 What TicTac Illustrates
+### 10.5.1 What TicTac Illustrates
 
 The TicTac sample application can teach you several things about how the 
 visible world works and about how to manage visible objects in an 
@@ -644,7 +644,7 @@ content.
 A simple, two-layer visible tree is used in the TicTac application: The 
 VisContent is the root of the tree, and each of the pieces is a leaf.
 
-#### 10.5.2 What TicTac Does
+### 10.5.2 What TicTac Does
 
 The TicTac sample application is extremely simple. It draws a Tic Tac Toe 
 board and its outline, and it has ten pieces which the user can move. Five of 
@@ -658,7 +658,7 @@ kind are enforced. Recognition of winning sequences and rules involving turn
 sequencing or playing against the computer are left as exercises for the 
 reader.
 
-#### 10.5.3 The Structure of TicTac
+### 10.5.3 The Structure of TicTac
 
 The TicTac sample application is coded in two files: The first, tictac.gp, is the 
 geode parameters file. The other, tictac.goc, contains all the code for objects 
@@ -824,7 +824,7 @@ Code Display 10-3 The TicTacView Object
 @end Interface                  /* End of the Interface resource block */
 ~~~
 
-##### 10.5.3.2 TicTac's Visible Tree
+#### 10.5.3.2 TicTac's Visible Tree
 
 The visible tree contains eleven objects. One acts as TicTacView's content and 
 is of TicTacBoardClass, a subclass of **VisContentClass**. The other ten are 
@@ -963,7 +963,7 @@ typedef ByteEnum TicTacPieceTypes;
 @classdecl TicTacPieceClass;
 ~~~
 
-#### 10.5.4 TicTacBoard Specifics
+### 10.5.4 TicTacBoard Specifics
 
 The TicTacBoard object, being of a subclass of **VisContentClass**, handles 
 many messages specific to content objects. However, only three messages are 
@@ -1113,7 +1113,7 @@ Code Display 10-5 Methods of TicTacBoardClass
 }
 ~~~
 
-#### 10.5.5 TicTacPiece Specifics
+### 10.5.5 TicTacPiece Specifics
 
 TicTacPieceClass contains most of the game's functionality. Since the user 
 interacts directly with each game piece, the piece must know not only how to 

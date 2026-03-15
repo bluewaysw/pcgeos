@@ -1,4 +1,4 @@
-## 23 Graphics Environment
+# 23 Graphics Environment
 
 The GEOS graphics system provides many powerful tools to enhance your 
 geode's appearance and graphical capabilities.
@@ -17,7 +17,7 @@ see ["Drawing Graphics," Chapter 24](cshapes.md).
 Before reading this chapter, you should be familiar with the basics of the 
 generic UI and messaging. You may also want to review high school geometry.
 
-### 23.1 Graphics Road Map
+## 23.1 Graphics Road Map
 
 Graphics is a big topic. It has many applications and thus many ways to 
 apply it. If you will be writing graphics-intensive programs, you'll probably 
@@ -28,7 +28,7 @@ This section is for those people who would like to skip around the GEOS
 imaging system. It contains an outline of the chapter as well as a list of 
 definitions for terms that will be used throughout.
 
-#### 23.1.1 Chapter Structure
+### 23.1.1 Chapter Structure
 
 This chapter is divided into sections. Which sections you'll want to read 
 depend on what you're interested in.
@@ -91,7 +91,7 @@ does to maintain windows in a Graphical User Interface.
 Included is an in-depth look at clipping, along with some 
 commands by which you can change the way clipping works.
 
-#### 23.1.2 Vocabulary
+### 23.1.2 Vocabulary
 
 Several terms will crop up again and again in your dealings with graphics. 
 Many of these terms will be familiar to programmers experienced with other 
@@ -235,7 +235,7 @@ useful for programs which allow the users to construct some
 sort of graphical document or provide a sort of graphical 
 overlay for a spreadsheet.
 
-### 23.2 Graphics Goals
+## 23.2 Graphics Goals
 
 The graphics system is in charge of displaying everything in GEOS. Thus, it 
 is vital that the GEOS graphics system be both powerful and easy to use. 
@@ -275,7 +275,7 @@ screen and printed images through the same language, the screen can
 display a document just as it will be printed. Except for differences in 
 resolution, what you see is what you get.
 
-### 23.3 Graphics Architecture
+## 23.3 Graphics Architecture
 
 The graphics system involves many pieces of GEOS working together to turn 
 an application's UI and graphics commands into drawings on a display.
@@ -304,7 +304,7 @@ manager. If the requested font isn't already in memory, the font manager
 loads it. The font manager then makes calls to the individual font driver for 
 information about specific characters.
 
-### 23.4 How To Use Graphics
+## 23.4 How To Use Graphics
 
 When looking at the source code of sample applications, it's usually not too 
 hard to pick out the commands that do the actual drawing. Commands with 
@@ -378,7 +378,7 @@ however, be sure that the spaceship will be drawn to the right place if the
 game's window is obscured and then exposed. Don't worry if this sounds 
 confusing now, but keep these words in mind as you read on.
 
-### 23.5 Coordinate Space
+## 23.5 Coordinate Space
 
 The graphics system uses a rectangular coordinate grid to specify the size 
 and position at which drawing commands will be carried out. This is a logical 
@@ -433,7 +433,7 @@ approach closer to a pure mathematical Cartesian plane. Programmers used
 to working with device-based coordinates are especially encouraged to read 
 [section 23.5.4](#2354-device-coordinates) to learn about some of the differences. 
 
-#### 23.5.2 Coordinate Transformations
+### 23.5.2 Coordinate Transformations
 
 GEOS provides routines which "transform" the coordinate space. These 
 commands can shift, magnify, or rotate the coordinate grid, or perform 
@@ -486,7 +486,7 @@ rotated and then translated. The drawing on the right received the same
 transformations but in reverse order. Note that the drawings ended up being 
 drawn to different positions._
 
-##### 23.5.2.1 Simple Transformations
+#### 23.5.2.1 Simple Transformations
 
 GrApplyRotation(), GrApplyScale(), GrApplyTranslation(), 
 GrSetDefaultTransform(), GrSetNullTransform(), 
@@ -539,7 +539,7 @@ There are "push" and "pop" operations for transformations. To keep a record
 of the GState's current transformation, call **GrSaveTransform()**. To restore 
 the saved transformation, call **GrRestoreTransform()**.
 
-##### 23.5.2.2 Complicated Transformations
+#### 23.5.2.2 Complicated Transformations
 
 GrApplyTransform(), GrSetTransform(), GrGetTransform(), 
 GrTransformByMatrix(), GrUntransformByMatrix()
@@ -604,7 +604,7 @@ makes a difference what order you make the transformations and thus
 makes a difference based on what order you multiply the matrices (See 
 Figure 23-6 and Equation 23-2).
 
-#### 23.5.3 Precise Coordinates
+### 23.5.3 Precise Coordinates
 
 As has been previously stated, coordinates are normally given in 
 typographer's points. Most graphics commands accept coordinates accurate 
@@ -627,7 +627,7 @@ commands to draw the components of the outline. To fill an area, use the
 precise drawing commands to describe the path forming the outline of the 
 area, then fill the path.
 
-#### 23.5.4 Device Coordinates
+### 23.5.4 Device Coordinates
 
 Most programmers can work quite well within the document space 
 regardless of how coordinates will correspond to device coordinates. However, 
@@ -636,7 +636,7 @@ The system provides clever algorithms for going from document to device
 space for all programmers, as well as routines to get device coordinate 
 information from the device driver.
 
-##### 23.5.4.1 What the System Draws on the Device
+#### 23.5.4.1 What the System Draws on the Device
 
 Consider a device whose pixels are exactly 1/72nd of an inch, such that no 
 scaling is required to map document units to device units. The relationship 
@@ -709,7 +709,7 @@ the gaps, resulting in a continuous line drawn as on the right._
 Since ellipses and Bèzier curves are drawn as polylines, Bresenham's 
 algorithm will work with them.
 
-##### 23.5.4.2 Converting Between Doc and Device Coordinates
+#### 23.5.4.2 Converting Between Doc and Device Coordinates
 
 GrTransform(), GrUntransform(), GrTransformWWFixed(), 
 GrUntransformWWFixed()
@@ -728,7 +728,7 @@ To transform points through an arbitrary transformation instead of to device
 coordinates, use the **GrTransformByMatrix()** or 
 **GrUntransformByMatrix()** routines, described previously.
 
-#### 23.5.5 Larger Document Spaces
+### 23.5.5 Larger Document Spaces
 
 GrApplyDWordTranslation(), GrTransformDWord(), 
 GrUntransformDWord(), GrTransformDWFixed(), 
@@ -788,7 +788,7 @@ this rectangle, you would have to divide it into two pieces._
 and **GrUntransformWWFixed()**, with two words in the integer part of the 
 number instead of one.
 
-#### 23.5.6 Current Position
+### 23.5.6 Current Position
 
 GrMoveTo(), GrRelMoveTo(), GrGetCurPos(), GrGetCurPosWWFixed()
 
@@ -818,7 +818,7 @@ current position, the current position is used to place the left side of the tex
 When done drawing the text, the current position has moved to the right side 
 of the text.
 
-### 23.6 Graphics State
+## 23.6 Graphics State
 
 The data structure known as the Graphics State, or GState, keeps track of 
 changes your code makes about how it wants to draw things. If your geode 
@@ -829,7 +829,7 @@ wide until the width is set to something else. Many graphics routines ask
 that you pass a GState along as one of the parameters so they know where 
 and how to draw what you've requested.
 
-#### 23.6.1 GState Contents
+### 23.6.1 GState Contents
 
 Sometimes it's convenient to think of the GState as being analogous to the 
 Properties boxes in GeoDraw. The GState keeps track of how the program 
@@ -899,7 +899,7 @@ The function of many of these parts may be fairly intuitive to someone used
 to working with graphics programs. Some of the others may require 
 additional explanation, especially when it comes to how to work with them.
 
-#### 23.6.2 Working with GStates
+### 23.6.2 Working with GStates
 
 GrCreateState(), GrDestroyState(), GrSaveState(), GrRestoreState()
 
@@ -944,7 +944,7 @@ to duplicate the region. **GrSaveTransform()** and **GrRestoreTransform()**
 are optimizations of **GrSaveState()** and **GrRestoreState()**, but they only 
 preserve the GState's transformation.
 
-### 23.7 Working With Bitmaps
+## 23.7 Working With Bitmaps
 
 GrCreateBitmap(), GrDestroyBitmap(), GrEditBitmap() 
 GrGetPoint(), GrSetBitmapMode(), GrGetBitmapMode(), 
@@ -1072,7 +1072,7 @@ bitmaps draw more quickly. Note that the bitmap drawing routines can
 handle compacted and uncompacted bitmaps. These functions are here to aid 
 programmers who wish more immediate control over their memory usage.
 
-### 23.8 Graphics Strings
+## 23.8 Graphics Strings
 
 A GString is a data structure which represents a series of graphics 
 commands. This structure may be stored in a chunk or VM file so that it may 
@@ -1080,7 +1080,7 @@ be played back later. An application may declare a GString statically or may
 create one dynamically using standard kernel drawing commands. They are 
 used for describing application icons and printer jobs, among other things. 
 
-#### 23.8.1 Storage and Loading
+### 23.8.1 Storage and Loading
 
 GrCreateGString(), GrDestroyGString(), GrLoadGString(), 
 GrEditGString(), GrCopyGString(), GrGetGStringHandle(), 
@@ -1181,7 +1181,7 @@ To find the handle of the GString data associated with a GState, call
 **GrGetGStringHandle()**. To update the VM file associated with a GString 
 (perhaps after calling **VMSave()**), use **GrSetVMFile()**.
 
-#### 23.8.2 Special Drawing Commands
+### 23.8.2 Special Drawing Commands
 
 GrEndGString(), GrNewPage(), GrLabel(), GrComment(), 
 GrNullOp(), GrEscape(), GrSetGStringBounds()
@@ -1264,7 +1264,7 @@ bounds of the GString. You should call this routine early on in your GString
 definition so that the system won't have to traverse very much of your 
 GString to discover the special element.
 
-#### 23.8.3 Declaring a GString Statically
+### 23.8.3 Declaring a GString Statically
 
 For most programmers, the first encounter with GStrings (often, in fact, their 
 first encounter with any sort of graphics mechanism) is with a program icon. 
@@ -1407,7 +1407,7 @@ static const byte gstring[] = {
 For more examples of statically declared GStrings, see the Moniker, GSTest, 
 and GSTest2 sample applications.
 
-#### 23.8.4 Creating GStrings Dynamically
+### 23.8.4 Creating GStrings Dynamically
 
 Sometimes it comes in handy to be able to create GStrings "on the fly." To add 
 elements to a GString, issue normal kernel drawing commands, but use a 
@@ -1547,7 +1547,7 @@ Probably the most important piece of advice is to think about how the
 Graphics String will be used. If it will be used only under certain 
 well-controlled circumstances, the above concerns may not affect you.
 
-#### 23.8.5 Drawing and Scanning
+### 23.8.5 Drawing and Scanning
 
 GrDrawGString(), GrDrawGStringAtCP(), GrSetGStringPos(), 
 GrGetGStringBounds(), GrGetGStringBoundsDWord()
@@ -1685,7 +1685,7 @@ returning the coordinates describing the GString's bounding rectangle. If the
 GString may have very large bounds, you should use the 
 **GrGetGStringBoundsDWord()** routine instead.
 
-#### 23.8.6 Editing GStrings Dynamically
+### 23.8.6 Editing GStrings Dynamically
 
 GrEditGString(), GrDeleteGStringElement()
 
@@ -1707,7 +1707,7 @@ of GString elements. The elements deleted will be taken starting at your
 position in the GString. This command only works while editing the GString, 
 and you must pass the GString's editing GState handle to this routine.
 
-#### 23.8.7 Parsing GStrings
+### 23.8.7 Parsing GStrings
 
 GrGetGStringElement(), GrParseGString()
 
@@ -1801,7 +1801,7 @@ all of the GString elements.
 The callback routine is passed a pointer to the GString element and the 
 handle of the GState that was passed to **GrParseGString()**.
 
-### 23.9 Graphics Paths
+## 23.9 Graphics Paths
 
 GrBeginPath(), GrEndPath(), GrCloseSubPath(), 
 GrSetStrokePath(), GrGetPathBounds(), GrTestPointInPath(), 
@@ -1898,13 +1898,13 @@ chapter 24](cshapes.md#24211-paths).
 **GrGetPath()** retrieves the handle of a block containing the path's data. You 
 may pass this handle to **GrSetPath()** and thus copy a path to another GState.
 
-### 23.10 Working With Video Drivers
+## 23.10 Working With Video Drivers
 
 The main benefit of the device independence is that the geode writer can 
 issue graphics commands without worrying about the device. Working with 
 the video driver is left to the graphics system.
 
-#### 23.10.1 Kernel Routines
+### 23.10.1 Kernel Routines
 
 GrInvalRect(), GrInvalRectDWord(), GrGrabExclusive(), 
 GrGetExclusive(), GrReleaseExclusive(), GrBitBlt(), 
@@ -1957,26 +1957,26 @@ find out the color of a pixel.
 At some times, it may prove useful to know what window, if any, is associated 
 with a GState. To find out, call **GrGetWinHandle()**.
 
-#### 23.10.2 Direct Calls to the Driver
+### 23.10.2 Direct Calls to the Driver
 
 Rarely, a geode may wish to make direct calls to the video driver. In most 
 cases, anything your code might want the video driver to do can be handled 
 better by going through the appropriate graphics routine.
 
-### 23.11 Windowing and Clipping
+## 23.11 Windowing and Clipping
 
 Windows are the interface between the graphics commands and the GEOS 
 user interface. In this section we will discuss some of the graphical 
 mechanisms associated with windows in GEOS. 
 
-#### 23.11.1 Palettes
+### 23.11.1 Palettes
 
 Each window has a color palette associated with it. For more information 
 about manipulating palettes, see [section 24.3.1.3 of chapter 24](cshapes.md#24313-color). 
 The system will use the palette of whatever window is active. As a result, if two windows 
 have different palettes, when one window is active, the other's colors will be distorted.
 
-#### 23.11.2 Clipping
+### 23.11.2 Clipping
 
 GrSetClipPath(), GrSetClipRect(), GrGetClipRegion(), 
 GrTestRectInMask(), GrSetWinClipRect(), GrGetMaskBounds(), 
@@ -2032,7 +2032,7 @@ associated with the window; you should never have occasion to use it.
 the window clipping path. To find out whether there is a window clipping 
 path at all, call **GrTestPath()** and pass GPT_WIN_CLIP.
 
-#### 23.11.3 Signalling Updates
+### 23.11.3 Signalling Updates
 
 GrBeginUpdate(), GrEndUpdate()
 

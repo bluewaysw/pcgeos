@@ -1,7 +1,7 @@
 ## 3.7 Structures T-U
 
 ----------
-#### Tab
+### Tab
     Tab     struct
         T_position      word            ; Position of tab (pixels * 8)
         T_attr          TabAttributes   ; Tab attributes.
@@ -16,7 +16,7 @@
 **Library:** text.def
 
 ----------
-#### TabAttributes
+### TabAttributes
     TabAttributes           record
                         :3
         TA_LEADER       TabLeader:3
@@ -26,7 +26,7 @@
 **Library:** text.def
 
 ----------
-#### TabLeader
+### TabLeader
     TabLeader           etype byte
         TL_NONE     enum TabLeader
         TL_DOT      enum TabLeader
@@ -36,7 +36,7 @@
 **Library:** text.def
 
 ----------
-#### TabReference
+### TabReference
     TabReference        record
         TR_TYPE             TabReferenceType:1  ; Type of reference.
         TR_REF_NUMBER       :7                  ; Reference number
@@ -45,7 +45,7 @@
 **Library:** text.def
 
 ----------
-#### TabReferenceType
+### TabReferenceType
     TabReferenceType        etype byte
         TRT_RULER   enum TabReferenceType   ; Reference is into the ruler.
         TRT_OTHER   enum TabReferenceType
@@ -53,7 +53,7 @@
 **Library:** text.def
 
 ----------
-#### TabType
+### TabType
     TabType etype byte
         TT_LEFT             enum TabType
         TT_CENTER           enum TabType
@@ -63,7 +63,7 @@
 **Library:** text.def
 
 ----------
-#### TargetLevel
+### TargetLevel
     TargetLevel     etype word
         TL_TARGET                   enum TargetLevel, 0
         TL_CONTENT                  enum TargetLevel
@@ -115,7 +115,7 @@ View within display.
 **Library:** Objects/genC.def
 
 ----------
-#### TargetReference
+### TargetReference
     TargetReference         struct
         TR_object       optr    ; OD of node/leaf in target hierarchy
         TR_class        fptr    ; class of above object
@@ -124,7 +124,7 @@ View within display.
 **Library:** Objects/gViewC.def
 
 ----------
-#### TCCFeatures
+### TCCFeatures
     TCCFeatures     record
         TCCF_CHARACTER      :1
         TCCF_WORD           :1
@@ -136,14 +136,14 @@ View within display.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TCCToolboxFeatures
+### TCCToolboxFeatures
     TCCToolboxFeatures      record
     TCCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TCFeatures
+### TCFeatures
     TCFeatures      record
         TCF_LIST            :1
         TCF_POSITION        :1
@@ -158,14 +158,14 @@ View within display.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TCToolboxFeatures
+### TCToolboxFeatures
     TCToolboxFeatures       record
     TCToolboxFeatures       end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TempGenControlInstance
+### TempGenControlInstance
     TempGenControlInstance          struct
         TGCI_interactibleFlags          GenControlInteractibleFlags
         TGCI_childBlock                 hptr
@@ -201,7 +201,7 @@ and avoid a redundant update.
 **Library:** Objects/gCtrlC.def
 
 ----------
-#### TempGenToolControlInstance
+### TempGenToolControlInstance
     TempGenToolControlInstance              struct
         TGTCI_curController         optr
         TGTCI_features              word
@@ -232,7 +232,7 @@ bring it to the attention of the user.
 **Library:** Objects/gToolCC.def
 
 ----------
-#### TempImportExportData
+### TempImportExportData
     TempImportExportData            struct
         TIED_formatUI           optr    ; OD of duplicated format UI
         TIED_formatLibrary      hptr    ; handle of library for above
@@ -241,7 +241,7 @@ bring it to the attention of the user.
 **Library:** impex.def
 
 ----------
-#### TempMetaGCNData
+### TempMetaGCNData
     TempMetaGCNData     struct
         TMGCND_listOfLists      lptr.GCNListOfListsHeader
         TMGCND_flags            TempMetaGCNFlags
@@ -252,7 +252,7 @@ bring it to the attention of the user.
 **Library:** Objects/metaC.def
 
 ----------
-#### TempMetaGCNFlags
+### TempMetaGCNFlags
     TempMetaGCNFlags        record
         TMGCNF_RELOCATED        :1      ; set if relocated
                                 :7
@@ -261,7 +261,7 @@ bring it to the attention of the user.
 **Library:** Objects/metaC.def
 
 ----------
-#### TempPrintCtrlInstance
+### TempPrintCtrlInstance
     TempPrintCtrlInstance           struct
         TPCI_currentSummons         optr    ; currently active summons
         TPCI_progressBox            optr    ; OD of progress dialog box
@@ -279,7 +279,7 @@ bring it to the attention of the user.
 **Library:** spool.def
 
 ----------
-#### TestRectReturnType
+### TestRectReturnType
     TestRectReturnType          etype byte
         TRRT_OUT            enum TestRectReturnType
         TRRT_PARTIAL        enum TestRectReturnType
@@ -288,7 +288,7 @@ bring it to the attention of the user.
 **Library:** graphics.def
 
 ----------
-#### TextArrayType
+### TextArrayType
     TextArrayType       etype byte
         TAT_CHAR_ATTRS          enum TextArrayType
         TAT_PARA_ATTRS          enum TextArrayType
@@ -298,7 +298,7 @@ bring it to the attention of the user.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextAttr
+### TextAttr
     TextAttr        struct
         TA_color        ColorQuad           ; RGB values or index
         TA_mask         SystemDrawMask      ; draw mask
@@ -321,7 +321,7 @@ This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 **Library:** graphics.def
 
 ----------
-#### TextClipboardOption
+### TextClipboardOption
     TextClipboardOption         etype word
         TCO_COPY                        enum TextClipboardOption
         TCO_RETURN_TRANSFER_FORMAT      enum TextClipboardOption
@@ -331,7 +331,7 @@ This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextColors
+### TextColors
     TextColors      struc
         TC_unselectedColor      byte
         TC_selectedColor        byte
@@ -340,7 +340,7 @@ This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 **Library:** genC.def
 
 ----------
-#### TextElementArrayHeader
+### TextElementArrayHeader
     TextElementArrayHeader      struct
         TEAH_meta           ElementArrayHeader
         TEAH_arrayType      TextArrayType
@@ -350,7 +350,7 @@ This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextFocusFlags
+### TextFocusFlags
     TextFocusFlags  record      ;Record passed in BP
         TFF_EDITABLE_TEXT_OBJECT_HAS_FOCUS      :1
                                 ; Set if an editable text object has the focus
@@ -362,7 +362,7 @@ This structure is used with **GrSetTextAttr** and **GrDrawTextField**.
 **Library:** vTextC.def
 
 ----------
-#### TextGuardianFlags
+### TextGuardianFlags
     TextGuardianFlags       record
         TGF_ENFORCE_DESIRED_MIN_HEIGHT                          :1
         TGF_ENFORCE_DESIRED_MAX_HEIGHT                          :1
@@ -399,7 +399,7 @@ clicks and releases in the same spot to create.
 **Library:** grobj.def
 
 ----------
-#### TextLargeRunArrayHeader
+### TextLargeRunArrayHeader
     TextLargeRunArrayHeader         struct
         TLRAH_meta              HugeArrayDirectory
         TLRAH_elementVMBlock    word        ; Element block (or null)
@@ -410,7 +410,7 @@ This structure stores a generic array of runs in the large text format.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextMetricStyles
+### TextMetricStyles
     TextMetricStyles        struct
         TMS_styleCallBack       fptr.far        ;style callback routine
         ;
@@ -448,7 +448,7 @@ This structure stores a generic array of runs in the large text format.
 **Library:** text.def
 
 ----------
-#### TextMode
+### TextMode
     TextMode        record
         TM_DRAW_CONTROL_CHARS       :1  ; Does the following mapping when drawing
                                         ; text:
@@ -469,7 +469,7 @@ This structure stores a generic array of runs in the large text format.
 **Library:** graphics.def
 
 ----------
-#### TextReference
+### TextReference
     TextReference       struct
         TR_type     TextReferenceType
         TR_ref      TextReferenceUnion
@@ -478,7 +478,7 @@ This structure stores a generic array of runs in the large text format.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceBlock
+### TextReferenceBlock
     TextReferenceBlock          struct
         TRB_handle          hptr.char
     TextReferenceBlock          ends
@@ -495,7 +495,7 @@ passed block or the allocated block will be resized to accommodate the text.
 **Library:** Object/vTextC.def
 
 ----------
-#### TextReferenceBlockChunk
+### TextReferenceBlockChunk
     TextReferenceBlockChunk         struct
         TRBC_ref        optr.char
     TextReferenceBlockChunk         ends
@@ -516,7 +516,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceDBItem
+### TextReferenceDBItem
     TextReferenceDBItem         struct
         TRDBI_file      hptr
         TRDBI_item      word
@@ -546,7 +546,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceHugeArray
+### TextReferenceHugeArray
     TextReferenceHugeArray          struct
         TRHA_file           hptr
         TRHA_array          word
@@ -568,7 +568,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferencePointer
+### TextReferencePointer
     TextReferencePointer            struct
         TRP_pointer         fptr.char
     TextReferencePointer            ends
@@ -589,7 +589,7 @@ caller allocates the block it can also handle errors in the allocation.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceSegmentChunk
+### TextReferenceSegmentChunk
     TextReferenceSegmentChunk               struct
         TRSC_chunk              word
         TRSC_segment            word
@@ -611,7 +611,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceType
+### TextReferenceType
     TextReferenceType       etype word, 0, 2
         TRT_POINTER             enum    TextReferenceType
         TRT_SEGMENT_CHUNK       enum    TextReferenceType
@@ -624,7 +624,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceUnion
+### TextReferenceUnion
     TextReferenceUnion          union
         TRU_pointer         TextReferencePointer
         TRU_segChunk        TextReferenceSegmentChunk
@@ -638,7 +638,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextReferenceVMBlock
+### TextReferenceVMBlock
     TextReferenceVMBlock            struct
         TRVMB_file          hptr
         TRVMB_block         word
@@ -659,7 +659,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextRulerAction
+### TextRulerAction
     TextRulerAction     etype byte
         TRA_NULL                enum TextRulerAction
         TRA_MOVE_TAB            enum TextRulerAction
@@ -669,7 +669,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TextRulerControlAttributes
+### TextRulerControlAttributes
     TextRulerControlAttributes      record
         TRCA_ROUND              :1
         TRCA_IGNORE_ORIGIN      :1
@@ -679,7 +679,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TextRulerFlags
+### TextRulerFlags
     TextRulerFlags      record
                                         :3
         TRF_ALWAYS_MOVE_BOTH_MARGINS    :1
@@ -692,7 +692,7 @@ block will be resized to accommodate the text.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TextRunArrayElement
+### TextRunArrayElement
     TextRunArrayElement         struct
         TRAE_position   WordAndAHalf <>     ; Position for start of run
         TRAE_token      word                ; Token for run
@@ -703,7 +703,7 @@ This structure stores an element in an array of text runs.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextRunArrayHeader
+### TextRunArrayHeader
     TextRunArrayHeader      struct
         TRAH_meta               ChunkArrayHeader
         TRAH_elementVMBlock     word        ; Element block
@@ -716,7 +716,7 @@ objects).
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextSearchInHugeArrayFrame
+### TextSearchInHugeArrayFrame
     TextSearchInHugeArrayFrame              struct
         TSIHAF_str1Size             dword (?)
         TSIHAF_curOffset            dword (?)
@@ -744,7 +744,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextStyle
+### TextStyle
     TextStyle       record
                             :1  ; Do not use this bit.
         TS_OUTLINE          :1
@@ -759,7 +759,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** graphics.def
 
 ----------
-#### TextStyleElementHeader
+### TextStyleElementHeader
     TextStyleElementHeader          struct
         TSEH_meta               NameArrayElement
         TSEH_baseStyle          word
@@ -774,7 +774,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextStyleFlags
+### TextStyleFlags
     TextStyleFlags      record
         TSF_APPLY_TO_SELECTION_ONLY     :1
         TSF_POINT_SIZE_RELATIVE         :1
@@ -786,7 +786,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextStylePrivateData
+### TextStylePrivateData
     TextStylePrivateData            struct
         TSPD_flags          TextStyleFlags
         TSPD_unused         byte 2 dup (0)
@@ -795,7 +795,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TextTransferBlockHeader
+### TextTransferBlockHeader
     TextTransferBlockHeader             struct
         TTBH_meta                       VMChainTree
         TTBH_reservedOther              word 20 dup (0)
@@ -825,7 +825,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** Objects/vTextC.def
 
 ----------
-#### TFStyleRun
+### TFStyleRun
     TFStyleRun      struct
         TFSR_count          word    ?       ; character count
         TFSR_attr           TextAttr <>     ; text attributes
@@ -834,7 +834,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** gstring.def
 
 ----------
-#### THCFeatures
+### THCFeatures
     THCFeatures     record
         THCF_FOLLOW_HYPERLINK           :1
         THCF_SET_HYPERLINK              :1
@@ -846,14 +846,14 @@ and block handles for the huge array we will be extracting text from.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### THCToolboxFeatures
+### THCToolboxFeatures
     THCToolboxFeatures      record
     THCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### ThreadException
+### ThreadException
     ThreadException     etype word, 0, 4
         TE_DIVIDE_BY_ZERO       enum ThreadException
         TE_OVERFLOW             enum ThreadException
@@ -865,7 +865,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** thread.def
 
 ----------
-#### ThreadGetInfoType
+### ThreadGetInfoType
     ThreadGetInfoType       etype word, 0, 2
         TGIT_PRIORITY_AND_USAGE         enum ThreadGetInfoType
         TGIT_THREAD_HANDLE              enum ThreadGetInfoType
@@ -874,7 +874,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** thread.def
 
 ----------
-#### ThreadModifyFlags
+### ThreadModifyFlags
     ThreadModifyFlags       record
         TMF_BASE_PRIO           :1
         TMF_ZERO_USAGE          :1
@@ -884,7 +884,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** thread.def
 
 ----------
-#### ThreadPriority
+### ThreadPriority
     ThreadPriority      etype byte
         PRIORITY_TIME_CRITICAL      enum ThreadPriority, 0
         PRIORITY_HIGH               enum ThreadPriority, 64     ;IM
@@ -897,7 +897,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** thread.def
 
 ----------
-#### ThreePointArcParams
+### ThreePointArcParams
     ThreePointArcParams             struct
         TPAP_close          ArcCloseType    ; how the arc should be closed
         TPAP_point1         PointWWFixed    ; Point #1 (start of arc)
@@ -909,7 +909,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** graphics.def
 
 ----------
-#### ThreePointArcToParams
+### ThreePointArcToParams
     ThreePointArcToParams           struct
         TPATP_close         ArcCloseType    ; how the arc should be closed
         TPATP_point2        PointWWFixed    ; Point #2 (a non-terminal point on the 
@@ -920,7 +920,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** graphics.def
 
 ----------
-#### ThreePointRelArcToParams
+### ThreePointRelArcToParams
     ThreePointRelArcToParams            struct
         TPRATP_close        ArcCloseType    ; how the arc should be closed
         TPRATP_delta2       PointWWFixed    ; delta to Point #2 
@@ -930,7 +930,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** graphics.def
 
 ----------
-#### TimerType
+### TimerType
     TimerType       etype word, 0, 2
         TIMER_ROUTINE_ONE_SHOT              enum TimerType
         TIMER_ROUTINE_CONTINUAL             enum TimerType
@@ -942,7 +942,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** timer.def
 
 ----------
-#### TMSFlags
+### TMSFlags
     TMSFlags        record
         TMSF_IS_BREAK_CHARACTER     :1  ;TRUE: Last char was a break character.
         TMSF_IS_OPTIONAL_HYPHEN     :1  ;TRUE: Break is an optional hyphen.
@@ -961,7 +961,7 @@ and block handles for the huge array we will be extracting text from.
 **Library:** text.def
 
 ----------
-#### TocCategoryStruct
+### TocCategoryStruct
     TocCategoryStruct           struct
         TCS_tokenChars      TokenChars <>
         TCS_files           dbptr <>        ; file name array
@@ -976,7 +976,7 @@ TCF_EXTENDED_DEVICE_DRIVERS is set).
 **Library:** config.def
 
 ----------
-#### TocDeviceStruct
+### TocDeviceStruct
     TocDeviceStruct         struct
         TDS_driver      word        ; element in driver array
         TDS_info        word        ; extra word of info (depends on device type).
@@ -986,7 +986,7 @@ TCF_EXTENDED_DEVICE_DRIVERS is set).
 **Library:** config.def
 
 ----------
-#### TocDiskStruct
+### TocDiskStruct
     TocDiskStruct       struct
         TDSS_volumeName         VolumeName
         TDSS_mediaType          MediaType
@@ -996,7 +996,7 @@ TCF_EXTENDED_DEVICE_DRIVERS is set).
 **Library:** config.def
 
 ----------
-#### TOC_ext
+### TOC_ext
     TOC_ext struct
         ;
         ; Entries that are passed
@@ -1129,7 +1129,7 @@ justification. This value doesn't include the spaces at the end of the line.
 **Library:** text.def
 
 ----------
-#### TocFileStruct
+### TocFileStruct
     TocFileStruct       struct
         TFS_sourceDisk      word            ; Disk token
         TFS_release         ReleaseNumber <>
@@ -1139,7 +1139,7 @@ justification. This value doesn't include the spaces at the end of the line.
 **Library:** config.def
 
 ----------
-#### TOCFlags
+### TOCFlags
     TOCFlags        record
         TOCF_NO_WORD_WRAP           :1  ; PASS: Set - word-wrap should be done
         TOCF_AUTO_HYPHENATE         :1  ; PASS: Set - attempt auto hyphenation
@@ -1157,7 +1157,7 @@ justification. This value doesn't include the spaces at the end of the line.
 **Library:** text.def
 
 ----------
-#### TOC_int
+### TOC_int
     TOC_int struct
         TOCI_style                  TextMetricStyles
         TOCI_currentHgt             WBFixed     ; Height of the field
@@ -1184,7 +1184,7 @@ are initialized and used inside **GrTextObjCalc**.
 **Library:** text.def
 
 ----------
-#### TocMap
+### TocMap
     TocMap  struct
         TM_disks            dbptr
         TM_categories       dbptr
@@ -1195,7 +1195,7 @@ This structure is the map item of the TOC file.
 **Library:** config.def
 
 ----------
-#### TOCOtherFlags
+### TOCOtherFlags
     TOCOtherFlags       record
         TOCOF_IS_FIRST_FIELD    :1  ; PASS: Set - This is the first field on the 
                                     ; line
@@ -1209,7 +1209,7 @@ This structure is the map item of the TOC file.
 **Library:** text.def
 
 ----------
-#### TocUpdateCategoryFlags
+### TocUpdateCategoryFlags
     TocUpdateCategoryFlags record
         TUCF_EXTENDED_DEVICE_DRIVERS        :1
         ; Files being enumerated are assumed to be extended device drivers.
@@ -1236,7 +1236,7 @@ This structure is the map item of the TOC file.
 **Library:** config.def
 
 ----------
-#### TocUpdateCategoryParams
+### TocUpdateCategoryParams
     TocUpdateCategoryParams struct
         TUCP_flags                      TocUpdateCategoryFlags
         TUCP_tokenChars                 TokenChars
@@ -1259,7 +1259,7 @@ This structure is the map item of the TOC file.
 **Library:** 
 
 ----------
-#### TOC_vars
+### TOC_vars
     TOC_vars        struct
         TOCV_int        TOC_int
         TOCV_ext        TOC_ext
@@ -1272,7 +1272,7 @@ parameters (*TOC_ext*) and internal variables (*TOC_int*).
 **Library:** text.def
 
 ----------
-#### ToggleState
+### ToggleState
     ToggleState     record
         TS_CAPSLOCK         :1
         TS_NUMLOCK          :1
@@ -1282,7 +1282,7 @@ parameters (*TOC_ext*) and internal variables (*TOC_int*).
 **Library:** 
 
 ----------
-#### TokenDBItem
+### TokenDBItem
     TokenDBItem     struct
         TDBI_group      word
         TDBI_item       word
@@ -1293,7 +1293,7 @@ This structure defines the identifier for a token database item.
 **Library:** token.def
 
 ----------
-#### TokenEntry
+### TokenEntry
     TokenEntry      struct
         TE_type             TokenIndexType
         TE_token            GeodeToken <>
@@ -1323,7 +1323,7 @@ relocation status.
 **Library:** token.def
 
 ----------
-#### TokenError
+### TokenError
     TokenError              etype   word, 1
         BAD_PROTOCOL_IN_SHARED_TOKEN_DATABASE_FILE      enum    TokenError
         ERROR_OPENING_SHARED_TOKEN_DATABASE_FILE        enum    TokenError
@@ -1332,7 +1332,7 @@ relocation status.
 **Library:** token.def
 
 ----------
-#### TokenFlags
+### TokenFlags
     TokenFlags      record
         TF_NEED_RELOCATION      :1
         TF_UNUSED               :15
@@ -1341,7 +1341,7 @@ relocation status.
 **Library:** token.def
 
 ----------
-#### TokenMonikerInfo
+### TokenMonikerInfo
     TokenMonikerInfo        struct
         TMI_moniker     TokenDBItem <>
         TMI_fileFlag    word            ; 0 if token is in shared
@@ -1356,7 +1356,7 @@ call **TokenLockTokenMoniker**.
 **Library:** token.def
 
 ----------
-#### TokenRangeFlags
+### TokenRangeFlags
     TokenRangeFlags record
         TRF_ONLY_GSTRING            :1
         TRF_ONLY_PASSED_MANUFID     :1
@@ -1366,7 +1366,7 @@ call **TokenLockTokenMoniker**.
 **Library:** token.def
 
 ----------
-#### ToolboxInfo
+### ToolboxInfo
     ToolboxInfo     struct
         TI_object       optr
         TI_name         optr
@@ -1381,7 +1381,7 @@ placed (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
 **Library:** Objects/gToolCC.def
 
 ----------
-#### ToolGroupHighlightType
+### ToolGroupHighlightType
     ToolGroupHighlightType              etype byte
         TGHT_INACTIVE_HIGHLIGHT     enum ToolGroupHighlightType
         TGHT_ACTIVE_HIGHLIGHT       enum ToolGroupHighlightType
@@ -1390,7 +1390,7 @@ placed (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
 **Library:** Objects/gToolGC.def
 
 ----------
-#### ToolGroupInfo
+### ToolGroupInfo
     ToolGroupInfo       struct
         TGI_object          optr
     ToolGroupInfo       ends
@@ -1401,7 +1401,7 @@ placed (This optr is *unrelocated*! Use the UN_OPTR macro in assembly).
 **Library:** Objects/gToolCC.def
 
 ----------
-#### TrackScrollingParams
+### TrackScrollingParams
     TrackScrollingParams            struct
         TSP_action              ScrollAction
         TSP_flags               ScrollFlags     ;scroll flags
@@ -1432,7 +1432,7 @@ message; in fact, return methods will be ignored for drags.
 **Library:** Objects/gViewC.def
 
 ----------
-#### TransferFileHeader
+### TransferFileHeader
     TransferFileHeader          struct
         TFH_normalItem      word    ; VM block handle of normal transfer item
     TransferFileHeader          ends
@@ -1444,7 +1444,7 @@ handles must be valid handles for this VM transfer file.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### TransFlags
+### TransFlags
     TransFlags      record
         TF_INV_VALID        :1
         TF_ROTATED          :1
@@ -1455,7 +1455,7 @@ handles must be valid handles for this VM transfer file.
 **Library:** tmatrix.def
 
 ----------
-#### TransMatrix
+### TransMatrix
     TransMatrix         struct
         TM_e11      WWFixed <0,1>
         TM_e12      WWFixed <0,0>
@@ -1486,7 +1486,7 @@ This **TransMatrix** is initially set to the identity matrix.
 **Library:** graphics.def
 
 ----------
-#### TravelingObjectReference
+### TravelingObjectReference
     TravelingObjectReference            struct
         TIR_travelingObject         optr
         TIR_parent                  lptr
@@ -1507,7 +1507,7 @@ traveling object below the parent.
 **Library:** Objects/gDispC.def
 
 ----------
-#### TravelOption
+### TravelOption
     TravelOption        etype word, 0
         TO_NULL                 enum TravelOption
         TO_SELF                 enum TravelOption
@@ -1531,7 +1531,7 @@ Sends event to the process owning the UI block.
 **Library:** Objects/metaC.def
 
 ----------
-#### TRCCFeatures
+### TRCCFeatures
     TRCCFeatures        record
         TRCCF_ROUND             :1
         TRCCF_IGNORE_ORIGIN     :1
@@ -1540,14 +1540,14 @@ Sends event to the process owning the UI block.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TRCCToolboxFeatures
+### TRCCToolboxFeatures
     TRCCToolboxFeatures         record
     TRCCToolboxFeatures         end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TSCFeatures
+### TSCFeatures
     TSCFeatures     record
         TSCF_PLAIN              :1
         TSCF_BOLD               :1
@@ -1566,7 +1566,7 @@ Sends event to the process owning the UI block.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TSCToolboxFeatures
+### TSCToolboxFeatures
     TSCToolboxFeatures      record
         TSCTF_PLAIN             :1
         TSCTF_BOLD              :1
@@ -1585,7 +1585,7 @@ Sends event to the process owning the UI block.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### TVTNCPIData
+### TVTNCPIData
     TVTNCPIData         struct
         TVTNCPID_handle     word
         TVTNCPID_id         word
@@ -1594,7 +1594,7 @@ Sends event to the process owning the UI block.
 **Library:** vTextC.def
 
 ----------
-#### UChar
+### UChar
     UChar   etype byte
         UC_NULL             enum UChar, 0x0     ;NULL
         UC_QUICK_COPY       enum UChar, 0x1     ;unnecessary -- should remove!
@@ -1603,7 +1603,7 @@ Sends event to the process owning the UI block.
 **Library:** uiInputC.def
 
 ----------
-#### UIButtonFlags
+### UIButtonFlags
     UIButtonFlags       record
         UIBF_NO_KEYBOARD                :1
         UIBF_CLICK_TO_TYPE              :1
@@ -1660,7 +1660,7 @@ Set if the text cursor should blink.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### UIExpressOptions
+### UIExpressOptions
     UIExpressOptions        record
                                     :4
         UIEO_RETURN_TO_DEFAULT_LAUNCHER :1  ; Set to have a "Return to <default
@@ -1685,7 +1685,7 @@ Set if the text cursor should blink.
 **Library:** ui.def
 
 ----------
-#### UIExpressPositions
+### UIExpressPositions
     UIExpressPositions      etype word
         UIEP_NONE               enum UIExpressPositions
         UIEP_TOP_PRIMARY        enum UIExpressPositions
@@ -1729,7 +1729,7 @@ Set if the text cursor should blink.
 **Library:** Objects/uiInput.def
 
 ----------
-#### UIHelpOptions
+### UIHelpOptions
     UIHelpOptions       record
                                     :15
         UIHO_HIDE_HELP_BUTTONS      :1
@@ -1744,7 +1744,7 @@ Default interpretation: false (i.e., help buttons appear).
 **Library:** ui.def
 
 ----------
-#### UIInterfaceLevel
+### UIInterfaceLevel
     UIInterfaceLevel        etype word
         UIIL_INTRODUCTORY       enum UIInterfaceLevel
         UIIL_BEGINNING          enum UIInterfaceLevel
@@ -1863,7 +1863,7 @@ safety or recoverability are tilted towards performance.
 **Library:** ui.def
 
 ----------
-#### UIInterfaceOptions
+### UIInterfaceOptions
     UIInterfaceOptions      record
         UIIO_OPTIONS_MENU                       :1
         UIIO_DISABLE_POPOUTS                    :1
@@ -1881,7 +1881,7 @@ out. False to allow pop in and pop out behavior.
 **Library:** ui.def
 
 ----------
-#### UILaunchModel
+### UILaunchModel
     UILaunchModel       etype word
         UILM_TRANSPARENT                enum UILaunchModel
         UILM_SINGLE_INSTANCE            enum UILaunchModel
@@ -1955,7 +1955,7 @@ instance.
 **Library:** ui.def
 
 ----------
-#### UILaunchOptions
+### UILaunchOptions
     UILaunchOptions record
         UILO_DESK_ACCESSORIES   :1  ;TRUE if the desk accessory mode is
                                     ; supported (default = TRUE)
@@ -1968,7 +1968,7 @@ instance.
 **Library:** ui.def
 
 ----------
-#### UIWindowOptions
+### UIWindowOptions
     UIWindowOptions     record
         UIWO_MAXIMIZE_ON_STARTUP                            :1
         UIWO_COMBINE_HEADER_AND_MENU_IN_MAXIMIZED_WINDOWS   :1
@@ -2030,7 +2030,7 @@ pixels in y).
 **Library:** ui.def
 
 ----------
-#### UIWindowOptionsInteger
+### UIWindowOptionsInteger
     UIWindowOptionsInteger          record
         UIWOI_MASK              UIWindowOptions:8
         UIWOI_OPTIONS           UIWindowOptions:8
@@ -2048,7 +2048,7 @@ any given bit).
 **Library:** ui.def
 
 ----------
-#### UndoActionDataFlags
+### UndoActionDataFlags
     UndoActionDataFlags         struct
         UADF_flags          dword
         UADF_extraFlags     word
@@ -2057,7 +2057,7 @@ any given bit).
 **Library:** Objects/gProcC.def
 
 ----------
-#### UndoActionDataOptr
+### UndoActionDataOptr
     UndoActionDataOptr          struct
         UADO_optr           optr
     UndoActionDataOptr          ends
@@ -2065,7 +2065,7 @@ any given bit).
 **Library:** Objects/gProcC.def
 
 ----------
-#### UndoActionDataPtr
+### UndoActionDataPtr
     UndoActionDataPtr       struct
         UADP_ptr        fptr
         UADP_size       word
@@ -2074,7 +2074,7 @@ any given bit).
 **Library:** Objects/gProcC.def
 
 ----------
-#### UndoActionDataType
+### UndoActionDataType
     UndoActionDataType      etype word, 0, 2
         UADT_FLAGS          enum UndoActionDataType
         UADT_PTR            enum UndoActionDataType
@@ -2104,7 +2104,7 @@ move, so the optr should be re-dereferenced after sending this message.
 **Library:** Objects/gProcC.def
 
 ----------
-#### UndoActionDataUnion
+### UndoActionDataUnion
     UndoActionDataUnion         union
         UADU_flags          UndoActionDataFlags
         UADU_ptr            UndoActionDataPtr
@@ -2115,7 +2115,7 @@ move, so the optr should be re-dereferenced after sending this message.
 **Library:** Object/gProcC.def
 
 ----------
-#### UndoActionDataVMChain
+### UndoActionDataVMChain
     UndoActionDataVMChain           struct
         UADVMC_vmChain          dword
         UADVMC_file             hptr
@@ -2129,7 +2129,7 @@ MSG_GEN_PROCESS_UNDO_GET_FILE).
 **Library:** Objects/gProcC.def
 
 ----------
-#### UndoActionStruct
+### UndoActionStruct
     UndoActionStruct        struct
         UAS_dataType            UndoActionDataType
         UAS_data                UndoActionDataUnion
@@ -2147,7 +2147,7 @@ undoing.
 **Library:** Objects/gProcC.def
 
 ----------
-#### UndoDescription
+### UndoDescription
     UndoDescription     etype byte
         UD_UNDO             enum UndoDescription
         UD_REDO             enum UndoDescription
@@ -2168,7 +2168,7 @@ undoable. Must pass 0:0 as title.
 **Library:** Objects/gEditCC.def
 
 ----------
-#### UpdateUIDataBlk
+### UpdateUIDataBlk
     UpdateUIDataBlk     struct
         UUIDB_formatDataVMFileHan   word
         UUIDB_formatDataVMBlkHan    word
@@ -2178,7 +2178,7 @@ undoable. Must pass 0:0 as title.
 **Library:** math.def
 
 ----------
-#### UpdateWindowFlags
+### UpdateWindowFlags
     UpdateWindowFlags       record
         UWF_ATTACHING               :1
         UWF_DETACHING               :1
@@ -2209,7 +2209,7 @@ UWF_ATTACHING is also set, i.e. application is attaching)
 **Library:** Objects/metaC.def
 
 ----------
-#### UserDoDialogStruct
+### UserDoDialogStruct
     UserDoDialogStruct          struct
         UDDS_callingThread              hptr
         UDDS_semaphore                  hptr
@@ -2252,7 +2252,7 @@ the dialog.
 **Library:** Objects/gInterC.def
 
 ----------
-#### UtilAsciiToHexError
+### UtilAsciiToHexError
     UtilAsciiToHexError         etype word
         UATH_NON_NUMERIC_DIGIT_IN_STRING    enum UtilAsciiToHexError
         UATH_CONVERT_OVERFLOW               enum UtilAsciiToHexError
@@ -2260,7 +2260,7 @@ the dialog.
 **Library:** system.def
 
 ----------
-#### UtilHexToAsciiFlags
+### UtilHexToAsciiFlags
     UtilHexToAsciiFlags         record
                                         :11
         UHTAF_SBCS_STRING               :1

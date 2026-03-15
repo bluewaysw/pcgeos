@@ -1,7 +1,7 @@
 ## 2.3 Routines G-G
 
 ----------
-#### GCNListAdd
+### GCNListAdd
 Add an object or process to a GCN list. The object will be notified the next time 
 the list's notification is sent out.
 
@@ -25,7 +25,7 @@ Nothing.
 pointers.
 
 ----------
-#### GCNListAddToBlock
+### GCNListAddToBlock
 Add a new GCN list to the block containing the GCN list of lists.
 
 **Pass:**  
@@ -51,7 +51,7 @@ Nothing.
 pointers.
 
 ----------
-#### GCNListAddToList
+### GCNListAddToList
 Called by **GCNListAdd**, this routine adds an object to a specified GCN list. 
 Most programs will call **GCNListAdd**, not this routine.
 
@@ -73,7 +73,7 @@ Nothing.
 invalidating pointers into it.
 
 ----------
-#### GCNListCreateBlock
+### GCNListCreateBlock
 Create a new GCN list of lists within a locked LMem block.
 
 **Pass:**  
@@ -89,7 +89,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListCreateList
+### GCNListCreateList
 Create an empty GCN list within a locked LMem block.
 
 **Pass:**  
@@ -107,7 +107,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListDestroyBlock
+### GCNListDestroyBlock
 Cleanly destroy a GCN list of lists and all the lists in it.
 
 **Pass:**  
@@ -122,7 +122,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListDestroyList
+### GCNListDestroyList
 Cleanly destroy a GCN list.
 
 **Pass:**  
@@ -137,7 +137,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListFindItemInList
+### GCNListFindItemInList
 Return the address of the GCN list entry corresponding to the optr passed.
 
 **Pass:**  
@@ -157,7 +157,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListFindListInBlock
+### GCNListFindListInBlock
 Find the appropriate GCN list entry in the GCN list of lists. If necessary and 
 desired, this routine creates a new GCN list and adds it to the list of lists.
 
@@ -181,7 +181,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListRecordAndSend
+### GCNListRecordAndSend
 
 Broadcast the given message to all the objects on the specified GCN list. This 
 is a utility message used to make broadcasting such messages easier.
@@ -203,7 +203,7 @@ ax, dx, bp, di, si
 **Library:** gcnlist.def
 
 ----------
-#### GCNListRelocateBlock
+### GCNListRelocateBlock
 Relocate all the GCN lists within the given locked block, updating optrs and 
 other handles.
 
@@ -224,7 +224,7 @@ Nothing.
 into it.
 
 ----------
-#### GCNListRelocateList
+### GCNListRelocateList
 Relocate a particular GCN list. This routine is called by 
 **GCNListRelocateBlock** and will not generally be called by applications.
 
@@ -244,7 +244,7 @@ Nothing.
 into it.
 
 ----------
-#### GCNListRemove
+### GCNListRemove
 Remove an optr from a specified GCN list.
 
 **Pass:**  
@@ -262,7 +262,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListRemoveFromBlock
+### GCNListRemoveFromBlock
 Remove the given optr from the specified GCN list type in the passed block.
 
 **Pass:**  
@@ -283,7 +283,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListRemoveFromList
+### GCNListRemoveFromList
 Remove an optr from a GCN list. This routine is called by GCNListRemove; 
 in general, applications should call GCNListRemove instead of this routine.
 
@@ -303,7 +303,7 @@ Nothing.
 **Library:** gcnlist.def
 
 ----------
-#### GCNListSend
+### GCNListSend
 Send a specified message to each element of a GCN list. If a data block with 
 a reference count is passed to this routine, the reference count should be 
 incremented before the call; otherwise, this routine will decrement the count 
@@ -344,7 +344,7 @@ decremented by this routine. To ensure the block does not get freed
 accidentally, increment the reference count before calling this routine.
 
 ----------
-#### GCNListSendToBlock
+### GCNListSendToBlock
 Send a specified message to each element in a GCN list. This routine differs 
 from **GCNListSend** only in that you pass a pointer to the list of lists to 
 indicate a particular GCN list block (usually a custom block) to use. Other 
@@ -387,7 +387,7 @@ decremented by this routine. To ensure the block does not get freed
 accidentally, increment the reference count before calling this routine.
 
 ----------
-#### GCNListSendToList
+### GCNListSendToList
 Dispatches a classed event to all the elements on a particular GCN list. This 
 routine is called by both **GCNListSend** and **GCNListSendToBlock**. In 
 general, you should use one of those two routines rather than this routine.
@@ -425,7 +425,7 @@ decremented by this routine. To ensure the block does not get freed
 accidentally, increment the reference count before calling this routine.
 
 ----------
-#### GCNListUnRelocateBlock
+### GCNListUnRelocateBlock
 Unrelocate all the GCN lists within the specified, locked GCN list block. This 
 routine will be called only in very rare situations by applications.
 
@@ -447,7 +447,7 @@ Nothing.
 to that block.
 
 ----------
-#### GCNListUnRelocateList
+### GCNListUnRelocateList
 Unrelocate a particular GCN list. This routine is called by 
 **GCNListUnRelocateBlock**; applications should call that routine instead.
 
@@ -467,7 +467,7 @@ Nothing.
 to that block.
 
 ----------
-#### GenControlOutputActionRegs
+### GenControlOutputActionRegs
 This utility routine calls MSG_GEN_OUTPUT_ACTION. This is used when a 
 controller needs to send out an action. This handles GenAttrs such as 
 GA_SIGNAL_INTERACTION_COMPLETE, GA_INITIATES_BUSY_STATE, and 
@@ -491,7 +491,7 @@ Nothing.
 **Library:** gCtrlC.def
 
 ----------
-#### GenControlOutputActionStack
+### GenControlOutputActionStack
 Utility routine to call MSG_GEN_OUTPUT_ACTION. This is used when a 
 controller needs to send out an action. This handles GenAttrs such as 
 GA_SIGNAL_INTERACTION_COMPLETE, GA_INITIATES_BUSY_STATE and 
@@ -513,7 +513,7 @@ Nothing.
 **Library:** gCtrlC.def
 
 ----------
-#### GenControlSendToOutputRegs
+### GenControlSendToOutputRegs
 Utility routine to send a message to the output of a controller. This message 
 may take arguments passed in via registers.
 
@@ -532,7 +532,7 @@ Nothing.
 **Library:** ui
 
 ----------
-#### GenControlSendToOutputStack
+### GenControlSendToOutputStack
 Utility routine to send a message to the output of a controller. This message 
 may take arguments passed via the stack.
 
@@ -552,7 +552,7 @@ Nothing.
 **Library:** gCtrlC.def
 
 ----------
-#### GenItemSendMsg
+### GenItemSendMsg
 This utility routine sends a message to a GenItemGroup's destination, with 
 the usual arguments.
 
@@ -572,7 +572,7 @@ Nothing.
 **Library:** gItemGC.def
 
 ----------
-#### GenPathConstructFullObjectPath
+### GenPathConstructFullObjectPath
 This utility routine constructs a full path from the object's path stored under 
 the passed vardata type.
 
@@ -605,7 +605,7 @@ ax, dx, bp.
 **Library:**    genC.def
 
 ----------
-#### GenPathGetObjectPath
+### GenPathGetObjectPath
 
 This utility scans the requested variable data field and fetches the path 
 stored in that field.
@@ -639,7 +639,7 @@ bx, dx.
 invalidating stored segment pointers to them.
 
 ----------
-#### GenPathSetCurrentPathFromObjectPath
+### GenPathSetCurrentPathFromObjectPath
 
 This utility routine sets the thread's current path to the value stored in a 
 GenFilePath in the object's vardata.
@@ -660,7 +660,7 @@ ax.
 **Library:**genC.def
 
 ----------
-#### GenPathSetObjectPath
+### GenPathSetObjectPath
 This utility routine changes the path stored in the indicated vardata entry to 
 match that passed.
 
@@ -687,7 +687,7 @@ bx, cx, dx.
 invalidating stored segment pointers to them.
 
 ----------
-#### GenPathUnrelocObjectPath
+### GenPathUnrelocObjectPath
 This utility routine changes the path stored in the indicated vardata entry to 
 match that passed.
 
@@ -710,7 +710,7 @@ Nothing.
 **Library:** genC.def
 
 ----------
-#### GenRelocMonikerList
+### GenRelocMonikerList
 This utility routine sends a message to a GenItemGroup's destination, with 
 the usual arguments. You can think of this routine as the equivalent of a 
 MSG_GEN_RELOC_MONIKER_LIST.
@@ -738,7 +738,7 @@ Nothing.
 **Library:** genC.def
 
 ----------
-#### GenReturnTrackingArgs
+### GenReturnTrackingArgs
 This utility routine sends the track scrolling information structure back to 
 the object which signalled the scroll event.
 
@@ -760,7 +760,7 @@ Nothing.
 and invalidating stored segment pointers to them.
 
 ----------
-#### GenSetupTrackingArgs
+### GenSetupTrackingArgs
 This utility routine fills in extra data for track scrolling. Normally this 
 routine is only called by a view.
 
@@ -780,7 +780,7 @@ Nothing.
 and invalidating stored segment pointers to them.
 
 ----------
-#### GenValueSendMsg
+### GenValueSendMsg
 This utility routine sends a message to a GenValue's destination.
 
 **Pass:**  
@@ -797,7 +797,7 @@ ax, cx, dx, bp, di, si
 **Library:** gValueC.def
 
 ----------
-#### GenViewSendToLinksIfNeeded
+### GenViewSendToLinksIfNeeded
 This utility routine encapsulates the current message and sends it to the 
 GenView's linked views, if there are any.
 
@@ -820,7 +820,7 @@ ax, cx, dx, bp if message successfully sent.
 **Library:** gViewC.def
 
 ----------
-#### GenViewSetSimpleBounds
+### GenViewSetSimpleBounds
 This utility routine fills in extra data for track scrolling.
 
 **Pass:**  
@@ -837,7 +837,7 @@ ax, cx, dx, bp.
 **Library:** gViewC.def
 
 ----------
-#### GeodeAddReference
+### GeodeAddReference
 Artificially increase the reference count of the specified geode. This is useful 
 for geodes which want to make sure they determine when they exit, by 
 keeping the reference count artificially above zero.
@@ -854,7 +854,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeAllocQueue
+### GeodeAllocQueue
 Allocate an event queue.
 
 **Pass:**  
@@ -869,7 +869,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeDuplicateResource
+### GeodeDuplicateResource
 Load a resource from a geode's file into a new block of memory.
 
 **Pass:**  
@@ -884,7 +884,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### GeodeFind
+### GeodeFind
 Find a geode, given its name, and return its handle.
 
 **Pass:**  
@@ -907,7 +907,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeFindResource
+### GeodeFindResource
 Locate a particular resource in the geode's **.geo** file. Every geode is laid out 
 as follows:  
 1. GeodeFileHeader  
@@ -935,7 +935,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeFlushQueue
+### GeodeFlushQueue
 Flush all events in one queue to another queue, synchronously.
 
 **Pass:**  
@@ -959,7 +959,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeFreeDriver
+### GeodeFreeDriver
 Free a driver, given its geode handle. The driver should have been loaded 
 with **GeodeUseDriver**.
 
@@ -975,7 +975,7 @@ bx
 **Library:** driver.def
 
 ----------
-#### GeodeFreeLibrary
+### GeodeFreeLibrary
 Free a library, given its geode handle. The library should have been loaded 
 with **GeodeUseLibrary**.
 
@@ -991,7 +991,7 @@ bx
 **Library:** library.def
 
 ----------
-#### GeodeFreeQueue
+### GeodeFreeQueue
 Free an event queue.
 
 **Pass:**  
@@ -1006,7 +1006,7 @@ bx
 **Library:** geode.def
 
 ----------
-#### GeodeGetAppObject
+### GeodeGetAppObject
 Return the optr of the **GenApplicationClass** object for the specified 
 process.
 
@@ -1023,7 +1023,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeGetDefaultDriver
+### GeodeGetDefaultDriver
 Return the handle of the default driver for the indicated type.
 
 **Pass:**  
@@ -1039,7 +1039,7 @@ Nothing.
 **Library:** driver.def
 
 ----------
-#### GeodeGetDGroupDS
+### GeodeGetDGroupDS
 Return the address of the dgroup segment of the geode owning the memory 
 handle passed. The segment is put into **ds**.
 
@@ -1056,7 +1056,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### GeodeGetDGroupES
+### GeodeGetDGroupES
 Return the address of the dgroup segment of the geode owning the memory 
 handle passed. The segment is put into **es**.
 
@@ -1073,7 +1073,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### GeodeGetGeodeResourceHandle
+### GeodeGetGeodeResourceHandle
 Return the resource handle of the specified resource in the given geode.
 
 **Pass:**  
@@ -1089,7 +1089,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### GeodeGetInfo
+### GeodeGetInfo
 Return information about a particular geode.
 
 **Pass:**  
@@ -1139,7 +1139,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeGetProcessHandle
+### GeodeGetProcessHandle
 Return the geode handle of the current process.
 
 **Pass:**  
@@ -1154,7 +1154,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeGetResourceHandle
+### GeodeGetResourceHandle
 Return the resource handle of the specified resource identifier owned by the 
 current geode.
 
@@ -1170,7 +1170,7 @@ Nothing.
 **Library:** resource.def
 
 ----------
-#### GeodeGetUIData
+### GeodeGetUIData
 Return the UI data (a reserved word which should not be used by 
 applications) for the specified process.
 
@@ -1187,7 +1187,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeInfoDriver
+### GeodeInfoDriver
 Return a pointer to the specified driver's information block.
 
 **Pass:**  
@@ -1203,7 +1203,7 @@ Nothing.
 **Library:** driver.def
 
 ----------
-#### GeodeInfoQueue
+### GeodeInfoQueue
 Return information about a driver.
 
 **Pass:**  
@@ -1218,7 +1218,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeLoad
+### GeodeLoad
 Load a geode from the given file and execute it based on its type.
 
 **Pass:**  
@@ -1257,7 +1257,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodePrivAlloc
+### GeodePrivAlloc
 Allocates a string of contiguous words in the geode's private data area.
 
 **Pass:**  
@@ -1273,7 +1273,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodePrivFree
+### GeodePrivFree
 Frees a group of contiguous words from the geode's private data area.
 
 **Pass:**  
@@ -1290,7 +1290,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodePrivRead
+### GeodePrivRead
 Reads a number of words from the geode's private data area, copying them 
 into a passed buffer.
 
@@ -1312,7 +1312,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodePrivWrite
+### GeodePrivWrite
 Writes a number of words into the specified geode's private data area.
 
 **Pass:**  
@@ -1331,7 +1331,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeRemoveReference
+### GeodeRemoveReference
 
 Remove an extra reference to the specified geode, decrementing its reference 
 count. If the reference count drops to zero, the geode will be removed from 
@@ -1351,7 +1351,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeSetDefaultDriver
+### GeodeSetDefaultDriver
 Sets the specified driver to be the default driver for the passed type.
 
 **Pass:**  
@@ -1368,7 +1368,7 @@ ax
 **Library:** driver.def
 
 ----------
-#### GeodeSetUIData
+### GeodeSetUIData
 Set the word of UI data for the specified process. This data is opaque to 
 applications and should not be used nor set by them.
 
@@ -1385,7 +1385,7 @@ Nothing.
 **Library:** geode.def
 
 ----------
-#### GeodeUseDriver
+### GeodeUseDriver
 Dynamically loads a driver given its file name.
 
 **Pass:**  
@@ -1405,7 +1405,7 @@ ax
 **Library:** driver.def
 
 ----------
-#### GeodeUseLibrary
+### GeodeUseLibrary
 Dynamically use the given library. If it is not already loaded, find it on the 
 disk and load it. If it is loaded, simply increment its reference count and 
 create an additional core block for it.
@@ -1429,7 +1429,7 @@ Nothing
 **Library:** library.def
 
 ----------
-#### GrApplyRotation
+### GrApplyRotation
 Apply a rotation to the transformation matrix for a GState, then mark the 
 current transformation as invalid. The effects are cumulative to previous 
 transformations.
@@ -1450,7 +1450,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrApplyScale
+### GrApplyScale
 Apply a scale factor to a GState's transformation matrix, then mark the 
 current transformation as invalid. The effects are cumulative to previous 
 transformations.
@@ -1471,7 +1471,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrApplyTransform
+### GrApplyTransform
 Apply a full transformation to the GState's transformation matrix, then 
 mark the current transformation as invalid. The effects are cumulative to 
 previous transformations. This routine requires advanced matrix 
@@ -1498,7 +1498,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrApplyTranslation
+### GrApplyTranslation
 Apply a translation to the passed GState's transformation matrix, then mark 
 the current transformation as invalid if necessary. The effects are cumulative 
 to previous transformations.
@@ -1519,7 +1519,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrApplyTranslationDWord
+### GrApplyTranslationDWord
 Apply a 32-bit extended translation to the GState's transformation matrix, 
 then mark the current transformation as invalid, if necessary. The effects are 
 cumulative to previous transformations.
@@ -1540,7 +1540,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrBeginPath
+### GrBeginPath
 Start a new graphics path definition, or alter the existing current path. All 
 graphics operations operated after this routine until **GrEndPath** become 
 part of the path.
@@ -1560,7 +1560,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrBeginUpdate
+### GrBeginUpdate
 Begin an update of an exposed, visible region. This routine is called by 
 applications upon receipt of MSG_META_EXPOSED. Drawing to the GState 
 passed to this routine will be clipped to the exposed region. After drawing is 
@@ -1581,7 +1581,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### GrBitBlt
+### GrBitBlt
 Transfer a bit-boundary block of pixels between two locations in the video 
 memory. This can be used to shove a block of pixels quickly to give the 
 impression of motion on the screen.
@@ -1610,7 +1610,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrBrushPolyline
+### GrBrushPolyline
 Brushes a connected polyline with the passed brush characteristics.
 
 **Pass:**  
@@ -1629,7 +1629,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrCharMetrics
+### GrCharMetrics
 Return the metrics for a single character, given its value and the information 
 to return.
 
@@ -1652,7 +1652,7 @@ Nothing.
 **Library:** font.def
 
 ----------
-#### GrCharWidth
+### GrCharWidth
 Return the width of a single character, given a GState and the character.
 
 **Pass:**  
@@ -1671,7 +1671,7 @@ Nothing.
 attributes-it simply returns the character's width.
 
 ----------
-#### GrCheckFontAvail
+### GrCheckFontAvail
 Check if the named font exists and return its ID if it does.
 
 **Pass:**  
@@ -1693,7 +1693,7 @@ Nothing.
 Otherwise a fatal error will result.
 
 ----------
-#### GrClearBitmap
+### GrClearBitmap
 Clear out the contents of the bitmap associated with the given GState. The 
 parts of the bitmap actually cleared (set to white) will depend on the bitmap's 
 mode. For the normal mode, the data part of the bitmap is cleared while the 
@@ -1714,7 +1714,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrCloseSubPath
+### GrCloseSubPath
 Geometrically closes the currently open path. This does not end the path 
 definition - you still must call **GrEndPath**.
 
@@ -1730,7 +1730,7 @@ Nothing.
 **Library:**    graphics.def
 
 ----------
-#### GrComment
+### GrComment
 Write a comment into a graphics string.
 
 **Pass:**  
@@ -1747,7 +1747,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrCompactBitmap
+### GrCompactBitmap
 Compact a bitmap stored in a huge array.
 
 **Pass:**  
@@ -1766,7 +1766,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrCopyGString
+### GrCopyGString
 Copy a graphics string from one GString to another.
 
 **Pass:**  
@@ -1797,7 +1797,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrCreateBitmap
+### GrCreateBitmap
 Allocate memory for a bitmap and associate the memory with a window.
 
 **Pass:**  
@@ -1820,7 +1820,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrCreateGString
+### GrCreateGString
 Open a graphics string and begin redirecting graphics commands to the 
 GString.
 
@@ -1843,7 +1843,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrCreatePalette
+### GrCreatePalette
 Create a color mapping table and associate it with the current window (the 
 window associated with the passed GState). Initialize the table to the default 
 values for the device's palette.
@@ -1860,7 +1860,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrCreateState
+### GrCreateState
 
 Create graphics state block containing a default GState associated with the 
 passed window. This routine is typically used to create a GState for drawing 
@@ -1881,7 +1881,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDeleteGStringElement
+### GrDeleteGStringElement
 Delete a range of GString elements from the specified GString.
 
 **Pass:**  
@@ -1898,7 +1898,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrDestroyBitmap
+### GrDestroyBitmap
 Free the bitmap associated with the given GState and disassociate it from 
 the window.
 
@@ -1918,7 +1918,7 @@ di
 **Library:** graphics.def
 
 ----------
-#### GrDestroyGString
+### GrDestroyGString
 Destroy the specified GString, either removing the GState from the data, or 
 freeing both GState and GString data. You may ask that an additional 
 GState be destroyed as well.
@@ -1940,7 +1940,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrDestroyPalette
+### GrDestroyPalette
 Free the current window's custom palette, if any.
 
 **Pass:**  
@@ -1955,7 +1955,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDestroyState
+### GrDestroyState
 Destroy a GState block and the GState handle. Typically called in 
 MSG_META_EXPOSED after drawing is finished. The GState is normally 
 created with **GrCreateState**.
@@ -1972,7 +1972,7 @@ di
 **Library:** graphics.def
 
 ----------
-#### GrDrawArc
+### GrDrawArc
 Draws an arc along the ellipse specified by a bounding box, a starting angle, 
 and an ending angle.
 
@@ -1991,7 +1991,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawArc3Point
+### GrDrawArc3Point
 Draw a circular arc specified by three points along the arc: both endpoints 
 and any other point on the arc.
 
@@ -2010,7 +2010,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawArc3PointTo
+### GrDrawArc3PointTo
 Draw a circular arc, given two points along the arc and using the current pen 
 position as the first endpoint. The other two points are the other endpoint 
 and any other point on the arc.
@@ -2028,7 +2028,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawBitmap
+### GrDrawBitmap
 Draw a bitmap at the coordinates passed. This routine will call a callback 
 routine that is expected to take a pointer to a slice of bitmap and return the 
 next slice. In most cases, the callback will be supplied by the kernel.
@@ -2058,7 +2058,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawBitmapAtCP
+### GrDrawBitmapAtCP
 Draw a bitmap at the current pen position. This routine will call a callback 
 routine that is expected to take a pointer to a slice of bitmap and return the 
 next slice. In most cases, the callback will be supplied by the kernel.
@@ -2088,7 +2088,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawChar
+### GrDrawChar
 Draw a given character at the specified position with the current text 
 drawing state.
 
@@ -2108,7 +2108,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawCharAtCP
+### GrDrawCharAtCP
 Draw a given character at the current pen position using the current text 
 drawing state.
 
@@ -2126,7 +2126,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawCurve
+### GrDrawCurve
 Draw a bezier curve specified by four points.
 
 ![image info](ASMRefFigures/9drawcurve.png)
@@ -2149,7 +2149,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawCurveTo
+### GrDrawCurveTo
 Draw a bezier curve beginning with the current pen position.
 
 **Pass:**  
@@ -2169,7 +2169,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawEllipse
+### GrDrawEllipse
 Draw a framed ellipse bounded by the passed rectangle.
 
 ![image info](ASMRefFigures/10drawellipse.png)
@@ -2189,7 +2189,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawGString
+### GrDrawGString
 Draw the passed GString at the given coordinates.
 
 **Pass:**  
@@ -2220,7 +2220,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrDrawGStringAtCP
+### GrDrawGStringAtCP
 Draw the passed GString at the current pen position.
 
 **Pass:**  
@@ -2251,7 +2251,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrDrawHLine
+### GrDrawHLine
 Draw a horizontal line.
 
 **Pass:**  
@@ -2269,7 +2269,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawHLineTo
+### GrDrawHLineTo
 Draw a horizontal line using the current pen position as the starting point.
 
 **Pass:**  
@@ -2285,7 +2285,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawHugeBitmap
+### GrDrawHugeBitmap
 Draw a bitmap residing in a HugeArray at the coordinates passed.
 
 **Pass:**  
@@ -2303,7 +2303,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawHugeBitmapAtCP
+### GrDrawHugeBitmapAtCP
 Draw a bitmap residing in a HugeArray at the current pen position.
 
 **Pass:**  
@@ -2320,7 +2320,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawHugeImage
+### GrDrawHugeImage
 Draw a bitmap at the passed position. The bitmap must reside in a 
 HugeArray, and the image may be drawn with a square block of video pixels 
 representing each bitmap pixel (i.e. a "magnified view").
@@ -2352,7 +2352,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawImage
+### GrDrawImage
 Draw a bitmap at the passed position. The bitmap may be drawn with a 
 square block of video pixels representing each bitmap pixel (i.e. a "magnified 
 view"). If the bitmap is in a HugeArray, you should use 
@@ -2385,7 +2385,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawLine
+### GrDrawLine
 Draw a line, given the two endpoints.
 
 **Pass:**  
@@ -2402,7 +2402,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawLineTo
+### GrDrawLineTo
 Draw a straight line from the pen position to the passed endpoint.
 
 **Pass:**  
@@ -2418,7 +2418,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawPath
+### GrDrawPath
 Draws the passed GState's path with the current line attributes.
 
 **Pass:**  
@@ -2434,7 +2434,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawPoint
+### GrDrawPoint
 Draw a single document pixel at the passed coordinates.
 
 **Pass:**  
@@ -2450,7 +2450,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawPointAtCP
+### GrDrawPointAtCP
 Draws a single document pixel at the current pen position.
 
 **Pass:**  
@@ -2465,7 +2465,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawPolygon
+### GrDrawPolygon
 Draws the passed connected polygon.
 
 **Pass:**  
@@ -2482,7 +2482,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawPolyline
+### GrDrawPolyline
 Draws a polyline using the passed GState's line attributes. To use special 
 "brush" attributes, call **GrBrushPolyline**.
 
@@ -2500,7 +2500,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRect
+### GrDrawRect
 Draw a rectangle defined by the two corner points. To fill the rectangle, call 
 **GrFillRect**.
 
@@ -2518,7 +2518,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRectTo
+### GrDrawRectTo
 Draw a rectangle defined by one corner point and the current pen position.
 
 **Pass:**  
@@ -2534,7 +2534,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRegion
+### GrDrawRegion
 Draw a region.
 
 **Pass:**  
@@ -2553,7 +2553,7 @@ Nothing.
 **Library:** graphics.def.
 
 ----------
-#### GrDrawRegionAtCP
+### GrDrawRegionAtCP
 Draw a region at the current pen position.
 
 **Pass:**  
@@ -2571,7 +2571,7 @@ Nothing.
 **Library:** graphics.def.
 
 ----------
-#### GrDrawRelArc3PointTo
+### GrDrawRelArc3PointTo
 Draw a circular arc relative to the current pen position, given two additional 
 points: the other endpoint, and any other point on the arc. Both of the 
 additional points are given in offsets from (relative to) the pen position.
@@ -2591,7 +2591,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRelCurveTo
+### GrDrawRelCurveTo
 Draw a bezier curve using the current pen position as the first endpoint. All 
 other points in the curve are defined by offsets from (relative to) the current 
 pen position. See **GrDrawCurve** for a diagram of a bezier curve.
@@ -2614,7 +2614,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRelLineTo
+### GrDrawRelLineTo
 Draw a line from the current pen position to the point defined by the passed 
 displacements.
 
@@ -2632,7 +2632,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRoundRect
+### GrDrawRoundRect
 Draw a rectangle with rounded corners.
 
 ![image info](ASMRefFigures/11drawroundrect.png)
@@ -2652,7 +2652,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawRoundRectTo
+### GrDrawRoundRectTo
 Draw a rounded rectangle at the current pen position.
 
 **Pass:**  
@@ -2669,7 +2669,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawSpline
+### GrDrawSpline
 Draw a collection of bezier curves defined by the passed array of Points.
 
 **Pass:**  
@@ -2687,7 +2687,7 @@ Nothing.
 **Library:** - graphics.def
 
 ----------
-#### GrDrawSplineTo
+### GrDrawSplineTo
 Draw a collection of bezier curves defined by the passed array of Points and 
 having its first anchor point at the current pen position.
 
@@ -2707,7 +2707,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawText
+### GrDrawText
 Draw a string at the given position with the current text drawing 
 characteristics (defined by the GState).
 
@@ -2727,7 +2727,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawTextAtCP
+### GrDrawTextAtCP
 Draw a string at the current pen position with the current text drawing 
 characteristics (defined by the GState).
 
@@ -2746,7 +2746,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawTextField
+### GrDrawTextField
 This routine draws a text field.
 
 **Pass:**  
@@ -2774,7 +2774,7 @@ ds:si - Pointer to text at offset
 **Library:**    graphics.def
 
 ----------
-#### GrDrawVLine
+### GrDrawVLine
 Draw a vertical line.
 
 **Pass:**  
@@ -2791,7 +2791,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrDrawVLineTo
+### GrDrawVLineTo
 Draw a vertical line beginning at the current pen position.
 
 **Pass:**  
@@ -2807,7 +2807,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrEditBitmap
+### GrEditBitmap
 Associate a previously created bitmap with a window and a GState to allow 
 the caller to edit the bitmap.
 
@@ -2826,7 +2826,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrEditGString
+### GrEditGString
 Set a specified graphics string into editing mode.
 
 **Pass:**  
@@ -2844,7 +2844,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrEndGString
+### GrEndGString
 End a definition of a GString. This is the complement to **GrBeginString**.
 
 **Pass:**  
@@ -2861,7 +2861,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrEndPath
+### GrEndPath
 Ends the definition of the current path. This is the complement to 
 **GrBeginPath**.
 
@@ -2877,7 +2877,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrEndUpdate
+### GrEndUpdate
 Unlock a window from a visual update begun with **GrBeginUpdate**.
 
 **Pass:**  
@@ -2892,7 +2892,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### GrEnumFonts
+### GrEnumFonts
 Generate a list of font names of the available fonts. Return the number of 
 matching fonts; the names are returned in a passed buffer.
 
@@ -2922,7 +2922,7 @@ Nothing.
 **Library:** font.def
 
 ----------
-#### GrEscape
+### GrEscape
 Write an "escape" element to a graphics string. This call is meaningful only 
 between calls to **GrBeginGString** and **GrEndGString**. The element, in 
 full, will have the following structure:
@@ -2948,7 +2948,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrFillArc
+### GrFillArc
 Draws an arc as in **GrDrawArc** and fills it like a pie wedge. The arc is 
 defined by an ellipse in a bounding box and two angles that intersect the 
 ellipse (see **GrDrawArc**).
@@ -2971,7 +2971,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillArc3Point
+### GrFillArc3Point
 Fill a circular arc defined by three points: two endpoints and any other point 
 along the arc. The filled portion will be the pie wedge defined by the arc.
 
@@ -2988,7 +2988,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillArc3PointTo
+### GrFillArc3PointTo
 Fill a circular arc defined by the current pen position (as the first endpoint) 
 and two other points: the opposite endpoint and any other point along the 
 arc. The filled portion will be the pie wedge defined by the arc.
@@ -3006,7 +3006,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillBitmap
+### GrFillBitmap
 
 Draw the given bitmap as if it were a mask, filling it with the current area 
 color.
@@ -3037,7 +3037,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillBitmapAtCP
+### GrFillBitmapAtCP
 Draw the given bitmap as if it were a mask, filling it with the current area 
 color. The bitmap will be drawn at the current pen position.
 
@@ -3066,7 +3066,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillEllipse
+### GrFillEllipse
 Draws a filled ellipse bounded by the passed rectangle.
 
 **Pass:**  
@@ -3083,7 +3083,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillHugeBitmap
+### GrFillHugeBitmap
 Treat a monochrome bitmap as a mask, filling it with the current area color. 
 The bitmap should be stored in a huge array.
 
@@ -3102,7 +3102,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillHugeBitmapAtCP
+### GrFillHugeBitmapAtCP
 Treat a monochrome bitmap as a mask, filling it with the current area color. 
 The bitmap should be stored in a huge array.
 
@@ -3121,7 +3121,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillPath
+### GrFillPath
 Draws a filled representation of the passed GState's current path, using the 
 supplied fill rule and current GState area attributes.
 
@@ -3138,7 +3138,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillPolygon
+### GrFillPolygon
 Draw a filled polygon.
 
 **Pass:**  
@@ -3156,7 +3156,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillRect
+### GrFillRect
 Fill the rectangle defined by the two passed points.
 
 **Pass:**  
@@ -3173,7 +3173,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillRectTo
+### GrFillRectTo
 Fill the rectangle defined by the current pen position and the passed point.
 
 **Pass:**  
@@ -3189,7 +3189,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillRoundRect
+### GrFillRoundRect
 Fill the rounded rectangle defined by the parameters.
 
 **Pass:**  
@@ -3207,7 +3207,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFillRoundRectTo
+### GrFillRoundRectTo
 Fill the rounded rectangle defined by the current pen position and the 
 parameters.
 
@@ -3225,7 +3225,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrFontMetrics
+### GrFontMetrics
 Return metrics information about the given GState's current font.
 
 **Pass:**  
@@ -3244,7 +3244,7 @@ Nothing.
 **Library:** font.def
 
 ----------
-#### GrGetAreaColor
+### GrGetAreaColor
 Return the area color set for the given GState.
 
 **Pass:**  
@@ -3261,7 +3261,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetAreaColorMap
+### GrGetAreaColorMap
 Return the area color map of the given GState.
 
 **Pass:**  
@@ -3276,7 +3276,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetAreaMask
+### GrGetAreaMask
 Return the area mask type of the passed GState.
 
 **Pass:**  
@@ -3297,7 +3297,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetAreaPattern
+### GrGetAreaPattern
 Return the fill pattern for the passed GState.
 
 **Pass:**  
@@ -3316,7 +3316,7 @@ Depending on return values, **ah**.
 **Library:**    graphics.def
 
 ----------
-#### GrGetBitmap
+### GrGetBitmap
 Copy a bitmap from the screen to a memory block.
 
 **Pass:**  
@@ -3341,7 +3341,7 @@ from the screen to memory. It is therefore useful for screen dumps but not
 necessarily useful for applications.
 
 ----------
-#### GrGetBitmapMode
+### GrGetBitmapMode
 Return the mode information for the editable bitmap owned by the passed 
 GState.
 
@@ -3363,7 +3363,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetBitmapRes
+### GrGetBitmapRes
 Return the resolution of the bitmap owned by the passed GState.
 
 **Pass:**  
@@ -3379,7 +3379,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetBitmapSize
+### GrGetBitmapSize
 Return the size of the bitmap owned by the passed GState.
 
 **Pass:**  
@@ -3395,7 +3395,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetClipRegion
+### GrGetClipRegion
 Return the region corresponding to the clip paths of the passed GState. The 
 region is in device coordinates; the first four words are its bounds.
 
@@ -3414,7 +3414,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetCurPos
+### GrGetCurPos
 Return the current drawing position for the passed GState.
 
 **Pass:**  
@@ -3430,7 +3430,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetCurPosWWFixed
+### GrGetCurPosWWFixed
 Return the current drawing position for the passed GState. The answer 
 returned is rather precise, with one word of fraction information for both the 
 *x* and *y* coordinates.
@@ -3448,7 +3448,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetDefFontID
+### GrGetDefFontID
 Return the default fond ID and point size as defined in the GEOS.INI file. Also 
 return the font data block.
 
@@ -3466,7 +3466,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetExclusive
+### GrGetExclusive
 Check to see if any GState has exclusive drawing rights to the screen.
 
 **Pass:**  
@@ -3483,7 +3483,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetFont
+### GrGetFont
 Return the current font's font ID and point size as set in the passed GState.
 
 **Pass:**  
@@ -3500,7 +3500,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetFontName
+### GrGetFontName
 Return the name string of a specified font.
 
 **Pass:**  
@@ -3522,7 +3522,7 @@ Nothing.
 **Library:** font.def
 
 ----------
-#### GrGetFontWeight
+### GrGetFontWeight
 Return the weight of the current font as set in the passed GState.
 
 **Pass:**  
@@ -3537,7 +3537,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetFontWidth
+### GrGetFontWidth
 Return the width of the current font as set in the passed GState.
 
 **Pass:**  
@@ -3552,7 +3552,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetGStringBounds
+### GrGetGStringBounds
 Return the coordinate bounds of a graphics string drawn at the current pen 
 position.
 
@@ -3576,7 +3576,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrGetGStringBoundsDWord
+### GrGetGStringBoundsDWord
 Get coordinate bounds of a graphics string.
 
 **Pass:**  
@@ -3594,7 +3594,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrGetGStringElement
+### GrGetGStringElement
 Extract and return an element from a graphics string.
 
 **Pass:**  
@@ -3614,7 +3614,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrGetGStringHandle
+### GrGetGStringHandle
 Return the handle of the graphics string associated with the passed GState.
 
 **Pass:**  
@@ -3629,7 +3629,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetHugeBitmapSize
+### GrGetHugeBitmapSize
 Return the size in points of the bitmap.
 
 **Pass:**  
@@ -3644,7 +3644,7 @@ Nothing.
 **Library:** graphics.def
     
 ----------
-#### GrGetInfo
+### GrGetInfo
 Return information about the GState as requested.
 
 **Pass:**  
@@ -3666,7 +3666,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineColor
+### GrGetLineColor
 Return the line drawing color set for the passed GState.
 
 **Pass:**  
@@ -3683,7 +3683,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineColorMap
+### GrGetLineColorMap
 Return the line color mapping information for the specified GState.
 
 **Pass:**  
@@ -3699,7 +3699,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineEnd
+### GrGetLineEnd
 Return the line end type set for the passed GState.
 
 **Pass:**  
@@ -3715,7 +3715,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineJoin
+### GrGetLineJoin
 Return the line join type set for the passed GState.
 
 **Pass:**  
@@ -3731,7 +3731,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineMask
+### GrGetLineMask
 Return information about the line mask set for the passed GState.
 
 **Pass:**  
@@ -3752,7 +3752,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineStyle
+### GrGetLineStyle
 Return the line style type (dash pattern) set for the passed GState.
 
 **Pass:**  
@@ -3769,7 +3769,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetLineWidth
+### GrGetLineWidth
 Return the line width set for the passed GState.
 
 **Pass:**  
@@ -3784,7 +3784,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetMaskBounds
+### GrGetMaskBounds
 Return the 16-bit bounds of the current clipping rectangle for the passed 
 GState.
 
@@ -3806,7 +3806,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetMaskBoundsDWord
+### GrGetMaskBoundsDWord
 Return the 32-bit bounds of the current clipping rectangle for the passed 
 GState.
 
@@ -3825,7 +3825,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetMiterLimit
+### GrGetMiterLimit
 Return the miter limit set for the passed GState. The miter limit is the 
 smallest angle that can be drawn with a miter join; smaller angles must be 
 drawn with a beveled join.
@@ -3842,7 +3842,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetMixMode
+### GrGetMixMode
 Return the mix mode set for the passed GState.
 
 **Pass:**  
@@ -3858,7 +3858,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetPalette
+### GrGetPalette
 Return the palette definition set for the passed GState.
 
 **Pass:**  
@@ -3877,7 +3877,7 @@ dx.
 **Library:** graphics.def
 
 ----------
-#### GrGetPath
+### GrGetPath
 Return the GString data defining the current path of the passed GState.
 
 **Pass:**  
@@ -3900,7 +3900,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetPathBounds
+### GrGetPathBounds
 Return the smallest rectangle that can encompass the path set in the passed 
 GState, as it would be filled.
 
@@ -3922,7 +3922,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetPathBoundsDWord
+### GrGetPathBoundsDWord
 Returns the rectangular bounds that encompass the current path (as it 
 would be filled)
 
@@ -3942,7 +3942,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetPathRegion
+### GrGetPathRegion
 Return the region defined by the path in the passed GState. The region is 
 expressed in terms of device coordinates; the first four words of the returned 
 region are its bounds.
@@ -3964,7 +3964,7 @@ Nothing.
 **Warning:** The returned bounds are in device coordinates, not document coordinates.
 
 ----------
-#### GrGetPoint
+### GrGetPoint
 Return the color of a single document pixel.
 
 **Pass:**  
@@ -3983,7 +3983,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetSubscriptAttr
+### GrGetSubscriptAttr
 Return the subscript attributes used by the passed GState.
 
 **Pass:**  
@@ -4000,7 +4000,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetSuperscriptAttr
+### GrGetSuperscriptAttr
 Return the superscript attributes used by the passed GState.
 
 **Pass:**  
@@ -4017,7 +4017,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextBounds
+### GrGetTextBounds
 Return the bounds of the smallest rectangle that can enclose the given text 
 string using the passed GState's text attributes.
 
@@ -4041,7 +4041,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextColor
+### GrGetTextColor
 Return the text color set in the passed GState.
 
 **Pass:**  
@@ -4058,7 +4058,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextColorMap
+### GrGetTextColorMap
 Return the color map used by the given GState when drawing text.
 
 **Pass:**  
@@ -4074,7 +4074,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextDrawOffset
+### GrGetTextDrawOffset
 Return the number of characters to be drawn at the end of a string.
 
 **Pass:**  
@@ -4090,7 +4090,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextMask
+### GrGetTextMask
 Return information about the given GState's text drawing mask.
 
 **Pass:**  
@@ -4113,7 +4113,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextMode
+### GrGetTextMode
 Return the text mode used by the passed GState.
 
 **Pass:**  
@@ -4128,7 +4128,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextPattern
+### GrGetTextPattern
 Return the text fill pattern set for the passed GState.
 
 **Pass:**  
@@ -4150,7 +4150,7 @@ Nothing. Possibly **ah**; see return values.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextSpacePad
+### GrGetTextSpacePad
 Return the given GState's space padding setting. This determines the 
 amount to pad spaces when drawing text.
 
@@ -4167,7 +4167,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTextStyle
+### GrGetTextStyle
 Return the text style set in the passed GState.
 
 **Pass:**  
@@ -4182,7 +4182,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTrackKern
+### GrGetTrackKern
 Return the degree of track kerning used by the passed GState.
 
 **Pass:**  
@@ -4197,7 +4197,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetTransform
+### GrGetTransform
 Return the transformation matrix set for the passed GState.
 
 **Pass:**  
@@ -4220,7 +4220,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetWinBounds
+### GrGetWinBounds
 Return the bounds of the current window's region, in document coordinates. 
 The window is specified by the passed GState.
 
@@ -4242,7 +4242,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetWinBoundsDWord
+### GrGetWinBoundsDWord
 Return the bounds of the current window's region, in document coordinates. 
 These coordinates are 32-bit values for extended transformations. If one of 
 the window's transformation matrixes contains a rotation, the returned 
@@ -4263,7 +4263,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGetWinHandle
+### GrGetWinHandle
 Return the window handle of the window associated with the passed GState.
 
 **Pass:**  
@@ -4278,7 +4278,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrGrabExclusive
+### GrGrabExclusive
 Grab the video driver's exclusive access in order to begin drawing directly to 
 the video driver. It is very rare that applications will ever need this.
 
@@ -4295,7 +4295,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrInitDefaultTransform
+### GrInitDefaultTransform
 Replace the default transformation matrix with the passed GState's current 
 transformation matrix. This routine should be used only with great care; it 
 will be called by applications only in the absolute rarest of situations.
@@ -4314,7 +4314,7 @@ Nothing.
 **Warning:** This routine should almost never be used by applications.
 
 ----------
-#### GrInvalRect
+### GrInvalRect
 Invalidate a portion of the window associated with the passed GState. The 
 rectangle passed will be added to the window's update region. If the rectangle 
 is rotated, the region will be built out before being added to the window's 
@@ -4336,7 +4336,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrInvalRectDWord
+### GrInvalRectDWord
 Invalidate a portion of the window associated with the passed GState. This 
 routine is like **GrInvalRect** except that it uses 32-bit coordinates rather than 
 16-bit coordinates.
@@ -4355,7 +4355,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrLabel
+### GrLabel
 Write a label element to a graphics string. This routine writes out three bytes 
 to the graphics string; the first byte is a GR_LABEL opcode, and the second 
 and third bytes are the label passed in ax.
@@ -4373,7 +4373,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrLoadGString
+### GrLoadGString
 Load a graphics string from a file, a stream, or a locked block. Allocate new 
 memory for the loaded graphics stream, returning the handle of the new 
 block. (This routine does not actually copy the entire string into the new 
@@ -4399,7 +4399,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrMapColorIndex
+### GrMapColorIndex
 Map a color index to its RGB equivalent.
 
 **Pass:**  
@@ -4418,7 +4418,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrMapColorRGB
+### GrMapColorRGB
 Map an RGB color to its palette index.
 
 **Pass:**  
@@ -4440,7 +4440,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrMoveReg
+### GrMoveReg
 Move a region by a given amount both horizontally and vertically.
 
 **Pass:**  
@@ -4457,7 +4457,7 @@ ax
 **Library:** graphics.def
 
 ----------
-#### GrMoveTo
+### GrMoveTo
 Set the current pen position for the passed GState.
 
 **Pass:**  
@@ -4474,7 +4474,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrMulDWFixed
+### GrMulDWFixed
 Multiply two 48-bit signed numbers, where each integer is a DWFixed 
 structure.
 
@@ -4495,7 +4495,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrMulDWFixedPtr
+### GrMulDWFixedPtr
 Multiply two 48-bit signed numbers, where each integer is a **DWFixed** 
 structure. The parameters are passed in two buffers, unlike 
 **GrMulDWFixed**.
@@ -4515,7 +4515,7 @@ Nothing.
 **Library:**    graphics.def
 
 ----------
-#### GrMulWWFixed
+### GrMulWWFixed
 Multiply two 32-bit signed numbers of type **WWFixed**.
 
 **Pass:**  
@@ -4531,7 +4531,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrMulWWFixedPtr
+### GrMulWWFixedPtr
 Multiply two 32-bit signed numbers of type WWFixed, passed in two buffers.
 
 **Pass:**  
@@ -4547,7 +4547,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrNewPage
+### GrNewPage
 Execute a form feed for the GState or GString passed. When drawing to a 
 path, this routine is ignored. When writing to a graphics string, it stores a 
 GR_NEW_PAGE code. Otherwise, it invalidates the entire window 
@@ -4566,7 +4566,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrNullOp
+### GrNullOp
 Write a no-operation code to a graphics string.
 
 **Pass:**  
@@ -4581,7 +4581,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrParseGString
+### GrParseGString
 Parse a graphics string by invoking a callback routine on each desired 
 element.
 
@@ -4612,7 +4612,7 @@ Any. May *not* write into the block pointed to by **ds**.
 **Library:** gstring.def
 
 ----------
-#### GrPolarToCartesian
+### GrPolarToCartesian
 Convert a polar coordinate to its corresponding cartesian equivalents.
 
 **Pass:**  
@@ -4630,7 +4630,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrQuickArcSine
+### GrQuickArcSine
 Calculate an inverse sine. This routine returns the largest integral angle 
 with a sine less than the passed value.
 
@@ -4647,7 +4647,7 @@ ax, bx
 **Library:** graphics.def
 
 ----------
-#### GrQuickCosine
+### GrQuickCosine
 Calculate the cosine of an angle.
 
 **Pass:**  
@@ -4664,7 +4664,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrQuickSine
+### GrQuickSine
 Calculate the sine of an angle.
 
 **Pass:**  
@@ -4681,7 +4681,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrQuickTangent
+### GrQuickTangent
 Calculate the tangent of the passed angle.
 
 **Pass:**  
@@ -4696,7 +4696,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrReleaseExclusive
+### GrReleaseExclusive
 Release the exclusive grab made on a video driver with **GrGrabExclusive**.
 
 **Pass:**  
@@ -4712,7 +4712,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrRelMoveTo
+### GrRelMoveTo
 Set the current pen position of the passed GState. Sets the new position 
 relative to the current position; to set the position absolutely, use 
 **GrMoveTo**.
@@ -4731,7 +4731,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrRestoreState
+### GrRestoreState
 Restore the current GState from a GState previously saved with 
 **GrSaveState**.
 
@@ -4747,7 +4747,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrRestoreTransform
+### GrRestoreTransform
 Set the passed GState's transformation matrix to be the one previously saved 
 with **GrSaveTransform**.
 
@@ -4764,7 +4764,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSaveState
+### GrSaveState
 Save the current GState characteristics for later restoration with 
 **GrRestoreState**.
 
@@ -4780,7 +4780,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSaveTransform
+### GrSaveTransform
 Save the transformation matrix of the passed GState for later restoration 
 with **GrRestoreTransform**.
 
@@ -4796,7 +4796,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSDivDWFbyWWF
+### GrSDivDWFbyWWF
 Divide the **WWFixed** value into the **DWFixed** value. The result is a **DWFixed**. 
 This routine is optimized for size over speed.
 
@@ -4813,7 +4813,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSDivWWFixed
+### GrSDivWWFixed
 Divide a 32-bit **WWFixed** value by another 32-bit **WWFixed** value.
 
 **Pass:**  
@@ -4830,7 +4830,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetAreaAttr
+### GrSetAreaAttr
 Set all the area attributes of the given GState.
 
 **Pass:**  
@@ -4846,7 +4846,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetAreaColor
+### GrSetAreaColor
 Set the GState's current area drawing color.
 
 **Pass:**  
@@ -4865,7 +4865,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetAreaColorMap
+### GrSetAreaColorMap
 Set the GState's current area color mapping mode.
 
 **Pass:**  
@@ -4881,7 +4881,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetAreaMask
+### GrSetAreaMask
 Set the GState's current area drawing pattern.
 
 **Pass:**  
@@ -4902,7 +4902,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetAreaPattern
+### GrSetAreaPattern
 Set the GState's area fill pattern.
 
 **Pass:**  
@@ -4923,7 +4923,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetBitmapMode
+### GrSetBitmapMode
 Set the GState's mode bits for an editable bitmap.
 
 **Pass:**  
@@ -4945,7 +4945,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetBitmapRes
+### GrSetBitmapRes
 Set the resolution of the GState's bitmap.
 
 **Pass:**  
@@ -4962,7 +4962,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetClipPath
+### GrSetClipPath
 Set the GState's current clip path to be the clip path for all future graphics 
 operations on the GState. The path is affected only by the window's 
 transformation matrix.
@@ -4982,7 +4982,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetClipRect
+### GrSetClipRect
 Modify a window's clipping path by intersecting it with the specified 
 rectangle. The rectangle should be defined in the document coordinate space 
 of the passed GState; the rectangle will be transformed appropriately when 
@@ -5007,7 +5007,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetDefaultTransform
+### GrSetDefaultTransform
 Reset the GState's transformation matrix to be the same as the default 
 transformation matrix. In most cases, the default transformation matrix is 
 simply the identity matrix (no transformations); this is not true in all cases, 
@@ -5026,7 +5026,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetFont
+### GrSetFont
 Set the font used by the GState for all subsequent text drawing. If the desired 
 font is not available, then the default font is set instead.
 
@@ -5045,7 +5045,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetFontWeight
+### GrSetFontWeight
 Set the font weight used by the GState.
 
 **Pass:**  
@@ -5061,7 +5061,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetFontWidth
+### GrSetFontWidth
 Set the font width used by the GState.
 
 **Pass:**  
@@ -5077,7 +5077,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetGStringBounds
+### GrSetGStringBounds
 Store a GR_SET_GSTRING_BOUNDS opcode to a graphics string, along with 
 the bounds of the string.
 
@@ -5097,7 +5097,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrSetGStringPos
+### GrSetGStringPos
 Set the current drawing position of a graphics string.
 
 **Pass:**  
@@ -5120,7 +5120,7 @@ Nothing.
 **Library:** gstring.def
 
 ----------
-#### GrSetLineAttr
+### GrSetLineAttr
 Set all the line drawing attributes for the given GState.
 
 **Pass:**  
@@ -5136,7 +5136,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineColor
+### GrSetLineColor
 Set the current line drawing color for the GState.
 
 **Pass:**  
@@ -5155,7 +5155,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineColorMap
+### GrSetLineColorMap
 Set the GState's current line color mapping mode.
 
 **Pass:**  
@@ -5171,7 +5171,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineEnd
+### GrSetLineEnd
 Set the line end type for the passed GState.
 
 **Pass:**  
@@ -5188,7 +5188,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineJoin
+### GrSetLineJoin
 Set the line join type for the passed GState.
 
 **Pass:**  
@@ -5205,7 +5205,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineMask
+### GrSetLineMask
 Set the current line drawing mask for the passed GState.
 
 **Pass:**  
@@ -5226,7 +5226,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineStyle
+### GrSetLineStyle
 Set the current line drawing style (dash pattern) of the passed GState.
 
 **Pass:**  
@@ -5246,7 +5246,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetLineWidth
+### GrSetLineWidth
 Set the line drawing width of the passed GState.
 
 **Pass:**  
@@ -5262,7 +5262,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetMiterLimit
+### GrSetMiterLimit
 Set the miter limit for the passed GState. The miter limit is the smallest 
 angle that can be drawn with a miter join; smaller angles must be drawn 
 with a beveled join.
@@ -5280,7 +5280,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetMixMode
+### GrSetMixMode
 Set the drawing mix mode for the passed GState.
 
 **Pass:**  
@@ -5298,7 +5298,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetNullTransform
+### GrSetNullTransform
 Replace the GState's transformation matrix with the null (identity) 
 transformation matrix. This routine should not be substituted for 
 **GrSetDefaultTransform**, which reverts a transformation matrix to the 
@@ -5316,7 +5316,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetPalette
+### GrSetPalette
 Set one or more palette entries in the GState's color map.
 
 **Pass:**  
@@ -5334,7 +5334,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetPaletteEntry
+### GrSetPaletteEntry
 Set a single entry in the GState's palette.
 
 **Pass:**  
@@ -5353,7 +5353,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetPrivateData
+### GrSetPrivateData
 Set the private data for the given GState. This may be retrieved with 
 **GrGetInfo**; applications should not use the GState's private data, however.
 
@@ -5370,7 +5370,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetStrokePath
+### GrSetStrokePath
 Replace the GState's current path with the one defined as the stroked 
 representation of the current path.
 
@@ -5386,7 +5386,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetSubscriptAttr
+### GrSetSubscriptAttr
 Set the GState's subscript attributes.
 
 **Pass:**  
@@ -5403,7 +5403,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetSuperscriptAttr
+### GrSetSuperscriptAttr
 Set the GState's superscript attributes.
 
 **Pass:**  
@@ -5420,7 +5420,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextAttr
+### GrSetTextAttr
 Set all the GState's text drawing attributes.
 
 **Pass:**  
@@ -5436,7 +5436,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextColor
+### GrSetTextColor
 Set the current text drawing color for the GState.
 
 **Pass:**  
@@ -5455,7 +5455,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextColorMap
+### GrSetTextColorMap
 Set the GState's current text color mapping mode.
 
 **Pass:**  
@@ -5471,7 +5471,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextDrawOffset
+### GrSetTextDrawOffset
 Set the number of characters at the end of a string to draw. This operation is 
 never saved out to a graphics string.
 
@@ -5489,7 +5489,7 @@ Nothing.
 **Library:** text.def
 
 ----------
-#### GrSetTextMask
+### GrSetTextMask
 Set the current text drawing mask for the passed GState.
 
 **Pass:**  
@@ -5510,7 +5510,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextMode
+### GrSetTextMode
 Set the GState's current text drawing mode.
 
 **Pass:**  
@@ -5527,7 +5527,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextPattern
+### GrSetTextPattern
 Set the GState's text fill pattern.
 
 **Pass:**  
@@ -5548,7 +5548,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextSpacePad
+### GrSetTextSpacePad
 Set the amount to pad spaces when drawing text with **GrPutString**.
 
 **Pass:**  
@@ -5565,7 +5565,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTextStyle
+### GrSetTextStyle
 Set the GState's current text style.
 
 **Pass:**  
@@ -5584,7 +5584,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTrackKern
+### GrSetTrackKern
 Set the GState's track kerning.
 
 **Pass:**  
@@ -5600,7 +5600,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetTransform
+### GrSetTransform
 Replace the GState's current transformation matrix with another.
 
 **Pass:**  
@@ -5623,7 +5623,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetVMFile
+### GrSetVMFile
 Sets the VM file in the associated Window or GString, if any.
 
 This routine must be called is the VM file handle stored in the Window or 
@@ -5642,7 +5642,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetWinClipPath
+### GrSetWinClipPath
 Set the GState's current path to be the document clip path for all future 
 graphics operations. This path is affected by both the window and GState's 
 transformation matrixes.
@@ -5661,7 +5661,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSetWinClipRect
+### GrSetWinClipRect
 Modify a window's clipping path by intersecting it with the specified 
 rectangle. The rectangle should be defined in the document coordinate space 
 of the passed GState; the rectangle will be transformed appropriately when 
@@ -5686,7 +5686,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSqrRootWWFixed
+### GrSqrRootWWFixed
 Calculate the square root of a 32-bit number. Numbers less than one return 
 the value one.
 
@@ -5702,7 +5702,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrSqrWWFixed
+### GrSqrWWFixed
 Calculate the square of a 32-bit number.
 
 **Pass:**  
@@ -5717,7 +5717,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTestPath
+### GrTestPath
 Checks for the existence of a path.
 
 **Pass:**  
@@ -5733,7 +5733,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTestPointInPath
+### GrTestPointInPath
 Determine if the passed point is inside the GState's current path.
 
 **Pass:**  
@@ -5750,7 +5750,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTestPointInPolygon
+### GrTestPointInPolygon
 Determine if the passed point is inside the given polygon.
 
 **Pass:**  
@@ -5770,7 +5770,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTestPointInReg
+### GrTestPointInReg
 Determine if the passed point is inside a given region. If so, return the 
 rectangle inside the region including the point.
 
@@ -5791,7 +5791,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTestRectInMask
+### GrTestRectInMask
 Determine if a given rectangle is inside the current clip region.
 
 **Pass:**  
@@ -5811,7 +5811,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTestRectInReg
+### GrTestRectInReg
 Determine if a given rectangle is inside a specified region.
 
 **Pass:**  
@@ -5833,7 +5833,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTextPosition
+### GrTextPosition
 Return the nearest offset into a text string when given a pixel position in the 
 string.
 
@@ -5856,7 +5856,7 @@ Nothing.
 **Library:** text.def
 
 ----------
-#### GrTextWidth
+### GrTextWidth
 Return the width of a text string, including kerning.
 
 **Pass:**  
@@ -5874,7 +5874,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTextWidthWBFixed
+### GrTextWidthWBFixed
 Return the width of a text string, including kerning.
 
 **Pass:**  
@@ -5892,7 +5892,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTransform
+### GrTransform
 Transform the given coordinate pair from document units to screen 
 coordinates, including the effects of the GState and window transformation 
 matrixes.
@@ -5911,7 +5911,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTransformByMatrix
+### GrTransformByMatrix
 Transform the given coordinate pair using the passed transformation matrix.
 
 **Pass:**  
@@ -5927,7 +5927,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTransformByMatrixDWord
+### GrTransformByMatrixDWord
 Transform the given coordinate pair using the passed transformation matrix. 
 Coordinates are 32-bit values rather than normal 16-bit values.
 
@@ -5946,7 +5946,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTransformDWFixed
+### GrTransformDWFixed
 Transform the given coordinate pair from document units to screen 
 coordinates, including the effects of the GState and window transformation 
 matrixes. Coordinates are in **DWFixed** format.
@@ -5965,7 +5965,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTransformDWord
+### GrTransformDWord
 Transform the given 32-bit coordinate pair from document units to screen 
 coordinates, including the effects of the GState and window transformation 
 matrixes.
@@ -5985,7 +5985,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrTransformWWFixed
+### GrTransformWWFixed
 Transform the given 32-bit fixed point coordinate pair using the passed 
 GState's transformation matrix. Coordinates are in **WWFixed** format.
 
@@ -6006,7 +6006,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUDivWWFixed
+### GrUDivWWFixed
 Divide two 32-bit unsigned numbers.
 
 **Pass:**  
@@ -6024,7 +6024,7 @@ Nothing.
 **Library:**graphics.def
 
 ----------
-#### GrUncompactBitmap
+### GrUncompactBitmap
 Uncompact a huge bitmap (a bitmap in a HugeArray).
 
 **Pass:**  
@@ -6043,7 +6043,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUntransform
+### GrUntransform
 Transform the given coordinate pair from screen coordinates to document 
 coordinates, including the effects of the GState and window transformation 
 matrixes.
@@ -6062,7 +6062,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUntransformByMatrix
+### GrUntransformByMatrix
 Untransform the given coordinate pair using the passed transformation 
 matrix. This is the inverse operation of transforming the coordinates using 
 the matrix.
@@ -6080,7 +6080,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUntransformByMatrixDWord
+### GrUntransformByMatrixDWord
 Untransform the given coordinate pair using the passed transformation 
 matrix. This is the inverse operation of transforming the coordinates using 
 the matrix.
@@ -6100,7 +6100,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUntransformDWFixed
+### GrUntransformDWFixed
 Untransform the given coordinate pair from screen coordinates to document 
 coordinates using the GState passed.
 
@@ -6119,7 +6119,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUntransformDWord
+### GrUntransformDWord
 Untransform the given 32-bit coordinate pair from screen coordinates to 
 document coordinates.
 
@@ -6138,7 +6138,7 @@ Nothing.
 **Library:** graphics.def
 
 ----------
-#### GrUntransformWWFixed
+### GrUntransformWWFixed
 Untransform the given 32-bit coordinate pair using the GState passed.
 
 **Pass:**  

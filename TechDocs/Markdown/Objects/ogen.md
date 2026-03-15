@@ -5617,7 +5617,7 @@ values into one word.
 **Interception:** Generally not intercepted.
 
 ----------
-####MSG_GEN_SET_WIN_CONSTRAIN
+#### MSG_GEN_SET_WIN_CONSTRAIN
 
     void    MSG_GEN_SET_WIN_CONSTRAIN(
             VisUpdateMode       updateMode,

@@ -1,4 +1,4 @@
-## 16 Local Memory
+# 16 Local Memory
 
 The GEOS memory manager is well suited to dealing with blocks of memory 
 in the 2K-6K range. However, for small amounts of memory, the manager's 
@@ -17,7 +17,7 @@ Before you read this chapter, you should be familiar with the use of handles in
 GEOS and with the 80x86's segment:offset memory referencing. You should also be 
 familiar with the global memory manager (see ["Memory Management", Chapter 15](cmemory.md)).
 
-### 16.1 Design Philosophy
+## 16.1 Design Philosophy
 
 The GEOS memory manager is designed to deal with blocks of memory which 
 are measured in kilobytes. Every memory block needs an entry in the global 
@@ -49,7 +49,7 @@ complete with a modified Quicksort routine. Similarly, all GEOS objects are
 stored in object blocks, which are a special kind of local-memory heap. This 
 makes it easy to add or delete objects dynamically.
 
-### 16.2 Structure of a Local Memory Heap
+## 16.2 Structure of a Local Memory Heap
 
 A local memory heap looks and acts much like the global heap. However, it is 
 contained entirely within a single memory block. This block is initialized 
@@ -100,7 +100,7 @@ is advisable if the heap is in a fixed block.
 A virtual-memory file block may contain an LMem heap. For details on this, 
 see ["Virtual Memory," Chapter 18](cvm.md).
 
-#### 16.2.2 Chunks and Chunk Handles
+### 16.2.2 Chunks and Chunk Handles
 
 Just as blocks on the local heap are accessed with handles, chunks are 
 accessed via chunk handles. Each chunk handle is an offset into the block 
@@ -139,7 +139,7 @@ this offset indicates an entry in the local memory handle table, where an offset
 to the chunk data is stored. In this case, the block containing the LMem heap 
 begins at address 1000:00. All addresses shown are in hexadecimal._
 
-#### 16.2.3 Types of LMem Heaps
+### 16.2.3 Types of LMem Heaps
 
 LMemType, LMemFlags
 
@@ -279,7 +279,7 @@ This is a constant which combines the LMF_HAS_FLAGS and
 LMF_RELOCATED flags. These flags should be set for all object 
 blocks.
 
-### 16.3 Using Local Memory Heaps
+## 16.3 Using Local Memory Heaps
 
 Local memory heaps are much like the global heap and are accessed in much 
 the same way. Local heaps are simple to create and manage.
@@ -293,7 +293,7 @@ understand how the other mechanisms work.
 Remember that every local memory heap resides in a global memory block. All the 
 rules for using memory blocks apply. (See ["Memory Etiquette"](cmemory.md#1531-memory-etiquette))
 
-#### 16.3.1 Creating a Local Heap
+### 16.3.1 Creating a Local Heap
 
 LMemInitHeap(), MemAllocLMem()
 
@@ -358,7 +358,7 @@ an **LMemType** of LMEM_TYPE_OBJ_BLOCK, **MemAllocLMem()** will pass
 the STD_LMEM_OBJECT_FLAGS flags; otherwise, it will pass a clear 
 **LocalMemoryFlags** record.
 
-#### 16.3.2 Using Chunks
+### 16.3.2 Using Chunks
 
 LMemAlloc(), LMemDeref(), LMemFree(), LMemGetChunkSize(), 
 LMemReAlloc(), LMemInsertAt(), LMemDeleteAt(), 
@@ -445,7 +445,7 @@ specify bytes that are beyond the end of the chunk. If you fail to do this,
 results are undefined. The version which takes handles is named 
 **LMemDeleteAtHandles()**.
 
-#### 16.3.3 Contracting the LMem Heap
+### 16.3.3 Contracting the LMem Heap
 
 LMemContract()
 
@@ -459,7 +459,7 @@ containing the LMem heap. It shuffles all the chunks, thus invalidating
 pointers to chunks; however, it is guaranteed not to move the block on the 
 global heap. 
 
-#### 16.3.4 Example of LMem Usage
+### 16.3.4 Example of LMem Usage
 
 At first, the local memory techniques can seem tricky. This section contains 
 an example of LMem usage in Goc. The example shows the basic principles 
@@ -553,7 +553,7 @@ MemUnlock(thisHeapsHandle);
 MemFree(thisHeapsHandle);
 ~~~
 
-### 16.4 Special LMem Uses
+## 16.4 Special LMem Uses
 
 Local memory heaps are used for many purposes in GEOS. Objects are stored 
 in special LMem heaps, called object blocks; windows, GStrings, and many 
@@ -568,7 +568,7 @@ chunks to store special arrays of data via the Chunk Array routines. The
 chapter will also describe special purpose variants of the Chunk Array: the 
 Element Array and the Name Array.
 
-#### 16.4.1 Chunk Arrays
+### 16.4.1 Chunk Arrays
 
 Very often an application will need to keep track of many different pieces of 
 data and access them by an index. An application can do this in the 
@@ -590,7 +590,7 @@ drops significantly if it is larger than roughly 6K. If you need a larger array,
 you should use a Huge Array (see [section 18.5 of chapter 18](cvm.md#195-huge-arrays)). 
 If you will be using the chunk array routines, you should include chunkarr.h.
 
-##### 16.4.1.1 Structure of the Chunk Array
+#### 16.4.1.1 Structure of the Chunk Array
 
 A chunk array is contained in a single chunk in an LMem heap. It begins 
 with a special header structure which specifies certain characteristics of the 
@@ -644,7 +644,7 @@ constructed by the chunk array routines.
 _A chunk array with variable-size elements is actually two successive arrays; 
 the first array is an array of chunk offsets to the elements of the second array._
 
-##### 16.4.1.2 Creating a Chunk Array
+#### 16.4.1.2 Creating a Chunk Array
 
 ChunkArrayCreate(), ChunkArrayCreateAt(), 
 ChunkArrayCreateAtHandles(), ChunkArrayHeader
@@ -692,7 +692,7 @@ be overwritten (except for whatever data falls in the header area after the
 When you are done with a chunk array, you can free it with **LMemFree()** the 
 way you would any other chunk.
 
-##### 16.4.1.3 Adding, Removing, and Accessing Elements
+#### 16.4.1.3 Adding, Removing, and Accessing Elements
 
 ChunkArrayAppend(), ChunkArrayAppendHandles(), 
 ChunkArrayInsertAt(), ChunkArrayInsertAtHandle(), 
@@ -796,7 +796,7 @@ the element number, and a pointer to a buffer big enough to hold the entire
 element. The routine will copy the element to the specified buffer. The 
 version which takes handles is called **ChunkArrayGetElementHandles()**.
 
-##### 16.4.1.4 Chunk Array Utilities
+#### 16.4.1.4 Chunk Array Utilities
 
 ChunkArrayGetCount(), ChunkArrayGetCountHandles(), 
 ChunkArrayZero(), ChunkArrayZeroHandles(), 
@@ -895,7 +895,7 @@ callback routine. It does not return anything.
 Note that **ChunkArraySort()** is currently implemented only for chunk 
 arrays with fixed-sized elements.
 
-##### 16.4.1.5 Example of Chunk Array Usage
+#### 16.4.1.5 Example of Chunk Array Usage
 
 This section contains an example of how a chunk array might be used. It 
 shows several common chunk array actions, including sorting the array.
@@ -1028,7 +1028,7 @@ ChunkArraySortHandles(blockWithHeap, myChunkArray,
 /* Array is now sorted! */
 ~~~
 
-#### 16.4.2 Element Arrays
+### 16.4.2 Element Arrays
 
 Sometimes an application will create an array with a high duplication rate; 
 that is, the array may contain many identical elements. This can be 
@@ -1072,7 +1072,7 @@ quickly translate an element's token into the offset to that element. Thus, it
 takes no longer to access an element in an element array than it does to 
 access one in a chunk array.
 
-##### 16.4.2.1 Creating an Element Array
+#### 16.4.2.1 Creating an Element Array
 
 ElementArrayCreate(), ElementArrayCreateAt(), 
 ElementArrayCreateAtHandles(), ElementArrayHeader
@@ -1101,7 +1101,7 @@ The routine returns the handle of the newly-created element array. It can
 cause heap compaction or resizing; therefore, all pointers to the heap are 
 invalidated.
 
-##### 16.4.2.2 Adding an Element
+#### 16.4.2.2 Adding an Element
 
 ElementArrayAddElement(), 
 ElementArrayAddElementHandles(), 
@@ -1167,7 +1167,7 @@ Both of these routines have counterparts which are passed handles instead
 of an optr; these counterparts are named 
 **ElementArrayAddElementHandles()** and **ElementArrayAddReferenceHandles()**.
 
-##### 16.4.2.3 Accessing Elements in an Element Array
+#### 16.4.2.3 Accessing Elements in an Element Array
 
 ElementArrayElementChanged(), 
 ElementArrayElementChangedHandles()
@@ -1217,7 +1217,7 @@ to change any references to the old element appropriately. If no match is
 found, the token which was passed will be returned. The version which takes 
 handles is called **ElementArrayElementChangedHandles()**.
 
-##### 16.4.2.4 Removing An Element From An Element Array
+#### 16.4.2.4 Removing An Element From An Element Array
 
 ElementArrayRemoveReference(), 
 ElementArrayRemoveReferenceHandles(), 
@@ -1250,7 +1250,7 @@ Both of these routines have counterparts which take handles; these
 counterparts are named **ElementArrayRemoveReferenceHandles()** and 
 **ElementArrayDeleteHandles()**.
 
-##### 16.4.2.5 The "Used Index" and Other Index Systems
+#### 16.4.2.5 The "Used Index" and Other Index Systems
 
 ElementArrayGetUsedCount(), 
 ElementArrayGetUsedCountHandles(), 
@@ -1309,7 +1309,7 @@ callback routine. Again, passing a null function pointer makes the routine
 count every "in-use" element. The routine which takes handles is called 
 **ElementArrayTokenToUsedIndexHandles()**.
 
-#### 16.4.3 Name Arrays
+### 16.4.3 Name Arrays
 
 Applications can build on chunk arrays and element arrays in many ways. 
 The chunk array library includes one example of an elaboration on these 
@@ -1334,7 +1334,7 @@ through the elements, and thus also takes linear time. Name arrays thus
 become slow if they grow too large. Accessing an element by token, however, 
 still takes constant time.
 
-##### 16.4.3.1 Creating a Name Array
+#### 16.4.3.1 Creating a Name Array
 
 NameArrayCreate(), NameArrayCreateAt(), 
 NameArrayCreateAtHandles(), NameArrayAdd(), 
@@ -1452,7 +1452,7 @@ myNameArray = NameArrayCreate(myLMemHeap, sizeof(MyDataSectionStruct),
                                 sizeof(MyNameArrayHeader));
 ~~~
 
-##### 16.4.3.2 Accessing Elements in a Name Array
+#### 16.4.3.2 Accessing Elements in a Name Array
 
 NameArrayFind(), NameArrayFindHandles(), 
 NameArrayChangeName(), NameArrayChangeNameHandles()

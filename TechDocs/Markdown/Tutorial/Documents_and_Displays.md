@@ -1,4 +1,4 @@
-## 7 Documents and Displays
+# 7 Documents and Displays
 
 In this chapter, the application starts maintaining real document files and 
 allows the user to have more than one document open at a time. This turns 
@@ -8,14 +8,14 @@ document's file handle in a global variable, since there may now be several
 files open. We will take a more object-oriented approach, storing this sort of 
 information in instance data of objects representing documents.
 
-### 7.1 Making the Changes
+## 7.1 Making the Changes
 
 Make the changes to MCHRT.GP and MCHRT.GOC as indicated in Code 
 Display 5-1 and Code Display 5-2; as before, places where the code has 
 changed are indicated by vertical bars in the margin. After making the 
 changes to the source code, re-compile the executable with pmake. 
 
-### 7.2 The Application So Far
+## 7.2 The Application So Far
 
 Our chart application can now keep track of more than one document at a 
 time. It provides UI allowing the user to choose and select document names. 
@@ -63,7 +63,7 @@ objects; we could reconstruct them using the information stored in the
 linked list; we're doing things this way only to demonstrate how you 
 might save an object within a document file.
 
-### 7.3 MCHRT.GP: New Resources
+## 7.3 MCHRT.GP: New Resources
 
 Our glue parameters file has expanded to accommodate several new 
 resources and a new subclass.
@@ -105,7 +105,7 @@ export MCDocumentClass
 
 We must export our document class so that its symbols are recognized.
 
-### 7.4 MCHRT.GOC: New Structures
+## 7.4 MCHRT.GOC: New Structures
 
 The start of the application has changed quite a bit. You may notice that the 
 global variables are all missing. These were used by the process object to 
@@ -186,7 +186,7 @@ We're now saving the visible chart object's object block in the document file.
 We'll store its handle in the map block's header so that we'll be able to extract 
 it when opening the file.
 
-### 7.5 MCHRT.GOC: Application Objects
+## 7.5 MCHRT.GOC: Application Objects
 
 ~~~
 @object GenApplicationClass MCApp = {
@@ -242,7 +242,7 @@ menu bar should be floating and the
 HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP hint says that the menu 
 bar should start out hidden on those systems that support hidden menu bars.
 
-### 7.6 Menus and Controllers
+## 7.6 Menus and Controllers
 
 In past stages of the application, we only had one menu (the File menu), 
 generated automatically. For this stage of the application, we create our own 
@@ -437,7 +437,7 @@ document object is now in charge of maintaining the data for each object, the
 gadgets which work with the data use the appropriate travel option to reach 
 the document.
 
-### 7.8 Document Group
+## 7.8 Document Group
 
 ~~~
 @start  DocGroup;
@@ -497,7 +497,7 @@ would change the document protocol. We could then write handlers in our
 document class for updating old documents, which would be recognized by 
 their low protocol numbers. 
 
-### 7.9 Altered Handlers
+## 7.9 Altered Handlers
 
 ~~~
 @method MCDocumentClass, MSG_MCD_SET_DATA_ITEM_MONIKER {
@@ -772,7 +772,7 @@ MSG_MCD_INSERT_DATA_ITEM. We won't explore each change; there are
 just more cases of using document instance data to refer to data structures 
 and constructing optrs to refer to objects.
 
-### 7.10 Maintaining the Document
+## 7.10 Maintaining the Document
 
 We have three message handlers to maintain our data structures within the 
 document file whenever the file is saved or opened.
