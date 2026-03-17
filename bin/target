@@ -39,29 +39,38 @@ if [ ! -f ${LOCAL_ROOT}/.bbxxip/.bbxxip.nt.${TYPE} ]; then
    exit 1
 fi
 eval $(cat ${LOCAL_ROOT}/.bbxxip/.bbxxip.nt.${TYPE})
-if [ ! -f ${destdir}/localpc/ensemble/geos/ENSEMBLE.BAT ]; then
+GEOS_ROOT_REL=localpc/geos
+if [ ! -f ${destdir}/${GEOS_ROOT_REL}/ENSEMBLE.BAT ]; then
    echo "*** Target at ${destdir} not usable."
    exit 1
 fi
+# Manual verification checklist after launcher/root-path changes:
+# 1. C:\LOCALPC\GEOS is reachable and GEOS boots.
+# 2. C:\IMAGE (or other gbuild siblings) is reachable from DOS/GEOS.
+# 3. ${destdir}/localpc/IPX_STAT.TXT appears and Swat connects.
+# 4. init.bat generation still appends swatgo and swatgo flow works.
 if [ "$BASEBOX" = "" ]; then
     BASEBOX=dosbox
 fi
 OLD_PATH=$PWD
-cd ${destdir}/localpc
+cd ${destdir}
 rm ${destdir}/localpc/IPX_STAT.TXT
-rm ensemble/geos/init.bat
+rm ${GEOS_ROOT_REL}/init.bat
 if [ "$GEOS_CENTRAL_STORAGE" != "" ]; then
-   echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble/geos/init.bat
+   echo mount s: %GEOS_CENTRAL_STORAGE% >> ${GEOS_ROOT_REL}/init.bat
 fi
 if [ "$GEOS_CDROM_DRIVE" != "" ]; then
    if [ -f "$GEOS_CDROM_DRIVE" ]; then
-      echo imgmount r "$GEOS_CDROM_DRIVE" -t iso >> ensemble/geos/init.bat
+      echo imgmount r "$GEOS_CDROM_DRIVE" -t iso >> ${GEOS_ROOT_REL}/init.bat
    else
-      echo mount r $GEOS_CDROM_DRIVE -t cdrom >> ensemble/geos/init.bat
+      echo mount r $GEOS_CDROM_DRIVE -t cdrom >> ${GEOS_ROOT_REL}/init.bat
    fi
 fi
-if [ -f "ensemble/geos/init.bat" ]; then
-   echo swatgo >> ensemble/geos/init.bat
+if [ -f "${GEOS_ROOT_REL}/init.bat" ]; then
+   echo swatgo >> ${GEOS_ROOT_REL}/init.bat
+fi
+if [ -f "${GEOS_ROOT_REL}/privdata/INI.BAK" ]; then
+   perl -pi -e 's{C:\\GEOS\\GFS\.IMG}{C:\\IMAGE\\GFS.IMG}ig; s{C:\\GEOS\\NETEC\.INI}{C:\\LOCALPC\\GEOS\\NETEC.INI}ig; s{C:\\GEOS\\NET\.INI}{C:\\LOCALPC\\GEOS\\NET.INI}ig; s{bootstrapPath\s*=\s*C:\\GEOS\b}{bootstrapPath = C:\\LOCALPC\\GEOS}ig;' "${GEOS_ROOT_REL}/privdata/INI.BAK"
 fi
 set -m
 $BASEBOX -conf $ROOT_DIR/bin/basebox.conf -conf $LOCAL_ROOT/basebox_user.conf >/dev/null 2>&1 &
