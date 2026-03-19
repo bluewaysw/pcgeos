@@ -553,8 +553,10 @@ if ( $GbuildResult != 0 ) {
     exit( $GbuildResult );
 } else {
     #
-    # Copy files to target demo directory if making PC/WIN32 image
+    # Copy the FreeGEOS image into the Ensemble tree when building NT.
     #
+    FreeGEOSCopyImageToEnsemble();
+
     print "\nbuildbbx completed!\n";
 }
 
@@ -1333,6 +1335,52 @@ sub CopyFilesToDemoDir {
 	} else {
 	    print "\nERROR: Cannot find demo file directory: $GbuildTargetDir/localpc\n";
 	}
+    }
+}
+
+##############################################################################
+#       FreeGEOSCopyImageToEnsemble
+##############################################################################
+#
+# SYNOPSIS:     Copy the generated GFS image into the FG600 folder
+# PASS:         $RealInfo{destdir} = gbuild destination tree
+# CALLED BY:    Main
+# RETURN:       nothing
+#
+##############################################################################
+sub FreeGEOSCopyImageToEnsemble {
+    my( $sourceImage, $targetDir, $targetImage );
+
+    #
+    # Only NT builds generate the FreeGEOS GFS image.
+    #
+    if ( $RealInfo{target} ne $TARGET_NT ||
+	 $opt_debug ||
+	 $opt_template ) {
+	return;
+    }
+
+    $sourceImage = "$RealInfo{destdir}/image/gfs.img";
+    $targetDir = "$RealInfo{destdir}/localpc/fg600";
+    $targetImage = "$targetDir/gfs.img";
+
+    if ( ! -f $sourceImage ) {
+	die "\nERROR: Cannot find FreeGEOS GFS image file: $sourceImage\n";
+    }
+
+    if ( ! -d $targetDir ) {
+	print "+ mkdir $targetDir\n";
+	if ( ! $opt_debug ) {
+	    mkdir( $targetDir, 0777 ) ||
+		die "\nERROR: Cannot create directory $targetDir\n";
+	}
+    }
+
+    print "+ copy $sourceImage $targetImage\n";
+    if ( ! $opt_debug ) {
+	copy( $sourceImage, $targetImage ) ||
+	    die "\nERROR: Cannot copy FreeGEOS GFS image file:\n" .
+		"$sourceImage -> $targetImage\n";
     }
 }
 
