@@ -1361,7 +1361,7 @@ sub FreeGEOSCopyImageToEnsemble {
     }
 
     $sourceImage = "$RealInfo{destdir}/image/gfs.img";
-    $targetDir = "$RealInfo{destdir}/localpc/fg600";
+    $targetDir = "$RealInfo{destdir}/localpc/ensemble/fg600";
     $targetImage = "$targetDir/gfs.img";
 
     if ( ! -f $sourceImage ) {
