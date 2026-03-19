@@ -1339,10 +1339,80 @@ sub CopyFilesToDemoDir {
 }
 
 ##############################################################################
+#       ResolveFreeGEOSBootstrapDir
+##############################################################################
+#
+# SYNOPSIS:     Resolve FreeGEOS bootstrap directory from gbuild output
+# PASS:         arg1 = gbuild destination tree
+# CALLED BY:    FreeGEOSCopyImageToEnsemble
+# RETURN:       resolved bootstrap directory path
+#
+##############################################################################
+sub ResolveFreeGEOSBootstrapDir {
+    local( $destdir ) = @_;
+    local( $ensembleDir ) = "$destdir/localpc/ensemble";
+    local( @allCandidates );
+    local( @validCandidates );
+    local( $entry, $candidateDir );
+    local( $allList, $validList );
+
+    if ( ! -d $ensembleDir ) {
+	die "\nERROR: Cannot find PC/GEOS Ensemble directory: $ensembleDir\n";
+    }
+
+    opendir( ENSEMBLE_DIR, $ensembleDir ) ||
+	die "\nERROR: Cannot read directory $ensembleDir\n";
+
+    while ( $entry = readdir( ENSEMBLE_DIR ) ) {
+	next if ( $entry eq "." || $entry eq ".." );
+	next if ( $entry !~ /^fg/i );
+
+	$candidateDir = "$ensembleDir/$entry";
+	next if ( ! -d $candidateDir );
+
+	push( @allCandidates, $candidateDir );
+	if ( -f "$candidateDir/net.ini" ||
+	     -f "$candidateDir/netec.ini" ) {
+	    push( @validCandidates, $candidateDir );
+	}
+    }
+
+    closedir( ENSEMBLE_DIR );
+
+    @allCandidates = sort( @allCandidates );
+    @validCandidates = sort( @validCandidates );
+
+    if ( $#validCandidates == 0 ) {
+	print "[Resolved PC/GEOS Ensemble bootstrap directory: $validCandidates[0]]\n";
+	return $validCandidates[0];
+    }
+
+    if ( $#allCandidates >= 0 ) {
+	$allList = join( "\n  ", @allCandidates );
+    } else {
+	$allList = "(none)";
+    }
+
+    if ( $#validCandidates >= 0 ) {
+	$validList = join( "\n  ", @validCandidates );
+    } else {
+	$validList = "(none)";
+    }
+
+    die "\nERROR: Cannot resolve PC/GEOS Ensemble bootstrap directory.\n" .
+	"Expected exactly one fg* directory with net.ini or netec.ini under:\n" .
+	"  $ensembleDir\n" .
+	"Found fg* directories:\n" .
+	"  $allList\n" .
+	"Found valid fg* directories containing net.ini or netec.ini:\n" .
+	"  $validList\n";
+}
+
+##############################################################################
 #       FreeGEOSCopyImageToEnsemble
 ##############################################################################
 #
-# SYNOPSIS:     Copy the generated GFS image into the FG600 folder
+# SYNOPSIS:     Copy generated GFS image into resolved FreeGEOS bootstrap dir
 # PASS:         $RealInfo{destdir} = gbuild destination tree
 # CALLED BY:    Main
 # RETURN:       nothing
@@ -1361,19 +1431,11 @@ sub FreeGEOSCopyImageToEnsemble {
     }
 
     $sourceImage = "$RealInfo{destdir}/image/gfs.img";
-    $targetDir = "$RealInfo{destdir}/localpc/ensemble/fg600";
+    $targetDir = ResolveFreeGEOSBootstrapDir( $RealInfo{destdir} );
     $targetImage = "$targetDir/gfs.img";
 
     if ( ! -f $sourceImage ) {
 	die "\nERROR: Cannot find FreeGEOS GFS image file: $sourceImage\n";
-    }
-
-    if ( ! -d $targetDir ) {
-	print "+ mkdir $targetDir\n";
-	if ( ! $opt_debug ) {
-	    mkdir( $targetDir, 0777 ) ||
-		die "\nERROR: Cannot create directory $targetDir\n";
-	}
     }
 
     print "+ copy $sourceImage $targetImage\n";
