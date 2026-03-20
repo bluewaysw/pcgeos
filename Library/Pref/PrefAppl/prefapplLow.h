@@ -26,6 +26,7 @@ Boolean PrefApplAddScannedLinkRecord(const GeodeToken *token,
                                      const char *relativeDir,
                                      const char *linkName);
 void PrefApplRemoveScannedLinkRecordsForToken(const GeodeToken *token);
+Boolean PrefApplLaunchBrowserURL(const char *url);
 
 Boolean PrefApplLoadApplicationCatalog(void);
 Boolean PrefApplRefreshLinkSelections(void);
