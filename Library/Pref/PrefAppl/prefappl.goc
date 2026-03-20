@@ -26,6 +26,7 @@
     @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PREF_APPL_RIGHT_LIST_DOUBLE_PRESS;
     @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_ADD_APPLICATION;
     @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_REMOVE_APPLICATION;
+    @message (GEN_TRIGGER_ACTION) MSG_PREF_APPL_LAUNCH_DOCUMENTS;
     @message void MSG_PREF_APPL_SET_STATUS_TEXT(const char *statusMessage);
     @message void MSG_PREF_APPL_SHOW_ERROR(PrefApplError paError);
     @message void MSG_PREF_APPL_QUEUE_REFRESH();
@@ -59,6 +60,8 @@ static const char prefApplDisabledText[] =
     "Application disabled.";
 static const char prefApplDisableFailedText[] =
     "Application disable failed.";
+static const char prefApplDocumentsUrl[] =
+    "FILE:///GFS:/FREEGEOS/USERDATA/DISTDOC/DOCINDEX.HTM";
 
 #define PREF_APPL_ICON_TEXT_SPACING 4
 #define PREF_APPL_MAX_ICON_WIDTH 20
@@ -68,7 +71,7 @@ static const char prefApplDisableFailedText[] =
 
 @include "Art/PrefApplIcon.goh"
 
-@visMoniker PrefApplTextMoniker = "Applications";
+@visMoniker PrefApplTextMoniker = "Packages";
 
 @visMoniker PrefApplMonikerList = list {
     @PrefApplIconMoniker,
@@ -87,7 +90,7 @@ static const char prefApplDisableFailedText[] =
 @start BASEINTERFACE, notDetachable;
 
 @object PrefApplDialogClass BaseBox = {
-    GI_visMoniker = "Applications";
+    GI_visMoniker = "Packages";
     GI_states = @default & ~GS_USABLE;
     GI_comp = @TabHolder, @DoneTrigger;
     GII_type = GIT_COMMAND;
@@ -116,7 +119,7 @@ static const char prefApplDisableFailedText[] =
 }
 
 @object GenItemGroupClass TabSelector = {
-    GI_comp = @EnsembleAppsTab;
+    GI_comp = @EnsembleAppsTab, @DocumentsTab;
     GIGI_selection = 0;
     GIGI_destination = @BaseBox;
     GIGI_applyMsg = MSG_PREF_APPL_TAB_SELECTION_CHANGED;
@@ -132,8 +135,13 @@ static const char prefApplDisableFailedText[] =
     GII_identifier = 0;
 }
 
+@object GenItemClass DocumentsTab = {
+    GI_visMoniker = "Documents";
+    GII_identifier = 1;
+}
+
 @object GenInteractionClass TabGroup = {
-    GI_comp = @EnsembleAppsPage;
+    GI_comp = @EnsembleAppsPage, @DocumentsPage;
 
     HINT_CENTER_CHILDREN_HORIZONTALLY;
     HINT_CENTER_CHILDREN_VERTICALLY;
@@ -149,6 +157,36 @@ static const char prefApplDisableFailedText[] =
     HINT_EXPAND_WIDTH_TO_FIT_PARENT;
     HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
     HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass DocumentsPage = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @DocumentsInfoGlyph, @DocumentsTriggerPadding;
+
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenGlyphClass DocumentsInfoGlyph = {
+    GI_visMoniker = "Use the button below to open the browser and find sample documents.";
+}
+
+@object GenInteractionClass DocumentsTriggerPadding = {
+    GI_comp = @DocumentsLaunchTrigger;
+
+    HINT_CUSTOM_EXTRA_MARGINS = { 4, 2, 4, 2 };
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass DocumentsLaunchTrigger = {
+    GI_visMoniker = "Open Sample Documents";
+    GTI_actionMsg = MSG_PREF_APPL_LAUNCH_DOCUMENTS;
+    GTI_destination = @BaseBox;
 }
 
 @object GenInteractionClass MainRow = {
@@ -478,11 +516,7 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
 
 @method PrefApplDialogClass, MSG_PREF_APPL_TAB_SELECTION_CHANGED
 {
-    optr tabPages[] = {
-        @EnsembleAppsPage
-    };
-
-    if (selection >= (sizeof(tabPages) / sizeof(tabPages[0]))) {
+    if (selection > 1) {
         return;
     }
 
@@ -490,12 +524,37 @@ void _export _pascal PrefGetModuleInfo(PrefModuleInfo *modInfo)
         return;
     }
 
-    if ((OldSelection != GIGS_NONE) &&
-        (OldSelection < (sizeof(tabPages) / sizeof(tabPages[0])))) {
-        @call tabPages[OldSelection]::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    if (OldSelection == GIGS_NONE) {
+        if (selection == 0) {
+            @call @Dup(@DocumentsPage)::MSG_GEN_SET_NOT_USABLE(
+                VUM_DELAYED_VIA_APP_QUEUE
+            );
+        } else {
+            @call @Dup(@EnsembleAppsPage)::MSG_GEN_SET_NOT_USABLE(
+                VUM_DELAYED_VIA_APP_QUEUE
+            );
+        }
+    } else if (OldSelection == 0) {
+        @call @Dup(@EnsembleAppsPage)::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE
+        );
+    } else if (OldSelection == 1) {
+        @call @Dup(@DocumentsPage)::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE
+        );
     }
+
     OldSelection = selection;
-    @call tabPages[selection]::MSG_GEN_SET_USABLE(VUM_NOW);
+    if (selection == 0) {
+        @call @Dup(@EnsembleAppsPage)::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+        @call @Dup(@DocumentsPage)::MSG_GEN_SET_USABLE(VUM_NOW);
+    }
+}
+
+@method PrefApplDialogClass, MSG_PREF_APPL_LAUNCH_DOCUMENTS
+{
+    (void) PrefApplLaunchBrowserURL(prefApplDocumentsUrl);
 }
 
 static void

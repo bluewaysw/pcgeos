@@ -17,6 +17,7 @@
 #include <chunkarr.h>
 #include <fileEnum.h>
 #include <geode.h>
+#include <iapp.h>
 #include <lmem.h>
 #include <Ansi/string.h>
 
@@ -53,6 +54,7 @@ static ChunkHandle prefApplLinkArray = NullChunk;
 static MemHandle prefApplAppDataBlock = NullHandle;
 static ChunkHandle prefApplAppArray = NullChunk;
 static PrefApplError prefApplLastScanError = PREF_APPL_ERROR_NONE;
+static GeodeToken prefApplBrowserToken = { { 'W', 'M', 'K', '3' }, 16431 };
 
 static Boolean
 PrefApplIsDotOrDotDot(const char *name)
@@ -1179,6 +1181,78 @@ PrefApplRemoveScannedLinkRecordsForToken(const GeodeToken *token)
                               index - 1, 1);
     }
     MemUnlock(prefApplLinkDataBlock);
+}
+
+Boolean
+PrefApplLaunchBrowserURL(const char *url)
+{
+    MemHandle urlDataHandle;
+    InternetAppBlock *urlData;
+    dword payloadSize;
+    word serverCount;
+    MemHandle launchBlock;
+    AppLaunchBlock *alb;
+    IACPConnection connection;
+
+    if ((url == NULL) || (url[0] == '\0')) {
+        return FALSE;
+    }
+
+    payloadSize = (dword)sizeof(InternetAppBlock) + (dword)strlen(url) + 1;
+    if (payloadSize > 0xffff) {
+        return FALSE;
+    }
+
+    urlDataHandle = MemAlloc((word)payloadSize, HF_SHARABLE, HAF_STANDARD_NO_ERR);
+    if (urlDataHandle == NullHandle) {
+        return FALSE;
+    }
+
+    urlData = (InternetAppBlock *)MemLock(urlDataHandle);
+    if (urlData == NULL) {
+        MemFree(urlDataHandle);
+        return FALSE;
+    }
+
+    memset(urlData, 0, (word)payloadSize);
+    urlData->IAB_type = IADT_URL;
+    strcpy((char *)(urlData + 1), url);
+    MemUnlock(urlDataHandle);
+
+    launchBlock = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    if (launchBlock == NullHandle) {
+        MemFree(urlDataHandle);
+        return FALSE;
+    }
+
+    alb = (AppLaunchBlock *)MemLock(launchBlock);
+    if (alb == NULL) {
+        MemFree(urlDataHandle);
+        MemFree(launchBlock);
+        return FALSE;
+    }
+
+    alb->ALB_extraData = urlDataHandle;
+    MemUnlock(launchBlock);
+
+    serverCount = 0;
+    /*
+     * IACPConnect consumes the AppLaunchBlock handle. ALB_extraData is handed
+     * to the server on success, so we only free it ourselves if no connection
+     * was made.
+     */
+    connection = IACPConnect(&prefApplBrowserToken,
+                             IACPCF_FIRST_ONLY | IACPSM_USER_INTERACTIBLE,
+                             launchBlock,
+                             NullOptr,
+                             &serverCount);
+    if (connection == IACP_NO_CONNECTION) {
+        MemFree(urlDataHandle);
+        return FALSE;
+    }
+
+    IACPShutdown(connection, NullOptr);
+    return TRUE;
 }
 
 static void
