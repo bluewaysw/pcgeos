@@ -572,7 +572,7 @@ prefvid	: Installed/Library/Pref/Prefvid
 Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
 prefappl : Installed/Library/Pref/PrefAppl
-Installed/Library/Pref/PrefAppl:	ui config MAKELIB
+Installed/Library/Pref/PrefAppl:	ui config ansic MAKELIB
 
 
 prefpntc	: Installed/Library/Pref/PrefPntC
