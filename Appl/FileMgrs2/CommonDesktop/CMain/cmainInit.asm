@@ -2490,6 +2490,8 @@ DesktopItems	DesktopDefaultItems \
 
 
 NDInitDesktop	proc	near
+drivesDirSeg	local	word
+	.enter
 	call	FilePushDir
 
 	;
@@ -2504,11 +2506,12 @@ NDInitDesktop	proc	near
 
 	mov	bx, handle DrivesDirectory
 	call	MemLock
-	mov	ds, ax
-	mov	es, ax
+	mov	ss:[drivesDirSeg], ax
 	mov	si, offset DesktopItems
 
 linkLoop:
+	mov	ds, ss:[drivesDirSeg]
+	mov	es, ss:[drivesDirSeg]
 	call	FilePushDir
 	;
 	; FileSetCurrentPath may destroy segment registers, so preserve
@@ -2567,6 +2570,7 @@ notToDir:
 	call	MemUnlock
 done:
 	call	FilePopDir
+	.leave
 	ret
 NDInitDesktop	endp
 
