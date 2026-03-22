@@ -21,6 +21,8 @@
 #define FIRST_RUN_INI_KEY_LAST_RELEASE "lastReleaseLevel"
 /* #define FIRST_RUN_GEODE_NAME "firstrun.geo" */
 #define FIRST_RUN_DISTAPPL_RELATIVE_PATH "DISTAPPL"
+#define FIRST_RUN_DISTAPPL_READY_RETRY_TICKS (1*60)
+#define FIRST_RUN_DISTAPPL_READY_MAX_ATTEMPTS 5
 
 typedef enum {
     FIRSTRUN_WARNING_DISTAPPL_PATH_UNAVAILABLE,
@@ -127,6 +129,39 @@ FirstRunNormalizeFolderPath(const char *folderPath, PathName normalizedFolderPat
         }
         cursor++;
     }
+}
+
+static Boolean
+FirstRunWaitForDistApplPath(void)
+{
+    word attempts;
+    Boolean ready = FALSE;
+
+    attempts = FIRST_RUN_DISTAPPL_READY_MAX_ATTEMPTS;
+    FilePushDir();
+
+    while (attempts != 0) {
+        if (FileSetCurrentPath(SP_SYSTEM, FIRST_RUN_DISTAPPL_RELATIVE_PATH) !=
+            NullHandle) {
+            ready = TRUE;
+            break;
+        }
+
+        attempts--;
+        if (attempts == 0) {
+            break;
+        }
+
+        TimerSleep(FIRST_RUN_DISTAPPL_READY_RETRY_TICKS);
+    }
+
+    FilePopDir();
+
+    if (!ready) {
+        EC_WARNING(FIRSTRUN_WARNING_DISTAPPL_PATH_UNAVAILABLE);
+    }
+
+    return ready;
 }
 
 static Boolean
@@ -308,17 +343,6 @@ FirstRunSetCurrentDestinationFolder(StandardPath standardPath,
 }
 
 static Boolean
-FirstRunCreateWorldLink(FileLongName linkName, PathName targetPath)
-{
-    if (FileCreateLink(linkName, SP_SYSTEM, targetPath, 0) != 0) {
-        EC_WARNING(FIRSTRUN_WARNING_LINK_CREATION_FAILED);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-static Boolean
 FirstRunEnsureWorldLink(FileLongName linkName, PathName targetPath)
 {
     word fileError;
@@ -347,7 +371,6 @@ FirstRunEnsureWorldLink(FileLongName linkName, PathName targetPath)
 static word
 FirstRunSeedPendingAppLinks(word lastReleaseLevel)
 {
-    Boolean freshInstall;
     Boolean currentFolderReady;
     Boolean haveCurrentFolder;
     word newReleaseLevel;
@@ -358,7 +381,6 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
     StandardPath currentStandardPath;
 
     newReleaseLevel = lastReleaseLevel;
-    freshInstall = (lastReleaseLevel == 0);
     currentFolderReady = FALSE;
     haveCurrentFolder = FALSE;
     currentFolderPath[0] = '\0';
@@ -436,13 +458,9 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
                 break;
             }
 
-            // Fresh installs skip all existing-link inspection. Upgrade
-            // runs keep the original read/compare behavior.
-            if (freshInstall) {
-                if (!FirstRunCreateWorldLink(linkName, targetPath)) {
-                    break;
-                }
-            } else if (!FirstRunEnsureWorldLink(linkName, targetPath)) {
+            // Always use the idempotent link path, so startup retries and
+            // repeated runs do not fail when links already exist.
+            if (!FirstRunEnsureWorldLink(linkName, targetPath)) {
                 break;
             }
 
@@ -469,9 +487,9 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
     word lastReleaseLevel;
     word newReleaseLevel;
 
-    /* This is intentional sleep. */
-    /* We need to sleep for a second for the system to keep going */
-    TimerSleep(1*60);
+    if (!FirstRunWaitForDistApplPath()) {
+        return;
+    }
 
     // Read the last completed release level; a missing key means nothing has
     // been seeded yet.
