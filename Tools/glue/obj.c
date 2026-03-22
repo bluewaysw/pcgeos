@@ -1547,6 +1547,7 @@ ObjEnterTypedef(VMHandle   	fh, 	    /* Object file */
 	     * assembly, so long as the types are the same size.
 	     */
 	    if (((otherOS->type == OSYM_RECORD) ||
+		 (otherOS->type == OSYM_STRUCT) ||
 		 (otherOS->type == OSYM_ETYPE)) &&
 		(otherOS->u.sType.size ==
 		 Obj_TypeSize(os->u.typeDef.type, dp->tbase, TRUE)))
