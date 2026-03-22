@@ -46,7 +46,7 @@ prefappl.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh config.goh token.h \
-                Art/PrefApplIcon.goh Art/PrefApplDocumentsMoniker.goh \
+                Art/PrefApplIcon.goh Art/PrefApplDocMoniker.goh \
                 Art/mkrRightArrowSC.goh Art/mkrRightArrowSM.goh \
                 Art/mkrRightArrowSCGA.goh Art/mkrLeftArrowSC.goh \
                 Art/mkrLeftArrowSM.goh Art/mkrLeftArrowSCGA.goh
