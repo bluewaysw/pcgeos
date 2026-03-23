@@ -8,7 +8,7 @@
 XCCOMFLAGS += -zc
 
 # Do not Create any EC version
- NO_EC = 1
+# NO_EC = 1
 
 
 # Create a Copyrigth-notice
