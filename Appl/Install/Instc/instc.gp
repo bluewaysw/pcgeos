@@ -34,8 +34,8 @@ export SelectDirOrFileDialogClass
 
 appobj ICApp
 
-# make the program compatible width BreadBox Ensemble 4.1.3
-#platform geos21
+# make the program downward compatible as possible
+platform geos20
 
 # Token for den GeoManager
 

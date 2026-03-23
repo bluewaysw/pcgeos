@@ -31,9 +31,8 @@ export IFDocumentControlClass
 # Dieses Objekt ist gleichzeitig das Top-Level-Objekt im UI-tree
 appobj IFApp
 
-# if required: make the app compatible with BBX 4.1.3
-#currently not needed
-#platform geos21
+# make the program downward compatible as possible
+platform geos20
 
 # Token for the GeoManager
 tokenchars "IstF"
