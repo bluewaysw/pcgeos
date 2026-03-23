@@ -359,56 +359,9 @@ typedef struct
 /* This data type is used as part of the cache files structures.
  * If changes are needed here, take care to update the cache file protocol.
  */
-#if 0    
-typedef struct
-{
-    Boolean                     FH_initialized;
-    word                        FH_h_height;        //top of 'H'
-    word                        FH_x_height;        //top of 'x'
-    word                        FH_ascender;        //top of 'd'
-    word                        FH_descender;       //bottom of 'p'
-    word                        FH_avgwidth;        //average character width
-    word                        FH_maxwidth;        //widest character width
-    word                        FH_height;          //height of font box
-    word                        FH_accent;          //height of accents
-    word                        FH_ascent;          //height of caps
-    word                        FH_descent;         //descent (from baseline)
-    word                        FH_baseAdjust;      //adjustment for baseline
-    char                        FH_firstChar;       //first char defined
-    char                        FH_lastChar;        //last char defined
-    char                        FH_defaultChar;     //default character
-    word                        FH_underPos;        //position of underline   		
-    word                        FH_underThick;      //thickness of underline
-    word                        FH_strikePos;       //position of strikethrough
-    word                        FH_numChars;        //number of characters
-    sword                       FH_minLSB;          //minimum left side bearing
-    sword                       FH_minTSB;          //minimum top side bound
-    sword                       FH_maxBSB;          //maximum bottom side bound
-    sword                       FH_maxRSB;          //maximum right side bound
-    word                        FH_kernCount;       //num of kerning pairs
-} FontHeader;
-#endif
-
 typedef struct
 {
     Boolean     FH_initialized;     // Flag: Is the structure initialized?
-/*    word        FH_avgwidth;        // Average width of all characters
-    word        FH_maxwidth;        // Width of the widest character in the font
-    word        FH_height;          // Total height of the font bounding box
-    word        FH_accent;          // Height of accent marks above the cap height
-    word        FH_mean;            // Mean line height (usually the x-height)
-    word        FH_baselinePos;     // Distance from top of box to baseline
-    word        FH_descent;         // Distance from baseline to bottom of descent
-    word        FH_underPos;        // Vertical offset for the underline
-    word        FH_underThickness;  // Thickness of the underline stroke
-    word        FH_strikePos;       // Vertical offset for the strikethrough
-    word        FH_aboveBox;        // Max. extension above the nominal font box
-    word        FH_belowBox;        // Max. extension below the nominal font box
-    sword       FH_minLSB;          // Min. Left Side Bearing
-    sword       FH_minTSB;          // Min. Top Side Bearing
-    sword       FH_maxBSB;          // Max. Bottom Side Bearing
-    sword       FH_maxRSB;          // Max. Right Side Bearing
-    word        FH_pixHeight;       // Height in pixels for the current size */
     word        FH_kernCount;       // Number of available kerning pairs
     word        FH_numChars;        // Number of characters defined in the font
     char        FH_firstChar;       // GEOS char code of the first defined char

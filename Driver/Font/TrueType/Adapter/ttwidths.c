@@ -36,9 +36,7 @@ static word  AllocFontBlock( word               additionalSpace,
                         word                    numOfKernPairs,
                         MemHandle*              fontHandle );
 
-static void ConvertHeader( TRUETYPE_VARS,
-                        FontHeader*             fontHeader, 
-                        FontBuf*                fontBuf );
+static void ConvertHeader( TRUETYPE_VARS, FontBuf* fontBuf );
 
 static void ConvertWidths( TRUETYPE_VARS, 
                         FontHeader*             fontHeader, 
@@ -54,8 +52,8 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
 
 static void CalcTransform( 
                         TransformMatrix*        transMatrix,
-                        FontMatrix*             fontMatrix, 
-                        FontBuf*                fontBuf,
+                        const FontMatrix*       fontMatrix, 
+                        const FontBuf*          fontBuf,
                         TextStyle               stylesToImplement,
                         Byte                    width,
                         Byte                    weight );
@@ -222,7 +220,7 @@ EC(             ECCheckBounds( (void*) fontBuf ) );
                 CalcScaleForWidths( trueTypeVars, pointSize, stylesToImplement, width, weight );
 
                 /* convert FontHeader and fill FontBuf structure */
-                ConvertHeader( trueTypeVars, fontHeader, fontBuf );
+                ConvertHeader( trueTypeVars, fontBuf );
 
                 /* fill kerning pairs and kerning values */
                 ConvertKernPairs( trueTypeVars, fontBuf );
@@ -318,7 +316,7 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
 
                 /* get glyph index of currentChar */
                 charIndex = TT_Char_Index( CHAR_MAP, GeosCharToUnicode( currentChar ) );
-                if ( charIndex == 0 )
+                if ( !charIndex )
                 {
                         charTableEntry->CTE_flags          = CTF_NO_DATA;
                         charTableEntry->CTE_dataOffset     = CHAR_NOT_EXIST;
@@ -637,12 +635,12 @@ static void CalcScaleForWidths( TRUETYPE_VARS,
  *      10.02.24  JK        width and weight implemented
  *******************************************************************/
 
-static void CalcTransform( TransformMatrix*  transMatrix, 
-                           FontMatrix*       fontMatrix, 
-                           FontBuf*          fontBuf,
-                           TextStyle         stylesToImplement,
-                           Byte              width,
-                           Byte              weight )
+static void CalcTransform( TransformMatrix*   transMatrix, 
+                           const FontMatrix*  fontMatrix, 
+                           const FontBuf*     fontBuf,
+                           TextStyle          stylesToImplement,
+                           Byte               width,
+                           Byte               weight )
 {
         TT_Matrix  styleMatrix = { 1L<<16, 0, 0, 1L<<16 };
 
@@ -784,9 +782,6 @@ EC(             ECCheckMemHandle( *fontHandle ) );
  * 
  * PARAMETERS:     TRUETYPE_VARS
  *                    Cached variables needed by the TrueType driver.
- *                 FontHeader* fontHeader
- *                    Pointer to the source TrueType `FontHeader`, which
- *                    contains font metrics to be scaled.
  *                 FontBuf* fontBuf
  *                    Pointer to the destination `FontBuf`, which stores
  *                    the converted and scaled metrics for use in rendering.
@@ -805,7 +800,7 @@ EC(             ECCheckMemHandle( *fontHandle ) );
  *      11.12.22  JK        Initial Revision
  *******************************************************************/
 
-static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontBuf ) 
+static void ConvertHeader( TRUETYPE_VARS, FontBuf* fontBuf ) 
 {
         WWFixedAsDWord      ttfElement;
         WWFixedAsDWord      scaleWidth  = SCALE_WIDTH;
@@ -815,7 +810,6 @@ static void ConvertHeader( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
       
 
  EC(    ECCheckBounds( (void*)fontBuf ) );
- EC(    ECCheckBounds( (void*)fontHeader ) );
 
 
         /* Fill elements in FontBuf structure.                               */
