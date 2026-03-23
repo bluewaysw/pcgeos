@@ -416,6 +416,10 @@ ObjTypedefEqual (void *base, ObjType *tdef, VMHandle f2, void *t2Base,
  *	ardeb	10/ 7/89	Initial Revision
  *
  ***********************************************************************/
+
+static char NAMELESS_PREFIX[] = "__NAMELESS__";
+#define NAMELESS_PREFIX_LEN 12
+
 int
 Obj_TypeEqual(VMHandle	f1, 	    /* VM file containing any IDs for type1 */
 	      void  	*t1Base,    /* Base of block containing first type */
@@ -557,7 +561,14 @@ Obj_TypeEqual(VMHandle	f1, 	    /* VM file containing any IDs for type1 */
 		name1 = ST_Lock(f1, OTYPE_STRUCT_ID(type1));
 		name2 = ST_Lock(f2, OTYPE_STRUCT_ID(type2));
 
-		retval = (strcmp(name1, name2) == 0);
+		if((strncmp(name1, NAMELESS_PREFIX, NAMELESS_PREFIX_LEN) != 0) && 
+			(strncmp(name2, NAMELESS_PREFIX, NAMELESS_PREFIX_LEN) != 0)) {
+
+		    retval = (strcmp(name1, name2) == 0);
+		} else {
+		    retval = 1;
+		}
+
 
 		ST_Unlock(f1, OTYPE_STRUCT_ID(type1));
 		ST_Unlock(f2, OTYPE_STRUCT_ID(type2));
