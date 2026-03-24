@@ -27,7 +27,8 @@ export FileSelectDialogClass
 export IconEditDialogClass
 export InifEditDialogClass
 export SelectDirOrFileDialogClass
-
+export	SmartTextClass
+export ICApplicationClass
 
 # legt fest, welches Objekt die Applikation nach "au?en" vertreten soll.
 # Dieses Objekt ist gleichzeitig das Top-Level-Objekt im UI-tree
@@ -64,4 +65,5 @@ resource InifUIResource lmem read-only shared
 resource InifDialogResource ui-object
 resource FToolDataResource lmem read-only shared
 resource FToolDialogResource ui-object
+
 
