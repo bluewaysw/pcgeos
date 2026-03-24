@@ -9,11 +9,9 @@
 # LINKFLAGS       += -r
 
 # Do not Create any EC version
-NO_EC = 1
-
-
+# NO_EC = 1
 
 # Create a Copyrigth-notice
-LINKFLAGS += -N "(c) by RABE-Soft 10/99-05/2023"
+LINKFLAGS += -N "by RABE-Soft, 10/99-05/23"
 
 #include <$(SYSMAKEFILE)>
