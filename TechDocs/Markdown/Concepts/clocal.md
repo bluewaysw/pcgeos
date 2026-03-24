@@ -1,4 +1,4 @@
-## 8 Localization
+# 8 Localization
 
 Localization is the means by which GEOS adapts to foreign environments. 
 The kernel automatically accounts for such country-dependent items as 
@@ -9,7 +9,7 @@ look over this chapter whether or not you're planning on distributing your
 software internationally. The chapter includes documentation for some 
 functions which you're likely to use regardless.
 
-### 8.1 Localization Goals
+## 8.1 Localization Goals
 
 The benefit of Geoworks' experience with previous international products 
 was designed into GEOS from the start. The kernel was designed with the 
@@ -61,7 +61,7 @@ _International formats include variations in how numbers, times,
 currencies, etc. are displayed in various countries. These formats may 
 be set in the International section of the Preferences desk tool._
 
-### 8.2 How To Use Localization
+## 8.2 How To Use Localization
 
 Your localization workload will vary depending on whether you plan to 
 release your software in other countries. If you don't plan on exporting your 
@@ -93,7 +93,7 @@ application's resources and checks all objects for strings and bitmaps,
 asking the translator to make any fitting changes. The translator never 
 needs to see the source code and doesn't have to know how to program.
 
-### 8.3 Preparing for ResEdit
+## 8.3 Preparing for ResEdit
 
 **ResEdit** is a GEOS program which speeds geode translations. This section 
 won't tell you how to use the **ResEdit** tool but will explain how to write your 
@@ -194,14 +194,14 @@ problem by constraining the size of some gadgetry, keep in mind that if you
 don't allow it to stretch, your new strings may not fit. See Figure 8-2 for 
 illustrations of these problems.
 
-### 8.4 International Formats
+## 8.4 International Formats
 
 "International Formats" generally refers to formats which differ from 
 country to country. In GEOS, it signifies those formats which the user can set 
 in the International section of the Preferences desk tool. GEOS provides 
 functions to work with International Formats.
 
-#### 8.4.1 Number and Measure
+### 8.4.1 Number and Measure
 
 LocalGetNumericFormat(), LocalSetNumericFormat()
 LocalGetMeasurementType(), LocalSetMeasurementType(), 
@@ -274,7 +274,7 @@ Table 8-1 DistanceUnit types
 
 DU_POINTS_OR_MILLIMETERS and DU_INCHES_OR_CENTIMETERS: special cases
 
-#### 8.4.2 Currency
+### 8.4.2 Currency
 
 LocalGetCurrencyFormat(), LocalSetCurrencyFormat()
 
@@ -293,7 +293,7 @@ changing of the set preferences. Most parts of the currency format are stored
 in a **LocalCurrencyFormat** structure when passed to or returned by these 
 functions.
 
-#### 8.4.3 Quotation Marks
+### 8.4.3 Quotation Marks
 
 LocalGetQuotes(), LocalSetQuotes()
 
@@ -318,7 +318,7 @@ use. If you want to reset the preferences, use the **LocalSetQuotes()** routine.
 These routines work with the **LocalQuotes** structure, which simply holds 
 four characters to use as the four kinds of quotation mark.
 
-#### 8.4.4 Dates and Times
+### 8.4.4 Dates and Times
 
 LocalFormatDateTime(), LocalParseDateTime(),
 LocalGetDateTimeFormat(), LocalSetDateTimeFormat(),
@@ -402,7 +402,7 @@ MAX_MONTH_LENGTH, MAX_DAY_LENGTH, MAX_YEAR_LENGTH,
 MAX_WEEKDAY_LENGTH, MAX_SEPARATOR_LENGTH, and 
 TOKEN_LENGTH.
 
-#### 8.4.5 Filters for Formats
+### 8.4.5 Filters for Formats
 
 LocalIsDateChar(), LocalIsTimeChar(), LocalIsNumChar()
 
@@ -447,7 +447,7 @@ Table 8-3 DateTimeFormat String Tokens
 Examples show what U.S. version could produce. Actual output might not 
 look like samples.
 
-### 8.5 Lexical Functions
+## 8.5 Lexical Functions
 
 Since different languages have different alphabets, GEOS has to allow for 
 characters not in the standard English character set. Thus, many standard 
@@ -456,7 +456,7 @@ lexical value of characters, their place in a lexical, or alphabetic, ordering.
 These lexical values take the place of ASCII standard character values that 
 you may be used to.
 
-#### 8.5.1 Comparing Strings
+### 8.5.1 Comparing Strings
 
 LocalCmpStrings(), LocalCmpStringsNoCase(), 
 LocalCmpStringsNoSpace(), LocalCmpStringsNoSpaceCase(), 
@@ -484,7 +484,7 @@ There are two assembly routines **LocalCmpChars()** and
 **LocalCmpCharsNoCase()** which allow for the quick lexical comparison of 
 two characters.
 
-#### 8.5.2 String Length and Size
+### 8.5.2 String Length and Size
 
 LocalStringLength(), LocalStringSize()
 
@@ -496,7 +496,7 @@ Normally these two values will be the same, but any applications which want
 to support double byte character support will need separate functions to 
 handle those characters that take more than one byte to represent.
 
-#### 8.5.3 Casing
+### 8.5.3 Casing
 
 LocalUpcaseChar(), LocalDowncaseChar(), 
 LocalUpcaseString(), LocalDowncaseString()
@@ -510,7 +510,7 @@ functions by doing arithmetic operations with the lexical or ASCII values of
 characters, but chances are these will not work with other character sets and 
 should be avoided.
 
-#### 8.5.4 Character Categories
+### 8.5.4 Character Categories
 
 LocalIsUpper(), LocalIsLower(), LocalIsAlpha(), 
 LocalIsPunctuation(), LocalIsSpace(), LocalIsSymbol(), 
@@ -535,7 +535,7 @@ space when printed, corresponding to the standard C function **isprint()**.
 **LocalIsGraphic()** checks for displayable characters, in the manner of the 
 standard C function **isgraphic()**.
 
-#### 8.5.5 Lexical Values
+### 8.5.5 Lexical Values
 
 LocalLexicalValue(), LocalLexicalValueNoCase()
 
@@ -547,7 +547,7 @@ character comes first alphabetically. For instance, "a" would have a lower
 lexical value than "z." This ordering will be valid in any language using the 
 same character set. 
 
-#### 8.5.6 DOS Text & Code Pages
+### 8.5.6 DOS Text & Code Pages
 
 LocalDosToGeos(), LocalGeosToDos(), LocalDosToGeosChar(), 
 LocalGeosToDosChar(), LocalCmpStringsDosToGeos(), 

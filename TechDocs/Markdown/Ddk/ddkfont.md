@@ -1,11 +1,11 @@
-## 4 Font Driver
+# 4 Font Driver
 
 AUTHOR:	Gene Anderson (01/21/91)
 
 This document describes the interface and interactions of font drivers in
 PC/GEOS.
 
-### 4.1 Overview
+## 4.1 Overview
 
 In PC/GEOS, outline font drivers play a vital role in the
 WYSIWYG rendering engine.  They are called to generate the metrics for
@@ -74,7 +74,7 @@ which the font driver may choose to support or not, as is appropriate.
 These include functions such as adding or deleting a font from the
 system.
 
-### 4.2 Initialization Routines
+## 4.2 Initialization Routines
 
 *DR_INIT*
 
@@ -133,7 +133,7 @@ include pointsize, as that is irrelevant for outline fonts).  If there
 are no outlines for the FontIDs value in question, FI_outlineTab is
 zero (0) and there are no OutlineDataEntry structures.
 
-### 4.3 Data Routines
+## 4.3 Data Routines
 
 *DR_FONT_GEN_WIDTHS*
 
@@ -325,7 +325,7 @@ scheme, the characters may not be in any particular order.
                 [...]
         Region/CharData #c
 
-### 4.4 Metrics Routines
+## 4.4 Metrics Routines
 
 *DR_FONT_CHAR_METRICS*
 
@@ -418,7 +418,7 @@ be the only routine called to add data to the RegionPath, so the
 integrity of RegionPath data must be ensured.
 
 
-### 4.5 Debugging Tips
+## 4.5 Debugging Tips
 
 To assist in debugging font drivers and their interaction with
 the Font Manager, there are a number of useful TCL commands available:

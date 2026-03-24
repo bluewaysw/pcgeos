@@ -1,10 +1,10 @@
-## 3 The Plan
+# 3 The Plan
 
 The body of our tutorial consists of the step-by-step construction of an 
 application. The first step when you set out on any software development 
 project is to plan. Thus, we will start with a simple specification.
 
-### 3.1 My Chart Application
+## 3.1 My Chart Application
 
 **Precis:** Application accepts simple data entry and creates bar charts.
 
@@ -16,7 +16,7 @@ of GEOS programming.
 
 ![](Art/tutorial-mychart_papermock.png)
 
-### 3.2 Data Entry
+## 3.2 Data Entry
 
 Data will be displayed in a scrolling list. The user can select a position in the 
 list by clicking on the list. To manipulate the piece of data at that position, 
@@ -51,7 +51,7 @@ the New or Change buttons will be a GenValueClass object.
 GenValueClass is another object class for use with the Generic UI, 
 allowing the user to enter a value.
 
-### 3.3 Data Storage
+## 3.3 Data Storage
 
 Eventually, we would like the user to be able to work with sets of data as 
 "documents," and to allow multiple documents to be open at one time. To this 
@@ -72,7 +72,7 @@ can allocate and manipulate.
 document object to store our data list along, and the same file will store 
 the object we use to display the chart.
 
-### 3.4 Chart Display
+## 3.4 Chart Display
 
 The chart will be displayed in a simple rectangular area. The body of the 
 chart will be an object in charge of drawing the axes and title(s). Each bar of 

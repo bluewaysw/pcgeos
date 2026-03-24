@@ -1,6 +1,6 @@
 ## 3.3 Routines G-G
 ----------
-#### GCNListAdd()
+### GCNListAdd()
     Boolean GCNListAdd(
             optr            OD,         /* optr to add to list */
             ManufacturerID  manufID,    /* manufacturer ID of list */
@@ -18,7 +18,7 @@ if it currently exists on that list.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListAddHandles()
+### GCNListAddHandles()
     Boolean GCNListAddHandles(
             MemHandle           mh,         /* handle of object to add */
             ChunkHandle         ch,         /* chunk of object to add */
@@ -31,7 +31,7 @@ memory and chunk handles of the object rather than a complete optr.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListAddToBlock()
+### GCNListAddToBlock()
     Boolean GCNListAddToBlock(
             optr            OD,         /* optr of list to add */
             ManufacturerID  manufID,    /* manufacturer ID of list */
@@ -54,7 +54,7 @@ pointers after calling this routine.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListCreateBlock()
+### GCNListCreateBlock()
     ChunkHandle GCNListCreateBlock(
             MemHandle mh);      /* handle of the locked LMem block */
 
@@ -65,7 +65,7 @@ the list should be created.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListDestroyBlock()
+### GCNListDestroyBlock()
     void    GCNListDestroyBlock(
             MemHandle       mh,             /* handle of locked block to
                                              * be destroyed */
@@ -78,7 +78,7 @@ the chunk handle of the chunk containing the list of lists.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListDestroyList()
+### GCNListDestroyList()
     void    GCNListDestroyList(
             optr    list);      /* optr of the GCN list to be destroyed */
 
@@ -87,7 +87,7 @@ This routine destroys the specified GCN list.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListRelocateBlock()
+### GCNListRelocateBlock()
     void    GCNListRelocateBlock(
             MemHandle       mh,             /* handle of locked LMem block
                                              * containing GCN lists */
@@ -104,7 +104,7 @@ dereference pointers after calling it.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListRemove()
+### GCNListRemove()
     Boolean GCNListRemove(
             optr            OD,         /* the optr to be removed */
             ManufacturerID  manufID,    /* manufacturer ID of the list */
@@ -121,7 +121,7 @@ could not be removed.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListRemoveFromBlock()
+### GCNListRemoveFromBlock()
     Boolean GCNListRemoveFromBlock(
             optr            OD,             /* optr of GCN list to remove */
             ManufacturerID  manufID,        /* manufacturer of list to remove */
@@ -136,7 +136,7 @@ therein.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListRemoveHandles()
+### GCNListRemoveHandles()
     Boolean GCNListRemoveHandles(
             MemHandle           mh,
             ChunkHandle         ch,
@@ -151,7 +151,7 @@ the object to be removed via handles rather than an optr.
 **See Also:** GCNListRemove()
 
 ----------
-#### GCNListSend()
+### GCNListSend()
     word    GCNListSend(
             ManufacturerID  manufID,            /* manufacturer of list */
             word            listType,           /* notification type */
@@ -185,7 +185,7 @@ sent out.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListSendToBlock()
+### GCNListSendToBlock()
     word    GCNListSendToBlock(
             ManufacturerID      manufID,    /* manufacturer id of list */
             word                listType,   /* notification type */
@@ -207,7 +207,7 @@ instance of the GCN list by specifying the appropriate list of lists in *mh* and
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListSendToList()
+### GCNListSendToList()
     void    GCNListSendToList(
             optr                list,       /* optr of GCN list */
             EventHandle         event,      /* event to send to list */
@@ -229,7 +229,7 @@ set, the event passed will be set as the list's status message.
 **See Also:** GCNListSend()
 
 ----------
-#### GCNListSendToListHandles()
+### GCNListSendToListHandles()
     void    GCNListSendToListHandles(
             MemHandle           mh,         /* handle of list's block */
             ChunkHandle         ch,         /* chunk of list */
@@ -246,7 +246,7 @@ handles.
 **Include:** gcnlist.goh
 
 ----------
-#### GCNListUnRelocateBlock()
+### GCNListUnRelocateBlock()
     Boolean GCNListUnRelocateBlock(
             MemHandle   mh,             /* handle of the locked lmem block
                                          * containing the list of lists */
@@ -266,7 +266,7 @@ saved to the state file normally.
 **Include:** gcnlist.goh
 
 ----------
-#### GenCopyChunk()
+### GenCopyChunk()
     word    GenCopyChunk(
             MemHandle       destBlock,  /* handle of locked LMem block into
                                          * which chunk will be copied */
@@ -290,7 +290,7 @@ dereference pointers after calling it.
 **Include:** genC.goh
 
 ----------
-#### GenFindObjectInTree()
+### GenFindObjectInTree()
     optr    GenFindObjectInTree(
             optr    startObject,    /* optr of object at which to start search */
             dword   childTable);    /* pointer to table of bytes, each indicating
@@ -309,7 +309,7 @@ byte of -1 indicates the end of the table. The object found will be returned.
 **Include:** genC.goh
 
 ----------
-#### GenInsertChild()
+### GenInsertChild()
     void    GenInsertChild(
             MemHandle       mh,                 /* handle of parent */
             ChunkHandle     chnk,               /* chunk of parent */
@@ -329,7 +329,7 @@ must dereference pointers after calling it.
 **Include:** genC.goh
 
 ----------
-#### GenProcessAction()
+### GenProcessAction()
     void    GenProcessAction(
             MemHandle       mh,     /* handle of object calling the routine */
             ChunkHandle     chnk,   /* chunk of object calling the routine */
@@ -352,7 +352,7 @@ must dereference pointers after calling it.
 **Include:** genC.goh
 
 ----------
-#### GenProcessGenAttrsAfterAction()
+### GenProcessGenAttrsAfterAction()
     void    GenProcessGenAttrsAfterAction(
             MemHandle       mh,     /* handle of object calling the routine */
             ChunkHandle     chnk);  /* chunk of object calling the routine */
@@ -367,7 +367,7 @@ must dereference pointers after calling it.
 **Include:** genC.goh
 
 ----------
-#### GenProcessGenAttrsBeforeAction()
+### GenProcessGenAttrsBeforeAction()
     void    GenProcessGenAttrsBeforeAction(
             MemHandle   mh,     /* handle of object calling the routine */
             ChunkHandle chnk);  /* chunk of object calling the routine */
@@ -382,7 +382,7 @@ must dereference pointers after calling it.
 **Include:** genC.goh
 
 ----------
-#### GenProcessUndoGetFile()
+### GenProcessUndoGetFile()
     VMFileHandle GenProcessUndoGetFile();
 
 This routine returns the handle of the file that holds the process' undo 
@@ -391,7 +391,7 @@ information.
 **Include:** Objects/gProcC.goh
 
 ----------
-#### GenProcessUndoCheckIfIgnoring()
+### GenProcessUndoCheckIfIgnoring()
     Boolean GenProcessUndoCheckIfIgnoring();
 
 This routine returns *true* if the process is currently ignoring actions.
@@ -399,7 +399,7 @@ This routine returns *true* if the process is currently ignoring actions.
 **Include:** Objects/gProcC.goh
 
 ----------
-#### GenRemoveDownwardLink()
+### GenRemoveDownwardLink()
     void    GenRemoveDownwardLink(
             MemHandle   mh,         /* handle of calling object */
             ChunkHandle chnk,       /* chunk of calling object */
@@ -417,7 +417,7 @@ must dereference pointers after calling it.
 **Include:** genC.goh
 
 ----------
-#### GenSetUpwardLink()
+### GenSetUpwardLink()
     void    GenSetUpwardLink(
             MemHandle       mh,         /* handle of calling object */
             ChunkHandle     chnk,       /* chunk of calling object */
@@ -430,7 +430,7 @@ parent composite.
 **Include:** genC.goh
 
 ----------
-#### GeodeAllocQueue()
+### GeodeAllocQueue()
     QueueHandle GeodeAllocQueue();
 
 This routine allocates an event queue which can then be attached to a thread 
@@ -444,7 +444,7 @@ kernel only in exceptional circumstances.
 **Include:** geode.h
 
 ----------
-#### GeodeDuplicateResource()
+### GeodeDuplicateResource()
     MemHandle GeodeDuplicateResource(
             MemHandle mh);      /* handle of geode resource to duplicate */
 
@@ -456,7 +456,7 @@ returned.
 **Include:** resource.h
 
 ----------
-#### GeodeFind()
+### GeodeFind()
     GeodeHandle GeodeFind(
             const char  * name,         /* geode's permanent name */
             word        numChars,       /* number of characters to match:
@@ -484,7 +484,7 @@ for a positive match.
 **Include:** geode.h
 
 ----------
-#### GeodeFindResource()
+### GeodeFindResource()
     word    GeodeFindResource(
             FileHandle  file,           /* geode's executable file */
             word        resNum,         /* resource number to find */
@@ -520,7 +520,7 @@ first byte of the resource.
 **Include:** geode.h
 
 ----------
-#### GeodeFlushQueue()
+### GeodeFlushQueue()
     void    GeodeFlushQueue(
             QueueHandle     source,     /* source queue to flush */
             QueueHandle     dest,       /* queue to hold flushed events */
@@ -549,7 +549,7 @@ this flag is not passed, events will be appended to the queue.
 **Include:** geode.h
 
 ----------
-#### GeodeFreeQueue()
+### GeodeFreeQueue()
     void    GeodeFreeQueue(
             QueueHandle     qh);        /* handle of queue being freed */
 
@@ -560,7 +560,7 @@ must pass the handle of the queue to be freed.
 **Include:** geode.h
 
 ----------
-#### GeodeFreeDriver()
+### GeodeFreeDriver()
     void    GeodeFreeDriver(
             GeodeHandle     gh);        /* handle of the driver */
 
@@ -571,7 +571,7 @@ that routine.
 **Include:** driver.h
 
 ----------
-#### GeodeFreeLibrary()
+### GeodeFreeLibrary()
     void    GeodeFreeLibrary(
             GeodeHandle     gh);        /* handle of the library */
 
@@ -581,7 +581,7 @@ This routine frees a library geode that had been loaded with
 **Include:** library.h
 
 ----------
-#### GeodeGetAppObject()
+### GeodeGetAppObject()
     optr    GeodeGetAppObject(
             GeodeHandle     gh);    /* handle of the application geode */
 
@@ -592,7 +592,7 @@ application object.
 **Include:** geode.h
 
 ----------
-#### GeodeGetCodeProcessHandle()
+### GeodeGetCodeProcessHandle()
     GeodeHandle GeodeGetCodeProcessHandle();
 
 This routine returns the geode handle of the geode that owns the block in 
@@ -601,7 +601,7 @@ which the code which calls this routine resides.
 **Include:** geode.h
 
 ----------
-#### GeodeGetDefaultDriver()
+### GeodeGetDefaultDriver()
     GeodeHandle GeodeGetDefaultDriver(
             GeodeDefaultDriverType  type);  /* type of default driver to get */
 
@@ -618,7 +618,7 @@ GDDT_TASK(12).
 **Include:** driver.h
 
 ----------
-#### GeodeGetInfo()
+### GeodeGetInfo()
     word    GeodeGetInfo(
             GeodeHandle         gh,         /* handle of the subject geode */
             GeodeGetInfoType    info,       /* type of information to return */
@@ -683,7 +683,7 @@ permanent name. The buffer must be at least nine bytes.
 **Include:** geode.h
 
 ----------
-#### GeodeGetOptrNS()
+### GeodeGetOptrNS()
     optr    GeodeGetOptrNS(
             optr    obj);
 
@@ -693,7 +693,7 @@ actual global handle.
 **Include:** resource.h
 
 ----------
-#### GeodeGetProcessHandle()
+### GeodeGetProcessHandle()
     GeodeHandle GeodeGetProcessHandle();
 
 This routine returns the geode handle of the current executing process (i.e. 
@@ -703,14 +703,14 @@ application's geode handle or Process object's handle to a routine or message.
 **Include:** geode.h
 
 ----------
-#### GeodeGetUIData()
+### GeodeGetUIData()
     word    GeodeGetUIData(
             GeodeHandle     gh);
 
 **Include:** geode.h
 
 ----------
-#### GeodeInfoDriver()
+### GeodeInfoDriver()
     DriverInfoStruct  * GeodeInfoDriver(
             GeodeHandle gh); /* handle of the driver to get information about */
 
@@ -730,7 +730,7 @@ entry.
 **Include:** driver.h
 
 ----------
-#### GeodeInfoQueue()
+### GeodeInfoQueue()
     word    GeodeInfoQueue(
             QueueHandle qh);            /* queue to query */
 
@@ -742,7 +742,7 @@ currently in the queue.
 **Include:** geode.h
 
 ----------
-#### GeodeLoad()
+### GeodeLoad()
     GeodeHandle GeodeLoad(
             const char *        name,           /* file name of geode */
             GeodeAttrs          attrMatch,      /* GeodeAttrs that must be set */
@@ -786,7 +786,7 @@ it when you are done with **GeodeFree()**.
 **See Also:** UserLoadApplication() 
 
 ----------
-#### GeodeLoadDGroup
+### GeodeLoadDGroup
     void    GeodeLoadDGroup(
             MemHandle       mh);
 
@@ -795,7 +795,7 @@ This routine forces the **dgroup** segment into the data-segment register.
 **Include:** resource.h
 
 ----------
-#### GeodePrivAlloc()
+### GeodePrivAlloc()
     word    GeodePrivAlloc(
             GeodeHandle     gh,         /* handle of the owner of the
                                          * newly-allocated private data */
@@ -818,7 +818,7 @@ written are returned as all zeros.
 **Include:** geode.h
 
 ----------
-#### GeodePrivFree()
+### GeodePrivFree()
     void    GeodePrivFree(
             word    offset,     /* offset returned by GeodePrivAlloc() */
             word    numWords);  /* number of words to free */
@@ -831,7 +831,7 @@ areas. The space must previously have been allocated with
 **Include:** geode.h
 
 ----------
-#### GeodePrivRead()
+### GeodePrivRead()
     void    GeodePrivRead(
             GeodeHandle gh,         /* handle of owner of private data */
             word        offset,     /* offset returned by
@@ -856,7 +856,7 @@ be read. It must be at least numWords words long.
 **Include:** geode.h
 
 ----------
-#### GeodePrivWrite()
+### GeodePrivWrite()
     void    GeodePrivWrite(
             GeodeHandle gh,         /* handle of owner of private data */
             word        offset,     /* offset returned by
@@ -882,7 +882,7 @@ written.
 **Include:** geode.h
 
 ----------
-#### GeodeSetDefaultDriver()
+### GeodeSetDefaultDriver()
     void    GeodeSetDefaultDriver(
             GeodeDefaultDriverType  type,   /* type of default driver to set */
             GeodeHandle             gh);    /* driver to set as the default */
@@ -901,13 +901,13 @@ GDDT_TASK(12)
 **Include:** driver.h
 
 ----------
-#### GeodeSetUIData()
+### GeodeSetUIData()
     void    GeodeSetUIData(
             GeodeHandle     gh,
             word            data)
 
 ----------
-#### GeodeUseDriver()
+### GeodeUseDriver()
     GeodeHandle GeodeUseDriver(
             const   char    * name,         /* file name of driver to load */
             word            protoMajor,     /* expected major protocol */
@@ -939,7 +939,7 @@ use **GeodeFreeDriver()** to free it when you are done using it.
 **Include:** driver.h
 
 ----------
-#### GeodeUseLibrary()
+### GeodeUseLibrary()
     GeodeHandle GeodeUseLibrary(
             const char *        name,       /* file name of library to load */
             word                protoMajor, /* expected major protocol */
@@ -968,7 +968,7 @@ manually free it when finished, with **GeodeFreeLibrary()**.
 **Include:** library.h
 
 ----------
-#### GeoFree()
+### GeoFree()
     void    * GeoFree(
             void            * blockPtr,     /* address of memory to free */
             GeodeHandle     geodeHan);      /* owner of block to be used */
@@ -988,7 +988,7 @@ the system.
 **See Also:** free()
 
 ----------
-#### GeoMalloc()
+### GeoMalloc()
     void    * GeoMalloc(
             size_t          blockSize,      /* # of bytes to allocate*/
             GeodeHandle     geodeHan,       /* Owner of block to be used */
@@ -1011,7 +1011,7 @@ initialized to null bytes; otherwise, the memory will be left uninitialized.
 **See Also:** malloc()
 
 ----------
-#### GeoReAlloc()
+### GeoReAlloc()
     void    * GeoReAlloc(
             void            * blockPtr,     /* address of memory to resize */
             size_t          newSize,        /* New size in bytes */
@@ -1037,7 +1037,7 @@ the system.
 **See Also:** realloc()
 
 ----------
-#### GrApplyRotation()
+### GrApplyRotation()
     void    GrApplyRotation(
             GStateHandle        gstate,     /* GState to alter */
             WWFixedAsDWord      angle);     /* degrees counterclockwise */
@@ -1047,7 +1047,7 @@ Apply a rotation to the GState's transformation matrix.
 **Include:** graphics.h 
 
 ----------
-#### GrApplyScale()
+### GrApplyScale()
     void    GrApplyScale(
             GStateHandle        gstate,     /* GState to alter */
             WWFixedAsDWord      xScale,     /* new x scale factor */
@@ -1058,7 +1058,7 @@ Apply a scale factor to the GState's transformation matrix.
 **Include:** graphics.h 
 
 ----------
-#### GrApplyTransform()
+### GrApplyTransform()
     void    GrApplyTransform(
             GStateHandle        gstate,     /* GState to draw to */
             const TransMatrix   *tm);       /* transformation matrix to apply */
@@ -1069,7 +1069,7 @@ coordinate system.
 **Include:** graphics.h 
 
 ----------
-#### GrApplyTranslation()
+### GrApplyTranslation()
     void    GrApplyTranslation(
             GStateHandle        gstate,         /* GState to alter */
             WWFixedAsDWord      xTrans,         /* translation in x */
@@ -1080,7 +1080,7 @@ Apply a translation to the GState.
 **Include:** graphics.h 
 
 ----------
-#### GrApplyTranslationDWord()
+### GrApplyTranslationDWord()
     void    GrApplyTranslationDWord(
             GStateHandle    gstate,         /* GState to alter */
             sdword          xTrans,         /* extended translation in x */
@@ -1091,7 +1091,7 @@ Apply a 32-bit integer extended translation to the GState.
 **Include:** graphics.h 
 
 ----------
-#### GrBeginPath()
+### GrBeginPath()
     void    GrBeginPath(
             GStateHandle        gstate,         /* GState to alter */
             PathCombineType     params);        /* path parameters */
@@ -1105,7 +1105,7 @@ path, or may be combined with the old path by intersection or union.
 **Include:** graphics.h 
 
 ----------
-#### GrBeginUpdate()
+### GrBeginUpdate()
     void    GrBeginUpdate(
             GStateHandle gstate);           /* GState to draw to */
 
@@ -1116,7 +1116,7 @@ MSG_META_EXPOSED handler. Blanks out the invalid area.
 **Include:** win.h
 
 ----------
-#### GrBitBlt()
+### GrBitBlt()
     void    GrBitBlt(
             GStateHandle    gstate,     /* GState to draw to */
             sword           sourceX,    /* original x origin */
@@ -1142,7 +1142,7 @@ involve moving a drawing around the screen.
 **Include:** graphics.h 
 
 ----------
-#### GrBrushPolyline()
+### GrBrushPolyline()
     void    GrBrushPolyline(
             GStateHandle    gstate,     /* GState to draw to */
             const Point     * points,   /* array of Point structures to draw */
@@ -1157,7 +1157,7 @@ pixels.
 **Include:** graphics.h 
 
 ----------
-#### GrCharMetrics()
+### GrCharMetrics()
     dword   GrCharMetrics(
             GStatehandle    gstate,     /* GState to get metrics for */
             GCM_info        info,       /* information to return */
@@ -1186,7 +1186,7 @@ character-by-character), use **GrCharWidth()** instead.
 **Include:** font.h
 
 ----------
-#### GrCharWidth()
+### GrCharWidth()
     dword   GrCharWidth(    /* Returns width << 16 */
             GStateHandle    gstate,     /* GState to query */
             word            ch);        /* character of type Chars */
@@ -1198,7 +1198,7 @@ attributes that apply to multiple characters.
 **Include:** graphics.h 
 
 ----------
-#### GrCheckFontAvailID()
+### GrCheckFontAvailID()
     FontID  GrCheckFontAvailID(
             FontEnumFlags   flags,
             word            family,
@@ -1209,7 +1209,7 @@ See if font (identified by ID) exists.
 **Include:** graphics.h 
 
 ----------
-#### GrCheckFontAvailName()
+### GrCheckFontAvailName()
     FontID  GrCheckFontAvailName(
             FontEnumFlags   flags,
             word            family,
@@ -1220,7 +1220,7 @@ See if font (identified by name) exists.
 **Include:** graphics.h 
 
 ----------
-#### GrClearBitmap()
+### GrClearBitmap()
     void    GrClearBitmap(
             GStateHandle    gstate);    /* GState to affect */
 
@@ -1232,7 +1232,7 @@ mask is cleared and the data portion is left alone.
 **Include:** graphics.h 
 
 ----------
-#### GrCloseSubPath()
+### GrCloseSubPath()
     void    GrCloseSubPath(
             GStateHandle gstate);       /* GState to affect */
 
@@ -1242,7 +1242,7 @@ still call **GrEndPath()** to end the path definition.
 **Include:** graphics.h 
 
 ----------
-#### GrComment()
+### GrComment()
     void    GrComment(
             GStateHandle    gstate,         /* GState to affect */
             const void      * data,         /* comment string */
@@ -1253,7 +1253,7 @@ Write a comment out to a graphics string.
 **Include:** graphics.h 
 
 ----------
-#### GrCopyGString()
+### GrCopyGString()
     GSRetType GrCopyGString(
             GStateHandle    source,     /* GState from which to get GString */
             GStateHandle    dest,       /* GState to which to copy GString */
@@ -1289,7 +1289,7 @@ The return value can be any one of **GSRetType**, a byte-size field:
 **Include:** gstring.h 
 
 ----------
-#### GrCreateBitmap()
+### GrCreateBitmap()
     VMBlockHandle GrCreateBitmap(
             BMFormat        initFormat,     /* color fomat of bitmap */
             word            initWidth,      /* initial width of bitmap */
@@ -1354,7 +1354,7 @@ The bitmap's raw data is in the VM block, but outside of the header area.
 **Include:** graphics.h 
 
 ----------
-#### GrCreateGString()
+### GrCreateGString()
     GStateHandle GrCreateGString(
             Handle      han,        /* memory, stream, or VM file handle */
             GStringType hanType,    /* type of handle in han parameter */
@@ -1368,7 +1368,7 @@ GST_VMEM.
 **Include:** gstring.h 
 
 ----------
-#### GrCreatePalette()
+### GrCreatePalette()
     word    GrCreatePalette( /* Returns # of entries in color table
                               * or 0 for monochrome or 24-bit */
             GStateHandle gstate);
@@ -1379,7 +1379,7 @@ Initialize the table entries to the default palette for the device.
 **Include:** graphics.h 
 
 ----------
-#### GrCreateState()
+### GrCreateState()
     GStateHandle GrCreateState(
             WindowHandle win);  /* Window in which GState will be active */
 
@@ -1391,7 +1391,7 @@ with it.
 **Include:** graphics.h 
 
 ----------
-#### GrDeleteGStringElement()
+### GrDeleteGStringElement()
     void    GrDeleteGStringElement(
             GStateHandle    gstate,     /* GState containing GString */
             word            count);     /* number of elements to delete */
@@ -1401,7 +1401,7 @@ Delete a range of GString elements from the GString in the passed GState.
 **Include:** graphics.h 
 
 ----------
-#### GrDestroyBitmap()
+### GrDestroyBitmap()
     void    GrDestroyBitmap(
             GStateHandle    gstate,     /* GState containing bitmap */
             BMDestroy       flags);     /* flags for removing data */
@@ -1420,7 +1420,7 @@ in a drawable state.
 **Include:** graphics.h 
 
 ----------
-#### GrDestroyGString()
+### GrDestroyGString()
     void    GrDestroyGString(
             Handle              gstring,    /* Handle of GString */
             GStateHandle        gstate,     /* NULL, or handle of another
@@ -1442,7 +1442,7 @@ routine will do some cleaning up.
 **Include:** gstring.h 
 
 ----------
-#### GrDestroyPalette()
+### GrDestroyPalette()
     void    GrDestroyPalette(
             GStateHandle gstate);       /* GState of palette to destroy */
 
@@ -1451,7 +1451,7 @@ Free any custom palette associated with the current window.
 **Include:** graphics.h 
 
 ----------
-#### GrDestroyState()
+### GrDestroyState()
     void    GrDestroyState(
             GStateHandle gstate);       /* GState to be destroyed */
 
@@ -1460,7 +1460,7 @@ Free a graphics state block.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawArc()
+### GrDrawArc()
     void    GrDrawArc(
             GStateHandle    gstate,         /* GState to draw to */
             sword           left,           /* bounds of box outlining arc */
@@ -1477,7 +1477,7 @@ starting angle to the ending angle.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawArc3Point()
+### GrDrawArc3Point()
     void    GrDrawArc3Point(
             GStateHandle                gstate,     /* GState to draw to */
             const ThreePointArcParams   *params);           
@@ -1487,7 +1487,7 @@ other point on the arc.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawArc3PointTo()
+### GrDrawArc3PointTo()
     void    GrDrawArc3PointTo(
             GStateHandle                gstate,     /* GState to draw to */
             const ThreePointArcToParams *params);
@@ -1498,7 +1498,7 @@ automatically used as one of the endpoints.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawBitmap()
+### GrDrawBitmap()
     void    GrDrawBitmap(
             GStateHandle    gstate,         /* GState to draw to */
             sword           x,              /* x starting point */
@@ -1518,7 +1518,7 @@ allows the bitmap to be drawn in horizontal bands, or swaths.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawBitmapAtCP()
+### GrDrawBitmapAtCP()
     void    GrDrawBitmapAtCP(
             GStateHandle        gstate,         /* GState to draw to */
             const   Bitmap      * bm,           /* pointer to the bitmap */
@@ -1530,7 +1530,7 @@ bitmap is drawn at the current position.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawChar()
+### GrDrawChar()
     void    GrDrawChar(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x,          /* x position at which to draw */
@@ -1543,7 +1543,7 @@ attributes.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawCharAtCP()
+### GrDrawCharAtCP()
     void    GrDrawCharAtCP(
             GStateHandle    gstate,         /* GState to draw to */
             word            ch);            /* character of type Chars */
@@ -1554,7 +1554,7 @@ attributes.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawCurve()
+### GrDrawCurve()
     void    GrDrawCurve(
             GStateHandle        gstate,         /* GState to draw to */
             const Point         *points);       /* array of four Points */
@@ -1564,7 +1564,7 @@ Draw a Bezier curve.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawCurveTo()
+### GrDrawCurveTo()
     void    GrDrawCurveTo(
             GStateHandle        gstate,         /* GState to draw to */
             const Point         *points);       /* array of three Points */
@@ -1574,7 +1574,7 @@ Draw a Bezier curve, using the current postion as the first point.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawEllipse()
+### GrDrawEllipse()
     void    GrDrawEllipse(
             GStateHandle    gstate,     /* GState to draw to */
             sword           left,       /* bounding box bounds */
@@ -1587,7 +1587,7 @@ Draw an ellipse, defined by its bounding box.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawGString()
+### GrDrawGString()
     GSRetType GrDrawGString(
             GStateHandle    gstate,         /* GState to draw to */
             Handle          gstringToDraw,  /* GString to draw */
@@ -1636,7 +1636,7 @@ element was present.
 **Include:** gstring.h 
 
 ----------
-#### GrDrawGStringAtCP()
+### GrDrawGStringAtCP()
     GSRetType GrDrawGStringAtCP(
             GStateHandle        gstate,         /* GState to draw to */
             GStringeHandle      gstringToDraw,  /* GString to draw */
@@ -1676,7 +1676,7 @@ element was present.
 **Include:** gstring.h 
 
 ----------
-#### GrDrawHLine()
+### GrDrawHLine()
     void    GrDrawHLine(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x1,         /* first horizontal coordinate */
@@ -1688,7 +1688,7 @@ Draw a horizontal line.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawHLineTo()
+### GrDrawHLineTo()
     void    GrDrawHLineTo(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x);         /* ending horizontal coordinate */
@@ -1698,7 +1698,7 @@ Draw a horizontal line starting from the current position.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawHugeBitmap()
+### GrDrawHugeBitmap()
     void    GrDrawHugeBitmap(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x           /* Point at which to draw */
@@ -1714,7 +1714,7 @@ Draw a bitmap that resides in a HugeArray.
 GrDrawHugeImage() 
 
 ----------
-#### GrDrawHugeBitmapAtCP()
+### GrDrawHugeBitmapAtCP()
     void    GrDrawHugeBitmapAtCP(
             GStateHandle        gstate,     /* GState to draw to */
             VMFileHandle        vmFile,     /* VM file containing HugeArray */
@@ -1728,7 +1728,7 @@ current position.
 **See Also:** GrDrawBitmapAtCP(), GrDrawHugeBitmap() 
 
 ----------
-#### GrDrawHugeImage()
+### GrDrawHugeImage()
     void    GrDrawHugeImage(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x           /* point at which to draw */
@@ -1762,7 +1762,7 @@ bitmap pixel.
 **See Also:** GrDrawImage() , GrDrawHugeBitmapAtCP()
 
 ----------
-#### GrDrawImage()
+### GrDrawImage()
     void    GrDrawImage(
             GStateHandle        gstate,         /* GState to draw to */
             sword       x           /* point at which to draw */
@@ -1794,7 +1794,7 @@ so that a square of device pixels displays each bitmap pixel.
 **See Also:** GrDrawHugeImage() , GrDrawBitmap() 
 
 ----------
-#### GrDrawLine()
+### GrDrawLine()
     void    GrDrawLine(
             GStateHandle    gstate, /* GState to draw to */
             sword           x1,     /* First coordinate of line */
@@ -1809,7 +1809,7 @@ Draw a line.
 **See Also:** GrDrawLineTo(), GrDrawHLine(), GrDrawVLine() 
 
 ----------
-#### GrDrawLineTo()
+### GrDrawLineTo()
     void    GrDrawLineTo(
             GStateHandle    gstate, /* GState to draw to */
             sword           x,      /* Second coordinate of line */
@@ -1822,7 +1822,7 @@ Draw a line starting from the current position.
 **See Also:** GrDrawLine(), GrDrawHLineTo(), GrDrawVLineTo() 
 
 ----------
-#### GrDrawPath()
+### GrDrawPath()
     void    GrDrawPath(
             GStateHandle gstate);       /* GState to draw to */
 
@@ -1832,7 +1832,7 @@ attributes.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawPoint()
+### GrDrawPoint()
     void    GrDrawPoint(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x,          /* Coordinates of point to draw */
@@ -1843,7 +1843,7 @@ Draw a pixel.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawPointAtCP()
+### GrDrawPointAtCP()
     void    GrDrawPointAtCP(
             GStateHandle gstate);       /* GState to draw to */
 
@@ -1852,7 +1852,7 @@ Draw a pixel.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawPolygon()
+### GrDrawPolygon()
     void    GrDrawPolygon(
             GStateHandle    gstate,         /* GState to draw to */
             const   Point   * points,       /* array of points in polygon */
@@ -1863,7 +1863,7 @@ Draws a connected polygon.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawPolyline()
+### GrDrawPolyline()
     void    GrDrawPolyline(
             GStateHandle    gstate,         /* GState to draw to */
             const   Point   * points,       /* array of points in polyline */
@@ -1874,7 +1874,7 @@ Draws a simple polyline.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRect()
+### GrDrawRect()
     void    GrDrawRect(
             GStateHandle    gstate,     /* GState to draw to */
             sword           left,       /* bounds of rectangle to draw */
@@ -1887,7 +1887,7 @@ Draws the outline of a rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRectTo()
+### GrDrawRectTo()
     void    GrDrawRectTo(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x,          /* opposite corner of rectangle */
@@ -1899,7 +1899,7 @@ position.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRegion()
+### GrDrawRegion()
     void    GrDrawRegion(
             GStateHandle    gstate,     /* GState to draw to */
             sword           xPos,       /* Position at which to draw */
@@ -1916,7 +1916,7 @@ attributes.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRegionAtCP()
+### GrDrawRegionAtCP()
     void    GrDrawRegionAtCP(
             GStateHandle    gstate, /* GState to draw to */
             const Region    * reg,  /* region definition */
@@ -1931,7 +1931,7 @@ with the GState's area attributes.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRelArc3PointTo()
+### GrDrawRelArc3PointTo()
     void    GrDrawRelArc3PointTo(
             const ThreePointRelArcToParams  *params);
 
@@ -1942,7 +1942,7 @@ coordinates.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRelLineTo()
+### GrDrawRelLineTo()
     void    GrDrawRelLineTo(
             GStateHandle    gstate, /* GState to draw to */
             WWFixedAsDWord  x,      /* horizontal offset of second point */
@@ -1954,7 +1954,7 @@ current pen position to draw to.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRoundRect()
+### GrDrawRoundRect()
     void    GrDrawRoundRect(
             GStateHandle    gstate,         /* GState to draw to */
             sword           left,           /* bounds of rectangle */
@@ -1968,7 +1968,7 @@ Draw the outline of a rounded rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawRoundRectTo()
+### GrDrawRoundRectTo()
     void    GrDrawRoundRectTo(
             GStateHandle    gstate,         /* GState to draw to */
             sword           x,              /* opposite corner of bounds */
@@ -1981,7 +1981,7 @@ rectangle is the current position.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawSpline()
+### GrDrawSpline()
     void    GrDrawSpline(
             GStateHandle    gstate,         /* GState to draw   to */
             const Point     * points,       /* array of points */
@@ -1994,7 +1994,7 @@ Draw a Bezier spline.
 **See Also:** GrDrawCurve() 
 
 ----------
-#### GrDrawSplineTo()
+### GrDrawSplineTo()
     void    GrDrawSplineTo(
             GStateHandle    gstate,         /* GState to draw to */
             const Point     *points,        /* array of points */
@@ -2007,7 +2007,7 @@ Draw a Bezier spline, using the current position as one endpoint.
 **See Also:** GrDrawCurveTo() 
 
 ----------
-#### GrDrawText()
+### GrDrawText()
     void    GrDrawText(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x,          /* point at which to draw */
@@ -2025,7 +2025,7 @@ null-terminated.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawTextAtCP()
+### GrDrawTextAtCP()
     void    GrDrawTextAtCP(
             GStateHandle    gstate,     /* GState to draw to */
             const Chars     * str,      /* pointer to character string */
@@ -2040,7 +2040,7 @@ null-terminated.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawVLine()
+### GrDrawVLine()
     void    GrDrawVLine(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x,          /* horizontal position of line */
@@ -2052,7 +2052,7 @@ Draw a vertical line.
 **Include:** graphics.h 
 
 ----------
-#### GrDrawVLineTo()
+### GrDrawVLineTo()
     void    GrDrawVLine(
             GStateHandle    gstate,     /* GState to draw to */
             sword           y);         /* second vertical position */
@@ -2062,7 +2062,7 @@ Draw a vertical line starting from the current position.
 **Include:** graphics.h 
 
 ----------
-#### GrEditBitmap()
+### GrEditBitmap()
     GStateHandle GrEditBitmap(
             VMFileHandle    vmFile,         /* VM file of bitmap */
             VMBlockHandle   vmBlock,        /* VM block of bitmap */
@@ -2074,7 +2074,7 @@ may be be sent to the bitmap.
 **Include:** graphics.h 
 
 ----------
-#### GrEditGString()
+### GrEditGString()
     GStateHandle GrEditGString(
             Handle  vmFile,     /* VM file containing the GString */
             word    vmBlock);   /* VM block containing the GString */
@@ -2087,7 +2087,7 @@ appended to the GString.
 **Include:** graphics.h 
 
 ----------
-#### GrEndGString()
+### GrEndGString()
     GStringErrorType GrEndGString( 
             GStateHandle gstate);           /* GState to draw to */
 
@@ -2103,7 +2103,7 @@ Finish the definition of a graphics string.
 **Include:** graphics.h 
 
 ----------
-#### GrEndPath()
+### GrEndPath()
     void    GrEndPath(
             GStateHandle gstate);       /* GState to draw to */
 
@@ -2113,7 +2113,7 @@ display, as normal.
 **Include:** graphics.h 
 
 ----------
-#### GrEndUpdate()
+### GrEndUpdate()
     void    GrEndUpdate(
             GStateHandle gstate);       /* GState to draw to */
 
@@ -2122,7 +2122,7 @@ Unlocks window from an update.
 **Include:** win.h 
 
 ----------
-#### GrEnumFonts()
+### GrEnumFonts()
     word    GrEnumFonts( /* Return value = number of fonts found */
             FontEnumStruct  * buffer,   /* buffer for returned values */
             word            size,       /* number of structures to return */
@@ -2142,7 +2142,7 @@ font's ID and a string name.
 **Include:** font.h 
 
 ----------
-#### GrEscape()
+### GrEscape()
     void    GrEscape(
             GStateHandle    gstate,         /* GState to draw to */
             word            code,           /* escape code */
@@ -2154,7 +2154,7 @@ Write an escape code to a graphics string.
 **Include:** graphics.h 
 
 ----------
-#### GrFillArc()
+### GrFillArc()
     void    GrFillArc(
             GStateHandle    gstate,         /* GState to draw to */
             sword           left,           /* bounding rectangle */
@@ -2172,7 +2172,7 @@ either a wedge or a chord fill.
 **Include:** graphics.h 
 
 ----------
-#### GrFillArc3Point()
+### GrFillArc3Point()
     void    GrFillArc3Point(
             GStateHandle            gstate,     /* GState to draw to */
             const ThreePointParams  *params);
@@ -2184,7 +2184,7 @@ other point, all of which must lie on the arc.
 **Include:** graphics.h 
 
 ----------
-#### GrFillArc3PointTo()
+### GrFillArc3PointTo()
     void    GrFillArc3PointTo(
             GStateHandle                gstate,     /* GState to draw to */
             const ThreePointArcParams   *params);
@@ -2195,7 +2195,7 @@ by the current position.
 **Include:** graphics.h 
 
 ----------
-#### GrFillBitmap()
+### GrFillBitmap()
     void    GrFillBitmap (
             GStateHandle        gstate,     /* GState to draw to */
             sword               x,          /* point at which to draw */
@@ -2209,7 +2209,7 @@ to this routine are the same as those for **GrDrawBitmap()**.
 **Include:** graphics.h 
 
 ----------
-#### GrFillBitmapAtCP()
+### GrFillBitmapAtCP()
     void    GrFillBitmapAtCP (
             GStateHandle    gstate,         /* GState to draw to */
             const Bitmap    * bm,           /* pointer to bitmap */
@@ -2222,7 +2222,7 @@ as those for **GrDrawBitmapAtCP()**.
 **Include:** graphics.h 
 
 ----------
-#### GrFillEllipse()
+### GrFillEllipse()
     void    GrFillEllipse(
             GStateHandle    gstate,     /* GState to draw to */
             sword           left,       /* Bounds of bounding rectangle */
@@ -2236,7 +2236,7 @@ box.
 **Include:** graphics.h 
 
 ----------
-#### GrFillPath()
+### GrFillPath()
     void    GrFillPath(
             GStateHandle    gstate,         /* GState to draw to */
             RegionFillRule  rule);          /* ODD_EVEN or WINDING */
@@ -2246,7 +2246,7 @@ Fill an area whose outline is defined by the GState's path.
 **Include:** graphics.h 
 
 ----------
-#### GrFillPolygon()
+### GrFillPolygon()
     void    GrFillPolygon(
             GStateHandle        gstate,         /* GState to draw to */
             RegionFillRule      windingRule,    /* ODD_EVEN or WINDING */
@@ -2258,7 +2258,7 @@ Fill polygon. The polygon is defined by the passed array of points.
 **Include:** graphics.h 
 
 ----------
-#### GrFillRect()
+### GrFillRect()
     void    GrFillRect(
             GStateHandle    gstate,         /* GState to draw to */
             sword           left,           /* bounds of rectangle */
@@ -2271,7 +2271,7 @@ Draw a filled rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrFillRectTo()
+### GrFillRectTo()
     void    GrFillRectTo(
             GStateHandle    gstate,     /* GState to draw to */
             sword           x,          /* opposite corner of rectangle */
@@ -2282,7 +2282,7 @@ Draw a filled rectangle. The current position will define one of the corners.
 **Include:** graphics.h 
 
 ----------
-#### GrFillRoundRect()
+### GrFillRoundRect()
     void    GrFillRoundRect(
             GStateHandle    gstate,         /* GState to draw to */
             sword           left,           /* bounds of rectangle */
@@ -2296,7 +2296,7 @@ Draw a filled rounded rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrFillRoundRectTo()
+### GrFillRoundRectTo()
     void    GrFillRoundRectTo(
             GStateHandle    gstate,         /* GState to draw to */
             sword           x,              /* opposite corner of rectangle */
@@ -2309,7 +2309,7 @@ corner of the bounding rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrFindNearestPointsize()
+### GrFindNearestPointsize()
     Boolean GrFindNearestPointsize( /* If false, then FontID invalid */
             FontID      id,                 /* fond ID */
             dword       sizeSHL16,          /* point size */
@@ -2325,7 +2325,7 @@ return valued will be *true*.
 **Include:** font.h 
 
 ----------
-#### GrFontMetrics()
+### GrFontMetrics()
     dword   GrFontMetrics(
             GStateHandle    gstate,     /* subject GState */
             GFM_info        info);      /* Type of information to return */
@@ -2375,7 +2375,7 @@ based on the *info* parameter.
 **Include:** font.h 
 
 ----------
-#### GrGetAreaColor()
+### GrGetAreaColor()
     RGBColorAsDWord     GrGetAreaColor(
             GStateHandle gstate);       /* GState of which to get color */
 
@@ -2384,7 +2384,7 @@ Get the color which is being used to fill areas.
 **Include:** graphics.h 
 
 ----------
-#### GrGetAreaColorMap()
+### GrGetAreaColorMap()
     ColorMapMode GrGetAreaColorMap(
             GStateHandle  gstate);  /* GState of which to get area color map */
 
@@ -2393,7 +2393,7 @@ Get the mapping mode used for filling areas with unavailable colors.
 **Include:** graphics.h 
 
 ----------
-#### GrGetAreaMask()
+### GrGetAreaMask()
     SysDrawMask GrGetAreaMask(
             GStateHandle    gstate,     /* GState of which to get mask */
             DrawMask        * dm);      /* buffer for returned mask */
@@ -2407,7 +2407,7 @@ from top row to bottom.
 **Include:** graphics.h 
 
 ----------
-#### GrGetAreaPattern()
+### GrGetAreaPattern()
     GraphicPattern  GrGetAreaPattern(
             GStateHandle    gstate,             /* GState of area pattern */
             const MemHandle * customPattern,    /* pointer to handle of block for
@@ -2420,7 +2420,7 @@ Get the area pattern used when filling areas.
 **Include:** graphics.h 
 
 ----------
-#### GrGetBitmap()
+### GrGetBitmap()
     MemHandle GrGetBitmap(
             GStateHandle    gstate,         /* GState containing bitmap */
             sword           x,              /* bitmap origin */
@@ -2436,7 +2436,7 @@ bitmap successfully copied.
 **Include:** graphics.h 
 
 ----------
-#### GrGetBitmapMode()
+### GrGetBitmapMode()
     BitmapMode  GrGetBitmapMode(
             GStateHandle    gstate);    /* GState containing bitmap */
 
@@ -2445,7 +2445,7 @@ Get mode bits for an editable bitmap.
 **Include:** graphics.h 
 
 ----------
-#### GrGetBitmapRes()
+### GrGetBitmapRes()
     XYValueAsDWord GrGetBitmapRes(
             const Bitmap    * bm);      /* pointer to the bitmap */
 
@@ -2454,7 +2454,7 @@ Get the resolution of a bitmap.
 **Include:** graphics.h 
 
 ----------
-#### GrGetBitmapSize()
+### GrGetBitmapSize()
     XYValueAsDWord GrGetBitmapSize(
             const Bitmap    * bm);      /* pointer to the bitmap */
 
@@ -2463,7 +2463,7 @@ Get the dimensions, in points, of a bitmap.
 **Include:** graphics.h 
 
 ----------
-#### GrGetClipRegion()
+### GrGetClipRegion()
     MemHandle GrGetClipRegion(
             GStateHandle    gstate,         /* subject GState */
             RegionFillRule  rule);          /* ODD_EVEN or WINDING */
@@ -2474,7 +2474,7 @@ paths are set for the GState.
 **Include:** graphics.h 
 
 ----------
-#### GrGetCurPos()
+### GrGetCurPos()
     XYValueAsDWord GrGetCurPos(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2483,7 +2483,7 @@ Get the current pen position.
 **Include:** graphics.h 
 
 ----------
-#### GrGetCurPosWWFixed()
+### GrGetCurPosWWFixed()
     void    GrGetCurPosWWFixed(
             GStateHandle    gstate,         /* subject GState */
             PointWWFixed    *cp);           /* buffer in which to return cur. pos. */
@@ -2493,7 +2493,7 @@ Get the current pen position.
 **Include:** graphics.h 
 
 ----------
-#### GrGetDefFontID()
+### GrGetDefFontID()
     FontID  GrGetDefFontID(
             dword   * sizeSHL16);   /* pointer to buffer for returned size */
 
@@ -2502,7 +2502,7 @@ Get the system default font (including size).
 **Include:** font.h 
 
 ----------
-#### GrGetFont()
+### GrGetFont()
     FontID  GrGetFont(
             GStateHandle    gstate,         /* subject GState */
             WWFixedAsDWord  * pointSize);   /* pointer to buffer for
@@ -2513,7 +2513,7 @@ Get the passed GState's current font, including point size.
 **Include:** graphics.h 
 
 ----------
-#### GrGetFontName()
+### GrGetFontName()
     FontID  GrGetFontName(
             FontID          id,         /* ID of font */
             const char      * name);    /* buffer for returned name string */
@@ -2525,7 +2525,7 @@ FID_NAME_LEN in size.
 **Include:** font.h 
 
 ----------
-#### GrGetFontWeight()
+### GrGetFontWeight()
     FontWeight GrGetFontWeight(
             GStateHandle    gstate);    /* GState containing the font */
 
@@ -2534,7 +2534,7 @@ Get the current font weight set for the passed GState.
 **Include:** font.h 
 
 ----------
-#### GrGetFontWidth()
+### GrGetFontWidth()
     FontWidth GrGetFontWidth(
             GStateHandle    gstate);    /* GState containing the font */
 
@@ -2543,7 +2543,7 @@ Get the current font width set for the passed GState.
 **Include:** font.h 
 
 ----------
-#### GrGetGStringBounds()
+### GrGetGStringBounds()
     void    GrGetGStringBounds(
             GStringHandle   source,         /* GString to be checked */
             GStateHandle    dest,           /* handle of GState to use */
@@ -2558,7 +2558,7 @@ containing rectangle will be returned in the structure pointed to by *bounds*.
 **Include:** gstring.h 
 
 ----------
-#### GrGetGStringBoundsDWord
+### GrGetGStringBoundsDWord
     void    GrGetGStringBoundsDWord(
             Handle          gstring,        /* GString to be checked */
             GStateHandle    gstate,         /* handle of GState to use */
@@ -2576,7 +2576,7 @@ containing rectangle will be returned in the structure pointed to by *bounds*.
 **Include:** gstring.h 
 
 ----------
-#### GrGetGStringElement()
+### GrGetGStringElement()
     GStringElement GrGetGStringElement(
             GStateHandle    gstate,                 /* handle of GString's GState */
             void            * buffer,               /* pointer to return buffer */
@@ -2591,7 +2591,7 @@ explicitly. The routine's data can be returned in a buffer.
 **Include:** gstring.h 
 
 ----------
-#### GrGetInfo()
+### GrGetInfo()
     void    GrGetInfo(
             GStateHandle    gstate,     /* GState to get information about */
             GrInfoTypes     type,       /* type of information to get */
@@ -2611,7 +2611,7 @@ GState.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineColor()
+### GrGetLineColor()
     RGBColorAsDWord GrGetLineColor(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2620,7 +2620,7 @@ Get the color used when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineColorMap()
+### GrGetLineColorMap()
     ColorMapMode GrGetLineColorMap(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2629,7 +2629,7 @@ Get the mode used when drawing lines in an unavailable color.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineEnd()
+### GrGetLineEnd()
     LineEnd GrGetLineEnd(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2638,7 +2638,7 @@ Get the end used when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineJoin()
+### GrGetLineJoin()
     LineJoin GrGetLineJoin(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2647,7 +2647,7 @@ Get the join used when drawing corners.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineMask()
+### GrGetLineMask()
     SysDrawMask GrGetLineMask(
             GStateHandle    gstate,     /* subject GState */
             DrawMask        * dm);      /* buffer for returned custom mask */
@@ -2661,7 +2661,7 @@ ordered from top row to bottom.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineStyle()
+### GrGetLineStyle()
     LineStyle GrGetLineStyle(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2670,7 +2670,7 @@ Get the style, or "dottedness," used when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrGetLineWidth()
+### GrGetLineWidth()
     WWFixedAsDWord  GrGetLineWidth(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2679,7 +2679,7 @@ Get the current line width.
 **Include:** graphics.h 
 
 ----------
-#### GrGetMaskBounds()
+### GrGetMaskBounds()
     void    GrGetMaskBounds(
             GStateHandle    gstate,         /* subject GState */
             Rectangle       * bounds);      /* buffer for returned bounds */
@@ -2689,7 +2689,7 @@ Get the 16-bit bounds of the current clip rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrGetMaskBoundsDWord()
+### GrGetMaskBoundsDWord()
     void    GrGetMaskBoundsDWord(
             GStateHandle    gstate,         /* subject GState */
             RectDWord       * bounds);      /* buffer for returned bounds */
@@ -2700,7 +2700,7 @@ point.
 **Include:** graphics.h 
 
 ----------
-#### GrGetMiterLimit()
+### GrGetMiterLimit()
     WWFixedAsDWord GrGetMiterLimit(
             GStateHandle    gstate);            /* subject GState */
 
@@ -2709,7 +2709,7 @@ Get the miter limit to use when drawing mitered corners.
 **Include:** graphics.h 
 
 ----------
-#### GrGetMixMode()
+### GrGetMixMode()
     MixMode GrGetMixMode(
             GStateHandle    gstate);            /* subject GState */
 
@@ -2718,7 +2718,7 @@ Get the current mixing mode.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPalette()
+### GrGetPalette()
     MemHandle GrGetPalette(
             GStateHandle    gstate,         /* subject GState */
             GetPalType      flag,           /* GPT_ACTIVE, GPT_CUSTOM, or
@@ -2731,7 +2731,7 @@ handle of a block containing all the returned palette entries.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPath()
+### GrGetPath()
     MemHandle   GrGetPath(
             GStateHandle    gstate,         /* subject GState */
             GetPathType     ptype);         /* Which path to retrieve */
@@ -2743,7 +2743,7 @@ clipping path may be retrieved.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPathBounds()
+### GrGetPathBounds()
     Boolean GrGetPathBounds(
             GStateHandle    gstate,         /* subject GState */
             GetPathType     ptype,
@@ -2756,7 +2756,7 @@ for the GState.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPathBoundsDWord()
+### GrGetPathBoundsDWord()
     Boolean GrGetPathBoundsDWord(
             GStateHandle    gstate,         /* subject GState */
             GetPathType     ptype,
@@ -2769,7 +2769,7 @@ for the GState.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPathPoints()
+### GrGetPathPoints()
     MemHandle   GrGetPathPoints(
             GStateHandle    gstate,         /* subject GState */
             word            resolution);    /* dots per inch */
@@ -2780,7 +2780,7 @@ points are in document coordinates.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPathRegion()
+### GrGetPathRegion()
     MemHandle GrGetPathRegion(
             GStateHandle        gstate,         /* subject GState */
             RegionFillRule      rule);          /* ODD_EVEN or WINDING */
@@ -2790,7 +2790,7 @@ Get the region enclosed by a path.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPoint()
+### GrGetPoint()
     RGBColorAsDWord GrGetPoint(
             GStateHandle    gstate,     /* subject GState */
             sword           x,          /* coordinates of pixel */
@@ -2801,7 +2801,7 @@ Get the color of the pixel corresponding to the specified coordinates.
 **Include:** graphics.h 
 
 ----------
-#### GrGetPtrRegBounds()
+### GrGetPtrRegBounds()
     word    GrGetPtrRegBounds( /* Returns size of Region data struct. */
             const Region    * reg,          /* pointer to region */
             Rectangle       * bounds);      /* returned bounds of region */
@@ -2811,7 +2811,7 @@ Get the bounds of the passed region.
 **Include:** graphics.h 
 
 ----------
-#### GrGetSubscriptAttr()
+### GrGetSubscriptAttr()
     ScriptAttrAsWord GrGetSubscriptAttr(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2822,7 +2822,7 @@ percentage of the font size from the top at which the character gets drawn.
 **Include:** font.h 
 
 ----------
-#### GrGetSuperscriptAttr()
+### GrGetSuperscriptAttr()
     ScriptAttrAsWord GrGetSuperscriptAttr(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2834,7 +2834,7 @@ drawn.
 **Include:** font.h 
 
 ----------
-#### GrGetTextBounds()
+### GrGetTextBounds()
     Boolean GrGetTextBounds(
             GStateHandle    gstate,     /* subject GState */
             word            xpos,       /* position where text would be drawn */
@@ -2849,7 +2849,7 @@ is zero, the string is assumed to be null-terminated.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextColor()
+### GrGetTextColor()
     RGBColorAsDWord GrGetTextColor(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2858,7 +2858,7 @@ Get the color used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextColorMap()
+### GrGetTextColorMap()
     ColorMapMode    GrGetTextColorMap(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2867,7 +2867,7 @@ Get the mode used when drawing text in an unavailable color.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextMask()
+### GrGetTextMask()
     SystemDrawMask  GrGetTextMask(
             GStateHandle    gstate,         /* subject GState */
             DrawMask        * dm);          /* returned custom mask, if any */
@@ -2881,7 +2881,7 @@ from top row to bottom.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextMode()
+### GrGetTextMode()
     TextMode    GrGetTextMode(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2891,7 +2891,7 @@ drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextPattern()
+### GrGetTextPattern()
     GraphicPattern  GrGetTextPattern(
             GStateHandle    gstate,             /* subject GState */
             const MemHandle * customPattern,    /* pointer to returned handle
@@ -2904,7 +2904,7 @@ Get the graphics pattern used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextSpacePad()
+### GrGetTextSpacePad()
     WWFixedAsDWord GrGetTextSpacePad(
             GStateHandle    gstate);            /* subject GState */
 
@@ -2913,7 +2913,7 @@ Get the space pad used when drawing strings of text.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTextStyle()
+### GrGetTextStyle()
     TextStyle   GrGetTextStyle(
             GStateHandle    gstate);            /* subject GState */
 
@@ -2922,7 +2922,7 @@ Get the style used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrGetTrackKern()
+### GrGetTrackKern()
     word    GrGetTrackKern(
             GStateHandle    gstate);            /* subject GState */
 
@@ -2931,7 +2931,7 @@ Get the track kerning used when drawing strings of text.
 **Include:**    graphics.h 
 
 ----------
-#### GrGetTransform()
+### GrGetTransform()
     void    GrGetTransform(
             GStateHandle    gstate,     /* subject GState */
             TransMatrix     * tm);      /* pointer to returned TransMatrix */
@@ -2941,7 +2941,7 @@ Get the current coordinate transformation, expressed as a matrix.
 **Include:** graphics.h 
 
 ----------
-#### GrGetWinBounds()
+### GrGetWinBounds()
     void    GrGetWinBounds(
             GStateHandle    gstate,         /* subject GState */
             Rectangle       * bounds);      /* returned window bounds */
@@ -2951,7 +2951,7 @@ Get the bounds of the GState's associated window.
 **Include:** graphics.h 
 
 ----------
-#### GrGetWinBoundsDWord()
+### GrGetWinBoundsDWord()
     void    GrGetWinBoundsDWord(
             GStateHandle    gstate,         /* subject GState */
             RectDWord       * bounds);      /* returned window bounds */
@@ -2962,7 +2962,7 @@ point.
 **Include:** graphics.h 
 
 ----------
-#### GrGetWinHandle()
+### GrGetWinHandle()
     WindowHandle GrGetWinHandle(
             GStateHandle    gstate);        /* subject GState */
 
@@ -2971,7 +2971,7 @@ Get the handle of the GState's associated window.
 **Include:** graphics.h 
 
 ----------
-#### GrGrabExclusive()
+### GrGrabExclusive()
     GStateHandle GrGrabExclusive(
             GeodeHandle     videoDriver,        /* NULL for default */
             GStateHandle    gstate);            /* subject GState */
@@ -2981,7 +2981,7 @@ Start drawing exclusively to a video driver.
 **Include:** graphics.h 
 
 ----------
-#### GrInitDefaultTransform()
+### GrInitDefaultTransform()
     void    GrInitDefaultTransform(
             GStateHandle    gstate);            /* subject GState */
 
@@ -2991,7 +2991,7 @@ transformation.
 **Include:** graphics.h 
 
 ----------
-#### GrInvalRect()
+### GrInvalRect()
     void    GrInvalRect(
             GStateHandle    gstate,     /* subject GState */
             sword           left,       /* bounds to be invalidated */
@@ -3004,7 +3004,7 @@ Invalidate the passed rectangular area. This area will be redrawn.
 **Include:** graphics.h 
 
 ----------
-#### GrInvalRectDWord()
+### GrInvalRectDWord()
     void    GrInvalRectDWord(
             GStateHandle        gstate,     /* subject GState */
             const RectDWord     * bounds);  /* bounds to be invalidated */
@@ -3014,7 +3014,7 @@ Invalidate the passed rectangular area. This area will be redrawn.
 **Include:** graphics.h 
 
 ----------
-#### GrLabel()
+### GrLabel()
     void    GrLabel(
             GStringHandle   gstate,         /* subject GState */
             word            label);         /* label to write to GString */
@@ -3024,7 +3024,7 @@ Write the passed label into the passed GString.
 **Include:** gstring.h 
 
 ----------
-#### GrLoadGString()
+### GrLoadGString()
     GStringHandle GrLoadGString(
             Handle          han,        /* handle of GString source */
             GStringType     hanType,    /* handle type */
@@ -3045,7 +3045,7 @@ addressed GStrings.
 **Include:** gstring.h 
 
 ----------
-#### GrMapColorIndex()
+### GrMapColorIndex()
     RGBColorAsDWord GrMapColorIndex(
             GStateHandle    gstate,         /* GState to use for mapping */
             Color           c);             /* source color to be mapped */
@@ -3056,7 +3056,7 @@ the passed GState.
 **Include:** graphics.h 
 
 ----------
-#### GrMapColorRGB()
+### GrMapColorRGB()
     RGBColorAsDWord GrMapColorRGB(
             GStateHandle    gstate,         /* GState to use for mapping */
             word            red,            /* RGB values to map */
@@ -3068,7 +3068,7 @@ Map an RGB color to an index.
 **Include:** graphics.h 
 
 ----------
-#### GrMoveReg()
+### GrMoveReg()
     void    GrMoveReg(
             Region  * reg,      /* pointer to region */
             sword   xOffset,    /* amount to shift horizontally */
@@ -3081,7 +3081,7 @@ way for the changes to have any visible effect.
 **Include:** graphics.h 
 
 ----------
-#### GrMoveTo()
+### GrMoveTo()
         void    GrMoveTo(
             GStateHandle    gstate,     /* subject GState */
             sword           x,          /* new absolute pen position */
@@ -3092,7 +3092,7 @@ Change the pen position.
 **Include:** graphics.h 
 
 ----------
-#### GrMulDWFixed()
+### GrMulDWFixed()
     void    GrMulDWFixed(
             const DWFixed   * i,            /* first number */
             const DWFixed   * j,            /* second number */
@@ -3103,7 +3103,7 @@ Multiply two fixed point numbers.
 **Include:** graphics.h 
 
 ----------
-#### GrMulWWFixed()
+### GrMulWWFixed()
     WWFixedAsDWord GrMulWWFixed(
             WWFixedAsDWord  i,          /* first number */
             WWFixedAsDWord  j);         /* second number */
@@ -3113,7 +3113,7 @@ Multiply two fixed point numbers.
 **Include:** graphics.h 
 
 ----------
-#### GrNewPage()
+### GrNewPage()
     void    GrNewPage(
             GStateHandle        gstate,
             PageEndCommand      pageEndCommand);
@@ -3123,7 +3123,7 @@ Begin drawing a new page. Normally used when printing documents.
 **Include:** graphics.h 
 
 ----------
-#### GrNullOp()
+### GrNullOp()
     void    GrNullOp(
             GStateHandle    gstate);        /* subject GState */
 
@@ -3132,7 +3132,7 @@ Write a null operation element to a GString.
 **Include:** graphics.h 
 
 ----------
-#### GrQuickArcSine()
+### GrQuickArcSine()
     WWFixedAsDWord GrQuickArcSine(
             WWFixedAsDWord  deltaYDivDistance,  /* delta y / distance */
             word            origDeltaX);        /* original delta x */
@@ -3143,7 +3143,7 @@ of the positive x axis.
 **Include:** graphics.h 
 
 ----------
-#### GrQuickCosine()
+### GrQuickCosine()
     WWFixedAsDWord GrQuickCosine(
             WWFixedAsDWord  angle);         /* angle to cosine */
 
@@ -3153,7 +3153,7 @@ of the positive x axis.
 **Include:** graphics.h 
 
 ----------
-#### GrQuickSine()
+### GrQuickSine()
     WWFixedAsDWord GrQuickSine(
             WWFixedAsDWord  angle);         /* angle to sine */
 
@@ -3163,7 +3163,7 @@ the positive x axis.
 **Include:** graphics.h 
 
 ----------
-#### GrQuickTangent()
+### GrQuickTangent()
     WWFixedAsDWord GrQuickTangent(
             WWFixedAsDWord  angle);         /* angle to tangent */
 
@@ -3173,7 +3173,7 @@ of the positive x axis.
 **Include:** graphics.h 
 
 ----------
-#### GrReleaseExclusive()
+### GrReleaseExclusive()
     void    GrReleaseExclusive( /* TRUE if system had to force a redraw */
             GeodeHandle     videoDriver,    /* handle of video driver */
             GStateHandle    gstate,         /* GState that was drawing */
@@ -3184,7 +3184,7 @@ Stop drawing exclusively to a video driver.
 **Include:** graphics.h 
 
 ----------
-#### GrRelMoveTo()
+### GrRelMoveTo()
     void    GrRelMoveTo(
             GStateHandle        gstate,     /* subject GState */
             WWFixedAsDWord      x,          /* offsets to new pen position */
@@ -3196,7 +3196,7 @@ position.
 **Include:** graphics.h 
 
 ----------
-#### GrRestoreState()
+### GrRestoreState()
     void    GrRestoreState(
             GStateHandle    gstate);        /* subject GState */
 
@@ -3205,7 +3205,7 @@ Restore the values of a saved GState.
 **Include:**    graphics.h 
 
 ----------
-#### GrSaveState()
+### GrSaveState()
     void    GrSaveState(
             GStateHandle    gstate);        /* subject GState */
 
@@ -3215,7 +3215,7 @@ Save the values of a GState, so that they may be restored by
 **Include:** graphics.h 
 
 ----------
-#### GrSDivDWFByWWF()
+### GrSDivDWFByWWF()
     void GrSDivDWFByWWF(
             const DWFixed       * dividend,
             const WWFixed       * divisor,
@@ -3226,7 +3226,7 @@ Divide two fixed point numbers.
 **Include:** graphics.h 
 
 ----------
-#### GrSDivWWFixed()
+### GrSDivWWFixed()
     WWFixedAsDWord GrSDivWWFixed(
             WWFixedAsDWord  dividend,
             WWFixedAsDWord  divisor)
@@ -3236,7 +3236,7 @@ Divide two fixed point numbers.
 **Include:** graphics.h 
 
 ----------
-#### GrSetAreaAttr()
+### GrSetAreaAttr()
     void    GrSetAreaAttr(
             GStateHandle    gstate,         /* subject GState */
             const AreaAttr  * aa);          /* AreaAttr structure */
@@ -3255,7 +3255,7 @@ Set all of the attributes used when filling areas.
 **Include:** graphics.h 
 
 ----------
-#### GrSetAreaColor()
+### GrSetAreaColor()
     void    GrSetAreaColor(
             GStateHandle    gstate,         /* GState to set color for */
             ColorFlag       flag,           /* flag of how to set color */
@@ -3269,7 +3269,7 @@ Set the color to use when filling areas. The flag parameter may be CF_RGB
 **Include:** graphics.h 
 
 ----------
-#### GrSetAreaColorMap()
+### GrSetAreaColorMap()
     void    GrSetAreaColorMap(
             GStateHandle    gstate,         /* subject GState */
             ColorMapMode    colorMap);      /* color mapping mode */
@@ -3279,7 +3279,7 @@ Set mode to use when trying to fill an area with an unavailable color.
 **Include:** graphics.h 
 
 ----------
-#### GrSetAreaMaskCustom()
+### GrSetAreaMaskCustom()
     void    GrSetAreaMaskCustom(
             GStateHandle        gstate,         /* subject GState */
             const DrawMask      * dm);          /* pointer to new custom mask */
@@ -3289,7 +3289,7 @@ Set the drawing mask to use when filling areas.
 **Include:** graphics.h 
 
 ----------
-#### GrSetAreaMaskSys()
+### GrSetAreaMaskSys()
     void    GrSetAreaMaskSys(
             GStateHandle    gstate,         /* subject GState */
             SystemDrawMask  sysDM);         /* new system area mask */
@@ -3299,7 +3299,7 @@ Set the drawing mask to use when filling areas.
 **Include:** graphics.h 
 
 ----------
-#### GrSetAreaPattern()
+### GrSetAreaPattern()
     void    GrSetAreaPattern(
             GStateHandle    gstate,         /* subject GState */
             GraphicPattern  pattern);       /* new pattern */
@@ -3309,7 +3309,7 @@ Set the graphics pattern to use when filling areas.
 **Include:** graphics.h 
 
 ----------
-#### GrSetBitmapMode()
+### GrSetBitmapMode()
     void    GrSetBitmapMode(
             GStateHandle    gstate,     /* subject GState */
             word            flags,      /* BM_EDIT_MASK or BM_CLUSTERED_DITHER */
@@ -3321,7 +3321,7 @@ turning on clustered dithering.
 **Include:** graphics.h 
 
 ----------
-#### GrSetBitmapRes()
+### GrSetBitmapRes()
     Boolean GrSetBitmapRes(
             GStateHandle    gstate,         /* subject GState */
             word            xRes,           /* new resolutions */
@@ -3332,7 +3332,7 @@ Set a complex bitmap's resolution.
 **Include:** graphics.h 
 
 ----------
-#### GrSetClipPath()
+### GrSetClipPath()
     void    GrSetClipPath(
             GStateHandle        gstate,     /* subject GState */
             PathCombineType     params,     /* how paths should be combined */
@@ -3343,7 +3343,7 @@ Restrict the clipping region by intersecting it with the passed path.
 **Include:** graphics.h 
 
 ----------
-#### GrSetClipRect()
+### GrSetClipRect()
     void    GrSetClipRect(
             GStateHandle        gstate,     /* subject GState */
             PathCombineType     flags,      /* how paths should be combined */
@@ -3357,7 +3357,7 @@ Restrict the clipping region by intersecting it with the passed rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrSetCustomAreaPattern()
+### GrSetCustomAreaPattern()
     void    GrSetCustomAreaPattern(
             GStateHandle    gstate,         /* subject GState */
             GraphicPattern  pattern,        /* new area pattern */
@@ -3369,7 +3369,7 @@ Set the graphics pattern to use when filling areas.
 **Include:** graphics.h 
 
 ----------
-#### GrSetCustomTextPattern()
+### GrSetCustomTextPattern()
     void    GrSetCustomTextPattern(
             GStateHandle    gstate,             /* subject GState */
             GraphicPattern  pattern,            /* new pattern */
@@ -3380,7 +3380,7 @@ Set the graphic pattern used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetDefaultTransform()
+### GrSetDefaultTransform()
     void    GrSetDefaultTransform(
             GStateHandle    gstate);            /* subject GState */
 
@@ -3390,7 +3390,7 @@ transformation.
 **Include: **graphics.h 
 
 ----------
-#### GrSetFont()
+### GrSetFont()
     void    GrSetFont(
             GStateHandle        gstate,         /* subject GState */
             FontID              id,             /* new font ID */
@@ -3401,7 +3401,7 @@ Set the font to use when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetFontWeight()
+### GrSetFontWeight()
     void    GrSetFontWeight(
             GStateHandle    gstate,         /* subject GState */
             FontWeight      weight);        /* new font weight */
@@ -3411,7 +3411,7 @@ Set the font weight to use when drawing text.
 **Include:** font.h 
 
 ----------
-#### GrSetFontWidth()
+### GrSetFontWidth()
     void    GrSetFontWidth(
             GStateHandle    gstate,             /* subject GState */
             FontWidth       width);             /* new font width */
@@ -3421,7 +3421,7 @@ Set the font width to use when drawing text.
 **Include:** font.h 
 
 ----------
-#### GrSetGStringBounds()
+### GrSetGStringBounds()
     void    GrSetGStringBounds(
             Handle      gstate,         /* GState or GString handle */
             sword       left,           /* new bounds of GString */
@@ -3436,7 +3436,7 @@ whenever that routine is called upon the affected GString.
 **Include:** graphics.h 
 
 ----------
-#### GrSetGStringPos()
+### GrSetGStringPos()
     void    GrSetGStringPos(
             GStateHandle        gstate,     /* subject GState */
             GStringSetPosType   type,       /* how to set position */
@@ -3456,7 +3456,7 @@ draw only selected elements of a GString.
 **Include:** gstring.h 
 
 ----------
-#### GrSetLineAttr()
+### GrSetLineAttr()
     void    GrSetLineAttr(
             GStateHandle        gstate,         /* subject GState */
             const LineAttr      * la);          /* new line attributes */
@@ -3466,7 +3466,7 @@ Set all attributes to use when drawing lines and corners.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineColor()
+### GrSetLineColor()
     void    GrSetLineColor(
             GStateHandle    gstate,         /* subject GState */
             ColorFlag       flag,           /* color flag */
@@ -3479,7 +3479,7 @@ Set the color to use when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineColorMap()
+### GrSetLineColorMap()
     void    GrSetLineColorMap(
             GStateHandle    gstate,         /* subject GState */
             ColorMapMode    colorMap);      /* new color map mode for lines */
@@ -3489,7 +3489,7 @@ Set the mode to use when trying to draw lines in an unavailable color.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineEnd()
+### GrSetLineEnd()
     void    GrSetLineEnd(
             GStateHandle    gstate,         /* subject GState */
             LineEnd         end);           /* new line end specification */
@@ -3499,7 +3499,7 @@ Set the end to use when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineJoin()
+### GrSetLineJoin()
     void    GrSetLineJoin(
             GStateHandle    gstate,         /* subject GState */
             LineJoin        join);          /* new line join specification */
@@ -3509,7 +3509,7 @@ Set the line join to use when drawing corners.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineMaskCustom()
+### GrSetLineMaskCustom()
     void    GrSetLineMaskCustom(
             GStateHandle    gstate,         /* subject GState */
             const DrawMask  * dm);          /* new line draw mask */
@@ -3519,7 +3519,7 @@ Set the drawing mask used when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineMaskSys()
+### GrSetLineMaskSys()
     void    GrSetLineMaskSys(
             GStateHandle        gstate,         /* subject GState */
             SystemDrawMask      sysDM);         /* the new system line mask */
@@ -3529,7 +3529,7 @@ Set the drawing mask used when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineStyle()
+### GrSetLineStyle()
     void    GrSetLineStyle(
             GStateHandle        gstate,         /* subject GState */
             LineStyle           style,          /* new line style */
@@ -3542,7 +3542,7 @@ Set the style, or "dottedness," to use when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrSetLineWidth()
+### GrSetLineWidth()
     void    GrSetLineWidth(
             GStateHandle        gstate,         /* subject GState */
             WWFixedAsDWord      width);         /* new line width */
@@ -3552,7 +3552,7 @@ Set the line width to use when drawing lines.
 **Include:** graphics.h 
 
 ----------
-#### GrSetMiterLimit()
+### GrSetMiterLimit()
     void    GrSetMiterLimit(
             GStateHandle        gstate,         /* subject GState */
             WWFixedAsDWord      limit);         /* new miter limit */
@@ -3562,7 +3562,7 @@ Set the miter limit to use when drawing mitered corners.
 **Include:** graphics.h 
 
 ----------
-#### GrSetMixMode()
+### GrSetMixMode()
     void    GrSetMixMode(
             GStateHandle    gstate,             /* subject GState */
             MixMode         mode);              /* new mix mode */
@@ -3573,7 +3573,7 @@ is drawn on top of an existing drawing.
 **Include:** graphics.h 
 
 ----------
-#### GrSetNullTransform()
+### GrSetNullTransform()
     void    GrSetNullTransform(
             GStateHandle    gstate);            /* subject GState */
 
@@ -3584,7 +3584,7 @@ replace the coordinate transformation with the default transformation using
 **Include:** graphics.h 
 
 ----------
-#### GrSetPalette()
+### GrSetPalette()
     void    GrSetPalette(
             GStateHandle    gstate,         /* subject GState */
             SetPalType      type,           /* SPT_DEFAULT or SPT_CUSTOM */
@@ -3597,7 +3597,7 @@ Set one or more entries in a palette, a window's color lookup table.
 **Include:** graphics.h 
 
 ----------
-#### GrSetPaletteEntry()
+### GrSetPaletteEntry()
     void    GrSetPaletteEntry(
             GStateHandle    gstate,     /* subject GState */
             word            index,      /* index in palette to set */
@@ -3610,7 +3610,7 @@ Set one entry in a palette, a GState's color lookup table.
 **Include:** graphics.h 
 
 ----------
-#### GrSetPath()
+### GrSetPath()
     void    GrSetPath(
             GStateHandle    gstate,             /* subject GState */
             MemHandle       pathGString);       /* handle of path's block */
@@ -3621,7 +3621,7 @@ passed handle. To get such a handle, call **GrGetPath()**
 **Include:** graphics.h 
 
 ----------
-#### GrSetPrivateData()
+### GrSetPrivateData()
     void    GrSetPrivateData(
             GStateHandle    gstate,             /* subject GState */
             word            dataAX,             /* data to set */
@@ -3634,7 +3634,7 @@ Set the private data for a GState.
 **Include:** graphics.h 
 
 ----------
-#### GrSetStrokePath()
+### GrSetStrokePath()
     void    GrSetStrokePath(
             GStateHandle    gstate);            /* subject GState */
 
@@ -3645,7 +3645,7 @@ clipping.
 **Include:** graphics.h 
 
 ----------
-#### GrSetSubscriptAttr()
+### GrSetSubscriptAttr()
     void    GrSetSubscriptAttr(
             GStateHandle        gstate,         /* subject GState */
             ScriptAttrAsWord    attrs);         /* new subscript percentages */
@@ -3655,7 +3655,7 @@ Get the attributes used when drawing subscript characters.
 **Include:** font.h 
 
 ----------
-#### GrSetSuperscriptAttr()
+### GrSetSuperscriptAttr()
     void    GrSetSuperscriptAttr(
             GStateHandle        gstate,     /* subject GState */
             ScriptAttrAsWord    attrs);     /* new superscript percentages */
@@ -3665,7 +3665,7 @@ Get the attributes used when drawing superscript characters.
 **Include:** font.h 
 
 ----------
-#### GrSetTextAttr()
+### GrSetTextAttr()
     void    GrSetTextAttr(
             GStateHandle        gstate,     /* subject GState */
             const   TextAttr    * ta);      /* pointer to text attributes */
@@ -3675,7 +3675,7 @@ Set all attributes used when drawing characters and text strings.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextColor()
+### GrSetTextColor()
     void    GrSetTextColor(
             GStateHandle    gstate,         /* subject GState */
             ColorFlag       flag,           /* color flag */
@@ -3688,7 +3688,7 @@ Set the color used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextColorMap()
+### GrSetTextColorMap()
     void    GrSetTextColorMap(
             GStateHandle        gstate,         /* subject GState */
             ColorMapMode        colorMap);      /* new color mapping mode */
@@ -3698,7 +3698,7 @@ Set the mode used when trying to draw text in an unavailable color.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextMaskCustom()
+### GrSetTextMaskCustom()
     void    GrSetTextMaskCustom(
             GStateHandle        gstate,         /* subject GState */
             const DrawMask      * dm);          /* pointer to custom mask */
@@ -3708,7 +3708,7 @@ Set the drawing mask used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextMaskSys()
+### GrSetTextMaskSys()
     void    GrSetTextMaskSys(
             GStateHandle        gstate,         /* subject GState */
             SystemDrawMask      sysDM);         /* new system draw mask */
@@ -3718,7 +3718,7 @@ Set the drawing mask used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextMode()
+### GrSetTextMode()
     void    GrSetTextMode(
             GStateHandle    gstate,             /* subject GState */
             TextMode        bitsToSet,          /* TextMode flags to set */
@@ -3730,7 +3730,7 @@ to change the vertical offset used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextPattern()
+### GrSetTextPattern()
     void    GrSetTextPattern(
             GStateHandle        gstate,         /* subject GState */
             GraphicPattern      pattern);       /* new graphic pattern for text */
@@ -3740,7 +3740,7 @@ Set the graphic pattern used when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextSpacePad()
+### GrSetTextSpacePad()
     void    GrSetTextSpacePad(
             GStateHandle        gstate,         /* subject GState */
             WWFixedAsDWord      padding);       /* new space padding */
@@ -3750,7 +3750,7 @@ Set the space pad used when drawing text strings.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTextStyle()
+### GrSetTextStyle()
     void    GrSetTextStyle(
             GStateHandle    gstate,             /* subject GState */
             TextStyle       bitsToSet,          /* TextStyle flags to set */
@@ -3761,7 +3761,7 @@ Set the style to use when drawing text.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTrackKern()
+### GrSetTrackKern()
     void    GrSetTrackKern(
             GStateHandle    gstate,         /* subject GState */
             word            tk);            /* degree of track kerning */
@@ -3771,7 +3771,7 @@ Set the track kerning to use when drawing text strings.
 **Include:** graphics.h 
 
 ----------
-#### GrSetTransform()
+### GrSetTransform()
     void    GrSetTransform(
             GStateHandle        gstate,         /* subject GState */
             const TransMatrix   * tm);          /* new transformation matrix */
@@ -3781,7 +3781,7 @@ Set the GState's coordinate transformation.
 **Include:** graphics.h 
 
 ----------
-#### GrSetVMFile()
+### GrSetVMFile()
     void    GrSetVMFile(
             GStateHandle    gstate,         /* subject GState */
             VMFileHandle    vmFile);        /* new transformation matrix */
@@ -3792,7 +3792,7 @@ with certain kinds of bitmaps and GStrings).
 **Include:** graphics.h 
 
 ----------
-#### GrSetWinClipPath()
+### GrSetWinClipPath()
     void    GrSetWinClipPath(
             GStateHandle        gstate,         /* subject GState */
             PathCombineType     params,         /* how paths are combined */
@@ -3803,7 +3803,7 @@ Restrict the window's clipping region by intersecting it with the passed path.
 **Include:** graphics.h 
 
 ----------
-#### GrSetWinClipRect()
+### GrSetWinClipRect()
     void    GrSetWinClipRect(
             GStateHandle        gstate,     /* subject GState */
             PathCombineType     flags,      /* how paths are combined */
@@ -3818,7 +3818,7 @@ rectangle.
 **Include:** graphics.h 
 
 ----------
-#### GrSqrRootWWFixed()
+### GrSqrRootWWFixed()
     WWFixedAsDWord GrSqrRootWWFixed(
             WWFixedAsDWord  i);         /* number to get the square root of */
 
@@ -3827,7 +3827,7 @@ Compute the square root of a fixed point number.
 **Include:** graphics.h 
 
 ----------
-#### GrTestPath()
+### GrTestPath()
     Boolean GrTestPath(
             GStateHandle    gstate,         /* subject GState */
             GetPathType     ptype);         /* Type of path to check for */
@@ -3837,7 +3837,7 @@ Determine whether the GState has a path of the specified type.
 **Include:** graphics.h 
 
 ----------
-#### GrTestPointInPath()
+### GrTestPointInPath()
     Boolean GrTestPointInPath(
             GStateHandle    gstate,             /* subject GState */
             word            xPos,               /* point to test */
@@ -3849,7 +3849,7 @@ Determine whether the passed point falls in the interior of the GState's path.
 **Include:** graphics.h 
 
 ----------
-#### GrTestPointInPolygon()
+### GrTestPointInPolygon()
     Boolean GrTestPointInPolygon(
             GStateHandle    gstate,         /* subject GState */
             RegionFillRule  rule,           /* ODD_EVEN or WINDING */
@@ -3864,7 +3864,7 @@ polygon.
 **Include:** graphics.h 
 
 ----------
-#### GrTestPointInReg()
+### GrTestPointInReg()
     Boolean     GrTestPointInReg( 
             const Region    * reg,          /* pointer to region */
             sword           x,              /* coordinates of point to test */
@@ -3878,7 +3878,7 @@ in the region, the return value is *true*.
 **Include:** graphics.h 
 
 ----------
-#### GrTestRectInReg()
+### GrTestRectInReg()
     TestRectReturnType GrTestRectInReg( 
             const Region    * reg       /* pointer to region */
             sword           left,       /* bounds of rectangle to be tested */
@@ -3898,7 +3898,7 @@ Determine whether a rectangle lies within the clip region.
 **Include:** graphics.h 
 
 ----------
-#### GrTextWidth()
+### GrTextWidth()
     word    GrTextWidth(
             GStateHandle    gstate,         /* subject GState */
             const Chars     * str,          /* text string to check */
@@ -3911,7 +3911,7 @@ Compute the space the passed text string would require in a line of text. Use
 **Include:** graphics.h 
 
 ----------
-#### GrTextWidthWWFixed()
+### GrTextWidthWWFixed()
     WWFixedAsDWord  GrTextWidthWWFixed( /* returns width << 16 */
             GStateHandle    gstate,         /* subject GState */
             const Chars     * str,          /* text string to check */
@@ -3925,7 +3925,7 @@ area necessary to render the text.
 **Include:** graphics.h 
 
 ----------
-#### GrTransform()
+### GrTransform()
     XYValueAsDWord  GrTransform(
             GStateHandle    gstate,         /* subject GState */
             sword           xCoord,         /* coordinates to transform */
@@ -3936,7 +3936,7 @@ Apply the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrTransformDWFixed()
+### GrTransformDWFixed()
     void    GrTransformDWFixed(
             GStateHandle    gstate,         /* subject GState */
             PointDWFixed    * coord);       /* coordinates to transform */
@@ -3946,7 +3946,7 @@ Apply the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrTransformDWord()
+### GrTransformDWord()
     void    GrTransformDWord(
             GStateHandle    gstate,         /* subject GState */
             sdword          xCoord,         /* coordinates to transform */
@@ -3959,7 +3959,7 @@ Apply the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrTransformWWFixed()
+### GrTransformWWFixed()
     void    GrTransformWWFixed(
             GStateHandle    gstate,             /* subject GState */
             WWFixedAsDWord  xPos,               /* coordinates to transform */
@@ -3972,7 +3972,7 @@ Apply the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrUDivWWFixed()
+### GrUDivWWFixed()
     WWFixedAsDWord GrUDivWWFixed(
             WWFixedAsDWord      dividend,
             WWFixedAsDWord      divisor);
@@ -3982,7 +3982,7 @@ Compute an unsigned division of two fixed point numbers.
 **Include:** graphics.h 
 
 ----------
-#### GrUntransform()
+### GrUntransform()
     XYValueAsDWord GrUnTransformCoord(
             GStateHandle    gstate,         /* subject GState */
             sword           xCoord,         /* coordinates to untransform */
@@ -3993,7 +3993,7 @@ Apply the reverse of the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrUntransformDWFixed()
+### GrUntransformDWFixed()
     void    GrUnTransCoordDWFixed(
             GStateHandle    gstate,         /* subject GState */
             PointDWFixed    * coord);       /* coordinates to untransform */
@@ -4003,7 +4003,7 @@ Apply the reverse of the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrUntransformDWord()
+### GrUntransformDWord()
     void    GrUnTransformExtCoord(
             GStateHandle    gstate,         /* subject GState */
             sdword          xCoord,         /* coordinates to untransform */
@@ -4016,7 +4016,7 @@ Apply the reverse of the device's transformation to the passed point.
 **Include:** graphics.h 
 
 ----------
-#### GrUntransformWWFixed()
+### GrUntransformWWFixed()
     void    GrUnTransCoordWWFixed(
             GStateHandle        gstate,         /* subject GState */
             WWFixedAsDWord      xPos,           /* coordinates to untransform */

@@ -1,4 +1,4 @@
-## E Mixing C and Assembly
+# E Mixing C and Assembly
 
 You may sometimes wish to combine Goc and Esp code in a single application. 
 There are two main times when you may want to do this. You may be writing 
@@ -21,7 +21,7 @@ that class of object. You can write all the method code in assembly, while
 providing a Goc interface; this lets every application that uses the class take 
 advantage of assembly's efficiency.
 
-### E.1 Adding Esp Code to a Goc Geode
+## E.1 Adding Esp Code to a Goc Geode
 
 Most people will find it easiest to write applications in Goc. For most 
 purposes, Goc is efficient enough; after all, whenever an application is 
@@ -87,7 +87,7 @@ arguments are passed in the opposite order they are declared. This is useful
 if the routine has a variable number of arguments, but in other situations, 
 it's just a nuisance.
 
-### E.2 Writing an Esp Library
+## E.2 Writing an Esp Library
 
 You may wish to write a library in Esp whose routines can be called by either 
 Goc or Esp code. This is very much like writing a library in Goc. Simply write 

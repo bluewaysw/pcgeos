@@ -1,4 +1,4 @@
-## 4 The UI Compiler
+# 4 The UI Compiler
 
 Assembly language is, by nature, very low-level. It does not ordinarily 
 provide support for object-oriented programming. GEOS has had to add 
@@ -27,7 +27,7 @@ kept in an object-block (e.g. Vis monikers).
 For assembly reference information about the various GEOS classes, see the 
 PCGEOS\INCLUDE\*.DEF and *.UIH files.
 
-### 4.1 UIC Overview
+## 4.1 UIC Overview
 
 Essentially, UIC reads files written in Espire, a special object-specification 
 language, and writes special GEOS object-assembly files. These files (which 
@@ -73,7 +73,7 @@ example, in assembly, a field might be called MET_AN_ENUM_VALUE; if the
 type were declared in a .uih file, the member would be called 
 "anEnumValue".
 
-### 4.2 Declaring Classes
+## 4.2 Declaring Classes
 
 You can create new classes by specifying them in your .ui file. You do this by 
 writing special Espire directives; these tell Esp how to create objects of that 
@@ -120,7 +120,7 @@ After the top line, you specify all the instance data fields for the class. You
 may also change default values for fields inherited from the class's 
 superclass. 
 
-#### 4.2.1 Declaring Fields
+### 4.2.1 Declaring Fields
 
 You must list all the instance data fields that are added with that subclass. 
 The basic format for specifying a field is:
@@ -270,7 +270,7 @@ two bits wide, and currentTask, which is four bits wide. By default, mode is
 set to sharedSingle (i.e. 1), and currentTask is set to new (i.e. 1); the flags 
 vmFile and supportsSaveAsRevert are set; and all other flags are cleared.
 
-#### 4.2.2 Changing a Default Value
+### 4.2.2 Changing a Default Value
 
 When you create a class, you may wish to change the default values of 
 instance fields inherited from a superclass. The format for doing this is:
@@ -348,7 +348,7 @@ MyTriggerClass class GenTriggerClass
 MyTriggerClass endc
 ~~~
 
-### 4.3 Creating Objects and Chunks
+## 4.3 Creating Objects and Chunks
 
 The whole point of the UIC is that it lets you create objects in your geode's 
 source code, instead of having to instantiate them at run-time. You can 
@@ -361,7 +361,7 @@ object block; that way, a resource editor can modify the text (if e.g. you are
 translating the application for another country). You may also set up data 
 resources, i.e. LMem heaps that contain chunks, but no objects.
 
-#### 4.3.1 Setting Up a Resource
+### 4.3.1 Setting Up a Resource
 
 start, end
 
@@ -395,7 +395,7 @@ A single resource may "start" and "end" many times in a .ui file. Thus, you
 can group your object declarations in whichever order is clear or convenient, 
 instead of being forced to group them by resource.
 
-#### 4.3.2 Creating Objects
+### 4.3.2 Creating Objects
 
 Creating objects in Espire is simple. You just specify the name of the object, 
 and the initial settings for any fields which do not have the default settings. 
@@ -474,7 +474,7 @@ aRecord = default +aFlag, -anotherFlag;
 specifies that the field aRecord should have its default settings, except that 
 the field aFlag should be set, and anotherFlag should be cleared.
 
-##### 4.3.2.1 Setting Up Parent-Child Links
+#### 4.3.2.1 Setting Up Parent-Child Links
 
 Gen and Vis objects are arranged in a hierarchy of children. GEOS 
 implements this with special linkings to the first child and the next sibling. 
@@ -493,7 +493,7 @@ These are the names of the children, in order, separated by commas.
 UIC automatically sets up the parent's and children's links to each other in 
 the proper way.
 
-##### 4.3.2.2 Hints and Vardata
+#### 4.3.2.2 Hints and Vardata
 
 You may specify an object's hints and other vardata in the .ui file. You can do 
 this by putting the "hints" directive in the instance-data section. This 
@@ -516,7 +516,7 @@ This field is optional. If the vardata field takes a value, you may
 specify it here. Everything between the curly braces is written 
 to the .rdf file, i.e. it is not interpreted by the UIC.
 
-#### 4.3.3 Creating Chunks
+### 4.3.3 Creating Chunks
 
 Chunks are very much like objects. They may be placed in an object block, 
 and referenced by name. They may also be placed in LMem data blocks.
@@ -611,7 +611,7 @@ The only difference is that in the second example, the name MyChunk
 evaluates to an optr to the chunk. (This allows you to examine the chunk by 
 name in Swat.)
 
-#### 4.3.4 Creating VisMonikers
+### 4.3.4 Creating VisMonikers
 
 **VisMoniker**s are created much the way they are in Goc. As in Goc, a 
 **VisMoniker** may be a single moniker, or a list of monikers; if it is, the system 

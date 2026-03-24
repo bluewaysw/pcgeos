@@ -1471,6 +1471,10 @@ See also:\n\
 	    Buffer	    buf;
 
 	    MAKE_TYPE_TCL(type, t, sym);
+	    while((t == NULL) && (Sym_Type(sym) == OSYM_TYPEDEF)) {
+		type = Sym_GetTypeData(sym);
+		MAKE_TYPE_TCL(type, t, sym);
+	    }
 	    if (t == NULL) {
 		if (Sym_Type(sym) != OSYM_ETYPE) {
 		    Tcl_Error(interp, "not an enumerated type");
@@ -1494,7 +1498,8 @@ See also:\n\
 	     * look up each typedef until we get to the pointer base type
 	     */
 	    while((t == NULL) && (Sym_Type(sym) == OSYM_TYPEDEF)) {
-		MAKE_TYPE_TCL(Sym_GetTypeData(sym), t, sym);
+		type = Sym_GetTypeData(sym);
+		MAKE_TYPE_TCL(type, t, sym);
 	    }
 	    if ((t == NULL) || (t->class != TYPE_POINTER)) {
 		Tcl_Error(interp, "not a pointer type");
@@ -1528,6 +1533,11 @@ See also:\n\
 		Tcl_Error(interp, "not a valid type");
 	    }
 	    MAKE_TYPE_TCL(type, t, sym);
+	    while((t == NULL) && (Sym_Type(sym) == OSYM_TYPEDEF)) {
+		type = Sym_GetTypeData(sym);
+		MAKE_TYPE_TCL(type, t, sym);
+	    }
+
 	    if (t == NULL) {
 		if (Sym_Type(sym) != OSYM_ETYPE) {
 		    Tcl_Error(interp, "not an enumerated type");
