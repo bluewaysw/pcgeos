@@ -2,4 +2,6 @@
 
 GEODE           = bbxmail
 
+ASMFLAGS	+= -DASM_WARNINGS_UNUSED -DASM_FATAL_ERRORS_UNUSED
+
 #include <$(SYSMAKEFILE)>
