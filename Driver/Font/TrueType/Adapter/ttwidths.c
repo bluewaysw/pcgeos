@@ -832,7 +832,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontBuf* fontBuf )
         fontBuf->FB_mean.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( ascender, scaleHeight );
-        fontBuf->FB_baselinePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 ); // round to the next pixel
+        fontBuf->FB_baselinePos.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 );
         fontBuf->FB_baselinePos.WBF_frac = 0;
 
         ttfElement = SCALE_WORD( ascender + descender, scaleHeight );
@@ -856,7 +856,7 @@ static void ConvertHeader( TRUETYPE_VARS, FontBuf* fontBuf )
         fontBuf->FB_minTSB            = fontBuf->FB_aboveBox.WBF_int;
 
         ttfElement = SCALE_WORD( -descender - FACE_PROPERTIES.header->yMin, scaleHeight );
-        fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0xffff ); // round to the next pixel
+        fontBuf->FB_belowBox.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0xffff );
         fontBuf->FB_belowBox.WBF_frac = 0;
         fontBuf->FB_maxBSB            = fontBuf->FB_belowBox.WBF_int;
 
@@ -875,7 +875,9 @@ static void ConvertHeader( TRUETYPE_VARS, FontBuf* fontBuf )
         ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->min_Left_Side_Bearing, scaleWidth );
         fontBuf->FB_minLSB = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 ); 
 
-        ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->advance_Width_Max - (FACE_PROPERTIES.horizontal->min_Left_Side_Bearing + (FACE_PROPERTIES.header->xMax - FACE_PROPERTIES.header->xMin)), scaleWidth );
+        ttfElement = SCALE_WORD( FACE_PROPERTIES.horizontal->advance_Width_Max 
+                                - (FACE_PROPERTIES.horizontal->min_Left_Side_Bearing 
+                                + (FACE_PROPERTIES.header->xMax - FACE_PROPERTIES.header->xMin)), scaleWidth );
         fontBuf->FB_maxRSB  = INTEGER_OF_WWFIXEDASDWORD( ttfElement + 0x8000 );
 
         ttfElement = SCALE_WORD( FACE_PROPERTIES.header->yMax - FACE_PROPERTIES.header->yMin, scaleHeight );
