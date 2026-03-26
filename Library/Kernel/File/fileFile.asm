@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1990 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		
+MODULE:
 FILE:		fileFile.asm
 
 AUTHOR:		Adam de Boor, Apr  5, 1990
@@ -90,7 +90,7 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	Functions for toying with (as opposed to accessing) files on disk.
-		
+
 
 	$Id: fileFile.asm,v 1.1 97/04/05 01:11:53 newdeal Exp $
 
@@ -208,11 +208,34 @@ FileCreateDirReal	proc	far
 	;
 	; If creating dir in std path, make sure local components exist, so
 	; dir is created *locally*
-	; 
-	call	FileEnsureLocalPath
-	jc	done
-	mov	ah,FSPOF_CREATE_DIR
-	call	FileWPathOpOnPath
+	;
+	call	FileEnsureLocalPath		; Ensure std-path parents exist locally.
+	jc	done				; If that setup failed, return that error.
+	push	ds, dx				; Save path pointer for post-failure probing.
+	mov	ah,FSPOF_CREATE_DIR		; Select "create directory" FS path op.
+	call	FileWPathOpOnPath		; Attempt the actual directory creation.
+	pop	ds, dx				; Restore original ds:dx path for follow-up.
+	jnc	done				; Success: return with carry clear.
+	cmp	ax, ERROR_WRITE_PROTECTED	; Only special-case write-protect failures.
+	jne	returnError			; Any other error is returned unchanged.
+
+	call	FileGetAttributes		; Probe what already exists at this path.
+	jc	probeError			; Probe failed: map only specific error below.
+
+	test	cx, mask FA_SUBDIR		; Did probe find a directory?
+	mov	ax, ERROR_ACCESS_DENIED		; Remap: file with name of intended directory already exists.
+	jz	returnError			; It exists but is not a directory - existing file of same name: deny directory create.
+	mov	ax, ERROR_FILE_EXISTS		; It exists and is not a file: report that directory already exists.
+	jmp	returnError			; Return remapped error with carry set.
+
+probeError:					; Handle failed FileGetAttributes probe.
+	cmp	ax, ERROR_PATH_NOT_FOUND	; Preserve PATH_NOT_FOUND if probe says so.
+	je	returnError			; Return that specific probe result.
+	mov	ax, ERROR_WRITE_PROTECTED	; Otherwise keep original write-protect.
+
+returnError:					; Unified error exit for this block.
+	stc					; Force error return semantics.
+
 done:
 	ret
 FileCreateDirReal	endp
@@ -239,7 +262,7 @@ FileCreateDirWithNativeShortNameReal	proc	far
 	;
 	; If creating dir in std path, make sure local components exist, so
 	; dir is created *locally*
-	; 
+	;
 	call	FileEnsureLocalPath
 	jc	done
 	mov	ah, FSPOF_CREATE_DIR_WITH_NATIVE_SHORT_NAME
@@ -266,10 +289,10 @@ RETURN:		carry set if can't change to root:
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -402,10 +425,10 @@ RETURN:		carry set if one or more attribute could not be fetched,
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -667,7 +690,7 @@ SYNOPSIS:	Set one or more extended attribute for a file whose
 		path is given.
 
 CALLED BY:	GLOBAL
-PASS:		ds:dx	= file/dir the setting of whose extended attribute(s) 
+PASS:		ds:dx	= file/dir the setting of whose extended attribute(s)
 			  is desired
 		ax	= FileExtendedAttribute
 		es:di	= buffer from which to set the attribute, or
@@ -695,10 +718,10 @@ RETURN:		carry set if one or more attribute could not be set,
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -787,12 +810,12 @@ PASS:		ds:si - source file name
 		     If TRUE then
 			copy file to local standard path directory even
 		        if a file of the same name exists in remote directory.
-		     If FALSE then 
+		     If FALSE then
 			complain to the user about replacing
 		     	the aforementioned remote file and remove it if
 		     	the user chooses to replace it.
 
-		Either one of the disk handles may be 0, in which case 
+		Either one of the disk handles may be 0, in which case
 		the disk handle in the thread's current path will be used.
 
 		If a disk handle is provided, the corresponding path *must*
@@ -1002,7 +1025,7 @@ lastRead:
 doWrite:
 	tst	ss:[destFileHan]
 	jnz	writeDest
-		
+
 	;----------------------------------------
 	; Create the destination file.
 	;
@@ -1011,7 +1034,7 @@ doWrite:
 	jz	usingLongName
 
 	;
-	; FileCopy is copying a GEOS executable so it is using the 
+	; FileCopy is copying a GEOS executable so it is using the
 	; DOS name, but we want the FCN to have the longname.  We batch
 	; up FCNs so we get the creation FCN in a block we can edit before
 	; it is sent off.
@@ -1068,7 +1091,7 @@ writeBuffer:
 	mov	bx, ss:[destFileHan]
 	call	FileWriteFar
 	jc	done
-		
+
 	test	ss:[flags], mask FCF_COPY_DONE
 	jz	copyLoop
 
@@ -1083,7 +1106,7 @@ fixLongName:
 	; there might be an error writing the destination and we wouldn't be
 	; able to delete the file, as it'd have the source file's longname
 	; in its header. Blech, again...
-	; 
+	;
 	CheckHack <COPY_FILE_BUF_SIZE ge \
 			offset GFHO_longName + size GFHO_longName>
 	push	cx
@@ -1096,7 +1119,7 @@ fixLongName:
 	;
 	; Recover registers from before (cx <- bytes read, ds:dx <- buffer)
 	; and clear the FCF_FIX_OLD_LONGNAME flag so we don't do this again.
-	; 
+	;
 	pop	cx
 	segmov	ds, es
 	andnf	ss:[flags], not mask FCF_FIX_OLD_LONGNAME
@@ -1110,7 +1133,7 @@ done:
 	; of whether the copy succeeded, we'll need the dest closed
 	; (either to set its extended attributes or to delete it), and
 	; we don't need the copy buffer any more...
-	; 
+	;
 
 	pushf
 	push	ax
@@ -1119,10 +1142,10 @@ done:
 	; 4/16/93: if FCF_FREE_DEST_NAME is set, it means we're copying an
 	; executable or directory and need to fix up the longname for the
 	; beast. -- ardeb
-	; 
+	;
 	mov	bx, ss:[destFileHan]
 	tst	bx
-	jz	afterCloseDest	
+	jz	afterCloseDest
 
 	test	ss:[flags], mask FCF_FREE_DEST_NAME
 	jz	closeDest
@@ -1131,7 +1154,7 @@ done:
 	mov	cx, size FileLongName
 	les	di, ss:[destFinalComp]
 	call	FileSetHandleExtAttributes
-	
+
 closeDest:
 	clr	al
 	call	FileCloseFar
@@ -1139,7 +1162,7 @@ closeDest:
 	;
 	; Error during close, so make sure we return an error now,
 	; regardless of whether there was one before.
-	; 
+	;
 	add	sp, 4
 	stc
 	pushf
@@ -1156,8 +1179,8 @@ afterCloseDest:
 	; need to transfer all extended attributes from the source to the
 	; destination. We've kept our working directory appropriate to the
 	; destination expressly for this purpose...
-	; 
-	
+	;
+
 	mov	ax, FEA_MULTIPLE
 	mov	cx, ss:[numFileAttrs]
 	mov	bx, ss:[fileAttrsHandle]
@@ -1169,7 +1192,7 @@ afterCloseDest:
 	;
 	; 4/15/93: if the source filesystem supports more attributes for the
 	; file than the destination filesystem, don't penalize it... -- ardeb
-	; 
+	;
 	jnc	flushBatch
 	cmp	ax, ERROR_ATTR_NOT_FOUND
 	je	ignoreError
@@ -1190,7 +1213,7 @@ closeSourcePopDirErrorAndExit:
 popDirErrorAndExit:
 	;
 	; Return to the thread's original directory, if necessary.
-	; 
+	;
 	tst	ss:[destDiskHan]
 	jz	memFreeAndExit
 
@@ -1233,7 +1256,7 @@ deleteDest:
 	; Something went wrong during the copy, so delete the destination
 	; file before we return. As noted above, we've kept the thread's
 	; working directory appropriate for just this sort of thing.
-	; 
+	;
 	pushf
 	push	ax
 	lds	dx, ss:[destFileName]
@@ -1244,7 +1267,7 @@ deleteDest:
 closeSource:
 	;----------------------------------------
 	; Close down the source file, if necessary
-	; 
+	;
 
 	test	ss:[flags], mask FCF_CLOSE_SOURCE_FILE
 	jz	closeSourceDone
@@ -1285,10 +1308,10 @@ RETURN:		ah	= FileCreateFlags
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1301,7 +1324,7 @@ FileCopyGenerateCreateFlags proc near
 		.enter	inherit FileCopyCommonReal
 	;
 	; See if the source file is in native mode.
-	; 
+	;
 		mov	cx, (mask FCF_NATIVE or FILE_CREATE_TRUNCATE) shl 8 or \
 				FileAccessFlags <FE_DENY_WRITE, FA_WRITE_ONLY>
 		mov	ah, FSHOF_CHECK_NATIVE
@@ -1309,19 +1332,19 @@ FileCopyGenerateCreateFlags proc near
 		jc	done
 	;
 	; File isn't native, so clear FCF_NATIVE from the high byte...
-	; 
+	;
 		andnf	ch, not mask FCF_NATIVE
 	;
 	; Cope with executables etc. by creating the dest using a native name,
 	; but extended attributes. We'll set the longname when we're done.
-	; 
+	;
 		test	ss:[flags], mask FCF_FREE_DEST_NAME
 		jz	done
 		ornf	ch, mask FCF_NATIVE_WITH_EXT_ATTRS
 done:
 	;
 	; Return proper flags in ax
-	; 
+	;
 		mov_tr	ax, cx
 		.leave
 		ret
@@ -1347,10 +1370,10 @@ RETURN:		carry set on error:
 DESTROYED:	ax, bx, cx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1365,13 +1388,13 @@ if not PRINT_FILE_COPY_BUFFER
 
 	;
 	; First find how big a block exists in the system.
-	; 
+	;
 		mov	ax, SGIT_LARGEST_FREE_BLOCK
 		call	SysGetInfo		; ax = size of largest block
 						;	in paragraphs
 	;
 	; If it's too small to be useful, we'll just have to be pushy.
-	; 
+	;
 		shl	ax, 1
 		shl	ax, 1
 		shl	ax, 1
@@ -1384,7 +1407,7 @@ compareToFileSize:
 		mov_tr	cx, ax
 		mov	bx, ss:[sourceFileHan]
 		call	FileSize
-		
+
 		tst	dx			; > 64K?
 		jnz	setCopySize		; yes -- what we've got is what
 						;  we'll get...
@@ -1409,7 +1432,7 @@ setCopySize:
 
 		clc				; zero-sized file not an error..
 		jcxz	setZeroBuffer		; use no buffer if empty
-		
+
 		mov_tr	ax, cx			; ax <- bytes to alloc
 		mov	cx, ALLOC_DYNAMIC_LOCK
 		call	MemAllocFar
@@ -1495,13 +1518,13 @@ PSEUDO CODE/STRATEGY:
 		the modification stamp and the DOS attributes, which is what
 		we'll get back from the GET_ALL_EXT_ATTRIBUTES since the thing
 		is seen as a non-geos file.
-		
+
 		In the case of a non-DOS-based filesystem, copying the file in
 		raw mode will have no effect, and all the extended attributes
 		will be returned by the GET_ALL_EXT_ATTRIBUTES anyway.
-		
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1527,7 +1550,7 @@ EC<	pop	bx, si					>
 endif
 	;
 	; Find the start of the final component of the source name
-	; 
+	;
 		mov	dx, si		; save src name start for getting
 					;  attributes, if necessary
 saveSrcFinalStart:
@@ -1544,7 +1567,7 @@ findSrcFinalLoop:
 					;  (temporary storage)
 	;
 	; Find the start of the final component of the dest name
-	; 
+	;
 saveDestFinalStart:
 		mov	bx, si
 findDestFinalLoop:
@@ -1559,14 +1582,14 @@ DBCS <		lodsw	es:						>
 		mov	ss:[destFinalComp].segment, es
 	;
 	; Compare the two final components.
-	; 
+	;
 		mov	cx, si
 		sub	cx, bx		; cx <- length of final dest piece,
 					;  including null
 DBCS <		shr	cx, 1						>
 		mov	si, di		; ds:si <- final source piece
 		mov	di, bx		; es:di <- final dest piece
-		
+
 SBCS <		repe	cmpsb						>
 DBCS <		repe	cmpsw						>
 		jne	normalCopyJmp
@@ -1579,7 +1602,7 @@ DBCS <		repe	cmpsw						>
 	; we're happy.
 	;
 	; If the file is missing FEA_DOS_NAME, we have no DOS name to preserve.
-	; 
+	;
 FCDWE_STACK_SIZE	equ  ((size FileDosName + size GeosFileType + \
 				2 * size FileExtAttrDesc)+1) and 0xfffe
 		sub	sp, FCDWE_STACK_SIZE
@@ -1631,7 +1654,7 @@ handleAsRaw:
 	;
 	; Source file is executable and has a DOS name. Allocate a block to
 	; hold the destination name.
-	; 
+	;
 		pop	bp
 		push	bx		; save start of final dest
 					;  component for copy
@@ -1650,7 +1673,7 @@ DBCS <		add	bx, (size FileDosName)*(size wchar) + size hptr	>
 		ornf	ss:[flags], mask FCF_FREE_DEST_NAME
 	;
 	; Copy the leading components of the dest name into the buffer.
-	; 
+	;
 		pop	bx		; bx <- start of final dest component
 		push	ds
 		lds	si, ss:[destFileName]	; ds:si <- source for copy
@@ -1661,7 +1684,7 @@ DBCS <		add	bx, (size FileDosName)*(size wchar) + size hptr	>
 	;
 	; Tack on the DOS name of the source. It's above the attribute
 	; descriptors, file type, and saved DS on the stack.
-	; 
+	;
 		segmov	ds, ss
 		mov	si, sp
 		add	si, size word + 2*FileExtAttrDesc + size GeosFileType
@@ -1679,13 +1702,13 @@ endif
 		pop	ds
 	;
 	; Set new name as the dest name to use.
-	; 
+	;
 		mov	ss:[destFileName].segment, es
 		mov	ss:[destFileName].offset, size hptr
 		add	sp, FCDWE_STACK_SIZE
 	;
 	; Tell FileOpen to open the thing in raw mode.
-	; 
+	;
 		mov	al, FullFileAccessFlags <
 			0,		; FFAF_RAW
 			FE_NONE,	; FFAF_EXCLUDE
@@ -1741,7 +1764,7 @@ RETURN:		If error:
 
 DESTROYED:	ax, bx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1776,7 +1799,7 @@ endif
 	;
 	; Make sure we weren't passed a file handle (ds = 0)
 	;
-	
+
 	mov	ax, ds
 	tst	ax
 		CheckHack <FALSE eq 0>
@@ -1806,7 +1829,7 @@ continue:
 	mov	dx, si
 	call	FileGetAttributes
 	jnc	checkFlag
-	
+
 popDirJMP:
 	jmp	popDir
 
@@ -1859,7 +1882,7 @@ gotBuffer:
 	jc	freeBufferPopDir
 
 afterExtraData:
-	
+
 	call	FilePopDir
 
 	;
@@ -1876,7 +1899,7 @@ afterExtraData:
 	segmov	es, ss
 	lea	di, ss:[targetPath]
 	mov	bx, ss:[targetDiskHandle]
-	mov	cx, -1			
+	mov	cx, -1
 	call	FileCreateLink
 	jc	freeBufferPopDir
 
@@ -1908,7 +1931,7 @@ freeBufferPopDir:
 
 popDir:
 	call	FilePopDir
-	
+
 done:
 	.leave
 	ret
@@ -1940,7 +1963,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Edit the FileChangeNotification batch block's last entry
 		to contain the longname of a file that has had its DOS
-		name put in because FileCopyCommon uses the DOS name when 
+		name put in because FileCopyCommon uses the DOS name when
 		copying GEOS executables.  If a create notification isn't
 		present or isn't the last notification, do nothing.   The
 		file probably already existed so the create wasn't sent.
@@ -1951,7 +1974,7 @@ PASS:		ss:bp	- inherited stack frame from FileCopyCommon
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -2030,10 +2053,10 @@ RETURN:		carry set on error:
 			ax	= file handle
 		if cx non-zero, thread remains pushed to the root of that disk
 DESTROYED:	es, di, bx, ax, cx, si
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2077,7 +2100,7 @@ reallyCreateFile:
 	call	FinishWithPathEnum
 checkCreateError:
 	popf
-	jc	done	
+	jc	done
 
 	test	ss:[flags], mask FCF_FIX_OLD_LONGNAME
 	jz	done
@@ -2087,7 +2110,7 @@ checkCreateError:
 	; created it with the appropriate longname, and reopen it again in
 	; raw mode, so we can overwrite the header with the old header.
 	; Blech.
-	; 
+	;
 	mov_tr	bx, ax
 	clr	al
 	call	FileCloseFar
@@ -2135,7 +2158,7 @@ attrFound:
 	jne	createFile
 	;
 	; Oh, joy. Set the FCF_FIX_OLD_LONGNAME bit in our inherited frame.
-	; 
+	;
 	ornf	ss:[flags], mask FCF_FIX_OLD_LONGNAME
 	andnf	ah, not mask FCF_NATIVE	; create with longname first time,
 					;  please
@@ -2203,8 +2226,8 @@ PASS:		ds:si - source file name
 		cx - source disk handle
 		es:di - destination file name
 		dx - destination disk handle
-		
-		Either one of the disk handles may be 0, in which case 
+
+		Either one of the disk handles may be 0, in which case
 		the disk handle in the thread's current path will be used.
 
 		If a disk handle is provided, the corresponding path *must*
@@ -2237,9 +2260,9 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 FXIP<CopyStackCodeXIP		segment	resource	>
 
-FileCopy	proc	far	
+FileCopy	proc	far
 	clr	ax			;don't override remote copies of file
-	call	FileCopyCommon	
+	call	FileCopyCommon
 	ret
 FileCopy	endp
 
@@ -2263,8 +2286,8 @@ PASS:		ds:si - source file name
 		cx - source disk handle
 		es:di - destination file name
 		dx - destination disk handle
-		
-		Either one of the disk handles may be 0, in which case 
+
+		Either one of the disk handles may be 0, in which case
 		the disk handle in the thread's current path will be used.
 
 		If a disk handle is provided, the corresponding path *must*
@@ -2297,10 +2320,10 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 FXIP<CopyStackCodeXIP		segment	resource	>
 
-FileCopyLocal	proc	far	
-	
-	mov	ax,TRUE			
-	call	FileCopyCommon	
+FileCopyLocal	proc	far
+
+	mov	ax,TRUE
+	call	FileCopyCommon
 	ret
 
 FileCopyLocal	endp
@@ -2325,11 +2348,11 @@ PASS:		ds:si	= source file name
 		cx	= source disk handle
 		es:di	= destination file name
 		dx	= destination disk handle
-		
-		Either one of the disk handles may be 0, in which case 
+
+		Either one of the disk handles may be 0, in which case
 		thread's current path will be used and the associated file
 		name (either source or destination) may be relative.
-		
+
 		If a disk handle is provide, the corresponding path *must*
 		be absolute (begin with a backslash).
 RETURN:		carry set if errror:
@@ -2342,10 +2365,10 @@ RETURN:		carry set if errror:
 				= ERROR_DIFFERENT_DEVICE
 				= ERROR_INSUFFICIENT_MEMORY
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2392,11 +2415,11 @@ PASS:		ds:si	= source file name
 				if no file of the same name exists.  If file
 				exists in local or remote directory, returns
 				error.
-		
-		Either one of the disk handles may be 0, in which case 
+
+		Either one of the disk handles may be 0, in which case
 		thread's current path will be used and the associated file
 		name (either source or destination) may be relative.
-		
+
 		If a disk handle is provide, the corresponding path *must*
 		be absolute (begin with a backslash).
 RETURN:		carry set if errror:
@@ -2458,10 +2481,10 @@ PSEUDO CODE/STRATEGY:
 			if it's happy, we're happy
 
 		if any links are encountered, just do FileCopy &
-		delete.  
+		delete.
 
 		if src is directory, return ERROR_DIFFERENT_DEVICE
-		
+
 		call FileCopy & delete source
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2518,7 +2541,7 @@ destFileExists	local	BooleanByte
 		czr	al, ss:[destFileExists]
 	;
 	; Allocate a buffer into which the two full paths will be built.
-	; 
+	;
 		mov	ax, size FileMoveData
 		push	cx
 		mov	cx, ALLOC_DYNAMIC_LOCK
@@ -2532,7 +2555,7 @@ haveBuffer:
 		mov	ss:[pathBufferSeg], ax
 	;
 	; If src disk given, push to its root.
-	; 
+	;
 		jcxz	afterPush
 		call	PushToRoot
 afterPush:
@@ -2662,7 +2685,7 @@ callFSD:
 		clr	al			; lock may be aborted
 		call	DiskLockFar		; lock dest disk
 		jc	moveError
-		
+
 		mov	cx, si			; es:cx <- dest disk
 		mov	si, ds:[FMD_srcActualDisk]	; es:si <- src disk
 
@@ -2681,7 +2704,7 @@ callFSD:
 		call	DiskLockCallFSD
 		pop	bp
 		lea	sp, ss:[bp+size FSMoveFileData]
-		
+
 		mov	si, cx
 		call	DiskUnlockFar		; unlock destination disk
 moveError:
@@ -2692,7 +2715,7 @@ moveError:
 	;
 	; If any error but ERROR_DIFFERENT_DEVICE (including
 	; ERROR_CANNOT_MOVE_DIRECTORY), return now.
-	; 
+	;
 		cmp	ax, ERROR_DIFFERENT_DEVICE
 		je	ensureSrcNotDir
 errorJMP:
@@ -2704,7 +2727,7 @@ ensureSrcNotDir:
 	; If source is a directory, we can't do recursive moves (besides,
 	; caller could well want to provide feedback, and we wouldn't want
 	; to steal its thunder...)
-	; 
+	;
 	; XXX: FileGetAttributes could return an error here, but it
 	; seems highly unlikely
 	;
@@ -2718,7 +2741,7 @@ ensureSrcNotDir:
 		jnz	errorJMP
 	;
 	; Copy the file over, aborting if there's any error in the copy.
-	; 
+	;
 		segmov	es, ds
 		mov	si, offset FMD_srcActualPath
 		mov	di, offset FMD_destActualPath
@@ -2736,7 +2759,7 @@ doCopy:
 	; dest after an earlier call had failed because it already existed...
 	;
 	; XXX: NEED TO OVERRIDE READ-ONLY ATTRIBUTE OF SOURCE BEFORE DELETE
-	; 
+	;
 		call	PushToRoot
 
 		xchg	dx, si
@@ -2763,7 +2786,7 @@ cleanupDirStack:
 		call	FilePopDir
 popFlags:
 		popf
-done:		
+done:
 		.leave
 		ret
 
@@ -2772,18 +2795,18 @@ cantDeleteSource:
 	; Unable to delete the source. If anything but ACCESS_DENIED (which
 	; implies the source is read-only), nuke the dest and return that
 	; error. Else try clearing FA_RDONLY and doing it again.
-	; 
+	;
 		cmp	ax, ERROR_SHARING_VIOLATION	;for baseband nets
 		jz	hack10
 		cmp	ax, ERROR_ACCESS_DENIED
 		jne	moveFailed
 hack10:
-		
+
 		push	cx
-		call	FileGetAttributes		
+		call	FileGetAttributes
 		test	cx, mask FA_RDONLY
 		jz	popCXMoveFailed	; not read-only, so we just can't do it
-		
+
 		andnf	cx, not mask FA_RDONLY
 		call	FileSetAttributes
 		jc	popCXMoveFailed
@@ -2792,7 +2815,7 @@ hack10:
 	    ; any weird setup where FA_RDONLY can't be cleared, but it doesn't
 	    ; tell us this; if we fail the delete after clearing RDONLY, just
 	    ; return ACCESS_DENIED and live with it)
-	    ; 
+	    ;
 		call	FileDelete
 		jnc	sourceNuked
 popCXMoveFailed:
@@ -2810,7 +2833,7 @@ moveFailed:
 	; ds:dx	= src name
 	; si	= dest disk handle
 	; es:di	= dest name
-	; 
+	;
 		call	FilePopDir	; get out of src directory
 		push	ax		; save error code
 		mov	cx, si		; cx <- dest disk handle
@@ -2843,7 +2866,7 @@ RETURN:		if error
 			carry clear
 			FMD_srcActualPath and FMD_srcActualDisk filled in
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
 	Since we know the thing's not a link, just call
@@ -2913,7 +2936,7 @@ PSEUDO CODE/STRATEGY:
 
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2929,7 +2952,7 @@ FileMoveLocateDest proc	near
 		.enter	inherit FileMoveCommonReal
 	;
 	; Since we might need to modify the destination name. First
-	; create a copy of it on the stack. Wow all of this just to 
+	; create a copy of it on the stack. Wow all of this just to
 	; copy the string to the stack.
 	;
 		mov_tr	ax, cx
@@ -2949,14 +2972,14 @@ FileMoveLocateDest proc	near
 DBCS <		shr	cx			; convert bytes to chars >
 		LocalCopyNString
 		pop	dx
-		push	es		
+		push	es
 		mov	es, bx
 		pop	ds			;ds:dx points to new
 						;string on stack
 		pop	cx			;restore disk handle
 	;
 	; Now deal with the destination.
-	; 
+	;
 		call	PushToRoot		; else push to disk, or just
 						;  pushdir
 		call	FileEnsureLocalPath
@@ -2964,12 +2987,12 @@ DBCS <		shr	cx			; convert bytes to chars >
 	;
 	; Scan for the final component of the destination name,
 	; stopping at the last backslash before it
-	; 
+	;
 		push	cx			; dest disk handle
 		mov	cx, length PathName
 		mov	si, dx
 saveBSPosition:
-		mov	bx, si			
+		mov	bx, si
 		loop	searchLoop
 EC <		ERROR	FILE_MOVE_PATH_TOO_LONG				>
 searchLoop:
@@ -2999,7 +3022,7 @@ afterSearch::
 	;
 	; If the last backslash is the first character of the
 	; destination path, then fetch the actual path of the root
-	; dir.  This is necessary if the passed disk handle is zero, 
+	; dir.  This is necessary if the passed disk handle is zero,
 	; and the path name contains a leading backslash.
 	;
 checkFirst:
@@ -3015,7 +3038,7 @@ DBCS <		add	di, 2*(size wchar)				>
 	;
 	; There are leading components.  Convert the final backslash
 	; to a NULL, and construct the actual path of the leading
-	; components. 
+	; components.
 	;
 
 nukeBackslash:
@@ -3032,7 +3055,7 @@ getActual:
 		jc	done
 
 	;
-	; CD to the root of the ACTUAL disk 
+	; CD to the root of the ACTUAL disk
 	;
 		push	ds
 		segmov	ds, cs
@@ -3051,10 +3074,10 @@ getActual:
 	; es:di = Actual path of destination file.  See if it exists.
 	; If it does, or if the error is any other than
 	; ERROR_FILE_NOT_FOUND, then quit.
-	; 
+	;
 
 		mov	dx, di
-		segmov	ds, es		
+		segmov	ds, es
 		call	FileGetAttributes
 		jnc	destExists
 
@@ -3094,18 +3117,18 @@ CALLED BY:	FileMoveLocateDest
 PASS:		ds:si - filename
 		es:di - buffer containing either a null string or a
 			path, possibly with or without a trailing
-			backslash. 
+			backslash.
 			buffer MUST be of size PathName or greater
 
 RETURN:		carry SET if error (path too long)
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
 	Passed path can be:
 		empty
 		contain a trailing backslash
-		contain NO trailing backslash	
+		contain NO trailing backslash
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -3185,11 +3208,11 @@ PASS:		ds:si	= source file name
 		cx	= source disk handle
 		es:di	= destination file name
 		dx	= destination disk handle
-		
-		Either one of the disk handles may be 0, in which case 
+
+		Either one of the disk handles may be 0, in which case
 		thread's current path will be used and the associated file
 		name (either source or destination) may be relative.
-		
+
 		If a disk handle is provide, the corresponding path *must*
 		be absolute (begin with a backslash).
 RETURN:		carry set if errror:
@@ -3202,10 +3225,10 @@ RETURN:		carry set if errror:
 				= ERROR_DIFFERENT_DEVICE
 				= ERROR_INSUFFICIENT_MEMORY
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
