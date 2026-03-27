@@ -349,11 +349,8 @@
   {
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
-#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
 #endif
 
@@ -398,11 +395,8 @@
   {
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
-#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
 #endif
 

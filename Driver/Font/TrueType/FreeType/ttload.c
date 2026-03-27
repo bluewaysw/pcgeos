@@ -513,16 +513,11 @@
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Version   = GET_ULong();
-#else
-    SKIP( 4 );
-#endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Line_Gap  = GET_Short();
 #else
-    SKIP( 2 );
+    SKIP( 10 );
 #endif
 
     header->advance_Width_Max      = GET_UShort();
