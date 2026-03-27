@@ -3,39 +3,40 @@
 #       (c) by RABE-Soft 10/96 - 05/2023
 #**************************************************************************
 
-# Name der Applikation f�r glue und swat
+# Name der Applikation f?r glue und swat
 
 name ICreat.app
 
 # Name for GeoManager
 
 longname "Install Creator"
-usernotes "English FreeGEOS Version 6.0"
+usernotes "English FreeGEOS Version 6.1.0"
 # spezifiziert den Applikations-typ
 
 type appl, process, single
 
-#  class legt den KlassenName des Applikations-Proze�-Objekts fest. Messages,
-#  die an den Appliaktions-Proze� gesendet werden, m�ssen hier behandelt werden.
+#  class legt den KlassenName des Applikations-Proze?-Objekts fest. Messages,
+#  die an den Appliaktions-Proze? gesendet werden, m?ssen hier behandelt werden.
 
 class ICProcessClass
 
-# alle anderen Klassen m�ssen mit export bekannt gemacht werden
+# alle anderen Klassen m?ssen mit export bekannt gemacht werden
 
 export ICOptionsDialogClass
 export FileSelectDialogClass
 export IconEditDialogClass
 export InifEditDialogClass
 export SelectDirOrFileDialogClass
+export	SmartTextClass
+export ICApplicationClass
 
-
-# legt fest, welches Objekt die Applikation nach "au�en" vertreten soll.
+# legt fest, welches Objekt die Applikation nach "au?en" vertreten soll.
 # Dieses Objekt ist gleichzeitig das Top-Level-Objekt im UI-tree
 
 appobj ICApp
 
-# make the program compatible width BreadBox Ensemble 4.1.3
-#platform geos21
+# make the program downward compatible as possible
+platform geos20
 
 # Token for den GeoManager
 
@@ -47,6 +48,8 @@ tokenid    16480
 library geos
 library ui
 library ansic
+
+library math
 
 
 # Aufteillung der Applikation in Recourcen
@@ -62,4 +65,5 @@ resource InifUIResource lmem read-only shared
 resource InifDialogResource ui-object
 resource FToolDataResource lmem read-only shared
 resource FToolDialogResource ui-object
+
 
