@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <token.h>
 #include <initfile.h>
+#include <math.h>
 
 
 extern FileHandle docFile;
@@ -372,14 +373,14 @@ VMBlockHandle	mainArray;
    }
 
 /*--------------------- MSG_IC_REBUILD_LIST ---------------------
- *	Aufgabe:        Liste neu aufbauen um die Datei-Infos 
+ *	Aufgabe:        Liste neu aufbauen um die Datei-Infos
  *			(Frabkaros) auf den neuesten Stand zu bringen
  *	Zusammenhang:
  *	Strategie:
  *	Parameter:
  ---------------------------------------------------------------------------*/
 @extern method ICProcessClass, MSG_IC_REBUILD_LIST {
-// 
+//
 word count, sel;
 
    count = @call ICFileList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
@@ -489,7 +490,8 @@ int v1, v2;
  *				Wikibooks: Astronomische Berechungen für Amateure
  *	Return:		*jdPtr:	Julianisches Datum
  *----------------------------------------------------------------------*/
-void CalcJD(int year, int month, int day, int h, int min, int sek, long double *jdPtr) {
+@if 0
+void CalcJD_alt(int year, int month, int day, int h, int min, int sek, long double *jdPtr) {
 long double time, b, jd;
 sdword		a, a4, i1, i2;
 
@@ -522,15 +524,107 @@ sdword		a, a4, i1, i2;
 	i2 = 30.6001*((long double)month+1);
 	jd = i1 + i2 + day + time + b - 1524.5;
 	memcpy(jdPtr, &jd, sizeof(long double));
+}
+@endif
+
+void CalcJD(int year, int month, int day, int h, int min, int sek, FloatNum *jdFNPtr) {
+/*
+ * double constants does not require the watcomc library
+ * therefore the program is still downward comaptible
+ */
+double	value_365_25 = 365.25;
+double	value_30_6001 = 30.6001;
+double	value_1524_5 = 1524.5;
+sdword	a, a4, i1, i2, b, iSum;
+
+
+	// 1. Monate verschieben
+	// 1. shift moths
+	if ( month < 3 ) {
+		month += 12;
+		year -= 1;
+		}
+
+	// Anteiligen Zeitwert für den Tag ausrechnen
+    	// Floating Point Berechung erforderlich
+    	//
+	// Calculate the value for the day based on the proportion of time
+    	// Floating-point calculation required
+    	//
+	// time = h/24.0 + min/1440.0 + sek/86400.0;
+
+	FloatWordToFloat(h);
+	FloatWordToFloat(24);
+	FloatDivide();
+
+	FloatWordToFloat(min);
+	FloatWordToFloat(1440);
+	FloatDivide();
+	FloatAdd();
+
+	FloatWordToFloat(sek);
+	Float86400();
+	FloatDivide();
+	FloatAdd();		// TOS: time
+
+	// Vor dem 15.10.1582 -> julianischer Jalender. b = 0
+	// Before October 15, 1582 -> Julian calendar. b = 0
+	do {
+		b = 0;
+		if ( year < 1582 ) break;
+		if ( (year==1582) && (month < 10) ) break;
+		if ( (year==1582) && (month == 10) && (day < 15) ) break;
+
+		// jetzt ist der 15.10.1582 oder später
+		// Korrekturwert für gregorianischen Kalender berechnen
+		//
+		// The current date is October 15, 1582 or later
+	        // Calculate the correction value for the Gregorian calendar
+		a =  year / 100;
+		a4 = a/4;
+		b = 2 - a + a4;
+		} while (0);
+
+
+	// Julianisches Datum in 3 Schritten berechnen
+	// Calculate the Julian date in 3 steps
+
+	// 1st step: i1 = 365.25*((double)year+4716);
+
+	FloatDwordToFloat(year+4716);
+	FloatIEEE64ToGeos80(&value_365_25);
+	FloatMultiply();
+	FloatInt();
+	i1 = FloatFloatToDword();
+
+	// 2nd step: i2 = 30.6001*((double)month+1);
+
+	FloatDwordToFloat(month+1);
+	FloatIEEE64ToGeos80(&value_30_6001);
+	FloatMultiply();
+	FloatInt();
+	i2 = FloatFloatToDword();
+
+	// 3rd step: jd = i1 + i2 + day + time + b - 1524.5;
+	// remember that 'time' is already on top of stack
+	iSum = i1 + i2 + day + b;
+	FloatDwordToFloat(iSum);
+	FloatAdd();			// TOS: time + i1 + i2 + day + b;
+	FloatIEEE64ToGeos80(&value_1524_5);
+	FloatSub();			// TOS: julian date
+
+	FloatPopNumber(jdFNPtr);	// write return value
 
 }
+
 
 /*--------------------- CompareFileDateAndTime ---------------------
    Datums und Zeitvergleich zweier FileDateAndTime-Strukturen
    return 	TRUE:	unterschiedlich (=Fehler)
 			FALSE: Gleich (OK)
  ---------------------------------------------------------------------------*/
-int CompareFileDateAndTime(FileDateAndTime fdat1, FileDateAndTime fdat2, dword *deltaMinutes) {
+@if 0
+int CompareFileDateAndTime_alt(FileDateAndTime fdat1, FileDateAndTime fdat2, dword *deltaMinutes) {
 word cmpBits, selBools;
 long double juldat1, juldat2, diff, diffMin;
 
@@ -577,6 +671,94 @@ long double juldat1, juldat2, diff, diffMin;
 	if ( diff > 0.04168 ) return TRUE;
 
 	return FALSE;		// OK, Abweichung beträgt 1h +/- 1 Sekunde
+
+}
+@endif
+
+int CompareFileDateAndTime(FileDateAndTime fdat1, FileDateAndTime fdat2, dword *deltaMinutes) {
+word 	cmpBits, selBools;
+FloatNum fNumJD1,  fNumJD2, fNumTmp;
+int 	cmp;
+
+	cmpBits = InternalCompareFileDateAndTime(fdat1, fdat2);
+	if ( cmpBits == 0 ) return FALSE;
+
+	// julianisches Datum der beiden Zeiten bilden und Minutendifferenz ausrechnen
+	CalcJD(FDATExtractYear(fdat1), FDATExtractMonth(fdat1),
+			FDATExtractDay(fdat1), 	FDATExtractHour(fdat1),
+			FDATExtractMinute(fdat1), FDATExtractSecond(fdat1), &fNumJD1);
+	CalcJD(FDATExtractYear(fdat2), FDATExtractMonth(fdat2),
+			FDATExtractDay(fdat2), 	FDATExtractHour(fdat2),
+			FDATExtractMinute(fdat2), FDATExtractSecond(fdat2), &fNumJD2);
+
+	/*
+	 * Calculate difference of fNumJD1 and fNumJD2
+	 */
+	FloatPushNumber(&fNumJD1);
+	FloatPushNumber(&fNumJD2);
+	FloatSub();
+	FloatAbs();		// TOS <-- diff = abs(fNumJD1 - fNumJD2)
+
+	if ( deltaMinutes) {
+		dword minutes;
+		/*
+		 * Convert date differente to minutes
+		 * diffMin = (diff * 1440.0)+0.5;	// --> round it
+		 * *deltaMinutes = diffMin;		// .. to dword
+		 */
+		FloatDup();
+		FloatWordToFloat(1440);
+		FloatMultiply();
+		FloatRound(0);
+		minutes = FloatFloatToDword();
+		*deltaMinutes = minutes;
+		}
+
+	FloatPopNumber(&fNumTmp);		// nothing on FP stack, fNumJD := diff
+
+	// jetzt checken, ob eine Stunde Sommerzeit/Winterzeit-Toleranz
+	// berücksichtigt werden soll
+	selBools = @call ICDisplayOptionsGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if ( (selBools & IC_OPT_IGNORE_ONE_HOUR) == 0 ) {
+		// nein, nicht berücksichtigen --> daten sind unterschiedlich
+		return TRUE;
+		}
+
+	// Wenn Minuten oder Sekunden anders sind kann es nicht der Sommerzeitbug sein
+	// Tage z.B dürfen unterschiedlich sein: 23:07 vs. 01:07 am nächsten Tag
+	if ( cmpBits & FTIME_MINUTE_DIFFERS ) return TRUE;
+	if ( cmpBits & FTIME_SECOND_DIFFERS ) return TRUE;
+
+
+	// Jetzt vergleiche ich das julianischen Datum
+	// Die Abfrage oben auf Sekundengleichheit behalte ich bei weil ich
+	// durch numerische Fehler nicht sicher Sekundengenau vergleichen kann
+
+	// 1h entspricht  0.04166666
+	// Vergleich ob diff im Breich 0.04165 bis 0.04168 liegt (1 Sekunde Toleranz)
+	//	if ( diff < 0.04165 ) return TRUE;
+	//	if ( diff > 0.04168 ) return TRUE;
+
+	/*
+	 * If the difference in fNumTmp is exactly one hour, we usually have the
+	 * "summer time bug". To avoid possible rounding issues, we compare the
+	 * value to one hour +/- one second.
+	 * - calculate the difference to one hour (absolute value)
+	 * - compare this to one second
+	 * - if more than one second, this is not the "summer time bug".
+	 */
+	FloatPushNumber(&fNumTmp);
+	FloatWordToFloat(24);
+	FloatInverse();			// TOS <-- 1/24 == 0.04166666 (one hour)
+	FloatSub();
+	FloatAbs();			// TOS <-- abs(1 hour - diff)
+	FloatDwordToFloat(86400);
+	FloatInverse();			// TOS <-- one second
+	cmp = FloatCompAndDrop();	// compare abs(1 hour - diff) with one second
+	if (cmp > 0) return TRUE;	// diff is other than 1h +/- one second
+
+	return FALSE;		// OK, Abweichung beträgt 1h +/- 1 Sekunde
+
 }
 
 /*--------------------- ICCheckDateTime ---------------------
