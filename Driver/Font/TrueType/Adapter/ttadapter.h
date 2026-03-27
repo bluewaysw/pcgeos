@@ -386,7 +386,6 @@ typedef struct
     TT_Face                     face;
     TT_Face_Properties          faceProperties; 
     TT_Instance                 instance;
-    TT_Instance_Metrics         instanceMetrics;
     TT_Glyph                    glyph;
     TT_Glyph_Metrics            glyphMetrics;
     TT_CharMap                  charMap;
@@ -411,7 +410,6 @@ typedef struct
 #define FACE                    trueTypeVars->face
 #define FACE_PROPERTIES         trueTypeVars->faceProperties
 #define INSTANCE                trueTypeVars->instance
-#define INSTANCE_METRICS        trueTypeVars->instanceMetrics
 #define GLYPH                   trueTypeVars->glyph
 #define CHAR_MAP                trueTypeVars->charMap
 #define OUTLINE                 trueTypeVars->outline
