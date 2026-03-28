@@ -24,6 +24,8 @@
 #	SetVars()
 #		Set all the variables, from the command line and build
 #               variable files.
+#       GenerateDefaultBuildStamp()
+#               Build default UTC timestamp + git hash build metadata.
 #	ReadVars(<file>)
 #		Read variables from the passed array into %var associative
 #		array.
@@ -134,6 +136,11 @@ sub SetVars {
 	} else {
 	    &SetVar($name,"true");
 	}
+    }
+
+    # If not passed in, generate build metadata used by template files.
+    if ( !defined($var{buildstamp}) || $var{buildstamp} eq "" ) {
+	$var{buildstamp} = &GenerateDefaultBuildStamp();
     }
 
     @sourcedirs=split(' ', "$var{sourcedirs}");
@@ -273,6 +280,54 @@ sub SetVars {
     # Make sure variables are defined correctly.
 
     &VariableSanityCheck();
+}
+
+##############################################################################
+#	GenerateDefaultBuildStamp
+##############################################################################
+#
+# SYNOPSIS:	Generate default build metadata in UTC with git hash.
+# PASS:		nothing
+# CALLED BY:	SetVars
+# RETURN:	build metadata string
+#
+##############################################################################
+sub GenerateDefaultBuildStamp {
+
+    my @utc = gmtime(time);
+    my $stamp = sprintf("%04d-%02d-%02d %02d:%02d UTC",
+			$utc[5] + 1900, $utc[4] + 1, $utc[3], $utc[2], $utc[1]);
+    my $hash = "unknown";
+    my $rootDir = $ENV{ROOT_DIR};
+
+    if ( defined($rootDir) && $rootDir ne "" && -d "$rootDir" ) {
+	my $nullDevice = &IsUnix() ? "/dev/null" : "nul";
+	my @gitCommands = (
+	    ["git", "-C", $rootDir, "rev-parse", "--short", "HEAD"],
+	    ["git", "--git-dir", "$rootDir/.git", "--work-tree", $rootDir,
+	     "rev-parse", "--short", "HEAD"],
+	);
+
+	# Keep build output clean when git is unavailable or root isn't a repo.
+	local *STDERR;
+	open(STDERR, ">$nullDevice");
+
+	foreach my $gitCommand (@gitCommands) {
+	    my $gitHash;
+	    if ( open(GIT_HASH, "-|", @$gitCommand) ) {
+		$gitHash = <GIT_HASH>;
+		if ( close(GIT_HASH) && defined($gitHash) ) {
+		    $gitHash =~ s/[\r\n]+$//;
+		    if ( $gitHash =~ /^[0-9a-fA-F]+$/ ) {
+			$hash = $gitHash;
+			last;
+		    }
+		}
+	    }
+	}
+    }
+
+    return "$stamp + $hash";
 }
 
 
