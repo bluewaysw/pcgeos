@@ -4,13 +4,13 @@ Global data structures and types are listed alphabetically below. Some data stru
 ## 4.1 Data Structures A-E
 
 ----------
-#### AddUndoActionFlags
+### AddUndoActionFlags
     typedef WordFlags AddUndoActionFlags;
     #define AUAF_NOTIFY_BEFORE_FREEING                          0x8000
     #define AUAF_NOTIFY_IF_FREED_WITHOUT_BEING_PLAYED_BACK      0x4000
 
 ----------
-#### AddUndoActionStruct
+### AddUndoActionStruct
     typedef struct {
         UndoActionStruct            AUAS_data;
         optr                        AUAS_output;
@@ -21,7 +21,7 @@ The "undo" structures work together to provide information vital to processes
 which will be working with undo events.
 
 ----------
-#### AppAttachFlags
+### AppAttachFlags
     typedef WordFlags AppAttachFlags;
         #define AAF_RESTORING_FROM_STATE        0x8000
         #define AAF_STATE_FILE_PASSED           0x4000
@@ -35,7 +35,7 @@ Note that if AAF_RESTORING_FROM_STATE is set, then
 AAF_STATE_FILE_PASSED will also be set.
 
 ----------
-#### AppInstanceReference
+### AppInstanceReference
     typedef struct {
         /* AIR_fileName:
          * Application being launched. Pathname is relative to application 
@@ -60,7 +60,7 @@ AAF_STATE_FILE_PASSED will also be set.
     } AppInstanceReference;
 
 ----------
-#### AppLaunchBlock
+### AppLaunchBlock
     typedef struct {
         /* ALB_appRef:
          * Instance reference. Contains full pathname to application, as 
@@ -127,13 +127,13 @@ The first fields (*ALB_appRef*, *ALB_appMode*, *ALB_launchFlags*, and
 information must be set correctly on launch.
 
 ----------
-#### AppLaunchFlags
+### AppLaunchFlags
     typedef ByteFlags AppLaunchFlags;
         #define ALF_SEND_LAUNCH_REQUEST_TO_UI_TO_HANDLE     0x80
         #define ALF_OPEN_IN_BACK                            0x40
 
 ----------
-#### ApplicationStates
+### ApplicationStates
     typedef ByteFlags ApplicationStates;
         #define AS_QUITTING                         0x80
         #define AS_DETACHING                        0x40
@@ -145,7 +145,7 @@ information must be set correctly on launch.
         #define AS_ATTACHING                        0x01
 
 ----------
-#### ArcCloseType
+### ArcCloseType
     typedef enum /* word */ {
         ACT_OPEN,
         ACT_CHORD,
@@ -155,7 +155,7 @@ information must be set correctly on launch.
 This structure is used when filling arcs.
 
 ----------
-#### AreaAttr
+### AreaAttr
     typedef struct {
         byte            AA_colorFlag;
         RGBValue        AA_color;
@@ -164,14 +164,14 @@ This structure is used when filling arcs.
     } AreaAttr;
 
 ----------
-#### ArgumentStackElement
+### ArgumentStackElement
     typedef struct {
         EvalStackArgumentType ASE_type;
         EvalStackArgumentData ASE_data;
     } ArgumentStackElement;
 
 ----------
-#### BBFixed
+### BBFixed
     typedef struct {
         byte BBF_frac;
         byte BBF_int;
@@ -180,13 +180,13 @@ This structure is used when filling arcs.
 This structure represents an 8.8 fixed point number.
 
 ----------
-#### BBFixedAsWord
+### BBFixedAsWord
     typedef word BBFixedAsWord;
 
 This structure represents an 8.8 fixed point number.
 
 ----------
-#### Bitmap
+### Bitmap
     typedef struct {
         word    B_width;            /* In bitmap pixels */
         word    B_height;           /* In bitmap pixels */
@@ -277,13 +277,13 @@ Thus a 16x4 color "=" with a matching mask would appear:
 **See Also:** CBitmap.
 
 ----------
-#### BitmapMode
+### BitmapMode
     typedef WordFlags BitmapMode;
         #define BM_EDIT_MASK                    0x0002
         #define BM_CLUSTERED_DITHER             0x0001
 
 ----------
-#### BLTMode
+### BLTMode
     typedef enum /* word */ {
         BLTM_COPY,
         BLTM_MOVE,
@@ -291,7 +291,7 @@ Thus a 16x4 color "=" with a matching mask would appear:
     } BLTMode;
 
 ----------
-#### BMCompact
+### BMCompact
     typedef ByteEnum ByteCompact;
         #define BMC_UNCOMPACTED             0
         #define BMC_PACKBITS                1
@@ -301,13 +301,13 @@ This data structure is used to specify what sort of compaction is used to store
 a graphics bitmap.
 
 ----------
-#### BMDestroy
+### BMDestroy
     typedef ByteEnum BMDestroy;
         #define BMD_KILL_DATA               0
         #define BMD_LEAVE_DATA              1
 
 ----------
-#### BMFormat
+### BMFormat
     typedef ByteEnum BMFormat
         #define BMF_MONO  0
         #define BMF_4BIT  1
@@ -317,7 +317,7 @@ a graphics bitmap.
 This enumerated type determines a graphics bitmap's depth.
 
 ----------
-#### BMType
+### BMType
     typedef ByteFlags BMType;
         #define BMT_PALETTE             0x40
         #define BMT_HUGE                0x20
@@ -327,13 +327,13 @@ This enumerated type determines a graphics bitmap's depth.
 This structure is used to store various facts about a graphics bitmap.
 
 ----------
-#### Boolean
+### Boolean
     typedef word Boolean;
 Booleans represent true/false values. If the Boolean is *false*, it will evaluate 
 to zero; otherwise, it will be non-zero.
 
 ----------
-#### Button
+### Button
     typedef ByteEnum Button;
         #define BUTTON_0                0
         #define BUTTON_1                1
@@ -341,7 +341,7 @@ to zero; otherwise, it will be non-zero.
         #define BUTTON_3                3
 
 ----------
-#### ButtonInfo
+### ButtonInfo
     typedef ByteFlags ButtonInfo;
         #define BI_PRESS                0x80
         #define BI_DOUBLE_PRESS         0x40
@@ -357,15 +357,15 @@ This structure contains the state of a mouse's buttons.
     typedef unsigned char byte;
 
 ----------
-#### ByteEnum
+### ByteEnum
     typedef byte ByteEnum;
 
 ----------
-#### ByteFlags
+### ByteFlags
     typedef byte ByteFlags;
 
 ----------
-#### CallbackType
+### CallbackType
     typedef ByteEnum CallbackType;
         #define CT_FUNCTION_TO_TOKEN        0
         #define CT_NAME_TO_TOKEN            1
@@ -384,7 +384,7 @@ This structure contains the state of a mouse's buttons.
         #define CT_SPECIAL_FUNCTION         14
 
 ----------
-#### CBitmap
+### CBitmap
     typedef struct {
         Bitmap  CB_simple;
         word    CB_startScan;
@@ -400,13 +400,13 @@ the CBitmap structure to hold bitmaps which need to keep track of resolution
 information, a palette, or a mask.
 
 ----------
-#### CellFunctionParameterFlags
+### CellFunctionParameterFlags
     typedef ByteFlags CellFunctionParameterFlags;
         #define CFPF_DIRTY          0x80 /* apps may read or change this. */
         #define CFPF_NO_FREE_COUNT  0x07
 
 ----------
-#### CellFunctionParameters
+### CellFunctionParameters
     typedef struct {
         CellFunctionParameterFlags  CFP_flags;
         VMFileHandle                CFP_file;       /* File containing cells */
@@ -443,27 +443,27 @@ motionless for the duration of a call. Therefore, if you allocate it as a DB ite
 in the cell file, you must not have the structure be an ungrouped item.
 
 ----------
-#### CellRange
+### CellRange
     typedef struct {
         CellReference           CR_start;
         CellReference           CR_end;
     } CellRange;
 
 ----------
-#### CellReference
+### CellReference
     typedef struct {
         CellRowColumn           CR_row;
         CellRowColumn           CR_column;
     } CellReference;
 
 ----------
-#### CellRowColumn
+### CellRowColumn
     typedef WordFlags CellRowColumn;
         #define CRC_ABSOLUTE                0x8000
         #define CRC_VALUE               0x7fff
 
 ----------
-#### CharacterSet
+### CharacterSet
     typedef ByteEnum CharacterSet;
         #define CS_BSW                  0
         #define CS_CONTROL              0xff
@@ -473,7 +473,7 @@ in the cell file, you must not have the structure be an ungrouped item.
         #define VC_ISUI                 CS_UI_FUNCS
 
 ----------
-#### CharFlags
+### CharFlags
     typedef ByteFlags CharFlags;
         #define CF_STATE_KEY                0x80
         #define CF_EXTENDED                 0x10
@@ -483,7 +483,7 @@ in the cell file, you must not have the structure be an ungrouped item.
         #define CF_RELEASE                  0x01
 
 ----------
-#### Chars
+### Chars
     typedef ByteEnum Chars;
         #define C_NULL              0x0 /* NULL */
         #define C_CTRL_A            0x1 /* <ctrl>-A */
@@ -792,7 +792,7 @@ treated as Chars, then the debugger will print out the constant names.
 **Include:** char.h
 
 ----------
-#### ChunkArrayHeader
+### ChunkArrayHeader
     typedef struct {
         word    CAH_count;          /* # of elements in chunk array */
         word    CAH_elementSize;    /* Size of each element (in bytes) */
@@ -819,7 +819,7 @@ elements are variable-sized, *CAH_elementSize* will be zero.
 in the array.
 
 ----------
-#### ChunkHandle
+### ChunkHandle
     typedef word ChunkHandle;
 
 Chunk handles are offsets into a local memory heap. To find the current 
@@ -830,14 +830,14 @@ offset of the chunk itself.
 **See Also:** optr, LMemDeref()
 
 ----------
-#### ChunkMapList
+### ChunkMapList
     typedef struct {
         word    CML_source;
         word    CML_dest;
     } ChunkMapList;
 
 ----------
-#### ClassFlags
+### ClassFlags
     typedef ByteFlags ClassFlags;
         #define CLASSF_HAS_DEFAULT                      0x80
         #define CLASSF_MASTER_CLASS                         0x40
@@ -852,7 +852,7 @@ flags are internal and may not be set or retrieved directly. See the entry on
 **@class** for more information about these flags.
 
 ----------
-#### ClassStruct
+### ClassStruct
     typedef struct  _ClassStruct {
         struct _ClassStruct *Class_superClass;  /* superclass pointer */
         word        Class_masterOffset;         /* offset to master offset in chunk */
@@ -868,13 +868,13 @@ This is the structure that defines a class. It is internal and used only very
 rarely by anything other than the kernel and the UI.
 
 ----------
-#### ClipboardItemFlags
+### ClipboardItemFlags
     typedef WordFlags ClipboardItemFlags;
         #define CIF_QUICK               0x4000
         #define TIF_NORMAL              0x0000
 
 ----------
-#### ClipboardItemFormat
+### ClipboardItemFormat
     typedef enum /* word */ {
         CIF_TEXT,
         CIF_GRAPHICS_STRING,
@@ -889,11 +889,11 @@ rarely by anything other than the kernel and the UI.
     } ClipboardItemFormat;
 
 ----------
-#### ClipboardItemFormatID
+### ClipboardItemFormatID
     typedef dword ClipboardItemFormatID;
 
 ----------
-#### ClipboardItemFormatInfo
+### ClipboardItemFormatInfo
     typedef struct {
         ClipboardItemFormatID       CIFI_format;
         word                        CIFI_extra1;
@@ -903,7 +903,7 @@ rarely by anything other than the kernel and the UI.
     } ClipboardItemFormatInfo;
 
 ----------
-#### ClipboardItemHeader
+### ClipboardItemHeader
     typedef struct {
         optr                        CIH_owner;
         ClipboardItemFlags          CIH_flags;
@@ -915,15 +915,15 @@ rarely by anything other than the kernel and the UI.
     } ClipboardItemHeader;
 
 ----------
-#### ClipboardItemNameBuffer
+### ClipboardItemNameBuffer
     typedef char ClipboardItemNameBuffer[CLIPBOARD_ITEM_NAME_LENGTH+1];
 
 ----------
-#### ClipboardQueryArgs
+### ClipboardQueryArgs
 See **ClipboardQueryItem()**.
 
 ----------
-#### ClipboardQuickNotifyFlags
+### ClipboardQuickNotifyFlags
     typedef WordFlags ClipboardQuickNotifyFlags;
         #define CQNF_ERROR                      0x8000
         #define CQNF_SOURCE_EQUAL_DEST          0x4000
@@ -936,7 +936,7 @@ These flags give information about the success or failure of a quick transfer
 operation.
 
 ----------
-#### ClipboardQuickTransferFeedback
+### ClipboardQuickTransferFeedback
     typedef enum {
         CQTF_SET_DEFAULT,
         CQTF_CLEAR_DEFAULT,
@@ -946,7 +946,7 @@ operation.
     } ClipboardQuickTransferFeedback;
 
 ----------
-#### ClipboardQuickTransferFlags
+### ClipboardQuickTransferFlags
     typedef WordFlags ClipboardQuickTransferFlags;
         #define CQTF_IN_PROGRESS            0x8000
         #define CQTF_COPY_ONLY              0x4000
@@ -954,7 +954,7 @@ operation.
         #define CQTF_NOTIFICATION           0x1000
 
 ----------
-#### ClipboardQuickTransferRegionInfo
+### ClipboardQuickTransferRegionInfo
     typedef struct {
         word    CQTRI_paramAX;
         word    CQTRI_paramBX;
@@ -966,11 +966,11 @@ operation.
     } ClipboardQuickTransferRegionInfo;
 
 ----------
-#### ClipboardRequestArgs
+### ClipboardRequestArgs
 See entry for **ClipboardRequestItemFormat()**.
 
 ----------
-#### CMYKTransfer
+### CMYKTransfer
     typedef struct {
         byte    CMYKT_cyan[256];
         byte    CMYKT_magenta[256];
@@ -979,7 +979,7 @@ See entry for **ClipboardRequestItemFormat()**.
     } CMYKTransfer;
 
 ----------
-#### Color
+### Color
     typedef ByteEnum Color;
         #define C_BLACK                 0
         #define C_BLUE                  1
@@ -1258,7 +1258,7 @@ See entry for **ClipboardRequestItemFormat()**.
 **Include:** color.h
 
 ----------
-#### ColorFlag
+### ColorFlag
     typedef ByteEnum ColorFlag;
         #define CF_INDEX        0
         #define CF_GRAY         1
@@ -1272,7 +1272,7 @@ described. The **ColorFlag** is normally used as part of a **ColorQuad**. See
 **ColorFlags**.
 
 ----------
-#### ColorMapMode
+### ColorMapMode
     typedef ByteFlags ColorMapMode;
         #define CMM_ON_BLACK 0x04   /* Set this bit if you're drawing on black */
         #define CMM_MAP_TYPE 0x01   /* Either CMT_CLOSEST or CMT_DITHER) */
@@ -1285,7 +1285,7 @@ more close colors in a dithered pattern. If you will be drawing against a black
 background, you may wish to set the CMM_ON_BLACK flag.
 
 ----------
-#### ColorQuad
+### ColorQuad
     typedef struct {
         byte            CQ_redOrIndex;
         ColorFlag       CQ_info;
@@ -1318,11 +1318,11 @@ area color will be used. The *CQ_redOrIndex*, *CQ_green*, and *CQ_blue* fields a
 all ignored.
 
 ----------
-#### ColorQuadAsDWord
+### ColorQuadAsDWord
     typedef dword ColorQuadAsDWord;
 
 ----------
-#### ColorTransfer
+### ColorTransfer
     typedef struct {
         RGBDelta                CT_data[125]; 
     } ColorTransfer;
@@ -1336,7 +1336,7 @@ factors" to tell the printer to use more or less ink than the raw RGB values
 would suggest.
 
 ----------
-#### ColorTransferData
+### ColorTransferData
     typedef union {
         MonoTransfer        CTD_mono;
         RGBTransfer         CTD_rgb;
@@ -1344,14 +1344,14 @@ would suggest.
     } ColorTransferData;
 
 ----------
-#### ColorTransferType
+### ColorTransferType
     typedef ByteEnum ColorTransferType;
         #define CTT_MONO                 0
         #define CTT_RGB                  1
         #define CTT_CMYK                 2
 
 ----------
-#### CommonParameters
+### CommonParameters
     typedef struct {
         word    CP_row;
         word    CP_column;
@@ -1362,7 +1362,7 @@ would suggest.
     } CommonParameters;
 
 ----------
-#### CompChildFlags
+### CompChildFlags
     typedef WordFlags CompChildFlags;
         #define CCF_MARK_DIRTY      0x8000
         #define CCF_REFERENCE       0x7fff
@@ -1384,7 +1384,7 @@ any number less than 32768, or it can be either of the two
 constants shown above (CCO_FIRST or CCO_LAST).
 
 ----------
-#### CountryType
+### CountryType
     typedef enum /* word */ {
         CT_UNITED_STATES=1,
         CT_CANADA,
@@ -1398,7 +1398,7 @@ constants shown above (CCO_FIRST or CCO_LAST).
     } CountryType;
 
 ----------
-#### CRangeEnumParams
+### CRangeEnumParams
     typedef struct {
         RangeEnumParams         CREP_params;
         void                    *CREP_locals;
@@ -1409,7 +1409,7 @@ constants shown above (CCO_FIRST or CCO_LAST).
 The *CREP_callback* routine should be declared _pascal.
 
 ----------
-#### CurrencyFormatFlags
+### CurrencyFormatFlags
     typedef ByteFlags CurrencyFormatFlags;
         #define CFF_LEADING_ZERO                    0x20
         #define CFF_SPACE_AROUND_SYMBOL             0x10
@@ -1419,14 +1419,14 @@ The *CREP_callback* routine should be declared _pascal.
         #define CFF_NEGATIVE_SIGN_BEFORE_SYMBOL     0x01
 
 ----------
-#### CustomDialogBoxFlags
+### CustomDialogBoxFlags
     typedef WordFlags CustomDialogBoxFlags;
         #define CDBF_SYSTEM_MODAL               0x8000
         #define CDBF_DIALOG_TYPE                0x6000
         #define CDBF_INTERACTION_TYPE           0x1e00
 
 ----------
-#### CustomDialogType
+### CustomDialogType
     typedef ByteEnum CustomDialogType;
         #define CDT_QUESTION                    0
         #define CDT_WARNING                     1
@@ -1436,19 +1436,19 @@ The *CREP_callback* routine should be declared _pascal.
         #define CDBF_INTERACTION_TYPE_OFFSET    9
 
 ----------
-#### DACPlayFlags
+### DACPlayFlags
     typedef ByteFlags DACPlayFlags;
     #define DACPF_CATENATE 0x80
 
 ----------
-#### DACReferenceByte
+### DACReferenceByte
     typedef enum {
          DACRB_NO_REFERENCE_BYTE,
          DACRB_WITH_REFERENCE_BYTE
     } DACReferenceByte;
 
 ----------
-#### DACSampleFormat
+### DACSampleFormat
     typedef enum {
         DACSF_8_BIT_PCM,
         DACSF_2_TO_1_ADPCM,
@@ -1460,11 +1460,11 @@ This structure specifies what sort of sampling should be used when recording
 or playing a sampled sound.
 
 ----------
-#### DashPairArray
+### DashPairArray
 **See:** LineStyle
 
 ----------
-#### DateTimeFormat
+### DateTimeFormat
     typedef enum /* word */ {
         DTF_LONG,
         DTF_LONG_CONDENSED,
@@ -1488,7 +1488,7 @@ or playing a sampled sound.
     } DateTimeFormat;
 
 ----------
-#### DayOfTheWeek
+### DayOfTheWeek
     typedef enum {
         DOTW_SUNDAY,
         DOTW_MONDAY,
@@ -1502,7 +1502,7 @@ or playing a sampled sound.
 This enumerated type is used in the **TimerDateAndTime** structure.
 
 ----------
-#### DBGroup
+### DBGroup
     typedef word DBGroup;
 
 This is the handle of a DB group. It is the VM handle of a DB group block. DB 
@@ -1510,7 +1510,7 @@ group handles do not change when a file is copied, or when it is closed and
 reopened.
 
 ----------
-#### DBGroupAndItem
+### DBGroupAndItem
     typedef dword DBGroupAndItem;
 
 This is a dword which contains the group and item handles of a database 
@@ -1538,14 +1538,14 @@ Extracts the **DBItem** from a given **DBGroupAndItem**.
 **Include:** geos.h
 
 ----------
-#### DBItem
+### DBItem
     typedef word DBItem;
 
 This is the handle of a DB item. The **DBItem** and **DBGroup** together 
 uniquely identify a DB item in a specified file.
 
 ----------
-#### DBReturn
+### DBReturn
     typedef struct {
         word    DBR_group;
         word    DBR_item;
@@ -1554,7 +1554,7 @@ uniquely identify a DB item in a specified file.
     } DBReturn;
 
 ----------
-#### DefaultPrintSizes
+### DefaultPrintSizes
     typedef struct {
         word    paperWidth;
         word    paperHeight;
@@ -1563,7 +1563,7 @@ uniquely identify a DB item in a specified file.
     } DefaultPrintSizes;
 
 ----------
-#### DevicePresent
+### DevicePresent
     typedef enum /* word */ {
         DP_NOT_PRESENT=0xffff,
         DP_CANT_TELL=0,
@@ -1572,7 +1572,7 @@ uniquely identify a DB item in a specified file.
     } DevicePresent;
 
 ----------
-#### DirPathInfo
+### DirPathInfo
     typedef word DirPathInfo;
         #define DPI_EXISTS_LOCALLY                  0x8000
         #define DPI_ENTRY_NUMBER_IN_PATH            0x7f00
@@ -1581,7 +1581,7 @@ uniquely identify a DB item in a specified file.
         #define DPI_STD_PATH_OFFSET                 0
 
 ----------
-#### DiskCopyCallback
+### DiskCopyCallback
     typedef enum /* word */ {
         CALLBACK_GET_SOURCE_DISK,
         CALLBACK_REPORT_NUM_SWAPS,
@@ -1592,7 +1592,7 @@ uniquely identify a DB item in a specified file.
     } DiskCopyCallback;
 
 ----------
-#### DiskCopyError
+### DiskCopyError
     typedef enum /* word */ {
         ERR_DISKCOPY_INSUFFICIENT_MEM=0xd0,
         ERR_CANT_COPY_FIXED_DISKS,
@@ -1604,7 +1604,7 @@ uniquely identify a DB item in a specified file.
     } DiskCopyError;
 
 ----------
-#### DiskFindResult
+### DiskFindResult
     typedef enum /* word */ {
         DFR_UNIQUE,
         DFR_NOT_UNIQUE,
@@ -1612,11 +1612,11 @@ uniquely identify a DB item in a specified file.
     } DiskFindResult;
 
 ----------
-#### DiskHandle
+### DiskHandle
     typedef Handle DiskHandle;
 
 ----------
-#### DiskInfoStruct
+### DiskInfoStruct
     typedef struct {
         word        DIS_blockSize;
         sdword      DIS_freeSpace;
@@ -1625,7 +1625,7 @@ uniquely identify a DB item in a specified file.
     } DiskInfoStruct;
 
 ----------
-#### DiskRestoreError
+### DiskRestoreError
     typedef enum /* word */ {
         DRE_DISK_IN_DRIVE,
         DRE_DRIVE_NO_LONGER_EXISTS,
@@ -1636,14 +1636,14 @@ uniquely identify a DB item in a specified file.
     } DiskRestoreError;
 
 ----------
-#### DisplayAspectRatio
+### DisplayAspectRatio
     typedef ByteEnum DisplayAspectRatio;
         #define DAR_NORMAL              0
         #define DAR_SQUISHED            1
         #define DAR_VERY_SQUISHED       2
 
 ----------
-#### DisplayClass
+### DisplayClass
     typedef ByteEnum DisplayClass;
         #define DC_TEXT                 0
         #define DC_GRAY_1               1
@@ -1655,7 +1655,7 @@ uniquely identify a DB item in a specified file.
         #define DC_CF_RGB               7
 
 ----------
-#### DisplaySize
+### DisplaySize
     typedef ByteEnum DisplaySize;
         #define DS_TINY             0
         #define DS_STANDARD         1
@@ -1663,14 +1663,14 @@ uniquely identify a DB item in a specified file.
         #define DS_HUGE             3
 
 ----------
-#### DisplayType
+### DisplayType
     typedef ByteFlags DisplayType;
         #define DT_DISP_SIZE                    0xc0
         #define DT_DISP_ASPECT_RATIO            0x30
         #define DT_DISP_CLASS                   0x0f
 
 ----------
-#### DistanceUnit
+### DistanceUnit
     typedef ByteEnum DistanceUnit;
         #define DU_POINTS                           0
         #define DU_INCHES                           1
@@ -1684,7 +1684,7 @@ uniquely identify a DB item in a specified file.
         #define LOCAL_DISTANCE_BUFFER_SIZE          32
 
 ----------
-#### DocQuitStatus
+### DocQuitStatus
     typedef enum /* word */ {
         DQS_OK,
         DQS_CANCEL,
@@ -1693,7 +1693,7 @@ uniquely identify a DB item in a specified file.
     } DocQuitStatus;
 
 ----------
-#### DocumentSize
+### DocumentSize
     typedef struct {
         int     leftMargin;
         int     topMargin;
@@ -1702,7 +1702,7 @@ uniquely identify a DB item in a specified file.
     } DocumentSize;
 
 ----------
-#### DosCodePage
+### DosCodePage
     typedef enum /* word */ {
         CODE_PAGE_US=437,
         CODE_PAGE_MULTILINGUAL=850,
@@ -1713,11 +1713,11 @@ uniquely identify a DB item in a specified file.
     } DosCodePage;
 
 ----------
-#### DosDotFileName
+### DosDotFileName
     typedef char DosDotFileName[DOS_DOT_DOS_FILE_NAME_SIZE];
 
 ----------
-#### DosExecFlags
+### DosExecFlags
     typedef ByteFlags DosExecFlags;
         #define DEF_PROMPT              0x80    /* prompt user to return to GEOS */
         #define DEF_FORCED_SHUTDOWN     0x40    /* force shutdown; no abort */
@@ -1727,7 +1727,7 @@ Flags used with **DosExec()**. **DosExec()** executes a DOS program based on
 these flags.
 
 ----------
-#### DosFileInfoStruct
+### DosFileInfoStruct
     typedef struct {
         byte DFIS_attributes;
         dword DFIS_modTimeDate;
@@ -1737,17 +1737,17 @@ these flags.
     } DosFileInfoStruct;
 
 ----------
-#### DosNoDotFileName
+### DosNoDotFileName
     typedef char DosNoDotFileName[DOS_NO_DOT_DOS_FILE_NAME_SIZE];
 
 ----------
-#### DrawMask
+### DrawMask
     typedef byte DrawMask[8];
 
 The graphics system uses this structure for defining custom draw masks.
 
 ----------
-####  DriveType
+###  DriveType
     typedef ByteEnum DriveType;
         #define DRIVE_5_25              0
         #define DRIVE_3_5               1
@@ -1766,7 +1766,7 @@ like **DriveGetStatus()** can return a **DriveTypes** value in the low four bits
 and other flags in the high four bits of a single byte.
 
 ----------
-#### DriverAttrs
+### DriverAttrs
     typedef WordFlags DriverAttrs;
         #define DA_FILE_SYSTEM                  0x8000
         #define DA_CHARACTER                    0x4000
@@ -1776,7 +1776,7 @@ This record contains flags that indicate a given driver's attributes. This
 record is stored in the driver's **DriverInfoStruct** structure.
 
 ----------
-#### DriverExtendedInfoStruct
+### DriverExtendedInfoStruct
     typedef struct {
         DriverInfoStruct    DEIS_common;    /* The base driver info structure */
         MemHandle           DEIS_resource;  /* Handle of driver's DriverExtendedInfo
@@ -1787,7 +1787,7 @@ This structure is used by Preferences to locate the names of devices
 supported by a particular driver.
 
 ----------
-#### DriverExtendedInfoTable
+### DriverExtendedInfoTable
     typedef struct {
         LMemBlockHeader     DEIT_common;
         word                DEIT_numDevices;
@@ -1796,7 +1796,7 @@ supported by a particular driver.
     } DriverExtendedInfoTable;
 
 ----------
-#### DriverInfoStruct
+### DriverInfoStruct
     typedef struct {
          void (*DIS_strategy)();                /* Pointer to strategy routine */
          DriverAttrs    DIS_driverAttributes;   /* driver's attribute flags */
@@ -1808,7 +1808,7 @@ applications will not need to access this structure unless they use a driver
 directly.
 
 ----------
-#### DriverType
+### DriverType
     typedef enum {
         DRIVER_TYPE_VIDEO = 1,          /* Video drivers */
         DRIVER_TYPE_INPUT,              /* Input (keyboard, mouse) drivers */
@@ -1830,22 +1830,22 @@ is used primarily with **GeodeUseDriver()** and its associated routines. Each
 driver stores its type in its **DriverInfoStruct** structure.
 
 ----------
-#### DWFixed
+### DWFixed
     typedef struct {
         word    WWF_frac;
         dword   WWF_int;
     } DWFixed;
 
 ----------
-#### dword
+### dword
     typedef unsigned long dword;
 
 ----------
-#### DWordFlags
+### DWordFlags
     typedef dword DWordFlags;
 
 ----------
-#### ElementArrayHeader
+### ElementArrayHeader
     typedef struct {
         ChunkArrayHeader    EAH_meta;       /* chunk array header structure */
         word                EAH_freePtr;    /* First free element */
@@ -1859,7 +1859,7 @@ track of the freed elements in the element array. Applications should not
 examine or change this field.
 
 ----------
-#### EndOfSongFlags
+### EndOfSongFlags
     typedef ByteFlags EndOfSongFlags;
             #define EOSF_UNLOCK 0x0080      /* unlock block at EOS ? */
             #define EOSF_DESTROY 0x0040     /* destroy block at EOS ? */
@@ -1868,14 +1868,14 @@ examine or change this field.
             #define DESTROY_ON_EOS EOSF_DESTROY
 
 ----------
-#### EntryPointRelocation
+### EntryPointRelocation
     typedef struct {
         char    EPR_geodeName[GEODE_NAME_SIZE];
         word    EPR_entryNumber;
     } EntryPointRelocation;
 
 ----------
-#### EnvelopeOrientation
+### EnvelopeOrientation
     typedef ByteEnum EnvelopeOrientation;
         #define EO_PORTAIT_LEFT             0x00
         #define EO_PORTAIT_RIGHT            0x01
@@ -1884,14 +1884,14 @@ examine or change this field.
 
 ----------
 
-#### EnvelopePath
+### EnvelopePath
     typedef ByteEnum EnvelopePath;
         #define EP_LEFT             0x00
         #define EP_CENTER           0x01
         #define EP_RIGHT            0x02
 
 ----------
-#### Errors
+### Errors
         #define ERROR_UNSUPPORTED_FUNCTION                  1
         #define ERROR_FILE_NOT_FOUND                        2
         #define ERROR_PATH_NOT_FOUND                        3
@@ -1937,7 +1937,7 @@ examine or change this field.
         #define ERROR_NO_TASK_DRIVER_LOADED                 147
 
 ----------
-#### ErrorCheckingFlags
+### ErrorCheckingFlags
     typedef WordFlags ErrorCheckingFlags;
         #define ECF_REGION                  0x8000
         #define ECF_HEAP_FREE_BLOCKS        0x4000
@@ -1960,13 +1960,13 @@ It is important to use error checking when debugging; it can help catch
 obscure bugs that might otherwise go unnoticed until after a product ships.
 
 ----------
-#### EvalErrorData
+### EvalErrorData
     typedef struct {
         byte    EED_errorCode;      /* ParserScannerEvaluatorError */
     } EvalErrorData;
 
 ----------
-#### EvalFlags
+### EvalFlags
     typedef ByteFlags EvalFlags;
         #define EF_MAKE_DEPENDENCIES            0x80
         #define EF_ONLY_NAMES                   0x40
@@ -1976,26 +1976,26 @@ obscure bugs that might otherwise go unnoticed until after a product ships.
         #define EVAL_MAX_NESTED_LEVELS          32
 
 ----------
-#### EvalFunctionData
+### EvalFunctionData
     typedef struct {
         FunctionID      EFD_functionID;
         word            EFD_nArgs;
     } EvalFunctionData;
 
 ----------
-#### EvalNameData
+### EvalNameData
     typedef struct {
         word    END_name;
     } EvalNameData;
 
 ----------
-#### EvalOperatorData
+### EvalOperatorData
     typedef struct {
         OperatorType        EOD_opType;
     } EvalOperatorData;
 
 ----------
-#### EvalStackArgumentData
+### EvalStackArgumentData
     typedef union {
         EvalStringData          ESAD_string;
         EvalRangeData           ESAD_range;
@@ -2003,7 +2003,7 @@ obscure bugs that might otherwise go unnoticed until after a product ships.
     } EvalStackArgumentData;
 
 ----------
-#### EvalParameters
+### EvalParameters
     typedef struct {
         CommonParameters    EP_common;
         EvalFlags           EP_flags;
@@ -2014,14 +2014,14 @@ obscure bugs that might otherwise go unnoticed until after a product ships.
     } EvalParameters;
 
 ----------
-#### EvalRangeData
+### EvalRangeData
     typedef struct {
         CellReference           ERD_firstCell;
         CellReference           ERD_lastCell;
     } EvalRangeData;
 
 ----------
-#### EvalStackArgumentType
+### EvalStackArgumentType
     typedef ByteFlags EvalStackArgumentType;
         #define ESAT_EMPTY                  0x80
         #define ESAT_ERROR                  0x40
@@ -2034,14 +2034,14 @@ obscure bugs that might otherwise go unnoticed until after a product ships.
         #define ESAT_FUNCTION               (ESAT_NUMBER | ESAT_STRING)
 
 ----------
-#### EvalStackOperatorData
+### EvalStackOperatorData
     typedef union {
         EvalOperatorData            ESOD_operator;
         EvalFunctionData            ESOD_function;
     } EvalStackOperatorData;
 
 ----------
-#### EvalStackOperatorType
+### EvalStackOperatorType
     typedef ByteEnum EvalStackOperatorType;
         #define ESOT_OPERATOR               0
         #define ESOT_FUNCTION               1
@@ -2049,17 +2049,17 @@ obscure bugs that might otherwise go unnoticed until after a product ships.
         #define ESOT_TOP_OF_STACK           3
 
 ----------
-#### EvalStringData
+### EvalStringData
     typedef struct {
         word    ESD_length;
     } EvalStringData;
 
 ----------
-#### EventHandle
+### EventHandle
     typedef Handle      EventHandle;
 
 ----------
-#### ExitFlags
+### ExitFlags
     typedef ByteFlags ExitFlags;
         #define EF_PANIC                0x80
         #define EF_RUN_DOS              0x40
@@ -2068,12 +2068,12 @@ obscure bugs that might otherwise go unnoticed until after a product ships.
         #define EF_RESTART              0x08
 
 ----------
-#### ExportControlFeatures
+### ExportControlFeatures
     typedef ByteFlags ExportControlFeatures;
         #define EXPORTCF_BASIC                      0x01
 
 ----------
-#### ExportControlToolboxFeatures
+### ExportControlToolboxFeatures
     typedef ByteFlags ExportControlToolboxFeatures;
         #define EXPORTCTF_DIALOG_BOX                0x01
 

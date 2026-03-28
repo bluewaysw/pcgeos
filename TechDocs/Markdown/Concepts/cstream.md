@@ -1,4 +1,4 @@
-## 21 Using Streams
+# 21 Using Streams
 
 It is often useful for an application to be able to write out data in an orderly 
 manner to be read by another program or sent to a device such as a printer 
@@ -33,7 +33,7 @@ to send data to and receive data from a serial port.
 + A description of the specific routines and conventions for using a stream 
 to send data to a parallel port.
 
-### 21.1 Using Streams: The Basics
+## 21.1 Using Streams: The Basics
 
 A stream is a path along which information flows in one direction. At one end 
 of the stream is a writer, who puts data into the stream. At the opposite end 
@@ -78,7 +78,7 @@ in Object-Assembly can call the driver directly. Goc programs cannot do this;
 instead, they make calls to the Stream Library, which in turn calls the 
 Stream Driver, and passes back any return values.
 
-#### 21.1.1 Initializing a Stream
+### 21.1.1 Initializing a Stream
 
 A stream is essentially a first-in-first-out data buffer, in which the writer is 
 different from the reader. When the writer writes data to the stream, the 
@@ -131,7 +131,7 @@ STREAM_CANNOT_ALLOC (if the memory for the stream's buffer cannot be
 allocated) or STREAM_BUFFER_TOO_LARGE (if the requested stream size 
 was greater than 32767).
 
-##### 21.1.1.2 Assigning Readers and Writers
+#### 21.1.1.2 Assigning Readers and Writers
 
 Once a stream is created, you must make sure that both ends will be 
 managed-a stream that has only a writer or only a reader is not a useful 
@@ -149,7 +149,7 @@ Once both geodes have the stream's token, each can access the stream
 normally. The next several sections explain how to access a stream for 
 writing and reading.
 
-#### 21.1.2 Blocking on Read or Write
+### 21.1.2 Blocking on Read or Write
 
 StreamBlocker, StreamError
 
@@ -184,7 +184,7 @@ If a stream routine returns an error, the error will be a member of the
 **StreamError** enumerated type. The possible error values are described in 
 the section for each routine.
 
-#### 21.1.3 Writing Data to a Stream
+### 21.1.3 Writing Data to a Stream
 
 StreamWrite(), StreamWriteByte()
 
@@ -258,7 +258,7 @@ permitted while this is happening.
 **STREAM_CLOSED**  
 The stream has already been closed.
 
-#### 21.1.4 Reading Data from a Stream
+### 21.1.4 Reading Data from a Stream
 
 StreamRead(), StreamReadByte()
 
@@ -326,7 +326,7 @@ waiting in the stream.
 The stream is in the process of being closed; no reading is 
 permitted while this is happening.
 
-#### 21.1.5 Shutting Down a Stream
+### 21.1.5 Shutting Down a Stream
 
 StreamClose()
 
@@ -357,7 +357,7 @@ until it's read; false (i.e. zero) indicates it should be flushed.
 If you are using the Serial or Parallel drivers (described later in this chapter), 
 you do not have to coordinate the closure of a stream.
 
-#### 21.1.6 Miscellaneous Functions
+### 21.1.6 Miscellaneous Functions
 
 StreamFlush(), StreamQuery()
 
@@ -390,7 +390,7 @@ stream buffer. If you pass STREAM_ROLES_READER, **StreamQuery()**
 returns the number of bytes of data waiting to be read. If the call is 
 unsuccessful, **StreamQuery()** returns a **StreamError**.
 
-### 21.2 Using the Serial Ports
+## 21.2 Using the Serial Ports
 
 The serial driver uses streams to control the flow of data to and from serial 
 ports. The kernel automatically copies data from the serial port into one 
@@ -398,7 +398,7 @@ stream for reading, and sends data from another stream into the serial port.
 An application which wishes to use the serial port simply reads and writes 
 data from those streams. 
 
-#### 21.2.1 Initializing a Serial Port
+### 21.2.1 Initializing a Serial Port
 
 Like the stream driver, the serial driver is not accessed directly from Goc 
 code. Instead, a Goc application makes calls to the Stream Library, which 
@@ -411,7 +411,7 @@ The serial driver uses two streams, one for data going out to the serial port
 program is the writer of the outgoing and the reader of the incoming. (In both 
 cases, the port acts as the opposite user.)
 
-##### 21.2.1.1 Opening a Serial Port
+#### 21.2.1.1 Opening a Serial Port
 
 SerialOpen()
 
@@ -453,7 +453,7 @@ with either STREAM_READ (if reading from the stream) or STREAM_WRITE
 it, you must specify both parameters. The serial driver will understand which 
 stream you are accessing.
 
-##### 21.2.1.2 Configuring a Serial Port
+#### 21.2.1.2 Configuring a Serial Port
 
 SerialSetFormat(), SerialGetFormat(),SerialSetModem(), 
 SerialGetModem(), SerialSetFlowControl()
@@ -608,7 +608,7 @@ hardware flow control is selected). When one of the selected lines is
 de-asserted by the remote system, the serial driver will not transmit any 
 more data until the state changes.
 
-#### 21.2.2 Communicating
+### 21.2.2 Communicating
 
 SerialRead(), SerialReadByte(), SerialWrite(), 
 SerialWriteByte(), SerialQuery(), SerialFlush()
@@ -632,7 +632,7 @@ To find out if you can read or write data to the port, call **SerialQuery()**.
 Again, this routine behaves like its **Stream-()** equivalent. To flush any data 
 from the input or output stream, call **SerialFlush()**.
 
-#### 21.2.3 Closing a Serial Port
+### 21.2.3 Closing a Serial Port
 
 SerialClose(), SerialCloseWithoutReset()
 
@@ -655,7 +655,7 @@ You can also instruct the serial driver to close the stream to a port, without
 actually resetting the port. Do this by calling **SerialCloseWithoutReset()**. 
 This routine is passed the same arguments as **SerialClose()**.
 
-### 21.3 Using the Parallel Ports
+## 21.3 Using the Parallel Ports
 
 Using a parallel port is simpler than using a serial port since data goes in 
 only one direction. GEOS does not currently support reading data from a 
@@ -667,7 +667,7 @@ whose applications will need to send data out through the parallel port
 without using the spooler. Most applications, however, will use the spooler for 
 any and all parallel port use.
 
-#### 21.3.1 Initializing a Parallel Port
+### 21.3.1 Initializing a Parallel Port
 
 ParallelOpen()
 
@@ -714,7 +714,7 @@ driver will understand which stream you are accessing.
 Once the port is selected, the PC will assert the SLCTIN signal, which usually 
 will place the device on-line.
 
-#### 21.3.2 Communicating
+### 21.3.2 Communicating
 
 ParallelWrite(), ParallelWriteByte()
 
@@ -726,7 +726,7 @@ routine is passed the **ParallelUnit** for the appropriate port, instead of bein
 passed a stream token. These routines behave exactly like their **Stream-()** 
 counterparts.
 
-#### 21.3.3 Closing a Parallel Port
+### 21.3.3 Closing a Parallel Port
 
 ParallelClose()
 

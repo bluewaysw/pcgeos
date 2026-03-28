@@ -1,5 +1,5 @@
 
-## 3 PCMCIA Drivers
+# 3 PCMCIA Drivers
 
 This chapter explains the fundamentals associated with writing a PCMCIA
 driver for GEOS . Life for a PCMCIA driver— as with a human being— begins
@@ -30,7 +30,7 @@ A PCMCIA sample driver that you may use as a template is available in
 \OMNIGO\DRIVER\DDK\PCMCIA\SAMPLE . Other (functioning) drivers are
 located within \OMNIGO\DRIVER\DDK\PCMCIA.
 
-### 3.1 PCMCIA Drivers Basics
+## 3.1 PCMCIA Drivers Basics
 Writing a GEOS device driver for PCMCIA cards is somewhat different than
 writing a driver for other devices. The driver acts not only with the device,
 but with the PCMCIA library (a GEOS library) and CardServices.
@@ -45,7 +45,7 @@ callback routine handling the specific CardServicesEventCode types. It
 will also need to send function calls to CardServices using the
 CardServicesFunction type.
 
-#### 3.1.1 State Information
+### 3.1.1 State Information
 A PCMCIA driver needs to maintain information about the card(s) and
 socket(s) that it is driving. The “socket” refers to the physical slot of the
 PCMCIA hardware interface. (This should not be confused with the GEOS
@@ -62,7 +62,7 @@ of information that may be necessary:
 + How the card was configured. This depends on the requirements of the
 device.
 
-#### 3.1.2 Handling Basic Functions
+### 3.1.2 Handling Basic Functions
 ``DR_INIT, DR_EXIT``  
 Your PCMCIA driver will need to handle the basic DR_INIT and DR_EXIT
 routines defined in driver.def. (There usually is not any need to handle
@@ -70,7 +70,7 @@ DR_SUSPEND and DR_UNSUSPEND .) Because PCMCIA drivers are not
 extended, there is no need to handle DRE_TEST_DEVICE and
 DRE_SET_DEVICE.
 
-##### 3.1.2.1 Insertion
+#### 3.1.2.1 Insertion
 As noted, the insertion or removal of a PCMCIA card are the two most
 important events in the driver’s life. When a driver is first loaded, it registers
 with CardServices. Among other things, this registration allows the driver to
@@ -86,7 +86,7 @@ the card. If the card is compatible, the driver configures the card according to
 its own specifications and makes its devices and/or memory available to
 GEOS.
 
-##### 3.1.2.2 Removal
+#### 3.1.2.2 Removal
 The removal of a PCMCIA card is a difficult event for a PCMCIA driver. The
 driver may be writing a file to the card; it may be communicating something
 over the serial line. No one wants to “go” when confronted with the tasks still
@@ -236,7 +236,7 @@ SampleExit     proc    far
 SampleExit     endp
 ~~~
 
-#### 3.1.3 PCMCIA Driver Functions
+### 3.1.3 PCMCIA Driver Functions
 ``DR_PCMCIA_CHECK_SOCKET, DR_PCMCIA_OBJECTION_RESOLVED,
 DR_PCMCIA_CLOSE_SOCKET, DR_PCMCIA_DEVICE_ON, DR_PCMCIA_DEVICE_OFF``
 
@@ -521,7 +521,7 @@ __Destroyed:__
 __Include:__
 pcmciaDr.def
 
-### 3.2 PCMCIA Library Functions
+## 3.2 PCMCIA Library Functions
 As noted, a PCMCIA driver will interact with both a PCMCIA library and,
 through that library, CardServices. The PCMCIA library provides a number
 of routines to aid in communicating with CardServices.
@@ -585,7 +585,7 @@ __Destroyed:__
 __Include:__
 pcmcia.def
 
-### 3.3 CardServices Functions
+## 3.3 CardServices Functions
 A driver must contact CardServices through use of CardServicesFunction
 types defined in pcmcia.def. Consult that file for a complete list of all
 possible function calls, as well as pass and return information for those calls.  
@@ -731,7 +731,7 @@ procedure), DONT_LOCK_BIOS must be passed as an option. At all other
 times you must not pass DONT_LOCK_BIOS (unless you call SysLockBIOS
 yourself) as CardServices is not re-entrant.
 
-### 3.4 CardServices Events
+## 3.4 CardServices Events
 The interface between CardServices and your driver occurs not only through
 use of the PCMCIA library; your driver must also handle events sent by
 CardServices as well. This is performed through use of a callback routine.

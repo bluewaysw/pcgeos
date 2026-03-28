@@ -76,6 +76,87 @@ extern void UpdateDocumentUI(void);
 		*/
 	}
 
+/* ---------------------------------------------------------------------
+ * SmartTextClass - handles clipboard operations
+ * --------------------------------------------------------------------- */
+
+@classdecl SmartTextClass;
+
+/*
+ * Do not copy empty text to clipboard (will overwrite existing clipboard data)
+ */
+Boolean GetNumSelectedCharactres(optr textObj) {
+VisTextRange	vtr;
+      @call textObj::MSG_VIS_TEXT_GET_SELECTION_RANGE(&vtr);
+      return vtr.VTR_end - vtr.VTR_start;
+}
+
+@method SmartTextClass, MSG_META_CLIPBOARD_COPY {
+    if ( 0 == GetNumSelectedCharactres(oself) ) return;
+    @callsuper();
+}
+
+@method SmartTextClass, MSG_META_CLIPBOARD_CUT {
+    if ( 0 == GetNumSelectedCharactres(oself) ) return;
+    @callsuper();
+}
+
+/* ---------------------------------------------------------------------
+ * ICApplicationClass - monitor cliboard related keyboard keys
+ * --------------------------------------------------------------------- */
+
+@classdecl ICApplicationClass;
+
+/*--------------------- MSG_META_KBD_CHAR ---------------------
+ *  Purpose:	See if Ctrl-C, Ctrl-V or Ctrl-X is pressed
+ *		and send the associated clipboard messages to 
+ *		the focus object
+ *  Parameters: void ( word character, word flags, word state )
+ *	character:	Low byte:  ASCII code (if high byte = 0)
+ *				   Control code  (if high byte = 0xFF)
+ *	flags:		High byte: ShiftState 	SS_xxxx
+ *			Low byte: CharFlags	CF_xxxx
+ *			   e.g. CF_FIST_PRESS , CF_RELEASE
+ *	state:		High byte: Scancode
+ *			Low byte: ToggleState
+ *			   TS_CAPSLOCK | TS_NUMLOCK | TS_SCROLLLOCK
+ *	Return:         -
+ -----------------------------------------------------------------------------*/
+@method ICApplicationClass, MSG_META_KBD_CHAR {
+EventHandle ev = 0;
+
+    /*
+     * see if Ctrl-key + C, X or V is pressed for first time
+     * if yes, record an clipboard event and send it to the
+     * focus text obect
+     */
+    do {
+      if ( (flags & 0xFF) != CF_FIRST_PRESS ) break;
+      if ( ( ((flags & 0xFF00)>>8) & (SS_LCTRL | SS_RCTRL)) == 0 ) break;
+
+      switch ( character ) {
+      case 'c':
+      	ev = @record SmartTextClass::MSG_META_CLIPBOARD_COPY();
+      	break;
+      case 'v':
+      	ev = @record SmartTextClass::MSG_META_CLIPBOARD_PASTE();
+      	break;
+      case 'x':
+      	ev = @record SmartTextClass::MSG_META_CLIPBOARD_CUT();
+      	break;
+      }
+    } while (FALSE);
+    
+    if (ev) {
+    	@send oself::MSG_META_SEND_CLASSED_EVENT(ev, TO_APP_FOCUS);
+    }
+
+    @callsuper();
+}
+
+/* ---------------------------------------------------------------------
+ * FileSelectDialogClass
+ * --------------------------------------------------------------------- */
 
 @classdecl FileSelectDialogClass;
 

@@ -456,7 +456,7 @@ made GS_USABLE.
 
 **Warnings:** Make sure that the object sent this message is not GS_USABLE.
 
-#### 7.2.2 Standard Interactions (Menus)
+### 7.2.2 Standard Interactions (Menus)
     ATTR_GEN_INTERACTION_GROUP_TYPE, GenInteractionGroupType
 
 Often you will set up standard menus such as the File menu, the Window 

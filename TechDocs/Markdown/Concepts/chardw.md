@@ -1,4 +1,4 @@
-## A Machine Architecture
+# A Machine Architecture
 
 The GEOS operating system is state-of-the art technology based on the 
 Intel 80x86 microprocessor. This chapter discusses some of the elements of 
@@ -9,7 +9,7 @@ this overview but also to pick up a book about the Intel chip series. There
 are dozens of good books about the 80x86 chips, and this section provides 
 only a brief review.
 
-### A.1 History of the 80x86
+## A.1 History of the 80x86
 
 The commercial microcomputer essentially began with Intel's introduction 
 of the 8008 chip in 1972. This was an 8-bit machine that eventually led to 
@@ -43,7 +43,7 @@ Both the 8088 and the 8086 can run the same software; they use the same
 instruction set. However, the power of the data processing offered by the 
 8086 eventually won out as systems and software became more complex.
 
-### A.2 8086 Architecture Overview
+## A.2 8086 Architecture Overview
 
 The 8086 uses a 16-bit architecture but can handle 8-bit data as well. It 
 accesses up to one megabyte (1024K) of memory, sixteen times more than 

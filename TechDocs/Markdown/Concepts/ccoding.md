@@ -1,4 +1,4 @@
-## 5 GEOS Programming
+# 5 GEOS Programming
 
 Because GEOS implements its own messaging and object system, standard C 
 programming must be supplemented with GEOS-specific programming. This 
@@ -10,7 +10,7 @@ concepts-you should be familiar with both before continuing. Additionally,
 you should have read both ["System Architecture," Chapter 3](carch.md) and 
 ["First Steps: Hello World," Chapter 4](cgetsta.md).
 
-### 5.1 Basic Data Types and Structures
+## 5.1 Basic Data Types and Structures
 
 In addition to the standard data types available in C, the Goc preprocessor 
 handles several other types specific to GEOS. These are all defined in the file 
@@ -41,7 +41,7 @@ from your functions and methods. Do not compare Boolean variables,
 however, against these constants. A Boolean may be true without actually 
 equaling the TRUE value.
 
-#### 5.1.1 Records and Enumerated Types
+### 5.1.1 Records and Enumerated Types
 
 GEOS objects and routines make extensive use of flag records and 
 enumerated types. A flag record is a byte, word, or dword in which each bit 
@@ -114,7 +114,7 @@ typedef ByteEnum USCity;
 #define USC_ORLANDO         0x04
 ~~~
 
-#### 5.1.2 Handles and Pointers
+### 5.1.2 Handles and Pointers
 
 Handles and pointers are present everywhere in GEOS-they are the 
 essential elements that make dynamic linking and efficient memory 
@@ -127,7 +127,7 @@ pointers (optrs) and segment pointers. Object pointers are described below;
 segment pointers are 16-bit addresses described in ["Memory Management", 
 Chapter 15](cmemory.md).
 
-##### 5.1.2.1 Handles
+#### 5.1.2.1 Handles
 
 Handles are 16-bit, unsigned values used for several purposes. They provide 
 abstraction when the exact address of a data structure or other item is not 
@@ -199,7 +199,7 @@ _The internal structure of every handle type is opaque and can not be accessed
 except by the kernel. Swat, the GEOS debugger, provides commands that allow 
 you to access the data referenced by the various handles._
 
-##### 5.1.2.2 Chunk Handles and Object Pointers
+#### 5.1.2.2 Chunk Handles and Object Pointers
 
 Objects and small data structures are stored in small memory pieces called 
 chunks. Chunks are stored in memory blocks known as local memory heaps, 
@@ -228,7 +228,7 @@ This macro extracts the MemHandle portion of the given optr.
 + **OptrToChunk()**  
 This macro extracts the chunk handle portion of a given optr.
 
-##### 5.1.2.3 Pointers
+#### 5.1.2.3 Pointers
 
 Pointers can be used normally as in C. All Goc-generated pointers are far 
 pointers; that is, they are 32-bits long, composed of a 16-bit segment and a 
@@ -250,7 +250,7 @@ call routines through pointers, you must take special measures to see to it
 that the routine is properly loaded into memory. This is discussed below in 
 [section 5.2.4](#534-using-routine-pointers-in-goc).
 
-#### 5.1.3 Fixed Point Structures
+### 5.1.3 Fixed Point Structures
 
 When you want to represent non-integral numbers (i.e., real numbers), you 
 can use either the standard C floating-point format or the following special 
@@ -338,7 +338,7 @@ This macro returns the integral portion of a **WWFixedAsDword** structure.
 + **FractionOf()**  
 This macro returns the fractional portion of a **WWFixedAsDword** structure.
 
-### 5.2 Goc and C
+## 5.2 Goc and C
 
 Goc is a superset of the standard C programming language. Goc actually acts 
 as a sort of preprocessor before the code is run through a standard C compiler. 
@@ -346,7 +346,7 @@ There are several differences you must be aware of, though. These
 differences are covered in the following sections as well as throughout the 
 documentation.
 
-#### 5.2.1 Goc File Types
+### 5.2.1 Goc File Types
 
 @include, @optimize
 
@@ -401,7 +401,7 @@ unchanged since the last compilation. You may choose to leave the
 **@optimize** directive out while the header is being developed, then put it in 
 when the header is fairly stable.
 
-#### 5.2.2 Conditional Code in Goc
+### 5.2.2 Conditional Code in Goc
 
 @if, @ifdef, @ifndef, @endif
 
@@ -436,7 +436,7 @@ expressions are shown below:
 @endif
 ~~~
 
-#### 5.2.3 Macros in Goc
+### 5.2.3 Macros in Goc
 
 @define
 
@@ -483,7 +483,7 @@ The above would equate to the following:
 Using "defChunk" without the "@" marker would most likely result in a 
 compilation error in the C compiler.
 
-#### 5.2.4 Using Routine Pointers in Goc
+### 5.2.4 Using Routine Pointers in Goc
 
 ProcCallFixedOrMovable_cdecl(), 
 ProcCallFixedOrMovable_pascal()
@@ -541,7 +541,7 @@ ProcCallFixedOrMovable_cdecl(funcPtr,       /* The pointer to the routine */
             1, 2, "Franklin T. Poomm");
 ~~~
 
-### 5.3 The GEOS Object System
+## 5.3 The GEOS Object System
 
 GEOS is almost entirely object-oriented. Its object system supports true 
 object-oriented principles such as encapsulation, inheritance, and message 
@@ -551,7 +551,7 @@ The following section describes the class and object structures of GEOS, how
 to declare and define classes and objects, and how the messaging system and 
 the kernel's message dispatcher work.
 
-#### 5.3.1 GEOS Terminology
+### 5.3.1 GEOS Terminology
 
 Though you should be familiar with general object-oriented programming 
 terms, there are quite a few for which the meaning is slightly different in 
@@ -559,7 +559,7 @@ GEOS, and there are others which are entirely new to GEOS. This section is
 divided into four categories: General Terms, Class Terms, Object Terms, and 
 Messaging Terms.
 
-##### 5.3.1.1 General Terms
+#### 5.3.1.1 General Terms
 
 **chunk**  
 A chunk is a small section of memory located in a Local 
@@ -593,7 +593,7 @@ procedural code or one or more objects. If a thread is
 "event-driven," it executes code for a given set of objects, 
 receiving messages and dispatching them to the proper objects.
 
-##### 5.3.1.2 Class Terms
+#### 5.3.1.2 Class Terms
 
 **class**  
 A class is the definition of a set of instance data structures and 
@@ -653,7 +653,7 @@ given moment. The use of variant classes can provide much the
 same functionality as the multiple inheritance found in some 
 other object systems.
 
-##### 5.3.1.3 Object Terms
+#### 5.3.1.3 Object Terms
 
 **child**  
 A child object is one that sits below another object in an object 
@@ -708,7 +708,7 @@ from the state file. Generic UI objects have this functionality
 built in automatically; other objects may manage their own 
 state saving by managing the state file.
 
-##### 5.3.1.4 Messaging Terms
+#### 5.3.1.4 Messaging Terms
 
 blocking    A thread "blocks" when it must wait for resources or return 
 values from messages sent to objects in another thread. 
@@ -748,7 +748,7 @@ Messages that return information or pass pointers should
 never be dispatched with the send command; use the call 
 command in those cases.
 
-#### 5.3.2 Object Structures
+### 5.3.2 Object Structures
 
 You do not need to know what data structures are used to store objects and 
 classes; understanding them can make programming GEOS much easier, 
@@ -776,7 +776,7 @@ Additionally, each class dynamically accesses its superclass' code, so any
 class may be accessed by all the objects of the subclasses as well. Class 
 structures are shown in [section 5.3.2.3](#5323-master-classes).
 
-##### 5.3.2.1 Instance Chunk Structures
+#### 5.3.2.1 Instance Chunk Structures
 
 Each object's instance data is stored in a Local Memory chunk. Several 
 chunks are stored in one memory block, called a local memory heap. (See 
@@ -885,7 +885,7 @@ its use are discussed in full in [section 5.4.1.4](#5414-defining-and-working-wi
 _All objects have class pointers, though only those with master classes in their 
 ancestries have master groups and master group offsets._
 
-##### 5.3.2.2 Master Classes
+#### 5.3.2.2 Master Classes
 
 A master class provides a conceptual break between levels within a class 
 tree. Each master class is the head of a class subtree, and all its subclasses 
@@ -922,7 +922,7 @@ The functionality of master classes is required to implement GEOS variant classe
 to have a version of "multiple inheritance" in that it can have different 
 superclasses depending on the system context.
 
-##### 5.3.2.3 Class Structure and Class Trees
+#### 5.3.2.3 Class Structure and Class Trees
 
 For the most part, you won't ever need or want to know the internal structure 
 of a class as implemented in memory. The class structure is created and 
@@ -1134,7 +1134,7 @@ executed immediately. (If the message number is not found in the table, the
 kernel will either execute the class' default handler or pass the message on 
 to the class' superclass.)
 
-##### 5.3.2.4 Variant Classes
+#### 5.3.2.4 Variant Classes
 
 A variant class is one which has no set superclass. The variant's superclass 
 is determined at run-time based on context and other criteria. Note that 
@@ -1253,7 +1253,7 @@ is resolved, the pointer (the first four bytes of the Gen master part) points to
 the proper superclass for this object (in this case, **OLMenuWinClass**). The 
 object, with its full class tree, is shown in Figure 5-11.
 
-##### 5.3.2.5 An In-Depth Example
+#### 5.3.2.5 An In-Depth Example
 
 This section gives an example of a GenTrigger object after its variant part 
 has been resolved. This example provides in-depth diagrams of the class and 
@@ -1399,14 +1399,14 @@ kernel checks the second part of the method table for the code pointer. It
 follows this pointer to the method's entry point and begins executing the code 
 there.
 
-#### 5.3.3 The GEOS Message System
+### 5.3.3 The GEOS Message System
 
 Because objects are independent entities, they must have some means of 
 communicating with other objects in the system. As shown in the example of 
 the calculator and requestor objects in "System Architecture," Chapter 3, 
 communication is implemented through the use of messages and methods.
 
-##### 5.3.3.1 The Messaging Process
+#### 5.3.3.1 The Messaging Process
 
 When an object needs to notify another object of some event, retrieve data 
 from another object, or send data to another object, it sends a message to that 
@@ -1483,7 +1483,7 @@ with a MSG_RETURNING_REQUESTED_INFORMATION (or something
 similar). With this scheme, the application's object is free to use call 
 whenever it wants, but the UI object must always use send.
 
-##### 5.3.3.2 Message Structures and Conventions
+#### 5.3.3.2 Message Structures and Conventions
 
 A message is simply a 16-bit number determined at compile time. 
 Specifically, it is an enumerated type-this ensures that no two messages in 
@@ -1495,7 +1495,7 @@ When an object sends a message, the kernel automatically builds out the
 event structure (generally stored in the handle table for speed and efficiency). 
 You will never have to know the structure of an event.
 
-### 5.4 Using Classes and Objects
+## 5.4 Using Classes and Objects
 
 The previous sections dealt with the internals of the GEOS object system. 
 This section describes how you can create classes and objects and manage 
@@ -1585,7 +1585,7 @@ gcnList(<manufID>, <ltype>) = <oname> [, <oname>]*;
 @define <mname> <macro>
 ~~~
 
-#### 5.4.1 Defining a New Class or Subclass
+### 5.4.1 Defining a New Class or Subclass
 
 @class, @classdecl, @endc, @default, @uses
 
@@ -1703,7 +1703,7 @@ Code Display 5-6 Defining Classes
 @classdecl MyNewVariantClass;
 ~~~
 
-##### 5.4.1.1 Defining New Messages for a Class
+#### 5.4.1.1 Defining New Messages for a Class
 
 @message, @stack, @reserveMessages, @exportMessages, 
 @importMessage, @alias, @prototype
@@ -1925,7 +1925,7 @@ Code Display 5-8 Aliasing Messages
 @classdecl MyClass;
 ~~~
 
-##### 5.4.1.2 Defining Instance Data Fields
+#### 5.4.1.2 Defining Instance Data Fields
 
 @instance, @composite, @link, @visMoniker, @kbdAccelerator, 
 @activeList
@@ -2039,7 +2039,7 @@ Code Display 5-9 Declaring Instance Data Fields
 @endc
 ~~~
 
-##### 5.4.1.3 New Defaults for Subclassed Instance Data Fields
+#### 5.4.1.3 New Defaults for Subclassed Instance Data Fields
 
 @default
 
@@ -2075,7 +2075,7 @@ its superclass, except with the GS_USABLE flag turned off:
 @default GI_states = @default & ~GS_USABLE;
 ~~~
 
-##### 5.4.1.4 Defining and Working With Variable Data Fields
+#### 5.4.1.4 Defining and Working With Variable Data Fields
 
 @vardata, @vardataAlias, ObjVarAddData(), 
 ObjVarDeleteData(), ObjVarDeleteDataAt(), ObjVarScanData(), 
@@ -2366,7 +2366,7 @@ static VarDataCHandler varDataInteractionHandlerTable[] = {
 };
 ~~~
 
-##### 5.4.1.5 Defining Relocatable Data
+#### 5.4.1.5 Defining Relocatable Data
 
 @reloc
 
@@ -2423,7 +2423,7 @@ relocation.
 **ptrType** This is the type of relocatable data contained in the field. It 
 may be one of optr, ptr, or handle.
 
-#### 5.4.2 Non-relocatable Data
+### 5.4.2 Non-relocatable Data
 
 @noreloc
 
@@ -2439,7 +2439,7 @@ Code Display 5-13 Use of the @noreloc Keyword
     @noreloc MCI_ruler;        /* -but now it isn't. */
 ~~~
 
-#### 5.4.3 Defining Methods
+### 5.4.3 Defining Methods
 
 @method, @extern
 
@@ -2668,7 +2668,7 @@ extern int _pascal HelloCounterRecalculateValue(
 }
 ~~~
 
-#### 5.4.4 Declaring Objects
+### 5.4.4 Declaring Objects
 
 In GEOS programs, you can instantiate objects in two ways: You can declare 
 them in your source code with the **@object** keyword, or you can instantiate 
@@ -2681,7 +2681,7 @@ of declarations in their definition (.goh) files; these declarations (**@deflib*
 and **@endlib**) indicate that the code contained between them is part of the 
 specified library.
 
-##### 5.4.4.1 Defining Library Code
+#### 5.4.4.1 Defining Library Code
 
 @deflib, @endlib
 
@@ -2709,7 +2709,7 @@ Note that these two keywords are only necessary in files that define classes
 in the library. Files that have just code or data used in the library do not 
 require them (though they are allowed).
 
-##### 5.4.4.2 Declaring Segment Resources and Chunks
+#### 5.4.4.2 Declaring Segment Resources and Chunks
 
 @start, @end, @header, @chunk, @chunkArray, @elementArray, 
 @extern
@@ -2834,7 +2834,7 @@ typedef struct {
 @end StudentBlock                   /* end of resource block */
 ~~~
 
-##### 5.4.4.3 Declaring an Object
+#### 5.4.4.3 Declaring an Object
 
 @object, @default, @specificUI, gcnList
 
@@ -3159,7 +3159,7 @@ Code Display 5-17 Declaring Objects with @object
 @end Interface
 ~~~
 
-#### 5.4.5 Sending Messages
+### 5.4.5 Sending Messages
 
 @send, @call, @callsuper, @record, @dispatch, @dispatchcall
 
@@ -3518,7 +3518,7 @@ using **@<obj>**, where <obj> represents the name of the object. This syntax
 gets translated by Goc into (optr)&<obj>; this is similar to using the 
 ampersand (&) to pass a pointer.
 
-#### 5.4.6 Managing Objects
+### 5.4.6 Managing Objects
 
 In addition to knowing how to declare objects and classes, you need to know 
 how to manage objects during execution. This includes instantiating new 
@@ -3531,7 +3531,7 @@ probably not have to or want to use all these routines and methods, but
 understanding what they do and how they work can help you understand the 
 object system as a whole.
 
-##### 5.4.6.1 Creating New Objects
+#### 5.4.6.1 Creating New Objects
 
 ObjDuplicateResource(), ObjInstantiate(), 
 MSG_META_INITIALIZE, MSG_GEN_COPY_TREE
@@ -3699,7 +3699,7 @@ destroyed with MSG_GEN_DESTROY.
 For an example of MSG_GEN_COPY_TREE use, see the SDK_C\GENTREE 
 sample application.
 
-##### 5.4.6.2 Working With Object Blocks
+#### 5.4.6.2 Working With Object Blocks
 
 ObjIncInUseCount(), ObjDecInUseCount(), ObjLockObjBlock(), 
 ObjFreeObjBlock(), ObjFreeDuplicate(), 
@@ -3723,7 +3723,7 @@ indicating whether the calling thread runs a given object block.
 of the object set to receive output messages (i.e., messages sent with travel 
 option TO_OBJ_BLOCK_OUTPUT) from all the objects within the object block.
 
-##### 5.4.6.3 Working With Individual Objects
+#### 5.4.6.3 Working With Individual Objects
 
 ObjIsObjectInClass(), ObjGetFlags(), ObjSetFlags(), 
 ObjDoRelocation(), ObjDoUnRelocation(), ObjResizeMaster(), 
@@ -3746,7 +3746,7 @@ to build all master groups above and including the passed level. (This will
 also resolve variant classes.) **ObjResizeMaster()** resizes a given master 
 part of the instance chunk, causing the chunk to be resized.
 
-##### 5.4.6.4 Managing Object Trees
+#### 5.4.6.4 Managing Object Trees
 
 ObjLinkFindParent(), ObjCompAddChild(), 
 ObjCompRemoveChild(), ObjCompMoveChild(), 
@@ -3815,7 +3815,7 @@ _An object's composite field points to its first child, and its link field point
 either to its next sibling or back to the parent. You can see that, by following 
 these links, any object is accessible from any other object in the tree._
 
-##### 5.4.6.5 Detaching and Destroying Objects
+#### 5.4.6.5 Detaching and Destroying Objects
 
 MSG_META_DETACH, MSG_META_DETACH_COMPLETE, MSG_META_ACK, 
 MSG_META_OBJ_FLUSH_INPUT_QUEUE, MSG_META_OBJ_FREE, 

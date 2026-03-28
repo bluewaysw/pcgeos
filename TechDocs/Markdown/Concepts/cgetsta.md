@@ -1,4 +1,4 @@
-## 4 First Steps: Hello World
+# 4 First Steps: Hello World
 
 This chapter provides you with an application shell to which you can add as 
 you learn more about GEOS programming. It describes each portion of the 
@@ -48,7 +48,7 @@ the Goc preprocessor. C header files do not have to go through the Goc
 preprocessor. Simple geodes might have none of their own header files. 
 These files are also described in [section 4.4](#44-the-source-file-and-source-code).
 
-### 4.2 Hello World
+## 4.2 Hello World
 
 The Hello World sample application (Hello3) is very simple and yet 
 accomplishes a great deal. With just a few simple steps, this program does 
@@ -74,7 +74,7 @@ may not be familiar yet. This section will describe each of those constructs
 and will refer to other sections of the documentation for complete 
 information.
 
-#### 4.2.1 Features of Hello World
+### 4.2.1 Features of Hello World
 
 To the user, the Hello World program is very simple. It consists of a primary 
 window with a single menu and a scrollable window within the primary. In 
@@ -95,7 +95,7 @@ _The Hello World application draws text in a scrolling View and has one menu
 and one dialog box. The Blue trigger changes the text to blue; the Gold trigger 
 changes the text to yellow._
 
-#### 4.2.2 Strategy and Internals
+### 4.2.2 Strategy and Internals
 
 The code for Hello World, as you will see, is quite simple. It consists mainly 
 of User Interface gadgetry and uses just a few message handlers.
@@ -124,7 +124,7 @@ it by the UI triggers and View. The other UI gadgets operate completely
 independently of the application's code; all of their functionality is 
 implemented within the UI._
 
-##### 4.2.2.1 The Menu and Dialog Box
+#### 4.2.2.1 The Menu and Dialog Box
 
 Both the menu and the dialog box, once defined in the source code as objects, 
 are implemented automatically by the system software. The application does 
@@ -138,7 +138,7 @@ modify the trigger objects, it must handle messages sent out by them when
 they are pressed by the user. This is discussed below, under ["Changing the 
 Text Color"](#4223-changing-the-text-color).
 
-##### 4.2.2.2 The Scrolling View and Drawing the Text
+#### 4.2.2.2 The Scrolling View and Drawing the Text
 
 Almost everything is handled automatically by the User Interface for the 
 Hello World application. This includes implementation of the system menus 
@@ -160,7 +160,7 @@ text is visible or what portion of the screen the view window occupies. The
 view will automatically clip the text properly and display it within the 
 window's bounds.
 
-##### 4.2.2.3 Changing the Text Color
+#### 4.2.2.3 Changing the Text Color
 
 In all, the Process object can handle six events specific to this application: 
 MSG_META_CONTENT_VIEW_WIN_OPENED (sent by the view when it first 
@@ -194,7 +194,7 @@ When the window closes, the view will send
 MSG_META_CONTENT_VIEW_WIN_CLOSED in which Hello World destroys 
 the cached window handle.
 
-#### 4.2.3 Naming Conventions
+### 4.2.3 Naming Conventions
 
 You might have noticed some of the names of variables, messages, and 
 routines and seen a pattern of naming. Geoworks has developed a few 
@@ -248,7 +248,7 @@ two portions are separated by an underscore. For example,
 GI_visMoniker is a field of **GenClass** (hence the GI_), and 
 visMoniker is the variable name of the field.
 
-### 4.3 Geode Parameters File
+## 4.3 Geode Parameters File
 
 Code Display 4-1 shows the Geode Parameters (hello3.gp) file for the Hello 
 World sample application. Each of the components of the parameters file is 
@@ -354,7 +354,7 @@ usernotes "Sample application for GEOS version 2.0."
 ~~~
 
 
-### 4.4 The Source File and Source Code
+## 4.4 The Source File and Source Code
 
 The Hello World program's source code resides in a single file, hello3.goc. 
 Portions of this file are presented throughout this section.
@@ -388,7 +388,7 @@ This discussion assumes you have a solid understanding of general
 programming concepts and C constructions. If you don't, you should most 
 likely get to know the C programming language before continuing.
 
-#### 4.4.1 Inclusions and Global Variables
+### 4.4.1 Inclusions and Global Variables
 
 As Code Display 4-2 shows, the first thing in a .goc file is a list of other files 
 and libraries that must be included. These are designated in the standard C 
@@ -462,7 +462,7 @@ WindowHandle    winHan;
 ~~~
 
 
-#### 4.4.2 The Process Object
+### 4.4.2 The Process Object
 
 Every GEOS application has an object called the Process object. This object is 
 run by the application's primary thread and is an instance of a subclass of 
@@ -533,7 +533,7 @@ This code display is part of hello3.goc and follows the previous display directl
 @classdecl HelloProcessClass, neverSaved;
 ~~~
 
-#### 4.4.3 UI Objects
+### 4.4.3 UI Objects
 
 As stated earlier, the bulk of the Hello World application consists of User 
 Interface objects. These objects are defined just after the Process object in 
@@ -552,7 +552,7 @@ takes up very little memory when iconified (minimized). Menus for complex
 applications are usually put in a menu resource. Most other UI gadgetry is 
 put in a resource called "Interface" (though this name is not required).
 
-##### 4.4.3.1 The Application Object
+#### 4.4.3.1 The Application Object
 
 Every application must have an application object, an instance of the class 
 **GenApplicationClass**. The application object handles and manages many 
@@ -603,7 +603,7 @@ This display is part of hello3.goc and follows the previous display directly.
 @end    AppResource                     /* End definition of objects in AppResource. */
 ~~~
 
-##### 4.4.3.2 The Primary Window and the View Window
+#### 4.4.3.2 The Primary Window and the View Window
 
 Every application must have a primary window object of class 
 **GenPrimaryClass**. This object will draw and manage the primary window 
@@ -710,7 +710,7 @@ This display is part of hello3.goc and directly follows the previous display.
 @end    Interface               /* End definition of objects in this resource. */
 ~~~
 
-##### 4.4.3.3 The Hello World Menu
+#### 4.4.3.3 The Hello World Menu
 
 The Hello World program has one menu, called "Menu" and located in the 
 primary window's menu bar. Menus are instances of **GenInteractionClass** 
@@ -747,7 +747,7 @@ This display is part of hello3.goc and follows the previous display directly.
 }
 ~~~
 
-##### 4.4.3.4 The Dialog Box and Its Triggers
+#### 4.4.3.4 The Dialog Box and Its Triggers
 
 Code Display 4-7 shows the code for the dialog box and its triggers.
 
@@ -833,7 +833,7 @@ This display is part of hello3.goc and follows the previous display directly.
 }
 ~~~
 
-#### 4.4.4 Code and Message Handlers
+### 4.4.4 Code and Message Handlers
 
 One of the first things a C programmer might notice when looking at the 
 Hello World program is that it has no main() routine. This illustrates the 
@@ -909,7 +909,7 @@ void HelloDrawText(GStateHandle gstate);
 #define TEXT_Y_POSITION         100     /* y position, in document coords. */
 ~~~
 
-##### 4.4.4.1 Handling the Window Messages
+#### 4.4.4.1 Handling the Window Messages
 
 As stated earlier, the winHan global variable contains the window handle of 
 the view's window. To set the variable, Hello World must intercept and 
@@ -1141,7 +1141,7 @@ void HelloDrawText(GStateHandle gstate) {
 }
 ~~~
 
-##### 4.4.4.3 Handling Messages from the Triggers
+#### 4.4.4.3 Handling Messages from the Triggers
 
 When the user clicks on one of the two triggers in the Color dialog box, the 
 pressed trigger sends off a message to the Hello World Process object. The 
@@ -1190,7 +1190,7 @@ This display is part of hello3.goc and follows the previous display directly.
 }
 ~~~
 
-### 4.5 Exercises and Suggestions
+## 4.5 Exercises and Suggestions
 
 After studying the Hello World sample application and reading the System 
 Architecture chapter, you may be ready to try some exercises before 

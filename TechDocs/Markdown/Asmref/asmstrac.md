@@ -4,7 +4,7 @@ Global data structures and types are listed alphabetically below. Some data stru
 ## 3.1 Structures A-C
 
 ----------
-#### ActionDescriptor
+### ActionDescriptor
     ActionDescriptor        struct
         AD_OD               optr
         AD_message          word
@@ -16,7 +16,7 @@ optr of the destination for that message.
 **Library:** ui.def
 
 ----------
-#### ActivateCreateFlags
+### ActivateCreateFlags
     ActivateCreateFlags         record
         ACF_NOTIFY      :   1       ;notify selected objects that
                                     ;tool is activating
@@ -25,7 +25,7 @@ optr of the destination for that message.
 **Library:** grobj.def
 
 ----------
-#### ActivationData
+### ActivationData
     ActivationData      struc
         AD_dialog           optr    ; On-screen "Activating..." dialog.
         AD_appLaunchBlock   hptr    ; Initial AppLaunchBlock - not used once 
@@ -41,7 +41,7 @@ optr of the destination for that message.
 **Library:** grobj.def
 
 ----------
-#### ActiveSearchSpellType
+### ActiveSearchSpellType
     ActiveSearchSpellType               etype   byte, 0, 1
         ASST_NOTHING_ACTIVE         enum    ActiveSearchSpellType
         ASST_SPELL_ACTIVE           enum    ActiveSearchSpellType
@@ -50,7 +50,7 @@ optr of the destination for that message.
 **Library:** Objects/vTextC.def
 
 ----------
-#### AddChildRelativeParams
+### AddChildRelativeParams
     AddChildRelativeParams          struct
         ACRP_child          optr            ;the object to add
         ACRP_parent         optr            ;the visual parent to use
@@ -60,7 +60,7 @@ optr of the destination for that message.
 **Library:** Objects/visC.def
 
 ----------
-#### AddUndoActionFlags
+### AddUndoActionFlags
     AddUndoActionFlags          record
         AUAF_NOTIFY_BEFORE_FREEING                      :1  
         AUAF_NOTIFY_IF_FREED_WITHOUT_BEING_PLAYED_BACK  :1
@@ -78,7 +78,7 @@ played back.
 **Library:** Objects/gProcC.def
 
 ----------
-#### AddUndoActionStruct
+### AddUndoActionStruct
     AddUndoActionStruct         struct
         AUAS_data           UndoActionStruct
         AUAS_output         optr
@@ -95,7 +95,7 @@ MSG_META_CLIPBOARD_UNDO.
 **Library:** Objects/gProc.def
 
 ----------
-#### AddVarDataParams
+### AddVarDataParams
     AddVarDataParams            struct
         AVDP_data           fptr;
         AVDP_dataSize       word;
@@ -113,7 +113,7 @@ be initialized to zero.
 **Library:** Objects/metaC.def
 
 ----------
-#### AdjustType
+### AdjustType
     AdjustType      etype   byte, 0, 1
         AT_NORMAL       enum        AdjustType
         AT_PASTE        enum        AdjustType
@@ -122,7 +122,7 @@ be initialized to zero.
 **Library:** Objects/vTextC.def
 
 ----------
-#### AfterAddedToGroupData
+### AfterAddedToGroupData
     AfterAddedToGroupData           struct
         AATGD_group             optr;
         AATGD_centerAdjust      PointDWFixed;
@@ -136,7 +136,7 @@ to position it correctly.
 **Library:** grobj.def
 
 ----------
-#### AfterEditAction
+### AfterEditAction
     AfterEditAction         etype   byte, 0
         DONT_SELECT_AFTER_EDIT      enum        AfterEditAction
         SELECT_AFTER_EDIT           enum        AfterEditAction
@@ -144,7 +144,7 @@ to position it correctly.
 **Library:** grobj.def
 
 ----------
-#### AlignParams
+### AlignParams
     AlignParams             struct
         AP_x            DWFixed
         AP_y            DWFixed
@@ -156,7 +156,7 @@ to position it correctly.
 **Library:** grobj.def
 
 ----------
-#### AlignToGridType
+### AlignToGridType
     AlignToGridType         record
         ATGT_LEFT       :1
         ATGT_H_CENTER   :1
@@ -169,7 +169,7 @@ to position it correctly.
 **Library:** grobj.def
 
 ----------
-#### AlignType
+### AlignType
     AlignType               record
         AT_ALIGN_X      :1
         AT_DISTRIBUTE_X :1
@@ -182,7 +182,7 @@ to position it correctly.
 **Library:** grobj.def
 
 ----------
-#### AnotherToolActivatedFlags
+### AnotherToolActivatedFlags
     AnotherToolActivatedFlags               record
         ATAF_STANDARD_POINTER       :1
         ATAF_SHAPE                  :1
@@ -206,7 +206,7 @@ A Vis guardian object
 **Library:** grobj.def
 
 ----------
-#### AppAttachFlags
+### AppAttachFlags
     AppAttachFlags                  record
         AAF_RESTORING_FROM_STATE        :1
         AAF_STATE_FILE_PASSED           :1
@@ -242,7 +242,7 @@ AAF_RESTORING_FROM_STATE will also be set.
 **Library:** Objects/gProcC.def
 
 ----------
-#### AppInstanceReference
+### AppInstanceReference
     AppInstanceReference            struct
         AIR_fileName            char PATH_BUFFER_SIZE dup (?)
         AIR_stateFile           char FILE_LONGNAME_BUFFER_SIZE dup (?)
@@ -274,7 +274,7 @@ instance data is saved to state.
 **Library:** Objects/gProcC.def
 
 ----------
-#### AppLaunchBlock
+### AppLaunchBlock
     AppLaunchBlock      struct
         ALB_appRef          AppInstanceReference
         ALB_appMode         word
@@ -349,7 +349,7 @@ handle to a block containing extra arguments).
 **Library:** Objects/gProcC.def
 
 ----------
-#### AppLaunchFlags
+### AppLaunchFlags
     AppLaunchFlags          record
         ALF_SEND_LAUNCH_REQUEST_TO_UI_TO_HANDLE     :1
         ALF_OPEN_IN_BACK                            :1
@@ -397,7 +397,7 @@ to remain open after the IACP connection is closed.
 **Library:** Objects/gProcC.def
 
 ----------
-#### ApplicationStates
+### ApplicationStates
     ApplicationStates           record
                                         :1
         AS_TRANSPARENT                  :1
@@ -478,7 +478,7 @@ Set if the application is in the process of attaching.
 **Library:** Objects/gAppC.def
 
 ----------
-#### AppMeasurementType
+### AppMeasurementType
     AppMeasurementType      etype       byte
         AMT_US      enum        AppMeasurementType, MEASURE_US
         AMT_METRIC  enum        AppMeasurementType, MEASURE_METRIC
@@ -487,7 +487,7 @@ Set if the application is in the process of attaching.
 **Library:** Objects/gAppC.def
 
 ----------
-#### AppNavigationID
+### AppNavigationID
     AppNavigationID     etype       word, NAVIGATION_ID_APP_START
         NAVIGATION_ID_START_OF_RANGE    equ     0x8000
 
@@ -498,7 +498,7 @@ start of a range.
 **Library:** Objects/genC.def
 
 ----------
-#### AppUIData
+### AppUIData
     AppUIData       struct
         AUID_specificUI             hptr            ;handle of specific UI
         AUID_displayScheme          DisplayScheme <>
@@ -516,7 +516,7 @@ This structure stores the UI data stored with each process.
 **Library:** Objects/gAppC.def
 
 ----------
-#### ApplicationOptFlags
+### ApplicationOptFlags
     ApplicationOptFlags         record
         AOF_MULTIPLE_INIT_FILE_CATEGORIES   :1
                                             :7
@@ -529,7 +529,7 @@ application has only one init file category.
 **Library:** Objects/gAppC.def
 
 ----------
-#### ArcCloseType
+### ArcCloseType
     ArcCloseType        etype       word
         ACT_OPEN    enum        ArcCloseType    ; illegal for filled arcs
         ACT_CHORD   enum        ArcCloseType    ; draw/fill as a chord
@@ -538,7 +538,7 @@ application has only one init file category.
 **Library:** graphics.def
 
 ----------
-#### ArcBasicInit
+### ArcBasicInit
     ArcBasicInit        struct
         ABI_arcCloseType        ArcCloseType
         ABI_startAngle          WWFixed
@@ -552,7 +552,7 @@ application has only one init file category.
 **Library:** grobj.def
 
 ----------
-#### ArcParams
+### ArcParams
     ArcParams           struct
         AP_close    ArcCloseTyp     ; how the arc should be closed
         AP_left     sword           ; ellipse bounding box: left
@@ -568,7 +568,7 @@ application has only one init file category.
 **Library:** graphics.def
 
 ----------
-#### AreaAttr
+### AreaAttr
     AreaAttr        struct
         AA_colorFlag    ColorFlag CF_INDEX      ; RGB or INDEX
         AA_color        RGBValue <0,0,0>        ; RGB values or index
@@ -581,7 +581,7 @@ This structure is used with **GrSetAreaAttr**.
 **Library:** graphics.def
 
 ----------
-#### ArgumentStackElement
+### ArgumentStackElement
     ArgumentStackElement            struct
         ASE_type        EvalStackArgumentType   ; The type of argument.
         ASE_data        EvalStackArgumentData   ; The associated data.
@@ -590,7 +590,7 @@ This structure is used with **GrSetAreaAttr**.
 **Library:** parse.def
 
 ----------
-#### BackgroundColors
+### BackgroundColors
     BackgroundColors        struc
         BC_unselectedColor1     byte    ;the two colors to use when unselected
         BC_unselectedColor2     byte
@@ -601,7 +601,7 @@ This structure is used with **GrSetAreaAttr**.
 **Library:** Objects/genC.def
 
 ----------
-#### BasicGrab
+### BasicGrab
     BasicGrab               struct
         BG_OD       optr
         BG_data     word
@@ -616,7 +616,7 @@ may operate on the different structures.
 **Library:** Objects/uiInputC.def
 
 ----------
-#### BasicInit
+### BasicInit
     BasicInit       struct
         BI_center       PointDWFixed
         BI_width        WWFixed
@@ -628,7 +628,7 @@ may operate on the different structures.
 **Library:** grobj.def
 
 ----------
-#### BBFixed
+### BBFixed
     BBFixed     struct
         BBF_frac        byte
         BBF_int         byte
@@ -639,14 +639,14 @@ This structure stores an 8 bit/8 bit fixed point number.
 **Library:** geos.def
 
 ----------
-#### BCCToolboxFeatures
+### BCCToolboxFeatures
     BCCToolboxFeatures          record
     BCCToolboxFeatures          end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### BCFeatures
+### BCFeatures
     BCFeatures              record
         BCF_LIST        :1
         BCF_CUSTOM      :1
@@ -655,14 +655,14 @@ This structure stores an 8 bit/8 bit fixed point number.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### BCToolboxFeatures
+### BCToolboxFeatures
     BCToolboxFeatures       record
     BCToolboxFeatures       end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### Bitmap
+### Bitmap
     Bitmap  struct
         B_width     word
         B_height    word
@@ -682,7 +682,7 @@ This structure stores information about a simple graphics bitmap.
 **Library:** graphics.def
 
 ----------
-#### BitmapGuardianBitmapPointerActiveStatus
+### BitmapGuardianBitmapPointerActiveStatus
     BitmapGuardianBitmapPointerActiveStatus etype byte, 0
         BGBPAS_ACTIVE       enum    BitmapGuardianBitmapPointerActiveStatus
         BGBPAS_INACTIVE     enum    BitmapGuardianBitmapPointerActiveStatus
@@ -690,7 +690,7 @@ This structure stores information about a simple graphics bitmap.
 **Library:** grobj.def
 
 ----------
-#### BitmapGuardianFlags
+### BitmapGuardianFlags
     BitmapGuardianFlags             record
         BGF_POINTER_ACTIVE              :1
         BGF_REAL_ESTATE_RESIZE          :1
@@ -709,7 +709,7 @@ resize.
 **Library:** grobj.def
 
 ----------
-#### BitmapGuardianSpecificInitializationData
+### BitmapGuardianSpecificInitializationData
     BitmapGuardianSpecificInitializationData    struct
         BGSID_toolClass                 fptr.ClassStruct
         BGSID_activeStatus              VisWardToolActiveStatus
@@ -718,7 +718,7 @@ resize.
 **Library:** grobj.def
 
 ----------
-#### BitmapMode
+### BitmapMode
     BitmapMode      record
                                 :14
         BM_EDIT_MASK            :1
@@ -735,7 +735,7 @@ dispersed dither.
 **Library:** graphics.def
 
 ----------
-#### BLTMode
+### BLTMode
     BLTMode etype   word
         BLTM_COPY       enum BLTMode        ; 0 = copy image
         BLTM_MOVE       enum BLTMode        ; 1 = move image
@@ -744,7 +744,7 @@ dispersed dither.
 **Library:** graphics.def
 
 ----------
-#### BMCompact
+### BMCompact
     BMCompact       etype       byte
         BMC_UNCOMPACTED     enum BMCompact          ; 0 = no compaction
         BMC_PACKBITS        enum BMCompact          ; 1 = Mac packbits
@@ -757,7 +757,7 @@ store a graphics bitmap.
 **Library:** graphics.def
 
 ----------
-#### BMDestroy
+### BMDestroy
     BMDestroy       etype       byte
         BMD_KILL_DATA       enum BMDestroy      ; 0 = free bitmap (HugeArray)
         BMD_LEAVE_DATA      enum BMDestroy      ; 1 = leave bitmap data alone
@@ -765,7 +765,7 @@ store a graphics bitmap.
 **Library:** graphics.def
 
 ----------
-#### BMFormat
+### BMFormat
     BMFormat        etype       byte, 0
         BMF_MONO        enum BMFormat       ; 0 = monochrome
         BMF_4BIT        enum BMFormat       ; 1 = 4-bit (EGA,VGA)
@@ -779,7 +779,7 @@ This type determines a graphic bitmap's depth.
 **Library:** graphics.def
 
 ----------
-#### BMType
+### BMType
     BMType      record
         BMT_PALETTE         :1
         BMT_HUGE            :1
@@ -810,7 +810,7 @@ The type of bitmap format (**BMFormat**) is specified here.
 **Library:** graphics.def
 
 ----------
-#### BooleanByte
+### BooleanByte
     BooleanByte             etype       byte
         BB_FALSE    enum        BooleanByte, 0
         BB_TRUE     enum        BooleanByte, 255
@@ -818,7 +818,7 @@ The type of bitmap format (**BMFormat**) is specified here.
 **Library:** geos.def
 
 ----------
-#### BooleanWord
+### BooleanWord
     BooleanWord             etype       word
         BW_FALSE    enum        BooleanWord, 0
         BW_TRUE     enum        BooleanWord, 0ffffh
@@ -826,7 +826,7 @@ The type of bitmap format (**BMFormat**) is specified here.
 **Library:** geos.def
 
 ----------
-#### BoundingRectData
+### BoundingRectData
     BoundingRectData            struct
         BRD_rect            RectDWFixed
         CheckHack           < (offset BRD_rect eq 0) >
@@ -841,7 +841,7 @@ generally ignored except by groups.
 **Library:** grobj.def
 
 ----------
-#### BranchReplaceParams
+### BranchReplaceParams
     BranchReplaceParams                 struct
         BRP_searchParam         dd  (?)
         BRP_replaceParam        dd  (?)
@@ -862,7 +862,7 @@ values should be stored in first word, single byte in first byte.
 **Library:** Objects/genC.def
 
 ----------
-#### BranchReplaceParamType
+### BranchReplaceParamType
     BranchReplaceParamType          etype       word
         BRPT_OUTPUT_OPTR        enum    BranchReplaceParamType
 
@@ -880,7 +880,7 @@ GenView: output optr's.
 **Library:** Objects/genC.def
 
 ----------
-#### Button
+### Button
     Button  etype   byte
         BUTTON_0        enum        Button
         BUTTON_1        enum        Button
@@ -890,7 +890,7 @@ GenView: output optr's.
 **Library:** input.def
 
 ----------
-#### ButtonInfo
+### ButtonInfo
     ButtonInfo          record
         BI_PRESS            :1
         BI_DOUBLE_PRESS     :1
@@ -906,7 +906,7 @@ This record defines the active state of a mouse's buttons.
 **Library:** input.def
 
 ----------
-#### C_CallbackStruct
+### C_CallbackStruct
     C_CallbackStruct        struc
         C_callbackType  CallbackType
         C_params        fptr
@@ -918,7 +918,7 @@ This record defines the active state of a mouse's buttons.
 **Library:** parse.def
 
 ----------
-#### C_CallbackUnion
+### C_CallbackUnion
     C_CallbackUnion     union
         CT_ftt      CT_FFT_CallbackStruct
         CT_ntt      CT_NTT_CallbackStruct
@@ -940,7 +940,7 @@ This record defines the active state of a mouse's buttons.
 **Library:** parse.def
 
 ----------
-#### CallBackMessageData
+### CallBackMessageData
     CallBackMessageData         struct
         CBMD_callBackOD             optr
         CBMD_callBackMessage        word
@@ -953,7 +953,7 @@ This record defines the active state of a mouse's buttons.
 **Library:** grobj.def
 
 ----------
-#### CallbackType
+### CallbackType
     CallbackType        etype       byte, 0, 1
         CT_FUNCTION_TO_TOKEN            enum        CallbackType
             ; Description:
@@ -1140,7 +1140,7 @@ This record defines the active state of a mouse's buttons.
 **Library:** parse.def
 
 ----------
-#### CBitmap
+### CBitmap
     CBitmap struct
         CB_simple       Bitmap <>           ; simple bitmap structure
         CB_startScan    word 0              ; starting row number
@@ -1167,7 +1167,7 @@ and mask data.
 **Library:** graphics.def
 
 ----------
-#### CDependencyStruct
+### CDependencyStruct
     CDependencyStruct       struc
         DP_parameters               DependencyParameters
         DP_callbackPtr              fptr
@@ -1177,7 +1177,7 @@ and mask data.
 **Library:** parse.def
 
 ----------
-#### CellFunctionParameterFlags
+### CellFunctionParameterFlags
     CellFunctionParameterFlags              record
         CFPF_DIRTY          :1  ;If set, the parameter block is dirty.
                             :4  ;Unused.
@@ -1190,7 +1190,7 @@ and mask data.
 **Library:** cell.def
 
 ----------
-#### CellFunctionParameters
+### CellFunctionParameters
     CellFunctionParameters          struct
         CFP_flags           CellFunctionParameterFlags
         CFP_file            word
@@ -1224,7 +1224,7 @@ item in a cell file, you must not have the structure be an ungrouped item.
 **Library:** cell.def
 
 ----------
-#### CellRange
+### CellRange
     CellRange       struct
         CR_start        CellReference <>
         CR_end          CellReference <>
@@ -1235,7 +1235,7 @@ This structure specifies a rectangular range of cells
 **Library:** parse.def
 
 ----------
-#### CellReference
+### CellReference
     CellReference       struct
         CR_row      CellRowColumn <>
         CR_column   CellRowColumn <>
@@ -1248,7 +1248,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** parse.def
 
 ----------
-#### CellRowColumn
+### CellRowColumn
     CellRowColumn       record
         CRC_ABSOLUTE            :1  ; Set if the reference is absolute
         CRC_VALUE               :15 ; The value of the row/column
@@ -1257,7 +1257,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** parse.def
 
 ----------
-#### CenterLeftRightWidth
+### CenterLeftRightWidth
     CenterLeftRightWidth            etype       byte
         CLRW_CENTER         enum    CenterLeftRightWidth
         CLRW_LEFT           enum    CenterLeftRightWidth
@@ -1267,7 +1267,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** grobj.def
 
 ----------
-#### CenterTopBottomHeight
+### CenterTopBottomHeight
     CenterTopBottomHeight           etype       byte
         CTBH_CENTER         enum    CenterTopBottomHeight
         CTBH_TOP            enum    CenterTopBottomHeight
@@ -1277,7 +1277,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** grobj.def
 
 ----------
-#### CEvalStruct
+### CEvalStruct
     CEvalStruct     struc
         CE_parameters           EvalParameters
         CE_callbackPtr          fptr
@@ -1287,7 +1287,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** parse.def
 
 ----------
-#### CFormatStruct
+### CFormatStruct
     CFormatStruct       struc
         CF_parameters           FormatParameters
         CF_callbackPtr          fptr
@@ -1297,7 +1297,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** parse.def
 
 ----------
-#### CharacterSet
+### CharacterSet
     CharacterSet        etype       byte
         CS_BSW      enum CharacterSet, 0x00 ;Extended BSW set (printable) (Chars)
         CS_CONTROL  enum CharacterSet, 0xff ;Control codes (non-printable) (VChar)
@@ -1310,7 +1310,7 @@ this structure specifies an offset from a previous cell position.
 **Library:** input.def
 
 ----------
-#### CharChoiceInformation
+### CharChoiceInformation
     CharChoiceInformation               struct
         CCI_numChoices          word
         CCI_firstPoint          word
@@ -1331,7 +1331,7 @@ to this char.
 **Library:** hwr.def
 
 ----------
-#### CharFlags
+### CharFlags
     CharFlags       record
         CF_STATE_KEY    :1  ;Set if state key (shift/toggle modifier)
             :2
@@ -1349,7 +1349,7 @@ to this char.
 **Library:** input.def
 
 ----------
-#### Chars
+### Chars
     Chars   etype   byte
 
         C_NULL          enum Chars, 0x0         ;NULL
@@ -1670,7 +1670,7 @@ to this char.
 **Library:** char.def
 
 ----------
-#### CharTableData
+### CharTableData
     CharTableData           struct
         CTD_line1       optr
         CTD_line2       optr
@@ -1684,7 +1684,7 @@ This structure is used during notification of the pen object.
 **Library:** Objects/gPenICC.def
 
 ----------
-#### ChunkArrayHeader
+### ChunkArrayHeader
     ChunkArrayHeader            struct
         CAH_count           word
         CAH_elementSize     word
@@ -1713,7 +1713,7 @@ the array.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkMapList
+### ChunkMapList
     ChunkMapList        struc
         CML_source          word
         CML_dest            word
@@ -1722,7 +1722,7 @@ the array.
 **Library:** impex.def
 
 ----------
-#### ClassFlags
+### ClassFlags
     ClassFlags      record
         CLASSF_HAS_DEFAULT      :1  ; Set if dword before the class record
                                     ; contains an fptr of a default method
@@ -1752,7 +1752,7 @@ flags are internal and may not be set or retrieved directly.
 **Library:** object.def
 
 ----------
-#### ClassStruct
+### ClassStruct
     ClassStruct         struct
         Class_superClass            fptr.ClassStruct
         Class_masterOffset          word
@@ -1792,7 +1792,7 @@ presence of method handlers for a given master level.
 **Library:** object.def
 
 ----------
-#### ClipboardItemFlags
+### ClipboardItemFlags
     ClipboardItemFlags          record
         CIF_UNUSED          :1
         CIF_QUICK           :1
@@ -1802,7 +1802,7 @@ presence of method handlers for a given master level.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardItemFormat
+### ClipboardItemFormat
     ClipboardItemFormat     etype       word
         CIF_TEXT                enum        ClipboardItemFormat
         CIF_GRAPHICS_STRING     enum        ClipboardItemFormat
@@ -1829,7 +1829,7 @@ direct-manipulation file operations.
 **Library:** geoworks.def
 
 ----------
-#### ClipboardItemFormatID
+### ClipboardItemFormatID
     ClipboardItemFormatID           struct
         CIFID_manufacturer              ManufacturerID
         CIFID_type                      ClipboardItemFormat
@@ -1841,7 +1841,7 @@ other is a manufacturer-specific value that specifies the actual format.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardItemFormatInfo
+### ClipboardItemFormatInfo
     ClipboardItemFormatInfo         struct
         ;
         ; two words of format identification
@@ -1873,7 +1873,7 @@ handle of the first VM block in a chain of VM data blocks for the format.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardItemHeader
+### ClipboardItemHeader
     ClipboardItemHeader         struct
         CIH_owner           optr
         CIH_flags           ClipboardItemFlags
@@ -1912,7 +1912,7 @@ given transfer item must be in the same VM file).
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardQuickNotifyFlags
+### ClipboardQuickNotifyFlags
     ClipboardQuickNotifyFlags           record
         CQNF_ERROR              :1
         CQNR_SOURCE_EQUAL_DEST  :1
@@ -1928,7 +1928,7 @@ operation.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardQuickTransferFeedback
+### ClipboardQuickTransferFeedback
     ClipboardQuickTransferFeedback              etype word
         CQTF_SET_DEFAULT        enum        ClipboardQuickTransferFeedback
         CQTF_CLEAR_DEFAULT      enum        ClipboardQuickTransferFeedback
@@ -1956,7 +1956,7 @@ Clears any move/copy cursors present.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardQuickTransferFlags
+### ClipboardQuickTransferFlags
     ClipboardQuickTransferFlags             record
         CQTF_IN_PROGRESS        :1      ; internal
         CQTF_COPY_ONLY          :1      ; if the source only supports copying
@@ -1970,7 +1970,7 @@ Clears any move/copy cursors present.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### ClipboardQuickTransferRegionInfo
+### ClipboardQuickTransferRegionInfo
     ClipboardQuickTransferRegionInfo            struct
         CQTRI_paramAX               word
         CQTRI_paramBX               word
@@ -1988,7 +1988,7 @@ use include CQTF_USE_REGION.
 **Library:** Objects/clipbrd.def
 
 ----------
-#### Color
+### Color
     Color       etype   byte
         C_BLACK         enum Color      ; black color index
         C_BLUE          enum Color      ; dark blue color index
@@ -2262,7 +2262,7 @@ use include CQTF_USE_REGION.
 **Library:** color.def
 
 ----------
-#### ColoredObjectOrientation
+### ColoredObjectOrientation
     ColoredObjectOrientation        etype       byte
         COO_AREA_ORIENTED               enum        ColoredObjectOrientation
         COO_TEXT_ORIENTED               enum        ColoredObjectOrientation
@@ -2271,7 +2271,7 @@ use include CQTF_USE_REGION.
 **Library:** Objects/colorC.def
 
 ----------
-#### ColorFlag
+### ColorFlag
     ColorFlag           etype       byte
         CF_INDEX    enum    ColorFlag           ; set color with index
         CF_GRAY     enum    ColorFlag           ; set color with gray value
@@ -2287,7 +2287,7 @@ information about how to interpret color specifications using **ColorFlags**.
 **Library:** color.def
 
 ----------
-#### ColorMapMode
+### ColorMapMode
     ColorMapMode            record
         CMM_ON_BLACK    :1                  ; 1 if drawing on black
                         :1
@@ -2297,7 +2297,7 @@ information about how to interpret color specifications using **ColorFlags**.
 **Library:** graphics.def
 
 ----------
-#### ColorMapType
+### ColorMapType
     ColorMapType            etype       byte
         CMT_CLOSEST     enum    ColorMapType    ; Map to closest solid color
         CMT_DITHER      enum    ColorMapType    ; Map to dither pattern
@@ -2305,7 +2305,7 @@ information about how to interpret color specifications using **ColorFlags**.
 **Library:** graphics.def
 
 ----------
-#### ColorModifiedStates
+### ColorModifiedStates
     ColorModifiedStates         record
         CMS_COLOR_CHANGED           :1
         CMS_DRAW_MASK_CHANGED       :1
@@ -2315,7 +2315,7 @@ information about how to interpret color specifications using **ColorFlags**.
 **Library:** colorC.def
 
 ----------
-#### ColorQuad
+### ColorQuad
     ColorQuad       struct
         CQ_redOrIndex   byte
         CQ_info         ColorFlag
@@ -2351,7 +2351,7 @@ are all ignored.
 **Library:** color.def
 
 ----------
-#### ColorScheme
+### ColorScheme
     ColorScheme     record
         CS_lightColor       Color:4
         CS_darkColor        Color:4
@@ -2360,7 +2360,7 @@ are all ignored.
 **Library:** Objects/visC.def
 
 ----------
-#### ColorToolboxPreferences
+### ColorToolboxPreferences
     ColorToolboxPreferences             record
                                     :2
         CTP_INDEX_ORIENTATION       :2      ;ColoredObjectOrientation
@@ -2372,7 +2372,7 @@ are all ignored.
 **Library:** colorC.def
 
 ----------
-#### ColorTransfer
+### ColorTransfer
     ColorTransfer       struct
         CT_data     RGBDelta 5*5*5 dup (?)      ; 375 bytes of data.
     ColorTransfer       ends
@@ -2384,7 +2384,7 @@ correction is done by doing a lookup in the 3D table and applying the
 **Library:** color.def
 
 ----------
-#### ColumnArrayElement
+### ColumnArrayElement
     ColumnArrayElement          struct
         CAE_column      byte        ; The column number in which the cell resides.
         CAE_data        DBaseItem   ; The item containing the cell data.
@@ -2393,7 +2393,7 @@ correction is done by doing a lookup in the 3D table and applying the
 **Library:** cell.def
 
 ----------
-#### ColumnArrayHeader
+### ColumnArrayHeader
     ColumnArrayHeader       struct
         CAH_numEntries          word    ; Number of entries in the array.
         CAH_rowFlags            word    ; Flags that exist for each row.
@@ -2402,7 +2402,7 @@ correction is done by doing a lookup in the 3D table and applying the
 **Library:** cell.def
 
 ----------
-#### CommonParameters
+### CommonParameters
     CommonParameters            struct
         CP_row              word    ; Current row
         CP_column           word    ; Current column
@@ -2419,7 +2419,7 @@ structures.
 **Library:** parse.def
 
 ----------
-#### CommonTransferParams
+### CommonTransferParams
     CommonTransferParams            struct
         CTP_range           VisTextRange
         CTP_pasteFrame      word            ;ptr to frame if quick paste.
@@ -2433,7 +2433,7 @@ This structure stores parameters sent on the stack to all transfer routines.
 **Library:** Objects/vTextC.def
 
 ----------
-#### CompChildFlags
+### CompChildFlags
     CompChildFlags      record
         CCF_MARK_DIRTY  :1,     ; Marks chunk and modified objects as
                                 ; dirty
@@ -2459,7 +2459,7 @@ CCO_LAST specifying the absolute first or last position.
 **Library:** Objects/metaC.def
 
 ----------
-#### CompPart
+### CompPart
     CompPart        struct
         CP_firstChild       optr        ; 0 = no children.
     CompPart        ends
@@ -2467,7 +2467,7 @@ CCO_LAST specifying the absolute first or last position.
 **Library:** Objects/metaC.def
 
 ----------
-#### CompSizeHintArgs
+### CompSizeHintArgs
     CompSizeHintArgs            struct
         CSHA_width      SpecWidth <>    ; Width of the composite.
         CSHA_height     SpecHeight <>   ; Height of each child.
@@ -2480,7 +2480,7 @@ HINT_MAXIMUM_SIZE and HINT_INITIAL_SIZE.
 **Library:** Objects/genC.def
 
 ----------
-#### ContextData
+### ContextData
     ContextData     struct
         CD_object           optr
         CD_numChars         dword
@@ -2502,7 +2502,7 @@ HINT_MAXIMUM_SIZE and HINT_INITIAL_SIZE.
 **Library:** Objects/vTextC.def
 
 ----------
-#### ContextLocation
+### ContextLocation
     ContextLocation     etype       word
         CL_STARTING_AT_POSITION             enum        ContextLocation
         CL_ENDING_AT_POSITION               enum        ContextLocation
@@ -2535,13 +2535,13 @@ Retrieves the selection or surrounding word.
 **Library:** Objects/vTextC.def
 
 ----------
-#### ContextValues
+### ContextValues
     ContextValues       etype word, 0
 
 **Library:** ec.def
 
 ----------
-#### CopyChunkFlags
+### CopyChunkFlags
     CopyChunkFlags          record
         CCF_DIRTY       :1
         CCF_MODE        CopyChunkMode:2
@@ -2556,7 +2556,7 @@ IGNORE_DIRTY
 **Library:** Objects/processC.def
 
 ----------
-#### CopyChunkInFrame
+### CopyChunkInFrame
     CopyChunkInFrame        struct
         CCIF_copyFlags          CopyChunkFlags
         CCIF_source             dword
@@ -2570,7 +2570,7 @@ This structure is passed on the stack to MSG_PROCESS_COPY_CHUNK_IN.
 **Library:** Objects/process.def
 
 ----------
-#### CopyChunkMode
+### CopyChunkMode
     CopyChunkMode           etype       byte
         CCM_OPTR        enum        CopyChunkMode
         CCM_HPTR        enum        CopyChunkMode
@@ -2589,7 +2589,7 @@ The chunk being copied is in the form of a segment and chunk offset.
 **Library:** Objects/processC.def
 
 ----------
-#### CopyChunkOutFrame
+### CopyChunkOutFrame
     CopyChunkOutFrame           struct
         CCOF_copyFlags      CopyChunkFlags
         CCOF_source         optr
@@ -2601,7 +2601,7 @@ This structure is passed on the stack to MSG_PROCESS_COPY_CHUNK_OUT.
 **Library:** Objects/processC.def
 
 ----------
-#### CopyChunkOVerFrame
+### CopyChunkOVerFrame
     CopyChunkOVerFrame          struct
         CCOVF_copyFlags     CopyChunkFlags
         CCOVF_source        dword
@@ -2614,7 +2614,7 @@ MSG_PROCESS_COPY_CHUNK_OVER.
 **Library:** Objects/processC.def
 
 ----------
-#### CountryType
+### CountryType
     CountryType         etype       word, 1, 1
         CT_UNITED_STATE         enum        CountryType
         CT_CANADA               enum        CountryType
@@ -2629,7 +2629,7 @@ MSG_PROCESS_COPY_CHUNK_OVER.
 **Library:** localize.def
 
 ----------
-#### CParserReturnStruct
+### CParserReturnStruct
     CParserReturnStruct struc
         PRS_errorCode               byte
         PRS_textOffsetStart         word
@@ -2640,7 +2640,7 @@ MSG_PROCESS_COPY_CHUNK_OVER.
 **Library:** parse.def
 
 ----------
-#### CParserStruct
+### CParserStruct
     CParserStruct       struc
         C_parameters            ParserParameters
         C_callbackPtr           fptr
@@ -2650,7 +2650,7 @@ MSG_PROCESS_COPY_CHUNK_OVER.
 **Library:** parse.def
 
 ----------
-#### CPUFlags
+### CPUFlags
     CPUFlags        record
                             :4
         CPU_OVERFLOW        :1
@@ -2670,7 +2670,7 @@ MSG_PROCESS_COPY_CHUNK_OVER.
 **Library:** geos.def
 
 ----------
-#### CRangeEnumCallbackParams
+### CRangeEnumCallbackParams
     CRangeEnumCallbackParams            struct
         CRECP_rangeParams       fptr.CRangeEnumParams
         CRECP_row               word            ;current row
@@ -2686,7 +2686,7 @@ called with.
 **Library:** cell.def
 
 ----------
-#### CRangeEnumParams
+### CRangeEnumParams
     CRangeEnumParams            struct
         CREP_params         RangeEnumParams
         CREP_locals         fptr
@@ -2698,7 +2698,7 @@ This structure is a C version of **RangeEnumParams**.
 **Library:** cell.def
 
 ----------
-#### CreateExpressMenuControlItemFeature
+### CreateExpressMenuControlItemFeature
     CreateExpressMenuControlItemFeature etype word
         CEMCIF_GEOS_TASKS_LIST      enum    CreateExpressMenuControlItemFeature
         CEMCIF_DOS_TASKS_LIST       enum    CreateExpressMenuControlItemFeature
@@ -2708,7 +2708,7 @@ This structure is a C version of **RangeEnumParams**.
 **Library:** Objects/eMenuC.def
 
 ----------
-#### CreateExpressMenuControlItemParams
+### CreateExpressMenuControlItemParams
     CreateExpressMenuControlItemParams struct
         CEMCIP_feature              CreateExpressMenuControlItemFeature
         CEMCIP_class                fptr.ClassStruct
@@ -2749,7 +2749,7 @@ GenField the Express Menu Control is associated with doesn't matter.
 **Library:** Objects/eMenuC.def
 
 ----------
-#### CreateExpressMenuControlItemPriority
+### CreateExpressMenuControlItemPriority
     CreateExpressMenuControlItemPriority etype word
         CEMCIP_SPOOL_CONTROL_PANEL  enum CreateExpressMenuControlItemPriority, 100h
         CEMCIP_NETMSG_SEND_MESSAGE  enum CreateExpressMenuControlItemPriority, 200h
@@ -2761,7 +2761,7 @@ GenField the Express Menu Control is associated with doesn't matter.
 **Library:** Objects/eMenuC.def
 
 ----------
-#### CreateExpressMenuControlItemResponseParams
+### CreateExpressMenuControlItemResponseParams
     CreateExpressMenuControlItemResponseParams struct
         CEMCIRP_newItem                 optr
         CEMCIRP_data                    word
@@ -2783,7 +2783,7 @@ object that created the new item.
 **Library:** Objects/eMenuC.def
 
 ----------
-#### CreateVisMonikerFlags
+### CreateVisMonikerFlags
     CreateVisMonikerFlags           record
         CVMF_DIRTY          :1
                             :7
@@ -2792,7 +2792,7 @@ object that created the new item.
 **Library:** Objects/visC.def
 
 ----------
-#### CreateVisMonikerFrame
+### CreateVisMonikerFrame
     CreateVisMonikerFrame           struct
         CVMF_source         dword
         CVMF_sourceType     VisMonikerSourceType
@@ -2838,7 +2838,7 @@ dirty.
 **Library:** Objects/visC.def
 
 ----------
-#### CSFeatures
+### CSFeatures
     CSFeatures      record
         CSF_FILLED_LIST     :1
         CSF_INDEX           :1
@@ -2850,7 +2850,7 @@ dirty.
 **Library:** Objects/colorC.def
 
 ----------
-#### CSToolboxFeatures
+### CSToolboxFeatures
     CSToolboxFeatures           record
         CSTF_INDEX          :1
         CSTF_DRAW_MASK      :1
@@ -2860,7 +2860,7 @@ dirty.
 **Library:** colorC.def
 
 ----------
-#### CT_CC_CallbackStruct
+### CT_CC_CallbackStruct
     CT_CC_CallbackStruct        struc       ; Structure for CT_CREATE_CELL
         CC_row              word
         CC_column           word
@@ -2871,7 +2871,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_CNE_CallbackStruct
+### CT_CNE_CallbackStruct
     CT_CNE_CallbackStruct       struc   ; Structure for CT_CHECK_NAME_EXISTS
         CNE_text            fptr
         CNE_length          word
@@ -2881,7 +2881,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_CNS_CallbackStruct
+### CT_CNS_CallbackStruct
     CT_CNS_CallbackStruct   struc       ; Structure for CT_CHECK_NAME_SPACE
         CNS_numToAllocate       word
         CNS_enoughSpace         byte
@@ -2892,7 +2892,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_DC_CallbackStruct
+### CT_DC_CallbackStruct
     CT_DC_CallbackStruct            struc   ;Structure for CT_DEREF_CELL
         DC_argStack             fptr
         DC_opFnStack            fptr
@@ -2907,7 +2907,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_EC_CallbackStruct
+### CT_EC_CallbackStruct
     CT_EC_CallbackStruct            struc   ; Structure for CT_EMPTY_CELL
         EC_row                  word
         EC_column               word
@@ -2918,7 +2918,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_EF_CallbackStruct
+### CT_EF_CallbackStruct
     CT_EF_CallbackStruct            struc   ; Structure for CT_EVAL_FUNCTION
         EF_numArgs              word
         EF_funcID               word
@@ -2931,7 +2931,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_FF_CallbackStruct
+### CT_FF_CallbackStruct
     CT_FF_CallbackStruct        struc   ; Structure for CT_FORMAT_FUNCTION
     FF_funcID               word
     FF_maxChars             word
@@ -2942,7 +2942,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_FN_CallbackStruct
+### CT_FN_CallbackStruct
     CT_FN_CallbackStruct            struc   ; Structure for CT_FORMAT_NAME
         FN_textPtr              fptr
         FN_nameToken            word
@@ -2954,7 +2954,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_FTC_CallbackStruct
+### CT_FTC_CallbackStruct
     CT_FTC_CallbackStruct       struc   ; Structure for CT_FUNCTION_TO_CELL
         FTC_funcID          word
         FTC_row             word
@@ -2966,7 +2966,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_FTT_CallbackStruct
+### CT_FTT_CallbackStruct
     CT_FTT_CallbackStruct   struc   ; Structure for CT_FUNCTION_TO_TOKEN
         FTT_text                fptr
         FTT_length              word
@@ -2977,7 +2977,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_LN_CallbackStruct
+### CT_LN_CallbackStruct
     CT_LN_CallbackStruct            struc   ; Structure for CT_LOCK_NAME
         LN_nameToken            word
         LN_defPtr               dword
@@ -2988,7 +2988,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_NTC_CallbackStruct
+### CT_NTC_CallbackStruct
     CT_NTC_CallbackStruct       struc   ; Structure for CT_NAME_TO_CELL
         NTC_nameToken       word
         NTC_row             word
@@ -2998,7 +2998,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_NTT_CallbackStruct
+### CT_NTT_CallbackStruct
     CT_NTT_CallbackStruct           struc   ; Structure for CT_NAME_TO_TOKEN
         NTT_text                fptr
         NTT_length              word
@@ -3010,7 +3010,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_SF_CallbackStruct
+### CT_SF_CallbackStruct
     CT_SF_CallbackStruct        struc   ; Structure for CT_SPECIAL_FUNCTION
         SF_argStack         fptr
         SF_opFnStack        fptr
@@ -3023,7 +3023,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CT_UL_CallbackStruct
+### CT_UL_CallbackStruct
     CT_UL_CallbackStruct            struc   ; Structure for CT_UNLOCK
         UL_dataPtr              fptr
     CT_UL_CallbackStruct            ends
@@ -3031,7 +3031,7 @@ dirty.
 **Library:** parse.def
 
 ----------
-#### CurrencyFormatFlags
+### CurrencyFormatFlags
     CurrencyFormatFlags         record
                                             :2
         CFF_LEADING_ZERO                    :1
@@ -3047,7 +3047,7 @@ dirty.
 **Library:** localize.def
 
 ----------
-#### CustomDialogBoxFlags
+### CustomDialogBoxFlags
     CustomDialogBoxFlags            record
         CDBF_SYSTEM_MODAL               :1
         CDBF_DIALOG_TYPE                CustomDialogType:2
@@ -3064,7 +3064,7 @@ dirty.
 **Library:** uDialog.def
 
 ----------
-#### CustomDialogType
+### CustomDialogType
     CustomDialogType            etype       byte
         CDT_QUESTION        enum    CustomDialogType
         CDT_WARNING         enum    CustomDialogType

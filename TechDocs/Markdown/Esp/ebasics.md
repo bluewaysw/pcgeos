@@ -1,4 +1,4 @@
-## 2 Esp Basics
+# 2 Esp Basics
 
 Esp is an assembly language for 80x86 microprocessors. It is designed for 
 creating applications, libraries, and drivers that will run under GEOS. As 
@@ -15,7 +15,7 @@ MASM.
 This book assumes that you already know how to program in 80x86 assembly 
 language.
 
-### 2.1 The Purpose of Esp
+## 2.1 The Purpose of Esp
 
 Esp is mainly a superset of MASM. With the exception of a few special cases 
 (which are noted in this chapter), MASM code can be ported intact to Esp 
@@ -26,7 +26,7 @@ Esp is, however, philosophically different from other assembly languages. It
 is designed for an object-oriented, multitasking environment. This means 
 that it works with different assumptions from other assembly languages. 
 
-### 2.2 Esp Ground Rules
+## 2.2 Esp Ground Rules
 
 There are certain rules you must follow when programming in Esp. These 
 rules are imposed by the nature of GEOS.
@@ -35,7 +35,7 @@ If you violate these rules, the results are unpredictable. Error-checking code
 may find violations of these rules; however, this is not guaranteed. Therefore, 
 you must be sure to follow the rules under all circumstances.
 
-#### 2.2.1 GEOS is a Multitasking Environment
+### 2.2.1 GEOS is a Multitasking Environment
 
 GEOS uses preemptive multitasking. It uses interrupts to halt each thread's 
 execution when its allotted time slice ends. This has two major consequences 
@@ -84,7 +84,7 @@ It bears repeating: Whenever you perform an unusual operation on the stack,
 ask yourself what would happen if a context switch occurred immediately 
 before or immediately after the instruction.
 
-#### 2.2.2 Upward and Downward Compatibility
+### 2.2.2 Upward and Downward Compatibility
 
 GEOS is intended to run on a wide range of platforms, from 8088-based 
 machines up through powerful desktop computers (80486s and beyond). 
@@ -128,7 +128,7 @@ There is currently no way for geodes to use a floating-point coprocessor
 directly. However, all GEOS floating-point routines will automatically use a 
 floating-point coprocessor if one is present.
 
-#### 2.2.3 Flags
+### 2.2.3 Flags
 
 GEOS makes certain assumptions about the flags.Your application must 
 follow these if it is to work with GEOS properly.
@@ -168,7 +168,7 @@ is the case unless the routine reference says so.
 
 You should never change TF; this is used by the debugger.
 
-### 2.3 Differences from MASM
+## 2.3 Differences from MASM
 
 Esp has a number of differences with other 80x86 assemblers. Some of these 
 are entirely transparent to the programmer; these differences will not be 
@@ -182,13 +182,13 @@ both synonymous with IF.
 In all cases where an algorithmic break is not involved, you can force Esp to 
 use the MASM syntax and directives by passing the flag "-m".
 
-#### 2.3.1 Data Types
+### 2.3.1 Data Types
 
 Esp makes it easy to declare and define structures, records, enumerated 
 types, and similar constructs. Its conventions are, however, slightly different 
 from those of MASM; you should be aware of these differences.
 
-##### 2.3.1.1 Constants
+#### 2.3.1.1 Constants
 
 Esp's rules for constants are almost the same as MASM's. Esp is slightly more 
 versatile. For example, hexadecimal constants may be specified with either 
@@ -213,7 +213,7 @@ Table 2-2. Since "\" is the escape character, you have to use a
 doubled backslash to put a backslash in the character string; that is, "\\" 
 specifies the single character 5Ch.
 
-##### 2.3.1.2 Simple Types
+#### 2.3.1.2 Simple Types
 
 Esp defines many standard data types beyond those provided by MASM. 
 These types can be used alone, or they can serve as building blocks for 
@@ -247,7 +247,7 @@ integers (i.e. "70, 111, 111, 33"); and if they are declared as an array of
 Similarly, Swat can use the information about a pointer's type to display its 
 referent appropriately.
 
-##### 2.3.1.3 Enumerated Types
+#### 2.3.1.3 Enumerated Types
 
 Sometimes you will have a variable that indicates one of a number of 
 conditions by holding an arbitrarily-chosen integer. For example, you may 
@@ -340,7 +340,7 @@ the step-value of two. If a routine expected to be passed a member of the
 MyColor enumerated type, it could check this by comparing the value to the 
 value of MyColor.
 
-##### 2.3.1.4 Structures
+#### 2.3.1.4 Structures
 
 Esp lets you define structures. Structure declarations have the following 
 format:
@@ -448,7 +448,7 @@ mov     ax, es:[di].3
 
 You can use the dot operator this way in any effective-address instruction.
 
-##### 2.3.1.5 Unions
+#### 2.3.1.5 Unions
 
 Esp supports unions as well as structures. A union is a variable that might, 
 at different times, have values of different sizes or types.
@@ -511,7 +511,7 @@ value after the field name, like so:
 aVariable               MyUnion         <MU_sbyte 12>
 ~~~
 
-##### 2.3.1.6 Records
+#### 2.3.1.6 Records
 
 Sometimes you will need to store several pieces of information, each of which 
 can be represented in less than a byte. One common situation is when you 
@@ -647,7 +647,7 @@ assembles equivalently to
 move    ax, 0x03E7
 ~~~
 
-##### 2.3.1.7 Creating New Types
+#### 2.3.1.7 Creating New Types
 
 Esp overloads the TYPE operator as a type-creation directive. It is useful if 
 you will be creating many arrays of exactly the same size. This is the format:
@@ -729,7 +729,7 @@ AStructure              MyStructure             <-123, <"Foo!", 0>,
 idata   ends
 ~~~
 
-#### 2.3.2 Symbols and Labels
+### 2.3.2 Symbols and Labels
 
 Esp improves on MASM's rules for symbols and labels.
 
@@ -746,7 +746,7 @@ label outside of the procedure, you should declare it thus:
 <myLabel> label near
 ~~~
 
-#### 2.3.3 Segments and dgroup
+### 2.3.3 Segments and dgroup
 
 Geodes are divided into segments. Each segment is loaded into memory all at 
 once, and accessed with a given segment address (hence the name). 
@@ -773,7 +773,7 @@ Every resource has a resource ID. This resource ID is determined at
 link-time; this means that a resource in a multi-launchable application will 
 have the same ID in each copy of the application running.
 
-##### 2.3.3.1 The dgroup Segment
+#### 2.3.3.1 The dgroup Segment
 
 Every geode is assigned a fixed memory resource for its global variables (and, 
 if the geode has a process object, for the process thread's stack). This resource 
@@ -826,7 +826,7 @@ udata   segment
 udata   ends
 ~~~
 
-##### 2.3.3.2 Accessing Segments
+#### 2.3.3.2 Accessing Segments
 
 GetResourceHandleNS, GetResourceSegmentNS, handle, segment, 
 GeodeGetResourceHandle, vSegment
@@ -947,7 +947,7 @@ handle.
 **Destroyed:**   
 Nothing.
 
-##### 2.3.3.3 Declaring Static Variables
+#### 2.3.3.3 Declaring Static Variables
 
 Esp has slightly different conventions for declaring variables than MASM 
 does. In Esp, you do not need to use the "db", dw", or "dd" reserved words 
@@ -1012,7 +1012,7 @@ myByteArray                     word    1, 2, 3, 4
 Note that if the variable is in the [udata](#2331-the-dgroup-segment) pseudo-segment, any specified 
 initializers will generate a link-time error.
 
-##### 2.3.3.4 Strings
+#### 2.3.3.4 Strings
 
 Esp provides a special format for declaring arrays of byte-sized values 
 (strings). A sequence of characters surrounded by single or double quotes is 
@@ -1081,7 +1081,7 @@ Certain character sequences (called escape sequences) are used to specify
 special characters. Esp supports the full range of C escape sequences; these 
 are shown in Table 2-2.
 
-#### 2.3.4 Miscellaneous Enhancements
+### 2.3.4 Miscellaneous Enhancements
 
 Many of Esp's features are general enhancements of MASM. Our engineers 
 simply felt that a given behavior was useful or preferable to the ordinary 
@@ -1106,7 +1106,7 @@ passing the "-m" flag to Esp.
 
 **Table 2-2** Esp Escape Sequences
 
-##### 2.3.4.1 Pseudo-Ops and Directives
+#### 2.3.4.1 Pseudo-Ops and Directives
 
 Esp provides a wide range of pseudo-ops and directives. Some of these will be 
 described in later chapters; a few of the most useful will be described here. 
@@ -1273,7 +1273,7 @@ Esp lets you use the EQ and NE directives to compare strings or segments, as
 well as immediate values. Of course, the operands must be defined at 
 assemble-time.
 
-##### 2.3.4.2 Miscellaneous Macros
+#### 2.3.4.2 Miscellaneous Macros
 
 Esp comes with a tremendous number of predefined macros. Some of these 
 perform common tasks in a roundabout, but more efficient, way. Others are 
@@ -1416,7 +1416,7 @@ _expr_ An expression whose value is known at assemble-time.
 **Include:**  
 geos.def
 
-##### 2.3.4.3 Useful Miscellaneous Macros
+#### 2.3.4.3 Useful Miscellaneous Macros
 
 clr, tst, BitSet, BitClr, segmov, segxchg, CmpStrings, 
 XchgTopStack
@@ -1671,7 +1671,7 @@ _fieldName_ The name of the field to clear. All bits in this field will be clear
 **Destroyed:**  
 Flags are destroyed.
 
-##### 2.3.4.4 dword Macros
+#### 2.3.4.4 dword Macros
 
 cmpdw, jgedw, jgdw, jledw, jldw, tstdw, pushdw, popdw, 
 notdw, negdw, incdw, decdw, movdw, adddw, adcdw, subdw, 
@@ -1689,7 +1689,7 @@ flags slightly differently from the corresponding instructions. The reference
 entries detail any such differences. Remember, when in doubt, you can 
 always look at the macro's source code.
 
-### 2.4 Defining Classes
+## 2.4 Defining Classes
 
 Every application defines at least one new class, its own process class. Most 
 applications define several more classes in addition to the process class.
@@ -1705,7 +1705,7 @@ of your class (in the .ui file) which matches the Esp one. The "Espire"
 language and the User-Interface compiler are discussed in ["The UI 
 Compiler", Chapter 4](euic.md).
 
-#### 2.4.1 Defining a Class
+### 2.4.1 Defining a Class
 
 Every class needs to be defined. The class's definition must be included once, 
 and only once, in the compilation, before the class name is ever actually used 
@@ -1732,7 +1732,7 @@ This is the name of the class's immediate superclass.
 
 For an example of a class definition, see Code Display 2-4.
 
-##### 2.4.1.1 Defining a Class's Messages
+#### 2.4.1.1 Defining a Class's Messages
 
 In Esp, you specify very little when you define a class's messages. You simply 
 specify the message name, without arguments or other information, like this:
@@ -1775,7 +1775,7 @@ exported by your class's superclass, define the message like this:
 This is the name of the message range exported by your class's 
 superclass.
 
-##### 2.4.1.2 Defining a Class's Instance Data Fields
+#### 2.4.1.2 Defining a Class's Instance Data Fields
 
 To define a class's instance data fields, put lines with this format in your class 
 definition:
@@ -1795,7 +1795,7 @@ standard or application-defined data type.
 This is the default value of the field when an object of this class 
 in instantiated.
 
-##### 2.4.1.3 Defining a Class's Vardata
+#### 2.4.1.3 Defining a Class's Vardata
 
 To define a hint or vardata field for a class, put lines with this format in your 
 class definition:
@@ -1812,7 +1812,7 @@ This field is optional; it is the type of data associated with the
 vardata field. It may be any standard or application-defined 
 data type.
 
-#### 2.4.2 Creating a Class's Class Structure
+### 2.4.2 Creating a Class's Class Structure
 
 Once you have defined a class, you must create its class structure. The class 
 structure must be in fixed memory; therefore, it is generally placed in the 
@@ -1871,7 +1871,7 @@ MyTriggerClass
 idata   ends
 ~~~
 
-#### 2.4.3 Defining your Process Class
+### 2.4.3 Defining your Process Class
 
 Every application with a process thread needs to define a new process class 
 for its process object. This is much like defining any other class. There are a 
@@ -1884,7 +1884,7 @@ process object (as described in [section 2.4.1](#241-defining-a-class)), you do 
 define the process object (with class... endc) unless you are defining 
 messages for your process class.
 
-### 2.5 Error-Checking Code
+## 2.5 Error-Checking Code
 
 ERROR_CHECK, ERROR, ERROR_C, ERROR_NC, ERROR_Z, ERROR_NZ...
 

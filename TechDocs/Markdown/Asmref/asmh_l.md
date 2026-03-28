@@ -1,7 +1,7 @@
 ## 2.4 Routines H-L
 
 ----------
-#### HandleModifyOwner
+### HandleModifyOwner
 Modifies the owner of a block. If passed a process handle, changes the parent 
 process instead of the owner.
 
@@ -18,7 +18,7 @@ ax
 **Library:** heap.def
 
 ----------
-#### HandleP
+### HandleP
 Sets a semaphore on the passed block. This provides the caller with exclusive 
 access to the block if all other processes use the **HandleP/HandleV** 
 mechanism. The *HM_otherInfo* field of the block is used for the semaphore 
@@ -44,7 +44,7 @@ Nothing.
 **Library:** heap.def
 
 ----------
-#### HandleV
+### HandleV
 Releases a semaphore on the given block.
 
 **Pass:**  
@@ -59,7 +59,7 @@ Nothing. (Flags preserved.)
 **Library:** heap.def
 
 ----------
-#### HugeArrayAppend
+### HugeArrayAppend
 
 Appends element(s) to the tail end of a Huge Array. If elements are of fixed 
 size, this routine may append several elements. If elements are of variable 
@@ -84,7 +84,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayCompressBlocks
+### HugeArrayCompressBlocks
 Compress all the free space out of VM blocks containing a HugeArray data.
 
 **Pass:**  
@@ -99,7 +99,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayContract
+### HugeArrayContract
 Deletes element(s) in a Huge Array. The elements may be of fixed or variable 
 size but must already be locked down. Elements will be deleted starting at 
 the element location passed.
@@ -119,7 +119,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayCreate
+### HugeArrayCreate
 Creates a Huge Array. Allocates a VM block for the directory block, initializes 
 the directory block header and allocates enough VM blocks for any initial 
 elements.
@@ -144,7 +144,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayDelete
+### HugeArrayDelete
 Locks down a Huge Array VM block and deletes element(s) starting at the 
 passed element number.
 
@@ -164,7 +164,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayDestroy
+### HugeArrayDestroy
 Destroys a Huge Array. This routine frees all blocks in the Huge Array.
 
 **Pass:**  
@@ -180,7 +180,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayDirty
+### HugeArrayDirty
 Marks a VM block containing an element in a Huge Array dirty
 
 **Pass:**  
@@ -195,7 +195,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayEnum
+### HugeArrayEnum
 Calls a callback routine for multiple elements within a Huge Array. Pass this 
 routine the element to start at, the number of elements to call the routine on, 
 and the address of the callback routine. The Index number of elements is a 
@@ -243,7 +243,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayExpand
+### HugeArrayExpand
 Insert element(s) into a locked Huge Array. Elements are inserted starting at 
 the passed element position.
 
@@ -269,7 +269,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayGetCount
+### HugeArrayGetCount
 Retrieves the number of element(s) in a Huge Array.
 
 **Pass:**  
@@ -285,7 +285,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayInsert
+### HugeArrayInsert
 Locks down and insert element(s) into a HugeArray.
 
 **Pass:**  
@@ -309,7 +309,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayLock
+### HugeArrayLock
 Locks down a HugeArray element. To unlock a locked HugeArray element, 
 use **HugeArrayUnlock**.
 
@@ -332,7 +332,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayLockDir
+### HugeArrayLockDir
 Locks a HugeArray directory block.
 
 **Pass:**  
@@ -348,7 +348,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayNext
+### HugeArrayNext
 Locks and points to the next HugeArray element. 
 
 **Pass:**  
@@ -368,7 +368,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayPrev
+### HugeArrayPrev
 Locks and points to the previous Huge Array element.
 
 **Pass:**  
@@ -389,7 +389,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayReplace
+### HugeArrayReplace
 Replace element(s) in a Huge Array.
 
 **Pass:**  
@@ -413,7 +413,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayResize
+### HugeArrayResize
 Resizes an array element. If the element is resized to a smaller size then data 
 at the end of the element is truncated (and lost). If it gets larger, the new data 
 is initialized to zero.
@@ -433,7 +433,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayUnlock
+### HugeArrayUnlock
 Unlocks a previously locked Huge Array element. 
 
 **Pass:**  
@@ -448,7 +448,7 @@ Nothing. (Flags preserved.)
 **Library:** hugearr.def
 
 ----------
-#### HugeArrayUnlockDir
+### HugeArrayUnlockDir
 Unlocks a previously locked block containing the **HugeArrayDirectory**.
 
 **Pass:**  
@@ -463,7 +463,7 @@ Nothing.
 **Library:** hugearr.def
 
 ----------
-#### IACPConnect
+### IACPConnect
 Establish a connection with one or all of the servers on a particular list.
 
 **Pass:**  
@@ -487,7 +487,7 @@ bx, dx.
 **Library:** iacp.def
 
 ----------
-#### IACPCreateDefaultLaunchBlock
+### IACPCreateDefaultLaunchBlock
 Utility routine to create an AppLaunchBlock to be given to IACPConnect. 
 The block is initialized with the following defaults:
 
@@ -513,7 +513,7 @@ Nothing.
 **Library:** iacp.def
 
 ----------
-#### IACPFinishConnect
+### IACPFinishConnect
 Complete the process of connecting. Called by the server when it's ready to 
 accept messages from the client.
 
@@ -530,7 +530,7 @@ Nothing
 **Library:** iacp.def
 
 ----------
-#### IACPGetDocumentID
+### IACPGetDocumentID
 Figure the 48-bit ID for a data file, dealing with links.
 
 **Pass:**  
@@ -549,7 +549,7 @@ Nothing.
 **Library:** iacp.def
 
 ----------
-#### IACPGetServerNumber
+### IACPGetServerNumber
 Returns the number a server object is for a particular IACP connection, so 
 the client can use the number to direct a message to a particular server.
 
@@ -567,7 +567,7 @@ Nothing.
 **Library:** iacp.def
 
 ----------
-#### IACPLostConnection
+### IACPLostConnection
 Utility routine for server objects to handle 
 MSG_META_IACP_LOST_CONNECTION
 
@@ -584,7 +584,7 @@ ax, cx, dx, bp, bx, di.
 **Library:** iacp.def
 
 ----------
-#### IACPProcessMessage
+### IACPProcessMessage
 Utility routine to handle a MSG_META_IACP_PROCESS_MESSAGE. Can 
 be bound as the method for this message for any class that might receive it.
 
@@ -605,7 +605,7 @@ ax, bx, cx, dx, bp, si, di
 **Library:** iacp.def
 
 ----------
-#### IACPRegisterDocument
+### IACPRegisterDocument
 Register a document as being open, specifying the server to which to connect 
 to communicate about the document.
 
@@ -623,7 +623,7 @@ Nothing
 **Library:** iacp.def
 
 ----------
-#### IACPRegisterServer
+### IACPRegisterServer
 Register an object as a server for a particular list. Can also be used to change 
 the mode in which the server is registered.
 
@@ -642,7 +642,7 @@ Nothing.
 **Library:** iacp.def
 
 ----------
-#### IACPSendMessage
+### IACPSendMessage
 Send a message through an IACP connection to all connected servers, or to 
 the client, depending on which side is doing the sending.
 
@@ -663,7 +663,7 @@ bx, cx, dx, both recorded messages.
 **Library:** iacp.def
 
 ----------
-#### IACPSendMessageToServer
+### IACPSendMessageToServer
 Send a message through an IACP connection to a specific connected server.
 
 **Pass:**  
@@ -683,7 +683,7 @@ bx, cx, dx, both recorded messages.
 **Library:** iacp.def
 
 ----------
-#### IACPShutdown
+### IACPShutdown
 Sever an IACP connection. MSG_META_IACP_LOST_CONNECTION is sent to 
 the other side of the connection.
 
@@ -700,7 +700,7 @@ ax.
 **Library:** iacp.def
 
 ----------
-#### IACPShutdownAll
+### IACPShutdownAll
 Shutdown all connections open to or from an object.
 
 **Pass:**  
@@ -716,7 +716,7 @@ ax
 **Library:** iacp.def
 
 ----------
-#### IACPShutdownConnection
+### IACPShutdownConnection
 Utility routine to handle MSG_META_IACP_SHUTDOWN_CONNECTION, as 
 generated by a call to **IACPLostConnection**.
 
@@ -733,7 +733,7 @@ ax, cx, dx, bp.
 **Library:** iacp.def
 
 ----------
-#### IACPUnregisterDocument
+### IACPUnregisterDocument
 Indicate a document is closed. New-connection messages may still be queued 
 based on the document having been registered, so the caller will need to 
 handle those gracefully.
@@ -752,7 +752,7 @@ Nothing.
 **Library:** iacp.def
 
 ----------
-#### IACPUnregisterServer
+### IACPUnregisterServer
 Unregister an object as a server for a particular list.
 
 **Pass:**  
@@ -768,7 +768,7 @@ Nothing.
 **Library:** iacp.def
 
 ----------
-#### ImpexCreateTempFile
+### ImpexCreateTempFile
 Creates and opens a unique Metafile in the waste directory.
 
 **Pass:**  
@@ -787,7 +787,7 @@ Nothing.
 **Library:** impex.def
 
 ----------
-#### ImpexDeleteTempFile
+### ImpexDeleteTempFile
 Closes and deletes a metafile in the waste directory.
 
 **Pass:**  
@@ -805,7 +805,7 @@ Nothing.
 **Library:** impex.def
 
 ----------
-#### ImpexExportToMetafile
+### ImpexExportToMetafile
 Converts a transfer format into a metafile.
 
 **Pass:**  
@@ -827,7 +827,7 @@ Nothing.
 **Library:** impex.def
 
 ----------
-#### ImpexImportExportCompleted
+### ImpexImportExportCompleted
 Sends a message back to the Import/ExportControl object stating that the 
 application has completed it's import or export operation.
 
@@ -843,7 +843,7 @@ Nothing.
 **Library:** impex.def
 
 ----------
-#### ImpexImportFromMetafile
+### ImpexImportFromMetafile
 Converts a metafile into a transfer format.
 
 **Pass:**  
@@ -865,7 +865,7 @@ Nothing.
 **Library:** impex.def
 
 ----------
-#### ImpexUpdateImportExportStatus
+### ImpexUpdateImportExportStatus
 Apprise the user of the status of an import or export. This routine should only 
 be called by translation libraries, and can be called at any time during the 
 import/export process. If a translation library chooses not to call this 
@@ -887,7 +887,7 @@ Nothing.
 **Library:**    impex.def
 
 ----------
-#### InitFileDeleteCategory
+### InitFileDeleteCategory
 Deletes an entire category (and therefore all its associated keys) from the 
 GEOS.INI file.
 
@@ -904,7 +904,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileDeleteEntry
+### InitFileDeleteEntry
 Deletes a "key" entry from the GEOS.INI file. Only matching keys within the 
 passed category will be deleted. Keys in other categories are unaffected.
 
@@ -923,7 +923,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileDeleteStringSection
+### InitFileDeleteStringSection
 Deletes the specific string "blob" starting at the zero-based string number. 
 "Blobs" are usually set off from each other in the GEOS.INI file with CR or LF 
 characters.
@@ -944,7 +944,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileEnumStringSection
+### InitFileEnumStringSection
 Calls the passed function on each matching string section within the 
 GEOS.INI file.
 
@@ -982,7 +982,7 @@ ax, cx, dx, di, si, bp, es
 **Library:** initfile.def
 
 ----------
-#### InitFileGetTimeLastModified
+### InitFileGetTimeLastModified
 Returns the time (from system counter) when the GEOS.INI file was last 
 written to.
 
@@ -999,7 +999,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileGrab
+### InitFileGrab
 Grab exclusive access on the initfile routines, and use the passed buffer as a 
 temporary init file.
 
@@ -1019,7 +1019,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileReadBoolean
+### InitFileReadBoolean
 Returns the Boolean value specified in the given category and key of the 
 GEOS.INI file.
 
@@ -1040,7 +1040,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileReadData
+### InitFileReadData
 Locates the contents of the given category and key of the GEOS.INI file and 
 returns a pointer to the associated data.
 
@@ -1068,7 +1068,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileReadInteger
+### InitFileReadInteger
 Returns the integer value specified in the given category and key of the 
 GEOS.INI file.
 
@@ -1088,7 +1088,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileReadString
+### InitFileReadString
 Locates the contents of the given category and key of the GEOS.INI file and 
 returns a pointer to the associated string.
 
@@ -1116,7 +1116,7 @@ bx (if not returned).
 **Library:** initfile.def
 
 ----------
-#### InitFileReadStringSection
+### InitFileReadStringSection
 Locates the contents of the given category and key of the GEOS.INI file, copies 
 a specified section of the string, and returns a pointer to the copied string 
 section.
@@ -1147,7 +1147,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileRevert
+### InitFileRevert
 Restores the GEOS.INI to its backed-up previous state.
 
 **Pass:**  
@@ -1162,7 +1162,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileSave
+### InitFileSave
 Saves the GEOS.INI file.
 
 **Pass:**  
@@ -1177,7 +1177,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileWriteBoolean
+### InitFileWriteBoolean
 Writes out a Boolean value to the GEOS.INI file.
 
 **Pass:**  
@@ -1196,7 +1196,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileWriteData
+### InitFileWriteData
 Writes out a string of data (which may represent a null-terminated text 
 string, a Boolean value, or an integer value) to the GEOS.INI file. You may 
 instead use **InitFileWriteString**, **InitFileWriteInteger**, or 
@@ -1219,7 +1219,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileWriteInteger
+### InitFileWriteInteger
 Writes out an integer to the GEOS.INI file.
 
 **Pass:**  
@@ -1238,7 +1238,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileWriteString
+### InitFileWriteString
 Writes out a string to the GEOS.INI file.
 
 **Pass:**  
@@ -1258,7 +1258,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InitFileWriteStringSection
+### InitFileWriteStringSection
 Appends a string onto the end of a pre-existing GEOS.INI entry.
 
 **Pass:**  
@@ -1278,7 +1278,7 @@ Nothing.
 **Library:** initfile.def
 
 ----------
-#### InkCompress
+### InkCompress
 Compress ink data from a VisInk object.
 
 **Pass:**  
@@ -1301,7 +1301,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkDBGetDisplayInfo
+### InkDBGetDisplayInfo
 Returns the current folder handle, note ID if any is selected and the page 
 number within the note.
 
@@ -1319,7 +1319,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkDBGetHeadFolder
+### InkDBGetHeadFolder
 Returns the head (root) folder for the associated Ink DB file.
 
 **Pass:**  
@@ -1334,7 +1334,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkDBInit
+### InkDBInit
 Creates and initializes a new DB file for use by the Ink object. This routine 
 must be called before calling any other Ink Database functions.
 
@@ -1350,7 +1350,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkDBSetDisplayInfo
+### InkDBSetDisplayInfo
 
 Displays the contents of the passed Folder, Note, and Page display 
 information, if applicable.
@@ -1370,7 +1370,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkDecompress
+### InkDecompress
 Uncompresses compressed ink data so that it may be loaded to a VisInk 
 object.
 
@@ -1387,7 +1387,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderCreateSubFolder
+### InkFolderCreateSubFolder
 Creates a new folder as a child of the passed folder.
 
 **Pass:**  
@@ -1403,7 +1403,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderDelete
+### InkFolderDelete
 Deletes a folder. If the folder contains children, it recursively deletes all 
 children.
 
@@ -1420,7 +1420,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderDepthFirstTraverse
+### InkFolderDepthFirstTraverse
 Performs a depth-first traversal of the folder tree, calling the passed routine 
 with all encountered folders.
 
@@ -1439,7 +1439,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderDisplayChildInList
+### InkFolderDisplayChildInList
 Displays a note or folder's name in a GenDynamicList. This routine builds 
 and sends a moniker to the passed list.
 
@@ -1460,7 +1460,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderGetChildInfo
+### InkFolderGetChildInfo
 Returns information on a folder's child, specifying whether the child is a 
 folder or a note along with the child's ID number.
 
@@ -1479,7 +1479,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderGetChildNumber
+### InkFolderGetChildNumber
 Returns the child's number given its folder or note ID.
 
 **Pass:**  
@@ -1496,7 +1496,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderGetContents
+### InkFolderGetContents
 Returns a chunk array containing all of the folder's subfolders and a chunk 
 array containing all the folder's child notes.
 
@@ -1514,7 +1514,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderGetNumChildren
+### InkFolderGetNumChildren
 Returns the number of children within the passed folder.
 
 **Pass:**  
@@ -1531,7 +1531,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderMove
+### InkFolderMove
 Moves a folder, attaching it below the passed parent folder.
 
 **Pass:**  
@@ -1548,7 +1548,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderSetTitle
+### InkFolderSetTitle
 Sets the title of a folder to use the passed text string.
 
 **Pass:**  
@@ -1565,7 +1565,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkFolderSetTitleFromTextObject
+### InkFolderSetTitleFromTextObject
 Sets the title of a folder from the entire text within the passed text object.
 
 **Pass:**  
@@ -1582,7 +1582,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkGetDocCustomGString
+### InkGetDocCustomGString
 Retrieves the custom GString field from the **InkDataFileMap** structure 
 
 **Pass:**  
@@ -1597,7 +1597,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkGetDocGString
+### InkGetDocGString
 Retrieves the background picture (in the form of a GString) of the Ink object. 
 If this function returns a token indicating that the Ink object is using a 
 custom GString, use **InkGetDocCustomGString**.
@@ -1614,7 +1614,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkGetDocPageInfo
+### InkGetDocPageInfo
 Retrieves the current page information for the Ink database.
 
 **Pass:**  
@@ -1630,7 +1630,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkGetParentFolder
+### InkGetParentFolder
 Returns the parent folder of the passed folder or note.
 
 **Pass:**  
@@ -1646,7 +1646,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkGetTitle
+### InkGetTitle
 Returns the title of the passed folder or note.
 
 **Pass:**  
@@ -1664,7 +1664,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteCopyMoniker
+### InkNoteCopyMoniker
 Copies the icon and note name into a visMoniker structure. (May also be used 
 to copy a folder's name into a visMoniker.)
 
@@ -1683,7 +1683,7 @@ ax, bx, cx, dx, si, di
 **Library:** pen.def
 
 ----------
-#### InkNoteCreate
+### InkNoteCreate
 Creates a note below the passed folder.
 
 **Pass:**  
@@ -1699,7 +1699,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteCreatePage
+### InkNoteCreatePage
 Creates a new page within a note.
 
 **Pass:**  
@@ -1716,7 +1716,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteDelete
+### InkNoteDelete
 Deletes the note and all references to it.
 
 **Pass:**  
@@ -1732,7 +1732,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteFindByKeywords
+### InkNoteFindByKeywords
 Retrieves a note by its associated keywords. Returns the first 20,000 or so 
 notes that match the given keywords.
 
@@ -1756,7 +1756,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteFindByTitle
+### InkNoteFindByTitle
 Retrieves a note by its associated title. Returns the first 20,000 or so notes 
 that match the given title.
 
@@ -1780,7 +1780,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteGetCreationDate
+### InkNoteGetCreationDate
 Returns the creation date of the passed note.
 
 **Pass:**  
@@ -1798,7 +1798,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteGetKeywords
+### InkNoteGetKeywords
 Copies the keyword string used by the passed note into the passed 
 destination address.
 
@@ -1816,7 +1816,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteGetModificationDate
+### InkNoteGetModificationDate
 Returns the date the passed note was last modified.
 
 **Pass:**  
@@ -1834,7 +1834,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteGetNoteType
+### InkNoteGetNoteType
 Returns the note type (ink or text) in use by the passed note.
 
 **Pass:**  
@@ -1850,7 +1850,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteGetNumPages
+### InkNoteGetNumPages
 Returns the number of pages associated with the passed note.
 
 **Pass:**  
@@ -1866,7 +1866,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteGetPages
+### InkNoteGetPages
 Returns the DB item in which the note's information is stored. This DB item 
 contains a chunk array of pages.
 
@@ -1883,7 +1883,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteLoadPage
+### InkNoteLoadPage
 Loads an ink or text object from a page of a note.
 
 **Pass:**  
@@ -1902,7 +1902,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteMove
+### InkNoteMove
 Moves a note from one folder to another.
 
 **Pass:**  
@@ -1919,7 +1919,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSavePage
+### InkNoteSavePage
 Saves an ink or text object from the page of a note to the instance data of that 
 object.
 
@@ -1939,7 +1939,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSendKeywordsToTextObject
+### InkNoteSendKeywordsToTextObject
 Replaces a text object's text with the passed note's keywords.
 
 **Pass:**  
@@ -1956,7 +1956,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSetKeywords
+### InkNoteSetKeywords
 Sets the keywords of the passed note using the passed text string.
 
 **Pass:**  
@@ -1973,7 +1973,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSetKeywordsFromTextObject
+### InkNoteSetKeywordsFromTextObject
 Sets the keywords of the passed note using the text within a text object.
 
 **Pass:**  
@@ -1990,7 +1990,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSetModificationDate
+### InkNoteSetModificationDate
 Sets the modification date of the passed note. This allows you to update the 
 note when writing changes.
 
@@ -2008,7 +2008,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSetNoteType
+### InkNoteSetNoteType
 Sets the note type (ink or text) in use by the passed note.
 
 **Pass:**  
@@ -2025,7 +2025,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSetTitle
+### InkNoteSetTitle
 Sets the title in use by the passed note to the passed text string.
 
 **Pass:**  
@@ -2042,7 +2042,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkNoteSetTitleFromTextObject
+### InkNoteSetTitleFromTextObject
 Sets the title in use by the passed note to the text within a text object.
 
 **Pass:**  
@@ -2059,7 +2059,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkSendTitleToTextObject
+### InkSendTitleToTextObject
 Sets the text within a text object to the text within the passed note or folder's 
 title.
 
@@ -2077,7 +2077,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkSetDocCustomGString
+### InkSetDocCustomGString
 Sets the custom GString field (*IDFM_customGstring*) in an Ink object's 
 **InkDataFileMap** field.
 
@@ -2094,7 +2094,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkSetDocGString
+### InkSetDocGString
 Sets the GString field (*IDFM_gstring*) in an Ink object's **InkDataFileMap** 
 field.
 
@@ -2111,7 +2111,7 @@ Nothing.
 **Library:** pen.def
 
 ----------
-#### InkSetDocPageInfo
+### InkSetDocPageInfo
 Sets the current page information in use by Ink database.
 
 **Pass:**  
@@ -2127,7 +2127,7 @@ Nothing.
 **Library:**    pen.def
 
 ----------
-#### LMemAlloc
+### LMemAlloc
 Allocates space (a new chunk) on the local-memory heap. This routine may 
 resize the LMem block, moving it on the heap, and invalidating stored 
 segment pointers to it.
@@ -2150,7 +2150,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LMemContract
+### LMemContract
 Compacts a local memory block. The local memory manager routines 
 ordinarily take care of heap compaction. This routine compacts the heap 
 manually and frees the unused heap space. The block is guaranteed to 
@@ -2168,7 +2168,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LMemDeleteAt
+### LMemDeleteAt
 Deletes space from within the middle of a chunk on the local memory heap. 
 
 **Pass:**  
@@ -2186,7 +2186,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LMemFree
+### LMemFree
 Frees the space occupied by a local-memory chunk. This routine does not 
 resize the block or shuffle any other chunks.
 
@@ -2203,7 +2203,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LMemInitHeap
+### LMemInitHeap
 Creates and initializes a local-memory heap block. This routine may resize 
 the LMem block, moving it on the heap, and invalidating stored segment 
 pointers to it. Where possible, you should try to use the higher-level routines: 
@@ -2229,7 +2229,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LMemInsertAt
+### LMemInsertAt
 Inserts space within the middle of a chunk on the local memory heap. The 
 new space is initialized to zeroes.
 
@@ -2249,7 +2249,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LMemReAlloc
+### LMemReAlloc
 Changes the size of a chunk in a local memory heap.
 
 **Pass:**  
@@ -2271,7 +2271,7 @@ Nothing.
 **Library:** lmem.def
 
 ----------
-#### LocalAsciiToFixed
+### LocalAsciiToFixed
 This routine converts the ASCII expression of a number to a **WWFixed** 
 number.
 
@@ -2290,7 +2290,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCalcDaysInMonth
+### LocalCalcDaysInMonth
 Return the number of days in the passed month/year.
 
 **Pass:**  
@@ -2306,7 +2306,7 @@ Nothing
 **Library:** localize.def
 
 ----------
-#### LocalCmpChars
+### LocalCmpChars
 This routine does a lexical comparison of two characters, determining which 
 comes first in alphabetic order. 
 
@@ -2335,7 +2335,7 @@ Nothing.
 cannot compare them a character at a time.
 
 ----------
-#### LocalCmpCharsNoCase
+### LocalCmpCharsNoCase
 This routine does a lexical comparison of two characters, determining which 
 comes first in alphabetic order. It will ignore case.
 
@@ -2363,7 +2363,7 @@ LocalCmpStrings. DBCS support requires special parsing of strings-you
 cannot compare them a character at a time.
 
 ----------
-#### LocalCmpStrings
+### LocalCmpStrings
 This routine does a lexical comparison of two text strings, determining which 
 comes sooner in alphabetic order.
 
@@ -2389,7 +2389,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCmpStringsDosToGeos
+### LocalCmpStringsDosToGeos
 Compares strings as does **LocalCmpStrings**, above, but one or both of the 
 strings may be Dos text.
 
@@ -2419,7 +2419,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCmpStringsNoCase
+### LocalCmpStringsNoCase
 Compares strings as does **LocalCmpStrings**, except that case is ignored.
 
 **Pass:**  
@@ -2444,7 +2444,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCmpStringsNoSpace
+### LocalCmpStringsNoSpace
 Compares two text strings as does **LocalCmpStrings**, except that spaces 
 are ignored.
 
@@ -2470,7 +2470,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCmpStringsNoSpaceCase
+### LocalCmpStringsNoSpaceCase
 Compares two text strings as does **LocalCmpStrings**, except that spaces 
 and case are ignored.
 
@@ -2496,7 +2496,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCodePageToGeos
+### LocalCodePageToGeos
 Converts Dos text to GEOS text. The Dos text may use any code page.
 
 **Pass:**  
@@ -2517,7 +2517,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCodePageToGeosChar
+### LocalCodePageToGeosChar
 Convert a single Dos character to GEOS text. The character may be in any 
 Dos code page.
 
@@ -2536,7 +2536,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCustomFormatDateTime
+### LocalCustomFormatDateTime
 
 Format a date or time. If you call this directly then you will not be language 
 independent. This routine is intended to be used by applications who do not 
@@ -2568,7 +2568,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalCustomParseDateTime
+### LocalCustomParseDateTime
 
 Parse a text string using a specific format string.
 
@@ -2597,7 +2597,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalDistanceFromAscii
+### LocalDistanceFromAscii
 This routine extracts a distance value from an ASCII text string.
 
 **Pass:**  
@@ -2614,7 +2614,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalDistanceToAscii
+### LocalDistanceToAscii
 Construct an ASCII string from a distance value.
 
 **Pass:**  
@@ -2634,7 +2634,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalDosToGeos
+### LocalDosToGeos
 This routine converts a Dos text string to GEOS text format.
 
 **Pass:**  
@@ -2654,7 +2654,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalDosToGeosChar
+### LocalDosToGeosChar
 This routine converts a single Dos character to a GEOS character.
 
 **Pass:**  
@@ -2671,7 +2671,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalDowncaseChar
+### LocalDowncaseChar
 This routine returns the lowercase equivalent of any character (if the 
 character has no lower-case equivalent, the character will be returned 
 untouched).
@@ -2688,7 +2688,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalDowncaseString
+### LocalDowncaseString
 This routine converts a string to all lower case.
 
 **Pass:**  
@@ -2705,7 +2705,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalFixedToAscii
+### LocalFixedToAscii
 This routine converts a **WWFixed** number to its ASCII string equivalent.
 
 **Pass:**  
@@ -2722,7 +2722,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalFormatDateTime
+### LocalFormatDateTime
 This routine takes a date or time and a enumerated type describing how that 
 time should be formatted and returns a text string containing the time/date 
 information formatted nicely.
@@ -2749,7 +2749,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalFormatFileDateTime
+### LocalFormatFileDateTime
 Like **LocalFormatDateTime**, except it works off a **FileDate** and a **FileTime** 
 record
 
@@ -2769,7 +2769,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGeosToCodePage
+### LocalGeosToCodePage
 Convert GEOS text string to Dos text using an arbitrary code page.
 
 **Pass:**  
@@ -2790,7 +2790,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGeosToCodePageChar
+### LocalGeosToCodePageChar
 Convert one character of GEOS text to Dos text using an arbitrary code page.
 
 **Pass:**  
@@ -2808,7 +2808,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGeosToDos
+### LocalGeosToDos
 Concert a string of GEOS text to its Dos equivalent.
 
 **Pass:**  
@@ -2828,7 +2828,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGeosToDosChar
+### LocalGeosToDosChar
 Convert one character of GEOS text to its Dos text equivalent.
 
 **Pass:**  
@@ -2846,7 +2846,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGetCodePage
+### LocalGetCodePage
 This routine returns the value of the current code page.
 
 **Pass:**  
@@ -2861,7 +2861,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGetCurrencyFormat
+### LocalGetCurrencyFormat
 This routine returns the information necessary to format currency text 
 strings in the way preferred by the user.
 
@@ -2882,7 +2882,7 @@ Nothing.
 **Library:**    localize.def
 
 ----------
-#### LocalGetDateTimeFormat
+### LocalGetDateTimeFormat
 Returns the text string associated with a **TimeDateFormat**.
 
 **Pass:**  
@@ -2899,7 +2899,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGetNumericFormat
+### LocalGetNumericFormat
 This routine returns the information necessary to format currency text 
 strings in the way preferred by the user.
 
@@ -2920,7 +2920,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalGetQuotes
+### LocalGetQuotes
 This routine returns the localized symbols to use as single or double quotes.
 
 **Pass:**  
@@ -2938,7 +2938,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalIsAlpha
+### LocalIsAlpha
 This routine detects alphabetic characters.
 
 **Pass:**  
@@ -2950,7 +2950,7 @@ ZF - Clear if character is alphabetic.
 **Library:** localize.def
 
 ----------
-#### LocalIsAlphaNumeric
+### LocalIsAlphaNumeric
 This routine detects alphabetic and numeric characters.
 
 **Pass:**  
@@ -2962,7 +2962,7 @@ ZF - Clear if character is alphanumeric.
 **Library:** localize.def
 
 ----------
-#### LocalIsCodePageSupported
+### LocalIsCodePageSupported
 Checks to see if the passed code page is a supported one.
 
 **Pass:**  
@@ -2977,7 +2977,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalIsControl
+### LocalIsControl
 This routine detects control characters.
 
 **Pass:**  
@@ -2989,7 +2989,7 @@ ZF - Clear if character is a control character.
 **Library:** localize.def
 
 ----------
-#### LocalIsDateChar
+### LocalIsDateChar
 This routine detects date characters.
 
 **Pass:**  
@@ -3002,7 +3002,7 @@ associated with DTF_SHORT.
 **Library:** localize.def
 
 ----------
-#### LocalIsDigit
+### LocalIsDigit
 This routine detects numeric characters.
 
 **Pass:**  
@@ -3014,7 +3014,7 @@ ZF - Clear if character is numeric.
 **Library:** localize.def
 
 ----------
-#### LocalIsDosChar
+### LocalIsDosChar
 This routine detects characters which are members of the Dos character set.
 
 **Pass:**  
@@ -3026,7 +3026,7 @@ ZF - Clear if character is in the Dos character set.
 **Library:** localize.def
 
 ----------
-#### LocalIsGraphic
+### LocalIsGraphic
 This routine detects characters that require some sort of drawing. Control 
 characters are not graphic; neither are line-feeds or spaces. Letters, 
 numbers, and punctuation marks are all good examples of graphic symbols.
@@ -3040,7 +3040,7 @@ ZF - Clear if character is graphic.
 **Library:** localize.def
 
 ----------
-#### LocalIsHexDigit
+### LocalIsHexDigit
 This routine detects numeric characters, including those letters necessary for 
 expressing hexadecimal numbers.
 
@@ -3053,7 +3053,7 @@ ZF - Clear if character is a hexidecimal digit.
 **Library:** localize.def
 
 ----------
-#### LocalIsLower
+### LocalIsLower
 This routine detects lower-case alphabetic characters.
 
 **Pass:**  
@@ -3065,7 +3065,7 @@ ZF - Clear if character is lower-case.
 **Library:** localize.def
 
 ----------
-#### LocalIsNumChar
+### LocalIsNumChar
 This routine detects numeric characters, including the decimal separator.
 
 **Pass:**  
@@ -3077,7 +3077,7 @@ ZF - Clear if character is part of the number format.
 **Library:** localize.def
 
 ----------
-#### LocalIsPrintable
+### LocalIsPrintable
 This routine detects printable characters (this includes all graphic 
 characters and the space character).
 
@@ -3090,7 +3090,7 @@ ZF - Clear if character is printable.
 **Library:** localize.def
 
 ----------
-#### LocalIsPunctuation
+### LocalIsPunctuation
 This routine detects punctuation marks.
 
 **Pass:**  
@@ -3102,7 +3102,7 @@ ZF - Clear if character is a punctuation mark.
 **Library:** localize.def
 
 ----------
-#### LocalIsSpace
+### LocalIsSpace
 This routine detects white-space.
 
 **Pass:**  
@@ -3114,7 +3114,7 @@ ZF - Clear if character is a space.
 **Library:** localize.def
 
 ----------
-#### LocalIsSymbol
+### LocalIsSymbol
 This routine detects symbol characters.
 
 **Pass:**  
@@ -3126,7 +3126,7 @@ ZF - Clear if character is a symbol.
 **Library:** localize.def
 
 ----------
-#### LocalIsTimeChar
+### LocalIsTimeChar
 This routine detects characters which are digits or part of the format string 
 associated with DTF_HMS.
 
@@ -3139,7 +3139,7 @@ ZF - Clear if character is part of a time string.
 **Library:** localize.def
 
 ----------
-#### LocalIsUpper
+### LocalIsUpper
 This routine detects upper-case alphabetic characters.
 
 **Pass:**  
@@ -3151,7 +3151,7 @@ ZF - Clear if character is upper-case.
 **Library:** localize.def
 
 ----------
-#### LocalLexicalValue
+### LocalLexicalValue
 This routine returns the lexical value of a character, useful when sorting 
 things into alphabetical order. Note that knowing the lexical value of just one 
 character is not much use - lexical values are only meaningful when 
@@ -3169,7 +3169,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalLexicalValueNoCase
+### LocalLexicalValueNoCase
 This routine returns the case-insensitive lexical value of a character, useful 
 when sorting things into alphabetical order. Note that knowing the 
 case-insensitive lexical value of just one character is not much use-lexical 
@@ -3187,7 +3187,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalParseDateTime
+### LocalParseDateTime
 This routine parses a text string and extracts time or date information from 
 it. Any field for which there is not data specified in the format string is 
 returned containing -1.
@@ -3215,7 +3215,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalSetCurrencyFormat
+### LocalSetCurrencyFormat
 This routine sets the currency format information. All items will be added to 
 the .INI file.
 
@@ -3233,7 +3233,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalSetDateTimeFormat
+### LocalSetDateTimeFormat
 Sets the localization date/time format in use by a **DateTimeFormatString**. 
 
 **Pass:**  
@@ -3249,7 +3249,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalSetMeasurementType
+### LocalSetMeasurementType
 This routine sets the measurement type. The correct value will be written to 
 the .INI file.
 
@@ -3265,7 +3265,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalSetNumericFormat
+### LocalSetNumericFormat
 This routine sets the fields used when formatting number strings. The 
 correct values will be written to the .INI file.
 
@@ -3285,7 +3285,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalSetQuotes
+### LocalSetQuotes
 This routine sets the localized single and double quotes.
 
 **Pass:**  
@@ -3303,7 +3303,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalStringLength
+### LocalStringLength
 This routine computes the number of characters in a null-terminated text 
 string. This routine allows for double byte character support.
 
@@ -3319,7 +3319,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalStringSize
+### LocalStringSize
 This routine determines the number of bytes used to store a null-terminated 
 text string.
 
@@ -3335,7 +3335,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalUpcaseChar
+### LocalUpcaseChar
 This routine returns a character's upper-case equivalent.
 
 **Pass:**  
@@ -3350,7 +3350,7 @@ Nothing.
 **Library:** localize.def
 
 ----------
-#### LocalUpcaseString
+### LocalUpcaseString
 This routine returns the all-caps equivalent of a text string.
 
 **Pass:**  

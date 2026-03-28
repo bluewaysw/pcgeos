@@ -11,7 +11,7 @@ name            rsftool.lib
 longname        "RabeSoft File Tool Library"
 tokenchars      "FlTl"
 tokenid         16480
-usernotes	"Made by RABE-Soft 04/2020-07/2025\rEnglisch Version 1.8.4"
+usernotes	"Made by RABE-Soft 04/2020-03/2026\rEnglisch Version 1.8.4.3"
 
 type            library, single
 

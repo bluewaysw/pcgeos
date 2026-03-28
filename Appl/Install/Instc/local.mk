@@ -8,10 +8,10 @@
 XCCOMFLAGS += -zc
 
 # Do not Create any EC version
- NO_EC = 1
+# NO_EC = 1
 
 
 # Create a Copyrigth-notice
-LINKFLAGS += -N "(c) by RABE-Soft 8/99-05/2023"
+LINKFLAGS += -N "(c) by RABE-Soft 8/99-03/2026"
 
 #include <$(SYSMAKEFILE)>

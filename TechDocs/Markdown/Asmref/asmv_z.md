@@ -1,7 +1,7 @@
 ## 2.7 Routines V-Z
 
 ----------
-#### VisCompInitialize
+### VisCompInitialize
 This routine initializes a VisComp object. This does parent class 
 initialization first, followed by an initialization of the VisComp part. It 
 initializes the composite linkage and marks the visible object as a composite.
@@ -20,7 +20,7 @@ ax, bx, cx, dx, bp, si, di, ds, es.
 **Library:** vCompC.def
 
 ----------
-#### VisCompMakePressesInk
+### VisCompMakePressesInk
 This routine is a handler for subclasses of VisCompClass that wish to make 
 presses that are not on a child to be ink.
 
@@ -41,7 +41,7 @@ Nothing.
 **Library:** vCompC.def
 
 ----------
-#### VisCompMakePressesNotInk
+### VisCompMakePressesNotInk
 This routine is a handler for subclasses of VisCompClass that wish to make 
 presses that are not on a child to be normal (i.e., not ink).
 
@@ -62,7 +62,7 @@ Nothing.
 **Library:** vCompC.def
 
 ----------
-#### VisInitialize
+### VisInitialize
 This routine initializes the VisInstance part of a visual object's instance data. 
 This includes setting the size of the object to zero (bounds being (0, 0) to 
 (-1, -1)) and marking the object invalid in all ways (image, window, and 
@@ -82,7 +82,7 @@ ax, cx, dx, bp.
 **Library:** visC.def
 
 ----------
-#### VisObjectHandlesInkReply
+### VisObjectHandlesInkReply
 This is a message handler to be used by those objects that want ink.
 
 **Pass:**  
@@ -100,7 +100,7 @@ ax, cx, di.
 **Library:** visC.def
 
 ----------
-#### VisTextGraphicCompressGraphic
+### VisTextGraphicCompressGraphic
 This routine compresses the bitmaps in a VisTextGraphic.
 
 **Pass:**  
@@ -118,7 +118,7 @@ Nothing
 **Library:** vTextC.def
 
 ----------
-#### VMAlloc
+### VMAlloc
 Creates and allocates space for a VM block within a previously existing VM 
 file. The block will not be initialized.
 
@@ -143,7 +143,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMAllocLMem
+### VMAllocLMem
 Allocates a VM block and initializes it to contain a local memory heap. If you 
 want a fixed data header space, you must pass the total size to allocate 
 (including the **LMemBlockHeader**; otherwise, pass zero indicating that 
@@ -167,7 +167,7 @@ Destroyed.
 **Library:** vm.def
 
 ----------
-#### VMAttach
+### VMAttach
 Attaches an existing block of memory to a VM block, deleting whatever data 
 was stored there before.
 
@@ -186,7 +186,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMCheckForModifications
+### VMCheckForModifications
 Checks whether a VM file has been marked as modified.
 
 **Pass:**  
@@ -201,7 +201,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMClose
+### VMClose
 Closes a VM file. This routine updates all dirty blocks, frees all global memory 
 blocks attached to the file and closes the file.
 
@@ -223,7 +223,7 @@ bx (if file was actually closed).
 **Library:** vm.def
 
 ----------
-#### VMCompareVMChains
+### VMCompareVMChains
 Compares two VM chains or DB items.
 
 **Pass:**  
@@ -241,7 +241,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMCopyVMBlock
+### VMCopyVMBlock
 Creates a duplicate of a VM block into the specified destination file. This 
 destination file may be the same as the source file. The duplicate VM block 
 user ID will remain the same as the original block's user.
@@ -260,7 +260,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMCopyVMChain
+### VMCopyVMChain
 Creates a duplicate of a VM chain (or DB item) in the specified destination 
 file. This destination file may be the same as the source file. All blocks in the 
 duplicate will have the same user ID number.
@@ -280,7 +280,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMDetach
+### VMDetach
 Detaches a VM block from a VM file, returning the handle of the detached 
 global memory block (which may have been allocated). The VM block will 
 contain no data after the detach.
@@ -299,7 +299,7 @@ ax
 **Library:** vm.def
 
 ----------
-#### VMDirty
+### VMDirty
 Marks a locked VM block as dirty.
 
 **Pass:**  
@@ -314,7 +314,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMFind
+### VMFind
 Given a VM block's user ID, locates and returns the first VM block handle 
 whose user ID matches.
 
@@ -334,7 +334,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMFree
+### VMFree
 Frees a VM block handle. If a global memory block is attached to the VM 
 block, that is freed also.
 
@@ -351,7 +351,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMFreeVMChain
+### VMFreeVMChain
 Frees a VM chain (or DB item). If freeing a VM chain, all blocks in the chain 
 will be freed.
 
@@ -368,7 +368,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMGetAttributes
+### VMGetAttributes
 Returns the **VMAttributes** associated with the specified VM file.
 
 **Pass:**  
@@ -383,7 +383,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMGetDirtyState
+### VMGetDirtyState
 Returns the dirty state of a VM file, in a word-length value that specifies both 
 if the file has been dirtied since the last save and whether it has been dirtied 
 since the last save, auto-save, or update.
@@ -402,7 +402,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMGetMapBlock
+### VMGetMapBlock
 Returns the VM block handle of the VM file's map block.
 
 **Pass:**  
@@ -417,7 +417,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMGrabExclusive
+### VMGrabExclusive
 Provides the current thread with exclusive access to the VM file.
 
 **Pass:**  
@@ -437,7 +437,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMInfo
+### VMInfo
 Fetches information about a VM block. Returns the memory handle, block 
 size, and user ID of the specified VM block.
 
@@ -461,7 +461,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMLock
+### VMLock
 Locks the given VM block into the global memory heap.
 
 **Pass:**  
@@ -478,7 +478,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMMemBlockToVMBlock
+### VMMemBlockToVMBlock
 Returns the VM block and VM file associated with a given VM memory 
 handle.
 
@@ -495,7 +495,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMModifyUserID
+### VMModifyUserID
 Changes the user ID of the passed VM block.
 
 **Pass:**  
@@ -512,7 +512,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMOpen
+### VMOpen
 Opens (or creates) a VM file, returning the handle of the opened file. 
 **VMOpen** looks for the file in the thread's current working directory (unless 
 creating a temporary file). 
@@ -535,7 +535,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMPreserveBlocksHandle
+### VMPreserveBlocksHandle
 Keeps the same global memory block with this VM block until the block is 
 explicitly detached or the VM block is freed.
 
@@ -552,7 +552,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMReleaseExclusive
+### VMReleaseExclusive
 Relinquishes a thread's exclusive access to a VM file.
 
 **Pass:**  
@@ -567,7 +567,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMRevert
+### VMRevert
 Reverts a file to its last-saved state.
 
 **Pass:**  
@@ -582,7 +582,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMSave
+### VMSave
 Updates and saves a VM file, freeing all backup blocks.
 
 **Pass:**  
@@ -598,7 +598,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMSaveAs
+### VMSaveAs
 Saves a VM file under a new name. The old file is reverted to its last-saved 
 state.
 
@@ -621,7 +621,7 @@ cx, dx
 **Library:** vm.def
 
 ----------
-#### VMSetAttributes
+### VMSetAttributes
 Changes a VM file's **VMAttributes** settings, also returning the new 
 attributes in a word-length record.
 
@@ -639,7 +639,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMSetExecThread
+### VMSetExecThread
 Sets the thread that will execute methods of all objects within the passed VM 
 file.
 
@@ -656,7 +656,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMSetMapBlock
+### VMSetMapBlock
 Sets the map block of a VM file.
 
 **Pass:**  
@@ -672,7 +672,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMSetReloc
+### VMSetReloc
 Sets the (fixed-memory) data relocation routine to be called whenever a block 
 is brought into memory from a VM file (or written to memory).
 
@@ -702,7 +702,7 @@ ax, bx, cx, dx, si, di, bp, ds, es
 **Library:** vm.def
 
 ----------
-#### VMUnlock
+### VMUnlock
 Unlocks a locked VM block. Note that the block's global memory handle is 
 passed (not it's VM handle).
 
@@ -722,7 +722,7 @@ procedure.)
 **Library:** vm.def
 
 ----------
-#### VMUpdate
+### VMUpdate
 Updates all dirty blocks within a VM file to the disk. (This is known as 
 flushing all changes onto disk.)
 
@@ -739,7 +739,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VMVMBlockToMemBlock
+### VMVMBlockToMemBlock
 Returns the handle of the global memory block attached to a specified VM 
 block. If no global block is currently attached, it will allocate and attach one.
 
@@ -756,7 +756,7 @@ Nothing.
 **Library:** vm.def
 
 ----------
-#### VTFClearSmartQuotes
+### VTFClearSmartQuotes
 Clear the variable that prohibits smart quotes.
 
 **Pass:**  
@@ -771,7 +771,7 @@ Nothing
 **Library:** vTextC.def
 
 ----------
-#### WarningNotice
+### WarningNotice
 A place for Swat to place a breakpoint to catch taken invocations of the 
 WARNING family of macros
 
@@ -787,7 +787,7 @@ Nothing.
 **Library:** ec.def
 
 ----------
-#### WinAckUpdate
+### WinAckUpdate
 Acknowledges an update in the window without performing any visual 
 updating. This is equivalent to calling **GrBeginUpdate**, then 
 **GrEndUpdate** but does not require a GState to do so. 
@@ -807,7 +807,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinApplyRotation
+### WinApplyRotation
 Applies the passed rotation to the window's transformation matrix.
 
 **Pass:**  
@@ -826,7 +826,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinApplyScale
+### WinApplyScale
 Applies the passed scale factor to the window's transformation matrix.
 
 **Pass:**  
@@ -846,7 +846,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinApplyTransform
+### WinApplyTransform
 Concatenates the passed transformation matrix (**TMatrix**) with the 
 window's current transformation matrix, forming the window's new 
 transformation matrix.
@@ -867,7 +867,7 @@ ax, bx
 **Library:** win.def
 
 ----------
-#### WinApplyTranslation
+### WinApplyTranslation
 Applies the passed translation to the window's transformation matrix.
 
 **Pass:**  
@@ -887,7 +887,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinApplyTranslationDWord
+### WinApplyTranslationDWord
 Applies a 32-bit translation to a window's transformation matrix.
 
 **Pass:**  
@@ -907,7 +907,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinChangeAck
+### WinChangeAck
 Called to acknowledge a MSG_META_WIN_CHANGE, this function generates 
 "Enter" and "Leave" events for any windows which the mouse may have 
 moved across. 
@@ -931,7 +931,7 @@ and invalidating stored segment pointers and current register or stored
 offsets to them.
 
 ----------
-#### WinChangePriority
+### WinChangePriority
 Changes a window's priority.
 
 **Pass:**  
@@ -948,7 +948,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinClose
+### WinClose
 Closes and frees the specified window.
 
 **Pass:**  
@@ -963,7 +963,7 @@ di
 **Library:** win.def
 
 ----------
-#### WinDecRefCount
+### WinDecRefCount
 Handle acknowledge of window death. To be called by whoever receives a 
 MSG_META_WIN_DEC_REF_COUNT.
 
@@ -979,7 +979,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinEnsureChangeNotification
+### WinEnsureChangeNotification
 Ensures that if the window that has the implied mouse grab has changed 
 since the last MSG_META_WIN_CHANGE, then another 
 MSG_META_WIN_CHANGE will be sent out to update the system.
@@ -996,7 +996,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeGetFlags
+### WinGeodeGetFlags
 Returns the **GeodeWinFlags** associated with a geode.
 
 **Pass:**  
@@ -1011,7 +1011,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeGetInputObj
+### WinGeodeGetInputObj
 Returns the optr of the input object associated with the specified geode. (If 
 there is no such object, this routine returns a null optr.)
 
@@ -1027,7 +1027,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeGetParentObj
+### WinGeodeGetParentObj
 Returns the optr of the parent object associated with the passed geode. (If 
 there is no such parent object, this routine returns a null optr.)
 
@@ -1043,7 +1043,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeSetActiveWin
+### WinGeodeSetActiveWin
 Sets the passed window within the specified geode to be that geode's "active" 
 window.
 
@@ -1060,7 +1060,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeSetFlags
+### WinGeodeSetFlags
 Sets the GeodeWinFlags associated with the specified geode.
 
 **Pass:**  
@@ -1076,7 +1076,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeSetInputObj
+### WinGeodeSetInputObj
 Sets the passed geode's input object to the specified optr.
 
 **Pass:**  
@@ -1092,7 +1092,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeSetParentObj
+### WinGeodeSetParentObj
 Sets the passed geode's parent object to the specified optr.
 
 **Pass:**  
@@ -1108,7 +1108,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGeodeSetPtrImage
+### WinGeodeSetPtrImage
 Sets the pointer image of the specified geode to the passed **PointerDef**.
 
 **Pass:**  
@@ -1125,7 +1125,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGetInfo
+### WinGetInfo
 Returns information (including any private data) associated with a window.
 
 **Pass:**  
@@ -1168,7 +1168,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGetTransform
+### WinGetTransform
 Returns the transformation matrix of the specified window.
 
 **Pass:**  
@@ -1191,7 +1191,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGetWinScreenBounds
+### WinGetWinScreenBounds
 Returns the bounds of the on-screen portion of the specified window.
 
 **Pass:**  
@@ -1210,7 +1210,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinGrabChange
+### WinGrabChange
 Allows an object to grab pointer events for windows within the system.
 
 **Pass:**  
@@ -1226,7 +1226,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinInvalReg
+### WinInvalReg
 Invalidates a portion of the specified window, indicated by the passed region 
 (or rectangle).
 
@@ -1245,7 +1245,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinLocatePoint
+### WinLocatePoint
 Searches through a window tree, returning the window in which the passed 
 point lies within, along with other information about the window.
 
@@ -1267,7 +1267,7 @@ ax, bx, cx, dx
 **Library:** win.def
 
 ----------
-#### WinMove
+### WinMove
 Moves a window, either relative to its current position or in an absolute 
 manner (relative to the parent).
 
@@ -1287,7 +1287,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinOpen
+### WinOpen
 Allocates and initializes a window and (optionally) its associated GState.
 
 The region/rectangle passed is expressed in units relative to the parent's 
@@ -1327,7 +1327,7 @@ ax, cx, dx, si, bp
 **Library:** win.def
 
 ----------
-#### WinRealizePalette
+### WinRealizePalette
 Realize the palette for this window in hardware.
 
 **Pass:**  
@@ -1342,7 +1342,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinReleaseChange
+### WinReleaseChange
 Releases an object from being notified of window changes.
 
 **Pass:**  
@@ -1357,7 +1357,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinResize
+### WinResize
 Resizes a window. It is also possible to move it at the same time.
 
 **Pass:**  
@@ -1378,7 +1378,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinScroll
+### WinScroll
 Scrolls a document within a window by the passed values. Actual 
 displacement values may be different than the passed values due to rounding 
 and optimizations.
@@ -1400,7 +1400,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinSetInfo
+### WinSetInfo
 Sets information within a window. Passed register arguments depend on the 
 **WinInfoType** passed in **si**.
 
@@ -1430,7 +1430,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinSetNullTransform
+### WinSetNullTransform
 Replaces a window's transformation matrix with a null (identity) 
 transformation.
 
@@ -1449,7 +1449,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinSetPtrImage
+### WinSetPtrImage
 Sets the pointer image within the range of the passed window.
 
 **Pass:**  
@@ -1467,7 +1467,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinSetTransform
+### WinSetTransform
 Sets the transformation matrix of a window. Any previous transformation 
 matrix is lost.
 
@@ -1487,7 +1487,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinSuspendUpdate
+### WinSuspendUpdate
 
 Suspends the sending of update messages to the window. If an update is 
 already in progress, it will be allowed to continue and suspend behavior will 
@@ -1505,7 +1505,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinSysSetActiveGeode
+### WinSysSetActiveGeode
 Sets the passed geode to be the system's "active" geode.
 
 **Pass:**  
@@ -1520,7 +1520,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinTransform
+### WinTransform
 Translates the passed document coordinates into screen coordinates, 
 ignoring the effect of any transformation in the associated GState.
 
@@ -1542,7 +1542,7 @@ Nothing (except possibly **bx**, see above).
 **Library:** win.def
 
 ----------
-#### WinTransformDWord
+### WinTransformDWord
 Translates the passed 32-bit document coordinates into 32-bit screen 
 coordinates.
 
@@ -1562,7 +1562,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinUnSuspendUpdate
+### WinUnSuspendUpdate
 Cancels any previous **WinSuspendUpdate** call, allowing update drawing to 
 the window.
 
@@ -1578,7 +1578,7 @@ Nothing.
 **Library:** win.def
 
 ----------
-#### WinUntransform
+### WinUntransform
 Translates a coordinate pair from screen coordinates into document 
 coordinates, ignoring the effects in the associated GState.
 
@@ -1598,7 +1598,7 @@ Nothing (except possibly **bx**; see above).
 **Library:** win.def
 
 ----------
-#### WinUntransformDWord
+### WinUntransformDWord
 Translates a 32-bit coordinate pair into 32-bit screen coordinates.
 
 **Pass:**  
