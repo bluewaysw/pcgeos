@@ -70,8 +70,6 @@ static word strlen( const char* str );
 
 static char* strcpy( char* dest, const char* source );
 
-static void strcpyname( char* dest, const char* source );
-
 static int strcmp( const char* s1, const char* s2 );
 
 static Boolean activateBytecodeInterpreter();
@@ -811,9 +809,6 @@ static FontGroup mapFontGroup( TT_Face_Properties* faceProperties )
 
 static Boolean getFontID( TRUETYPE_VARS, const char* familyName, FontID* fontID ) 
 {
-        /* clean up family name */
-   //     strcpyname( familyName, TypeVars->familyName );
-
         /* get FontID from geos.ini */
         if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
         {
@@ -1209,21 +1204,6 @@ static char* strcpy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
         return dest;
-}
-
-
-static void strcpyname( char* dest, const char* source )
-{
-        while( *source != '\0' ) 
-        {
-                if( *source != ' ' ) 
-                {
-                        *dest = *source;
-                        ++dest;
-                }
-                ++source;
-        }
-        *dest = '\0';  // stringending
 }
 
 
