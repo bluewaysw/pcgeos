@@ -45,13 +45,13 @@ static sword getFontIDAvailIndex(
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
 
-static Boolean getFontID( TRUETYPE_VARS, FontID* fontID );
+static Boolean getFontID( TRUETYPE_VARS, const char* familyName, FontID* fontID );
 
 static FontWeight mapFontWeight( TT_Short weightClass );
 
 static TextStyle mapTextStyle(  const char* subfamily );
 
-static FontGroup mapFontGroup( TRUETYPE_VARS );
+static FontGroup mapFontGroup( TT_Face_Properties* faceProperties );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
@@ -341,6 +341,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         Boolean                 mappedFont;
         sword                   availIndex;
         char                    styleName[STYLE_NAME_LENGTH];
+        char                    familyName[FID_NAME_LEN];
 
 
 EC(     ECCheckBounds( (void*)fileName ) );
@@ -362,13 +363,13 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
 
-        if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )
+        if ( getNameFromNameTable( trueTypeVars, familyName, FAMILY_NAME_ID ) == 0 )
                 goto Fail;
 
         if ( getNameFromNameTable( trueTypeVars, &styleName, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
-        mappedFont = getFontID( trueTypeVars, &fontID );
+        mappedFont = getFontID( trueTypeVars, familyName, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
         /* if we have an new font FontAvailEntry, FontInfo and Outline must be created */
@@ -398,7 +399,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* get pointer to FontInfo and fill it */
 		fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
-                strcpy( fontInfo->FI_faceName, FAMILY_NAME );
+                strcpy( fontInfo->FI_faceName, familyName );
                 fontInfo->FI_fileHandle   = NullHandle;
                 fontInfo->FI_fontID       = fontID;
                 fontInfo->FI_family       = FA_USEFUL | FA_OUTLINE | ( mappedFont ? FA_FAMILY : 0 );
@@ -742,18 +743,18 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 #define B_FAMILY_TYPE           0
 #define B_PROPORTION            3
-static FontGroup mapFontGroup( TRUETYPE_VARS )
+static FontGroup mapFontGroup( TT_Face_Properties* faceProperties )
 {
         /* The font group of a TrueType font cannot be determined exactly.  */
         /* This implementation is therefore more of an approximation than   */
         /* an exact determination.                                          */
 
         /* recognize FF_MONO from panose fields */
-        if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
+        if( faceProperties->os2->panose[B_PROPORTION] == 9 )    //Monospaced
                 return FG_MONO;
 
         /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
-        switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
+        switch( faceProperties->os2->sFamilyClass >> 8 )
         {
                 case 1:
                 case 2:
@@ -771,7 +772,7 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
         }
 
         /* recognize FF_SCRIPT from panose fields */
-        if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
+        if( faceProperties->os2->panose[B_FAMILY_TYPE] == 2 )   //Script
                 return FG_SCRIPT;
 
         return FG_NON_PORTABLE;
@@ -808,13 +809,10 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
  *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
-static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
+static Boolean getFontID( TRUETYPE_VARS, const char* familyName, FontID* fontID ) 
 {
-        char  familyName[FID_NAME_LEN];
-
-
         /* clean up family name */
-        strcpyname( familyName, trueTypeVars->familyName );
+   //     strcpyname( familyName, TypeVars->familyName );
 
         /* get FontID from geos.ini */
         if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
@@ -824,7 +822,7 @@ static Boolean getFontID( TRUETYPE_VARS, FontID* fontID )
         }
 
         /* generate FontID */
-        *fontID = MAKE_FONTID( mapFontGroup( trueTypeVars ), trueTypeVars->familyName );
+        *fontID = MAKE_FONTID( mapFontGroup( &FACE_PROPERTIES ), familyName );
         return FALSE;
 }
 
