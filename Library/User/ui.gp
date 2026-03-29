@@ -47,7 +47,6 @@ library net noload
 #library	pcmcia noload
 library	sound
 library	wav
-library	ansic
 
 #
 # Desktop-related things
@@ -789,8 +788,9 @@ incminor UIStandardTimedDialog
 
 incminor
 # export TokenListIcons	<- Error D:/G6/PCGEOS/Library/User/ui.gp 791: TokenListIcons undefined4
-export TOKENLISTICONS
+publish TOKENLISTICONS
 
 # export TokenTestIcon
-export TOKENTESTICON
+# export TOKENTESTICON
+publish TOKENTESTICON
 
