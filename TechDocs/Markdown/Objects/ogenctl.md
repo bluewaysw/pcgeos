@@ -2501,20 +2501,28 @@ retrieval of the instance data of the controller.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_COLOR
-    void    MSG_COLOR_SELECTOR_GET_COLOR(
-            ColorQuad       *retVal);
 
-This message retrieves the controller's *CSI_color* field.
+    typedef struct {
+	word 		CAFR_unused;
+	Boolean 	CAFR_indeterminate;
+	ColorQuad	CAFR_color;
+    } ColorAndFlagReturn;
+
+    void MSG_COLOR_SELECTOR_GET_COLOR(
+         ColorAndFlagReturn *retValue);
+    
+This message retrieves the controller's *CSI_color* field and non-zero in 
+CAFR_indeterminate if objects of different colors are selected..
 
 **Source:** Unrestricted.
 
 **Destination:** Any ColorSelector object.
 
 **Parameters:**  
-*retVal*    A pointer to an empty **ColorQuad** structure.
+*retVal*    A pointer to an empty **ColorAndFlagReturn** structure.
 
-**Return:** The **ColorQuad** structure pointed to by *retVal* will be the color set in 
-*CSI_color*.
+**Return:** The **ColorAndFlagReturn** structure pointed to by *retVal* will filled in with the color set in 
+*CSI_color* and the *CSI_colorIndeterminate* field.
 
 **Interception:** Generally not intercepted.
 
@@ -2539,9 +2547,12 @@ color for the *CSI_color* field.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_DRAW_MASK
-    SystemDrawMask MSG_COLOR_SELECTOR_GET_DRAW_MASK();
 
-This message retrieves the draw mask set in *CSI_drawMask*.
+    typedef dword DrawMaskAndFlagAsDWord;
+    
+    DrawMaskAndFlagAsDWord MSG_COLOR_SELECTOR_GET_DRAW_MASK();
+
+This message retrieves the draw mask set in *CSI_drawMask* and an inteterminate flag.
 
 **Source:** Unrestricted.
 
@@ -2549,7 +2560,8 @@ This message retrieves the draw mask set in *CSI_drawMask*.
 
 **Parameters:** None.
 
-**Return:** The **SystemDrawMask** set in *CSI_drawMask*.
+**Return:**  The **DrawMaskAndFlagAsDWord** structure contains the **SystemDrawMask**, currently set in *CSI_drawMask*, 
+in the higher word and the indeterminate flag in the lower word.
 
 **Interception:** Generally not intercepted.
 
@@ -2575,9 +2587,12 @@ This message sets the draw mask stored in *CSI_drawMask*.
 ----------
 
 #### MSG_COLOR_SELECTOR_GET_PATTERN
-    GraphicPattern MSG_COLOR_SELECTOR_GET_PATTERN();
 
-This message returns the pattern set in *CSI_pattern*.
+    typedef dword PatternAndFlagAsDWord;
+    
+    PatternAndFlagAsDWord MSG_COLOR_SELECTOR_GET_PATTERN();
+
+This message returns the pattern set in *CSI_pattern* and an indeterminate flag.
 
 **Source:** Unrestricted.
 
@@ -2585,7 +2600,8 @@ This message returns the pattern set in *CSI_pattern*.
 
 **Parameters:** None.
 
-**Return:** The **GraphicPattern** currently set in *CSI_pattern*.
+**Return:** The **PatternAndFlagAsDWord** structure contains the **GraphicPattern**, currently 
+set in *CSI_pattern*, in the upper word and the indeterminate flag in the lower word.
 
 **Interception:** Generally not intercepted.
 
@@ -2609,7 +2625,9 @@ This message sets the drawing pattern stored in *CSI_pattern*.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_COLOR
-    See colorC.goh
+    void MSG_COLOR_SELECTOR_UPDATE_COLOR(
+         ColorQuad colorQuad,
+         Boolean indeterminateFlag);
 
 Update the current color in the toolbox and normal UI. This message is 
 normally sent from within a MSG_GEN_CONTROL_UPDATE_UI handler.
@@ -2626,7 +2644,9 @@ normally sent from within a MSG_GEN_CONTROL_UPDATE_UI handler.
 
 ----------
 #### MSG_COLOR_SELECTOR_APPLY_COLOR
-    See colorC.goh
+    
+    void MSG_COLOR_SELECTOR_APPLY_COLOR(
+         ColorQuad colorQuad);
 
 Makes the color selector send MSG_META_COLORED_OBJECT_SET_COLOR.
 
@@ -2642,8 +2662,12 @@ Makes the color selector send MSG_META_COLORED_OBJECT_SET_COLOR.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_FILLED_STATUS
-    See colorC.goh
 
+    void MSG_COLOR_SELECTOR_UPDATE_FILLED_STATUS(
+         SystemDrawMask drawMask,
+         Boolean indeterminateFlag,
+         word updateToolboxFlag);
+         
 Makes the color selector update the draw mask and associated UI.
 
 **Source:** Unrestricted.
@@ -2658,10 +2682,11 @@ Makes the color selector update the draw mask and associated UI.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_FILLED_MONIKER
-    See colorC.goh
+    optr MSG_COLOR_SELECTOR_GET_FILLED_MONIKER();
 
 Returns the VisMoniker that should be used to represent the "do draw" item 
-in the color selector.
+in the color selector. The optr is valid if the handle part is non-zero, otherwise
+it is invalid.
 
 **Source:** Unrestricted.
 
@@ -2675,10 +2700,11 @@ in the color selector.
 
 ----------
 #### MSG_COLOR_SELECTOR_GET_UNFILLED_MONIKER
-    See colorC.goh
+    optr MSG_COLOR_SELECTOR_GET_UNFILLED_MONIKER();
 
 Returns the VisMoniker that should be used to represent the "don't draw" 
-item in the color selector.
+item in the color selector. The optr is valid if the handle part is non-zero, otherwise
+it is invalid.
 
 **Source:** Unrestricted.
 
@@ -2692,7 +2718,10 @@ item in the color selector.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_DRAW_MASK
-    See colorC.goh
+
+    void MSG_COLOR_SELECTOR_UPDATE_DRAW_MASK(
+         SystemDrawMask drawMask,
+         Boolean indeterminateFlag);
 
 Update the current draw mask in the toolbox and the UI. This is often sent 
 from within a MSG_GEN_CONTROL_UPDATE_UI handler.
@@ -2709,8 +2738,10 @@ from within a MSG_GEN_CONTROL_UPDATE_UI handler.
 
 ----------
 #### MSG_COLOR_SELECTOR_APPLY_DRAW_MASK
-    See colorC.goh
-
+    
+    void MSG_COLOR_SELECTOR_APPLY_DRAW_MASK(
+         SystemDrawMask drawMask);
+    	    	    	    	
 Generates MSG_META_COLORED_OBJECT_SET_DRAW_MASK.
 
 **Source:** Unrestricted.
@@ -2725,7 +2756,10 @@ Generates MSG_META_COLORED_OBJECT_SET_DRAW_MASK.
 
 ----------
 #### MSG_COLOR_SELECTOR_UPDATE_PATTERN
-    See colorC.goh
+    
+    void MSG_COLOR_SELECTOR_UPDATE_PATTERN(
+         GraphicPattern pattern,
+         Boolean indeterminateFlag);
 
 Update the current pattern in the toolbox and the UI. This is often sent from 
 within a MSG_GEN_CONTROL_UPDATE_UI handler.
@@ -2742,8 +2776,10 @@ within a MSG_GEN_CONTROL_UPDATE_UI handler.
 
 ----------
 #### MSG_COLOR_SELECTOR_APPLY_PATTERN
-    See colorC.goh
-
+    
+    void MSG_COLOR_SELECTOR_APPLY_PATTERN(
+         GraphicPattern pattern);
+    	    	    	    	
 Generates MSG_META_COLORED_OBJECT_SET_PATTERN.
 
 **Source:** Unrestricted.
@@ -2758,16 +2794,16 @@ Generates MSG_META_COLORED_OBJECT_SET_PATTERN.
 
 ----------
 #### MSG_CS_SET_FILLED_STATUS
-    See colorC.goh
+    void MSG_CS_SET_FILLED_STATUS();
 
-Tells the controller to disable itself and set the mask to zero or to re-enable 
+Internal message, tells the controller to disable itself and set the mask to zero or to re-enable 
 itself and set the mask to 100, based on the passed flag.
 
 **Source:** Unrestricted.
 
 **Destination:** Any ColorSelector object.
 
-**Parameters:** A **SysDrawMask** value.
+**Parameters:** Internal, see **colorC.def**.
 
 **Return:** Nothing.
 
@@ -2775,15 +2811,15 @@ itself and set the mask to 100, based on the passed flag.
 
 ----------
 #### MSG_CS_SET_CF_INDEX
-    See colorC.goh
+    void CS_SET_CF_INDEX();
 
-Sent by the color list to set a color via an index.
+Internal message, sent by the color list to set a color via an index.
 
 **Source:** The color list.
 
 **Destination:** Any ColorSelector object.
 
-**Parameters:** See **colorC.goh**.
+**Parameters:** Internal, see **colorC.def**.
 
 **Return:** Nothing.
 
@@ -2791,15 +2827,15 @@ Sent by the color list to set a color via an index.
 
 ----------
 #### MSG_CS_SET_CF_RGB_RED
-    See colorC.goh
+    void MSG_CS_SET_CF_RGB_RED();
 
-Sent by the color list to set a color's red value.
+Internal message, sent by the color list to set a color's red value.
 
 **Source:** The color list.
 
 **Destination:** Any ColorSelector object.
 
-**Parameters:** see **colorC.goh**.
+**Parameters:** Internal, see **colorC.def**.
 
 **Return:** Nothing.
 
@@ -2807,15 +2843,15 @@ Sent by the color list to set a color's red value.
 
 ----------
 #### MSG_CS_SET_CF_RGB_GREEN
-    See colorC.goh
+    void MSG_CS_SET_CF_RGB_GREEN();
 
-Sent by the color list to set a color's green value.
+Internal message, sent by the color list to set a color's green value.
 
 **Source:** The color list.
 
 **Destination:** Any ColorSelector object.
 
-**Parameters:** see **colorC.goh**.
+**Parameters:** Internal, see **colorC.def**.
 
 **Return:** Nothing.
 
@@ -2823,15 +2859,15 @@ Sent by the color list to set a color's green value.
 
 ----------
 #### MSG_CS_SET_CF_RGB_BLUE
-    See colorC.goh
+    void MSG_CS_SET_CF_RGB_BLUE();
 
-Sent by the color list to set a color's blue value.
+Internal message, sent by the color list to set a color's blue value.
 
 **Source:** The color list.
 
 **Destination:** Any ColorSelector object.
 
-**Parameters:** see **colorC.goh**.
+**Parameters:** Internal, see **colorC.def**.
 
 **Return:** Nothing.
 
@@ -2839,15 +2875,15 @@ Sent by the color list to set a color's blue value.
 
 ----------
 #### MSG_CS_SET_DRAW_MASK
-    See colorC.goh
+    void MSG_CS_SET_DRAW_MASK();
 
-Sets the draw mask for the color selector.
+Internal message, sets the draw mask for the color selector.
 
 ----------
 #### MSG_CS_SET_PATTERN
-    See colorC.goh
+    void MSG_CS_SET_PATTERN();
 
-Sets the pattern for the color selector.
+Internal message, sets the pattern for the color selector.
 
 ### 12.7.2 GenPageControlClass
 **GenPageControlClass** provides a controller object that allows the user to 
