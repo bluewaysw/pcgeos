@@ -138,6 +138,7 @@ doubleClick:
 openIt::
 	call	ClearRegionIfNeeded
 
+if _NEWDESK
 	; temporarily toggle browse mode if adjust key is down
 	mov	al, ss:[browseMode]			; save browse mode to AX
 	push	ax
@@ -153,6 +154,7 @@ openIt::
 switchToSingle:
 	ornf	ss:[browseMode], mask FIBM_SINGLE	; switch to single
 	andnf	ss:[browseMode], not mask FIBM_MULTIPLE
+endif
 
 doOpen:
 if _NEWDESKBA
@@ -168,9 +170,11 @@ else
 	call	FileOpenESDI
 endif
 
+if _NEWDESK
 	; restore browse mode
 	pop	ax
 	mov	ss:[browseMode], al
+endif
 
 	jmp	short done
 
