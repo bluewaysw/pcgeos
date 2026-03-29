@@ -1,0 +1,44 @@
+### FirstRun WORLD Link Seeder - Implementation Plan
+
+**Summary**
+- Build a new headless startup application in `Appl/FirstRun` (*.gp name = firstrun) that seeds and incrementally updates WORLD (`SP_APPLICATION`) links from the in-app chunk array in [appSeedList.goh](/home/konstantinmeyer/pcgeos/Appl/FirstRun/appSeedList.goh).
+- Use `firstRun:lastReleaseLevel` in `GEOS.INI` as the only persisted progress marker.
+- Keep `PrefAppl` read-only; only copy/adapt relevant low-level helper logic from [prefapplLow.goc](/home/konstantinmeyer/pcgeos/Library/Pref/PrefAppl/prefapplLow.goc).
+- Remove `firstrun.geo` from `ui:execOnStartup` at the end of each run (always, regardless of errors).
+
+**Implementation Changes**
+- Create a minimal non-UI app geode (process class + app object) under `Appl/FirstRun` with `MSG_GEN_PROCESS_OPEN_APPLICATION` as entrypoint.
+- In the startup method, execute this deterministic sequence: read `lastReleaseLevel` (default `0`), process seed records, write updated `lastReleaseLevel`, remove `firstrun.geo` from `execOnStartup`, commit INI, quit app.
+- Add a seed-runner module that iterates `AppSeedRecords` and filters to `ASR_releaseLevel > lastReleaseLevel`.
+- Add EC/NC target-name resolver for record names: NC uses stored name, EC transforms by rule (`<8 => +ec`, `==8 => replace char 8 with e`).
+- For each candidate record, compute target path under `SP_SYSTEM\DISTAPPL`, verify target exists and is executable app, and read `FEA_NAME` to get link display name.
+- Resolve destination folder in WORLD: empty folder means root; non-empty means ensure folder exists under `SP_APPLICATION` (create if missing; skip silently if creation fails).
+- Implement `EnsureLinkExists` behavior: if an existing link in destination folder already resolves to the same target path, treat as success and do nothing; otherwise attempt create via `FileCreateLink`.
+- Handle collisions/errors exactly as non-fatal skip: missing target app, create-link API failure, non-link item with desired display name, unresolved/invalid link target.
+- Track highest release level with at least one successful record in this run and write that value back as `lastReleaseLevel` (partial-advance policy).
+
+**Public Interfaces / Contracts**
+- `GEOS.INI` contract:
+  - Category: `firstRun`
+  - Key: `lastReleaseLevel` (`word` integer; invalid/missing => `0`)
+- Startup cleanup contract:
+  - Category: `ui`
+  - Key: `execOnStartup`
+  - Remove string section value: `firstrun.geo` only
+- Seed schema remains `AppSeedRecord { releaseLevel, folder, name }`; records are append-only across releases.
+
+**Test Plan**
+- Fresh install test: no `firstRun:lastReleaseLevel`, empty WORLD app links, run FirstRun, verify all release `>0` entries are linked into expected folders and INI updated.
+- Upgrade test: set `lastReleaseLevel` to prior value, include new higher-level records, run FirstRun, verify only new levels are considered and old links remain untouched.
+- Idempotency test: run twice with unchanged record list and same INI value, verify second run produces no filesystem changes.
+- Existing-link test: precreate matching link target in destination folder, verify record is treated as success with no duplicate link.
+- Missing-folder test: remove `Desk Accessories/Games/Extras`, verify creation is attempted and seeding continues if creation fails.
+- Missing-target test: remove one `DISTAPPL` target geode, verify skip without dead link and run continues.
+- Name-collision test: create non-link item using desired display name, verify no overwrite/delete and run continues.
+- Partial-advance test: mix success/failure within same release level, verify `lastReleaseLevel` advances to highest level with at least one success.
+- Startup-cleanup test: add `firstrun.geo` to `ui:execOnStartup`, run app, verify entry removed even when some seed operations fail.
+
+**Assumptions**
+- Removal from startup is exact-match on `firstrun.geo` only, per your instruction.
+- Version policy is partial advance (selected): advance INI to the highest release level with any successful record in the run.
+- No logging/UI reporting is added; app runs silently and exits.

@@ -11,38 +11,39 @@
 # REVISION HISTORY:
 #       Name    Date            Description
 #       ----    ----            -----------
-#       TDS	07/22/98        Initial Revision
+#       TDS     07/22/98        Initial Revision
+#       meyerk  3/2026          added image creation via GFS for FreeGEOS
 #
 # DESCRIPTION:
 # 	"buildbbx" is an interactive script that allows one to create
 # 	an bbxensem image easily using the build tool
-# 
+#
 # USAGE:
 # 	buildbbx [-h] [-debug] [-nolocal] [-noprompt] [-template] [-xip]
 #                [-i <directory>] [-s <directory>] [<gbuild argument>+]
-# 
+#
 # 	-h or -help:	Bring up this help message
 # 	-debug:	        Debug mode. Do not really create any image.
 #       -nolocal:       Do not look at .local file, the download list file
 #       -noprompt:      Do not ask the user for input, use the defaults.
-#       -template:      Only send templates, like *.INI files, and not 
+#       -template:      Only send templates, like *.INI files, and not
 #                       make any images
 #	-xip:		Make an non-XIP image
-#       -i <source directory>: 
+#       -i <source directory>:
 #			Specify the directory to search for source
 #			files before installed ones.
-#       -s <build file directory>: 
+#       -s <build file directory>:
 #			Specify the top directory where the *.build
-#                       and *.filetree files should be used. 
+#                       and *.filetree files should be used.
 #			"Tools/build/product/bbxensem" should be omitted
-#			in <build file directory>. 
+#			in <build file directory>.
 #
-#			For example, if you have *.build files in 
+#			For example, if you have *.build files in
 #			c:\pcgeos\todd\Tools\build\product\bbxensem\,
 #			you only need to specify "-s c:\pcgeos\todd".
 #
 #       <gbuild argument>+:
-#			The extra arguments you want to pass to gbuild. 
+#			The extra arguments you want to pass to gbuild.
 #
 #	$Id:$
 #
@@ -51,9 +52,9 @@
 #
 # User interrupt handler
 #
-$SIG{INT} = sub { 
+$SIG{INT} = sub {
     #
-    # Simply exit instead of "die" so that any child process will not 
+    # Simply exit instead of "die" so that any child process will not
     # continue.
     #
     print "\n[User interrupted]\n";
@@ -74,12 +75,12 @@ $TARGET_DEMO = "demo";        # Prototype hardware platform for demo
 $TARGET_WIN = "win";		  # Windows build
 $TARGET_PROTO_TOOLS = "hwtools"; # Prototype hardware platform for tools
 $TARGET_NT_TOOLS = "nttools";	# Windows NT platform for tools
-$DEST_SUB_DIRECTORY = "gbuild"; # sub-directory to download files to in 
+$DEST_SUB_DIRECTORY = "gbuild"; # sub-directory to download files to in
                                 # defining destination directory
 $CONFIG_FILE_ROOT = ".bbxxip";	# Config file root
-$LOCAL_LIST_FILE = ".local";    # File that specifies the list of files 
+$LOCAL_LIST_FILE = ".local";    # File that specifies the list of files
                                 # to include in download
-$TARGET_LANGUAGE = $ENV{TARGET_LANG} || "english";   # start out with English 
+$TARGET_LANGUAGE = $ENV{TARGET_LANG} || "english";   # start out with English
 
 ######################################################################
 #	Process command line options
@@ -116,7 +117,7 @@ if ( $opt_i ) {
 # Set tools directories
 #
 #if ( IsWinNT() ) {
-    $TopDir = $ENV{ROOT_DIR} || 
+    $TopDir = $ENV{ROOT_DIR} ||
 	die "ERROR: \%ROOT_DIR\% variable must be set.\n";
     $TopDir = FormatPath( $TopDir, 0 );
 
@@ -139,8 +140,8 @@ $CommonConfigFile = "$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT";
 #
 # Default values of the settings
 #
-%DefaultInfo = ("target" => $TARGET_NT, 
-		"ec" => "n", 
+%DefaultInfo = ("target" => $TARGET_NT,
+		"ec" => "n",
 		"dbcs" => "n",
 		"mapblock" => "e8000",
 		"romwindows" => "c8000 128k",
@@ -213,6 +214,9 @@ if ( $opt_nolocal ) {
 } else {
     ReadLocalFileList();
 }
+
+# Always make images for FreeGEOS
+AddGbuildArg("makeImages", "true");
 
 print "\n*** Welcome to buildbbxensem! ***\n\n";
 
@@ -328,7 +332,7 @@ if ( $RealInfo{target} eq $TARGET_PC_XIP ||
     #
     print "ROM Windows location and size ";
     print "(default = $DefaultInfo{romwindows}): ";
-    $RealInfo{romwindows} = 
+    $RealInfo{romwindows} =
 	ReadUserInput( $DefaultInfo{romwindows} );
 
     #
@@ -339,7 +343,7 @@ if ( $RealInfo{target} eq $TARGET_PC_XIP ||
 
 ##############################################################################
 #
-# Need to make an image with patching? It only applies to buildbbxensem running 
+# Need to make an image with patching? It only applies to buildbbxensem running
 # in NT environment as localization tools only exist on NT, except the case
 # that we are using the nightly make files. In this case, we don't need to
 # launch the Resedit.
@@ -365,7 +369,7 @@ $RealInfo{patching} = $DefaultInfo{patching};
 #
 # English is the only option for the copy of buildbbx.pl on the Trunk of perforce
 # as English is the current default.  If another language is desired, user needs
-# to go to the localization (currently Rel13) perforce  branch and use the buildbbx.pl 
+# to go to the localization (currently Rel13) perforce  branch and use the buildbbx.pl
 # script there.
 
 #print "Select desired language (english, uss, brp, etc.), ";
@@ -406,16 +410,16 @@ AddGbuildArg( "shipFiles", YesNo2TrueFalse( $RealInfo{shipfiles} ) );
 #	AddGbuildArg( "action", $DefaultInfo{patchaction} );
 #	AddGbuildArg( "language", $DefaultInfo{language} );
 #
-#	# 
+#	#
 #	# Get ResEdit demo path
 #	#
 #	print "ResEdit demo diretory ";
 #	print "(default = $DefaultInfo{reseditpath}): ";
-#	$RealInfo{reseditpath} = 
+#	$RealInfo{reseditpath} =
 #	    FormatPath( ReadUserInput( $DefaultInfo{reseditpath} ), 0 );
 #	AddGbuildArg( "reseditpath", $RealInfo{reseditpath} );
 #
-#	# 
+#	#
 #	# Get translation file path
 #	#
 #	print "Translation file directory ";
@@ -424,7 +428,7 @@ AddGbuildArg( "shipFiles", YesNo2TrueFalse( $RealInfo{shipfiles} ) );
 #	    FormatPath( ReadUserInput( $DefaultInfo{transpath} ), 0 );
 #	AddGbuildArg( "transdir", $RealInfo{transpath} );
 #
-#	# 
+#	#
 #	# Get log file path
 #	#
 #	print "Log file directory (default = $DefaultInfo{logpath}): ";
@@ -435,8 +439,8 @@ AddGbuildArg( "shipFiles", YesNo2TrueFalse( $RealInfo{shipfiles} ) );
 #    } else {
 #	#
 #	# No Resedit needs to be launched, but we still want to save
-#	# the default patching info in case user wants to run patching 
-#	# again. 
+#	# the default patching info in case user wants to run patching
+#	# again.
 #	#
 #	$RealInfo{reseditpath} = $DefaultInfo{reseditpath};
 #	$RealInfo{transpath} = $DefaultInfo{transpath};
@@ -444,10 +448,10 @@ AddGbuildArg( "shipFiles", YesNo2TrueFalse( $RealInfo{shipfiles} ) );
 #    }
 #
 #} else {
-    # 
-    # non-NT version, but we still want to save the default patching info 
+    #
+    # non-NT version, but we still want to save the default patching info
     # in case user wants to switch back to run it on NT.
-    # 
+    #
     $RealInfo{reseditpath} = $DefaultInfo{reseditpath};
     $RealInfo{transpath} = $DefaultInfo{transpath};
     $RealInfo{logpath} = $DefaultInfo{logpath};
@@ -475,7 +479,7 @@ SaveTargetCommonInputToCache();
 ReadTargetInputFromCache();
 
 #
-# Since we are not making xip images, this is not the temporary directory, 
+# Since we are not making xip images, this is not the temporary directory,
 # it is the destination directory for the demo.
 #
 print "Directory to put target files in (default = $DefaultInfo{destdir}): ";
@@ -487,16 +491,16 @@ AddGbuildArg( "desttree", $RealInfo{destdir} );
 #
 # Find out the target demo directory for non-prototypes
 #
-if ( $RealInfo{target} eq $TARGET_PC_XIP ) {	
+if ( $RealInfo{target} eq $TARGET_PC_XIP ) {
 
     # Set default demo directory if undefined
     if ( ! $DefaultInfo{demodir} ) {
-	$DefaultInfo{demodir} = 
+	$DefaultInfo{demodir} =
 	    FormatPath( "$RealInfo{destdir}/localpc", 1 );
     }
 
     print "Demo directory (default = $DefaultInfo{demodir}): ";
-    $RealInfo{demodir} = FormatPath( ReadUserInput( $DefaultInfo{demodir} ), 
+    $RealInfo{demodir} = FormatPath( ReadUserInput( $DefaultInfo{demodir} ),
 					1 ); # demodir is DOS path based
     CheckDemoDir( $RealInfo{demodir} );
 
@@ -533,7 +537,7 @@ $GbuildArgs .= join(" ", @ARGV);
 #
 if ( $opt_s ) {
     print "+ chdir $opt_s/Tools/build/product/bbxensem\n";
-    chdir( "$opt_s/Tools/build/product/bbxensem" ) || 
+    chdir( "$opt_s/Tools/build/product/bbxensem" ) ||
 	die "\nERROR: Cannot change directory to $opt_s/Tools/build/product/bbxensem\n";
 } else {
     print "+ chdir $TopDir/Tools/build/product/bbxensem\n";
@@ -549,8 +553,10 @@ if ( $GbuildResult != 0 ) {
     exit( $GbuildResult );
 } else {
     #
-    # Copy files to target demo directory if making PC/WIN32 image
+    # Copy the FreeGEOS image into the Ensemble tree when building NT.
     #
+    FreeGEOSCopyImageToEnsemble();
+
     print "\nbuildbbx completed!\n";
 }
 
@@ -577,12 +583,12 @@ print "[End of DEBUG mode]\n" if ( $opt_debug );
 #                   For example, "d0000 64k" or "c9000 16k d0000 64k"
 #
 # CALLED BY:    Main
-# RETURN:       ROM window arguments are set in gbuild arguments. 
+# RETURN:       ROM window arguments are set in gbuild arguments.
 # SIDE EFFECTS: Die if any ROM window arguments are invalid or missing.
 #
 ##############################################################################
 sub SetRomWindows {
-    local( $addr1, $size1, $addr2, $size2 ) = 
+    local( $addr1, $size1, $addr2, $size2 ) =
 		split( " ", $RealInfo{romwindows} );
 
     #
@@ -591,7 +597,7 @@ sub SetRomWindows {
     CheckRomWindowArgInPairs( $addr1, $size1 );
     CheckRomWindowArgInPairs( $addr2, $size2 );
 
-    # 
+    #
     # Verify that starting address is a heximal number
     #
     CheckAddr( $addr1 );
@@ -603,7 +609,7 @@ sub SetRomWindows {
     CheckWinSize( $size1 );
     CheckWinSize( $size2 );
 
-    # 
+    #
     # Set ROM Window arguments in gbuild
     #
     if ( $addr1 && $size1 ) {
@@ -624,7 +630,7 @@ sub SetRomWindows {
 ##############################################################################
 #
 # SYNOPSIS:     Check to see if both ROM window starting address and
-#               size are supplied together  
+#               size are supplied together
 # PASS:         arg1 = ROM window starting address
 #               arg2 = ROM window size
 # CALLED BY:    SetRomWindows
@@ -657,8 +663,8 @@ sub CheckAddr
 
     if ( $start && $start !~ /^[a-fA-F0-9]{5}$/ ) {
 	die "\nERROR: Illegal address: $start\n" .
-	    "Address format=\"d0000\", for example.\n" . 
-	    "It must be in hex and has 5 digits.\n"; 
+	    "Address format=\"d0000\", for example.\n" .
+	    "It must be in hex and has 5 digits.\n";
     }
 }
 
@@ -676,7 +682,7 @@ sub CheckAddr
 sub CheckWinSize {
     local( $size ) = @_;
     local( $numSize ) = $size;	       # ROM window size w/o 'k'
-    
+
     if ( $size && $size !~ /[\d]{2,}k/ ) {
 	die "\nERROR: Illegal \"romWindows\" window size: $size\n" .
 	    "Size format = \"64k\", for example.\n";
@@ -686,7 +692,7 @@ sub CheckWinSize {
     if ( $size ) {
 	$numSize =~ s/([\d]{2,})k/$1/; # Strip 'k' and get the number only
 	if ( $numSize % 16 ) {
-	    die "\nERROR: Illegal \"romWindows\" window size: $size\n" . 
+	    die "\nERROR: Illegal \"romWindows\" window size: $size\n" .
 		"ROM window size must be in multiples of 16k as in 32k, 64k, etc.\n";
 	}
     }
@@ -760,29 +766,29 @@ Usage:
   	-debug:	        Debug mode. Do not really create any image.
         -nolocal:       Do not look at .local file, the download list file
         -noprompt:      Don't ask the user for input, use the defaults.
-        -template:      Only send template files, like *.INI files, and 
+        -template:      Only send template files, like *.INI files, and
                         not any images
 	-xip:		Make an XIP image
-        -i <source directory>: 
+        -i <source directory>:
  			Specify the directory to search for source
  			files before installed ones.
-        -s <build file directory>: 
+        -s <build file directory>:
  			Specify the top directory where the *.build
-                        and *.filetree files should be used. 
+                        and *.filetree files should be used.
  			"Tools/build/product/bbxensem" should be omitted
- 			in <build file directory>. 
- 
- 			For example, if you have *.build files in 
+ 			in <build file directory>.
+
+ 			For example, if you have *.build files in
  			c:\pcgeos\simon\Tools\build\product\bbxensem\,
  			you only need to specify "-s c:\pcgeos\todd".
 
         <gbuild argument>+:
-			The extra arguments you want to pass to gbuild. 
+			The extra arguments you want to pass to gbuild.
 
 Cache Files:
 	User input is cached in cache files. These files are located in:
 
-	Windows NT: 
+	Windows NT:
 	    %LOCAL_ROOT%\\$CONFIG_FILE_ROOT\\.*
 	UNIX:
 	    /staff/\$USER/$CONFIG_FILE_ROOT/.*
@@ -824,7 +830,7 @@ sub IsWinNT {
 #
 ##############################################################################
 sub ReadUserInput {
-    local( $default ) = @_; 
+    local( $default ) = @_;
     if ( $opt_noprompt ) {
 	print "\n";
 	return $default;
@@ -859,7 +865,7 @@ sub YesNo2TrueFalse {
 	return "true";
     }
     print "Invalid argument to YesNo2TrueFalse: assuming \"n\"\n"
-	if ( $arg ne "n" ); 
+	if ( $arg ne "n" );
     return "false";
 }
 
@@ -877,7 +883,7 @@ sub YesNo2TrueFalse {
 ##############################################################################
 sub FormatPath {
     local( $arg, $pathType ) = @_;
-    
+
     #
     # Convert all backslashes to forward slashes
     #
@@ -931,14 +937,14 @@ sub CRLF2CR {
 #       ReadCommonInputFromCache
 ##############################################################################
 #
-# SYNOPSIS:     Read common non-target specific information from cache 
+# SYNOPSIS:     Read common non-target specific information from cache
 #               files to set default values
 # PASS:         nothing
 # CALLED BY:    Main
 # RETURN:       nothing
 # NOTES:
 #	The file format of the common configuration file is:
-#       
+#
 #       target=
 #
 ##############################################################################
@@ -947,14 +953,14 @@ sub ReadCommonInputFromCache {
     # Read the file if it exists
     #
     if ( -f $CommonConfigFile ) {
-	open( CONFIG_FILE, "< $CommonConfigFile" ) || 
+	open( CONFIG_FILE, "< $CommonConfigFile" ) ||
 	    die "\nERROR: Cannot read from configuration file: $CommonConfigFile\n";
 
 	#
 	# Parse the configuration file
 	#
 	while ( <CONFIG_FILE> ) {
-	    
+
 	    # Get last saved target
 	    if ( /^target=(.*)/ ) {
 		$DefaultInfo{target} = CRLF2CR( $1 );
@@ -968,25 +974,25 @@ sub ReadCommonInputFromCache {
 #       SaveCommonInputToCache
 ##############################################################################
 #
-# SYNOPSIS:     Save common non-target specific information to cache 
+# SYNOPSIS:     Save common non-target specific information to cache
 #               files
 # PASS:         nothing
 # CALLED BY:    Main
 # RETURN:       nothing
 # NOTES:
 #	The file format of the common configuration file is:
-#       
+#
 #       target=
 #
 ##############################################################################
 sub SaveCommonInputToCache {
 
     if ( ! -d "$LocalDir/$CONFIG_FILE_ROOT" ) {
-	mkdir( "$LocalDir/$CONFIG_FILE_ROOT", 0777 ) || 
+	mkdir( "$LocalDir/$CONFIG_FILE_ROOT", 0777 ) ||
 	    die "\nERROR: Cannot create configuration file directory: $LocalDir/$CONFIG_FILE_ROOT\n";
     }
 
-    open( CONFIG_FILE, "> $CommonConfigFile" ) || 
+    open( CONFIG_FILE, "> $CommonConfigFile" ) ||
 	die "\nERROR: Cannot write to configuration file: $CommonConfigFile\n";
 
     # Write the target to configuration file
@@ -999,14 +1005,14 @@ sub SaveCommonInputToCache {
 #       ReadTargetCommonInputFromCache
 ##############################################################################
 #
-# SYNOPSIS:     Read common target specific information from cache 
+# SYNOPSIS:     Read common target specific information from cache
 #               files to set default values
 # PASS:         nothing
 # CALLED BY:    Main
 # RETURN:       nothing
 # NOTES:
 #	The file format of the target common configuration file:
-#       
+#
 #       Win32 (.bbx.win32) or DOS (.bbx.pc):
 #       ec=
 #       mapblock=
@@ -1016,9 +1022,9 @@ sub SaveCommonInputToCache {
 sub ReadTargetCommonInputFromCache {
 
 
-    local( $targetConfigFile ) = 
+    local( $targetConfigFile ) =
 	"$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT.$RealInfo{target}";
-    
+
     if ( -f $targetConfigFile ) {
 	open( PLATFORM_CONFIG_FILE, "< $targetConfigFile" ) ||
 	    die "\nERROR: Cannot read from configuration file: $targetConfigFile\n";
@@ -1033,7 +1039,7 @@ sub ReadTargetCommonInputFromCache {
 		if ( /^patching=(.*)/ ) {
 		    $DefaultInfo{patching} = CRLF2CR( $1 );
 		    last COMMONCACHE;
-		} 
+		}
 		if ( /^reseditpath=(.*)/ ) {
 		    $DefaultInfo{reseditpath} = CRLF2CR( $1 );
 		    last COMMONCACHE;
@@ -1076,7 +1082,7 @@ sub ReadTargetCommonInputFromCache {
 		    }
 		}
 	    }
-	      
+
 	}
         close( PLATFORM_CONFIG_FILE );
     }
@@ -1086,14 +1092,14 @@ sub ReadTargetCommonInputFromCache {
 #       SaveTargetCommonInputToCache
 ##############################################################################
 #
-# SYNOPSIS:     Save common target specific information to cache 
+# SYNOPSIS:     Save common target specific information to cache
 #               files
 # PASS:         nothing
 # CALLED BY:    Main
 # RETURN:       nothing
 # NOTES:
 #	The file format of the common configuration file is:
-#       
+#
 #       Win32 (.bbx.win32) or DOS (.bbx.pc):
 #       ec=
 #       mapblock=
@@ -1101,14 +1107,14 @@ sub ReadTargetCommonInputFromCache {
 #
 ##############################################################################
 sub SaveTargetCommonInputToCache {
-    local( $targetConfigFile ) = 
+    local( $targetConfigFile ) =
 	"$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT.$RealInfo{target}";
-    
+
     #
-    # Do not create common target cache file for Lizzy prototypes because 
+    # Do not create common target cache file for Lizzy prototypes because
     # there is nothing in there.
     #
-    open( TARGET_CONFIG_FILE, "> $targetConfigFile" ) || 
+    open( TARGET_CONFIG_FILE, "> $targetConfigFile" ) ||
 	die "\nERROR: Cannot write to configuration file: $targetConfigFile\n";
 
     # Common configuration for patching
@@ -1121,10 +1127,10 @@ sub SaveTargetCommonInputToCache {
 
     # Write nightly make info
     print TARGET_CONFIG_FILE "nightlymake=$RealInfo{nightlymake}\n";
-   
+
     # Write the target to configuration file
     TARGETCACHE: {
-	if ( $RealInfo{target} eq $TARGET_PC_XIP || 
+	if ( $RealInfo{target} eq $TARGET_PC_XIP ||
 	    $RealInfo{target} eq $TARGET_PC_XIP  ) {
 	    print TARGET_CONFIG_FILE "ec=$RealInfo{ec}\n";
 	    print TARGET_CONFIG_FILE "dbcs=$RealInfo{dbcs}\n";
@@ -1132,7 +1138,7 @@ sub SaveTargetCommonInputToCache {
 	    print TARGET_CONFIG_FILE "romwindows=$RealInfo{romwindows}\n";
 	    last TARGETCACHE;
 	}
-    }    
+    }
 
     close( TARGET_CONFIG_FILE );
 }
@@ -1141,16 +1147,16 @@ sub SaveTargetCommonInputToCache {
 #       ReadTargetInputFromCache
 ##############################################################################
 #
-# SYNOPSIS:     Read target specific information from cache 
+# SYNOPSIS:     Read target specific information from cache
 #               files to set default values
 # PASS:         nothing
 # CALLED BY:    Main
 # RETURN:       nothing
 # NOTES:
 #	The file format of the target common configuration file:
-#       
+#
 #       Common:
-#       destdir= 
+#       destdir=
 #       shipfiles=
 #
 #       Win32 or PC only:
@@ -1162,13 +1168,13 @@ sub ReadTargetInputFromCache {
     if ( $RealInfo{ec} eq "y" ) {
 	$ecSuffix = "ec";
     }
-    local( $targetConfigFile ) = 
+    local( $targetConfigFile ) =
 	"$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT.$RealInfo{target}.$ecSuffix";
     if ( $RealInfo{dbcs} eq "y" ) {
-	$targetConfigFile = 
+	$targetConfigFile =
 	"$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT.$RealInfo{target}.dbcs.$ecSuffix";
     }
-    
+
     if ( -f $targetConfigFile ) {
 	open( PLATFORM_CONFIG_FILE, "< $targetConfigFile" ) ||
 	    die "\nERROR: Cannot read from configuration file: $targetConfigFile\n";
@@ -1210,7 +1216,7 @@ sub ReadTargetInputFromCache {
 # RETURN:       nothing
 # NOTES:
 #	The file format of the common configuration file is:
-#       
+#
 #       destdir=
 #
 ##############################################################################
@@ -1219,20 +1225,20 @@ sub SaveTargetInputToCache {
     if ( $RealInfo{ec} eq "y" ) {
 	$ecSuffix = "ec";
     }
-    local( $targetConfigFile ) = 
+    local( $targetConfigFile ) =
 	"$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT.$RealInfo{target}.$ecSuffix";
     if ( $RealInfo{dbcs} eq "y" ) {
-	$targetConfigFile = 
+	$targetConfigFile =
 	"$LocalDir/$CONFIG_FILE_ROOT/$CONFIG_FILE_ROOT.$RealInfo{target}.dbcs.$ecSuffix";
     }
-    
-    open( TARGET_CONFIG_FILE, "> $targetConfigFile" ) || 
+
+    open( TARGET_CONFIG_FILE, "> $targetConfigFile" ) ||
 	die "\nERROR: Cannot write to configuration file: $targetConfigFile\n";
 
     #
     # Write the platform specific information. At this point, only
     # intermediate temporary directory is kept.
-    # 
+    #
     print TARGET_CONFIG_FILE "destdir=$RealInfo{destdir}\n";
 
     #
@@ -1264,7 +1270,7 @@ sub SaveTargetInputToCache {
 #
 # SYNOPSIS:     Copy image and demo files to target demo directory
 # PASS:         $RealInfo{demodir} = target demo directory
-#               $RealInfo{destdir} = gbuild dest tree 
+#               $RealInfo{destdir} = gbuild dest tree
 # CALLED BY:    Main
 # RETURN:       nothing
 #
@@ -1276,7 +1282,7 @@ sub CopyFilesToDemoDir {
     if ( ! IsWinNT() ) {
 	#
 	# If we are not running from Windows NT, assume we are running
-	# in UNIX. We need to change target directory to UNIX  
+	# in UNIX. We need to change target directory to UNIX
 	# path in order to copy the files there if demo directory
 	# starts in F: drive. If it is not F: drive, simply do nothing.
 	#
@@ -1299,7 +1305,7 @@ sub CopyFilesToDemoDir {
 		die "\nERROR: Cannot create demo directory $DemoTargetDir\n";
 	}
     }
-    
+
     $DemoTargetDir =~ s/\/$//;	           # Remove prepending slashes
 
     #
@@ -1309,7 +1315,7 @@ sub CopyFilesToDemoDir {
     if ( ! $opt_debug ) {
 	copy( "$GbuildTargetDir/image/xip.img", "$DemoTargetDir/xipimage" ) ||
 	    die "\nERROR: Cannot copy XIP image file:\n" .
-		"$GbuildTargetDir/image/xip.img -> $DemoTargetDir/xipimage"; 
+		"$GbuildTargetDir/image/xip.img -> $DemoTargetDir/xipimage";
     }
 
     print "+ copy $GbuildTargetDir/image/gfs.img $DemoTargetDir/resp.gfs\n";
@@ -1333,12 +1339,120 @@ sub CopyFilesToDemoDir {
 }
 
 ##############################################################################
+#       ResolveFreeGEOSBootstrapDir
+##############################################################################
+#
+# SYNOPSIS:     Resolve FreeGEOS bootstrap directory from gbuild output
+# PASS:         arg1 = gbuild destination tree
+# CALLED BY:    FreeGEOSCopyImageToEnsemble
+# RETURN:       resolved bootstrap directory path
+#
+##############################################################################
+sub ResolveFreeGEOSBootstrapDir {
+    local( $destdir ) = @_;
+    local( $ensembleDir ) = "$destdir/localpc/ensemble";
+    local( @allCandidates );
+    local( @validCandidates );
+    local( $entry, $candidateDir );
+    local( $allList, $validList );
+
+    if ( ! -d $ensembleDir ) {
+	die "\nERROR: Cannot find PC/GEOS Ensemble directory: $ensembleDir\n";
+    }
+
+    opendir( ENSEMBLE_DIR, $ensembleDir ) ||
+	die "\nERROR: Cannot read directory $ensembleDir\n";
+
+    while ( $entry = readdir( ENSEMBLE_DIR ) ) {
+	next if ( $entry eq "." || $entry eq ".." );
+	next if ( $entry !~ /^fg/i );
+
+	$candidateDir = "$ensembleDir/$entry";
+	next if ( ! -d $candidateDir );
+
+	push( @allCandidates, $candidateDir );
+	if ( -f "$candidateDir/net.ini" ||
+	     -f "$candidateDir/netec.ini" ) {
+	    push( @validCandidates, $candidateDir );
+	}
+    }
+
+    closedir( ENSEMBLE_DIR );
+
+    @allCandidates = sort( @allCandidates );
+    @validCandidates = sort( @validCandidates );
+
+    if ( $#validCandidates == 0 ) {
+	print "[Resolved PC/GEOS Ensemble bootstrap directory: $validCandidates[0]]\n";
+	return $validCandidates[0];
+    }
+
+    if ( $#allCandidates >= 0 ) {
+	$allList = join( "\n  ", @allCandidates );
+    } else {
+	$allList = "(none)";
+    }
+
+    if ( $#validCandidates >= 0 ) {
+	$validList = join( "\n  ", @validCandidates );
+    } else {
+	$validList = "(none)";
+    }
+
+    die "\nERROR: Cannot resolve PC/GEOS Ensemble bootstrap directory.\n" .
+	"Expected exactly one fg* directory with net.ini or netec.ini under:\n" .
+	"  $ensembleDir\n" .
+	"Found fg* directories:\n" .
+	"  $allList\n" .
+	"Found valid fg* directories containing net.ini or netec.ini:\n" .
+	"  $validList\n";
+}
+
+##############################################################################
+#       FreeGEOSCopyImageToEnsemble
+##############################################################################
+#
+# SYNOPSIS:     Copy generated GFS image into resolved FreeGEOS bootstrap dir
+# PASS:         $RealInfo{destdir} = gbuild destination tree
+# CALLED BY:    Main
+# RETURN:       nothing
+#
+##############################################################################
+sub FreeGEOSCopyImageToEnsemble {
+    my( $sourceImage, $targetDir, $targetImage );
+
+    #
+    # Only NT builds generate the FreeGEOS GFS image.
+    #
+    if ( $RealInfo{target} ne $TARGET_NT ||
+	 $opt_debug ||
+	 $opt_template ) {
+	return;
+    }
+
+    $sourceImage = "$RealInfo{destdir}/image/gfs.img";
+    $targetDir = ResolveFreeGEOSBootstrapDir( $RealInfo{destdir} );
+    $targetImage = "$targetDir/gfs.img";
+
+    if ( ! -f $sourceImage ) {
+	die "\nERROR: Cannot find FreeGEOS GFS image file: $sourceImage\n";
+    }
+
+    print "+ copy $sourceImage $targetImage\n";
+    if ( ! $opt_debug ) {
+	copy( $sourceImage, $targetImage ) ||
+	    die "\nERROR: Cannot copy FreeGEOS GFS image file:\n" .
+		"$sourceImage -> $targetImage\n";
+    }
+}
+
+##############################################################################
 #       CopyFileToDemoDirCallback
 ##############################################################################
 #
-# SYNOPSIS:     Copy a demo file or make a directory to the target demo 
-#               directory 
-# PASS:         $File::Find::name = enumerated file or directory from gbuild 
+# SYNOPSIS:     Copy a demo file or make a directory to the target demo
+#               directory
+# PASS:         $File::Find::name = enumerated file or directory from gbuild
 #                                   desttree localpc directory
 #               $GbuildTargetDir  = gbuild desttree directory
 #               $TargetDemoDir    = target demo directory
@@ -1409,7 +1523,7 @@ sub ReadLocalFileList {
 
     if ( -e "$localfile" ) {
 	# Check if it is an empty file
-	open( LOCALFILE, "< $localfile" ) || 
+	open( LOCALFILE, "< $localfile" ) ||
 	    die "ERROR: Cannot read download file list: $localfile\n";
 	while ( <LOCALFILE> ) {
 	    if ( /\w/ ) {
@@ -1420,7 +1534,7 @@ sub ReadLocalFileList {
 
 	# Only process a non-empty file
 	if ( $isEmpty == 0 ) {
-	    # Print the local file list 
+	    # Print the local file list
 	    print "[Download only these files:]\n\n";
 	    seek( LOCALFILE, 0, 0 );
 	    while ( <LOCALFILE> ) {
@@ -1439,23 +1553,23 @@ sub ReadLocalFileList {
 #	CopyDemoTreeToDestTree
 ##############################################################################
 #
-# SYNOPSIS:	Copy nightly make files to the destination tree 
+# SYNOPSIS:	Copy nightly make files to the destination tree
 #               so that image can be made from there
-# PASS:		
-# CALLED BY:	
+# PASS:
+# CALLED BY:
 # RETURN:	nothing
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	5/05/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub   CopyDemoTreeToDestTree {
-    
+
     my($from, $to);
 
     $from = &FindDemoDir();
@@ -1483,17 +1597,17 @@ sub   CopyDemoTreeToDestTree {
 # RETURN:	nothing
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	5/05/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub   CopyTree {
     my($from, $to) = @_;
-    
+
     print "Copying files from $from to $to...\n";
     #
     # Not too sophisticated platform dependent copy tree.
@@ -1502,9 +1616,9 @@ sub   CopyTree {
 	if ( IsWinNT() ) {
 	    $from =~ s|/|\\|g;
 	    $to =~ s|/|\\|g;
-	    
+
 	    system("xcopy /e /i $from $to\\");
-	    
+
 	} else {
 	    system("\\cp -r $from $to");
 	}
@@ -1521,13 +1635,13 @@ sub   CopyTree {
 # RETURN:	nothing
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	5/05/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub RmTree {
 
@@ -1550,9 +1664,9 @@ sub RmTree {
 # RETURN:	Full path of the directory
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #     We have made the assumptions for the location of the nightly make files:
-#     
+#
 #     N:\dosxip.ec
 #     N:\dosxip.nec
 #     N:\patch\dosxip.ec
@@ -1570,10 +1684,10 @@ sub RmTree {
 #	Name		Date		Description
 #	----		----		-----------
 #       kliu     	5/05/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub FindDemoDir {
-    
+
     my ($dir, $dirname);
 
     if (IsWinNT) {
@@ -1581,21 +1695,21 @@ sub FindDemoDir {
     } else {
 	$dir = "/n/nevada/";
     }
-    
+
     if ($RealInfo{patching} eq "y") {
 	$dir .= "patch/";
     }
-    
+
     #
     # Now map the directory name using the target info.
-    
+
     MAPDIR: {
       if ($RealInfo{target} eq $TARGET_PC_XIP) {
 
 	  $dirname = "pcxip";
 	  last MAPDIR;
-      } 
-      
+      }
+
       if ($RealInfo{target} eq $TARGET_PC) {
 
 	  $dirname = "pc";
@@ -1612,55 +1726,55 @@ sub FindDemoDir {
 	  $dirname = "ntxip";
 	  last MAPDIR;
       }
-      
+
       if ($RealInfo{target} eq $TARGET_PROTO) {
-	  $dirname = "hw";	  
+	  $dirname = "hw";
 	  last MAPDIR;
       }
 
       if ($RealInfo{target} eq $TARGET_PROTO_XIP) {
-	  $dirname = "hwxip";	  
+	  $dirname = "hwxip";
 	  last MAPDIR;
-     } 
+     }
 
       if ($RealInfo{target} eq $TARGET_DEMO) {
-	  $dirname = "demo";	  
+	  $dirname = "demo";
 	  last MAPDIR;
       }
 
       if ($RealInfo{target} eq $TARGET_WIN) {
-	  $dirname = "win";	  
+	  $dirname = "win";
 	  last MAPDIR;
       }
 
       if ($RealInfo{target} eq $TARGET_PROTO_TOOLS) {
-	  $dirname = "hwtools";	  
+	  $dirname = "hwtools";
 	  last MAPDIR;
       }
 
       if ($RealInfo{target} eq $TARGET_NT_TOOLS) {
-	  $dirname = "nttools";	  
+	  $dirname = "nttools";
 	  last MAPDIR;
       }
 
   }
-    
+
     #
     # Complete the dirname with the ec/nec info
-    
+
     if (! ($dirname =~ /hw/)) {
 	if ($RealInfo{ec} eq "y") {
 	    $dirname .= ".ec";
 	} else {
 	    $dirname .= ".nec";
-	} 
+	}
     }
-	
+
     #
     # Complete the entire path
 
     $dir .= $dirname;
-    
+
     return $dir;
 }
 
@@ -1674,13 +1788,13 @@ sub FindDemoDir {
 # RETURN:	nothing
 # SIDE EFFECTS:	none
 #
-# STRATEGY:	
+# STRATEGY:
 #
 # REVISION HISTORY:
 #	Name		Date		Description
 #	----		----		-----------
 #       simon     	6/01/98   	Initial Revision
-#	
+#
 ##############################################################################
 sub ModifyGeosIni {
     local( $tmpini ) = "$RealInfo{destdir}/localpc/tmp.ini.$$";
@@ -1696,7 +1810,7 @@ sub ModifyGeosIni {
 	$RealInfo{target} eq $TARGET_NT_TOOLS ||
 	$RealInfo{target} eq $TARGET_NT_XIP ||
 	 $RealInfo{target} eq $TARGET_PC ) {
-	
+
 	# GEOSEC.INI or GEOS.INI?
 	if ( $RealInfo{ec} eq "y" ) {
 	    $ininame = "$RealInfo{destdir}/localpc/geosec.ini";
@@ -1713,7 +1827,7 @@ sub ModifyGeosIni {
 		# Fill in "system fs" line with "demodir"
 		print "Updating $ininame...\n";
 		open( FROMINI, "< $ininame" );
-		open( TOINI, "> $tmpini" ) || 
+		open( TOINI, "> $tmpini" ) ||
 		    die "\nERROR: Cannot write to temporary $tmpini.\n";
 
 		binmode FROMINI;

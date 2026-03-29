@@ -1,0 +1,29 @@
+# PrefAppl DOS-Name Links With Long-Name Display Text
+
+## Summary
+Change `PrefAppl` only so links created in `SP_APPLICATION` use the app's DOS name (`FEA_DOS_NAME`) as the actual link filename, while newly created links still display the GEOS long filename by setting the link's `FEA_NAME` to the app's long name.
+
+## Key Changes
+- Keep `PAAR_name` as the GEOS long filename used for:
+  - list display text/monikers
+  - sorting
+  - the `FEA_NAME` written onto newly created links
+- Extend the internal app record type in `prefapplLow.h` with a second filename field, `PAAR_linkName`, typed as `DosDotFileName`, to store the DOS link filename.
+- In the `DISTAPPL` scan in `prefapplLow.goc`, after validating `GFT_EXECUTABLE`, `GA_APPLICATION`, and `FEA_TOKEN`, extract `FEA_DOS_NAME` and store it in `PAAR_linkName`.
+- Leave the UI layer in `prefappl.goc` unchanged. It continues to consume `PAAR_name` as display text; do not surface `PAAR_linkName` in either list.
+- Update `PrefApplCreateApplicationLink` so:
+  - the target path becomes `DISTAPPL\\PAAR_linkName`
+  - the created link filename in `SP_APPLICATION` is `PAAR_linkName`
+  - after a fresh successful create, set the link's `FEA_NAME` to `PAAR_name`
+  - the existing-link collision/readback path also uses `PAAR_linkName`
+  - if a matching DOS-name link already exists, return success without modifying its `FEA_NAME`
+- Do not change link scanning or deletion behavior. Existing links remain identified by resolved target token, so both old long-name links and new DOS-name links stay visible/removable.
+
+## Interfaces / Types
+- No exported module API changes.
+- Internal type change: `PrefApplApplicationRecord` gains a DOS link-name field alongside the existing long-name field.
+- Internal helper addition: a private helper sets `FEA_NAME` on newly created links after `FileCreateLink` succeeds.
+
+## Assumptions
+- Scope is limited to `PrefAppl`; `FirstRun` is not touched.
+- Existing links created by earlier implementations are not repaired or renamed by `PrefAppl`.

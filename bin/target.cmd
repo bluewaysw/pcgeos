@@ -14,39 +14,39 @@ IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE% (
    GOTO :EOF
 )
 for /f "delims=" %%a in (%LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE%) do set %%a
-IF NOT EXIST %destdir%\localpc\ensemble\ensemble.bat (
+IF NOT EXIST %destdir%\localpc\ensemble\geos\ensemble.bat (
    echo *** Target at "%destdir%" not usable.
    GOTO :EOF
 )
 IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
-cd /D %destdir%\localpc 
-del /F "%destdir%\localpc\IPX_STAT.txt"
-del /F ensemble\init.bat
+cd /D %destdir%\localpc
+del /F "%destdir%\localpc\IPX_STAT.TXT"
+del /F ensemble\geos\init.bat
 IF DEFINED GEOS_CENTRAL_STORAGE (
-   echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\init.bat
+   echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\geos\init.bat
 )
 IF DEFINED GEOS_CDROM_DRIVE (
    IF EXIST "%GEOS_CDROM_DRIVE%\" (
-      echo mount r %GEOS_CDROM_DRIVE% -t cdrom >> ensemble\init.bat
+      echo mount r %GEOS_CDROM_DRIVE% -t cdrom >> ensemble\geos\init.bat
    ) ELSE (
-      echo imgmount r "%GEOS_CDROM_DRIVE%" -t iso >> ensemble\init.bat
+      echo imgmount r "%GEOS_CDROM_DRIVE%" -t iso >> ensemble\geos\init.bat
    )
 )
-IF EXIST ensemble\init.bat (
-   echo swatgo >> ensemble\init.bat
+IF EXIST ensemble\geos\init.bat (
+   echo swatgo >> ensemble\geos\init.bat
 )
 start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole
 cd %OLD_PATH%
 @cls
 :waitForFile
-@IF EXIST %destdir%\localpc\IPX_STAT.txt GOTO foundFile
+@IF EXIST %destdir%\localpc\IPX_STAT.TXT GOTO foundFile
 @sleep 1s
 @echo|set /p="."
 @GOTO waitForFile
 :foundFile
-FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.txt | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.txt
-set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.txt
+FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.TXT | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.TXT
+set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.TXT
 cls
 rem mode 120,50
 IF EXIST "%USERPROFILE%\swat.rc" (
