@@ -229,6 +229,12 @@ FileCreateDirReal	proc	far
 	jmp	returnError			; Return remapped error with carry set.
 
 probeError:					; Handle failed FileGetAttributes probe.
+	cmp	ax, ERROR_FILE_NOT_FOUND	; Turn ERROR_FILE_NOT_FOUND into ERROR_PATH_NOT_FOUND.
+	jne	probePathNotFound
+	mov	ax, ERROR_PATH_NOT_FOUND
+	jmp	returnError
+
+probePathNotFound:
 	cmp	ax, ERROR_PATH_NOT_FOUND	; Preserve PATH_NOT_FOUND if probe says so.
 	je	returnError			; Return that specific probe result.
 	mov	ax, ERROR_WRITE_PROTECTED	; Otherwise keep original write-protect.
