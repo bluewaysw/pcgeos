@@ -60,6 +60,10 @@ pause
 echo Installing from USER\INSTALL to ..\..\ ...
 xcopy user\install\*.* ..\..\ /S /E /Y
 
+rem Ensure bootstrap INI is present in ensemble root even if XCOPY omits it.
+if exist user\install\geosec.ini copy user\install\geosec.ini ..\..\
+if exist user\install\geos.ini copy user\install\geos.ini ..\..\
+
 echo.
 echo Running GUPDATE.BAT ...
 call gupdate.bat
