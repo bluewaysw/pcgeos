@@ -1,12 +1,12 @@
 @echo off
-rem INSTALL.BAT
-rem Install from USER\INSTALL into ..\.. (ensemble root), then call UPDATE.BAT.
+rem GSETUP.BAT
+rem Install from USER\INSTALL into ..\.. (ensemble root), then call GUPDATE.BAT.
 rem
 rem Usage:
-rem   INSTALL.BAT
-rem   INSTALL.BAT -F
-rem   INSTALL.BAT DRIVE DIR
-rem   INSTALL.BAT DRIVE DIR -F
+rem   GSETUP.BAT
+rem   GSETUP.BAT -F
+rem   GSETUP.BAT DRIVE DIR
+rem   GSETUP.BAT DRIVE DIR -F
 
 set FORCE=
 
@@ -46,7 +46,7 @@ goto DOINSTALL
 :INIEXISTS
 if "%FORCE%"=="1" goto FORCEWARN
 echo NOTICE: Existing GEOS configuration found in ..\..\ (GEOS.INI or GEOSEC.INI).
-echo NOTICE: Installation aborted. Use INSTALL.BAT -F to force install.
+echo NOTICE: Installation aborted. Use GSETUP.BAT -F to force install.
 goto END
 
 :FORCEWARN
@@ -61,22 +61,22 @@ echo Installing from USER\INSTALL to ..\..\ ...
 xcopy user\install\*.* ..\..\ /S /E /Y
 
 echo.
-echo Running UPDATE.BAT ...
-call update.bat
+echo Running GUPDATE.BAT ...
+call gupdate.bat
 
 echo.
 echo Install complete.
 goto END
 
 :BADDIR
-echo NOTICE: INSTALL.BAT must run from ...\FREEGEOS\6*
+echo NOTICE: GSETUP.BAT must run from ...\FREEGEOS\6*
 echo NOTICE: or be called with DRIVE and DIR arguments.
 echo.
 echo Usage:
-echo   INSTALL.BAT
-echo   INSTALL.BAT -F
-echo   INSTALL.BAT DRIVE DIR
-echo   INSTALL.BAT DRIVE DIR -F
+echo   GSETUP.BAT
+echo   GSETUP.BAT -F
+echo   GSETUP.BAT DRIVE DIR
+echo   GSETUP.BAT DRIVE DIR -F
 
 goto END
 
@@ -84,10 +84,10 @@ goto END
 echo NOTICE: Invalid arguments.
 echo.
 echo Usage:
-echo   INSTALL.BAT
-echo   INSTALL.BAT -F
-echo   INSTALL.BAT DRIVE DIR
-echo   INSTALL.BAT DRIVE DIR -F
+echo   GSETUP.BAT
+echo   GSETUP.BAT -F
+echo   GSETUP.BAT DRIVE DIR
+echo   GSETUP.BAT DRIVE DIR -F
 
 :END
 set FORCE=

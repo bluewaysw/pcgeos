@@ -1,10 +1,10 @@
 @echo off
-rem UPDATE.BAT
+rem GUPDATE.BAT
 rem Copy USER\UPDATE contents into ..\.. (ensemble root), overwriting existing files.
 rem
 rem Usage:
-rem   UPDATE.BAT
-rem   UPDATE.BAT DRIVE DIR
+rem   GUPDATE.BAT
+rem   GUPDATE.BAT DRIVE DIR
 
 if "%1"=="" goto CHECKDIR
 if "%2"=="" goto USAGE
@@ -29,19 +29,19 @@ echo Update complete.
 goto END
 
 :BADDIR
-echo NOTICE: UPDATE.BAT must run from ...\FREEGEOS\6*
+echo NOTICE: GUPDATE.BAT must run from ...\FREEGEOS\6*
 echo NOTICE: or be called with DRIVE and DIR arguments.
 echo.
 echo Usage:
-echo   UPDATE.BAT
-echo   UPDATE.BAT DRIVE DIR
+echo   GUPDATE.BAT
+echo   GUPDATE.BAT DRIVE DIR
 goto END
 
 :USAGE
 echo NOTICE: Invalid arguments.
 echo.
 echo Usage:
-echo   UPDATE.BAT
-echo   UPDATE.BAT DRIVE DIR
+echo   GUPDATE.BAT
+echo   GUPDATE.BAT DRIVE DIR
 
 :END
