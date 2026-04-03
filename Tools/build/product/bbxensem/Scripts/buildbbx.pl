@@ -1342,7 +1342,7 @@ sub CopyFilesToDemoDir {
 #       ResolveFreeGEOSBootstrapDir
 ##############################################################################
 #
-# SYNOPSIS:     Resolve FreeGEOS bootstrap directory from gbuild output
+# SYNOPSIS:     Resolve first bootstrap directory under ensemble/freegeos
 # PASS:         arg1 = gbuild destination tree
 # CALLED BY:    FreeGEOSCopyImageToEnsemble
 # RETURN:       resolved bootstrap directory path
@@ -1350,62 +1350,38 @@ sub CopyFilesToDemoDir {
 ##############################################################################
 sub ResolveFreeGEOSBootstrapDir {
     local( $destdir ) = @_;
-    local( $ensembleDir ) = "$destdir/localpc/ensemble";
-    local( @allCandidates );
-    local( @validCandidates );
+    local( $freegeosDir ) = "$destdir/localpc/ensemble/freegeos";
+    local( @candidates );
     local( $entry, $candidateDir );
-    local( $allList, $validList );
 
-    if ( ! -d $ensembleDir ) {
-	die "\nERROR: Cannot find PC/GEOS Ensemble directory: $ensembleDir\n";
+    if ( ! -d $freegeosDir ) {
+        die "\nERROR: Cannot find FreeGEOS directory: $freegeosDir\n";
     }
 
-    opendir( ENSEMBLE_DIR, $ensembleDir ) ||
-	die "\nERROR: Cannot read directory $ensembleDir\n";
+    opendir( FREEGEOS_DIR, $freegeosDir ) ||
+    die "\nERROR: Cannot read directory $freegeosDir\n";
 
-    while ( $entry = readdir( ENSEMBLE_DIR ) ) {
-	next if ( $entry eq "." || $entry eq ".." );
-	next if ( $entry !~ /^fg/i );
+    while ( $entry = readdir( FREEGEOS_DIR ) )
+    {
+        next if ( $entry eq "." || $entry eq ".." );
 
-	$candidateDir = "$ensembleDir/$entry";
-	next if ( ! -d $candidateDir );
+        $candidateDir = "$freegeosDir/$entry";
+        next if ( ! -d $candidateDir );
 
-	push( @allCandidates, $candidateDir );
-	if ( -f "$candidateDir/net.ini" ||
-	     -f "$candidateDir/netec.ini" ) {
-	    push( @validCandidates, $candidateDir );
-	}
+        push( @candidates, $candidateDir );
+    }
+    closedir( FREEGEOS_DIR );
+
+    @candidates = sort( @candidates );
+
+    if ( $#candidates >= 0 ) {
+        print "[Resolved FreeGEOS bootstrap directory: $candidates[0]]\n";
+        return $candidates[0];
     }
 
-    closedir( ENSEMBLE_DIR );
-
-    @allCandidates = sort( @allCandidates );
-    @validCandidates = sort( @validCandidates );
-
-    if ( $#validCandidates == 0 ) {
-	print "[Resolved PC/GEOS Ensemble bootstrap directory: $validCandidates[0]]\n";
-	return $validCandidates[0];
-    }
-
-    if ( $#allCandidates >= 0 ) {
-	$allList = join( "\n  ", @allCandidates );
-    } else {
-	$allList = "(none)";
-    }
-
-    if ( $#validCandidates >= 0 ) {
-	$validList = join( "\n  ", @validCandidates );
-    } else {
-	$validList = "(none)";
-    }
-
-    die "\nERROR: Cannot resolve PC/GEOS Ensemble bootstrap directory.\n" .
-	"Expected exactly one fg* directory with net.ini or netec.ini under:\n" .
-	"  $ensembleDir\n" .
-	"Found fg* directories:\n" .
-	"  $allList\n" .
-	"Found valid fg* directories containing net.ini or netec.ini:\n" .
-	"  $validList\n";
+    die "\nERROR: Cannot resolve FreeGEOS bootstrap directory.\n" .
+    "Expected at least one directory under:\n" .
+    "  $freegeosDir\n";
 }
 
 ##############################################################################
