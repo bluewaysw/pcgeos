@@ -2,9 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ASM_FILE="$SCRIPT_DIR/getcwd.asm"
-OBJ_FILE="$SCRIPT_DIR/getcwd.obj"
-COM_FILE="$SCRIPT_DIR/getcwd.com"
+ASM_FILE="$SCRIPT_DIR/gsetup.asm"
+OBJ_FILE="$SCRIPT_DIR/gsetup.obj"
+COM_FILE="$SCRIPT_DIR/gsetup.com"
 
 find_tool() {
     local tool_name="$1"
