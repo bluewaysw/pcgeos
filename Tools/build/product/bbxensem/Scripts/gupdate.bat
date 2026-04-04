@@ -6,6 +6,9 @@ rem Usage:
 rem   GUPDATE.BAT
 rem   GUPDATE.BAT DRIVE DIR
 
+set UPDATE_SOURCE=user\update
+set UPDATE_TARGET=..\..\
+
 if "%1"=="" goto CHECKDIR
 if "%2"=="" goto USAGE
 if not "%3"=="" goto USAGE
@@ -17,12 +20,12 @@ if errorlevel 1 goto BADDIR
 goto CHECKDIR
 
 :CHECKDIR
-if exist user\update\NUL goto DOUPDATE
+if exist %UPDATE_SOURCE%\NUL goto DOUPDATE
 goto BADDIR
 
 :DOUPDATE
-echo Updating from USER\UPDATE to ..\..\ ...
-xcopy user\update\*.* ..\..\ /S /E /Y
+echo Updating from %UPDATE_SOURCE% to %UPDATE_TARGET% ...
+xcopy %UPDATE_SOURCE%\*.* %UPDATE_TARGET% /S /E /Y
 
 echo.
 echo Update complete.
