@@ -9,6 +9,9 @@ rem   GSETUP.BAT DRIVE DIR
 rem   GSETUP.BAT DRIVE DIR -F
 
 set FORCE=
+set INSTALL_SOURCE=user\install
+set ENSEMBLE_ROOT=..\..\
+set UPDATE_SCRIPT=gupdate.bat
 
 if "%1"=="" goto CHECKDIR
 if "%1"=="-f" goto FORCELOCAL
@@ -35,38 +38,38 @@ set FORCE=1
 goto CHECKDIR
 
 :CHECKDIR
-if exist user\install\NUL goto CHECKINI
+if exist %INSTALL_SOURCE%\NUL goto CHECKINI
 goto BADDIR
 
 :CHECKINI
-if exist ..\..\geos.ini goto INIEXISTS
-if exist ..\..\geosec.ini goto INIEXISTS
+if exist %ENSEMBLE_ROOT%geos.ini goto INIEXISTS
+if exist %ENSEMBLE_ROOT%geosec.ini goto INIEXISTS
 goto DOINSTALL
 
 :INIEXISTS
 if "%FORCE%"=="1" goto FORCEWARN
-echo NOTICE: Existing GEOS configuration found in ..\..\ (GEOS.INI or GEOSEC.INI).
+echo NOTICE: Existing GEOS configuration found in %ENSEMBLE_ROOT% (GEOS.INI or GEOSEC.INI).
 echo NOTICE: Installation aborted. Use GSETUP.BAT -F to force install.
 goto END
 
 :FORCEWARN
-echo WARNING: Existing GEOS configuration found in ..\..\ (GEOS.INI or GEOSEC.INI).
+echo WARNING: Existing GEOS configuration found in %ENSEMBLE_ROOT% (GEOS.INI or GEOSEC.INI).
 echo WARNING: Forced install will continue and may overwrite existing files.
 echo.
 echo Press CTRL+C now to cancel, or press any key to continue.
 pause
 
 :DOINSTALL
-echo Installing from USER\INSTALL to ..\..\ ...
-xcopy user\install\*.* ..\..\ /S /E /Y
+echo Installing from %INSTALL_SOURCE% to %ENSEMBLE_ROOT% ...
+xcopy %INSTALL_SOURCE%\*.* %ENSEMBLE_ROOT% /S /E /Y
 
 rem Ensure bootstrap INI is present in ensemble root even if XCOPY omits it.
-if exist user\install\geosec.ini copy user\install\geosec.ini ..\..\
-if exist user\install\geos.ini copy user\install\geos.ini ..\..\
+if exist %INSTALL_SOURCE%\geosec.ini copy %INSTALL_SOURCE%\geosec.ini %ENSEMBLE_ROOT%
+if exist %INSTALL_SOURCE%\geos.ini copy %INSTALL_SOURCE%\geos.ini %ENSEMBLE_ROOT%
 
 echo.
 echo Running GUPDATE.BAT ...
-call gupdate.bat
+call %UPDATE_SCRIPT%
 
 echo.
 echo Install complete.
