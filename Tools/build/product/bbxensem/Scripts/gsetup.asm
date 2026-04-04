@@ -462,7 +462,7 @@ ResolveDone:
 
 ; Build "/C <batchPath> <geosDistDir> [arg1] [arg2]" into cmdTail.
 ; We only forward the first two arguments after gsetup.com because
-; gsetup.bat supports INSTALL, INSTALL -F, and ENABLE.
+; gsetup.bat supports INSTALL, INSTALL -F, and ACTIVATE.
 BuildCommandTail:
 		push	ax
 		push	bx
