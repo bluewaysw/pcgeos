@@ -1353,6 +1353,7 @@ sub ResolveFreeGEOSBootstrapDir {
     local( $freegeosDir ) = "$destdir/localpc/ensemble/freegeos";
     local( @candidates );
     local( $entry, $candidateDir );
+    local( $bootstrapDir );
 
     if ( ! -d $freegeosDir ) {
         die "\nERROR: Cannot find FreeGEOS directory: $freegeosDir\n";
@@ -1375,8 +1376,9 @@ sub ResolveFreeGEOSBootstrapDir {
     @candidates = sort( @candidates );
 
     if ( $#candidates >= 0 ) {
-        print "[Resolved FreeGEOS bootstrap directory: $candidates[0]]\n";
-        return $candidates[0];
+        $bootstrapDir = $candidates[0]."/boot";
+        print "[Resolved FreeGEOS bootstrap directory: $bootstrapDir]\n";
+        return $bootstrapDir;
     }
 
     die "\nERROR: Cannot resolve FreeGEOS bootstrap directory.\n" .
