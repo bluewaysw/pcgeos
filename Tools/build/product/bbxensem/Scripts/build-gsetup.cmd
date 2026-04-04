@@ -2,9 +2,9 @@
 setlocal
 
 set SCRIPT_DIR=%~dp0
-set ASM_FILE=%SCRIPT_DIR%getcwd.asm
-set OBJ_FILE=%SCRIPT_DIR%getcwd.obj
-set COM_FILE=%SCRIPT_DIR%getcwd.com
+set ASM_FILE=%SCRIPT_DIR%gsetup.asm
+set OBJ_FILE=%SCRIPT_DIR%gsetup.obj
+set COM_FILE=%SCRIPT_DIR%gsetup.com
 
 set WASM_EXE=
 set WLINK_EXE=
@@ -42,5 +42,5 @@ echo ERROR: Put tools in PATH or set WATCOM.
 exit /b 1
 
 :BUILDERROR
-echo ERROR: Failed to build getcwd.com
+echo ERROR: Failed to build gsetup.com
 exit /b 1
