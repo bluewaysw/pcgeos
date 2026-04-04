@@ -126,9 +126,13 @@ echo Enabling from %ENABLE_SOURCE% to current target directory ...
 xcopy %ENABLE_SOURCE%\*.* .\ /S /E /Y
 echo.
 
-echo Regenerating GFSEC.INI for %GEOS_DIST_DIR% ...
+echo Regenerating GFS bootstrap INI for %GEOS_DIST_DIR% ...
 call %GFS_WRITER%
-if not exist gfsec.ini goto GFSGENFAIL
+if exist gfsec.ini goto GFSGENOK
+if exist gfs.ini goto GFSGENOK
+goto GFSGENFAIL
+
+:GFSGENOK
 
 set GEOS_DIST_DIR=
 
@@ -141,7 +145,7 @@ echo Install complete.
 goto END
 
 :GFSGENFAIL
-echo ERROR: Failed to generate GFSEC.INI for current GEOS_DIST_DIR.
+echo ERROR: Failed to generate GFSEC.INI or GFS.INI for current GEOS_DIST_DIR.
 if exist %GFS_ENVBAT% del %GFS_ENVBAT%
 set GEOS_DIST_DIR=
 set SETUP_ROOT=
