@@ -6,7 +6,7 @@ rem Usage:
 rem   GUPDATE.BAT
 rem   GUPDATE.BAT DRIVE DIR
 
-set UPDATE_SOURCE=user\update
+set UPDATE_SOURCE=setup\update
 set UPDATE_TARGET=..\..\
 
 if "%1"=="" goto CHECKDIR

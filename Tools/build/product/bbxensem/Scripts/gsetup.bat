@@ -9,7 +9,7 @@ rem   GSETUP.BAT DRIVE DIR
 rem   GSETUP.BAT DRIVE DIR -F
 
 set FORCE=
-set INSTALL_SOURCE=user\install
+set INSTALL_SOURCE=setup\install
 set ENSEMBLE_ROOT=..\..\
 set UPDATE_SCRIPT=gupdate.bat
 
