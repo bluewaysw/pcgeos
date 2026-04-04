@@ -5,9 +5,14 @@ org 100h
 
 ; GSETUP.COM
 ; Launcher for GSETUP.BAT.
-; Resolves the launcher's own directory from the DOS environment block
-; and executes:
+; Resolves the launcher's own directory and executes:
 ;   %COMSPEC% /C <dir>\gsetup.bat <dir> <original args>
+;
+; Notes:
+; - We shrink our memory block before EXEC because COM programs
+;   initially own almost all DOS memory.
+; - The DOS environment trailer layout varies, so path extraction
+;   probes multiple candidate offsets.
 
 MAX_PATH_CHARS	equ	127
 CMD_TAIL_MAX	equ	127
@@ -23,30 +28,23 @@ _start:
 		mov	sp, offset stackTop
 		sti
 
-		mov	byte ptr failStage, '1'
 		call	ShrinkMemoryForExec
 
-		mov	byte ptr failStage, '2'
 		call	GetProgramPathFromEnv
 		jc	ExitError
 
-		mov	byte ptr failStage, '3'
 		call	ExtractDirectory
 		jc	ExitError
 
-		mov	byte ptr failStage, '4'
 		call	BuildBatchPath
 		jc	ExitError
 
-		mov	byte ptr failStage, '5'
 		call	ResolveComspecPath
 		jc	ExitError
 
-		mov	byte ptr failStage, '6'
 		call	BuildCommandTail
 		jc	ExitError
 
-		mov	byte ptr failStage, '7'
 		call	ExecComspec
 		jc	ExitError
 
@@ -56,13 +54,7 @@ _start:
 		int	21h
 
 ExitError:
-		mov	dx, offset msgErrorPrefix
-		mov	ah, 09h
-		int	21h
-		mov	dl, byte ptr failStage
-		mov	ah, 02h
-		int	21h
-		mov	dx, offset msgErrorSuffix
+		mov	dx, offset msgError
 		mov	ah, 09h
 		int	21h
 		mov	ax, 4c01h
@@ -468,7 +460,9 @@ ResolveDone:
 		ret
 
 
-; Build "/C <batchPath> <geosDistDir><original tail>" into cmdTail.
+; Build "/C <batchPath> <geosDistDir> [arg1] [arg2]" into cmdTail.
+; We only forward the first two arguments after gsetup.com because
+; gsetup.bat supports INSTALL, INSTALL -F, and ENABLE.
 BuildCommandTail:
 		push	ax
 		push	bx
@@ -852,9 +846,6 @@ fallbackComspecZ	db	'Z:\COMMAND.COM', 0
 launcherName		db	'gsetup.com', 0
 slashC			db	'/C ', 0
 msgError		db	'GSETUP launcher failed.', 13, 10, '$'
-msgErrorPrefix		db	'GSETUP launcher failed at stage ', '$'
-msgErrorSuffix		db	'.', 13, 10, '$'
-failStage		db	'?'
 
 execBlock:
 execEnvSeg		dw	0
