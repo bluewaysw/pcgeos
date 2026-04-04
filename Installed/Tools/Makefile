@@ -13,7 +13,7 @@ MK_MAKE = mkdir %PARAM% & \
 BINS = Tools/esp Tools/uicpp Tools/goc Tools/grev Tools/loc Tools/nmkmf Tools/pmake/makedpnd \
 		Tools/glue Tools/uic Tools/pmake/findlbdr \
 		Tools/geodump Tools/sym2dis Tools/ldf2sls Tools/swat Tools/misc/cvtpcx \
-		Tools/gfs
+		Tools/gfs Tools/tplsub
 LIBS =  Tools/utils Tools/compat Tools/winutil Tools/swat/tcl \
 	Tools/swat/ntcurses Tools/swat/curses Tools/swat/termcap
 
@@ -41,4 +41,3 @@ $(BINS) : $(LIBS)
 	cd $(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) & \
 	$(MAKE) -k -I$(ROOT_DIR)\Installed\$(.TARGET:S/\//\\/g) install
 #endif
-
