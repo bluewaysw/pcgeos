@@ -15,6 +15,10 @@ rem   GSETUP ENABLE
 if "%1"=="" goto NOENTRY
 if "%2"=="" goto NOENTRY
 
+rem Keep variable footprint small for COMMAND.COM environment space limits.
+set PINST=setup\install
+set PENAB=setup\enable
+
 if "%2"=="install" goto PARSEINSTALL
 if "%2"=="INSTALL" goto PARSEINSTALL
 if "%2"=="enable" goto PARSEENABLE
@@ -35,11 +39,11 @@ goto CHECKINSTALL2
 if not "%3"=="" goto USAGE
 
 :CHECKINSTALL2
-if exist %1\setup\install\NUL goto CHECKINSTALL3
+if exist %1\%PINST%\NUL goto CHECKINSTALL3
 goto BADDIR
 
 :CHECKINSTALL3
-if exist %1\setup\enable\NUL goto CHECKINI
+if exist %1\%PENAB%\NUL goto CHECKINI
 goto BADDIR
 
 :CHECKINI
@@ -62,12 +66,12 @@ echo Press CTRL+C now to cancel, or press any key to continue.
 pause
 
 :DOINSTALL
-echo Installing from %1\setup\install to current target directory ...
-xcopy %1\setup\install\*.* .\ /S /E /Y
+echo Installing from %1\%PINST% to current target directory ...
+xcopy %1\%PINST%\*.* .\ /S /E /Y
 
 rem Ensure bootstrap INI is present in target directory even if XCOPY omits it.
-if exist %1\setup\install\geosec.ini copy %1\setup\install\geosec.ini .\
-if exist %1\setup\install\geos.ini copy %1\setup\install\geos.ini .\
+if exist %1\%PINST%\geosec.ini copy %1\%PINST%\geosec.ini .\
+if exist %1\%PINST%\geos.ini copy %1\%PINST%\geos.ini .\
 
 echo.
 echo Running enable phase ...
@@ -75,12 +79,12 @@ goto DOENABLEINSTALL
 
 :PARSEENABLE
 if not "%3"=="" goto USAGE
-if exist %1\setup\enable\NUL goto DOENABLE
+if exist %1\%PENAB%\NUL goto DOENABLE
 goto BADDIR
 
 :DOENABLE
-echo Enabling from %1\setup\enable to current target directory ...
-xcopy %1\setup\enable\*.* .\ /S /E /Y
+echo Enabling from %1\%PENAB% to current target directory ...
+xcopy %1\%PENAB%\*.* .\ /S /E /Y
 echo.
 
 echo Regenerating GFS bootstrap INI for %1 ...
@@ -90,8 +94,8 @@ if exist gfs.ini goto ENABLEDONE
 goto GFSGENFAIL
 
 :DOENABLEINSTALL
-echo Enabling from %1\setup\enable to current target directory ...
-xcopy %1\setup\enable\*.* .\ /S /E /Y
+echo Enabling from %1\%PENAB% to current target directory ...
+xcopy %1\%PENAB%\*.* .\ /S /E /Y
 echo.
 
 echo Regenerating GFS bootstrap INI for %1 ...
@@ -124,7 +128,7 @@ goto END
 
 :BADDIR
 echo NOTICE: GSETUP must be called from target root directory.
-echo NOTICE: Current directory must contain FREEGEOS\60BETA\SETUP\INSTALL and ...\ENABLE.
+echo NOTICE: Current directory must contain FREEGEOS\60BETA\SETUP\INSTALL and FREEGEOS\60BETA\SETUP\ENABLE.
 echo.
 echo Usage:
 echo   FREEGEOS\60BETA\GSETUP INSTALL
