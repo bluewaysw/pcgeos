@@ -2,7 +2,7 @@
 
 ## 1. General Information
 * **Original File Name:** StandardSymbolPS.ttf
-* **GEOS File Name:** SYMBOLPS.TTF
+* **GEOS File Name:** symbolps.ttf
 * **License:** [GNU Aferro General Public License](https://github.com/ArtifexSoftware/urw-base35-fonts/blob/master/COPYING)
 * **Upstream Source:** https://github.com/ArtifexSoftware/urw-base35-fonts/tree/master
 
@@ -16,14 +16,14 @@
 ### Technical Adjustments:
 - [x] **Charset Reduction:** Removed all non-GEOS glyphs to save memory.
 - [ ] **Kerning Pairs:** Reduced to a minimum to optimize driver performance and memory.
-- [x] **Character Mapping:** (e.g., re-mapped special characters to GEOS-specific code pages)
-- [x] **OS/2 Metrics:** (Adjusted WinAscent/WinDescent to fix line clipping in GeoWrite)
+- [x] **Character Mapping:** Re-mapped specsymbol characters to GEOS code page.
+- [ ] **OS/2 Metrics:** (Adjusted WinAscent/WinDescent to fix line clipping in GeoWrite)
 - [ ] **Em-Size Scaling:** (Standardized to 2048 units for consistency)
 - [ ] **Naming:** (Shortened internal font names to comply with older GEOS conventions if necessary)
 
 ### Visual Optimizations / Hinting:
-- [x] **Auto-Hinting:** (Applied FontForge auto-hinting for low-resolution screens)
-- [ ] **Optimized Hinting:** Hinting specifically for **Black & White rendering** to ensure sharp stems and consistent glyph heights.
+- [x] **Auto-Hinting:** Applied auto-hinting for low-resolution screens
+- [ ] **Optimized Hinting:** (Hinting specifically for **Black & White rendering** to ensure sharp stems and consistent glyph heights)
 - [ ] **Manual Deltas:** (Specific tweaks for legibility at 10pt or 12pt)
 - [ ] **Blue Values:** (Alignment zones adjusted for typical 72dpi screens)
 
