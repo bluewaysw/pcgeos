@@ -349,11 +349,8 @@
   {
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
-#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
 #endif
 
@@ -362,11 +359,7 @@
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
-#endif
-
     TT_FWord   xMax_Extent;            /* xmax extents          */
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
@@ -402,11 +395,8 @@
   {
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
-#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
 #endif
 
@@ -414,10 +404,7 @@
     TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
-#endif
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
-
-    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
     TT_FWord   caret_Offset;
