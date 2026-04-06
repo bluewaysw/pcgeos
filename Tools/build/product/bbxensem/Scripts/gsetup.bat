@@ -67,11 +67,9 @@ pause
 
 :DOINSTALL
 echo Installing from %1\%PINST% to current target directory ...
-xcopy %1\%PINST%\*.* .\ /S /E /Y
-
-rem Ensure bootstrap INI is present in target directory even if XCOPY omits it.
-if exist %1\%PINST%\geosec.ini copy %1\%PINST%\geosec.ini .\
-if exist %1\%PINST%\geos.ini copy %1\%PINST%\geos.ini .\
+subst k: %1\%PINST%\
+xcopy k:*.* .\ /S /E /Y
+subst k: /D
 
 echo.
 echo Running activate phase ...
