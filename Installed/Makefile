@@ -102,7 +102,8 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
-		  prefintl prefcomp prefbg prefpntc preffont configui
+		  prefintl prefcomp prefbg prefpntc preffont configui \
+		  prefappl
 
 # prefs not used preflvl prefuic prefui prefts prefspui prefsock preflink preflang
 
@@ -129,7 +130,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  launcher webmagick idialup \
 		  charm wordmat banner \
 		  bbxchat bbxmail \
-		  newsread geozip sclock trayapps\
+		  newsread geozip sclock trayapps firstrun \
  	  	  hmbase pdfvu bnkr30 ftpc \
  	  	  instc instf grafcalc
 
@@ -169,7 +170,8 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 #		  nimbus vidmem logibus logiser msbus msser \
 #		  disk xms emm nonts epson9 epson24 sound_std
 
-minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipointer \
+minimalDriver	: nimbus ms4 ntfat os2 cdrom megafile \
+		  stream dri gdi keyboard modem gdipointer \
 		  standard winnt parallel serial disk vidmem svga \
 		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
 		  printerDriver ctm ctmabs imps2 \
@@ -569,6 +571,10 @@ Installed/Library/Pref/Prefts:		ui config MAKELIB
 prefvid	: Installed/Library/Pref/Prefvid
 Installed/Library/Pref/Prefvid:		ui config MAKELIB
 
+prefappl : Installed/Library/Pref/PrefAppl
+Installed/Library/Pref/PrefAppl:	ui config ansic MAKELIB
+
+
 prefpntc	: Installed/Library/Pref/PrefPntC
 Installed/Library/Pref/PrefPntC:	ui config parentc MAKELIB
 
@@ -601,6 +607,9 @@ Installed/Driver/IFS/DOS/MSLF:		kernel MAKEDRV
 
 cdrom     : Installed/Driver/IFS/DOS/CDROM
 Installed/Driver/IFS/DOS/CDROM:		kernel MAKEDRV
+
+megafile : Installed/Driver/IFS/GEOS/MegaFile
+Installed/Driver/IFS/GEOS/MegaFile:	kernel MAKEDRV
 
 gdi	: Installed/Driver/Keyboard/GDI
 Installed/Driver/Keyboard/GDI:		kernel genpc MAKEDRV
@@ -962,6 +971,10 @@ Installed/Appl/SysTray/SClock:		ui MAKEAPPL
 
 trayapps: Installed/Appl/SysTray/TrayApps
 Installed/Appl/SysTray/TrayApps:	ui ansic MAKEAPPL
+
+firstrun: Installed/Appl/FirstRun
+Installed/Appl/FirstRun:	ui ansic MAKEAPPL
+
 
 linktool: Installed/Library/FMTools/Linktool
 Installed/Library/FMTools/Linktool:	ui shell MAKEAPPL

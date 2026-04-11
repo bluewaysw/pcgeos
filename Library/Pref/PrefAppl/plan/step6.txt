@@ -1,0 +1,155 @@
+GOAL ACHIEVED:
+remove dependence on manual "Refresh" by wiring PrefAppl to file-system
+notifications, while keeping `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` as the
+single authoritative rebuild path.
+
+What was actually implemented
+
+1. `PrefAppl` keeps the known-good scan and rebuild path
+
+* `prefapplLow.goc` and `prefapplLow.h` were restored to the working
+  step5-style scan/list rebuild behavior after earlier watched-ID changes
+  regressed UI population.
+* No watched-folder ID tracking or scanned-link file-ID cache is used in the
+  shipped step6 implementation.
+* `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` remains the only path that rebuilds
+  the disabled and enabled lists from disk.
+
+2. File-system notifications are delivered through `PrefMgr`
+
+Files:
+
+* `Appl/Preferences/PrefMgr/prefmgrApplication.asm`
+
+Implementation:
+
+* `PrefMgrApplicationClass` already receives `GCNSLT_FILE_SYSTEM`
+  notifications on the application object.
+* `PrefMgrAppNotifyFileChange` now forwards `MSG_NOTIFY_FILE_CHANGE` to the
+  currently loaded module UI before its existing module-rescan logic runs.
+* Forwarding only happens when the active module's permanent geode name is
+  `prefappl`.
+* The target is `dgroup:moduleUI`, which is the duplicated module root object
+  currently active inside PrefMgr.
+
+Reason for this design:
+
+* Earlier attempts that registered `GCNSLT_FILE_SYSTEM` directly on the
+  PrefAppl dialog did not match working examples such as TrayApps and PrefMgr.
+* Forwarding through PrefMgr's application object matched the working delivery
+  model without modifying PrefAppl's low-level scan code.
+
+3. `PrefAppl` handles notifications by queueing one refresh
+
+Files:
+
+* `Library/Pref/PrefAppl/prefappl.goc`
+
+Implementation:
+
+* Added `MSG_NOTIFY_FILE_CHANGE` handling in `PrefApplDialogClass`.
+* The handler treats `FCNT_CREATE`, `FCNT_DELETE`, `FCNT_RENAME`, and
+  `FCNT_BATCH` as refresh-worthy notification types.
+* The handler does not parse batches or inspect path IDs. It simply queues one
+  coalesced refresh when any of those notification types arrive.
+* Refresh is queued with duplicate suppression and runs through
+  `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`.
+
+4. Refresh coalescing was added to avoid storms
+
+Files:
+
+* `Library/Pref/PrefAppl/prefappl.goc`
+
+Implementation:
+
+* Added dialog instance flags:
+  * `PADI_refreshQueued`
+  * `PADI_refreshInProgress`
+* `PrefApplQueueRefresh(...)` suppresses duplicate queued refreshes.
+* `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` clears the queued flag, marks refresh
+  in progress while rebuilding, then clears the in-progress flag before
+  returning.
+* Add/remove operations mark refresh in progress before doing file operations
+  so self-generated file notifications do not queue redundant refreshes during
+  the explicit post-operation rebuild.
+
+5. Add/remove behavior still ends in a full rebuild
+
+Files:
+
+* `Library/Pref/PrefAppl/prefappl.goc`
+
+Implementation:
+
+* Enabling or disabling an application still ends by calling
+  `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK`.
+* Selection restore and status-text behavior remain unchanged.
+* The shipped code still contains some older incremental scanned-link helper
+  calls in add/remove paths, but list truth still comes from the final full
+  rebuild.
+
+6. Manual `Refresh` was removed from the UI after automatic refresh worked
+
+Files:
+
+* `Library/Pref/PrefAppl/prefappl.goc`
+
+Implementation:
+
+* Removed `RescanTrigger` from the object tree.
+* Removed the `MSG_PREF_APPL_RESCAN` handler.
+* Opening the module and later file-system events now rely on the automatic
+  refresh path only.
+
+7. Build support needed for PrefMgr in this tree
+
+Files:
+
+* `Appl/Preferences/PrefMgr/local.mk`
+* `Installed/Appl/Preferences/PrefMgr/local.mk`
+* `Installed/Appl/Preferences/PrefMgr/dependencies.mk`
+
+Notes:
+
+* In this repository state, the Installed-side PrefMgr build was missing a
+  `local.mk`, so the build did not pick up the `PREFMGR` defines and `Art`
+  include paths needed for the correct UI variant.
+* The build support was adjusted so PrefMgr could be rebuilt with the new
+  forwarding code.
+* This was build plumbing only; the runtime design is still the application-
+  object forwarding described above.
+
+Behavioral result
+
+* PrefAppl rebuilds correctly on open.
+* Disabled and enabled lists populate from disk correctly.
+* PrefAppl rebuilds automatically when PrefMgr forwards relevant file-system
+  notifications.
+* Notifications are handled with a coarse refresh policy:
+  * no watched-path filtering
+  * no per-file ID filtering
+  * no batch-item parsing
+
+Why the coarse policy was kept
+
+* Watched-path and file-ID tracking previously introduced regressions in the
+  scan/list population code.
+* The coarse policy is much smaller and easier to maintain.
+* The rebuild path was already known-good, so queueing that path directly is
+  the lowest-risk design.
+
+Tradeoff accepted
+
+* PrefAppl may rescan in response to some unrelated file-system activity seen
+  by PrefMgr while PrefAppl is the active module.
+* This is acceptable for now because it keeps the implementation simple and
+  preserves correctness of the UI lists.
+
+Final step6 scope, as implemented
+
+* `MSG_PREF_APPL_REFRESH_LIST_FROM_DISK` is the single rebuild path.
+* File-system notifications are received by PrefMgr and forwarded to PrefAppl.
+* PrefAppl coalesces notifications into one queued rebuild.
+* No watched-folder ID or link-ID filtering is part of the shipped design.
+* Manual Refresh is removed from the UI.

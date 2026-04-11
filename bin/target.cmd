@@ -20,8 +20,8 @@ IF NOT EXIST %destdir%\localpc\ensemble\ensemble.bat (
 )
 IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
-cd /D %destdir%\localpc 
-del /F "%destdir%\localpc\IPX_STAT.txt"
+cd /D %destdir%\localpc
+del /F "%destdir%\localpc\IPX_STAT.TXT"
 del /F ensemble\init.bat
 IF DEFINED GEOS_CENTRAL_STORAGE (
    echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\init.bat
@@ -33,20 +33,20 @@ IF DEFINED GEOS_CDROM_DRIVE (
       echo imgmount r "%GEOS_CDROM_DRIVE%" -t iso >> ensemble\init.bat
    )
 )
-IF EXIST ensemble\init.bat (
+IF EXIST ensemble\geos\init.bat (
    echo swatgo >> ensemble\init.bat
 )
 start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole
 cd %OLD_PATH%
 @cls
 :waitForFile
-@IF EXIST %destdir%\localpc\IPX_STAT.txt GOTO foundFile
+@IF EXIST %destdir%\localpc\IPX_STAT.TXT GOTO foundFile
 @sleep 1s
 @echo|set /p="."
 @GOTO waitForFile
 :foundFile
-FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.txt | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.txt
-set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.txt
+FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.TXT | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.TXT
+set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.TXT
 cls
 rem mode 120,50
 IF EXIST "%USERPROFILE%\swat.rc" (

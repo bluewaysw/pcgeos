@@ -281,6 +281,70 @@ afterFloatingKbd:
 ;-------------------------------------------------------------------------
 
 	;
+	; move "Preferences" to Control Panel in Motif/Motif Redux
+	;	bx = child block
+	;	*ds:si  = EMC
+	;
+
+	push	ax, si
+
+	call	CheckIfRunningMotif
+	jz	afterMotifPreferences		; jump if zero flag is set, no Motif
+
+	test	ax, mask EMCF_CONTROL_PANEL
+	jz	afterMotifPreferences
+
+	push	bx, si				; save child block, EMC chunk
+	mov	si, offset SettingsGroup	; ^lbx:si = Settings menu
+	mov	cx, bx				; ^lcx:dx = PreferencesTrigger
+	mov	dx, offset PreferencesTrigger
+	mov	ax, MSG_GEN_FIND_CHILD
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	jc	noPreferencesInSettings
+
+	movdw	bxsi, cxdx			; ^lbx:si = PreferencesTrigger
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	movdw	cxdx, bxsi			; ^lcx:dx = PreferencesTrigger
+	mov	si, offset SettingsGroup	; ^lbx:si = Settings menu
+	mov	ax, MSG_GEN_REMOVE_CHILD
+	clr	bp				; not dirty
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+noPreferencesInSettings:
+	pop	bx, si				; bx = child block, *ds:si = EMC
+
+	push	bx, si				; save child block, EMC chunk
+	mov	si, offset ControlPanel		; ^lbx:si = Control Panel
+	mov	cx, bx				; ^lcx:dx = PreferencesTrigger
+	mov	dx, offset PreferencesTrigger
+	mov	ax, MSG_GEN_FIND_CHILD
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	pop	bx, si				; bx = child block, *ds:si = EMC
+	jnc	haveMotifPreferences
+
+	mov	si, offset ControlPanel		; ^lbx:si = Control Panel
+	mov	cx, bx				; ^lcx:dx = PreferencesTrigger
+	mov	dx, offset PreferencesTrigger
+	mov	ax, MSG_EMC_PANEL_ADD_CHILD
+	mov	bp, CEMCIP_STANDARD_PRIORITY
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+
+haveMotifPreferences:
+	mov	si, offset PreferencesTrigger	; ^lbx:si = PreferencesTrigger
+	call	emcGUISetUsable
+
+afterMotifPreferences:
+	pop	ax, si				; ax = features, EMC chunk
+
+;-------------------------------------------------------------------------
+
+	;
 	; add "Go to GeoManager" in Motif Redux
 	;	bx = child block
 	;	*ds:si  = EMC
@@ -1298,6 +1362,36 @@ ExpressMenuControlDestroyUI	method	dynamic	ExpressMenuControlClass,
 	mov	ax, MSG_GEN_REMOVE_CHILD
 	call	ObjCallInstanceNoLock
 noKeyboard:
+	;
+	; free up "Preferences" from Control Panel, if any
+	;
+	call	EMGetFeaturesAndChildBlock	; bx = child block
+	test	ax, mask EMCF_CONTROL_PANEL
+	jz	noPreferencesTrigger
+	push	si				; save EMC chunk
+	mov	si, offset ControlPanel		; ^lbx:si = Control Panel
+	mov	cx, bx				; ^lcx:dx = PreferencesTrigger
+	mov	dx, offset PreferencesTrigger
+	mov	ax, MSG_GEN_FIND_CHILD
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage			; carry set if not found
+	jc	restoreEMCAfterPreferences
+	push	si
+	movdw	bxsi, cxdx			; ^lcx:dx preserved above
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	mov	dl, VUM_NOW
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	movdw	cxdx, bxsi
+	pop	si				; ^lbx:si = Control Panel
+	mov	si, offset ControlPanel		; ^lbx:si = Control Panel
+	clr	bp				; not dirty
+	mov	ax, MSG_GEN_REMOVE_CHILD
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+restoreEMCAfterPreferences:
+	pop	si				; *ds:si = EMC
+noPreferencesTrigger:
 	;
 	; free up "Go to GeoManager" (NOT defaultLauncher!), if any
 	;
