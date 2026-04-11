@@ -3,7 +3,7 @@
 #
 # If you edit it, you will lose your changes, should it be regenerated.
 #
-GEODE           = PHOTOPC
+GEODE           = photopc
 ASM_TO_OBJS     =
 UI_TO_RDFS      =
 SRCS            = eph_cmd.c eph_err.c eph_io.c eph_iob.c eph_open.c\
