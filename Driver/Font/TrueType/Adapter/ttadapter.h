@@ -57,7 +57,6 @@ extern TEngine_Instance engineInstance;
 #define SUPERSCRIPT_OFFSET                  0x00006000
 #define SUBSCRIPT_OFFSET                    0x00001a00
 
-
 #define MAX_BITMAP_SIZE		                125
 #define MAX_FONTBUF_SIZE                    ( 10 * 1024 )
 #define INITIAL_BITMAP_BLOCKSIZE            ( 2 * 1024 )
@@ -86,7 +85,6 @@ extern TEngine_Instance engineInstance;
 
 #define MIN_OS2_TABLE_VERSION               2
 
-#define BASELINE_CORRECTION                 1
 #define MIN_BITMAP_DIMENSION                1
 
 
@@ -363,38 +361,17 @@ typedef struct
  */
 typedef struct
 {
-    Boolean                     FH_initialized;
-    word                        FH_h_height;        //top of 'H'
-    word                        FH_x_height;        //top of 'x'
-    word                        FH_ascender;        //top of 'd'
-    word                        FH_descender;       //bottom of 'p'
-    word                        FH_avgwidth;        //average character width
-    word                        FH_maxwidth;        //widest character width
-    word                        FH_height;          //height of font box
-    word                        FH_accent;          //height of accents
-    word                        FH_ascent;          //height of caps
-    word                        FH_descent;         //descent (from baseline)
-    word                        FH_baseAdjust;      //adjustment for baseline
-    char                        FH_firstChar;       //first char defined
-    char                        FH_lastChar;        //last char defined
-    char                        FH_defaultChar;     //default character
-    word                        FH_underPos;        //position of underline   		
-    word                        FH_underThick;      //thickness of underline
-    word                        FH_strikePos;       //position of strikethrough
-    word                        FH_numChars;        //number of characters
-    sword                       FH_minLSB;          //minimum left side bearing
-    sword                       FH_minTSB;          //minimum top side bound
-    sword                       FH_maxBSB;          //maximum bottom side bound
-    sword                       FH_maxRSB;          //maximum right side bound
-    word                        FH_kernCount;       //num of kerning pairs
+    Boolean     FH_initialized;     // Flag: Is the structure initialized?
+    word        FH_kernCount;       // Number of available kerning pairs
+    word        FH_numChars;        // Number of characters defined in the font
+    char        FH_firstChar;       // GEOS char code of the first defined char
+    char        FH_lastChar;        // GEOS char code of the last defined char
+    char        FH_defaultChar;     // GEOS char code for undefined glyphs
 } FontHeader;
 
 
 typedef struct
 {
-    /* init fonts */
-    char                        familyName[FID_NAME_LEN];
-
     /* scaling */
     WWFixedAsDWord              scaleHeight;
     WWFixedAsDWord              scaleWidth;
@@ -406,7 +383,6 @@ typedef struct
     TT_Face                     face;
     TT_Face_Properties          faceProperties; 
     TT_Instance                 instance;
-    TT_Instance_Metrics         instanceMetrics;
     TT_Glyph                    glyph;
     TT_Glyph_Metrics            glyphMetrics;
     TT_CharMap                  charMap;
@@ -427,11 +403,9 @@ typedef struct
 
 #define TRUETYPE_VARS           TrueTypeVars* trueTypeVars
 
-#define FAMILY_NAME             trueTypeVars->familyName
 #define FACE                    trueTypeVars->face
 #define FACE_PROPERTIES         trueTypeVars->faceProperties
 #define INSTANCE                trueTypeVars->instance
-#define INSTANCE_METRICS        trueTypeVars->instanceMetrics
 #define GLYPH                   trueTypeVars->glyph
 #define CHAR_MAP                trueTypeVars->charMap
 #define OUTLINE                 trueTypeVars->outline

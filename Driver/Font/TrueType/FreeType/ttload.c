@@ -513,28 +513,18 @@
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Version   = GET_ULong();
-#else
-    SKIP( 4 );
-#endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Line_Gap  = GET_Short();
 #else
-    SKIP( 2 );
+    SKIP( 10 );
 #endif
 
     header->advance_Width_Max      = GET_UShort();
     header->min_Left_Side_Bearing  = GET_Short();
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->min_Right_Side_Bearing = GET_Short();
-#else
-    SKIP( 2 );
-#endif
     header->xMax_Extent            = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
@@ -547,7 +537,7 @@
 
     header->metric_Data_Format = GET_Short();
 #else
-    SKIP( 16 );
+    SKIP( 20 );
 #endif
 
     header->number_Of_HMetrics = GET_UShort();

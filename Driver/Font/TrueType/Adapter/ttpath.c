@@ -194,7 +194,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 	/* in reverse order. Step 5 is, of course, already in the GState.  */
 
         /* calculate baseline for further use */
-        baseline = fontHeader->FH_accent + fontHeader->FH_ascent + BASELINE_CORRECTION;
+        baseline = FACE_PROPERTIES.os2->usWinAscent;
 
         /* translate by current cursor position */
         cursorPos = GrGetCurPos( gstate );
@@ -825,7 +825,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         transMatrix->TM_matrix.yx = 0L;
         transMatrix->TM_matrix.yy = scaleFactor;
         transMatrix->TM_heightX   = 0;
-        transMatrix->TM_heightY   = fontHeader->FH_ascent + fontHeader->FH_accent + BASELINE_CORRECTION;
+        transMatrix->TM_heightY   = FACE_PROPERTIES.os2->usWinAscent;
         transMatrix->TM_scriptX   = 0;
         transMatrix->TM_scriptY   = 0;
 
@@ -847,7 +847,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
         /* fake script style      */
         if( stylesToImplement & ( TS_SUBSCRIPT | TS_SUPERSCRIPT ) )
         {      
-                WWFixedAsDWord scriptBaseline = GrMulWWFixed( MakeWWFixed( fontHeader->FH_height + fontHeader->FH_baseAdjust ), scaleFactor ); 
+                WWFixedAsDWord scriptBaseline = GrMulWWFixed( MakeWWFixed( FACE_PROPERTIES.os2->usWinAscent ), scaleFactor ); 
 
 
                 transMatrix->TM_matrix.xx = GrMulWWFixed( transMatrix->TM_matrix.xx, SCRIPT_FACTOR );
@@ -862,7 +862,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                 {
                         //TODO: Is rounding necessary here?
                         transMatrix->TM_scriptY = ( GrMulWWFixed( scriptBaseline, SUPERSCRIPT_OFFSET ) - 
-                                                GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( fontHeader->FH_accent + fontHeader->FH_ascent + fontHeader->FH_baseAdjust ), scaleFactor ) >> 16 );
+                                                GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( FACE_PROPERTIES.os2->usWinAscent ), scaleFactor ) >> 16 );
                 }
         }
 

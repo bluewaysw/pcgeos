@@ -45,13 +45,13 @@ static sword getFontIDAvailIndex(
                                 FontID     fontID, 
                                 MemHandle  fontInfoBlock );
 
-static Boolean getFontID( TRUETYPE_VARS, FontID* fontID );
+static Boolean getFontID( TRUETYPE_VARS, const char* familyName, FontID* fontID );
 
 static FontWeight mapFontWeight( TT_Short weightClass );
 
 static TextStyle mapTextStyle(  const char* subfamily );
 
-static FontGroup mapFontGroup( TRUETYPE_VARS );
+static FontGroup mapFontGroup( TT_Face_Properties* faceProperties );
 
 static word getNameFromNameTable( 
                                 TRUETYPE_VARS,
@@ -69,8 +69,6 @@ static word toHash( const char* str );
 static word strlen( const char* str );
 
 static char* strcpy( char* dest, const char* source );
-
-static void strcpyname( char* dest, const char* source );
 
 static int strcmp( const char* s1, const char* s2 );
 
@@ -341,6 +339,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         Boolean                 mappedFont;
         sword                   availIndex;
         char                    styleName[STYLE_NAME_LENGTH];
+        char                    familyName[FID_NAME_LEN];
 
 
 EC(     ECCheckBounds( (void*)fileName ) );
@@ -362,13 +361,13 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
 
-        if ( getNameFromNameTable( trueTypeVars, FAMILY_NAME, FAMILY_NAME_ID ) == 0 )
+        if ( getNameFromNameTable( trueTypeVars, familyName, FAMILY_NAME_ID ) == 0 )
                 goto Fail;
 
         if ( getNameFromNameTable( trueTypeVars, &styleName, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
-        mappedFont = getFontID( trueTypeVars, &fontID );
+        mappedFont = getFontID( trueTypeVars, familyName, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
         /* if we have an new font FontAvailEntry, FontInfo and Outline must be created */
@@ -398,7 +397,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* get pointer to FontInfo and fill it */
 		fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
-                strcpy( fontInfo->FI_faceName, FAMILY_NAME );
+                strcpy( fontInfo->FI_faceName, familyName );
                 fontInfo->FI_fileHandle   = NullHandle;
                 fontInfo->FI_fontID       = fontID;
                 fontInfo->FI_family       = FA_USEFUL | FA_OUTLINE | ( mappedFont ? FA_FAMILY : 0 );
@@ -742,18 +741,18 @@ static TextStyle mapTextStyle( const char* subfamily )
 
 #define B_FAMILY_TYPE           0
 #define B_PROPORTION            3
-static FontGroup mapFontGroup( TRUETYPE_VARS )
+static FontGroup mapFontGroup( TT_Face_Properties* faceProperties )
 {
         /* The font group of a TrueType font cannot be determined exactly.  */
         /* This implementation is therefore more of an approximation than   */
         /* an exact determination.                                          */
 
         /* recognize FF_MONO from panose fields */
-        if( FACE_PROPERTIES.os2->panose[B_PROPORTION] == 9 )    //Monospaced
+        if( faceProperties->os2->panose[B_PROPORTION] == 9 )    //Monospaced
                 return FG_MONO;
 
         /* recognize FF_SANS_SERIF, FF_SERIF, FF_SYMBOL and FF_ORNAMENT from sFamilyClass */
-        switch( FACE_PROPERTIES.os2->sFamilyClass >> 8 )
+        switch( faceProperties->os2->sFamilyClass >> 8 )
         {
                 case 1:
                 case 2:
@@ -771,7 +770,7 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
         }
 
         /* recognize FF_SCRIPT from panose fields */
-        if( FACE_PROPERTIES.os2->panose[B_FAMILY_TYPE] == 2 )   //Script
+        if( faceProperties->os2->panose[B_FAMILY_TYPE] == 2 )   //Script
                 return FG_SCRIPT;
 
         return FG_NON_PORTABLE;
@@ -808,14 +807,8 @@ static FontGroup mapFontGroup( TRUETYPE_VARS )
  *      21.01.23  JK        Initial Revision
  *******************************************************************/
 
-static Boolean getFontID( TRUETYPE_VARS, FontID* fontID ) 
+static Boolean getFontID( TRUETYPE_VARS, const char* familyName, FontID* fontID ) 
 {
-        char  familyName[FID_NAME_LEN];
-
-
-        /* clean up family name */
-        strcpyname( familyName, trueTypeVars->familyName );
-
         /* get FontID from geos.ini */
         if( !InitFileReadInteger( FONTMAPPING_CATEGORY, familyName, fontID ) )
         {
@@ -824,7 +817,7 @@ static Boolean getFontID( TRUETYPE_VARS, FontID* fontID )
         }
 
         /* generate FontID */
-        *fontID = MAKE_FONTID( mapFontGroup( trueTypeVars ), trueTypeVars->familyName );
+        *fontID = MAKE_FONTID( mapFontGroup( &FACE_PROPERTIES ), familyName );
         return FALSE;
 }
 
@@ -1024,32 +1017,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                                        &fontHeader->FH_lastChar ); 
         fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
-
-        /* read parameter from os2 table */
-        fontHeader->FH_h_height   = FACE_PROPERTIES.os2->sCapHeight;
-        fontHeader->FH_x_height   = FACE_PROPERTIES.os2->sxHeight;
-        fontHeader->FH_avgwidth   = FACE_PROPERTIES.os2->xAvgCharWidth;
-        fontHeader->FH_height     = FACE_PROPERTIES.os2->usWinAscent + FACE_PROPERTIES.os2->usWinDescent;
-
-        fontHeader->FH_ascent     = FACE_PROPERTIES.os2->sTypoAscender;
-        fontHeader->FH_ascender   = FACE_PROPERTIES.os2->sTypoAscender;
-        fontHeader->FH_descender  = FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_descent    = -FACE_PROPERTIES.os2->sTypoDescender;
-        fontHeader->FH_baseAdjust = fontHeader->FH_ascender- FACE_PROPERTIES.os2->usWinAscent;
-
-        /* read parameter from horizontal head table */
-        fontHeader->FH_maxRSB   = FACE_PROPERTIES.horizontal->xMax_Extent;
-        fontHeader->FH_maxwidth = FACE_PROPERTIES.horizontal->advance_Width_Max;
-        fontHeader->FH_minLSB   = FACE_PROPERTIES.horizontal->min_Left_Side_Bearing;
-
-        /* read parameter from header table */
-        fontHeader->FH_accent   = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
-        fontHeader->FH_maxBSB   = fontHeader->FH_descender- FACE_PROPERTIES.header->yMin;
-        fontHeader->FH_minTSB   = FACE_PROPERTIES.header->yMax - fontHeader->FH_ascent;
-        fontHeader->FH_underPos = FACE_PROPERTIES.header->yMax + DEFAULT_UNDER_POSITION( UNITS_PER_EM );
-
-        fontHeader->FH_underThick = DEFAULT_UNDER_THICK( UNITS_PER_EM );
-        
         fontHeader->FH_initialized = TRUE;
 
         TrueType_Cache_WriteHeader(
@@ -1237,21 +1204,6 @@ static char* strcpy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
         return dest;
-}
-
-
-static void strcpyname( char* dest, const char* source )
-{
-        while( *source != '\0' ) 
-        {
-                if( *source != ' ' ) 
-                {
-                        *dest = *source;
-                        ++dest;
-                }
-                ++source;
-        }
-        *dest = '\0';  // stringending
 }
 
 
