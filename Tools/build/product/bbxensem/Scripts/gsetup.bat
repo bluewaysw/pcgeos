@@ -11,6 +11,14 @@ rem Usage:
 rem   GSETUP INSTALL
 rem   GSETUP INSTALL -F
 rem   GSETUP ACTIVATE
+rem
+rem Behavior summary:
+rem - INSTALL:
+rem     no GEOS.INI/GEOSEC.INI => install user files / folder stubs + activate.
+rem     existing INI + UPDATE.TXT => activate only (UPDATE.TXT deleted afterwards).
+rem     existing INI + no UPDATE.TXT => abort, unless -F.
+rem - ACTIVATE: always runs activate; UPDATE.TXT is ignored.
+
 
 if "%1"=="" goto NOENTRY
 if "%2"=="" goto NOENTRY
