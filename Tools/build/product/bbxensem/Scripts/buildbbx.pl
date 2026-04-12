@@ -1400,9 +1400,10 @@ sub FreeGEOSCopyImageToEnsemble {
     my( $sourceImage, $targetDir, $targetImage );
 
     #
-    # Only NT builds generate the FreeGEOS GFS image.
+    # NT and NT tools builds generate the FreeGEOS GFS image.
     #
-    if ( $RealInfo{target} ne $TARGET_NT ||
+    if ( ( $RealInfo{target} ne $TARGET_NT &&
+	   $RealInfo{target} ne $TARGET_NT_TOOLS ) ||
 	 $opt_debug ||
 	 $opt_template ) {
 	return;
