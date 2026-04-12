@@ -23,7 +23,6 @@ set OLD_PATH=%cd%
 cd /D %destdir%\localpc
 del /F "%destdir%\localpc\IPX_STAT.TXT"
 del /F ensemble\init.bat
-echo update > ensemble\update.txt
 IF DEFINED GEOS_CENTRAL_STORAGE (
    echo mount s: %GEOS_CENTRAL_STORAGE% >> ensemble\init.bat
 )
