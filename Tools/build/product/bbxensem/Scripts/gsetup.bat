@@ -52,11 +52,17 @@ if exist geosec.ini goto INIEXISTS
 goto DOINSTALL
 
 :INIEXISTS
+if exist update.txt goto UPDATEMARKER
 if "%3"=="-f" goto FORCEWARN
 if "%3"=="-F" goto FORCEWARN
 echo NOTICE: Existing GEOS configuration found in current target directory (GEOS.INI or GEOSEC.INI).
 echo NOTICE: Installation aborted. Use GSETUP INSTALL -F to force install.
 goto END
+
+:UPDATEMARKER
+echo NOTICE: Update marker found (UPDATE.TXT). Running activate phase only.
+if exist update.txt del update.txt
+goto DOACTIVATE
 
 :FORCEWARN
 echo WARNING: Existing GEOS configuration found in current target directory (GEOS.INI or GEOSEC.INI).
