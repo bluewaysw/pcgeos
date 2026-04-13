@@ -8,7 +8,7 @@ following chapter.
 ## 2.1 Routines A-D
 
 ----------
-#### ArrayQuickSort
+### ArrayQuickSort
 Sort the given array using a modified quicksort algorithm.
 
 **Pass:**  
@@ -27,7 +27,7 @@ ax, cx, dx
 **Library:** chunkarr.def
 
 ----------
-#### CellDirty
+### CellDirty
 Mark a cell as dirty.
 
 **Pass:**  
@@ -42,7 +42,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### CellGetDBItem
+### CellGetDBItem
 Get the group and item numbers of the database item associated with the 
 specified cell.
 
@@ -62,7 +62,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### CellGetExtent
+### CellGetExtent
 Get the extent (bounds) of the current sheet of spreadsheet cells.
 
 **Pass:**  
@@ -82,7 +82,7 @@ Nothing.
 **Library:** cell.def
 
 ----------
-#### CellLock
+### CellLock
 Lock a cell's data to examine or change it. The cell should not be locked while 
 also working with other cells; the caller should lock the cell, copy the data, 
 then unlock it with **CellUnlock**.
@@ -102,7 +102,7 @@ di, unless it is returned.
 **Library:** cell.def
 
 ----------
-#### CellReplace
+### CellReplace
 Replace a cell's data with new data.
 
 **Pass:**  
@@ -121,7 +121,7 @@ Possibly **es**, if it pointed to a database item in the same file.
 **Library:** cell.def
 
 ----------
-#### CellUnlock
+### CellUnlock
 Unlock a cell previously locked with **CellLock**.
 
 **Pass:**  
@@ -138,7 +138,7 @@ become unlocked, that register will be set to NULL_SEGMENT.
 **Library:** cell.def
 
 ----------
-#### CheckForDamagedES
+### CheckForDamagedES
 When using the error-checking version of the ui, this routine checks the ES 
 register to make sure it points to a valid LMem block. This comes in handy 
 in code where *es:xx should point to an object.
@@ -157,7 +157,7 @@ Nothing.
 **Library:** ui.def
 
 ----------
-#### ChunkArrayAppend
+### ChunkArrayAppend
 Append a new element to the end of a chunk array.
 
 **Pass:**  
@@ -176,7 +176,7 @@ Nothing.
 chunks or elements within it.
 
 ----------
-#### ChunkArrayCreate
+### ChunkArrayCreate
 Create a new general chunk array with no elements.
 
 **Pass:**  
@@ -204,7 +204,7 @@ Nothing.
 pointers to it.
 
 ----------
-#### ChunkArrayDelete
+### ChunkArrayDelete
 Delete a specified element from the given array.
 
 **Pass:**  
@@ -220,7 +220,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArrayDeleteRange
+### ChunkArrayDeleteRange
 Delete a range of elements from the given chunk array.
 
 **Pass:**  
@@ -238,7 +238,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArrayElementResize
+### ChunkArrayElementResize
 Resize an element in a variable-sized chunk array.
 
 **Pass:**  
@@ -259,7 +259,7 @@ the block are invalidated. If you are resizing the element smaller, the array
 is guaranteed not to move or cause other chunks to move.
 
 ----------
-#### ChunkArrayElementToPtr
+### ChunkArrayElementToPtr
 Return the address of a specified element in a chunk array.
 
 **Pass:**  
@@ -280,7 +280,7 @@ Nothing.
 **Warning:** The error-checking version fatal-errors if passed CA_NULL_ELEMENT in ax.
 
 ----------
-#### ChunkArrayEnum
+### ChunkArrayEnum
 Process all elements in a chunk array, calling a callback routine for each.
 
 **Pass:**  
@@ -311,7 +311,7 @@ cx, dx, bp, es - Data to pass to next enumeration.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArrayEnumRange
+### ChunkArrayEnumRange
 Process the specified elements in a chunk array, calling a callback routine for 
 each element.
 
@@ -346,7 +346,7 @@ cx, dx, bp, es - Data to pass to next enumeration.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArrayGetCount
+### ChunkArrayGetCount
 Return the number of elements in the given chunk array.
 
 **Pass:**  
@@ -361,7 +361,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArrayGetElement
+### ChunkArrayGetElement
 Get an element given its element number.
 
 **Pass:**  
@@ -382,7 +382,7 @@ Nothing.
 passed in ax or if **ax** is out of bounds.
 
 ----------
-#### ChunkArrayInsertAt
+### ChunkArrayInsertAt
 Insert the specified element at a given position in the array.
 
 **Pass:**  
@@ -402,7 +402,7 @@ Nothing.
 pointers to it.
 
 ----------
-#### ChunkArrayPtrToElement
+### ChunkArrayPtrToElement
 Return the element number of the element pointed to.
 
 **Pass:**  
@@ -418,7 +418,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArraySort
+### ChunkArraySort
 Sort the given chunk array in ascending order.
 
 **Pass:**  
@@ -461,7 +461,7 @@ ZF - clear
 **Library:** chunkarr.def
 
 ----------
-#### ChunkArrayZero
+### ChunkArrayZero
 Free all the elements of the given chunk array and resize it.
 
 **Pass:**  
@@ -476,7 +476,7 @@ Nothing.
 **Library:** chunkarr.def
 
 ----------
-#### ClipboardAbortQuickTransfer
+### ClipboardAbortQuickTransfer
 This routine aborts a quick-transfer. This routine is normally used if the 
 quick-transfer source object is about to be destroyed or if an error occurs 
 trying to register the quick-transfer item.
@@ -493,7 +493,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardAddToNotificationList
+### ClipboardAddToNotificationList
 Add the passed OD to the transfer notify list.
 
 **Pass:**  
@@ -508,7 +508,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardClearQuickTransferNotification
+### ClipboardClearQuickTransferNotification
 This routine removes the quick-transfer OD notification.
 
 **Pass:**  
@@ -523,7 +523,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardDoneWithItem
+### ClipboardDoneWithItem
 This routine must be called when you are finished using the requested 
 transfer item.
 
@@ -540,7 +540,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardEndQuickTransfer
+### ClipboardEndQuickTransfer
 
 End a quick-transfer. Reset the mouse pointer image, clear the 
 quick-transfer region (if any), and clear the quick-transfer item. Send out 
@@ -562,7 +562,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardEnumItemFormats
+### ClipboardEnumItemFormats
 This routine returns the list of all available formats 
 (**ClipboardItemFormatID** structures).
 
@@ -583,7 +583,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardFreeItem
+### ClipboardFreeItem
 Free the passed clipboard item.
 
 **Pass:**  
@@ -598,7 +598,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardFreeItemsNotInUse
+### ClipboardFreeItemsNotInUse
 Frees normal or quick transfer item if nobody's using it, nukes references to 
 it, sends proper GCN messages out.
 
@@ -618,7 +618,7 @@ item, as this routine just frees the data without updating any references in
 the map block.
 
 ----------
-#### ClipboardGetClipboardFile
+### ClipboardGetClipboardFile
 Return the VM file used to hold clipboard items.
 
 **Pass:**  
@@ -633,7 +633,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardGetItemInfo
+### ClipboardGetItemInfo
 
 Get more information about the passed transfer item.
 
@@ -650,7 +650,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardGetNormalItemInfo
+### ClipboardGetNormalItemInfo
 
 Return normal clipboard item information.
 
@@ -667,7 +667,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardGetQuickItemInfo
+### ClipboardGetQuickItemInfo
 
 Return quick clipboard item information.
 
@@ -684,7 +684,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardGetQuickTransferStatus
+### ClipboardGetQuickTransferStatus
 
 Check to see if a quick-transfer is in progress.
 
@@ -703,7 +703,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardGetUndoItemInfo
+### ClipboardGetUndoItemInfo
 
 Return undo clipboard item information.
 
@@ -720,7 +720,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardHandleEndMoveCopy
+### ClipboardHandleEndMoveCopy
 This routine handles a MSG_META_END_COPY, either preparing to finish the 
 quick-transfer and send a MSG_META_END_MOVE_COPY to the object with 
 the active grab or ending the quick-transfer and sending a 
@@ -743,7 +743,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardQueryItem
+### ClipboardQueryItem
 This routine registers the passed transfer item.
 
 **Pass:**  
@@ -764,7 +764,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardRegisterItem
+### ClipboardRegisterItem
 
 This routine registers the passed transfer item.
 
@@ -785,7 +785,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardRemoteReceive
+### ClipboardRemoteReceive
 Receive clipboard from remotely connected machine.
 
 **Pass:**  
@@ -800,7 +800,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardRemoteSend
+### ClipboardRemoteSend
 Send clipboard to remotely connected machine.
 
 **Pass:**  
@@ -815,7 +815,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardRemoveFromNotificationList
+### ClipboardRemoveFromNotificationList
 Remove the passed OD from the transfer notify list.
 
 **Pass:**  
@@ -831,7 +831,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardRequestItemFormat
+### ClipboardRequestItemFormat
 This routine requests the given transfer item, as stored in the given format 
 type.
 
@@ -852,7 +852,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardSetQuickTransferFeedback
+### ClipboardSetQuickTransferFeedback
 Set mouse cursor for quick-transfer.
 
 **Pass:**  
@@ -872,7 +872,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardStartQuickTransfer
+### ClipboardStartQuickTransfer
 Initiate a quick transfer (normally called from 
 MSG_META_START_MOVE_COPY).
 
@@ -925,7 +925,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardTestItemFormat
+### ClipboardTestItemFormat
 This routine determines whether the clipboard item supports the specified 
 format.
 
@@ -943,7 +943,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ClipboardUnregisterItem
+### ClipboardUnregisterItem
 
 This routine unregisters the passed clipboard item, restoring any transfer 
 which may have been disturbed by the last normal clipboard item.
@@ -961,7 +961,7 @@ Nothing.
 **Library:** clipbrd.def
 
 ----------
-#### ConfigBuildTitledMoniker
+### ConfigBuildTitledMoniker
 Global routine to build a titled moniker based on the passed moniker list
 
 **Pass:**  
@@ -976,7 +976,7 @@ Nothing.
 **Library:** config.def
 
 ----------
-#### ConfigBuildTitledMonikerUsingToken
+### ConfigBuildTitledMonikerUsingToken
 Combine 2 vis monikers-placing the text moniker centered below the 
 picture moniker.
 
@@ -994,7 +994,7 @@ ax, bx, cx, di
 **Library:** config.def
 
 ----------
-#### DBAlloc
+### DBAlloc
 Allocate a new database item in a specified group.
 
 **Pass:**  
@@ -1017,7 +1017,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBCopyDBItem
+### DBCopyDBItem
 Copy an existing database item into a newly-allocated item.
 
 **Pass:**  
@@ -1041,7 +1041,7 @@ Nothing.
 pointers are invalidated by this routine.
 
 ----------
-#### DBDeleteAt
+### DBDeleteAt
 Delete a given number of bytes from within the specified database item.
 
 **Pass:**  
@@ -1060,7 +1060,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBDirty
+### DBDirty
 
 Mark a database item as dirty so it will be written to the database file with 
 its changes.
@@ -1077,7 +1077,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBFree
+### DBFree
 Remove the specified item from the database.
 
 **Pass:**  
@@ -1094,7 +1094,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBGetMap
+### DBGetMap
 Return the item that is set to be the database's map.
 
 **Pass:**  
@@ -1110,7 +1110,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBGroupAlloc
+### DBGroupAlloc
 Create a new database group.
 
 **Pass:**  
@@ -1125,7 +1125,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBGroupFree
+### DBGroupFree
 Remove all items in the specified group and delete the group.
 
 **Pass:**  
@@ -1141,7 +1141,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBInsertAt
+### DBInsertAt
 Insert a specified number of bytes within a given database item. The bytes 
 may be inserted at any offset, and the new bytes will be zeroed.
 
@@ -1168,7 +1168,7 @@ Nothing.
 all pointers are invalidated by this routine.
 
 ----------
-#### DBLock
+### DBLock
 Lock a database item for exclusive access. When you're done with the item, 
 unlock it with **DBUnlock**.
 
@@ -1186,7 +1186,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBLockMap
+### DBLockMap
 Lock the map item for the database file. This is a utility that is slightly 
 quicker than calling **DBGetMap** followed by **DBLock**. When finished with 
 the map item, you must call **DBUnlock** on it.
@@ -1204,7 +1204,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBReAlloc
+### DBReAlloc
 Change the size of an existing database item.
 
 **Pass:**  
@@ -1224,7 +1224,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBSetMap
+### DBSetMap
 Mark a database item as being the map item for the database file.
 
 **Pass:**  
@@ -1241,7 +1241,7 @@ Nothing.
 **Library:** dbase.def
 
 ----------
-#### DBUnlock
+### DBUnlock
 Unlocks a database item that had previously been locked with **DBLock**.
 
 **Pass:**  
@@ -1257,7 +1257,7 @@ NULL_SEGMENT to it, if it pointed to a block that had become unlocked.)
 **Library:** dbase.def
 
 ----------
-#### DiskCheckInUse
+### DiskCheckInUse
 Determine if the passed disk is actively being used, either by an open file or 
 by a thread having a directory on the disk in its directory stack.
 
@@ -1273,7 +1273,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskCheckUnnamed
+### DiskCheckUnnamed
 Check if the passed disk handle refers to an unnamed disk (i.e. a disk that 
 has no user-supplied volume name).
 
@@ -1289,7 +1289,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskCheckWritable
+### DiskCheckWritable
 See if the passed volume is writable.
 
 **Pass:**  
@@ -1304,7 +1304,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskCopy
+### DiskCopy
 Copies the contents of the source disk to the destination disk, prompting for 
 them as necessary.
 
@@ -1345,7 +1345,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskFind
+### DiskFind
 Search the list of registered disks and return the handle of that having the 
 passed volume name. An additional search is also made to ensure the match 
 is unique.
@@ -1367,7 +1367,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskForEach
+### DiskForEach
 Call a callback routine for each disk registered with the system, allowing the 
 callback to cancel the operation.
 
@@ -1397,7 +1397,7 @@ ax, cx, dx, bp
 **Library:**    disk.def
 
 ----------
-#### DiskFormat
+### DiskFormat
 Format the disk in the specified drive.
 
 **Pass:**  
@@ -1435,7 +1435,7 @@ CF - Return set to cancel format.
 **Warning:** All data on the destination disk is lost.
 
 ----------
-#### DiskGetDrive
+### DiskGetDrive
 Return the drive number of the drive in which the passed disk was 
 registered.
 
@@ -1451,7 +1451,7 @@ ah
 **Library:** disk.def
 
 ----------
-#### DiskGetVolumeFreeSpace
+### DiskGetVolumeFreeSpace
 Return the number of bytes free on a volume.
 
 **Pass:**  
@@ -1468,7 +1468,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskGetVolumeInfo
+### DiskGetVolumeInfo
 Return information about a registered disk.
 
 **Pass:**  
@@ -1487,7 +1487,7 @@ ax
 **Library:** disk.def
 
 ----------
-#### DiskGetVolumeName
+### DiskGetVolumeName
 Return the volume name of the disk specified by the passed handle.
 
 **Pass:**  
@@ -1505,7 +1505,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskRegisterDisk
+### DiskRegisterDisk
 Register a disk with the system.
 
 **Pass:**  
@@ -1521,7 +1521,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskRegisterDiskSilently
+### DiskRegisterDiskSilently
 Register a disk with the system without informing the user.
 
 **Pass:**  
@@ -1537,7 +1537,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskRestore
+### DiskRestore
 Restore a disk handle that had been saved to the state file with DiskSave.
 
 **Pass:**  
@@ -1578,7 +1578,7 @@ DRE_USER_CANCELED_RESTORE).
 **Library:** disk.def
 
 ----------
-#### DiskSave
+### DiskSave
 Save information that will allow a disk handle to be restored when the caller 
 is restoring itself from a state file after a shutdown.
 
@@ -1600,7 +1600,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DiskSetVolumeName
+### DiskSetVolumeName
 Set the name of a registered disk.
 
 **Pass:**  
@@ -1619,7 +1619,7 @@ Nothing.
 **Library:** disk.def
 
 ----------
-#### DosExec
+### DosExec
 Begin execution of a DOS application, shutting down GEOS to state files or 
 creating a new task in the task-switcher for the DOS application.
 
@@ -1655,7 +1655,7 @@ ax, bx, cx, dx, di, si, bp, ds, es
 **Library:** system.def
 
 ----------
-#### DriveGetDefaultMedia
+### DriveGetDefaultMedia
 Return the GEOS media descriptor of the highest density format supported 
 by the specified drive.
 
@@ -1672,7 +1672,7 @@ Nothing.
 **Library:** drive.def
 
 ----------
-#### DriveGetExtStatus
+### DriveGetExtStatus
 Return the extended status word for the specified drive.
 
 **Pass:**  
@@ -1688,7 +1688,7 @@ Nothing.
 **Library:** drive.def
 
 ----------
-#### DriveGetName
+### DriveGetName
 Return the name of the specified drive.
 
 **Pass:**  
@@ -1714,7 +1714,7 @@ Nothing.
 **Library:** drive.def
 
 ----------
-#### DriveGetStatus
+### DriveGetStatus
 Returns status information on the specified drive.
 
 **Pass:**  
@@ -1730,7 +1730,7 @@ Nothing.
 **Library:** drive.def
 
 ----------
-#### DriveTestMediaSupport
+### DriveTestMediaSupport
 Test if the specified drive supports the given media type.
 
 **Pass:**  

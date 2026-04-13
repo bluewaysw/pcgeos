@@ -1,7 +1,7 @@
 ## 3.2 Structures D-F
 
 ----------
-#### DACPlayFlags
+### DACPlayFlags
     DACPlayFlags        record
         DACPF_CATENATE          :1
                                 :7
@@ -10,7 +10,7 @@
 **Library:** sound.def
 
 ----------
-#### DACReferenceByte
+### DACReferenceByte
     DACReferenceByte        etype       word, 0, 1
         DACRB_NO_REFERENCE_BYTE     enum        DACReferenceByte
         DACRB_WITH_REFERENCE_BYTE   enum        DACReferenceByte
@@ -18,7 +18,7 @@
 **Library:** sound.def
 
 ----------
-#### DACSampleFormat
+### DACSampleFormat
     DACSampleFormat     etype       word, 0, 1
         DACSF_8_BIT_PCM         enum        DACSampleFormat
         DACSF_2_TO_1_ADPCM      enum        DACSampleFormat
@@ -28,7 +28,7 @@
 **Library:** sound.def
 
 ----------
-#### DateTimeFormat
+### DateTimeFormat
     DateTimeFormat      etype       word
         DTF_LONG                    enum    DateTimeFormat ; Sunday, March 5th, 1990
         DTF_LONG_CONDENSED          enum    DateTimeFormat ; Sun, Mar 5, 1990
@@ -66,7 +66,7 @@ substantially different.
 **Library:** localize.def
 
 ----------
-#### DBaseItem
+### DBaseItem
     DBaseItem       struct
         DBI_group       word    ; The group in which the data resides.
         DBI_item        word    ; The item within that group.
@@ -77,7 +77,7 @@ This structure defines a dbase item.
 **Library:** cell.def
 
 ----------
-#### DBGroupAndItem
+### DBGroupAndItem
     DBGroupAndItem          struct
         DBGI_item       word
         DBGI_group      word
@@ -86,7 +86,7 @@ This structure defines a dbase item.
 **Library:** dbase.def
 
 ----------
-#### dbptr
+### dbptr
     dbptr   struct
         dbitem  word
         dbgroup word
@@ -95,7 +95,7 @@ This structure defines a dbase item.
 **Library:** config.def
 
 ----------
-#### DCCFeatures
+### DCCFeatures
     DCCFeatures     record
         DCCF_DROP_CAP       :1
     DCCFeatures     end
@@ -106,14 +106,14 @@ ATTR_GEN_CONTROL_PROHIBIT_UI.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### DCCToolboxFeatures
+### DCCToolboxFeatures
     DCCToolboxFeatures      record
     DCCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### DDFixed
+### DDFixed
     DDFixed struct
         DDF_frac        dword
         DDF_int     sdword
@@ -124,7 +124,7 @@ This structure defines a 32 bit/32 bit fixed point number.
 **Library:** geos.def
 
 ----------
-#### DebugObjDuplicateResourceInfo
+### DebugObjDuplicateResourceInfo
     DebugObjDuplicateResourceInfo   struct
         DODRI_tempOwner char    GEODE_NAME_SIZE dup(?)
         ; The permanent name of the geode owning the template that this block
@@ -147,7 +147,7 @@ symbol, uses this to be able to show a reference like:
 **Library:** metaC.def
 
 ----------
-#### DefaultFieldNameUsage
+### DefaultFieldNameUsage
     DefaultFieldNameUsage   etype   byte,   0
         DFNU_FIELD      enum    DefaultFieldNameUsage
         DFNU_COLUMN     enum    DefaultFieldNameUsage
@@ -156,7 +156,7 @@ symbol, uses this to be able to show a reference like:
 **Library:** impex.def
 
 ----------
-#### Dependency
+### Dependency
     Dependency      struct
         D_row           word        ; Row of the dependency.
         D_column        byte        ; Column of the dependency.
@@ -165,7 +165,7 @@ symbol, uses this to be able to show a reference like:
 **Library:** parse.def
 
 ----------
-#### DependencyBlock
+### DependencyBlock
     DependencyBlock     struct
         DB_size     word    ; Size of the block containing the dependency.
     DependencyBlock     ends
@@ -173,7 +173,7 @@ symbol, uses this to be able to show a reference like:
 **Library:** parse.def
 
 ----------
-#### DependencyListHeader
+### DependencyListHeader
     DependencyListHeader            struct
         DLH_next        dword   ; DBase item containing next block in the list.
     DependencyListHeader            ends
@@ -185,7 +185,7 @@ start of the cell data).
 **Library:** parse.def
 
 ----------
-#### DependencyParameters
+### DependencyParameters
     DependencyParameters            struct
         DP_common           CommonParameters <>
         ;
@@ -210,7 +210,7 @@ This structure is passed to the dependency code.
 **Library:** parse.def
 
 ----------
-#### DerefFlags
+### DerefFlags
     DerefFlags      record
         DF_DONT_POP_ARGUMENT    :1      ; Set = don't pop arg from arg stack.
     DerefFlags      end
@@ -218,7 +218,7 @@ This structure is passed to the dependency code.
 **Library:** parse.def
 
 ----------
-#### DestinationClassArgs
+### DestinationClassArgs
     DestinationClassArgs            struct
         DCA_class       fptr.ClassStruct
     DestinationClassArgs            ends
@@ -226,7 +226,7 @@ This structure is passed to the dependency code.
 **Library:** Objects/genC.def
 
 ----------
-#### DetachDataEntry
+### DetachDataEntry
     DetachDataEntry     struct
         DDE_ackCount        word
         DDE_callerID        word
@@ -237,7 +237,7 @@ This structure is passed to the dependency code.
 **Library:** Objects/metaC.def
 
 ----------
-#### DevicePresent
+### DevicePresent
     DevicePresent       etype       word
         DP_NOT_PRESENT          enum        DevicePresent, 0xffff   
         DP_CANT_TELL            enum        DevicePresent, 0    
@@ -259,7 +259,7 @@ An unknown device string was passed.
 **Library:** driver.def
 
 ----------
-#### DirPathInfo
+### DirPathInfo
     DirPathInfo     record
         DPI_EXISTS_LOCALLY          :1
         DPI_ENTRY_NUMBER_IN_PATH    :7
@@ -273,7 +273,7 @@ server-based one).
 **Library:** file.def
 
 ----------
-#### DiskCopyCallback
+### DiskCopyCallback
     DiskCopyCallback        etype       word, 0
         DCC_GET_SOURCE_DISK                 enum DiskCopyCallback
             ;   Desc:   prompt the user to insert the source disk.
@@ -341,7 +341,7 @@ callback operation to use with this routine.
 **Library:** disk.def
 
 ----------
-#### DiskCopyError
+### DiskCopyError
     DiskCopyError       etype       word, FormatError
         ERR_INVALID_SOURCE_DRIVE                            enum DiskCopyError
         ERR_INVALID_DEST_DRIVE                              enum DiskCopyError
@@ -386,7 +386,7 @@ it and the registration failed.
 **Library:** disk.def
 
 ----------
-#### DiskCopyFlags
+### DiskCopyFlags
     DiskCopyFlags           record
         DCF_GREEDY      :1
                         :7
@@ -400,7 +400,7 @@ drives are the same.
 **Library:** disk.def
 
 ----------
-#### DiskFindResult
+### DiskFindResult
     DiskFindResult      etype       word
         DFR_UNIQUE              enum    DiskFindResult
         DFR_NOT_UNIQUE          enum    DiskFindResult
@@ -409,7 +409,7 @@ drives are the same.
 **Library:** disk.def
 
 ----------
-#### DiskFormatFlags
+### DiskFormatFlags
     DiskFormatFlags     record
                                     :13
         DFF_CALLBACK_PCT_DONE       :1
@@ -431,7 +431,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** disk.def
 
 ----------
-#### DiskInfoStruct
+### DiskInfoStruct
     DiskInfoStruct      struct
         DIS_blockSize   word    ; number of bytes in which file system allocations
                                 ; are performed. Useful as an efficient
@@ -445,7 +445,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** disk.def
 
 ----------
-#### DiskRestoreError
+### DiskRestoreError
     DiskRestoreError        etype       word, 0, 1
         DRE_DISK_IN_DRIVE                       enum DiskRestoreError
              ;  This is the value returned by DiskRestore itself and the callback 
@@ -481,7 +481,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** disk.def
 
 ----------
-#### DisplayAspectRatio
+### DisplayAspectRatio
     DisplayAspectRatio      etype       byte
         DAR_NORMAL              enum        DisplayAspectRatio  ;VGA, MCGA
         DAR_SQUISHED            enum        DisplayAspectRatio  ;EGA, HGCA
@@ -490,7 +490,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** win.def
 
 ----------
-#### DisplayClass
+### DisplayClass
     DisplayClass        etype       byte
         DC_TEXT     enum        DisplayClass    ;denotes that display is 
                                                 ;character only (Not implemented)
@@ -506,7 +506,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** win.def
 
 ----------
-#### DisplayScheme
+### DisplayScheme
     DisplayScheme       struct
         DS_colorScheme          ColorScheme     ;passed in al
         DS_displayType          DisplayType     ;passed in ah
@@ -521,7 +521,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** Objects/visC.def
 
 ----------
-#### DisplaySize
+### DisplaySize
     DisplaySize     etype       byte
         DS_TINY         enum    DisplaySize ;tiny screens: CGA, 256x320
         DS_STANDARD     enum    DisplaySize ;standard screens: EGA,VGA,HGC,MCGA
@@ -531,7 +531,7 @@ This flag is set if we wish to force erasure of the entire disk.
 **Library:** win.def
 
 ----------
-#### DisplayType
+### DisplayType
     DisplayType     record
         DT_DISP_SIZE                DisplaySize:2
         DT_DISP_ASPECT_RATIO        DisplayAspectRatio:2
@@ -550,7 +550,7 @@ Class of driver (or closest match).
 **Library:** win.def
 
 ----------
-#### DistanceUnit
+### DistanceUnit
     DistanceUnit        etype       byte
         DU_POINTS                   enum DistanceUnit
             ;U.S. points (72 per inch)
@@ -584,7 +584,7 @@ Class of driver (or closest match).
 **Library:** localize.def
 
 ----------
-#### DocQuitStatus
+### DocQuitStatus
     DocQuitStatus       etype       word
         DQS_OK              enum    DocQuitStatus
         DQS_CANCEL          enum    DocQuitStatus
@@ -594,7 +594,7 @@ Class of driver (or closest match).
 **Library:** Objects/gDocGrpC.def
 
 ----------
-#### DocumentCommonParams
+### DocumentCommonParams
     DocumentCommonParams            struct
         DCP_name            FileLongName
         DCP_diskHandle      word
@@ -612,7 +612,7 @@ simplify passing the flags around.
 **Library:** Objects/gDocC.def
 
 ----------
-#### DocumentFileChangedParams
+### DocumentFileChangedParams
     DocumentFileChangedParams               struct
         DFCP_name               FileLongName
         DFCP_diskHandle         hptr
@@ -624,7 +624,7 @@ simplify passing the flags around.
 **Library:** Objects/gDocCtrl.def
 
 ----------
-#### DocumentOpenFlags
+### DocumentOpenFlags
     DocumentOpenFlags       record
         DOF_CREATE_FILE_IF_FILE_DOES_NOT_EXIST      :1
         DOF_FORCE_TEMPLATE_BEHAVIOR                 :1
@@ -676,7 +676,7 @@ Internal.
 **Library:** Objects/gDocC.def
 
 ----------
-#### DosCodePage
+### DosCodePage
     DosCodePage     etype       word
         CODE_PAGE_US                enum        DosCodePage, 437
         CODE_PAGE_MULTILINGUAL      enum        DosCodePage, 850
@@ -689,7 +689,7 @@ Internal.
 **Library:** localize.def
 
 ----------
-#### DosExecFlags
+### DosExecFlags
     DosExecFlags        record
         DEF_PROMPT                  :1
         DEF_FORCED_SHUTDOWN         :1
@@ -726,7 +726,7 @@ Set if a **DosExecArgAndMemReqStruct** is passed to
 **Library:** system.def
 
 ----------
-#### DosExecMemReq
+### DosExecMemReq
     DosExecMemReq   struct
         DEMR_minimum    word        ; minimum memory requirement
         DEMR_optimal    word        ; optimal memory requirement
@@ -735,7 +735,7 @@ Set if a **DosExecArgAndMemReqStruct** is passed to
 **Library:** 
 
 ----------
-#### DosExecMemReqsStruct
+### DosExecMemReqsStruct
     DosExecMemReqsStruct        struct
         DEMRS_tsr           BooleanByte     BB_FALSE    ; program is a TSR
         DEMRS_conventional  DosExecMemReq   <0,0>       ; conventional
@@ -748,7 +748,7 @@ Set if a **DosExecArgAndMemReqStruct** is passed to
 **Library:** 
 
 ----------
-#### DrawFlags
+### DrawFlags
     DrawFlags       record
         DF_EXPOSED              :1
         DF_OBJECT_SPECIFIC      :1
@@ -789,7 +789,7 @@ This flag is set to **DisplayClass** (*not* **DisplayType**).
 **Library:** Objects/visC.def
 
 ----------
-#### DrawMonikerFlags
+### DrawMonikerFlags
     DrawMonikerFlags        record
         DMF_TEXT_ONLY               :1
         DMF_UNDERLINE_ACCELERATOR   :1
@@ -821,7 +821,7 @@ Horizontal justification.
 **Library:** Objects/visC.def
 
 ----------
-#### DriveExtendedStatus
+### DriveExtendedStatus
     DriveExtendedStatus             record
         DES_LOCAL_ONLY      :1
         DES_READ_ONLY       :1
@@ -854,7 +854,7 @@ Externally-visible status flags.
 **Library:** drive.def
 
 ----------
-#### DriverAttrs
+### DriverAttrs
     DriverAttrs         record
         DA_FILE_SYSTEM              :1
         DA_CHARACTER                :1
@@ -875,7 +875,7 @@ functions.
 **Library:** driver.def
 
 ----------
-#### DriverEscCode
+### DriverEscCode
     DriverEscCode       etype   word, 8000h, 1
         DRV_ESC_QUERY_ESC   enum    DriverEscCode   ; query for escape cpde 
                                                     ; support
@@ -883,7 +883,7 @@ functions.
 **Library:** driver.def
 
 ----------
-#### DriverExtendedFunction
+### DriverExtendedFunction
     DriverExtendedFunction      etype   word, DriverFunction, 2
         DRE_TEST_DEVICE     enum    DriverExtendedFunction
         ;   PASS:       dx:si   = pointer to null-terminated device name string
@@ -905,7 +905,7 @@ functions.
 **Library:** driver.def
 
 ----------
-#### DriverExtendedInfoStruct
+### DriverExtendedInfoStruct
     DriverExtendedInfoStruct            struct
         DEIS_common             DriverInfoStruct
         DEIS_resource           hptr.DriverExtendedInfoTable
@@ -929,7 +929,7 @@ resource to keep the amount of fixed memory required to a minimum.
 **Library:** driver.def
 
 ----------
-#### DriverExtendedInfoTable
+### DriverExtendedInfoTable
     DriverExtendedInfoTable         struct
         DEIT_common             LMemBlockHeader
         DEIT_numDevices         word
@@ -954,7 +954,7 @@ stored here is specified by the driver-type-specific interface .def file (e.g.
 **Library:** driver.def
 
 ----------
-#### DriverFunction
+### DriverFunction
     DriverFunction      etype       word, 0, 2
         DR_INIT             enum DriverFunction ;Initialize driver
         ;   PASS:   cx  = di passed to GeodeLoad. Garbage if loaded via
@@ -1011,7 +1011,7 @@ stored here is specified by the driver-type-specific interface .def file (e.g.
 **Library:** driver.def
 
 ----------
-#### DriverInfoStruct
+### DriverInfoStruct
     DriverInfoStruct            struct
         DIS_strategy                fptr.far
         DIS_driverAttributes        DriverAttrs
@@ -1032,7 +1032,7 @@ driver.
 **Library:** driver.def
 
 ----------
-#### DriverType
+### DriverType
     DriverType      etype       word, 1
         DRIVER_TYPE_VIDEO               enum        DriverType
         DRIVER_TYPE_INPUT               enum        DriverType
@@ -1055,7 +1055,7 @@ driver.
 **Library:** driver.def
 
 ----------
-#### DriveStatus
+### DriveStatus
     DriveStatus     record
         DS_PRESENT          :1          ; Set if physical drive exists
         DS_MEDIA_REMOVABLE  :1          ; Set if disk can be removed from 
@@ -1071,7 +1071,7 @@ driver.
 **Library:** drive.def
 
 ----------
-#### DriveType
+### DriveType
     DriveType       etype       byte
         DRIVE_5_25          enum    DriveType
         DRIVE_3_5           enum    DriveType
@@ -1085,7 +1085,7 @@ driver.
 **Library:** drive.def
 
 ----------
-#### DTCFeatures
+### DTCFeatures
     DTCFeatures     record
         DTCF_LIST       :1
         DTCF_CUSTOM     :1
@@ -1097,14 +1097,14 @@ ATTR_GEN_CONTROL_PROHIBIT_UI).
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### DTCToolboxFeatures
+### DTCToolboxFeatures
     DTCToolboxFeatures      record
     DTCToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### DWFixed
+### DWFixed
     DWFixed     struct
         DWF_frac        word
         DWF_int         sdword
@@ -1115,7 +1115,7 @@ This structure stores a 32 bit/16 bit fixed point number.
 **Library:** geos.def
 
 ----------
-#### ElementArrayHeader
+### ElementArrayHeader
     ElementArrayHeader      struct
         EAH_meta        ChunkArrayHeader
         EAH_freePtr     word
@@ -1133,7 +1133,7 @@ Applications should not examine or change this field.
 **Library:** chunkarr.def
 
 ----------
-#### EMCDetachData
+### EMCDetachData
     EMCDetachData   struct
         EMCDD_ackEvent      hptr 
         EMCDD_childBlock    hptr 
@@ -1154,7 +1154,7 @@ MSG_META_DETACH.
 **Library:** eMenuC.def
 
 ----------
-#### EMCFeatures
+### EMCFeatures
     EMCFeatures     record
         EMCF_GEOS_TASKS_LIST        :1
         EMCF_DESK_ACCESSORY_LIST    :1
@@ -1169,7 +1169,7 @@ MSG_META_DETACH.
 **Library:** eMenuC.def
 
 ----------
-#### EmptyRowBlock
+### EmptyRowBlock
     EmptyRowBlock       struct
         ERB_header          LMemBlockHeader <>
         ERB_handles         word N_ROWS_PER_ROW_BLOCK dup (0)
@@ -1180,7 +1180,7 @@ An empty row block is an LMem block with space for several handles.
 **Library:** cell.def
 
 ----------
-#### EndCreatePassFlags
+### EndCreatePassFlags
     EndCreatePassFlags      record
         ECPF_ADJUSTED_CREATE                :1
     EndCreatePassFlags      end
@@ -1192,7 +1192,7 @@ the object creation.
 **Library:** grobj.def
 
 ----------
-#### EndCreateReturnFlags
+### EndCreateReturnFlags
     EndCreateReturnFlags            record
         ECRF_NOT_CREATING       :1      ;object was not in create mode.
         ECRF_DESTROYED          :1      ;object was destroyed
@@ -1201,7 +1201,7 @@ the object creation.
 **Library:** grobj.def
 
 ----------
-#### EndOfSongFlags
+### EndOfSongFlags
     EndOfSongFlags      record
         EOSF_UNLOCK             :1 = 0  ; unlock block at EOS?
         EOSF_DESTROY            :1 = 0  ; destroy sound at EOS?
@@ -1211,7 +1211,7 @@ the object creation.
 **Library:** sound.def
 
 ----------
-#### EnsureActiveFTPriorityPreferenceData
+### EnsureActiveFTPriorityPreferenceData
     EnsureActiveFTPriorityPreferenceData    struct
         EAFTPPD_priority        word
         EAFTPPD_avoidOptr       optr
@@ -1220,7 +1220,7 @@ the object creation.
 **Library:** 
 
 ----------
-#### EnsureNoMenusInStayUpModeParams
+### EnsureNoMenusInStayUpModeParams
     EnsureNoMenusInStayUpModeParams struc
         ENMISUMP_menuCount      word    ;Number of menus released so far
     EnsureNoMenusInStayUpModeParams ends
@@ -1228,7 +1228,7 @@ the object creation.
 **Library:** ui.def
 
 ----------
-#### EntryPointRelocation
+### EntryPointRelocation
     EntryPointRelocation            struct
         EPR_geodeName           char GEODE_NAME_SIZE dup (?)
         EPR_entryNumber         word
@@ -1239,7 +1239,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** object.def
 
 ----------
-#### EnvelopeOrientation
+### EnvelopeOrientation
     EnvelopeOrientation         etype       byte, 0, 1
         EO_PORTAIT                  enum            EnvelopeOrientation
         EO_LANDSCAPE                enum            EnvelopeOrientation
@@ -1247,7 +1247,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** print.def
 
 ----------
-#### ErrorCheckingFlags
+### ErrorCheckingFlags
     ErrorCheckingFlags      record
         ECF_UNUSED_1:1 
         ECF_UNUSED_2:1 
@@ -1270,7 +1270,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** ec.def
 
 ----------
-#### EvalErrorData
+### EvalErrorData
     EvalErrorData       struct
         EED_errorCode           ParserScannerEvaluatorError
     EvalErrorData       ends
@@ -1278,7 +1278,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** parse.def
 
 ----------
-#### EvalFlags
+### EvalFlags
     EvalFlags       record
         EF_MAKE_DEPENDENCIES    :1  ; Make dependencies instead of 
                                     ; recalculating
@@ -1297,7 +1297,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** parse.def
 
 ----------
-#### EvalFunctionData
+### EvalFunctionData
     EvalFunctionData        struct
         EFD_functionID          FunctionID  ; Function ID if a function
         EFD_nArgs               word        ; Number of arguments
@@ -1306,7 +1306,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** parse.def
 
 ----------
-#### EvalNameData
+### EvalNameData
     EvalNameData        struct
         END_name            word
     EvalNameData        ends
@@ -1314,7 +1314,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** parse.def
 
 ----------
-#### EvalOperatorData
+### EvalOperatorData
     EvalOperatorData        struct
         EOD_opType      OperatorType            ; Type of operator
     EvalOperatorData        ends
@@ -1322,7 +1322,7 @@ This structure is passed to **ObjRelocateEntryPoint**.
 **Library:** parse.def
 
 ----------
-#### EvalParameters
+### EvalParameters
     EvalParameters      struct
         EP_common               CommonParameters <>
         ;
@@ -1348,7 +1348,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvalRangeData
+### EvalRangeData
     EvalRangeData       struct
         ERD_firstCell           CellReference <>
         ERD_lastCell            CellReference <>
@@ -1357,7 +1357,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvalStackArgumentData
+### EvalStackArgumentData
     EvalStackArgumentData           union
         ESAD_string         EvalStringData
         ESAD_range          EvalRangeData
@@ -1367,7 +1367,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvalStackArgumentType
+### EvalStackArgumentType
     EvalStackArgumentType           record
         ESAT_EMPTY      :1          ; Set: Argument came from an empty cell
         ;
@@ -1388,7 +1388,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvalStackOperatorData
+### EvalStackOperatorData
     EvalStackOperatorData           union
         ESOD_operator           EvalOperatorData
         ESOD_function           EvalFunctionData
@@ -1397,7 +1397,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvalStackOperatorType
+### EvalStackOperatorType
     EvalStackOperatorType           etype       byte, 0, 1
         ESOT_OPERATOR           enum        EvalStackOperatorType
         ESOT_FUNCTION           enum        EvalStackOperatorType
@@ -1407,7 +1407,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvalStringData
+### EvalStringData
     EvalStringData          struct
         ESD_length      word    ; Length of the string. (String data follows.)
     EvalStringData          ends
@@ -1415,7 +1415,7 @@ structure is passed in a stack frame.
 **Library:** parse.def
 
 ----------
-#### EvaluatePositionNotes
+### EvaluatePositionNotes
     EvaluatePositionNotes       record
         EPN_PADDING                 :14
         EPN_SELECTION_LOCK_SET      :1  ;Object's selection lock is set.
@@ -1427,7 +1427,7 @@ structure is passed in a stack frame.
 **Library:** grobj.def
 
 ----------
-#### EvaluatePositionRating
+### EvaluatePositionRating
     EvaluatePositionRating          etype       byte, 0
         EVALUATE_NONE               enum        EvaluatePositionRating
         EVALUATE_SUB_LOW            enum        EvaluatePositionRating
@@ -1461,7 +1461,7 @@ Point is on a line or a filled - or partially filled - area.
 **Library:** grobj.def
 
 ----------
-#### ExitFlags
+### ExitFlags
     ExitFlags       record
         EF_PANIC        :1  ; Set if the exit is unstable; in this case we 
                             ; choose not to write out the .ini file.
@@ -1476,7 +1476,7 @@ Point is on a line or a filled - or partially filled - area.
 **Library:** system.def
 
 ----------
-#### ExportControlAttrs
+### ExportControlAttrs
     ExportControlAttrs      record
         ECA_IGNORE_INPUT        :1      ; ignore input while export occurs
                                 :15
@@ -1485,7 +1485,7 @@ Point is on a line or a filled - or partially filled - area.
 **Library:** impex.def
 
 ----------
-#### ExportControlFeatures
+### ExportControlFeatures
     ExportControlFeatures       record
         EXPORTCF_EXPORT_TRIGGER :1  ; export trigger
         EXPORTCF_FORMAT_OPTIONS :1  ; export format UI parent, under which is 
@@ -1504,7 +1504,7 @@ ATTR_GEN_CONTROL_PROHIBIT_UI.
 **Library:** impex.def
 
 ----------
-#### ExportControlToolboxFeatures
+### ExportControlToolboxFeatures
     ExportControlToolboxFeatures                record
         EXPORTCTF_DIALOG_BOX                :1
     ExportControlToolboxFeatures                end
@@ -1512,7 +1512,7 @@ ATTR_GEN_CONTROL_PROHIBIT_UI.
 **Library:** impex.def
 
 ----------
-#### ExtSelFlags
+### ExtSelFlags
     ExtSelFlags     record
         ESF_INITIAL_SELECTION       :1  ;set if initial selection -- will update
                                         ; all items between anchor and extent
@@ -1529,7 +1529,7 @@ ATTR_GEN_CONTROL_PROHIBIT_UI.
 **Library:** Objects/gItemGC.def
 
 ----------
-#### FACFeatures
+### FACFeatures
     FACFeatures         record
         FACF_FONT_WEIGHT            :1
         FACF_FONT_WIDTH             :1
@@ -1539,14 +1539,14 @@ ATTR_GEN_CONTROL_PROHIBIT_UI.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### FACToolboxFeatures
+### FACToolboxFeatures
     FACToolboxFeatures      record
     FACToolboxFeatures      end
 
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### FatalErrors
+### FatalErrors
     FatalErrors     etype   word, 0
         CAN_NOT_USE_CHUNKSIZEPTR_MACRO_ON_EMPTY_CHUNKS      enum FatalErrors
         CHUNK_ARRAY_BAD_ELEMENT                             enum FatalErrors
@@ -1565,7 +1565,7 @@ bounds if Swat is to receive the type unmolested.
 **Library:** ec.def
 
 ----------
-#### FCFeatures
+### FCFeatures
     FCFeatures      record
         FCF_SHORT_LIST          :1
         FCF_LONG_LIST           :1
@@ -1574,7 +1574,7 @@ bounds if Swat is to receive the type unmolested.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### FCToolboxFeatures
+### FCToolboxFeatures
     FCToolboxFeatures           record
         FCTF_TOOL_LIST      :1
     FCToolboxFeatures           end
@@ -1582,7 +1582,7 @@ bounds if Swat is to receive the type unmolested.
 **Library:** Objects/Text/tCtrlC.def
 
 ----------
-#### FEDosInfo
+### FEDosInfo
     FEDosInfo       struct
         FEDI_attributes     FileAttrs           ; file's attributes
         FEDI_modified       FileDateAndTime     ; file's modification timestamp
@@ -1598,7 +1598,7 @@ This structure is used with FileEnum.
 **Library:** fileEnum.def
 
 ----------
-#### FENameAndAttr
+### FENameAndAttr
     FENameAndAttr       struct
         FENAA_attr          FileAttrs
         FENAA_name          FileLongName
@@ -1609,7 +1609,7 @@ This structure is used with FileEnum.
 **Library:** fileEnum.def
 
 ----------
-#### FFA_stackFrame
+### FFA_stackFrame
     FFA_stackFrame      union
         FFA_float               FloatFloatToAsciiData
         FFA_dateTime            FloatFloatToDateTimeData
@@ -1618,7 +1618,7 @@ This structure is used with FileEnum.
 **Library:** math.def
 
 ----------
-#### FFCFeatures
+### FFCFeatures
     FFCFeatures     record
                                     :14
         FCF_FORMAT_LIST             :1
@@ -1628,7 +1628,7 @@ This structure is used with FileEnum.
 **Library:** math.def
 
 ----------
-#### FieldBGFormatType
+### FieldBGFormatType
     FieldBGFormatType       etype   word
         FBGFT_STANDARD_GSTRING              enum FieldBGFormatType
         ;Just a standard graphics string.
@@ -1638,7 +1638,7 @@ This structure is used with FileEnum.
 **Library:** backgrnd.def
 
 ----------
-#### FieldInfo
+### FieldInfo
     FieldInfo       struct
         FI_nChars       word            ; Number of characters in the field
         FI_position     word            ; X position of field on line
@@ -1649,7 +1649,7 @@ This structure is used with FileEnum.
 **Library:** text.def
 
 ----------
-#### FileAccess
+### FileAccess
     FileAccess      etype   byte, 0
         FA_READ_ONLY            enum FileAccess
         FA_WRITE_ONLY           enum FileAccess
@@ -1658,7 +1658,7 @@ This structure is used with FileEnum.
 **Library:** file.def
 
 ----------
-#### FileAccessFlags
+### FileAccessFlags
     FileAccessFlags         record
                         :1=0,           ; Must be 0.
         FAF_EXCLUDE     FileExclude:3,  ; What others may not do.
@@ -1669,7 +1669,7 @@ This structure is used with FileEnum.
 **Library:** file.def
 
 ----------
-#### FileAddStandardPathFlags
+### FileAddStandardPathFlags
     FileAddStandardPathFlags        record
                                 :16
     FileAddStandardPathFlags        end
@@ -1677,7 +1677,7 @@ This structure is used with FileEnum.
 **Library:** 
 
 ----------
-#### FileAttrs
+### FileAttrs
     FileAttrs       record
         :1=0,
         FA_LINK     :1      ; File is a link
@@ -1693,7 +1693,7 @@ This structure is used with FileEnum.
 **Library:** file.def
 
 ----------
-#### FileChangeBatchNotificationData
+### FileChangeBatchNotificationData
     FileChangeBatchNotificationData                 struct
         FCBND_end           nptr
         FCBND_items         label FileChangeBatchNotificationItem
@@ -1705,7 +1705,7 @@ This structure is used with FileEnum.
 **Library:** gcnlist.def
 
 ----------
-#### FileChangeBatchNotificationItem
+### FileChangeBatchNotificationItem
     FileChangeBatchNotificationItem                 struct
         FCBNI_type      FileChangeNotificationType
         FCBNI_disk      word
@@ -1716,7 +1716,7 @@ This structure is used with FileEnum.
 **Library:** gcnlist.def
 
 ----------
-#### FileChangeNotificationData
+### FileChangeNotificationData
     FileChangeNotificationData              struct
         FCND_disk   word            ; handle for disk on which the change occurred
         FCND_id     FileID          ; 32-bit identifier for the directory in 
@@ -1730,7 +1730,7 @@ This structure is used with FileEnum.
 **Library:** gcnlist.def
 
 ----------
-#### FileChangeNotificationType
+### FileChangeNotificationType
     FileChangeNotificationType              etype word
         FCNT_CREATE             enum FileChangeNotificationType
             ; File or directory created. FCND_id is the id of the containing
@@ -1787,7 +1787,7 @@ This structure is used with FileEnum.
 **Library:** gcnlist.def
 
 ----------
-#### FileCreateFlags
+### FileCreateFlags
     FileCreateFlags     record
         FCF_NATIVE                  :1
         FCF_NATIVE_WITH_EXT_ATTRS   :1
@@ -1812,7 +1812,7 @@ How the file should be created.
 **Library:** file.def
 
 ----------
-#### FileCreateMode
+### FileCreateMode
     FileCreateMode      etype   byte, 0
         FILE_CREATE_TRUNCATE            enum FileCreateMode
         FILE_CREATE_NO_TRUNCATE         enum FileCreateMode
@@ -1821,7 +1821,7 @@ How the file should be created.
 **Library:** file.def
 
 ----------
-#### FileDate
+### FileDate
     FileDate        record
         FD_YEAR         :7,     ; year since 1980   
         FD_MONTH        :4,     ; month (1-12)
@@ -1831,7 +1831,7 @@ How the file should be created.
 **Library:** file.def
 
 ----------
-#### FileDateAndTime
+### FileDateAndTime
     FileDateAndTime     struct
         FDAT_date           FileDate
         FDAT_time           FileTime
@@ -1839,7 +1839,7 @@ How the file should be created.
 
 **Library:** file.def
 ----------
-#### FileEnumCallbackData
+### FileEnumCallbackData
     FileEnumCallbackData            struct
         FECD_attrs      label FileExtAttrDesc
     FileEnumCallbackData            ends
@@ -1854,7 +1854,7 @@ attribute, in which case *FEAD_value*.segment will be 0.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumParams
+### FileEnumParams
     FileEnumParams      struct
         FEP_searchFlags         FileEnumSearchFlags 0
         FEP_returnAttrs         fptr.FileExtAttrDesc 0
@@ -1996,7 +1996,7 @@ block if FESF_LEAVE_HEADER set.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumSearchFlags
+### FileEnumSearchFlags
     FileEnumSearchFlags             record
         FESF_DIRS               :1  ; accept directories
         FESF_NON_GEOS           :1  ; accept non-GEOS files
@@ -2020,7 +2020,7 @@ block if FESF_LEAVE_HEADER set.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumStandardCallback
+### FileEnumStandardCallback
     FileEnumStandardCallback            etype       word, 0
         FESC_WILDCARD           enum    FileEnumStandardCallback
             ;FEP_cbData1 is a far pointer to a null-terminated string 
@@ -2038,7 +2038,7 @@ block if FESF_LEAVE_HEADER set.
 **Library:** fileEnum.def
 
 ----------
-#### FileEnumStandardReturnType
+### FileEnumStandardReturnType
     FileEnumStandardReturnType              etype word, 0
         FESRT_COUNT_ONLY                enum FileEnumStandardReturnType
         FESRT_DOS_INFO                  enum FileEnumStandardReturnType
@@ -2048,7 +2048,7 @@ block if FESF_LEAVE_HEADER set.
 **Library:** fileEnum.def
 
 ----------
-#### FileError
+### FileError
     FileError       etype word
         ERROR_UNSUPPORTED_FUNCTION      enum FileError, 1   ;MS-DOS error
         ERROR_FILE_NOT_FOUND            enum FileError, 2   ;MS-DOS error
@@ -2150,7 +2150,7 @@ block if FESF_LEAVE_HEADER set.
 **Library:** file.def
 
 ----------
-#### FileExclude
+### FileExclude
     FileExclude     etype   byte, 0
         FE_COMPAT           enum FileExclude
         FE_EXCLUSIVE        enum FileExclude
@@ -2161,7 +2161,7 @@ block if FESF_LEAVE_HEADER set.
 **Library:** file.def
 
 ----------
-#### FileExtAttrDesc
+### FileExtAttrDesc
     FileExtAttrDesc     struct
         FEAD_attr           FileExtendedAttribute
         FEAD_value          fptr
@@ -2188,7 +2188,7 @@ should have its *FEAD_attr* field set to FEA_END_OF_LIST.
 **Library:** file.def
 
 ----------
-#### FileExtendedAttribute
+### FileExtendedAttribute
     FileExtendedAttribute           etype word, 0
         FEA_MODIFICATION enum FileExtendedAttribute ; FileDateAndTime
         FEA_FILE_ATTR   enum FileExtendedAttribute  ; FileAttrs
@@ -2249,7 +2249,7 @@ should have its *FEAD_attr* field set to FEA_END_OF_LIST.
 **Library:** file.def
 
 ----------
-#### FileOpenAndReadFlags
+### FileOpenAndReadFlags
     FileOpenAndReadFlags            record
         ; These three flags are processed in order:
 
@@ -2270,7 +2270,7 @@ should have its *FEAD_attr* field set to FEA_END_OF_LIST.
 **Library:** file.def
 
 ----------
-#### FilePathID
+### FilePathID
     FilePathID      struct
         FPID_disk           word        ; disk handle
         FPID_id             FileID      ; ID for path on that disk.
@@ -2282,7 +2282,7 @@ These structures act as elements of arrays returned by
 **Library:** file.def
 
 ----------
-#### FilePosMode
+### FilePosMode
     FilePosMode     etype   byte, 0
         FILE_POS_START              enum FilePosMode
         FILE_POS_RELATIVE           enum FilePosMode
@@ -2291,7 +2291,7 @@ These structures act as elements of arrays returned by
 **Library:** file.def
 
 ----------
-#### FileSelectorAttrs
+### FileSelectorAttrs
     FileSelectorAttrs           record
         FSA_ALLOW_CHANGE_DIRS           :1
                     :1
@@ -2343,7 +2343,7 @@ changing variable data).
 **Library:** Objects/gFSelC.def
 
 ----------
-#### FileSelectorFileCriteria
+### FileSelectorFileCriteria
     FileSelectorFileCriteria            record
         ;
         ; Types of files to include in the listing
@@ -2400,7 +2400,7 @@ Also use ATTR_GEN_FILE_SELECTOR_NAME_MASK attribute for directories.
 **Library:** Objects/gFSelC.def
 
 ----------
-#### FileTime
+### FileTime
     FileTime            record
         FT_HOUR     :5,     ; hour (24-hour clock)
         FT_MIN      :6,     ; minute (0-59)
@@ -2411,7 +2411,7 @@ Also use ATTR_GEN_FILE_SELECTOR_NAME_MASK attribute for directories.
 **Library:** file.def
 
 ----------
-#### FindNoteHeader
+### FindNoteHeader
     FindNoteHeader      struct
         FNH_count   word            ; The number of matching notes.
         FNH_data    label dword
@@ -2420,7 +2420,7 @@ Also use ATTR_GEN_FILE_SELECTOR_NAME_MASK attribute for directories.
 **Library:** pen.def
 
 ----------
-#### FloatAsciiToFloatFlags
+### FloatAsciiToFloatFlags
     FloatAsciiToFloatFlags          record
                                 :6
         FAF_PUSH_RESULT         :1
@@ -2441,7 +2441,7 @@ passed in **FloatFloatToAscii**.
 **Library:** math.def
 
 ----------
-#### FloatCtrlInfoStruc
+### FloatCtrlInfoStruc
     FloatCtrlInfoStruc          struc
         ;
         ; passed values
@@ -2481,7 +2481,7 @@ returned by the routine.
 **Library:** math.def
 
 ----------
-#### FloatErrorType
+### FloatErrorType
     FloatErrorType      etype   byte, FLOAT_ERROR_CODES_ENUM_START, 1
         FLOAT_POS_INFINITY              enum FloatErrorType
         FLOAT_NEG_INFINITY              enum FloatErrorType
@@ -2490,7 +2490,7 @@ returned by the routine.
 **Library:** math.def
 
 ----------
-#### FloatExponent
+### FloatExponent
     FloatExponent           record
         FE_SIGN         :1      ; set if number is negative
         FE_EXPONENT     :15     ; the exponent is biased by 3fffh
@@ -2505,7 +2505,7 @@ FE_EXPONENT against FP_NAN.
 **Library:** math.def
 
 ----------
-#### FloatFloatToAsciiData
+### FloatFloatToAsciiData
     FloatFloatToAsciiData           struct
         ;
         ; Fields for caller to set up. All fields must be initialized.
@@ -2563,7 +2563,7 @@ if the exponent format was used.
 **Library:** math.def
 
 ----------
-#### FloatFloatToAsciiFormatFlags
+### FloatFloatToAsciiFormatFlags
     FloatFloatToAsciiFormatFlags                record
         FFAF_FLOAT_RESERVED                 :1
         FFAF_FROM_ADDR                      :1
@@ -2627,7 +2627,7 @@ This flag indicates the position of the sign character(s).
 **Library:** math.def
 
 ----------
-#### FloatFloatToAsciiParams
+### FloatFloatToAsciiParams
     FloatFloatToAsciiParams         struct
         ;
         ;Fields for caller to set up. All fields must be initialized.
@@ -2722,7 +2722,7 @@ the sign is determined by FFAF_SIGN_CHAR_TO_PRECEDE_TRAILER.
 **Library:** math.def
 
 ----------
-#### FloatFloatToAsciiParams_Union
+### FloatFloatToAsciiParams_Union
     FloatFloatToAsciiParams         union
         FFAP_FLOAT          FloatFloatToAsciiParams
         FFAP_DATE_TIME      FloatFloatToDateTimeParams
@@ -2734,7 +2734,7 @@ should be converted into ASCII text or into a date-time.
 **Library:** math.def
 
 ----------
-#### FloatFloatToDateTimeData
+### FloatFloatToDateTimeData
     FloatFloatToDateTimeData            struct
         FFA_dateTimeParams          FloatFloatToDateTimeParams
     FloatFloatToDateTimeData            ends
@@ -2746,7 +2746,7 @@ future. This structure exists as a member of the *FFA_stackFrame* union.
 **Library:** math.def
 
 ----------
-#### FloatFloatToDateTimeFlags
+### FloatFloatToDateTimeFlags
     FloatFloatToDateTimeFlags               record
         ; these first 2 bits must not move
         FFDT_DATE_TIME_OP           :1
@@ -2767,7 +2767,7 @@ FFDT_FORMAT stores the **DateTimeFormat** format to use.
 **Library:** math.def
 
 ----------
-#### FloatFloatToDateTimeParams
+### FloatFloatToDateTimeParams
     FloatFloatToDateTimeParams              struct
         FFA_dateTimeFlags           FloatFloatToDateTimeFlags
         FFA_year                    word
@@ -2790,7 +2790,7 @@ The **FloatFloatToDateTimeParams** is part of the
 **Library:** math.def
 
 ----------
-#### FloatFormatErrors
+### FloatFormatErrors
     FloatFormatErrors       etype   byte, 0
         FLOAT_FORMAT_NO_ERROR                   enum FloatFormatErrors
         FLOAT_FORMAT_TOO_MANY_FORMATS           enum FloatFormatErrors
@@ -2805,7 +2805,7 @@ The **FloatFloatToDateTimeParams** is part of the
 **Library:** math.def
 
 ----------
-#### FloatNum
+### FloatNum
     FloatNum        struct
         F_mantissa_wd0      word                ; offset 0
         F_mantissa_wd1      word                ; offset 2
@@ -2819,7 +2819,7 @@ This structure defines a GEOS 80 bit floating point number.
 **Library:** math.def
 
 ----------
-#### FloatStackType
+### FloatStackType
     FloatStackType      etype   byte, 0
         FLOAT_STACK_GROW                enum FloatStackType
         FLOAT_STACK_WRAP                enum FloatStackType
@@ -2842,7 +2842,7 @@ whenever it reaches its maximum size.
 **Library:** math.def
 
 ----------
-#### FloatingKeyboardInfo
+### FloatingKeyboardInfo
     FloatingKeyboardInfo    struct
         FKI_defaultPosition     word
             ; If set, the keyboard will be moved to the default position before
@@ -2855,7 +2855,7 @@ whenever it reaches its maximum size.
 **Library:** gAppC.def
 
 ----------
-#### FontAttrs
+### FontAttrs
     FontAttrs       record
         FA_USEFUL           FontUseful:1        ;TRUE: "useful" font
         FA_FIXED_WIDTH      FontPitch:1         ;TRUE: fixed width
@@ -2867,7 +2867,7 @@ whenever it reaches its maximum size.
 **Library:** font.def
 
 ----------
-#### FontEnumFlags
+### FontEnumFlags
     FontEnumFlags       record
         FEF_ALPHABETIZE     :1  ;TRUE: alphabetize list
         FEF_USEFUL          :1  ;TRUE: find "useful" fonts only
@@ -2882,7 +2882,7 @@ whenever it reaches its maximum size.
 **Library:** font.def
 
 ----------
-#### FontEnumStruct
+### FontEnumStruct
     FontEnumStruct      struct
         FES_ID      FontID
         FES_name    char FONT_NAME_LEN dup (?)  ; null terminated string
@@ -2893,7 +2893,7 @@ This structure is returned by **GrEnumFonts**.
 **Library:** font.def
 
 ----------
-#### FontFamily
+### FontFamily
     FontFamily          etype   byte
         FF_SERIF            enum FontFamily
         FF_SANS_SERIF       enum FontFamily
@@ -2907,7 +2907,7 @@ This structure is returned by **GrEnumFonts**.
 **Library:** fontID.def
 
 ----------
-#### FontGroup
+### FontGroup
     FontGroup       etype   word, 0, FID_FAMILY_DIVISIONS
         FG_SERIF        enum FontGroup, FF_SERIF        *FID_FAMILY_DIVISIONS
         FG_SANS_SERIF   enum FontGroup, FF_SANS_SERIF   *FID_FAMILY_DIVISIONS
@@ -2921,7 +2921,7 @@ This structure is returned by **GrEnumFonts**.
 **Library:** fontID.def
 
 ----------
-#### FontID
+### FontID
     FontID  etype   word
         FID_INVALID                         enum FontID, 0x0000 ; invalid font ID
         FID_PRINTER_PROP_SANS               enum FontID,  0xf200
@@ -4097,7 +4097,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** fontID.def
 
 ----------
-#### FontIDRecord
+### FontIDRecord
     FontIDRecord            record
         FIDR_maker      :4
         FIDR_ID         :12
@@ -4106,7 +4106,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** font.def
 
 ----------
-#### FontMaker
+### FontMaker
     FontMaker       etype       word, 0, FID_MAKER_DIVISIONS
         FM_BITMAP           enum FontMaker
         FM_NIMBUSQ          enum FontMaker
@@ -4121,7 +4121,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** fontID.def
 
 ----------
-#### FontMap
+### FontMap
     FontMap etype   byte, 0
         FM_EXACT        enum FontMap, 0
         FM_DONT_USE     enum FontMap, 0xff
@@ -4129,7 +4129,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** fontID.def
 
 ----------
-#### FontOrientation
+### FontOrientation
     FontOrientation     etype   byte
         FO_NORMAL       enum FontOrientation    ; normal straight up & down font
         FO_LANDSCAPE    enum FontOrientation    ; rotated 90 degrees.
@@ -4137,7 +4137,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** font.def
 
 ----------
-#### FontPitch
+### FontPitch
     FontPitch       etype       byte
         FP_PROPORTIONAL     enum FontPitch  ; proportional font.
         FP_FIXED            enum FontPitch  ; Fixed pitch font.
@@ -4145,7 +4145,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** font.def
 
 ----------
-#### FontSource
+### FontSource
     FontSource      etype   byte
         FS_BITMAP       enum FontSource     ; bitmap data
         FS_OUTLINE      enum FontSource     ; outline data
@@ -4153,7 +4153,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** font.def
 
 ----------
-#### FontUseful
+### FontUseful
     FontUseful      etype   byte
         FU_NOT_USEFUL   enum FontUseful     ; not useful for menus
         FU_USEFUL       enum FontUseful     ; useful for menus
@@ -4161,7 +4161,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** font.def
 
 ----------
-#### FontWeight
+### FontWeight
     FontWeight      etype   byte
         FW_MINIMUM      enum FontWeight, 75
         FW_NORMAL       enum FontWeight, 100
@@ -4170,7 +4170,7 @@ fonts, and FID_INVALID, which is a special case and is set to all zeros.
 **Library:** font.def
 
 ----------
-#### FontWidth
+### FontWidth
     FontWidth       etype       byte
         FWI_MINIMUM         enum FontWidth, 25
         FWI_NARROW          enum FontWidth, 75
@@ -4185,7 +4185,7 @@ This type defines the width of the font as a percentage of its normal width.
 **Library:** font.def
 
 ----------
-#### FormatArrayHeader
+### FormatArrayHeader
     FormatArrayHeader       struc
         FAH_signature           word
         FAH_numFormatEntries    word    ; format array entries that have
@@ -4197,7 +4197,7 @@ This type defines the width of the font as a percentage of its normal width.
 **Library:** math.def
 
 ----------
-#### FormatEntry
+### FormatEntry
     FormatEntry     struc
         FE_params           FormatParams
         FE_listEntryNumber  word        ; list entry number
@@ -4210,7 +4210,7 @@ This type defines the width of the font as a percentage of its normal width.
 **Library:** math.def
 
 ----------
-#### FormatError
+### FormatError
     FormatError     etype   word
         FMT_DONE                            enum FormatError, 0
         FMT_READY                           enum FormatError
@@ -4239,7 +4239,7 @@ This type defines the width of the font as a percentage of its normal width.
 **Library:** disk.def
 
 ----------
-#### FormatInfoStruc
+### FormatInfoStruc
     FormatInfoStruc     struc
         FIS_signature                   word
         FIS_userDefFmtArrayFileHan      word
@@ -4292,7 +4292,7 @@ in with the matching **FormatParams**.
 **Library:** math.def
 
 ----------
-#### FormatNameParams
+### FormatNameParams
     FormatNameParams        struct
         FNP_listEntry   word                ; the entry number in the defined 
                                             ; list
@@ -4305,7 +4305,7 @@ in with the matching **FormatParams**.
 **Library:** math.def
 
 ----------
-#### FormatOption
+### FormatOption
     FormatOption        record
                                 :2
         FO_COMMA                :1
@@ -4319,7 +4319,7 @@ in with the matching **FormatParams**.
 **Library:** math.def
 
 ----------
-#### FormatParams
+### FormatParams
     FormatParams        struc
         FP_params           FloatFloatToAsciiParams_Union
         FP_formatName       char FORMAT_NAME_LENGTH+1 dup (?)
@@ -4348,7 +4348,7 @@ within the dynamic list.
 **Library:** parse.def
 
 ----------
-#### FormatParameters
+### FormatParameters
     FormatParameters        struct
         FP_common       CommonParameters <>
         FP_nChars       word                ; Number of bytes left in the buffer.
@@ -4357,7 +4357,7 @@ within the dynamic list.
 **Library:** parse.def
 
 ----------
-#### FRSPFlags
+### FRSPFlags
     FRSPFlags       record
                                         :14
         FRSPF_ADD_DRIVE_NAME            :1
@@ -4376,7 +4376,7 @@ directory along the standard path.
 **Library:** file.def
 
 ----------
-#### FTVMCGrab
+### FTVMCGrab
     FTVMCGrab       struct
         FTVMC_OD            optr
         FTVMC_flags         MetaAlterFTVMCExclFlags
@@ -4388,7 +4388,7 @@ record, adding the optr of the Focus/Target/Model hierarchical grab.
 **Library:** uiInputC.def
 
 ----------
-#### FunctionID
+### FunctionID
     FunctionID      etype   word, 0, 2
         FUNCTION_ID_ABS                 enum FunctionID
         FUNCTION_ID_ACOS                enum FunctionID
@@ -4497,7 +4497,7 @@ record, adding the optr of the Focus/Target/Model hierarchical grab.
 **Library:** parse.def
 
 ----------
-#### FunctionType
+### FunctionType
     FunctionType        record
             :7
         FT_PRINT            :1

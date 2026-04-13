@@ -1,4 +1,4 @@
-## 15 Memory Management
+# 15 Memory Management
 
 Managing memory in a multitasking system is complex because many 
 different entities-the kernel, libraries, and applications-are all trying to 
@@ -11,7 +11,7 @@ also describes the routines applications can use to get raw memory. Before
 you read this chapter, you should be familiar with the use of handles (see 
 ["Handles", Chapter 14](chandle.md)).
 
-### 15.1 Design Philosophy
+## 15.1 Design Philosophy
 
 Some systems make each application maintain and manage its own memory. 
 In a multitasking system, this is not only difficult and time-consuming but 
@@ -52,7 +52,7 @@ Applications can also request memory at run-time, either by requesting raw
 memory from the memory manager, or by creating Virtual Memory files 
 through the VM library (see ["Virtual Memory", Chapter 18](cvm.md)).
 
-### 15.2 The Structure of Memory
+## 15.2 The Structure of Memory
 
 The GEOS memory manager currently uses real mode memory addressing, 
 and is designed to run on PCs with as little as 512K RAM. Typically, between 
@@ -67,7 +67,7 @@ application will need a seemingly contiguous section of memory which is
 larger than 64K; in these situations, it should use the HugeArray routines 
 (see [section 18.4 of chapter 18](cvm.md#184-vm-chains)).
 
-#### 15.2.1 Expanded/Extended Memory
+### 15.2.1 Expanded/Extended Memory
 
 While GEOS is designed to run on a standard system, it makes efficient use 
 of expanded and extended memory, if it is available. GEOS treats extended 
@@ -76,7 +76,7 @@ extended memory rather than out to a slower disk drive. This incurs none of
 the usual overhead of a RAM disk such as a directory because it is treated as 
 normal memory. Expanded memory is used in a similar manner.
 
-#### 15.2.2 Main Memory
+### 15.2.2 Main Memory
 
 Memory available to applications is organized in a data structure called the 
 Global Heap. The size of the global heap may vary from machine to machine 
@@ -98,7 +98,7 @@ when it restores from state. The GEOS kernel attaches object blocks to
 system VM files and takes care of storing them to state and restoring them 
 when GEOS restarts.
 
-##### 15.2.2.1 Blocks and Handles
+#### 15.2.2.1 Blocks and Handles
 
 GEOS segments memory into blocks. A block is simply a number of 
 contiguous bytes on the global heap in which code or data may be stored. Any 
@@ -124,7 +124,7 @@ records the block's attributes, such as whether the block is discardable,
 swapable, or fixed. The memory manager uses all these attributes to 
 manipulate the block.
 
-##### 15.2.2.2 Enabling Block Access
+#### 15.2.2.2 Enabling Block Access
 
 Dynamic memory, while providing significant benefits, poses one major 
 problem: What happens if a block is accessed while being moved, swapped, or 
@@ -144,7 +144,7 @@ memory manager can, depending on the block's category, move the block on
 the heap, swap it to disk or extended/expanded memory, or discard it 
 altogether.
 
-##### 15.2.2.3 Types of Blocks
+#### 15.2.2.3 Types of Blocks
 
 When a geode requests memory, it may specify how that memory is to be 
 treated by the memory manager. The memory request includes a set of 
@@ -213,7 +213,7 @@ remain so until they are freed. However, non-fixed blocks may become or
 cease to be discardable or swapable after they are created. To enable or 
 disable these characteristics, call the routine **MemModifyFlags()**.
 
-##### 15.2.2.4 Maximizing Free Space in Memory
+#### 15.2.2.4 Maximizing Free Space in Memory
 
 Moveable, swapable, and discardable blocks are allocated from the top of the 
 heap using a first-fit method. Fixed blocks are allocated from the bottom of 
@@ -257,7 +257,7 @@ when space can be freed. Applications may also resize blocks at will; if
 necessary, the memory manager will compact the heap to accommodate the 
 request.
 
-##### 15.2.2.5 Block Attributes
+#### 15.2.2.5 Block Attributes
 
 HeapAllocFlags, HeapFlags
 
@@ -350,7 +350,7 @@ HF_SWAPPED
 The block has been swapped to extended or expanded memory 
 or to the hard disk. Only the system can set or clear this flag.
 
-### 15.3 Using Global Memory
+## 15.3 Using Global Memory
 
 When an application needs more raw memory at run-time, it can use the 
 memory manager kernel routines to allocate, use, and free new blocks. An 
@@ -364,7 +364,7 @@ a local memory heap (a special kind of memory block). LMem heaps are also
 useful for storing arrays of information or for storing objects. For more 
 information, see ["Local Memory," Chapter 16](clmem.md).
 
-#### 15.3.1 Memory Etiquette
+### 15.3.1 Memory Etiquette
 
 The GEOS memory manager tries to fulfill every memory request. It does not 
 enforce many rules on how the geodes should use memory. This gives each 
@@ -421,7 +421,7 @@ small data items, you should use the Database library, which automatically
 distributes data items among different memory blocks, keeping each block 
 near the optimum size. (See ["Database Library", Chapter 19](cdb.md)).
 
-#### 15.3.2 Requesting Memory
+### 15.3.2 Requesting Memory
 
 MemAlloc(), MemAllocSetOwner(), MemReAlloc()
 
@@ -466,7 +466,7 @@ error condition. The requestor can prevent error messages by passing the flag
 HAF_NO_ERR; this will result in a system error if the memory cannot be 
 allocated. Passing HAF_NO_ERR is therefore strongly discouraged.
 
-#### 15.3.3 Freeing Memory
+### 15.3.3 Freeing Memory
 
 MemFree()
 
@@ -487,7 +487,7 @@ if several threads will be accessing the same block. For more information, see
 
 When a geode exits, all blocks owned by it are automatically freed.
 
-#### 15.3.4 Accessing Data in a Block
+### 15.3.4 Accessing Data in a Block
 
 MemLock(), MemUnlock()
 
@@ -528,7 +528,7 @@ same time, causing potential synchronization problems. For this reason, if
 threads will be sharing a block, they should use the synchronization routines 
 (see [section 15.3.6](#1536-data-access-synchronization)).
 
-#### 15.3.5 Accessing Data: An Example
+### 15.3.5 Accessing Data: An Example
 
 Code Display 15-1 shows how to allocate a block, lock it, access a word of data 
 in the block, and unlock the block. This example shows the basic principles 
@@ -582,7 +582,7 @@ strcpy(charArray, blockBaseAddress);
 MemFree(myBlockhandle); /* myBlockHandle is now meaningless */
 ~~~
 
-#### 15.3.6 Data-Access Synchronization
+### 15.3.6 Data-Access Synchronization
 
 MemThreadGrab(), MemThreadGrabNB(), MemThreadRelease(), 
 MemLockShared(), MemUnlockShared(), MemLockExcl(), 
@@ -730,7 +730,7 @@ synchronize their access to a file, they can lock and unlock the file handle
 with **HandleP()** and **HandleV()**. However, they are most commonly used 
 with memory blocks.
 
-#### 15.3.7 Retrieving Block Information
+### 15.3.7 Retrieving Block Information
 
 MemDeref(), MemGetInfo(), MemModifyFlags(), 
 HandleModifyOwner(), MemModifyOtherInfo()
@@ -792,7 +792,7 @@ block can change the block's owner.
 handle table entry. It takes two arguments: The handle of the block, and one 
 word of data to store in the HM_otherInfo field. It returns nothing.
 
-#### 15.3.8 The Reference Count
+### 15.3.8 The Reference Count
 
 MemInitRefCount(), MemIncRefCount(), MemDecRefCount()
 
@@ -857,7 +857,7 @@ passed the handle of a global memory block. It decrements the block's
 HM_otherInfo field. If the field reaches zero, **MemDecRefCount()** will 
 immediately free the block. The routine does not return anything.
 
-### 15.4 malloc()
+## 15.4 malloc()
 
 malloc(), calloc(), realloc(), free()
 

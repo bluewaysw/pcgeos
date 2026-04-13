@@ -1,4 +1,4 @@
-## 8 Resource Editor
+# 8 Resource Editor
 
 The Resource Editor is a tool created by Geoworks to translate the existing 
 English language GEOS executables into your local language. 
@@ -17,7 +17,7 @@ code. If you are following this model, you may wish to give just this piece of
 documentation to your translator instead of burdening them with a full 
 documentation set.
 
-### 8.1 Glossary
+## 8.1 Glossary
 
 In explaining how to use the Resource Editor, it is important that we use the 
 same vocabulary to describe a certain portion of the code or the operation 
@@ -131,7 +131,7 @@ Editor is however able to match these two executables and
 show the newest changes. The process of updating a file will be 
 discussed in more detail later in these instructions.
 
-### 8.2 Getting Started
+## 8.2 Getting Started
 
 You will need to install localization target version of Ensemble 2.0 in a 
 directory of your target machine (for example \TARGET.20); This 
@@ -142,7 +142,7 @@ your translated executables. This will be explained in more detail later.
 Note: you may wish to not have these directories in your path. We suggest 
 that you edit batch files to run each installation.
 
-### 8.3 What Needs to be Translated?
+## 8.3 What Needs to be Translated?
 
 To create a localized version of your applications, you will need to translate 
 only the applications, libraries, and drivers you have created. All Geoworks 
@@ -156,14 +156,14 @@ library is not translated, that UI will always appear in its original form. Your
 application will work with the Spell library, whether or not it has been 
 translated.
 
-### 8.4 Translating
+## 8.4 Translating
 
 At this point you are ready to translate geodes into the target language. The 
 following set of steps can be carried out by a non-programmer running the 
 ResEdit tool. Of course, the translator should have a good idea of the geode's 
 function and use.
 
-#### 8.4.1 Choosing a new translation file
+### 8.4.1 Choosing a new translation file
 
 To begin creating new translation files, double click on the "Res Edit" icon in 
 the Tools folder of the WORLD directory of the LOCALIZE.20 version of 
@@ -192,7 +192,7 @@ GEOS20 installation (or whichever installation is currently set as the
 top-level source directory) you must change the top-level source directory 
 first.
 
-#### 8.4.2 Main translation screen
+### 8.4.2 Main translation screen
 
 After selecting a localization (.vm) file to translate, the Resource Editor will 
 then load the information from this file and the corresponding geode into an 
@@ -207,7 +207,7 @@ completely sure that the translation is accurate is to enter the translation
 and then actually run the translated executable (to be discussed later) and 
 see how the translations appear in the program.
 
-#### 8.4.3 Translating a Text String
+### 8.4.3 Translating a Text String
 
 Click on any text string in the right portion of the screen. The blinking text 
 editing cursor should appear, and you will be able to edit the text in the right 
@@ -255,7 +255,7 @@ shortcut. Currently, only text-based shortcuts are displayed, and are
 therefore, modifiable. Again, it is important to watch out for overlapping 
 shortcuts, as these cannot be detected by the Resource Editor.
 
-#### 8.4.4 Moving between chunks
+### 8.4.4 Moving between chunks
 
 + Use the mouse to click on any chunk.
 
@@ -267,7 +267,7 @@ to move to the previous chunk.
 + Click on the Chunk pop-up menu in the upper left corner of the screen 
 and  choose any chunk.
 
-#### 8.4.5 Moving between resources
+### 8.4.5 Moving between resources
 
 + Type Ctrl > (Ctrl-greater) to move to the next resource or Ctrl < 
 (Ctrl-less) to move to the previous resource. 
@@ -277,13 +277,13 @@ and  choose any chunk.
 + Click on the Resource pop-up menu in the upper left corner of the screen 
 and choose any resource.
 
-### 8.5 Resource Editor Menus
+## 8.5 Resource Editor Menus
 
 Many of these features available in the Resource Editor are identical to those 
 in the Ensemble 2.0 software. The quick overview of the menu items below 
 should give you the necessary information to use all of the features.
 
-#### 8.5.1 File Menu
+### 8.5.1 File Menu
 
 **New/Open:**  
 brings up the New/Open dialog box, allowing you to open a new           
@@ -348,7 +348,7 @@ newest version of the translation file
 **Exit:**  
 exits the Resource Editor
 
-#### 8.5.2 Edit Menu
+### 8.5.2 Edit Menu
 
 **Cut:**  
 takes highlighted information and moves it to the clipboard
@@ -370,7 +370,7 @@ with local language translation. You can limit a forward or backward
 search by selecting filters for certain types of chunks from the Filters 
 menu.
 
-#### 8.5.3 Project Menu
+### 8.5.3 Project Menu
 
 The items in this menu keep track of how your project is organized.
 
@@ -383,7 +383,7 @@ Set the top level directory holding modified geodes.
 **Reset Source Geode Path:**  
 Reset the path of the source geode if it moves to a different subdirectory.
 
-#### 8.5.4 Filter Menu
+### 8.5.4 Filter Menu
 
 Each of these menu items is a radio button, which allows you to turn on or      
 off as many of these filters as you like. These options can be helpful when         
@@ -408,7 +408,7 @@ chunks affected by updating the translation file.
 
 **Show deleted chunks:**
 
-#### 8.5.5 Utilities Menu
+### 8.5.5 Utilities Menu
 
 These menu items allow for quick movement between chunks and resources.
 
@@ -420,7 +420,7 @@ These menu items allow for quick movement between chunks and resources.
 
 **Previous Resource:**
 
-#### 8.5.6 Window Menu
+### 8.5.6 Window Menu
 
 These menu items make manipulation of multiple translation files easy, by       
 opening overlapping windows or tiling active windows.
@@ -431,7 +431,7 @@ opening overlapping windows or tiling active windows.
 
 **Tile:**
 
-### 8.6 Creating an Executable
+## 8.6 Creating an Executable
 
 After all of the chunks and resources in the selected .vm file have been 
 translated and saved in a translation file, a new local language executable 
@@ -463,7 +463,7 @@ the WORLD directory and the Screen Savers, to reflect local language names.
 In this case, the new geode will not overwrite the original one, and you will 
 have to go back and delete the old one to avoid duplicates. 
 
-### 8.7 Updating an Executable
+## 8.7 Updating an Executable
 
 Even after all the translations are complete, there may be a need to replace 
 a certain executable with a newer version containing a bug fix or a feature 
@@ -493,7 +493,7 @@ by clicking on the Commit the Update trigger in the File/Update menu. This
 will remove information which marks the chunks as "new" or "changed" and 
 will delete the Deleted Chunks resource.
 
-### 8.8 Testing Your New Executables
+## 8.8 Testing Your New Executables
 
 You may find that you would like to be able to test your translations as soon 
 as you make them. At any point during a translation, you can create an 

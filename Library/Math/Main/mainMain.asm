@@ -211,8 +211,10 @@ loadCoprocLibrary:
 
 	push	ds
 	segmov	ds, cs
-	clr	ax
-	mov	bx, ax
+
+	mov	ax, COPROC_LIB_PROTO_MAJOR
+	mov	bx, COPROC_LIB_PROTO_MINOR
+
 	call	GeodeUseLibrary			; bx <- library handle
 	call	FilePopDir
 	pop	ds

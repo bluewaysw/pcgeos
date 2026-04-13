@@ -1,11 +1,11 @@
-## 13 Sound Library
+# 13 Sound Library
 
 GEOS includes a powerful sound library. The library allows users to play 
 individual notes, sequences of notes, and sampled sounds. It also provides 
 support for those sound devices which allow the sampling and playback of 
 digitized sounds.
 
-### 13.1 Goals and Motives
+## 13.1 Goals and Motives
 
 The sound library provides multiple tiers of support for a variety of devices. 
 You may program multiple-voice compositions (musical pieces which require 
@@ -23,7 +23,7 @@ programmer can keep his interface consistent with that of existing programs.
 When the standard system sounds are inappropriate, the programmer can 
 use other routines to completely specify the sound's pitch and duration.
 
-### 13.2 Playing UI Sounds
+## 13.2 Playing UI Sounds
 
 UserStandardSound()
 
@@ -73,7 +73,7 @@ sampled sound. SST_CUSTOM_NOTE signals that you wish to
 play a single note. To learn more about creating custom notes 
 and music buffers, see below. 
 
-### 13.3 Representing Tones
+## 13.3 Representing Tones
 
 Tones are defined by the following characteristics:
 
@@ -195,7 +195,7 @@ instrument, you should probably play notes of that frequency. For example,
 to simulate an "electric snare," you would use IP_ELECTRIC_SNARE to play a 
 note of frequency FR_ELECTRIC_SNARE.
 
-### 13.4 Single Notes
+## 13.4 Single Notes
 
 SoundAllocMusicNote(), SoundPlayMusicNote(), 
 SoundStopMusicNote(), SoundReallocMusicNote(), 
@@ -321,7 +321,7 @@ SoundStopMusicNote(BigBlatt);
 SoundFreeMusicNote(BigBlatt);
 ~~~
 
-### 13.5 Declaring Music Buffers
+## 13.5 Declaring Music Buffers
 
 You may set up a buffer of notes to be played. This buffer may include 
 information for several voices. If you are familiar with constructing MIDI 
@@ -473,7 +473,7 @@ Release a semaphore. There is one word of data:
 
 - **semaphore** The handle of the semaphore to release ("V").
 
-### 13.6 Playing Music Buffers
+## 13.6 Playing Music Buffers
 
 SoundAllocMusic(), SoundInitMusic(), SoundPlayMusic(), 
 SoundStopMusic(), SoundReallocMusic(), SoundFreeMusic()
@@ -542,7 +542,7 @@ SoundStopMusic(theSong);
 SoundFreeMusic(theSong);
 ~~~
 
-### 13.7 Playing Very Large Music Buffers
+## 13.7 Playing Very Large Music Buffers
 
 SoundAllocMusicStream(), SoundPlayToMusicStream(), 
 SoundStopMusicStream(), SoundFreeMusicStream()
@@ -563,7 +563,7 @@ call **SoundStopMusicStream()**. To free up the music stream, call
 through the stream when you free it; be sure to call 
 **SoundStopMusicStream()** if you are not otherwise sure.
 
-### 13.8 Playing Sampled Sounds
+## 13.8 Playing Sampled Sounds
 
 Once you have your sound data structure set up, the basic steps to playing 
 the sound are
@@ -628,7 +628,7 @@ Once the DAC stream has been disabled, you may free up the sound token by
 calling **SoundFreeSampleStream()**. You should call this with all sound 
 tokens before your application exits.
 
-### 13.9 Grabbing the Sound Exclusive
+## 13.9 Grabbing the Sound Exclusive
 
 SoundGetExclusive(), SoundGetExclusiveNB(), 
 SoundReleaseExclusive()
@@ -665,7 +665,7 @@ To release the exclusive, call **SoundReleaseExclusive()**. This will allow
 sounds to enter the queue and will allow another thread which has called 
 **SoundGetExclusive()** to grab the exclusive.
 
-### 13.10 Simulating Musical Instruments
+## 13.10 Simulating Musical Instruments
 
 In addition to the standard instruments provided by the system, you may 
 define instruments of your own. To do so, you must first find out what sort of 
@@ -676,7 +676,7 @@ To find out what sort of data structure the sound driver expects, call
 **SoundSynthDriverInfo()** and note the value returned at the format 
 pointer argument.
 
-#### 13.10.1 Acoustics In Brief
+### 13.10.1 Acoustics In Brief
 
 Sound may be thought of in terms of waves. A pure tone manifests as a sine 
 wave. The higher the frequency of the wave (as measured in Hertz), the 
@@ -695,7 +695,7 @@ A rich instrument such as an organ will make sounds on many frequencies
 other than that of the main note. A violin, with a very pure tone, will generate 
 almost no sound on frequencies other than that of the note being played.
 
-#### 13.10.2 Simple Instrument Description
+### 13.10.2 Simple Instrument Description
 
 The simple instrument description allows you to specify a way for less 
 powerful devices to emulate different musical instruments. You describe 
@@ -747,7 +747,7 @@ CTIEnvelopeFormat NoisyDrum =
     { 0, 0, 0, ((NT_METAL_NOISE << 6) | 63 ) };
 ~~~
 
-#### 13.10.3 Advanced Description
+### 13.10.3 Advanced Description
 
 The advanced instrument description data structures were set up with the 
 SoundBlaster card in mind; for detailed information (i.e. timing numbers) 

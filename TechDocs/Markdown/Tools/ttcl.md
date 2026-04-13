@@ -1,4 +1,4 @@
-## 5 Tool Command Language
+# 5 Tool Command Language
 
 Before using this chapter one should have a good understanding of how the 
 Swat commands function "Swat Introduction," Chapter 3, and of how the 
@@ -30,7 +30,7 @@ Descriptions and examples of coding conventions, techniques, and tricks.
 Steps to take in order to be able to use a newly written command to help 
 debug an application.
 
-### 5.1 Using This Chapter
+## 5.1 Using This Chapter
 
 This chapter provides the information needed to write a new Swat command 
 in Tcl. But, new commands need only be written in certain situations. Some 
@@ -49,7 +49,7 @@ should be written to examine that table in particular.
 The existing Swat commands should take care of the bulk of debugging, but 
 sometimes an extra command can help.
 
-### 5.2 Copyright Information
+## 5.2 Copyright Information
 
 The following sections of this chapter fall under the copyright below: 
 Background and Description, Syntax and Structure, and Commands.
@@ -62,7 +62,7 @@ that the above copyright notice appear in all copies. The University of
 California makes no representations about the suitability of this software for 
 any purpose. It is provided "as is" without express or implied warranty.
 
-### 5.3 Background and Description
+## 5.3 Background and Description
 
 The Tool Command Language is abbreviated as Tcl and is pronounced 
 "tickle". It was developed and written by Professor John Ousterhout at the 
@@ -82,7 +82,7 @@ the Tcl language, routines to implement the Tcl built-in
 commands, and procedures allowing an application to extend 
 Tcl with additional commands.
 
-### 5.4 Syntax and Structure
+## 5.4 Syntax and Structure
 
 Tcl supports only one type of data: *strings*. All commands, all arguments to 
 commands, all command results, and all variable values are strings. Where 
@@ -121,7 +121,7 @@ The structure and building of procedures in Tcl.
 + Variables  
 Variable declaration and description.
 
-#### 5.4.1 Basic Command Syntax
+### 5.4.1 Basic Command Syntax
 
 The Tcl language has syntactic similarities to both Unix and Lisp. However, 
 the interpretation of commands is different in Tcl than in either of those 
@@ -143,13 +143,13 @@ example, will treat its first argument as the name of a variable and its second
 argument as a string value to assign to that variable. For other commands, 
 arguments may be interpreted as integers, lists, file names, or Tcl commands.
 
-##### 5.4.1.1 Comments
+#### 5.4.1.1 Comments
 
 If the first non-blank character in a command is # (a number sign), then 
 everything from the # up through the next newline character is treated as 
 comment and discarded by the parser.
 
-##### 5.4.1.2 Argument Grouping
+#### 5.4.1.2 Argument Grouping
 
 Normally each argument field ends at the next white space (tabs or spaces), 
 but curly braces ("{" and "}") may be used to group arguments in different 
@@ -187,7 +187,7 @@ significant in a command field if the first character of the field is a left bra
 Otherwise neither left nor right braces in the field will be treated specially 
 (except as part of variable substitution).
 
-##### 5.4.1.3 Command Grouping
+#### 5.4.1.3 Command Grouping
 
 Normally, each command occupies one line (the command is terminated by a 
 newline character). Thus, the string:
@@ -237,7 +237,7 @@ If a field is enclosed in braces then the brackets and the characters between
 them are not interpreted specially; they are passed through to the argument 
 verbatim.
 
-##### 5.4.1.5 Variable Substitution
+#### 5.4.1.5 Variable Substitution
 
 The dollar sign ($) may be used as a special shorthand form for substituting 
 variables. If $ appears in an argument that is not enclosed in braces then 
@@ -269,7 +269,7 @@ argument verbatim.
 The dollar sign abbreviation is simply a shorthand form. **$a** is completely 
 equivalent to **[var a]**; it is provided as a convenience to reduce typing.
 
-##### 5.4.1.6 Backslash Substitution
+#### 5.4.1.6 Backslash Substitution
 
 Backslashes may be used to insert non-printing characters into command 
 fields and also to insert braces, brackets, and dollar signs into fields without 
@@ -330,7 +330,7 @@ structure; it only covers the most common cases. To produce particularly
 complicated arguments it will probably be easiest to use the format 
 command along with command substitution.
 
-#### 5.4.2 Expressions
+### 5.4.2 Expressions
 
 The second major interpretation applied to strings in Tcl is as *expressions*. 
 Several commands, such as **expr**, **for**, and **if**, treat some of their arguments 
@@ -408,7 +408,7 @@ desired result:
 
 `for {var i 1} {$i<=10} {var i [expr $i+1]} {body-}`
 
-#### 5.4.3 Lists
+### 5.4.3 Lists
 
 The third major way that strings are interpreted in Tcl is a *list*. A list is just 
 a string with a list-like structure consisting of fields separated by white 
@@ -439,7 +439,7 @@ The Tcl commands **concat**, **foreach**, **index**, **length**, **list**, and *
 you to build lists, extract elements from them, search them, and perform 
 other list-related functions.
 
-#### 5.4.4 Command Results
+### 5.4.4 Command Results
 
 Each command produces two results: a code and a string. The code indicates 
 whether the command completed successfully or not, and the string gives 
@@ -487,7 +487,7 @@ TCL_**RETURN** codes. The **catch** command allows Tcl programs to catch
 errors and handle them without aborting command interpretation any 
 further.
 
-#### 5.4.5 Procedures
+### 5.4.5 Procedures
 
 Tcl allows one to extend the command interface by defining procedures. A Tcl 
 procedure can be invoked just like any other Tcl command (it has a name and 
@@ -496,7 +496,7 @@ a piece of C code linked into the program; it is a string containing one or more
 other Tcl commands. See the **proc** command for information on how to define 
 procedures and what happens when they are invoked.
 
-#### 5.4.6 Variables
+### 5.4.6 Variables
 
 Tcl allows the definition of variables and the use of their values either 
 through $-style variable substitution, the var command, or a few other 
@@ -509,14 +509,14 @@ global command may be used to request that a name refer to a global
 variable for the duration of the current procedure (somewhat analogous to 
 **extern** in C).
 
-### 5.5 Commands
+## 5.5 Commands
 
 The Tcl library provides the following built-in commands, which will be 
 available to any application using Tcl. In addition to these built-in 
 commands, there may be additional commands defined in Swat, plus 
 commands defined as Tcl procedures.
 
-#### 5.5.1 Notation
+### 5.5.1 Notation
 
 The descriptions of the Tcl commands will follow the following notational 
 conventions:
@@ -548,7 +548,7 @@ indicates one or more repetitions of the construct may be used. For
 example, `unalias word*` can be the `unalias` command by itself, or it can 
 be followed by a list of words to be unaliased.
 
-#### 5.5.2 Built-in Commands
+### 5.5.2 Built-in Commands
 
 The built-in Tcl commands are as follows:
 
@@ -837,7 +837,7 @@ return, catch.
 
 ----------
 
-###eval
+### eval
 
 **Usage:**  
 `eval <body>`
@@ -1752,7 +1752,7 @@ given name, even if it has no value yet.
 **See Also:**  
 global.
 
-### 5.6 Coding
+## 5.6 Coding
 
 This section provides information about the features and commands of Tcl 
 that are important to know when using Swat, and the features and 
@@ -1767,7 +1767,7 @@ them.
 
 + Examples
 
-#### 5.6.1 Swat Data Structure Commands
+### 5.6.1 Swat Data Structure Commands
 
 `symbol, type, patient, handle, brk, cbrk, event, thread, 
 src, cache, table`
@@ -2952,7 +2952,7 @@ to display their fields (or members, as the case may be).
 **See Also:**  
 gc, symbol, symbol-types, value
 
-#### 5.6.2 Examples
+### 5.6.2 Examples
 
 This section will contain a few examples of Tcl code for Swat commands, 
 showing the use of some of included Tcl commands. A good way to view the 
@@ -3049,7 +3049,7 @@ fifth line, and the **range** command on the twenty-ninth line.
 
 ----------
 
-### 5.7 Using a New Command
+## 5.7 Using a New Command
 
 Once a new command is written, it needs to be loaded into Swat so that it can 
 be used. Depending on how the command is to be used, you may be interested 
@@ -3061,7 +3061,7 @@ in any of the following topics:
 
 + Explicit loading
 
-#### 5.7.1 Compilation
+### 5.7.1 Compilation
 
 It is possible to byte-compile a Tcl script. The **bc** Tcl command creates a .TLC 
 file containing compiled Tcl code-this code will run faster than normal Tcl 
@@ -3069,7 +3069,7 @@ code. When loading, Swat will load a .TLC file instead of a .TCL file where
 possible. Making changes to compiled Tcl functions involves changing the 
 source code and re-compiling.
 
-#### 5.7.2 Autoloading
+### 5.7.2 Autoloading
 
 If the development environment has been set up properly, there should 
 already exist the **/pcgeos/Tools/swat/lib** directory on the workstation. This 
@@ -3092,7 +3092,7 @@ the 1 indicates that the interpreter will not evaluate arguments passed to the
 command. (See "Swat Reference," Chapter 4, for more information on the 
 **autoload** command.)
 
-#### 5.7.3 Explicit Loading
+### 5.7.3 Explicit Loading
 
 Another way to load a command into Swat is to use the **load** command from 
 the Swat command line. This command is simply `load <path>/<filename>`. 

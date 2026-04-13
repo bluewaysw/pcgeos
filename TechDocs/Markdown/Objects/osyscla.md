@@ -3019,7 +3019,7 @@ See description for this and other gained/lost exclusive messages below.
 
 ----------
 
-####MSG_META_GAINED_SYS_TARGET_EXCL
+#### MSG_META_GAINED_SYS_TARGET_EXCL
 
     @importMessage MetaUIMessages, void MSG_META_GAINED_SYS_TARGET_EXCL();
 
@@ -5202,7 +5202,7 @@ application exits, for custom mode cases. Superclass must be called.
 
 ----------
 
-####MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE
+#### MSG_GEN_PROCESS_ATTACH_TO_PASSED_STATE_FILE
 
     MemHandle   MSG_GEN_PROCESS_ATTACH_TO_STATE_FILE(
                 AppAttachFlags      attachFlags,

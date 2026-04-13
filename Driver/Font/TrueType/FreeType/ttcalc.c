@@ -137,55 +137,47 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     eax, a
-        mov     ebx, b
-        mov     ecx, c
+        mov     eax, a          ; edx:eax = a * b
+        imul    b               ; signed multiplication (64-bit result)
 
-        ; Calculate sign
-        mov     esi, eax
-        xor     esi, ebx
-        xor     esi, ecx        ; esi now holds the sign bit
-
-        ; Take absolute values
-        test    eax, eax
-        jns     skip_abs_a
-        neg     eax
-    skip_abs_a:
+        ; check for division by zero
+        mov     ebx, c
         test    ebx, ebx
-        jns     skip_abs_b
-        neg     ebx
-    skip_abs_b:
-        test    ecx, ecx
-        jns     skip_abs_c
-        neg     ecx
-    skip_abs_c:
-
-        ; Check for division by zero
-        test    ecx, ecx
         jz      divide_by_zero
 
-        ; Perform (a * b + c/2) / c
-        mov     edx, 0          ; Clear upper 32 bits for 64-bit multiplication
-        mul     ebx             ; EDX:EAX = a * b
-        mov     edi, ecx        ; Save c in edi
-        shr     edi, 1          ; edi = c/2
-        add     eax, edi        ; Add c/2 to lower 32 bits
-        adc     edx, 0          ; Add carry to upper 32 bits
-        idiv    ecx             ; Divide EDX:EAX by c
-        jmp     apply_sign
+        ; prepare rounding value: abs(c) / 2
+        mov     ecx, ebx
+        sar     ecx, 31         ; Create sign mask (0xFFFFFFFF if c < 0, else 0)
+        xor     ebx, ecx
+        sub     ebx, ecx        ; ebx = abs(c)
+        shr     ebx, 1          ; ebx = abs(c) / 2
+
+        ; apply rounding based on the sign of the product (in edx)
+        test    edx, edx
+        js      is_negative     ; product is negative (bit 31 of edx set)
+
+        ; product is positive: add rounding offset
+        add     eax, ebx
+        adc     edx, 0
+        jmp     do_div
+
+    is_negative:
+        ; product is negative: subtract rounding offset (round away from zero)
+        sub     eax, ebx
+        sbb     edx, 0
+
+    do_div:
+        ; divide: edx:eax / c
+        idiv    c               ; signed division: result in eax
+        jmp     done
 
     divide_by_zero:
-        ; Handle division by zero (return max positive or min negative)
-        mov     eax, 80000000h  ; Load min negative value
-
-    apply_sign:
-        ; Apply sign
-        test    esi, 80000000h  ; Test sign bit
-        jz      done
-        neg     eax
+        ; handle division by zero (returning max 32-bit signed integer)
+        mov     eax, 7FFFFFFFh
 
     done:
-        mov     edx, eax        ; Store result in dx:ax
+        ; result into dx:ax for 16:16 return format
+        mov     edx, eax
         shr     edx, 16
     }
   #else
@@ -238,42 +230,20 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        ; store sign of result
-        mov     eax, a
-        xor     eax, b
-        mov     esi, eax         ; esi = sign of result
+      ; signed multiplication
+      mov     eax, a
+      imul    b
 
-        ; calculate |a|
-        mov     eax, a
-        cdq                      ; sign extend eax into edx
-        xor     eax, edx
-        sub     eax, edx
-        mov     ebx, eax         ; ebx = |a|
+      ; rounding
+      add     eax, 0x8000
+      adc     edx, 0
 
-        ; calculate |b|
-        mov     eax, b
-        cdq
-        xor     eax, edx
-        sub     eax, edx         ; eax = |b|
+      ; fixed point scaling
+      shrd    eax, edx, 16
 
-        ; multiply |a| * |b|
-        mul     ebx              ; edx:eax = |a| * |b|
-
-        ; add 0x8000 (rounding factor)
-        add     eax, 0x8000
-        adc     edx, 0           ; edx:eax += 0x8000
-
-        ; divide by 0x10000 (shift right by 16)
-        shrd    eax, edx, 16
-        shr     edx, 16          ; edx:eax >>= 16
-
-        ; apply sign using NEG if necessary
-        test    esi, 0x80000000  ; test the sign bit
-        jz      positive
-        neg     eax
-    positive:
-        mov     edx, eax         ; store result in dx:ax
-        shr     edx, 16
+      ; return value alignment
+      mov     edx, eax 
+      shr     edx, 16
     }
   #else
     long   s;
@@ -331,19 +301,19 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     esi, x           ; Load address of x into esi
-        mov     edi, y           ; Load address of y into edi
-        mov     ebx, z           ; Load address of z into ebx
+        mov     eax, x           ; Load pointer to x into eax
+        mov     edx, y           ; Load pointer to y into edx
+        mov     ecx, z           ; Load pointer to z into ecx
 
         ; Add lower 32 bits
-        mov     eax, [esi]       ; Load x->lo into eax
-        add     eax, [edi]       ; Add y->lo to eax
-        mov     [ebx], eax       ; Store result in z->lo
+        mov     ebx, [eax]       ; Load x->lo into ebx
+        add     ebx, [edx]       ; Add y->lo to ebx
+        mov     [ecx], ebx       ; Store result in z->lo
 
         ; Add upper 32 bits with carry
-        mov     eax, [esi + 4]   ; Load x->hi into eax
-        adc     eax, [edi + 4]   ; Add y->hi to eax with carry
-        mov     [ebx + 4], eax   ; Store result in z->hi
+        mov     ebx, [eax + 4]   ; Load x->hi into ebx
+        adc     ebx, [edx + 4]   ; Add y->hi to ebx with carry
+        mov     [ecx + 4], ebx   ; Store result in z->hi
     }
   #else
     register TT_Word32  lo, hi;
@@ -364,13 +334,11 @@
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
         mov     eax, x           ; Load x into eax
-        mov     ecx, y           ; Load y into ecx
-        imul    ecx              ; Signed multiply eax by ecx
-                                 ; Result: edx:eax (high:low)
+        imul    y                ; Signed multiply eax by y
 
-        mov     esi, z           ; Load address of z into esi
-        mov     [esi], eax       ; Store low 32 bits (eax) into z->lo
-        mov     [esi + 4], edx   ; Store high 32 bits (edx) into z->hi
+        mov     ecx, z           ; Load address of z into esi
+        mov     [ecx], eax       ; Store low 32 bits (eax) into z->lo
+        mov     [ecx + 4], edx   ; Store high 32 bits (edx) into z->hi
     }
   #else
     TT_Int32   s;
@@ -421,25 +389,25 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     esi, x                ; Load address of x into esi
-        mov     eax, [esi]            ; Load lower 32 bits of x into eax
-        mov     edx, [esi+4]          ; Load upper 32 bits of x into edx
-        mov     ebx, y                ; Load y into ebx
-        test    ebx, ebx              ; Check if y is zero
-        jz      divide_by_zero        ; Jump to divide_by_zero if y is zero
-        idiv    ebx                   ; Signed divide EDX:EAX by EBX
-        jmp     done                  ; Jump to done after division
+        mov     ecx, y                ; load divisor
+        test    ecx, ecx              ; check for zero
+        jz      overflow
 
-    divide_by_zero:
-        test    edx, edx              ; Check sign of dividend (upper 32 bits of x)
-        js      negative_dividend     ; Jump if dividend is negative
-        mov     eax, 0x7FFFFFFF       ; Load maximum positive 32-bit value
+        mov     esi, x                ; pointer to x
+        mov     eax, [esi]            ; low 32 bits
+        mov     edx, [esi+4]          ; high 32 bits
+        
+        idiv    ecx                   ; result in EAX
         jmp     done
-    negative_dividend:
-        mov     eax, 0x80000000       ; Load minimum negative 32-bit value
+
+    overflow:
+        mov     eax, [esi+4]          ; sign of dividend
+        sar     eax, 31               ; 0xFFFFFFFF if neg, 0 if pos
+        mov     edx, eax              ; temp storage
+        xor     eax, 0x7FFFFFFF       ; flip bits: 0x7FFFFFFF (pos) or 0x80000000 (neg)
 
     done:
-        mov     edx, eax              ; Store result in dx:ax
+        mov     edx, eax              ; store result in dx:ax
         shr     edx, 16
     }
   #else
@@ -486,6 +454,56 @@
   LOCAL_FUNC
   TT_Int32  Sqrt64( TT_Int64*  l )
   {
+  #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+    __asm {
+        mov     esi, l
+        mov     eax, [esi]       ; eax = l->lo
+        mov     edx, [esi+4]     ; edx = l->hi
+
+        ; check for 0 and 1
+        test    edx, edx
+        jnz     start_calc
+        test    eax, eax
+        jz      done             ; return 0
+        cmp     eax, 1
+        je      done             ; return 1
+
+    start_calc:
+        mov     ebx, edx
+        test    ebx, ebx
+        jnz     guess_hi
+        bsr     ecx, eax
+        jmp     set_guess
+    guess_hi:
+        bsr     ecx, edx
+        add     ecx, 32
+    set_guess:
+        shr     ecx, 1           ; n / 2
+        mov     ebx, 1
+        shl     ebx, cl          ; ebx = x
+
+    sqrt_loop:
+        ; Newton: next = (x + (l / x)) / 2
+        mov     eax, [esi]       ; l->lo
+        mov     edx, [esi+4]     ; l->hi
+        div     ebx              ; eax = l / x
+        
+        add     eax, ebx         ; eax = x + (l/x)
+        shr     eax, 1           ; eax = (x + (l/x)) / 2
+        
+        cmp     eax, ebx
+        jae     sqrt_finished    ; if next >= x, finished
+        
+        mov     ebx, eax         ; x = next
+        jmp     sqrt_loop
+
+    sqrt_finished:
+        mov     eax, ebx         ; return x
+    done:
+        mov     edx, eax         ; store result in dx:ax
+        shr     edx, 16
+    }
+  #else
 	  long  x = l->hi ? l->hi >> 1 : l->lo >> 1;
 	
     if (l->hi == 0 )
@@ -507,6 +525,7 @@
       // Update approximation
       x = next;
     }
+  #endif
   }
 
 #endif /* LONG64 */
