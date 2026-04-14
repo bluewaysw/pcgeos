@@ -2385,7 +2385,7 @@ Move the GrObj by a number of device units.
 
 Set the object's width and height in points. The dimensions are calculated by 
 mapping the object's corners into document coordinates and calculating the 
-absolute distances between them. The center of the selection handles of a rectangle 
+distances between them. The center of the selection handles of a rectangle 
 represent the corners mapped into document coordinates. The line thickness 
 is not included in this calculation.
 
