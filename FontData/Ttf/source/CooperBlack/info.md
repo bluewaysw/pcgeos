@@ -31,4 +31,4 @@
 - [ ] **Priority:** Fine-tune Hinting for B/W rendering to eliminate "blurry" pixels in 1-bit mode.
 
 ---
-*Last updated: 13.04.2026 by jkunze*
+*Last updated: 16.04.2026 by jkunze*
