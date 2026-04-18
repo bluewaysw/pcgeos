@@ -5,6 +5,8 @@ rem bootstrapPath holds the path with the
 rem GFS image (%1\BOOT). bootstrapPath is used to remove that
 rem path from the standard path list once the GFS has been loaded
 rem and runs.
+rem NOTE: using WRITEGFS and WRITEGFSEC instead of variables helps
+rem us to keep environmental space low for COMMAND.COM.
 
 if "%1"=="" goto NOVAR
 
