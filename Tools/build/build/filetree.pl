@@ -25,6 +25,8 @@
 # DESCRIPTION:
 #
 #	Subroutines for parsing and sending a file tree.
+#	The parser supports ENVAR(...) expressions in filetree lines, with
+#	precedence: ENV -> build variable -> variable name.
 #
 # SUBROUTINES:
 #
@@ -277,6 +279,10 @@ sub SendFileTree {
 	
 	# Pre-process special directory
 	s/\%LANGUAGE\%/$var{language}/;
+
+	# Expand variable expressions so all directives can consume resolved
+	# values. ENVAR(...) is env-first.
+	s/ENVAR\(([^)]*)\)/&ResolveEnvar($1)/ge;
 
 	# 
 	# Translate simple conditional macros.
