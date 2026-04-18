@@ -5,38 +5,53 @@ rem bootstrapPath holds the path with the
 rem GFS image (%1\BOOT). bootstrapPath is used to remove that
 rem path from the standard path list once the GFS has been loaded
 rem and runs.
+rem NOTE: using WRITEGFS and WRITEGFSEC instead of variables helps
+rem us to keep environmental space low for COMMAND.COM.
 
 if "%1"=="" goto NOVAR
 
-set GFS_INI=
-set BOOT_INI=
+if exist %1\BOOT\NET.INI goto WRITEGFS
+if exist %1\BOOT\NETEC.INI goto WRITEGFSEC
+goto NOCFG
 
-if exist geosec.ini set GFS_INI=gfsec.ini
-if "%GFS_INI%"=="" if exist geos.ini set GFS_INI=gfs.ini
-if "%GFS_INI%"=="" goto NOCFG
+:WRITEGFS
+if exist gfs.ini del gfs.ini
 
-if "%GFS_INI%"=="gfsec.ini" set BOOT_INI=%1\BOOT\NETEC.INI
-if "%GFS_INI%"=="gfs.ini" set BOOT_INI=%1\BOOT\NET.INI
-if not exist %BOOT_INI% goto NONETCFG
+>gfs.ini echo [system]
+>>gfs.ini echo fs = megafile.geo
+>>gfs.ini echo.
+>>gfs.ini echo [paths]
+>>gfs.ini echo top = %1\BOOT GFS:\FG
+>>gfs.ini echo ini = %1\BOOT\NET.INI
+>>gfs.ini echo.
+>>gfs.ini echo [gfs]
+>>gfs.ini echo file = %1\BOOT\GFS.IMG
+>>gfs.ini echo drive = GFS
+>>gfs.ini echo bootstrapPath = %1\BOOT
+>>gfs.ini echo cacheFile = none
+>>gfs.ini echo.
+if exist gfs.ini goto END
+echo ERROR: Failed to generate GFS.INI.
+goto END
 
-:WRITEINI
-if exist %GFS_INI% del %GFS_INI%
+:WRITEGFSEC
+if exist gfsec.ini del gfsec.ini
 
->%GFS_INI% echo [system]
->>%GFS_INI% echo fs = megafile.geo
->>%GFS_INI% echo.
->>%GFS_INI% echo [paths]
->>%GFS_INI% echo top = %1\BOOT GFS:\FG
->>%GFS_INI% echo ini = %BOOT_INI%
->>%GFS_INI% echo.
->>%GFS_INI% echo [gfs]
->>%GFS_INI% echo file = %1\BOOT\GFS.IMG
->>%GFS_INI% echo drive = GFS
->>%GFS_INI% echo bootstrapPath = %1\BOOT
->>%GFS_INI% echo cacheFile = none
->>%GFS_INI% echo.
-if exist %GFS_INI% goto END
-echo ERROR: Failed to generate %GFS_INI%.
+>gfsec.ini echo [system]
+>>gfsec.ini echo fs = megafile.geo
+>>gfsec.ini echo.
+>>gfsec.ini echo [paths]
+>>gfsec.ini echo top = %1\BOOT GFS:\FG
+>>gfsec.ini echo ini = %1\BOOT\NETEC.INI
+>>gfsec.ini echo.
+>>gfsec.ini echo [gfs]
+>>gfsec.ini echo file = %1\BOOT\GFS.IMG
+>>gfsec.ini echo drive = GFS
+>>gfsec.ini echo bootstrapPath = %1\BOOT
+>>gfsec.ini echo cacheFile = none
+>>gfsec.ini echo.
+if exist gfsec.ini goto END
+echo ERROR: Failed to generate GFSEC.INI.
 goto END
 
 :NOVAR
@@ -44,12 +59,7 @@ echo ERROR: GEOS_DIST_DIR argument is missing.
 goto END
 
 :NOCFG
-echo ERROR: Neither GEOSEC.INI nor GEOS.INI exists in current directory.
+echo ERROR: Neither NET.INI nor NETEC.INI exists in %1\BOOT.
 goto END
 
-:NONETCFG
-echo ERROR: Missing required BOOT INI file: %BOOT_INI%
-
 :END
-set GFS_INI=
-set BOOT_INI=
