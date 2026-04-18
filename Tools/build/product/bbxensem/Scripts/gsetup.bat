@@ -178,3 +178,5 @@ echo   FREEGEOS\60BETA\GSETUP ACTIVATE
 
 rem Shared script exit label.
 :END
+set PINST=
+set PACT=
