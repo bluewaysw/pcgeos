@@ -14,12 +14,13 @@ rem   GSETUP ACTIVATE
 rem
 rem Behavior summary:
 rem - DEFAULT (no mode parameter):
-rem     no GEOS.INI/GEOSEC.INI results in install user files / folder stubs, then "activate".
+rem     no GEOS.INI/GEOSEC.INI results in "install" user files / folder stubs, then "activate".
 rem     UPDATE.TXT present results in "activate" only (UPDATE.TXT deleted afterwards).
-rem     existing INI with matching bootstrapPath in GFS.INI/GFSEC.INI results in no-op.
-rem     missing/mismatched bootstrap INI results in "activate".
+rem     existing INI with existing GFS.INI/GFSEC.INI results in no-op.
 rem - INSTALL: always runs install plus activate after warning and confirmation.
-rem - ACTIVATE: always runs "activate"; UPDATE.TXT is ignored.
+rem - ACTIVATE: "activate"s the selected version for which it is called; UPDATE.TXT is ignored.
+rem - When moving the Ensemble folder around or renaming it, create an empty update.txt and call init.bat
+rem   or call "gsetup.com activate" for the current version (freegeos\60\gsetup activate).
 
 
 if "%1"=="" goto NOENTRY
@@ -27,9 +28,6 @@ if "%1"=="" goto NOENTRY
 rem Keep variable footprint small for COMMAND.COM environment space limits.
 set PINST=setup\install
 set PACT=setup\activate
-set PDM=GEOSDIR.GDM
-set PDMB=GDMREAD.BAT
-set GDD=
 
 if "%2"=="" goto PARSEDEFAULT
 if "%2"=="install" goto PARSEINSTALL
@@ -79,37 +77,17 @@ rem Default path for non-EC configuration.
 :DEFAULTNC
 if exist update.txt goto UPDATEMARKER
 if not exist gfs.ini goto DEFAULTNEEDACTIVATE
-if not exist %PDM% goto DEFAULTNEEDACTIVATE
-set GDD=
-if exist %PDMB% del %PDMB% >NUL
-copy %PDM% %PDMB% >NUL
-if not exist %PDMB% goto DEFAULTNEEDACTIVATE
-call %PDMB%
-if exist %PDMB% del %PDMB% >NUL
-if not "%GDD%"=="%1" goto DEFAULTNEEDACTIVATE
-find "bootstrapPath = %1\BOOT" gfs.ini >NUL
-if not errorlevel 1 goto DEFAULTDONE
-goto DEFAULTNEEDACTIVATE
+goto DEFAULTDONE
 
 rem Default path for EC configuration.
 :DEFAULTEC
 if exist update.txt goto UPDATEMARKER
 if not exist gfsec.ini goto DEFAULTNEEDACTIVATE
-if not exist %PDM% goto DEFAULTNEEDACTIVATE
-set GDD=
-if exist %PDMB% del %PDMB% >NUL
-copy %PDM% %PDMB% >NUL
-if not exist %PDMB% goto DEFAULTNEEDACTIVATE
-call %PDMB%
-if exist %PDMB% del %PDMB% >NUL
-if not "%GDD%"=="%1" goto DEFAULTNEEDACTIVATE
-find "bootstrapPath = %1\BOOT" gfsec.ini >NUL
-if not errorlevel 1 goto DEFAULTDONE
-goto DEFAULTNEEDACTIVATE
+goto DEFAULTDONE
 
 rem Default path when bootstrap INI is missing or stale.
 :DEFAULTNEEDACTIVATE
-echo NOTICE: Path change or missing bootstrap INI detected. Running activate phase.
+echo NOTICE: Missing bootstrap INI detected. Running activate phase.
 goto DOACTIVATE
 
 rem Default path when no work is needed.
@@ -148,8 +126,8 @@ echo.
 
 echo Regenerating GFS bootstrap INI for %1 ...
 call %1\writegfs.bat %1
-if exist gfsec.ini goto ACTIVATEMARKER
-if exist gfs.ini goto ACTIVATEMARKER
+if exist gfsec.ini goto ACTIVATEDONE
+if exist gfs.ini goto ACTIVATEDONE
 goto GFSGENFAIL
 
 rem Run activate phase after INSTALL and clear update marker if present.
@@ -161,41 +139,9 @@ echo.
 
 echo Regenerating GFS bootstrap INI for %1 ...
 call %1\writegfs.bat %1
-if exist gfsec.ini goto INSTALLMARKER
-if exist gfs.ini goto INSTALLMARKER
+if exist gfsec.ini goto INSTALLDONE
+if exist gfs.ini goto INSTALLDONE
 goto GFSGENFAIL
-
-rem Write directory marker after successful ACTIVATE flow.
-:ACTIVATEMARKER
->%PDM% echo set GDD=%1
-if not exist %PDM% goto ACTIVATEMARKERWARN
-set GDD=
-if exist %PDMB% del %PDMB% >NUL
-copy %PDM% %PDMB% >NUL
-if not exist %PDMB% goto ACTIVATEMARKERWARN
-call %PDMB%
-if exist %PDMB% del %PDMB% >NUL
-if "%GDD%"=="%1" goto ACTIVATEDONE
-
-:ACTIVATEMARKERWARN
-echo WARNING: Failed to write %PDM%. Path changes may trigger extra activate runs.
-goto ACTIVATEDONE
-
-rem Write directory marker after successful INSTALL+ACTIVATE flow.
-:INSTALLMARKER
->%PDM% echo set GDD=%1
-if not exist %PDM% goto INSTALLMARKERWARN
-set GDD=
-if exist %PDMB% del %PDMB% >NUL
-copy %PDM% %PDMB% >NUL
-if not exist %PDMB% goto INSTALLMARKERWARN
-call %PDMB%
-if exist %PDMB% del %PDMB% >NUL
-if "%GDD%"=="%1" goto INSTALLDONE
-
-:INSTALLMARKERWARN
-echo WARNING: Failed to write %PDM%. Path changes may trigger extra activate runs.
-goto INSTALLDONE
 
 rem Finish pure ACTIVATE flow.
 :ACTIVATEDONE
@@ -214,8 +160,8 @@ goto END
 
 rem Show launcher-only usage when GEOS_DIST_DIR is missing.
 :NOENTRY
-echo NOTICE: GSETUP.BAT is launcher-only and needs GEOS_DIST_DIR as first argument.
-echo NOTICE: Use FREEGEOS\60BETA\GSETUP from the target root directory.
+echo NOTICE: GSETUP.BAT needs GEOS_DIST_DIR as first argument.
+echo NOTICE: Use GSETUP from the target root directory (usually "Ensemble").
 echo.
 echo Usage:
 echo   FREEGEOS\60BETA\GSETUP
@@ -225,8 +171,7 @@ goto END
 
 rem Show usage when current directory layout is invalid.
 :BADDIR
-echo NOTICE: GSETUP must be called from target root directory.
-echo NOTICE: Current directory must contain FREEGEOS\60BETA\SETUP\INSTALL and FREEGEOS\60BETA\SETUP\ACTIVATE.
+echo NOTICE: GSETUP must be called from target root directory (usually "Ensemble").
 echo.
 echo Usage:
 echo   FREEGEOS\60BETA\GSETUP
@@ -245,9 +190,5 @@ echo   FREEGEOS\60BETA\GSETUP ACTIVATE
 
 rem Shared script exit label.
 :END
-if exist %PDMB% del %PDMB% >NUL
 set PINST=
 set PACT=
-set PDM=
-set PDMB=
-set GDD=
