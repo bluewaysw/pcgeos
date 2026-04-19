@@ -11,6 +11,9 @@ org 100h
 ; Notes:
 ; - We shrink our memory block before EXEC because COM programs
 ;   initially own almost all DOS memory.
+; - We first derive GEOS_DIST_DIR from current drive+directory and append
+;   "FREEGEOS\60BETA". If that fails, we fall back to environment-trailer
+;   executable-path extraction for compatibility.
 ; - The DOS environment trailer layout varies, so path extraction
 ;   probes multiple candidate offsets.
 
@@ -30,12 +33,16 @@ _start:
 
 		call	ShrinkMemoryForExec
 
+		call	BuildGeosDistDirFromCwd
+		jnc	GeosDistDirReady
+
 		call	GetProgramPathFromEnv
 		jc	ExitError
 
 		call	ExtractDirectory
 		jc	ExitError
 
+GeosDistDirReady:
 		call	BuildBatchPath
 		jc	ExitError
 
@@ -77,6 +84,98 @@ ShrinkMemoryForExec:
 		mov	ah, 4ah
 		int	21h
 
+		pop	bx
+		pop	ax
+		ret
+
+
+; Build "<drive>:\<cwd>\FREEGEOS\60BETA" into geosDistDir.
+; CWD is read from DOS and does not include drive letter.
+BuildGeosDistDirFromCwd:
+		push	ax
+		push	bx
+		push	dx
+		push	si
+		push	di
+
+		lea	di, geosDistDir
+		xor	bx, bx
+
+		mov	ah, 19h
+		int	21h
+		add	al, 'A'
+
+		cmp	bx, MAX_PATH_CHARS
+		jae	BuildGeosDistFromCwdFail
+		mov	byte ptr [di], al
+		inc	di
+		inc	bx
+
+		cmp	bx, MAX_PATH_CHARS
+		jae	BuildGeosDistFromCwdFail
+		mov	byte ptr [di], ':'
+		inc	di
+		inc	bx
+
+		cmp	bx, MAX_PATH_CHARS
+		jae	BuildGeosDistFromCwdFail
+		mov	byte ptr [di], '\'
+		inc	di
+		inc	bx
+
+		lea	si, cwdPath
+		mov	dl, 0
+		mov	ah, 47h
+		int	21h
+		jc	BuildGeosDistFromCwdFail
+
+		lea	si, cwdPath
+		cmp	byte ptr [si], 0
+		je	BuildGeosDistAppendSuffix
+
+BuildGeosDistCopyCwd:
+		mov	al, byte ptr [si]
+		or	al, al
+		jz	BuildGeosDistCwdDone
+		cmp	bx, MAX_PATH_CHARS
+		jae	BuildGeosDistFromCwdFail
+		mov	byte ptr [di], al
+		inc	di
+		inc	si
+		inc	bx
+		jmp	BuildGeosDistCopyCwd
+
+BuildGeosDistCwdDone:
+		cmp	bx, MAX_PATH_CHARS
+		jae	BuildGeosDistFromCwdFail
+		mov	byte ptr [di], '\'
+		inc	di
+		inc	bx
+
+BuildGeosDistAppendSuffix:
+		lea	si, geosDistSuffix
+
+BuildGeosDistSuffixLoop:
+		mov	al, byte ptr [si]
+		cmp	bx, MAX_PATH_CHARS
+		jae	BuildGeosDistFromCwdFail
+		mov	byte ptr [di], al
+		inc	di
+		inc	si
+		inc	bx
+		or	al, al
+		jnz	BuildGeosDistSuffixLoop
+
+		clc
+		jmp	BuildGeosDistFromCwdDone
+
+BuildGeosDistFromCwdFail:
+		stc
+
+BuildGeosDistFromCwdDone:
+		pop	di
+		pop	si
+		pop	dx
 		pop	bx
 		pop	ax
 		ret
@@ -837,8 +936,10 @@ geosDistDir		db	MAX_PATH_CHARS+1 dup (0)
 batchPath		db	MAX_PATH_CHARS+1 dup (0)
 comspecPath		db	MAX_PATH_CHARS+1 dup (0)
 cmdTail			db	CMD_TAIL_MAX+2 dup (0)
+cwdPath			db	65 dup (0)
 
 batchName		db	'gsetup.bat', 0
+geosDistSuffix		db	'FREEGEOS\60BETA', 0
 comspecKey		db	'COMSPEC=', 0
 fallbackComspec		db	'COMMAND.COM', 0
 fallbackComspecC	db	'C:\COMMAND.COM', 0
