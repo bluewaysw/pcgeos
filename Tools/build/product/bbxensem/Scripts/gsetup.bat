@@ -7,7 +7,6 @@ rem in C:\ENSEMBLE
 rem    freegeos\60\gsetup
 rem    freegeos\60\gsetup install
 rem    freegeos\60\gsetup activate
-rem
 rem Behavior summary:
 rem - DEFAULT (no mode parameter):
 rem     if no GEOS.INI/GEOSEC.INI exists, "install" user files / folder stubs, then "activate".
@@ -16,7 +15,8 @@ rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI/GFSEC.INI, does no
 rem - INSTALL: always runs "install" plus "activate" after warning and confirmation.
 rem - ACTIVATE: "activate"s the version for which it is called; UPDATE.TXT is ignored.
 rem - When moving the Ensemble folder around or renaming it, create an empty update.txt and call init.bat
-rem   afterwards or call "gsetup.com activate" explicitely (freegeos\60\gsetup activate).
+rem   afterwards or call "gsetup.com activate" explicitely (freegeos\60\gsetup activate). This will
+rem   regenerate GFS.INI for the new path.
 
 
 if "%1"=="" goto NOENTRY
