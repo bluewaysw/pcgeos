@@ -1,26 +1,22 @@
 @echo off
 rem GSETUP.BAT
-rem Install/activate from current target directory.
-rem
-rem Internal launcher contract:
-rem   GSETUP.BAT GEOS_DIST_DIR
-rem   GSETUP.BAT GEOS_DIST_DIR INSTALL
-rem   GSETUP.BAT GEOS_DIST_DIR ACTIVATE
-rem
-rem Usage:
-rem   GSETUP
-rem   GSETUP INSTALL
-rem   GSETUP ACTIVATE
+rem Install/activate a (new) GEOS version from the target directory.
+rem (gsetup.bat gets called by gsetup.com which hands us the current workdir)
+rem So it is usually something like this:
+rem in C:\ENSEMBLE
+rem    freegeos\60\gsetup
+rem    freegeos\60\gsetup install
+rem    freegeos\60\gsetup activate
 rem
 rem Behavior summary:
 rem - DEFAULT (no mode parameter):
-rem     no GEOS.INI/GEOSEC.INI results in "install" user files / folder stubs, then "activate".
-rem     UPDATE.TXT present results in "activate" only (UPDATE.TXT deleted afterwards).
-rem     existing INI with existing GFS.INI/GFSEC.INI results in no-op.
-rem - INSTALL: always runs install plus activate after warning and confirmation.
-rem - ACTIVATE: "activate"s the selected version for which it is called; UPDATE.TXT is ignored.
+rem     if no GEOS.INI/GEOSEC.INI exists, "install" user files / folder stubs, then "activate".
+rem     if an UPDATE.TXT is present, run "activate" only (UPDATE.TXT deleted afterwards).
+rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI/GFSEC.INI, does nothing.
+rem - INSTALL: always runs "install" plus "activate" after warning and confirmation.
+rem - ACTIVATE: "activate"s the version for which it is called; UPDATE.TXT is ignored.
 rem - When moving the Ensemble folder around or renaming it, create an empty update.txt and call init.bat
-rem   or call "gsetup.com activate" for the current version (freegeos\60\gsetup activate).
+rem   afterwards or call "gsetup.com activate" explicitely (freegeos\60\gsetup activate).
 
 
 if "%1"=="" goto NOENTRY
