@@ -1685,19 +1685,22 @@ HINT_VALUE_X_SCROLLER and HINT_VALUE_Y_SCROLLER cause the GenValue to act as a
 scroll bar. To use a GenValus as a stand-alone scroll bar, the application must 
 provide more comprehensive support.
 
-A GenValue that functions as a scroll bar sends not just one apply message, but 
+- A GenValue that functions as a scroll bar sends not just one apply message, but 
 one of seven. Which one is sent depends on the action performed. The application 
 must define all seven messages sequentially. The first of these messages must be 
 set as GVLI_applyMsg of the object. It is permitted but not 
 required to handle all these messages in the same way.
 
-Furthermore, the visual update of scroll bars does not occur automatically. It 
+- Furthermore, the visual update of scroll bars does not occur automatically. It 
 is necessary to send the current value of the GenValue back to the GenValue,
 for example using MSG_GEN_VALUE_SET_VALUE. In 
 doing so, it is allowed to change the value beforehand, for example by rounding it to 
 ensure that only integer values are stored in the GenValue.
 
-Typically, a GenValue that works as a scroll bar displays a range.
+Typically, a GenValue that works as a scroll bar should display a range.
+
+A GenValue that has set the hints HINT_VALUE_X_SCROLLER or HINT_VALUE_Y_SCROLLER does 
+not send it's status message, even if the attribute ATTR_GEN_VALUE_STATUS_MSG is present.
 
 ----------
 **Code Display 8-9 Declaring and Handling the Messages**
