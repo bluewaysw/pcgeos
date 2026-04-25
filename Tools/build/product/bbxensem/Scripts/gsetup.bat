@@ -14,7 +14,7 @@ rem     if an UPDATE.TXT is present, run "activate" only (UPDATE.TXT deleted aft
 rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI/GFSEC.INI, does nothing.
 rem - INSTALL: always runs "install" plus "activate" after warning and confirmation.
 rem - ACTIVATE: "activate"s the version for which it is called; UPDATE.TXT is ignored.
-rem - When moving the Ensemble folder around or renaming it, create an empty update.txt and call init.bat
+rem - When moving the Ensemble folder around or renaming it, create an empty update.txt and call setup.bat
 rem   afterwards or call "gsetup.com activate" explicitely (freegeos\60\gsetup activate). This will
 rem   regenerate GFS.INI for the new path.
 
