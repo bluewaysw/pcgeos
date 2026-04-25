@@ -138,6 +138,14 @@ sub SetVars {
 	}
     }
 
+    # If not passed in, expose the primary build file name to template files.
+    if ( !defined($var{buildfile}) || $var{buildfile} eq "" ) {
+	if ( scalar(@varfiles) ) {
+	    $var{buildfile} = $varfiles[$#varfiles];
+	    $var{buildfile} =~ s|^.*/||;
+	}
+    }
+
     # If not passed in, generate build metadata used by template files.
     if ( !defined($var{buildstamp}) || $var{buildstamp} eq "" ) {
 	$var{buildstamp} = &GenerateDefaultBuildStamp();
