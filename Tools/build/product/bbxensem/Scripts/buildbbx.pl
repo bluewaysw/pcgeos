@@ -67,6 +67,7 @@ $SIG{INT} = sub {
 
 $TARGET_NT = "nt";
 $TARGET_NT_XIP = "ntxip";
+$TARGET_FG = "fg";
 $TARGET_PC = "pc";		# DOS PC platform
 $TARGET_PC_XIP = "pcxip";	# DOS PC platform
 $TARGET_PROTO = "hw";           # Prototype hardware platform
@@ -75,6 +76,7 @@ $TARGET_DEMO = "demo";        # Prototype hardware platform for demo
 $TARGET_WIN = "win";		  # Windows build
 $TARGET_PROTO_TOOLS = "hwtools"; # Prototype hardware platform for tools
 $TARGET_NT_TOOLS = "nttools";	# Windows NT platform for tools
+$TARGET_FG_TOOLS = "fgtools";	# FreeGEOS GFS layout with tools
 $DEST_SUB_DIRECTORY = "gbuild"; # sub-directory to download files to in
                                 # defining destination directory
 $CONFIG_FILE_ROOT = ".bbxxip";	# Config file root
@@ -229,7 +231,7 @@ print "\n*** Welcome to buildbbxensem! ***\n\n";
 ReadCommonInputFromCache();
 
 print "Which platform? ";
-print "($TARGET_PC/$TARGET_PC_XIP/$TARGET_PROTO/$TARGET_PROTO_XIP/$TARGET_DEMO/$TARGET_NT/$TARGET_WIN/$TARGET_PROTO_TOOLS/$TARGET_NT_TOOLS), \n";
+print "($TARGET_PC/$TARGET_PC_XIP/$TARGET_PROTO/$TARGET_PROTO_XIP/$TARGET_DEMO/$TARGET_NT/$TARGET_FG/$TARGET_WIN/$TARGET_PROTO_TOOLS/$TARGET_NT_TOOLS/$TARGET_FG_TOOLS), \n";
 print "   default = $DefaultInfo{target}: ";
 $RealInfo{target} = ReadUserInput( $DefaultInfo{target} );
 
@@ -244,6 +246,11 @@ BUILDFILE: {
 
     if ( $RealInfo{target} eq $TARGET_NT ) {
 	 $RealInfo{targetfile} = "ntbbx.build";
+	 last BUILDFILE;
+    }
+
+    if ( $RealInfo{target} eq $TARGET_FG ) {
+	 $RealInfo{targetfile} = "fg.build";
 	 last BUILDFILE;
     }
 
@@ -279,6 +286,11 @@ BUILDFILE: {
 
     if ( $RealInfo{target} eq $TARGET_NT_TOOLS ) {
 	 $RealInfo{targetfile} = "ntbbxtools.build";
+	 last BUILDFILE;
+    }
+
+    if ( $RealInfo{target} eq $TARGET_FG_TOOLS ) {
+	 $RealInfo{targetfile} = "fgtools.build";
 	 last BUILDFILE;
     }
 
@@ -1193,8 +1205,10 @@ sub ReadTargetInputFromCache {
 	    if ( $RealInfo{target} eq $TARGET_PC_XIP ||
 		$RealInfo{target} eq $TARGET_NT_XIP ||
 		$RealInfo{target} eq $TARGET_NT ||
+		$RealInfo{target} eq $TARGET_FG ||
 		$RealInfo{target} eq $TARGET_DEMO ||
 		$RealInfo{target} eq $TARGET_NT_TOOLS ||
+		$RealInfo{target} eq $TARGET_FG_TOOLS ||
 		 $RealInfo{target} eq $TARGET_PC ) {
 		if ( /^demodir=(.*)/ ) {
 		    $DefaultInfo{demodir} = CRLF2CR( $1 );
@@ -1247,8 +1261,10 @@ sub SaveTargetInputToCache {
     if ( $RealInfo{target} eq $TARGET_PC_XIP ||
 	 $RealInfo{target} eq $TARGET_PC ||
 	$RealInfo{target} eq $TARGET_NT ||
+	$RealInfo{target} eq $TARGET_FG ||
 	$RealInfo{target} eq $TARGET_DEMO ||
 	$RealInfo{target} eq $TARGET_NT_TOOLS ||
+	$RealInfo{target} eq $TARGET_FG_TOOLS ||
 	$RealInfo{target} eq $TARGET_NT_XIP ) {
 	print TARGET_CONFIG_FILE "demodir=$RealInfo{demodir}\n";
     }
@@ -1400,10 +1416,10 @@ sub FreeGEOSCopyImageToEnsemble {
     my( $sourceImage, $targetDir, $targetImage );
 
     #
-    # NT and NT tools builds generate the FreeGEOS GFS image.
+    # FreeGEOS builds generate the GFS image.
     #
-    if ( ( $RealInfo{target} ne $TARGET_NT &&
-	   $RealInfo{target} ne $TARGET_NT_TOOLS ) ||
+    if ( ( $RealInfo{target} ne $TARGET_FG &&
+	   $RealInfo{target} ne $TARGET_FG_TOOLS ) ||
 	 $opt_debug ||
 	 $opt_template ) {
 	return;
@@ -1700,6 +1716,11 @@ sub FindDemoDir {
 	  $dirname = "nt";
 	  last MAPDIR;
       }
+      if ($RealInfo{target} eq $TARGET_FG) {
+
+	  $dirname = "fg";
+	  last MAPDIR;
+      }
       if ($RealInfo{target} eq $TARGET_NT_XIP) {
 
 	  $dirname = "ntxip";
@@ -1733,6 +1754,10 @@ sub FindDemoDir {
 
       if ($RealInfo{target} eq $TARGET_NT_TOOLS) {
 	  $dirname = "nttools";
+	  last MAPDIR;
+      }
+      if ($RealInfo{target} eq $TARGET_FG_TOOLS) {
+	  $dirname = "fgtools";
 	  last MAPDIR;
       }
 
@@ -1785,8 +1810,10 @@ sub ModifyGeosIni {
     # the demo directory.
     if ( $RealInfo{target} eq $TARGET_PC_XIP ||
 	$RealInfo{target} eq $TARGET_NT ||
+	$RealInfo{target} eq $TARGET_FG ||
 	$RealInfo{target} eq $TARGET_DEMO ||
 	$RealInfo{target} eq $TARGET_NT_TOOLS ||
+	$RealInfo{target} eq $TARGET_FG_TOOLS ||
 	$RealInfo{target} eq $TARGET_NT_XIP ||
 	 $RealInfo{target} eq $TARGET_PC ) {
 
