@@ -2,9 +2,10 @@
 rem WRITEGFS.BAT
 rem Generate GFSEC.INI or GFS.INI from GEOS_DIST_DIR argument.
 rem bootstrapPath holds the path with the
-rem GFS image (%1\BOOT). bootstrapPath is used to remove that
-rem path from the standard path list once the GFS has been loaded
-rem and runs.
+rem GFS image. bootstrapPath is used to remove that path from the
+rem standard path list once the GFS has been loaded and runs.
+rem The generated paths are relative to the Ensemble root so that
+rem moved/renamed trees can boot without regenerating this file.
 rem NOTE: using WRITEGFS and WRITEGFSEC instead of variables helps
 rem us to keep environmental space low for COMMAND.COM.
 
@@ -21,13 +22,13 @@ if exist gfs.ini del gfs.ini
 >>gfs.ini echo fs = megafile.geo
 >>gfs.ini echo.
 >>gfs.ini echo [paths]
->>gfs.ini echo top = %1\BOOT GFS:\FG
->>gfs.ini echo ini = %1\BOOT\NET.INI
+>>gfs.ini echo top = FREEGEOS\60BETA\BOOT GFS:\FG
+>>gfs.ini echo ini = FREEGEOS\60BETA\BOOT\NET.INI
 >>gfs.ini echo.
 >>gfs.ini echo [gfs]
->>gfs.ini echo file = %1\BOOT\GFS.IMG
+>>gfs.ini echo file = FREEGEOS\60BETA\BOOT\GFS.IMG
 >>gfs.ini echo drive = GFS
->>gfs.ini echo bootstrapPath = %1\BOOT
+>>gfs.ini echo bootstrapPath = FREEGEOS\60BETA\BOOT
 >>gfs.ini echo cacheFile = none
 >>gfs.ini echo.
 if exist gfs.ini goto END
@@ -41,13 +42,13 @@ if exist gfsec.ini del gfsec.ini
 >>gfsec.ini echo fs = megafile.geo
 >>gfsec.ini echo.
 >>gfsec.ini echo [paths]
->>gfsec.ini echo top = %1\BOOT GFS:\FG
->>gfsec.ini echo ini = %1\BOOT\NETEC.INI
+>>gfsec.ini echo top = FREEGEOS\60BETA\BOOT GFS:\FG
+>>gfsec.ini echo ini = FREEGEOS\60BETA\BOOT\NETEC.INI
 >>gfsec.ini echo.
 >>gfsec.ini echo [gfs]
->>gfsec.ini echo file = %1\BOOT\GFS.IMG
+>>gfsec.ini echo file = FREEGEOS\60BETA\BOOT\GFS.IMG
 >>gfsec.ini echo drive = GFS
->>gfsec.ini echo bootstrapPath = %1\BOOT
+>>gfsec.ini echo bootstrapPath = FREEGEOS\60BETA\BOOT
 >>gfsec.ini echo cacheFile = none
 >>gfsec.ini echo.
 if exist gfsec.ini goto END
