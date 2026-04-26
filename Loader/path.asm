@@ -239,6 +239,8 @@ AddPathToDataStructure	proc	near	uses bx, di, bp, es
 	mov	cx, INI_PATH_BUFFER_SIZE
 	call	ReconstructString		;es:di = string
 
+	call	ExpandRelativeTopLevelPathElements
+
 DBCS <	call	ConvertLoaderStringInPlace				>
 
 	call	NullTerminatePathElements	;cx = path size
@@ -253,6 +255,230 @@ DBCS <	call	ConvertLoaderStringInPlace				>
 	ret
 
 AddPathToDataStructure	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ExpandRelativeTopLevelPathElements
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Expand relative physical path elements against KLV_topLevelPath.
+
+CALLED BY:	AddPathToDataStructure
+PASS:		es:di	= null-terminated SBCS path list
+RETURN:		es:di	= same buffer, with relative elements expanded
+DESTROYED:	nothing
+SIDE EFFECTS:	Errors if the expanded path list does not fit
+
+PSEUDO CODE/STRATEGY:
+		Path lists are separated by space, tab, CR, or LF, as in
+		NullTerminatePathElements. Elements with a colon before any
+		separator (for example C:\FOO or GFS:\FG) are already rooted
+		somewhere and are left unchanged. Elements starting with a
+		backslash are also left unchanged. All other elements are
+		relative to the GEOS top-level directory.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ExpandRelativeTopLevelPathElements	proc	near
+	uses	ax, bx, cx, dx, si, di
+sourceStart	local	word
+destStart	local	word
+lastChar	local	byte
+	.enter
+
+	mov	sourceStart, di
+	sub	sp, INI_PATH_BUFFER_SIZE
+	mov	destStart, sp
+
+	mov	si, sourceStart
+	mov	di, destStart
+	mov	dx, INI_PATH_BUFFER_SIZE
+
+copyLoop:
+	mov	al, {char} es:[si]
+	tst	al
+	jz	storeNull
+
+	call	IsTopLevelPathSeparator
+	jnc	copyElement
+
+	call	AppendCharToExpandedPath
+	jc	expandFail
+	inc	si
+	jmp	copyLoop
+
+copyElement:
+	call	IsTopLevelPathElementRelative
+	jnc	copyElementOnly
+
+	push	si
+	mov	bx, offset loaderVars.KLV_topLevelPath
+	mov	{char} lastChar, 0
+
+copyTopLevel:
+	mov	al, {char} ds:[bx]
+	tst	al
+	jz	topLevelDone
+	call	AppendCharToExpandedPath
+	jc	expandFailPopSI
+	mov	{char} lastChar, al
+	inc	bx
+	jmp	copyTopLevel
+
+topLevelDone:
+	cmp	{char} lastChar, '\\'
+	je	topLevelSeparatorDone
+	mov	al, '\\'
+	call	AppendCharToExpandedPath
+	jc	expandFailPopSI
+
+topLevelSeparatorDone:
+	pop	si
+
+copyElementOnly:
+	mov	al, {char} es:[si]
+	tst	al
+	jz	storeNull
+	call	IsTopLevelPathSeparator
+	jc	copyLoop
+	call	AppendCharToExpandedPath
+	jc	expandFail
+	inc	si
+	jmp	copyElementOnly
+
+storeNull:
+	call	AppendCharToExpandedPath
+	jc	expandFail
+
+	mov	si, destStart
+	mov	di, sourceStart
+
+copyBack:
+	mov	al, {char} ss:[si]
+	mov	{char} es:[di], al
+	inc	si
+	inc	di
+	tst	al
+	jnz	copyBack
+
+	add	sp, INI_PATH_BUFFER_SIZE
+	.leave
+	ret
+
+expandFailPopSI:
+	pop	si
+expandFail:
+	add	sp, INI_PATH_BUFFER_SIZE
+	ERROR	LS_MALFORMED_PATH_SPEC
+
+ExpandRelativeTopLevelPathElements	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IsTopLevelPathElementRelative
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check whether a path-list element needs top-level expansion.
+
+CALLED BY:	ExpandRelativeTopLevelPathElements
+PASS:		es:si	= element start
+RETURN:		carry set if relative
+DESTROYED:	ax, bx
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IsTopLevelPathElementRelative	proc	near
+
+	mov	al, {char} es:[si]
+	cmp	al, '\\'
+	je	notRelative
+
+	mov	bx, si
+
+scanElement:
+	mov	al, {char} es:[bx]
+	tst	al
+	jz	isRelative
+	call	IsTopLevelPathSeparator
+	jc	isRelative
+	cmp	al, ':'
+	je	notRelative
+	inc	bx
+	jmp	scanElement
+
+isRelative:
+	stc
+	ret
+
+notRelative:
+	clc
+	ret
+
+IsTopLevelPathElementRelative	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IsTopLevelPathSeparator
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check for a loader path-list separator.
+
+CALLED BY:	ExpandRelativeTopLevelPathElements,
+		IsTopLevelPathElementRelative
+PASS:		al	= character
+RETURN:		carry set if separator
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IsTopLevelPathSeparator	proc	near
+
+	cmp	al, C_SPACE
+	je	separator
+	cmp	al, C_TAB
+	je	separator
+	cmp	al, C_CR
+	je	separator
+	cmp	al, C_LF
+	je	separator
+	clc
+	ret
+
+separator:
+	stc
+	ret
+
+IsTopLevelPathSeparator	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		AppendCharToExpandedPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Append one SBCS character to the expansion buffer.
+
+CALLED BY:	ExpandRelativeTopLevelPathElements
+PASS:		al	= character
+		ss:di	= destination
+		dx	= bytes left
+RETURN:		carry set if full
+		ss:di	= advanced
+		dx	= decremented
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+AppendCharToExpandedPath	proc	near
+
+	tst	dx
+	jz	full
+	mov	{char} ss:[di], al
+	inc	di
+	dec	dx
+	clc
+	ret
+
+full:
+	stc
+	ret
+
+AppendCharToExpandedPath	endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ConvertLoaderStringInPlace

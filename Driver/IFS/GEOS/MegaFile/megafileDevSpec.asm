@@ -126,27 +126,26 @@ fileKeyStr	char	'file', 0
 MFSOpenFile	proc	near
 		uses	ds, bx, si, di, dx, cx, es, bp
 DBCS <		filenameBuf	local DOS_STD_PATH_LENGTH + 3 dup (wchar) >
+sbcFilenameBuf	local	DOS_STD_PATH_LENGTH + 3 dup (char)
 		.enter
 
-if	DBCS_PCGEOS
 		segmov	es, ss
+if	DBCS_PCGEOS
 		lea	di, ss:[filenameBuf]
 else
-		mov	di, segment megaFile
-		mov	es, di
-		mov	di, offset megaFile
+		lea	di, ss:[sbcFilenameBuf]
 endif
 
 		segmov	ds, cs, cx		; ds, cx <- cs
 		mov	dx, offset fileKeyStr
 		mov	si, offset gfsKeyStr
+		push	bp
 SBCS <		mov	bp, (IFCC_UPCASE shl offset IFRF_CHAR_CONVERT) or \
-				size megaFile				>
-DBCS <		push	bp						>
+				size sbcFilenameBuf			>
 DBCS <		mov	bp, (IFCC_UPCASE shl offset IFRF_CHAR_CONVERT) or \
 				size filenameBuf			>
 		call	InitFileReadString
-DBCS <		pop	bp						>
+		pop	bp
 		jc	done			;skip if no key found...
 
 if	DBCS_PCGEOS
@@ -156,8 +155,8 @@ if	DBCS_PCGEOS
 		push	ax			; save ax
 
 		movdw	dssi, esdi
-		segmov	es, <segment megaFile>, di
-		mov	di, offset megaFile
+		segmov	es, ss, di
+		lea	di, ss:[sbcFilenameBuf]
 charLoop:
 		lodsw
 		stosb
@@ -167,11 +166,151 @@ charLoop:
 		pop	ax			; restore ax
 endif
 
+		segmov	ds, ss
+		lea	si, ss:[sbcFilenameBuf]
+		call	MFSStorePathFromIni
+		jc	done
+
 		call	MFSReopenFile
 done:
 		.leave
 		ret
 MFSOpenFile	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MFSStorePathFromIni
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Copy or expand the megafile path read from the INI file.
+
+CALLED BY:	MFSOpenFile
+PASS:		ds:si	= SBCS path read from [gfs] file
+RETURN:		carry set if the path could not be stored
+DESTROYED:	ax, bx, cx, dx, si, di, es
+SIDE EFFECTS:	none
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MFSStorePathFromIni	proc	near
+
+		call	MFSPathIsRelative
+		jnc	copyPath
+
+		;
+		; Resolve relative paths against the loader's top-level GEOS
+		; directory, not the DOS current directory.
+		;
+		push	ds, si
+		mov	ax, SGIT_LOADER_VARS_ADDRESS
+		call	SysGetInfo			;dx:ax = loader vars
+		mov	bx, ax
+		mov	ds, dx
+		add	bx, offset KLV_topLevelPath
+		mov	si, bx
+
+		segmov	es, <segment megaFile>, di
+		mov	di, offset megaFile
+		mov	cx, size megaFile
+
+copyTopLevelPath:
+		jcxz	copyFailPopSource
+if DBCS_PCGEOS
+		lodsw
+		stosb
+else
+		lodsb
+		stosb
+endif
+		dec	cx
+if DBCS_PCGEOS
+		tst	ax
+else
+		tst	al
+endif
+		jnz	copyTopLevelPath
+
+		dec	di				;es:di = top-level null terminator
+		cmp	di, offset megaFile+3		;don't add slash to root
+		jbe	appendTail
+		cmp	{char} es:[di-1], '\\'
+		je	appendTail
+		jcxz	copyFailPopSource
+		mov	al, '\\'
+		stosb
+		dec	cx
+
+appendTail:
+		pop	ds, si
+		jmp	copySourcePath
+
+copyPath:
+	segmov	es, <segment megaFile>, di
+	mov	di, offset megaFile
+	mov	cx, size megaFile
+
+copySourcePath:
+	jcxz	copyFail
+	lodsb
+	stosb
+	dec	cx
+		tst	al
+		jz	copyDone
+		jmp	copySourcePath
+
+copyFailPopSource:
+		pop	ds, si
+copyFail:
+		stc
+		ret
+
+copyDone:
+	clc
+	ret
+
+MFSStorePathFromIni	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MFSPathIsRelative
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check whether an SBCS DOS path should be expanded against
+		KLV_topLevelPath.
+
+CALLED BY:	MFSStorePathFromIni
+PASS:		ds:si	= path
+RETURN:		carry set if relative
+DESTROYED:	ax, bx
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MFSPathIsRelative	proc	near
+
+	mov	al, ds:[si]
+	cmp	al, '\\'
+	je	notRelative
+
+	mov	bx, si
+
+scanPath:
+	mov	al, ds:[bx]
+	tst	al
+	jz	isRelative
+	cmp	al, ':'
+	je	notRelative
+	cmp	al, '\\'
+	je	isRelative
+	inc	bx
+	jmp	scanPath
+
+isRelative:
+	stc
+	ret
+
+notRelative:
+	clc
+	ret
+
+MFSPathIsRelative	endp
 
 
 COMMENT @----------------------------------------------------------------------
