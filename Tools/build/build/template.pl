@@ -362,10 +362,10 @@ sub EvaluateExpression {
 	print "* Evaluating expression $expr\n";
     }
 
-    $expr =~ s/!/! /g;
     $expr =~ s/[^"\w]([\w]+)[^"\w]/"\$var{$1}"/g;
     $expr =~ s/==/ eq /g;
-    $expr =~ s/!=/ neq /g;
+    $expr =~ s/!=/ ne /g;
+    $expr =~ s/!/! /g;
 
     if ( &Debug("parsefiletree")  || &Debug("parsetemplate") ) {
 	print "* Evaluating pexpression $expr\n";
