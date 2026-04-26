@@ -525,6 +525,9 @@ bootstrapPathKeyStr	char	'bootstrapPath', 0
 GFSForgetBootstrapDir	proc	near
 
 	bootstrapPath	local	PathName
+	expandedPath	local	PathName
+	lastTopLevelChar	local	word
+	topLevelLength	local	word
 
 		.enter
 
@@ -552,9 +555,86 @@ GFSForgetBootstrapDir	proc	near
 	; if is the FIRST SP_TOP path.
 	;
 
-		segmov	ds, es, ax		;ds:dx = path to delete
-		mov	dx, di
+		segmov	ds, es, ax
+		mov	si, di			;ds:si = path read from INI
+		call	GFSPathIsRelative
+		jnc	deletePath
 
+		;
+		; Resolve against loaderVars.KLV_topLevelPath.
+		;
+		push	ds, si			;save relative path from INI
+		mov	ax, SGIT_LOADER_VARS_ADDRESS
+		call	SysGetInfo		;dx:ax = loader vars
+		mov	bx, ax
+		mov	ds, dx
+		add	bx, offset KLV_topLevelPath
+		mov	si, bx
+
+		segmov	es, ss, ax
+		lea	di, expandedPath
+		mov	cx, size PathName
+		clr	ax
+		mov	ss:[lastTopLevelChar], ax
+		mov	ss:[topLevelLength], ax
+
+copyTopLevelPath:
+		cmp	cx, size TCHAR
+		jb	copyFailPopSource
+
+		LocalGetChar	ax, dssi
+		LocalPutChar	esdi, ax
+		sub	cx, size TCHAR
+
+		LocalIsNull	ax
+		jz	topLevelDone
+
+		mov	ss:[lastTopLevelChar], ax
+		inc	ss:[topLevelLength]
+		jmp	copyTopLevelPath
+
+topLevelDone:
+		cmp	ss:[topLevelLength], 3		;don't add slash to root
+		jbe	copyIniPath
+
+		mov	ax, ss:[lastTopLevelChar]
+		LocalCmpChar	ax, C_BACKSLASH
+		je	copyIniPath
+
+		cmp	cx, size TCHAR
+		jb	copyFailPopSource
+
+		LocalLoadChar	ax, C_BACKSLASH
+		LocalPutChar	esdi, ax
+		sub	cx, size TCHAR
+
+copyIniPath:
+		pop	ds, si
+
+copyIniPathLoop:
+		cmp	cx, size TCHAR
+		jb	done
+
+		LocalGetChar	ax, dssi
+		LocalPutChar	esdi, ax
+		sub	cx, size TCHAR
+
+		LocalIsNull	ax
+		jnz	copyIniPathLoop
+
+		segmov	ds, ss, ax
+		lea	dx, expandedPath
+		jmp	havePath
+
+copyFailPopSource:
+		pop	ds, si
+		jmp	done
+
+deletePath:
+		segmov	ds, ss, ax
+		lea	dx, bootstrapPath
+
+havePath:
 		mov	ax, SP_TOP		;nuke it from the SP_TOP list
 		call	FileDeleteStandardPathDirectory
 						;ignore errors
@@ -563,6 +643,50 @@ done:
 		.leave
 		ret
 GFSForgetBootstrapDir	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GFSPathIsRelative
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check whether a path should be expanded against
+		KLV_topLevelPath.
+
+CALLED BY:	GFSForgetBootstrapDir
+PASS:		ds:si	= path
+RETURN:		carry set if relative
+DESTROYED:	ax
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GFSPathIsRelative	proc	near
+	uses	si
+	.enter
+
+	LocalGetChar	ax, dssi
+	LocalIsNull	ax
+	jz	isRelative
+	LocalCmpChar	ax, C_BACKSLASH
+	je	notRelative
+
+scanPath:
+	LocalGetChar	ax, dssi
+	LocalIsNull	ax
+	jz	isRelative
+	LocalCmpChar	ax, C_COLON
+	je	notRelative
+	jmp	scanPath
+
+isRelative:
+	stc
+	jmp	done
+
+notRelative:
+	clc
+
+done:
+	.leave
+	ret
+GFSPathIsRelative	endp
 
 endif
 

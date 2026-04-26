@@ -1,58 +1,31 @@
-##############################################################################
 #
-# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+# THIS FILE HAS BEEN GENERATED AUTOMATICALLY.
 #
-# PROJECT:	PC GEOS
-# MODULE:	MegaFile -- Makefile
-# FILE: 	Makefile
-# AUTHOR: 	God, Wed Apr  2 20:18:45 PST 1997
+# If you edit it, you will lose your changes, should it be regenerated.
 #
-# TARGETS:
-# 	Name			Description
-#	----			-----------
-#	megafileec.geo		create an error-checking version
-#	megafile.geo		create a non error-checking version
-#	full			create both of the above, plus tags
-#	part			create only the error-checking version
-#	tags			create a tags file from all the sources
-#	depend			generate source file dependencies
-#
-# DESCRIPTION:
-#	This makefile was automatically generated from:
-#	    /staff/pcgeos/Tools/mkmf/Makefile.geode
-#
-#	DO NOT EDIT IT, AS YOU MAY LOSE YOUR CHANGES WHEN IT IS REGENERATED
-#
-#	$Id: Makefile.geode,v 1.4 92/01/03 20:17:45 johnm Exp $
-#
-###############################################################################
-
 GEODE           = megafile
+ASM_TO_OBJS     = megafileManager.asm
+UI_TO_RDFS      =
+SRCS            = megafileManager.asm megafileDevSpec.asm gfsDisk.asm\
+                  gfsEntry.asm gfsEnum.asm gfsExtAttrs.asm gfsInitExit.asm\
+                  gfsIO.asm gfsMapPath.asm gfsPath.asm gfsUtils.asm\
+                  megafileConstant.def megafileVariable.def
+OBJS            = megafileManager.obj
+LOBJS           =
 LIBNAME         = fsd
 PROTOCONST      = FS
-OBJS            = megafileManager.obj
-SRCS            = gfsDisk.asm gfsEntry.asm gfsEnum.asm gfsExtAttrs.asm\
-                  gfsIO.asm gfsInitExit.asm gfsMapPath.asm gfsPath.asm\
-                  gfsUtils.asm megafileDevSpec.asm megafileManager.asm\
-                  megafileConstant.def megafileVariable.def
-LOBJS           =
 
-SUBDIRS         = COMPRESSED DBCS DBCSXIP XIP
+SYSMAKEFILE     = geode.mk
 
-#include	<geos.mk>		# system directory definitions
-#include	<gpath.mk>		# set search paths for files
-
-MAKEFILE	= Makefile
-SYSMAKEFILE	= geode.mk
+#include <geos.mk>
+#include <gpath.mk>
 
 #if exists(local.mk)
-#	include	"local.mk"
+#include "local.mk"
 #else
-#	include	<$(SYSMAKEFILE)>
+#include <$(SYSMAKEFILE)>
 #endif
 
-#if 	exists($(DEPFILE))
-#include	"$(DEPFILE)"
+#if exists($(DEPFILE))
+#include "$(DEPFILE)"
 #endif
-
-# Allow mkmf
