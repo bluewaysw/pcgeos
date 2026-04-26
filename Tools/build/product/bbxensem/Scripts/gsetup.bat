@@ -9,10 +9,10 @@ rem Behavior summary:
 rem - DEFAULT (no mode parameter):
 rem     if no GEOS.INI/GEOSEC.INI exists, "install" user files / folder stubs, then "activate".
 rem     if an UPDATE.TXT is present, run "activate" only (UPDATE.TXT deleted afterwards).
-rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI/GFSEC.INI, does nothing.
+rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI, does nothing.
 rem - INSTALL: always runs "install" plus "activate" after warning and confirmation.
 rem - ACTIVATE: "activate"s the version for which it is called; UPDATE.TXT is ignored.
-rem - GFS.INI/GFSEC.INI uses paths relative to the Ensemble root, so moving or
+rem - GFS.INI uses paths relative to the Ensemble root, so moving or
 rem   renaming the Ensemble folder does not require rerunning setup.
 
 
@@ -49,33 +49,27 @@ echo Press CTRL+C now to cancel, or press any key to continue.
 pause
 goto DOINSTALL
 
-rem Parse default no-arg mode.
+rem Parse default mode.
 :PARSEDEFAULT
 if not "%3"=="" goto USAGE
 if exist %1\%PINST%\NUL goto CHECKDEFAULT2
 goto BADDIR
 
-rem Verify activate payload directory exists for default flow.
+rem Verify activate payload directory exists.
 :CHECKDEFAULT2
 if exist %1\%PACT%\NUL goto CHECKDEFAULTINI
 goto BADDIR
 
-rem Detect GEOS configuration in target root for default mode.
+rem Detect GEOS configuration in target root.
 :CHECKDEFAULTINI
-if exist geosec.ini goto DEFAULTEC
-if exist geos.ini goto DEFAULTNC
+if exist geosec.ini goto DEFAULTCHECK
+if exist geos.ini goto DEFAULTCHECK
 goto DOINSTALL
 
-rem Default path for non-EC configuration.
-:DEFAULTNC
+rem Shared default path.
+:DEFAULTCHECK
 if exist update.txt goto UPDATEMARKER
 if not exist gfs.ini goto DEFAULTNEEDACTIVATE
-goto DEFAULTDONE
-
-rem Default path for EC configuration.
-:DEFAULTEC
-if exist update.txt goto UPDATEMARKER
-if not exist gfsec.ini goto DEFAULTNEEDACTIVATE
 goto DEFAULTDONE
 
 rem Default path when bootstrap INI is missing or stale.
@@ -111,13 +105,12 @@ echo.
 echo Running activate phase ...
 goto DOACTIVATEINSTALL
 
-rem Copy setup\\activate payload. The payload contains the GFS bootstrap INI.
+rem Copy setup\\activate payload. The payload provides GFS.INI.
 :DOACTIVATE
 echo Activating from %1\%PACT% to current target directory ...
 xcopy %1\%PACT%\*.* .\ /S /E /Y
 echo.
 
-if exist gfsec.ini goto ACTIVATEDONE
 if exist gfs.ini goto ACTIVATEDONE
 goto GFSINIFAIL
 
@@ -128,7 +121,6 @@ xcopy %1\%PACT%\*.* .\ /S /E /Y
 if exist update.txt del update.txt
 echo.
 
-if exist gfsec.ini goto INSTALLDONE
 if exist gfs.ini goto INSTALLDONE
 goto GFSINIFAIL
 
@@ -142,9 +134,9 @@ rem Finish combined INSTALL plus activate flow.
 echo Install complete.
 goto END
 
-rem Abort when activate payload did not provide a GFS bootstrap INI.
+rem Abort when activate payload did not provide GFS.INI.
 :GFSINIFAIL
-echo ERROR: Activate payload did not provide GFSEC.INI or GFS.INI.
+echo ERROR: Activate payload did not provide GFS.INI.
 goto END
 
 rem Show launcher-only usage when GEOS_DIST_DIR is missing.
