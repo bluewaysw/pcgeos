@@ -2,9 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ASM_FILE="$SCRIPT_DIR/gsetup.asm"
-OBJ_FILE="$SCRIPT_DIR/gsetup.obj"
-COM_FILE="$SCRIPT_DIR/gsetup.com"
+SRC_FILE="$SCRIPT_DIR/gsetup.c"
+EXE_FILE="$SCRIPT_DIR/gsetup.exe"
 
 find_tool() {
     local tool_name="$1"
@@ -29,18 +28,20 @@ find_tool() {
     return 1
 }
 
-WASM_EXE="$(find_tool wasm || true)"
-WLINK_EXE="$(find_tool wlink || true)"
+WCL_EXE="$(find_tool wcl || true)"
 
-if [ -z "$WASM_EXE" ] || [ -z "$WLINK_EXE" ]; then
-    echo "ERROR: Could not find OpenWatcom wasm/wlink." >&2
+if [ -z "$WCL_EXE" ]; then
+    echo "ERROR: Could not find OpenWatcom wcl." >&2
     echo "ERROR: Put tools in PATH or set WATCOM." >&2
     exit 1
 fi
 
-"$WASM_EXE" -zq -fo="$OBJ_FILE" "$ASM_FILE"
-"$WLINK_EXE" option quiet format dos com option nodefault option start=_start \
-    file "$OBJ_FILE" name "$COM_FILE"
-rm -f "$OBJ_FILE"
+if [ -n "${WATCOM:-}" ]; then
+    WATCOM_ROOT="$WATCOM"
+else
+    WATCOM_ROOT="$(cd "$(dirname "$WCL_EXE")/.." && pwd)"
+fi
 
-echo "Built $COM_FILE"
+WATCOM="$WATCOM_ROOT" "$WCL_EXE" -bt=dos -ms -zq -i="$WATCOM_ROOT/h" -fe="$EXE_FILE" "$SRC_FILE"
+
+echo "Built $EXE_FILE"

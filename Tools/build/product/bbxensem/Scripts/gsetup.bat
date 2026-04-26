@@ -1,5 +1,6 @@
 @echo off
 rem GSETUP.BAT
+rem called by gsetup.exe
 rem Install/activate a (new) GEOS version from the target directory.
 rem So it is usually something like this, standing in C:\ENSEMBLE:
 rem    freegeos\60\gsetup
