@@ -1,26 +1,20 @@
 @echo off
 rem GSETUP.BAT
-rem Install/activate from current target directory.
-rem
-rem Internal launcher contract:
-rem   GSETUP.BAT GEOS_DIST_DIR
-rem   GSETUP.BAT GEOS_DIST_DIR INSTALL
-rem   GSETUP.BAT GEOS_DIST_DIR ACTIVATE
-rem
-rem Usage:
-rem   GSETUP
-rem   GSETUP INSTALL
-rem   GSETUP ACTIVATE
-rem
+rem called by gsetup.exe
+rem Install/activate a (new) GEOS version from the target directory.
+rem So it is usually something like this, standing in C:\ENSEMBLE:
+rem    freegeos\60\gsetup
+rem    freegeos\60\gsetup install
+rem    freegeos\60\gsetup activate
 rem Behavior summary:
 rem - DEFAULT (no mode parameter):
-rem     no GEOS.INI/GEOSEC.INI results in "install" user files / folder stubs, then "activate".
-rem     UPDATE.TXT present results in "activate" only (UPDATE.TXT deleted afterwards).
-rem     existing INI with existing GFS.INI/GFSEC.INI results in no-op.
-rem - INSTALL: always runs install plus activate after warning and confirmation.
-rem - ACTIVATE: "activate"s the selected version for which it is called; UPDATE.TXT is ignored.
-rem - When moving the Ensemble folder around or renaming it, create an empty update.txt and call init.bat
-rem   or call "gsetup.com activate" for the current version (freegeos\60\gsetup activate).
+rem     if no GEOS.INI/GEOSEC.INI exists, "install" user files / folder stubs, then "activate".
+rem     if an UPDATE.TXT is present, run "activate" only (UPDATE.TXT deleted afterwards).
+rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI, does nothing.
+rem - INSTALL: always runs "install" plus "activate" after warning and confirmation.
+rem - ACTIVATE: "activate"s the version for which it is called; UPDATE.TXT is ignored.
+rem - GFS.INI uses paths relative to the Ensemble root, so moving or
+rem   renaming the Ensemble folder does not require rerunning setup.
 
 
 if "%1"=="" goto NOENTRY
@@ -56,33 +50,27 @@ echo Press CTRL+C now to cancel, or press any key to continue.
 pause
 goto DOINSTALL
 
-rem Parse default no-arg mode.
+rem Parse default mode.
 :PARSEDEFAULT
 if not "%3"=="" goto USAGE
 if exist %1\%PINST%\NUL goto CHECKDEFAULT2
 goto BADDIR
 
-rem Verify activate payload directory exists for default flow.
+rem Verify activate payload directory exists.
 :CHECKDEFAULT2
 if exist %1\%PACT%\NUL goto CHECKDEFAULTINI
 goto BADDIR
 
-rem Detect GEOS configuration in target root for default mode.
+rem Detect GEOS configuration in target root.
 :CHECKDEFAULTINI
-if exist geosec.ini goto DEFAULTEC
-if exist geos.ini goto DEFAULTNC
+if exist geosec.ini goto DEFAULTCHECK
+if exist geos.ini goto DEFAULTCHECK
 goto DOINSTALL
 
-rem Default path for non-EC configuration.
-:DEFAULTNC
+rem Shared default path.
+:DEFAULTCHECK
 if exist update.txt goto UPDATEMARKER
 if not exist gfs.ini goto DEFAULTNEEDACTIVATE
-goto DEFAULTDONE
-
-rem Default path for EC configuration.
-:DEFAULTEC
-if exist update.txt goto UPDATEMARKER
-if not exist gfsec.ini goto DEFAULTNEEDACTIVATE
 goto DEFAULTDONE
 
 rem Default path when bootstrap INI is missing or stale.
@@ -118,17 +106,14 @@ echo.
 echo Running activate phase ...
 goto DOACTIVATEINSTALL
 
-rem Copy setup\\activate payload and regenerate GFS bootstrap INI.
+rem Copy setup\\activate payload. The payload provides GFS.INI.
 :DOACTIVATE
 echo Activating from %1\%PACT% to current target directory ...
 xcopy %1\%PACT%\*.* .\ /S /E /Y
 echo.
 
-echo Regenerating GFS bootstrap INI for %1 ...
-call %1\writegfs.bat %1
-if exist gfsec.ini goto ACTIVATEDONE
 if exist gfs.ini goto ACTIVATEDONE
-goto GFSGENFAIL
+goto GFSINIFAIL
 
 rem Run activate phase after INSTALL and clear update marker if present.
 :DOACTIVATEINSTALL
@@ -137,11 +122,8 @@ xcopy %1\%PACT%\*.* .\ /S /E /Y
 if exist update.txt del update.txt
 echo.
 
-echo Regenerating GFS bootstrap INI for %1 ...
-call %1\writegfs.bat %1
-if exist gfsec.ini goto INSTALLDONE
 if exist gfs.ini goto INSTALLDONE
-goto GFSGENFAIL
+goto GFSINIFAIL
 
 rem Finish pure ACTIVATE flow.
 :ACTIVATEDONE
@@ -153,9 +135,9 @@ rem Finish combined INSTALL plus activate flow.
 echo Install complete.
 goto END
 
-rem Abort when GFS bootstrap INI generation fails.
-:GFSGENFAIL
-echo ERROR: Failed to generate GFSEC.INI or GFS.INI for current GEOS_DIST_DIR.
+rem Abort when activate payload did not provide GFS.INI.
+:GFSINIFAIL
+echo ERROR: Activate payload did not provide GFS.INI.
 goto END
 
 rem Show launcher-only usage when GEOS_DIST_DIR is missing.
