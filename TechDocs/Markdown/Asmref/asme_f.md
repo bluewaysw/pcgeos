@@ -2599,10 +2599,10 @@ hierarchy.
 
 **Pass:**  
 *ds:si - Object instance data.  
-ax - TargetLevel of object in ***ds:si**.  
+ax - TargetLevel of object in *ds:si.  
 bx - Offset to Master part.  
 di - Offset to targetExcl field of type **HierarchicalGrab** in 
-instance data of object in ***ds:si**.  
+instance data of object in *ds:si.  
 cx - **TargetLevel** searching for.
 
 **Returns:**  
