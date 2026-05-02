@@ -1524,26 +1524,180 @@ REVISION HISTORY:
 	pjc	7/27/95   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-REDOpenSourceGeode	method dynamic ResEditDocumentClass, 
+REDOpenSourceGeode	method dynamic ResEditDocumentClass,
 					MSG_RESEDIT_DOCUMENT_OPEN_SOURCE_GEODE
+pushedBP	local	word	push bp
+fallbackPath	local	PathName
 		uses	cx, dx
 		.enter
 
-EC<		cmp	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
+EC<		mov	bx, ss:[pushedBP]				  >
+EC<		cmp	ss:[bx].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 EC<		ERROR_NE  BAD_TRANSLATION_FILE_FRAME			  >
+
+	; Clear the source-location state for this open attempt.
+
+		andnf	ds:[di].REDI_state, not mask DS_SOURCE_FROM_DISTAPPL
 
 	; Go to source geode's path.
 
 		call	FilePushDir
 		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
 		call	ObjCallInstanceNoLock
-		LONG jc	done
+		jc	tryFallbackNoMap
 
 	; Lock TransMapHeader.
 
 		mov	ax, MSG_RESEDIT_DOCUMENT_LOCK_MAP
 		call	ObjCallInstanceNoLock
 		movdw	esdi, cxdx
+
+	; Try the normal source path first.
+
+		push	bp
+		mov	bp, ss:[pushedBP]
+		call	REDTryOpenSourceGeode
+		pop	bp
+		jnc	errorUnlock
+
+	; The normal path did not contain a usable source geode.  If the
+	; fallback is enabled, try the matching SYSTEM\DISTAPPL path.
+
+		call	ReadDistapplFallbackFromInitFile
+		jc	sourceGeodeError
+
+		push	ds, si
+		push	es, di
+		segmov	ds, es, ax
+		mov	si, di
+		segmov	es, ss, ax
+		lea	di, ss:[fallbackPath]
+		call	BuildDistapplPathFromMap
+		pop	es, di
+		pop	ds, si
+		jc	sourceGeodeError
+
+		push	ds
+		segmov	ds, ss, ax
+		lea	dx, ss:[fallbackPath]
+		clr	bx
+		call	FileSetCurrentPath
+		pop	ds
+		jc	sourceGeodeError
+
+		push	bp
+		mov	bp, ss:[pushedBP]
+		call	REDTryOpenSourceGeode
+		pop	bp
+		jc	sourceGeodeError
+
+		DerefDoc
+		ornf	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		jmp	errorUnlock
+
+sourceGeodeError:
+		call	SourceGeodeFileError
+		stc
+		jmp	errorUnlock
+
+tryFallbackNoMap:
+		push	ax
+		call	ReadDistapplFallbackFromInitFile
+		jc	noMapFallbackDisabled
+
+		mov	ax, MSG_RESEDIT_DOCUMENT_LOCK_MAP
+		call	ObjCallInstanceNoLock
+		movdw	esdi, cxdx
+
+		push	ds, si
+		push	es, di
+		segmov	ds, es, ax
+		mov	si, di
+		segmov	es, ss, ax
+		lea	di, ss:[fallbackPath]
+		call	BuildDistapplPathFromMap
+		pop	es, di
+		pop	ds, si
+		jc	noMapFallbackUnlock
+
+		push	ds
+		segmov	ds, ss, ax
+		lea	dx, ss:[fallbackPath]
+		clr	bx
+		call	FileSetCurrentPath
+		pop	ds
+		jc	noMapFallbackUnlock
+
+		push	bp
+		mov	bp, ss:[pushedBP]
+		call	REDTryOpenSourceGeode
+		pop	bp
+		jc	sourceGeodeErrorAfterPath
+
+		DerefDoc
+		ornf	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		pop	ax
+		jmp	errorUnlock
+
+sourceGeodeErrorAfterPath:
+		call	SourceGeodeFileError
+		pop	cx
+		stc
+		jmp	errorUnlock
+
+noMapFallbackUnlock:
+		call	DBUnlock
+
+noMapFallbackDisabled:
+		pop	ax
+		stc
+		jmp	done
+
+errorUnlock:
+
+	; Unlock TransMapHeader.
+
+		pushf
+		push	ax
+		call	DBDirty
+		call	DBUnlock
+		pop	ax
+		popf
+
+done:
+		call	FilePopDir
+
+		.leave
+		ret
+
+REDOpenSourceGeode	endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		REDTryOpenSourceGeode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Try to open the source geode in the current directory.
+
+CALLED BY:	REDOpenSourceGeode
+PASS:		*ds:si	= ResEditDocumentClass object
+		es:di	= TransMapHeader
+		ss:bp	= TranslationFileFrame
+
+RETURN:		if error,
+			carry set
+			ax - ErrorValue
+		else
+			carry clear
+
+DESTROYED:	ax
+SIDE EFFECTS:	Saves the opened geode file handle in the frame.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+REDTryOpenSourceGeode	proc	near
+		uses	bx, cx, dx
+		.enter
 
 	; Copy source geode name to TranslationFileFrame.
 
@@ -1631,9 +1785,8 @@ EC <		popf							>
 	; We couldn't find an executable.  Handle error.
 
 		mov	ax, EV_FILE_OPEN
-		jnc	openGeodeFile
-		call	SourceGeodeFileError
-		jmp	errorUnlock
+		stc
+		jmp	done
 
 openGeodeFile:
 
@@ -1645,7 +1798,7 @@ openGeodeFile:
 		call	FileOpen
 		pop	ds
 		mov	bx, ax			; bx <- file handle
-		jc	errorUnlock
+		jc	done
 
 	; Save the file handle.
 
@@ -1654,25 +1807,12 @@ openGeodeFile:
 		mov	ds, ss:[bp].TFF_handles
 		mov	ds:[DHS_geode], bx
 		pop	ds
-
-errorUnlock:
-
-	; Unlock TransMapHeader.
-
-		pushf
-		push	ax
-		call	DBDirty
-		call	DBUnlock
-		pop	ax
-		popf
+		clc
 
 done:
-		call	FilePopDir
-
 		.leave
 		ret
-
-REDOpenSourceGeode	endm
+REDTryOpenSourceGeode	endp
 
 
 
