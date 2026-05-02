@@ -44,6 +44,146 @@ DESCRIPTION:
 
 DocOpenClose segment resource
 
+WORLD_ROOT_LENGTH	= 5
+
+LocalDefNLString	worldRootString, <'WORLD', 0>
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		IsRelativePathWorldRooted
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check whether a relative path starts with WORLD.
+
+CALLED BY:	BuildDistapplPathFromMap, AppendDistapplRootPath
+PASS:		ds:si	= relative path
+
+RETURN:		carry clear if path is WORLD or WORLD\...
+		carry set otherwise
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+IsRelativePathWorldRooted	proc	near
+		uses	ax, cx, di, es, si
+		.enter
+
+		segmov	es, cs, ax
+		mov	di, offset worldRootString
+		mov	cx, WORLD_ROOT_LENGTH
+		call	LocalCmpStringsNoCase
+		jne	notWorld
+
+		LocalNextChar	dssi
+		LocalNextChar	dssi
+		LocalNextChar	dssi
+		LocalNextChar	dssi
+		LocalNextChar	dssi
+		LocalGetChar	ax, dssi, NO_ADVANCE
+		LocalIsNull	ax
+		jz	isWorld
+		LocalCmpChar	ax, C_BACKSLASH
+		jne	notWorld
+
+isWorld:
+		clc
+		jmp	done
+
+notWorld:
+		stc
+
+done:
+		.leave
+		ret
+IsRelativePathWorldRooted	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		AppendDistapplRootPath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Append SYSTEM\DISTAPPL for any WORLD-rooted path.
+
+CALLED BY:	BuildDistapplPathFromMap, REDGetFullPath
+PASS:		ds:si	= TransMapHeader
+		es:di	= destination insertion point
+
+RETURN:		carry clear if DISTAPPL root was appended
+		carry set if the relative path is not WORLD-rooted
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+AppendDistapplRootPath	proc	near
+fallbackPath	local	PathName
+		uses	ax, si, ds
+		.enter
+
+		push	si
+		lea	si, ds:[si].TMH_relativePath
+		call	IsRelativePathWorldRooted
+		pop	si
+		jc	done
+
+		push	es, di
+		segmov	es, ss, ax
+		lea	di, ss:[fallbackPath]
+		call	ReadDistapplFallbackPathFromInitFile
+		pop	es, di
+		jc	done
+
+		LocalLoadChar	ax, C_BACKSLASH
+		LocalPutChar	esdi, ax
+
+		push	ds, si
+		segmov	ds, ss, ax
+		lea	si, ss:[fallbackPath]
+		LocalCopyString
+		pop	ds, si
+		clc
+
+done:
+		.leave
+		ret
+AppendDistapplRootPath	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BuildDistapplPathFromMap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Build a full source path with WORLD rewritten to DISTAPPL.
+
+CALLED BY:	REDOpenSourceGeode
+PASS:		ds:si	= TransMapHeader
+		es:di	= PathName buffer
+
+RETURN:		carry clear if path was built
+		carry set otherwise
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BuildDistapplPathFromMap	proc	near
+		uses	ax, cx, dx, di
+		.enter
+
+		mov	dx, offset sourceKey
+		call	ReadPathFromInitFile
+		jc	done
+
+		mov	cx, -1
+		LocalClrChar	ax
+		LocalFindChar
+		LocalPrevChar	esdi
+
+		call	AppendDistapplRootPath
+
+done:
+		.leave
+		ret
+BuildDistapplPathFromMap	endp
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -75,16 +215,28 @@ REVISION HISTORY:
 	pjc	7/27/95   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-REDGetFullPath	method dynamic ResEditDocumentClass, 
+REDGetFullPath	method dynamic ResEditDocumentClass,
 					MSG_RESEDIT_DOCUMENT_GET_FULL_PATH
+pushedBP	local	word	push bp
+rewritePath	local	byte
 		uses	cx,dx,ds,es
 		.enter
 
+		clr	ax
+		mov	ss:[rewritePath], al
+		cmp	ss:[pushedBP], offset destinationKey
+		jne	readPath
+		test	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		jz	readPath
+		mov	al, TRUE
+		mov	ss:[rewritePath], al
+
 	; Read the top level path from the .ini file.
 
+readPath:
 		mov	es, cx
 		mov	di, dx
-		mov	dx, bp
+		mov	dx, ss:[pushedBP]
 		call	ReadPathFromInitFile
 		jc	noSourceDir
 
@@ -106,6 +258,12 @@ noSourceDir:
 
 	; Append the relative path.
 
+		cmp	ss:[rewritePath], 0
+		je	appendNormalPath
+		call	AppendDistapplRootPath
+		jnc	unlockMap
+
+appendNormalPath:
 		mov	cx, ds:[si].TMH_pathLength	; Includes null?
 		dec	cx
 		jcxz	appendNull
@@ -123,6 +281,7 @@ appendNull:
 
 	; Unlock TransMapHeader.
 
+unlockMap:
 		call	DBUnlock_DS
 		pop	ds, si
 	
