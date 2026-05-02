@@ -45,6 +45,8 @@ DocumentInitfile	segment resource
 categoryString	char	"resedit", 0
 destinationKey	char	"destinationDir", 0
 sourceKey	char	"sourceDir", 0
+distapplFallbackKey	char	"distapplFallback", 0
+distapplFallbackPathKey	char	"distapplFallbackPath", 0
 LocalDefNLString	nullPath, < 0 >
 
 DIF_ObjMessage_call		proc	near
@@ -568,6 +570,96 @@ ReadPathFromInitFile	proc	far
 		ret
 ReadPathFromInitFile	endp
 
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ReadDistapplFallbackFromInitFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Read the DISTAPPL fallback flag from the init file.
+
+CALLED BY:	REDOpenSourceGeode
+PASS:		nothing
+
+RETURN:		carry clear if fallback is enabled
+		carry set otherwise
+DESTROYED:	ax
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kdm	5/ 2/26		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ReadDistapplFallbackFromInitFile	proc	far
+		uses	si, ds, cx, dx
+		.enter
+
+		mov	cx, cs
+		mov	ds, cx
+		mov	si, offset categoryString
+		mov	dx, offset distapplFallbackKey
+		call	InitFileReadBoolean
+		jc	disabled
+		cmp	ax, TRUE
+		jne	disabled
+
+		clc
+		jmp	done
+
+disabled:
+		stc
+
+done:
+		.leave
+		ret
+ReadDistapplFallbackFromInitFile	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ReadDistapplFallbackPathFromInitFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Read the DISTAPPL fallback path from the init file.
+
+CALLED BY:	AppendDistapplRootPath
+PASS:		es:di	= PathName buffer
+
+RETURN:		carry clear if fallback path was read
+		carry set otherwise
+DESTROYED:	ax
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kdm	5/ 2/26		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ReadDistapplFallbackPathFromInitFile	proc	far
+		uses	si, bp, ds, cx, dx
+		.enter
+
+		mov	cx, cs
+		mov	ds, cx
+		mov	si, offset categoryString
+		mov	dx, offset distapplFallbackPathKey
+		mov	bp, PATH_BUFFER_SIZE
+		call	InitFileReadString
+		jc	done
+
+		LocalIsNull	es:[di]
+		jnz	done
+		stc
+
+done:
+		mov	ax, EV_READ_FROM_INIT_FILE
+
+		.leave
+		ret
+ReadDistapplFallbackPathFromInitFile	endp
+
 
 DocumentInitfile	ends
-
