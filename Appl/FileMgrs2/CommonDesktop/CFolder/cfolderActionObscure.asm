@@ -35,9 +35,9 @@ PASS:		ds:si - handle of instance of Folder
 		dx - Y coord of press
 		bp - button info
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 		PLAIN:
@@ -138,10 +138,29 @@ doubleClick:
 openIt::
 	call	ClearRegionIfNeeded
 
+if _NEWDESK
+	; temporarily toggle browse mode if adjust key is down
+	mov	al, ss:[browseMode]			; save browse mode to AX
+	push	ax
+	test	bp, mask UIFA_ADJUST shl 8		; adjust key (CTRL) down?
+	jz	doOpen					; nope, just do what we usually do
+	test	es:[di].FR_fileAttrs, mask FA_SUBDIR	; is this a directory?
+	jz	doOpen					; nope, just do what we usually do
+	test	al, mask FIBM_SINGLE			; is browse mode "single"?
+	jz	switchToSingle				; nope, switch to single
+	andnf	ss:[browseMode], not mask FIBM_SINGLE	; switch to multiple
+	ornf	ss:[browseMode], mask FIBM_MULTIPLE
+	jmp	short doOpen
+switchToSingle:
+	ornf	ss:[browseMode], mask FIBM_SINGLE	; switch to single
+	andnf	ss:[browseMode], not mask FIBM_MULTIPLE
+endif
+
+doOpen:
 if _NEWDESKBA
 	;
 	; Rather than calling FileOpenESDI directly, send a message,
-	; as various subclasses will want to do various things.  
+	; as various subclasses will want to do various things.
 	;
 	mov	cx, es
 	mov	dx, di
@@ -150,6 +169,13 @@ if _NEWDESKBA
 else
 	call	FileOpenESDI
 endif
+
+if _NEWDESK
+	; restore browse mode
+	pop	ax
+	mov	ss:[browseMode], al
+endif
+
 	jmp	short done
 
 objAdjust:
@@ -225,9 +251,9 @@ CALLED BY:	MSG_META_DRAG_SELECT
 
 PASS:		mouse stuff
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -247,7 +273,7 @@ FolderDragSelect	method	dynamic	FolderClass, MSG_META_DRAG_SELECT
 	;
 
 if _PEN_BASED
-	; 
+	;
 	; If user is holding down shift key then don't do quick transfer
 	;
 
@@ -325,21 +351,21 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FolderEndSelect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-DESCRIPTION:	
+DESCRIPTION:
 
 PASS:		*ds:si	= FolderClass object
 		ds:di	= FolderClass instance data
 		es	= segment of FolderClass
 
-RETURN:		
+RETURN:
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -440,13 +466,13 @@ CALLED BY:	INTERNAL
 
 PASS:		ss:[regionStartSelect] - upper left
 		ss:[regionEndSelet] - lower right
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 		es - segment of locked folder buffer
 		bp - button flags
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -466,7 +492,7 @@ SelectRange	proc	far
 	.enter
 
 	call	HackSelectBoundsForNamesOnly
-	
+
 	DerefFolderObject	ds, si, bx
 	mov	di, ds:[bx].FOI_displayList
 	mov	bx, NIL
@@ -518,11 +544,11 @@ CALLED BY:	SelectRange
 
 PASS:		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -579,9 +605,9 @@ PASS:		es:di - file to check
 
 RETURN:		carry SET if in region, carry CLEAR otherwise
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -667,7 +693,7 @@ iconMode:
 	cmp	dx, bp
 	jl	notIn
 	jmp	short yesIn
-	
+
 notIn:
 	clc
 done:
@@ -686,11 +712,11 @@ SYNOPSIS:	handle MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL -
 
 CALLED BY:	MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL
 
-PASS:		*ds:si - FolderClass object 
+PASS:		*ds:si - FolderClass object
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -703,7 +729,7 @@ REVISION HISTORY:
 	brianc	3/91		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderStopQuickTransferFeedback	method	FolderClass, 
+FolderStopQuickTransferFeedback	method	FolderClass,
 					MSG_META_CONTENT_VIEW_LOST_GADGET_EXCL,
 					MSG_FOLDER_STOP_FEEDBACK
 
@@ -741,7 +767,7 @@ PASS:		*ds:si - FolderClass object
 		bx - offset to FolderClass instance data
 RETURN:		none
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -798,15 +824,15 @@ PASS:		*ds:si	- FolderClass object
 		ds:di	- FolderClass instance data
 		es	- segment of FolderClass
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 		called statically from FolderDragSelect
 
 REVISION HISTORY:
@@ -825,7 +851,7 @@ if _PEN_BASED
 	test	bp, mask UIFA_MOVE_COPY shl 8
 	jnz	clearState
 endif
-		
+
 	tst	ss:[fileToMoveCopy]
 	jz	done
 
@@ -862,9 +888,9 @@ CALLED BY:	MSG_FOLDER_BRING_TO_FRONT
 
 PASS:		ds:si - instance handle of this folder
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -924,9 +950,9 @@ PASS:		ds:si - instance handle of folder object
 			UIFA_MOVE - if move override
 			UIFA_COPY - if copy override
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 		called statically from FolderEndSelect
@@ -1047,7 +1073,7 @@ if _NEWDESK
 	jnc	whiteSpace
 
 	call	NDObjectPopUp
-	jmp	done	
+	jmp	done
 
 whiteSpace:
 	call	NDWhiteSpacePopUp
@@ -1079,7 +1105,7 @@ foundFormat:
 	mov	ss:[destFile].offset, -1	; no files in folder
 	jmp	gotDestFlags
 
-haveBuffer:	
+haveBuffer:
 	mov	destFile.segment, es
 	mov	ax, TRUE			; force checking icon and name
 	mov	cx, mousePos.P_x
@@ -1161,7 +1187,7 @@ different:
 	mov	ax, ss:[mousePos].P_x
 	mov	ss:[lastMousePosition].P_x, ax
 	mov	ax, ss:[mousePos].P_y
-	mov	ss:[lastMousePosition].P_y, ax 
+	mov	ss:[lastMousePosition].P_y, ax
 	;
 	; get transfer item and process it
 	;
@@ -1169,7 +1195,7 @@ different:
 	mov	ax, transferVMblock
 	mov	cx, ss:[manufacturer]
 	mov	dx, CIF_FILES			; transfer format to get
-	push	bp	
+	push	bp
 	call	ClipboardRequestItemFormat	; bx:ax = file list VM block
 	pop	bp				; cx is true disk handle of src
 						; dx is remote flag of source
@@ -1187,7 +1213,7 @@ different:
 	; default to copy for ALL quick transfers.  The correct solution will
 	; be implemented at some later date.  We accomplish this by just setting
 	; the remote flag of the source, so it will still check for illegal
-	; destinations, but always be a copy in the event of a valid 
+	; destinations, but always be a copy in the event of a valid
 	; destination.  dlitwin 6/4/93
 BA<	mov	bx, -1			; set remote flag	>
 	call	GetDefaultMoveCopyResponse
@@ -1296,9 +1322,9 @@ PASS:		*ds:si - instance data of destination folder object
 			UIFA_COPY shl 8 - set if explicit copy
 			UIFA_MOVE shl 8 - set if explicit move
 
-RETURN:	
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1321,7 +1347,7 @@ quickNotifyFlags	local	ClipboardQuickNotifyFlags
 	class	FolderClass
 
 	uses	ds, si
-		
+
 	.enter
 
 EC <	cmp	di, NIL				>
@@ -1404,7 +1430,7 @@ endif		; if (not _FCAB)
 
 	push	bp
 	mov	bp, ss:[quickNotifyFlags]
-	call	ProcessDragFilesCommon		; pass: ds:si, bp, 
+	call	ProcessDragFilesCommon		; pass: ds:si, bp,
 						; bx:ax, dx, cx
 	pop	bp
 
@@ -1423,7 +1449,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	If the destination file is a drive link, make the destination
-		path reflect the true path of the disk, not the path of the 
+		path reflect the true path of the disk, not the path of the
 		link to the disk.
 
 CALLED BY:	ProcessDragFileListItem
@@ -1437,13 +1463,13 @@ RETURN:		ds:si - path of evaluated drive link (root of a drive)
 			On Error of the FileConstructActualPath,
 				ds:si and dx
 			will remain the original drive link.  Later
-			evaluation will probably fail and the error 
+			evaluation will probably fail and the error
 			will be handled then appropriately, as this
 			routine and its caller aren't equipt to do so.
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -1513,7 +1539,7 @@ PASS:		bp - ClipboardQuickTransferFeedback
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1595,7 +1621,7 @@ RETURN:		if carry clear
 		if carry set
 			error
 DESTROYED:	bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1628,7 +1654,7 @@ objectLoop:
 		clr	cx
 		call	LocalCmpStrings
 		pop	si, di, cx
-		
+
 		je	found
 		add	di, size FolderRecord
 		loop	objectLoop
@@ -1668,11 +1694,11 @@ PASS:		*ds:si	= FolderClass object
 
 RETURN:		nothing
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		ax, cx, dx, bp
 		bx, si, di, ds, es
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1724,11 +1750,11 @@ SYNOPSIS:	abort quick transfer if we are the source because the
 
 CALLED BY:	MSG_META_CONTENT_VIEW_CLOSING
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1784,7 +1810,7 @@ PASS:		object stuff
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1800,23 +1826,23 @@ REVISION HISTORY:
 FolderUpdateDiskName	method	FolderClass, MSG_UPDATE_DISK_NAME
 	;
 	; See if the message applies to us (disk handle is our disk handle)
-	; 
+	;
 	call	Folder_GetDiskAndPath
 	cmp	dx, ax				; us?
 	jne	done				; => no
 
 	;
 	; Yes. Fetch the new name of the disk into our instance data.
-	; 
+	;
 	mov_tr	bx, ax
-	DerefFolderObject	ds, si, di 
+	DerefFolderObject	ds, si, di
 	add	di, offset FOI_diskInfo.DIS_name
 	segmov	es, ds			; es:di <- buffer
 	call	DiskGetVolumeName
-	
+
 	;
 	; And go update our moniker/header
-	; 
+	;
 	mov	ax, MSG_FOLDER_SET_PRIMARY_MONIKER
 	call	ObjCallInstanceNoLock
 done:
@@ -1841,10 +1867,10 @@ RETURN:		pathBuf filled with parent directory
 DESTROYED:	ax, dx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1858,7 +1884,7 @@ GetFolderParentPath	proc	far	pathBuf:PathName
 		.enter
 	;
 	; Construct the full path in the passed buffer
-	; 
+	;
 		segmov	es, ss				; es:di = path buffer
 		lea	di, ss:[pathBuf]
 		mov	cx, size pathBuf
@@ -1882,7 +1908,7 @@ EC <		ERROR_C	PATH_BUFFER_TOO_SMALL				>
 ;end of change
 	;
 	; See if the thing is already the root directory.
-	; 
+	;
 		push	bx			; save disk handle for return
 
 		cmp	{word} ss:[pathBuf][0], '\\' or (0 shl 8) ; root?
@@ -1895,7 +1921,7 @@ DBCS <notRoot:								>
 	; Nope. ES:DI points to the null, so locate the backslash preceding it.
 	; We use a scasb with DF set, but would like to have CX be number of
 	; chars we need to examine, so figure that out first.
-	; 
+	;
 		lea	cx, ss:[pathBuf]	; cx <- start
 SBCS <		sbb	cx, di			; cx <- negative of	>
 DBCS <		sub	cx, di			; cx <- negative of	>
@@ -1906,7 +1932,7 @@ DBCS <		shr	cx, 1						>
 DBCS <		inc	cx			; cx <- length of path w/null>
 	;
 	; Now locate the most-recent backslash.
-	; 
+	;
 		LocalLoadChar ax, C_BACKSLASH
 		std
 		LocalFindChar 			; find parent
@@ -1941,9 +1967,9 @@ CALLED BY:	MSG_FOLDER_UP_DIR
 
 PASS:		usual object stuff
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -1978,7 +2004,7 @@ endif		; if _FCAB
 	;
 	; Parse the beast down to a standard path, if appropriate, as that's
 	; what the extant folder will have, if it's indeed extant...
-	; 
+	;
 	mov	bx, cx				; bx <- disk handle
 	segmov	es, ss
 	mov	di, sp				; es:di <- path to parse
@@ -2025,9 +2051,9 @@ PASS:		ds:si = Folder Object instance handle
 		ax = MSG_REMOVED_FLOPPY
 		dx:bp = floppy entry for removed floppy
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2066,7 +2092,7 @@ FolderRemovedFloppy	method	dynamic FolderClass, MSG_REMOVED_FLOPPY
 	mov	di, bp
 	add	di, offset FTE_diskInfo.DIS_volumeName
 						; ds:si = our volume name
-	
+
 	call	CompareString			; same?
 
 	pop	si, di
@@ -2105,9 +2131,9 @@ PASS:		ds:si = Folder Object instance handle
 		ax = MSG_INSERTED_FLOPPY
 		dx:bp = floppy table entry of floppy inserted into drive
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2178,7 +2204,7 @@ PASS:		object stuff
 RETURN:		buffer filled with disk info
 		ax	= disk handle
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2218,7 +2244,7 @@ PASS:		ds:si - instance handle of Folder object
 
 RETURN:		folder window closed
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2261,9 +2287,9 @@ CALLED BY:	MSG_CLOSE_IF_MATCH
 
 PASS:		dx - disk handle
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2301,7 +2327,7 @@ PASS:		ds:*si - Folder Window object
 
 RETURN:		Folder Window closed if ...
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
        		this used to rescan if the path still existed, but that's
@@ -2347,7 +2373,7 @@ PASS:		ds:*si - Folder Window object
 
 RETURN:		Folder Window closed if ...
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2369,7 +2395,7 @@ FolderCloseIfDrive	method	dynamic	FolderClass, MSG_CLOSE_IF_DRIVE
 
 	; 10/7/93: don't close if there are two or more path IDs for the
 	; folder (three, if logical and actual are different) -- ardeb
-	
+
 	call	FolderCompareActualAndLogicalPaths
 	mov	dx, 2 * size FilePathID
 	je	checkNumIDs
@@ -2379,7 +2405,7 @@ checkNumIDs:
 	mov	ax, TEMP_FOLDER_PATH_IDS
 	call	ObjVarFindData
 	jnc	closeIt				; not found, so close (why not?)
-	
+
 	VarDataSizePtr	ds, bx, cx
 	cmp	cx, dx
 	jae	done
@@ -2411,7 +2437,7 @@ PASS:		ds:si - Folder object instance handle
 
 RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 		case:
@@ -2456,7 +2482,7 @@ ND <	jz	closeOnly						>
 ND <	mov	ax, MSG_FOLDER_SAVE_ICON_POSITIONS			>
 ND <	call	ObjCallInstanceNoLock 					>
 ND <closeOnly:								>
-						
+
 	andnf	ds:[di].FOI_folderState, not (mask FOS_TARGET or mask FOS_FOCUS)
 						; manual closing or pushpin?
 	cmp	ss:[exitFlag], 1		; shutdown?
@@ -2484,10 +2510,10 @@ CALLED BY:	MSG_META_DETACH
 PASS:		*ds:si	= Folder object
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2518,7 +2544,7 @@ CALLED BY:	MSG_FOLDER_CLOSE
 
 PASS:		*ds:si - Folder object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -2532,9 +2558,9 @@ REVISION HISTORY:
 	brianc	3/03/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderClose	method	dynamic FolderClass, MSG_FOLDER_CLOSE, 
+FolderClose	method	dynamic FolderClass, MSG_FOLDER_CLOSE,
 					MSG_CLOSE_FOR_BAD_CREATE
-		
+
 	;
 	; update numFiles
 	;
@@ -2547,7 +2573,7 @@ FolderClose	method	dynamic FolderClass, MSG_FOLDER_CLOSE,
 	clr	bx
 
 setNumFiles:
-	mov	ss:[numFiles], bx	
+	mov	ss:[numFiles], bx
 
 if _NEWDESK
 	mov	ax, MSG_FOLDER_SAVE_ICON_POSITIONS
@@ -2558,7 +2584,7 @@ endif
 	;
 	; Remove ourselves from the filesystem change notification list, if
 	; we're there.
-	; 
+	;
 	call	UtilRemoveFromFileChangeList
 
 	call	FreeFolderBuffers
@@ -2571,7 +2597,7 @@ if _NEWDESK
 	; for itself whether we should retain the sys focus/target or if
 	; some other app that is now above all our folder windows should
 	; get them.
-	; 
+	;
 	mov	ax, MSG_META_RELEASE_FOCUS_EXCL
 	mov	bx, handle Desktop
 	mov	si, offset Desktop
@@ -2581,7 +2607,7 @@ if _NEWDESK
 	call	ObjMessageCall
 
 	;
-	; Send MSG_META_ENSURE_ACTIVE_FT to the field above our 
+	; Send MSG_META_ENSURE_ACTIVE_FT to the field above our
 	; application obj.
 	;
 
@@ -2610,11 +2636,11 @@ SYNOPSIS:	clean up instance data of folder object
 
 CALLED BY:	INTERNAL
 
-PASS:		*ds:si - FolderClass object 
+PASS:		*ds:si - FolderClass object
 
 RETURN:		preserves ds:si
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2630,7 +2656,7 @@ REVISION HISTORY:
 FreeFolderBuffers	proc	near
 	class	FolderClass
 
-	DerefFolderObject	ds, si, di 
+	DerefFolderObject	ds, si, di
 	mov	ds:[di].FOI_selectList, NIL	; clear lists, in case
 	mov	ds:[di].FOI_displayList, NIL	;	other methods come in!!
 	mov	ds:[di].FOI_cursor, NIL
@@ -2655,7 +2681,7 @@ CALLED BY:	INTERNAL
 
 PASS:		*ds:si - Folder object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	nothing
 
@@ -2679,7 +2705,7 @@ FolderCloseNotifyDesktop	proc	near
 	mov	dx, si
 	mov	bx, handle 0
 	call	ObjMessageFixup
- 
+
 	.leave
 	ret
 FolderCloseNotifyDesktop	endp
@@ -2696,9 +2722,9 @@ CALLED BY:	FolderClose
 
 PASS:		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
 
@@ -2723,7 +2749,7 @@ DestroyFolderObject	proc	near
 	;
 	; Remove the primary from the generic tree.  If there is no
 	; window block, then just bail, as we may get this message
-	; multiple times  
+	; multiple times
 	;
 
 	DerefFolderObject	ds, si, si
@@ -2761,7 +2787,7 @@ ND<	call	NDUnhookSortViewMenu		>
 
 	mov	si, FOLDER_OBJECT_OFFSET	; common offset
 	mov	ax, MSG_META_BLOCK_FREE
-	call	ObjCallInstanceNoLock 
+	call	ObjCallInstanceNoLock
 done:
 	ret
 
@@ -2782,10 +2808,10 @@ CALLED BY:	DestroyFolderObject, DesktopDetach
 PASS:		ds	= segment that can be fixup up
 RETURN:		ds fixed up
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2887,7 +2913,7 @@ ifdef SMARTFOLDERS
 	jz	reSort
 	andnf	ds:[di].FOI_positionFlags, not mask FIPF_RESTORE_OPTS
 	jmp	short checkDiffs
-		
+
 reSort:
 endif
 	mov	ds:[di].FOI_displaySort, -1
@@ -2942,7 +2968,7 @@ different:
 						; else, compressed change, no
 						;	re-sort needed
 sort:
-	BitClr	ds:[di].FOI_positionFlags, FIPF_POSITIONED	
+	BitClr	ds:[di].FOI_positionFlags, FIPF_POSITIONED
 	mov	ax, TRUE			; assume sort needed
 	jmp	preSort
 
@@ -2982,8 +3008,8 @@ saveIconPositions:
 
 positionGeoManagerStyle:
 
-	BitClr	ds:[di].FOI_positionFlags, FIPF_POSITIONED	
-	
+	BitClr	ds:[di].FOI_positionFlags, FIPF_POSITIONED
+
 
 continueBuild:
 	;
@@ -3002,7 +3028,7 @@ continueBuild:
 	pushf
 	mov	bx, ds:[LMBH_handle]
 	mov	ax, MSG_FOLDER_UNSUSPEND_WINDOW
-	call	ObjMessageForce		
+	call	ObjMessageForce
 	popf
 
 	jnc	noError				; if no error, continue
@@ -3040,7 +3066,7 @@ notFull:
 	call	ObjMessageCallFixup
 noTitle:
 endif
-		
+
 done:
 	.leave
 	ret
@@ -3061,7 +3087,7 @@ PASS:		*ds:si - FolderClass object
 
 RETURN:		none
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3108,9 +3134,9 @@ PASS:		ax = message
 			cx = mask of selected booleans
 			bp = mask of modified booleans
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3171,7 +3197,7 @@ PASS:		al = FIDT_*
 RETURN:		none
 DESTROYED:	all
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
