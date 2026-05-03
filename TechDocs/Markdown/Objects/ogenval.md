@@ -1747,7 +1747,7 @@ not send it's status message, even if the attribute ATTR_GEN_VALUE_STATUS_MSG is
 ~~~
     /* This GenValue is intended to function as a horizontal scroll bar and 
      * represent a range of three values from zero to ten. This means that the
-     * GenValue's apply messages provide a ‘value’ ranging from zero to seven.  
+     * GenValue's apply messages provide a 'value' ranging from zero to seven.  
      *
      * It is necessary to set the first of the seven messages defined above as 
      * GVLI_applyMsg.
