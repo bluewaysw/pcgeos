@@ -23,12 +23,12 @@ word paIndexEntrySize(PAAlbumData *data)
 
 	if(!(data->PAAD_attrs.PAAA_flags & PAAF_STORE_NOTES)) {
 
-		retValue -= sizeof(TCHAR) * (PA_PICTURES_NOTES_TEXT_LEN + 1); 
+		retValue -= sizeof(TCHAR) * (PA_PICTURES_NOTES_TEXT_LEN + 1);
 	}
 
 	retValue -= sizeof(byte) * (84*84+6);
 
-	retValue += (6 + data->PAAD_attrs.PAAA_width * data->PAAD_attrs.PAAA_height); 
+	retValue += (6 + data->PAAD_attrs.PAAA_width * data->PAAD_attrs.PAAA_height);
 
 	return retValue;
 }
@@ -39,12 +39,12 @@ Boolean strEnds(char *string, char *end) {
 	word endLen = strlen(end);
 
 	if(stringLen > endLen) {
-	
+
 		if(LocalCmpStringsNoCase(&string[stringLen-endLen], end, 0) == 0) {
-		
+
 			return TRUE;
 		}
-	} 
+	}
 
 	return FALSE;
 }
@@ -63,7 +63,7 @@ word paAlbumDeleteItemLow(PAAlbumData *data, word item, Boolean realDelete) {
 		/* create delete index if not there already */
 		loopCount = 0;
 		while(loopCount < data->PAAD_itemCount) {
-		
+
 			p_list[loopCount] = loopCount;
 
 			loopCount++;
@@ -90,7 +90,7 @@ word paAlbumDeleteItemLow(PAAlbumData *data, word item, Boolean realDelete) {
 				err = FileDelete(fileName);
 
 				if(err && (err != ERROR_FILE_NOT_FOUND)) {
-				
+
 					FilePopDir();
 					return TRUE;
 				}
@@ -110,7 +110,7 @@ word paAlbumDeleteItemLow(PAAlbumData *data, word item, Boolean realDelete) {
 			loopCount2 = item + 1;
 
 			while(loopCount2 < data->PAAD_tempItemCount) {
-			
+
 				p_list[loopCount2 - 1] = p_list[loopCount2];
 
 				loopCount2++;
@@ -120,9 +120,9 @@ word paAlbumDeleteItemLow(PAAlbumData *data, word item, Boolean realDelete) {
 
 			oldMH = data->PAAD_tempList;
 			data->PAAD_tempList = MemReAlloc(data->PAAD_tempList, sizeof(word) * data->PAAD_tempItemCount - 1, 0);
-		
+
 			if(!data->PAAD_tempList) {
-			
+
 				data->PAAD_tempList = oldMH;
 			}
 
@@ -172,18 +172,18 @@ word paAlbumUpdate(PAAlbumData *data) {
 			fileLoop = 0;
 			outLoop = 0;
 			while(fileLoop < itemsRead) {
-			
+
 				if(	strEnds(p_dosInfo[fileLoop].DFIS_name, ".gif") ||
 					strEnds(p_dosInfo[fileLoop].DFIS_name, ".jpg") ||
 					strEnds(p_dosInfo[fileLoop].DFIS_name, ".jpe") ||
 					strEnds(p_dosInfo[fileLoop].DFIS_name, ".jpeg") ) {
-				
+
 					p_dosInfo[outLoop] = p_dosInfo[fileLoop];
 					outLoop++;
 				}
 
 				fileLoop++;
-			}			
+			}
 			MemUnlock(listMem);
 			itemsRead = outLoop;
 		}
@@ -212,7 +212,7 @@ word paAlbumUpdate(PAAlbumData *data) {
 				if(	(LocalCmpStringsNoCase(p_dosInfo[fileLoop].DFIS_name, indexItem->PAAIE_fileName, 0) == 0) &&
 					(p_dosInfo[fileLoop].DFIS_fileSize == indexItem->PAAIE_size) &&
 					(p_dosInfo[fileLoop].DFIS_modTimeDate == indexItem->PAAIE_date)) {
-				
+
 					p_dosInfo[fileLoop].DFIS_name[0] = 0;
 					break;
 				}
@@ -220,9 +220,9 @@ word paAlbumUpdate(PAAlbumData *data) {
 			}
 			MemUnlock(listMem);
 			if(fileLoop == itemsRead) {
-			
+
 				paAlbumDeleteItemLow(data, indexLoop, FALSE);
-			}			
+			}
 		}
 
 		p_dosInfo = MemLock(listMem);
@@ -231,9 +231,9 @@ word paAlbumUpdate(PAAlbumData *data) {
 
 			if(p_dosInfo[fileLoop].DFIS_name[0]) {
 
-				if(strcmp(p_dosInfo[fileLoop].DFIS_name, "Album Index") && 
+				if(strcmp(p_dosInfo[fileLoop].DFIS_name, "Album Index") &&
 						(p_dosInfo[fileLoop].DFIS_name[0] != '@') ) {
-			
+
 					memset(indexItem, 32, paIndexEntrySize(data));
 
 					/* put together the index item */
@@ -244,23 +244,23 @@ word paAlbumUpdate(PAAlbumData *data) {
 					indexItem->PAAIE_notes[0] = 0;
 
 					/* if not found add it to the end of the index */
-					FilePos(data->PAAD_indexFile, 
+					FilePos(data->PAAD_indexFile,
 						((dword)paIndexEntrySize(data)) * data->PAAD_itemCount, FILE_POS_START);
 					FileWrite(data->PAAD_indexFile, indexItem, paIndexEntrySize(data), 0);
 					FileCommit(data->PAAD_indexFile, 0);
-					
+
 					data->PAAD_tempItemCount++;
 					data->PAAD_itemCount++;
 
 					/* XXX add it to temp list if there is any */
 					if(data->PAAD_tempList) {
-					
+
 						MemHandle newList;
 
 						newList = MemReAlloc(data->PAAD_tempList, data->PAAD_tempItemCount * sizeof(word), 0);
 
 						if(newList) {
-						
+
 							word *p_list;
 
 							data->PAAD_tempList = newList;
@@ -278,11 +278,11 @@ word paAlbumUpdate(PAAlbumData *data) {
 		}
 
 		MemUnlock(data->PAAD_bufferBlock);
-	
+
 	} else {
 
 		word indexSize, indexLoop;
-	
+
 		indexSize = data->PAAD_tempItemCount;
 
 		/* delete all items from the index */
@@ -295,7 +295,7 @@ word paAlbumUpdate(PAAlbumData *data) {
 	}
 
 	if(listMem) {
-	
+
 		MemFree(listMem);
 	}
 
@@ -317,14 +317,14 @@ FileHandle paAlbumGetIndex(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAl
 
 		/* open/create meta index */
 		vmf = VMOpen("Meta Index", VMAF_FORCE_READ_WRITE, VMO_CREATE, 0);
-		
+
 		if(vmf) {
 
 			VMBlockHandle array;
 
 			array = VMGetMapBlock(vmf);
 			if(!array) {
-			
+
 				array = HugeArrayCreate(vmf, 0, 0);
 				if(array) {
 
@@ -335,10 +335,10 @@ FileHandle paAlbumGetIndex(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAl
 			if(array) {
 
 				word itemCount, loopCount;
-			
+
 				FilePushDir();
 				if(FileSetCurrentPath(disk, path)) {
-					
+
 					FileAttrs fileAttrs;
 
 					thisPath[0] = 0;
@@ -347,7 +347,7 @@ FileHandle paAlbumGetIndex(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAl
 						TCHAR fname[13];
 
 						FilePopDir();
-						
+
 						thisPathPtr[0] = 0;
 
 						/* search entry */
@@ -358,28 +358,28 @@ FileHandle paAlbumGetIndex(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAl
 							word elemSize;
 							paAlbumMetaEntry *elemPtr;
 
-							HugeArrayLock(vmf, array, loopCount, &elemPtr, &elemSize);				
+							HugeArrayLock(vmf, array, loopCount, (void**)&elemPtr, &elemSize);
 							if(	(elemPtr->paAME_header.paAMH_attrs.PAAA_width == attrs->PAAA_width) &&
 								(elemPtr->paAME_header.paAMH_attrs.PAAA_height == attrs->PAAA_height) &&
 								(elemPtr->paAME_header.paAMH_attrs.PAAA_flags == attrs->PAAA_flags) &&
 								(LocalCmpStringsNoCase(thisPath, elemPtr->paAME_path, 0) == 0)) {
 
 								strcpy(fname, elemPtr->paAME_header.paAMH_indexName);
-							
-								HugeArrayUnlock(elemPtr);				
+
+								HugeArrayUnlock(elemPtr);
 								break;
 							}
-							HugeArrayUnlock(elemPtr);				
+							HugeArrayUnlock(elemPtr);
 
 							loopCount++;
 						}
 						if(itemCount == loopCount) {
-			
+
 							word err;
 							dword nameNum;
 							TimerDateAndTime thisDate;
 							paAlbumMetaEntry metaIndexEntry;
-	
+
 							TimerGetDateAndTime(&thisDate);
 
 							nameNum = thisDate.TDAT_month;
@@ -394,7 +394,7 @@ FileHandle paAlbumGetIndex(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAl
 
 							/* create new index file */
 							do {
-															
+
 								sprintf(fname, "%lu8", nameNum);
 								strcpy(fname + 8, ".IDX");
 
@@ -411,13 +411,13 @@ FileHandle paAlbumGetIndex(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAl
 								metaIndexEntry.paAME_header.paAMH_attrs = (*attrs);
 								strcpy(metaIndexEntry.paAME_path, thisPath);
 
-								HugeArrayAppend(vmf, array, 
+								HugeArrayAppend(vmf, array,
 									sizeof(metaIndexEntry.paAME_header) + strlen(metaIndexEntry.paAME_path) + 1,
 								&metaIndexEntry);
 							}
 
 						} else {
-						
+
 							/* open found index file */
 							indexFile = FileCreate(fname, FILE_CREATE_NO_TRUNCATE |FILE_ACCESS_RW | FILE_DENY_RW | FCF_NATIVE, 0);
 						}
@@ -462,11 +462,11 @@ Boolean PAAlbumRename(TCHAR *oldName, TCHAR *newName)
 		/* search all entries */
 		itemCount = HugeArrayGetCount(vmf, array);
 		while(loopCount < itemCount) {
-		    HugeArrayLock(vmf, array, loopCount, &elemPtr, &elemSize);
+		    HugeArrayLock(vmf, array, loopCount, (void**)&elemPtr, &elemSize);
 		    if (LocalCmpStringsNoCase(oldPath, elemPtr->paAME_path, 0) == 0) {
 			HugeArrayUnlock(elemPtr);
 			HugeArrayResize(vmf, array, loopCount, sizeof(elemPtr->paAME_header) + strlen(newPath)+1);
-			HugeArrayLock(vmf, array, loopCount, &elemPtr, &elemSize);
+			HugeArrayLock(vmf, array, loopCount, (void**)&elemPtr, &elemSize);
 			strcpy(elemPtr->paAME_path, newPath);
 			result = TRUE;
 		    }
@@ -494,13 +494,13 @@ word PAAlbumOpen(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAlbumAttrs *
 
 		data->PAAD_disk = disk;
 		strcpy(data->PAAD_path, path);
-		
+
 		/* open/create album index file */
 //		data->PAAD_indexFile = FileCreate("Album Index", FILE_CREATE_NO_TRUNCATE | FILE_ACCESS_RW | FILE_DENY_RW, 0);
 		data->PAAD_indexFile = paAlbumGetIndex(data, disk, path, attrs);
 
 		if(data->PAAD_indexFile) {
-		
+
 			/* size gives us the item count */
 			data->PAAD_itemCount = FileSize(data->PAAD_indexFile) / paIndexEntrySize(data);
 			data->PAAD_tempItemCount = data->PAAD_itemCount;
@@ -518,7 +518,7 @@ word PAAlbumOpen(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAlbumAttrs *
 }
 
 word PAAlbumClose(PAAlbumData *data) {
-	
+
 	if(data->PAAD_tempList &&
 		(data->PAAD_tempItemCount != data->PAAD_itemCount)) {
 
@@ -526,15 +526,15 @@ word PAAlbumClose(PAAlbumData *data) {
 		PAAlbumIndexEntry *itemData;
 
 		/* write the new item index file */
-		
+
 		loopCount = 0;
 		itemData = MemLock(data->PAAD_bufferBlock);
 		while(loopCount < data->PAAD_tempItemCount) {
-		
-			FilePos(data->PAAD_indexFile, 
+
+			FilePos(data->PAAD_indexFile,
 				((dword)PAAlbumGetIndex(data, loopCount)) * paIndexEntrySize(data), FILE_POS_START);
 			FileRead(data->PAAD_indexFile, itemData, paIndexEntrySize(data), 0);
-			FilePos(data->PAAD_indexFile, 
+			FilePos(data->PAAD_indexFile,
 				((dword)loopCount) * paIndexEntrySize(data), FILE_POS_START);
 			FileWrite(data->PAAD_indexFile, itemData, paIndexEntrySize(data), 0);
 
@@ -583,28 +583,28 @@ word PAAlbumSwapItem(PAAlbumData *data, word item1, word item2) {
 	mh = MemAlloc(paIndexEntrySize(data), HF_SWAPABLE, 0);
 
 	if(mh) {
-	
+
 		itemData1 = MemLock(data->PAAD_bufferBlock);
 		itemData2 = MemLock(mh);
 
-		FilePos(data->PAAD_indexFile, 
+		FilePos(data->PAAD_indexFile,
 			((dword)PAAlbumGetIndex(data, item1)) * paIndexEntrySize(data), FILE_POS_START);
 		FileRead(data->PAAD_indexFile, itemData1, paIndexEntrySize(data), 0);
 
-		FilePos(data->PAAD_indexFile, 
+		FilePos(data->PAAD_indexFile,
 			((dword)PAAlbumGetIndex(data, item2)) * paIndexEntrySize(data), FILE_POS_START);
 		FileRead(data->PAAD_indexFile, itemData2, paIndexEntrySize(data), 0);
 
-		FilePos(data->PAAD_indexFile, 
+		FilePos(data->PAAD_indexFile,
 			((dword)PAAlbumGetIndex(data, item1)) * paIndexEntrySize(data), FILE_POS_START);
 		FileWrite(data->PAAD_indexFile, itemData2, paIndexEntrySize(data), 0);
 
-		FilePos(data->PAAD_indexFile, 
+		FilePos(data->PAAD_indexFile,
 			((dword)PAAlbumGetIndex(data, item2)) * paIndexEntrySize(data), FILE_POS_START);
 		FileWrite(data->PAAD_indexFile, itemData1, paIndexEntrySize(data), 0);
-	
+
 		FileCommit(data->PAAD_indexFile, 0);
-		
+
 		MemUnlock(data->PAAD_bufferBlock);
 		MemFree(mh);
 	}
@@ -613,8 +613,8 @@ word PAAlbumSwapItem(PAAlbumData *data, word item1, word item2) {
 }
 
 word PAAlbumGetItem(PAAlbumData *data, word item, PAAlbumIndexEntry *buffer) {
-	
-	FilePos(data->PAAD_indexFile, 
+
+	FilePos(data->PAAD_indexFile,
 		((dword)PAAlbumGetIndex(data, item)) * paIndexEntrySize(data), FILE_POS_START);
 	FileRead(data->PAAD_indexFile, buffer, paIndexEntrySize(data), 0);
 
@@ -622,8 +622,8 @@ word PAAlbumGetItem(PAAlbumData *data, word item, PAAlbumIndexEntry *buffer) {
 }
 
 word PAAlbumSetItem(PAAlbumData *data, word item, PAAlbumIndexEntry *buffer) {
-	
-	FilePos(data->PAAD_indexFile, 
+
+	FilePos(data->PAAD_indexFile,
 		((dword)PAAlbumGetIndex(data, item)) * paIndexEntrySize(data), FILE_POS_START);
 	FileWrite(data->PAAD_indexFile, buffer, paIndexEntrySize(data), 0);
 	FileCommit(data->PAAD_indexFile, 0);
@@ -632,7 +632,7 @@ word PAAlbumSetItem(PAAlbumData *data, word item, PAAlbumIndexEntry *buffer) {
 }
 
 word PAAlbumGetItemCount(PAAlbumData *data) {
-	
+
 	return data->PAAD_tempItemCount;
 }
 
@@ -641,7 +641,7 @@ word PAAlbumGetIndex(PAAlbumData *data, word item) {
 	word retValue = item;
 
 	if(data->PAAD_tempList) {
-	
+
 		word *p_list;
 
 		p_list = MemLock(data->PAAD_tempList);

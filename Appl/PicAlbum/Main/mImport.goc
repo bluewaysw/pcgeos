@@ -1,7 +1,7 @@
 @include "PicAlbum.goh"
 #include <Ansi/string.h>
 @include <htmldrv.h>
-#include <Library.h>
+#include <library.h>
 #include <resource.h>
 #include <geode.h>
 #include <awatcher.h>
@@ -13,7 +13,7 @@ typedef struct {
 	PathName		paIH_path;
 	FileLongName	paIH_name;
 	VMFileHandle	paIH_vmFile;
-	GeodeHandle		paIH_impGraph;	
+	GeodeHandle		paIH_impGraph;
 	optr			paIH_statDest;
 	Message			paIH_statMsg;
 
@@ -70,7 +70,7 @@ word paImport(PAImportHandle aHandle)
 		entry = ProcGetLibraryEntry(impGraphGeode, MIME_ENTRY_GRAPHIC_EX);
 
 		if(entry) {
-			
+
 			dword usedMem;
 			dword availMem;
 			AllocWatcherHandle allocWatcher;
@@ -86,7 +86,7 @@ word paImport(PAImportHandle aHandle)
 				allocWatcher = AllocWatcherCreate(availMem) ;
 
 				vmb = ((pcfm_MimeDrvGraphicEx*) ProcCallFixedOrMovable_pascal)(
-			
+
 					"",		//char *mimeType, \
 					fname,		//char *file, \
 					vmf,				//VMFileHandle vmf, \
@@ -100,7 +100,7 @@ word paImport(PAImportHandle aHandle)
 					entry
 				);
 			}
-					
+
 			FilePopDir();
 			AllocWatcherDestroy(allocWatcher);
 
@@ -110,7 +110,7 @@ word paImport(PAImportHandle aHandle)
 
 					VMBlockHandle firstFrame;
 					MemHandle mem;
-					AnimationHeader *p_header ;	
+					AnimationHeader *p_header ;
 					VMChain *p_chain;
 					VMBlockHandle newBlock;
 
@@ -126,20 +126,20 @@ word paImport(PAImportHandle aHandle)
 					if(vmb) {
 
 						VMFreeVMChain(
-								vmf, 
+								vmf,
 								VMCHAIN_MAKE_FROM_VM_BLOCK(vmb));
 					}
-				
+
 					vmb = newBlock;
 
 				} else if(iad.IAD_type != IAD_TYPE_BITMAP) {
-				
+
 					/* if wrong format */
 					VMFreeVMChain(
-							vmf, 
+							vmf,
 							VMCHAIN_MAKE_FROM_VM_BLOCK(vmb));
-					vmb = 0;			
-				} 	
+					vmb = 0;
+				}
 			}
 		}
 
@@ -150,13 +150,13 @@ word paImport(PAImportHandle aHandle)
 	if(!p_handle->paIH_stop) {
 
 		@send notify_obj::{PA_IMPORT_STATUS_MSG}(notify_msg)(vmb, TRUE, vmb ? TRUE : FALSE);
-    
+
 	} else {
 
 		if(vmb) {
-			
+
 			VMFreeVMChain(
-					vmf, 
+					vmf,
 					VMCHAIN_MAKE_FROM_VM_BLOCK(vmb));
 		}
 	}
@@ -183,7 +183,7 @@ PAImportStart(
 	GeodeHandle		aImpGraph,
 	optr			aStatDest,
 	Message			aStatMsg
-) 
+)
 {
 	typedef word (*startRoutine)(PAImportHandle aHandle);
 	PAImportHandle handle;
@@ -202,13 +202,13 @@ PAImportStart(
 		strcpy(p_handle->paIH_path, aPath);
 		strcpy(p_handle->paIH_name, aName);
 		p_handle->paIH_vmFile = aVMFile;
-		p_handle->paIH_impGraph = aImpGraph;	
+		p_handle->paIH_impGraph = aImpGraph;
 		p_handle->paIH_statDest = aStatDest;
 		p_handle->paIH_statMsg = aStatMsg;
 		p_handle->paIH_stop = FALSE;
 		p_handle->paIH_finished = FALSE;
 		p_handle->paIH_mimeStatusPtr = 0;
-	
+
 		MemUnlock(handle);
 
         if(!ThreadCreate(
@@ -217,7 +217,7 @@ PAImportStart(
             (startRoutine) paImport,
             3 * 1024,
             GeodeGetProcessHandle())) {
-		
+
 			MemFree(handle);
 			handle = 0;
 		}
@@ -240,12 +240,12 @@ PAImportStop(
     p_handle = MemLockExcl(aHandle);
     p_handle->paIH_stop = TRUE;
 	if(!p_handle->paIH_finished) {
-	
+
 		retValue = TRUE;
 	}
-	
+
 	if(p_handle->paIH_mimeStatusPtr) {
-		
+
 		p_handle->paIH_mimeStatusPtr->MS_mimeFlags |= MIME_STATUS_ABORT;
 	}
 	MemUnlockExcl(aHandle);

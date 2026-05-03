@@ -26,8 +26,8 @@ cThumbV.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/stdio.h product.h \
-                math.h htmlfstr.h awatcher.h htmlprog.h extgraph.h \
-                Ansi/string.h
+                math.h htmlfstr.h awatcher.h htmlprog.h library.h \
+                extgraph.h Ansi/string.h
 popups.obj \
 popups.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/metaC.goh Objects/inputC.goh Objects/clipbrd.goh \
@@ -113,9 +113,9 @@ mImport.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h Ansi/string.h product.h \
-                math.h htmlfstr.h awatcher.h htmlprog.h
-AWATCHER.obj \
-AWATCHER.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
+                math.h htmlfstr.h awatcher.h htmlprog.h library.h
+awatcher.obj \
+awatcher.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/inputC.goh Objects/clipbrd.goh \
                 Objects/uiInputC.goh iacp.goh Objects/winC.goh \
                 Objects/gProcC.goh alb.goh Objects/processC.goh \
@@ -133,8 +133,8 @@ AWATCHER.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
                 Objects/helpCC.goh
-AWATCHER.obj \
-AWATCHER.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
+awatcher.obj \
+awatcher.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
                 dbase.h localize.h Ansi/ctype.h timedate.h file.h \
                 sllang.h system.h geoworks.h chunkarr.h Objects/helpCC.h \
@@ -329,11 +329,11 @@ uiMain.eobj: PicAlbum.goh stdapp.goh object.goh ui.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh Objects/gViewCC.goh Art/PIC003-8.goh \
-                Art/PIC010-8.goh Art/PIC011-8.goh Art/PIC012-8.goh \
-                Art/PIC013-8.goh Art/PIC005-8.goh Art/PIC006-8.goh \
-                Art/PIC007-8.goh Art/A128-8.goh Art/PIC014-8.goh \
-                Art/PIC015-8.goh Art/PIC00018.goh Art/PIC00028.goh
+                Objects/helpCC.goh Objects/gViewCC.goh Art/pic003_8.goh \
+                Art/pic010_8.goh Art/pic011_8.goh Art/pic012_8.goh \
+                Art/pic013_8.goh Art/pic005_8.goh Art/pic006_8.goh \
+                Art/pic007_8.goh Art/a128_8.goh Art/pic014_8.goh \
+                Art/pic015_8.goh Art/pic00018.goh Art/pic00028.goh
 uiMain.obj \
 uiMain.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -371,3 +371,5 @@ uicVDLC.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 Objects/gInterC.h Objects/Text/tCommon.h stylesh.h \
                 driver.h thread.h print.h Internal/spoolInt.h serialDr.h \
                 parallDr.h hugearr.h fileEnum.h
+
+picalbumEC.geo picalbum.geo : geos.ldf ui.ldf spool.ldf ansic.ldf extgraph.ldf photopc.ldf 
