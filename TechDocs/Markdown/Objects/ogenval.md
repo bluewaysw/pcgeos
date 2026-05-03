@@ -90,7 +90,7 @@ instance fields inherited from the GenValue's superclass, **GenClass**.
 
 ----------
 **Code Display 8-1 GenValue Instance Data**
-
+~~~
     /* The instance data fields for GenValue are shown below. Those that are records
      * of flags have their default flags shown with other possible flags listed below.
      * Other fields are shown with their default values. */
@@ -125,7 +125,7 @@ instance fields inherited from the GenValue's superclass, **GenClass**.
 
         @instance optr              GVLI_destination;
         @instance Message           GVLI_applyMsg = 0;
-
+~~~
 ----------
 *GVLI_value* is the current numerical value of the GenValue. By default, it is 
 an integer constant defined by the application. Depending on the 
@@ -161,14 +161,14 @@ changes. This can be an optr to an object or a valid **TravelOption**. See
 
 ----------
 **Code Display 8-2 GenValue Optional Attribute Fields**
-
+~~~
     @vardata Message    ATTR_GEN_VALUE_STATUS_MSG;
     @vardata word       TTR_GEN_VALUE_DECIMAL_PLACES;
     @vardata WWFixed    ATTR_GEN_VALUE_METRIC_INCREMENT;
     @vardata optr       ATTR_GEN_VALUE_RUNS_ITEM_GROUP;
         @reloc ATTR_GEN_VALUE_RUNS_ITEM_GROUP, 0 optr;
     @vardata void       ATTR_GEN_VALUE_SET_MODIFIED_ON_REDUNDANT_SELECTION;
-
+~~~
 ----------
 ATTR_GEN_VALUE_STATUS_MSG sets a status message for a GenValue. A 
 status message allows your object to communicate with other objects when 
@@ -193,7 +193,7 @@ state occurs, no message will be sent out.)
 
 ----------
 **Code Display 8-3 GenValue Hints**
-
+~~~
     @vardata void       HINT_VALUE_INCREMENTABLE;
     @vardata void       HINT_VALUE_NOT_INCREMENTABLE;
 
@@ -201,6 +201,9 @@ state occurs, no message will be sent out.)
     @vardata Message    HINT_VALUE_CUSTOM_RETURN_PRESS;
 
     @vardata WWFixedAsDWord     HINT_VALUE_DISPLAYS_RANGE;
+    @vardata void 	HINT_VALUE_X_SCROLLER;
+    @vardata void 	HINT_VALUE_Y_SCROLLER;
+    
     @vardata GenValueIntervals  HINT_VALUE_DISPLAY_INTERVALS;
     @vardata void       HINT_VALUE_CONSTRAIN_TO_INTERVALS;
 
@@ -221,7 +224,7 @@ state occurs, no message will be sent out.)
     @vardata void       HINT_VALUE_NO_ANALOG_DISPLAY;
     @vardata void       HINT_VALUE_NOT_DIGITALLY_EDITABLE;
     @vardata void       HINT_VALUE_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
-
+~~~
 ----------
 HINT_VALUE_INCREMENTABLE and HINT_VALUE_NOT_INCREMENTABLE 
 specify whether increment (and decrement) gadgets are appropriate for this 
@@ -240,6 +243,12 @@ range of values, whose width is stored in the **WWFixedAsDWord** value
 here. The maximum *GVLI_value* in this case would be *GVLI_maximum* minus 
 the range. If this hint is not present, the range "length" is presumed to be 
 zero, even in gadgets that specify a range length by default.
+
+HINT_VALUE_X_SCROLLER and HINT_VALUE_Y_SCROLLER cause the GenValue to act as a 
+scroll bar. These hints are often used to replace the scroll bars of a GenView with 
+your own GenValue objects. It is also possible to use stand-alone scroll bars. 
+However, this requires more extensive support from the application.
+
 
 HINT_VALUE_DISPLAY_INTERVALS indicates that intervals should be 
 displayed along an object's range. This hint is used most often in analog (e.g. 
@@ -323,7 +332,7 @@ immediate mode, which will result in an immediate change in *GVLI_value*.
 
 ----------
 **Code Display 8-4 Setting an Initial Value**
-
+~~~
     /* This GenValue will appear with the initial integer value of two. MakeWWFixed
      * creates a fixed point value. */
 
@@ -331,7 +340,7 @@ immediate mode, which will result in an immediate change in *GVLI_value*.
         GI_visMoniker = "My Value";
         GVLI_value = MakeWWFixed(2.0);
     }
-
+~~~
 ----------
 **GenValueClass** provides several messages to change the value without user 
 control. MSG_GEN_VALUE_SET_VALUE sets this numeric value to a passed 
@@ -565,6 +574,7 @@ and minimum.
 ----------
 **Code Display 8-5 Setting Minimum, Maximum, Increment Values**
 
+~~~
     @object GenValueClass MyValue = {
         GI_visMoniker = "My Value";
         GVLI_value = MakeWWFixed(1.0);
@@ -572,6 +582,7 @@ and minimum.
         GVLI_maximum= MakeWWFixed(100.0);
         GVLI_increment = MakeWWFixed(5.0);
     }
+~~~
 
 ----------
 You may change the fixed point value of this increment with 
@@ -842,6 +853,7 @@ it displays the numerical value within the textual display.
 ----------
 **Code Display 8-6 Setting a Distance Display Format**
 
+~~~
     @object GenValueClass MyValue = {
         GI_visMoniker = "My Value";
         GVLI_displayFormat = GVDF_INCHES;
@@ -852,6 +864,7 @@ it displays the numerical value within the textual display.
     /* For an initial value of 1/2 inch, the equivalent value in Points is 36. */
         GVLI_increment = MakeWWFixed(36.0);
     }
+~~~
 
 ----------
  For example, if your display format is GVDF_INCHES and you wish to set an 
@@ -890,6 +903,7 @@ the increment used if the application is metric.
 ----------
 Code Display 8-7 ATTR_GEN_VALUE_METRIC_INCREMENT
 
+~~~
     /* If the application is US, the initial value will be 1 inch and the increment 
      * will be 1 inch. If the application is metric, the initial value will be 2.54 cm
      * (1 inch or 72 points) but the increment will be 2.0 cm (56.692 points). If
@@ -904,6 +918,7 @@ Code Display 8-7 ATTR_GEN_VALUE_METRIC_INCREMENT
         GVLI_increment = MakeWWFixed(72.0);
         ATTR_GEN_VALUE_METRIC_INCREMENT = MakeWWFixed(56.692);
     }
+~~~
 
 ----------
 To set a new display format, send MSG_GEN_VALUE_SET_DISPLAY_FORMAT. 
@@ -974,6 +989,7 @@ TO_APP_TARGET.)
 
 **Code Display 8-8 Sending an Apply Message**
 
+~~~
     @object GenValueClass MyValue = {
         GI_visMoniker = "My Value";
         GVLI_value = MakeWWFixed(1.0);
@@ -990,6 +1006,7 @@ TO_APP_TARGET.)
         curValue = curValue*2;
         @call MyValue::MSG_GEN_VALUE_SET_VALUE(curValue, 0);
     }
+~~~
 
 ----------
 
@@ -1658,5 +1675,92 @@ range length.
 **Destination:** Any GenValue object.
 
 **Interception:** Generally not intercepted.
+
+### 8.4.7 Stand Alone Scroll Bars
+
+    HINT_VALUE_X_SCROLLER
+    HINT_VALUE_Y_SCROLLER
+    
+HINT_VALUE_X_SCROLLER and HINT_VALUE_Y_SCROLLER cause the GenValue to act as a 
+scroll bar. To use a GenValus as a stand-alone scroll bar, the application must 
+provide more comprehensive support.
+
+- A GenValue that functions as a scroll bar sends not just one apply message, but 
+one of seven. Which one is sent depends on the action performed. The application 
+must define all seven messages sequentially. The first of these messages must be 
+set as GVLI_applyMsg of the object. It is permitted but not 
+required to handle all these messages in the same way.
+
+- Furthermore, the visual update of scroll bars does not occur automatically. It 
+is necessary to send the current value of the GenValue back to the GenValue,
+for example using MSG_GEN_VALUE_SET_VALUE. In 
+doing so, it is allowed to change the value beforehand, for example by rounding it to 
+ensure that only integer values are stored in the GenValue.
+
+Typically, a GenValue that works as a scroll bar should display a range.
+
+A GenValue that has set the hints HINT_VALUE_X_SCROLLER or HINT_VALUE_Y_SCROLLER does 
+not send it's status message, even if the attribute ATTR_GEN_VALUE_STATUS_MSG is present.
+
+----------
+**Code Display 8-9 Declaring and Handling the Messages**
+~~~
+    /* Define seven messages to support a GenValue that acts as a scroll bar.
+     * These messages must be defined immediately one after the other.
+     */
+    @class SampleApplicationClass, GenApplicationClass;
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY;	/* BEG_ANCHOR */
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY_1;	/* PAGE_UP */
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY_2;	/* INC_UP */
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY_3;	/* DRAG_AREA */
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY_4;	/* INC_DOWN */
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY_5;	/* PAGE_DOWN */
+        @message (GEN_VALUE_APPLY_MSG) MSG_SAMPLE_APP_SCROLLER_APPLY_6;	/* END_ANCHOR */
+    @endc
+
+    /* We handle all the messages in the same way. 
+     * As example, we round the passed value to the nearest integer first. 
+     * Then we send it back to GenValue to visual update the scroll bar.
+     * The actual application-specific actions have been left out here.
+     */
+    @method SampleApplicationClass, MSG_SAMPLE_APP_SCROLLER_APPLY,
+				MSG_SAMPLE_APP_SCROLLER_APPLY_1,
+				MSG_SAMPLE_APP_SCROLLER_APPLY_2,
+				MSG_SAMPLE_APP_SCROLLER_APPLY_3,
+				MSG_SAMPLE_APP_SCROLLER_APPLY_4,
+				MSG_SAMPLE_APP_SCROLLER_APPLY_5,
+				MSG_SAMPLE_APP_SCROLLER_APPLY_6 {
+
+    /* Round the WWFixedAsDWord value. */
+    value += 0x8000;
+    value &= 0xFFFF0000;
+    @send SampleScroller::MSG_GEN_VALUE_SET_VALUE(value, FALSE);
+
+    /*
+     * Do whatever is necessary with that value.
+     */
+    
+    }
+~~~
+
+**Code Display 8-10 Set up GenValue**
+~~~
+    /* This GenValue is intended to function as a horizontal scroll bar and 
+     * represent a range of three values from zero to ten. This means that the
+     * GenValue's apply messages provide a ‘value’ ranging from zero to seven.  
+     *
+     * It is necessary to set the first of the seven messages defined above as 
+     * GVLI_applyMsg.
+     */
+    @object GenValueClass SampleScroller = {
+        HINT_VALUE_X_SCROLLER;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_VALUE_DISPLAYS_RANGE = MakeWWFixed(3);
+        GVLI_maximum = MakeWWFixed(10);
+        GVLI_applyMsg = MSG_SAMPLE_APP_SCROLLER_APPLY;
+        GVLI_destination = @SampleApp;
+    }
+~~~
+
 
 [GenInteraction](ogenint.md) <-- [Table of Contents](../objects.md) &nbsp;&nbsp; --> [GenView](ogenvew.md)
