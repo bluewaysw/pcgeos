@@ -70,7 +70,6 @@ TrueTypeGenChar	proc	far
 
 	mov	es, bp			;es <- seg addr of gstate
 
-	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx			;pass point size
 	push 	ax
