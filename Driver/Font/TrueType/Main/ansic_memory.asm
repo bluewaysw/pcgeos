@@ -345,7 +345,17 @@ backward:
 
 forward:
 	shr	cx			; Word-sized moves please.
+if SUPPORT_32BIT_DATA_REGS
+    	lahf
+    	shr     cx
+    	rep     movsd
+    	jnc     noWords
+    	movsw
+noWords:
+    	sahf
+else
 	rep	movsw			; Move it!
+endif
 	jnc	exit			; Carry flag set from shr above.
 	movsb				; Move odd byte if necessary.
 exit:
@@ -405,11 +415,25 @@ MEMSET	proc	far	target:fptr, value:word, count:word
 	mov	cx, count		; CX = Number of bytes to write.
 	jcxz	exit			; Bail iff no bytes to write.
 	mov	ax, value		; AL = (unsigned char) value;
-	mov	ah, al			; Duplicate value for setting...
-	shr	cx			; ...by word sized writes.
-	rep	stosw			; Write it!
-	jnc	exit			; Skip odd byte move if not needed.
-	stosb				; Store odd byte.
+mov     ah, al          		; Duplicate byte to word.
+    	shr     cx              	; Word-sized writes.
+if SUPPORT_32BIT_DATA_REGS
+    	lahf
+    	shr     cx              	; Dword-sized writes.
+    	push    eax
+    	shl     eax, 16
+    	or      ax, dx          	; EAX = value in all 4 bytes (AH=AL=value)
+    	rep     stosd
+    	pop     eax
+    	jnc     noWord
+    	stosw
+noWord:
+    	sahf
+else
+    	rep     stosw
+endif
+    	jnc     exit
+    	stosb				; Store odd byte.
 exit:
 	mov_trash	ax, dx		; ES:AX = String to set.
 	mov	dx, es			; DX:AX = String to set.
