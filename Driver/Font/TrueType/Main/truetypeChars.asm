@@ -84,8 +84,7 @@ TrueTypeGenChar	proc	far
 	call	FontDrFindFontInfo
 	push	ds			;pass ptr to FontInfo
 	push	di
-
-	clr	ah		                   
+			                   
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData
