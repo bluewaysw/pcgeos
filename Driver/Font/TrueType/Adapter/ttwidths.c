@@ -650,12 +650,12 @@ EC(     ECCheckBounds( (void*)fontMatrix ) );
 EC(     ECCheckBounds( (void*)fontBuf ) );
 
         /* initialize transMatrix */
-        transMatrix->TM_heightX = 0;
-        transMatrix->TM_scriptX = 0;
-        transMatrix->TM_heightY = 0;
-        transMatrix->TM_scriptY = 0;
-        transMatrix->TM_resX    = 72;
-        transMatrix->TM_resY    = 72;
+        transMatrix->TM_heightX    = 0;
+        transMatrix->TM_scriptX    = 0;
+        transMatrix->TM_heightY    = 0;
+        transMatrix->TM_scriptY    = 0;
+        transMatrix->TM_resolution = 72;
+
 
         /* fake bold style       */
         if( stylesToImplement & TS_BOLD )
@@ -993,7 +993,7 @@ static void AdjustTransMatrix( TransformMatrix* transMatrix, FontMatrix* windowM
                 return;
 
         /* set horizontal and vertical resolution based on 72 dpi */
-        transMatrix->TM_resX = transMatrix->TM_resY = 
+        transMatrix->TM_resolution = 
                 INTEGER_OF_WWFIXEDASDWORD( GrMulWWFixed( WORD_TO_WWFIXEDASDWORD( 72 ), windowMatrix->FM_11 ) );
 
         /* normalize transformation matrix values */

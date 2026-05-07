@@ -296,7 +296,7 @@ word geosCharMap[] =
 
 word GeosCharToUnicode( const word  geosChar )
 {
-        if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
+        if( geosChar < MIN_GEOS_CHAR || geosChar >= MAX_GEOS_CHAR )
                 return 0;
 
         return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ];
@@ -342,20 +342,24 @@ word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastCh
 {
         word  charIndex;
         word  firstFound = NUM_CHARMAPENTRIES;
-        word  lastFound = 0;
+        word  lastFound  = 0;
 
 
         for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
         {
+                if( geosCharMap[charIndex] == 0 )
+                        continue;
+
                 if( TT_Char_Index( map, geosCharMap[charIndex] ) )
                 {
-                        if( firstFound > charIndex ) firstFound = charIndex;
+                        if( firstFound == NUM_CHARMAPENTRIES )
+                                firstFound = charIndex;
                         lastFound = charIndex;
                 }
         }
 
         *firstChar = (firstFound < NUM_CHARMAPENTRIES) ? (char)(firstFound + C_SPACE) : 255;
-        *lastChar = (lastFound > 0) ? (char)(lastFound + C_SPACE) : 0;
+        *lastChar  = (lastFound  > 0)                  ? (char)(lastFound  + C_SPACE) : 0;
 
         return (*firstChar <= *lastChar) ? (1 + *lastChar - *firstChar) : 0;
 }

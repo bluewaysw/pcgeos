@@ -113,7 +113,7 @@ EC(     ECCheckBounds( (void*)trueTypeOutline ) );
 EC(     ECCheckBounds( (void*)transformMatrix ) );
 
         /* set pointsize and resolution */
-        TT_Set_Instance_CharSize_And_Resolutions( INSTANCE, pointSize >> 10, transformMatrix->TM_resX, transformMatrix->TM_resY );
+        TT_Set_Instance_CharSize_And_Resolutions( INSTANCE, pointSize >> 10, transformMatrix->TM_resolution );
 
         /* create new glyph */
         TT_New_Glyph( FACE, &GLYPH );

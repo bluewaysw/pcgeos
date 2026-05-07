@@ -428,20 +428,14 @@
   /* metrics used by the instance and execution context objects */
   struct  TIns_Metrics_
   {
-    TT_F26Dot6  pointSize;      /* point size.  1 point = 1/72 inch. */
+    TT_F26Dot6  pointSize;   /* point size.  1 point = 1/72 inch. */
 
-    UShort      x_resolution;   /* device horizontal resolution in dpi. */
-    UShort      y_resolution;   /* device vertical resolution in dpi.   */
-
-    UShort      x_ppem;         /* horizontal pixels per EM */
-    UShort      y_ppem;         /* vertical pixels per EM   */
-
+    UShort      resolution;  /* device resolution in dpi. */
+    UShort      ppem;        /* maximum ppem size */
     Long        x_scale1;
-    Long        y_scale1;
 
     Long        units_per_em;
 
-    UShort      ppem;        /* maximum ppem size */
     Long        ratio;       /* current ratio     */
     Long        scale1;
     Long        scale2;      /* scale for ppem */

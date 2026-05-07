@@ -665,9 +665,9 @@ extern TEngine_Instance engineInstance;
  *            released on error.
  *
  ******************************************************************/
-//#pragma code_seg(ttcache_TEXT)
+
   LOCAL_FUNC
-  TT_Error  /*_near*/ Instance_Create( void*  _instance,
+  TT_Error  Instance_Create( void*  _instance,
                              void*  _face )
   {
     PInstance  ins  = (PInstance)_instance;
@@ -692,13 +692,9 @@ extern TEngine_Instance engineInstance;
       PIns_Metrics   metrics = &ins->metrics;
 
 
-      metrics->pointSize    = 10 << 6;     /* default pointsize  = 10pts */
-
-      metrics->x_resolution = 72;          /* default resolution = 72dpi */
-      metrics->y_resolution = 72;
-
-      metrics->x_ppem = 0;
-      metrics->y_ppem = 0;
+      metrics->pointSize  = 10 << 6;   /* default pointsize  = 10pts */
+      metrics->resolution = 72;        /* default resolution = 72dpi */
+      metrics->ppem       = 0;
 
       /* set default compensation ( all 0 ) */
       for ( i = 0; i < 4; ++i )
@@ -726,7 +722,6 @@ extern TEngine_Instance engineInstance;
     Instance_Destroy( ins );
     return error;
   }
-//#pragma code_seg()
 
 
 /*******************************************************************
@@ -777,14 +772,10 @@ extern TEngine_Instance engineInstance;
       PIns_Metrics  metrics = &exec->metrics;
 
 
-      metrics->x_ppem       = 0;
-      metrics->y_ppem       = 0;
+      metrics->ppem         = 0;
       metrics->pointSize    = 0;
       metrics->x_scale1     = 0;
       metrics->units_per_em = 1;
-      metrics->y_scale1     = 0;
-
-      metrics->ppem         = 0;
       metrics->scale1       = 0;
       metrics->scale2       = 1;
       metrics->ratio        = 1L << 16;
@@ -859,21 +850,11 @@ extern TEngine_Instance engineInstance;
 
     face = ins->owner;
 
-    if ( ins->metrics.x_ppem < 1 ||
-         ins->metrics.y_ppem < 1 )
+    if ( ins->metrics.ppem < 1 )
       return TT_Err_Invalid_PPem;
 
     /* compute new transformation */
-    if ( ins->metrics.x_ppem >= ins->metrics.y_ppem )
-    {
-      ins->metrics.scale1  = ins->metrics.x_scale1;
-      ins->metrics.ppem    = ins->metrics.x_ppem;
-    }
-    else
-    {
-      ins->metrics.scale1  = ins->metrics.y_scale1;
-      ins->metrics.ppem    = ins->metrics.y_ppem;
-    }
+    ins->metrics.scale1 = ins->metrics.x_scale1;
     ins->metrics.scale2 = ins->metrics.units_per_em;
 
     /* Scale the cvt values to the new ppem.          */

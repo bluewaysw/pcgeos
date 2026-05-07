@@ -702,8 +702,7 @@
   EXPORT_DEF
   TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
                                                       TT_F26Dot6   charSize,
-                                                      TT_UShort    xResolution,
-                                                      TT_UShort    yResolution );
+                                                      TT_UShort    resolution );
   
 
   /* Close a given instance object, destroying all associated data. */

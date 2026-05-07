@@ -26,6 +26,7 @@
 #include "ttmemory.h"
 #include "tttags.h"
 #include "ttload.h"
+#include <ec.h>
 
 
 /* composite font flags */
@@ -156,42 +157,21 @@
 
 /*******************************************************************
  *
- *  Function    :  Scale_X
+ *  Function    :  Scale
  *
  *  Description :  scale an horizontal distance from font
  *                 units to 26.6 pixels
  *
  *  Input  :  metrics  pointer to metrics
- *            x        value to scale
+ *            val      value to scale
  *
  *  Output :  scaled value
  *
  ******************************************************************/
 
-  static TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
+  static TT_Pos  Scale( PIns_Metrics  metrics, TT_Pos  val )
   {
-    return TT_MulDiv( x, metrics->x_scale1, metrics->units_per_em );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Scale_Y
- *
- *  Description :  scale a vertical distance from font
- *                 units to 26.6 pixels
- *
- *  Input  :  metrics  pointer to metrics
- *            y        value to scale
- *
- *  Output :  scaled value
- *
- ******************************************************************/
-
-  static 
-  TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
-  {
-    return TT_MulDiv( y, metrics->y_scale1, metrics->units_per_em );
+    return TT_MulDiv( val, metrics->x_scale1, metrics->units_per_em );
   }
 
 
@@ -368,8 +348,8 @@
 
       for ( j = 0; j < n_points; ++j )
       {
-        pts->org[j].x = Scale_X( &exec->metrics, pts->org[j].x );
-        pts->org[j].y = Scale_Y( &exec->metrics, pts->org[j].y );
+        pts->org[j].x = Scale( &exec->metrics, pts->org[j].x );
+        pts->org[j].y = Scale( &exec->metrics, pts->org[j].y );
       }
 
       /* if hinting, round pp1, and shift the glyph accordingly */
@@ -611,12 +591,9 @@
 
 
     /* first of all, check arguments */
-    if ( !glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
+EC( ECCheckBounds( glyph ) );
     face = glyph->face;
-    if ( !face )
-      return TT_Err_Invalid_Glyph_Handle;
+EC( ECCheckBounds( face ) );
 
     if ( glyph_index >= face->numGlyphs )
       return TT_Err_Invalid_Glyph_Index;
@@ -636,8 +613,7 @@
     /* query new execution context */
     exec = New_Context( face );
 
-    if ( !exec )
-      return TT_Err_Could_Not_Find_Context;
+EC( ECCheckBounds( exec ) );
 
     Context_Load( exec, face, instance );
 
@@ -649,7 +625,7 @@
         exec->GS = instance->GS;
       /* load default graphics state */
 
-      glyph->outline.y_ppem = ( instance->metrics.y_ppem );
+      glyph->outline.y_ppem = ( instance->metrics.ppem );
     }
 
     /* save its critical pointers, as they'll be modified during load */
@@ -764,7 +740,7 @@
           subglyph->pp1.x = 0;
           subglyph->pp2.x = subglyph->metrics.advance;
           if (load_flags & TTLOAD_SCALE_GLYPH)
-            subglyph->pp2.x = Scale_X( &exec->metrics, subglyph->pp2.x );
+            subglyph->pp2.x = Scale( &exec->metrics, subglyph->pp2.x );
 
           exec->glyphSize = 0;
           phase = Load_End;
@@ -801,8 +777,8 @@
         subglyph->pp2.x = subglyph->pp1.x + subglyph->metrics.advance;
         if (load_flags & TTLOAD_SCALE_GLYPH)
         {
-          subglyph->pp1.x = Scale_X( &exec->metrics, subglyph->pp1.x );
-          subglyph->pp2.x = Scale_X( &exec->metrics, subglyph->pp2.x );
+          subglyph->pp1.x = Scale( &exec->metrics, subglyph->pp1.x );
+          subglyph->pp2.x = Scale( &exec->metrics, subglyph->pp2.x );
         }
 
         /* is it a simple glyph ? */
@@ -1057,8 +1033,8 @@
 
             if ( load_flags & TTLOAD_SCALE_GLYPH )
             {
-              x = Scale_X( &exec->metrics, x );
-              y = Scale_Y( &exec->metrics, y );
+              x = Scale( &exec->metrics, x );
+              y = Scale( &exec->metrics, y );
 
               if ( subglyph->element_flag & ROUND_XY_TO_GRID )
               {
@@ -1169,7 +1145,7 @@
          subglyph->is_hinted )
     {
       widths = Get_Advance_Widths( exec->face,
-                                   exec->instance->metrics.x_ppem );
+                                   exec->instance->metrics.ppem );
       if ( widths )
         glyph->metrics.advance = widths[glyph_index] << 6;
     }

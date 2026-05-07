@@ -5,7 +5,7 @@
 #include "ttacache.h"
 #include <Ansi/string.h>
 
-#define TTF_CACHE_MAJOR_VERSION 2
+#define TTF_CACHE_MAJOR_VERSION 3
 #define TTF_CACHE_MINOR_VERSION 0
 
 VMFileHandle _pascal TrueType_Cache_Init() {
