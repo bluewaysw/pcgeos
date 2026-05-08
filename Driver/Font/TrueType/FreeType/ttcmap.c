@@ -465,48 +465,6 @@
  *            0 if the glyph does not exist.
  *
  ******************************************************************/
-#if 0
-UShort  code_to_index4( UShort  charCode,
-                          PCMap4  cmap4 )
-  {
-    UShort         i, segCount;
-    UShort         result;
-    TCMap4Segment  seg4;
-    PCMap4Segment  segments;
-    PUShort        glyphIdArray;
-
-
-    segCount = cmap4->segCountX2 >> 1;
-    segments = GEO_LOCK( cmap4->segmentBlock );
-
-    for ( i = 0; i < segCount; ++i )
-      if ( charCode <= segments[i].endCount )
-        break;
-
-    if ( i < segCount )
-      seg4 = segments[i];
-
-    GEO_UNLOCK( cmap4->segmentBlock );
-
-    if ( i >= segCount || charCode < seg4.startCount )
-      return 0;
-
-    if ( seg4.idRangeOffset == 0 )
-      return ( charCode + seg4.idDelta );
-
-    result       = 0;
-    glyphIdArray = GEO_LOCK( cmap4->glyphIdBlock );
-
-    i = seg4.idRangeOffset / 2 + ( charCode - seg4.startCount )
-        - ( segCount - i );
-
-    if ( i < cmap4->numGlyphId && glyphIdArray[i] != 0 )
-      result = ( glyphIdArray[i] + seg4.idDelta );
-
-    GEO_UNLOCK( cmap4->glyphIdBlock );
-    return result;
-  }
-#endif
 
 UShort  code_to_index4( UShort  charCode,
                         PCMap4  cmap4 )
@@ -554,6 +512,7 @@ UShort  code_to_index4( UShort  charCode,
 
   return result;
 }
+
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
 /*******************************************************************
