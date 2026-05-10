@@ -1207,6 +1207,7 @@ REDInitializeDocumentFile		method dynamic ResEditDocumentClass,
 		mov	ss:[bp].TFF_destItem, di
 		clr	ss:[bp].TFF_locFile
 		clr	ss:[bp].TFF_geodeFile
+		clr	ss:[bp].TFF_sourceFromDistappl
 EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 	
 	; Lock the map block and mark it dirty.
@@ -1494,6 +1495,107 @@ ReadLocalizationFile		endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ChangeToDistapplSourcePathFromMap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Change to the source fallback path for the passed map.
+
+CALLED BY:	REDOpenSourceGeode, REDOpenLocalizationFile,
+		REDChangeToEffectiveSourcePath, OpenSourceFile
+PASS:		es:di	= TransMapHeader
+
+RETURN:		if error,
+			carry set
+			ax = EV_INVALID_PATH
+		else
+			carry clear
+
+DESTROYED:	ax
+SIDE EFFECTS:	Current path changed.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ChangeToDistapplSourcePathFromMap	proc	near
+fallbackPath	local	PathName
+		uses	bx, dx, ds, si, di, es
+		.enter
+
+	; Build the configured DISTAPPL source path for this map.
+
+		push	es, di
+		segmov	ds, es, ax
+		mov	si, di
+		segmov	es, ss, ax
+		lea	di, ss:[fallbackPath]
+		call	BuildDistapplPathFromMap
+		pop	es, di
+		jc	error
+
+	; Change to the fallback path.
+
+		push	ds
+		segmov	ds, ss, ax
+		lea	dx, ss:[fallbackPath]
+		clr	bx
+		call	FileSetCurrentPath
+		pop	ds
+		jc	error
+
+		clc
+		jmp	done
+
+error:
+		mov	ax, EV_INVALID_PATH
+		stc
+
+done:
+		.leave
+		ret
+ChangeToDistapplSourcePathFromMap	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		REDChangeToEffectiveSourcePath
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Change to the source path selected for this operation.
+
+CALLED BY:	REDReadSourceGeode
+PASS:		*ds:si	= ResEditDocumentClass object
+		es:di	= TransMapHeader
+		ss:bp	= TranslationFileFrame
+
+RETURN:		if error,
+			carry set
+			ax = ErrorValue
+		else
+			carry clear
+
+DESTROYED:	ax
+SIDE EFFECTS:	Current path changed.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+REDChangeToEffectiveSourcePath	proc	near
+		.enter
+
+		tst	ss:[bp].TFF_sourceFromDistappl
+		jz	normalPath
+
+		call	ChangeToDistapplSourcePathFromMap
+		jmp	done
+
+normalPath:
+		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
+		call	ObjCallInstanceNoLock
+
+done:
+		.leave
+		ret
+REDChangeToEffectiveSourcePath	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		REDOpenSourceGeode
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1527,7 +1629,6 @@ REVISION HISTORY:
 REDOpenSourceGeode	method dynamic ResEditDocumentClass,
 					MSG_RESEDIT_DOCUMENT_OPEN_SOURCE_GEODE
 pushedBP	local	word	push bp
-fallbackPath	local	PathName
 		uses	cx, dx
 		.enter
 
@@ -1535,22 +1636,30 @@ EC<		mov	bx, ss:[pushedBP]				  >
 EC<		cmp	ss:[bx].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 EC<		ERROR_NE  BAD_TRANSLATION_FILE_FRAME			  >
 
-	; Clear the source-location state for this open attempt.
-
-		andnf	ds:[di].REDI_state, not mask DS_SOURCE_FROM_DISTAPPL
-
-	; Go to source geode's path.
+	; Save the starting directory and lock the translation map.
 
 		call	FilePushDir
-		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
-		call	ObjCallInstanceNoLock
-		jc	tryFallbackNoMap
-
-	; Lock TransMapHeader.
 
 		mov	ax, MSG_RESEDIT_DOCUMENT_LOCK_MAP
 		call	ObjCallInstanceNoLock
 		movdw	esdi, cxdx
+
+	; If the localization file already selected DISTAPPL, the geode
+	; must come from the same location.
+
+		mov	bx, ss:[pushedBP]
+		tst	ss:[bx].TFF_sourceFromDistappl
+		jnz	tryFallbackOnly
+
+	; Start from the normal source path.
+
+		push	di
+		DerefDoc
+		andnf	ds:[di].REDI_state, not mask DS_SOURCE_FROM_DISTAPPL
+		pop	di
+		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
+		call	ObjCallInstanceNoLock
+		jc	normalOpenFailed
 
 	; Try the normal source path first.
 
@@ -1558,31 +1667,23 @@ EC<		ERROR_NE  BAD_TRANSLATION_FILE_FRAME			  >
 		mov	bp, ss:[pushedBP]
 		call	REDTryOpenSourceGeode
 		pop	bp
-		jnc	errorUnlock
+		jnc	normalOpenSucceeded
+
+normalOpenFailed:
+
+	; If a normal-path localization file is already open, do not mix it
+	; with a fallback geode.
+
+		mov	bx, ss:[pushedBP]
+		tst	ss:[bx].TFF_locFile
+		jnz	sourceGeodeError
 
 	; The normal path did not contain a usable source geode.  If the
 	; fallback is enabled, try the matching SYSTEM\DISTAPPL path.
 
 		call	ReadDistapplFallbackFromInitFile
 		jc	sourceGeodeError
-
-		push	ds, si
-		push	es, di
-		segmov	ds, es, ax
-		mov	si, di
-		segmov	es, ss, ax
-		lea	di, ss:[fallbackPath]
-		call	BuildDistapplPathFromMap
-		pop	es, di
-		pop	ds, si
-		jc	sourceGeodeError
-
-		push	ds
-		segmov	ds, ss, ax
-		lea	dx, ss:[fallbackPath]
-		clr	bx
-		call	FileSetCurrentPath
-		pop	ds
+		call	ChangeToDistapplSourcePathFromMap
 		jc	sourceGeodeError
 
 		push	bp
@@ -1591,67 +1692,44 @@ EC<		ERROR_NE  BAD_TRANSLATION_FILE_FRAME			  >
 		pop	bp
 		jc	sourceGeodeError
 
+		mov	bx, ss:[pushedBP]
+		mov	ss:[bx].TFF_sourceFromDistappl, TRUE
+		push	di
 		DerefDoc
 		ornf	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		pop	di
+		jmp	errorUnlock
+
+tryFallbackOnly:
+		call	ChangeToDistapplSourcePathFromMap
+		jc	sourceGeodeError
+
+		push	bp
+		mov	bp, ss:[pushedBP]
+		call	REDTryOpenSourceGeode
+		pop	bp
+		jc	sourceGeodeError
+
+		push	di
+		DerefDoc
+		ornf	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		pop	di
+		jmp	errorUnlock
+
+normalOpenSucceeded:
+		mov	bx, ss:[pushedBP]
+		clr	ss:[bx].TFF_sourceFromDistappl
+
+		push	di
+		DerefDoc
+		andnf	ds:[di].REDI_state, not mask DS_SOURCE_FROM_DISTAPPL
+		pop	di
 		jmp	errorUnlock
 
 sourceGeodeError:
 		call	SourceGeodeFileError
 		stc
 		jmp	errorUnlock
-
-tryFallbackNoMap:
-		push	ax
-		call	ReadDistapplFallbackFromInitFile
-		jc	noMapFallbackDisabled
-
-		mov	ax, MSG_RESEDIT_DOCUMENT_LOCK_MAP
-		call	ObjCallInstanceNoLock
-		movdw	esdi, cxdx
-
-		push	ds, si
-		push	es, di
-		segmov	ds, es, ax
-		mov	si, di
-		segmov	es, ss, ax
-		lea	di, ss:[fallbackPath]
-		call	BuildDistapplPathFromMap
-		pop	es, di
-		pop	ds, si
-		jc	noMapFallbackUnlock
-
-		push	ds
-		segmov	ds, ss, ax
-		lea	dx, ss:[fallbackPath]
-		clr	bx
-		call	FileSetCurrentPath
-		pop	ds
-		jc	noMapFallbackUnlock
-
-		push	bp
-		mov	bp, ss:[pushedBP]
-		call	REDTryOpenSourceGeode
-		pop	bp
-		jc	sourceGeodeErrorAfterPath
-
-		DerefDoc
-		ornf	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
-		pop	ax
-		jmp	errorUnlock
-
-sourceGeodeErrorAfterPath:
-		call	SourceGeodeFileError
-		pop	cx
-		stc
-		jmp	errorUnlock
-
-noMapFallbackUnlock:
-		call	DBUnlock
-
-noMapFallbackDisabled:
-		pop	ax
-		stc
-		jmp	done
 
 errorUnlock:
 
@@ -1664,7 +1742,6 @@ errorUnlock:
 		pop	ax
 		popf
 
-done:
 		call	FilePopDir
 
 		.leave
@@ -1871,10 +1948,9 @@ REDReadSourceGeode	method dynamic ResEditDocumentClass,
 		jc	errorUnlock
 		mov	bx, ss:[bp].TFF_geodeFile
 
-	; Go to source geode's path for later getting extended attributes..
+	; Go to the selected source path for extended attributes.
 
-		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
-		call	ObjCallInstanceNoLock
+		call	REDChangeToEffectiveSourcePath
 		jc	errorUnlock
 
 	; Copy values from GeodeHeader to TransMapHeader. 
@@ -2604,6 +2680,7 @@ PASS:		*ds:si	= ResEditDocumentClass object
 		ds:bx	= ResEditDocumentClass object (same as *ds:si)
 		es 	= segment of ResEditDocumentClass
 		ax	= message #
+		ss:bp	= TranslationFileFrame
 
 RETURN:		if error,
 			carry set
@@ -2625,19 +2702,19 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 REDOpenLocalizationFile	method dynamic ResEditDocumentClass, 
 					MSG_RESEDIT_DOCUMENT_OPEN_LOCALIZATION_FILE
+pushedBP	local	word	push bp
 vmFileName	local	DosDotFileName
-		uses	cx, dx, ds, si
+locError	local	word
+		uses	bx, cx, dx, ds, si
 		.enter
+
+EC<		mov	bx, ss:[pushedBP]				  >
+EC<		cmp	ss:[bx].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
+EC<		ERROR_NE  BAD_TRANSLATION_FILE_FRAME			  >
 
 	; Push current directory.
 
 		call	FilePushDir
-
-	; Go to source geode directory (localization file should be there).
-
-		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
-		call	ObjCallInstanceNoLock	
-		jc	donePopDir
 
 	; Lock TransMapHeader.
 
@@ -2645,49 +2722,60 @@ vmFileName	local	DosDotFileName
 		call	ObjCallInstanceNoLock
 		movdw	esdi, cxdx		; es:di = TransMapHeader
 
-	; Construct localization filename.
+	; If the geode already selected DISTAPPL, the localization file must
+	; come from the same location.
 
-		push	ds, si
-		segmov	ds, ss, si
-		lea	si, ss:[vmFileName]
-		call	BuildLocalizationFileName
-		pop	ds, si
+		mov	bx, ss:[pushedBP]
+		tst	ss:[bx].TFF_sourceFromDistappl
+		jnz	tryFallbackOnly
 
-	; Make sure it is a VM file.
+	; Try the normal source path first.
 
-		push	ds
-		mov	ax, GFT_VM
-		segmov	ds, ss, dx
-		lea	dx, ss:[vmFileName]	; es:dx <- file name
-		call	AssertFileType
-		pop	ds
-		jnc	openFile		; No error.
-		cmp	ax, EV_NO_ERROR
-		jne	tryLowerCase		; File open error occured.
-		mov	ax, EV_EXPECTED_LOCALIZATION_FILE
-		jmp	error			; Was not a VM file.
+		push	di
+		DerefDoc
+		andnf	ds:[di].REDI_state, not mask DS_SOURCE_FROM_DISTAPPL
+		pop	di
 
-openFile:
+		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
+		call	ObjCallInstanceNoLock	
+		jc	normalOpenFailed
 
-	; Open the file.
+		call	BuildLocalizationFileNameOnStack
+		call	TryOpenLocalizationFileOnStack
+		jnc	openSucceeded
 
-		push	ds
-		segmov	ds, ss, ax
-		mov	ah, VMO_OPEN
-		mov	al, mask VMAF_FORCE_READ_ONLY or \
-				mask VMAF_FORCE_DENY_WRITE
-		clr	cx
-		call	VMOpen			; ^hbx <- localization file
-		pop	ds
-		mov	ax, EV_FILE_OPEN
+normalOpenFailed:
+		mov	ss:[locError], ax
+
+	; If a normal-path geode is already open, do not mix it with a
+	; fallback localization file.
+
+		mov	bx, ss:[pushedBP]
+		tst	ss:[bx].TFF_geodeFile
+		jnz	error
+
+		call	ReadDistapplFallbackFromInitFile
+		jnc	tryFallbackOnly
+		mov	ax, ss:[locError]
+		jmp	error
+
+tryFallbackOnly:
+		call	ChangeToDistapplSourcePathFromMap
 		jc	error
 
-	; Check file for validity, correct version, protocols, etc.
+		call	BuildLocalizationFileNameOnStack
+		call	TryOpenLocalizationFileOnStack
+		jc	error
 
-		call	AssertLocalization	; If error, ax = ErrorValue
-		jc	assertError
-		mov	ax, bx			; File handle.
-		clc
+		mov	bx, ss:[pushedBP]
+		mov	ss:[bx].TFF_sourceFromDistappl, TRUE
+		push	di
+		DerefDoc
+		ornf	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		pop	di
+		jmp	openSucceeded
+
+openSucceeded:
 
 	; If in batch mode, report update attempt and name of localization
 	; file.
@@ -2730,6 +2818,94 @@ exit:
 		.leave
 		ret					; <--- EXIT HERE
 
+error:
+
+	; Display error message.
+
+		call	LocalizationFileError
+		stc
+		jmp	donePopDir
+
+BuildLocalizationFileNameOnStack:
+		push	ds, si
+		segmov	ds, ss, si
+		lea	si, ss:[vmFileName]
+		call	BuildLocalizationFileName
+		pop	ds, si
+		retn
+
+TryOpenLocalizationFileOnStack:
+		push	ds, si
+		segmov	ds, ss, si
+		lea	si, ss:[vmFileName]
+		call	REDTryOpenLocalizationFile
+		pop	ds, si
+		retn
+
+REDOpenLocalizationFile	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		REDTryOpenLocalizationFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Try to open the localization VM in the current directory.
+
+CALLED BY:	REDOpenLocalizationFile
+PASS:		ds:si	= localization file name
+
+RETURN:		if error,
+			carry set
+			ax = ErrorValue
+		else
+			carry clear
+			ax = localization file handle
+
+DESTROYED:	ax
+SIDE EFFECTS:	May downcase the passed filename.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+REDTryOpenLocalizationFile	proc	near
+fileName	local	word	push si
+		uses	bx, cx, dx, ds, si
+		.enter
+
+	; Make sure it is a VM file.
+
+		push	ds
+		mov	ax, GFT_VM
+		mov	dx, ss:[fileName]	; ds:dx <- file name
+		call	AssertFileType
+		pop	ds
+		jnc	openFile		; No error.
+		cmp	ax, EV_NO_ERROR
+		jne	tryLowerCase		; File open error occured.
+		mov	ax, EV_EXPECTED_LOCALIZATION_FILE
+		jmp	error			; Was not a VM file.
+
+openFile:
+
+	; Open the file.
+
+		push	ds
+		mov	dx, ss:[fileName]	; ds:dx <- file name
+		mov	ah, VMO_OPEN
+		mov	al, mask VMAF_FORCE_READ_ONLY or \
+				mask VMAF_FORCE_DENY_WRITE
+		clr	cx
+		call	VMOpen			; ^hbx <- localization file
+		pop	ds
+		mov	ax, EV_FILE_OPEN
+		jc	error
+
+	; Check file for validity, correct version, protocols, etc.
+
+		call	AssertLocalization	; If error, ax = ErrorValue
+		jc	assertError
+		mov	ax, bx			; File handle.
+		clc
+		jmp	done
+
 assertError:
 
 	; Close the localization file gracefully.
@@ -2739,14 +2915,7 @@ assertError:
 		call	VMClose
 		pop	ax
 		stc
-
-error:
-
-	; Display error message.
-
-		call	LocalizationFileError
-		stc
-		jmp	donePopDir
+		jmp	done
 
 tryLowerCase:
 
@@ -2754,23 +2923,28 @@ tryLowerCase:
 
 		push	ds, si
 		clr	cx
-		segmov	ds, ss, dx
-		lea	si, ss:[vmFileName]	; es:dx <- file name
+		mov	si, ss:[fileName]	; ds:si <- file name
 		call	LocalDowncaseString
 
 	; Make sure it is a VM file.
 
 		mov	ax, GFT_VM
-		lea	dx, ss:[vmFileName]	; ds:dx <- file name
+		mov	dx, ss:[fileName]	; ds:dx <- file name
 		call	AssertFileType
 		pop	ds, si
 		jnc	openFile		; No error.
 		cmp	ax, EV_NO_ERROR
 		jne	error			; File open error occured.
 		mov	ax, EV_EXPECTED_LOCALIZATION_FILE
-		jmp	error			; Was not a VM file.
 
-REDOpenLocalizationFile	endm
+error:
+		stc
+
+done:
+		.leave
+		ret
+REDTryOpenLocalizationFile	endp
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2989,37 +3163,65 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 OpenSourceFile	 proc	far
 fileType	local	GeosFileType
+docObj		local	optr
+sourceFromDistappl local	word
 	uses	dx,si,di,ds,es
 	.enter
 
-	segmov	ds, es, ax			; ds:di <- TransMapHeader
+	; Remember whether the document already selected DISTAPPL.
+
+		mov	bx, ds:[LMBH_handle]
+		movdw	ss:[docObj], bxsi
+		clr	ss:[sourceFromDistappl]
+		push	di
+		DerefDoc
+		test	ds:[di].REDI_state, mask DS_SOURCE_FROM_DISTAPPL
+		jz	haveSourceState
+		mov	ss:[sourceFromDistappl], TRUE
+
+haveSourceState:
+		pop	di
+		segmov	ds, es, ax			; ds:di <- TransMapHeader
 
 	call	FilePushDir			; save current directory
+
+	; If the current operation selected DISTAPPL, keep using it.
+
+	tst	ss:[sourceFromDistappl]
+	jnz	useFallbackPath
 
 	; go to the top-level source dir
 	;
 	mov	dx, offset sourceKey
 	call	SetDirectoryFromInitFile
-	jc	done
+	jc	openError
 
 	; change to the file's directory
 	;	
 	clr	bx
 	lea	dx, ds:[di].TMH_relativePath	; ds:dx <- pathname buffer
 	call	FileSetCurrentPath	
+	jc	openError
+	jmp	openCurrentPath
+
+useFallbackPath:
+	call	ChangeToDistapplSourcePathFromMap
 	jc	error
 
+openCurrentPath:
 	; get the file type of the file that was selected
 	;
 	push	di
 	lea	dx, ds:[di].TMH_sourceName	;ds:dx <- file name
+	push	es
 	segmov	es, ss, ax
 	lea	di, ss:[fileType]
 	mov	ax, FEA_FILE_TYPE
 	mov	cx, size fileType
 	call	FileGetPathExtAttributes
+	pop	es
 	pop	di
-	jc	error
+	jc	openError
 
 	; try to open the file
 	;
@@ -3031,7 +3233,7 @@ EC <	ERROR_NE	RESEDIT_EXPECT_EXECUTABLE_FILE			>
 	mov	al, FILE_DENY_W or FILE_ACCESS_R
 	call	FileOpen			; ^hax <- executable geode
 	mov	bx, ax
-	jc	error
+	jc	openError
 	jmp	saveHandle
 
 vmFile:	
@@ -3039,7 +3241,7 @@ vmFile:
 	mov	al, mask VMAF_FORCE_READ_ONLY or mask VMAF_FORCE_DENY_WRITE
 	clr	cx
 	call	VMOpen				; ^hbx <- localization file
-	jc	error
+	jc	openError
 
 saveHandle:
 	mov	cx, ss:[fileType]
@@ -3049,11 +3251,20 @@ done:
 	.leave
 	ret
 
+openError:
+	tst	ss:[sourceFromDistappl]
+	jnz	error
+	call	ReadDistapplFallbackFromInitFile
+	jc	error
+	mov	ss:[sourceFromDistappl], TRUE
+	call	ChangeToDistapplSourcePathFromMap
+	jc	error
+	jmp	openCurrentPath
+
 error:
 	mov	ax, EV_FILE_OPEN
-	mov	si, di				;ds:si <- transMapHeader
-
-
+	movdw	bxsi, ss:[docObj]
+	call	MemDerefDS
 	call	SourceGeodeFileError
 	mov	cx, -1				;null file type
 	jmp	done
