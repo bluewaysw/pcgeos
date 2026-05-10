@@ -15,6 +15,7 @@
 #include <geode.h>
 #include <geoMisc.h>
 #include <initfile.h>
+#include <lmem.h>
 #include <Ansi/string.h>
 
 #define FIRST_RUN_INI_CATEGORY "firstRun"
@@ -50,6 +51,13 @@ typedef enum {
 }
 
 @visMoniker FirstRunTextMoniker = "FirstRun";
+
+@chunk char FirstRunDeskAccessoriesFolderName[] = "Desk Accessories";
+@localize {"WORLD folder name for desk accessory application links" 0-32};
+@chunk char FirstRunGamesFolderName[] = "Games";
+@localize {"WORLD folder name for game application links" 0-32};
+@chunk char FirstRunExtrasFolderName[] = "Extras";
+@localize {"WORLD folder name for extra application links" 0-32};
 
 @end AppResource;
 
@@ -377,6 +385,8 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
     word index;
     word count;
     AppSeedRecord *record;
+    const char *folderNameP;
+    MemHandle folderNameBlockH;
     PathName currentFolderPath;
     StandardPath currentStandardPath;
 
@@ -431,8 +441,19 @@ FirstRunSeedPendingAppLinks(word lastReleaseLevel)
                 break;
             }
 
-            FirstRunNormalizeFolderPath(record->ASR_folder,
-                                        normalizedFolderPath);
+            folderNameP = "";
+            folderNameBlockH = NullHandle;
+            if (record->ASR_folderName != NullOptr) {
+                folderNameBlockH = OptrToHandle(record->ASR_folderName);
+                MemLock(folderNameBlockH);
+                folderNameP = LMemDeref(record->ASR_folderName);
+            }
+
+            FirstRunNormalizeFolderPath(folderNameP, normalizedFolderPath);
+            if (folderNameBlockH != NullHandle) {
+                MemUnlock(folderNameBlockH);
+            }
+
             if (!haveCurrentFolder ||
                 (currentStandardPath != record->ASR_standardPath) ||
                 (strcmp(currentFolderPath, normalizedFolderPath) != 0)) {
