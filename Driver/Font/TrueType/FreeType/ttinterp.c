@@ -1539,61 +1539,48 @@
  *
  *****************************************************************/
 
-  static void Normalize(TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R)
-  {
+static void Normalize( TT_F26Dot6 Vx, TT_F26Dot6 Vy, TT_UnitVector* R )
+{
     TT_F26Dot6  W;
     Bool        s1 = FALSE, s2 = FALSE;
 
+    if ( Vx < 0 ) { Vx = -Vx; s1 = TRUE; }
+    if ( Vy < 0 ) { Vy = -Vy; s2 = TRUE; }
 
-    /* Extract signs to work with absolute values and simplify logic */
-    if (Vx < 0) { Vx = -Vx; s1 = TRUE; }
-    if (Vy < 0) { Vy = -Vy; s2 = TRUE; }
+    /* Opt 2: Nullvektor-Check vorgezogen, verhindert Division durch 0 */
+    if ( (Vx | Vy) == 0 ) return;
 
-    /* Handle small vectors by scaling up to maintain precision */
-    if (Vx < 0x10000L && Vy < 0x10000L)
+    /* Opt 2: Beide Zweige vereint */
+    if ( Vx < 0x10000L && Vy < 0x10000L )
     {
-        if ((Vx | Vy) == 0) return;
+        Vx <<= 8;
+        Vy <<= 8;
+    }
 
-        W = Norm(Vx << 8, Vy << 8);
-        Vx = (TT_F26Dot6)TT_MulDiv(Vx << 8, 0x4000L, W);
-        Vy = (TT_F26Dot6)TT_MulDiv(Vy << 8, 0x4000L, W);
-    }
-    else
-    {
-        W = Norm(Vx, Vy);
-        Vx = (TT_F26Dot6)TT_MulDiv(Vx, 0x4000L, W);
-        Vy = (TT_F26Dot6)TT_MulDiv(Vy, 0x4000L, W);
-    }
+    /* Opt 1: Kein Doppel-Shift mehr */
+    W  = Norm( Vx, Vy );
+    Vx = (TT_F26Dot6)TT_MulDiv( Vx, 0x4000L, W );
+    Vy = (TT_F26Dot6)TT_MulDiv( Vy, 0x4000L, W );
 
     W = Vx * Vx + Vy * Vy;
 
-    /* Incrementally adjust W to reach 0x1000000 <= W < 0x1004000     */
-    /* Uses (n+1)^2 = n^2 + 2n + 1 to avoid expensive multiplications */
-    while (W < 0x1000000L)
+    while ( W < 0x1000000L )
     {
-        if (Vx < Vy) {
-            W += (Vx << 1) + 1;
-            ++Vx;
-        } else {
-            W += (Vy << 1) + 1;
-            ++Vy;
-        }
+        if ( Vx < Vy ) { W += (Vx << 1) + 1; ++Vx; }
+        else           { W += (Vy << 1) + 1; ++Vy; }
+    }
+    while ( W >= 0x1004000L )
+    {
+        if ( Vx < Vy ) { W -= (Vx << 1) - 1; --Vx; }
+        else           { W -= (Vy << 1) - 1; --Vy; }
     }
 
-    while (W >= 0x1004000L)
-    {
-        if (Vx < Vy) {
-            W -= (Vx << 1) - 1;
-            --Vx;
-        } else {
-            W -= (Vy << 1) - 1;
-            --Vy;
-        }
-    }
-
-    R->x = (TT_F2Dot14)(s1 ? -Vx : Vx);
-    R->y = (TT_F2Dot14)(s2 ? -Vy : Vy);
-  }
+    /* Opt 4: Vorzeichen ohne verschachtelte ternäre Ausdrücke */
+    if ( s1 ) Vx = -Vx;
+    if ( s2 ) Vy = -Vy;
+    R->x = (TT_F2Dot14)Vx;
+    R->y = (TT_F2Dot14)Vy;
+}
 
 
 /****************************************************************
@@ -5184,83 +5171,64 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
       LINK->curs[i].x += x;
   }
 
-  static void  Interp( UShort               p1,
-                       UShort               p2,
-                       UShort               ref1,
-                       UShort               ref2,
-                       struct LOC_Ins_IUP*  LINK )
-  {
+
+static void Interp( UShort               p1,
+                    UShort               p2,
+                    UShort               ref1,
+                    UShort               ref2,
+                    struct LOC_Ins_IUP*  LINK )
+{
     UShort      i;
     TT_F26Dot6  x, x1, x2, d1, d2;
-
+    TT_F26Dot6  cur1, cur2, cur_delta, x_delta;
+    TT_F26Dot6  lo, hi, d_lo, d_hi;
 
     if ( p1 > p2 )
-      return;
+        return;
 
-    x1 = LINK->orgs[ref1].x;
-    d1 = LINK->curs[ref1].x - LINK->orgs[ref1].x;
-    x2 = LINK->orgs[ref2].x;
-    d2 = LINK->curs[ref2].x - LINK->orgs[ref2].x;
+    x1   = LINK->orgs[ref1].x;
+    x2   = LINK->orgs[ref2].x;
+    d1   = LINK->curs[ref1].x - x1;
+    d2   = LINK->curs[ref2].x - x2;
+    cur1 = LINK->curs[ref1].x;
+    cur2 = LINK->curs[ref2].x;
 
     if ( x1 == x2 )
     {
-      for ( i = p1; i <= p2; ++i )
-      {
-        x = LINK->orgs[i].x;
-
-        if ( x <= x1 )
-          x += d1;
-        else
-          x += d2;
-
-        LINK->curs[i].x = x;
-      }
-      return;
+        for ( i = p1; i <= p2; ++i )
+        {
+            x = LINK->orgs[i].x;
+            LINK->curs[i].x = x + ( x <= x1 ? d1 : d2 );
+        }
+        return;
     }
 
     if ( x1 < x2 )
     {
-      for ( i = p1; i <= p2; ++i )
-      {
-        x = LINK->orgs[i].x;
-
-        if ( x <= x1 )
-          x += d1;
-        else
-        {
-          if ( x >= x2 )
-            x += d2;
-          else
-            x = LINK->curs[ref1].x +
-                  TT_MulDiv( x - x1,
-                             LINK->curs[ref2].x - LINK->curs[ref1].x,
-                             x2 - x1 );
-        }
-        LINK->curs[i].x = x;
-      }
-      return;
+        lo = x1;  hi = x2;  d_lo = d1;  d_hi = d2;
+    }
+    else
+    {
+        lo = x2;  hi = x1;  d_lo = d2;  d_hi = d1;
     }
 
-    /* x2 < x1 */
+    cur_delta = cur2 - cur1;
+    x_delta   = x2 - x1;
 
     for ( i = p1; i <= p2; ++i )
     {
-      x = LINK->orgs[i].x;
-      if ( x <= x2 )
-        x += d2;
-      else
-      {
-        if ( x >= x1 )
-          x += d1;
+        x = LINK->orgs[i].x;
+
+        if ( x <= lo )
+            x += d_lo;
+        else if ( x >= hi )
+            x += d_hi;
         else
-          x = LINK->curs[ref1].x +
-              TT_MulDiv( x - x1,
-                         LINK->curs[ref2].x - LINK->curs[ref1].x,
-                         x2 - x1 );
-      }
-      LINK->curs[i].x = x;
+            x = cur1 + TT_MulDiv( x - x1, cur_delta, x_delta );
+
+        LINK->curs[i].x = x;
     }
-  }
+}
 
 
 /**********************************************/

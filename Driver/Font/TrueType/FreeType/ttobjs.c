@@ -21,6 +21,8 @@
 #include "ttmemory.h"
 #include "ttload.h"
 #include "ttinterp.h"
+#include <string.h>
+#include <ec.h>
 
 
 #ifdef __GEOS__
@@ -36,7 +38,7 @@ extern TEngine_Instance engineInstance;
  *                 face object.
  *
  ******************************************************************/
-
+#if 0
   LOCAL_FUNC
   PExecution_Context  New_Context( PFace  face )
   {
@@ -57,7 +59,21 @@ extern TEngine_Instance engineInstance;
     exec->face = face;
 
     return exec;
-  }
+  } 
+    #endif
+
+ LOCAL_FUNC
+PExecution_Context New_Context(PFace face)
+{
+    PExecution_Context exec;
+
+    if ( !face || !(exec = engineInstance.exec) || engineInstance.exec_in_use) 
+        return NULL;
+
+    engineInstance.exec_in_use = TRUE;
+    exec->face = face;
+    return exec;
+}
 
 
 /*******************************************************************
@@ -71,9 +87,6 @@ extern TEngine_Instance engineInstance;
   LOCAL_FUNC
   TT_Error  Done_Context( PExecution_Context  exec )
   {
-    if ( !exec )
-      return TT_Err_Ok;
-
     if ( exec != engineInstance.exec )
         return TT_Err_Invalid_Argument;
 
@@ -747,7 +760,6 @@ extern TEngine_Instance engineInstance;
 
 
     exec = New_Context( face );
-    /* debugging instances have their own context */
 
     if ( !exec )
       return TT_Err_Could_Not_Find_Context;
@@ -838,12 +850,10 @@ extern TEngine_Instance engineInstance;
   {
     PExecution_Context  exec;
     TT_Error            error;
-    UShort              i;
     PFace               face;
 
 
-    if ( !ins )
-      return TT_Err_Invalid_Instance_Handle;
+EC( ECCheckBounds( ins ) );
 
     if ( ins->valid )
       return TT_Err_Ok;
@@ -862,17 +872,11 @@ extern TEngine_Instance engineInstance;
     MulDivList( ins->cvt, ins->cvtSize, face->cvt, ins->metrics.scale1, ins->metrics.scale2 );
 
     /* All twilight points are originally zero */
-    for ( i = 0; i < ins->twilight.n_points; ++i )
-    {
-      ins->twilight.org[i].x = 0;
-      ins->twilight.org[i].y = 0;
-      ins->twilight.cur[i].x = 0;
-      ins->twilight.cur[i].y = 0;
-    }
+    memset( ins->twilight.org, 0, ins->twilight.n_points * sizeof(TT_Vector) );
+    memset( ins->twilight.cur, 0, ins->twilight.n_points * sizeof(TT_Vector) );
 
     /* clear storage area */
-    for ( i = 0; i < ins->storeSize; ++i )
-      ins->storage[i] = 0;
+    memset( ins->storage, 0, ins->storeSize * sizeof(ins->storage[0]) );
 
     ins->GS = Default_GraphicsState;
 
@@ -921,7 +925,6 @@ extern TEngine_Instance engineInstance;
 
     return error;
   }
-
 
 
 /*******************************************************************

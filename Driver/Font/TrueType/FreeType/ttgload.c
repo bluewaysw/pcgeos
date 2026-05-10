@@ -60,10 +60,9 @@
                         UShort*                advance )
   {
     PLongMetrics  longs_m  = (PLongMetrics)GEO_LOCK( header->long_metrics_block );
-    PShortMetrics shorts_m = (PShortMetrics)GEO_LOCK( header->short_metrics_block );
     UShort        k        = header->number_Of_HMetrics;
-
-
+    
+    
     if ( index < k )
     {
       *bearing = longs_m[index].bearing;
@@ -71,12 +70,13 @@
     }
     else
     {
+      PShortMetrics shorts_m = (PShortMetrics)GEO_LOCK( header->short_metrics_block );
       *bearing = shorts_m[index - k];
       *advance = longs_m[k - 1].advance;
+      GEO_UNLOCK( header->short_metrics_block );
     }
 
     GEO_UNLOCK( header->long_metrics_block );
-    GEO_UNLOCK( header->short_metrics_block );
   }
 
   
@@ -123,13 +123,13 @@
     UShort  k;
 
 
-    if ( delta_x )
-      for ( k = 0; k < n; ++k )
-        coords[k].x += delta_x;
+    if ( !delta_x && !delta_y ) return;
 
-    if ( delta_y )
-      for ( k = 0; k < n; ++k )
+    for ( k = 0; k < n; ++k )
+    {
+        coords[k].x += delta_x;
         coords[k].y += delta_y;
+    }
   }
 
 
@@ -451,8 +451,8 @@
     pts->cur[n_points - 2] = subg->pp1;
     pts->cur[n_points - 1] = subg->pp2;
 
-    pts->touch[n_points - 1] = 0;
-    pts->touch[n_points - 2] = 0;
+    //pts->touch[n_points - 1] = 0;  REDUNDANT!
+    //ts->touch[n_points - 2] = 0;
 
     /* if hinting, round the phantom points */
     if ( subg->is_hinted )
@@ -1117,7 +1117,7 @@ EC( ECCheckBounds( exec ) );
     }
 
     glyph->metrics.bearingX = glyph->metrics.bbox.xMin;
-    glyph->metrics.bearingY = glyph->metrics.bbox.yMax;
+    //TEST glyph->metrics.bearingY = glyph->metrics.bbox.yMax;
     glyph->metrics.advance  = subglyph->pp2.x - subglyph->pp1.x;
 
     /* Now take care of vertical metrics.  In the case where there is    */

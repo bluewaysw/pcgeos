@@ -782,7 +782,10 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
 
     /* read first glyph header */
     if ( FILE_Seek( faze->dirTables[table].Offset + glyphLocations[index] ) || ACCESS_Frame( 10 ) )
+    {
+      GEO_UNLOCK( faze->glyphLocationBlock );
       goto Fail;
+    }
 
     SKIP( 2 );
 
@@ -804,7 +807,7 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
 
     metrics->advance  = advance;
     metrics->bearingX = bearing;
-    metrics->bearingY = 0;
+    //TEST metrics->bearingY = 0;
 
   Fail:
     DONE_Stream( stream );
@@ -812,8 +815,8 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
   }
 
 
-  static const TT_Outline  null_outline
-      = { 0, 0, NULL, NULL, NULL, 0, 0, 0, 0 };
+  /*TEST static const TT_Outline  null_outline
+      = { 0, 0, NULL, NULL, NULL, 0, 0, 0, 0 };*/
 
 
 /*******************************************************************
@@ -844,7 +847,8 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
 
 EC( ECCheckBounds( outline ) );
 
-    *outline = null_outline;
+    //TEST *outline = null_outline;
+    MEM_Set( outline, 0, sizeof(TT_Outline) );
     outline->owner = TRUE;
 
     if ( ALLOC( outline->points,   numPoints*2*sizeof ( TT_F26Dot6 ) ) ||
@@ -889,7 +893,8 @@ EC( ECCheckBounds( outline ) );
         FREE( outline->flags    );
         FREE( outline->contours );
       }
-      *outline = null_outline;
+      //TEST*outline = null_outline;
+      MEM_Set( outline, 0, sizeof(TT_Outline) );
     }
   }
 
@@ -1132,9 +1137,9 @@ EC_ERROR_IF( charmapIndex >= faze->numCMaps, TT_Err_Invalid_Argument );
                             TT_UShort    charmapIndex,
                             TT_CharMap*  charMap )
   {
-    TT_Error    error;
     TT_Stream   stream;
     PCMapTable  cmap;
+    TT_Error    error = TT_Err_Ok;
     PFace       faze = HANDLE_Face( face );
 
 
@@ -1144,8 +1149,6 @@ EC_ERROR_IF( charmapIndex >= faze->numCMaps, TT_Err_Invalid_Argument );
     cmap = faze->cMaps + charmapIndex;
 
     /* Load table if needed */
-    error = TT_Err_Ok;
-
     if ( !cmap->loaded )
     {
       (void)USE_Stream( faze->stream, stream );
