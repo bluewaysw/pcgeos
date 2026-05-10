@@ -403,6 +403,8 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 		mov	ss:[bp].TFF_destGroup, ax
 		mov	ss:[bp].TFF_destItem, di
 		clr	ss:[bp].TFF_locFile
+		clr	ss:[bp].TFF_geodeFile
+		clr	ss:[bp].TFF_sourceFromDistappl
 		push	ax, di			; save for call to FinishUpdate
 
 	; Open localization file.
@@ -417,17 +419,10 @@ EC<		mov	ss:[bp].TFF_signature, TRANSLATION_FILE_FRAME_SIG >
 
 		call	DocumentCommitUpdate
 
-	; Change to source geode directory.
-
-		call	FilePushDir
-		mov	ax, MSG_RESEDIT_DOCUMENT_CHANGE_TO_FULL_SOURCE_PATH
-		call	ObjCallInstanceNoLock
-
 	; Read the chunk data into the ResourceArrays.
 
 		mov	ax, MSG_RESEDIT_DOCUMENT_READ_SOURCE_GEODE
 		call	ObjCallInstanceNoLock	; cx <- # editable resources
-		call	FilePopDir
 		jc	error
 
 	; Error if geode has no resources.
