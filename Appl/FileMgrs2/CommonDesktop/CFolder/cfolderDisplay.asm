@@ -995,6 +995,13 @@ FolderGetDefaultIcon	proc	near
 	;
 	mov	si, MANUFACTURER_ID_GEOWORKS
 
+    ;
+	; assume a directory
+    ;
+	movdw	bxax, cs:[defaultGEOSFolderIconChars]
+	cmp	es:[di].FR_fileType, GFT_DIRECTORY
+	je gotChars
+
 	;
 	; assume a default DOS document
 	;
@@ -1053,6 +1060,7 @@ if 1 ;_NEWDESK
 defaultDOSDataIconChars		dword	"nDOS"
 defaultGEOSDataIconChars	dword	"nDAT"
 defaultGEOSApplIconChars	dword	"nAPP"
+defaultGEOSFolderIconChars  dword   "nFDR"
 else
 defaultDOSDataIconChars		dword	"gDOS"
 defaultGEOSDataIconChars	dword	"gDAT"
