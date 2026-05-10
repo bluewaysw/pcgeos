@@ -76,7 +76,6 @@ $TARGET_DEMO = "demo";        # Prototype hardware platform for demo
 $TARGET_WIN = "win";		  # Windows build
 $TARGET_PROTO_TOOLS = "hwtools"; # Prototype hardware platform for tools
 $TARGET_NT_TOOLS = "nttools";	# Windows NT platform for tools
-$TARGET_FG_TOOLS = "fgtools";	# FreeGEOS GFS layout with tools
 $DEST_SUB_DIRECTORY = "gbuild"; # sub-directory to download files to in
                                 # defining destination directory
 $CONFIG_FILE_ROOT = ".bbxxip";	# Config file root
@@ -286,11 +285,6 @@ BUILDFILE: {
 
     if ( $RealInfo{target} eq $TARGET_NT_TOOLS ) {
 	 $RealInfo{targetfile} = "ntbbxtools.build";
-	 last BUILDFILE;
-    }
-
-    if ( $RealInfo{target} eq $TARGET_FG_TOOLS ) {
-	 $RealInfo{targetfile} = "fgtools.build";
 	 last BUILDFILE;
     }
 
@@ -1754,10 +1748,6 @@ sub FindDemoDir {
 
       if ($RealInfo{target} eq $TARGET_NT_TOOLS) {
 	  $dirname = "nttools";
-	  last MAPDIR;
-      }
-      if ($RealInfo{target} eq $TARGET_FG_TOOLS) {
-	  $dirname = "fgtools";
 	  last MAPDIR;
       }
 
