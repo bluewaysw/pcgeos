@@ -230,7 +230,7 @@ print "\n*** Welcome to buildbbxensem! ***\n\n";
 ReadCommonInputFromCache();
 
 print "Which platform? ";
-print "($TARGET_PC/$TARGET_PC_XIP/$TARGET_PROTO/$TARGET_PROTO_XIP/$TARGET_DEMO/$TARGET_NT/$TARGET_FG/$TARGET_WIN/$TARGET_PROTO_TOOLS/$TARGET_NT_TOOLS/$TARGET_FG_TOOLS), \n";
+print "($TARGET_PC/$TARGET_PC_XIP/$TARGET_PROTO/$TARGET_PROTO_XIP/$TARGET_DEMO/$TARGET_NT/$TARGET_FG/$TARGET_WIN/$TARGET_PROTO_TOOLS/$TARGET_NT_TOOLS), \n";
 print "   default = $DefaultInfo{target}: ";
 $RealInfo{target} = ReadUserInput( $DefaultInfo{target} );
 
