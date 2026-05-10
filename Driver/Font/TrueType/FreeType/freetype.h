@@ -221,7 +221,7 @@
     TT_BBox  bbox;      /* glyph bounding box */
 
     TT_Pos   bearingX;  /* left-side bearing                    */
-    TT_Pos   bearingY;  /* top-side bearing, per se the TT spec */
+    //TEST TT_Pos   bearingY;  /* top-side bearing, per se the TT spec */
 
     TT_Pos   advance;   /* advance width (or height) */
   };

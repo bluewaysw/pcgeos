@@ -116,9 +116,13 @@ extern TEngine_Instance engineInstance;
 #define NULL  (void*)0
 #endif
 
-#define MaxBezier  32   /* The maximum number of stacked Bezier curves. */
+#define MaxBezier  16   /* The maximum number of stacked Bezier curves. */
                         /* Setting this constant to more than 32 is a   */
                         /* pure waste of space.                         */
+
+#define MaxBands   12   /* The maximum number of bands used for sub-banding. */
+                        /* Setting this constant to more than 16 is a       */
+                        /* pure waste of space.                             */
 
 #define Pixel_Bits  6   /* fractional bits of *input* coordinates */
 
@@ -293,9 +297,9 @@ extern TEngine_Instance engineInstance;
 
     Byte      dropOutControl;       /* current drop_out control method */
 
-    TPoint    arcs[2 * MaxBezier + 1];      /* The Bezier stack */
+    TPoint    arcs[2 * MaxBezier + 1];  /* The Bezier stack */
 
-    TBand     band_stack[16];       /* band stack used for sub-banding */
+    TBand     band_stack[MaxBands];     /* band stack used for sub-banding */
   };
 
 
@@ -2215,7 +2219,7 @@ Scan_DropOuts :
 
         k = ( i + j ) >> 1;
 
-        if ( band_top >= 7 || k < i )
+        if ( band_top > MaxBands || k < i )
           return Raster_Err_Invalid;
 
         ras.band_stack[band_top+1].y_min = k;
