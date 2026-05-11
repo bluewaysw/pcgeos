@@ -1153,30 +1153,6 @@ SetUIOptions	proc	near
 	;
 		pop	ds
 
-	;
-	; check if taskbar enabled / disabled
-	;
-		cmp	cs:uicombos[di].UIC_hasTaskbar, TRUE
-		je	taskBarEnabled
-
-taskBarDisabled::
-	;
-	; remove TrayApps und SysTray Clock when Taskbar is off
-	;
-		mov	si, offset ProgStartupList
-		mov	ax, MSG_SL_DELETE_TASKBAR_APPS
-		call	ObjCallInstanceNoLock
-		jmp	done
-
-taskBarEnabled:
-	;
-	; add TrayApps und SClock when Taskbar is on
-	;
-		mov	si, offset ProgStartupList
-		mov	ax, MSG_SL_ADD_TASKBAR_APPS
-		call	ObjCallInstanceNoLock
-
-done:
 		.leave
 		ret
 SetUIOptions	endp
