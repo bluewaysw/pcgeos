@@ -807,16 +807,11 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
 
     metrics->advance  = advance;
     metrics->bearingX = bearing;
-    //TEST metrics->bearingY = 0;
 
   Fail:
     DONE_Stream( stream );
     return error;
   }
-
-
-  /*TEST static const TT_Outline  null_outline
-      = { 0, 0, NULL, NULL, NULL, 0, 0, 0, 0 };*/
 
 
 /*******************************************************************
@@ -847,7 +842,6 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
 
 EC( ECCheckBounds( outline ) );
 
-    //TEST *outline = null_outline;
     MEM_Set( outline, 0, sizeof(TT_Outline) );
     outline->owner = TRUE;
 
@@ -893,7 +887,7 @@ EC( ECCheckBounds( outline ) );
         FREE( outline->flags    );
         FREE( outline->contours );
       }
-      //TEST*outline = null_outline;
+
       MEM_Set( outline, 0, sizeof(TT_Outline) );
     }
   }

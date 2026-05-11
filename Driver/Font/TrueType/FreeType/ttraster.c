@@ -143,18 +143,14 @@ extern TEngine_Instance engineInstance;
 
   struct  TProfile_
   {
-    TT_F26Dot6  X;           /* current coordinate during sweep          */
-    PProfile    link;        /* link to next profile - various purpose   */
-    PStorage    offset;      /* start of profile's data in render pool   */
-    Int         flow;        /* Profile orientation: Asc/Descending      */
-    Short       height;      /* profile's height in scanlines            */
-    Short       start;       /* profile's starting scanline              */
-
-    //TEST UShort      countL;      /* number of lines to step before this      */
-                             /* profile becomes drawable                 */
-
-    PProfile    next;        /* next profile in same contour, used       */
-                             /* during drop-out control                  */
+    TT_F26Dot6  X;           /* current coordinate during sweep        */
+    PProfile    link;        /* link to next profile - various purpose */
+    PStorage    offset;      /* start of profile's data in render pool */
+    Int         flow;        /* Profile orientation: Asc/Descending    */
+    Short       height;      /* profile's height in scanlines          */
+    Short       start;       /* profile's starting scanline            */
+    PProfile    next;        /* next profile in same contour, used     */
+                             /* during drop-out control                */
   };
 
   typedef PProfile   TProfileList;
@@ -1930,7 +1926,7 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  Draw_Sweep( RAS_ARG )
   {
-    Short  y, y_change/* TEST, y_height*/;
+    Short  y, y_change;
 
     PProfile  P, Q, P_Left, P_Right;
 
@@ -1996,15 +1992,11 @@ extern TEngine_Instance engineInstance;
     P = wait;
 
     while ( P )
-    {
-      //TEST P->countL = P->start - min_Y;
       P = P->link;
-    }
 
     /* Let's go */
 
-    y        = min_Y;
-    //TEST y_height = 0;
+    y = min_Y;
 
     if ( ras.numTurns > 0 &&
          ras.sizeBuff[-ras.numTurns] == min_Y )
@@ -2020,8 +2012,8 @@ extern TEngine_Instance engineInstance;
         aP = &wait;
         while ( (P = *aP) != NULL )
         {
-          //TESTP->countL -= y_height;
-          if ( /*TEST P->countL P->start == 0*/ P->start <= y )
+
+          if ( P->start <= y )
           {
             *aP = P->link;    /* unlink directly, don't advance aP */
 
@@ -2042,7 +2034,6 @@ extern TEngine_Instance engineInstance;
       Sort( &draw_right );
 
       y_change = (Short)ras.sizeBuff[-ras.numTurns--];
-      //TESTy_height = y_change - y;
 
       while ( y < y_change )
       {
@@ -2076,12 +2067,6 @@ extern TEngine_Instance engineInstance;
             {
               /* a drop out was detected */
 
-              /* TEST P_Left ->X = x1;
-              P_Right->X = x2;*/
-
-              /* mark profile for drop-out processing */
-              // TEST P_Left->countL = 1;
-              //TEST ++dropouts;
               dropouts = 1;
 
               goto Skip_To_Next;
@@ -2155,25 +2140,6 @@ extern TEngine_Instance engineInstance;
     return SUCCESS;
 
 Scan_DropOuts :
-
-    /*TEST P_Left  = draw_left;
-    P_Right = draw_right;
-
-    while ( P_Left )
-    {
-      if ( P_Left->countL )
-      {
-        P_Left->countL = 0;
-        ras.Proc_Sweep_Drop( RAS_VARS  y,
-                                       P_Left->X,
-                                       P_Right->X,
-                                       P_Left,
-                                       P_Right );
-      }
-
-      P_Left  = P_Left->link;
-      P_Right = P_Right->link;
-    } */
 
     P_Left  = draw_left;
     P_Right = draw_right;
@@ -2427,7 +2393,7 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
   TT_UShort   renderpoolSize = ( ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
                                                         + RASTER_RENDER_POOL_MIN_SIZE ) & ~255;
 
-                                                        TT_UShort currentSize = (TT_UShort)MemGetInfo( ras.buffer, MGIT_SIZE );
+  TT_UShort currentSize = (TT_UShort)MemGetInfo( ras.buffer, MGIT_SIZE );
 
   if ( currentSize != renderpoolSize )
     MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK );

@@ -1117,7 +1117,6 @@ EC( ECCheckBounds( exec ) );
     }
 
     glyph->metrics.bearingX = glyph->metrics.bbox.xMin;
-    //TEST glyph->metrics.bearingY = glyph->metrics.bbox.yMax;
     glyph->metrics.advance  = subglyph->pp2.x - subglyph->pp1.x;
 
     /* Now take care of vertical metrics.  In the case where there is    */
