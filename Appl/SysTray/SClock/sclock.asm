@@ -19,6 +19,10 @@ include	sclockConstant.def
 
 include sclock.rdef
 
+; TimerStart uses GEOS timer ticks, 60 ticks per second. Give the
+; express menu three seconds to create the tray clock before exiting.
+CLOCK_ATTACH_TIMEOUT	equ	3*60
+
 
 idata	segment
 
@@ -135,6 +139,11 @@ ClockOpenApplication method dynamic ClockProcessClass,
 
 		call	RecordCreateMessage
 		call	SendToExpressMenu
+		clr	bx
+		call	GeodeGetAppObject
+		mov	ax, MSG_CLOCK_APP_START_ATTACH_TIMER
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
 
 		.leave
 		mov	di, offset ClockProcessClass
@@ -250,6 +259,34 @@ ClockProcessBringDownMenu	endm
 ;------------------------------------------------------------------------------
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClockAppStartAttachTimer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Start a timer to quit if no systray clock is created
+
+CALLED BY:	MSG_CLOCK_APP_START_ATTACH_TIMER
+PASS:		*ds:si - ClockApplication object
+		ds:di - ClockApplicationInstance
+RETURN:		none
+DESTROYED:	ax, cx, dx, bp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ClockAppStartAttachTimer	method dynamic ClockApplicationClass,
+					MSG_CLOCK_APP_START_ATTACH_TIMER
+
+		mov	al, TIMER_EVENT_ONE_SHOT
+		mov	bx, ds:[LMBH_handle]
+		mov	cx, CLOCK_ATTACH_TIMEOUT
+		mov	dx, MSG_CLOCK_APP_ATTACH_TIMEOUT
+		call	TimerStart
+		mov	ds:[di].CAI_attachTimerHan, bx
+		mov	ds:[di].CAI_attachTimerID, ax
+
+		ret
+ClockAppStartAttachTimer	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ClockAppClockCreated
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -266,6 +303,16 @@ DESTROYED:	ax, cx, dx, bp
 ClockAppClockCreated	method dynamic ClockApplicationClass,
 						MSG_CLOCK_APP_CLOCK_CREATED
 
+		clr	bx
+		xchg	bx, ds:[di].CAI_attachTimerHan
+		clr	ax
+		xchg	ax, ds:[di].CAI_attachTimerID
+		tst	bx
+		jz	noAttachTimer
+		push	bp
+		call	TimerStop
+		pop	bp
+noAttachTimer:
 		movdw	ds:[di].CAI_clock, ss:[bp].CEMCIRP_newItem, ax
 		movdw	ds:[di].CAI_emc, ss:[bp].CEMCIRP_expressMenuControl, ax
 	;
@@ -279,6 +326,37 @@ ClockAppClockCreated	method dynamic ClockApplicationClass,
 		GOTO	ObjMessage
 
 ClockAppClockCreated	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ClockAppAttachTimeout
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Quit if the systray clock was never created
+
+CALLED BY:	MSG_CLOCK_APP_ATTACH_TIMEOUT
+PASS:		*ds:si - ClockApplication object
+		ds:di - ClockApplicationInstance
+		bp - timer ID
+RETURN:		none
+DESTROYED:	ax, cx, dx, bp
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ClockAppAttachTimeout	method dynamic ClockApplicationClass,
+						MSG_CLOCK_APP_ATTACH_TIMEOUT
+
+		cmp	bp, ds:[di].CAI_attachTimerID
+		jne	done
+		clr	ds:[di].CAI_attachTimerHan
+		clr	ds:[di].CAI_attachTimerID
+		tst	ds:[di].CAI_clock.handle
+		jnz	done
+
+		mov	ax, MSG_META_QUIT
+		call	ObjCallInstanceNoLock
+done:
+		ret
+ClockAppAttachTimeout	endm
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -299,8 +377,18 @@ ClockAppDetach	method dynamic ClockApplicationClass, MSG_META_DETACH
 		uses	si, ax, cx, dx, bp
 		.enter
 
+		clr	bx
+		xchg	bx, ds:[di].CAI_attachTimerHan
+		clr	ax
+		xchg	ax, ds:[di].CAI_attachTimerID
+		tst	bx
+		jz	noAttachTimer
+		call	TimerStop
+noAttachTimer:
 		movdw	bxsi, ds:[di].CAI_emc
 		movdw	cxdx, ds:[di].CAI_clock
+		tst	bx
+		jz	done
 		clr	ax
 		clrdw	ds:[di].CAI_emc, ax
 		clrdw	ds:[di].CAI_clock, ax
@@ -309,6 +397,7 @@ ClockAppDetach	method dynamic ClockApplicationClass, MSG_META_DETACH
 		mov	di, mask MF_FIXUP_DS
 		call	ObjMessage
 
+done:
 		.leave
 		mov	di, offset ClockApplicationClass
 		GOTO	ObjCallSuperNoLock
