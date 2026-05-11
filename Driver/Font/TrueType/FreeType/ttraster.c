@@ -120,7 +120,7 @@ extern TEngine_Instance engineInstance;
                         /* Setting this constant to more than 32 is a   */
                         /* pure waste of space.                         */
 
-#define MaxBands   12   /* The maximum number of bands used for sub-banding. */
+#define MaxBand    12   /* The maximum number of bands used for sub-banding. */
                         /* Setting this constant to more than 16 is a       */
                         /* pure waste of space.                             */
 
@@ -150,7 +150,7 @@ extern TEngine_Instance engineInstance;
     Short       height;      /* profile's height in scanlines            */
     Short       start;       /* profile's starting scanline              */
 
-    UShort      countL;      /* number of lines to step before this      */
+    //TEST UShort      countL;      /* number of lines to step before this      */
                              /* profile becomes drawable                 */
 
     PProfile    next;        /* next profile in same contour, used       */
@@ -299,7 +299,7 @@ extern TEngine_Instance engineInstance;
 
     TPoint    arcs[2 * MaxBezier + 1];  /* The Bezier stack */
 
-    TBand     band_stack[MaxBands];     /* band stack used for sub-banding */
+    TBand     band_stack[MaxBand];     /* band stack used for sub-banding */
   };
 
 
@@ -1930,7 +1930,7 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  Draw_Sweep( RAS_ARG )
   {
-    Short  y, y_change, y_height;
+    Short  y, y_change/* TEST, y_height*/;
 
     PProfile  P, Q, P_Left, P_Right;
 
@@ -1997,14 +1997,14 @@ extern TEngine_Instance engineInstance;
 
     while ( P )
     {
-      P->countL = P->start - min_Y;
+      //TEST P->countL = P->start - min_Y;
       P = P->link;
     }
 
     /* Let's go */
 
     y        = min_Y;
-    y_height = 0;
+    //TEST y_height = 0;
 
     if ( ras.numTurns > 0 &&
          ras.sizeBuff[-ras.numTurns] == min_Y )
@@ -2020,8 +2020,8 @@ extern TEngine_Instance engineInstance;
         aP = &wait;
         while ( (P = *aP) != NULL )
         {
-          P->countL -= y_height;
-          if ( P->countL == 0 )
+          //TESTP->countL -= y_height;
+          if ( /*TEST P->countL P->start == 0*/ P->start <= y )
           {
             *aP = P->link;    /* unlink directly, don't advance aP */
 
@@ -2042,7 +2042,7 @@ extern TEngine_Instance engineInstance;
       Sort( &draw_right );
 
       y_change = (Short)ras.sizeBuff[-ras.numTurns--];
-      y_height = y_change - y;
+      //TESTy_height = y_change - y;
 
       while ( y < y_change )
       {
@@ -2076,12 +2076,13 @@ extern TEngine_Instance engineInstance;
             {
               /* a drop out was detected */
 
-              P_Left ->X = x1;
-              P_Right->X = x2;
+              /* TEST P_Left ->X = x1;
+              P_Right->X = x2;*/
 
               /* mark profile for drop-out processing */
-              P_Left->countL = 1;
-              ++dropouts;
+              // TEST P_Left->countL = 1;
+              //TEST ++dropouts;
+              dropouts = 1;
 
               goto Skip_To_Next;
             }
@@ -2155,7 +2156,7 @@ extern TEngine_Instance engineInstance;
 
 Scan_DropOuts :
 
-    P_Left  = draw_left;
+    /*TEST P_Left  = draw_left;
     P_Right = draw_right;
 
     while ( P_Left )
@@ -2168,6 +2169,41 @@ Scan_DropOuts :
                                        P_Right->X,
                                        P_Left,
                                        P_Right );
+      }
+
+      P_Left  = P_Left->link;
+      P_Right = P_Right->link;
+    } */
+
+    P_Left  = draw_left;
+    P_Right = draw_right;
+
+    while ( P_Left )
+    {
+      x1 = P_Left ->X;
+      x2 = P_Right->X;
+
+      if ( x1 > x2 )
+      {
+        xs = x1;
+        x1 = x2;
+        x2 = xs;
+      }
+
+      if ( x2 - x1 <= PRECISION )
+      {
+        e1 = FLOOR( x1 );
+        e2 = CEILING( x2 );
+
+        if ( ras.dropOutControl != 0 &&
+             ( e1 > e2 || e2 == e1 + PRECISION ) )
+        {
+          ras.Proc_Sweep_Drop( RAS_VARS  y,
+                               x1,
+                               x2,
+                               P_Left,
+                               P_Right );
+        }
       }
 
       P_Left  = P_Left->link;
@@ -2219,7 +2255,7 @@ Scan_DropOuts :
 
         k = ( i + j ) >> 1;
 
-        if ( band_top > MaxBands || k < i )
+        if ( band_top > MaxBand || k < i )
           return Raster_Err_Invalid;
 
         ras.band_stack[band_top+1].y_min = k;
