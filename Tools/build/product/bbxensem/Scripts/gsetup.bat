@@ -146,9 +146,9 @@ echo NOTICE: GSETUP.BAT needs GEOS_DIST_DIR as first argument.
 echo NOTICE: Use GSETUP from the target root directory (usually "Ensemble").
 echo.
 echo Usage:
-echo   FREEGEOS\60BETA\GSETUP
-echo   FREEGEOS\60BETA\GSETUP INSTALL
-echo   FREEGEOS\60BETA\GSETUP ACTIVATE
+echo   FREEGEOS\600\GSETUP
+echo   FREEGEOS\600\GSETUP INSTALL
+echo   FREEGEOS\600\GSETUP ACTIVATE
 goto END
 
 rem Show usage when current directory layout is invalid.
@@ -156,9 +156,9 @@ rem Show usage when current directory layout is invalid.
 echo NOTICE: GSETUP must be called from target root directory (usually "Ensemble").
 echo.
 echo Usage:
-echo   FREEGEOS\60BETA\GSETUP
-echo   FREEGEOS\60BETA\GSETUP INSTALL
-echo   FREEGEOS\60BETA\GSETUP ACTIVATE
+echo   FREEGEOS\600\GSETUP
+echo   FREEGEOS\600\GSETUP INSTALL
+echo   FREEGEOS\600\GSETUP ACTIVATE
 goto END
 
 rem Show usage for invalid argument combinations.
@@ -166,9 +166,9 @@ rem Show usage for invalid argument combinations.
 echo NOTICE: Invalid arguments.
 echo.
 echo Usage:
-echo   FREEGEOS\60BETA\GSETUP
-echo   FREEGEOS\60BETA\GSETUP INSTALL
-echo   FREEGEOS\60BETA\GSETUP ACTIVATE
+echo   FREEGEOS\600\GSETUP
+echo   FREEGEOS\600\GSETUP INSTALL
+echo   FREEGEOS\600\GSETUP ACTIVATE
 
 rem Shared script exit label.
 :END
