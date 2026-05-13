@@ -252,7 +252,6 @@ extern TEngine_Instance engineInstance;
     PByte     flags;                /* current flags table    */
     PUShort   outs;                 /* current outlines table */
 
-    UShort    nPoints;              /* number of points in current glyph   */
     Short     nContours;            /* number of contours in current glyph */
     Int       numTurns;             /* number of Y-turns in outline        */
 
@@ -2251,7 +2250,6 @@ Scan_DropOuts :
   {
     ras.outs      = glyph->contours;
     ras.flags     = glyph->flags;
-    ras.nPoints   = glyph->n_points;
     ras.nContours = glyph->n_contours;
     ras.coords    = glyph->points;
 
@@ -2391,7 +2389,7 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 {
   /* estimated size of the renderpool */
   TT_UShort   renderpoolSize = ( ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
-                                                        + RASTER_RENDER_POOL_MIN_SIZE ) & ~255;
+                                                        + RASTER_RENDER_POOL_MIN_SIZE );
 
   TT_UShort currentSize = (TT_UShort)MemGetInfo( ras.buffer, MGIT_SIZE );
 
