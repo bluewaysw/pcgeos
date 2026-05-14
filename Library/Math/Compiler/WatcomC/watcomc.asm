@@ -521,4 +521,790 @@ done:
 __FSC	endp
 	public	__FSC
 
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		_trig_common
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	common code to implement the various trigonometric functions
+		in this file
+
+CALLED BY:	sin, cos, sinh, cosh, tan, tanh, ...
+PASS:		each of these routines receives on the stack:
+			sp	-> retf
+				   offset (to store result in ss)
+				   arg (double)
+RETURN:		
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+		First set up the regular stack
+		Push the operand
+		Call our caller back to do what it needs to do
+		the result is left on the top of the FPU stack
+		return, clearing the stack
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	6/15/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDefaultConvention
+
+_trig_common	proc	near 	:fptr.far,	; caller's return address
+				off:word,
+				arg:IEEE64
+		uses	ds, es, si, di
+		.enter
+	;
+	; Push the passed 64-bit float onto the FPU stack
+	; 
+		segmov	ds, ss
+		lea	si, ss:[arg]
+		call	FloatIEEE64ToGeos80
+	;
+	; Call our caller back to have it do what it has to do.
+	; 
+		call	{nptr.far}ss:[bp+2]
+
+	;
+	; Fetch result from FPU stack
+	;
+		segmov	es, ss
+		mov	di, off
+		call	FloatGeos80ToIEEE64
+		.leave
+	;
+	; Clear the return address to our caller
+	; 
+		inc	sp
+		inc	sp
+	;
+	; And return to our caller's caller, clearing the stack of its args
+	; 
+		retf	@ArgSize-4
+_trig_common	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		_float_2_arg_common
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	common code to implement the various trigonometric functions
+		in this file
+		
+		Same as _trig_common, but with 2 arguments on the stack
+
+CALLED BY:	sin, cos, sinh, cosh, tan, tanh, ...
+PASS:		each of these routines receives on the stack:
+			sp	-> retf
+				   arg2 (double)
+				   arg  (double)
+
+		(Remember, PASCAL notation means args are pushed left to
+		right, so the second arg will be nearest to top of stack.)
+RETURN:		
+DESTROYED:	
+
+PSEUDO CODE/STRATEGY:
+		First set up the regular stack
+		Push the operand
+		Call our caller back to do what it needs to do
+		the result is left on the top of the FPU stack
+		return, clearing the stack
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	2000/4/19	Initial revision
+    mgroeb	2000/5/12	Merged cruppel's changes
+	dhunter	7/16/2000	Fixup arg order to make sense
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+_float_2_arg_common proc	near 	:fptr.far, ; caller's return address
+				off:word,
+				arg2:IEEE64,
+				arg:IEEE64
+		uses	ds, es, si, di
+		.enter
+	;
+	; Push the passed 64-bit float onto the FPU stack
+	; 
+		segmov	ds, ss
+                lea     si, ss:[arg]
+		call	FloatIEEE64ToGeos80
+	;
+	; Push the passed 64-bit float onto the FPU stack
+	; 
+		segmov	ds, ss
+                lea     si, ss:[arg2]
+		call	FloatIEEE64ToGeos80
+	;
+	; Call our caller back to have it do what it has to do.
+	; 
+		call	{nptr.far}ss:[bp+2]
+	;
+	; Fetch result from FPU stack
+	;
+		segmov	es, ss
+		mov	di, off
+		call	FloatGeos80ToIEEE64
+		.leave
+	;
+	; Clear the return address to our caller
+	; 
+		inc	sp
+		inc	sp
+	;
+	; And return to our caller's caller, clearing the stack of its args
+	; 
+		retf	@ArgSize-4
+_float_2_arg_common	endp
+
+
+; Same as _trig_common, but with 0 arguments on the stack
+
+_trig_common0	proc	near 	return:fptr.far,; caller's return address
+				off:word
+		uses	ds, si
+		.enter
+
+	;
+	; Call our caller back to have it do what it has to do.
+	; 
+		call	{nptr.far}ss:[bp+2]
+	;
+	; Fetch result from FPU stack
+	;
+		segmov	es, ss
+		mov	di, off
+		call	FloatGeos80ToIEEE64
+		.leave
+	;
+	; Clear the return address to our caller
+	; 
+		inc	sp
+		inc	sp
+	;
+	; And return to our caller's caller, clearing the stack of its args
+	; 
+		retf	@ArgSize-4
+_trig_common0	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		sin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		sin of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SIN	proc	far 
+	call	_trig_common
+	call	FloatSin
+	retn
+SIN	endp
+	public	SIN
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		cos
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		cos of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+COS	proc	far
+	call	_trig_common
+	call	FloatCos
+	retn
+COS	endp
+	public	COS
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		tan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		tan of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+TAN	proc	far
+	call	_trig_common
+	call	FloatTan
+	retn
+TAN	endp
+	public	TAN
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		cosh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		cosh of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+COSH	proc	far
+	call	_trig_common
+	call	FloatCosh
+	retn
+COSH	endp
+	public	COSH
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		sinh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		sinh of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SINH	proc	far
+	call	_trig_common
+	call	FloatSinh
+	retn
+SINH	endp
+	public	SINH
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		tanh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		tanh of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+TANH	proc	far
+	call	_trig_common
+	call	FloatTanh
+	retn
+TANH	endp
+	public	TANH
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		atan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		atan of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ATAN	proc	far
+	call	_trig_common
+	call	FloatArcTan
+	retn
+ATAN	endp
+	public	ATAN
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		asin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		asin of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ASIN	proc	far
+	call	_trig_common
+	call	FloatArcSin
+	retn
+ASIN	endp
+	public	ASIN
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		acos
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		acos of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ACOS	proc	far
+	call	_trig_common
+	call	FloatArcCos
+	retn
+ACOS	endp
+	public	ACOS
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		atanh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		atanh of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ATANH	proc	far
+	call	_trig_common
+	call	FloatArcTanh
+	retn
+ATANH	endp
+	public	ATANH
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		asinh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		asinh of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ASINH	proc	far
+	call	_trig_common
+	call	FloatArcSinh
+	retn
+ASINH	endp
+	public	ASINH
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		acosh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		asinh of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ACOSH	proc	far
+	call	_trig_common
+	call	FloatArcCosh
+	retn
+ACOSH	endp
+	public	ACOSH
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		log
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		log of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+LOG	proc	far
+	call	_trig_common
+	call	FloatLog
+	retn
+LOG	endp
+	public	LOG
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ln
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		ln of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+LN	proc	far
+	call	_trig_common
+	call	FloatLn
+	retn
+LN	endp
+	public	LN
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		sqrt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		sqrt of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	6/ 9/92		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+SQRT	proc	far
+	call	_trig_common
+	call	FloatSqrt
+	retn
+SQRT	endp
+	public	SQRT
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		atan2, floor, fabs, exp, frand, fmod, pow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Glue for various Ansi routines not supported before 3/99
+
+CALLED BY:	GLOBAL
+
+PASS:		routines with _trig_common are passed one float argument
+			on the stack; with _trig_common2, two floats; with 
+			_trig_common0, nothing.
+
+RETURN:		float result
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	2/3/99		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FABS_C	proc	far
+	call	_trig_common
+	call	FloatAbs
+	retn
+FABS_C	endp
+	public	FABS_C
+
+
+FLOOR	proc	far
+	call	_trig_common
+	call	FloatInt
+	retn
+FLOOR	endp
+	public	FLOOR
+
+EXP	proc	far
+	call	_trig_common
+	call	FloatExp
+	retn
+EXP	endp
+	public	EXP
+
+FRAND	proc	far
+	call	_trig_common0
+	call	FloatRandom
+	retn
+FRAND	endp
+	public	FRAND
+
+FMOD	proc	far
+	call	_float_2_arg_common
+	call	FloatMod
+	retn
+FMOD	endp
+	public	FMOD
+
+ATAN2	proc	far
+	call	_float_2_arg_common
+	call	FloatArcTan2
+	retn
+ATAN2	endp
+	public	ATAN2
+
+LOG10	proc	far
+	call	_trig_common
+	call	FloatLog
+	retn
+LOG10	endp
+	public	LOG10
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		POW
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	takes an ieee64 number off the stack and returns the
+		cos of it in the return adress passed
+
+CALLED BY:	GLOBAL
+
+PASS:		nothing
+
+RETURN:		Void.
+
+DESTROYED:	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	2000/4/19	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+POW	proc	far
+	call	_float_2_arg_common
+	call	FloatExponential
+	retn
+POW	endp
+	public	POW
+
+
 WatcomMath	ends
