@@ -11,14 +11,14 @@ AUTHOR:		Adam de Boor
 ROUTINES:
 	Name			Description
 	----			-----------
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	ardeb	12/7/92		Initial Version  	
+	ardeb	12/7/92		Initial Version
 
 DESCRIPTION:
-		
+
 	$Id: preflo.asm,v 1.1 97/04/05 01:32:20 newdeal Exp $
 
 -----------------------------------------------------------------------------@
@@ -46,9 +46,9 @@ include Objects/inputC.def
 include initfile.def
 
 ;-----------------------------------------------------------------------------
-;	Libraries used		
+;	Libraries used
 ;-----------------------------------------------------------------------------
- 
+
 UseLib	ui.def
 UseLib	config.def
 UseLib	saver.def
@@ -57,21 +57,21 @@ UseLib	Internal/im.def
 UseLib	net.def
 
 ;-----------------------------------------------------------------------------
-;	DEF FILES		
+;	DEF FILES
 ;-----------------------------------------------------------------------------
- 
+
 include preflo.def
 include preflo.rdef
 
 ;-----------------------------------------------------------------------------
-;	CODE		
+;	CODE
 ;-----------------------------------------------------------------------------
 
 idata	segment
 	PrefLODialogClass
 	PrefLOPasswordTextClass
 idata	ends
- 
+
 PrefLOCode	segment resource
 
 
@@ -83,13 +83,13 @@ SYNOPSIS:	Return the root of the UI tree for "Preferences"
 
 CALLED BY:	PrefMgr
 
-PASS:		nothing 
+PASS:		nothing
 
 RETURN:		dx:ax - OD of root of tree
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -121,9 +121,9 @@ PASS:		ds:si - PrefModuleInfo structure to be filled in
 
 RETURN:		ds:si - buffer filled in
 
-DESTROYED:	ax,bx 
+DESTROYED:	ax,bx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -146,7 +146,7 @@ PrefLOGetModuleInfo	proc far
 	mov	ds:[si].PMI_monikerList.offset, offset  LOMonikerList
 	mov	{word} ds:[si].PMI_monikerToken,  'P' or ('F' shl 8)
 	mov	{word} ds:[si].PMI_monikerToken+2, 'L' or ('O' shl 8)
-	mov	{word} ds:[si].PMI_monikerToken+4, MANUFACTURER_ID_APP_LOCAL 
+	mov	{word} ds:[si].PMI_monikerToken+4, MANUFACTURER_ID_APP_LOCAL
 
 	.leave
 	ret
@@ -168,11 +168,11 @@ SYNOPSIS:	Handler for quick move/copy -- refuse to do it.
 CALLED BY:	MSG_META_START_MOVE_COPY
 PASS:		*ds:si	= instance data
 RETURN:		ax	= MouseReturnFlags (not processed)
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -180,7 +180,7 @@ REVISION HISTORY:
 	ardeb	12/ 7/92	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-PLOPTStartMoveCopy method dynamic PrefLOPasswordTextClass, 
+PLOPTStartMoveCopy method dynamic PrefLOPasswordTextClass,
 					MSG_META_START_MOVE_COPY
 		.enter
 		clr	ax		; not processed
@@ -208,9 +208,9 @@ PASS:		*ds:si	= PrefLOPasswordText object
 		dh 	= ShiftState
 		bp low 	= ToggleState (unused)
 		bp high = scan code (unused)
-				
+
 RETURN:		cx, dx, bp - preserved
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 	Remember the number of chars in the text at the start.
@@ -218,10 +218,10 @@ PSEUDO CODE/STRATEGY:
 	If the object has changed from empty to non-empty, or
 		non-empty to empty, enable or disable the Lock Screen
 		trigger appropriately.
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -237,10 +237,10 @@ PLOPTCatchTextChange	method dynamic	PrefLOPasswordTextClass,
 		.enter
 	;
 	; If marked for only wholesale replacement, nuke everything
-	; 
+	;
 		test	ds:[di].PLOPTI_state, mask PLOPTS_REPLACE_ALL
 		jz	passItUp
-		
+
 		andnf	ds:[di].PLOPTI_state, not mask PLOPTS_REPLACE_ALL
 
 		push	ax, cx, dx, bp
@@ -263,7 +263,7 @@ passItUp:
 		call	ObjCallSuperNoLock
 	;
 	; If we are the master and we have no text now, disable our pair.
-	; 
+	;
 		mov	di, ds:[si]
 		mov	bx, di
 		add	di, ds:[di].PrefLOPasswordText_offset
@@ -293,7 +293,7 @@ enableDisablePair:
 comparePasswords:
 	;
 	; See if the passwords now match and act accordingly
-	; 
+	;
 		call	PLOPTVerifyPassword
 
 		.leave
@@ -315,10 +315,10 @@ RETURN:		nothing
 DESTROYED:	ax, cx, di
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -335,7 +335,7 @@ PLOPTVerifyPassword proc	near
 	; Clear the passwordVerified bit for this object, coincidentally
 	; fetching the chunk of its pair, and the chunk that stores its
 	; text.
-	; 
+	;
 		mov	di, ds:[si]
 		mov	bx, di			; for getting the text chunk...
 		add	di, ds:[di].PrefLOPasswordText_offset
@@ -349,7 +349,7 @@ PLOPTVerifyPassword proc	near
 	;
 	; Clear the passwordVerified bit for the paired object, coincidentally
 	; fetching the chunk that stores its text.
-	; 
+	;
 		mov	di, ds:[di]
 		mov	bp, di			; for getting the text chunk...
 		add	di, ds:[di].PrefLOPasswordText_offset
@@ -368,14 +368,14 @@ PLOPTVerifyPassword proc	near
 
 		ChunkSizeHandle ds, si, ax
 		ChunkSizeHandle ds, di, cx
-		
+
 		cmp	ax, cx
 		jne	done		; if not same length, can't be same
 		dec	cx		; don't count null in comparison
 
 	; if password is zero length, still verified as Null string
-		jz	verifiedPassword	
-			
+		jz	verifiedPassword
+
 
 		mov	si, ds:[si]	; ds:si <- source
 		segmov	es, ds
@@ -388,7 +388,7 @@ verifiedPassword:
 	;
 	; The passwords are the same non-zero length and equal in all their
 	; characters, so they match (really? gosh!)
-	; 
+	;
 		ornf	ds:[bx].PLOPTI_state, mask PLOPTS_PASSWORD_VERIFIED
 		ornf	ds:[bp].PLOPTI_state, mask PLOPTS_PASSWORD_VERIFIED
 
@@ -409,11 +409,11 @@ CALLED BY:	MSG_GEN_LOAD_OPTIONS
 PASS:		*ds:si	= PrefLOPasswordText object
 		ss:bp	= GenOptionsParams
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -428,7 +428,7 @@ PLOPTLoadOptions method dynamic PrefLOPasswordTextClass, MSG_GEN_LOAD_OPTIONS
 	;
 	; Make room for fetching the encrypted password from the .ini file on
 	; the stack.
-	; 
+	;
 SBCS <		sub	sp, SAVER_MAX_PASSWORD				>
 DBCS <		sub	sp, SAVER_MAX_PASSWORD*(size wchar)		>
 		mov	di, sp
@@ -452,7 +452,7 @@ displayAsterisk:
 	;
 	; Set our text to be as many asterisks as there were in the password
 	; we encrypted, also enable the Apply button
-	; 
+	;
 if DBCS_PCGEOS
 		shr	cx, 1
 		mov	ax, '*'
@@ -472,13 +472,13 @@ endif
 	;
 	; Select everything, so it's a bit more obvious what we'll do if the
 	; user types something...
-	; 
+	;
 		mov	ax, MSG_VIS_TEXT_SELECT_ALL
 		call	ObjCallInstanceNoLock
 	;
 	; Tell ourselves to wipe the whole thing out if the user tries to
 	; change the object.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].PrefLOPasswordText_offset
 		ornf	ds:[di].PLOPTI_state, mask PLOPTS_REPLACE_ALL or \
@@ -489,7 +489,7 @@ endif
 	; text.
 	; edigeron 10/9/00 - only enable paired text object if we have
 	; text in this object.
-	; 
+	;
 		test	ds:[di].PLOPTI_state, mask PLOPTS_AM_MASTER
 		jz	done
 		mov	ax, MSG_VIS_TEXT_GET_TEXT_SIZE
@@ -503,7 +503,7 @@ endif
 done:
 	;
 	; Clear the stack.
-	; 
+	;
 SBCS <		add	sp, SAVER_MAX_PASSWORD				>
 DBCS <		add	sp, SAVER_MAX_PASSWORD*(size wchar)		>
 		.leave
@@ -526,13 +526,13 @@ PASS:		*ds:si	- PrefLOPasswordTextClass object
 
 RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -541,13 +541,13 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-PrefLOPTApply	method	dynamic	PrefLOPasswordTextClass, 
+PrefLOPTApply	method	dynamic	PrefLOPasswordTextClass,
 					MSG_GEN_APPLY
 
 		mov	ax, MSG_VIS_TEXT_GET_USER_MODIFIED_STATE
 		call	ObjCallInstanceNoLock
 		push	cx
-		
+
 		mov	di, offset PrefLOPasswordTextClass
 		call	ObjCallSuperNoLock
 
@@ -555,7 +555,7 @@ PrefLOPTApply	method	dynamic	PrefLOPasswordTextClass,
 		jcxz	done
 
 		mov	ax, MSG_VIS_TEXT_SET_USER_MODIFIED
-		GOTO	ObjCallInstanceNoLock 
+		GOTO	ObjCallInstanceNoLock
 done:
 		ret
 PrefLOPTApply	endm
@@ -585,21 +585,21 @@ REVISION HISTORY:
 				fix bug: no warning when password mismatch
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-PLOPTGenPreApply	method dynamic PrefLOPasswordTextClass, 
+PLOPTGenPreApply	method dynamic PrefLOPasswordTextClass,
 					MSG_GEN_PRE_APPLY
 	uses	ax, bp
 	.enter
 
 	; if the text has not modified yet, no warning message is
 	; needed
-	
+
 		mov	ax, MSG_VIS_TEXT_GET_USER_MODIFIED_STATE
 		call	ObjCallInstanceNoLock
 		jcxz	done
 
 	;
 	; check whether the password is verified
-	; 
+	;
 		test	ds:[di].PLOPTI_state, mask PLOPTS_AM_MASTER
 		jz	done
 
@@ -623,7 +623,7 @@ PLOPTGenPreApply	method dynamic PrefLOPasswordTextClass,
 		mov	ax, MSG_VIS_TEXT_SET_NOT_USER_MODIFIED
 		call	ObjCallInstanceNoLock
 
-	; 
+	;
 	; Bring up a dialog box notifying the user that the password
 	; not verified
 	;
@@ -642,7 +642,7 @@ PLOPTGenPreApply	method dynamic PrefLOPasswordTextClass,
 		mov	ss:[bp].SDOP_helpContext.segment, NULL
 		call	UserStandardDialogOptr
 		stc
-done:	
+done:
 
 	.leave
 	ret
@@ -659,10 +659,10 @@ PASS:		*ds:si	= PrefLOPasswordText object
 		ss:bp	= GenOptionsParams
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -682,7 +682,7 @@ PLOPTSaveOptions method dynamic PrefLOPasswordTextClass, MSG_GEN_SAVE_OPTIONS
 	; Make sure we've even been modified. If not, there's nothing new
 	; to save, and saving what we've got would be detrimental, seeing as
 	; it's garbage...
-	; 
+	;
 		mov	ax, MSG_VIS_TEXT_GET_USER_MODIFIED_STATE
 		call	ObjCallInstanceNoLock
 		clc
@@ -690,15 +690,15 @@ PLOPTSaveOptions method dynamic PrefLOPasswordTextClass, MSG_GEN_SAVE_OPTIONS
 
 	;
 	; Make room on the stack for the current text and fetch it.
-	; 
+	;
 SBCS <		sub	sp, SAVER_MAX_PASSWORD				>
 DBCS <		sub	sp, SAVER_MAX_PASSWORD*(size wchar)		>
 
 		test	ds:[di].PLOPTI_state, mask PLOPTS_AM_MASTER
 		jz	done		; if not master, don't mess with things
-		
+
 		push	bp
-		
+
 		test	ds:[di].PLOPTI_state, mask PLOPTS_PASSWORD_VERIFIED
 		jz	reset		; if not verified, => no password
 
@@ -712,20 +712,20 @@ DBCS <		sub	sp, SAVER_MAX_PASSWORD*(size wchar)		>
 		LONG	jcxz	noPassword	; => empty, so nuke key
 	;
 	; Use that as the key by which we'll encrypt it.
-	; 
+	;
 		movdw	dssi, dxbp		; ds:si <- key
 		call	SaverCryptInit	; bx <- machine token
 		LONG	jc	noPassword	; => couldn't create, so act as if no
 					;  password entered
 	;
 	; Encrypt the key with itself (cx remains # chars w/o null)
-	; 
+	;
 		call	SaverCryptEncrypt
 		pop	bp		; ss:bp <- GenOptionsParams
 
 	;
 	; Write the result to the ini file as raw data.
-	; 
+	;
 DBCS <		shl	cx, 1				; # chars -> # bytes>
 		lea	si, ss:[bp].GOP_category
 		lea	dx, ss:[bp].GOP_key
@@ -737,12 +737,12 @@ DBCS <		shl	cx, 1				; # chars -> # bytes>
 		call	InitFileWriteData
 	;
 	; Nuke the encryption machine.
-	; 
+	;
 		call	SaverCryptEnd
 done:
 	;
 	; Clear the stack and return.
-	; 
+	;
 SBCS <		add	sp, SAVER_MAX_PASSWORD				>
 DBCS <		add	sp, SAVER_MAX_PASSWORD*(size wchar)		>
 doneNoClear:
@@ -753,7 +753,7 @@ reset:
 	;
 	; If password not verified, reset both objects to their original
 	; condition.
-	; 
+	;
 		push	si
 		mov	ax, MSG_GEN_RESET
 		call	ObjCallInstanceNoLock
@@ -769,14 +769,14 @@ noPassword:
 	;
 	; No password entered. Signal this by nuking the key from the
 	; ini file.
-	; 
+	;
 		pop	bp
 		segmov	ds, ss, cx	; ds, cx <- ss
 		lea	si, ss:[bp].GOP_category
 		lea	dx, ss:[bp].GOP_key
 		call	InitFileDeleteEntry
 		jmp	done
-		
+
 PLOPTSaveOptions endm
 
 
@@ -790,11 +790,11 @@ SYNOPSIS:	Reset the object to the way it was on startup.
 CALLED BY:	MSG_GEN_RESET
 PASS:		*ds:si	= PrefLOPasswordText object
 RETURN:		nothing
-DESTROYED:	
-SIDE EFFECTS:	
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -809,7 +809,7 @@ PLOPTReset	method dynamic PrefLOPasswordTextClass, MSG_GEN_RESET
 	;
 	; If was replace-all when options loaded, make sure it still is,
 	; and select the whole thing again.
-	; 
+	;
 		mov	di, ds:[si]
 		add	di, ds:[di].PrefLOPasswordText_offset
 		test	ds:[di].PLOPTI_state, mask PLOPTS_WAS_REPLACE_ALL
@@ -840,10 +840,10 @@ PASS:		*ds:si	= PrefLODialog object
 		cx	= TRUE to enable blanking, FALSE to disable it.
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -870,7 +870,7 @@ PLODSetScreenBlank method dynamic PrefLODialogClass, MSG_PLOD_AUTO_SCREEN_BLANK
 		call	ObjCallInstanceNoLock
 done:
 		ret
- 
+
 disable:
 		call	PLODSetForNothingSpecial
 		mov	ax, MSG_IM_DISABLE_SCREEN_SAVER
@@ -889,10 +889,10 @@ PASS:		*ds:si	= PrefLODialog object
 		dx.cx	= timeout (minutes)
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -919,10 +919,10 @@ PASS:		ax	= message to send
 		cx, dx, bp = arguments to same
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, bp, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -951,10 +951,10 @@ RETURN:		carry set if couldn't connect
 		carry clear if connected:
 			bp	= IACPConnection
 DESTROYED:	ax, bx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -989,10 +989,10 @@ PASS:		*ds:si	= PrefLODialog object
 		cx	= identifier
 RETURN:		bx	= handle of AppLaunchBlock
 DESTROYED:	ax, cx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1005,27 +1005,27 @@ PLODGenerateAppLaunchBlock proc	near
 		.enter
 	;
 	; Get the path of the selected item.
-	; 
+	;
 		mov	ax, MSG_PREF_TOC_LIST_GET_SELECTED_ITEM_PATH
 		mov	si, offset LOList
 		call	ObjCallInstanceNoLock
 	;
 	; Use that to generate the launch block.
-	; 
+	;
 		push	ax
 		call	SaverCreateLaunchBlock
 	;
 	; Tell it it's the master saver.
-	; 
+	;
 		call	MemLock
 		mov	es, ax
 		mov	es:[ALB_extraData], mask SED_NOT_JUST_TESTING or \
 				(SID_MASTER_SAVER shl offset SED_SAVER_ID)
 		call	MemUnlock
-		
+
 	;
 	; Free the block holding the saver's path.
-	; 
+	;
 		pop	ax
 		xchg	ax, bx
 		call	MemFree
@@ -1039,17 +1039,17 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		PLODSetForNothingSpecial
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Shut off any current screen saver and make sure the
-		launcher isn't loaded on startup.
+SYNOPSIS:	Shut off any current screen saver and disable the
+		launcher.
 
 CALLED BY:	(INTERNAL) PLODChangeSaver, PLODSetScreenBlank
 PASS:		nothing
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, di
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1058,23 +1058,24 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 PLODSetForNothingSpecial proc	near
-		.enter
-		clr	bx			; don't launch
-		call	PLODConnect
-		jc	done			; => nothing in autoexec
-						;  either, as we remove it
-						;  whenever we disable things
+		.enter				; set up the stack frame
+		clr	bx			; don't launch the master saver
+		call	PLODConnect		; try to connect to a running master
+		jc	writeDisabled		; no master is running, just save state
 
-		mov	ax, MSG_META_QUIT
-		clr	bx			; no response
-		call	PLODSendMessageToMaster
-		
-		segmov	ds, cs
-		mov	si, offset launcherName
-		call	UserRemoveAutoExec
-done:
-		.leave
-		ret
+		mov	ax, MSG_META_QUIT	; ask the master saver to exit
+		clr	bx			; no response message is needed
+		call	PLODSendMessageToMaster	; send the quit request
+
+writeDisabled:
+		segmov	ds, cs			; ds:si will point at our category
+		mov	si, offset lightsOutCategory ; ds:si <- "Lights Out"
+		mov	cx, cs			; cx:dx will point at our key
+		mov	dx, offset enabledKey	; cx:dx <- "enabled"
+		clr	ax			; write FALSE
+		call	InitFileWriteBoolean	; store [Lights Out] enabled=false
+		.leave				; tear down the stack frame
+		ret				; return to the caller
 PLODSetForNothingSpecial endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1088,10 +1089,10 @@ PASS:		*ds:si	= PrefLODialog
 		cx	= saver #
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1099,8 +1100,8 @@ REVISION HISTORY:
 	ardeb	12/ 9/92	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-SBCS <launcherName	char	'Lights Out Launcher', 0		>
-DBCS <launcherName	wchar	'Lights Out App', 0			>
+lightsOutCategory	char	'Lights Out', 0
+enabledKey		char	'enabled', 0
 
 PLODChangeSaver	method dynamic PrefLODialogClass, MSG_PLOD_CHANGE_SAVER
 		.enter
@@ -1119,7 +1120,7 @@ PLODChangeSaver	method dynamic PrefLODialogClass, MSG_PLOD_CHANGE_SAVER
 	;
 	; Create an AppLaunchBlock that we use both for launching, and for
 	; telling an existing master to change.
-	; 
+	;
 		call	PLODGenerateAppLaunchBlock
 
 		call	PLODConnect		; connect, with ourselves
@@ -1128,10 +1129,13 @@ PLODChangeSaver	method dynamic PrefLODialogClass, MSG_PLOD_CHANGE_SAVER
 
 		clr	cx			; shutdown client end
 		call	IACPShutdown
-		
+
 		segmov	ds, cs
-		mov	si, offset launcherName
-		call	UserAddAutoExec
+		mov	si, offset lightsOutCategory
+		mov	cx, cs
+		mov	dx, offset enabledKey
+		mov	ax, TRUE		; make sure "lights out" is on
+		call	InitFileWriteBoolean
 done:
 		.leave
 		ret
@@ -1151,12 +1155,12 @@ CALLED BY:	MSG_PLOD_FREE_APP_LAUNCH_BLOCK
 PASS:		*ds:si	= PrefLODialog object
 		^hcx	= AppLaunchBlock
 		bp	= IACPConnection to close
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1164,7 +1168,7 @@ REVISION HISTORY:
 	ardeb	12/10/92	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-PLODFreeAppLaunchBlock method dynamic PrefLODialogClass, 
+PLODFreeAppLaunchBlock method dynamic PrefLODialogClass,
 				MSG_PLOD_FREE_APP_LAUNCH_BLOCK
 		.enter
 		mov	bx, cx
@@ -1186,10 +1190,10 @@ CALLED BY:	MSG_GEN_APPLY
 PASS:		*ds:si	= PrefLODialog object
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1201,7 +1205,7 @@ PLODApply	method dynamic PrefLODialogClass, MSG_GEN_APPLY
 		.enter
 	;
 	; Let superclass ensure everyone has done what they need to.
-	; 
+	;
 		mov	di, offset PrefLODialogClass
 		call	ObjCallSuperNoLock
 ifdef GPC_VERSION
@@ -1209,7 +1213,7 @@ ifdef GPC_VERSION
 endif
 	;
 	; Now instruct the master saver to do likewise.
-	; 
+	;
 		clr	bx		; don't launch
 		call	PLODConnect
 		jc	done
@@ -1276,7 +1280,7 @@ SIDE EFFECTS:	connection is closed if no completion message, else
 		bp)
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1288,7 +1292,7 @@ PLODSendMessageToMaster proc	near
 		.enter
 	;
 	; Record the real message to send.
-	; 
+	;
 		push	bx, si
 		clr	bx, si
 		mov	di, mask MF_RECORD
@@ -1310,7 +1314,7 @@ PLODSendMessageToMaster proc	near
 		jz	haveCompletionMsg
 	;
 	; Record the completion message using the same (cx, dx, bp) parameters.
-	; 
+	;
 		mov	bx, ds:[LMBH_handle]
 		mov	di, mask MF_RECORD
 		call	ObjMessage
@@ -1321,7 +1325,7 @@ haveCompletionMsg:
 	;
 	; Now record the message we'll send through IACP that ensures what
 	; we're sending goes only to the master saver.
-	; 
+	;
 		mov	ax, MSG_SAVER_APP_DISPATCH_EVENT_IF_MINE
 		clr	bx, si
 		mov	dx, SID_MASTER_SAVER
@@ -1329,7 +1333,7 @@ haveCompletionMsg:
 		call	ObjMessage
 	;
 	; Send the message.
-	; 
+	;
 		mov	bx, di		; bx <- message to send
 		pop	cx		; cx <- completion message
 		mov	dx, TO_SELF	; dx <- TravelOption
@@ -1359,10 +1363,10 @@ PASS:		*ds:si	= PrefDialog object
 		bp	= SpecBuildFlags
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1395,7 +1399,7 @@ enableDisable:
 		je	done
 	;
 	; UseNet not usable, so ensure password group is enabled.
-	; 
+	;
 		mov	ax, MSG_GEN_SET_ENABLED
 		mov	dl, VUM_NOW
 		mov	si, offset SaverPasswordGroup
@@ -1482,7 +1486,7 @@ PASS:		*ds:si	- PrefLODialogClass object
 		ds:di	- PrefLODialogClass instance data
 		es	- dgroup
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -1492,7 +1496,7 @@ REVISION HISTORY:
        	brianc	7/27/94   	Initial version.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-PrefLODialogDestroy	method	dynamic	PrefLODialogClass, 
+PrefLODialogDestroy	method	dynamic	PrefLODialogClass,
 					MSG_GEN_REMOVE,
 					MSG_GEN_DESTROY_AND_FREE_BLOCK
 
