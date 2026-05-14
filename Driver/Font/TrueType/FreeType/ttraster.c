@@ -1966,7 +1966,8 @@ extern TEngine_Instance engineInstance;
 #endif
 
       P->X = 0;
-      InsNew( &wait, P );
+      P->link = wait;
+      wait    = P;
 
       P = Q;
     }
@@ -1985,13 +1986,6 @@ extern TEngine_Instance engineInstance;
 #else
     ras.Proc_Sweep_Init( RAS_VARS  &min_Y );
 #endif
-
-    /* Then compute the distance of each profile from min_Y */
-
-    P = wait;
-
-    while ( P )
-      P = P->link;
 
     /* Let's go */
 
