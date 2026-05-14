@@ -559,8 +559,10 @@ if ( $GbuildResult != 0 ) {
     exit( $GbuildResult );
 } else {
     #
-    # Copy the FreeGEOS image into the Ensemble tree when building NT.
+    # Generate FreeGEOS setup copy scripts and copy the image into the
+    # Ensemble tree.
     #
+    GenerateFreeGEOSSetupCopyScripts();
     FreeGEOSCopyImageToEnsemble();
 
     print "\nbuildbbx completed!\n";
@@ -1349,21 +1351,21 @@ sub CopyFilesToDemoDir {
 }
 
 ##############################################################################
-#       ResolveFreeGEOSBootstrapDir
+#       ResolveFreeGEOSVersionDir
 ##############################################################################
 #
-# SYNOPSIS:     Resolve first bootstrap directory under ensemble/freegeos
+# SYNOPSIS:     Resolve first version directory under ensemble/freegeos
 # PASS:         arg1 = gbuild destination tree
-# CALLED BY:    FreeGEOSCopyImageToEnsemble
-# RETURN:       resolved bootstrap directory path
+# CALLED BY:    FreeGEOS setup helpers
+# RETURN:       resolved version directory path
 #
 ##############################################################################
-sub ResolveFreeGEOSBootstrapDir {
+sub ResolveFreeGEOSVersionDir {
     local( $destdir ) = @_;
     local( $freegeosDir ) = "$destdir/localpc/ensemble/freegeos";
     local( @candidates );
     local( $entry, $candidateDir );
-    local( $bootstrapDir );
+    local( $versionDir );
 
     if ( ! -d $freegeosDir ) {
         die "\nERROR: Cannot find FreeGEOS directory: $freegeosDir\n";
@@ -1386,14 +1388,121 @@ sub ResolveFreeGEOSBootstrapDir {
     @candidates = sort( @candidates );
 
     if ( $#candidates >= 0 ) {
-        $bootstrapDir = $candidates[0]."/boot";
-        print "[Resolved FreeGEOS bootstrap directory: $bootstrapDir]\n";
-        return $bootstrapDir;
+        $versionDir = $candidates[0];
+        print "[Resolved FreeGEOS version directory: $versionDir]\n";
+        return $versionDir;
     }
 
-    die "\nERROR: Cannot resolve FreeGEOS bootstrap directory.\n" .
+    die "\nERROR: Cannot resolve FreeGEOS version directory.\n" .
     "Expected at least one directory under:\n" .
     "  $freegeosDir\n";
+}
+
+##############################################################################
+#       ResolveFreeGEOSBootstrapDir
+##############################################################################
+#
+# SYNOPSIS:     Resolve first bootstrap directory under ensemble/freegeos
+# PASS:         arg1 = gbuild destination tree
+# CALLED BY:    FreeGEOSCopyImageToEnsemble
+# RETURN:       resolved bootstrap directory path
+#
+##############################################################################
+sub ResolveFreeGEOSBootstrapDir {
+    local( $destdir ) = @_;
+    local( $bootstrapDir );
+
+    $bootstrapDir = ResolveFreeGEOSVersionDir( $destdir )."/boot";
+    print "[Resolved FreeGEOS bootstrap directory: $bootstrapDir]\n";
+    return $bootstrapDir;
+}
+
+##############################################################################
+#       GenerateFreeGEOSSetupCopyScripts
+##############################################################################
+#
+# SYNOPSIS:     Generate DOS COPY/MD scripts for FreeGEOS setup payloads
+# PASS:         $RealInfo{destdir} = gbuild destination tree
+# CALLED BY:    Main
+# RETURN:       nothing
+#
+##############################################################################
+sub GenerateFreeGEOSSetupCopyScripts {
+    local( $versionDir, $setupDir );
+
+    if ( $RealInfo{target} ne $TARGET_FG ||
+	 $opt_debug ) {
+	return;
+    }
+
+    $versionDir = ResolveFreeGEOSVersionDir( $RealInfo{destdir} );
+    $setupDir = "$versionDir/setup";
+
+    GenerateFreeGEOSSetupCopyScript( "$setupDir/install",
+				     "$versionDir/ginst.bat",
+				     "setup\\install" );
+    GenerateFreeGEOSSetupCopyScript( "$setupDir/activate",
+				     "$versionDir/gact.bat",
+				     "setup\\activate" );
+}
+
+##############################################################################
+#       GenerateFreeGEOSSetupCopyScript
+##############################################################################
+#
+# SYNOPSIS:     Generate one DOS COPY/MD setup helper script
+# PASS:         arg1 = source payload directory
+#               arg2 = output batch file
+#               arg3 = DOS source directory relative to FreeGEOS version dir
+# CALLED BY:    GenerateFreeGEOSSetupCopyScripts
+# RETURN:       nothing
+#
+##############################################################################
+sub GenerateFreeGEOSSetupCopyScript {
+    local( $sourceDir, $outputFile, $dosSourceRoot ) = @_;
+    local( @dirs, @files );
+    local( $path );
+
+    if ( ! -d $sourceDir ) {
+	die "\nERROR: Cannot find FreeGEOS setup payload directory: $sourceDir\n";
+    }
+
+    find( sub {
+	local( $relPath );
+
+	return if ( $File::Find::name eq $sourceDir );
+
+	$relPath = $File::Find::name;
+	$relPath =~ s/^\Q$sourceDir\E\/?//;
+	$relPath =~ s|/|\\|g;
+
+	if ( -d $File::Find::name ) {
+	    push( @dirs, $relPath );
+	} elsif ( -f $File::Find::name ) {
+	    push( @files, $relPath );
+	}
+    }, $sourceDir );
+
+    @dirs = sort {
+	($a =~ tr/\\//) <=> ($b =~ tr/\\//) || $a cmp $b;
+    } @dirs;
+    @files = sort @files;
+
+    print "+ generate $outputFile\n";
+    open( SETUP_COPY_SCRIPT, "> $outputFile" ) ||
+	die "\nERROR: Cannot write FreeGEOS setup copy script: $outputFile\n";
+
+    print SETUP_COPY_SCRIPT "\@echo off\r\n";
+
+    foreach $path ( @dirs ) {
+	print SETUP_COPY_SCRIPT "if not exist $path\\NUL md $path\r\n";
+    }
+
+    foreach $path ( @files ) {
+	print SETUP_COPY_SCRIPT "copy %1\\$dosSourceRoot\\$path $path\r\n";
+    }
+
+    close( SETUP_COPY_SCRIPT );
 }
 
 ##############################################################################
