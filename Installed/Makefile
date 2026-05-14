@@ -64,7 +64,7 @@ MAKESTUB:	.USE
 
 
 minimal		: minimalLoader minimalLibrary minimalDriver minimalAppl \
-		  otherEnsemble minimalStub
+		  otherEnsemble minimalStub gsetup
 
 minimalLoader	: textLoader VGALoader
 
@@ -190,6 +190,9 @@ printerDriver	: deskjet dj500c lbp mercury pcl4 quietjet canon48 \
 #escp2 remove from above since it doesn't compile
 
 #faxDriver	: class1in class1out class2in class2out
+
+gsetup	:	Tools/build/product/bbxensem/gsetup
+Tools/build/product/bbxensem/gsetup	:	MAKETOOL
 
 textLoader	:	Installed/Loader/Text
 Installed/Loader/Text	:	MAKETOOL
