@@ -40,6 +40,7 @@ include	lol.rdef
 idata	segment
 category	char	'Lights Out', 0
 key		char	'specific', 0
+enabledKey	char	'enabled', 0
 
 SBCS <saverPath	char	C_BACKSLASH, 'SAVERS', C_BACKSLASH		>
 DBCS <saverPath	wchar	C_BACKSLASH, "SAVERS", C_BACKSLASH		>
@@ -79,10 +80,26 @@ REVISION HISTORY:
 LOLOpenApplication method dynamic LOLProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
 		.enter
 	;
-	; Fetch the key from the .ini file.
-	; 
+	; Open the application object before any early exit, so the normal
+	; quit/detach/shutdown sequence has matching attach state.
+	;
 		mov	di, offset LOLProcessClass
 		call	ObjCallSuperNoLock
+	;
+	; If the screen saver has been disabled, exit before loading the
+	; configured saver. A missing key means enabled for compatibility.
+	;
+		mov	cx, ds
+		mov	dx, offset enabledKey
+		mov	si, offset category
+		call	InitFileReadBoolean
+		jc	fetchSaver
+		tst	ax
+		jz	done
+fetchSaver:
+	;
+	; Fetch the key from the .ini file.
+	;
 		mov	di, offset saverName
 		mov	bp, size saverName	; fetch chars intact
 		mov	cx, ds
