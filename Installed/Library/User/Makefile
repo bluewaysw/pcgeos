@@ -20,12 +20,12 @@ GEN             = genActive.asm genAppAttDet.asm genAppCommonIACP.asm\
                   genTrigger.asm genUIDocumentControl.asm genUtils.asm\
                   genValue.asm genView.asm genConstant.def genMacro.def\
                   genVariable.def
-HELP            = helpC.asm helpControl.asm helpEC.asm helpFile.asm\
-                  helpFirstAid.asm helpHelp.asm helpHint.asm\
-                  helpHistory.asm helpLink.asm helpManager.asm helpName.asm\
+HELP            = helpC.asm helpEC.asm helpFile.asm helpFirstAid.asm\
+                  helpHelp.asm helpHistory.asm helpManager.asm helpName.asm\
                   helpPointerImage.asm helpRoutines.asm helpTextClass.asm\
-                  helpTextUtils.asm helpUtils.asm helpConstant.def\
-                  helpText.def helpControl.ui
+                  helpTextUtils.asm helpUtils.asm helpControl.asm\
+                  helpHint.asm helpLink.asm helpConstant.def helpText.def\
+                  helpControl.ui
 IACP            = iacpC.asm iacpConnect.asm iacpEC.asm iacpMain.asm\
                   iacpManager.asm iacpUtils.asm iacpConstant.def\
                   iacpVariable.def
@@ -34,28 +34,27 @@ PROC            = procClass.asm procManager.asm procUndo.asm procUtils.asm\
 TOKEN           = token.asm tokenC.asm tokenManager.asm tokenConstant.def\
                   tokenMacro.def tokenVariable.def
 UI              = uiDispCtrl.asm uiEMOM.asm uiEMTrigger.asm uiEdit.asm\
-                  uiExpress.asm uiManager.asm uiPage.asm uiTool.asm\
-                  uiView.asm uiEMCInteraction.def toyMain.ui uiDispCtrl.ui\
-                  uiEdit.ui uiExpress.ui uiMain.ui uiManager.ui uiPage.ui\
-                  uiTool.ui uiView.ui
-USER            = userC.asm userDialog.asm userDocumentSave.asm\
-                  userFlow.asm userFlowGrab.asm userFlowGrabLow.asm\
+                  uiManager.asm uiPage.asm uiTool.asm uiView.asm\
+                  uiExpress.asm uiEMCInteraction.def toyMain.ui\
+                  uiDispCtrl.ui uiEdit.ui uiExpress.ui uiManager.ui\
+                  uiPage.ui uiTool.ui uiView.ui uiMain.ui
+USER            = userDialog.asm userDocumentSave.asm userFlow.asm\
+                  userFlowGrab.asm userFlowGrabLow.asm userFlowInput.asm\
                   userFlowMisc.asm userFlowUtils.asm userLibrary.asm\
-                  userListUtils.asm userLog.asm userMain.asm\
-                  userManager.asm userQuick.asm userScreen.asm\
-                  userStrings.asm userTitleScreen.asm userTransfer.asm\
-                  userUtils.asm userFlowInput.asm userConstant.def\
-                  userMacro.def userVariable.def userManager.ui\
-                  userPassword.ui
+                  userListUtils.asm userLog.asm userQuick.asm\
+                  userScreen.asm userStrings.asm userTitleScreen.asm\
+                  userTransfer.asm userUtils.asm userMain.asm\
+                  userManager.asm userC.asm userConstant.def userMacro.def\
+                  userVariable.def userManager.ui userPassword.ui
 VIS             = visClass.asm visComp.asm visCompGeometry.asm\
-                  visContentClass.asm visEmpty.asm visGeometry.asm\
-                  visIsoContent.asm visManager.asm visSpec.asm\
-                  visSpecUtils.asm visUtilsClass.asm visUtilsResident.asm\
-                  visContentCommon.asm visConstant.def visMacro.def\
+                  visContentClass.asm visContentCommon.asm visEmpty.asm\
+                  visGeometry.asm visIsoContent.asm visManager.asm\
+                  visSpec.asm visSpecUtils.asm visUtilsClass.asm\
+                  visUtilsResident.asm visConstant.def visMacro.def\
                   visVariable.def
 UI_TO_RDFS      = helpControl.ui uiManager.ui userManager.ui
 OBJS            =
-COMMON          = uiConstant.def uiGeode.def uiGlobal.def uiMacro.def
+COMMON          = uiGeode.def uiGlobal.def uiMacro.def uiConstant.def
 MODULES         = Gen Help IACP Proc Token UI User Vis
 CMODULES        =
 SRCS            = $(GEN) $(HELP) $(IACP) $(PROC) $(TOKEN) $(UI) $(USER)\
