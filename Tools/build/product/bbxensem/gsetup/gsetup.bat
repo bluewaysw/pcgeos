@@ -98,8 +98,8 @@ goto DOACTIVATE
 rem Copy setup\\install payload into current target root.
 :DOINSTALL
 echo Installing from %1\%PINST% to current target directory ...
-subst k: %1\%PINST%\
-xcopy k:*.* .\ /S /E /Y
+subst k: %1\
+call k:\ginst.bat k:
 subst k: /D
 
 echo.
@@ -109,7 +109,9 @@ goto DOACTIVATEINSTALL
 rem Copy setup\\activate payload. The payload provides GFS.INI.
 :DOACTIVATE
 echo Activating from %1\%PACT% to current target directory ...
-xcopy %1\%PACT%\*.* .\ /S /E /Y
+subst k: %1\
+call k:\gact.bat k:
+subst k: /D
 echo.
 
 if exist gfs.ini goto ACTIVATEDONE
@@ -118,7 +120,9 @@ goto GFSINIFAIL
 rem Run activate phase after INSTALL and clear update marker if present.
 :DOACTIVATEINSTALL
 echo Activating from %1\%PACT% to current target directory ...
-xcopy %1\%PACT%\*.* .\ /S /E /Y
+subst k: %1\
+call k:\gact.bat k:
+subst k: /D
 if exist update.txt del update.txt
 echo.
 
