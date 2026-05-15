@@ -54,9 +54,7 @@ extern TEngine_Instance engineInstance;
 
 
 /* render pool size */
-#define  RASTER_RENDER_POOL_INITIAL     1
-#define  RASTER_RENDER_POOL_FACTOR    256
-#define  RASTER_RENDER_POOL_MIN_SIZE 1024
+#define  RASTER_RENDER_POOL_SIZE     2048
 
 
 #define Raster_Err_None              TT_Err_Ok
@@ -96,7 +94,7 @@ extern TEngine_Instance engineInstance;
 #endif
 
 
-#define LOCK_RENDER_POOL    Lock_Render_Pool( RAS_VARS  glyph )
+#define LOCK_RENDER_POOL    Lock_Render_Pool( RAS_VAR )
 #define UNLOCK_RENDER_POOL  MemUnlock( ras.buffer )
 
 
@@ -121,8 +119,6 @@ extern TEngine_Instance engineInstance;
                         /* pure waste of space.                         */
 
 #define MaxBand    12   /* The maximum number of bands used for sub-banding. */
-                        /* Setting this constant to more than 16 is a       */
-                        /* pure waste of space.                             */
 
 #define Pixel_Bits  6   /* fractional bits of *input* coordinates */
 
@@ -280,6 +276,9 @@ extern TEngine_Instance engineInstance;
     Short     traceOfs;             /* current offset in target bitmap */
     Short     traceOfsLastLine;     /* offset in traget region before line step */
     Short     traceIncr;            /* sweep's increment in target bitmap */
+#ifdef __GEOS__
+    Bool      regionStarted;        /* true after region output was initialized */
+#endif
 
     /* dispatch variables */
 
@@ -458,7 +457,7 @@ extern TEngine_Instance engineInstance;
 
     if ( n < 0 )
     {
-      if (ras.maxBuff <= ras.top)
+      if (ras.maxBuff <= ras.top + 1)
       {
         ras.error = Raster_Err_Overflow;
         return FAILURE;
@@ -1227,7 +1226,13 @@ extern TEngine_Instance engineInstance;
     if (Finalize_Profile_Table( RAS_VAR ))
       return FAILURE;
 
-    return (ras.top < ras.maxBuff ? SUCCESS : FAILURE );
+    if ( ras.top >= ras.maxBuff )
+    {
+      ras.error = Raster_Err_Overflow;
+      return FAILURE;
+    }
+
+    return SUCCESS;
   }
 
 
@@ -1507,9 +1512,14 @@ extern TEngine_Instance engineInstance;
   {
     (void)min;
 
-    ras.traceOfs         = 0;
-    ras.traceIncr        = 0;
-    ras.traceOfsLastLine = -1;
+    if ( !ras.regionStarted )
+    {
+      ras.traceOfs         = 0;
+      ras.traceOfsLastLine = -1;
+      ras.regionStarted    = TRUE;
+    }
+
+    ras.traceIncr = 0;
   }
 
   static void _near  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
@@ -1518,7 +1528,7 @@ extern TEngine_Instance engineInstance;
   {
     Short   e1     = TRUNC( CEILING( x1 ) );
     Short   e2     = TRUNC( FLOOR( x2 ) );
-    PShort  target = ( (PShort)ras.bTarget ) + ras.traceOfs;;
+    PShort  target = ( (PShort)ras.bTarget ) + ras.traceOfs;
 
 
     if ( ras.traceIncr == 0 )
@@ -2189,13 +2199,23 @@ Scan_DropOuts :
   static TT_Error  Render_Single_Pass( RAS_ARGS Bool  flipped )
   {
     Short  i, j, k;
-    Int    band_top = 0;
+    TBand  band;
+    Int    band_top = 1;
 
 
-    while ( band_top >= 0 )
+    /*
+     * Treat band_stack as a stack of pending bands.  When a band overflows,
+     * push the upper half first and the lower half last so that the lower
+     * half is processed first.  Bitmap rendering is order independent, but
+     * GEOS region output is not: it appends scanline records and must see
+     * bands in ascending y order.
+     */
+    while ( band_top > 0 )
     {
-      ras.maxY = (Long)ras.band_stack[band_top].y_max * PRECISION;
-      ras.minY = (Long)ras.band_stack[band_top].y_min * PRECISION;
+      band = ras.band_stack[--band_top];
+
+      ras.maxY = (Long)band.y_max * PRECISION;
+      ras.minY = (Long)band.y_min * PRECISION;
 
       ras.top = MemDeref( ras.buffer );
 
@@ -2203,24 +2223,34 @@ Scan_DropOuts :
 
       if ( Convert_Glyph( RAS_VARS  flipped ) )
       {
-        if ( ras.error != Raster_Err_Overflow ) return FAILURE;
-
-        ras.error = Raster_Err_None;
+        if ( ras.error != Raster_Err_Overflow ) return ras.error;
 
         /* sub-banding */
 
-        i = ras.band_stack[band_top].y_min;
-        j = ras.band_stack[band_top].y_max;
+        i = band.y_min;
+        j = band.y_max;
+
+        if ( i >= j )
+        {
+          ras.error = Raster_Err_Overflow;
+          return ras.error;
+        }
+
+        if ( band_top > MaxBand - 2 )
+        {
+          ras.error = Raster_Err_Overflow;
+          return ras.error;
+        }
 
         k = ( i + j ) >> 1;
 
-        if ( band_top > MaxBand || k < i )
-          return Raster_Err_Invalid;
+        /* LIFO order: push upper first, lower second. */
+        ras.band_stack[band_top].y_min = k + 1;
+        ras.band_stack[band_top].y_max = j;
+        ++band_top;
 
-        ras.band_stack[band_top+1].y_min = k;
-        ras.band_stack[band_top+1].y_max = j;
-        ras.band_stack[band_top].y_max = k - 1;
-
+        ras.band_stack[band_top].y_min = i;
+        ras.band_stack[band_top].y_max = k;
         ++band_top;
       }
       else
@@ -2231,8 +2261,6 @@ Scan_DropOuts :
         }
         else
           ras.Proc_Sweep_Init( RAS_VAR, 0 );
-
-        --band_top;
       }
     }
 
@@ -2359,8 +2387,9 @@ EC( ECCheckBounds( (void*)map ) );
     ras.band_stack[0].y_min = 0;
     ras.band_stack[0].y_max = ras.target.rows - 1;
 
-    ras.bWidth  = ras.target.cols;
-    ras.bTarget = (PByte)ras.target.bitmap;
+    ras.bWidth        = ras.target.cols;
+    ras.bTarget       = (PByte)ras.target.bitmap;
+    ras.regionStarted = FALSE;
 
 
     /* lock renderpool cache */
@@ -2379,20 +2408,10 @@ EC( ECCheckBounds( (void*)map ) );
 
 #endif  /* __GEOS__ */
 
-static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
+static void Lock_Render_Pool( RAS_ARG )
 {
-  /* estimated size of the renderpool */
-  TT_UShort   renderpoolSize = ( ( glyph->y_ppem >> 3 ) * RASTER_RENDER_POOL_FACTOR 
-                                                        + RASTER_RENDER_POOL_MIN_SIZE );
-
-  TT_UShort currentSize = (TT_UShort)MemGetInfo( ras.buffer, MGIT_SIZE );
-
-  if ( currentSize != renderpoolSize )
-    MemReAlloc( ras.buffer, renderpoolSize, HAF_NO_ERR | HAF_LOCK );
-  else
-    MemLock( ras.buffer );
-
-  ras.sizeBuff = (PStorage)MemDeref( ras.buffer ) + ( renderpoolSize >> 2 );
+  ras.sizeBuff = (PStorage)MemLock( ras.buffer ) + 
+                    ( RASTER_RENDER_POOL_SIZE >> 2 );
 }
 
 
@@ -2442,8 +2461,8 @@ static void Lock_Render_Pool( RAS_ARGS  TT_Outline*  glyph )
 #endif
 
     ras->buffer = MemAllocSetOwner( GeodeGetCodeProcessHandle(), 
-                      RASTER_RENDER_POOL_INITIAL,
-                      HF_DISCARDABLE | HF_DISCARDED | HF_SHARABLE | HF_SWAPABLE, 
+                      RASTER_RENDER_POOL_SIZE,
+                      HF_SHARABLE | HF_SWAPABLE, 
                       HAF_NO_ERR );
 
     ras->error  = Raster_Err_None;
