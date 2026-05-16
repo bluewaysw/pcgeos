@@ -167,14 +167,6 @@
     /*                   1/1024 pixel precision).  This is important for */
     /*                   small ppem sizes.                               */
     /*                                                                   */
-    /*  second_pass      If true, the scan-line converter performs a     */
-    /*                   second sweep phase dedicated to find vertical   */
-    /*                   drop-outs.  If false, only horizontal drop-outs */
-    /*                   will be checked during the first vertical       */
-    /*                   sweep (yes, this is a bit confusing but it is   */
-    /*                   really the way it should work).  This is        */
-    /*                   important for small ppems too.                  */
-    /*                                                                   */
     /*  dropout_mode     Specifies the TrueType drop-out mode to use for */
     /*                   continuity checking.  Valid values are 0 (no    */
     /*                   check), 1, 2, 4, and 5.                         */
@@ -182,7 +174,6 @@
     /*  Most of the engine's users will safely ignore these fields...    */
 
     TT_UShort        y_ppem;          /* vertical resolution      */
-    TT_Bool          second_pass;     /* two sweeps rendering     */
     TT_Char          dropout_mode;    /* dropout mode             */
   };
 

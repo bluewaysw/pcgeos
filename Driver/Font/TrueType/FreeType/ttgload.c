@@ -1097,7 +1097,7 @@ EC( ECCheckBounds( exec ) );
 
     glyph->outline.n_points    = num_points;
     glyph->outline.n_contours  = num_contours;
-    glyph->outline.second_pass = TRUE;
+    //TEST glyph->outline.second_pass = TRUE;
 
     /* translate array so that (0,0) is the glyph's origin */
     translate_array( num_points + 2,

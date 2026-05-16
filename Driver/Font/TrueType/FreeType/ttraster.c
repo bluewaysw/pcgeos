@@ -42,7 +42,6 @@
 #include "tttypes.h"
 #include "ttengine.h"
 #include "ttcalc.h"      /* for TT_MulDiv only */
-
 #include "ttmemory.h"    /* only used to allocate memory on engine init */
 
 
@@ -76,22 +75,6 @@ extern TEngine_Instance engineInstance;
 /* So, the following definition fits the bill nicely, and we don't need   */
 /* to use the one in 'ttcalc' anymore, even for 16-bit systems...         */
 #define SMulDiv   TT_MulDiv
-
-
-/* Define DEBUG_RASTER if you want to generate a debug version of the  */
-/* rasterizer.  This will progressively draw the glyphs while all the  */
-/* computation are done directly on the graphics screen (the glyphs    */
-/* will be inverted).                                                  */
-
-/* Note that DEBUG_RASTER should only be used for debugging with b/w   */
-/* rendering, not with gray levels.                                    */
-
-/* The definition of DEBUG_RASTER should appear in the file            */
-/* "ttconfig.h".                                                       */
-
-#ifdef DEBUG_RASTER
-  extern Char*  Vio;  /* A pointer to VRAM or display buffer */
-#endif
 
 
 #define LOCK_RENDER_POOL    Lock_Render_Pool( RAS_VAR )
@@ -215,11 +198,6 @@ extern TEngine_Instance engineInstance;
 #define FRAC( x )     ( (x) & (PRECISION - 1) )
 #define SCALED( x )   ( ((x) << PRECISION_SHIFT) - PRECISION_HALF )
 
-#ifdef DEBUG_RASTER
-#define DEBUG_PSET  Pset()
-#else
-#define DEBUG_PSET
-#endif
 
   struct  TPoint_
   {
@@ -337,20 +315,12 @@ extern TEngine_Instance engineInstance;
       return FAILURE;
     }
 
-    switch ( aState )
+    if ( aState == Unknown )
     {
-    case Ascending:
-      ras.cProfile->flow = TT_Flow_Up;
-      break;
-
-    case Descending:
-      ras.cProfile->flow = TT_Flow_Down;
-      break;
-
-    default:
       ras.error = Raster_Err_Invalid;
       return FAILURE;
     }
+    ras.cProfile->flow = ( aState == Ascending ) ? TT_Flow_Up : TT_Flow_Down;
 
     ras.cProfile->start  = 0;
     ras.cProfile->height = 0;
@@ -748,8 +718,6 @@ extern TEngine_Instance engineInstance;
 
         *top++ = arc[2].x;
 
-        DEBUG_PSET;
-
         e += PRECISION;
       }
     }
@@ -823,7 +791,7 @@ extern TEngine_Instance engineInstance;
 /* Description: Computes the x-coordinates of a descending bezier arc       */
 /*              and stores them in the render pool.                         */
 /*                                                                          */
-/* Input:       None.  Arc is taken from the top of the Bezier stack.       */
+/* Input:       None. Arc is taken from the top of the Bezier stack.        */
 /*                                                                          */
 /* Returns:     SUCCESS on success.                                         */
 /*              FAILURE on Render Pool overflow.                            */
@@ -2328,7 +2296,7 @@ EC( ECCheckBounds( (void*)target_map ) );
 
     /* Horizontal Sweep */
 
-    if ( glyph->second_pass && ras.dropOutControl != 0 )
+    if ( ras.dropOutControl != 0 )
     {
       ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
       ras.Proc_Sweep_Span   = Horizontal_Sweep_Span;
