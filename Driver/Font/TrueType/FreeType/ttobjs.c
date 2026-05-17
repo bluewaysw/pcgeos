@@ -38,33 +38,10 @@ extern TEngine_Instance engineInstance;
  *                 face object.
  *
  ******************************************************************/
-#if 0
+
   LOCAL_FUNC
-  PExecution_Context  New_Context( PFace  face )
+  PExecution_Context New_Context(PFace face)
   {
-    PExecution_Context  exec;
-
-
-    if ( !face )
-      return NULL;
-
-    exec = engineInstance.exec;
-    if ( !exec )
-        return NULL;
-
-    if ( engineInstance.exec_in_use )
-        return NULL;
-
-    engineInstance.exec_in_use = TRUE;
-    exec->face = face;
-
-    return exec;
-  } 
-    #endif
-
- LOCAL_FUNC
-PExecution_Context New_Context(PFace face)
-{
     PExecution_Context exec;
 
     if ( !face || !(exec = engineInstance.exec) || engineInstance.exec_in_use) 
@@ -73,7 +50,7 @@ PExecution_Context New_Context(PFace face)
     engineInstance.exec_in_use = TRUE;
     exec->face = face;
     return exec;
-}
+  }
 
 
 /*******************************************************************
@@ -98,6 +75,7 @@ PExecution_Context New_Context(PFace face)
   }
 
 
+  
 /*******************************************************************
  *                                                                 *
  *                     GLYPH ZONE FUNCTIONS                        *
