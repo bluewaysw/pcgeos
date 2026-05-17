@@ -2345,8 +2345,10 @@ EC( ECCheckBounds( (void*)map ) );
 
     Initialize_Raster_Instance( RAS_VARS glyph );
 
+    /* disable drop-out control */
+    ras.dropOutControl = 0;
+
     /* Vertical Sweep */
-  
     ras.Proc_Sweep_Init   = Vertical_Region_Sweep_Init;
     ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
     ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
