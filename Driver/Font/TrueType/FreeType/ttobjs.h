@@ -654,10 +654,6 @@
     TT_F26Dot6      phase;      /* 'SuperRounding'     */
     TT_F26Dot6      threshold;
 
-    Long            scale1;         /* scaling values along the current   */
-    Long            scale2;         /* projection vector too..            */
-    Bool            cached_metrics; /* the ppem is computed lazily. used  */
-                                    /* to trigger computation when needed */
 #ifdef DEBUG_INTERPRETER
     Bool            instruction_trap;  /* If True, the interpreter will */
 #endif                                 /* exit after each instruction   */

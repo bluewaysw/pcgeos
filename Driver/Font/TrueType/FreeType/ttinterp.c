@@ -1481,8 +1481,6 @@
       }
     }
 
-    CUR.cached_metrics = FALSE;
-
     if ( CUR.GS.projVector.x == 0x4000 )
       CUR.func_project = Project_x;
     else
