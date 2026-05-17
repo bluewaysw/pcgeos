@@ -75,7 +75,7 @@ extern TEngine_Instance engineInstance;
   }
 
 
-  
+
 /*******************************************************************
  *                                                                 *
  *                     GLYPH ZONE FUNCTIONS                        *
@@ -305,37 +305,15 @@ extern TEngine_Instance engineInstance;
  *****************************************************************/
 
   static
-  TT_Error  Context_Create( void*  _context, void*  _face )
+  TT_Error  Context_Create( void*  _context )
   {
     PExecution_Context  exec = (PExecution_Context)_context;
+    TT_Error            error;
 
-    PFace        face = (PFace)_face;
-    TT_Error     error;
-
-
-    /* XXX : We don't reserve arrays anymore, this is done automatically */
-    /*       during a "Context_Load"..                                   */
 
     exec->callSize  = 32;
     if ( ALLOC_ARRAY( exec->callStack, exec->callSize, TCallRecord ) )
       goto Fail_Memory;
-
-    /* all values in the context are set to 0 already, but this is */
-    /* here as a remainder                                         */
-    
-    /*exec->maxPoints   = 0;
-    exec->maxContours = 0;
-
-    exec->stackSize = 0;
-    exec->loadSize  = 0;
-    exec->glyphSize = 0;
-
-    exec->stack     = NULL;
-    exec->loadStack = NULL;
-    exec->glyphIns  = NULL;
-
-    exec->face     = face;
-    exec->instance = NULL;*/
 
     return TT_Err_Ok;
 
@@ -1179,7 +1157,7 @@ EC( ECCheckBounds( ins ) );
     if ( ALLOC( exec, sizeof ( TExecution_Context ) ) )
       goto Fail;
 
-    error = Context_Create( exec, NULL );
+    error = Context_Create( exec );
     if ( error )
         goto Fail;
 
