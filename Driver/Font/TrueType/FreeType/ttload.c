@@ -444,6 +444,9 @@
         (shorts)[n] = GET_Short();
     }
 
+    GEO_UNLOCK( face->horizontalHeader.short_metrics_block );
+    GEO_UNLOCK( face->horizontalHeader.long_metrics_block );
+
     FORGET_Frame();
 
     return TT_Err_Ok;
@@ -730,7 +733,7 @@
       for ( i = 0; i < names->numNameRecords; ++i )
       {
         namerec = names->names + i;
-        namerec->string = storage + names->names[i].stringOffset;
+        namerec->string = storage + namerec->stringOffset;
 
 /* It is possible (but rather unlikely) that a new platform ID will be */
 /* added by Apple, so we can't rule out IDs > 3.                       */
