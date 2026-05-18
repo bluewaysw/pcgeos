@@ -388,7 +388,7 @@
     DEFINE_LOCALS;
 
     Short          n, num_shorts;
-    UShort         num_shorts_checked, num_longs;
+    UShort         num_longs;
     PLongMetrics   longs;
     PShortMetrics  shorts;
 
@@ -396,12 +396,8 @@
     if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
       return TT_Err_Hmtx_Table_Missing;
 
-    num_longs = face->horizontalHeader.number_Of_HMetrics;
-
-    /* never trust derived values! */
-
-    num_shorts         = face->maxProfile.numGlyphs - num_longs;
-    num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) >> 1;
+    num_longs  = face->horizontalHeader.number_Of_HMetrics;
+    num_shorts = face->maxProfile.numGlyphs - num_longs;
 
     if ( num_shorts < 0 )            /* sanity check */
         return TT_Err_Invalid_Horiz_Metrics;
@@ -415,40 +411,24 @@
       return error;
 
     longs  = (PLongMetrics)GEO_LOCK( face->horizontalHeader.long_metrics_block );
-    shorts = (PShortMetrics)GEO_LOCK( face->horizontalHeader.short_metrics_block );
-
+    
     for ( n = 0; n < num_longs; ++n )
     {
       longs->advance = GET_UShort();
       longs->bearing = GET_Short();
       ++longs;
     }
+    
+    GEO_UNLOCK( face->horizontalHeader.long_metrics_block );
+    
+    shorts = (PShortMetrics)GEO_LOCK( face->horizontalHeader.short_metrics_block );
 
-    /* do we have an inconsistent number of metric values? */
-
-    if ( num_shorts > num_shorts_checked )
-    {
-      for ( n = 0; n < num_shorts_checked; ++n )
-        (shorts)[n] = GET_Short();
-
-      /* we fill up the missing left side bearings with the    */
-      /* last valid value. Since this will occur for buggy CJK */
-      /* fonts usually, nothing serious will happen.           */
-
-      for ( n = num_shorts_checked; n < num_shorts; ++n )
-        (shorts)[n] = (shorts)[num_shorts_checked - 1];
-    }
-    else
-    {
-      for ( n = 0; n < num_shorts; ++n )
-        (shorts)[n] = GET_Short();
-    }
+    for ( n = 0; n < num_shorts; ++n )
+      (shorts)[n] = GET_Short();
 
     GEO_UNLOCK( face->horizontalHeader.short_metrics_block );
-    GEO_UNLOCK( face->horizontalHeader.long_metrics_block );
 
     FORGET_Frame();
-
     return TT_Err_Ok;
   }
 
