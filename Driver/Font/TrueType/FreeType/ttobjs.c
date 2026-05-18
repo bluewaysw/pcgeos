@@ -710,15 +710,13 @@ extern TEngine_Instance engineInstance;
   TT_Error  Instance_Init( PInstance  ins )
   {
     PExecution_Context  exec;
-
-    TT_Error  error;
-    PFace     face = ins->owner;
+    TT_Error            error;
+    PFace               face = ins->owner;
 
 
     exec = New_Context( face );
 
-    if ( !exec )
-      return TT_Err_Could_Not_Find_Context;
+EC( ECCheckBounds( exec ) );
 
     ins->GS = Default_GraphicsState;
 
@@ -1118,11 +1116,8 @@ EC( ECCheckBounds( ins ) );
     PGlyph    glyph = (PGlyph)_glyph;
 
 
-    if ( !face )
-      return TT_Err_Invalid_Face_Handle;
-
-    if ( !glyph )
-      return TT_Err_Invalid_Glyph_Handle;
+EC( ECCheckBounds( face ) );
+EC( ECCheckBounds( glyph ) );
 
     glyph->face = face;
 
@@ -1150,8 +1145,8 @@ EC( ECCheckBounds( ins ) );
   LOCAL_FUNC
   TT_Error  TTObjs_Init( )
   {
-    PExecution_Context exec = NULL;
-    TT_Error      error;
+    PExecution_Context  exec = NULL;
+    TT_Error            error;
 
 
     if ( ALLOC( exec, sizeof ( TExecution_Context ) ) )
