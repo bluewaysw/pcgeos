@@ -25,6 +25,7 @@
 #include "ttmemory.h"
 #include "tttags.h"
 #include "ttload.h"
+#include <geos.h>
 
 
 /* In all functions, the stream is taken from the 'face' object */
@@ -78,9 +79,8 @@
   {
     DEFINE_LOCALS;
 
-    UShort     n, limit;
-    TTableDir  tableDir;
-
+    UShort          n, limit;
+    TTableDir       tableDir;
     PTableDirEntry  entry;
 
 
@@ -353,7 +353,6 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Mac_Style       = GET_UShort();
     header->Lowest_Rec_PPEM = GET_UShort();
-
     header->Font_Direction  = GET_Short();
 #else
     SKIP( 6 );
@@ -999,7 +998,7 @@
     os2->xAvgCharWidth       = GET_Short();
     os2->usWeightClass       = GET_UShort();
 
-    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
     os2->ySubscriptXSize     = GET_Short();

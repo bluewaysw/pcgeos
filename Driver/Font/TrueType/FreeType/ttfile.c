@@ -735,8 +735,8 @@
 
     if ( rec )
       return rec->size;
-    else
-      return 0;  /* invalid stream - return 0 */
+
+    return 0;  /* invalid stream - return 0 */
   }
 
 #endif
@@ -846,8 +846,8 @@
       Stream_Deactivate( rec );
       return TT_Err_Ok;
     }
-    else
-      return TT_Err_Invalid_Argument;
+
+    return TT_Err_Invalid_Argument;
   }
 
 #endif /* __GEOS__ */

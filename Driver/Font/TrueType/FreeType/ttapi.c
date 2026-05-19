@@ -92,8 +92,7 @@ extern TEngine_Instance engineInstance;
 #define TT_FAIL( x )  ( error = x () ) != TT_Err_Ok
 
     /* Initalize components */
-    if ( 
-         TT_FAIL( TTObjs_Init )   ||
+    if ( TT_FAIL( TTObjs_Init )   ||
          TT_FAIL( TTRaster_Init ) )
        goto Fail;
 
