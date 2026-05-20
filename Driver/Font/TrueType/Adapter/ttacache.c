@@ -49,10 +49,9 @@ VMFileHandle _pascal TrueType_Cache_Init() {
         return cacheFile;
 }
 
-static char* strcpy( char* dest, const char* source )
+static void strcopy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
-        return dest;
 }
 
 static int strcmp( const char* s1, const char* s2 )
@@ -135,11 +134,11 @@ EC(             		ECCheckMemHandle( *fontHandle ) );
 
 			    return TRUE;
 			}
-			loopCount2++;
+			++loopCount2;
 		    }		
 
 		}
-		loopCount++;
+		++loopCount;
 	    }
 	    VMUnlock(dirMem);
 	}
@@ -211,7 +210,7 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 			    }
 			    return;
 			}
-			loopCount2++;
+			++loopCount2;
 		    }		
 		    /* not found append entry if free slots*/
 		    if(loopCount2 < TRUETYPE_CACHE_MAX_BUF_ENTRIES) {
@@ -240,7 +239,7 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 		    }
 		    break;
 		}
-		loopCount++;
+		++loopCount;
 	    }
 	    VMUnlock(dirMem);
 	}
@@ -276,7 +275,7 @@ Boolean _pascal TrueType_Cache_ReadHeader(VMFileHandle cacheFile, const TCHAR* f
 			result = TRUE;
 			break;
 		}
-	    	loopCount++;
+	    	++loopCount;
 	    }
 
 	    VMUnlock(dirMem);
@@ -302,7 +301,7 @@ void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fon
 
 	dirEntry = VMLock(cacheFile, dirBlock, &dirMem);
 	dirEntry->TTCE_bufEntryCount = 0;
-	strcpy(dirEntry->TTCE_ttfFileName, fontFileName);
+	strcopy(dirEntry->TTCE_ttfFileName, fontFileName);
 	dirEntry->TTCE_ttfFileSize = fontFileSize;
 	dirEntry->TTCE_magicWord = fontMagic;
 	dirEntry->TTCE_fontHeader = *headerPtr;
@@ -328,7 +327,7 @@ void _pascal TrueType_Cache_WriteHeader(VMFileHandle cacheFile, const TCHAR* fon
 		MemReAlloc(dirMem, sizeof(TrueTypeCacheDirEntry) * (entryCount + 1), HAF_NO_ERR | HAF_ZERO_INIT);
 		dirEntry = MemDeref(dirMem);
 	    
-		strcpy(dirEntry[entryCount].TTCE_ttfFileName, fontFileName);
+		strcopy(dirEntry[entryCount].TTCE_ttfFileName, fontFileName);
         	dirEntry[entryCount].TTCE_ttfFileSize = fontFileSize;
         	dirEntry[entryCount].TTCE_magicWord = fontMagic;
 		dirEntry[entryCount].TTCE_fontHeader = *headerPtr;
