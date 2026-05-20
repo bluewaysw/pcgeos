@@ -560,7 +560,6 @@ TT_Error  TT_New_Glyph( TT_Face    face,
 
 
 EC( ECCheckBounds( _face ) );
-EC_ERROR_IF( _face->glyph, TT_Err_Invalid_Face_Handle );
 
     if ( ALLOC( _glyph, sizeof ( TGlyph ) ) )
         return TT_Err_Out_Of_Memory;

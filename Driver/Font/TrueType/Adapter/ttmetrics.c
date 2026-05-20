@@ -134,6 +134,7 @@ EC(     ECCheckBounds( (void*)trueTypeVars ) );
                         break;
         }
 
+        TT_Done_Glyph( GLYPH );
         TrueType_Unlock_Face( trueTypeVars );
 
 Fail:
