@@ -236,7 +236,7 @@ extern TEngine_Instance engineInstance;
  *
  *****************************************************************/
 
-  LOCAL_FUNC
+  static
   TT_Error Clear_CodeRange( PExecution_Context  exec, Int  range )
   {
     if ( range < 1 || range > 3 )
