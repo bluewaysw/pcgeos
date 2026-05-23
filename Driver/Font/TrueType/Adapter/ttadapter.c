@@ -29,6 +29,8 @@
 static int strcmp( const char* s1, const char* s2 );
 
 
+#pragma code_seg(ttapi_TEXT)
+
 /********************************************************************
  *                      TrueType_Lock_Face
  ********************************************************************
