@@ -1067,6 +1067,7 @@ EC( ECCheckBounds( ins ) );
 
 #undef LOAD_
 
+#pragma code_seg(ttapi_TEXT)
 
 /*******************************************************************
  *
@@ -1126,6 +1127,7 @@ EC( ECCheckBounds( glyph ) );
                            &glyph->outline );
   }
 
+#pragma code_seg()
 
 /*******************************************************************
  *
