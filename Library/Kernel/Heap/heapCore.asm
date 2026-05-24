@@ -2739,7 +2739,7 @@ ContractNoNotify proc	near
 	mov	ax, ds:[bx][HM_size]		;
 	mov	ds, dx
 	test	ds:[LMBH_flags], mask LMF_NO_ENLARGE
-	jnz	done
+	LONG_EC	jnz	done
 
 ;
 ;	If EC_FORCE_MOVE is set, then there is the possibility that when
