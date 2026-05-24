@@ -940,7 +940,7 @@ checkVMemBlock:
 
 		and	bx, mask GSF_HANDLE_TYPE	; isolate type
 		cmp	bl, GST_CHUNK			; chunk based ?
-		je	unlockChunk			;  yes, unlock it
+		LONG	je	unlockChunk		;  yes, unlock it
 
 		; next thing is to unlock the GString block.
 unlockGString:
@@ -2759,7 +2759,7 @@ setFilePos:
 resetToEnd:
 		cmp	dl, GST_PTR		; no can do for ptr
 EC <		ERROR_Z	GRAPHICS_CANT_POS_PTR_GSTRING_TO_END		>
-NEC <		je	done			; just bail in non-ec	>
+NEC <		LONG	je	done		; just bail in non-ec	>
 		cmp	dl, GST_CHUNK		; if chunk based, find size
 		je	posChunkAtEnd
 EC <		cmp	dl, GST_VMEM		; must be HugeArray based >

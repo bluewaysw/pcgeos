@@ -19,7 +19,7 @@ INT	CallStyleCallBack	Callback routine to find # of chars in style
 INT	AddWidth		Add character width, accounting for style
 INT	GraphicInlineWidth	Find width of inline graphic
 INT	UpdateFieldHeightVars	Update field height variables
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -28,7 +28,7 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	Contains text metrics routines used only for the text object.
-		
+
 	$Id: graphicsTextObject.asm,v 1.1 97/04/05 01:13:43 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
@@ -75,7 +75,7 @@ EC <	call	ECCheckGStateHandle					>
 
 	mov	cx, size TOC_int		;cx <- # of bytes to clear
 	call	InitForTextMetrics		;like it says...
-	
+
 	clr	cx
 	mov	externals.TOCE_nSpaces, cx
 	mov	externals.TOCE_nExtraSpaces, cx
@@ -86,7 +86,7 @@ EC <	call	ECCheckGStateHandle					>
 	; Beginning of field is also start of last word.
 	;
 	mov	internals.TOCI_lastWordStart, cx
-	
+
 	;
 	; Initialize the position of a tall character to some value which will
 	; ensure that we don't assume the presence of a tall character.
@@ -95,7 +95,7 @@ EC <	call	ECCheckGStateHandle					>
 	mov	internals.TOCI_tallCharBaselinePos, cx
 	mov	internals.TOCI_tallCharHeightPos, cx
 	inc	cx				; cx <- 0
-	
+
 	mov	di, cx				;di <- start of field (0)
 
 	;
@@ -192,7 +192,7 @@ hasSpace:
 firstNotTab:
 SBCS <	clr	ah				; Can't kern around style chang>
 DBCS <	clr	ss:[bp].TMS_kernChar		; Can't kern around style chang>
-	
+
 validChars:
 	;
 	; cx should be non-zero here. If it is zero then we have reached the
@@ -201,7 +201,7 @@ validChars:
 	andnf	ss:[bp].TMS_flags, not mask TMSF_IS_BREAK_CHARACTER
 
 	LocalGetChar ax, dssi			; ax <- current character
-	
+
 	;
 	; The following cannot be condensed into a 'jcxz' instruction because
 	; we are doing a branch-to-branch. Since jcxz does not set the flags
@@ -211,7 +211,7 @@ validChars:
 	jz	gotoEndLoop			; Quit if no characters left
 
 	dec	cx				; One less character to do
-	
+
 	;
 	; Quick check for character >= space. This works because all the
 	; tests below are against values that are <0x20.
@@ -297,7 +297,7 @@ notBelow:
 endif
 	;
 	; Check for non-space character. If we have found a non-space char
-	; and the previous character was a space or a tab, then we want 
+	; and the previous character was a space or a tab, then we want
 	; to save this character position as the last word start.
 	;
 if not PZ_PCGEOS
@@ -310,7 +310,7 @@ if not PZ_PCGEOS
 
 	;
 	; Check previous character for being a space or a tab.
-	;	
+	;
 	LocalCmpChar	bx, C_SPACE
 	je	wordStart
 	LocalCmpChar	bx, C_TAB
@@ -326,7 +326,7 @@ wordStart::
 	; the end of the previous word.
 	;
 	mov	internals.TOCI_lastWordStart, di
-	
+
 	push	ax
 PZ <	push	bx							>
 	call	GetPosBeforeLastChar		; bx.al <- pos
@@ -334,7 +334,7 @@ PZ <	push	bx							>
 PZ <	pop	bx							>
 	pop	ax
 NPZ <	jmp	endSpaceCheck						>
-		
+
 checkWordEnd:
 PZ <	LocalCmpChar ax, C_SPACE					>
 PZ <	jne	checkWordEndNotSpace					>
@@ -453,7 +453,7 @@ noMaximum:
 	pushf
 	andnf	externals.TOCE_otherFlags, not mask TOCOF_FOUND_WORD
 	popf
-	jnz	endLoop
+	LONG	jnz	endLoop
 					; else, set pending and continue
 	ornf	externals.TOCE_otherFlags, mask TOCOF_WAIT_FOR_WORD
 	jmp	afterOverflowCheck
@@ -524,7 +524,7 @@ isHardHyphen:
 	; Need to save the position of the end of the hyphen.
 	;
 	movwbf	internals.TOCI_lastHyphenPos, ss:[bp].TMS_sizeSoFar, bx
-	
+
 	andnf	ss:[bp].TMS_flags, not mask TMSF_IS_OPTIONAL_HYPHEN
 	ornf	ss:[bp].TMS_flags, mask TMSF_IS_BREAK_CHARACTER
 
@@ -724,34 +724,34 @@ PSEUDO CODE/STRATEGY:
 		- Justification width is sizeSoFar - lastCharWidth.
 		- LineFlags |= {}
 		- Can't optimize if previous char was kerned.
-	    
+
 	    (c) Word-wrap is desired and is possible.
 		- Break before start of last word.
 		- Width is lastWordPos.
 		- Justification width is lastWordEndPos.
 		- LineFlags |= {}
 		- Can't optimize if last break was kerned.
-	    
+
 	    (d) A hyphen character exists and word-break should occur there.
 		- Break after hyphen character.
 		- Width is lastHyphenPos.
 		- Justification width is lastHyphenPos.
 		- LineFlags |= {}
 		- Can't optimize if last break was kerned.
-	    
+
 	    (e) An auto-hyphen exists and word-break should occur there.
 		- Break before auto-hyphen position.
 		- Width is suggestedHyphenPos.
 		- Justification width is suggestedHyphenPos + hyphenWidth.
 		- LineFlags |= {ENDS_IN_AUTO_HYPHEN}
-	    
+
 	    (f) An optional hyphen exists and word-break should occur there.
 		- Break after optional hyphen.
 		- Width is lastHyphenPos.
 		- Justification width is lastHyphenPos.
 		- LineFlags |= {}
 		- Can't optimize if last break was kerned.
-	    
+
 	    (g) Only one character fit in the field and this is the first field
 		on the line.
 		- Break after the character.
@@ -824,7 +824,7 @@ gotValues:
 	; di	= Offset into the field where we want to break the line
 	; si	= Number of extra spaces on the line
 	;
-	
+
 if (0)	; Removed: we can't always determine LF_INTERACTS_{ABOVE/BELOW}
 	; by checking the tall character. - Joon (12/5/94)
 	;
@@ -835,7 +835,7 @@ if (0)	; Removed: we can't always determine LF_INTERACTS_{ABOVE/BELOW}
 	;
 	call	CheckTallChars
 endif
-	
+
 	;
 	; The height and baseline have been adjusted and flags have been
 	; set to indicate if text extends outside the line bounds.
@@ -970,7 +970,7 @@ BreakAtCR	proc	near
 	mov	dx, mask LF_ENDS_PARAGRAPH or mask LF_ENDS_IN_CR
 	mov	ax, 1
 	call	BreakAtLineEndChar
-	
+
 	;
 	; Add to the field width the size of a paragraph-end character.
 	;
@@ -980,7 +980,7 @@ SBCS <	mov	al, C_PARAGRAPH		; al <- char to add		>
 DBCS <	mov	ax, C_PARAGRAPH_SIGN	; ax <- char to add		>
 	call	JustAddCharWidth	; Update sizeSoFar
 	pop	cx, dx, di
-	
+
 	GOTO	GetSizeSoFar		; bx.al <- TMS_sizeSoFar
 BreakAtCR	endp
 
@@ -1194,7 +1194,7 @@ onlyCharWideTab:
 	;
 	; The only character in the field is a tab. The tab is wider
 	; than the field.
-	;	
+	;
 	clr	si			; No more spaces to pad
 	clrwbf	bxal			; Width of the field
 	clr	cx			; Justification width
@@ -1260,8 +1260,8 @@ BreakAtWordWrapOrHyphen	proc	near
 	; release the font, do callback, and lock font again
 	;
 	mov	ax, 1
-	call	DoCallback 
-	
+	call	DoCallback
+
 gotHyphens:
 	;
 	; Decide if we have to choose between the suggestion and a hyphen in
@@ -1339,7 +1339,7 @@ useLastHyphen:
 	mov	si, externals.TOCE_nExtraSpaces
 	movwbf	bxal, internals.TOCI_lastHyphenPos
 	rndwbf	bxal, cx
-	
+
 	;
 	; There aren't any extra spaces at the end of the line when we break
 	; at a hyphen.
@@ -1412,7 +1412,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BreakAtWordWrap	proc	near
 	;
-	; Break the line at the last word break. 
+	; Break the line at the last word break.
 	; There may be only a single word on the line, in which case we want
 	; to do word break as though there was no word-wrap.
 	;
@@ -1536,7 +1536,7 @@ BreakAtOneWideChar	proc	near
 CopyFieldHeightVarsAndCheckBreakKerned	label	near
 	;
 	; "Called" by:
-	;	BreakAtTab, 
+	;	BreakAtTab,
 	call	CopyFieldHeightVars	; Set the line height
 
 CheckBreakKerned	label	near
@@ -1692,7 +1692,7 @@ CheckSoftHyphen	proc	near
 	; If it is the first character on the line, it always fits.
 	;
 	mov	dx, ss:[bp].TMS_sizeSoFar.WBF_int
-	
+
 	tst	di
 	je	hyphenFits
 
@@ -1712,7 +1712,7 @@ hyphenFits:
 	mov	internals.TOCI_lastHyphenPos.WBF_int, dx
 	mov	dl, ss:[bp].TMS_sizeSoFar.WBF_frac
 	mov	internals.TOCI_lastHyphenPos.WBF_frac, dl
-	
+
 	mov	dx, di
 	inc	dx
 	mov	internals.TOCI_lastHyphen, dx
@@ -1727,7 +1727,7 @@ afterHyphen:
 	;
 	lahf
 	andnf	ss:[bp].TMS_flags, not (mask TMSF_UPDATE_SIZE_ONLY)
-	
+
 	popwbf	ss:[bp].TMS_lastCharWidth, dx	; Restore last char width
 	popwbf	ss:[bp].TMS_sizeSoFar, dx	; Restore size so far
 
@@ -1792,7 +1792,7 @@ CopyFieldHeightVars	proc	near
 	; to the line height.
 	;
 	subwbf	axbl, didl			; ax.bl = amount of change.
-	
+
 	addwbf	externals.TOCE_lineHeight, axbl
 noDescChange:
 	;
@@ -1954,7 +1954,7 @@ hasCharacters:					;
 
 	.enter
 
-	push	cx	
+	push	cx
 	mov	cx, size TextMetricStyles	;cx <- # of bytes to init
 	call	InitForTextMetrics		;initialize TextMetricStyles
 	mov	ss:[bp].GTPL_charCount, 0
@@ -1972,12 +1972,12 @@ charLoop:
 	;
 	tst	cx
 	jnz	validChars
-	
+
 	push	di				; Save max count
 	mov	di, ss:[bp].GTPL_charCount	; di <- offset to current pos
 	call	CallStyleCallBack		; es <- font seg addr
 	pop	di				; Restore max count
-	
+
 	cmp	cx, di				; check for count too large.
 	jbe	validChars
 	mov	cx, di
@@ -2098,7 +2098,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Unlock a font and a gstate.
 
-CALLED BY:	
+CALLED BY:
 PASS:		ss:bp	= pointer to TMS_locals structure on the stack.
 RETURN:		nothing
 DESTROYED:	ax, bx, di
@@ -2273,7 +2273,7 @@ NOFXIP<	call	ss:[bp].TMS_styleCallBack				>
 	; ds <- gstate segment address
 	;
 	call	FixupGStateGetInDS		;ds <- gstate segment
-	
+
 	mov	ax, ss:[bp].TMS_textAttr.TA_trackKern
 	mov	ds:GS_trackKernDegree, ax	;set track kerning
 
@@ -2308,7 +2308,7 @@ noOldFont:
 	call	NearLockFont
 	mov	ss:[bp].TMS_fontHandle, bx	;save font handle
 	mov	es, ax				;es <- font segment
-	
+
 	mov	ax, {word}ds:GS_trackKernValue	;save new character spacing
 	mov	{word}ss:[bp].TMS_trackKernValue, ax
 	mov	al, ds:GS_textMode
@@ -2435,7 +2435,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Releases the font so callback can lock it if needed, then
-		does the callback, and re-locks the font. 
+		does the callback, and re-locks the font.
 
 CALLED BY:	GraphicInLineWidth, BreakAtWordWrapOrHyphen
 PASS:		ax 	= nonzero for BreakAtWordHyphen, 0 for GraphicILW
@@ -2444,10 +2444,10 @@ PASS:		ax 	= nonzero for BreakAtWordHyphen, 0 for GraphicILW
 RETURN:		(see CalculateGraphicsCallback or CalculateHyphenCallBack)
 
 DESTROYED:	ax, bx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2712,7 +2712,7 @@ noTrackKerning:
 	ornf	ss:[bp].TMS_flags, mask TMSF_NEGATIVE_KERNING
 notNegKerning:
 	jmp	afterKerning
-	
+
 AddWidth	endp
 
 
@@ -2895,7 +2895,7 @@ UpdateFieldHeightVars	proc	near
 	; If the descent is larger the height gets changed.
 	;
 	call	CalcDescent			; di.dl = descent
-	
+
 	;
 	; di.dl = current descent.
 	;
@@ -2935,7 +2935,7 @@ noBloChange:
 	jz	noChange
 	;
 	; Either the descent or ascent has changed. Regardless, the line
-	; height will change so we need to 
+	; height will change so we need to
 	;
 	movwbf	axbl, internals.TOCI_currentHgt	; get current height
 NOFXIP<	call	externals.TOCE_heightCallback				>
@@ -2958,7 +2958,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Get the adjusted height and adjusted baseline of the font.
 
-CALLED BY:	
+CALLED BY:
 PASS:		es	= segment address of the font.
 RETURN:		ax.bl	= height (WBFixed).
 		cx.bh	= baseline (WBFixed).
@@ -2987,7 +2987,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Store the height and baseline of a font.
 
-CALLED BY:	
+CALLED BY:
 PASS:		es	= segment address of the font.
 		ss:bp	= TOC_vars structure on stack.
 RETURN:		nothing
@@ -3012,13 +3012,13 @@ SetHeightAndBaseline	proc	near
 	movwbf	axbl, es:FB_height
 	addwbf	axbl, es:FB_heightAdjust
 	movwbf	ss:[bp].TMS_styleHeight, axbl
-	
+
 	movwbf	cxbh, es:FB_baselinePos
 	addwbf	cxbh, es:FB_baseAdjust
 	movwbf	ss:[bp].TMS_styleBaseline, cxbh
-	
+
 	subwbf	axbl, cxbh
-	
+
 	;
 	; Now figure out if the line will get taller. We do this by figuring
 	; the change in the ascent and descent.
@@ -3029,7 +3029,7 @@ SetHeightAndBaseline	proc	near
 	; If the line height will change with this new style, we need to
 	; call the callback to adjust the areaToFill based on the new height.
 	;
-	
+
 	;
 	; Compute the larger of the old/new descents and put it in cx.bh
 	;
@@ -3048,13 +3048,13 @@ noDescentChange:
 	jbe	noAscentChange		; Branch if new is larger
 	movwbf	cxbh, didl		; cx.bh <- larger of the ascents
 noAscentChange:
-	
+
 	;
 	; ax.bl	= Descent for the line
 	; cx.bh	= Ascent for the line
 	;
 	addwbf	axbl, cxbh		; ax.bl <- new line height
-	
+
 	;
 	; Compare the new line height against the old one and call the callback
 	; if there is a change for the taller.
@@ -3064,7 +3064,7 @@ noAscentChange:
 
 	;
 	; Either the descent or ascent has changed. Regardless, the line
-	; height will change so we need to 
+	; height will change so we need to
 	;
 NOFXIP<	call	externals.TOCE_heightCallback				>
 FXIP<	mov	ss:[TPD_dataBX], bx					>
