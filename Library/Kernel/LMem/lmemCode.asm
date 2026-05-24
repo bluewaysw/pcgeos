@@ -1272,7 +1272,7 @@ hasMemory:					;
 	;
 	; Now we branch according the size change.
 	;
-	jb	smaller				;
+	LONG_EC	jb	smaller			;
 
 EC <	test	ds:[LMBH_flags], mask LMF_NO_HANDLES			>
 EC <	jnz	20$							>
