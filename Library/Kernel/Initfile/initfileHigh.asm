@@ -2324,9 +2324,6 @@ InitFileWriteStringSection	proc	far
 
 if INI_STRING_SECTION_TOMBSTONES
 	call	InitFilePrepareStringSectionWrite
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	call	InitFileTombTraceFlush
-endif
 	push	ds, si, cx, dx, es, di
 	LoadVarSeg	ds, ax
 	tst	ds:[skipStringSectionWrite]
@@ -2432,177 +2429,6 @@ InitFileWriteStringSectionRaw	endp
 if INI_STRING_SECTION_TOMBSTONES
 
 
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileTombTraceSet
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Set temporary tombstone trace state.
-
-PASS:		ax - step
-		bx - reason
-
-	DESTROYED:	nothing
-	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileTombTraceSet	proc	near
-			push	ax, bx, cx, ds
-			LoadVarSeg	ds, cx
-			mov	ds:[iniTombTraceStep], ax
-			mov	ds:[iniTombTraceReason], bx
-			pop	ax, bx, cx, ds
-			ret
-	InitFileTombTraceSet	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileTombTraceResetCount
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Reset temporary tombstone trace entry count.
-
-DESTROYED:	nothing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-InitFileTombTraceResetCount	proc	near
-			push	ds, ax
-			LoadVarSeg	ds, ax
-			clr	ds:[iniTombTraceCount]
-			clr	ds:[iniTombTraceSkipCount]
-			clr	ds:[iniTombTraceEntryLen]
-			clr	ds:[iniTombTraceFirstByte]
-			clr	ds:[iniTombTraceTempFirst]
-			pop	ds, ax
-			ret
-InitFileTombTraceResetCount	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileTombTraceIncCount
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Increment temporary tombstone trace entry count.
-
-DESTROYED:	nothing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-InitFileTombTraceIncCount	proc	near
-		push	ds, ax
-		LoadVarSeg	ds, ax
-		inc	ds:[iniTombTraceCount]
-		pop	ds, ax
-		ret
-InitFileTombTraceIncCount	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileTombTraceIncSkipCount
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Increment temporary tombstone trace skipped-entry count.
-
-DESTROYED:	nothing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-InitFileTombTraceIncSkipCount	proc	near
-		push	ds, ax
-		LoadVarSeg	ds, ax
-		inc	ds:[iniTombTraceSkipCount]
-		pop	ds, ax
-		ret
-InitFileTombTraceIncSkipCount	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileTombTraceWriteInt
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Write one temporary tombstone trace integer.
-
-PASS:		ax - value
-		dx - key offset in dgroup
-
-DESTROYED:	nothing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileTombTraceWriteInt	proc	near
-			push	ds, si, cx, dx, bp
-			mov	bp, ax
-			LoadVarSeg	ds, cx
-			mov	si, offset dgroup:[iniTombTraceCategory]
-			mov	cx, ds
-			call	InitFileWriteInteger
-			pop	ds, si, cx, dx, bp
-			ret
-	InitFileTombTraceWriteInt	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileTombTraceFlush
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Flush temporary tombstone trace state to geos.ini.
-
-DESTROYED:	nothing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-InitFileTombTraceFlush	proc	near
-	uses	ax, dx, di, ds
-	.enter
-
-	LoadVarSeg	ds, ax
-	mov	ax, ds:[iniTombTraceStep]
-	mov	dx, offset dgroup:[iniTombTraceStepKey]
-	call	InitFileTombTraceWriteInt
-
-	LoadVarSeg	ds, ax
-	mov	ax, ds:[iniTombTraceReason]
-	mov	dx, offset dgroup:[iniTombTraceReasonKey]
-	call	InitFileTombTraceWriteInt
-
-		LoadVarSeg	ds, ax
-		mov	ax, ds:[iniTombTraceCount]
-		mov	dx, offset dgroup:[iniTombTraceCountKey]
-		call	InitFileTombTraceWriteInt
-
-		LoadVarSeg	ds, ax
-		mov	ax, ds:[iniTombTraceSkipCount]
-		mov	dx, offset dgroup:[iniTombTraceSkipCountKey]
-		call	InitFileTombTraceWriteInt
-
-		LoadVarSeg	ds, ax
-		clr	ax
-		mov	al, ds:[rewriteStringSection]
-		mov	dx, offset dgroup:[iniTombTraceRewriteFlagKey]
-		call	InitFileTombTraceWriteInt
-
-	LoadVarSeg	ds, ax
-	mov	ax, ds:[rewriteSnapshotHan]
-	mov	dx, offset dgroup:[iniTombTraceSnapshotHanKey]
-	call	InitFileTombTraceWriteInt
-
-			LoadVarSeg	ds, ax
-			mov	ax, ds:[rewriteSnapshotSize]
-			mov	dx, offset dgroup:[iniTombTraceSnapshotSizeKey]
-			call	InitFileTombTraceWriteInt
-
-			LoadVarSeg	ds, ax
-			mov	ax, ds:[iniTombTraceEntryLen]
-			mov	dx, offset dgroup:[iniTombTraceEntryLenKey]
-			call	InitFileTombTraceWriteInt
-
-			LoadVarSeg	ds, ax
-			mov	ax, ds:[iniTombTraceFirstByte]
-			mov	dx, offset dgroup:[iniTombTraceFirstByteKey]
-			call	InitFileTombTraceWriteInt
-
-			LoadVarSeg	ds, ax
-			mov	ax, ds:[iniTombTraceTempFirst]
-			mov	dx, offset dgroup:[iniTombTraceTempFirstKey]
-			call	InitFileTombTraceWriteInt
-
-			.leave
-			ret
-InitFileTombTraceFlush	endp
-
-endif	; INI_STRING_SECTION_TOMBSTONE_TRACE
-
-
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFilePrepareStringSectionWrite
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2623,19 +2449,9 @@ InitFilePrepareStringSectionWrite	proc	near
 	LoadVarSeg	ds, ax
 	clr	ds:[skipStringSectionWrite]
 	pop	ds, si, cx, dx, es, di
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 200
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 
 	call	InitFileHaveLowerIniFile
 	jc	haveLowerIni
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 201
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 	call	InitFileFreeRewriteSnapshot
 	jmp	done
 
@@ -2644,11 +2460,6 @@ haveLowerIni:
 	call	InitFileBuildDisabledKey
 	pop	ds, si, cx, dx, es, di
 	jnc	haveDisabledKey
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 202
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 	jmp	done
 
 haveDisabledKey:
@@ -2665,11 +2476,6 @@ haveDisabledKey:
 	pop	bp
 	pop	ds, si, cx, dx, es, di
 	jnc	checkDisabledSidecar
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 220
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 	jmp	skipWrite
 
 checkDisabledSidecar:
@@ -2688,14 +2494,6 @@ checkDisabledSidecar:
 		call	InitFileRemoveStringSectionEntryRaw
 		pop	bp
 		jnc	done
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		call	InitFileTombTraceIncSkipCount
-endif
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 221
-		clr	bx
-	call	InitFileTombTraceSet
-endif
 	jmp	skipWrite
 
 skipWrite:
@@ -2724,21 +2522,11 @@ DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 	InitFileMaybeTombstoneRewrite	proc	near
 		.enter
 
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 300
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		LoadVarSeg	es, ax
 		tst	es:[rewriteStringSection]
 		jnz	checkPending
 		tst	es:[rewriteSnapshotHan]
 		jnz	checkSnapshotKey
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 301
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	done
 
 checkSnapshotKey:
@@ -2746,11 +2534,6 @@ checkSnapshotKey:
 			call	InitFileDisabledKeyMatchesRewrite
 			pop	ds, si, cx, dx
 			jnc	done
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-			mov	ax, 302
-			clr	bx
-			call	InitFileTombTraceSet
-endif
 			push	ds, si, cx, dx
 			call	InitFileRewriteDisabledSidecarFromSnapshot
 			call	InitFileFreeRewriteSnapshot
@@ -2774,11 +2557,6 @@ endif
 		call	InitFileReadString
 		pop	bp
 		jnc	gotLower
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 304
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	done
 
 gotLower:
@@ -2789,11 +2567,6 @@ gotLower:
 		jmp	done
 
 		noMatch:
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-			mov	ax, 303
-			clr	bx
-			call	InitFileTombTraceSet
-endif
 			push	ds, si, cx, dx
 			call	InitFileStartPendingRewrite
 			call	InitFileRewriteDisabledSidecarFromSnapshot
@@ -2912,9 +2685,6 @@ DBCS <			shr	ax, 1						>
 			LoadVarSeg	ds, bx
 			mov	ds:[rewriteSnapshotSize], ax
 			mov	ss:[snapshotSize], ax
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-			call	InitFileTombTraceIncSkipCount
-endif
 				mov	bx, ss:[snapshotHan]
 				call	MemUnlock
 				stc
@@ -3056,39 +2826,19 @@ DESTROYED:	nothing
 		uses	ax, bx, cx, dx, di, si, bp, ds, es
 		.enter
 
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 400
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		LoadVarSeg	ds, ax
 		tst	ds:[rewriteStringSection]
 		jnz	checkRewriteKey
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 401
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	done
 
 checkRewriteKey:
 		tst	{byte}ds:[rewriteKey]
 		jnz	checkLower
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 402
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	clearState
 
 checkLower:
 		call	InitFilePendingRewriteIsLowerBlob
 		jc	isLowerBlob
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 403
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	clearState
 
 isLowerBlob:
@@ -3107,11 +2857,6 @@ isLowerBlob:
 		call	InitFileReadString
 		pop	bp
 		jnc	gotLower
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 404
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	clearState
 
 gotLower:
@@ -3228,37 +2973,14 @@ DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 
 	tst	ss:[entryLen]
 	jnz	haveEntry
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 601
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 	jmp	done
 
 haveEntry:
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	push	ds, si, ax
-	LoadVarSeg	ds, ax
-	mov	ax, ss:[entryLen]
-	mov	ds:[iniTombTraceEntryLen], ax
-	mov	ds, ss:[entrySeg]
-	mov	si, ss:[entryPtr]
-	clr	ax
-	mov	al, ds:[si]
-	LoadVarSeg	ds, si
-	mov	ds:[iniTombTraceFirstByte], ax
-	pop	ds, si, ax
-endif
 	mov	ax, ss:[entryLen]
 	inc	ax
 	mov	cx, ALLOC_DYNAMIC_LOCK
 	call	MemAllocFar
 	jnc	haveTemp
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 602
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 	jmp	done
 
 haveTemp:
@@ -3274,16 +2996,6 @@ haveTemp:
 	rep	movsb
 	clr	al
 	stosb
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	push	ds, ax
-	LoadVarSeg	ds, ax
-	mov	ax, ss:[tempSeg]
-	mov	es, ax
-	clr	ax
-	mov	al, es:[0]
-	mov	ds:[iniTombTraceTempFirst], ax
-	pop	ds, ax
-endif
 
 	LoadVarSeg	ds, ax
 	mov	si, offset dgroup:[disabledCategory]
@@ -3305,9 +3017,6 @@ endif
 	push	bp
 	call	InitFileWriteStringSectionRaw
 	pop	bp
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	call	InitFileTombTraceIncCount
-endif
 
 	mov	bx, ss:[tempHan]
 	call	MemFree
@@ -3597,12 +3306,6 @@ entryPtr	local	word
 	entryLen	local	word
 		.enter
 
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 550
-		clr	bx
-		call	InitFileTombTraceSet
-		call	InitFileTombTraceResetCount
-endif
 		push	bp
 		clr	bp
 		call	InitFileReadMergedStringSection
@@ -3634,11 +3337,6 @@ endif
 	lds	si, ss:[catString]
 	jc	disableFactory
 
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-	mov	ax, 552
-	clr	bx
-	call	InitFileTombTraceSet
-endif
 	movdw	cxdx, ss:[keyString]
 	push	bp
 	mov	bp, ss:[entryLen]
@@ -3647,11 +3345,6 @@ endif
 	jmp	free
 
 	disableFactory:
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 551
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		LoadVarSeg	ds, ax
 		mov	si, offset dgroup:[disabledCategory]
 	mov	cx, ds
@@ -4226,11 +3919,6 @@ done:
 		call	MemFree				; free buffer used earlier
 		popf					; restore carry flag
 	exit:
-if INI_STRING_SECTION_TOMBSTONES
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		call	InitFileTombTraceFlush
-endif
-endif
 		.leave
 		ret
 
@@ -4355,9 +4043,6 @@ if INI_STRING_SECTION_TOMBSTONES
 		tst	es:[suppressStringSectionHooks]
 		jnz	skipRewriteStart
 		call	InitFileStartPendingRewrite
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		call	InitFileTombTraceFlush
-endif
 skipRewriteStart:
 endif
 
@@ -4383,19 +4068,8 @@ DESTROYED:	nothing
 		uses	ax, bx, cx, dx, di, si, ds, es
 		.enter
 
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 100
-		clr	bx
-		call	InitFileTombTraceSet
-		call	InitFileTombTraceResetCount
-endif
 		call	InitFileHaveLowerIniFile
 		jc	haveLowerForMark
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 101
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	done
 
 haveLowerForMark:
@@ -4404,11 +4078,6 @@ haveLowerForMark:
 		lds	si, ds:[catStrAddr]
 		call	InitFileKeyIsDisabledScratch
 		jnc	notScratchKey
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 102
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	done
 
 notScratchKey:
@@ -4419,11 +4088,6 @@ notScratchKey:
 		call	InitFileBuildDisabledKey
 		pop	ds, si, cx, dx
 		jnc	haveMarkDisabledKey
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 103
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 		jmp	done
 
 haveMarkDisabledKey:
@@ -4459,11 +4123,6 @@ copyLoop:
 		tst	al
 		jnz	copyLoop
 		mov	ds:[rewriteStringSection], TRUE
-if INI_STRING_SECTION_TOMBSTONE_TRACE
-		mov	ax, 110
-		clr	bx
-		call	InitFileTombTraceSet
-endif
 
 	done:
 	.leave
