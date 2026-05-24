@@ -39,7 +39,7 @@ REVISION HISTORY:
 	Cheng	11/89		Initial revision
 
 DESCRIPTION:
-		
+
 	$Id: initfileConstruct.asm,v 1.1 97/04/05 01:18:06 newdeal Exp $
 
 -------------------------------------------------------------------------------@
@@ -306,8 +306,8 @@ DBCS <	mov	al, C_TAB						>
 SBCS <	mov	al, VC_ENTER						>
 DBCS <	mov	al, C_ENTER						>
 	repne	scasb			;scan for CR
-	jz	initEntry		;CR found, so use a blob	
-	
+	jz	initEntry		;CR found, so use a blob
+
 	mov	di, si
 	mov	cx, dx
 SBCS <	mov	al, VC_LF						>
@@ -376,7 +376,7 @@ fetchChar:
 	cmp	al, ah			;escape backslashes in blobs
 	je	storeEscaped
 
-notBrace:                               ;escape CR ONLY if not paired with LF
+;notBrace:                               ;escape CR ONLY if not paired with LF
 SBCS<   cmp     al, VC_ENTER                                            >
 DBCS<   cmp     al, C_ENTER                                             >
         jne     notCR
@@ -640,8 +640,8 @@ ReconstructData	proc	near
 	;
 	mov	ax, es			;sav seg addr of buffer
 	mov	es, bp			;es <- dgroup
-	
-	mov	es:[bufAddr].offset, di	
+
+	mov	es:[bufAddr].offset, di
 	mov	es:[bufAddr].segment, ax
 
 	call	SkipWhiteSpace
@@ -776,8 +776,8 @@ ReconstructString	proc	near
 	;
 	mov	ax, es			;sav seg addr of buffer
 	mov	es, bp			;es <- dgroup
-	
-	mov	es:[bufAddr].offset, di	
+
+	mov	es:[bufAddr].offset, di
 	mov	es:[bufAddr].segment, ax
 
 	call	SkipWhiteSpace		;func(es)
@@ -800,7 +800,7 @@ blob::
 	call	GetChar
 	cmp	al, VC_LF
 	jne	charGotten
-	
+
 copyLoop:
 	mov	es, bp
 	call	GetChar			;fetch char
@@ -814,7 +814,7 @@ charGotten:
 	jne	processingBlob		;branch if so
 
 	cmp	al, VC_ENTER		;else CR?
-	je	copyDone		;done if so
+	LONG_EC	je	copyDone		;done if so
 	cmp	al, VC_LF		;LF?
 	je	copyDone		;done if so
 	cmp	al, MSDOS_TEXT_FILE_EOF	;EOF?

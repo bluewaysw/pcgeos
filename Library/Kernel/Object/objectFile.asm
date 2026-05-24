@@ -194,7 +194,7 @@ EC <	ERROR_NZ	LMF_IN_RESOURCE_FLAG_SET_ON_NON_OBJECT_BLOCK	>
 	;
 	call	HandleToID			;bx: handle -> ID
 EC <	ERROR_C	FULL_OBJ_LOCK_CANNOT_FIND_RESOURCE			>
-NEC <	jc	choke							>
+NEC <	LONG	jc	choke						>
 	mov	es, ax				;es = core block of owner
 
 	mov_trash	ax, bx			;pass tag in ax

@@ -782,7 +782,7 @@ be deleted.
             const char *        key,
             word                stringNum);
 
-This routine deletes the specified string section from the given blob in the 
+This routine deletes the specified string section from the given blob in the
 GEOS.INI file. Pass it the following:
 
 category - A pointer to the null-terminated string representing the 
@@ -793,6 +793,14 @@ key - A pointer to the null-terminated string representing the key to
 be edited.
 
 stringNum - The zero-based string section number.
+
+When the kernel is built with `INI_STRING_SECTION_TOMBSTONES` and a lower INI
+file is present, string sections are read as a merged list from the layered INI
+files. If a section entry that originated in a lower-priority INI file is
+deleted, the kernel stores the exact original factory entry in a sidecar string
+section named `key.disabled` in the same category. Kernels built with
+`INI_STRING_SECTION_TOMBSTONES=FALSE`, and runtimes with only one INI file, use
+the legacy local-only string-section delete behavior.
 
 **Include:** initfile.h
 
@@ -830,8 +838,16 @@ described below.
 *enumData* - This pointer is passed unchanged to the callback routine. 
 **InitFileEnumStringSection()** does not use it.
 
-This routine returns a Boolean value. It returns *true* if the callback routine 
+This routine returns a Boolean value. It returns *true* if the callback routine
 halted the enumeration by returning *true*; otherwise, it returns *false*.
+
+For string-section keys, enumeration uses the layered INI merge only when
+`INI_STRING_SECTION_TOMBSTONES` is enabled and a lower INI file is present.
+Entries from lower-priority INI files are combined with local entries, exact
+duplicates are removed, and entries listed in the primary file sidecar key
+`key.disabled` are suppressed. Passing `IFRF_FIRST_ONLY` preserves
+primary-file-only behavior. Disabled kernels and single-file runtimes use the
+legacy read behavior.
 
 **Callback Routine:**
 
@@ -1091,11 +1107,14 @@ not be found; it will be *false* otherwise.
             InitFileReadFlags   flags,
             word *              dataSize);
 
-This routine reads a string section from the specified entry in the GEOS.INI 
-file, allocates a new block on the global heap, and copies the read string 
-section into the new block. It returns the first instance of the category/key 
-combination it encounters, searching the local INI file first. Thus, local 
-settings will always override system or network settings.
+This routine reads a string section from the specified entry in the GEOS.INI
+file, allocates a new block on the global heap, and copies the read string
+section into the new block. If the kernel is built with
+`INI_STRING_SECTION_TOMBSTONES` and a lower INI file is present, layered INI
+entries are merged so that factory entries from lower-priority INI files remain
+visible after local customization. Local entries are included, exact duplicates
+are removed, and factory entries listed in the sidecar key `key.disabled` are
+suppressed.
 
 This routine is used for reading data written with **InitFileWriteString()** or 
 **InitFileWriteStringSection()**. Pass it the following parameters:
@@ -1135,11 +1154,13 @@ not be found; it will be *false* otherwise.
             InitFileReadFlags   flags,
             word *              dataSize);
 
-This routine reads a string section from the specified entry in the GEOS.INI 
-file, copying it into a passed, locked buffer. It returns the indicated section in 
-the first instance of the category/key combination it encounters, searching 
-the local INI file first. Thus, local settings will always override system or 
-network settings.
+This routine reads a string section from the specified entry in the GEOS.INI
+file, copying it into a passed, locked buffer. If the kernel is built with
+`INI_STRING_SECTION_TOMBSTONES` and a lower INI file is present, layered INI
+entries are merged so that factory entries from lower-priority INI files remain
+visible after local customization. Local entries are included, exact duplicates
+are removed, and factory entries listed in the sidecar key `key.disabled` are
+suppressed.
 
 This routine is used for reading data written with 
 **InitFileWriteStringSection()**. Pass it the following parameters:
@@ -1319,9 +1340,18 @@ written.
 
 *string* - A pointer to the string section to be written.
 
-Once written, the segment may be read with 
-**InitFileReadStringSectionBlock()** or 
+Once written, the segment may be read with
+**InitFileReadStringSectionBlock()** or
 **InitfileReadStringSectionBuffer()**.
+
+When `INI_STRING_SECTION_TOMBSTONES` is enabled and a lower INI file is present,
+a string section being rewritten after deleting the local key causes the kernel
+to temporarily list the current factory entries in `key.disabled` and remove
+each entry again when it is written back with only lexical formatting changes.
+The sidecar stores exact factory string-section entries. This preserves user
+deletions and modifications while still allowing new lower-priority INI entries
+to appear later. Disabled kernels and single-file runtimes append string
+sections with the legacy local-only behavior.
 
 **Include:** initfile.h
 
