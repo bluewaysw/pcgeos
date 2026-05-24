@@ -2017,14 +2017,13 @@ CreateCategory	proc	near
 	uses	cx, di, si, ds
 	.enter
 
-if HASH_INIFILE
 	;
-	; Jump to the end of the file
+	; Always append new categories at EOF.  FindCategory can return a
+	; cached CATEGORY_NOT_PRESENT without positioning initFileBufPos.
 	;
 	mov	ax, es:[loaderVars].KLV_initFileSize	; size including EOF
 	dec	ax					; offset of EOF
 	mov	es:[initFileBufPos], ax
-endif		;HASH_INIFILE
 
 	; First make space for the new category name
 	;
