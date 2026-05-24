@@ -63,7 +63,7 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	Routines to draw/scale bitmaps
-		
+
 
 	$Id: graphicsRasterDraw.asm,v 1.1 97/04/05 01:13:36 newdeal Exp $
 
@@ -103,7 +103,7 @@ PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		just returns right now if there is an allocation error
 
-		Note for HugeArrays:  We try to treat these the same as a 
+		Note for HugeArrays:  We try to treat these the same as a
 		complex bitmap, each "slice" being what is held in a single
 		VM block of the HugeArray.
 
@@ -142,7 +142,7 @@ EC <		pop	bx						>
 
 endif
 
-		; we need to save the current area color, since it may change 
+		; we need to save the current area color, since it may change
 		; if we do some format conversion (which always wants it to
 		; be black)
 
@@ -186,9 +186,9 @@ EC <		mov	es:[di], SENTINEL		; init sentinel      >
 		mov	BMframe.BF_finalBM.segment, ax	; save address
 		mov	BMframe.BF_args.PBA_data.segment, ax ; save here too
 		mov	BMframe.BF_finalBM.offset, di	; save offset
-		mov	BMframe.BF_origBMcurScan, di	
+		mov	BMframe.BF_origBMcurScan, di
 
-		; At this point, we're going to init some data pointers and 
+		; At this point, we're going to init some data pointers and
 		; copy the header over to the just-allocated block.  For Huge
 		; Arrays, this yields slightly different results...
 
@@ -198,7 +198,7 @@ EC <		mov	es:[di], SENTINEL		; init sentinel      >
 		mov	cx, size Bitmap
 		mov	bx, cx
 
-		; copy over bitmap header to allocated block.  
+		; copy over bitmap header to allocated block.
 
 		mov	ax, ds:[si].B_height		; assume src is simple
 		test	ds:[si].B_type, mask BMT_COMPLEX ; see if simple
@@ -246,7 +246,7 @@ storeType:
 		or	al, mask BMT_COMPLEX		; set complex bit
 		mov	es:[B_type], al		; save type
 		mov	es:[CB_data], size CBitmap	; stuff data pointer
-		mov	es:[CB_palette], di		; no cptr for now 
+		mov	es:[CB_palette], di		; no cptr for now
 		mov	es:[CB_devInfo], di		; not a device
 		mov	es:[CB_numScans], di		; init these too
 		mov	es:[CB_startScan], di		; init these too
@@ -263,10 +263,10 @@ storeType:
 		mov	BMframe.BF_args.PBA_size, ax	; store here too...
 		mov	BMframe.BF_args.PBA_bm.B_compact, BMC_UNCOMPACTED
 
-		; Test if complex, non-rotated bitmap starts outside of the 
-		; mask rectangle. We check this by computing the y-pos of 
-		; the scanline in the source bitmap that should fall at or 
-		; across the top of the mask rectangle (bottom if 
+		; Test if complex, non-rotated bitmap starts outside of the
+		; mask rectangle. We check this by computing the y-pos of
+		; the scanline in the source bitmap that should fall at or
+		; across the top of the mask rectangle (bottom if
 		; BMOT_SCALE_NEGY). If there is such a scanline, then save
 		; its position for later, and set the skipping flag.
 
@@ -299,7 +299,7 @@ skipScaled:
 noSkip:
 
 		; before we leave this section, we want to check for HugeArray
-		; type bitmaps, and set the BF_origBMscansLeft field to 
+		; type bitmaps, and set the BF_origBMscansLeft field to
 		; the number of scans in the block containing BF_origBMfirstScan
 		; and BF_origBMcurScan to the first scan in that block.
 
@@ -363,16 +363,16 @@ popWindow:
 		; will be required, etc.  First, set up the coordinates
 getDrawPoint:
 		mov	ax, BMframe.BF_drawPoint.P_x ; retrieve coords
-		mov	bx, BMframe.BF_drawPoint.P_y 
+		mov	bx, BMframe.BF_drawPoint.P_y
 
 		; re-save the GState segment, for use later
 
 		push	cx
 
-		; get the next slice and call the driver.  
+		; get the next slice and call the driver.
 
 		call	BMGetSlice		; get the next slice
-		jc	done			;  has no scans, just quit
+		LONG_EC	jc	done		;  has no scans, just quit
 
 		; check for rotation.  deal with that separately
 
@@ -381,7 +381,7 @@ getDrawPoint:
 
 		; no rotation.  just call the video driver.
 		; first check if we are drawing the bitmap or filling a mask
-		
+
 		test	BMframe.BF_opType, mask BMOT_FILL_MASK
 		jz	loadGState
 		or	BMframe.BF_args.PBA_flags, mask PBF_FILL_MASK
@@ -397,7 +397,7 @@ loadGState:
 		jmp	afterCall
 doNextSlice:
 		mov	ax, BMframe.BF_drawPoint.P_x ; pass coordinates
-		push	ds	
+		push	ds
 		test	BMframe.BF_imageFlags, mask IF_DRAW_IMAGE
 		jnz	drawImage
 		mov	di, DR_VID_PUTBITS	; use putbits
@@ -422,7 +422,7 @@ EC <		cmp	ds:[di], SENTINEL				>
 EC <		ERROR_NE GRAPHICS_SENTINEL_FOR_BITMAP_BUFFER_CORRUPTED	>
 EC <		pop	ds						>
 EC <		popf							>
-		mov	bx, ds:[si].CB_startScan	; find start scan line 
+		mov	bx, ds:[si].CB_startScan	; find start scan line
 		pop	ds
 		jc	done
 		add	bx, BMframe.BF_drawPoint.P_y
@@ -470,7 +470,7 @@ drawImage:
 		mov	ax, BMframe.BF_drawPoint.P_x
 		add	bx, BMframe.BF_drawPoint.P_y
 		call	ImageHugeSectionFar
-		jnc	afterCall		; if not done, continue
+		LONG_EC	jnc	afterCall	; if not done, continue
 		pop	ds			; else restore stack and exit
 		jmp	done
 DrawSlice	endp
@@ -502,11 +502,11 @@ PSEUDO CODE/STRATEGY:
 
 		DECOMPACT  FORMAT CHG  SCALE	Comment
 		---------  ----------  -----	-------
-		       no   	   no	  no	No buffer allocated 
+		       no   	   no	  no	No buffer allocated
 		       no	   no	 yes	Divide buffer into two pieces,
 						The first part is where the
 						scans from the original bitmap
-						are scaled (directly from the 
+						are scaled (directly from the
 						original).  The second part of
 						the buffer holds the masks and
 						jumps for each destination
@@ -516,12 +516,12 @@ PSEUDO CODE/STRATEGY:
 						300 bytes is appended to assist
 						in the format conversion.
 		       no	  yes	 yes	Divide buffer into three, 1st
-						to copy bytes, 2nd to scale 
-						into and change fmt,, 3rd to 
-						hold masks/jumps. this one has 
+						to copy bytes, 2nd to scale
+						into and change fmt,, 3rd to
+						hold masks/jumps. this one has
 						the format buffer too.
 		      yes	   no	  no	Decompact into full buffer.
-						(Eventually we may want to 
+						(Eventually we may want to
 						 move this into the driver)
 		      yes	   no	 yes	Three pieces, decompact into
 						1st, scale into 2nd, 3rd for
@@ -531,7 +531,7 @@ PSEUDO CODE/STRATEGY:
 						has 300 byte format conversion
 						buffer to help out
 		      yes	  yes	 yes	Three pieces: decompact into
-						1st, scale into 2nd, change 
+						1st, scale into 2nd, change
 						fmt in place, 3rd for masks/
 						jumps. adds a format conversion
 						buffer (300 bytes) at the end
@@ -577,14 +577,14 @@ BMframe		local	BitmapFrame
 		jbe	storeSliceSize
 		mov	ax, ds:[si].B_height	; don't assume larger
 storeSliceSize:
-		mov	BMframe.BF_origBMscans, ax ; set scans per slice 
+		mov	BMframe.BF_origBMscans, ax ; set scans per slice
 		mov	cx, bx			; pass scan line size
 		mul	cx			; determine #bytes to decompact
 		mov	BMframe.BF_finalBMsliceSize, ax
 		mov	BMframe.BF_getSliceDSize, ax
 		clr	dx				; dl will hold flags
 		mov	BMframe.BF_scaledScanSize, dx ; init some other vars
-		mov	BMframe.BF_xtraScanLinePtr, dx 
+		mov	BMframe.BF_xtraScanLinePtr, dx
 		mov	BMframe.BF_getSliceMaskPtr, dx
 		mov	BMframe.BF_getSliceMaskPtr2, dx
 		mov	BMframe.BF_getSliceScalePtr, dx
@@ -601,9 +601,9 @@ if	(DISPLAY_CMYK_BITMAPS eq TRUE)
 		cmp	dh, BMF_4CMYK
 		je	checkDecompaction
 endif
-		test	BMframe.BF_imageFlags, mask IF_DRAW_IMAGE 
+		test	BMframe.BF_imageFlags, mask IF_DRAW_IMAGE
 		jnz	checkDecompaction
-		test	es:[W_curTMatrix].TM_flags, TM_ROTATED	
+		test	es:[W_curTMatrix].TM_flags, TM_ROTATED
 		jz	checkScale
 		or	dl, mask BMOT_ROTATE		; we're rotated
 		jmp	setScaled			; for now, assume scaled
@@ -656,7 +656,7 @@ endif
 		and	al, mask BMT_FORMAT		; isolate bits
 		and	BMframe.BF_args.PBA_bm.B_type, not mask BMT_FORMAT
 		or	BMframe.BF_args.PBA_bm.B_type, al ; set new type
-		mov	bx, BMframe.BF_getSliceDSize	
+		mov	bx, BMframe.BF_getSliceDSize
 		add	BMframe.BF_getSliceDSize, FORMAT_SCRATCH_SIZE
 		add	bx, size CBitmap		; form pointer
 		mov	BMframe.BF_formatPtr, bx	; save it
@@ -741,15 +741,15 @@ DESTROYED:	ax,bx,dx,di
 PSEUDO CODE/STRATEGY:
 		get the next scan line of data out of the original bitmap slice
 		and put it in the allocated buffer.  Operations may include
-		decompaction, stretching, and format conversion.  This 
+		decompaction, stretching, and format conversion.  This
 		routine is NOT called if there is any rotation.
 
 		If the bitmap is to be stretched, decompacted, or requires
 		a format conversion (color format), then TWO bitmaps will
-		be passed here.  One is pointed to by BMframe.origBM and 
-		contains a pointer to the original bitmap passed to 
+		be passed here.  One is pointed to by BMframe.origBM and
+		contains a pointer to the original bitmap passed to
 		GrDrawBitmap.  The other is a block allocated by the bitmap
-		drawing code (in DrawSlice), and is the workspace for 
+		drawing code (in DrawSlice), and is the workspace for
 		decompacting/scaling/format conversion (d/s/fc).
 
 		If the bitmap is simple (i.e. uses the Bitmap structure and
@@ -761,7 +761,7 @@ PSEUDO CODE/STRATEGY:
 		If the bitmap is complex, but does not require any d/s/fc,
 		then this routine will get called from the video driver
 		to get the next slice of the complex bitmap.  In this case,
-		there is only ONE bitmap to deal with (no additional 
+		there is only ONE bitmap to deal with (no additional
 		workspace buffer).
 
 		CASE 2.
@@ -776,12 +776,12 @@ PSEUDO CODE/STRATEGY:
 			is no application callback to call.  We just need
 			to keep track of where we are in the original bitmap
 			(what scan line, keep data pointer) and copy the
-			next piece over to our own bitmap buffer so we 
+			next piece over to our own bitmap buffer so we
 			can d/s/fc it.
 
 			CASE 2B.
 			-------
-			The original bitmap is complex. This is the worst 
+			The original bitmap is complex. This is the worst
 			case of all.  We have to keep track of where we are
 			in each slice, like we did in CASE 2A for the simple
 			bitmaps, then when we finish the slice we call back
@@ -800,12 +800,12 @@ PSEUDO CODE/STRATEGY:
 					copy them;
 					numScansWanted=0;
 					CheckToGetNextSlice;
-				    else 
+				    else
 					copy what's left in original slice;
 					numScansWanted -= #scans left in o.s.
 					CheckToGetNextSlice;
 
-			The routine CheckToGetNextSlice checks to see if 
+			The routine CheckToGetNextSlice checks to see if
 			there is another slice to get.  If not, it bails.
 			If so, it does the callback to get the pointers to
 			the next slice;
@@ -814,15 +814,15 @@ PSEUDO CODE/STRATEGY:
 		There is one additional case.  If the bitmap is being scaled,
 		and the scale factor is greater than 1.0 in y, then it
 		is possible that one or more of the scan lines of the bitmap
-		will need to be drawn twice.  The video driver supports 
+		will need to be drawn twice.  The video driver supports
 		drawing slices repeatedly, and the bitmap scaling code uses
 		this feature.  In all other cases, this routine is called
 		when the current slice has been drawn, and the next slice
 		is needed.  In the case just described, however, each
 		repeated scan line is drawn alone, so this routine will get
-		called multiple times for each slice.  In this case, a 
-		special flag (partScaleFlag) is maintained by the bitmap 
-		scaling code, and is checked for and handled here as a 
+		called multiple times for each slice.  In this case, a
+		special flag (partScaleFlag) is maintained by the bitmap
+		scaling code, and is checked for and handled here as a
 		special case.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -849,8 +849,8 @@ BMframe		local	BitmapFrame
 		; before we check to see if we need to get more of the bitmap
 		; check to see if we're scaling.  It could be we're not done
 		; drawing the scans that are in the first half of the data
-		; space of the bitmap we've allocated.  See ScaleSlice to 
-		; get further confused (and the notes in the above function 
+		; space of the bitmap we've allocated.  See ScaleSlice to
+		; get further confused (and the notes in the above function
 		; header)
 
 		test	BMframe.BF_opType, mask BMOT_PARTIAL
@@ -865,7 +865,7 @@ noPartFormatConvert:
 
 		; CHECK FOR CASE 1
 		; next check for a single bitmap.  In this case we just
-		; need to do the callback to get the next slice from the 
+		; need to do the callback to get the next slice from the
 		; caller of GrDrawBitmap. (if we're not done).
 		; NOTE: There's another complication now: ds is not valid at
 		;       this point if the original bitmap is HUGE.  In that
@@ -879,7 +879,7 @@ checkForCase1:
 		je	singleBitmap			;  yes, deal w/CASE 1
 
 		; MUST BE CASE 2
-		; Make sure the data pointer is in the right place, and 
+		; Make sure the data pointer is in the right place, and
 		; update the startRow
 case2:
 		mov	ax, size CBitmap		; reset pointer
@@ -961,7 +961,7 @@ endif
 							;   carry, we're done
 		mov	BMframe.BF_finalBM.segment, ds	; reset internal vars
 		mov	BMframe.BF_finalBM.offset, si
-		mov	BMframe.BF_origBM.segment, ds	
+		mov	BMframe.BF_origBM.segment, ds
 		mov	BMframe.BF_origBM.offset, si
 		jmp	doneMoreToDraw			; more to do
 
@@ -991,7 +991,7 @@ PSEUDO CODE/STRATEGY:
 		We have to split the buffer into three pieces.  The first
 		to copy the data in and perform the decompaction/format
 		change.  The second to scale the scan lines into and the
-		thrird to hold the precalculated masks/jumps for scaling 
+		thrird to hold the precalculated masks/jumps for scaling
 		each scan line.
 
 
@@ -1010,11 +1010,11 @@ REVISION HISTORY:
 GetSliceComplex	proc	near
 BMframe		local	BitmapFrame
 		.enter	inherit
-		; START OF WHILE LOOP TO GET DATA 
+		; START OF WHILE LOOP TO GET DATA
 		; (See description in header for BMGetSlice)
 		; OK, we've established that the first row of the next slice
 		; will not overflow on the destination bitmap end.  Assume
-		; it won't overflow the source bitmap end (it shouldn't).  
+		; it won't overflow the source bitmap end (it shouldn't).
 		; We'll take care of that later anyway.  Now we head into
 		; that cute while loop described in the function header.
 
@@ -1082,7 +1082,7 @@ restorePointers:
 		pop	cx				; restore #scans left
 		tst	cx				; if more, keep going
 		jnz	topOfWhileLoop			;  yep...
-		
+
 		; END OF WHILE LOOP
 		; now stretch/compress if any scale factor.  This includes
 		; the effects of different bitmap resolutions.
@@ -1091,7 +1091,7 @@ scaleBitmap:
 		jz	formatConversion		;   no, skip the call
 		call	ScaleSlice			;   yes, call scaler
 
-		; now we have our buffer full of decompacted/scaled data.  
+		; now we have our buffer full of decompacted/scaled data.
 		; Continue with the final construction pipeline. do any format
 		; conversion needed.
 formatConversion:
@@ -1113,7 +1113,7 @@ doneFinishedDrawing:
 		; we've run out of bitmap, call the caller to get some more.
 		; Unless the original bitmap was simple, of course.  Then
 		; we know we're done.
-		; We'll also come here if the bitmap is in a HugeArray, in 
+		; We'll also come here if the bitmap is in a HugeArray, in
 		; which case we want to lock down the next block.
 doCallback:
 		test	BMframe.BF_origBMtype, mask BMT_HUGE
@@ -1174,7 +1174,7 @@ figureCopyAmount:
 		mov	cx, ax				; cx = #bytes to copy
 		pop	dx
 		jmp	haveCopySize
-		
+
 		; it's a HugeBitmap.  Find the right scan line.
 		; dx = # we're doing this time around
 getHugePointer:
@@ -1183,7 +1183,7 @@ getHugePointer:
 		mov	di, BMframe.BF_origBM.offset	; block handle
 		mov	ax, BMframe.BF_origBMcurScan	; dx.ax = desired scan
 		sub	ax, dx				; dx = # doing this rnd
-		clr	dx		
+		clr	dx
 EC <		call	ECCheckHugeArrayFar				>
 		call	HugeArrayLock
 		pop	bx, di, cx
@@ -1198,7 +1198,7 @@ nextHugeBlock:
 		mov	ax, BMframe.BF_origBMcurScan	; dx.ax = desired scan
 		cmp	ax, BMframe.BF_origBMheight	; see if we're done
 		jae	popCheckPartialSlice
-		clr	dx		
+		clr	dx
 EC <		call	ECCheckHugeArrayFar				>
 		call	HugeArrayLock
 		mov	BMframe.BF_origBMscansLeft, ax	; store # in this block
@@ -1374,7 +1374,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFormatConversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Might want to do some initialization for format conversion 
+SYNOPSIS:	Might want to do some initialization for format conversion
 		before any slices are loaded up
 
 CALLED BY:	INTERNAL
@@ -1391,8 +1391,8 @@ PSEUDO CODE/STRATEGY:
 
 		We have at our disposal, 65 different dither-level with an
 		8x8 pattern matrix.  This is used for the 8/24bit to 1bit
-		conversions, but a subset is used for the 4bit to 1bit 
-		conversions, since we don't need that many levels and the 
+		conversions, but a subset is used for the 4bit to 1bit
+		conversions, since we don't need that many levels and the
 		bigger the matrix, the lower the spacial resolution.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -1433,19 +1433,19 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GetPointerToPalette
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Returns a pointer to the palette to use when mapping from 
+SYNOPSIS:	Returns a pointer to the palette to use when mapping from
 		one format to another( i.e 256 -> 16 colors, 16 -> mono,
 		256-> mono). If there is a palette associated with the Bitmap,
 		use that one, else, use the default system palette
 
 CALLED BY:	InitSVGAtoVGA, InitSVGAtoMono, InitVGAtoMono
-PASS:		inherits BMframe		
+PASS:		inherits BMframe
 RETURN:		es:di	pointer to Palette
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1473,9 +1473,9 @@ BMframe		local	BitmapFrame
 		and	BMframe.BF_args.PBA_bm.B_type, not mask BMT_PALETTE
 		mov	di, BMframe.BF_finalBM.offset ; ds:di -> bitmap
 		and	ds:[di].B_type, not mask BMT_PALETTE
-		test	BMframe.BF_origBMtype, mask BMT_HUGE 
+		test	BMframe.BF_origBMtype, mask BMT_HUGE
 		jz	getOrigPalette		; if not huge, point at table
-		
+
 		; Else lock down the HugeArrayBitmap
 		;
 		movdw	bxdi, BMframe.BF_origBM	; bx.di is the Huge Array
@@ -1524,7 +1524,7 @@ PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		There are some better algorithms for this, like a Floyd-
 		Steinberg error-propagation algorithm.  But they take more
-		time/space.  
+		time/space.
 
 REVISION HISTORY:
 		Name	Date		Description
@@ -1609,11 +1609,11 @@ PSEUDO CODE/STRATEGY:
 		This routine maps the RGB value to a grey scale level using the
 		following relation:
 
-	    	Map color to grey level.  This section of code maps an RGB 
-		triplet into a value (0-63) that is used to pick one of 64 
-		dither patterns.  The optimal mapping is: 
+	    	Map color to grey level.  This section of code maps an RGB
+		triplet into a value (0-63) that is used to pick one of 64
+		dither patterns.  The optimal mapping is:
 			level = .299*red + .587*green + .114*blue
-		The mapping we use is:  
+		The mapping we use is:
 			level = .375*red + .500*green + .125*blue
 		since it's easier/faster to calculate.
 
@@ -1640,15 +1640,15 @@ BMframe		local	BitmapFrame
 		;
 
 		call	CalcDitherFromMixMode
-		jc	done		
+		jc	done
 
 		mov	ah, bl
 		mov	bl, bh
 
 		call	GrCalcLuminance		; ax = luminance
 
-		; we need to map this luminence value (0-255) to a smaller 
-		; range (0-16) so that's a shift right two bits. We then 
+		; we need to map this luminence value (0-255) to a smaller
+		; range (0-16) so that's a shift right two bits. We then
 		; need to index into a table of dither patterns, 8 bytes each.
 
 		shr	al, 1			; divide luminence by 16
@@ -1675,7 +1675,7 @@ Description:	This routine checks to see whether the dither can be
 		calculated from the MixMode, which is the case for MixModes
 		wherein the result is not a function of the source
 		(eg. MM_SET, MM_CLEAR)
-		
+
 Pass:		nothing (inherits BitmapFrame)
 
 Return:		If dither can be calculated from MixMode:
@@ -1815,7 +1815,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		BMIndexToRGB
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	A quick verison of the old standby.  
+SYNOPSIS:	A quick verison of the old standby.
 
 CALLED BY:	INTERNAL
 		InitSVGAtoMono, InitVGAtoMono
@@ -1825,9 +1825,9 @@ RETURN:		al,bl,bh	- equivalent RGB values
 DESTROYED:	ah
 
 PSEUDO CODE/STRATEGY:
-		
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -1881,12 +1881,12 @@ BMIndex256toIndex16	proc	near
 		add	bx, ax			; index *3
 		mov	al, es:[di][bx].RGB_red
 		mov	bx, {word} es:[di][bx].RGB_green
-		mov	ch, 0xf		
+		mov	ch, 0xf
 
 		; Get a pointer to the palette for the window, the custom one,
 		; if any, otherwise return a pointer to the default palette
 		;
-						; pass window segment in dx 
+						; pass window segment in dx
 		call	GetCurrentPalette	; pointer to palette-> ds:si
 		call	MapRGBtoIndex
 
@@ -1981,7 +1981,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Do some initialization for 24-bit to monochrome conversion
-		Also used for 4-bit and 8-bit conversions		
+		Also used for 4-bit and 8-bit conversions
 
 CALLED BY:	INTERNAL
 		InitFormatConversion
@@ -2052,11 +2052,11 @@ DESTROYED:	nothing
 PSEUDO CODE/STRATEGY:
 		Basically, we have to change higher bit-per-pixel formats into
 		lower bit-per-pixel formats.  This is so we can display, for
-		example, an 8-bit/pixel image on a 4-bit/pixel device. 
+		example, an 8-bit/pixel image on a 4-bit/pixel device.
 
 		This routine acts as the distributor -- it figures out which
 		format conversion routine is needed.  It bases that on what
-		the two types of input bitmaps are, according to the 
+		the two types of input bitmaps are, according to the
 		following table.  The (formats added)*2 column is how the
 		jump table index is calculated.  Basically, the enums of the
 		two formats are added and shifted left.  This yields 5
@@ -2064,7 +2064,7 @@ PSEUDO CODE/STRATEGY:
 		handled specially.
 						(formats
 		old format	new format	added)*2	Routine
-		----------	----------	-------		-------	
+		----------	----------	-------		-------
 		4-bit		1-bit		2		VGAtoMono
 		8-bit		4-bit		6		SVGAtoVGA
 		8-bit		1-bit		4		SVGAtoMono
@@ -2078,7 +2078,7 @@ PSEUDO CODE/STRATEGY:
 		format, of which there are now four values defined:
 		BMF_MONO(=0), BMF_4BIT(=1), BMF_8BIT(=2), BMF_24BIT(=3).
 		The values for both device/bitmap are added, then multiplied
-		by two to get a table index.  This leads to the mapping in 
+		by two to get a table index.  This leads to the mapping in
 		the above table
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2141,9 +2141,9 @@ CALLED BY:	INTERNAL
 PASS:		BMframe stack frame
 		ds:si		- points to bitmap header of bitmap containing
 				  data to convert
-		es:di		- points to beginning data section of same 
+		es:di		- points to beginning data section of same
 				  bitmap
-		dx		- 0 if no mask in bitmap, else offset to 
+		dx		- 0 if no mask in bitmap, else offset to
 				  mask info (same as di coming in to routine)
 
 RETURN:		nothing
@@ -2154,9 +2154,9 @@ PSEUDO CODE/STRATEGY:
 		This routine maps color pixels to some grey scale level (dither
 		pattern).
 
-		Basically, we have to go through the slice and replace the 
+		Basically, we have to go through the slice and replace the
 		4-bit pixels there with monochrome data.  We map the colors
-		to dither patterns, then select the proper bit within the 
+		to dither patterns, then select the proper bit within the
 		dither to choose whether to set/reset the bit.
 
 		Build dither pattern table (4-bit index -> dither pattern #)
@@ -2238,7 +2238,7 @@ setTarget:
 		;
 		; We want to preserve the mask, so bump di to point
 		; right at the data, skipping the mask
-		; 
+		;
 		mov	di, si
 
 scanLoop:
@@ -2249,7 +2249,7 @@ scanLoop:
 		and	dh, 7			; index into dither
 
 		; this loop is executed for each byte of the CONVERTED data
-		; basically, we keep accumulating the bits until we have a 
+		; basically, we keep accumulating the bits until we have a
 		; bytes worth, then write it out.  In this loop:
 		;	ax = scratch registers
 		;	bx = pointer to format conversion table
@@ -2417,7 +2417,7 @@ setTarget:
 		;
 		; We want to preserve the mask, so bump di to point
 		; right at the data, skipping the mask
-		; 
+		;
 		mov	di, si
 
 scanLoop:
@@ -2428,7 +2428,7 @@ scanLoop:
 		and	dh, 7			; index into dither
 
 		; this loop is executed for each byte of the CONVERTED data
-		; basically, we keep accumulating the bits until we have a 
+		; basically, we keep accumulating the bits until we have a
 		; bytes worth, then write it out.  In this loop:
 		;	ax = scratch registers
 		;	bx = pointer to format conversion table
@@ -2609,7 +2609,7 @@ scanLoop:
 		mov	cx, ax			; cx = #bytes in scan line
 
 		; this loop is executed for each byte of the CONVERTED data
-		; basically, we keep accumulating the bits until we have a 
+		; basically, we keep accumulating the bits until we have a
 		; bytes worth, then write it out.  In this loop:
 		;	ax = scratch registers
 		;	bx = pointer to format conversion table
@@ -2626,7 +2626,7 @@ byteLoop:
 		GetIndex16
 		GetIndex16
 		mov	al, ch			; byte to store
-		stosb	
+		stosb
 		pop	cx			; restore byte count
 		loop	byteLoop
 
@@ -2736,7 +2736,7 @@ setTarget:
 		;
 		; We want to preserve the mask, so bump di to point
 		; right at the data, skipping the mask
-		; 
+		;
 		mov	di, si
 
 scanLoop:
@@ -2747,7 +2747,7 @@ scanLoop:
 		and	dh, 7			; index into dither
 
 		; this loop is executed for each byte of the CONVERTED data
-		; basically, we keep accumulating the bits until we have a 
+		; basically, we keep accumulating the bits until we have a
 		; bytes worth, then write it out.  In this loop:
 		;	ax = scratch registers
 		;	bx = pointer to format conversion table
@@ -2898,7 +2898,7 @@ RETURN:		nothing
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		This routine maps color pixels to some other lower res 
+		This routine maps color pixels to some other lower res
 		color level.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2915,7 +2915,7 @@ GetRGBIndex16	macro
 		mov	bx, {word} ds:[si].RGB_green
 		lodsb				; get the next source byte
 		add	si, 2
-		mov	ah, 0xf	
+		mov	ah, 0xf
 		call	BMRGBtoIndex
 		shl	ch, cl			; shift up color
 		or	ch, ah
@@ -2964,7 +2964,7 @@ scanLoop:
 		mov	cx, ax			; cx = #bytes in scan line
 
 		; this loop is executed for each byte of the CONVERTED data
-		; basically, we keep accumulating the bits until we have a 
+		; basically, we keep accumulating the bits until we have a
 		; bytes worth, then write it out.  In this loop:
 		;	ax = scratch registers
 		;	bx = pointer to format conversion table
@@ -2981,7 +2981,7 @@ byteLoop:
 		GetRGBIndex16
 		GetRGBIndex16
 		mov	al, ch			; byte to store
-		stosb	
+		stosb
 		pop	cx			; restore byte count
 		loop	byteLoop
 
@@ -3034,7 +3034,7 @@ RETURN:		nothing
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		This routine maps color pixels to some other lower res 
+		This routine maps color pixels to some other lower res
 		color level.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -3114,7 +3114,7 @@ scanLoop:
 		mov	cx, ax			; cx = #bytes in scan line
 
 		; this loop is executed for each byte of the CONVERTED data
-		; basically, we keep accumulating the bits until we have a 
+		; basically, we keep accumulating the bits until we have a
 		; bytes worth, then write it out.  In this loop:
 		;	ax = scratch registers
 		;	bx = pointer to format conversion table

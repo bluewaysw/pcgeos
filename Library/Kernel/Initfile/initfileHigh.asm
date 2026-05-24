@@ -1124,16 +1124,16 @@ factorySize	local	word
 localHan	local	hptr
 localSize	local	word
 disabledHan	local	hptr
-		disabledSize	local	word
+disabledSize	local	word
 sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 		.enter
 
-	test	ss:[readFlags], mask IFRF_FIRST_ONLY
-	jnz	readOne
+		test	ss:[readFlags], mask IFRF_FIRST_ONLY
+		LONG	jnz	readOne
 
-	call	InitFileHaveLowerIniFile
-	jnc	readOne
+		call	InitFileHaveLowerIniFile
+		LONG	jnc	readOne
 
 		push	ds, si, cx, dx
 		segmov	es, ss
@@ -1142,25 +1142,25 @@ sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 		lea	ax, ss:[sidecarKey]
 		call	InitFileBuildDisabledKey
 		pop	ds, si, cx, dx
+		LONG	jc	readOne
+
+		push	bp
+		mov	bp, ss:[readFlags]
+		andnf	bp, not (mask IFRF_SIZE)
+		call	InitFileReadLowerString
+		pop	bp
 		jc	readOne
+		tst	bx
+		jz	readOne
 
-	push	bp
-	mov	bp, ss:[readFlags]
-	andnf	bp, not (mask IFRF_SIZE)
-	call	InitFileReadLowerString
-	pop	bp
-	jc	readOne
-	tst	bx
-	jz	readOne
-
-	inc	cx			; count the terminating null
-	mov	ss:[factoryHan], bx
-	mov	ss:[factorySize], cx
-	clr	ax
-	mov	ss:[localHan], ax
-	mov	ss:[localSize], ax
-	mov	ss:[disabledHan], ax
-	mov	ss:[disabledSize], ax
+		inc	cx			; count the terminating null
+		mov	ss:[factoryHan], bx
+		mov	ss:[factorySize], cx
+		clr	ax
+		mov	ss:[localHan], ax
+		mov	ss:[localSize], ax
+		mov	ss:[disabledHan], ax
+		mov	ss:[disabledSize], ax
 
 		segmov	ds, ss
 		lea	si, ss:[sidecarCategory]
@@ -1168,45 +1168,45 @@ sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 		lea	dx, ss:[sidecarKey]
 		push	bp
 		mov	bp, mask IFRF_FIRST_ONLY
-	call	InitFileReadString
-	pop	bp
-	jc	noDisabled
-	inc	cx
-	mov	ss:[disabledHan], bx
-	mov	ss:[disabledSize], cx
+		call	InitFileReadString
+		pop	bp
+		jc	noDisabled
+		inc	cx
+		mov	ss:[disabledHan], bx
+		mov	ss:[disabledSize], cx
 noDisabled:
-	lds	si, ss:[catString]
-	movdw	cxdx, ss:[keyString]
-	push	bp
-	mov	bp, mask IFRF_FIRST_ONLY
-	call	InitFileReadString
-	pop	bp
-	jc	noLocal
-	inc	cx
-	mov	ss:[localHan], bx
-	mov	ss:[localSize], cx
+		lds	si, ss:[catString]
+		movdw	cxdx, ss:[keyString]
+		push	bp
+		mov	bp, mask IFRF_FIRST_ONLY
+		call	InitFileReadString
+		pop	bp
+		jc	noLocal
+		inc	cx
+		mov	ss:[localHan], bx
+		mov	ss:[localSize], cx
 noLocal:
-	mov	bx, ss:[factoryHan]
-	mov	cx, ss:[factorySize]
-	mov	ax, ss:[localHan]
-	mov	dx, ss:[localSize]
-	mov	si, ss:[disabledHan]
-	mov	di, ss:[disabledSize]
-	call	InitFileBuildMergedStringBlock
-	jc	readOne
+		mov	bx, ss:[factoryHan]
+		mov	cx, ss:[factorySize]
+		mov	ax, ss:[localHan]
+		mov	dx, ss:[localSize]
+		mov	si, ss:[disabledHan]
+		mov	di, ss:[disabledSize]
+		call	InitFileBuildMergedStringBlock
+		jc	readOne
 
-	dec	cx			; match InitFileReadString return value
-	clc
+		dec	cx			; match InitFileReadString return value
+		clc
 done:
-	.leave
-	ret
+		.leave
+		ret
 
 readOne:
-	push	bp
-	mov	bp, ss:[readFlags]
-	call	InitFileReadString
-	pop	bp
-	jmp	done
+		push	bp
+		mov	bp, ss:[readFlags]
+		call	InitFileReadString
+		pop	bp
+		jmp	done
 InitFileReadMergedStringSection	endp
 
 
@@ -1562,7 +1562,7 @@ writeOffset	local	word
 	mov	ss:[disabledSize], di
 
 	tst	bx
-	jz	noFactory
+	LONG	jz	noFactory
 
 	clr	ax
 	mov	ss:[disabledSeg], ax
@@ -1573,7 +1573,7 @@ writeOffset	local	word
 	add	ax, 2
 	mov	cx, ALLOC_DYNAMIC_LOCK
 	call	MemAllocFar
-	jc	allocFailed
+	LONG	jc	allocFailed
 
 	mov	ss:[outputHan], bx
 	mov	es, ax
@@ -2638,14 +2638,14 @@ snapshotSeg	local	sptr
 	LoadVarSeg	ds, ax
 	mov	bx, ds:[rewriteSnapshotHan]
 	tst	bx
-	jz	notFound
+	LONG	jz	notFound
 	mov	ss:[snapshotHan], bx
 	mov	ax, ds:[rewriteSnapshotSize]
 	mov	ss:[snapshotSize], ax
 	lds	si, ss:[sidecarCategory]
 	movdw	cxdx, ss:[sidecarKey]
 	call	InitFileDisabledKeyMatchesRewrite
-	jc	notFound
+	LONG	jc	notFound
 
 	push	ds
 	mov	ds, ss:[writtenSeg]
@@ -3051,9 +3051,9 @@ entryRemaining	local	word
 	mov	bp, mask IFRF_FIRST_ONLY
 	call	InitFileReadString
 	pop	bp
-	jc	notRemoved
+	LONG	jc	notRemoved
 	mov	ss:[blobHan], bx
-	jcxz	freeNotRemoved
+	LONG	jcxz	freeNotRemoved
 	mov	ss:[blobSize], cx
 	call	MemLock
 	mov	ss:[blobSeg], ax
@@ -3190,13 +3190,13 @@ sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 	lea	ax, ss:[sidecarKey]
 	call	InitFileBuildDisabledKey
 	pop	ds, si, cx, dx, es, di
-	jc	notFactory
+	LONG	jc	notFactory
 
 	push	bp
 	clr	bp
 	call	InitFileReadLowerString
 	pop	bp
-	jc	notFactory
+	LONG	jc	notFactory
 	mov	ss:[factoryHan], bx
 	mov	ss:[factorySize], cx
 
