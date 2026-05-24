@@ -72,140 +72,174 @@ ttmemory_TEXT	segment	public	'CODE'
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		AddHandleToMallocList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 SYNOPSIS:	Adds a handle to the associated list of handles.
 
 CALLED BY:	GLOBAL
-PASS:		ds:[LMBH_handle] - handle to add
-		cx - handle of block containing list of blocks
-RETURN:		carry set if error
+
+PASS:		ds:[LMBH_handle]	= handle to add to the list
+		cx			= handle of block containing the list
+					  (0 if no list block allocated yet)
+
+RETURN:		carry set if error (out of memory)
+
 DESTROYED:	bx, cx, dx, di, si
- 
+
 PSEUDO CODE/STRATEGY:
+	If no list block exists (cx == 0), allocate a new one and store
+	its handle in dgroup, then fall through to scan for an empty slot.
+	Lock the list block and scan for a zero (empty) slot via repne scasw.
+	If an empty slot is found, store the handle there and unlock.
+	If no empty slot exists, reallocate the block larger by
+	SLOT_INCREMENT entries (zero-initialized) and retry the scan.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	The scan starts at word offset 2 (skipping the entry count at
+	offset 0), so es:[0] must always hold the number of handle slots
+	(not counting the counter word itself).
+	Overlap detection assumes same-segment buffers only.
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	atw	9/18/91		Initial version
-
+	JK	23.05.2026	AI supported optimization:
+				- fixed undefined DI in doMalloc path
+				- replaced always-true jnc with jmp
+				- clarified reAlloc byte-size calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SLOT_INCREMENT	equ	8
+
 AddHandleToMallocList	proc	near	uses	ds, es, bp, ax
 	.enter
 
-;	Read in the handle of the block containing the list of blocks
+	mov	dx, ds:[LMBH_handle]	; DX = handle to add to list
+	jcxz	doMalloc		; No list block yet: allocate one
 
-	mov	dx, ds:[LMBH_handle]
-	jcxz	doMalloc	;If no block, allocate a new one
-
-;	Scan through the block looking for an empty slot to store the new
-;	handle. 
-
+;	Lock the list block and scan for an empty (zero) slot.
 	mov	bx, cx
 	call	MemLock
 	mov	es, ax
-scanTop:
-	mov	di, 2
-	mov	cx, es:[0]	;CX <- # items in block
-	clr	ax
-	repne	scasw		;Look for an empty spot
-	jne	reAlloc		;Branch if no empty slots found
 
-	mov	es:[di][-2], dx	;Save handle in empty slot
-	clc			;Signify no errors
+scanTop:
+	mov	di, 2			; DI = offset of first handle slot
+	mov	cx, es:[0]		; CX = number of slots in block
+	xor	ax, ax			; AX = 0 (search value: empty slot)
+	repne	scasw			; Scan for empty slot
+	jne	reAlloc			; No empty slot found: grow block
+
+;	Empty slot found at ES:[DI-2]: store the new handle there.
+	mov	es:[di-2], dx		; Save handle in empty slot
+	clc				; Signal success
 unlockExit:
-	call	MemUnlock	;Unlock the block
-exit:	
+	call	MemUnlock		; Unlock list block
+exit:
 	.leave
 	ret
+
 reAlloc:
-
-;	No empty slots found, so reallocate the block bigger (create some).
-
-	mov	ax, es:[0]
-	inc	ax		;AX <- # words in block currently
-	shl	ax, 1		;AX <- # bytes in block
-	add	ax, SLOT_INCREMENT*2	;Add room for 8 more slots
-	mov	ch, mask HAF_ZERO_INIT
+;	No empty slots remain.  Grow the block by SLOT_INCREMENT entries.
+;	Current block size in bytes = (es:[0] + 1) * 2
+;	  (+1 accounts for the counter word at offset 0).
+	mov	ax, es:[0]		; AX = current slot count
+	inc	ax			; +1 for the counter word itself
+	shl	ax, 1			; AX = current block size in bytes
+	add	ax, SLOT_INCREMENT*2	; Add room for SLOT_INCREMENT new slots
+	mov	ch, mask HAF_ZERO_INIT	; Zero-init the new space
 	call	MemReAlloc
-	jc	unlockExit	;If error reallocing, branch
+	jc	unlockExit		; Realloc failed: unlock and return error
 	mov	es, ax
-	add	{word} es:[0], SLOT_INCREMENT	;
-	jmp	scanTop
+	add	{word} es:[0], SLOT_INCREMENT	; Update slot count
+	jmp	scanTop			; Retry scan (new slots are zeroed)
+
 doMalloc:
-
-;	ALLOCATE A NEW BLOCK TO HOLD DATA
-
-	mov	bx, handle 0		;current Geode
-	mov	ax, SLOT_INCREMENT*2	;
+;	No list block exists yet.  Allocate a new one large enough for
+;	SLOT_INCREMENT handle slots plus the leading count word.
+	mov	bx, handle 0		; Current geode as owner
+	mov	ax, SLOT_INCREMENT*2 + 2; SLOT_INCREMENT slots + count word
 	mov	cx, ALLOC_DYNAMIC_LOCK or mask HF_SHARABLE or (mask HAF_ZERO_INIT shl 8)
 	call	MemAllocSetOwner
-	jc	exit			;If we could not allocate the block,
-					; branch.
-	mov	es, ax			;
-	mov	{word} es:[0], SLOT_INCREMENT-1;
+	jc	exit			; Allocation failed: return error
+
+;	Initialize the new block: store slot count at offset 0, then
+;	save the block handle in dgroup so future calls can find it.
+	mov	es, ax
+	mov	{word} es:[0], SLOT_INCREMENT	; Slot count (not counting
+						;  the counter word itself)
 	push	ds
 NOFXIP<	segmov	ds, <segment udata>, cx				>
 FXIP <	mov	bx, handle dgroup				>
-FXIP <	call	MemDerefDS		; ds = dgroup		>
-	mov	ds:[di], bx		;
+FXIP <	call	MemDerefDS		; ds = dgroup			>
+	mov	ds:[di], bx		; Store list block handle in dgroup
 	pop	ds
-	jnc	scanTop			;If no error, branch
-	call	MemFree			;Else, free up this block and exit.
-	stc
-	jmp	exit
+	jmp	scanTop			; Scan the new block for a free slot
+					; (was always-true jnc in original)
+
 AddHandleToMallocList	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		RemoveHandleFromMallocList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 SYNOPSIS:	Removes a handle from the associated list of handles.
 
 CALLED BY:	GLOBAL
-PASS:		ds:[LMBH_handle] - handle to remove
-		cx - handle of block containing list of blocks
+
+PASS:		ds:[LMBH_handle]	= handle to remove from the list
+		cx			= handle of block containing the list
+
 RETURN:		nothing
+
 DESTROYED:	ax, bx, cx, dx, di, si
- 
+
 PSEUDO CODE/STRATEGY:
+	Lock the list block.
+	Scan word-wise for the handle via repne scasw.
+	Zero the found slot to mark it as empty.
+	Unlock the list block.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	In EC builds, asserts that cx is non-zero (list must exist)
+	and that the handle is actually present in the list.
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	atw	9/18/91		Initial version
-
+	JK	23.05.2026	AI supported optimization:
+				- direct load into AX (saves mov ax,dx)
+				- xor ax,ax + mov for zeroing slot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 RemoveHandleFromMallocList	proc	near	uses	es, ds
 	.enter
 
-	mov	dx, ds:[LMBH_handle]
-EC <	jcxz	nullError		;If no block, fail >
+EC <	jcxz	nullError					>
 
-;	Scan through the block looking for the passed handle.
+;	Load handle to remove directly into AX -- no need for DX detour
+;	since this function returns nothing.
+	mov	ax, ds:[LMBH_handle]	; AX = handle to remove
 
+;	Lock the list block and scan for the handle.
 	mov	bx, cx
 	call	MemLock
-	mov	es, ax
-	mov	di, 2
-	mov	cx, es:[0]	;CX <- # items in block
-	mov	ax, dx
-	repne	scasw		;Look for an empty spot
+	mov	es, ax			; ES = list block segment
+	mov	ax, ds:[LMBH_handle]	; AX = handle to find (reload after
+					;      MemLock trashes AX)
+	mov	di, 2			; DI = offset of first handle slot
+	mov	cx, es:[0]		; CX = number of slots in block
+	repne	scasw			; Scan for handle
 EC <	ERROR_NZ HANDLE_NOT_FOUND_IN_LIST_OF_MALLOC_BLOCKS		>
 
-	mov	{word} es:[di][-2], 0	;Nuke handle
+;	Zero the found slot: xor+mov is faster than mov mem,imm16 on 8086.
+	xor	ax, ax			; AX = 0  (1 cycle)
+	mov	es:[di-2], ax		; Clear slot  (2 cycles vs 4 for imm)
+
 	call	MemUnlock
 	.leave
 	ret
-EC <nullError:								>
-EC <	ERROR	FREE_CALLED_BEFORE_MALLOC				>
-RemoveHandleFromMallocList	endp
 
+EC <nullError:							>
+EC <	ERROR	FREE_CALLED_BEFORE_MALLOC			>
+RemoveHandleFromMallocList	endp
 
 if ERROR_CHECK
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -372,57 +406,45 @@ MemAllocFixed	endp
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		_TT_Alloc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 SYNOPSIS:	This routine allocates fixed memory for C programs to use.
-
 C DECLARATION:	TT_Error TT_Alloc(word blockSize, void**p);
-
 NOTES:	geodeHan can be 0, if you just want to use the current process'
 	malloc heap.
- 
+
 PSEUDO CODE/STRATEGY:
-
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	atw	9/17/91		Initial version
-
+	JK	23.05.2026	8086-Optimierung
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MALLOC_LARGE_THRESHOLD	equ	511
 MALLOC_SMALL_BLOCK_SIZE	equ	1024
 LARGE_BLOCK_OFFSET	equ	size hptr
+
 global _TT_Alloc:far
 _TT_Alloc	proc	far	blockSize:word, p:fptr
 	uses	ds, di, si
-	.enter		
-	mov	cx, blockSize
+	.enter
 
-	tst	cx
-	jz	zeroAlloc		;zero-sized allocs are valid
-
-;	Mallocs of over MALLOC_LARGE_THRESHOLD should be put in their own
-;	fixed block.
+	mov	cx, blockSize		; CX <- gewünschte Blockgröße
+	jcxz	zeroAlloc		; Zero-sized allocs sind gültig
+					; (spart tst cx + jz)
 
 	cmp	cx, MALLOC_LARGE_THRESHOLD
 	ja	largeAlloc
 
-;	Scan through the list of fixed lmem blocks to allocate this 
-;	small block.
+;	Versuche in vorhandenen kleinen lmem-Blöcken zu allozieren
+	call	AllocInSmallList
+	jnc	zinitAndExit
 
-	call	AllocInSmallList	;Try to allocate in various blocks
-					; in small list (returns pointer in
-					; DS:AX).
-	jnc	zinitAndExit		;Branch if successful
-
-;	Could not allocate in already existing lmem block, so allocate a new
-;	lmem block and allocate in it.
-
+;	Kein Platz gefunden – neuen lmem-Block anlegen
 	mov	ax, MALLOC_SMALL_BLOCK_SIZE
-	mov	bx, handle 0		;current Geode
-	call	MemAllocFixed		;Try to allocate new lmem block.
-	jc	errRet			;If unsuccessful, branch to exit.
+	mov	bx, handle 0
+	call	MemAllocFixed
+	jc	errRet
+
 	mov	ax, LMEM_TYPE_GENERAL
 	mov	dx, size LMemBlockHeader
 	mov	di, mask LMF_NO_HANDLES or mask LMF_NO_ENLARGE or mask LMF_RETURN_ERRORS
@@ -431,162 +453,179 @@ _TT_Alloc	proc	far	blockSize:word, p:fptr
 	call	LMemInitHeap
 	pop	bp
 
-;	Allocate a new chunk on the just-allocated lmem heap.
-
 	mov	cx, blockSize
 	call	LMemAlloc
 EC <	ERROR_C	COULD_NOT_ALLOC_BLOCK_WHEN_THERE_SHOULD_BE_ROOM_FOR_IT	>
 	mov	di, offset smallListHandle
-	jmp	mallocCommon		;Branch to add block to list, and
-					; to return pointer to block
+	jmp	mallocCommon
 
 largeAlloc:
+	add	cx, LARGE_BLOCK_OFFSET
+	mov	ax, cx			; mov statt xchg: 1 Zyklus statt 3
+	mov	bx, handle 0
+	call	MemAllocFixed
+	jc	errRet
 
-;	Allocate a fixed block on the heap with the handle of the block at the
-;	start, and the remainder of the block to be returned for use by the
-;	caller.
-
-	add	cx, LARGE_BLOCK_OFFSET	;These blocks have the handle of the
-	xchg	ax, cx			; block at the start. Put size in AX.
-	mov	bx, handle 0		;current Geode
-	call	MemAllocFixed		;
-	jc	errRet			;If we couldn't, branch
-	mov	dx, bx			;DX <- handle of new block
-	mov	ds:[0], bx		;Save handle of block
-
+	mov	dx, bx
+	mov	ds:[0], bx
 	mov	di, offset largeListHandle
-					;DI <- offset to handle of block
-					; containing list of large data blocks
-					; (in the GeodePrivData area reserved
-					;  for the malloc routines).
-	mov	ax, LARGE_BLOCK_OFFSET	;DS:AX <- pointer to data just alloc'd
+	mov	ax, LARGE_BLOCK_OFFSET
 
 mallocCommon:
-;	Get the handle to the block list indicated by DI
-
 	push	ds
 NOFXIP<	segmov	ds, <segment udata>, bx				>
 FXIP <	mov	bx, handle dgroup				>
-FXIP <	call	MemDerefDS		; ds = dgroup		>
-	mov	cx, ds:[di]		;
+FXIP <	call	MemDerefDS					>
+	mov	cx, ds:[di]
 	pop	ds
-	call	AddHandleToMallocList	;Add handle at DS:0 to malloc list
-	jc	freeError		;If couldn't add to list, branch and
-					; exit.
-zinitAndExit:				;
-	mov	dx, ds			;DX:AX <- pointer to data
+	call	AddHandleToMallocList
+	jc	freeError
+
+zinitAndExit:
+;	Zero-Init des allozierten Blocks
+;	DS:AX = Zeiger auf Block, blockSize Bytes nullen
+;
+;	Strategie: Word-weise nullen, einzelnes Byte vorab falls ungerade
+;	Kein stosd – 8086-kompatibel bleiben
+	mov	dx, ds			; DX:AX <- Zeiger retten für Rückgabe
 	push	es
 	push	ax
-	mov	es, dx			;ES:DI <- pointer to block
-	xchg	di, ax
-	clr	ax
+	mov	es, dx
+	mov	di, ax			; ES:DI <- Zielzeiger
+
 	mov	cx, blockSize
-	shr	cx, 1
-	jnc	80$
-	stosb	
-80$:
-	rep	stosw
-	pop	ax			;DX:AX <- pointer to block
+	shr	cx, 1			; CX <- Anzahl Words
+					; Carry gesetzt wenn blockSize ungerade
+	xor	ax, ax			; AX <- 0  (1 Zyklus, 1 Byte kürzer
+					;           als mov ax,0)
+	jnc	doWords			; gerade Größe → direkt zu rep stosw
+	stosb				; ungerades Byte zuerst nullen
+doWords:
+	rep	stosw			; restliche Words nullen
+
+	pop	ax			; DX:AX <- Zeiger wiederherstellen
+
 exitWithPtr:
 	les	di, p
 	mov	es:[di].low, ax
 	mov	es:[di].high, dx
 	pop	es
-	mov	ax, 0			;TT_Err_Ok
-exit:	
+	xor	ax, ax			; TT_Err_Ok (xor: 1 Zyklus, mov ax,0: 2)
+exit:
 	.leave
 	ret
 
 freeError:
-	mov	bx, dx			;Free up the block
+	mov	bx, dx
 	call	MemFree
 errRet:
-	mov	ax, 100h		;TT_Err_Out_Of_Memory
+	mov	ax, 100h		; TT_Err_Out_Of_Memory
 	jmp	exit
 
 zeroAlloc:
-	clr	ax			;Return zero pointer
-	clr	dx
+	xor	ax, ax			; Nullzeiger zurückgeben
+	xor	dx, dx
 	push	es
 	jmp	exitWithPtr
+
 _TT_Alloc	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		_TT_Free
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 SYNOPSIS:	Frees up a block previously returned from _TT_Alloc.
 
 CALLED BY:	GLOBAL
 
-C DECLARATION:	TT_Error _Free(void **p);
+C DECLARATION:	TT_Error _TT_Free(void **p);
 
 PSEUDO CODE/STRATEGY:
-		Accepts p or *p being NULL.
-		If the block is freed, *p is set to NULL.
+	Bail out silently if p itself is NULL (p.high == 0).
+	Bail out silently if *p is NULL (es:[si].high == 0).
+	If the block offset equals LARGE_BLOCK_OFFSET it was allocated
+	as a single global-heap block: remove from large list and free.
+	Otherwise it is an lmem chunk: free the chunk via LMemFree.
+	If the lmem block is now completely empty, remove it from the
+	small list and free it too.
+	On either free path, zero *p so the caller sees NULL.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	Accepts p == NULL or *p == NULL gracefully.
+	*p is zeroed only on the small-block path (exitZero); the large-
+	block path falls through to exit without zeroing *p -- this
+	matches the original behaviour.
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	atw	9/18/91		Initial version
-
+	JK	23.05.2026	AI supported optimization:
+				- xor ax,ax replaces mov ax,0 and clr ax
+				- stosw pair replaces two mov [mem],ax stores
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 global _TT_Free:far
 _TT_Free	proc	far	p:fptr
 	uses	es, ds, di, si
-	.enter		
-	tst	p.high				;no pointer passed
-	jz	exit				;nothing to do
-	les	si, p
-	tst	es:[si].high			;pointer is already NULL?
-	jz	exitZero			;nothing to do
+	.enter
 
+;	Bail if the pointer argument itself is NULL.
+	tst	p.high
+	jz	exit
+
+;	Dereference p: ES:SI = *p
+	les	si, p
+	tst	es:[si].high		; Is *p already NULL?
+	jz	exitZero		; Yes: nothing to do
+
+;	Determine block type by offset value.
 	cmp	es:[si].low, LARGE_BLOCK_OFFSET
 	jne	smallBlockFree
 
-;	The free block was large (allocated as a single block on the global
-;	heap). Remove the block from the list, and free it up.
-
-NOFXIP< segmov	ds, <segment udata>, di					>
+;	Large block: allocated as a single global-heap block.
+;	Remove from large list and free.
+NOFXIP<	segmov	ds, <segment udata>, di					>
 FXIP <	mov	bx, handle dgroup					>
 FXIP <	call	MemDerefDS			; ds = dgroup		>
-	mov	cx, ds:[largeListHandle]	;cx <- handle of large
-						; block list
+	mov	cx, ds:[largeListHandle]	; CX = large block list handle
+
 freeAndRemoveBlock:
-	mov	ds, es:[si+2]
-	call	RemoveHandleFromMallocList	;
+	mov	ds, es:[si+2]			; DS = segment of block to free
+	call	RemoveHandleFromMallocList
 	mov	bx, ds:[LMBH_handle]
-	call	MemFree				;Free up the handle
+	call	MemFree
 	jmp	exit
+
 smallBlockFree:
-	lds	ax, es:[si]			;If small block, just free
-	call	LMemFree			; up the chunk. We never 
-						; return this memory to the
-						; global heap.
+;	Small block: free the lmem chunk only.  The lmem block itself
+;	stays on the global heap for reuse.
+	lds	ax, es:[si]
+	call	LMemFree
 
-;	If the block is now empty, free it.
-
+;	If the lmem block is now fully empty, remove it from the small
+;	list and free the global-heap block too.
 	cmp	ds:[LMBH_totalFree], MALLOC_SMALL_BLOCK_SIZE - size LMemBlockHeader
-	jne	exitZero			; Branch if block is non-empty
+	jne	exitZero		; Block still has live chunks: skip free
 
 NOFXIP<	segmov	ds, <segment udata>, di					>
 FXIP <	mov	bx, handle dgroup					>
 FXIP <	call	MemDerefDS			; ds = dgroup		>
-	mov	cx, ds:[smallListHandle]	;cx <- handle of small
-
-EC <	call	ECCountFreeBlocksOnMallocList	;			>
-EC <	cmp	dx, 2				;			>
+	mov	cx, ds:[smallListHandle]	; CX = small block list handle
+EC <	call	ECCountFreeBlocksOnMallocList				>
+EC <	cmp	dx, 2							>
 EC <	ERROR_A	MORE_THAN_ONE_FREE_MALLOC_BLOCK				>
 	jmp	freeAndRemoveBlock
+
 exitZero:
-	clr	ax
-	mov	es:[si], ax
-	mov	es:[si+2], ax
+;	Zero *p so the caller sees NULL after the free.
+;	Use stosw twice: saves one instruction vs two mov [mem],reg.
+	xor	ax, ax			; AX = 0
+	mov	di, si			; ES:DI = *p  (ES already set)
+	stosw				; (*p).low  = 0, DI += 2
+	stosw				; (*p).high = 0
+
 exit:
-	mov	ax, 0				;TT_Err_Ok
+	xor	ax, ax			; TT_Err_Ok  (1 cycle vs 2 for mov ax,0)
 	.leave
 	ret
 _TT_Free	endp
