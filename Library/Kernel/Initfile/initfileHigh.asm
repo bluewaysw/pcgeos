@@ -15,28 +15,28 @@ ROUTINES:
 	InitFilePopPrimaryFile
 
 	InitFileReadData
-	InitFileReadString	
-	InitFileReadBoolean	
-	InitFileReadInteger	
+	InitFileReadString
+	InitFileReadBoolean
+	InitFileReadInteger
 	InitFileReadStringSection
 	InitFileEnumStringSection
-	InitFileRead		
+	InitFileRead
 	InitFileGetTimeLastModified
 
-	InitFileWriteData	
-	InitFileWriteString	
-	InitFileWriteInteger	
-	InitFileWriteBoolean	
+	InitFileWriteData
+	InitFileWriteString
+	InitFileWriteInteger
+	InitFileWriteBoolean
 	InitFileWriteStringSection
-	InitFileWrite		
+	InitFileWrite
 
 	InitFileDeleteStringSection
-	InitFileDeleteEntry	
-	InitFileDeleteCategory	
+	InitFileDeleteEntry
+	InitFileDeleteCategory
 
-	InitFileSave		
-	InitFileRevert		
-	INITFILECOMMIT		
+	InitFileSave
+	InitFileRevert
+	INITFILECOMMIT
 
     	InitFileSetPrimaryFile
 
@@ -121,7 +121,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFilePushPrimaryFile
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Description:	
+Description:
 
 Pass:		nothing
 
@@ -129,7 +129,7 @@ Return:		carry set if error
 
 Destroyed:	nothing
 
-Comments:	
+Comments:
 
 Revision History:
 
@@ -192,7 +192,7 @@ InitFilePushPrimaryFile	proc	far
 		mov	ax, handle 0
 		call	HandleModifyOwner
 
-		mov	bx, dx			
+		mov	bx, dx
 		mov	ax, handle 0
 		call	HandleModifyOwner
 
@@ -254,7 +254,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFilePopPrimaryFile
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Description:	
+Description:
 
 Pass:		nothing
 
@@ -262,7 +262,7 @@ Return:		carry set if error
 
 Destroyed:	nothing
 
-Comments:	
+Comments:
 
 Revision History:
 
@@ -417,7 +417,7 @@ PASS:		ds:si - category ASCIIZ string
 			bp - buffer size
 			es:di - buffer to fill
 
-RETURN:		carry clear if successful 
+RETURN:		carry clear if successful
 		cx - number of bytes retrieved (excluding null terminator)
 		if bp was passed as 0,
 		     bx = mem handle to block containing entry
@@ -466,12 +466,12 @@ CALLED BY:	GLOBAL
 PASS:		ds:si	- category ASCIIZ string
 		cx:dx	- key ASCIIZ string
 		bp	- InitFileReadFlags
-				If IFRF_SIZE = 0	
+				If IFRF_SIZE = 0
 					Buffer will be allocated for string
 				Else
 			    		es:di - buffer to fill
 
-RETURN:		carry	- clear if successful 
+RETURN:		carry	- clear if successful
 		cx 	- number of chars retrieved (excluding null terminator)
 			  cx = 0 if category / key not found
 
@@ -494,7 +494,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-InitFileReadString	proc	far	
+InitFileReadString	proc	far
 	uses 	bp
 	.enter
 	mov	bx, IFOT_STRING
@@ -667,7 +667,7 @@ RETURN:		es, bx - Data from callback
 		For callback routine (must be delcared as far):
 			PASS:		ax - integer
 					es, bx - Data
-			
+
 			RETURN:		es, bx - Data
 					carry - Clear (continue enumeration)
 					      - Set (stop enumeration)
@@ -747,12 +747,12 @@ PASS:		DS:SI	= Category ASCIIZ string
 		CX:DX	= Key ASCIIZ string
 		AX	= 0-based integer signifying which string section
 		BP	= InitFileReadFlags
-				If IFRF_SIZE = 0	
+				If IFRF_SIZE = 0
 					Buffer will be allocated for string
 				Else
 			    		ES:DI	= Buffer to fill
 
-RETURN:		Carry	= Clear if successful 
+RETURN:		Carry	= Clear if successful
 		CX	= Number of bytes retrieved (excluding null terminator)
 		BX	= Handle to block containing string (if IFRF_SIZE = 0)
 				- or -
@@ -816,7 +816,7 @@ endif
 	; Copy string section to destination block and null terminate it,
 	; and unlock allocated block if it exists.
 copyString:
-	push	cx				; save the length 
+	push	cx				; save the length
 	Assert	okForRepMovsb
 if DBCS_PCGEOS
 	rep 	movsw				; copy the string
@@ -873,7 +873,7 @@ DESTROYED:	Nothing
 					DX	= Section #
 					CX	= Length of section
 					ES, BX	= Data
-			
+
 			RETURN:		BX, ES	= Data
 					Carry	= Clear (continue enumeration)
 						= Set (stop enumeration)
@@ -894,7 +894,7 @@ REVISION HISTORY:
 InitFileEnumStringSection	proc	far
 	uses	ax, cx, dx, di, si, bp, ds
 	.enter
-	
+
 	; Get entire string
 	;
 	push	bx				; save passed data
@@ -1010,7 +1010,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-InitFileRead	proc	near 	
+InitFileRead	proc	near
 
 	uses ax, bx, di, si, ds, es
 
@@ -1124,8 +1124,10 @@ factorySize	local	word
 localHan	local	hptr
 localSize	local	word
 disabledHan	local	hptr
-	disabledSize	local	word
-	.enter
+		disabledSize	local	word
+sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+		.enter
 
 	test	ss:[readFlags], mask IFRF_FIRST_ONLY
 	jnz	readOne
@@ -1133,10 +1135,14 @@ disabledHan	local	hptr
 	call	InitFileHaveLowerIniFile
 	jnc	readOne
 
-	push	ds, si, cx, dx
-	call	InitFileBuildDisabledKey
-	pop	ds, si, cx, dx
-	jc	readOne
+		push	ds, si, cx, dx
+		segmov	es, ss
+		lea	di, ss:[sidecarCategory]
+		mov	bx, es
+		lea	ax, ss:[sidecarKey]
+		call	InitFileBuildDisabledKey
+		pop	ds, si, cx, dx
+		jc	readOne
 
 	push	bp
 	mov	bp, ss:[readFlags]
@@ -1156,12 +1162,12 @@ disabledHan	local	hptr
 	mov	ss:[disabledHan], ax
 	mov	ss:[disabledSize], ax
 
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledCategory]
-	mov	cx, ds
-	mov	dx, offset dgroup:[disabledKey]
-	push	bp
-	mov	bp, mask IFRF_FIRST_ONLY
+		segmov	ds, ss
+		lea	si, ss:[sidecarCategory]
+		mov	cx, ds
+		lea	dx, ss:[sidecarKey]
+		push	bp
+		mov	bp, mask IFRF_FIRST_ONLY
 	call	InitFileReadString
 	pop	bp
 	jc	noDisabled
@@ -1368,8 +1374,11 @@ InitFilePendingRewriteIsLowerBlob	proc	far
 	clr	bp
 	call	InitFileEnterLowerAndFindKey
 	pop	bp
-	jc	notBlob
+	jnc	haveLowerKey
+	call	ExitInitfileGet
+	jmp	notBlob
 
+haveLowerKey:
 	clr	bx			; not starting in blob
 	call	GetCharFar
 	pushf
@@ -1804,47 +1813,50 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFileBuildDisabledKey
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Build category and key.disabled in dgroup scratch.
+SYNOPSIS:	Build category and key.disabled in caller storage.
 
 PASS:		ds:si - category
 		cx:dx - key
+		es:di - destination category
+		bx:ax - destination disabled key
 
 RETURN:		carry set if name is too long
 
 DESTROYED:	ax,bx,cx,dx,di,si,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileBuildDisabledKey	proc	far
-	.enter
+keyString	local	fptr.char	push	cx, dx
+disabledCat	local	fptr.char	push	es, di
+disabledKeyDest	local	fptr.char	push	bx, ax
+		.enter
 
-	mov	bx, cx			; key segment
-	LoadVarSeg	es, ax
-	mov	di, offset dgroup:[disabledCategory]
-	mov	cx, offset dgroup:[disabledCategory] + \
-		    MAX_INITFILE_CATEGORY_LENGTH - 1
+		les	di, ss:[disabledCat]
+		mov	bx, di
+		add	bx, MAX_INITFILE_CATEGORY_LENGTH - 1
 copyCategory:
-	lodsb
-	tst	al
-	jz	categoryDone
-	cmp	di, cx
-	jae	tooLong
-	stosb
-	jmp	copyCategory
+		lodsb
+		tst	al
+		jz	categoryDone
+		cmp	di, bx
+		jae	tooLong
+		stosb
+		jmp	copyCategory
 
 categoryDone:
-	stosb
-	mov	si, dx			; key offset
-	mov	di, offset dgroup:[disabledKey]
-	mov	cx, offset dgroup:[disabledKey] + \
-		    MAX_INITFILE_CATEGORY_LENGTH - INITFILE_DISABLED_SUFFIX_LENGTH - 1
-	mov	ds, bx
+		stosb
+		lds	si, ss:[keyString]
+		les	di, ss:[disabledKeyDest]
+		mov	bx, di
+		add	bx, MAX_INITFILE_CATEGORY_LENGTH - \
+			    INITFILE_DISABLED_SUFFIX_LENGTH - 1
 copyKey:
-	lodsb
-	tst	al
-	jz	keyDone
-	cmp	di, cx
-	jae	tooLong
-	stosb
-	jmp	copyKey
+		lodsb
+		tst	al
+		jz	keyDone
+		cmp	di, bx
+		jae	tooLong
+		stosb
+		jmp	copyKey
 
 keyDone:
 	LoadVarSeg	ds, ax
@@ -1855,15 +1867,16 @@ copySuffix:
 	tst	al
 	jnz	copySuffix
 	clc
-	jmp	done
+		jmp	done
 
 tooLong:
-	LoadVarSeg	es, ax
-	clr	{byte}es:[disabledCategory]
-	clr	{byte}es:[disabledKey]
-	stc
+		les	di, ss:[disabledCat]
+		clr	{byte}es:[di]
+		les	di, ss:[disabledKeyDest]
+		clr	{byte}es:[di]
+		stc
 done:
-	.leave
+		.leave
 	ret
 InitFileBuildDisabledKey	endp
 
@@ -1892,10 +1905,10 @@ RETURN:		if error
 
 DESTROYED:	ax,bx,cx,dx,di,si
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 	Read each blob, and then terminate it with a CR/LF pair, so
 	that the caller will see one huge blob.
-	
+
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 
@@ -1922,10 +1935,10 @@ keyString	local	fptr.char	push	cx, dx
 	; enough to pass it in (should probably fatal error in this
 	; case?)
 	;
-		
+
 	push	bp
 	mov	bp, ss:[readFlags]
-	andnf	bp, not mask IFRF_FIRST_ONLY		
+	andnf	bp, not mask IFRF_FIRST_ONLY
 	call	EnterInitfileAndFindKey
 	pop	bp
 	LONG jc	done
@@ -1973,7 +1986,7 @@ afterAlloc:
 	;
 	; DoReconstruct will probably use up less bytes than the
 	; original, so make sure we update the CurPtr field correctly
-	; afterwards. 
+	; afterwards.
 	;
 
 	mov	cx, ss:[bufferSize]
@@ -2320,24 +2333,20 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 InitFileWriteStringSection	proc	far
-	call	PushAllFar
+
+		call	PushAllFar
 
 if INI_STRING_SECTION_TOMBSTONES
-	call	InitFilePrepareStringSectionWrite
-	push	ds, si, cx, dx, es, di
-	LoadVarSeg	ds, ax
-	tst	ds:[skipStringSectionWrite]
-	pop	ds, si, cx, dx, es, di
-	jz	writeLocalNow
-	LoadVarSeg	ds, ax
-	clr	ds:[skipStringSectionWrite]
-	call	PopAllFar
-	ret
-writeLocalNow:
+		call	InitFilePrepareStringSectionWrite
+		jnc	writeLocalNow
+		call	PopAllFar
+		ret
+	writeLocalNow:
 endif
-	call	InitFileWriteStringSectionRaw
-	call	PopAllFar
-	ret
+		call	InitFileWriteStringSectionRaw
+		call	PopAllFar
+
+		ret
 InitFileWriteStringSection	endp
 
 
@@ -2353,10 +2362,12 @@ PASS:		ds:si - category
 
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileWriteStringSectionRaw	proc	near
 
+	;
 	; First determine the length of the new string section
 	;
-InitFileWriteStringSectionRaw	proc	near
+
 	push	ds, si, cx, dx
 	push	es, di
 	push	cx
@@ -2364,7 +2375,7 @@ InitFileWriteStringSectionRaw	proc	near
 	inc	cx				; cx = length w/null
 	mov	ax, cx				; string length (w/NULL) => AX
 	pop	cx
-		
+
 	;
 	; Obtain the existing string from the LOCAL init file, if any
 	;
@@ -2412,7 +2423,7 @@ writeString:
 	pop	ds, si				; category name => DS:SI
 	call	InitFileWriteString
 	tst	bx				; any allocate buffer ??
-	jz	done	
+	jz	done
 	call	MemFree				; else free allocate buffer
 done:
 	ret
@@ -2439,39 +2450,50 @@ PASS:		ds:si - category
 		cx:dx - key
 		es:di - string section being written
 
+RETURN:		carry set to skip the local write
+
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFilePrepareStringSectionWrite	proc	near
-	uses	ax, bx, cx, dx, di, si, bp, ds, es
-	.enter
-
-	push	ds, si, cx, dx, es, di
-	LoadVarSeg	ds, ax
-	clr	ds:[skipStringSectionWrite]
-	pop	ds, si, cx, dx, es, di
+		uses	ax, bx, cx, dx, di, si, bp, ds, es
+sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+		.enter
 
 	call	InitFileHaveLowerIniFile
 	jc	haveLowerIni
 	call	InitFileFreeRewriteSnapshot
-	jmp	done
+	jmp	writeLocal
 
 haveLowerIni:
 	push	ds, si, cx, dx, es, di
+	segmov	es, ss
+	lea	di, ss:[sidecarCategory]
+	mov	bx, es
+	lea	ax, ss:[sidecarKey]
 	call	InitFileBuildDisabledKey
 	pop	ds, si, cx, dx, es, di
 	jnc	haveDisabledKey
-	jmp	done
+	jmp	writeLocal
 
 haveDisabledKey:
 
 	push	ds, si, cx, dx, es, di
 	push	bp
+	segmov	es, ss
+	lea	di, ss:[sidecarCategory]
+	mov	bx, es
+	lea	ax, ss:[sidecarKey]
 	call	InitFileMaybeTombstoneRewrite
 	pop	bp
 	pop	ds, si, cx, dx, es, di
 
 	push	ds, si, cx, dx, es, di
 	push	bp
+	segmov	ds, ss
+	lea	si, ss:[sidecarCategory]
+	mov	cx, ds
+	lea	dx, ss:[sidecarKey]
 	call	InitFileMaybeSkipRewriteSnapshotEntry
 	pop	bp
 	pop	ds, si, cx, dx, es, di
@@ -2485,20 +2507,23 @@ checkDisabledSidecar:
 	call	LocalStringLength		; cx <- length
 	mov	bx, cx
 	pop	ds, si, es, di
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledCategory]
+	segmov	ds, ss
+	lea	si, ss:[sidecarCategory]
 	mov	cx, ds
-	mov	dx, offset dgroup:[disabledKey]
+	lea	dx, ss:[sidecarKey]
 	push	bp
 		mov	bp, bx
 		call	InitFileRemoveStringSectionEntryRaw
 		pop	bp
-		jnc	done
+		jnc	writeLocal
 	jmp	skipWrite
 
 skipWrite:
-	LoadVarSeg	ds, ax
-	mov	ds:[skipStringSectionWrite], TRUE
+	stc
+	jmp	done
+
+writeLocal:
+	clc
 
 done:
 	.leave
@@ -2515,14 +2540,19 @@ SYNOPSIS:	If this key was just deleted for a rewrite, disable the
 
 PASS:		ds:si - category
 		cx:dx - key
-		dgroup:disabledKey - current disabled sidecar key
+		es:di - disabled sidecar category
+		bx:ax - disabled sidecar key
 
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileMaybeTombstoneRewrite	proc	near
-		.enter
+		InitFileMaybeTombstoneRewrite	proc	near
+catString	local	fptr.char	push	ds, si
+keyString	local	fptr.char	push	cx, dx
+sidecarCategory	local	fptr.char	push	es, di
+sidecarKey	local	fptr.char	push	bx, ax
+			.enter
 
-		LoadVarSeg	es, ax
+			LoadVarSeg	es, ax
 		tst	es:[rewriteStringSection]
 		jnz	checkPending
 		tst	es:[rewriteSnapshotHan]
@@ -2530,33 +2560,32 @@ DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 		jmp	done
 
 checkSnapshotKey:
-			push	ds, si, cx, dx
+				lds	si, ss:[sidecarCategory]
+				movdw	cxdx, ss:[sidecarKey]
+				call	InitFileDisabledKeyMatchesRewrite
+				jnc	done
+				call	InitFileRewriteDisabledSidecarFromSnapshot
+				call	InitFileFreeRewriteSnapshot
+				jmp	done
+
+			checkPending:
+			lds	si, ss:[sidecarCategory]
+			movdw	cxdx, ss:[sidecarKey]
 			call	InitFileDisabledKeyMatchesRewrite
-			pop	ds, si, cx, dx
-			jnc	done
-			push	ds, si, cx, dx
-			call	InitFileRewriteDisabledSidecarFromSnapshot
-			call	InitFileFreeRewriteSnapshot
-			pop	ds, si, cx, dx
-			call	InitFileBuildDisabledKey
-			jmp	done
+			jc	noMatch
 
-		checkPending:
-		push	ds, si, cx, dx
-		call	InitFileDisabledKeyMatchesRewrite
-		pop	ds, si, cx, dx
-		jc	noMatch
-
-	clr	es:[rewriteStringSection]
+		clr	es:[rewriteStringSection]
 	;
 	; The primary key was deleted before the rewrite was marked, so the
 	; normal read path now resolves to the lower factory entry.
-	;
-		push	bp
-		clr	bp
-		call	InitFileReadString
-		pop	bp
-		jnc	gotLower
+		;
+			push	bp
+			clr	bp
+			lds	si, ss:[catString]
+			movdw	cxdx, ss:[keyString]
+			call	InitFileReadString
+			pop	bp
+			jnc	gotLower
 		jmp	done
 
 gotLower:
@@ -2566,16 +2595,13 @@ gotLower:
 			mov	es:[rewriteSnapshotSize], cx
 		jmp	done
 
-		noMatch:
-			push	ds, si, cx, dx
-			call	InitFileStartPendingRewrite
-			call	InitFileRewriteDisabledSidecarFromSnapshot
-			call	InitFileFreeRewriteSnapshot
-			pop	ds, si, cx, dx
-			call	InitFileBuildDisabledKey
-		done:
-		.leave
-		ret
+			noMatch:
+				call	InitFileStartPendingRewrite
+				call	InitFileRewriteDisabledSidecarFromSnapshot
+				call	InitFileFreeRewriteSnapshot
+			done:
+			.leave
+			ret
 InitFileMaybeTombstoneRewrite	endp
 
 
@@ -2585,16 +2611,18 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	See if a rewrite entry matches a factory snapshot entry.
 
-PASS:		ds:si - category
+PASS:		ds:si - disabled sidecar category
+		cx:dx - disabled sidecar key
 		es:di - string section entry being written
-		dgroup:disabledKey - current disabled sidecar key
 
 RETURN:		carry set if caller should skip the local write
 
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileMaybeSkipRewriteSnapshotEntry	proc	near
-	uses	ax, bx, cx, dx, di, si, ds, es
+		uses	ax, bx, cx, dx, di, si, ds, es
+sidecarCategory	local	fptr.char	push	ds, si
+sidecarKey	local	fptr.char	push	cx, dx
 writtenSeg	local	sptr	push	es
 writtenPtr	local	word	push	di
 writtenLen	local	word
@@ -2614,6 +2642,8 @@ snapshotSeg	local	sptr
 	mov	ss:[snapshotHan], bx
 	mov	ax, ds:[rewriteSnapshotSize]
 	mov	ss:[snapshotSize], ax
+	lds	si, ss:[sidecarCategory]
+	movdw	cxdx, ss:[sidecarKey]
 	call	InitFileDisabledKeyMatchesRewrite
 	jc	notFound
 
@@ -2709,32 +2739,37 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFileDisabledKeyMatchesRewrite
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Compare disabledKey with rewriteDisabledKey.
+SYNOPSIS:	Compare a disabled sidecar key with rewriteDisabledKey.
+
+PASS:		ds:si - disabled sidecar category
+		cx:dx - disabled sidecar key
 
 RETURN:		carry clear if the names match
 
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileDisabledKeyMatchesRewrite	proc	near
-	uses	ax, di, si, ds, es
-	.enter
+		uses	ax, di, si, ds, es
+sidecarCategory	local	fptr.char	push	ds, si
+sidecarKey	local	fptr.char	push	cx, dx
+		.enter
 
-	LoadVarSeg	ds, ax
-	tst	{byte}ds:[rewriteDisabledKey]
-	jz	noMatch
-	mov	si, offset dgroup:[disabledCategory]
-	mov	di, offset dgroup:[rewriteCategory]
-	segmov	es, ds
-compareCategoryLoop:
+			LoadVarSeg	es, ax
+			tst	{byte}es:[rewriteDisabledKey]
+			jz	noMatch
+			lds	si, ss:[sidecarCategory]
+			mov	di, offset dgroup:[rewriteCategory]
+	compareCategoryLoop:
 	lodsb
 	scasb
 	jne	noMatch
-	tst	al
-	jnz	compareCategoryLoop
-	mov	si, offset dgroup:[disabledKey]
-	mov	di, offset dgroup:[rewriteDisabledKey]
+		tst	al
+		jnz	compareCategoryLoop
+		lds	si, ss:[sidecarKey]
+		LoadVarSeg	es, ax
+		mov	di, offset dgroup:[rewriteDisabledKey]
 compareLoop:
-	lodsb
+		lodsb
 	scasb
 	jne	noMatch
 	tst	al
@@ -2747,42 +2782,7 @@ noMatch:
 done:
 	.leave
 	ret
-	InitFileDisabledKeyMatchesRewrite	endp
-
-	
-	COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-			InitFileCopyRewriteKeyToDisabledScratch
-	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Copy saved rewrite category and sidecar key to scratch.
-
-DESTROYED:	nothing
-	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileCopyRewriteKeyToDisabledScratch	proc	near
-		uses	ax, di, si, ds, es
-		.enter
-
-		LoadVarSeg	ds, ax
-		segmov	es, ds
-		mov	si, offset dgroup:[rewriteCategory]
-		mov	di, offset dgroup:[disabledCategory]
-	copyCategory:
-		lodsb
-		stosb
-		tst	al
-		jnz	copyCategory
-
-		mov	si, offset dgroup:[rewriteDisabledKey]
-		mov	di, offset dgroup:[disabledKey]
-	copyDisabledKey:
-		lodsb
-		stosb
-		tst	al
-		jnz	copyDisabledKey
-
-		.leave
-		ret
-	InitFileCopyRewriteKeyToDisabledScratch	endp
+		InitFileDisabledKeyMatchesRewrite	endp
 
 	
 	COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2842,7 +2842,6 @@ checkLower:
 		jmp	clearState
 
 isLowerBlob:
-		call	InitFileCopyRewriteKeyToDisabledScratch
 		LoadVarSeg	ds, ax
 
 		mov	si, offset dgroup:[rewriteCategory]
@@ -2914,33 +2913,27 @@ InitFileRewriteDisabledSidecarFromSnapshot	proc	near
 		tst	{byte}ds:[rewriteDisabledKey]
 		jz	done
 
-		call	InitFileCopyRewriteKeyToDisabledScratch
-
 		LoadVarSeg	ds, ax
 		mov	ax, ds:[rewriteSnapshotSize]
 		cmp	ax, 1
 		ja	writeSnapshot
-		mov	ds:[suppressStringSectionHooks], TRUE
-		mov	si, offset dgroup:[disabledCategory]
+		mov	si, offset dgroup:[rewriteCategory]
 		mov	cx, ds
-		mov	dx, offset dgroup:[disabledKey]
-		call	InitFileDeleteEntry
-		LoadVarSeg	ds, ax
-		clr	ds:[suppressStringSectionHooks]
+		mov	dx, offset dgroup:[rewriteDisabledKey]
+		call	InitFileDeleteEntryRaw
 		jmp	done
 
 	writeSnapshot:
 		LoadVarSeg	ds, ax
-		clr	ds:[suppressStringSectionHooks]
 		mov	bx, ds:[rewriteSnapshotHan]
 		push	bx
 		call	MemLock
 		mov	es, ax
 		clr	di
 		LoadVarSeg	ds, ax
-		mov	si, offset dgroup:[disabledCategory]
+		mov	si, offset dgroup:[rewriteCategory]
 		mov	cx, ds
-		mov	dx, offset dgroup:[disabledKey]
+		mov	dx, offset dgroup:[rewriteDisabledKey]
 		call	InitFileWriteString
 		pop	bx
 		call	MemUnlock
@@ -2956,17 +2949,19 @@ InitFileRewriteDisabledSidecarFromSnapshot	endp
 
 SYNOPSIS:	Append a raw entry to the disabled sidecar without hooks.
 
-PASS:		es:di - entry
+PASS:		ds:si - target category
+		cx:dx - target key
+		es:di - entry
 		bp - entry length
-		dgroup:disabledCategory - target category
-		dgroup:disabledKey - target key
 
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileAppendStringSectionEntryRaw	proc	near
-	entrySeg	local	sptr	push	es
-	entryPtr	local	word	push	di
-	entryLen	local	word	push	bp
+		InitFileAppendStringSectionEntryRaw	proc	near
+		catString	local	fptr.char	push	ds, si
+		keyString	local	fptr.char	push	cx, dx
+		entrySeg	local	sptr	push	es
+		entryPtr	local	word	push	di
+		entryLen	local	word	push	bp
 	tempHan	local	hptr
 	tempSeg	local	sptr
 		.enter
@@ -2994,27 +2989,23 @@ haveTemp:
 	mov	cx, ss:[entryLen]
 	cld
 	rep	movsb
-	clr	al
-	stosb
+		clr	al
+		stosb
 
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledCategory]
-	mov	cx, ds
-	mov	dx, offset dgroup:[disabledKey]
-	mov	es, ss:[tempSeg]
-	clr	di
-	push	bp
+		lds	si, ss:[catString]
+		movdw	cxdx, ss:[keyString]
+		mov	es, ss:[tempSeg]
+		clr	di
+		push	bp
 	mov	bp, ss:[entryLen]
-	call	InitFileRemoveStringSectionEntryRaw
-	pop	bp
+		call	InitFileRemoveStringSectionEntryRaw
+		pop	bp
 
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledCategory]
-	mov	cx, ds
-	mov	dx, offset dgroup:[disabledKey]
-	mov	es, ss:[tempSeg]
-	clr	di
-	push	bp
+		lds	si, ss:[catString]
+		movdw	cxdx, ss:[keyString]
+		mov	es, ss:[tempSeg]
+		clr	di
+		push	bp
 	call	InitFileWriteStringSectionRaw
 	pop	bp
 
@@ -3133,13 +3124,9 @@ DBCS <	mov	es:[di], cx						>
 	jmp	freeRemoved
 
 deleteEntry:
-	LoadVarSeg	es, ax
-	mov	es:[suppressStringSectionHooks], TRUE
 	lds	si, ss:[catString]
 	movdw	cxdx, ss:[keyString]
-	call	InitFileDeleteEntry
-	LoadVarSeg	es, ax
-	clr	es:[suppressStringSectionHooks]
+	call	InitFileDeleteEntryRaw
 
 freeRemoved:
 	mov	bx, ss:[blobHan]
@@ -3187,12 +3174,23 @@ entryStart	local	word
 entryLength	local	word
 entryRemaining	local	word
 entryIndex	local	word
-	.enter
+sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+		.enter
 
 	clr	ax
 	mov	ss:[disabledHan], ax
 	mov	ss:[disabledSize], ax
 	mov	ss:[disabledSeg], ax
+
+	push	ds, si, cx, dx, es, di
+	segmov	es, ss
+	lea	di, ss:[sidecarCategory]
+	mov	bx, es
+	lea	ax, ss:[sidecarKey]
+	call	InitFileBuildDisabledKey
+	pop	ds, si, cx, dx, es, di
+	jc	notFactory
 
 	push	bp
 	clr	bp
@@ -3202,10 +3200,10 @@ entryIndex	local	word
 	mov	ss:[factoryHan], bx
 	mov	ss:[factorySize], cx
 
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledCategory]
+	segmov	ds, ss
+	lea	si, ss:[sidecarCategory]
 	mov	cx, ds
-	mov	dx, offset dgroup:[disabledKey]
+	lea	dx, ss:[sidecarKey]
 	push	bp
 	mov	bp, mask IFRF_FIRST_ONLY
 	call	InitFileReadString
@@ -3303,12 +3301,23 @@ mergedHan	local	hptr
 mergedSeg	local	sptr
 mergedSize	local	word
 entryPtr	local	word
-	entryLen	local	word
-		.enter
+		entryLen	local	word
+sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+			.enter
 
-		push	bp
-		clr	bp
-		call	InitFileReadMergedStringSection
+		push	ds, si, cx, dx
+		segmov	es, ss
+		lea	di, ss:[sidecarCategory]
+		mov	bx, es
+		lea	ax, ss:[sidecarKey]
+		call	InitFileBuildDisabledKey
+		pop	ds, si, cx, dx
+		jc	done
+
+			push	bp
+			clr	bp
+			call	InitFileReadMergedStringSection
 	pop	bp
 	jc	done
 	mov	ss:[mergedHan], bx
@@ -3344,14 +3353,14 @@ entryPtr	local	word
 	pop	bp
 	jmp	free
 
-	disableFactory:
-		LoadVarSeg	ds, ax
-		mov	si, offset dgroup:[disabledCategory]
-	mov	cx, ds
-	mov	dx, offset dgroup:[disabledKey]
-	push	bp
-	mov	bp, ss:[entryLen]
-	call	InitFileAppendStringSectionEntryRaw
+		disableFactory:
+		segmov	ds, ss
+		lea	si, ss:[sidecarCategory]
+		mov	cx, ds
+		lea	dx, ss:[sidecarKey]
+		push	bp
+		mov	bp, ss:[entryLen]
+		call	InitFileAppendStringSectionEntryRaw
 	pop	bp
 
 free:
@@ -3610,45 +3619,6 @@ notDelimiter:
 	ret
 InitFileLexIsDelimiterChar	endp
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		InitFileKeyIsDisabledScratch
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Check if the key points at the disabledKey scratch.
-
-PASS:		cx:dx - key
-
-RETURN:		carry set if key is the disabledKey scratch buffer
-
-DESTROYED:	nothing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-InitFileKeyIsDisabledScratch	proc	near
-	.enter
-
-	cmp	dx, offset dgroup:[disabledKey]
-	jne	notScratch
-	push	ax
-	push	bx
-	push	es
-	LoadVarSeg	es, ax
-	mov	ax, cx
-	mov	bx, es
-	cmp	ax, bx
-	pop	es
-	pop	bx
-	pop	ax
-	jne	notScratch
-	stc
-	jmp	done
-
-notScratch:
-	clc
-done:
-	.leave
-	ret
-InitFileKeyIsDisabledScratch	endp
-
 endif	; INI_STRING_SECTION_TOMBSTONES
 
 	
@@ -3670,7 +3640,7 @@ PASS:		bx - mode
 		else
 		     es:di - body ASCIIZ string
 
-RETURN:		
+RETURN:
 
 DESTROYED:	none
 
@@ -3702,7 +3672,7 @@ InitFileWrite	proc	near
 	je	doWrite
 	mov	bx, offset BuildEntryFromData	; Nope. data.
 
-	
+
 doWrite:
 	call	bx			;destroys ax, bx
 
@@ -3752,7 +3722,7 @@ EC<	call	IFCheckDgroupRegs					>
 	mov	es, bp
 
 	;-----------------------------------------------------------------------
-	;store time 
+	;store time
 
 	call	TimerGetCount	;bx:ax <- system timer count
 	mov	word ptr es:[initfileLastModified+2], bx
@@ -3780,7 +3750,7 @@ if ERROR_CHECK
 	dec	cx
 
 	call	ValidateIniFileFar	;saves all regs that it trashes
-	ERROR_C	CORRUPTED_INI_FILE					
+	ERROR_C	CORRUPTED_INI_FILE
 	pop	ax, cx, ds
 afterCheck:
 endif
@@ -3833,98 +3803,107 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 InitFileDeleteStringSection	proc	far
-	uses	ax, bx, di, bp, es
-	.enter
+		uses	ax, bx, di, bp, es
+if INI_STRING_SECTION_TOMBSTONES
+sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
+endif
+		.enter
 
 if INI_STRING_SECTION_TOMBSTONES
-	push	ax, ds, si, cx, dx
-	call	InitFileHaveLowerIniFile
-	jnc	legacyDelete
-	call	InitFileBuildDisabledKey
-	jc	legacyDelete
-	pop	ax, ds, si, cx, dx
-	call	InitFileDeleteMergedStringSection
-	jmp	exit
+		push	ax, ds, si, cx, dx
+		call	InitFileHaveLowerIniFile
+		jnc	legacyDelete
+		segmov	es, ss
+		lea	di, ss:[sidecarCategory]
+		mov	bx, es
+		lea	ax, ss:[sidecarKey]
+		call	InitFileBuildDisabledKey
+		jc	legacyDelete
+		pop	ax, ds, si, cx, dx
+		call	InitFileDeleteMergedStringSection
+		jmp	exit
 legacyDelete:
-	pop	ax, ds, si, cx, dx
+		pop	ax, ds, si, cx, dx
 endif
 
-	; First get the blob
+		; First get the blob
 	;
-	push	cx
-	clr	bp				; allocate memory for us
-	call	InitFileReadString		; memory handle => BX
-	mov	bp, cx				; size of original string => BP
-	pop	cx
-	jc	exit				; if error, we abort
+		push	cx
+		clr	bp				; allocate memory for us
+		call	InitFileReadString		; memory handle => BX
+		mov	bp, cx				; size of original string => BP
+		pop	cx
+		jc	exit				; if error, we abort
 
 	; Now we find the string section we want
 	;
-	push	ds, si, cx, dx
-	mov_tr	dx, ax				; string number => DX
-	mov	cx, bp				; string size => CX
-	call	MemLock
-	mov	ds, ax				; start of string => DS:SI
-	mov	es, ax
-	clr	si
-	call	GetStringSectionByIndex		; get start of section to nuke
-	jc	done				; if error, abort
+		push	ds, si, cx, dx
+		mov_tr	dx, ax				; string number => DX
+		mov	cx, bp				; string size => CX
+		call	MemLock
+		mov	ds, ax				; start of string => DS:SI
+		mov	es, ax
+		clr	si
+		call	GetStringSectionByIndex		; get start of section to nuke
+		jc	done				; if error, abort
 
 	; Now determine how much we need to delete. We are always going
 	; to assume that there is a CR/LF pair separating each section,
 	; to make things a lot easier.
 	;
-	mov	di, si				; destination => ES:DI
-DBCS <	shl	cx, 1				; # chars -> # bytes	>
-	add	si, cx				; go to end of section
-	mov	cx, ax				; # of chars left => CX
-	jcxz	atEnd
-SBCS <	add	si, 2				; jump past CR/LF separator>
-DBCS <	add	si, 4				; jump past CR/LF separator>
-	sub	cx, 2				; move two fewer chars
-DBCS <	jc	forceTerminate			; only one char, must be NULL>
-SBCS <	rep	movsb				; move the chars	>
-DBCS <	rep	movsw				; move the chars	>
-	jmp	terminate			; go terminate the string
+		mov	di, si				; destination => ES:DI
+DBCS <		shl	cx, 1				; # chars -> # bytes	>
+		add	si, cx				; go to end of section
+		mov	cx, ax				; # of chars left => CX
+		jcxz	atEnd
+SBCS <		add	si, 2				; jump past CR/LF separator>
+DBCS <		add	si, 4				; jump past CR/LF separator>
+		sub	cx, 2				; move two fewer chars
+DBCS <		jc	forceTerminate			; only one char, must be NULL>
+SBCS <		rep	movsb				; move the chars	>
+DBCS <		rep	movsw				; move the chars	>
+		jmp	terminate			; go terminate the string
 
 DBCS <forceTerminate:							>
-DBCS <	xor	cx, cx				; clear cx and carry	>
-DBCS <	jmp	terminate						>
+DBCS <		xor	cx, cx				; clear cx and carry	>
+DBCS <		jmp	terminate						>
 
 	; We're at the end. Either back up two character for the destination
 	; or we have no more strings left
 atEnd:
-	tst	di
-	jz	terminate
-SBCS <	sub	di, 2							>
-DBCS <	sub	di, 4							>
+		tst	di
+		jz	terminate
+SBCS <		sub	di, 2							>
+DBCS <		sub	di, 4							>
 
 	; We're done. Write the string back to .INI file
 terminate:
-SBCS <	mov	es:[di], cl			; store the NULL terminator>
-DBCS <	mov	es:[di], cx			; store the NULL terminator>
+SBCS <		mov	es:[di], cl			; store the NULL terminator>
+DBCS <		mov	es:[di], cx			; store the NULL terminator>
 done:
-	pop	ds, si, cx, dx			; restore category & key names
-	jc	free				; if error, free memory only
+		pop	ds, si, cx, dx			; restore category & key names
+		jc	free				; if error, free memory only
 
-	tst	di				; anything left?
-	jz	deleteEntry			; no -- nuke it
+		tst	di				; anything left?
+		jz	deleteEntry			; no -- nuke it
 
-	clr	di				; string => ES:DI
-	call	InitFileWriteString		; write the resulting string
+		clr	di				; string => ES:DI
+		call	InitFileWriteString		; write the resulting string
 
 	; Now free the buffer, and we're done
-	free:
+free:
 		pushf					; save carry flag
 		call	MemFree				; free buffer used earlier
 		popf					; restore carry flag
-	exit:
+exit:
 		.leave
 		ret
 
 deleteEntry:
-	call	InitFileDeleteEntry
-	jmp	free
+		call	InitFileDeleteEntry
+		jmp	free
+
 InitFileDeleteStringSection	endp
 
 
@@ -3962,33 +3941,80 @@ InitFileDeleteEntry	proc	far
 
 if INI_STRING_SECTION_TOMBSTONES
 		push	ds, si, cx, dx
-		LoadVarSeg	es, ax
-		tst	es:[suppressStringSectionHooks]
-		jnz	skipPreFlush
 		push	bp
 		call	InitFileFlushPendingRewrite
 		pop	bp
-skipPreFlush:
 		pop	ds, si, cx, dx
 endif
 		call	EnterInitfile	;es,bp <- dgroup
 if INI_STRING_SECTION_TOMBSTONES
-		tst	es:[suppressStringSectionHooks]
-	jnz	skipRewriteMark
-	call	InitFileMarkStringSectionRewrite
-skipRewriteMark:
+		call	InitFileMarkStringSectionRewrite
 endif
+		call	InitFileDeleteEntryLow
+		call	ExitInitfile
+if INI_STRING_SECTION_TOMBSTONES
+		call	InitFileStartPendingRewrite
+endif
+
+		.leave
+
+		ret
+InitFileDeleteEntry	endp
+
+if INI_STRING_SECTION_TOMBSTONES
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileDeleteEntryRaw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Delete a key entry without string-section sidecar hooks.
+
+PASS:		ds:si - category ASCIIZ string
+		cx:dx - key ASCIIZ string
+
+DESTROYED:	none
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileDeleteEntryRaw	proc	near
+		uses	ax, bx, cx, di, si, bp, ds, es
+		.enter
+
+		call	EnterInitfile	;es,bp <- dgroup
+		call	InitFileDeleteEntryLow
+		call	ExitInitfile
+
+		.leave
+
+		ret
+InitFileDeleteEntryRaw	endp
+
+endif
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileDeleteEntryLow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Delete a key entry from an entered initfile.
+
+PASS:		ds:si - category ASCIIZ string
+		cx:dx - key ASCIIZ string
+		es,bp - dgroup
+
+DESTROYED:	ax,bx,cx,di,si,ds,es
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileDeleteEntryLow	proc	near
 	call	FindCategory
-	jc	exit
+	jc	done
 	call	FindKey		;initFileBufPos = body, curKeyOffset
-	jc	exit
+	jc	done
 
 	;-----------------------------------------------------------------------
 	;locate end of body
 
 	clr	bx			;not starting in blob
 	call	GetCharFar
-	jc	exit
+	jc	done
 
 	cmp	al, '{'			;blob?
 	jne	doDelete
@@ -4036,19 +4062,9 @@ if HASH_INIFILE
 	neg	cx
 	call	HashUpdateHashTable
 endif
-	exit:
-		call	ExitInitfile
-if INI_STRING_SECTION_TOMBSTONES
-		LoadVarSeg	es, ax
-		tst	es:[suppressStringSectionHooks]
-		jnz	skipRewriteStart
-		call	InitFileStartPendingRewrite
-skipRewriteStart:
-endif
-
-		.leave
+done:
 	ret
-InitFileDeleteEntry	endp
+InitFileDeleteEntryLow	endp
 
 if INI_STRING_SECTION_TOMBSTONES
 
@@ -4064,7 +4080,7 @@ PASS:		es, bp - dgroup
 
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileMarkStringSectionRewrite	proc	near
+InitFileMarkStringSectionRewrite	proc	near
 		uses	ax, bx, cx, dx, di, si, ds, es
 		.enter
 
@@ -4076,15 +4092,15 @@ haveLowerForMark:
 		mov	ds, bp
 		movdw	cxdx, ds:[keyStrAddr]
 		lds	si, ds:[catStrAddr]
-		call	InitFileKeyIsDisabledScratch
-		jnc	notScratchKey
-		jmp	done
 
-notScratchKey:
 		push	ds, si, cx, dx
 		call	InitFileFreeRewriteSnapshot
-	pop	ds, si, cx, dx
+		pop	ds, si, cx, dx
 		push	ds, si, cx, dx
+		LoadVarSeg	es, ax
+		mov	di, offset dgroup:[rewriteCategory]
+		mov	bx, es
+		mov	ax, offset dgroup:[rewriteDisabledKey]
 		call	InitFileBuildDisabledKey
 		pop	ds, si, cx, dx
 		jnc	haveMarkDisabledKey
@@ -4092,41 +4108,26 @@ notScratchKey:
 
 haveMarkDisabledKey:
 		push	ds
-	mov	bx, cx
-	mov	si, dx
-	LoadVarSeg	ds, ax
-	mov	di, offset dgroup:[rewriteKey]
-	segmov	es, ds
-	mov	ds, bx
+		mov	bx, cx
+		mov	si, dx
+		LoadVarSeg	ds, ax
+		mov	di, offset dgroup:[rewriteKey]
+		segmov	es, ds
+		mov	ds, bx
 copyRewriteKey:
-	lodsb
-	stosb
-	tst	al
-	jnz	copyRewriteKey
-	pop	ds
-
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledCategory]
-	mov	di, offset dgroup:[rewriteCategory]
-	segmov	es, ds
-copyRewriteCategory:
-	lodsb
-	stosb
-	tst	al
-	jnz	copyRewriteCategory
-
-	mov	si, offset dgroup:[disabledKey]
-	mov	di, offset dgroup:[rewriteDisabledKey]
-copyLoop:
-	lodsb
+		lodsb
 		stosb
 		tst	al
-		jnz	copyLoop
+		jnz	copyRewriteKey
+		pop	ds
+
+		LoadVarSeg	ds, ax
 		mov	ds:[rewriteStringSection], TRUE
 
-	done:
-	.leave
-	ret
+done:
+		.leave
+
+		ret
 InitFileMarkStringSectionRewrite	endp
 
 endif	; INI_STRING_SECTION_TOMBSTONES
@@ -4202,7 +4203,7 @@ doDelete:
 EC <	ERROR_NZ INIT_FILE_START_OF_CATEGORY_NOT_FOUND			>
 	cld
 	inc	di			;es:di <- start of category
-		
+
 
 	; Now perform the actual category removal
 	;
@@ -4216,7 +4217,7 @@ if HASH_INIFILE
 	mov	es, bp		;es - dgroup
 	mov	cx, ax
 	neg	cx
-	call	HashUpdateHashTable		
+	call	HashUpdateHashTable
 	call	HashRemoveCategory
 	pop	es
 endif
@@ -4328,7 +4329,7 @@ DESCRIPTION:	Restores the backed-up initfile
 
 CALLED BY:	GLOBAL
 
-PASS:		nothing		
+PASS:		nothing
 
 RETURN:		carry	- clear clear if successful
 			- set otherwise
@@ -4354,60 +4355,61 @@ InitFileRevert	proc	far
 
 	; Change to the correct directory
 	;
-	call	FilePushDir
-	mov	ax, SP_PRIVATE_DATA
-	call	FileSetStandardPath
+		call	FilePushDir
+		mov	ax, SP_PRIVATE_DATA
+		call	FileSetStandardPath
 
 	; Lock buffer after grabbing semaphore
 	;
-	call	LoadVarSegDS_PInitFile
+		call	LoadVarSegDS_PInitFile
 if INI_STRING_SECTION_TOMBSTONES
-	call	InitFileFreeRewriteSnapshot
+		call	InitFileFreeRewriteSnapshot
 endif
-	mov	bx, ds:[loaderVars].KLV_initFileBufHan
-	mov	al, FILE_ACCESS_R or FILE_DENY_RW
-	mov	dx, offset initfileBackupName
-	call	FileOpen
-	jc	done
-	push	bx
-	mov	bx, ax				;bx <- file handle
+		mov	bx, ds:[loaderVars].KLV_initFileBufHan
+		mov	al, FILE_ACCESS_R or FILE_DENY_RW
+		mov	dx, offset initfileBackupName
+		call	FileOpen
+		jc	done
+		push	bx
+		mov	bx, ax				;bx <- file handle
 
-	call	FileSize			;AX = file size
+		call	FileSize			;AX = file size
 
 	; realloc initfile buffer
 	;
-	push	bx				;save file handle
-;	mov	ax, ds:[initFileBackupSize]
-	push	ax				;save size
-	mov	bx, ds:[loaderVars].KLV_initFileBufHan
-	mov	ch, mask HAF_ZERO_INIT or mask HAF_LOCK or mask HAF_NO_ERR
-	call	MemReAlloc
-	mov	ds:[initFileBufSegAddr], ax	;update seg addr
-	pop	cx
-	mov	ds:[loaderVars].KLV_initFileSize, cx		;change size
-	pop	bx				;retrieve file handle
+		push	bx				;save file handle
+;		mov	ax, ds:[initFileBackupSize]
+		push	ax				;save size
+		mov	bx, ds:[loaderVars].KLV_initFileBufHan
+		mov	ch, mask HAF_ZERO_INIT or mask HAF_LOCK or mask HAF_NO_ERR
+		call	MemReAlloc
+		mov	ds:[initFileBufSegAddr], ax	;update seg addr
+		pop	cx
+		mov	ds:[loaderVars].KLV_initFileSize, cx		;change size
+		pop	bx				;retrieve file handle
 
 	; read file in
 	; ax = seg addr of buffer
 	; cx = size
 	;
-	push	ds
-	mov	ds, ax
-	clr	dx				;ds:dx <- initfile buffer
-	mov	al, FILE_NO_ERRORS
-	call	FileReadFar			;cx <- # bytes
-	mov	al, FILE_NO_ERRORS
-	call	FileCloseFar
-	pop	ds
-	clc					;indicate success
-	pop	bx				;retrieve mem handle
-	call	MemUnlock			;release buffer
+		push	ds
+		mov	ds, ax
+		clr	dx				;ds:dx <- initfile buffer
+		mov	al, FILE_NO_ERRORS
+		call	FileReadFar			;cx <- # bytes
+		mov	al, FILE_NO_ERRORS
+		call	FileCloseFar
+		pop	ds
+		clc					;indicate success
+		pop	bx				;retrieve mem handle
+		call	MemUnlock			;release buffer
 done:
-	call	VInitFileWrite			;release semaphore
-	call	FilePopDir
+		call	VInitFileWrite			;release semaphore
+		call	FilePopDir
 
-	.leave
-	ret
+		.leave
+
+		ret
 InitFileRevert	endp
 
 
@@ -4445,18 +4447,18 @@ INITFILECOMMIT	proc	far
 	; Some set-up work first
 	;
 if INI_STRING_SECTION_TOMBSTONES
-	call	InitFileFlushPendingRewrite
-	call	InitFileFreeRewriteSnapshot
+		call	InitFileFlushPendingRewrite
+		call	InitFileFreeRewriteSnapshot
 endif
-	call	LoadVarSegDS_PInitFile
-	LoadVarSeg	es
-	tst	es:[trashedIniBuffer]	;If the .ini buffer is trashed, just
-	jnz	exit			; exit.
-	mov	bx, es:[loaderVars].KLV_initFileBufHan	;lock the buffer
-	push	bx
-	call	MemLock
-	mov	ds, ax
-	mov	bx, es:[loaderVars].KLV_initFileHan
+		call	LoadVarSegDS_PInitFile
+		LoadVarSeg	es
+		tst	es:[trashedIniBuffer]	;If the .ini buffer is trashed, just
+		jnz	exit			; exit.
+		mov	bx, es:[loaderVars].KLV_initFileBufHan	;lock the buffer
+		push	bx
+		call	MemLock
+		mov	ds, ax
+		mov	bx, es:[loaderVars].KLV_initFileHan
 
 	; To ensure we have sufficient disk space, we first expand the
 	; current file to the size of the new .INI file. We do this by
@@ -4464,136 +4466,136 @@ endif
 	; the old & new file sizes. The first character will always be
 	; EOF (CTRL-Z), to ensure that the file continues to be valid.
 	;
-	mov	al, FILE_POS_END
-	clr	cx, dx
-	call	FilePosFar		; file size => AX (smaller than 64K)
-	mov	cx, es:[loaderVars].KLV_initFileSize
-	dec	cx			; match logic below
-	sub	cx, ax
-	ja	ensureRoom
+		mov	al, FILE_POS_END
+		clr	cx, dx
+		call	FilePosFar		; file size => AX (smaller than 64K)
+		mov	cx, es:[loaderVars].KLV_initFileSize
+		dec	cx			; match logic below
+		sub	cx, ax
+		ja	ensureRoom
 
 	; Rewind the sucker first...
 validate:
-	clr	cx
-	mov	dx, cx
-	mov	al, FILE_POS_START
-	call	FilePosFar
-	mov	al, FILE_NO_ERRORS
-	mov	cx, es:[loaderVars].KLV_initFileSize
-	dec	cx			; Don't write EOF
-EC < 	call	ValidateIniFileFar	; Check to see if buffer was trashed >
-NEC < 	call	ValidateIniFile		; Check to see if buffer was trashed >
-LONG	jc	error			; branch if so...
+		clr	cx
+		mov	dx, cx
+		mov	al, FILE_POS_START
+		call	FilePosFar
+		mov	al, FILE_NO_ERRORS
+		mov	cx, es:[loaderVars].KLV_initFileSize
+		dec	cx			; Don't write EOF
+EC < 		call	ValidateIniFileFar	; Check to see if buffer was trashed >
+NEC < 		call	ValidateIniFile		; Check to see if buffer was trashed >
+LONG		jc	error			; branch if so...
 
 	; the .ini file could have been opened read-only.
-	; We find out it that was the case if our first call to 
+	; We find out it that was the case if our first call to
 	; FileWrite returns ax=ERROR_ACCESS_DENIED.  If that's the
 	; case, return.  If error is something else, then panic.
 	;
-	clr	al			;clear FILE_NO_ERRORS flag 
-	call	FileWriteFar
-	jnc	fileWriteOK
+		clr	al			;clear FILE_NO_ERRORS flag
+		call	FileWriteFar
+		jnc	fileWriteOK
 
-	cmp	ax, ERROR_SHARING_VIOLATION	;for baseband nets
-	jz	hack10
-	cmp	ax, ERROR_ACCESS_DENIED
-	jne	writeError
+		cmp	ax, ERROR_SHARING_VIOLATION	;for baseband nets
+		jz	hack10
+		cmp	ax, ERROR_ACCESS_DENIED
+		jne	writeError
 hack10:
-	
+
 	; .ini file was opened read-only
-	pop	bx
-	call	MemUnlock
-	jmp	exit
+		pop	bx
+		call	MemUnlock
+		jmp	exit
 
 fileWriteOK:
-	mov	al, FILE_NO_ERRORS	;reset the FILE_NO_ERRORS_FLAG
+		mov	al, FILE_NO_ERRORS	;reset the FILE_NO_ERRORS_FLAG
 
 	; Truncate the file at the current position (using # bytes written
 	; as the position value), and then commit the file
 	;
-	mov	dx, cx
-	clr	cx
-	call	FileTruncate
-	mov	al, FILE_NO_ERRORS
-	call	FileCommit
+		mov	dx, cx
+		clr	cx
+		call	FileTruncate
+		mov	al, FILE_NO_ERRORS
+		call	FileCommit
 done:
-	pop	bx
-	call	MemUnlock		; unlock the buffer
-	segmov	ds, es			; dgroup -> ds
-	call	VInitFileWrite
+		pop	bx
+		call	MemUnlock		; unlock the buffer
+		segmov	ds, es			; dgroup -> ds
+		call	VInitFileWrite
 exit:
-	.leave
-	ret
+		.leave
+
+		ret
 
 	; Ensure sufficient space is present in the file by writing to it
 ensureRoom:
-	push	ds, ax			; save the old file size
-	mov	al, dl			; return errors (DX was 0 from above)
-	segmov	ds, cs, dx
-	mov	dx, offset fileTerminationChar
-	call	FileWriteFar
-	pop	ds, dx			; old file size => DX
-	jnc	validate
-	cmp	ax, ERROR_SHORT_READ_WRITE
-	jne	validate
+		push	ds, ax			; save the old file size
+		mov	al, dl			; return errors (DX was 0 from above)
+		segmov	ds, cs, dx
+		mov	dx, offset fileTerminationChar
+		call	FileWriteFar
+		pop	ds, dx			; old file size => DX
+		jnc	validate
+		cmp	ax, ERROR_SHORT_READ_WRITE
+		jne	validate
 
 	; Truncate .INI file (size to truncate to is in DX), and display
 	; the short-write error
 	;
-	clr	al
-	clr	cx
-	call	FileTruncate		; truncate file to prior size
-	jmp	shortWrite
+		clr	al
+		clr	cx
+		call	FileTruncate		; truncate file to prior size
+		jmp	shortWrite
 
 writeError:
-	cmp	ax, ERROR_SHORT_READ_WRITE
-	jne	error
-	
+		cmp	ax, ERROR_SHORT_READ_WRITE
+		jne	error
+
 	; a short-write we can allow. we just want to make sure the user is
 	; aware of the problem.
-shortWrite:	
-	mov	bx, handle noSpaceForIniString1
-	call	MemLock
-	mov	ds, ax
-	assume 	ds:segment noSpaceForIniString1
-	mov	si, ds:[noSpaceForIniString1]
-	mov	di, ds:[noSpaceForIniString2]
-	mov	ax, mask SNF_CONTINUE
-	call	SysNotify
-	call	MemUnlock
-	jmp	done
-	assume	ds:dgroup
-	
+shortWrite:
+		mov	bx, handle noSpaceForIniString1
+		call	MemLock
+		mov	ds, ax
+		assume 	ds:segment noSpaceForIniString1
+		mov	si, ds:[noSpaceForIniString1]
+		mov	di, ds:[noSpaceForIniString2]
+		mov	ax, mask SNF_CONTINUE
+		call	SysNotify
+		call	MemUnlock
+		jmp	done
+		assume	ds:dgroup
+
 	; There is something wrong with the .INI file, so DON'T write it out
 error:
-	mov	es:[trashedIniBuffer], TRUE	;Set flag saying the .ini buffer
-						; has been trashed, so we don't
-						; want to write it out.
-	call	ExitInitfile
+		mov	es:[trashedIniBuffer], TRUE	; Set flag saying the .ini buffer
+							; has been trashed, so we don't
+							; want to write it out.
+		call	ExitInitfile
 if 0	; Code redundancy
 if ERROR_CHECK
-	ERROR	CORRUPTED_INI_FILE					
-else   
-	mov	bx, handle corruptedIniBufferStringOne
-	call	MemLock
-	mov	ds, ax
-	assume	ds:segment corruptedIniBufferStringOne
-	mov	ax, mask SNF_EXIT
-	mov	si, ds:[corruptedIniBufferStringOne]
-	mov	di, ds:[corruptedIniBufferStringTwo]
-	call	SysNotify
-	mov	si, -1
-	mov	ax, SST_DIRTY
-	GOTO	SysShutdown
-	assume	ds:dgroup
+		ERROR	CORRUPTED_INI_FILE
+else
+		mov	bx, handle corruptedIniBufferStringOne
+		call	MemLock
+		mov	ds, ax
+		assume	ds:segment corruptedIniBufferStringOne
+		mov	ax, mask SNF_EXIT
+		mov	si, ds:[corruptedIniBufferStringOne]
+		mov	di, ds:[corruptedIniBufferStringTwo]
+		call	SysNotify
+		mov	si, -1
+		mov	ax, SST_DIRTY
+		GOTO	SysShutdown
+		assume	ds:dgroup
 endif
 else
-	call	CorruptedIniFileError		; never returns
+		call	CorruptedIniFileError		; never returns
 	.unreached
 endif
 
 INITFILECOMMIT	endp
-
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -4615,11 +4617,11 @@ RETURN:		if error
 			init file contains non-ascii characters, or is
 			not in a valid init file format.
 		else
-			carry clear 
+			carry clear
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4630,9 +4632,9 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileGrab	proc far
-		
+
 		uses	ax, bx, cx, ds
-		
+
 		.enter
 
 		call	LoadVarSegDS_PInitFile
@@ -4640,7 +4642,7 @@ InitFileGrab	proc far
 	;
 	; Save the current init file handle and buffer handle
 	;
-		
+
 		xchg	ax, ds:[loaderVars].KLV_initFileBufHan
 		mov	ds:[savedInitFileBuffer], ax
 
@@ -4654,14 +4656,14 @@ if ERROR_CHECK
 	;
 	; Make sure we were passed a valid file
 	;
-		
+
 		mov_tr	bx, ax				; buffer handle
 		call	MemLock
 		mov	ds, ax
 		call	ValidateIniFileFar
 		call	MemUnlock
 endif
-		
+
 		.leave
 		ret
 InitFileGrab	endp
@@ -4677,13 +4679,13 @@ SYNOPSIS:	Write the temporary init file to disk, restore the
 
 CALLED BY:	GLOBAL
 
-PASS:		nothing 
+PASS:		nothing
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4698,7 +4700,7 @@ INITFILERELEASE	proc far
 		.enter
 
 		call	InitFileCommit
-		
+
 		LoadVarSeg	ds
 		mov	ax, ds:[savedInitFileBuffer]
 		mov	ds:[loaderVars].KLV_initFileBufHan, ax
@@ -4709,9 +4711,9 @@ INITFILERELEASE	proc far
 		mov	ax, ds:[savedInitFileSize]
 		mov	ds:[loaderVars].KLV_initFileSize, ax
 
-		
+
 		call	VInitFileWrite
-		
+
 
 		.leave
 		ret
@@ -4742,7 +4744,7 @@ RETURN:		es:di	= Buffer filled with SBCS ASCIIZ result.
 			  the above sizes.
 
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -4855,10 +4857,10 @@ CALLED BY:	GLOBAL
 PASS:		nothing
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4939,15 +4941,15 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Delete the current .ini file buffer, and load a new
 		buffer with the .ini file last used for the newly
-		specified language.  
+		specified language.
 
 CALLED BY:	GLOBAL
 PASS:		nothing
 RETURN:		nothing
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
-PSEUDO CODE/STRATEGY:		
+PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4963,7 +4965,7 @@ if MULTI_LANGUAGE
 	; Load the new .ini file into a buffer.
 
 		call	GeodeSetLanguagePatchPath
-		jc	done			; Error on setting path. 
+		jc	done			; Error on setting path.
 		mov	ax, mask FOARF_ADD_EOF \
 				or FILE_DENY_W or FILE_ACCESS_R
 		segmov	ds, cs, dx
@@ -4971,7 +4973,7 @@ EC <		mov	dx, offset initECInitFileName			>
 NEC <		mov	dx, offset initInitFileName				>
 		call	FileOpenAndRead
 			; ax = handle of new .ini buffer.
-		jc	done			; Reading new .ini file. 
+		jc	done			; Reading new .ini file.
 
 	; Lock the .ini file.
 
