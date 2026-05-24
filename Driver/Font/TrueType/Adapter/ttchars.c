@@ -535,25 +535,27 @@ EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove  - 1) 
  *      ----      ----      -----------
  *      23.12.22  JK        Initial Revision
  *      26.02.26  JK        Refactoring to avoid some MemReAlloc() calls
+ *      24.05.26  JK        Optimize bitmap buffer clearing
  *******************************************************************/
 
 static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
 {
     void* bitmapData;
     word  currentSize;
+    word  allocSize;
 
     /* round up to 256 bytes */
     if (size < INITIAL_BITMAP_BLOCKSIZE)
-        size = INITIAL_BITMAP_BLOCKSIZE;
+        allocSize = INITIAL_BITMAP_BLOCKSIZE;
     else
-        size = (size + 255) & 0xFF00;
+        allocSize = (size + 255) & 0xFF00;
 
     bitmapData = MemLock( bitmapHandle );
     currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );
 
-    if ( currentSize != size )
+    if ( currentSize != allocSize )
     {
-        MemReAlloc( bitmapHandle, size, HAF_NO_ERR );
+        MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR );
         bitmapData = MemLock( bitmapHandle );
     }
 

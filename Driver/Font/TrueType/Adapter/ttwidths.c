@@ -305,6 +305,8 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         word             currentChar;
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
         WWFixedAsDWord   scaledWidth;
+        const word       winDescent = FACE_PROPERTIES.os2->usWinDescent;
+        const word       winAscent  = FACE_PROPERTIES.os2->usWinAscent;
 
 
         for( currentChar = fontHeader->FH_firstChar; currentChar <= fontHeader->FH_lastChar; ++currentChar )
@@ -344,10 +346,10 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                         if( GLYPH_BBOX.xMin < 0 )
                                 charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
                         
-                        if( -GLYPH_BBOX.yMin > FACE_PROPERTIES.os2->usWinDescent )
+                        if( -GLYPH_BBOX.yMin > winDescent )
                                 charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
-                        if( GLYPH_BBOX.yMax > FACE_PROPERTIES.os2->usWinAscent )
+                        if( GLYPH_BBOX.yMax > winAscent )
                                 charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
                 }
 
@@ -451,6 +453,8 @@ void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
         TT_Kern_0_Pair*   pairs;
         LookupEntry*      indices;
         word              kernCount = 0;
+        const word        minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+        char              left, right;
 
         
         KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
@@ -476,7 +480,6 @@ EC(     ECCheckBounds( indices ) );
         for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word        i;
-                const word  minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
                 
 
                 if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
@@ -491,10 +494,14 @@ EC(             ECCheckBounds( pairs ) );
 
                 for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
                 {
-                        const char left = GetGEOSCharForIndex( indices, pairs[i].left );
-                        const char right = GetGEOSCharForIndex( indices, pairs[i].right );
+                        /* discard pairs with small kerning values */
+                        if( ABS( pairs[i].value ) <= minKernValue )
+                                continue;
 
-                        if( left && right && ABS( pairs[i].value ) > minKernValue )
+                        left = GetGEOSCharForIndex( indices, pairs[i].left );
+                        right = GetGEOSCharForIndex( indices, pairs[i].right );
+
+                        if( left && right )
                         {
                                 WWFixedAsDWord  scaledKernValue;
 
