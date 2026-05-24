@@ -1467,8 +1467,17 @@ string section in the buffer. **InitFileReadStringSectionBlock()** allocates a
 new block on the heap and returns the string section in it. You should use this 
 routine if you don't know the approximate size of the string section.
 
-**InitFileEnumStringSection()** enumerates the specified blob, executing a 
+**InitFileEnumStringSection()** enumerates the specified blob, executing a
 specified callback routine on each string section within the blob.
+
+When the kernel is built with `INI_STRING_SECTION_TOMBSTONES` and a lower INI
+file is present, string-section reads and enumeration merge layered INI files.
+Entries from lower-priority INI files are combined with local entries, exact
+duplicates are removed, and entries listed in the primary file sidecar key
+`key.disabled` are suppressed. The sidecar key lives in the same category as the
+original key and stores exact factory string-section entries. Kernels built with
+`INI_STRING_SECTION_TOMBSTONES=FALSE`, and runtimes with only one INI file, use
+the legacy string-section read behavior.
 
 #### 6.3.2.5 Deleting Items from the INI File
 
@@ -1482,11 +1491,19 @@ deletes the entry. **InitFileDeleteCategory()** takes only a pointer to the
 null-terminated category name and deletes the entire category, including all 
 the keys stored under it.
 
-In addition, you can delete a single string section from a specified blob. 
-**InitFileDeleteStringSection()** takes the category and key names of the 
-blob as well as the index of the string section, and it deletes the string section. 
-If the string section does not exist or if either the key or category can not be 
+In addition, you can delete a single string section from a specified blob.
+**InitFileDeleteStringSection()** takes the category and key names of the
+blob as well as the index of the string section, and it deletes the string section.
+If the string section does not exist or if either the key or category can not be
 found, the routine will return an error flag.
+
+When tombstone support is compiled in and a lower INI file is present, deleting
+or rewriting string sections records affected factory entries in a `key.disabled`
+sidecar list in the same category. User-deleted or user-modified factory entries
+do not reappear when lower-priority INI files are updated. Full-list rewrites
+compare entries lexically, so formatting-only changes do not create local
+duplicates or leave factory entries disabled. Disabled kernels and single-file
+runtimes keep the legacy local-only delete behavior.
 
 ## 6.4 General System Utilities
 
