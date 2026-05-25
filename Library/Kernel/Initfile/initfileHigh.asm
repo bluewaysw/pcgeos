@@ -443,12 +443,12 @@ REVISION HISTORY:
 
 InitFileReadData	proc	far	uses bp
 	.enter
-	andnf	bp, not mask IFRF_CHAR_CONVERT	; make sure we won't be
-						;  confused by being told to
-						;  upcase or downcase things
-	mov	bx, IFOT_DATA
-	call	InitFileRead
-	mov	bx, bp
+		andnf	bp, not mask IFRF_CHAR_CONVERT	; make sure we won't be
+							;  confused by being told to
+							;  upcase or downcase things
+		mov	bx, IFOT_DATA
+		call	InitFileRead
+		mov	bx, bp
 	.leave
 	ret
 InitFileReadData	endp
@@ -497,11 +497,12 @@ REVISION HISTORY:
 InitFileReadString	proc	far
 	uses 	bp
 	.enter
+
 	mov	bx, IFOT_STRING
 	call	InitFileRead
 	jc	notFound
-DBCS <	shr	cx, 1							>
-DBCS <	EC <ERROR_C	ILLEGAL_INIT_FILE_STRING	;odd size	>>
+DBCS <	shr	cx, 1						>
+DBCS <	EC <ERROR_C	ILLEGAL_INIT_FILE_STRING		>> ;odd size
 	dec	cx			;don't include NULL size (preserve CF)
 	mov	bx, bp			;block handle => BX
 done:
@@ -1265,7 +1266,7 @@ InitFileReadLowerString	proc	far
 	tst	bx
 	jz	nullHandle
 DBCS <	shr	cx, 1							>
-DBCS <	EC <ERROR_C	ILLEGAL_INIT_FILE_STRING	;odd size	>>
+DBCS <	EC <ERROR_C	ILLEGAL_INIT_FILE_STRING			>> ;odd size
 	dec	cx			; don't include NULL size
 	jmp	done
 
@@ -1438,9 +1439,9 @@ startLoop:
 	call	GetBodySize		; ax,cx <- func(es, bp)
 	pop	bp
 	mov	es:[initFileBufPos], cx	; reset pos
-SBCS <	add	ax, 2			; make sure there's enough for >
-DBCS <	add	ax, 2*(size wchar)	; make sure there's enough for >
-					; a CR/LF pair
+SBCS <	add	ax, 2			 > 	; make sure there's enough for
+DBCS <	add	ax, 2*(size wchar)	 > 	; make sure there's enough for
+						; a CR/LF pair
 	add	ax, ss:[bufferSize]
 	mov	ss:[bufferSize], ax
 	mov	bx, ss:[bufferHandle]
@@ -1477,12 +1478,12 @@ afterAlloc:
 
 	clr	ax
 	add	di, cx
-DBCS <	shr	cx, 1			; # bytes -> # chars		>
+DBCS <	shr	cx, 1							> ; # bytes -> # chars
 DBCS <	EC <ERROR_C	ILLEGAL_INIT_FILE_STRING			>>
 	LocalPrevChar	esdi		; es:di = end of string
 	std
 	LocalFindChar			; es:di = before null
-DBCS <	shl	cx, 1			; # chars -> # bytes		>
+DBCS <	shl	cx, 1							> ; # chars -> # bytes
 	cld
 	LocalNextChar	esdi		; es:di = null
 SBCS <	mov	{word} es:[di], (C_LF shl 8) or C_CR			>
@@ -1506,11 +1507,11 @@ finish:
 	mov	bx, ss:[bufferHandle]
 	mov	es, es:[bx].HM_addr
 	mov	di, ss:[bufferCurPtr]
-SBCS <	mov	{byte} es:[di-2], 0					>
-DBCS <	mov	{wchar} es:[di-4], 0					>
+SBCS <	mov	{byte} es:[di-2], 0			>
+DBCS <	mov	{wchar} es:[di-4], 0			>
 
-SBCS <	lea	cx, es:[di-1]	; include the null			>
-DBCS <	lea	cx, es:[di-2]	; include the null			>
+SBCS <	lea	cx, es:[di-1]				> ; include the null
+DBCS <	lea	cx, es:[di-2]				> ; include the null
 
 doneUnlock:
 	call	MemUnlock
@@ -1571,6 +1572,7 @@ writeOffset	local	word
 	mov	ax, ss:[factorySize]
 	add	ax, ss:[localSize]
 	add	ax, 2
+DBCS <	shl	ax, 1							>
 	mov	cx, ALLOC_DYNAMIC_LOCK
 	call	MemAllocFar
 	LONG	jc	allocFailed
@@ -1622,9 +1624,13 @@ noLocal:
 	call	MemFree
 noDisabledUnlock:
 	mov	di, ss:[writeOffset]
-	clr	al
-	stosb
-	lea	cx, es:[di]
+SBCS <	clr	al							>
+SBCS <	stosb								>
+DBCS <	clr	ax							>
+DBCS <	stosw								>
+SBCS <	lea	cx, es:[di]						>
+DBCS <	mov	cx, di							>
+DBCS <	shr	cx, 1							>
 	mov	bx, ss:[outputHan]
 	call	MemUnlock
 	mov	bx, ss:[outputHan]
@@ -1723,6 +1729,7 @@ notDisabled:
 	mov	si, ss:[entryStart]
 	mov	cx, ss:[entryLength]
 	mov	dx, ss:[writeOffset]
+DBCS <	shr	dx, 1							>
 	push	ds, es
 	call	InitFileStringSectionAlreadyWritten
 	lahf
@@ -1735,12 +1742,17 @@ notDisabled:
 	mov	di, ss:[writeOffset]
 	tst	di
 	jz	copyEntry
-	mov	{byte} es:[di], C_CR
-	inc	di
-	mov	{byte} es:[di], C_LF
-	inc	di
+SBCS <	mov	{byte} es:[di], C_CR					>
+SBCS <	inc	di							>
+SBCS <	mov	{byte} es:[di], C_LF					>
+SBCS <	inc	di							>
+DBCS <	mov	{wchar} es:[di], C_CARRIAGE_RETURN			>
+DBCS <	add	di, 2							>
+DBCS <	mov	{wchar} es:[di], C_LINE_FEED				>
+DBCS <	add	di, 2							>
 copyEntry:
-	rep	movsb
+SBCS <	rep	movsb							>
+DBCS <	rep	movsw							>
 	mov	ss:[writeOffset], di
 
 skipEntry:
@@ -1763,9 +1775,9 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	See if the current entry already exists in the output blob.
 
 PASS:		ds:si - entry
-		cx - entry length
+		cx - entry length in chars
 		es:0 - output blob
-		dx - current output size
+		dx - current output size in chars
 
 RETURN:		carry set if duplicate
 
@@ -1793,7 +1805,8 @@ dupLoop:
 	mov	di, ss:[entryPtr]
 	mov	es, ss:[entrySeg]
 	mov	cx, ax
-	repe	cmpsb
+SBCS <	repe	cmpsb							>
+DBCS <	repe	cmpsw							>
 	pop	cx, si, di, ds, es
 	stc
 	je	done
@@ -1828,7 +1841,7 @@ InitFileBuildDisabledKey	proc	far
 keyString	local	fptr.char	push	cx, dx
 disabledCat	local	fptr.char	push	es, di
 disabledKeyDest	local	fptr.char	push	bx, ax
-		.enter
+	.enter
 
 		les	di, ss:[disabledCat]
 		mov	bx, di
@@ -1859,14 +1872,14 @@ copyKey:
 		jmp	copyKey
 
 keyDone:
-	LoadVarSeg	ds, ax
-	mov	si, offset dgroup:[disabledSuffix]
+		LoadVarSeg	ds, ax
+		mov	si, offset dgroup:[disabledSuffix]
 copySuffix:
-	lodsb
-	stosb
-	tst	al
-	jnz	copySuffix
-	clc
+		lodsb
+		stosb
+		tst	al
+		jnz	copySuffix
+		clc
 		jmp	done
 
 tooLong:
@@ -1876,7 +1889,7 @@ tooLong:
 		clr	{byte}es:[di]
 		stc
 done:
-		.leave
+	.leave
 	ret
 InitFileBuildDisabledKey	endp
 
@@ -2001,12 +2014,12 @@ afterReconstruct::
 	;
 	clr	ax
 	add	di, cx
-DBCS <	shr	cx, 1			; # bytes -> # chars		>
+DBCS <	shr	cx, 1							> ; # bytes -> # chars
 DBCS <	EC <ERROR_C	ILLEGAL_INIT_FILE_STRING			>>
 	LocalPrevChar	esdi		; es:di = end of string
 	std
 	LocalFindChar			; es:di = before null
-DBCS <	shl	cx, 1			; # chars -> # bytes		>
+DBCS <	shl	cx, 1							> ; # chars -> # bytes
 	cld
 	LocalNextChar	esdi		; es:di = null
 SBCS <	mov	{word} es:[di], (C_LF shl 8) or C_CR			>
@@ -2036,8 +2049,8 @@ DBCS <	add	cx, 4							>
 SBCS <	mov	{byte} es:[di-2], 0					>
 DBCS <	mov	{wchar} es:[di-4], 0					>
 
-SBCS <	lea	cx, es:[di-1]	; include the null			>
-DBCS <	lea	cx, es:[di-2]	; include the null			>
+SBCS <	lea	cx, es:[di-1]						> ; include the null
+DBCS <	lea	cx, es:[di-2]						> ; include the null
 
 	;
 	; Finally (and very importantly), unlock the block...
@@ -2512,10 +2525,10 @@ checkDisabledSidecar:
 	mov	cx, ds
 	lea	dx, ss:[sidecarKey]
 	push	bp
-		mov	bp, bx
-		call	InitFileRemoveStringSectionEntryRaw
-		pop	bp
-		jnc	writeLocal
+	mov	bp, bx
+	call	InitFileRemoveStringSectionEntryRaw
+	pop	bp
+	jnc	writeLocal
 	jmp	skipWrite
 
 skipWrite:
@@ -2628,11 +2641,11 @@ writtenPtr	local	word	push	di
 writtenLen	local	word
 snapshotHan	local	hptr
 snapshotSeg	local	sptr
-	snapshotSize	local	word
-		entryStart	local	word
-		entryLength	local	word
-		entryRemaining	local	word
-		entryIndex	local	word
+snapshotSize	local	word
+entryStart	local	word
+entryLength	local	word
+entryRemaining	local	word
+entryIndex	local	word
 	.enter
 
 	LoadVarSeg	ds, ax
@@ -2667,58 +2680,60 @@ scanLoop:
 	dec	cx
 	mov	dx, ss:[entryIndex]
 	call	GetStringSectionByIndex
-			jc	unlockNotFound
-			mov	ss:[entryStart], si
-			mov	ss:[entryLength], cx
-			mov	ss:[entryRemaining], ax
+	jc	unlockNotFound
+	mov	ss:[entryStart], si
+	mov	ss:[entryLength], cx
+	mov	ss:[entryRemaining], ax
 
-			mov	cx, ss:[entryLength]
-			mov	dx, ss:[writtenLen]
+	mov	cx, ss:[entryLength]
+	mov	dx, ss:[writtenLen]
 	mov	es, ss:[writtenSeg]
 	mov	di, ss:[writtenPtr]
 	mov	si, ss:[entryStart]
-		call	InitFileLexCompareStringSectionEntries
-		jc	nextEntry
+	call	InitFileLexCompareStringSectionEntries
+	jc	nextEntry
 
-			mov	es, ss:[snapshotSeg]
-			mov	ds, ss:[snapshotSeg]
-			mov	di, ss:[entryStart]
-			mov	si, di
-			mov	cx, ss:[entryLength]
-			add	si, cx
-			mov	cx, ss:[entryRemaining]
-			jcxz	removeAtEnd
-SBCS <			add	si, 2						>
-DBCS <			add	si, 4						>
-			sub	cx, 2
-DBCS <			jc	forceTerminate					>
-SBCS <			rep	movsb						>
-DBCS <			rep	movsw						>
-			jmp	terminateEntry
+	mov	es, ss:[snapshotSeg]
+	mov	ds, ss:[snapshotSeg]
+	mov	di, ss:[entryStart]
+	mov	si, di
+	mov	cx, ss:[entryLength]
+SBCS <	add	si, cx						>
+DBCS <	shl	cx, 1						>
+DBCS <	add	si, cx						>
+	mov	cx, ss:[entryRemaining]
+	jcxz	removeAtEnd
+SBCS <	add	si, 2						>
+DBCS <	add	si, 4						>
+	sub	cx, 2
+DBCS <	jc	forceTerminate					>
+SBCS <	rep	movsb						>
+DBCS <	rep	movsw						>
+	jmp	terminateEntry
 
-DBCS <forceTerminate:							>
-DBCS <			xor	cx, cx					>
-DBCS <			jmp	terminateEntry				>
+DBCS <forceTerminate:						>
+DBCS <	xor	cx, cx						>
+DBCS <	jmp	terminateEntry					>
 
 removeAtEnd:
-			tst	di
-			jz	terminateEntry
-SBCS <			sub	di, 2						>
-DBCS <			sub	di, 4						>
+	tst	di
+	jz	terminateEntry
+SBCS <	sub	di, 2						>
+DBCS <	sub	di, 4						>
 
 terminateEntry:
-SBCS <			mov	es:[di], cl					>
-DBCS <			mov	es:[di], cx					>
-			mov	ax, di
-DBCS <			shr	ax, 1						>
-			inc	ax
-			LoadVarSeg	ds, bx
-			mov	ds:[rewriteSnapshotSize], ax
-			mov	ss:[snapshotSize], ax
-				mov	bx, ss:[snapshotHan]
-				call	MemUnlock
-				stc
-		jmp	done
+SBCS <	mov	es:[di], cl					>
+DBCS <	mov	es:[di], cx					>
+	mov	ax, di
+DBCS <	shr	ax, 1						>
+	inc	ax
+	LoadVarSeg	ds, bx
+	mov	ds:[rewriteSnapshotSize], ax
+	mov	ss:[snapshotSize], ax
+	mov	bx, ss:[snapshotHan]
+	call	MemUnlock
+	stc
+	jmp	done
 
 nextEntry:
 	inc	ss:[entryIndex]
@@ -2752,24 +2767,25 @@ InitFileDisabledKeyMatchesRewrite	proc	near
 		uses	ax, di, si, ds, es
 sidecarCategory	local	fptr.char	push	ds, si
 sidecarKey	local	fptr.char	push	cx, dx
-		.enter
 
-			LoadVarSeg	es, ax
-			tst	{byte}es:[rewriteDisabledKey]
-			jz	noMatch
-			lds	si, ss:[sidecarCategory]
-			mov	di, offset dgroup:[rewriteCategory]
-	compareCategoryLoop:
+	.enter
+
+	LoadVarSeg	es, ax
+	tst	{byte}es:[rewriteDisabledKey]
+	jz	noMatch
+	lds	si, ss:[sidecarCategory]
+	mov	di, offset dgroup:[rewriteCategory]
+compareCategoryLoop:
 	lodsb
 	scasb
 	jne	noMatch
-		tst	al
-		jnz	compareCategoryLoop
-		lds	si, ss:[sidecarKey]
-		LoadVarSeg	es, ax
-		mov	di, offset dgroup:[rewriteDisabledKey]
+	tst	al
+	jnz	compareCategoryLoop
+	lds	si, ss:[sidecarKey]
+	LoadVarSeg	es, ax
+	mov	di, offset dgroup:[rewriteDisabledKey]
 compareLoop:
-		lodsb
+	lodsb
 	scasb
 	jne	noMatch
 	tst	al
@@ -2782,7 +2798,7 @@ noMatch:
 done:
 	.leave
 	ret
-		InitFileDisabledKeyMatchesRewrite	endp
+InitFileDisabledKeyMatchesRewrite	endp
 
 	
 	COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2822,9 +2838,9 @@ SYNOPSIS:	Capture lower entries for a pending rewrite snapshot.
 
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileStartPendingRewrite	proc	near
-		uses	ax, bx, cx, dx, di, si, bp, ds, es
-		.enter
+InitFileStartPendingRewrite	proc	near
+	uses	ax, bx, cx, dx, di, si, bp, ds, es
+	.enter
 
 		LoadVarSeg	ds, ax
 		tst	ds:[rewriteStringSection]
@@ -2846,7 +2862,7 @@ isLowerBlob:
 
 		mov	si, offset dgroup:[rewriteCategory]
 		mov	cx, ds
-	mov	dx, offset dgroup:[rewriteKey]
+		mov	dx, offset dgroup:[rewriteKey]
 	;
 	; The primary key was deleted before the rewrite was marked, so the
 	; normal read path now resolves to the lower factory entry.
@@ -2859,15 +2875,15 @@ isLowerBlob:
 		jmp	clearState
 
 gotLower:
-			LoadVarSeg	es, ax
-			inc	cx
-			mov	es:[rewriteSnapshotHan], bx
-			mov	es:[rewriteSnapshotSize], cx
+		LoadVarSeg	es, ax
+		inc	cx
+		mov	es:[rewriteSnapshotHan], bx
+		mov	es:[rewriteSnapshotSize], cx
 		clr	es:[rewriteStringSection]
 		jmp	done
 
 clearState:
-	call	InitFileFreeRewriteSnapshot
+		call	InitFileFreeRewriteSnapshot
 done:
 	.leave
 	ret
@@ -2903,8 +2919,8 @@ SYNOPSIS:	Replace the disabled sidecar with the current snapshot.
 DESTROYED:	ax,bx,cx,dx,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileRewriteDisabledSidecarFromSnapshot	proc	near
-		uses	ax, bx, cx, dx, si, bp, ds, es
-		.enter
+	uses	ax, bx, cx, dx, si, bp, ds, es
+	.enter
 
 		LoadVarSeg	ds, ax
 		mov	bx, ds:[rewriteSnapshotHan]
@@ -2923,7 +2939,7 @@ InitFileRewriteDisabledSidecarFromSnapshot	proc	near
 		call	InitFileDeleteEntryRaw
 		jmp	done
 
-	writeSnapshot:
+writeSnapshot:
 		LoadVarSeg	ds, ax
 		mov	bx, ds:[rewriteSnapshotHan]
 		push	bx
@@ -2938,14 +2954,14 @@ InitFileRewriteDisabledSidecarFromSnapshot	proc	near
 		pop	bx
 		call	MemUnlock
 
-	done:
-		.leave
+done:
+	.leave
 	ret
 InitFileRewriteDisabledSidecarFromSnapshot	endp
 
-	COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-			InitFileAppendStringSectionEntryRaw
-	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	InitFileAppendStringSectionEntryRaw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Append a raw entry to the disabled sidecar without hooks.
 
@@ -2956,15 +2972,16 @@ PASS:		ds:si - target category
 
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-		InitFileAppendStringSectionEntryRaw	proc	near
-		catString	local	fptr.char	push	ds, si
-		keyString	local	fptr.char	push	cx, dx
-		entrySeg	local	sptr	push	es
-		entryPtr	local	word	push	di
-		entryLen	local	word	push	bp
+InitFileAppendStringSectionEntryRaw	proc	near
+	catString	local	fptr.char	push	ds, si
+	keyString	local	fptr.char	push	cx, dx
+	entrySeg	local	sptr	push	es
+	entryPtr	local	word	push	di
+	entryLen	local	word	push	bp
 	tempHan	local	hptr
 	tempSeg	local	sptr
-		.enter
+
+	.enter
 
 	tst	ss:[entryLen]
 	jnz	haveEntry
@@ -2973,6 +2990,7 @@ DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 haveEntry:
 	mov	ax, ss:[entryLen]
 	inc	ax
+DBCS <	shl	ax, 1							>
 	mov	cx, ALLOC_DYNAMIC_LOCK
 	call	MemAllocFar
 	jnc	haveTemp
@@ -2988,24 +3006,27 @@ haveTemp:
 	mov	si, ss:[entryPtr]
 	mov	cx, ss:[entryLen]
 	cld
-	rep	movsb
-		clr	al
-		stosb
+SBCS <	rep	movsb						>
+DBCS <	rep	movsw						>
+SBCS <	clr	al						>
+SBCS <	stosb							>
+DBCS <	clr	ax						>
+DBCS <	stosw							>
 
-		lds	si, ss:[catString]
-		movdw	cxdx, ss:[keyString]
-		mov	es, ss:[tempSeg]
-		clr	di
-		push	bp
+	lds	si, ss:[catString]
+	movdw	cxdx, ss:[keyString]
+	mov	es, ss:[tempSeg]
+	clr	di
+	push	bp
 	mov	bp, ss:[entryLen]
-		call	InitFileRemoveStringSectionEntryRaw
-		pop	bp
+	call	InitFileRemoveStringSectionEntryRaw
+	pop	bp
 
-		lds	si, ss:[catString]
-		movdw	cxdx, ss:[keyString]
-		mov	es, ss:[tempSeg]
-		clr	di
-		push	bp
+	lds	si, ss:[catString]
+	movdw	cxdx, ss:[keyString]
+	mov	es, ss:[tempSeg]
+	clr	di
+	push	bp
 	call	InitFileWriteStringSectionRaw
 	pop	bp
 
@@ -3044,7 +3065,7 @@ blobSize	local	word
 entryStart	local	word
 entryLength	local	word
 entryRemaining	local	word
-	entryIndex	local	word
+entryIndex	local	word
 	.enter
 
 	push	bp
@@ -3076,7 +3097,8 @@ scanLoop:
 	push	cx, si, di, ds, es
 	mov	es, ss:[entrySeg]
 	mov	di, ss:[entryPtr]
-	repe	cmpsb
+SBCS <	repe	cmpsb							>
+DBCS <	repe	cmpsw							>
 	pop	cx, si, di, ds, es
 	je	removeEntry
 
@@ -3090,7 +3112,9 @@ removeEntry:
 	mov	di, ss:[entryStart]
 	mov	si, di
 	mov	cx, ss:[entryLength]
-	add	si, cx
+SBCS <	add	si, cx							>
+DBCS <	shl	cx, 1							>
+DBCS <	add	si, cx							>
 	mov	cx, ss:[entryRemaining]
 	jcxz	atEnd
 SBCS <	add	si, 2				; jump past CR/LF separator>
@@ -3176,7 +3200,7 @@ entryRemaining	local	word
 entryIndex	local	word
 sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
-		.enter
+	.enter
 
 	clr	ax
 	mov	ss:[disabledHan], ax
@@ -3236,7 +3260,8 @@ scanLoop:
 	push	cx, si, di, ds, es
 	mov	es, ss:[entrySeg]
 	mov	di, ss:[entryPtr]
-	repe	cmpsb
+SBCS <	repe	cmpsb						>
+DBCS <	repe	cmpsw						>
 	pop	cx, si, di, ds, es
 	jne	nextEntry
 
@@ -3293,31 +3318,31 @@ PASS:		ds:si - category
 
 DESTROYED:	ax,bx,cx,dx,di,si,bp,ds,es
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	InitFileDeleteMergedStringSection	proc	near
-	catString	local	fptr.char	push	ds, si
-	keyString	local	fptr.char	push	cx, dx
+InitFileDeleteMergedStringSection	proc	near
+catString	local	fptr.char	push	ds, si
+keyString	local	fptr.char	push	cx, dx
 entryIndex	local	word	push	ax
 mergedHan	local	hptr
 mergedSeg	local	sptr
 mergedSize	local	word
 entryPtr	local	word
-		entryLen	local	word
+entryLen	local	word
 sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
-			.enter
+	.enter
 
-		push	ds, si, cx, dx
-		segmov	es, ss
-		lea	di, ss:[sidecarCategory]
-		mov	bx, es
-		lea	ax, ss:[sidecarKey]
-		call	InitFileBuildDisabledKey
-		pop	ds, si, cx, dx
-		jc	done
+	push	ds, si, cx, dx
+	segmov	es, ss
+	lea	di, ss:[sidecarCategory]
+	mov	bx, es
+	lea	ax, ss:[sidecarKey]
+	call	InitFileBuildDisabledKey
+	pop	ds, si, cx, dx
+	jc	done
 
-			push	bp
-			clr	bp
-			call	InitFileReadMergedStringSection
+	push	bp
+	clr	bp
+	call	InitFileReadMergedStringSection
 	pop	bp
 	jc	done
 	mov	ss:[mergedHan], bx
@@ -3353,14 +3378,14 @@ sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 	pop	bp
 	jmp	free
 
-		disableFactory:
-		segmov	ds, ss
-		lea	si, ss:[sidecarCategory]
-		mov	cx, ds
-		lea	dx, ss:[sidecarKey]
-		push	bp
-		mov	bp, ss:[entryLen]
-		call	InitFileAppendStringSectionEntryRaw
+disableFactory:
+	segmov	ds, ss
+	lea	si, ss:[sidecarCategory]
+	mov	cx, ds
+	lea	dx, ss:[sidecarKey]
+	push	bp
+	mov	bp, ss:[entryLen]
+	call	InitFileAppendStringSectionEntryRaw
 	pop	bp
 
 free:
@@ -3396,7 +3421,7 @@ rightPtr	local	word	push	di
 rightLen	local	word	push	dx
 prevDelimiter	local	byte
 quoteState	local	byte
-leftChar	local	byte
+leftChar	local	word
 	.enter
 
 	mov	ss:[prevDelimiter], TRUE
@@ -3411,7 +3436,7 @@ compareLoop:
 	call	InitFileLexGetChar
 	mov	ss:[leftPtr], si
 	mov	ss:[leftLen], cx
-	mov	ss:[leftChar], al
+	mov	ss:[leftChar], ax
 
 	mov	ds, ss:[rightSeg]
 	mov	si, ss:[rightPtr]
@@ -3422,13 +3447,13 @@ compareLoop:
 	mov	ss:[rightPtr], si
 	mov	ss:[rightLen], cx
 
-	cmp	al, ss:[leftChar]
+	cmp	ax, ss:[leftChar]
 	jne	noMatch
-	mov	al, ss:[leftChar]
-	tst	al
+	mov	ax, ss:[leftChar]
+	tst	ax
 	jz	match
 
-	cmp	al, C_QUOTE
+	cmp	ax, C_QUOTE
 	jne	notQuote
 	tst	ss:[quoteState]
 	jz	enterQuote
@@ -3476,7 +3501,7 @@ PASS:		ds:si - string
 		bl - nonzero if previous significant char was delimiter
 		bh - nonzero if currently inside quotes
 
-RETURN:		al - next char, or 0 at logical end
+RETURN:		ax - next char, or 0 at logical end
 		ds:si - advanced
 		cx - remaining length
 
@@ -3487,14 +3512,15 @@ InitFileLexGetChar	proc	near
 
 getLoop:
 	jcxz	atEnd
-	mov	al, ds:[si]
+	LocalGetChar ax, dssi, NO_ADVANCE
+SBCS <	clr	ah							>
 	tst	bh
 	jnz	takeChar
 	call	InitFileLexIsSpaceChar
 	jc	whiteSpace
 
 takeChar:
-	inc	si
+	LocalNextChar dssi
 	dec	cx
 	jmp	done
 
@@ -3504,10 +3530,11 @@ whiteSpace:
 	mov	di, si
 	mov	dx, cx
 lookAhead:
-	mov	al, ds:[di]
+	LocalGetChar ax, dsdi, NO_ADVANCE
+SBCS <	clr	ah							>
 	call	InitFileLexIsSpaceChar
 	jnc	foundNext
-	inc	di
+	LocalNextChar dsdi
 	dec	dx
 	jnz	lookAhead
 	jmp	skipWhiteSpace
@@ -3515,22 +3542,24 @@ lookAhead:
 foundNext:
 	call	InitFileLexIsDelimiterChar
 	jc	skipWhiteSpace
-	mov	al, ds:[si]
-	inc	si
+	LocalGetChar ax, dssi, NO_ADVANCE
+SBCS <	clr	ah							>
+	LocalNextChar dssi
 	dec	cx
 	jmp	done
 
 skipWhiteSpace:
 	jcxz	getLoop
-	mov	al, ds:[si]
+	LocalGetChar ax, dssi, NO_ADVANCE
+SBCS <	clr	ah							>
 	call	InitFileLexIsSpaceChar
 	jnc	getLoop
-	inc	si
+	LocalNextChar dssi
 	dec	cx
 	jmp	skipWhiteSpace
 
 atEnd:
-	clr	al
+	clr	ax
 done:
 	.leave
 	ret
@@ -3543,16 +3572,18 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Check for lexical whitespace.
 
-PASS:		al - character
+PASS:		ax - character
 
 RETURN:		carry set if space or tab
 
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileLexIsSpaceChar	proc	near
-	cmp	al, C_SPACE
+SBCS <	cmp	al, C_SPACE						>
+DBCS <	cmp	ax, C_SPACE						>
 	je	isSpace
-	cmp	al, C_TAB
+SBCS <	cmp	al, C_TAB						>
+DBCS <	cmp	ax, C_TAB						>
 	je	isSpace
 	clc
 	ret
@@ -3568,48 +3599,65 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Check for generic delimiter punctuation.
 
-PASS:		al - character
+PASS:		ax - character
 
 RETURN:		carry set if delimiter punctuation
 
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileLexIsDelimiterChar	proc	near
-	cmp	al, C_QUOTE
+SBCS <	cmp	al, C_QUOTE						>
+DBCS <	cmp	ax, C_QUOTE						>
 	je	notDelimiter
-	cmp	al, C_SPACE
+SBCS <	cmp	al, C_SPACE						>
+DBCS <	cmp	ax, C_SPACE						>
 	jbe	notDelimiter
-	cmp	al, '0'
+SBCS <	cmp	al, '0'							>
+DBCS <	cmp	ax, '0'							>
 	jb	checkWordChars
-	cmp	al, '9'
+SBCS <	cmp	al, '9'							>
+DBCS <	cmp	ax, '9'							>
 	jbe	notDelimiter
-	cmp	al, 'A'
+SBCS <	cmp	al, 'A'							>
+DBCS <	cmp	ax, 'A'							>
 	jb	checkWordChars
-	cmp	al, 'Z'
+SBCS <	cmp	al, 'Z'							>
+DBCS <	cmp	ax, 'Z'							>
 	jbe	notDelimiter
-	cmp	al, 'a'
+SBCS <	cmp	al, 'a'							>
+DBCS <	cmp	ax, 'a'							>
 	jb	checkWordChars
-	cmp	al, 'z'
+SBCS <	cmp	al, 'z'							>
+DBCS <	cmp	ax, 'z'							>
 	jbe	notDelimiter
 
 checkWordChars:
-	cmp	al, '.'
+SBCS <	cmp	al, '.'							>
+DBCS <	cmp	ax, '.'							>
 	je	notDelimiter
-	cmp	al, '*'
+SBCS <	cmp	al, '*'							>
+DBCS <	cmp	ax, '*'							>
 	je	notDelimiter
-	cmp	al, '?'
+SBCS <	cmp	al, '?'							>
+DBCS <	cmp	ax, '?'							>
 	je	notDelimiter
-	cmp	al, '\\'
+SBCS <	cmp	al, C_BACKSLASH						>
+DBCS <	cmp	ax, C_BACKSLASH						>
 	je	notDelimiter
-	cmp	al, '/'
+SBCS <	cmp	al, '/'							>
+DBCS <	cmp	ax, '/'							>
 	je	notDelimiter
-	cmp	al, ':'
+SBCS <	cmp	al, ':'							>
+DBCS <	cmp	ax, ':'							>
 	je	notDelimiter
-	cmp	al, '_'
+SBCS <	cmp	al, '_'							>
+DBCS <	cmp	ax, '_'							>
 	je	notDelimiter
-	cmp	al, '-'
+SBCS <	cmp	al, '-'							>
+DBCS <	cmp	ax, '-'							>
 	je	notDelimiter
-	cmp	al, '+'
+SBCS <	cmp	al, '+'							>
+DBCS <	cmp	ax, '+'							>
 	je	notDelimiter
 	stc
 	ret
@@ -3827,7 +3875,8 @@ legacyDelete:
 		pop	ax, ds, si, cx, dx
 endif
 
-		; First get the blob
+	;
+	; First get the blob
 	;
 		push	cx
 		clr	bp				; allocate memory for us
@@ -3936,8 +3985,8 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 InitFileDeleteEntry	proc	far
-		uses	ax, bx, cx, di, si, bp, ds, es
-		.enter
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
 
 if INI_STRING_SECTION_TOMBSTONES
 		push	ds, si, cx, dx
@@ -3956,9 +4005,9 @@ if INI_STRING_SECTION_TOMBSTONES
 		call	InitFileStartPendingRewrite
 endif
 
-		.leave
+	.leave
 
-		ret
+	ret
 InitFileDeleteEntry	endp
 
 if INI_STRING_SECTION_TOMBSTONES
@@ -3976,16 +4025,16 @@ PASS:		ds:si - category ASCIIZ string
 DESTROYED:	none
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileDeleteEntryRaw	proc	near
-		uses	ax, bx, cx, di, si, bp, ds, es
-		.enter
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
 
 		call	EnterInitfile	;es,bp <- dgroup
 		call	InitFileDeleteEntryLow
 		call	ExitInitfile
 
-		.leave
+	.leave
 
-		ret
+	ret
 InitFileDeleteEntryRaw	endp
 
 endif
@@ -4081,8 +4130,8 @@ PASS:		es, bp - dgroup
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileMarkStringSectionRewrite	proc	near
-		uses	ax, bx, cx, dx, di, si, ds, es
-		.enter
+	uses	ax, bx, cx, dx, di, si, ds, es
+	.enter
 
 		call	InitFileHaveLowerIniFile
 		jc	haveLowerForMark
@@ -4125,9 +4174,9 @@ copyRewriteKey:
 		mov	ds:[rewriteStringSection], TRUE
 
 done:
-		.leave
+	.leave
 
-		ret
+	ret
 InitFileMarkStringSectionRewrite	endp
 
 endif	; INI_STRING_SECTION_TOMBSTONES
@@ -4633,9 +4682,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileGrab	proc far
 
-		uses	ax, bx, cx, ds
-
-		.enter
+	uses	ax, bx, cx, ds
+	.enter
 
 		call	LoadVarSegDS_PInitFile
 
@@ -4664,8 +4712,8 @@ if ERROR_CHECK
 		call	MemUnlock
 endif
 
-		.leave
-		ret
+	.leave
+	ret
 InitFileGrab	endp
 
 

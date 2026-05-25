@@ -2405,7 +2405,9 @@ is not included in this calculation.
     void    MSG_GO_SET_POSITION (
             PointDWFixed    *location);
 
-Set the position of the upper left of a GrObj. The position set is in document 
+Set the position of a GrObj. This is the upper left corner for Text, Arc and Spline,
+while for Line, Rect, RoundedRect and Ellipse, it is the corner from which the object
+was initially created by the user. The position set is in document 
 coordinates unless the GrObj is in a group, in which case the position is in 
 coordinates relative to the group's upper left corner. If the GrObj has been 
 rotated, skewed, or otherwise transformed, this sets the location of the 
@@ -2489,7 +2491,7 @@ which handle will act as the center of scaling.
     void    MSG_GO_GET_SIZE (
             GOGetSizeParams     *retVal);
 
-Get the object's width and height in points. The dimensions are calculated by 
+Get the object's absolute width and height in points. The dimensions are calculated by 
 mapping the object's corners into document coordinates and calculating the 
 distances between them. The center of the selection handles of a rectangle 
 represent the corners mapped into document coordinates. The line thickness 
@@ -2520,7 +2522,9 @@ Structures:
     void    MSG_GO_GET_POSITION (
             PointDWFixed    *retValue);
 
-Get the position of the upper left of a GrObj. The position is in document 
+Get the position of a GrObj. This is the upper left corner for Text, Arc and Spline,
+while for Line, Rect, RoundedRect and Ellipse, it is the corner from which the object
+was initially created by the user. The position is in document 
 coordinates unless the GrObj is in a group, in which case the position is 
 relative to the upper left of the group. If the GrObj has been rotated, skewed, 
 or otherwise transformed, then this message gets the location of the selection 

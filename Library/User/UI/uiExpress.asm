@@ -5851,10 +5851,6 @@ EMCInteractionNotifyFileChange	method	dynamic	EMCInteractionClass,
 	jnc	toDone			; app list not built, no need
 					; to update
 
-	mov	ax, TEMP_EMC_INTERACTION_PATH_IDS
-	call	ObjVarFindData
-	jnc	toDone			; not found, don't bother
-
 	cmp	dx, FCNT_BATCH
 	LONG je	batch
 	cmp	dx, FCNT_ADD_SP_DIRECTORY
@@ -5866,22 +5862,42 @@ EMCInteractionNotifyFileChange	method	dynamic	EMCInteractionClass,
 	cmp	dx, FCNT_RENAME
 	je	rename
 	cmp	dx, FCNT_ATTRIBUTES
-	je	rename			; treat as rename - rebuild
+	je	deleteRename		; treat as rename - rebuild
 	cmp	dx, FCNT_DELETE
-	jne	done
+	LONG jne done
 ;delete:
+deleteRename:
+	;
+	; FCNT_DELETE and FCNT_ATTRIBUTES - check child file IDs
+	;
+	jmp	short checkDeleteRenameIDs
+
 rename:
 	;
-	; FCNT_DELETE and FCNT_RENAME - check child file IDs
+	; FCNT_RENAME - if this is being renamed to our path tail,
+	; rebuild so the list can reappear.
+	;
+	call	checkRenameLocalSP
+	jc	rebuildThisEMCInteraction
+
+checkDeleteRenameIDs:
+	;
+	; FCNT_DELETE, FCNT_RENAME, and FCNT_ATTRIBUTES - check child file IDs
 	;
 	call	getIDFromBlock			; cx:dx = file ID, bp = disk
 	pushdw	cxdx
+	call	emcCheckPathIDs			; path itself changed?
+	jc	rebuildThisEMCInteractionPopCXDX
 	clrdw	cxdx				; check only disk
 	call	emcCheckPathIDs
 	popdw	cxdx				; cx:dx = file ID
 	jnc	done				; disk doesn't match, done
 	call	emcCheckFileIDs			; check file IDs
 	jmp	short checkRebuild
+
+rebuildThisEMCInteractionPopCXDX:
+	popdw	cxdx
+	jmp	rebuildThisEMCInteraction
 
 toDone:
 	jmp	done
@@ -5919,6 +5935,17 @@ rebuildThisEMCInteraction:
 	call	GenCallApplication
 	mov	bx, ds:[LMBH_handle]		; ^lbx:si = add items here
 	call	CreateAppOrDocList
+	mov	ax, MSG_GEN_COUNT_CHILDREN
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage			; dx = child count
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	tst	dx
+	jz	setRebuiltUsableState
+	mov	ax, MSG_GEN_SET_USABLE
+setRebuiltUsableState:
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
 	mov	ax, MSG_GEN_APPLICATION_MARK_NOT_BUSY
 	call	GenCallApplication
 done:
@@ -5983,7 +6010,7 @@ batchLoop:
 EC <	cmp	ax, FileChangeNotificationType		>
 EC <	ERROR_A -1					>
 	cmp	ax, FCNT_CREATE
-	je	batchCreate
+	LONG je	batchCreate
 	cmp	ax, FCNT_RENAME
 	je	batchDeleteRename
 	cmp	ax, FCNT_ATTRIBUTES
@@ -6021,6 +6048,11 @@ batchDeleteSPDir:
 batchDeleteRename:
 						; offset to next batch item
 	mov	bp, size FileChangeBatchNotificationItem
+	cmp	ax, FCNT_RENAME
+	jne	batchDeleteRenameNoName
+	call	checkCreateLocalSPBatch
+	jc	batchNext
+batchDeleteRenameNoName:
 	cmp	ax, FCNT_DELETE
 	je	batchDeleteRenameCommon		; FCNT_DELETE, have offset
 	cmp	ax, FCNT_ATTRIBUTES
@@ -6035,6 +6067,10 @@ batchDeleteRenameCommon:
 	;	ax = offset to next item in FileChangeBatchNotification buffer
 	;
 	mov	bp, es:[di].FCBNI_disk		; bp = disk
+	mov	cx, es:[di].FCBNI_id.high	; cx:dx = file ID
+	mov	dx, es:[di].FCBNI_id.low
+	call	emcCheckPathIDs			; path itself changed?
+	jc	nextBatchDeleteRename
 	clrdw	cxdx				; only match disk
 	call	emcCheckPathIDs
 	jnc	nextBatchDeleteRename		; diff disk, no rebuild
@@ -6067,7 +6103,7 @@ batchCreate:
 batchCreateRebuild:
 						; offset to next batch item
 	mov	ax, size FileChangeBatchNotificationItem + size FileLongName
-	jmp	short batchNext
+	jmp	batchNext
 
 ;
 ; pass:
@@ -6209,8 +6245,29 @@ fileIDReturn:
 	pop	ax, bx, di
 	retn
 
-;
-; pass:
+	;
+	; pass:
+	;	*ds:si = EMCInteraction
+	;	^hbp = FileChangeNotificationData
+	; return:
+	;	carry set if renamed item has our stored path tail
+	;	carry clear otherwise
+	; destroyed:
+	;	none
+	;
+checkRenameLocalSP	label	near
+	push	ax, bx, di, es
+	mov	bx, bp
+	call	MemLock
+	mov	es, ax
+	clr	di
+	call	checkCreateLocalSPLow
+	call	MemUnlock			; preserves flags
+	pop	ax, bx, di, es
+	retn
+
+	;
+	; pass:
 ;	*ds:si = ECMInteraction
 ;	^hbp = FileChangeNotificationData
 ; return:

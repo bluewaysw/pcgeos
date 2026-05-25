@@ -901,10 +901,10 @@ bx, si, di, es - Unchanged.
 **Passed:**  
 es - Segment of class called.  
 *ds:si - Instance data of object called.  
-ds:bx - Instance data of object called (= ***ds:si**).  
+ds:bx - Instance data of object called (= *ds:si).  
 ds:di - If class of message handler is in a master 
 part, this is the data for master part of 
-message. Otherwise, **ds:di** = ***ds:si**.  
+message. Otherwise, **ds:di** = *ds:si.  
 cx, dx, bp - Other data.  
 ax - Message.  
 **Return:**  
@@ -948,10 +948,10 @@ unchanged.
 **Passed:**  
 es - Segment of class called.  
 *ds:si - Instance data of object called.  
-ds:bx - Instance data of object called (= ***ds:si**).  
+ds:bx - Instance data of object called (= *ds:si).  
 ds:di - If class of message handler is in a master 
 part, this is the data for master part of 
-message. Otherwise, **ds:di** = ***ds:si**.  
+message. Otherwise, **ds:di** = *ds:si.  
 cx, dx, bp - Other data.  
 ax - Message.  
 **Return:**  
@@ -999,10 +999,10 @@ bx, si, di - Unchanged.
 **Passed:**  
 es - Segment of class called.  
 *ds:si - Instance data of object called.  
-ds:bx - Instance data of object called (= ***ds:si**).  
+ds:bx - Instance data of object called (= *ds:si).  
 ds:di - If class of message handler is in a master 
 part, this is the data for master part of 
-message.    Otherwise, **ds:di** = ***ds:si**.  
+message.    Otherwise, **ds:di** = *ds:si.  
 cx, dx, bp - Other data.  
 ax - Message.  
 **Return:**  
@@ -1044,10 +1044,10 @@ bx, si, di, es - Unchanged.
 **Passed:**  
 es - Segment of class called.  
 *ds:si - Instance data of object called.  
-ds:bx - Instance data of object called (= ***ds:si**).  
+ds:bx - Instance data of object called (= *ds:si).  
 ds:di - If class of message handler is in a master 
 part, this is the data for master part of 
-message.    Otherwise, **ds:di** = ***ds:si**.  
+message.    Otherwise, **ds:di** = *ds:si.  
 cx, dx, bp - Other data useful to message.  
 ax - Message.  
 **Return:**  
@@ -1866,10 +1866,10 @@ es - Segment of class called.
 *ds:si - Instance data of object called. (If class is a 
 subclass of ProcessClass **ds** = dgroup of 
 process and **si** = other data passed by caller.)  
-ds:bx - Instance data of object called (= ***ds:si**).  
+ds:bx - Instance data of object called (= *ds:si).  
 ds:di - If the class of the message handler is in a 
 master part, this is the data for master part 
-of message. Otherwise, **ds:di** = ***ds:si**.  
+of message. Otherwise, **ds:di** = *ds:si.  
 cx, dx, bp - Other data useful to message.  
 ax - Message.  
 **Return:**  

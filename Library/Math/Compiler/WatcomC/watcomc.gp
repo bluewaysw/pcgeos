@@ -83,6 +83,29 @@ export __FSN
 export __FSFD
 export __FSC
 
+export SIN
+export COS
+export TAN
+export COSH
+export SINH
+export TANH
+export ATAN
+export ACOS
+export ASIN
+export ATANH
+export ASINH
+export ACOSH
+export LOG
+export LN
+export SQRT
+export POW
+export	FLOOR
+export	FABS_C as FABS
+export	EXP
+export	FRAND
+export	FMOD
+export	ATAN2
+export  LOG10
 
 #
 # XIP enabled

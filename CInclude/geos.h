@@ -119,7 +119,7 @@ pragma On(Long_enums);          /* to be compatible with MSC */
 
 #pragma aux __pascal "^"                       \
            parm reverse routine []             \
-           value struct float routine [ax] \
+           value no8087 \
            modify [ax bx cx dx es]
 
 #define _pascal __pascal
