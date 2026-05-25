@@ -3875,7 +3875,8 @@ legacyDelete:
 		pop	ax, ds, si, cx, dx
 endif
 
-		; First get the blob
+	;
+	; First get the blob
 	;
 		push	cx
 		clr	bp				; allocate memory for us
@@ -3984,8 +3985,8 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 InitFileDeleteEntry	proc	far
-		uses	ax, bx, cx, di, si, bp, ds, es
-		.enter
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
 
 if INI_STRING_SECTION_TOMBSTONES
 		push	ds, si, cx, dx
@@ -4004,9 +4005,9 @@ if INI_STRING_SECTION_TOMBSTONES
 		call	InitFileStartPendingRewrite
 endif
 
-		.leave
+	.leave
 
-		ret
+	ret
 InitFileDeleteEntry	endp
 
 if INI_STRING_SECTION_TOMBSTONES
@@ -4024,16 +4025,16 @@ PASS:		ds:si - category ASCIIZ string
 DESTROYED:	none
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileDeleteEntryRaw	proc	near
-		uses	ax, bx, cx, di, si, bp, ds, es
-		.enter
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
 
 		call	EnterInitfile	;es,bp <- dgroup
 		call	InitFileDeleteEntryLow
 		call	ExitInitfile
 
-		.leave
+	.leave
 
-		ret
+	ret
 InitFileDeleteEntryRaw	endp
 
 endif
@@ -4129,8 +4130,8 @@ PASS:		es, bp - dgroup
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileMarkStringSectionRewrite	proc	near
-		uses	ax, bx, cx, dx, di, si, ds, es
-		.enter
+	uses	ax, bx, cx, dx, di, si, ds, es
+	.enter
 
 		call	InitFileHaveLowerIniFile
 		jc	haveLowerForMark
@@ -4173,9 +4174,9 @@ copyRewriteKey:
 		mov	ds:[rewriteStringSection], TRUE
 
 done:
-		.leave
+	.leave
 
-		ret
+	ret
 InitFileMarkStringSectionRewrite	endp
 
 endif	; INI_STRING_SECTION_TOMBSTONES
@@ -4681,9 +4682,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileGrab	proc far
 
-		uses	ax, bx, cx, ds
-
-		.enter
+	uses	ax, bx, cx, ds
+	.enter
 
 		call	LoadVarSegDS_PInitFile
 
@@ -4712,8 +4712,8 @@ if ERROR_CHECK
 		call	MemUnlock
 endif
 
-		.leave
-		ret
+	.leave
+	ret
 InitFileGrab	endp
 
 
