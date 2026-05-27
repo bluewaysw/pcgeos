@@ -556,7 +556,7 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
     if ( currentSize != allocSize )
     {
         MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR );
-        bitmapData = MemLock( bitmapHandle );
+        bitmapData = MemDeref( bitmapHandle );
     }
 
     return memset( bitmapData, 0, size );
