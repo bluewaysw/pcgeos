@@ -24,19 +24,19 @@ library photopc
 exempt extgraph
 exempt photopc
 
-resource APPRESOURCE	            ui-object
-resource INTERFACE	                ui-object
-resource ALBUMSCREENRESOURCE        ui-object
+resource AppResource	            ui-object
+resource Interface	                ui-object
+resource AlbumScreenResource        ui-object
 #resource THUMBNAILSCREENRESOURCE    ui-object
-resource VIEWSCREENRESOURCE         ui-object
-resource DIALOGRESOURCE				ui-object
-resource PRINTSIZEOPTIONSRESOURCE	ui-object
-resource CAMERAPROGRESSRESOURCE		ui-object
+resource ViewScreenResource         ui-object
+resource DialogResource				ui-object
+resource PrintSizeOptionsResource	ui-object
+resource CameraProgressResource		ui-object
 #resource DOCUMENTGROUPRESOURCE		object
 #resource THUMBNAILVIEWRESOURCE		object
-resource ALBUMVIEWRESOURCE			object
-resource GETPICTURESVIEWRESOURCE	object
-resource COPYPROGRESSRESOURCE           ui-object
+resource AlbumViewResource			object
+resource GetPicturesViewResource	object
+resource CopyProgressResource           ui-object
 
 #export PAButtonItemClass
 #export PAColorInteractionClass
