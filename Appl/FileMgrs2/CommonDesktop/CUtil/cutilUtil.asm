@@ -56,7 +56,7 @@ SIDE EFFECTS:	object is added to both the GCNSLT_FILE_SYSTEM list and the
 		MSG_META_DETACH and call UtilRemoveFromFileChangeList
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -70,16 +70,16 @@ UtilAddToFileChangeList proc	far
 
 	;
 	; Add to the file-change list
-	; 
+	;
 	mov	cx, ds:[LMBH_handle]
 	mov	dx, si
 	mov	bx, MANUFACTURER_ID_GEOWORKS
 	mov	ax, GCNSLT_FILE_SYSTEM
 	call	GCNListAdd
-	
+
 	;
 	; Add to the app's active list.
-	; 
+	;
 	mov	dx, size GCNListParams
 	sub	sp, dx
 	mov	bp, sp
@@ -110,10 +110,10 @@ CALLED BY:	(EXTERNAL) FolderClose, FolderDetach, Tree...
 PASS:		*ds:si	= object
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -133,7 +133,7 @@ UtilRemoveFromFileChangeList proc	far
 
 	;
 	; Remove from the app's active list.
-	; 
+	;
 	mov	dx, size GCNListParams
 	sub	sp, dx
 	mov	bp, sp
@@ -248,7 +248,7 @@ PSEUDO CODE/STRATEGY:
 		ax and dx are numerically the same, they are also "the same"
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -308,7 +308,7 @@ PASS:		dx:bp - folder's pathname
 			only if ax != NIL
 
 		(NewDesk):
-		cx - NewDeskObjectType			
+		cx - NewDeskObjectType
 
 RETURN:		carry clear if new Folder Window created
 		carry set if not
@@ -353,7 +353,7 @@ ND<	mov	di, offset NDFolderSetup				>
 	; but this case is probably the only one the testers will
 	; test, so here it is.   Note that this causes a performance
 	; penalty for the opening of every folder, but it's rather
-	; small. 
+	; small.
 
 BA <	mov	ax, SP_TOP				>
 BA <	call	FileSetStandardPath			>
@@ -371,7 +371,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Sets up and calls CreateFolderWindowCommon with the
-		call back routine MaximizeWindow, which puts up the 
+		call back routine MaximizeWindow, which puts up the
 		window in Full Screen mode, not overlapping mode.
 
 CALLED BY:	InitSetFolderDispOpts, ...
@@ -380,20 +380,20 @@ PASS:		dx:bp - Pathname at which to create new folder
 		bx - disk handle for folder window
 		ds - assumed to be pointing to object block
 			(MF_FIXUP_DS performed)
-		
+
 
 RETURN:		^lcx:dx - OD of new folder object
 
 DESTROYED:	ax, bx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	dlitwin	7/23/92   	added header 
+	dlitwin	7/23/92   	added header
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CreateMaxFolderWindow	proc	far
@@ -426,7 +426,7 @@ SYNOPSIS:	Common routine to create a folder window
 CALLED BY:	CreateNewFolderWindow, CreateMaxFolderWindow
 
 PASS:		dx:bp - Pathname at which to create new folder
-		bx - disk handle for folder 
+		bx - disk handle for folder
 		ds - assumed to be pointing to object block
 			(MF_FIXUP_DS performed)
 		di - callback routine.
@@ -442,14 +442,14 @@ RETURN:		^lcx:dx - OD of new folder object
 
 DESTROYED:	ax,bx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
-	cdb	7/13/92   	added header 
+	cdb	7/13/92   	added header
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CreateFolderWindowCommon	proc near
@@ -499,7 +499,7 @@ endif	; _NEWDESK
 	;  case, just bring it to the front.)
 	;
 	mov	cx, bx				; cx = disk handle
-	mov	si, dx		
+	mov	si, dx
 	mov	dx, ss:[pathname].segment	; dx:si - pathname
 ND<	mov	ax, ss:[objectType]			>
 	call	CheckFolderWindow
@@ -790,11 +790,11 @@ CALLED BY:	CreateFolderWindowCommon
 PASS:		bx - handle of UI objects
 		ds - object block to be fixed up
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -851,7 +851,7 @@ UtilBringUpFolderWindow	endp
 ; to the negative end of the list, when adding NewDesk WOT's add them to
 ; the end of the enumerated type.
 ;-----------------------------------------------------------------------------
- 
+
 ;
 ; This is the table of template folder objects.  There must be one for
 ; each NewDeskObjectType, and the offsets of each must be the same.
@@ -1011,7 +1011,7 @@ RETURN:		none
 
 DESTROYED:	???
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1058,7 +1058,7 @@ RETURN:		none
 
 DESTROYED:	all but bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1102,7 +1102,7 @@ RETURN:		none
 
 DESTROYED:	ax, di
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1217,7 +1217,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Returns if the state of the the document control object
 		for the GeoManagers folder windows is maximized or not.
 
-CALLED BY:	
+CALLED BY:
 
 PASS:		none
 RETURN:		cx =	TRUE if it is in maximized state
@@ -1225,7 +1225,7 @@ RETURN:		cx =	TRUE if it is in maximized state
 
 DESTROYED:	none
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -1339,10 +1339,10 @@ RETURN:		carry set - if we're tryimg to close the window that
 			we just opened
 		carry clear - if we closed an old window successfully
 DESTROYED:	evrything, but cx
-SIDE EFFECTS:	ss:[numFiles] gets updated	
+SIDE EFFECTS:	ss:[numFiles] gets updated
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1504,7 +1504,28 @@ CheckFolderWindow	proc	near
 	mov	bp, si				; dx:bp = pathname
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	FindFolderWindow		; check if already opened
-	; For NewDesk, we want to allow multiple windows in the same folder
+if _NEWDESK
+	; For NewDesk (ISDesk), we want to allow multiple windows in the same folder,
+	; but we don't want to open a new window EVERYTIME we click on the same folder
+	; So by default, we don't create a new window if one is already open and bring
+	; the existing window to the front instead. If the user wants to open a new
+	; window, they can do so by holding down the CTRL key when double-clicking a folder.
+	jnc	notFoundND
+	tst	bx
+	jz	notFoundND
+	;
+	; found matching folder window, bring to front
+	;	bx = folder object block
+	;
+	mov	si, FOLDER_OBJECT_OFFSET	; common offset
+	mov	ax, MSG_FOLDER_BRING_TO_FRONT
+	call	ObjMessageCallFixup
+	clr	ax				; no error
+	jmp	short noCreate			; brought-to-front,
+						; don't create
+notFoundND:
+endif		; if _NEWDESK
+
 if _GMGR
 	jnc	notFound			; if not, check # windows
 	;
@@ -1679,7 +1700,7 @@ FindFolderWindow	proc	far
 	.enter
 
 	;
-	; Construct the actual path to find 
+	; Construct the actual path to find
 	;
 
 	push	di, ds, ax
@@ -1733,7 +1754,7 @@ tryNext:
 	; Not found -- clear carry
 	;
 
-	clc				
+	clc
 	jmp	done
 
 foundOrError:
@@ -1763,7 +1784,7 @@ DESTROYED:	nothing
 SIDE EFFECTS:	none
 
 PSEUDO CODE/STRATEGY:
-	
+
 KNOWN BUGS/IDEAS:
 
 REVISION HISTORY:
@@ -1795,7 +1816,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SaveNewFolder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	save the OD of the new folder into a global table and 
+SYNOPSIS:	save the OD of the new folder into a global table and
 		increment count of opened windows
 
 CALLED BY:	INTERNAL
@@ -1892,7 +1913,7 @@ DESTROYED:	nothing
 SIDE EFFECTS:	file-changes are batched
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1924,7 +1945,7 @@ DESTROYED:	nothing (flags preserved)
 SIDE EFFECTS:	file-changes are flushed
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2032,7 +2053,7 @@ EC <	ERROR_NZ	BAD_MARK_WINDOW_FOR_UPDATE_FLAGS		>
 	; Load up registers for source path
 	;
 	test	ss:[updateFlags], mask FWUF_DS_IS_FQT_BLOCK
-	jz	checkCurDirSrc 
+	jz	checkCurDirSrc
 	mov	ax, ds
 	mov	bx, offset FQTH_pathname
 	mov	cx, ds:[FQTH_diskHandle]
@@ -2041,7 +2062,7 @@ EC <	ERROR_NZ	BAD_MARK_WINDOW_FOR_UPDATE_FLAGS		>
 checkCurDirSrc:
 	test	ss:[updateFlags], mask FWUF_CUR_DIR_HOLDS_SOURCE
 	jz	checkFCNAsSrc
-	
+
 	push	ds, si
 	segmov	ds, ss
 	lea	si, ss:[updatePath]
@@ -2060,7 +2081,7 @@ checkFCNAsSrc:
 	;
 	; Now perform whatever marking is appropriate with the source path
 	; we've got.
-	; 
+	;
 handleSource:
 	mov	ss:[updateSrcDiskHandle], cx
 
@@ -2103,7 +2124,7 @@ endif
 scanDest:
 	;
 	; Any dest-related things?
-	; 
+	;
 	test	ss:[updateFlags], mask FWUF_CLOSE_DEST or \
 			mask FWUF_SUSPEND or \
 			mask FWUF_UNSUSPEND
@@ -2114,7 +2135,7 @@ EC <	ERROR_Z	DESKTOP_FATAL_ERROR	; no other option yet		>
 
 	;
 	; Fetch current path for passing th marking routines
-	; 
+	;
 	push	ds, si
 	segmov	ds, ss
 	lea	si, ss:[updatePath]
@@ -2193,10 +2214,10 @@ RETURN:		nothing
 DESTROYED:	dx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2270,7 +2291,7 @@ actImmediately:
 	; Suspend happens right away, while unsuspend gets queued. Neither
 	; modifies FTE_state. They also can only apply to one folder, so once
 	; we've called the folder, we're done.
-	; 
+	;
 	test	bx, mask FTES_SUSPEND
 
 ; change to mark as suspended, to ensure unsuspend will happen when
@@ -2418,7 +2439,7 @@ PASS:		ss:[folderTrackingTable] - table of opened folder windows
 
 RETURN:		marked windows updated
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
 		go through all opened folder windows and check if
@@ -2523,11 +2544,11 @@ CALLED BY:	UpdateMarkedWindows
 PASS:		^lbx:si - FolderClass object
 		ax	- FolderTrackingEntryFlags
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2704,7 +2725,7 @@ SendToTreeAndBroadcast	proc	far
 if _GMGR
 if not _ZMGR
 ifndef GEOLAUNCHER		; no Tree Window for GeoLauncher
-if _TREE_MENU		
+if _TREE_MENU
 	cmp	ss:[treeRelocated], TRUE	; tree alive?
 	jne	noTree				; nope
 	test	di, mask MF_FIXUP_DS
@@ -2735,7 +2756,7 @@ noCallback:
 	pop	ds
 fixedDS:
 noTree:
-endif		; if _TREE_MENU		
+endif		; if _TREE_MENU
 endif		; ifndef GEOLAUNCHER
 endif		; if (not _ZMGR)
 endif		; if _GMGR
@@ -2850,7 +2871,7 @@ GetVolumeNameAndFreeSpace	proc	far
 		.enter
 	;
 	; Get all the pertinent info at once.
-	; 
+	;
 		segmov	es, ds
 		mov	di, si
 		call	DiskGetVolumeInfo
@@ -2859,7 +2880,7 @@ if _GMGR
 	;
 	; Notify anyone interested in the free space for this disk of the
 	; current amount of free space.
-	; 
+	;
 	mov	cx, ds:[si].DIS_freeSpace.high
 	mov	dx, ds:[si].DIS_freeSpace.low
 	mov	di, mask MF_FORCE_QUEUE or mask MF_CHECK_DUPLICATE or \
@@ -2876,7 +2897,7 @@ done:
 error:
 		call	DesktopOKError
 		jmp	done
-	
+
 GetVolumeNameAndFreeSpace	endp
 
 ;not needed - usability 4/3/90
@@ -2922,9 +2943,9 @@ NOFXIP<	mov	bp, offset nukeVolumeEntry	; clear vol. entry field>
 FXIP<	clr	dx							>
 FXIP<	push	dx							>
 FXIP<	mov	dx, ss							>
-FXIP<	mov	bp, sp				; dx:bp = ptr to null	>	
+FXIP<	mov	bp, sp				; dx:bp = ptr to null	>
 	call	CallSetText
-FXIP<	pop	si				; restore stack		>	
+FXIP<	pop	si				; restore stack		>
 	mov	si, offset MiscUI:VolumeNameBox
 	call	UserDoDialog
 	pop	bx				; retrieve disk handle
@@ -2976,7 +2997,7 @@ SYNOPSIS:	stuff genParent field of AppLaunchBlock
 CALLED BY:	EXTERNAL
 			DesktopLoadApplication,
 			CallApplToGetMoniker,
-			
+
 
 PASS:		dx - handle of AppLaunchBlock
 
@@ -3039,10 +3060,10 @@ RETURN:		buffer null-terminated
 DESTROYED:	ax
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3051,7 +3072,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 UtilFormatDateAndTime proc	far
-	
+
 	uses	bx, di, si
 	.enter
 
@@ -3062,14 +3083,14 @@ UtilFormatDateAndTime proc	far
 	; Even though the name is LocalFormatFileDateTime, we don't seem to
 	; have any format that combines the two, so do the formatting
 	; in two parts, time first.
-	; 
+	;
 	xchg	ax, bx		; ax <- date, bx <- time
 	mov	si, DTF_HMS
 	call	LocalFormatFileDateTime
 
 	;
 	; Put space between the time and the date.
-	; 
+	;
 	add	di, cx				; es:di=byte after time
 DBCS <	add	di, cx							>
 	mov_tr	si, ax				; save date
@@ -3084,12 +3105,12 @@ if GPC_NAMES_AND_DETAILS_TITLES
 	LocalPutChar esdi, ax
 	inc	cx
 endif
-	
+
 	push	cx
 
 	;
 	; Now format the date appropriately
-	; 
+	;
 	mov_tr	ax, si
 	mov	si, DTF_ZERO_PADDED_SHORT
 	call	LocalFormatFileDateTime
@@ -3103,7 +3124,7 @@ invalid:
 	;
 	; Just use a minus sign if the date/time are invalid (as indicated by
 	; the FileDate being 0)
-	; 
+	;
 	mov	ax, '-'
 	stosw
 DBCS <	clr	ax							>
@@ -3130,7 +3151,7 @@ DESTROYED:	everything
 SIDE EFFECTS:	closes on an LRU basis if not enough memory available
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3152,7 +3173,7 @@ checkAgain:
 	jc	lastWindow
 
 	; see if we need to close another one
-	mov	dx, ss:[numFiles]	
+	mov	dx, ss:[numFiles]
 	cmp	cx, dx
 	jl	checkAgain
 
