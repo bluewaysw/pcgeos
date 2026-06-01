@@ -126,8 +126,6 @@ AddPaperSize	  595,  842,	PAPER_PORTRAIT, PS_USO_BOLLO, \
 				"Uso Bollo - 4 faces"
 AddPaperSize	  595,  842,	PAPER_PORTRAIT, PS_PROTOCOLLO, \
 				"Protocollo - 4 faces"
-AddPaperSize    842,  595, PAPER_LANDSCAPE, PS_A4_GERMAN, \
-                		"A4 rotated"
 AddPaperSize	  610,  780,	PAPER_PORTRAIT, PS_QUARTO, \
 				"Quarto"
 AddPaperSize	  612,  792,	PAPER_PORTRAIT, PS_LETTER, \
@@ -160,6 +158,8 @@ AddPaperSize	  792, 1063,	PAPER_PORTRAIT, PS_11INx37_5CM, \
 				"11 in x 37.5 cm (Italian)"
 AddPaperSize	  792, 1224,	PAPER_PORTRAIT, PS_B_SIZE, \
 				"B Size/Tabloid/Ledger"
+AddPaperSize	  842,  595, PAPER_PORTRAIT, PS_A4_GERMAN, \
+                		"A4 rotated"
 AddPaperSize	  842, 1191,	PAPER_PORTRAIT, PS_A3, \
 				"A3 Size"
 AddPaperSize	  864, 1063,	PAPER_PORTRAIT, PS_12INx37_5CM, \
