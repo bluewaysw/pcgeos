@@ -550,14 +550,12 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
     else
         allocSize = (size + 255) & 0xFF00;
 
-    bitmapData = MemLock( bitmapHandle );
     currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );
-
+        
     if ( currentSize != allocSize )
-    {
         MemReAlloc( bitmapHandle, allocSize, HAF_NO_ERR );
-        bitmapData = MemDeref( bitmapHandle );
-    }
+        
+    bitmapData = MemLock( bitmapHandle );
 
     return memset( bitmapData, 0, size );
 }
