@@ -133,18 +133,21 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidShowPtr	proc	near
-	dec	cs:[cursorCount]	; set new value for nest count
-EC <	ERROR_S	VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			>
-	jnz	VShP_done
-	push	es
-	push	ds
-	mov	cx, cs
-	mov	ds, cx
-	call	DrawCursor		;  yes, draw it
-	pop	ds
-	pop	es
+		dec	cs:[cursorCount]	; set new value for nest count
+		js	VShP_underflow
+		jnz	VShP_done
+		push	es
+		push	ds
+		mov	cx, cs
+		mov	ds, cx
+		call	DrawCursor		;  yes, draw it
+		pop	ds
+		pop	es
 VShP_done:
-	ret
+		ret
+VShP_underflow:
+		mov	cs:[cursorCount],0
+		jmp	VShP_done
 
 VidShowPtr	endp
 
