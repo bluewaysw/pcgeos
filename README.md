@@ -1,11 +1,11 @@
 # PC/GEOS
-This repository is the offical place to hold all the source codes around the PC/GEOS graphical user
+This repository is the official place to hold all the source codes around the PC/GEOS graphical user
 interface and its sophisticated applications. It is the source to build SDK and release version of PC/GEOS.
 It is the place to collaborate on further developments.
 
 ![Screenshot showing a typical GEOS desktop](TechDocs/Markdown/Art/title-screenshot.png)
 
-The base of this repository is the source code used to build Breadbox Ensemble 4.13 reduced by some modules identified as critical in regard to the license choosen for the repository.
+The base of this repository is the source code used to build Breadbox Ensemble 4.13 reduced by some modules identified as critical in regard to the license chosen for the repository.
 
 While now the WATCOM is used to compile the C parts, the full SDK is available for Windows and Linux.
 
@@ -89,7 +89,7 @@ If you want to customize the target environment settings only for yourself, you 
 
 PC/GEOS comes with extensive technical documentation that describes tools, programming languages and API calls from the perspective of an SDK user. This documentation can be found in the `TechDocs` folder and is available in Markdown format.
 
-You can find a browseable, searchable version of the documentation here: https://bluewaysw.github.io/pcgeos/
+You can find a browsable, searchable version of the documentation here: https://bluewaysw.github.io/pcgeos/
 
 ##
 We are on https://discord.com/ for more efficient collaboration. Please register at https://discord.gg/qtMqgZXhf9 for blueway.Softworks or use an existing discord-account to get access to our developer community. Welcome!
