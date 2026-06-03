@@ -417,7 +417,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	atw	9/17/91		Initial version
-	JK	23.05.2026	8086-Optimierung
+	JK	23.05.2026	8086 optimization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MALLOC_LARGE_THRESHOLD	equ	511
 MALLOC_SMALL_BLOCK_SIZE	equ	1024
@@ -428,18 +428,17 @@ _TT_Alloc	proc	far	blockSize:word, p:fptr
 	uses	ds, di, si
 	.enter
 
-	mov	cx, blockSize		; CX <- gewünschte Blockgröße
-	jcxz	zeroAlloc		; Zero-sized allocs sind gültig
-					; (spart tst cx + jz)
+	mov	cx, blockSize		; CX = requested size
+	jcxz	zeroAlloc		; Zero-sized alloc returns NULL
 
 	cmp	cx, MALLOC_LARGE_THRESHOLD
 	ja	largeAlloc
 
-;	Versuche in vorhandenen kleinen lmem-Blöcken zu allozieren
+;	Try to allocate from an existing small LMem block.
 	call	AllocInSmallList
 	jnc	zinitAndExit
 
-;	Kein Platz gefunden – neuen lmem-Block anlegen
+;	No room found; create a new small LMem block.
 	mov	ax, MALLOC_SMALL_BLOCK_SIZE
 	mov	bx, handle 0
 	call	MemAllocFixed
@@ -461,69 +460,63 @@ EC <	ERROR_C	COULD_NOT_ALLOC_BLOCK_WHEN_THERE_SHOULD_BE_ROOM_FOR_IT	>
 
 largeAlloc:
 	add	cx, LARGE_BLOCK_OFFSET
-	mov	ax, cx			; mov statt xchg: 1 Zyklus statt 3
+	mov	ax, cx			; AX = total block size
 	mov	bx, handle 0
 	call	MemAllocFixed
 	jc	errRet
 
-	mov	dx, bx
-	mov	ds:[0], bx
+	mov	ds:[0], bx		; Store handle before user data
 	mov	di, offset largeListHandle
-	mov	ax, LARGE_BLOCK_OFFSET
+	mov	ax, LARGE_BLOCK_OFFSET	; AX = user data offset
 
 mallocCommon:
-	push	ds
-NOFXIP<	segmov	ds, <segment udata>, bx				>
-FXIP <	mov	bx, handle dgroup				>
-FXIP <	call	MemDerefDS					>
-	mov	cx, ds:[di]
-	pop	ds
+	push	ds			; Save allocated block segment
+NOFXIP<	segmov	ds, <segment udata>, bx	>
+FXIP <	mov	bx, handle dgroup	>
+FXIP <	call	MemDerefDS		>
+	mov	cx, ds:[di]		; CX = list block handle
+	pop	ds			; Restore allocated block segment
 	call	AddHandleToMallocList
 	jc	freeError
 
 zinitAndExit:
-;	Zero-Init des allozierten Blocks
-;	DS:AX = Zeiger auf Block, blockSize Bytes nullen
-;
-;	Strategie: Word-weise nullen, einzelnes Byte vorab falls ungerade
-;	Kein stosd – 8086-kompatibel bleiben
-	mov	dx, ds			; DX:AX <- Zeiger retten für Rückgabe
+;	Zero-initialize the allocated memory.
+;	DS:AX points to the user buffer.
+	mov	dx, ds			; Save return pointer in DX:AX
 	push	es
 	push	ax
 	mov	es, dx
-	mov	di, ax			; ES:DI <- Zielzeiger
+	mov	di, ax			; ES:DI = destination
 
 	mov	cx, blockSize
-	shr	cx, 1			; CX <- Anzahl Words
-					; Carry gesetzt wenn blockSize ungerade
-	xor	ax, ax			; AX <- 0  (1 Zyklus, 1 Byte kürzer
-					;           als mov ax,0)
-	jnc	doWords			; gerade Größe → direkt zu rep stosw
-	stosb				; ungerades Byte zuerst nullen
+	shr	cx, 1			; CX = word count, carry if odd
+	xor	ax, ax			; AX = 0
+	jnc	doWords			; Even size: skip leading byte
+	stosb				; Clear odd leading byte
 doWords:
-	rep	stosw			; restliche Words nullen
+	rep	stosw			; Clear remaining words
 
-	pop	ax			; DX:AX <- Zeiger wiederherstellen
+	pop	ax			; Restore return pointer offset
 
 exitWithPtr:
 	les	di, p
 	mov	es:[di].low, ax
 	mov	es:[di].high, dx
 	pop	es
-	xor	ax, ax			; TT_Err_Ok (xor: 1 Zyklus, mov ax,0: 2)
+	xor	ax, ax			; TT_Err_Ok
 exit:
 	.leave
 	ret
 
 freeError:
-	mov	bx, dx
+	mov	bx, ds:[LMBH_handle]	; Free the newly allocated block
 	call	MemFree
 errRet:
 	mov	ax, 100h		; TT_Err_Out_Of_Memory
 	jmp	exit
 
 zeroAlloc:
-	xor	ax, ax			; Nullzeiger zurückgeben
+	xor	ax, ax			; Return NULL
 	xor	dx, dx
 	push	es
 	jmp	exitWithPtr
