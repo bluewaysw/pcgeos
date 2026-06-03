@@ -410,16 +410,25 @@ EC(     ECCheckBounds( lookupTable ) );
                 lookupTable[i].geoscode = (char)i + C_SPACE;
         }
 
-        qsort( lookupTable, NUM_CHARMAPENTRIES, sizeof( LookupEntry ), compareLookupEntries );
+        SortLookupTable( lookupTable, NUM_CHARMAPENTRIES );
 
         MemUnlock( memHandle );
         return memHandle;
 }
 
 
-int _pascal compareLookupEntries( const void *a, const void *b ) 
+static void SortLookupTable(LookupEntry* table, int count)
 {
-        return (int)((LookupEntry *)a)->ttindex - (int)((LookupEntry *)b)->ttindex;
+    int         i, j;
+    LookupEntry temp;
+
+    for (i = 1; i < count; ++i)
+    {
+        temp = table[i];
+        for (j = i; j > 0 && table[j - 1].ttindex > temp.ttindex; --j)
+            table[j] = table[j - 1];
+        table[j] = temp;
+    }
 }
 #pragma code_seg()
 
