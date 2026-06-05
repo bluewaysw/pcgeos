@@ -437,6 +437,7 @@ done:
 
 
 callSuper:
+	segmov	es, <segment OLScreenClass>, bx
 	mov	di, offset OLScreenClass
 	GOTO	ObjCallSuperNoLock
 
