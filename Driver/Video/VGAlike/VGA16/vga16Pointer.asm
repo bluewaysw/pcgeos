@@ -134,7 +134,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidShowPtr	proc	near
 		dec	cs:[cursorCount]	; set new value for nest count
-		js	VShP_underflow
+EC <	ERROR_S	VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			>
 		jnz	VShP_done
 		push	es
 		push	ds
@@ -145,9 +145,6 @@ VidShowPtr	proc	near
 		pop	es
 VShP_done:
 		ret
-VShP_underflow:
-		mov	cs:[cursorCount],0
-		jmp	VShP_done
 
 VidShowPtr	endp
 
