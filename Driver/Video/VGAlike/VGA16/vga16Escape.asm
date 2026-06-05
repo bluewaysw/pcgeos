@@ -66,6 +66,10 @@ VidEscSetDeviceAgain 	proc	near
 		cmp	di, 0xFFFF
 		je	done
 
+		;
+		; Keep the pointer off-screen while the mode is reset, but
+		; preserve the caller-visible hide count across SetDevice.
+		;
 		mov	al, cs:[cursorCount]
 		push	ax
 		call	VidHidePtr
@@ -75,8 +79,11 @@ VidEscSetDeviceAgain 	proc	near
 		mov	si, 0
 		mov	di, DRE_SET_DEVICE
 		call	VidCallMod
+
 		pop	ax
+		inc	al
 		mov	cs:[cursorCount], al
+		call	VidShowPtr
 done:
 		.leave
 		mov	di, 0		; function executed
