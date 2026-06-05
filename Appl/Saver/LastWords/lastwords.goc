@@ -188,26 +188,17 @@ const LWSAOptionTable lastwordsOptionTable = {
  ***********************************************************************/
 @method LWApplicationClass, MSG_SAVER_APP_SET_WIN
 {
-    dword randomSeed;
-    RandomToken randomToken;
-    TimerHandle timerHandle;
-    word timerID;
-
     /*
      * If a previous window went away with timer events still queued, make
      * sure they cannot use the old random state.
      */
-    timerHandle = pself->LWCI_timerHandle;
-    timerID = pself->LWCI_timerID;
-    pself->LWCI_timerHandle = NullHandle;
-    randomToken = pself->LWCI_randomToken;
-    pself->LWCI_randomToken = 0;
-
-    if (timerHandle) {
-        TimerStop(timerHandle, timerID);
+    if (pself->LWCI_timerHandle) {
+        TimerStop(pself->LWCI_timerHandle, pself->LWCI_timerID);
+        pself->LWCI_timerHandle = NullHandle;
     }
-    if (randomToken != 0) {
-        SaverEndRandom(randomToken);
+    if (pself->LWCI_randomToken != 0) {
+        SaverEndRandom(pself->LWCI_randomToken);
+        pself->LWCI_randomToken = 0;
     }
 
     /*
@@ -224,8 +215,7 @@ const LWSAOptionTable lastwordsOptionTable = {
      * Create a random number generator and save its token in our instance
      * data.
      */
-    randomSeed = TimerGetCount();
-    pself->LWCI_randomToken = SaverSeedRandom(randomSeed, 0);
+    pself->LWCI_randomToken = SaverSeedRandom(TimerGetCount(), 0);
 
     /*
      * Now initialize everything, draw the first message, and set one-shot
@@ -923,14 +913,6 @@ LWTimerStart(optr oself)
  ***********************************************************************/
 @method LWApplicationClass, MSG_SAVER_APP_UNSET_WIN
 {
-    RandomToken randomToken;
-    TimerHandle timerHandle;
-    word timerID;
-    GStateHandle gstring;
-    VMFileHandle file;
-    Boolean wasGraphic;
-    Boolean unsetRet;
-
     if (winHandle != pself->SAI_curWindow) {
         return @callsuper();
     }
@@ -939,43 +921,34 @@ LWTimerStart(optr oself)
      * Stop the draw timer.  A one-shot timer event may already be queued, so
      * clear the instance data before freeing the handles it can use.
      */
-    timerHandle = pself->LWCI_timerHandle;
-    timerID = pself->LWCI_timerID;
-    pself->LWCI_timerHandle = NullHandle;
+    if (pself->LWCI_timerHandle) {
+        TimerStop(pself->LWCI_timerHandle, pself->LWCI_timerID);
+        pself->LWCI_timerHandle = NullHandle;
+    }
 
     /*
      * Nuke the random number generator, too.
      */
-    randomToken = pself->LWCI_randomToken;
-    pself->LWCI_randomToken = 0;
+    if (pself->LWCI_randomToken != 0) {
+        SaverEndRandom(pself->LWCI_randomToken);
+        pself->LWCI_randomToken = 0;
+    }
 
     /*
      * Close down the VM file, if we're drawing something out of it.
      */
-    wasGraphic = (pself->LWCI_format == LWFT_GRAPHIC);
-    gstring = pself->LWCI_gstring;
-    file = pself->LWCI_file;
-    pself->LWCI_gstring = NullHandle;
-    pself->LWCI_file = NullHandle;
-
-    unsetRet = @callsuper();
-
-    if (timerHandle) {
-        TimerStop(timerHandle, timerID);
-    }
-    if (randomToken != 0) {
-        SaverEndRandom(randomToken);
-    }
-    if (wasGraphic) {
-        if (gstring != NullHandle) {
-            GrDestroyGString(gstring, 0, GSKT_LEAVE_DATA);
+    if (pself->LWCI_format == LWFT_GRAPHIC) {
+        if (pself->LWCI_gstring != NullHandle) {
+            GrDestroyGString(pself->LWCI_gstring, 0, GSKT_LEAVE_DATA);
+            pself->LWCI_gstring = NullHandle;
         }
-        if (file != NullHandle) {
-            VMClose(file, FILE_NO_ERRORS);
+        if (pself->LWCI_file != NullHandle) {
+            VMClose(pself->LWCI_file, FILE_NO_ERRORS);
+            pself->LWCI_file = NullHandle;
         }
     }
 
-    return unsetRet;
+    return @callsuper();
 }
 
 /***********************************************************************
