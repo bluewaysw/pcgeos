@@ -228,6 +228,17 @@ AfterCursorRedrawn:
 common:
 ;	cmp	cs:[suCount], 0			; any active save under areas?
 ;	jne	CheckSUAreas
+
+	; Balance the extra hide left by VID_ESC_UPDATE_DEVICE once
+	; ImSetPtrWin has hidden around the new pointer window.
+	mov	al, cs:[updateHideCount]
+	tst	al
+	jz	noUpdateHide
+	cmp	cs:[cursorCount], al
+	jbe	noUpdateHide
+	dec	cs:[cursorCount]
+	clr	cs:[updateHideCount]
+noUpdateHide:
 	clr	al
 	ret
 

@@ -67,8 +67,9 @@ VidEscSetDeviceAgain 	proc	near
 		je	done
 
 		;
-		; Keep the pointer off-screen while the mode is reset, but
-		; preserve the caller-visible hide count across SetDevice.
+		; Keep the pointer off-screen while the mode is reset.
+		; VidMovePtr balances this hide after the new pointer window
+		; has been established.
 		;
 		mov	al, cs:[cursorCount]
 		push	ax
@@ -83,7 +84,7 @@ VidEscSetDeviceAgain 	proc	near
 		pop	ax
 		inc	al
 		mov	cs:[cursorCount], al
-		call	VidShowPtr
+		mov	cs:[updateHideCount], al
 done:
 		.leave
 		mov	di, 0		; function executed
