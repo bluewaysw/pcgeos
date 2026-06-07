@@ -129,7 +129,6 @@ include		truetypeEC.asm
 include	    	ansic_runtime.asm
 include		ansic_memory.asm
 include		ttmemory_asm.asm
-include		ansic_stdlib.asm
 
 Resident segment	public	'CODE'	;MODULE_FIXED
 

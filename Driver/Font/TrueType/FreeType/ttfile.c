@@ -55,11 +55,6 @@
 #include "ttfile.h"     /* our prototypes */
 
 
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT  trace_file
-
-
 /* For now, we don't define additional error messages in the core library */
 /* to report open-on demand errors. Define these error as standard ones   */
 
@@ -95,7 +90,6 @@
   {
     Long        position;                /* current position within the file */
     FileHandle  file;                    /* file handle                      */
-    Long        base;                    /* stream base in file              */
     Long        size;                    /* stream size in file              */
   };
 
@@ -553,7 +547,7 @@
 
     CUR_Frame.cursor = CUR_Frame.address;
     return error;
-  }
+  } 
 
 
 /*******************************************************************
@@ -741,8 +735,8 @@
 
     if ( rec )
       return rec->size;
-    else
-      return 0;  /* invalid stream - return 0 */
+
+    return 0;  /* invalid stream - return 0 */
   }
 
 #endif
@@ -780,7 +774,6 @@
 
     stream_rec->file     = file;
     stream_rec->size     = -1L;
-    stream_rec->base     = 0;
     stream_rec->position = 0;
 
     error = Stream_Activate( stream_rec );
@@ -853,8 +846,8 @@
       Stream_Deactivate( rec );
       return TT_Err_Ok;
     }
-    else
-      return TT_Err_Invalid_Argument;
+
+    return TT_Err_Invalid_Argument;
   }
 
 #endif /* __GEOS__ */
@@ -875,8 +868,6 @@
   EXPORT_FUNC
   TT_Error  TT_Seek_File( STREAM_ARGS Long  position )
   {
-    position += CUR_Stream->base;
-
     FilePos( CUR_Stream->file, position, FILE_POS_START );
     if ( ThreadGetError() != NO_ERROR_RETURNED )  
       return TT_Err_Invalid_File_Offset;
@@ -900,8 +891,11 @@
   EXPORT_FUNC
   TT_Error  TT_Skip_File( STREAM_ARGS Long  distance )
   {
-    return TT_Seek_File( STREAM_VARS FilePos( CUR_Stream->file, 0, FILE_POS_RELATIVE ) -
-                                    CUR_Stream->base + distance );
+    FilePos( CUR_Stream->file, distance, FILE_POS_RELATIVE );
+    if ( ThreadGetError() != NO_ERROR_RETURNED )
+      return TT_Err_Invalid_File_Offset;
+
+    return TT_Err_Ok;
   }
 
 
@@ -973,7 +967,7 @@
   EXPORT_FUNC
   Long  TT_File_Pos( STREAM_ARG )
   {
-    return FilePos( CUR_Stream->file, 0, FILE_POS_RELATIVE ) - CUR_Stream->base;
+    return FilePos( CUR_Stream->file, 0, FILE_POS_RELATIVE );
   }
 
 
