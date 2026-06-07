@@ -232,6 +232,7 @@ mouseAccelThreshold	word	5	; Pixels/report threshold
 mouseAccelMultiplier	word	1	; Multiplier past threshold
 					; (Default is 1:1, in case mouse
 					; itself does something...)
+mouseNaturalScroll		byte	0	; Non-zero to invert wheel direction
 		even
 
 mouseLastDeltaX	word	0x8000
@@ -516,6 +517,7 @@ endif
 inputCategoryStr	char	"input", 0
 accelThresholdStr	char	"mouseAccelThreshold", 0
 accelMultiplierStr	char	"mouseAccelMultiplier", 0
+mouseNaturalScrollStr	char	"mouseNaturalScroll", 0
 
 startinitfunc
 		;
@@ -549,6 +551,15 @@ afterAccelThreshold:
 		jc	afterAccelMultiplier
 		mov	ds:[mouseAccelMultiplier], ax
 afterAccelMultiplier:
+		push	ds
+		segmov	ds, cs, cx
+		mov	si, offset cs:[inputCategoryStr]
+		mov	dx, offset cs:[mouseNaturalScrollStr]
+		call	InitFileReadBoolean
+		pop	ds
+		jc	afterNaturalScroll
+		mov	ds:[mouseNaturalScroll], al
+afterNaturalScroll:
 
 		;
 		; Note that the driver's initialized
@@ -1251,6 +1262,16 @@ endif
 
 		pop	bp		; Restore passed BP
 MH_Done:
+
+	; prepare wheel event - invert, if "natural scroll" is wanted
+
+		cmp	ds:[wheelData], 0
+		je	afterInversionOfWheelData
+		cmp	ds:[mouseNaturalScroll], 0
+		je	afterInversionOfWheelData
+		neg	ds:[wheelData]	; "Natural scrolling" reverses wheel direction.
+afterInversionOfWheelData:
+
 	; now send our humble wheel event
 ifdef MOUSE_HAS_WHEEL
 		call	MouseSendWheelEventNative
@@ -1675,7 +1696,7 @@ noCombine:
 
 MouseCombineEvent endp
 
-
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MouseSendWheelEventNative / MouseSendWheelEventKey
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
