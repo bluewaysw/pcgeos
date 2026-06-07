@@ -5,27 +5,26 @@
 #
 GEODE           = truetype
 MAIN            = truetypeEscape.asm ansic_runtime.asm mainManager.asm\
-                  ttmemory_asm.asm truetypeWidths.asm ansic_stdlib.asm\
-                  ansic_memory.asm truetypeMetrics.asm truetypeInit.asm\
-                  truetypeEC.asm truetypeChars.asm truetypePath.asm\
-                  truetypeMacros.def ansicGeode.def truetypeVariable.def\
-                  truetypeConstant.def
+                  ttmemory_asm.asm truetypeWidths.asm ansic_memory.asm\
+                  truetypeMetrics.asm truetypeInit.asm truetypeEC.asm\
+                  truetypeChars.asm truetypePath.asm truetypeMacros.def\
+                  ansicGeode.def truetypeVariable.def truetypeConstant.def
 ADAPTER         = ttacache.c ttchars.c ttinit.c ttmetrics.c ttcharmapper.c\
                   ttadapter.c ttwidths.c ttpath.c ttcharmapper.h ttpath.h\
                   ttchars.h ttwidths.h ttinit.h ttmetrics.h ttadapter.h\
                   ttacache.h
-FREETYPE        = ttcache.c ttraster.c ttgload.c ttcalc.c ttapi.c ftxkern.c\
+FREETYPE        = ttraster.c ttgload.c ttcalc.c ttapi.c ftxkern.c\
                   ttinterp.c ttload.c ttfile.c ttcmap.c ttobjs.c ttmemory.c\
-                  ttcache.h ttcmap.h ttconfig.h freetype.h ttgload.h\
-                  ttfile.h ttinterp.h ttload.h tttables.h ttobjs.h\
-                  fterrid.h ttraster.h ttengine.h tttypes.h ft_conf.h\
-                  ftnameid.h ttcalc.h ftxkern.h ttmemory.h tttags.h
+                  ttcmap.h ttconfig.h freetype.h ttgload.h ttfile.h\
+                  ttinterp.h ttload.h tttables.h ttobjs.h fterrid.h\
+                  ttraster.h ttengine.h tttypes.h ft_conf.h ftnameid.h\
+                  ttcalc.h ftxkern.h ttmemory.h tttags.h
 UI_TO_RDFS      =
 OBJS            = ttacache.obj ttchars.obj ttinit.obj ttmetrics.obj\
                   ttcharmapper.obj ttadapter.obj ttwidths.obj ttpath.obj\
-                  ttcache.obj ttraster.obj ttgload.obj ttcalc.obj ttapi.obj\
-                  ftxkern.obj ttinterp.obj ttload.obj ttfile.obj ttcmap.obj\
-                  ttobjs.obj ttmemory.obj
+                  ttraster.obj ttgload.obj ttcalc.obj ttapi.obj ftxkern.obj\
+                  ttinterp.obj ttload.obj ttfile.obj ttcmap.obj ttobjs.obj\
+                  ttmemory.obj
 COMMON          =
 MODULES         = Main
 CMODULES        = Adapter FreeType

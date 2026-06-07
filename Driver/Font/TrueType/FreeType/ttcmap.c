@@ -21,10 +21,6 @@
 #include "ttload.h"
 #include "ttcmap.h"
 
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT      trace_cmap
-
 
 /*******************************************************************
  *
@@ -162,9 +158,11 @@
         goto Fail;
 
       cmap4->segCountX2    = GET_UShort();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
       cmap4->searchRange   = GET_UShort();
       cmap4->entrySelector = GET_UShort();
       cmap4->rangeShift    = GET_UShort();
+#endif
 
       num_Seg = cmap4->segCountX2 >> 1;
 
@@ -468,51 +466,52 @@
  *
  ******************************************************************/
 
-  UShort  code_to_index4( UShort  charCode,
-                                 PCMap4  cmap4 )
-  {
-    UShort         index1, segCount;
-    UShort         i, result;
-    PUShort        glyphIdArray;
-    TCMap4Segment  seg4;
-    PCMap4Segment  segments;
+UShort  code_to_index4( UShort  charCode,
+                        PCMap4  cmap4 )
+{
+  UShort         i, segCount;
+  UShort         result;
+  UShort         glyphIndex;
+  TCMap4Segment  seg4;
+  PCMap4Segment  segments;
+  PUShort        glyphIdArray;
 
 
-    segCount     = cmap4->segCountX2 >> 1;
-    segments     = GEO_LOCK( cmap4->segmentBlock );
-    glyphIdArray = GEO_LOCK( cmap4->glyphIdBlock );
-    result       = 0;
+  segCount = cmap4->segCountX2 >> 1;
+  segments = GEO_LOCK( cmap4->segmentBlock );
 
-    for ( i = 0; i < segCount; ++i )
-      if ( charCode <= segments[i].endCount )
-        break;
+  for ( i = 0; i < segCount; ++i )
+    if ( charCode <= segments[i].endCount )
+      break;
 
-    /* Safety check - even though the last endCount should be 0xFFFF */
-    if ( i >= segCount ) 
-      goto Fin;
-
+  if ( i < segCount )
     seg4 = segments[i];
 
-    if ( charCode < seg4.startCount )
-      goto Fin;
+  GEO_UNLOCK( cmap4->segmentBlock );
 
-    if ( seg4.idRangeOffset == 0 )
-      result = ( charCode + seg4.idDelta ) & 0xFFFF;
-    else
-    {
-      index1 = seg4.idRangeOffset / 2 + (charCode - seg4.startCount) -
-               (segCount - i);
+  if ( i >= segCount || charCode < seg4.startCount )
+    return 0;
 
-      if ( index1 < cmap4->numGlyphId )
-        if ( glyphIdArray[index1] != 0 )
-          result = ( glyphIdArray[index1] + seg4.idDelta ) & 0xFFFF;
-    }
+  if ( seg4.idRangeOffset == 0 )
+    return (UShort)( charCode + seg4.idDelta );
 
-  Fin:
-    GEO_UNLOCK( cmap4->segmentBlock );
-    GEO_UNLOCK( cmap4->glyphIdBlock );
-    return result;
-  }
+  glyphIndex = (UShort)( seg4.idRangeOffset / 2 +
+                         ( charCode - seg4.startCount ) -
+                         ( segCount - i ) );
+
+  if ( glyphIndex >= cmap4->numGlyphId )
+    return 0;
+
+  glyphIdArray = GEO_LOCK( cmap4->glyphIdBlock );
+
+  result = glyphIdArray[glyphIndex];
+  if ( result != 0 )
+    result = (UShort)( result + seg4.idDelta );
+
+  GEO_UNLOCK( cmap4->glyphIdBlock );
+
+  return result;
+}
 
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_CMAP6
@@ -575,7 +574,7 @@ TT_Error getCharMap( TT_Face face, TT_Face_Properties* faceProperties, TT_CharMa
 {
         TT_UShort           platform;
         TT_UShort           encoding;
-        int                 map;
+        UShort              map;
 
 
 	for ( map = 0; map < faceProperties->num_CharMaps; ++map ) 
@@ -583,10 +582,7 @@ TT_Error getCharMap( TT_Face face, TT_Face_Properties* faceProperties, TT_CharMa
 		TT_Get_CharMap_ID( face, map, &platform, &encoding );
 
 		if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
-    {
-		  TT_Get_CharMap( face, map, charMap);
-			return TT_Err_Ok;
-		}
+		  return TT_Get_CharMap( face, map, charMap);
 	}
 
   return TT_Err_CMap_Table_Missing;

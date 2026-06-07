@@ -55,11 +55,6 @@
 #include "ttfile.h"     /* our prototypes */
 
 
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT  trace_file
-
-
 /* For now, we don't define additional error messages in the core library */
 /* to report open-on demand errors. Define these error as standard ones   */
 
@@ -552,7 +547,7 @@
 
     CUR_Frame.cursor = CUR_Frame.address;
     return error;
-  }
+  } 
 
 
 /*******************************************************************
@@ -740,8 +735,8 @@
 
     if ( rec )
       return rec->size;
-    else
-      return 0;  /* invalid stream - return 0 */
+
+    return 0;  /* invalid stream - return 0 */
   }
 
 #endif
@@ -851,8 +846,8 @@
       Stream_Deactivate( rec );
       return TT_Err_Ok;
     }
-    else
-      return TT_Err_Invalid_Argument;
+
+    return TT_Err_Invalid_Argument;
   }
 
 #endif /* __GEOS__ */
@@ -896,8 +891,11 @@
   EXPORT_FUNC
   TT_Error  TT_Skip_File( STREAM_ARGS Long  distance )
   {
-    return TT_Seek_File( STREAM_VARS FilePos( CUR_Stream->file, 0, FILE_POS_RELATIVE ) +
-                                    distance );
+    FilePos( CUR_Stream->file, distance, FILE_POS_RELATIVE );
+    if ( ThreadGetError() != NO_ERROR_RETURNED )
+      return TT_Err_Invalid_File_Offset;
+
+    return TT_Err_Ok;
   }
 
 
