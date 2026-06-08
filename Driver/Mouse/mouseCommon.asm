@@ -1263,15 +1263,6 @@ endif
 		pop	bp		; Restore passed BP
 MH_Done:
 
-	; prepare wheel event - invert, if "natural scroll" is wanted
-
-		cmp	ds:[wheelData], 0
-		je	afterInversionOfWheelData
-		cmp	ds:[mouseNaturalScroll], 0
-		je	afterInversionOfWheelData
-		neg	ds:[wheelData]	; "Natural scrolling" reverses wheel direction.
-afterInversionOfWheelData:
-
 	; now send our humble wheel event
 ifdef MOUSE_HAS_WHEEL
 		call	MouseSendWheelEventNative
@@ -1719,14 +1710,20 @@ MouseSendWheelEventNative	proc	near
 	uses  dx, bx, di, ax, ds
 	.enter
 
-	cmp 	ds:[wheelData], 0
-	je 	exit		; if wheel data equals zero => no wheel action, done
+		cmp	ds:[wheelData], 0
+		je	exit				; no wheel action, done
 
-	mov	dh, ds:[wheelData]
-	mov	bx, ds:[mouseOutputHandle]
-	mov	di, mask MF_FORCE_QUEUE
-	mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
-	call 	ObjMessage	; Send the event
+		cmp	ds:[mouseNaturalScroll], 0	; invert wanted?
+		je	afterInversionOfWheelData	; no
+		neg	ds:[wheelData]			; yes: reverse wheel direction
+
+afterInversionOfWheelData:
+
+		mov	dh, ds:[wheelData]
+		mov	bx, ds:[mouseOutputHandle]
+		mov	di, mask MF_FORCE_QUEUE
+		mov	ax, MSG_IM_MOUSE_WHEEL_VERTICAL
+		call 	ObjMessage	; Send the event
 
 exit:
 	.leave
@@ -1742,43 +1739,50 @@ MouseSendWheelEventKey	proc	near
 	uses  cx, di, ax, bx, dx, ds
 	.enter
 
-	cmp 	ds:[wheelData], 0
-	je 	exit			; if wheel data equals zero => no wheel action, done
+		cmp 	ds:[wheelData], 0
+		je 	exit				; no wheel action, done
+
+		cmp	ds:[mouseNaturalScroll], 0	; invert wanted?
+		je	afterInversionOfWheelData	; no
+		neg	ds:[wheelData]			; yes: reverse wheel direction
+
+afterInversionOfWheelData:
+
 ;
 ; check which driver variant to use
 ;
-	cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
-	je 	pageKeyEvent
-	cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
-	je 	cursorKeyEvent
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_PAGE
+		je 	pageKeyEvent
+		cmp 	ds:[driverVariant], MOUSE_WHEEL_ACTION_CURSOR
+		je 	cursorKeyEvent
 
 pageKeyEvent:
-	mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
-	mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
-	jmp	continue
+		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_PAGE_UP
+		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_PAGE_DOWN
+		jmp	continue
 
 cursorKeyEvent:
-	mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_CURSOR_UP
-	mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_CURSOR_DOWN
+		mov 	ds:[wheelKeyUp], MOUSE_WHEEL_KEY_CURSOR_UP
+		mov 	ds:[wheelKeyDown], MOUSE_WHEEL_KEY_CURSOR_DOWN
 
 continue:
-	cmp	ds:[wheelData], 0	; compare wheel data with 0
-	jg 	wheelDown		; if value greater than 0 => jump to wheel down
+		cmp	ds:[wheelData], 0	; compare wheel data with 0
+		jg 	wheelDown		; if value greater than 0 => jump to wheel down
 
 ;wheelUp:				; otherwise continue with wheel up
-	mov 	cx, ds:[wheelKeyUp]	; put "up" key in cx
-	jmp 	doPress			; push the button
+		mov 	cx, ds:[wheelKeyUp]	; put "up" key in cx
+		jmp 	doPress			; push the button
 
 wheelDown:
-	mov	cx, ds:[wheelKeyDown]	; wheel down => put "down" key in cx
+		mov	cx, ds:[wheelKeyDown]	; wheel down => put "down" key in cx
 
 doPress:
-	mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
-	mov	ax, MSG_IM_KBD_SCAN
-	mov	bx, ds:[mouseOutputHandle]
+		mov	di, mask MF_FORCE_QUEUE ; setup ObjMessage
+		mov	ax, MSG_IM_KBD_SCAN
+		mov	bx, ds:[mouseOutputHandle]
 
-	mov	dx, BW_TRUE	; set to "press"
-	call	ObjMessage	; press - release not necessary!
+		mov	dx, BW_TRUE	; set to "press"
+		call	ObjMessage	; press - release not necessary!
 
 exit:
 	.leave
