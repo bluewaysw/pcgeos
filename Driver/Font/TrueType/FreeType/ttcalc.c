@@ -18,10 +18,6 @@
 #include "ttcalc.h"
 #include "tttables.h"
 
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT      trace_calc
-
 
 #pragma code_seg(Resident)
 

@@ -29,6 +29,8 @@
 static int strcmp( const char* s1, const char* s2 );
 
 
+#pragma code_seg(ttapi_TEXT)
+
 /********************************************************************
  *                      TrueType_Lock_Face
  ********************************************************************
@@ -75,8 +77,7 @@ EC(     ECCheckFileHandle( TTFILE) );
 
         if( TT_Open_Face( TTFILE, &FACE ) )
                 goto Fin;
-        if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
-                goto Fail;
+        TT_Get_Face_Properties( FACE, &FACE_PROPERTIES );
         if ( getCharMap( FACE, &FACE_PROPERTIES, &CHAR_MAP ) )
                 goto Fail;
         if ( TT_New_Instance( FACE, &INSTANCE ) )
