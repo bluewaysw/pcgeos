@@ -37,12 +37,12 @@ DESCRIPTION:
 ; file for documentation.
 ;
 ifndef PRODUCT_GEOS2X
-MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS 
-					; has native wheel support in the kernel/ui, 
+MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS
+					; has native wheel support in the kernel/ui,
 					; disable ...HAS_WHEEL_KEYS
 else
-MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver 
-					; that has the wheel simulate keypresses, 
+MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver
+					; that has the wheel simulate keypresses,
 					; disable ...HAS_WHEEL
 endif
 MOUSE_NUM_BUTTONS	= 3		; Assume 3 for now -- we'll set it in MouseDevInit
@@ -80,7 +80,7 @@ ifdef MOUSE_HAS_WHEEL
 	ctNativeMouse	chunk.char	'CuteMouse Wheel Mouse', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC	; nativeMouse
+			mask MEI_GENERIC or mask MEI_WHEEL	; nativeMouse
 endif
 
 ifdef MOUSE_HAS_WHEEL_KEYS
@@ -92,8 +92,8 @@ ifdef MOUSE_HAS_WHEEL_KEYS
 	ctCursorMouse	chunk.char	'CuteMouse Wheel Mouse (Wheel: Cursor Up/Down)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC,	; pageMouse
-			mask MEI_GENERIC	; cursorMouse
+			mask MEI_GENERIC or mask MEI_WHEEL,	; pageMouse
+			mask MEI_GENERIC or mask MEI_WHEEL	; cursorMouse
 endif
 
 MouseExtendedInfoSeg	ends

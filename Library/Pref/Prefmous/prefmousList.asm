@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		
+MODULE:
 FILE:		prefmousList.asm
 
 AUTHOR:		Chris Boyke
@@ -18,7 +18,7 @@ REVISION HISTORY:
        chrisb	9/21/93   	Initial version.
 
 DESCRIPTION:
-	
+
 
 	$Id: prefmousList.asm,v 1.1 97/04/05 01:38:06 newdeal Exp $
 
@@ -31,21 +31,21 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 DESCRIPTION:	Nuke the "No idea" extra entry if GENMOUSE.GEO isn't
-		available. 
+		available.
 
 PASS:		*ds:si	- PrefMousListClass object
 		ds:di	- PrefMousListClass instance data
 		es	- dgroup
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -54,7 +54,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-PrefMousListInit	method	dynamic	PrefMousListClass, 
+PrefMousListInit	method	dynamic	PrefMousListClass,
 					MSG_PREF_INIT
 
 		mov	di, offset PrefMousListClass
@@ -90,15 +90,15 @@ PASS:		*ds:si	- PrefMousListClass object
 		ds:di	- PrefMousListClass instance data
 		es	- dgroup
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -107,7 +107,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-PrefMousListSetSingleSelection	method	dynamic	PrefMousListClass, 
+PrefMousListSetSingleSelection	method	dynamic	PrefMousListClass,
 					MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
 
 		mov	di, offset PrefMousListClass
@@ -123,11 +123,15 @@ PrefMousListSetSingleSelection	method	dynamic	PrefMousListClass,
 
 		push	ax		; MouseExtendedInfo
 
+	;
+	; Enable/disable the serial port list
+	;
+
 		test	ax, mask MEI_SERIAL
 		mov	ax, MSG_GEN_SET_ENABLED
 		jnz	setSerial
 
-		
+
 		mov	ax, MSG_GEN_SET_NOT_ENABLED
 
 setSerial:
@@ -137,6 +141,10 @@ setSerial:
 
 		pop	cx		; MouseExtendedInfo
 
+	;
+	; Enable/disable the interrupt level
+	;
+
 		test	cx, mask MEI_IRQ
 		mov	ax, MSG_GEN_SET_NOT_ENABLED
 		jz	setIntEnableState
@@ -144,7 +152,8 @@ setSerial:
 	;
 	; If there is an interrupt level, then store it in the GenValue
 	;
-		
+
+		push	cx			; store MouseExtendedInfo again
 		mov_tr	ax, cx
 		andnf	ax, mask MEI_IRQ
 		mov	cl, offset MEI_IRQ
@@ -153,15 +162,31 @@ setSerial:
 		mov	si, offset MouseIntValue
 		clr	bp
 		mov	ax, MSG_GEN_VALUE_SET_INTEGER_VALUE
-		call	ObjCallInstanceNoLock 
-		
+		call	ObjCallInstanceNoLock
+		pop	cx			; MouseExtendedInfo
+
 		mov	ax, MSG_GEN_SET_ENABLED
 
 setIntEnableState:
+		push	cx			; MouseExtendedInfo
 		mov	si, offset MouseIntValue
 		mov	dl, VUM_NOW
 		call	ObjCallInstanceNoLock
-		
+		pop	cx
+
+	;
+	; Enable/disable the wheel direction toggle
+	;
+		test	cx, mask MEI_WHEEL
+		mov	ax, MSG_GEN_SET_NOT_ENABLED
+		jz	setWheelEnableState
+		mov	ax, MSG_GEN_SET_ENABLED
+
+setWheelEnableState:
+		mov	si, offset MouseWheelGroup
+		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+		call	ObjCallInstanceNoLock
+
 done:
 
 		ret
@@ -180,15 +205,15 @@ PASS:		*ds:si	- PrefMousListClass object
 		ds:di	- PrefMousListClass instance data
 		es	- dgroup
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -197,7 +222,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-PrefMousListApply	method	dynamic	PrefMousListClass, 
+PrefMousListApply	method	dynamic	PrefMousListClass,
 					MSG_GEN_APPLY
 		mov	di, offset PrefMousListClass
 		call	ObjCallSuperNoLock
@@ -220,15 +245,15 @@ PASS:		*ds:si	- PrefMousListClass object
 		ds:di	- PrefMousListClass instance data
 		es	- dgroup
 
-RETURN:		
+RETURN:
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -237,7 +262,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-PrefMousListUpdateText	method	dynamic	PrefMousListClass, 
+PrefMousListUpdateText	method	dynamic	PrefMousListClass,
 					MSG_PREF_ITEM_GROUP_UPDATE_TEXT
 		uses	ax,cx,dx,bp
 		.enter

@@ -83,9 +83,11 @@
   struct  TCMap4_
   {
     UShort  segCountX2;     /* number of segments * 2       */
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     UShort  searchRange;    /* these parameters can be used */
     UShort  entrySelector;  /* for a binary search          */
     UShort  rangeShift;
+#endif
 
     MemHandle      segmentBlock;
     MemHandle      glyphIdBlock;
