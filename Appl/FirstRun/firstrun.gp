@@ -20,4 +20,4 @@ library ui
 library ansic
 
 resource AppResource ui-object
-resource SeedResource data read-only shared
+resource SeedResource lmem read-only shared

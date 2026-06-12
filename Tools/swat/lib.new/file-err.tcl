@@ -307,6 +307,55 @@ See also:
     }
 }]
 		
+##############################################################################
+#			    file-mangle-for-dos-target
+##############################################################################
+#
+# SYNOPSIS:	Mangle a name to 8.3 the way the DOS target's filesystem
+#   	    	stores it, matching the Perl Dosify logic (including the
+#   	    	"EC" special case).  Unlike file-mangle-for-dos, this
+#   	    	ALWAYS mangles -- it is meant for names that live on the
+#   	    	DOS target, not for resolving files on the (possibly
+#   	    	long-named) host filesystem.
+# PASS:		file	= path/name as it appears in the source tree
+# CALLED BY:	INTERNAL -- callers that read 8.3 names from the DOS
+#   	    	target layout
+# RETURN:	path with each component trimmed to an 8.3 name
+# SIDE EFFECTS:	none
+#
+# STRATEGY:	Normalize separators, then for each path component:
+#		- pass drive letters (X:) through untouched
+#		- if the base is longer than 9 chars and ends in "EC",
+#		  emit first 7 chars + "E" + extension (Dosify EC case)
+#		- otherwise emit first 8 chars of base + extension
+#		Names are assumed already upper-cased by the caller.
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	(port)			Initial Revision; EC logic from Perl Dosify
+#
+##############################################################################
+[defsubr file-mangle-for-dos-target {file}
+{
+    var file [string subst $file \\ / global]
+
+    if {[string c x y] == 0} {
+	return $file
+    } else {
+	return [mapconcat f [explode $file /\\] {
+	    if {[string match $f *:]} {
+		var f
+	    } else {
+		if {[string c [range [file root $f] 0 8 char] [file root $f]] != 0 && [string match [file root $f] *EC]} {
+		    [format {/%sE%s} [range [file root $f] 0 6 char] [range [file ext $f] 0 3 char]]
+		} else {
+		    [format {/%s%s} [range [file root $f] 0 7 char] [range [file ext $f] 0 3 char]]
+		}
+	    }
+	}]
+    }
+}]
 
 ##############################################################################
 # Error-handling routine for File module when a patient's executable cannot
