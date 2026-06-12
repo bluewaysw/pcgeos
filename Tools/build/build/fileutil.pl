@@ -75,7 +75,7 @@
 ##############################################################################
 sub MakeDir{
 
-    local($longname, $dosname, $destpath, $abbrevto, $checkName);
+    local($longname, $dosname, $destpath, $abbrevto);
 
     # Determine the GEOS and DOS names of the directory to create.
 
@@ -113,17 +113,7 @@ sub MakeDir{
     # @DIRNAME file.
 
 	# check for DOS compatible name written all lower case
-	$checkName = $longname;
-	$checkName =~ y/A-Z/a-z/;
-    if ("$longname" eq "$checkName") {
-		# long name is all lower case
-		$checkName =~ y/a-z/A-Z/;
-	} else {
-		$checkName = $longname;
-	}
-
-    if ( "$dosname" ne "$checkName") {
-
+    if ( lc($dosname) ne $longname ) {
 	# Create the @DIRNAME file.
 
 	if ( "$var{reportabbreviatedpaths}" ) {
