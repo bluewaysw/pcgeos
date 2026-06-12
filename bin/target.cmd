@@ -9,14 +9,17 @@ if "%1"=="-n" (
 ) ELSE (
    set TYPE=ec
 )
-IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE% (
+IF NOT DEFINED TARGET (SET TARGET=nt)
+IF NOT EXIST %LOCAL_ROOT%\.bbxxip\.bbxxip.%TARGET%.%TYPE% (
    echo *** Target type "%TYPE%" not built.
    GOTO :EOF
 )
-for /f "delims=" %%a in (%LOCAL_ROOT%\.bbxxip\.bbxxip.nt.%TYPE%) do set %%a
+for /f "delims=" %%a in (%LOCAL_ROOT%\.bbxxip\.bbxxip.%TARGET%.%TYPE%) do set %%a
 IF NOT EXIST %destdir%\localpc\ensemble\ensemble.bat (
-   echo *** Target at "%destdir%" not usable.
-   GOTO :EOF
+   IF NOT EXIST %destdir%\localpc\ensemble\setup.bat (
+      echo *** Target at "%destdir%" not usable.
+      GOTO :EOF
+   )
 )
 IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%

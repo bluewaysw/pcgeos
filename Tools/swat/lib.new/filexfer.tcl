@@ -154,7 +154,7 @@ See also:
 	var src [upcase $src]
     }
 
-    var dest [file tail [file-mangle-for-dos $src]]
+    var dest [file tail [file-mangle-for-dos-target $src]]
 
     if {![file exists $pathfile]} {
 	echo Warning: couldn't find $pathfile: sending to default directory
