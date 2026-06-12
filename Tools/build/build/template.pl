@@ -65,6 +65,7 @@ sub ParseTemplateFileAndSend {
     $passedtemplate=$template;
     local($destname)="$template";
     $destname =~ s|.*/([\w]*)|$1|;
+	$destname =~ y/a-z/A-Z/;
     $template=&FindInstalledFile("$template");
     if ( !"$template" && ($passedtemplate =~ /ec\./) ) {
 
@@ -132,7 +133,7 @@ sub ParseTemplateFileAndSend {
 	    s/EC-only\(([^)]*)\)/$1/;
 	    s/EC-NEC\(([^),]*),([^)]*)\)/$1/;
 	    s/EC-dos\(([^).]*)\.([^)]*)\)/\@S\@$1ec.$2\@E\@/;
-	    s/\@S\@(.*)\@E\@/&Dosify("$1")/e;
+	    s/\@S\@(.*)\@E\@/lc(&Dosify("$1"))/e;
 
 	} else {
 
@@ -148,7 +149,7 @@ sub ParseTemplateFileAndSend {
 	    s/EC-only\([^)]*\)//;
 	    s/EC-NEC\(([^),]*),([^)]*)\)/$2/;
 	    s/EC-dos\(([^).]*)\.([^)]*)\)/\@S\@$1.$2\@E\@/;
-	    s/\@S\@(.*)\@E\@/&Dosify("$1")/e;
+	    s/\@S\@(.*)\@E\@/lc(&Dosify("$1"))/e;
 	}
 
 	# Handle mono vs. color macros.

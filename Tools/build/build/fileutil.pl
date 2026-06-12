@@ -75,7 +75,7 @@
 ##############################################################################
 sub MakeDir{
 
-    local($longname, $dosname, $destpath, $abbrevto);
+    local($longname, $dosname, $destpath, $abbrevto, $checkName);
 
     # Determine the GEOS and DOS names of the directory to create.
 
@@ -87,7 +87,7 @@ sub MakeDir{
 
     $destpath="@_";
     $destpath =~ s|(.*)/[\w \.]*$|$1|;   # Grab the path.
-    $destpath = &GEOSToDOSPathName("$destpath");
+    #$destpath = &GEOSToDOSPathName("$destpath");
 
     # Make the directory.
 
@@ -112,14 +112,24 @@ sub MakeDir{
     # If the DOS name does not directly match the GEOS name, we need an
     # @DIRNAME file.
 
-    if ( "$dosname" ne "$longname") {
+	# check for DOS compatible name written all lower case
+	$checkName = $longname;
+	$checkName =~ y/A-Z/a-z/;
+    if ("$longname" eq "$checkName") {
+		# long name is all lower case
+		$checkName =~ y/a-z/A-Z/;
+	} else {
+		$checkName = $longname;
+	}
+
+    if ( "$dosname" ne "$checkName") {
 
 	# Create the @DIRNAME file.
 
 	if ( "$var{reportabbreviatedpaths}" ) {
-	    $sourcePath=&AbbrevPath("$destpath/$dosname/\@dirname.000");
+	    $sourcePath=&AbbrevPath("$destpath/$dosname/\@DIRNAME.000");
 	} else {
-	    $sourcePath="$destpath/$dosname/\@dirname.000";
+	    $sourcePath="$destpath/$dosname/\@DIRNAME.000";
 	}
 	print " Making $sourcePath\n     as ";
 	if ( "$var{dbcs}" ) {
@@ -129,7 +139,7 @@ sub MakeDir{
 	    printf "%.32s\n\n", $longname;
 	    open(DIRSRC, "$geosPath/Installed/ProductFiles/Build/Common/Template/dirname.000");  # Change this once we move it back a dir.
 	}
-	open(DIRDEST, "> $destpath/$dosname/\@dirname.000");
+	open(DIRDEST, "> $destpath/$dosname/\@DIRNAME.000");
 	read(DIRSRC, $buffer, 4);
 	if ( "$var{dbcs}" ) {
 	    # Change string to DBCS.
@@ -167,40 +177,41 @@ sub MakeDir{
 #
 ##############################################################################
 sub MakePath {
-
     local($directory, $dosdirectory);
     local($path)="/";
     local($dosPath)="/";
     local($passedpath)=@_;
-
-    if ( &IsUnix() ) {		# Unix system
-	#$passedpath =~ s|^/||;	# Cut off the starting slash.
-
+    if ( &IsUnix() ) {      # Unix system
         $passedpath = substr($passedpath, length($var{desttree}));
-        $path = $dosPath = $var{desttree};
-    } else {			# Win32 system
-	$path = $dosPath = substr($passedpath, 0, 3); # Drive & leading slash
-	$passedpath = substr($passedpath, 3); # Rest of the path
+        $path = $dosPath = "$var{desttree}/";
+    } else {            # Win32 system
+        $passedpath = substr($passedpath, length($var{desttree}));
+        $path = $dosPath = "$var{desttree}/";
     }
-
     print "MakePath $passedpath $var{desttree}\n";
-
+    my $firstFolder = 1;
     foreach $directory (split('/', "$passedpath")) {
-
-	# We presume that if the DOS name of the directory matches, it is
-	# a match.
-
-	$dosdirectory = &GEOSToDOSFileName($directory);
-	if ( ! -d "$path$dosdirectory" ) {
-	    &MakeDir("$path$directory");
-	}
-	$path .= "$directory/";
-	$dosPath .= "$dosdirectory/";
+        next if $directory eq "";  # Skip empty segments (leading slash etc.)
+        if ($firstFolder) {
+            # First folder: use as-is, no GEOSToDOSFileName conversion
+            if ( ! -d "$path$directory" ) {
+                &MkDir("$path$directory");
+            }
+            $path    .= "$directory/";
+            $dosPath .= "$directory/";
+            $firstFolder = 0;
+        } else {
+            # All subsequent folders: normal path with GEOSToDOSFileName
+            $dosdirectory = &GEOSToDOSFileName($directory);
+            if ( ! -d "$path$dosdirectory" ) {
+                &MakeDir("$path$directory");
+            }
+            $path    .= "$directory/";
+            $dosPath .= "$dosdirectory/";
+        }
     }
     return "$dosPath";
 }
-
-
 ##############################################################################
 #	SendFile
 ##############################################################################
@@ -426,7 +437,7 @@ sub Dosify {
 
     $name = "@_";
     &DebugPrint("dosify", "Dosifying filename $name");
-    $name =~ y/A-Z/a-z/;
+    $name =~ y/a-z/A-Z/;
     &DebugPrint("dosify", "Lowercased: $name");
     if ($name =~ /([^\.]+).*\.([^\.]+)$/) {
 
@@ -437,11 +448,11 @@ sub Dosify {
 	&DebugPrint("dosify", "Cropped: $newname");
 
 	$ending = substr($1,$namepreflen-2,$namepreflen);
-	if ($namepreflen > 9 && "$ending" eq "ec") {
+	if ($namepreflen > 9 && "$ending" eq "EC") {
 
-	    # If "ec" was chopped off, slap an 'e' right before the dot.
+	    # If "EC" was chopped off, slap an 'e' right before the dot.
 
-	    substr($newname, 7, 1) = "e";
+	    substr($newname, 7, 1) = "E";
 	    &DebugPrint("dosify", "Correcting for EC: $newname");
 	}
     } else {
@@ -497,7 +508,7 @@ sub GEOSToDOSFileName{
 	$dosname =~ s/\./_/g;   # Change periods to underscores.
     }
     $dosname =~ s/\s/_/g;   # Change spaces to underscores.
-    $dosname =~ y/A-Z/a-z/; # Lowercase.
+    $dosname =~ y/a-z/A-Z/; # Uppercase.
     if ( "$dosname" ne "$longname" ) {
 	$dosname =~ s/\./_/g;   # Might still be periods from first case.
 	if ( length($longname) > 8 ) {
@@ -608,7 +619,7 @@ sub BuildDestTreePath {
 	}
     }
 
-    $var{desttree} =~ y/A-Z/a-z/; # The destination tree must be all lowercase.
+    #$var{desttree} =~ y/a-z/A-Z/; # The destination tree must be all upper case (DOS like)
     $path="/";
     $destPath = $var{desttree};
 
