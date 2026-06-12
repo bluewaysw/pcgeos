@@ -1362,7 +1362,7 @@ sub CopyFilesToDemoDir {
 ##############################################################################
 sub ResolveFreeGEOSVersionDir {
     local( $destdir ) = @_;
-    local( $freegeosDir ) = "$destdir/localpc/ensemble/freegeos";
+    local( $freegeosDir ) = "$destdir/localpc/ENSEMBLE/FREEGEOS";
     local( @candidates );
     local( $entry, $candidateDir );
     local( $versionDir );
@@ -1439,11 +1439,11 @@ sub GenerateFreeGEOSSetupCopyScripts {
     $setupDir = "$versionDir/setup";
 
     GenerateFreeGEOSSetupCopyScript( "$setupDir/install",
-				     "$versionDir/ginst.bat",
-				     "setup\\install" );
+				     "$versionDir/GINST.BAT",
+				     "SETUP\\INSTALL" );
     GenerateFreeGEOSSetupCopyScript( "$setupDir/activate",
-				     "$versionDir/gact.bat",
-				     "setup\\activate" );
+				     "$versionDir/GACT.BAT",
+				     "SETUP\\ACTIVATE" );
 }
 
 ##############################################################################
@@ -1530,7 +1530,7 @@ sub FreeGEOSCopyImageToEnsemble {
 
     $sourceImage = "$RealInfo{destdir}/image/gfs.img";
     $targetDir = ResolveFreeGEOSBootstrapDir( $RealInfo{destdir} );
-    $targetImage = "$targetDir/gfs.img";
+    $targetImage = "$targetDir/GFS.IMG";
 
     if ( ! -f $sourceImage ) {
 	die "\nERROR: Cannot find FreeGEOS GFS image file: $sourceImage\n";
