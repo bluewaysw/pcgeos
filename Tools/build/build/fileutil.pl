@@ -204,9 +204,9 @@ sub MakePath {
             # All subsequent folders: normal path with GEOSToDOSFileName
             $dosdirectory = &GEOSToDOSFileName($directory);
             if ( ! -d "$path$dosdirectory" ) {
-                &MakeDir("$path$directory");
+                &MakeDir("$path$dosdirectory");
             }
-            $path    .= "$directory/";
+            $path    .= "$dosdirectory/";
             $dosPath .= "$dosdirectory/";
         }
     }
