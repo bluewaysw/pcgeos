@@ -1412,7 +1412,7 @@ sub ResolveFreeGEOSBootstrapDir {
     local( $destdir ) = @_;
     local( $bootstrapDir );
 
-    $bootstrapDir = ResolveFreeGEOSVersionDir( $destdir )."/boot";
+    $bootstrapDir = ResolveFreeGEOSVersionDir( $destdir )."/BOOT";
     print "[Resolved FreeGEOS bootstrap directory: $bootstrapDir]\n";
     return $bootstrapDir;
 }
@@ -1436,12 +1436,12 @@ sub GenerateFreeGEOSSetupCopyScripts {
     }
 
     $versionDir = ResolveFreeGEOSVersionDir( $RealInfo{destdir} );
-    $setupDir = "$versionDir/setup";
+    $setupDir = "$versionDir/SETUP";
 
-    GenerateFreeGEOSSetupCopyScript( "$setupDir/install",
+    GenerateFreeGEOSSetupCopyScript( "$setupDir/INSTALL",
 				     "$versionDir/GINST.BAT",
 				     "SETUP\\INSTALL" );
-    GenerateFreeGEOSSetupCopyScript( "$setupDir/activate",
+    GenerateFreeGEOSSetupCopyScript( "$setupDir/ACTIVATE",
 				     "$versionDir/GACT.BAT",
 				     "SETUP\\ACTIVATE" );
 }
