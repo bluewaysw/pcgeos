@@ -206,7 +206,7 @@ BAAppRunIclasBatchFileIfNeeded	endm
 endif		; _NEWDESKBA
 
 
-if _DOS_LAUNCHERS
+if _ND_DOS_LAUNCHERS
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		DesktopHandleCreateOrEditLauncher

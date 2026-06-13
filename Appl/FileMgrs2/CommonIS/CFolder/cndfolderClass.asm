@@ -207,6 +207,11 @@ notSingleOpened:
 	call	NDGlobalMenuGrabSortViewUI
 	call	NDSetGlobalMenuFromFlags
 	jc	exit				; if no menu items, exit
+if _ND_DOS_LAUNCHERS and _NEWDESKONLY
+ifndef GEOLAUNCHER
+	call	NDSetLauncherMenuItemsUsable
+endif
+endif
 
 	mov	cx, handle GlobalMenu
 	mov	dx, offset GlobalMenu
@@ -217,6 +222,108 @@ exit:
 	.leave
 	ret
 NDObjectPopUp	endp
+
+
+if _ND_DOS_LAUNCHERS and _NEWDESKONLY
+ifndef GEOLAUNCHER
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NDSetLauncherMenuItemsUsable
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Show launcher popup items only for matching single files.
+
+CALLED BY:	NDObjectPopUp
+
+PASS:		*ds:si	- NDFolderClass object
+		es	- folder buffer
+
+RETURN:		nothing
+
+DESTROYED:	nothing
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NDSetLauncherMenuItemsUsable	proc	near
+	uses	ax, bx, cx, dx, bp, di, si
+	class	NDFolderClass
+	.enter
+
+	push	si
+	mov	ax, MSG_GEN_SET_NOT_USABLE
+	mov	bx, handle GlobalMenuCreateLauncherTrigger
+	mov	si, offset GlobalMenuCreateLauncherTrigger
+	call	NDSetLauncherMenuItemState
+	mov	bx, handle GlobalMenuEditLauncherTrigger
+	mov	si, offset GlobalMenuEditLauncherTrigger
+	call	NDSetLauncherMenuItemState
+	pop	si
+
+	DerefFolderObject	ds, si, bx
+	cmp	ds:[bx].NDFOI_popUpType, WPUT_OBJECT
+	je	checkSingle
+	cmp	ds:[bx].NDFOI_popUpType, WPUT_SELECTION
+	jne	done
+
+	mov	di, ds:[bx].FOI_selectList
+	cmp	di, NIL
+	je	done
+	cmp	es:[di].FR_selectNext, NIL
+	jne	done
+	jmp	gotRecord
+
+checkSingle:
+	mov	di, ds:[bx].NDFOI_nonSelect
+	cmp	di, NIL
+	je	done
+
+gotRecord:
+	cmp	es:[di].FR_fileType, GFT_EXECUTABLE
+	jne	checkCreate
+	cmp	{word} es:[di].FR_creator.GT_chars, 'L' or ('A' shl 8)
+	jne	checkCreate
+	cmp	{word} es:[di+2].FR_creator.GT_chars, 'U' or ('N' shl 8)
+	jne	checkCreate
+	cmp	{word} es:[di].FR_creator.GT_manufID, MANUFACTURER_ID_GEOWORKS
+	jne	checkCreate
+	mov	bx, handle GlobalMenuEditLauncherTrigger
+	mov	si, offset GlobalMenuEditLauncherTrigger
+	mov	ax, MSG_GEN_SET_USABLE
+	call	NDSetLauncherMenuItemState
+	jmp	done
+
+checkCreate:
+	test	es:[di].FR_fileAttrs, mask FA_SUBDIR
+	jnz	done
+	mov	bp, di
+	CheckHack <(offset FR_name) eq 0>
+	mov	cx, -1
+	clr	ax
+	LocalFindChar
+	not	cx
+	mov	di, bp
+	LocalLoadChar ax, '.'
+	LocalFindChar
+	jne	done
+	call	CheckIfBatComExe
+	jc	done
+	mov	bx, handle GlobalMenuCreateLauncherTrigger
+	mov	si, offset GlobalMenuCreateLauncherTrigger
+	mov	ax, MSG_GEN_SET_USABLE
+	call	NDSetLauncherMenuItemState
+
+done:
+	.leave
+	ret
+NDSetLauncherMenuItemsUsable	endp
+
+
+NDSetLauncherMenuItemState	proc	near
+	mov	dl, VUM_NOW
+	call	ObjMessageCallFixup
+	ret
+NDSetLauncherMenuItemState	endp
+endif		; ifndef GEOLAUNCHER
+endif		; if _ND_DOS_LAUNCHERS and _NEWDESKONLY
 
 
 
