@@ -1100,7 +1100,7 @@ EC<	ECCheckDGroup	es						>
 	mov	dx, {word} es:[launcherMonikerToken+2]	; put chars 3&4 in dx
 	mov	bp, {word} es:[launcherMonikerToken+4]	; put manufID in bp
 	call	SearchTokenList
-	jnc	gotTokenPosition
+	jnc	gotOriginalTokenPosition
 
 	; FIX!!!   Later make first entry the launcher's token and grab
 	 ;directly from the launcher file if its entry is not in the token.db
@@ -1143,16 +1143,39 @@ EC<	ECCheckDGroup	es						>
 	clr	cx				; list starts from 0
 
 gotTokenAlternate:
+	mov	bp, TRUE
 	assume ds:dgroup
 	call	MemUnlock			; unlock Deskstrings
+	jmp	setTokenPosition
 
-gotTokenPosition:
+gotOriginalTokenPosition:
+	mov	bp, FALSE
+
+setTokenPosition:
+	push	bp
 	clr	dx				; not indeterminate
 	mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
 	mov	bx, handle EditLauncherChooseIconList
 	mov	si, offset EditLauncherChooseIconList
 	mov	di, mask MF_CALL
 	call	ObjMessage
+	pop	cx
+
+	tst	es:[creatingLauncher]
+	jnz	done
+	clr	dx				; not indeterminate
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	mov	bx, handle EditLauncherOptionTokenManual
+	mov	si, offset EditLauncherOptionTokenManual
+	mov	di, mask MF_CALL
+	push	cx
+	call	ObjMessage
+	pop	cx
+	mov	ax, MSG_DOS_LAUNCHER_TOKEN_OPTIONS_CHANGE
+	call	GeodeGetProcessHandle
+	call	ObjMessageForce
+
+done:
 
 	.leave
 	ret
