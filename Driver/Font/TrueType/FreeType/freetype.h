@@ -167,14 +167,6 @@
     /*                   1/1024 pixel precision).  This is important for */
     /*                   small ppem sizes.                               */
     /*                                                                   */
-    /*  second_pass      If true, the scan-line converter performs a     */
-    /*                   second sweep phase dedicated to find vertical   */
-    /*                   drop-outs.  If false, only horizontal drop-outs */
-    /*                   will be checked during the first vertical       */
-    /*                   sweep (yes, this is a bit confusing but it is   */
-    /*                   really the way it should work).  This is        */
-    /*                   important for small ppems too.                  */
-    /*                                                                   */
     /*  dropout_mode     Specifies the TrueType drop-out mode to use for */
     /*                   continuity checking.  Valid values are 0 (no    */
     /*                   check), 1, 2, 4, and 5.                         */
@@ -182,7 +174,6 @@
     /*  Most of the engine's users will safely ignore these fields...    */
 
     TT_UShort        y_ppem;          /* vertical resolution      */
-    TT_Bool          second_pass;     /* two sweeps rendering     */
     TT_Char          dropout_mode;    /* dropout mode             */
   };
 
@@ -218,11 +209,8 @@
 
   struct  TT_Glyph_Metrics_
   {
-    TT_BBox  bbox;      /* glyph bounding box */
-
-    TT_Pos   bearingX;  /* left-side bearing                    */
-    TT_Pos   bearingY;  /* top-side bearing, per se the TT spec */
-
+    TT_BBox  bbox;      /* glyph bounding box        */
+    TT_Pos   bearingX;  /* left-side bearing         */
     TT_Pos   advance;   /* advance width (or height) */
   };
 
@@ -349,11 +337,8 @@
   {
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
-#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
 #endif
 
@@ -362,11 +347,7 @@
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   min_Right_Side_Bearing; /* minimum right-sb      */
-#endif
-
     TT_FWord   xMax_Extent;            /* xmax extents          */
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
 
@@ -402,11 +383,8 @@
   {
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_Fixed   Version;
-#endif
     TT_FWord   Ascender;
     TT_FWord   Descender;
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   Line_Gap;
 #endif
 
@@ -414,10 +392,7 @@
     TT_FWord   min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
-#endif
     TT_FWord   yMax_Extent;             /* xmax or ymax extents            */
-
-    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_FWord   caret_Slope_Rise;
     TT_FWord   caret_Slope_Run;
     TT_FWord   caret_Offset;
@@ -679,15 +654,15 @@
   /* will be zeroed.                                                */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Face_Properties( TT_Face              face,
-                                    TT_Face_Properties*  properties );
+  void  TT_Get_Face_Properties( TT_Face              face,
+                                TT_Face_Properties*  properties );
 
 
   /* Close a given font object, destroying all associated */
   /* instances.                                           */
 
   EXPORT_DEF
-  TT_Error  TT_Close_Face( TT_Face  face );
+  void  TT_Close_Face( TT_Face  face );
 
 
 /* A simple macro to build table tags from ASCII chars */
@@ -715,14 +690,13 @@
   EXPORT_DEF
   TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
                                                       TT_F26Dot6   charSize,
-                                                      TT_UShort    xResolution,
-                                                      TT_UShort    yResolution );
+                                                      TT_UShort    resolution );
   
 
   /* Close a given instance object, destroying all associated data. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_Instance( TT_Instance  instance );
+  void  TT_Done_Instance( TT_Instance  instance );
 
 
 
@@ -738,7 +712,7 @@
   /* Discard (and destroy) a given glyph object. */
 
   EXPORT_DEF
-  TT_Error  TT_Done_Glyph( TT_Glyph  glyph );
+  void  TT_Done_Glyph( TT_Glyph  glyph );
 
 
 #define TTLOAD_SCALE_GLYPH                    1
@@ -782,15 +756,15 @@
   /* it.  The client application should _not_ change the pointers.       */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Outline( TT_Glyph     glyph,
-                                  TT_Outline*  outline );
+  void  TT_Get_Glyph_Outline( TT_Glyph     glyph,
+                              TT_Outline*  outline );
 
 
   /* Copy the glyph metrics into `metrics'. */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Glyph_Metrics( TT_Glyph           glyph,
-                                  TT_Glyph_Metrics*  metrics );
+  void  TT_Get_Glyph_Metrics( TT_Glyph           glyph,
+                              TT_Glyph_Metrics*  metrics );
 
 
   EXPORT_DEF
@@ -835,8 +809,8 @@
   /* the most accurate values.                                       */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Outline_BBox( TT_Outline*  outline,
-                                 TT_BBox*     bbox );
+  void  TT_Get_Outline_BBox( TT_Outline*  outline,
+                             TT_BBox*     bbox );
 
 
   /* Apply a transformation to a glyph outline. */
@@ -879,10 +853,10 @@
   /* used to enumerate the charmaps present in a TrueType file.     */
 
   EXPORT_DEF
-  TT_Error  TT_Get_CharMap_ID( TT_Face     face,
-                               TT_UShort   charmapIndex,
-                               TT_UShort*  platformID,
-                               TT_UShort*  encodingID );
+  void  TT_Get_CharMap_ID( TT_Face     face,
+                           TT_UShort   charmapIndex,
+                           TT_UShort*  platformID,
+                           TT_UShort*  encodingID );
 
 
   /* Look up the character maps found in `face' and return a handle */
@@ -914,12 +888,12 @@
   /* used to enumerate the charmaps present in a TrueType file.   */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Name_ID( TT_Face     face,
-                            TT_UShort   nameIndex,
-                            TT_UShort*  platformID,
-                            TT_UShort*  encodingID,
-                            TT_UShort*  languageID,
-                            TT_UShort*  nameID );
+  void  TT_Get_Name_ID( TT_Face     face,
+                        TT_UShort   nameIndex,
+                        TT_UShort*  platformID,
+                        TT_UShort*  encodingID,
+                        TT_UShort*  languageID,
+                        TT_UShort*  nameID );
 
 
   /* Return the address and length of the name number `nameIndex' */
@@ -931,10 +905,10 @@
   /* returned.                                                    */
 
   EXPORT_DEF
-  TT_Error  TT_Get_Name_String( TT_Face      face,
-                                TT_UShort    nameIndex,
-                                TT_String**  stringPtr,
-                                TT_UShort*   length );
+  void  TT_Get_Name_String( TT_Face      face,
+                            TT_UShort    nameIndex,
+                            TT_String**  stringPtr,
+                            TT_UShort*   length );
 
 
 #ifdef __cplusplus

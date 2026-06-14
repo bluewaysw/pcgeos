@@ -44,7 +44,7 @@ extern GlobalStruct global;
 /*###################### Spezifische Tool-Routinen ###########################*/
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 VMBlockHandle IFGetMainArrayHandle(void) {
 MemHandle 	mh;
@@ -59,7 +59,7 @@ VMBlockHandle	mainArray;
 
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 InstallEntry * IFLockMainArrayElement(word item) {
 VMBlockHandle	mainArray;
@@ -72,7 +72,7 @@ word 		size;
    }
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void	IFUnlockMainArray(InstallEntry 	*elemPtr ) {
 	HugeArrayUnlock(elemPtr);
@@ -169,7 +169,9 @@ FileLongName newDosName;
 		FileSetPathExtAttributes(fParams->geosName,FEA_MODIFICATION,
 			&(fParams->fdat),sizeof(FileDateAndTime));
 		}
-
+@if @DEBUG_LOG_INSTALLED_FILES
+if(errFlag) DebugInfo("\r--Error Writing File--");
+@endif
 	return errFlag;
 	}
 
@@ -204,6 +206,9 @@ int err, err2, cv, fileType;
 // Protocol-Nummer vergleichen
    protoDoit = FALSE;
    if ( flags & INST_IGNORE_PROTOCOL ) {
+@if @DEBUG_LOG_INSTALLED_FILES
+	DebugInfo("\rP: Ignore protocol");
+@endif
 	protoDoit = TRUE;
 	}
    else {
@@ -223,6 +228,9 @@ int err, err2, cv, fileType;
 // Release-Nummer vergleichen
    releDoit = FALSE;
    if ( flags & INST_IGNORE_RELEASE ) {
+@if @DEBUG_LOG_INSTALLED_FILES
+   	DebugInfo("\rR: Ignore release");
+@endif
 	releDoit = TRUE;
 	}
    else {
@@ -323,7 +331,18 @@ doDialog:
 }
 
 /*###################### Allgemeine Tool-Routinen ###########################*/
-
+@if @DEBUG_LOG_INSTALLED_FILES
+#define FTSetAttrTextElement(atr,AT,str,ch,n)   \
+	if ( atr & AT ) str[n] = ch ; else str[n] = ' '
+#define	FTSetAttrText(attr,str)	FTSetAttrTextElement(attr,FA_ARCHIVE,str,'A',0);\
+			FTSetAttrTextElement(attr,FA_RDONLY,str,'R',1);\
+			FTSetAttrTextElement(attr,FA_SUBDIR,str,'D',2);\
+			FTSetAttrTextElement(attr,FA_HIDDEN,str,'H',3);\
+			FTSetAttrTextElement(attr,FA_SYSTEM,str,'S',4);\
+			FTSetAttrTextElement(attr,FA_LINK,str,'L',5);\
+			FTSetAttrTextElement(attr,FA_VOLUME,str,'V',6);\
+			str[7]=0
+@endif
 /*--------------------- FileToolExistFileGD ---------------------
  *	Purpose:        testet, ob eine Datei mit dem angegebenen Geos und
  *			DOS-Namen existiert. Der Dateiname darf keinen
@@ -334,7 +353,74 @@ doDialog:
  *	Return:		FTEF_YES | FTEF_NO | FTEF_INVALID_DOSNAME |
  *			FTEF_IVALID_GEOSNAME | FTEF_DIFFERENT_FILES
  *			{ FTExistFilesValue }
+ *
+ *  We have a standard- and a debug-version
+ *
  ---------------------------------------------------------------------------*/
+@if @DEBUG_LOG_INSTALLED_FILES
+/*
+ * Debugging Version
+ */
+FTExistFilesValue FileToolExistFileGD(char * geosName, char * dosName) {
+Boolean		geosFound, dosFound;
+FileLongName	dosNameOfGeos;
+word attrs;
+char  buf[30];
+
+    DebugInfo("\r\rFile: "); DebugInfo(geosName);
+
+    attrs = FileGetAttributes(geosName);
+    geosFound = ThreadGetError();
+    geosFound = !geosFound;
+
+    if (geosFound) {
+    	DebugInfo("\rGeos: found. Attrs=");
+    	FTSetAttrText(attrs,buf);
+    	DebugInfo(buf);
+    } else {
+    	DebugInfo("\rGeos: NOT FOUND");
+    }
+
+    if ( !dosName) {
+    	DebugInfo("\r- no DOS file name specified");
+	return ( geosFound ? FTEF_YES : FTEF_NO );
+	}
+
+    attrs = FileGetAttributes(dosName);
+    dosFound = ThreadGetError();
+    dosFound = !dosFound;
+
+    DebugInfo("\rDOS-File: "); DebugInfo(dosName);
+    if (dosFound) {
+    	DebugInfo(" found. Attrs=");
+    	FTSetAttrText(attrs,buf);
+    	DebugInfo(buf);
+    } else {
+    	DebugInfo(" NOT FOUND");
+    }
+
+
+    if ( geosFound ) {		// Datei mit Geos-Name existiert
+	FileGetPathExtAttributes(geosName, FEA_DOS_NAME,
+				dosNameOfGeos, sizeof(FileLongName));
+	DebugInfo("\rDOS-name read: "); DebugInfo(dosNameOfGeos);
+
+	if ( !strcmp(dosName,dosNameOfGeos) ) {
+		DebugInfo(" - ok");
+		return FTEF_YES;
+		}
+	// DOS-Name ist anders als gefordert
+	return ( dosFound ? FTEF_DIFFERENT_FILES : FTEF_INVALID_DOSNAME );
+	}
+
+    // Geos_datei existiert nicht
+    return ( dosFound ? FTEF_INVALID_GEOSNAME : FTEF_NO );
+    }
+
+@elseif
+/*
+ * NON-Debug Version
+ */
 FTExistFilesValue FileToolExistFileGD(char * geosName, char * dosName) {
 Boolean		geosFound, dosFound;
 FileLongName	dosNameOfGeos;
@@ -363,6 +449,8 @@ FileLongName	dosNameOfGeos;
     // Geos_datei existiert nicht
     return ( dosFound ? FTEF_INVALID_GEOSNAME : FTEF_NO );
     }
+
+@endif
 
 /*--------------------- FileToolCreatePath ---------------------
  *	Purpose:	Anlegen eines Pfades auf einem Datentr„ger
@@ -446,6 +534,13 @@ char	z;
  ---------------------------------------------------------------------------*/
 int FileToolCompareProtocol
 		(ProtocolNumber fileProtocol,ProtocolNumber compProtocol) {
+@if @DEBUG_LOG_INSTALLED_FILES
+char buf[30];
+sprintf(buf, "%u.%u", fileProtocol.PN_major, fileProtocol.PN_minor);
+DebugInfo("\rP: current: "); DebugInfo(buf);
+sprintf(buf, "%u.%u", compProtocol.PN_major, compProtocol.PN_minor);
+DebugInfo(" \t-> new: "); DebugInfo(buf);
+@endif
 
 	if ( fileProtocol.PN_major > compProtocol.PN_major ) return CRP_FILE_NEWER;
 	if ( fileProtocol.PN_major < compProtocol.PN_major ) return CRP_FILE_OLDER;
@@ -464,6 +559,15 @@ int FileToolCompareProtocol
  ---------------------------------------------------------------------------*/
 int FileToolCompareRelease
 		(ReleaseNumber fileRelease,ReleaseNumber compRelease) {
+
+@if @DEBUG_LOG_INSTALLED_FILES
+char buf[30];
+sprintf(buf, "%u.%u.%u.%u", fileRelease.RN_major, fileRelease.RN_minor, fileRelease.RN_change, fileRelease.RN_engineering);
+DebugInfo("\rR: current: "); DebugInfo(buf);
+sprintf(buf, "%u.%u.%u.%u", compRelease.RN_major, compRelease.RN_minor, compRelease.RN_change, compRelease.RN_engineering);
+DebugInfo(" \t-> new: "); DebugInfo(buf);
+@endif
+
 
 	if ( fileRelease.RN_major > compRelease.RN_major ) return CRP_FILE_NEWER;
 	if ( fileRelease.RN_major < compRelease.RN_major ) return CRP_FILE_OLDER;
@@ -545,7 +649,7 @@ DelStart:
 
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetFileEntryListText(InstallEntry * entryPtr, char * text) {
 char *txt;
@@ -559,7 +663,7 @@ char *txt;
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetDeleteFileListText(InstallEntry * entryPtr, char * textPtr) {
 char *text;
@@ -575,7 +679,7 @@ char *text;
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetTokenEntryListText(InstallEntry * entryPtr, char * text) {
 char tokenID[16];
@@ -587,7 +691,7 @@ char tokenID[16];
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetDosTokenEntryListText(InstallEntry * entryPtr, char * text) {
 	MemLock(HandleOf(@DosTokenEntryText));
@@ -600,7 +704,7 @@ void GetDosTokenEntryListText(InstallEntry * entryPtr, char * text) {
 
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetIniKatListText(InstallEntry * entryPtr, char * text) {
 	MemLock(HandleOf(@IniKategorieEntryText));
@@ -611,7 +715,7 @@ void GetIniKatListText(InstallEntry * entryPtr, char * text) {
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetIniEntryInstallListText(InstallEntry * entryPtr, char * text) {
 	MemLock(HandleOf(@IniSetEntryText));
@@ -632,7 +736,7 @@ void GetIniEntryInstallListText(InstallEntry * entryPtr, char * text) {
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetIniEntryDeinstallListText(InstallEntry * entryPtr, char * text) {
 	MemLock(HandleOf(@DeinstallCommonText));
@@ -643,7 +747,7 @@ void GetIniEntryDeinstallListText(InstallEntry * entryPtr, char * text) {
 
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetStartFileEntryListText(InstallEntry * entryPtr, char *text, Boolean isExtern) {
 StartFileParams	*sfpPtr;
@@ -673,7 +777,7 @@ char *txtPtr;
 
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetToolEntryListText(InstallEntry * entryPtr, char *text, word type) {
 char *txtPtr;
@@ -697,7 +801,7 @@ char *txtPtr;
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetDeleteFolderListText(InstallEntry * entryPtr, char * text) {
 char *txtPtr;
@@ -713,7 +817,7 @@ char *txtPtr;
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 void GetDelTempFileListText(InstallEntry * entryPtr, char * textPtr) {
 char *text;
@@ -730,7 +834,7 @@ char *text;
 
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 /* message (GEN_DYNAMIC_LIST_QUERY_MSG)
 optr list, word item */
@@ -792,12 +896,12 @@ InstallEntry * entryPtr;
 /* ####################################################################### */
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 @classdecl FileSelectDialogClass;
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 @method FileSelectDialogClass, MSG_FS_FILE_SELECTED {
 char    path[PATH_BUFFER_SIZE],
@@ -817,7 +921,7 @@ DiskHandle dh;
 	}
 
 /*---------------------  ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 @method FileSelectDialogClass, MSG_FS_SET_DIRECTORY {
 	if ( stdPath == (-1) ) {
@@ -833,7 +937,7 @@ DiskHandle dh;
 @classdecl IFDocumentControlClass;
 
 /*--------------------- MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR ---------------------
- *      Purpose:        
+ *      Purpose:
  *---------------------------------------------------------------------------*/
 @method IFDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR {
 //	optr 		fileSelector,
@@ -898,7 +1002,7 @@ void MessageNumberBox(word number) {
 */
 
 /*--------------------- Debuging ---------------------
- *      Purpose:        Display debug information  
+ *      Purpose:        Display debug information
  *---------------------------------------------------------------------------*/
 @if @DEBUG_FLAG
 

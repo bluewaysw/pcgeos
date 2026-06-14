@@ -69,6 +69,7 @@
 #define DEFAULT_CHAR                        '.'
 #define DEFAULT_UNDER_THICK( value )	    ( value >> 4 )      // 1/16 of size
 #define DEFAULT_UNDER_POSITION( value )	    ( value / 10 )      // -10% of size
+#define DEFAULT_STRIKE_POSITION( value )    ( 3 * value >> 2 )  // 1/4 of size
 
 
 /***********************************************************************

@@ -40,12 +40,12 @@ DESCRIPTION:
 ; file for documentation.
 ;
 ifndef PRODUCT_GEOS2X
-MOUSE_HAS_WHEEL			= 1	; define/uncomment this if GEOS 
-					; has native wheel support in the kernel/ui, 
+MOUSE_HAS_WHEEL			= 1	; define/uncomment this if GEOS
+					; has native wheel support in the kernel/ui,
 					; disable ...HAS_WHEEL_KEYS
 else
-MOUSE_HAS_WHEEL_KEYS		= 1	; define/uncomment this for a version of the driver 
-					; that has the wheel simulate keypresses, 
+MOUSE_HAS_WHEEL_KEYS		= 1	; define/uncomment this for a version of the driver
+					; that has the wheel simulate keypresses,
 					; disable ...HAS_WHEEL
 endif
 
@@ -84,8 +84,8 @@ ifdef MOUSE_HAS_WHEEL
 	cutemouseNativeMouse	chunk.char	'CuteMouse Wheel Mouse (absolute coordinates)', 0
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC,	; baseboxNativeMouse
-			mask MEI_GENERIC	; cutemouseNativeMouse
+			mask MEI_GENERIC or mask MEI_WHEEL,	; baseboxNativeMouse
+			mask MEI_GENERIC or mask MEI_WHEEL	; cutemouseNativeMouse
 endif
 
 ifdef MOUSE_HAS_WHEEL_KEYS
@@ -102,10 +102,10 @@ ifdef MOUSE_HAS_WHEEL_KEYS
 
 
 	mouseInfoTable	MouseExtendedInfo	\
-			mask MEI_GENERIC,	; baseboxPageMouse
-			mask MEI_GENERIC,	; baseboxCursorMouse
-			mask MEI_GENERIC,
-			mask MEI_GENERIC
+			mask MEI_GENERIC or mask MEI_WHEEL,	; baseboxPageMouse
+			mask MEI_GENERIC or mask MEI_WHEEL,	; baseboxCursorMouse
+			mask MEI_GENERIC or mask MEI_WHEEL,	; cutemousePageMouse
+			mask MEI_GENERIC or mask MEI_WHEEL	; cutemouseCursorMouse
 endif
 
 MouseExtendedInfoSeg	ends

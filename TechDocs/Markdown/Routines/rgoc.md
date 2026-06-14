@@ -865,7 +865,7 @@ arguments will be passed on the stack; the handler will pop them
 off the stack in reverse order from the way they are listed in the 
 declaration.
 
-*param** - The parameters for this message, of which there may be none or 
+*param* - The parameters for this message, of which there may be none or 
 several. All the parameters must appear inside the parentheses. 
 Parameters are defined in a similar manner as for functions and 
 routines; each one consists of a data type followed by the name of 

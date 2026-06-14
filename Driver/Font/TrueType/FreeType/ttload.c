@@ -25,10 +25,8 @@
 #include "ttmemory.h"
 #include "tttags.h"
 #include "ttload.h"
+#include <geos.h>
 
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT      trace_load
 
 /* In all functions, the stream is taken from the 'face' object */
 #define DEFINE_LOCALS           DEFINE_LOAD_LOCALS( face->stream )
@@ -81,9 +79,8 @@
   {
     DEFINE_LOCALS;
 
-    UShort     n, limit;
-    TTableDir  tableDir;
-
+    UShort          n, limit;
+    TTableDir       tableDir;
     PTableDirEntry  entry;
 
 
@@ -93,9 +90,11 @@
     tableDir.version   = GET_Long();
     tableDir.numTables = GET_UShort();
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     tableDir.searchRange   = GET_UShort();
     tableDir.entrySelector = GET_UShort();
     tableDir.rangeShift    = GET_UShort();
+#endif
 
     FORGET_Frame();
 
@@ -354,7 +353,6 @@
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Mac_Style       = GET_UShort();
     header->Lowest_Rec_PPEM = GET_UShort();
-
     header->Font_Direction  = GET_Short();
 #else
     SKIP( 6 );
@@ -389,7 +387,7 @@
     DEFINE_LOCALS;
 
     Short          n, num_shorts;
-    UShort         num_shorts_checked, num_longs;
+    UShort         num_longs;
     PLongMetrics   longs;
     PShortMetrics  shorts;
 
@@ -397,12 +395,8 @@
     if ( ( n = TT_LookUp_Table( face, TTAG_hmtx ) ) < 0 )
       return TT_Err_Hmtx_Table_Missing;
 
-    num_longs = face->horizontalHeader.number_Of_HMetrics;
-
-    /* never trust derived values! */
-
-    num_shorts         = face->maxProfile.numGlyphs - num_longs;
-    num_shorts_checked = ( face->dirTables[n].Length - num_longs * 4 ) >> 1;
+    num_longs  = face->horizontalHeader.number_Of_HMetrics;
+    num_shorts = face->maxProfile.numGlyphs - num_longs;
 
     if ( num_shorts < 0 )            /* sanity check */
         return TT_Err_Invalid_Horiz_Metrics;
@@ -416,37 +410,24 @@
       return error;
 
     longs  = (PLongMetrics)GEO_LOCK( face->horizontalHeader.long_metrics_block );
-    shorts = (PShortMetrics)GEO_LOCK( face->horizontalHeader.short_metrics_block );
-
+    
     for ( n = 0; n < num_longs; ++n )
     {
       longs->advance = GET_UShort();
       longs->bearing = GET_Short();
       ++longs;
     }
+    
+    GEO_UNLOCK( face->horizontalHeader.long_metrics_block );
+    
+    shorts = (PShortMetrics)GEO_LOCK( face->horizontalHeader.short_metrics_block );
 
-    /* do we have an inconsistent number of metric values? */
+    for ( n = 0; n < num_shorts; ++n )
+      (shorts)[n] = GET_Short();
 
-    if ( num_shorts > num_shorts_checked )
-    {
-      for ( n = 0; n < num_shorts_checked; ++n )
-        (shorts)[n] = GET_Short();
-
-      /* we fill up the missing left side bearings with the    */
-      /* last valid value. Since this will occur for buggy CJK */
-      /* fonts usually, nothing serious will happen.           */
-
-      for ( n = num_shorts_checked; n < num_shorts; ++n )
-        (shorts)[n] = (shorts)[num_shorts_checked - 1];
-    }
-    else
-    {
-      for ( n = 0; n < num_shorts; ++n )
-        (shorts)[n] = GET_Short();
-    }
+    GEO_UNLOCK( face->horizontalHeader.short_metrics_block );
 
     FORGET_Frame();
-
     return TT_Err_Ok;
   }
 
@@ -513,28 +494,18 @@
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Version   = GET_ULong();
-#else
-    SKIP( 4 );
-#endif
     header->Ascender  = GET_Short();
     header->Descender = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->Line_Gap  = GET_Short();
 #else
-    SKIP( 2 );
+    SKIP( 10 );
 #endif
 
     header->advance_Width_Max      = GET_UShort();
     header->min_Left_Side_Bearing  = GET_Short();
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->min_Right_Side_Bearing = GET_Short();
-#else
-    SKIP( 2 );
-#endif
     header->xMax_Extent            = GET_Short();
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     header->caret_Slope_Rise       = GET_Short();
     header->caret_Slope_Run        = GET_Short();
 
@@ -547,7 +518,7 @@
 
     header->metric_Data_Format = GET_Short();
 #else
-    SKIP( 16 );
+    SKIP( 20 );
 #endif
 
     header->number_Of_HMetrics = GET_UShort();
@@ -741,7 +712,7 @@
       for ( i = 0; i < names->numNameRecords; ++i )
       {
         namerec = names->names + i;
-        namerec->string = storage + names->names[i].stringOffset;
+        namerec->string = storage + namerec->stringOffset;
 
 /* It is possible (but rather unlikely) that a new platform ID will be */
 /* added by Apple, so we can't rule out IDs > 3.                       */
@@ -857,11 +828,10 @@
   {
     DEFINE_LOCALS;
 
-    Long   off, table_start;
+    Long   off, table_start, entry_offset;
     Short  n, limit;
 
     TCMapDir       cmap_dir;
-    TCMapDirEntry  entry_;
     PCMapTable     cmap;
 
 
@@ -899,16 +869,15 @@
 
       /* extra code using entry_ for platxxx could be cleaned up later */
       cmap->loaded             = FALSE;
-      cmap->platformID         = entry_.platformID         = GET_UShort();
-      cmap->platformEncodingID = entry_.platformEncodingID = GET_UShort();
-
-      entry_.offset = GET_Long();
+      cmap->platformID         = GET_UShort();
+      cmap->platformEncodingID = GET_UShort();
+      entry_offset             = GET_Long();
 
       FORGET_Frame();
 
       off = FILE_Pos();
 
-      if ( FILE_Seek( table_start + entry_.offset ) ||
+      if ( FILE_Seek( table_start + entry_offset ) ||
            ACCESS_Frame( 6 ) )
         return error;
 
@@ -1029,7 +998,7 @@
     os2->xAvgCharWidth       = GET_Short();
     os2->usWeightClass       = GET_UShort();
 
-    #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->usWidthClass        = GET_UShort();
     os2->fsType              = GET_Short();
     os2->ySubscriptXSize     = GET_Short();
