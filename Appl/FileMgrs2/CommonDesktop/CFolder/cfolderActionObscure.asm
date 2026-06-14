@@ -83,7 +83,7 @@ endif
 	mov	ax, FALSE			; no default checking
 	call	GetFolderObjectClicked		; check if click on object
 						; es:di = object if so
-	jnc	noObject			; if none, handle it
+	LONG jnc	noObject		; if none, handle it
 	;
 	; click on object
 	;
@@ -128,7 +128,7 @@ endif
 doubleClick:
 	mov	ss:[fileDoubleClick], TRUE	; received double-click
 	test	ds:[bx].FOI_folderState, mask FOS_DISALLOW_DOUBLE
-	jnz	done				; no double-clicks allowed!
+	LONG 	jnz	done			; no double-clicks allowed!
 	cmp	di, ds:[bx].FOI_objectClick	; same as prev. single-click?
 	jne	single				; nope, treat as single-click
 						; no more double-clicks
@@ -156,7 +156,9 @@ switchToSingle:
 	andnf	ss:[browseMode], not mask FIBM_MULTIPLE
 endif
 
+if _NEWDESK
 doOpen:
+endif
 if _NEWDESKBA
 	;
 	; Rather than calling FileOpenESDI directly, send a message,

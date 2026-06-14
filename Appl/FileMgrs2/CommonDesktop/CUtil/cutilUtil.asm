@@ -1504,15 +1504,9 @@ CheckFolderWindow	proc	near
 	mov	bp, si				; dx:bp = pathname
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	FindFolderWindow		; check if already opened
-if _NEWDESK
-	; For NewDesk (ISDesk), we want to allow multiple windows in the same folder,
-	; but we don't want to open a new window EVERYTIME we click on the same folder
-	; So by default, we don't create a new window if one is already open and bring
-	; the existing window to the front instead. If the user wants to open a new
-	; window, they can do so by holding down the CTRL key when double-clicking a folder.
-	jnc	notFoundND
+	jnc	notFound			; if not, check # windows
 	tst	bx
-	jz	notFoundND
+	jz	checkError			; error or special case
 	;
 	; found matching folder window, bring to front
 	;	bx = folder object block
@@ -1523,11 +1517,9 @@ if _NEWDESK
 	clr	ax				; no error
 	jmp	short noCreate			; brought-to-front,
 						; don't create
-notFoundND:
-endif		; if _NEWDESK
 
 if _GMGR
-	jnc	notFound			; if not, check # windows
+checkError:
 	;
 	; If an error occurred for a student, put up error about generic
 	; students.  If for a drive, put up message about drives.  Otherwise
@@ -1546,22 +1538,7 @@ ND<	cmp	ax, WOT_DRIVE				>
 ND<	jne	gotErrorMsg				>
 ND<	mov	ax, ERROR_DRIVE_LINK_TARGET_GONE	>
 ND<gotErrorMsg:						>
-	tst	bx
-	jz	errorButCheckSPLink
 
-	;
-	; found matching folder window, bring to front
-	;	bx = folder window block
-	;
-	mov	si, FOLDER_OBJECT_OFFSET	; common offset
-	mov	ax, MSG_FOLDER_BRING_TO_FRONT
-	call	ObjMessageCallFixup		; tell window to come to front
-						;	via the FolderObject
-	clr	ax				; no error
-	jmp	short noCreate			; brought-to-front,
-						; don't create
-
-errorButCheckSPLink:
 	;
 	; If we have a ERROR_LINK_TARGET_GONE error, but if the path is a
 	; StandardPath, CD'ing to that directory will create it (the kernel
@@ -1587,8 +1564,10 @@ popAndErrorNC:
 	pop	es, di, bx, ax
 	jnc	error
 
-notFound:
+else
+checkError:
 endif	; _GMGR
+notFound:
 	;
 	; Removed call to CheckIfLinkIsValid.  Most links are, so the
 	; time we waste checking isn't worth it.  If the link isn't
