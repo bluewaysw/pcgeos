@@ -1552,8 +1552,10 @@ LauncherPrepForWriting	proc	near
 EC <	ECCheckDGroup	es						>
 	mov	bx, es:[launcherFileHandle]	; put file handle in bx
 	tst	es:[creatingLauncher]
-	jz	editingLauncher
+	jnz	createLauncherFile
+	jmp	editingLauncher
 
+createLauncherFile:
 	clr	al				; no flags
 	call	FileClose			; close default launcher
 	clr	es:[launcherFileHandle]
@@ -1571,7 +1573,26 @@ EC <	ECCheckDGroup	es						>
 	jmp	pathSet
 
 sourcePath:
-	call	LauncherSetSourcePathForWriting
+	mov	bx, es:[launchFilePathHandle]
+	tst	bx
+	jz	sourcePathError
+	call	MemLock
+	push	bx
+	mov	ds, ax
+	mov	bx, ds:[GFP_disk]
+	mov	dx, offset GFP_path
+	call	FileSetCurrentPath
+	pop	bx
+	push	ax
+	pushf
+	call	MemUnlock
+	popf
+	pop	ax
+	jmp	pathSet
+
+sourcePathError:
+	mov	ax, ERROR_PATH_NOT_FOUND
+	stc
 
 pathSet:
 	jc	exit
@@ -1611,87 +1632,6 @@ exit:
 	.leave
 	ret
 LauncherPrepForWriting	endp
-
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		LauncherSetSourcePathForWriting
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Set current path to the source path for launcher creation.
-
-CALLED BY:	LauncherPrepForWriting
-
-PASS:		es	- dgroup
-
-RETURN:		carry clear if path was set
-		carry set, ax = error if path could not be set
-		es	- dgroup
-
-DESTROYED:	ax, bx, cx, ds, si, di
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-LauncherSetSourcePathForWriting	proc	near
-	mov	bx, es:[launchFilePathHandle]
-	tst	bx
-	jz	sourcePathError
-	call	MemLock
-	push	bx
-	mov	ds, ax
-	mov	bx, ds:[GFP_disk]
-	mov	dx, offset GFP_path
-	call	FileSetCurrentPath
-	pop	bx
-	push	ax
-	pushf
-	call	MemUnlock
-	popf
-	pop	ax
-	jc	exit
-	segmov	ds, es, si
-	mov	si, offset launcherGeosName
-	mov	di, offset launchFileName
-	clr	cx				; null-terminated strings
-	call	LocalCmpStrings
-	jne	sourcePathDone
-
-	mov	di, offset launcherGeosName
-SBCS <	clr	al							>
-DBCS <	clr	ax							>
-	mov	cx, FILE_LONGNAME_LENGTH - currentLauncherSuffixChars
-SBCS <	repne	scasb							>
-DBCS <	repne	scasw							>
-	jne	truncateName
-SBCS <	dec	di							>
-DBCS <	sub	di, size wchar						>
-	jmp	appendSuffix
-
-truncateName:
-	mov	di, offset launcherGeosName
-SBCS <	add	di, FILE_LONGNAME_LENGTH - currentLauncherSuffixChars	>
-DBCS <	add	di, (FILE_LONGNAME_LENGTH - currentLauncherSuffixChars) * (size wchar) >
-
-appendSuffix:
-	segmov	ds, cs, si
-	mov	si, offset currentLauncherSuffix
-	mov	cx, currentLauncherSuffixSize
-SBCS <	rep	movsb							>
-DBCS <	rep	movsw							>
-
-sourcePathDone:
-	clc
-	jmp	exit
-
-sourcePathError:
-	mov	ax, ERROR_PATH_NOT_FOUND
-	stc
-
-exit:
-	ret
-LauncherSetSourcePathForWriting	endp
-
-currentLauncherSuffixChars	equ	9
-currentLauncherSuffixSize	equ	10
-LocalDefNLString currentLauncherSuffix <" Launcher", 0>
 
 
 
