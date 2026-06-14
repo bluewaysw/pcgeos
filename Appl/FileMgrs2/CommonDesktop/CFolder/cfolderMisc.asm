@@ -3066,6 +3066,9 @@ FolderCreateEditDosLauncher	method	FolderClass,
 
 	mov	cx, ds:[di].FOI_selectList
 if _NEWDESK
+	;
+	; NewDesk object popups can target an unselected file.
+	;
 	call	NDFolderGetLauncherSelection
 endif
 	cmp	cx, NIL
