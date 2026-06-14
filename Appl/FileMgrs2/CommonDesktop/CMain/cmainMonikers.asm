@@ -86,7 +86,7 @@ FXIP<	call	SysCopyToStackESDI					>
 	call	ShellDefineTokens
 FXIP<	call	SysRemoveFromStack					>
 
-if _ND_DOS_LAUNCHERS
+if _DOS_LAUNCHERS
 	mov	di, offset launcherMonikerTable
 	mov	si, MANUFACTURER_ID_DOS_LAUNCHER
 FXIP<	segmov	es, cs							>
@@ -225,7 +225,7 @@ endif	; if	_GMGR
 
 FXIP<DESKTOP_MONIKER_TABLE_SIZE	= $-desktopMonikerTable		>
 
-if _ND_DOS_LAUNCHERS
+if _DOS_LAUNCHERS
 ;-----------------------------------------------------------------
 ;	FileManagers that have launcher creation need to make
 ; sure they include at least one launcher token, incase the user

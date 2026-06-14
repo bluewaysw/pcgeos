@@ -207,7 +207,7 @@ notSingleOpened:
 	call	NDGlobalMenuGrabSortViewUI
 	call	NDSetGlobalMenuFromFlags
 	jc	exit				; if no menu items, exit
-if _ND_DOS_LAUNCHERS and _NEWDESKONLY
+if _DOS_LAUNCHERS and _NEWDESKONLY
 ifndef GEOLAUNCHER
 	call	NDSetLauncherMenuItemsUsable
 endif
@@ -224,7 +224,7 @@ exit:
 NDObjectPopUp	endp
 
 
-if _ND_DOS_LAUNCHERS and _NEWDESKONLY
+if _DOS_LAUNCHERS and _NEWDESKONLY
 ifndef GEOLAUNCHER
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -323,7 +323,7 @@ NDSetLauncherMenuItemState	proc	near
 	ret
 NDSetLauncherMenuItemState	endp
 endif		; ifndef GEOLAUNCHER
-endif		; if _ND_DOS_LAUNCHERS and _NEWDESKONLY
+endif		; if _DOS_LAUNCHERS and _NEWDESKONLY
 
 
 

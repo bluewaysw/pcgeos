@@ -32,7 +32,7 @@ include cdesktopGeode.def
 
 include fileEnum.def
 
-if _ND_DOS_LAUNCHERS
+if _DOS_LAUNCHERS
 ;-----------------------------------------------------------------------------
 ;	Include code
 ;-----------------------------------------------------------------------------

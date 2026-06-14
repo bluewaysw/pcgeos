@@ -61,10 +61,10 @@ include cmainVariable.def
 
 include cmainChangeDir.asm
 
-if _ND_DOS_LAUNCHERS
+if _DOS_LAUNCHERS
 include cmainCreateLauncher.asm
 include cmainLauncher.asm
-endif		; _ND_DOS_LAUNCHERS
+endif		; _DOS_LAUNCHERS
 
 if _DISK_OPS
 include cmainDiskOps.asm
