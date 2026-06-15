@@ -53,7 +53,7 @@ REVISION HISTORY:
 ECNukeVariableBlock	proc	far
 	uses	ax, bx, cx, di, es
 	.enter
-
+if 0
 	pushf
 
 	;
@@ -87,7 +87,7 @@ ECNukeVariableBlock	proc	far
 done:
 
 	popf
-
+endif
 	.leave
 	ret
 ECNukeVariableBlock	endp
