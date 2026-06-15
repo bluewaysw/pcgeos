@@ -3065,6 +3065,12 @@ FolderCreateEditDosLauncher	method	FolderClass,
 	.enter
 
 	mov	cx, ds:[di].FOI_selectList
+if _NEWDESK
+	;
+	; NewDesk object popups can target an unselected file.
+	;
+	call	NDFolderGetLauncherSelection
+endif
 	cmp	cx, NIL
 	je	notCorrectFile
 
@@ -3134,6 +3140,19 @@ done:
 FolderCreateEditDosLauncher	endm
 
 
+if _NEWDESK
+NDFolderGetLauncherSelection	proc	near
+	class	NDFolderClass
+
+	cmp	ds:[di].NDFOI_popUpType, WPUT_OBJECT
+	jne	done
+	mov	cx, ds:[di].NDFOI_nonSelect
+done:
+	ret
+NDFolderGetLauncherSelection	endp
+endif
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CheckIfSingleFileIsCorrect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3180,8 +3199,8 @@ CheckIfSingleFileIsCorrect	proc	near
 	jmp	correctFile
 
 checkForDOSExecutable:
-	cmp	es:[di].FR_fileType, GFT_NOT_GEOS_FILE
-	jne	notCorrectFile				; as if nothing selected
+	test	es:[di].FR_fileAttrs, mask FA_SUBDIR
+	jnz	notCorrectFile				; as if nothing selected
 	mov	si, di					; save FolderRecord ptr
 		CheckHack <(offset FR_name) eq 0>
 	mov	bp, di					; save filename in bp
