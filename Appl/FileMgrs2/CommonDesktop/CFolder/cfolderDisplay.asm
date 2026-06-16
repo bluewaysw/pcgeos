@@ -19,7 +19,7 @@ ROUTINES:
 	INT	CheckFileAttrs - check file attributes to be included
 	INT	PrintFolderInfoString - print folder size information
 	INT	BuildBoundsFolderObjectIcon - build display bounds of
-					      one object in folder window 
+					      one object in folder window
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -221,16 +221,16 @@ SYNOPSIS:	Low-level routine to actually do the drawing
 
 CALLED BY:	DrawFolderObjectIcon
 
-PASS:		es:bp - FolderRecord 
-		*ds:si - FolderClass object 
+PASS:		es:bp - FolderRecord
+		*ds:si - FolderClass object
 		di - gstate handle
 
 RETURN:		ZERO FLAG CLEAR - if we should invert the current
-		file. 
+		file.
 
 DESTROYED:	cx,dx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -244,16 +244,16 @@ DrawFolderObjectIconLow	proc 	near
 		class	FolderClass
 		uses	ax, bx
 		.enter
-		
+
 if OPEN_CLOSE_NOTIFICATION
-		
+
 		test	es:[bp].FR_state, mask FRSF_OPENED
 		jz	afterPattern
-		
+
 		call	DrawOpenPattern
 afterPattern:
 endif
-		
+
 		xchg	di, bp			; Always determine the token
 		call	InitFileHeaderToken	;  for the thing, since we may
 		xchg	di, bp			;  need the creator token later
@@ -262,26 +262,26 @@ endif
 	; Get the display mode & decide whether to draw the icon, or
 	; just name & details.
 	;
-		
+
 		DerefFolderObject	ds, si, bx
 		mov	dh, ds:[bx].FOI_displayMode	; dh = display mode
-		test	dh, mask FIDM_FULL		
-		jnz	fullFileDetails			
+		test	dh, mask FIDM_FULL
+		jnz	fullFileDetails
 
 	;
 	; It's names only or icon mode -- so draw the name first.
 	; DrawFolderObjectName returns the name vertical position in
 	; BX, which trashes the instance data ptr, so preserve it...
 	;
-		
+
 		push	bx
-		call	DrawFolderObjectName		
+		call	DrawFolderObjectName
 		pop	bx
 
 drawIcon:
-		mov	dl, ds:[bx].FOI_displayType	
-		call	DrawIconModeIcon		
-		jmp	selectTest			
+		mov	dl, ds:[bx].FOI_displayType
+		call	DrawIconModeIcon
+		jmp	selectTest
 
 fullFileDetails:
 		push	bx			; save FOI_
@@ -293,11 +293,11 @@ selectTest:
 	;
 	; See if this object is selected, and if so, return Z clear
 	;
-		
+
 		test	es:[bp].FR_state, mask FRSF_SELECTED
 		.leave
 		ret
-		
+
 DrawFolderObjectIconLow	endp
 
 if OPEN_CLOSE_NOTIFICATION
@@ -312,17 +312,17 @@ SYNOPSIS:	Draw a pattern to show that this file is open
 CALLED BY:	DrawFolderObjectIconLow
 
 PASS:		*ds:si - FolderInstance
-		es:bp - FolderRecord 
+		es:bp - FolderRecord
 		di - gstate handle
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 	Rectangle is (boundBox.top, boundBox.left, boundBox.right,
-		      iconBounds.bottom) 
+		      iconBounds.bottom)
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -383,7 +383,7 @@ SYNOPSIS:	draw name, clipping if needed
 CALLED BY:	INTERNAL
 			DrawFolderObjectIconLow
 
-PASS:		*ds:si - FolderClass object 
+PASS:		*ds:si - FolderClass object
 		es:bp = file entry in folder buffer
 		di = gstate
 
@@ -404,9 +404,9 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DrawFolderObjectName	proc	near
 		class	FolderClass
-		
+
 		uses	ds, si, dx, bp
-		
+
 		.enter
 
 if ICON_INVERT_MASK
@@ -445,19 +445,19 @@ endif
 
 textStyleSet:
 	; di = GState handle
-		
+
 		call	FolderSetBackgroundFillPattern
 		jc	skipFill
-		
+
 		call	RectFolderObjectIconNameBox	; wash out name area
-		
+
 		mov	ax, C_BLACK or (CF_INDEX shl 8)
 		call	GrSetAreaColor
 skipFill:
 	;
 	; Load the name bounds in case we skipped the fill
 	;
-		call	LoadNameBounds		
+		call	LoadNameBounds
 if ICON_INVERT_MASK
 		add	ax, ICON_BOX_X_MARGIN
 endif
@@ -472,9 +472,9 @@ endif
 		DerefFolderObject	ds, si, bx
 		mov	cl, ds:[bx].FOI_displayMode	; cl = display mode
 		pop	bx
-		
+
 		mov	dx, ss:[largeIconBoxWidth]
-		test	cl, mask FIDM_LICON	
+		test	cl, mask FIDM_LICON
 		jnz	gotMaxWidth
 
 		mov	dx, ss:[shortTextBoxWidth]
@@ -503,13 +503,13 @@ notFull:
 else
 		jnz	gotMaxWidth
 endif
-		
+
 		mov	dx, ss:[smallIconBoxWidth]
 		sub	dx, SMALL_ICON_WIDTH + SMALL_ICON_HORIZ_SPACING
 EC <		test	cl, mask FIDM_SICON		>
 EC <		ERROR_Z	DESKTOP_FATAL_ERROR				>
 gotMaxWidth:
-		
+
 		mov	cx, dx				; max width
 		call	GetFolderObjectName		; ds:si = filename
 
@@ -519,7 +519,7 @@ if WRAP
 		call	WordWrapFilename
 		jmp	afterName
 dontWrap:
-		
+
 endif
 		mov	dx, es:[bp].FR_nameWidth
 		call	DrawFilenameAndClipIfNecessary
@@ -566,7 +566,7 @@ haveRGB:
 		add	ax, bx			; ax = 2R + B + 4G
 		mov	bx, (255*7)/2
 		sub	bx, ax			; C set if > (255*7)/2
-haveLightColor:
+haveLightColor::
 		pop	ax, bx, si
 		retn
 endif
@@ -589,11 +589,11 @@ PASS:		ds:si - name
 		(ax, bx) - position at which to draw
 		di - gstate handle
 
-RETURN:		bx - vertical position of name 
+RETURN:		bx - vertical position of name
 
-DESTROYED:	ax,cx,dx,si,di,ds,bp 
+DESTROYED:	ax,cx,dx,si,di,ds,bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -632,20 +632,20 @@ fitLoop:
 	;
 	; Keep increasing the number of chars until we run out of room...
 	;
-		
+
 		inc	cx
 EC <		cmp	cx, size FileLongName				>
 EC <		ERROR_A	DESKTOP_FATAL_ERROR				>
 		call	GrTextWidth			; dx = width
 							; of this part
-		cmp	dx, bp				
-		jbe	fitLoop				
+		cmp	dx, bp
+		jbe	fitLoop
 
 	;
 	; We've run out of room.  Remove the last character, and draw
 	; the name with the ellipses
 	;
-		dec	cx		
+		dec	cx
 		call	GrDrawText
 NOFXIP<		segmov	ds, cs, si					>
 FXIP <		mov	si, bx						>
@@ -660,7 +660,7 @@ wideEnough:
 		mov	cx, FILE_LONGNAME_LENGTH
 		call	GrDrawText			; draw name
 done:
-		
+
 		.leave
 		ret
 DrawFilenameAndClipIfNecessary	endp
@@ -690,9 +690,9 @@ PASS:		ds:si - filename (or a portion thereof)
 
 RETURN:		ds:si - points to filename AFTER leading blanks
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -705,7 +705,7 @@ REVISION HISTORY:
 FolderNameSkipLeadingSpace	proc near
 		uses	ax
 		.enter
-		
+
 SBCS <		clr	ah						>
 		LocalGetChar	ax, dssi, noAdvance
 		LocalIsNull	ax
@@ -714,9 +714,9 @@ SBCS <		clr	ah						>
 		jz	done
 
 		LocalNextChar	dssi
-		
+
 done:
-		
+
 		.leave
 		ret
 FolderNameSkipLeadingSpace	endp
@@ -740,11 +740,11 @@ PASS:		es:bp - FolderRecord
 		di - gstate handle
 		cx - max width
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -768,7 +768,7 @@ WordWrapFilename	proc near
 		mov	cx, es:[bp].FR_line1NumChars
 		call	FolderNameSkipLeadingSpace
 		call	GrDrawText
-		
+
 	;
 	; Now, draw the remainder, clipping rather than going to
 	; a third line.
@@ -780,7 +780,7 @@ DBCS <		add	si, es:[bp].FR_line1NumChars			>
 		call	FolderGetTextWidth
 		add	bx, ss:[desktopFontHeight]
 		mov	ax, es:[bp].FR_line2Pos
-		
+
 		pop	cx			; max allowed width
 		call	DrawFilenameAndClipIfNecessary
 
@@ -801,7 +801,7 @@ CALLED BY:	INTERNAL
 			DrawFolderObjectIconLow
 
 PASS:		es:bp - entry for this file in folder buffer
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 		dl - DisplayType for this Folder Window
 		dh - display mode for this Folder Window
 			(FIDM_LICON or FIDM_SICON)
@@ -1099,7 +1099,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DrawIconModeIconLow	proc	near
-	
+
 	uses	ds, si
 	.enter	inherit	DrawIconModeIcon
 
@@ -1132,7 +1132,7 @@ notCGA:
 	jnz	56$
 	mov	ax, TEXT_ICON_HEIGHT
 56$:
-	sub	ax, ({VisMonikerGString} ds:[si].VM_data).VMGS_height	
+	sub	ax, ({VisMonikerGString} ds:[si].VM_data).VMGS_height
 						; minus actual icon height
 	sar	ax, 1				; divided by two
 	tst	ax				; check width adjustment
@@ -1161,7 +1161,7 @@ goodWidthAdjust:
 
 	; The following code was changed since the kernel no longer supports
 	; GrPlayString.  I've pushed all the registers that get trashed,
-	; and this code could probably be optimized by someone who knows 
+	; and this code could probably be optimized by someone who knows
 	; the code  :-)   jim  4/23/92
 	;
 	push	bx				; save y position
@@ -1199,16 +1199,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			FolderTokenLookupMoniker
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Sets up visual flags and calls TokenLookupMoniker.	
+SYNOPSIS:	Sets up visual flags and calls TokenLookupMoniker.
 
-CALLED BY:	INTERNAL - 
+CALLED BY:	INTERNAL -
 			DrawIconModeIcon,
 			FolderGetObjectIconToken
 
 PASS:		es:di 	= pointer to folder record
 		axbxsi	= GeodeToken characters for lookup
-		dl	= DisplayMode 
-		dh	= DisplayType 
+		dl	= DisplayMode
+		dh	= DisplayType
 
 RETURN:		carry clear if token exists in database
 			cx:dx - group/item of moniker
@@ -1478,7 +1478,7 @@ CALLED BY:	INTERNAL
 
 PASS:		es:di - entry in folder buffer of application
 			must be GEOS file
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 
 RETURN:		carry set if not possible:
 			not an executable
@@ -1520,7 +1520,7 @@ nopeJNZ:
 	LONG	jne	nope			; not executable, cannot launch
 
 	; We also can't launch (IACPConnect) ourself to install the token.
-	; Instead, we'll just send MSG_GEN_APPLICATION_INSTALL_TOKEN to 
+	; Instead, we'll just send MSG_GEN_APPLICATION_INSTALL_TOKEN to
 	; our application object to install the token.
 
 ND <	cmp	{word}es:[di].FR_token.GT_chars[0], 'nD'		>
@@ -1535,7 +1535,7 @@ GM <	cmp	{word}es:[di].FR_token.GT_chars[2], 'SK'		>
 	mov	ax, MSG_GEN_APPLICATION_INSTALL_TOKEN
 	call	UserCallApplication
 	clc
-	jmp	exit	
+	jmp	exit
 
 launch:
 	;
@@ -1620,7 +1620,7 @@ launch:
 	mov	cx, di			; cx <- completion msg
 	push	bx			; save queue handle for blocking &
 					;  nuking
-	
+
 	mov	ax, MSG_GEN_PROCESS_INSTALL_TOKEN
 	clr	bx, si
 	mov	di, mask MF_RECORD
@@ -1675,7 +1675,7 @@ PASS:		es:bp - file entry in folder buffer
 		di - gState to draw with
 		dh - display mode
 
-RETURN:		
+RETURN:
 
 DESTROYED:	cx, dx
 
@@ -1692,7 +1692,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ClearFolderObjectIcon	proc	near
 	uses	ax, bx, si
-		
+
 	.enter
 
 	call	FolderSetBackgroundFillPattern
@@ -1730,7 +1730,7 @@ PASS:		es:bp - file entry in folder buffer
 		*ds:si - FolderClass object
 		di - gState to draw with
 
-RETURN:		
+RETURN:
 
 DESTROYED:	cx, dx
 
@@ -1770,7 +1770,7 @@ PASS:		es:bp - file entry in folder buffer
 		*ds:si - FolderClass object
 		di - gState to draw with
 
-RETURN:		
+RETURN:
 
 DESTROYED:	cx, dx
 
@@ -1900,7 +1900,7 @@ checkSkipOps:
 		mov	al, cs:[opCodeSizeTable][di-1]
 		add	si, ax
 		jmp	short checkOp
-		
+
 fixedGString:
 		call	MemUnlock		; (preserves flags)
 		pop	ds, es
@@ -1962,7 +1962,7 @@ endif	;---------------------------------------------------------------------
 GreyFolderObjectIcon	proc	near
 	class	FolderClass
 	uses	ax, bx
-	.enter			
+	.enter
 
 	DerefFolderObject	ds, si, bx
 	test	es:[bp].FR_state, mask FRSF_SELECTED	; selected?
@@ -1996,7 +1996,7 @@ RectFolderObjectIcon	proc	near
 	class	FolderClass
 	uses	bx
 	.enter
-	DerefFolderObject	ds, si, bx		
+	DerefFolderObject	ds, si, bx
 	test	ds:[bx].FOI_displayMode, mask FIDM_LICON or \
 					mask FIDM_SICON		; icon modes?
 	jz	regularDraw			; if not, use regular draw
@@ -2028,14 +2028,14 @@ SYNOPSIS:	Fill a rectangle around the folder object
 
 CALLED BY:
 
-PASS:		es:bp - FolderRecord 
+PASS:		es:bp - FolderRecord
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx
 
-PSEUDO CODE/STRATEGY:	
-	For NewDesk - draw 
+PSEUDO CODE/STRATEGY:
+	For NewDesk - draw
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2058,17 +2058,17 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		LoadIconBounds
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Return the bounds of the icon part of the FolderRecord 
+SYNOPSIS:	Return the bounds of the icon part of the FolderRecord
 
 CALLED BY:	UTILITY
 
-PASS:		es:[bp] - FolderRecord 
+PASS:		es:[bp] - FolderRecord
 
 RETURN:		ax, bx, cx, dx, - icon bounds
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2102,7 +2102,7 @@ RETURN:		ax, bx - upper left-hand corner of name box
 
 DESTROYED:	cx, dx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2124,17 +2124,17 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		LoadNameBounds
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	return the bounds of the "name" part of the FolderRecord 
+SYNOPSIS:	return the bounds of the "name" part of the FolderRecord
 
 CALLED BY:
 
-PASS:		es:[bp] - FolderRecord 
+PASS:		es:[bp] - FolderRecord
 
 RETURN:		ax, bx, cx, dx - bounds
 
 DESTROYED:	nothing -- flags preserved
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2164,17 +2164,17 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		LoadBoundBox
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Return the bounding box of the current FolderRecord 
+SYNOPSIS:	Return the bounding box of the current FolderRecord
 
 CALLED BY:	UTILITY
 
-PASS:		es:bp - FolderRecord 
+PASS:		es:bp - FolderRecord
 
-RETURN:		ax, bx, cx, dx- bounds of FolderRecord 
+RETURN:		ax, bx, cx, dx- bounds of FolderRecord
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2230,7 +2230,7 @@ endif
 		.enter
 	;
 	; Need to do token processing to handle creator token -- ardeb 6/14/91
-	; 
+	;
 		xchg	di, bp				; es:di <- entry
 		call	InitFileHeaderToken
 		xchg	di, bp
@@ -2297,7 +2297,7 @@ endif
 		sub	sp, EVEN_DATE_TIME_BUFFER_SIZE
 		mov	si, sp
 		push	es, ds, di
-		
+
 		mov	ax, es:[bp].FR_modified.FDAT_time ; ax <- FileTime
 		mov	bx, es:[bp].FR_modified.FDAT_date ; bx <- FileDate
 		segmov	es, ss				  ; es:di <- buffer
@@ -2344,7 +2344,7 @@ hackDone:
 		pop	es, ds
 		add	sp, EVEN_DATE_TIME_BUFFER_SIZE
 		pop	bx
-		
+
 ;
 ; No attributes in ZMGR's Names and Sizes or Names and Dates
 ;
@@ -2447,13 +2447,13 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BuildDisplayList	proc	far
-		
+
 		class	FolderClass
-		
+
 		uses	bx, cx, dx, bp, di, es, si
-		
+
 		.enter
-		
+
 EC <	cmp	ax, TRUE						>
 EC <	je	EC_good							>
 EC <	cmp	ax, FALSE						>
@@ -2461,12 +2461,12 @@ EC <	ERROR_NZ	DESK_BAD_PARAMS					>
 EC <EC_good:								>
 
 		DerefFolderObject	ds, si, di
-		tst	ds:[di].FOI_suspendCount			
-		jnz	hourGlassSet					
+		tst	ds:[di].FOI_suspendCount
+		jnz	hourGlassSet
 		call	ShowHourglass		; might take a while...
 
-hourGlassSet:							
-		
+hourGlassSet:
+
 		mov	bp, ax			; save flag for
 						; SortFolderBuffer
 	;
@@ -2475,7 +2475,7 @@ hourGlassSet:
 		call	SetFileBoxWidthHeight
 		call	FolderLockBuffer
 		jz	clearBothLists
-		
+
 		mov	cl, ds:[di].FOI_displayTypes	; get display options
 		mov	ch, ds:[di].FOI_displayAttrs
 		mov	dl, ds:[di].FOI_displaySort
@@ -2486,56 +2486,56 @@ hourGlassSet:
 	; returns dx=seg of index table
 	;	  cx=handle of
 	;	  index table
-		
+
 		mov	ds:[di].FOI_displayList, NIL	; clear list
 							; in case no files
 		pop	bx				; display types/attrs
-		LONG jc	exit				
-		
+		LONG jc	exit
+
 	;
 	; Are there any files?  If not, done
 	;
-		
-		tst	ds:[di].FOI_fileCount	
-		jz	noFiles	
+
+		tst	ds:[di].FOI_fileCount
+		jz	noFiles
 		push	cx				; handle of index table
 		call	BuildListPass
 		pop	bx				; free the index table
 		call	MemFree
-		
+
 noFiles:
-		call	RebuildSelectList	
+		call	RebuildSelectList
 		call	FolderUnlockBuffer
 		jmp	finishUp
-		
+
 clearBothLists:
 	;
 	; Set both display and select lists to empty if no buffer. NOTE: Do
 	; not attempt to do this before calling FolderLockBuffer, as
 	; SortFolderBuffer relies on having a display list if ax passed to
 	; us as FALSE (don't sort).
-	; 
+	;
 		mov	ds:[di].FOI_displayList, NIL
 		mov	ds:[di].FOI_selectList, NIL
-		
+
 finishUp:
 	;
 	; Delay updating the folder info string and other visual things
 	; if suspended.
-	; 
+	;
 		tst	ds:[di].FOI_suspendCount
 		jz	buildString
-		
+
 		ornf	ds:[di].FOI_folderState, mask FOS_REBUILD_ON_UNSUSPEND
 		jmp	visualStuffDone
-		
+
 buildString:
 	call	PrintFolderInfoString
-		
+
 	;
 	; now set increment size
 	;
-		
+
 		mov	al, ds:[di].FOI_displayMode	; al, display mode
 		push	ax				; save display mode
 		mov	cx, ss:[largeIconBoxWidth]
@@ -2558,9 +2558,9 @@ buildString:
 		mov	dx, ss:[smallIconBoxHeight]
 EC <	test	al, mask FIDM_SICON					>
 EC <	ERROR_Z	DESKTOP_FATAL_ERROR					>
-		
+
 gotIncrements:
-		push	bp			
+		push	bp
 		sub	sp, size PointDWord
 		mov	bp, sp
 		mov	ss:[bp].PD_x.low, cx
@@ -2577,10 +2577,10 @@ gotIncrements:
 	;
 	; Fetch the display mode, keeping it on the stack
 	;
-		
+
 		pop	ax		; display mode
 if not _NEWDESK
-		push	ax		
+		push	ax
 endif
 	;
 	; set minimum document size
@@ -2606,14 +2606,14 @@ endif
 		add	dx, TEXT_DOWNDENT
 		test	al, mask FIDM_SHORT
 		jnz	gotMinSize
-		
-		mov	cx, ss:[shortTextBoxWidth]	
+
+		mov	cx, ss:[shortTextBoxWidth]
 		add	cx, TEXT_INDENT
 		mov	dx, ss:[longTextBoxHeight]
 		add	dx, TEXT_DOWNDENT
 EC <		test	al, mask FIDM_FULL				>
 EC <		ERROR_Z	DESKTOP_FATAL_ERROR				>
-		
+
 gotMinSize:
 		mov	ax, bp				;update mode
 
@@ -2624,14 +2624,14 @@ gotMinSize:
 		mov	ss:[bp].SSA_height, dx
 		clr	ss:[bp].SSA_count
 		mov	dx, size SetSizeArgs
-		mov	ax, MSG_GEN_SET_MINIMUM_SIZE	
+		mov	ax, MSG_GEN_SET_MINIMUM_SIZE
 		mov	di, mask MF_CALL or mask MF_STACK
 		call	FolderCallView
 		add	sp, size SetSizeArgs
 
-		
+
 if not _NEWDESK
-	
+
 	;
 	; set correct scrollbars, depending on display mode.  Large
 	; icon mode has a vertical scrollbar
@@ -2639,23 +2639,23 @@ if not _NEWDESK
 		pop	ax			; al - display mode
 		mov	cx, 0 or (mask GVDA_SCROLLABLE shl 8)
 		mov	dx, mask GVDA_SCROLLABLE or (0 shl 8)
-		test	al, mask FIDM_LICON		
+		test	al, mask FIDM_LICON
 		jnz	gotScrollBars
 
 	;
 	; names only mode has a horizontal scrollbar
 	;
-		
-		mov	cx, mask GVDA_SCROLLABLE or (0 shl 8)	
-		mov	dx, 0 or (mask GVDA_SCROLLABLE shl 8)	
+
+		mov	cx, mask GVDA_SCROLLABLE or (0 shl 8)
+		mov	dx, 0 or (mask GVDA_SCROLLABLE shl 8)
 		test	al, mask FIDM_SHORT		; names only mode
 		jnz	gotScrollBars
 
 	;
 	; Names and details mode has both vertical and horizontal
-	; scrollers. 
+	; scrollers.
 	;
-		
+
 
 ;
 ; ZMGR Names and Sizes/Names and Dates has only vertical scrollbar
@@ -2663,10 +2663,10 @@ if not _NEWDESK
 if _ZMGR
 		mov	cx, 0 or (mask GVDA_SCROLLABLE shl 8)
 else
-		mov	cx, mask GVDA_SCROLLABLE or (0 shl 8)	
+		mov	cx, mask GVDA_SCROLLABLE or (0 shl 8)
 endif
-		mov	dx, mask GVDA_SCROLLABLE or (0 shl 8)	
-		
+		mov	dx, mask GVDA_SCROLLABLE or (0 shl 8)
+
 gotScrollBars:
 
 	;
@@ -2674,17 +2674,17 @@ gotScrollBars:
 	; GenView has put a MSG_META_CONTENT_VIEW_SIZE_CHANGED message
 	; on our queue before we return from this procedure!
 	;
-		
+
 		mov	bp, VUM_NOW
 		mov	ax, MSG_GEN_VIEW_SET_DIMENSION_ATTRS
 		mov	di, mask MF_CALL
 		call	FolderCallView
 endif
 		clc				; indicate no error
-		
+
 exit:
 		call	HideHourglass
-		
+
 visualStuffDone:
 		.leave
 		ret
@@ -2701,7 +2701,7 @@ DESCRIPTION:	Updates the following global variables:
 			smallIconBoxWidth, smallIconBoxHeight
 			shortTextBoxWidth, shortTextBoxHeight
 			longTextBoxWidth,  longTextBoxHeight
-			fullFileWidth, fullFileAttrPos, 
+			fullFileWidth, fullFileAttrPos,
 			fullFileTimePos, fullFileDatePos
 
 CALLED BY:	INTERNAL - BuildDisplayList,
@@ -2818,11 +2818,11 @@ COMMENT @-------------------------------------------------------------------
 ----------------------------------------------------------------------------
 
 DESCRIPTION:	Returns the size of icon box (used during a selection)
-		used by the given folder. 
+		used by the given folder.
 
 CALLED BY:	INTERNAL - SetFileBoxWidthHeight
 
-PASS:		*ds:si - FolderClass object 
+PASS:		*ds:si - FolderClass object
 		ss:[desktopFontHeight]
 		ss:[desktopDisplayType]
 
@@ -2852,12 +2852,12 @@ FolderCalcIconBoxSize	proc	near
 		call	FolderCalcIconSize
 		; cx = width
 		; dx = height
-		
+
 		add	cx, LARGE_ICON_EXTERNAL_HORIZ_SPACING
 		add	dx, LARGE_ICON_VERT_SPACING + \
 			    LARGE_ICON_EXTERNAL_VERT_SPACING
 		add	dx, ss:[desktopFontHeight]
-		
+
 	;
 	; Handle any adjustments needed if we are in compressed mode.
 	;
@@ -2881,7 +2881,7 @@ DESCRIPTION:	Returns the size of icons used by the given folder.
 
 CALLED BY:	INTERNAL - SetFileBoxWidthHeight
 
-PASS:		nothing 
+PASS:		nothing
 
 RETURN:		cx	= icon width
 		dx	= icon height
@@ -2929,7 +2929,7 @@ CALLED BY:	INTERNAL
 			BuildDisplayList
 
 PASS:		dl - sort field (FI_DisplaySort record)
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 		es - segment of locked folder buffer
 		bp = TRUE to sort
 		     FALSE to no sort (just rearranging file positions)
@@ -3440,7 +3440,7 @@ PASS:		*ds:si - FolderClass object
 		bl - file types to display
 		bh - file attributes to display
 
-RETURN:		
+RETURN:
 
 DESTROYED:	ax, cx, bp
 
@@ -3508,7 +3508,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Gets the folder record from the index table, and
 		checks if it should be added to the display list.
-		If the file is not on the display list, will set 
+		If the file is not on the display list, will set
 		FR_StateFlags for the FolderRecord appropriately.
 
 CALLED BY:	INTERNAL - BuildListPass
@@ -3535,7 +3535,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	martin	7/22/92		Added header
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DerefIndexAndCheckFile	proc	near
 		push	es			; save folder buffer segment
@@ -3549,7 +3549,7 @@ DerefIndexAndCheckFile	proc	near
 	;
 		pushf				; save carry flag
 		andnf	es:[di].FR_state, mask FRSF_OPENED
-		popf				; restore carry	
+		popf				; restore carry
 skip:
 		ret
 DerefIndexAndCheckFile	endp
@@ -3581,7 +3581,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	martin	7/22/92		Added header
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 LinkToDisplayList	proc	near
 	class	FolderClass
@@ -3627,7 +3627,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	brianc	8/10/89		Initial version
-	
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckFileInList	proc	near
 
@@ -3670,7 +3670,7 @@ SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 	HACK!  Check if the WOT type of this folder is < WOT_FOLDER (i.e. is a
 	BA-only WOT type).  If so, return carry clear.
-	
+
 KNOWN BUGS/IDEAS:
 
 REVISION HISTORY:
@@ -3681,9 +3681,9 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BACheckManagedFolder		proc	near
 		class	NDFolderClass
-		
+
 		uses	ax
-		
+
 		.enter
 
 		mov	ax, ds:[si].NDFOI_ndObjType
@@ -3720,7 +3720,7 @@ RETURN:		carry	- set if this is USERDATA and we should hide it
 DESTROYED:	nothing
 
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -3784,13 +3784,13 @@ SYNOPSIS:	See if this file is of a type accepted by this folder.
 CALLED BY:	CheckFileInList
 
 PASS:		es:di - FolderRecord
-		bl - file types to display 
+		bl - file types to display
 
 RETURN:		carry clear if accepted, carry set otherwise
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -3855,9 +3855,9 @@ PASS:		bh - FI_DisplayAttrs to match
 RETURN:		carry clear to accept
 		carry set to reject
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 	If not showing FIDA_HIDDEN files, then make sure both the
 	FA_HIDDEN and the GFHF_HIDDEN are not set
 
@@ -4095,9 +4095,9 @@ PASS:		es:di - FolderRecord
 
 RETURN:		Z set if program, Z clear otherwise
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4121,7 +4121,7 @@ CheckDOSExecutable	proc	far
 	cmp	es:[di].FR_fileType, GFT_EXECUTABLE
 	jae	done
 
-	CheckHack	<offset FR_name eq 0>			
+	CheckHack	<offset FR_name eq 0>
 	segmov	ds, cs, si
 	mov	si, offset checkBatMask	; ds:si = *.BAT
 	call	CheckFilemaskLow
@@ -4227,7 +4227,7 @@ CALLED BY:	INTERNAL
 
 PASS:		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	nothing
 
@@ -4325,7 +4325,7 @@ endif
 	mov	ss:[displayedFileCount], ax
 	pop	bx
 
-	DerefFolderObject	ds, si, bx	
+	DerefFolderObject	ds, si, bx
 	cmp	ds:[bx].FOI_selectList, NIL	; check if select or display
 	jne	useSelectList			; if select, use it instead
 						; else, use display list
@@ -4374,7 +4374,7 @@ if	not _BMGR
 	jz	notSmallScreen
 endif
 	;
-	; if small screen, show just disk space if there are no 
+	; if small screen, show just disk space if there are no
 	; files selected otherwise, show selection info
 	;
 
@@ -4409,7 +4409,7 @@ gotString:
 	mov	si, ds:[si]			; ds:si = template string
 stringLoop:
 	;
-	; See if we're getting too close to the end 
+	; See if we're getting too close to the end
 	;
 
 	lea	ax, ss:[folderInfoStringBuffer]
@@ -4543,7 +4543,7 @@ endif
 	clr	dx
 	mov	ax, MSG_VIS_TEXT_SELECT_RANGE_SMALL
 	call	ObjMessageCallFixup
-	
+
 	;
 	; Unsuspend the object
 	;
@@ -4583,11 +4583,11 @@ CALLED BY:	PrintFolderInfoString via FolderSendToChildren
 PASS:		ds:di - FolderRecord
 		ss:bp - inherited local vars
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4614,19 +4614,19 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		DiskNameAndPathnameForFolderInfo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
 CALLED BY:	PrintFolderInfoString
 
-PASS:		*ds:si - FolderClass object 
+PASS:		*ds:si - FolderClass object
 		ss:di - info string
 		cx - size of info string
 
 RETURN:		di - updated to point at end
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4654,7 +4654,7 @@ DiskNameAndPathnameForFolderInfo	proc	near
 	mov	si, offset FileSystemDisplayGroup
 	mov	ax, MSG_GEN_DISPLAY_GROUP_GET_FULL_SIZED
 	call	ObjMessageCallFixup		; carry set if maximized
-	pop	si, di, cx			; 
+	pop	si, di, cx			;
 	jnc	done				; nope, no pathname in info str
 	segmov	es, ss				; es:di = info string buffer
 						; *ds:si <- folder
@@ -4682,10 +4682,10 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			FolderDrawTemplateIcon
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
-CALLED BY:	INTERNAL - 
-			
+CALLED BY:	INTERNAL -
+
 
 PASS:		ds:si 	= instance data of Folder object
 		es:di 	= pointer to locked folder record
@@ -4697,7 +4697,7 @@ PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
-	
+
 	Name	Date		Description
 	----	----		-----------
 	martin	8/3/92		Initial version
@@ -4754,9 +4754,9 @@ PASS:		*ds:si - FolderClass object
 
 RETURN:		ax,cx,dx,bp - returned from view, if MF_CALL passed
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -4821,7 +4821,7 @@ FolderSetBackgroundFillPattern	proc	near
 	mov	cx, ax			; save flags, color
 	and	ah, mask WCF_MAP_MODE	; set the map mode
 	mov	al, ah
-	call	GrSetAreaColorMap		
+	call	GrSetAreaColorMap
 	mov	al, cl
 	mov	ah, CF_RGB
 	test	ch, mask WCF_RGB	; if non-zero, have RGB color
@@ -4829,7 +4829,7 @@ FolderSetBackgroundFillPattern	proc	near
 	mov	ah, CF_INDEX
 setColor:
 	call	GrSetAreaColor
-	clc	
+	clc
 washDone:	; carry set
 	.leave
 	ret
@@ -4883,7 +4883,7 @@ FolderPlaceIconsGeoManagerStyle	proc	near
 		DerefFolderObject	ds, si, di
 		mov	al, ds:[di].FOI_displayMode
 		mov	cx, ds:[di].FOI_winBounds.P_x
-		
+
 	;
 	; Check for Large Icon mode.
 	;
@@ -4934,15 +4934,15 @@ PASS:		*ds:si	- FolderClass object
 		es	- segment of FolderClass
 		cx, dx 	- document bounds
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4951,7 +4951,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-FolderSetDocBounds	method	dynamic	FolderClass, 
+FolderSetDocBounds	method	dynamic	FolderClass,
 					MSG_FOLDER_SET_DOC_BOUNDS
 
 		movP	ds:[di].FOI_docBounds, cxdx
@@ -4971,9 +4971,9 @@ PASS:		*ds:si	- NDDesktopClass object
 		es	- segment of NDDesktopClass
 		cx, dx	- doc bounds
 
-RETURN:		
+RETURN:
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
@@ -4984,7 +4984,7 @@ seems to prevent it.  Of course, this causes additional problems, but...
 
 
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4995,7 +4995,7 @@ REVISION HISTORY:
 
 if _NEWDESK
 
-NDDesktopSetDocBounds	method	dynamic	NDDesktopClass, 
+NDDesktopSetDocBounds	method	dynamic	NDDesktopClass,
 					MSG_FOLDER_SET_DOC_BOUNDS
 
 		uses	ax, cx, dx
@@ -5008,7 +5008,7 @@ NDDesktopSetDocBounds	method	dynamic	NDDesktopClass,
 		mov	di, ds:[di].DVI_gState
 		tst	di
 		jz	done
-		
+
 		push	cx, dx			; doc bounds
 		call	GrGetWinBounds
 EC <		ERROR_C	DESKTOP_FATAL_ERROR				>
@@ -5021,7 +5021,7 @@ EC <		ERROR_C	DESKTOP_FATAL_ERROR				>
 	; Compare horizontal dimensions, and add horizontal scroller
 	; if needed
 	;
-		
+
 		cmp	ax, cx
 		mov	cx, mask GVDA_SCROLLABLE
 		ja	gotHoriz
@@ -5031,7 +5031,7 @@ gotHoriz:
 	;
 	; Do same for vertical
 	;
-		
+
 		cmp	bx, dx
 		mov	dx, mask GVDA_SCROLLABLE
 		ja	gotVert
@@ -5042,7 +5042,7 @@ gotVert:
 		mov	bp, VUM_DELAYED_VIA_UI_QUEUE
 		clr	di
 		call	FolderCallView
-		
+
 done:
 		.leave
 		mov	di, offset NDDesktopClass
@@ -5068,9 +5068,9 @@ PASS:		ds:di		= FolderRecord "instance data"
 		bp		- nonzero if at least one folder on
 				  this row is word-wrapped to 2 lines
 
-GLOBALS USED:	buildListXPos 
+GLOBALS USED:	buildListXPos
 		buildListYPos
-		largeIconBoxWidth		
+		largeIconBoxWidth
 
 RETURN:		bp - updated
 
@@ -5118,7 +5118,7 @@ GM <		shr	ax						>
 NPZ <		add	ss:[buildListYPos], ax				>
 		clr	bp
 endif
-		
+
 gotPos:
 	;
 	; compute bounds for file
@@ -5169,7 +5169,7 @@ REVISION HISTORY:
 ---------------------------------------------------------------------------@
 FolderRecordPositionLongMode	proc	far
 		.enter
-		
+
 		andnf	ds:[di].FR_state, not mask FRSF_WORD_WRAP
 	;
 	; compute bounds for file
@@ -5191,11 +5191,11 @@ COMMENT @-------------------------------------------------------------------
 			BuildBoundsLongMode
 ----------------------------------------------------------------------------
 
-DESCRIPTION:	
+DESCRIPTION:
 
 CALLED BY:	INTERNAL - FolderRecordPositionLongMode
 
-PASS:		ds:di	= FolderRecord	
+PASS:		ds:di	= FolderRecord
 RETURN:		nothing
 DESTROYED:	ax
 
@@ -5285,7 +5285,7 @@ REVISION HISTORY:
 FolderRecordPositionNamesOnlyMode	proc	far
 
 		.enter
-		
+
 		andnf	ds:[di].FR_state, not mask FRSF_WORD_WRAP
 
 		mov	ax, ss:[buildListYPos]		; need new column?
@@ -5318,13 +5318,13 @@ sameColumn:
 	; If this file is wider than any others seen so far, then
 	; remember that fact.
 	;
-		
+
 		mov	ax, ds:[di].FR_boundBox.R_right
 		sub	ax, ds:[di].FR_boundBox.R_left
 		cmp	ax, cx
 		jbe	done
 		mov	cx, ax
-		
+
 done:
 		clc
 		.leave
@@ -5336,7 +5336,7 @@ COMMENT @-------------------------------------------------------------------
 			BuildBoundsNamesOnlyMode
 ----------------------------------------------------------------------------
 
-DESCRIPTION:	
+DESCRIPTION:
 
 CALLED BY:	FolderRecordPositionNamesOnlyMode
 

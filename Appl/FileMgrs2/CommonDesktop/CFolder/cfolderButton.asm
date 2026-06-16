@@ -11,7 +11,7 @@ ROUTINES:
 	INT	StartFolderObjectIconMove - dragging folder object icon
 	INT	LaunchGeoApplication - attempt to launch PC/GEOS application
 	INT	BuildOpenFilePathname - build complete pathname of file to open
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -32,7 +32,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		StartDragMoveOrCopy
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
 CALLED BY:	FolderDragSelect
 
@@ -65,7 +65,7 @@ REVISION HISTORY:
 StartDragMoveOrCopy	proc	near
 
 	uses	si
-	
+
 	class	FolderClass
 
 	.enter
@@ -204,9 +204,9 @@ PASS:		*ds:si - Folder object
 
 RETURN:		ss:[bp].CQTRI_region.low set correclty
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -411,7 +411,7 @@ BuildDragFileList	proc	near
 	call	GenPathGetObjectPath
 	pop	bx
 	pop	dx				; retrieve size as EOF
-	mov	es:[FQTH_diskHandle], cx	
+	mov	es:[FQTH_diskHandle], cx
 	;
 	; init rest of header
 	;
@@ -490,7 +490,7 @@ CALLED BY:	INTERNAL
 			FolderOpenSelectList
 
 PASS:		es:di - FolderRecord of file to open
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 
 RETURN:		if carry clear and a folder was opened,
 			^lcx:dx	= optr of FolderClass object
@@ -512,16 +512,16 @@ REVISION HISTORY:
 FileOpenESDI	proc	far
 
 		uses	ds, si
-		
+
 		class	FolderClass
-		
+
 		.enter
-		
+
 	;
 	; XXX: We should change this routine to send a
 	; MSG_SHELL_OBJECT_OPEN to a dummy with the correct NewDeskObjectType
 	;
-		
+
 if _NEWDESK
 		cmp	es:[di].FR_desktopInfo.DI_objectType, WOT_LOGOUT
 		jne	notLogout
@@ -536,31 +536,31 @@ else
 endif
 		call	ObjMessageForce
 		jmp	done
-		
+
 notLogout:
-		
+
 if not GPC_NO_PRINT
 		cmp	es:[di].FR_desktopInfo.DI_objectType, WOT_PRINTER
 		jne	notPrinter
 		call	NDBringUpPrinterControl
 		jmp	done
-		
+
 notPrinter:
 endif
-		
+
 endif		; if _NEWDESK
-		
+
 	;
-	; See if the file's a subdirectory. 
+	; See if the file's a subdirectory.
 	;
-		
+
 		test	es:[di].FR_fileAttrs, mask FA_SUBDIR
 		jz	openAppl
-		
+
 	;
 	; double-click on folder, create new Folder window to show contents
 	;
-		
+
 		call	BuildOpenFilePathname		; get complete
 							; pathname of sub.
 NOFXIP<		mov	dx, segment pathBuffer				>
@@ -572,25 +572,25 @@ FXIP	<	pop	ds						>
 		mov	bx, ss:[openFileDiskHandle]
 		call	InheritAndCreateNewFolderWindow
 		jc	done
-		
+
 if _NEWDESK
 	;
 	; Mark this folder as opened, unless the thing is a drive,
 	; since we won't be able to get file change notification when
 	; the drive closes, for various nasty reasons.
 	;
-		
+
 EC <		call	ECCheckFolderRecordESDI	>
 
 		cmp	es:[di].FR_desktopInfo.DI_objectType, WOT_DRIVE
 		je	afterOpen
-		
+
 		ornf	es:[di].FR_state, mask FRSF_OPENED
 
 	;
 	; But only redraw the thing if this constant is on, which it isn't.
 	;
-		
+
 if OPEN_CLOSE_NOTIFICATION
 		mov	ax, mask DFI_CLEAR or mask DFI_DRAW
 		call	ExposeFolderObjectIcon
@@ -600,13 +600,13 @@ afterOpen:
 endif ; _NEWDESK
 
 		jmp	done
-		
+
 	;
 	; double-click on file (not folder), try to open PCGEOS/MS-DOS
 	; application
 	;
 openAppl:
-		
+
 if _CONNECT_MENU or _CONNECT_TO_REMOTE
 	;
 	; don't allow if RFSD is active
@@ -618,21 +618,21 @@ if _CONNECT_MENU or _CONNECT_TO_REMOTE
 		jmp	done
 notLinking:
 endif
-		
+
 		test	es:[di].FR_fileAttrs, mask FA_LINK
 		jz	notLink
-		
+
 		call	ValidateExecutableLink
 		jc	done
-		
+
 notLink:
 		cmp	es:[di].FR_fileType, GFT_NOT_GEOS_FILE
 		je	notGeosFile
-		
+
 openGeosApp:
 		call	LaunchGeosFile		; GEOS appl. or datafile
 		jmp	done
-		
+
 	;
 	; not a GEOS application or datafile
 	; might be DOS application or associated DOS datafile
@@ -642,7 +642,7 @@ BA <		test	es:[di].FR_fileAttrs,  mask FA_LINK 	>
 BA <		jnz	openGeosApp 				>
 
 		call	PrepESDIForError	; save filename for
-						; error report 
+						; error report
 
 if _ZMGR
 		test	es:[di].FR_state, mask FRSF_DOS_FILE_WITH_TOKEN
@@ -651,7 +651,7 @@ endif
 
 		test	es:[di].FR_state, mask FRSF_DOS_FILE_WITH_CREATOR
 		jnz	openGeosApp
-		
+
 		add	di, offset FR_name	; es:di = name
 		call	CheckAssociation	; check if associated data file
 		jc	notDOSAssoc		; if not, check if DOS appl.
@@ -693,7 +693,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ValidateExecutableLink
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Checks to see if the target of the link (to a supossed 
+SYNOPSIS:	Checks to see if the target of the link (to a supossed
 		executable) exists, and if not puts up an error.
 		If we are looking at a courseware link, then don't bother
 		to validate it.  We will do so later.
@@ -708,7 +708,7 @@ RETURN:		carry set if target was missing, error already handled
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -733,7 +733,7 @@ if  _NEWDESKBA
 		je	exit
 		cmp	es:[di].FR_desktopInfo.DI_objectType, WOT_GEOS_COURSEWARE
 		je	exit
-endif 
+endif
 
 	call	BuildOpenFilePathname
 
@@ -776,7 +776,7 @@ SYNOPSIS:	Create a new folder window with the same attributes as
 CALLED BY:	FileOpenESDI (same segment)
 		FolderUpDir (different segment)
 
-PASS:		*ds:si - FolderClass object 
+PASS:		*ds:si - FolderClass object
 		es:di - FolderRecord
 		dx:bp - folder's pathname
 		bx - disk handle for folder window
@@ -787,7 +787,7 @@ RETURN:		carry set on error,
 
 DESTROYED:	ax,bx
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -802,10 +802,10 @@ InheritAndCreateNewFolderWindow	proc	far
 
 		uses	si
 		.enter
-		
+
 if _NEWDESK
 		test	ss:[browseMode], mask FIBM_SINGLE
-		jz	openNewWindow
+	LONG	jz	openNewWindow
 	; If we're trying to open a window by opening an object on the
 	; desktop, then make a new window instead of trying to reuse an
 	; existing one.
@@ -814,7 +814,7 @@ if _NEWDESK
 		mov	si, FOLDER_OBJECT_OFFSET
 		call	checkIfDesktop
 		popa	;ax, bx, cx, dx, si, bp
-		jc	openNewWindow
+	LONG	jc	openNewWindow
 if 0
 	;
 	; check if already opened
@@ -910,14 +910,14 @@ popAndTest:
 		jc	short done
 openNewWindow:
 endif
-		
+
 		DerefFolderObject	ds, si, si
 if _NEWDESK
 
 	;
 	; Copy the display options to dgroup for the new folder
 	;
-		
+
 		mov	al, ds:[si].FOI_displayTypes
 		mov	ss:[defDisplayTypes], al
 		mov	al, ds:[si].FOI_displayAttrs
@@ -928,18 +928,18 @@ if _NEWDESK
 		mov	ss:[defDisplayMode], al
 		mov	cx, es:[di].FR_desktopInfo.DI_objectType
 else
-		
+
 EC <		mov	ax, NULL_SEGMENT				>
 EC <		mov	es, ax						>
 
 endif
-		
+
 		mov	ax, di		; offset to FolderRecord
 		call	CreateNewFolderWindow
 done::
 		.leave
 		ret
-		
+
 if _NEWDESK
 checkIfTrash	label	near
 		mov	cx, segment NDWastebasketClass
@@ -967,7 +967,7 @@ DESCRIPTION:	Show new path in folder window.  For single window
 
 PASS:		*ds:si	- FolderClass object
 		es	- segment of FolderClass
-		
+
 		dx	- path block
 		bp	- disk handle
 
@@ -977,9 +977,9 @@ DESTROYED:	ax,cx,dx,bp
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -990,7 +990,7 @@ REVISION HISTORY:
 
 if _NEWDESK
 
-FolderDisplayNewPath	method	dynamic	FolderClass, 
+FolderDisplayNewPath	method	dynamic	FolderClass,
 					MSG_FOLDER_DISPLAY_NEW_PATH
 	;
 	; Nuke various pieces of vardata that will get in the way when
@@ -1047,7 +1047,7 @@ newPathNukeVarDataList	word	\
 	TEMP_FOLDER_PATH_IDS
 
 endif
-		
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		LaunchGeosFile
@@ -1061,7 +1061,7 @@ CALLED BY:	INTERNAL
 PASS:		es:di - folder buffer entry of file to launch
 		ds:si - instance data of parent folder object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	bx,cx,dx
 
@@ -1163,7 +1163,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			LaunchCreateAppLaunchBlock
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Creates AppLaunchBlock for file passed.  (Used for both 
+SYNOPSIS:	Creates AppLaunchBlock for file passed.  (Used for both
 		opening & printing)
 
 CALLED BY:	LaunchGeosFile, PrintGeosFile
@@ -1315,10 +1315,10 @@ RETURN:		ds:dx	= item line buffer
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1351,8 +1351,8 @@ getGeodeName:
 	; Get Geode name from .itm file
 	;
 	push	bx				; bx ?= IclasArgumentBlock
-	clr	ax				
-	mov	bx, ds:[ISLIS_targetDiskHandle]	
+	clr	ax
+	mov	bx, ds:[ISLIS_targetDiskHandle]
 	mov	dx, offset ISLIS_coursewareTarget
 	call	IclasFileOpenAndReadReadOnlyCorrectServer
 	xchg	bp, bx				; bp = item line buffer
@@ -1363,7 +1363,7 @@ getGeodeName:
 	mov	ax, ERROR_FILE_OPEN
 	jc	done				; return with error
 
-	clr	ax				; no errors	
+	clr	ax				; no errors
 done:
 	.leave
 	ret
@@ -1393,7 +1393,7 @@ DESTROYED:	nothing
 SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1525,11 +1525,11 @@ GetErrFilenameBuffer	proc	far
 	call	MemAlloc
 	jc	error
 	mov	es, ax
-	
+
 	mov	{word}es:[LAD_token].GT_chars[0], di
 	mov	{word}es:[LAD_token].GT_chars[2], dx
 	mov	es:[LAD_token].GT_manufID, si
-		CheckHack <offset LAD_file eq 0>	
+		CheckHack <offset LAD_file eq 0>
 	clr	di
 NOFXIP<	mov	si, segment fileOperationInfoEntryBuffer		>
 NOFXIP<	mov	ds, si				;ds = dgroup		>
@@ -1562,9 +1562,9 @@ CALLED BY:	INTERNAL
 			FileOpenESDI
 
 PASS:		es:di - name of file to attempt to launch
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,si,di,ds,es
 
@@ -1600,13 +1600,13 @@ if _BMGR
 endif
 
 	call	Folder_GetDiskAndPath
-	
+
 	push	es, di				; save filename
 	lea	si, ds:[bx].GFP_path		; ds:si <- path
 	mov_tr	bx, ax				; bx <- disk handle
 
 	;
-	; copy pathname to pathname buffer for DosExec.  
+	; copy pathname to pathname buffer for DosExec.
 	;
 
 	segmov	es, ss
@@ -1783,10 +1783,10 @@ RETURN:		cl	= DosExecFlags
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1832,7 +1832,7 @@ CALLED BY:	INTERNAL
 			FileOpenESDI
 
 PASS:		es:di = file name
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 
 RETURN:		C clear if associated data file
 			dx:bp - MS-DOS application name
@@ -1968,9 +1968,9 @@ CALLED BY:	FileOpenESDI
 
 PASS:		es:di = name of data file
 		dx:bp = name of application (user entered association)
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,di,es,ds,si
 
@@ -1998,7 +1998,7 @@ DOSPathString	local	PathName
 	class	FolderClass
 
 	call	Folder_GetDiskAndPath
-	
+
 	push	ax				; save disk handle
 	push	es, di				; save filename
 	lea	si, ds:[bx].GFP_path		; ds:si <- path
@@ -2241,7 +2241,7 @@ entryTail:
 	;	ds:si = appl-param
 	;
 	push	si
-	mov	dx, si				; ds:dx = appl to get params	
+	mov	dx, si				; ds:dx = appl to get params
 	call	GetTailComponent		; ds:dx = appl-param's tail
 	mov	si, dx				; ds:si = tail of appl-param
 ;	call	CompareString			; compare tails
@@ -2286,7 +2286,7 @@ PASS:		dx:bp - parameters found in geos.ini file
 RETURN:		carry clear if parameters available
 			dx:bp = unchanged if '?' not specified
 				= user entered parameters if '?' specified
-		carry set if no parameters 
+		carry set if no parameters
 		- or -
 		if detaching with modal DOS parameters box up
 			ax <> 0 if no parameters
@@ -2373,10 +2373,10 @@ RETURN:		ds 	= ^s IclasSpawnLaunchInfoStruct (locked)
 		carry iff error
 		ax	= possible error
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2399,7 +2399,7 @@ LONG	jc	error
 	call	MemLock
 	jc	error
 	mov	spawnBlock, ax
-	
+
 	call 	Folder_GetDiskAndPath
 	; ax = disk handle, 0 if invalid
 	; ds:bx = GenFilePath
@@ -2407,11 +2407,11 @@ LONG	jc	error
 	clr	dx
 	lea	si, ds:[bx].GFP_path			; ds:si = tail of path
 	mov	bx, ax					; disk handle of folder
-	
+
 	; ------- Write link folder name into spawn block as courseware name
 	; ds:si = folder symbolic name
 		push	si
-		clr	dx				; no <disk:> 
+		clr	dx				; no <disk:>
 		mov	es, spawnBlock
 		mov	di, offset ISLIS_fullSymbolicName
 		mov	cx, FILE_LONGNAME_BUFFER_SIZE + PATH_LENGTH
@@ -2420,7 +2420,7 @@ LONG	jc	error
 		mov	endOfPath, di
 		mov	es:[ISLIS_linkDiskHandle], bx
 		pop	si
-	
+
 	; ------- Get Actual DOS path of folder -----------------
 	; ds:si = folder symbolic name
 		mov	bx, ax				; disk handle of folder
@@ -2466,7 +2466,7 @@ targetIsGone:
 	;
 	; Try to do a FileReadlink to get old .itm file
 	;
-	
+
 		; go to root of drive of courseware
 		push	ds
 		segmov	ds, cs
