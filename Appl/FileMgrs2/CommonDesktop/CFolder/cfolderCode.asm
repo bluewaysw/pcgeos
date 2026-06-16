@@ -2345,13 +2345,32 @@ if _NEWDESK
 	;
 	; set moniker again, using nice normalized name from path object
 	;
+
+	.warn -private
+	cmp	ds:[di].NDFOI_ndObjType, WOT_WASTEBASKET
+	.warn @private
+	jne	notWasteBasket
+
+	push	bp
+	mov	si, FOLDER_WINDOW_OFFSET
+	mov	cx, cs
+	mov	dx, offset fspmWastebasketName
+	mov	bp, VUM_NOW
+	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	call	ObjMessageCallFixup
+	pop	bp
+	jmp	afterCopyMoniker
+
+notWasteBasket:
 	push	bp
 	mov	dx, ss
 	lea	bp, ss:[locals].SPMV_folderName
 	mov	ax, MSG_VIS_TEXT_GET_ALL_PTR
 	call	ObjMessageCallFixup
 	pop	bp
+
 	call	CopyInAndSetNewMoniker		; do it
+afterCopyMoniker:
 endif
 noPathInfo:
 endif
@@ -2476,6 +2495,7 @@ endif  ; _NEWDESK
 
 if _NEWDESK
 fspmDesktopPath	char	ND_DESKTOP_RELATIVE_PATH, 0
+fspmWastebasketName	TCHAR	"Wastebasket", 0
 endif
 FolderSetPrimaryMoniker	endm
 
