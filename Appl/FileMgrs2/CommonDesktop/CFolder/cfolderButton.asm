@@ -804,8 +804,34 @@ InheritAndCreateNewFolderWindow	proc	far
 		.enter
 
 if _NEWDESK
+	;
+	; Exact matches are not browse-mode policy: if the folder is already
+	; open, bring that window forward before deciding whether to reuse
+	; another window or create a new one.
+	;
+		push	bx, cx, es, di
+		mov	cx, bx			; cx = disk handle
+		mov	ax, es:[di].FR_desktopInfo.DI_objectType
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	FindFolderWindow
+		call	ShellFreePathBuffer
+		jnc	exactNotFound
+		tst	bx
+		jz	exactNotFound
+
+		mov	si, FOLDER_OBJECT_OFFSET
+		mov	ax, MSG_FOLDER_BRING_TO_FRONT
+		call	ObjMessageCallFixup
+		pop	bx, cx, es, di
+		clr	ax
+		stc
+		jmp	done
+
+exactNotFound:
+		pop	bx, cx, es, di
+
 		test	ss:[browseMode], mask FIBM_SINGLE
-	LONG	jz	openNewWindow
+		LONG 	jz	openNewWindow
 	; If we're trying to open a window by opening an object on the
 	; desktop, then make a new window instead of trying to reuse an
 	; existing one.
