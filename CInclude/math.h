@@ -799,4 +799,41 @@ extern double _pascal frand(void);
 extern double _pascal atan2(double __x, double __y);
 extern double _pascal fmod(double __x, double __y);
 extern double _pascal log10(double __x);
+
+#ifdef __WATCOMC__
+#pragma aux GEOS_DOUBLE_RET "^"                       \
+           parm reverse routine []        \
+           value struct caller [] no8087  \
+           modify [ax bx cx dx es]
+
+#pragma aux (GEOS_DOUBLE_RET) sin;
+
+#pragma aux (GEOS_DOUBLE_RET) cabs;
+#pragma aux (GEOS_DOUBLE_RET) hypot;
+#pragma aux (GEOS_DOUBLE_RET) atof;
+#pragma aux (GEOS_DOUBLE_RET) sin;
+#pragma aux (GEOS_DOUBLE_RET) cos;
+#pragma aux (GEOS_DOUBLE_RET) asin;
+#pragma aux (GEOS_DOUBLE_RET) acos;
+#pragma aux (GEOS_DOUBLE_RET) tan;
+#pragma aux (GEOS_DOUBLE_RET) atan;
+#pragma aux (GEOS_DOUBLE_RET) sinh;
+#pragma aux (GEOS_DOUBLE_RET) cosh;
+#pragma aux (GEOS_DOUBLE_RET) tanh;
+#pragma aux (GEOS_DOUBLE_RET) asinh;
+#pragma aux (GEOS_DOUBLE_RET) acosh;
+#pragma aux (GEOS_DOUBLE_RET) atanh;
+#pragma aux (GEOS_DOUBLE_RET) sqrt;
+#pragma aux (GEOS_DOUBLE_RET) pow;
+#pragma aux (GEOS_DOUBLE_RET) floor;
+#pragma aux (GEOS_DOUBLE_RET) log;
+#pragma aux (GEOS_DOUBLE_RET) fabs;
+#pragma aux (GEOS_DOUBLE_RET) exp;
+#pragma aux (GEOS_DOUBLE_RET) frand;
+#pragma aux (GEOS_DOUBLE_RET) atan2;
+#pragma aux (GEOS_DOUBLE_RET) fmod;
+#pragma aux (GEOS_DOUBLE_RET) log10;
+
+#endif
+
 #endif

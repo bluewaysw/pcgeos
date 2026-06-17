@@ -296,7 +296,7 @@ word geosCharMap[] =
 
 word GeosCharToUnicode( const word  geosChar )
 {
-        if( geosChar < MIN_GEOS_CHAR || geosChar > MAX_GEOS_CHAR )
+        if( geosChar < MIN_GEOS_CHAR || geosChar >= MAX_GEOS_CHAR )
                 return 0;
 
         return geosCharMap[ GEOS_CHAR_INDEX( geosChar ) ];
@@ -342,20 +342,24 @@ word CountValidGeosChars( const TT_CharMap  map, char*  firstChar, char*  lastCh
 {
         word  charIndex;
         word  firstFound = NUM_CHARMAPENTRIES;
-        word  lastFound = 0;
+        word  lastFound  = 0;
 
 
         for( charIndex = 0; charIndex < NUM_CHARMAPENTRIES; ++charIndex )
         {
+                if( geosCharMap[charIndex] == 0 )
+                        continue;
+
                 if( TT_Char_Index( map, geosCharMap[charIndex] ) )
                 {
-                        if( firstFound > charIndex ) firstFound = charIndex;
+                        if( firstFound == NUM_CHARMAPENTRIES )
+                                firstFound = charIndex;
                         lastFound = charIndex;
                 }
         }
 
         *firstChar = (firstFound < NUM_CHARMAPENTRIES) ? (char)(firstFound + C_SPACE) : 255;
-        *lastChar = (lastFound > 0) ? (char)(lastFound + C_SPACE) : 0;
+        *lastChar  = (lastFound  > 0)                  ? (char)(lastFound  + C_SPACE) : 0;
 
         return (*firstChar <= *lastChar) ? (1 + *lastChar - *firstChar) : 0;
 }
@@ -406,16 +410,25 @@ EC(     ECCheckBounds( lookupTable ) );
                 lookupTable[i].geoscode = (char)i + C_SPACE;
         }
 
-        qsort( lookupTable, NUM_CHARMAPENTRIES, sizeof( LookupEntry ), compareLookupEntries );
+        SortLookupTable( lookupTable, NUM_CHARMAPENTRIES );
 
         MemUnlock( memHandle );
         return memHandle;
 }
 
 
-int _pascal compareLookupEntries( const void *a, const void *b ) 
+static void SortLookupTable(LookupEntry* table, int count)
 {
-        return (int)((LookupEntry *)a)->ttindex - (int)((LookupEntry *)b)->ttindex;
+    int         i, j;
+    LookupEntry temp;
+
+    for (i = 1; i < count; ++i)
+    {
+        temp = table[i];
+        for (j = i; j > 0 && table[j - 1].ttindex > temp.ttindex; --j)
+            table[j] = table[j - 1];
+        table[j] = temp;
+    }
 }
 #pragma code_seg()
 

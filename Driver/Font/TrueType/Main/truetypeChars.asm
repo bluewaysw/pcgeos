@@ -70,7 +70,6 @@ TrueTypeGenChar	proc	far
 
 	mov	es, bp			;es <- seg addr of gstate
 
-	clr	al
 	movwbf	dxah, es:GS_fontAttr.FCA_pointsize
 	push	dx			;pass point size
 	push 	ax
@@ -85,8 +84,7 @@ TrueTypeGenChar	proc	far
 	call	FontDrFindFontInfo
 	push	ds			;pass ptr to FontInfo
 	push	di
-
-	clr	ah		                   
+			                   
 	mov	al, es:GS_fontAttr.FCA_textStyle
 	mov	bx, ODF_HEADER
 	call	FontDrFindOutlineData

@@ -26,10 +26,7 @@
 #include "ttmemory.h"
 #include "tttags.h"
 #include "ttload.h"
-
-/* required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT  trace_gload
+#include <ec.h>
 
 
 /* composite font flags */
@@ -63,10 +60,9 @@
                         UShort*                advance )
   {
     PLongMetrics  longs_m  = (PLongMetrics)GEO_LOCK( header->long_metrics_block );
-    PShortMetrics shorts_m = (PShortMetrics)GEO_LOCK( header->short_metrics_block );
     UShort        k        = header->number_Of_HMetrics;
-
-
+    
+    
     if ( index < k )
     {
       *bearing = longs_m[index].bearing;
@@ -74,33 +70,16 @@
     }
     else
     {
+      PShortMetrics shorts_m = (PShortMetrics)GEO_LOCK( header->short_metrics_block );
       *bearing = shorts_m[index - k];
       *advance = longs_m[k - 1].advance;
+      GEO_UNLOCK( header->short_metrics_block );
     }
 
     GEO_UNLOCK( header->long_metrics_block );
-    GEO_UNLOCK( header->short_metrics_block );
   }
 
-
-/********************************************************/
-/* Return horizontal metrics in font units for a given  */
-/* glyph.  If `check' is true, take care of mono-spaced */
-/* fonts by returning the advance width max.            */
-#if 0
-  static void Get_HMetrics( PFace    face,
-                            UShort   index,
-                            Bool     check,
-                            Short*   lsb,
-                            UShort*  aw )
-  {
-    TT_Get_Metrics( &face->horizontalHeader, index, lsb, aw );
-
-    if ( check && face->postscript.isFixedPitch )
-      *aw = face->horizontalHeader.advance_Width_Max;
-  }
-#endif
-
+  
 #ifdef TT_CONFIG_OPTION_PROCESS_HDMX
 /********************************************************/
 /* Return advance width table for a given pixel size    */
@@ -144,13 +123,13 @@
     UShort  k;
 
 
-    if ( delta_x )
-      for ( k = 0; k < n; ++k )
-        coords[k].x += delta_x;
+    if ( !delta_x && !delta_y ) return;
 
-    if ( delta_y )
-      for ( k = 0; k < n; ++k )
+    for ( k = 0; k < n; ++k )
+    {
+        coords[k].x += delta_x;
         coords[k].y += delta_y;
+    }
   }
 
 
@@ -178,42 +157,21 @@
 
 /*******************************************************************
  *
- *  Function    :  Scale_X
+ *  Function    :  Scale
  *
  *  Description :  scale an horizontal distance from font
  *                 units to 26.6 pixels
  *
  *  Input  :  metrics  pointer to metrics
- *            x        value to scale
+ *            val      value to scale
  *
  *  Output :  scaled value
  *
  ******************************************************************/
 
-  static TT_Pos  Scale_X( PIns_Metrics  metrics, TT_Pos  x )
+  static TT_Pos  Scale( PIns_Metrics  metrics, TT_Pos  val )
   {
-    return TT_MulDiv( x, metrics->x_scale1, metrics->units_per_em );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Scale_Y
- *
- *  Description :  scale a vertical distance from font
- *                 units to 26.6 pixels
- *
- *  Input  :  metrics  pointer to metrics
- *            y        value to scale
- *
- *  Output :  scaled value
- *
- ******************************************************************/
-
-  static 
-  TT_Pos  Scale_Y( PIns_Metrics  metrics, TT_Pos  y )
-  {
-    return TT_MulDiv( y, metrics->y_scale1, metrics->units_per_em );
+    return TT_MulDiv( val, metrics->x_scale1, metrics->units_per_em );
   }
 
 
@@ -390,8 +348,8 @@
 
       for ( j = 0; j < n_points; ++j )
       {
-        pts->org[j].x = Scale_X( &exec->metrics, pts->org[j].x );
-        pts->org[j].y = Scale_Y( &exec->metrics, pts->org[j].y );
+        pts->org[j].x = Scale( &exec->metrics, pts->org[j].x );
+        pts->org[j].y = Scale( &exec->metrics, pts->org[j].y );
       }
 
       /* if hinting, round pp1, and shift the glyph accordingly */
@@ -493,8 +451,8 @@
     pts->cur[n_points - 2] = subg->pp1;
     pts->cur[n_points - 1] = subg->pp2;
 
-    pts->touch[n_points - 1] = 0;
-    pts->touch[n_points - 2] = 0;
+    //pts->touch[n_points - 1] = 0;  REDUNDANT!
+    //ts->touch[n_points - 2] = 0;
 
     /* if hinting, round the phantom points */
     if ( subg->is_hinted )
@@ -633,12 +591,9 @@
 
 
     /* first of all, check arguments */
-    if ( !glyph )
-      return TT_Err_Invalid_Glyph_Handle;
-
+EC( ECCheckBounds( glyph ) );
     face = glyph->face;
-    if ( !face )
-      return TT_Err_Invalid_Glyph_Handle;
+EC( ECCheckBounds( face ) );
 
     if ( glyph_index >= face->numGlyphs )
       return TT_Err_Invalid_Glyph_Index;
@@ -658,8 +613,7 @@
     /* query new execution context */
     exec = New_Context( face );
 
-    if ( !exec )
-      return TT_Err_Could_Not_Find_Context;
+EC( ECCheckBounds( exec ) );
 
     Context_Load( exec, face, instance );
 
@@ -671,7 +625,7 @@
         exec->GS = instance->GS;
       /* load default graphics state */
 
-      glyph->outline.y_ppem = ( instance->metrics.y_ppem );
+      glyph->outline.y_ppem = ( instance->metrics.ppem );
     }
 
     /* save its critical pointers, as they'll be modified during load */
@@ -786,7 +740,7 @@
           subglyph->pp1.x = 0;
           subglyph->pp2.x = subglyph->metrics.advance;
           if (load_flags & TTLOAD_SCALE_GLYPH)
-            subglyph->pp2.x = Scale_X( &exec->metrics, subglyph->pp2.x );
+            subglyph->pp2.x = Scale( &exec->metrics, subglyph->pp2.x );
 
           exec->glyphSize = 0;
           phase = Load_End;
@@ -823,8 +777,8 @@
         subglyph->pp2.x = subglyph->pp1.x + subglyph->metrics.advance;
         if (load_flags & TTLOAD_SCALE_GLYPH)
         {
-          subglyph->pp1.x = Scale_X( &exec->metrics, subglyph->pp1.x );
-          subglyph->pp2.x = Scale_X( &exec->metrics, subglyph->pp2.x );
+          subglyph->pp1.x = Scale( &exec->metrics, subglyph->pp1.x );
+          subglyph->pp2.x = Scale( &exec->metrics, subglyph->pp2.x );
         }
 
         /* is it a simple glyph ? */
@@ -1079,8 +1033,8 @@
 
             if ( load_flags & TTLOAD_SCALE_GLYPH )
             {
-              x = Scale_X( &exec->metrics, x );
-              y = Scale_Y( &exec->metrics, y );
+              x = Scale( &exec->metrics, x );
+              y = Scale( &exec->metrics, y );
 
               if ( subglyph->element_flag & ROUND_XY_TO_GRID )
               {
@@ -1143,7 +1097,6 @@
 
     glyph->outline.n_points    = num_points;
     glyph->outline.n_contours  = num_contours;
-    glyph->outline.second_pass = TRUE;
 
     /* translate array so that (0,0) is the glyph's origin */
     translate_array( num_points + 2,
@@ -1162,28 +1115,7 @@
       glyph->metrics.bbox.yMax  = (glyph->metrics.bbox.yMax+63) & -64;
     }
 
-    /* get the device-independent scaled horizontal metrics */
-    /* take care of fixed-pitch fonts...                    */
-    {
-      TT_Pos  left_bearing;
-      TT_Pos  advance;
-
-
-      left_bearing = subglyph->metrics.bearingX;
-      advance      = subglyph->metrics.advance;
-
-      if ( face->postscript.isFixedPitch )
-        advance = face->horizontalHeader.advance_Width_Max;
-
-      if ( load_flags & TTLOAD_SCALE_GLYPH )
-      {
-        left_bearing = Scale_X( &exec->metrics, left_bearing );
-        advance      = Scale_X( &exec->metrics, advance      );
-      }
-    }
-
     glyph->metrics.bearingX = glyph->metrics.bbox.xMin;
-    glyph->metrics.bearingY = glyph->metrics.bbox.yMax;
     glyph->metrics.advance  = subglyph->pp2.x - subglyph->pp1.x;
 
     /* Now take care of vertical metrics.  In the case where there is    */
@@ -1211,7 +1143,7 @@
          subglyph->is_hinted )
     {
       widths = Get_Advance_Widths( exec->face,
-                                   exec->instance->metrics.x_ppem );
+                                   exec->instance->metrics.ppem );
       if ( widths )
         glyph->metrics.advance = widths[glyph_index] << 6;
     }

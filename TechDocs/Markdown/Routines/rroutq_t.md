@@ -2652,7 +2652,7 @@ moniker is being requested.
 *tokenDBItem* A pointer to an empty **TokenMonikerInfo** structure, in which 
 the token's group and item numbers will be returned.
 
-The return value is an error flag: it will be *true* if the item could not be found 
+The return value is *true* if the item was found 
 in the token database, *false* otherwise.
 
 **Include:** token.h

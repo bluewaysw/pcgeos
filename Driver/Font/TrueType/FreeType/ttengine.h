@@ -24,6 +24,8 @@
 #define TTENGINE_H
 
 #include "tttypes.h"
+#include "ttobjs.h"
+
 #include "ttconfig.h"
 #include "freetype.h"
 
@@ -48,19 +50,11 @@
 
   struct  TEngine_Instance_
   {
-     void*   list_free_elements;
+    void*   exec;
+    Bool    exec_in_use;
 
-     void*   objs_face_class;       /* the face cache class     */
-     void*   objs_instance_class;   /* the instance cache class */
-     void*   objs_execution_class;  /* the context cache class  */
-     void*   objs_glyph_class;      /* the glyph cache class    */
-
-     void*   objs_face_cache;       /* these caches are used to track */
-     void*   objs_exec_cache;       /* the current face and execution */
-                                    /* context objects                */
-
-     void*   raster_component;      /* ttraster implementation depedent    */
-     Boolean interpreterActive;     /* is bytecodeinterpreter aktive?  */
+    void*   raster_component;      /* ttraster implementation depedent    */
+    Boolean interpreterActive;     /* is bytecodeinterpreter aktive?  */
   };
 
   /* NOTE : The raster's lock is only acquired by the Render_Glyph and     */
@@ -80,8 +74,6 @@
 
 #define ENGINE_VAR   _engine
 #define ENGINE_VARS  _engine,
-
-#define ENGINE  _engine
 
 #else                       /* for thread-safe builds */
 

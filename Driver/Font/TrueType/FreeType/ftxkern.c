@@ -28,10 +28,6 @@
 #include "tttags.h"
 #include <ec.h>
 
-/* Required by the tracing mode */
-#undef  TT_COMPONENT
-#define TT_COMPONENT  trace_any
-
 
 /*******************************************************************
  *
@@ -66,9 +62,11 @@
 
     num_pairs            = GET_UShort();
     kern0->nPairs        = 0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     kern0->searchRange   = GET_UShort();
     kern0->entrySelector = GET_UShort();
     kern0->rangeShift    = GET_UShort();
+#endif
 
     /* we only set kern0->nPairs if the subtable has been loaded */
 
@@ -392,9 +390,11 @@ EC( ECCheckBounds( pairs ) );
         case 0:
           GEO_FREE( sub->t.kern0.pairsBlock );
           sub->t.kern0.nPairs        = 0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
           sub->t.kern0.searchRange   = 0;
           sub->t.kern0.entrySelector = 0;
           sub->t.kern0.rangeShift    = 0;
+#endif
           break;
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_KERN2
@@ -454,8 +454,7 @@ EC( ECCheckBounds( pairs ) );
     PFace        faze = HANDLE_Face( face );
 
 
-    if ( !faze )
-      return TT_Err_Invalid_Face_Handle;
+EC( ECCheckBounds( faze ) );
 
     /* copy directory header */
     return Kerning_Create( directory, faze );
@@ -489,11 +488,8 @@ EC( ECCheckBounds( pairs ) );
 
     PFace  faze = HANDLE_Face( face );
 
-    if ( !faze )
-      return TT_Err_Invalid_Face_Handle;
-
-    if ( !directory )
-      return TT_Err_Bad_Argument;
+EC( ECCheckBounds( faze ) );
+EC( ECCheckBounds( directory ) );
 
     if ( directory->nTables == 0 )
       return TT_Err_Table_Missing;

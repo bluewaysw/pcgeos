@@ -18,12 +18,12 @@ DESCRIPTION:
 ; file for documentation.
 ;
 ifndef PRODUCT_GEOS2X
-MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS 
-					; has native wheel support in the kernel/ui, 
+MOUSE_HAS_WHEEL		= 1		; define/uncomment this if GEOS
+					; has native wheel support in the kernel/ui,
 					; disable ...HAS_WHEEL_KEYS
 else
-MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver 
-					; that has the wheel simulate keypresses, 
+MOUSE_HAS_WHEEL_KEYS	= 1		; define/uncomment this for a version of the driver
+					; that has the wheel simulate keypresses,
 					; disable ...HAS_WHEEL
 endif
 MOUSE_NUM_BUTTONS		= 3	; Wheel mice have at least 3 buttons
@@ -55,7 +55,7 @@ ifdef MOUSE_HAS_WHEEL
 	imps2NativeMouse  chunk.char	'Intellimouse-compatible PS/2 Wheel Mouse', 0
 
 	mouseInfoTable  MouseExtendedInfo  \
-			0	; nativeMouse
+			mask MEI_WHEEL	; imps2NativeMouse: has wheel
 endif
 
 ifdef MOUSE_HAS_WHEEL_KEYS
@@ -67,8 +67,8 @@ ifdef MOUSE_HAS_WHEEL_KEYS
 	imps2CursorMouse  chunk.char	'IM PS/2 Wheel Mouse (Wheel: Cursor Up/Down)', 0
 
 	mouseInfoTable  MouseExtendedInfo  \
-			0,	; pageMouse
-			0	; cursorMouse
+			mask MEI_WHEEL,	; pageMouse
+			mask MEI_WHEEL	; cursorMouse
 endif
 
 MouseExtendedInfoSeg  ends

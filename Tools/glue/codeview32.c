@@ -1012,7 +1012,8 @@ static word
 CV32ProcessStructure(const char  	    *file,
 		   byte	    	    **bpPtr,
 		   word	    	    len,
-		   VMBlockHandle    typeBlock)
+		   VMBlockHandle    typeBlock,
+		   Boolean          isUnion)
 {
     byte    	    *bp;    	    /* Current byte in structure record */
     byte    	    *dataBase;	    /* Base of the structure description */
@@ -1084,9 +1085,10 @@ CV32ProcessStructure(const char  	    *file,
 //    }
 
     MSObj_GetWord(prop, bp);
-    MSObj_GetWord(dlist, bp);
-    MSObj_GetWord(shape, bp);
-
+    if (!isUnion) {
+	MSObj_GetWord(dlist, bp);
+	MSObj_GetWord(shape, bp);
+    }
     size = CV32GetInteger(&bp) /*/ 8*/;
 
     if(size == 0) {
@@ -2179,10 +2181,10 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 			break;
 		case CTL2_CLASS:
 		case CTL2_STRUCTURE:
-			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
+			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock, FALSE);
 			break;
 		case CTL2_MEMBER:
-			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock);
+			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock, FALSE);
 			break;
 		case CTL2_ID:
 		{
@@ -2200,23 +2202,7 @@ CV32ProcessTypeRecord(const char 	    *file,  	/* Object file from which
 		}
 		case CTL2_UNION:
 		{
-			word count;
-			word baseType;
-			word properties;
-			unsigned long size;
-			ID name;   	    /* Name of the union */
-
-			MSObj_GetWord(count, bp);
-			MSObj_GetWord(baseType, bp);
-			MSObj_GetWord(properties, bp);
-
-			size = CV32GetInteger(&bp);
-
-			name = NullID;
-			if ((bp - *bpPtr) < (len-2)) {
-				name = CV32GetString(&bp);
-			}
-			bp = *bpPtr + len;
+			retval = CV32ProcessStructure(file, &bp, len - 2, typeBlock, TRUE);
 			break;
 		}
 		case CTL2_ENUMERATION:

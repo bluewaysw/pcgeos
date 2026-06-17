@@ -1552,8 +1552,10 @@ LauncherPrepForWriting	proc	near
 EC <	ECCheckDGroup	es						>
 	mov	bx, es:[launcherFileHandle]	; put file handle in bx
 	tst	es:[creatingLauncher]
-	jz	editingLauncher
+	jnz	createLauncherFile
+	jmp	editingLauncher
 
+createLauncherFile:
 	clr	al				; no flags
 	call	FileClose			; close default launcher
 	clr	es:[launcherFileHandle]
@@ -1562,10 +1564,38 @@ EC <	ECCheckDGroup	es						>
 	mov	bx, handle EditLauncherDestinationList
 	mov	si, offset EditLauncherDestinationList
 	call	ObjMessageCall			; gets item's identifer into ax
-						; identifiers for this list
-						; are SP_APPLICATION,SP_DOS_ROOM
+							; identifiers for this list
+							; are SP_APPLICATION,SP_DOS_ROOM,
+							; SP_NOT_STANDARD_PATH
+	cmp	ax, SP_NOT_STANDARD_PATH
+	je	sourcePath
 	call	FileSetStandardPath
+	jmp	pathSet
 
+sourcePath:
+	mov	bx, es:[launchFilePathHandle]
+	tst	bx
+	jz	sourcePathError
+	call	MemLock
+	push	bx
+	mov	ds, ax
+	mov	bx, ds:[GFP_disk]
+	mov	dx, offset GFP_path
+	call	FileSetCurrentPath
+	pop	bx
+	push	ax
+	pushf
+	call	MemUnlock
+	popf
+	pop	ax
+	jmp	pathSet
+
+sourcePathError:
+	mov	ax, ERROR_PATH_NOT_FOUND
+	stc
+
+pathSet:
+	jc	exit
 	segmov	ds, es, dx			; put dgroup in ds
 	mov	si, offset launcherGeosName	; point ds:si to geos name
 	mov	di, offset fileOperationInfoEntryBuffer	+ FOIE_name

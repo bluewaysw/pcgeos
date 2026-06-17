@@ -6,13 +6,13 @@
 GEODE           = picalbum
 CLASS           = cThumbV.goc popups.goc
 MAIN            = mAlbum.goc mImport.goc
-PROCESS         = AWATCHER.GOC pBmpOp.goc pCamera.goc pMain.goc pPrint.goc\
+PROCESS         = awatcher.goc pBmpOp.goc pCamera.goc pMain.goc pPrint.goc\
                   pSlide.goc pUtils.goc
 UI              = uiMain.goc
 UICLASS         = uicVDLC.goc
 UI_TO_RDFS      =
 OBJS            = cThumbV.obj popups.obj mAlbum.obj mImport.obj\
-                  AWATCHER.obj pBmpOp.obj pCamera.obj pMain.obj pPrint.obj\
+                  awatcher.obj pBmpOp.obj pCamera.obj pMain.obj pPrint.obj\
                   pSlide.obj pUtils.obj uiMain.obj uicVDLC.obj
 COMMON          = PicAlbum.goh
 MODULES         =

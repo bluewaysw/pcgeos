@@ -169,11 +169,39 @@ endif
 		cmp	bx, 3205h 	; WINNT will always return ver 5.50
 		jne	notNT
 		mov	ds:[isWINNT], BB_TRUE		
-notNT:	
-	
+notNT:
+
+	;
+	; See if we're running under DOSBox.  FE /7 is DOSBox's private
+	; callback opcode.  On a real 80186+ CPU, it traps through INT 06h.
+	;
+		cmp	ds:[sysProcessorType], SPT_80186
+		jb	notDOSBox
+		pushf
+		INT_OFF
+		segmov	es, ds
+		mov	di, offset dosBoxInt06Addr
+		mov	bx, cs
+		mov	cx, offset DOSBoxInvalidOpcode
+		mov	ax, 6
+		call	SysCatchInterrupt
+		mov	ax, BB_TRUE
+		.inst	byte	0feh, 038h, 0, 0	; DOSBox callback 0
+		segmov	es, ds
+		mov	di, offset dosBoxInt06Addr
+		push	ax
+		mov	ax, 6
+		call	SysResetInterrupt	; restore INT 06h immediately
+		pop	ax
+		call	SafePopf
+		tst	ax
+		jz	notDOSBox
+		mov	ds:[isDOSBox], BB_TRUE
+notDOSBox:
+
 	;
 	; See if we're running under DRDOS...
-	; 
+	;
 		mov	ax, DRDOS_GET_VERSION
 		int	21h
 		jc	done
@@ -195,6 +223,31 @@ done:
 		mov	ds:[isDRDOS], BB_TRUE
 		jmp	done
 InitFSD		endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DOSBoxInvalidOpcode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	INT 06h handler for the DOSBox FE /7 probe
+
+CALLED BY:	INT 06h
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	ax
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DOSBoxInvalidOpcode	proc	far
+		push	ax
+		push	bp
+		mov	bp, sp
+		clr	ax
+		mov	ss:[bp+2], ax		; real CPU: return AX = 0
+		add	{word}ss:[bp+4], 4	; skip FE 38 00 00
+		pop	bp
+		pop	ax
+		iret
+DOSBoxInvalidOpcode	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -320,6 +373,10 @@ endif	; PRIMARY_FSD_FOUND_IN_INTIFILE
 	; Find version number.
 	;
 		LoadVarSeg	ds,bx
+		mov	si, offset os2Name
+		tst	ds:[isDOSBox]
+		jnz	loadDriver
+
 		mov	si, offset drdosName
 		tst	ds:[isDRDOS]
 		jnz	loadDriver

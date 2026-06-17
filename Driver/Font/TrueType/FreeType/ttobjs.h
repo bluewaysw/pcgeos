@@ -20,7 +20,6 @@
 
 #include "ttconfig.h"
 #include "ttengine.h"
-#include "ttcache.h"
 #include "tttables.h"
 #include "ttcmap.h"
 #include <heap.h>
@@ -429,20 +428,14 @@
   /* metrics used by the instance and execution context objects */
   struct  TIns_Metrics_
   {
-    TT_F26Dot6  pointSize;      /* point size.  1 point = 1/72 inch. */
+    TT_F26Dot6  pointSize;   /* point size.  1 point = 1/72 inch. */
 
-    UShort      x_resolution;   /* device horizontal resolution in dpi. */
-    UShort      y_resolution;   /* device vertical resolution in dpi.   */
-
-    UShort      x_ppem;         /* horizontal pixels per EM */
-    UShort      y_ppem;         /* vertical pixels per EM   */
-
+    UShort      resolution;  /* device resolution in dpi. */
+    UShort      ppem;        /* maximum ppem size */
     Long        x_scale1;
-    Long        y_scale1;
 
     Long        units_per_em;
 
-    UShort      ppem;        /* maximum ppem size */
     Long        ratio;       /* current ratio     */
     Long        scale1;
     Long        scale2;      /* scale for ppem */
@@ -538,12 +531,8 @@
     UShort  maxContours;   /* max glyph contours numb, simple and composite */
     UShort  maxComponents; /* max components in a composite glyph */
 
-    /* the following are object caches to track active */
-    /* and recycled instances and execution contexts   */
-    /* objects.  See 'ttcache.h'                       */
-
-    TCache  instances;   /* current instances for this face */
-    TCache  glyphs;      /* current glyph containers for this face */
+    PInstance  instance;   /* current instances for this face */
+    PGlyph     glyph;      /* current glyph containers for this face */
   };
 
 
@@ -665,10 +654,6 @@
     TT_F26Dot6      phase;      /* 'SuperRounding'     */
     TT_F26Dot6      threshold;
 
-    Long            scale1;         /* scaling values along the current   */
-    Long            scale2;         /* projection vector too..            */
-    Bool            cached_metrics; /* the ppem is computed lazily. used  */
-                                    /* to trigger computation when needed */
 #ifdef DEBUG_INTERPRETER
     Bool            instruction_trap;  /* If True, the interpreter will */
 #endif                                 /* exit after each instruction   */

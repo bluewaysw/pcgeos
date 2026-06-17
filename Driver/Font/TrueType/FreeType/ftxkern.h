@@ -74,10 +74,11 @@ extern "C" {
   struct  TT_Kern_0_
   {
     TT_UShort  nPairs;          /* number of kerning pairs */
-
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     TT_UShort  searchRange;     /* these values are defined by the TT spec */
     TT_UShort  entrySelector;   /* for table searchs.                      */
     TT_UShort  rangeShift;
+#endif
     MemHandle  pairsBlock;      /* a table of nPairs `pairs' */
   };
 

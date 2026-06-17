@@ -16,4 +16,4 @@
 
 #include <$(SYSMAKEFILE)>
 
-XCCOMFLAGS = -WDE
+# XCCOMFLAGS = -WDE

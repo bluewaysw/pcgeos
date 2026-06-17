@@ -352,8 +352,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( TT_Open_Face( truetypeFile, &FACE ) )
                 goto Fin;
 
-        if ( TT_Get_Face_Properties( FACE, &FACE_PROPERTIES ) )
-                goto Fail;
+        TT_Get_Face_Properties( FACE, &FACE_PROPERTIES );
 
         if ( isFontUnacceptable( trueTypeVars ) )
                 goto Fail;

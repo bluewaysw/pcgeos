@@ -4867,7 +4867,7 @@ should be redrawn.
     MSG_GEN_SET_INITIAL_SIZE, MSG_GEN_SET_MINIMUM_SIZE, 
     MSG_GEN_SET_MAXIMUM_SIZE, MSG_GEN_SET_FIXED_SIZE, 
     MSG_GEN_GET_INITIAL_SIZE, MSG_GEN_GET_MINIMUM_SIZE, 
-    MSG_GEN_GET_MAXIMUM_SIZE, MSG_GEN_GET_FIZED_SIZE, 
+    MSG_GEN_GET_MAXIMUM_SIZE, MSG_GEN_GET_FIXED_SIZE, 
     MSG_GEN_RESET_TO_INITIAL_SIZE, CompSizeHintArgs
 
 These messages all perform resizing operations on generic objects. In some 
@@ -5063,6 +5063,7 @@ passed will remain empty.
 #### MSG_GEN_SET_MAXIMUM_SIZE
 
     void    MSG_GEN_SET_MAXIMUM_SIZE(
+            byte    updateMode,
             word    count,
             word    height,     /* SpecHeight */
             word    width);     /* SpecWidth */
@@ -5116,6 +5117,7 @@ HINT_FIXED_SIZE is not set, the structure passed will remain empty.
 #### MSG_GEN_SET_FIXED_SIZE
 
     void    MSG_GEN_SET_FIXED_SIZE(
+            byte    updateMode,
             word    count,
             word    height,     /* SpecHeight */
             word    width);     /* SpecWidth */
