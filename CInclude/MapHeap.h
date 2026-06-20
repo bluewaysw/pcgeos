@@ -6,8 +6,6 @@
  * FILE:	MapHeap.h
  * AUTHOR:	ayuen: September 01, 2000
  *
- * DECLARER:	Kernel
- *
  * DESCRIPTION:
  *	This file defines structures and routines for managing the mapped
  *	heap window system.
@@ -87,3 +85,4 @@ pragma Alias(LMemLockReAllocAndReturnError, "LMEMLOCKREALLOCANDRETURNERROR");
 #endif
 
 #endif /* __MAPHEAP_H */
+
