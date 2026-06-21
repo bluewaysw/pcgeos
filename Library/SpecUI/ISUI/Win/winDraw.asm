@@ -635,14 +635,8 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	uses	bp, ax, cx, bp
 	.enter
 
-	;
-	; Code added 2/ 6/92 to get rid of title on maximized windows.
-	; 
-	call	OpenWinCheckMenusInHeader
-	jc	done			;menus in header, don't draw title
-
 	;reset some invalid flags for this window, to indicate that draw
-	;has occurred.  
+	;has occurred.
 
 	mov	cl, mask OLWHS_HEADER_AREA_INVALID or \
 		    mask OLWHS_FOCUS_AREA_INVALID or \
@@ -678,11 +672,23 @@ haveColor:
 	call	OpenWinCheckIfBordered
 	jnc	10$
 
+	call	OpenWinCheckMenusInHeader
+	jc	5$
 	add	ax, 4			;4 pixel offset 
 	sub	cx, 4			;4 pixel offset
+	jmp	10$
+5$:
+	add	ax, 2			;inside window border
+	sub	cx, 2			;inside window border
 10$:
 	push	ax, cx 
+	call	OpenWinCheckMenusInHeader
+	jnc	20$
+	call	OpenWinGetHeaderBounds
+	jmp	30$
+20$:
 	call	OpenWinGetHeaderTitleBounds
+30$:
 	pop	ax, cx
 
 	;

@@ -671,7 +671,19 @@ CUAS <	mov	dx, ax			;use minimum height		>
 	;
 	mov	ax, ATTR_OL_BUTTON_IN_TITLE_BAR
 	call	ObjVarFindData
+	jc	inTitleBar
+if _MOTIF or _ISUI
+	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR
+	jz	notInTitleBar
+	call	OpenCheckMenusInHeaderOnMax
 	jnc	notInTitleBar
+	push	cx			; save width
+	mov	ax, MSG_OL_WIN_IS_MAXIMIZED
+	call	CallOLWin
+	pop	cx			; restore width
+	jnc	notInTitleBar
+endif
+inTitleBar:
 	push	cx			; save width
 	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
 	call	CallOLWin		; dx = height
