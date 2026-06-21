@@ -1005,8 +1005,6 @@ endif
 	call	WinCommon_DerefVisSpec_DI
 	add	ds:[di].OLWI_titleBarBounds.R_left, cx
 
-ISUI_SYS_MENU_FUDGE	equ	8
-
 ISU <	add	ds:[di].OLWI_titleBarBounds.R_left, ISUI_SYS_MENU_FUDGE >
 
 	or	bh, mask OLWSI_SYS_MENU		; flag so System menu button

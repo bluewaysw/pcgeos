@@ -5312,6 +5312,7 @@ endif
 	jnc	5$				;CHECK BW FOR CUA LOOK
 	dec	cx				;needed for correct menu bar
 5$:						; position now (cbh 2/15/92)
+ISU <	add	cx, ISUI_SYS_MENU_FUDGE		; ISUI sysMenuButton is wider>
 	mov	ax, cx				;ax = left icon width
 						; (system menu icon only,
 						;  OLBaseWin adds in express

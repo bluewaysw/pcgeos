@@ -1578,7 +1578,7 @@ endif
 					;until MSG_VIS_MOVE_RESIZE_WIN to
 					;do this.
 
-if _MOTIF
+if _ISUI
 	call	InvalidateMenuBarGeometryIfMenusInHeader
 endif
 
@@ -1632,16 +1632,20 @@ updateWindow:
 	mov	ax, MSG_VIS_VUP_UPDATE_WIN_GROUP
 	call	WinClasses_ObjCallInstanceNoLock
 
+if _MOTIF
+	call	InvalidateMenuBarGeometryIfMenusInHeader
+endif
+
 done:
 	ret
 SetMaximized	endp
 
-if _MOTIF	;--------------------------------------------------------------
+if _MOTIF or _ISUI	;--------------------------------------------------------------
 InvalidateMenuBarGeometryIfMenusInHeader	proc	near	uses	si, es
 	.enter
 	;
 	; Maximizing with menus in the header removes the title area.  Make
-	; the menu bar recalc against the new header bounds before updating.
+	; the menu bar recalc against the new header bounds.
 	;
 	call	OpenWinCheckMenusInHeader
 	jnc	done

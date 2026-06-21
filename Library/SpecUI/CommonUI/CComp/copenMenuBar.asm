@@ -991,10 +991,18 @@ OLMenuBarRecalcSize	method dynamic	OLMenuBarClass, \
 	pop	ax
 	jnc	20$
 	push	ax
+	push	cx
 	mov	ax, MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 	call	VisCallParent
 	sub	cx, ax				;subtract left icon widths
+	jc	restoreWidth
 	sub	cx, bp				;and right icon widths
+	jc	restoreWidth
+	add	sp, size word			;discard saved width
+	jmp	short widthDone
+restoreWidth:
+	pop	cx				;ignore impossible title bounds
+widthDone:
 	pop	ax
 20$:
 	call	MenuBarPassMarginInfo
