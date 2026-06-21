@@ -1578,7 +1578,7 @@ endif
 					;until MSG_VIS_MOVE_RESIZE_WIN to
 					;do this.
 
-if _ISUI
+if _MOTIF or _ISUI
 	call	InvalidateMenuBarGeometryIfMenusInHeader
 endif
 
@@ -1631,10 +1631,6 @@ updateWindow:
 	pop	dx				; restore update mode
 	mov	ax, MSG_VIS_VUP_UPDATE_WIN_GROUP
 	call	WinClasses_ObjCallInstanceNoLock
-
-if _MOTIF
-	call	InvalidateMenuBarGeometryIfMenusInHeader
-endif
 
 done:
 	ret
