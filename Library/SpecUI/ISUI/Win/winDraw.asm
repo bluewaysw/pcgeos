@@ -324,6 +324,7 @@ OWD_noHeader:
 	jz	gotChildren
 	call	DrawTitleChildren
 gotChildren:
+	call	DrawHeaderTopLineForMenusInHeader
 
 	; Darken background if necessary
 
@@ -425,6 +426,27 @@ VCD_done:
 	.leave
 	ret
 DrawTitleChildren	endp
+
+DrawHeaderTopLineForMenusInHeader	proc	near
+	class	OLWinClass
+	uses	ax, bx, cx, dx, bp
+	.enter
+	mov	bp, ds:[si]
+	add	bp, ds:[bp].Vis_offset
+	test	ds:[bp].OLWI_attrs, mask OWA_TITLED
+	jz	done
+	call	OpenWinCheckMenusInHeader
+	jnc	done
+	call	OpenWinGetHeaderBounds
+	push	ax
+	mov	ax, C_LIGHT_GREY
+	call	GrSetLineColor
+	pop	ax
+	call	GrDrawHLine
+done:
+	.leave
+	ret
+DrawHeaderTopLineForMenusInHeader	endp
 
 DTC_callBack	proc	far
 	class	VisCompClass		; Tell Esp we're a friend of VisComp

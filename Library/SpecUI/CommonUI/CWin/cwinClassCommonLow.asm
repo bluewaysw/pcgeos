@@ -5368,6 +5368,34 @@ afterAdjustments:
 	dec	bp				; Else make adjustment to right
 15$:						;   icon width, who knows why
 
+if _ISUI
+	call	WinCommon_DerefVisSpec_DI
+	test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE
+	jz	afterCloseWidth
+
+	push	ax
+	call	OpenWinCheckIfMinMaxRestoreControls
+	jnc	addCloseWidth
+	call	WinCommon_DerefVisSpec_DI
+	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
+	jz	addCloseWidth
+	mov	ax, TEMP_OL_WIN_HIDE_MINIMIZE
+	call	ObjVarFindData
+	jc	addCloseWidth
+	mov	ax, TEMP_OL_WIN_MINIMIZE_IS_CLOSE
+	call	ObjVarFindData
+	jnc	addCloseWidth
+	call	UserGetDefaultUILevel
+	cmp	ax, UIIL_INTRODUCTORY
+	je	addCloseWidth
+	pop	ax
+	jmp	short afterCloseWidth
+addCloseWidth:
+	pop	ax
+	add	bp, CUAS_WIN_ICON_WIDTH+1
+afterCloseWidth:
+endif
+
 haveRightWidth:
 
 	;
