@@ -89,6 +89,10 @@ ROUTINES:
 				more of the header area INVALID flags. We
 				generally so this as we draw that item.
 
+    INT OpenWinUpdateHeaderMenuBar
+				Redraws the menu bar after a header-only
+				update when menus live in the header.
+
     MTD MSG_OL_WIN_UPDATE_HEADER
 				This method is sent by
 				OpenWinHeaderMarkInvalid when it changes
@@ -1263,12 +1267,15 @@ CUAS <	test	dl, mask OLWHS_HEADER_AREA_INVALID >
 
 	jz	headerOK
 
-CUAS <	call	OpenWinDrawHeaderTitleBackground			>
-	call	OpenWinDrawHeaderTitle
+	CUAS <	call	OpenWinDrawHeaderTitleBackground			>
+		call	OpenWinDrawHeaderTitle
+if _MOTIF or _ISUI
+		call	OpenWinUpdateHeaderMenuBar
+endif
 
 if	(0)
-	;since the header was just drawn, we must redraw the Express menu
-	;button (if this is a GenPrimary)
+		;since the header was just drawn, we must redraw the Express menu
+		;button (if this is a GenPrimary)
 
 	call	OpenWinDrawFieldIconsIfBaseWindow
 endif
@@ -1316,6 +1323,9 @@ CUAS <	test	dl, mask OLWHS_TITLE_AREA_INVALID or \
 	push	dx
 	call	OpenWinDrawHeaderTitleBackground
 	call	OpenWinDrawHeaderTitle
+if _MOTIF or _ISUI
+	call	OpenWinUpdateHeaderMenuBar
+endif
 	pop	dx
 done:
 	call	GrDestroyState
@@ -1323,6 +1333,27 @@ exit:
 	ret
 
 OpenWinUpdateHeader	endp
+
+if _MOTIF or _ISUI	;--------------------------------------------------------------
+OpenWinUpdateHeaderMenuBar	proc	near	uses	ax, cx, dx, si, di
+	.enter
+	;
+	; Header-only updates repaint over menus hosted in the titlebar.
+	; Redraw the menu bar after the header is current.
+	;
+	call	OpenWinCheckMenusInHeader
+	jnc	done
+	call	WinCommon_DerefVisSpec_DI
+	mov	si, ds:[di].OLMDWI_menuBar
+	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_IMAGE_INVALID
+	mov	dl, VUM_NOW
+	mov	ax, MSG_VIS_MARK_INVALID
+	call	WinCommon_ObjCallInstanceNoLock
+done:
+	.leave
+	ret
+OpenWinUpdateHeaderMenuBar	endp
+endif		;--------------------------------------------------------------
 
 
 COMMENT @----------------------------------------------------------------------

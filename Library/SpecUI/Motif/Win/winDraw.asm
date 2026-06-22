@@ -1092,12 +1092,6 @@ REVISION HISTORY:
 
 OpenWinDrawHeaderTitleBackground	proc	near
 	class	OLWinClass
-	;
-	; Code added 2/ 6/92 to get rid of title on maximized windows.
-	; 
-	call	OpenWinCheckMenusInHeader
-	LONG	jc	exit		;menus in header, don't draw title
-
 	push	bp			; Save instance data pointer
 	push	ax, cx			;preserve color scheme and draw flags
 	push	si

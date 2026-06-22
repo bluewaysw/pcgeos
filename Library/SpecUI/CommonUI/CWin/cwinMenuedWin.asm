@@ -1647,7 +1647,7 @@ InvalidateMenuBarGeometryIfMenusInHeader	proc	near	uses	si, es
 	jnc	done
 	call	WinClasses_DerefVisSpec_DI
 	mov	si, ds:[di].OLMDWI_menuBar
-	mov	cl, mask VOF_GEOMETRY_INVALID
+	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_IMAGE_INVALID
 	mov	dl, VUM_MANUAL
 	mov	ax, MSG_VIS_MARK_INVALID
 	call	WinClasses_ObjCallInstanceNoLock
