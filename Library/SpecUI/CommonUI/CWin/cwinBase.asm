@@ -5432,6 +5432,13 @@ endif	; if _GCM -------------------------------------------------------------
 	call	WinClasses_DerefVisSpec_DI		; ds:di = instance data
 	test	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 	jz	done				; nope
+if TOOL_AREA_IS_TASK_BAR
+	push	ds
+	segmov	ds, dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED
+	pop	ds
+	jnz	done				; taskbar is not in the header
+endif
 	push	bp				;save right side width
 	call	OLBaseWinGetExpressMenuButtonWidth	; bp = width
 	dec	bp				;overlap express menu button

@@ -175,7 +175,7 @@ OpenWinGetInsideBorderBounds	proc	near
 	add	bx, 4
 	sub	cx, 4
 	sub	dx, 4
-done:	
+done:
 	ret
 OpenWinGetInsideBorderBounds	endp
 
@@ -193,7 +193,7 @@ CALLED BY:	utility
 PASS:		ds:*si	- handle of instance data
 		ds:bp	- pointer to instance data
 
-RETURN:		(ax, bx, cx, dx) = bounds		
+RETURN:		(ax, bx, cx, dx) = bounds
 
 DESTROYED:	nothing
 
@@ -204,7 +204,7 @@ REVISION HISTORY:
 	----	----		-----------
 	Eric	9/89		split from OpenLook code.
 	Chris	4/91		Updated for new graphics, bounds conventions
-	
+
 ------------------------------------------------------------------------------@
 
 OpenWinGetHeaderBounds	proc	near
@@ -299,7 +299,7 @@ if not NORMAL_HEADERS_ON_DISABLED_WINDOWS	; only 50% if disabling headers
 	mov	al, SDM_50		; else draw everything 50%
 	call	GrSetTextMask
 	call	GrSetLineMask
-	
+
 OWD_drawHeader:
 endif
 	call	OpenWinDrawHeaderTitleBackground
@@ -307,7 +307,7 @@ endif
 	mov	al, SDM_100		; else draw everything 100%
 	call	GrSetTextMask
 	call	GrSetLineMask
-	
+
 OWD_noHeader:
 	mov	bp, di			;bp = GState
 					;Then call parent class, to do children
@@ -388,7 +388,7 @@ DrawTitleChildren	proc	near
 	test	ds:[di].VCI_geoAttrs, mask VCGA_ONLY_DRAWS_IN_MARGINS
 	jnz	10$		; IMAGE_INVALID only covers margins, must
 				;   continue -cbh 12/17/91
-	test	ds:[di].VI_optFlags, mask VOF_IMAGE_INVALID 
+	test	ds:[di].VI_optFlags, mask VOF_IMAGE_INVALID
 	jnz	VCD_done	; if not, skip drawing it
 10$:
 	; allocate frame on the stack to hold update bounds
@@ -428,7 +428,7 @@ DrawTitleChildren	endp
 DTC_callBack	proc	far
 	class	VisCompClass		; Tell Esp we're a friend of VisComp
 					; so we can use its instance data.
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].VI_attrs, mask VA_DRAWABLE
 	jz	done
@@ -536,7 +536,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Draw a border around window
 
 CALLED BY:	OpenWinDraw
-	
+
 PASS:		ds:*si	- instance data
 		ds:bp	- pointer to instance data
 		es	- segment of OLWinClass
@@ -549,10 +549,10 @@ RETURN:		nothing
 DESTROYED:	bx, dx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -615,7 +615,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -633,6 +633,11 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	class	OLWinClass
 	uses	bp, ax, cx, bp
 	.enter
+	;
+	; Code added 2/ 6/92 to get rid of title on maximized windows.
+	;
+;	call	OpenWinCheckMenusInHeader
+;	jc	done			;menus in header, don't draw title
 
 	;reset some invalid flags for this window, to indicate that draw
 	;has occurred.
@@ -671,23 +676,23 @@ haveColor:
 	call	OpenWinCheckIfBordered
 	jnc	10$
 
-	call	OpenWinCheckMenusInHeader
-	jc	5$
-	add	ax, 4			;4 pixel offset 
+	;call	OpenWinCheckMenusInHeader
+	;jc	5$
+	add	ax, 4			;4 pixel offset
 	sub	cx, 4			;4 pixel offset
-	jmp	10$
-5$:
-	add	ax, 2			;inside window border
-	sub	cx, 2			;inside window border
+;	jmp	10$
+;5$:
+;	add	ax, 2			;inside window border
+;	sub	cx, 2			;inside window border
 10$:
-	push	ax, cx 
-	call	OpenWinCheckMenusInHeader
-	jnc	20$
-	call	OpenWinGetHeaderBounds
-	jmp	30$
-20$:
+	push	ax, cx
+;	call	OpenWinCheckMenusInHeader
+;	jnc	20$
+;	call	OpenWinGetHeaderBounds
+;	jmp	30$
+;20$:
 	call	OpenWinGetHeaderTitleBounds
-30$:
+;30$:
 	pop	ax, cx
 
 	;
@@ -711,7 +716,7 @@ afterDraw:
 
 	dec	cx
 	dec	dx
-	call	GrDrawRect		;draw rect for BW if not target  
+	call	GrDrawRect		;draw rect for BW if not target
 done:
 	.leave
 	ret
@@ -772,7 +777,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -788,7 +793,7 @@ REVISION HISTORY:
 
 CGA_TITLE_TEXT_Y_OFFSET	=	-1
 GCM_CGA_TITLE_TEXT_Y_OFFSET = 	-1
-			    
+
 TITLE_TEXT_Y_OFFSET	=	2
 GCM_TITLE_TEXT_Y_OFFSET	=	6	;for non CGA only
 
@@ -797,7 +802,7 @@ OpenWinDrawHeaderTitle	proc	near
 
 	;
 	; Code added 2/ 6/92 to get rid of title on maximized windows.
-	; 
+	;
 	call	OpenWinCheckMenusInHeader
 	LONG	jc	exit		;menus in header, don't draw title
 
@@ -812,7 +817,7 @@ EC <	call	GenCheckGenAssumption	;Make sure gen data exists 	>
 	mov	cl, mask OLWHS_TITLE_IMAGE_INVALID or \
 		    mask OLWHS_FOCUS_AREA_INVALID
 	call	OpenWinHeaderResetInvalid
-   
+
 	test	ds:[bp].OLWI_attrs, mask OWA_TITLED
 	LONG	jz done			;skip if not titled...
 
@@ -849,7 +854,7 @@ EC <	call	GenCheckGenAssumption	;Make sure gen data exists 	>
 
 ;HACK
 20$:	test	ds:[bp].OLWI_fixedAttr, mask OWFA_GCM_TITLED
-	jz	30$			;If not GCM, branch	
+	jz	30$			;If not GCM, branch
 	mov	bx, GCM_TITLE_TEXT_Y_OFFSET-TITLE_TEXT_Y_OFFSET
 	call	OpenCheckIfCGA		;see if on CGA
 	jnc	30$			;not CGA, branch
@@ -875,12 +880,12 @@ notCGA:
 	mov	ss:[bp].DMA_yInset, bx			;and y inset
 	mov	ss:[bp].DMA_xMaximum, cx		;titlearea is max width
 	mov	ss:[bp].DMA_yMaximum, MAX_COORD		;don't clip Y
-	
+
 	mov	cl, (J_LEFT shl offset DMF_X_JUST) or \
 		    (J_LEFT shl offset DMF_Y_JUST) or \
 		    mask DMF_CLIP_TO_MAX_WIDTH or \
 		    mask DMF_TEXT_ONLY
-		    
+
 	call	OpenWinDrawMoniker			;draw it
 	pop	di					;restore gstate
 	add	sp, size DrawMonikerArgs		;dump args
