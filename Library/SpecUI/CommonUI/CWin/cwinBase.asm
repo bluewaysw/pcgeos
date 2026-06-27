@@ -5433,6 +5433,8 @@ endif	; if _GCM -------------------------------------------------------------
 	test	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 	jz	done				; nope
 if TOOL_AREA_IS_TASK_BAR
+	; if the taskbar is enabled, the width of the express menu
+	; must not be reserved inside the window header.
 	push	ds
 	segmov	ds, dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED
