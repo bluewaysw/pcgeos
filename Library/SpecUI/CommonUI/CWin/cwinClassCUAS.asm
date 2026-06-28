@@ -1326,7 +1326,8 @@ noRightGroupPosition:
 	mov	ax, offset SMI_Close		;chunk handle of menu item
 	mov	bl, mask OLWSI_CLOSABLE		;mask for Close icon
 if _ISUI
-	add	cx, 2				;gap between min/max & close
+	add	cx, ISUI_CLOSE_BUTTON_LEFT_SPACING
+						;gap between min/max and close
 	mov	bp, offset SMI_CloseIcon	;chunk handle of icon
 else
 	clr	bp				;pass: no icon

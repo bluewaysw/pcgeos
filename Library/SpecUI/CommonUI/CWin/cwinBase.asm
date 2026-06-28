@@ -5089,7 +5089,8 @@ else
 	jc	5$				; yes, skip this
 	call	OpenWinCheckMenusInHeader	; are we in the header?
 	jnc	5$				; nope, done
-	add	cx, 3				; match combined menu-bar height
+	add	cx, ISUI_COMBINED_MENU_BAR_HEIGHT_EXTRA
+						; match combined menu-bar height
 endif
 5$:
 MO <	push	ds							>
