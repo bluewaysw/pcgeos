@@ -5471,7 +5471,8 @@ else
 if _MOTIF
 	call	OpenWinCheckMenusInHeader
 	jnc	done
-	inc	dx				; include combined header bottom edge
+	add	dx, MO_COMBINED_HEADER_BOTTOM_EDGE
+						; include combined header bottom edge
 endif
 endif
 done:

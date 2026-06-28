@@ -5075,7 +5075,8 @@ if _MOTIF
 	mov	cx, dx				; cx = canonical title height
 	call	OpenCheckIfBW
 	jc	5$
-	add	cx, 2				; canceled by color inset below
+	add	cx, MO_TITLE_BUTTON_COLOR_INSET
+						; canceled by color inset below
 else
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	cx, ds:[di].OLWI_titleBarBounds.R_top
@@ -5096,7 +5097,7 @@ MO <	mov	ds, ax							>
 MO <	test	ds:[moCS_flags], mask CSF_BW	; Is this a B&W display?>
 MO <	pop	ds							>
 MO <	jnz	20$				;   skip if so...	>
-MO <	sub	cx, 2				; Nest icon inside resize  >
+MO <	sub	cx, MO_TITLE_BUTTON_COLOR_INSET	; Nest icon inside resize  >
 MO <20$:					;   display		   >
 
 ISU <	push	ds							>

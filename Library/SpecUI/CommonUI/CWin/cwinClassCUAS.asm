@@ -1687,7 +1687,8 @@ if _MOTIF
 	call	WinCommon_ObjCallInstanceNoLock
 	call	OpenCheckIfBW
 	jc	haveCanonicalHeight
-	add	dx, 2				; canceled by color inset below
+	add	dx, MO_TITLE_BUTTON_COLOR_INSET
+						; canceled by color inset below
 haveCanonicalHeight:
 	pop	ax, bx, bp			; restore width, flags and icon
 endif
@@ -1740,7 +1741,7 @@ MO <	mov	ds, ax							>
 MO <	test	ds:[moCS_flags], mask CSF_BW	; Is this a B&W display?>
 MO <	pop	ds							>
 MO <	jnz	20$				;   skip if so...	>
-MO <	sub	dx, 2				; Nest icon inside resize  >
+MO <	sub	dx, MO_TITLE_BUTTON_COLOR_INSET	; Nest icon inside resize  >
 MO <	dec	cx				;   bars & title in a color>
 MO <20$:					;   display		   >
 
