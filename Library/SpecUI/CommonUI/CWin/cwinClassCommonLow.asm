@@ -5400,7 +5400,8 @@ if _ISUI					; ISUI has a separate right close button
 	jmp	short afterCloseWidth		; minimize supplies the close action
 addCloseWidth:
 	pop	ax				; restore returned left width
-	add	bp, CUAS_WIN_ICON_WIDTH+1	; reserve separate close button
+	add	bp, ISUI_CLOSE_BUTTON_RESERVED_WIDTH
+						; reserve separate close button
 afterCloseWidth:
 endif						; _ISUI
 
@@ -5462,7 +5463,8 @@ OLWinGetTitleBarHeight	method dynamic	OLWinClass, \
 if _ISUI
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done
-	sub	dx, 4				; margins = 2 above / 2 below
+	sub	dx, ISUI_TITLE_BUTTON_VERTICAL_INSET
+						; margins = 2 above / 2 below
 else
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done

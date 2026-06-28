@@ -1146,7 +1146,8 @@ adjustTitleForClose:
 	call	OpenCheckIfKeyboardOnly		; carry set if so
 	jc	40$
 
-	sub	ds:[di].OLWI_titleBarBounds.R_right, CUAS_WIN_ICON_WIDTH+1
+	sub	ds:[di].OLWI_titleBarBounds.R_right, \
+				ISUI_CLOSE_BUTTON_RESERVED_WIDTH
 40$:
 endif
 
@@ -1457,7 +1458,8 @@ else
 if _ISUI
 	call	OpenCheckIfBW			; that's all for BW
 	jc	gotHeight
-	sub	ax, 4				; margins = 2 above / 2 below
+	sub	ax, ISUI_TITLE_BUTTON_VERTICAL_INSET
+						; margins = 2 above / 2 below
 gotHeight:
 else
 	call	OpenCheckIfBW			; that's all for BW
@@ -1643,7 +1645,8 @@ if _ISUI
 notSysMenuButton:
 	call	OpenCheckIfBW			; that's all for BW
 	jc	10$
-	sub	dx, 4				; margins = 2 above / 2 below
+	sub	dx, ISUI_TITLE_BUTTON_VERTICAL_INSET
+						; margins = 2 above / 2 below
 10$:
 	; we need to adjust the width of the button if it is a SMI_CloseIcon
 	; button for GenPrimary and we are in ConsumerUI

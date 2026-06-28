@@ -25,11 +25,11 @@ ROUTINES:
 
     INT AppCommonFarRet         Answer a generic query or two.
 
-    MTD MSG_SPEC_GUP_QUERY_VIS_PARENT 
+    MTD MSG_SPEC_GUP_QUERY_VIS_PARENT
 				Respond to a query travaeling up the
 				generic composite tree
 
-    MTD MSG_SPEC_VUP_GET_WIN_SIZE_INFO 
+    MTD MSG_SPEC_VUP_GET_WIN_SIZE_INFO
 				Returns margins for use with windows that
 				wish to avoid extending over icon areas in
 				the parent window.  Also size of window
@@ -163,7 +163,7 @@ OLScreenSpecBuild	method dynamic	OLScreenClass, MSG_SPEC_BUILD
 	mov	bx, ds:[di].GSCI_videoDriver
 					; See if video driver to build for
 					; is set up.
-EC <	tst	bx		>	
+EC <	tst	bx		>
 EC <	ERROR_Z	OL_ERROR	>
 
 	push	si
@@ -290,15 +290,15 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	; make sure we've got what we're looking for
 	;
 	cmp	cx, MANUFACTURER_ID_GEOWORKS
-	jne	callSuper
+LONG 	jne	callSuper
 	cmp	dx, GWNT_HOST_DISPLAY_SIZE_CHANGE
-	jne	callSuper
+LONG	jne	callSuper
 
 	push 	si, ds, di
 	; set the video mode again
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	mov	bx, ds:[di].GSCI_videoDriver	
+	mov	bx, ds:[di].GSCI_videoDriver
 
 	; get driver strategy
 	push	bx
@@ -310,7 +310,7 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	pop  	ax,bx,cx,dx,si,di,bp,es
 
 	; call update escape function
-	mov	di, VID_ESC_UPDATE_DEVICE 
+	mov	di, VID_ESC_UPDATE_DEVICE
 	call	ds:[si].DIS_strategy
 
 	; update screen coordinates
@@ -404,7 +404,7 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	mov	ax, ds:[di].GSCI_videoDriver	
+	mov	ax, ds:[di].GSCI_videoDriver
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	bx, ds:[di].VCI_window
@@ -428,7 +428,7 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	push 	si, ds, di
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	mov	bx, ds:[di].GSCI_videoDriver	
+	mov	bx, ds:[di].GSCI_videoDriver
 
 	; get driver strategy
 	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
@@ -498,7 +498,7 @@ OLScreenOpenWin	method dynamic	OLScreenClass, MSG_VIS_OPEN_WIN
 
 	tst	ds:[di].VCI_window	; already have a window?
 	jnz	GSOW_90			; if so, can't open a new one
-	
+
 				; Get bounds of window
 	push	si				; just saving this reg, not
 						; passing to WinOpen...
@@ -640,13 +640,13 @@ CALLED BY:	MSG_SPEC_GUP_QUERY
 PASS:		*ds:si	= instance data
 		cx	= query type (GenQueryType or SpecGenQueryType)
 RETURN:		carry	= set if acknowledged, clear if not
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -721,10 +721,10 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLScreenGupQueryVisParent	method	dynamic OLScreenClass, 
+OLScreenGupQueryVisParent	method	dynamic OLScreenClass,
 					MSG_SPEC_GUP_QUERY_VIS_PARENT
 	; Return our OD, in cx:dx, & window handle in bp, for ALL requests.
-	; We're the window of last resort, if no one else wants to be a 
+	; We're the window of last resort, if no one else wants to be a
 	; parent.
 	;
 	mov	cx, ds:[LMBH_handle]
@@ -737,7 +737,7 @@ OLScreenGupQueryVisParent	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLScreenGetWinSizeInfo -- 
+METHOD:		OLScreenGetWinSizeInfo --
 		MSG_SPEC_VUP_GET_WIN_SIZE_INFO for OLScreenClass
 
 DESCRIPTION:	Returns margins for use with windows that wish to avoid
@@ -753,7 +753,7 @@ RETURN:		cx, dx  - size of window area
 		bp high - margins to the right edge of object
 		ax, cx, dx - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -773,7 +773,7 @@ REVISION HISTORY:
 OLScreenGetWinSizeInfo	method dynamic	OLScreenClass, \
 				MSG_SPEC_VUP_GET_WIN_SIZE_INFO
 	call	VisGetSize		;return current size
-	
+
 	;return margin info in bp - is used for staggered windows which
 	;want to extend ALMOST to their parent's limits - so that they don't
 	;cover the icon area, etc.
