@@ -636,11 +636,11 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	.enter
 	;
 	; Code added 2/ 6/92 to get rid of title on maximized windows.
-	; 06/2026: We now better support menus in header bars and want a background,
-	; so we disable the skip.
+	; 06/2026: We now better support menus in header bars,
+	; but still want no backgrounds in menubar-turned-title-bars
 	;
-;	call	OpenWinCheckMenusInHeader
-;	jc	done			;menus in header, don't draw title
+	call	OpenWinCheckMenusInHeader
+	jc	done			;menus in header, don't draw title
 
 	;reset some invalid flags for this window, to indicate that draw
 	;has occurred.
