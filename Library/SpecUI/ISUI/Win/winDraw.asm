@@ -324,6 +324,7 @@ OWD_noHeader:
 	jz	gotChildren
 	call	DrawTitleChildren
 gotChildren:
+
 	; Darken background if necessary
 
 	mov	bp, ds:[si]
@@ -635,6 +636,8 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	.enter
 	;
 	; Code added 2/ 6/92 to get rid of title on maximized windows.
+	; 06/2026: We now better support menus in header bars and want a background,
+	; so we disable the skip.
 	;
 ;	call	OpenWinCheckMenusInHeader
 ;	jc	done			;menus in header, don't draw title
@@ -676,23 +679,11 @@ haveColor:
 	call	OpenWinCheckIfBordered
 	jnc	10$
 
-	;call	OpenWinCheckMenusInHeader
-	;jc	5$
 	add	ax, 4			;4 pixel offset
 	sub	cx, 4			;4 pixel offset
-;	jmp	10$
-;5$:
-;	add	ax, 2			;inside window border
-;	sub	cx, 2			;inside window border
 10$:
 	push	ax, cx
-;	call	OpenWinCheckMenusInHeader
-;	jnc	20$
-;	call	OpenWinGetHeaderBounds
-;	jmp	30$
-;20$:
 	call	OpenWinGetHeaderTitleBounds
-;30$:
 	pop	ax, cx
 
 	;
