@@ -1392,11 +1392,18 @@ OpenWinGetTitleBarGroupSize	proc	far
 	mov	dx, mask RSA_CHOOSE_OWN_SIZE
 	mov	ax, MSG_VIS_RECALC_SIZE
 ;	mov	ax, MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED
+	push	bp				; preserve title-group selector
 	call	WinCommon_ObjCallInstanceNoLock	; cx = width, dx = height
 	call	OpenCheckIfBW
-	jnc	unlockDone
-	jcxz	unlockDone			; keep non-negative
+	jnc	haveGroupWidth
+	jcxz	haveGroupWidth			; keep non-negative
 	dec	cx				; so we overlap adjacent button
+haveGroupWidth:
+	pop	bp				; restore title-group selector
+	cmp	bp, offset OLWI_titleBarRightGroup
+	jne	unlockDone
+	add	cx, TITLE_RIGHT_GROUP_CONTROL_SPACING
+						; gap before standard controls
 unlockDone:
 	call	ObjSwapUnlock
 done:
