@@ -5081,14 +5081,15 @@ else
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	cx, ds:[di].OLWI_titleBarBounds.R_top
 
-	;Fairly bad hacks to match menu bar height.  -cbh 6/29/92
-	;Must match similar code in EnableDisableAndPosSysIcon.
+	; ISUI calculates the menu bar independently from the title bounds.
+	; In a combined header its outer height is three pixels greater, so
+	; include that difference when sizing the express tool area.
 
 	call	OpenWinCheckIfSquished		; running CGA?
 	jc	5$				; yes, skip this
 	call	OpenWinCheckMenusInHeader	; are we in the header?
 	jnc	5$				; nope, done
-	add	cx, 3				; else expand to match menu bar
+	add	cx, 3				; match combined menu-bar height
 endif
 5$:
 MO <	push	ds							>
