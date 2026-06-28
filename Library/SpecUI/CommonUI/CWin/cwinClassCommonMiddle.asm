@@ -1345,7 +1345,7 @@ OpenWinUpdateHeaderMenuBar	proc	near	uses	ax, cx, dx, si, di
 	jnc	done
 	call	WinCommon_DerefVisSpec_DI
 	mov	si, ds:[di].OLMDWI_menuBar
-	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_IMAGE_INVALID
+	mov	cl, mask VOF_IMAGE_INVALID
 	mov	dl, VUM_NOW
 	mov	ax, MSG_VIS_MARK_INVALID
 	call	WinCommon_ObjCallInstanceNoLock
