@@ -3824,7 +3824,7 @@ OLRedoMenuBarGeometryIfMenusInHeader	proc	near
 	push	si
 	mov	bx, ds:[LMBH_handle]
 	mov	si, ds:[di].OLMDWI_menuBar
-	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_IMAGE_INVALID
+	mov	cl, mask VOF_GEOMETRY_INVALID
 	mov	dl, VUM_NOW
 	mov	ax, MSG_VIS_MARK_INVALID
 	mov	di, mask MF_FORCE_QUEUE or mask MF_INSERT_AT_FRONT
