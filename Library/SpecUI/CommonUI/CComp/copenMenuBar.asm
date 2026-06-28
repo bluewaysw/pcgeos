@@ -701,20 +701,20 @@ ISU <	mov	dl, ah				; Pass Display type in dl >
 	;
 	; call procedure in DrawBW or DrawColor resource
 	;
-;ISU <	call	OpenCheckMenusInHeaderOnMax				>
-;ISU <	jnc	drawMenuBarFrame					>
-;ISU <	push	ax							>
-;ISU <	push	cx							>
-;ISU <	push	dx							>
-;ISU <	mov	ax, MSG_OL_WIN_IS_MAXIMIZED				>
-;ISU <	call	VisCallParent						>
-;ISU <	pop	dx							>
-;ISU <	pop	cx							>
-;ISU <	pop	ax							>
-;ISU <	jnc	noMenuBarFrame						>
-;ISU <drawMenuBarFrame:							>
-;	call	DrawColorOrBWMenuBar
-;ISU <noMenuBarFrame:							>
+ISU <	call	OpenCheckMenusInHeaderOnMax				>
+ISU <	jnc	drawMenuBarFrame					>
+ISU <	push	ax							>
+ISU <	push	cx							>
+ISU <	push	dx							>
+ISU <	mov	ax, MSG_OL_WIN_IS_MAXIMIZED				>
+ISU <	call	VisCallParent						>
+ISU <	pop	dx							>
+ISU <	pop	cx							>
+ISU <	pop	ax							>
+ISU <	jc	noMenuBarFrame						>
+ISU <drawMenuBarFrame:							>
+	call	DrawColorOrBWMenuBar
+ISU <noMenuBarFrame:							>
 	pop	ax, bp, si, es, cx
 
 if HIGHLIGHT_MNEMONICS	;------------------------------------------------------
