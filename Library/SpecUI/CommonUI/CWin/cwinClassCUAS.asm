@@ -1005,7 +1005,8 @@ endif
 	call	WinCommon_DerefVisSpec_DI
 	add	ds:[di].OLWI_titleBarBounds.R_left, cx
 
-ISU <	add	ds:[di].OLWI_titleBarBounds.R_left, ISUI_SYS_MENU_FUDGE >
+ISU <	add	ds:[di].OLWI_titleBarBounds.R_left, \
+				ISUI_SYS_MENU_RESERVED_WIDTH_EXTRA	>
 
 	or	bh, mask OLWSI_SYS_MENU		; flag so System menu button
 						; will be visible
@@ -1252,7 +1253,7 @@ if _ISUI
 endif
 	mov_tr	ax, cx
 	call	OpenWinGetSysMenuButtonWidth	; cx = button width
-ISU <	add	cx, ISUI_SYS_MENU_FUDGE		; ISUI sysMenuButton is wider>
+ISU <	add	cx, ISUI_SYS_MENU_RESERVED_WIDTH_EXTRA		>
 	sub	ax, cx
 	mov_tr	cx, ax
 
@@ -1635,8 +1636,9 @@ endif
 if _ISUI
 	cmp	bp, ds:[di].OLWI_sysMenuButton	; sysMenu button is 3 pixels
 	jne	notSysMenuButton		; wider and is as tall as the
-	add	ax, 3+4				; titlebar in ISUI
-						; more room for icon
+	add	ax, ISUI_SYS_MENU_BUTTON_WIDTH_EXTRA + \
+		    ISUI_SYS_MENU_MONIKER_WIDTH_EXTRA
+						; widen button and its moniker area
 	jmp	afterAdjustment
 notSysMenuButton:
 	call	OpenCheckIfBW			; that's all for BW
