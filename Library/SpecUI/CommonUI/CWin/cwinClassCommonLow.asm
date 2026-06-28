@@ -5368,33 +5368,41 @@ afterAdjustments:
 	dec	bp				; Else make adjustment to right
 15$:						;   icon width, who knows why
 
-if _ISUI
-	call	WinCommon_DerefVisSpec_DI
+if _ISUI					; ISUI has a separate right close button
+	;
+	; Keep the returned right-side width in sync with the space removed
+	; from OLWI_titleBarBounds for a separate ISUI close button.
+	;
+	call	WinCommon_DerefVisSpec_DI	; ds:di = window instance
 	test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE
-	jz	afterCloseWidth
+	; does this window have close UI?
+	jz	afterCloseWidth			; no, reserve no close width
 
-	push	ax
+	push	ax				; preserve returned left width
 	call	OpenWinCheckIfMinMaxRestoreControls
-	jnc	addCloseWidth
-	call	WinCommon_DerefVisSpec_DI
+	; are min/max controls allowed?
+	jnc	addCloseWidth			; no minimize button can act as close
+	call	WinCommon_DerefVisSpec_DI	; restore window instance
 	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
-	jz	addCloseWidth
-	mov	ax, TEMP_OL_WIN_HIDE_MINIMIZE
-	call	ObjVarFindData
-	jc	addCloseWidth
+	; can this window have minimize UI?
+	jz	addCloseWidth			; no, close must be separate
+	mov	ax, TEMP_OL_WIN_HIDE_MINIMIZE	; check for hidden minimize UI
+	call	ObjVarFindData			; carry set if minimize is hidden
+	jc	addCloseWidth			; hidden minimize cannot act as close
 	mov	ax, TEMP_OL_WIN_MINIMIZE_IS_CLOSE
-	call	ObjVarFindData
-	jnc	addCloseWidth
-	call	UserGetDefaultUILevel
-	cmp	ax, UIIL_INTRODUCTORY
-	je	addCloseWidth
-	pop	ax
-	jmp	short afterCloseWidth
+	; check for minimize-as-close mode
+	call	ObjVarFindData			; carry set if mode is active
+	jnc	addCloseWidth			; absent mode needs separate close
+	call	UserGetDefaultUILevel		; ax = current UI level
+	cmp	ax, UIIL_INTRODUCTORY		; introductory UI uses separate close
+	je	addCloseWidth			; reserve its close-button width
+	pop	ax				; restore returned left width
+	jmp	short afterCloseWidth		; minimize supplies the close action
 addCloseWidth:
-	pop	ax
-	add	bp, CUAS_WIN_ICON_WIDTH+1
+	pop	ax				; restore returned left width
+	add	bp, CUAS_WIN_ICON_WIDTH+1	; reserve separate close button
 afterCloseWidth:
-endif
+endif						; _ISUI
 
 haveRightWidth:
 
