@@ -1495,8 +1495,11 @@ endif
 	push	cx, dx				; save position
 	mov	cx, mask RSA_CHOOSE_OWN_SIZE
 	mov	dx, ax
+	push	dx				; save canonical title height
 	mov	ax, MSG_VIS_RECALC_SIZE
 	call	WinCommon_ObjCallInstanceNoLock	; cx = width, dx = height
+	pop	bp				; bp = canonical title height
+	mov	dx, bp				; group matches system controls
 	push	cx				; save untweaked width
 
 	push	dx
@@ -1506,8 +1509,24 @@ endif
 	pop	ax				; ax = untweaked width
 	pop	cx, dx				; get position for group
 
+	push	bp
 	mov	ax, MSG_VIS_POSITION_BRANCH
 	call	WinCommon_ObjCallInstanceNoLock
+	pop	bp
+
+	push	bx				; preserve old block handle
+	clr	bx
+	push	bx, bx				; start with first child
+	mov	bx, offset VI_link
+	push	bx
+	mov	bx, SEGMENT_CS
+	push	bx
+	mov	bx, offset SetTitleGroupChildHeight
+	push	bx
+	mov	bx, offset Vis_offset
+	mov	di, offset VCI_comp
+	call	ObjCompProcessChildren
+	pop	bx
 	;
 	;  Last thing to do is set the bits on the object to say
 	;  the geometry has been calculated.
@@ -1531,6 +1550,27 @@ done:
 	.leave
 	ret
 OpenWinPositionTitleBarGroup	endp
+
+SetTitleGroupChildHeight	proc	far
+	;
+	; Match every title-group control to the system-control bounds.
+	;
+	mov	bx, ds:[si]
+	add	bx, ds:[bx].Vis_offset
+	mov	cx, ds:[bx].VI_bounds.R_left
+	mov	bx, es:[di]
+	add	bx, es:[bx].Vis_offset
+	mov	dx, es:[bx].VI_bounds.R_top
+	push	bp
+	mov	ax, MSG_VIS_POSITION_BRANCH
+	call	ObjCallInstanceNoLock		; align child with group top
+	pop	bp
+	call	VisGetSize			; cx = current child width
+	mov	dx, bp				; dx = canonical title height
+	call	VisSetSize
+	clc					; continue with remaining children
+	ret
+SetTitleGroupChildHeight	endp
 
 
 COMMENT @----------------------------------------------------------------------
