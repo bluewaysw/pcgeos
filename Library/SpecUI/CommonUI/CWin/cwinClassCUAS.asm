@@ -1458,17 +1458,6 @@ else
 	dec	ax
 gotHeight:
 endif
-	;
-	; Fairly bad hack to match menu bar height.  -cbh 5/12/92
-	; Must match similar hack in OLBaseWinUpdateExpressToolArea.
-	;
-	call	OpenWinCheckIfSquished		; running CGA?
-	jc	205$				; yes, skip this
-	call	OpenWinCheckMenusInHeader	; are we in the header?
-	jnc	205$				; nope, done
-	add	ax, 3				; else expand to match menu bar
-205$:
-
 	mov	si, ({optr} ds:[di][bp]).chunk
 	call	ObjSwapLock			; *ds:si = title bar group
 						; (bx = OLWin block handle)
@@ -1679,18 +1668,6 @@ notSysMenuButton:
 	pop	bx, si, dx, bp
 afterAdjustment:
 endif
-
-	;
-	; Fairly bad hack to match menu bar height.  -cbh 5/12/92
-	; Must match similar hack in OLBaseWinUpdateExpressToolArea.
-	;
-
-	call	OpenWinCheckIfSquished		; running CGA?
-	jc	5$				; yes, skip this
-	call	OpenWinCheckMenusInHeader	; are we in the header?
-	jnc	5$				; nope, done
-	add	dx, 3				; else expand to match menu bar
-5$:
 
 	mov	di, dx
 	pop	cx, dx
