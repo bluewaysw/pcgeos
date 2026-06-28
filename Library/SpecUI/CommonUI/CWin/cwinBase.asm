@@ -5069,6 +5069,14 @@ if TOOL_AREA_IS_TASK_BAR
 	jnz	done					; skip if taskbar
 endif
 	call	WinClasses_DerefVisSpec_DI
+if _MOTIF
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinClasses_ObjCallInstanceNoLock
+	mov	cx, dx				; cx = canonical title height
+	call	OpenCheckIfBW
+	jc	5$
+	add	cx, 2				; canceled by color inset below
+else
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	cx, ds:[di].OLWI_titleBarBounds.R_top
 
@@ -5080,6 +5088,7 @@ endif
 	call	OpenWinCheckMenusInHeader	; are we in the header?
 	jnc	5$				; nope, done
 	add	cx, 3				; else expand to match menu bar
+endif
 5$:
 MO <	push	ds							>
 MO <	mov	ax, segment dgroup					>

@@ -1444,6 +1444,13 @@ OpenWinPositionTitleBarGroup	proc	near
 	;  actually the wrong height!  See OLWinGetTitleBarHeight
 	;  for more details -- this code needs to match that code.
 	;
+if _MOTIF
+	push	bx, bp, cx, dx			; preserve group and position
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinCommon_ObjCallInstanceNoLock
+	mov	ax, dx				; ax = canonical title height
+	pop	bx, bp, cx, dx
+else
 	mov	ax, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	ax, ds:[di].OLWI_titleBarBounds.R_top	; ax = title bar height
 if _ISUI
@@ -1457,6 +1464,7 @@ else
 	dec	ax				; small adjustment for color
 	dec	ax
 gotHeight:
+endif
 endif
 	mov	si, ({optr} ds:[di][bp]).chunk
 	call	ObjSwapLock			; *ds:si = title bar group
@@ -1669,6 +1677,20 @@ notSysMenuButton:
 afterAdjustment:
 endif
 
+if _MOTIF
+	;
+	; Use the same final height as title-bar buttons.  The color path
+	; below removes two pixels, so include them in its input.
+	;
+	push	ax, bx, bp			; preserve width, flags and icon
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinCommon_ObjCallInstanceNoLock
+	call	OpenCheckIfBW
+	jc	haveCanonicalHeight
+	add	dx, 2				; canceled by color inset below
+haveCanonicalHeight:
+	pop	ax, bx, bp			; restore width, flags and icon
+endif
 	mov	di, dx
 	pop	cx, dx
 readyWithWidthHeight:

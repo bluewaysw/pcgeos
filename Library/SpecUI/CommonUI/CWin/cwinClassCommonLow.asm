@@ -5468,6 +5468,11 @@ else
 	jc	done
 	dec	dx				; small adjustment for color
 	dec	dx
+if _MOTIF
+	call	OpenWinCheckMenusInHeader
+	jnc	done
+	inc	dx				; include combined header bottom edge
+endif
 endif
 done:
 	ret
