@@ -634,6 +634,7 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	class	OLWinClass
 	uses	bp, ax, cx, bp
 	.enter
+
 	;
 	; Code added 2/ 6/92 to get rid of title on maximized windows.
 	; 06/2026: We now better support menus in header bars,

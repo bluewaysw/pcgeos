@@ -1734,6 +1734,8 @@ if _MOTIF
 	;
 	; Use the same final height as title-bar buttons.  The color path
 	; below removes two pixels, so include them in its input.
+	; The canonical height calculation already handles squished/CGA
+	; header sizing and the B&W title-button adjustment.
 	;
 	push	ax, bx, bp			; preserve width, flags and icon
 	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
