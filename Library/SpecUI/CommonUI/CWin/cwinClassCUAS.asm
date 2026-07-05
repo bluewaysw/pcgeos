@@ -1454,6 +1454,11 @@ OpenWinPositionTitleBarGroup	proc	near
 	;  actually the wrong height!  See OLWinGetTitleBarHeight
 	;  for more details -- this code needs to match that code.
 	;
+	;  UPDATE 07/2026: Motif now calls OLWinGetTitleBarHeight
+	;  directly, so the warning above no longer applies there.
+	;  The other UIs still use the duplicated calculation below,
+	;  (see "else") which must remain synchronized.
+	;
 if _MOTIF
 	push	bx, bp, cx, dx			; preserve group and position
 	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
