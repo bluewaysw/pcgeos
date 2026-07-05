@@ -841,18 +841,6 @@ exactNotFound:
 		call	checkIfDesktop
 		popa	;ax, bx, cx, dx, si, bp
 	LONG	jc	openNewWindow
-if 0
-	;
-	; check if already opened
-	;
-		push	bx, cx, es, di
-		mov	cx, bx			; cx = disk handle
-		mov	di, mask MF_CALL or mask MF_FIXUP_DS
-		call	FindFolderWindow	; (don't need ax=obj type)
-		call	ShellFreePathBuffer
-		pop	bx, cx, es, di
-		jc	openNewWindow		; branch to front existing
-endif
 	;
 	; if opening wastebasket, use regular routine (will bring
 	; already opened wastebasket window to the front)
