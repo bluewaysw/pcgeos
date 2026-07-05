@@ -672,7 +672,12 @@ CUAS <	mov	dx, ax			;use minimum height		>
 	mov	ax, ATTR_OL_BUTTON_IN_TITLE_BAR
 	call	ObjVarFindData
 	jc	inTitleBar
-if _MOTIF or _ISUI
+	;
+	; ISUI promotes maximized menu-bar buttons to title-bar height.
+	; Motif must not: restored maximize state is visible here earlier
+	; than fresh maximize state, producing inconsistent menu heights.
+	;
+if _ISUI
 	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR
 	jz	notInTitleBar
 	call	OpenCheckMenusInHeaderOnMax
@@ -682,6 +687,9 @@ if _MOTIF or _ISUI
 	call	CallOLWin
 	pop	cx			; restore width
 	jnc	notInTitleBar
+	jmp	inTitleBar
+else
+	jmp	notInTitleBar
 endif
 inTitleBar:
 	push	cx			; save width
