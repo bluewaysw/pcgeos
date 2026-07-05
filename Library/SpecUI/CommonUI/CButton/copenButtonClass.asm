@@ -673,6 +673,12 @@ CUAS <	mov	dx, ax			;use minimum height		>
 	call	ObjVarFindData
 	jc	inTitleBar
 if _ISUI
+	;
+	; ISUI suppresses the menu-bar frame when the bar is embedded in a
+	; maximized header; the window draws the combined frame instead.
+	; Its menu buttons must therefore use the same usable height as the
+	; title-bar controls when menus-in-header mode is active.
+	;
 	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR
 	jz	notInTitleBar
 	call	OpenCheckMenusInHeaderOnMax
