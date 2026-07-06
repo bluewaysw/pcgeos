@@ -5312,6 +5312,10 @@ endif
 	jnc	5$				;CHECK BW FOR CUA LOOK
 	dec	cx				;needed for correct menu bar
 5$:						; position now (cbh 2/15/92)
+	;
+	; Combined headers expose an old ISUI mismatch: system-menu placement
+	; adds this extra width, so the returned title bounds must reserve it.
+	;
 ISU <	add	cx, ISUI_SYS_MENU_RESERVED_WIDTH_EXTRA		>
 	mov	ax, cx				;ax = left icon width
 						; (system menu icon only,
@@ -5370,8 +5374,10 @@ afterAdjustments:
 
 if _ISUI					; ISUI has a separate right close button
 	;
-	; Keep the returned right-side width in sync with the space removed
-	; from OLWI_titleBarBounds for a separate ISUI close button.
+	; Combined headers use MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS to fit the
+	; menu bar between the controls.  ISUI already removed its separate
+	; close button from OLWI_titleBarBounds.R_right, but omitted it from
+	; the returned right width (bp), which was harmless without menus here.
 	;
 	call	WinCommon_DerefVisSpec_DI	; ds:di = window instance
 	test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE

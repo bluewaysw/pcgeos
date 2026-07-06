@@ -699,8 +699,11 @@ ISU <	mov	dl, ah				; Pass Display type in dl >
 	mov	cl, al				; Pass color scheme in cl
 						; (ax & bx get trashed)
 	;
-	; call procedure in DrawBW or DrawColor resource
-	; ISUI's combined header supplies the menu-bar frame.
+	; Normally the menu bar is a separate row and needs its inset frame.
+	; If ISUI's combined-header option is enabled, query the window because
+	; only maximized windows actually move the menu bar into the title row.
+	; Preserve the drawing arguments across that query, and skip the inset
+	; frame when the window already draws one around the combined header.
 	;
 ISU <	call	OpenCheckMenusInHeaderOnMax				>
 ISU <	jnc	drawMenuBarFrame					>

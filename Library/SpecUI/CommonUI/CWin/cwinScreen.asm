@@ -287,8 +287,8 @@ idata	ends
 
 OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	;
-	; make sure we've got what we're looking for
-	; LONG branches keep the expanded notification handler in range.
+	; Handle only host display-size changes here; pass all other
+	; notifications to the superclass beyond the inline resize code.
 	;
 	cmp	cx, MANUFACTURER_ID_GEOWORKS
 LONG 	jne	callSuper
