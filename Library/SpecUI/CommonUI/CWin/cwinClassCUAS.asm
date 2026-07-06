@@ -1519,6 +1519,9 @@ endif
 	call	WinCommon_ObjCallInstanceNoLock
 	pop	bp
 
+	;
+	; Reapply the canonical height to each control in the title group.
+	;
 	push	bx				; preserve old block handle
 	clr	bx
 	push	bx, bx				; start with first child

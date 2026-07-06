@@ -5460,6 +5460,9 @@ OLWinGetTitleBarHeight	method dynamic	OLWinClass, \
 	mov	bp, di				; ds:bp - instance data
 	call	OpenWinGetHeaderBounds		; (ax, bx, cx, dx) = bounds
 	sub	dx, bx				; dx = height
+	;
+	; Convert outer header bounds to the usable title-control height.
+	;
 if _ISUI
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done

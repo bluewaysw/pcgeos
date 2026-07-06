@@ -288,6 +288,7 @@ idata	ends
 OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	;
 	; make sure we've got what we're looking for
+	; LONG branches keep the expanded notification handler in range.
 	;
 	cmp	cx, MANUFACTURER_ID_GEOWORKS
 LONG 	jne	callSuper

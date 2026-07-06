@@ -700,6 +700,7 @@ ISU <	mov	dl, ah				; Pass Display type in dl >
 						; (ax & bx get trashed)
 	;
 	; call procedure in DrawBW or DrawColor resource
+	; ISUI's combined header supplies the menu-bar frame.
 	;
 ISU <	call	OpenCheckMenusInHeaderOnMax				>
 ISU <	jnc	drawMenuBarFrame					>
@@ -1005,6 +1006,9 @@ OLMenuBarRecalcSize	method dynamic	OLMenuBarClass, \
 	jnc	20$
 	push	ax
 	push	cx
+	;
+	; Use title bounds only when both icon reservations fit the width.
+	;
 	mov	ax, MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 	call	VisCallParent
 	sub	cx, ax				;subtract left icon widths

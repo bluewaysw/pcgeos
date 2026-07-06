@@ -5070,6 +5070,10 @@ if TOOL_AREA_IS_TASK_BAR
 endif
 	call	WinClasses_DerefVisSpec_DI
 if _MOTIF
+	;
+	; Size the express tool area from the same canonical height as the
+	; adjacent title-bar controls.
+	;
 	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
 	call	WinClasses_ObjCallInstanceNoLock
 	mov	cx, dx				; cx = canonical title height
