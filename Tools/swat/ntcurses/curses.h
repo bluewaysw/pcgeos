@@ -79,6 +79,7 @@ typedef struct {
 #define PAGE_DOWN_EXTENDED	0x22
 #define HOME_EXTENDED		0x24
 #define END_EXTENDED		0x23
+#define DELETE_EXTENDED		0x2e
 
 #define UP_ARROW_ASCII		0xc8		
 #define DOWN_ARROW_ASCII	0xd0
@@ -88,6 +89,7 @@ typedef struct {
 #define PAGE_DOWN_ASCII		0xd1
 #define HOME_ASCII		0xc7
 #define END_ASCII		0xcf
+#define DELETE_ASCII		0xd3
 
 #ifndef	 bool
 #define  bool		char		/* boolean type */
