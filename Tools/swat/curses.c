@@ -3766,6 +3766,7 @@ CursesDecodeEscape(void)
     int		    n;
     int		    button;
     int		    decoded;
+    int		    digit;
 
     if (!CursesGetPendingChar(&c) || ((c != '[') && (c != 'O'))) {
 	return -1;
@@ -3827,8 +3828,10 @@ CursesDecodeEscape(void)
 		return END_ASCII;
 	    case '~':
 		n = 0;
-		for (i = 1; i < (int)sizeof(seq) && isdigit(seq[i]); i++) {
-		    n = (n * 10) + seq[i] - '0';
+		for (digit = 1; digit < (int)sizeof(seq) &&
+		     isdigit(seq[digit]); digit++)
+		{
+		    n = (n * 10) + seq[digit] - '0';
 		}
 		switch (n) {
 		    case 1:
