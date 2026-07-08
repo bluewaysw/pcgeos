@@ -3647,6 +3647,59 @@ int getch2() {
 #endif
 
 #if defined(_LINUX)
+typedef struct {
+    char	    *name;
+    char	    *cap;
+    unsigned char   key;
+} CursesTermcapKey;
+
+static CursesTermcapKey cursesTermcapKeys[] = {
+    {"ku", NULL, UP_ARROW_ASCII},
+    {"kd", NULL, DOWN_ARROW_ASCII},
+    {"kl", NULL, LEFT_ARROW_ASCII},
+    {"kr", NULL, RIGHT_ARROW_ASCII},
+    {"kh", NULL, HOME_ASCII},
+    {"@7", NULL, END_ASCII},
+    {"kH", NULL, END_ASCII},
+    {"kD", NULL, DELETE_ASCII},
+    {"kP", NULL, PAGE_UP_ASCII},
+    {"kN", NULL, PAGE_DOWN_ASCII}
+};
+
+static void
+CursesInitTermcapKeys(void)
+{
+    int	    i;
+
+    for (i = 0; i < (int)(sizeof(cursesTermcapKeys) /
+			  sizeof(cursesTermcapKeys[0])); i++)
+    {
+	cursesTermcapKeys[i].cap = getcap(cursesTermcapKeys[i].name);
+    }
+}
+
+/* Prefer termcap keys; keep the xterm parser below as fallback. */
+static int
+CursesDecodeTermcapKey(unsigned char *seq, int len)
+{
+    CursesTermcapKey	*key;
+    int			i;
+
+    for (i = 0; i < (int)(sizeof(cursesTermcapKeys) /
+			  sizeof(cursesTermcapKeys[0])); i++)
+    {
+	key = &cursesTermcapKeys[i];
+	if ((key->cap != NULL) &&
+	    (key->cap[0] == 0x1b) &&
+	    (strlen(key->cap + 1) == len) &&
+	    (memcmp(key->cap + 1, seq, len) == 0))
+	{
+	    return key->key;
+	}
+    }
+    return -1;
+}
+
 /***********************************************************************
  *				CursesSetXtermMouse
  ***********************************************************************
@@ -3712,6 +3765,7 @@ CursesDecodeEscape(void)
     int		    i;
     int		    n;
     int		    button;
+    int		    decoded;
 
     if (!CursesGetPendingChar(&c) || ((c != '[') && (c != 'O'))) {
 	return -1;
@@ -3723,6 +3777,13 @@ CursesDecodeEscape(void)
 	    return -1;
 	}
 	c = seq[i];
+
+	if ((c == '~') || ((c >= 0x40) && (c <= 0x7e))) {
+	    decoded = CursesDecodeTermcapKey(seq, i + 1);
+	    if (decoded >= 0) {
+		return decoded;
+	    }
+	}
 
 	switch (c) {
 	    case 'M':
@@ -3904,6 +3965,7 @@ CursesReadInput(int 	    stream,
     if ((istate->inProc == CursesInputChar) &&
 	CursesInputKey((unsigned char)(chr & 0xff), istate))
     {
+	wrefresh(cmdWin);
 	return;
     }
 
@@ -6657,6 +6719,7 @@ Curses_Init(void)
 #endif
 	noecho();
 #if defined(_LINUX)
+	CursesInitTermcapKeys();
 	CursesSetXtermMouse(TRUE);
 #endif
 	cursesFlags = CURSES_ECHO;
