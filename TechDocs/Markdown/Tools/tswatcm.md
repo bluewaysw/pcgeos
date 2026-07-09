@@ -1607,6 +1607,17 @@ line), Ctrl-e (forward one line), Ctrl-b (backward page) and Ctrl-f
 By pressing Ctrl-p several times, you can call previous commands up to 
 the Swat prompt. If you go past the command that you want, use Ctrl-n 
 to go forward in the history.
+On Linux terminals and Windows consoles, Swat also enables modern prompt
+keys by default: the Up and Down arrow keys move through command history,
+Left and Right move within the current prompt line, Home and End move to
+the start and end of the prompt line, and Delete removes the character under
+the cursor. This does not replace the tcsh-style Ctrl-key commands; Ctrl-p
+and Ctrl-n remain available for history navigation. To disable the modern
+prompt keys, and Linux mouse-wheel source-window scrolling, add the
+following line to SWAT.RC:
+
+    var modernPromptKeys 0
+
 The `!' character followed by a number repeats that command in the 
 command history. (The standard Swat prompt includes a command 
 number which may be used for this.) e.g. !184 will execute the 184th 

@@ -176,5 +176,13 @@ Use these for `addr` in commands that follow.
 `Ctrl-x` — Erase main buffer input line  
 `Ctrl-p` — Scroll backward thru command history  
 `Ctrl-n` — Scroll forward thru command history  
+`↑` / `↓` — Move through prompt history when `modernPromptKeys` is enabled
+`←` / `→` / `Home` / `End` / `Delete` — Edit prompt line when `modernPromptKeys` is enabled
 `!!` — Repeat last command  
 `!string` — Repeat last command that began with string  
+
+Disable modern prompt keys and Linux mouse-wheel source scrolling from `SWAT.RC`:
+
+```tcl
+var modernPromptKeys 0
+```
