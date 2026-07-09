@@ -314,6 +314,7 @@ static char *CursesGetMouseHighlight(int *value1, int *value2);
 
 static void CursesScrollInput(unsigned char c, CursesInputState *state);
 static void CursesEndScroll(CursesInputState *state);
+static int CursesUseModernPromptKeys(void);
 static int CursesInputKey(unsigned char c, CursesInputState *state);
 extern DosInvertScreenRegion(short start, short end);
 extern DosCopyScreenRegion(char *buf, short start, short end);
@@ -2797,6 +2798,32 @@ CursesHonk(void)
 
 
 /***********************************************************************
+ *				CursesUseModernPromptKeys
+ ***********************************************************************
+ * SYNOPSIS:	    Return whether modern prompt keys should be active.
+ * RETURN:	    TRUE unless the Tcl flag explicitly disables them.
+ *
+ ***********************************************************************/
+static int
+CursesUseModernPromptKeys(void)
+{
+    char    *value;
+
+    value = (char *)Tcl_GetVar(interp, "modernPromptKeys", TRUE);
+    if (value == NULL) {
+	return TRUE;
+    }
+    if ((value[0] == '\0') ||
+	(strcmp(value, "0") == 0) ||
+	(strcmp(value, "off") == 0))
+    {
+	return FALSE;
+    }
+    return TRUE;
+}
+
+
+/***********************************************************************
  *				CursesInputKey
  ***********************************************************************
  * SYNOPSIS:	    Handle normalized editing keys at the prompt.
@@ -3710,6 +3737,7 @@ static void
 CursesSetXtermMouse(int enable)
 {
     char    *term;
+    static int mouseEnabled = FALSE;
 
     term = getenv("TERM");
     if ((term == NULL) ||
@@ -3724,9 +3752,13 @@ CursesSetXtermMouse(int enable)
     {
 	return;
     }
+    if (enable == mouseEnabled) {
+	return;
+    }
 
     fputs(enable ? XTERM_MOUSE_ON : XTERM_MOUSE_OFF, stdout);
     fflush(stdout);
+    mouseEnabled = enable;
 }
 
 /***********************************************************************
@@ -3898,6 +3930,7 @@ CursesReadInput(int 	    stream,
 
 #if defined(unix) || defined(_LINUX)
 #if defined(_LINUX)
+    CursesSetXtermMouse(CursesUseModernPromptKeys());
     if (!CursesGetPendingChar(buf)) {
 	return;
     }
@@ -3966,6 +3999,7 @@ CursesReadInput(int 	    stream,
 #endif
 
     if ((istate->inProc == CursesInputChar) &&
+	CursesUseModernPromptKeys() &&
 	CursesInputKey((unsigned char)(chr & 0xff), istate))
     {
 	wrefresh(cmdWin);
@@ -5088,7 +5122,9 @@ See also:\n\
     (void)ioctl(_tty_ch, TIOCSLTC, &oltc);
 #endif
 #if defined(_LINUX)
-    CursesSetXtermMouse(TRUE);
+    if (CursesUseModernPromptKeys()) {
+	CursesSetXtermMouse(TRUE);
+    }
 #endif
     wrefresh(curscr);
 
@@ -6721,9 +6757,14 @@ Curses_Init(void)
 	cbreak();
 #endif
 	noecho();
+	if (Tcl_GetVar(interp, "modernPromptKeys", TRUE)[0] == '\0') {
+	    Tcl_SetVar(interp, "modernPromptKeys", "1", TRUE);
+	}
 #if defined(_LINUX)
 	CursesInitTermcapKeys();
-	CursesSetXtermMouse(TRUE);
+	if (CursesUseModernPromptKeys()) {
+	    CursesSetXtermMouse(TRUE);
+	}
 #endif
 	cursesFlags = CURSES_ECHO;
 #undef CTRL
