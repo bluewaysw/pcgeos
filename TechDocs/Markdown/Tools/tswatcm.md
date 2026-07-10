@@ -1598,10 +1598,15 @@ On DOS and Windows, Swat handles mouse selection itself. Click-drag with the
 left mouse button to capture text in the main Swat buffer. Press the right
 mouse button to paste the captured text to the Swat prompt line.
 
-On Linux, Swat enables xterm-compatible mouse reporting so the mouse wheel
-can scroll the source window. Mouse reporting sends ordinary mouse actions to
-Swat instead of starting the terminal emulator's native text selection. Hold
-Shift while click-dragging to select terminal text for copying.
+On Linux with modern prompt keys enabled (the default), Swat enables
+xterm-compatible mouse reporting so the mouse wheel can scroll the source
+window. Mouse reporting sends ordinary mouse actions to Swat instead of
+starting the terminal emulator's native text selection. Hold Shift while
+click-dragging to select terminal text for copying.
+
+When modern prompt keys are disabled, Swat does not enable Linux mouse
+reporting. Plain click-drag selects terminal text, but the mouse wheel does
+not scroll the source window.
 
 + Navigating the Main Buffer
 To scroll the main buffer, use Ctrl-u (up), Ctrl-d (down), Ctrl-y (back one 
@@ -1622,6 +1627,11 @@ prompt keys and Linux mouse-wheel source-window scrolling, add the following
 line to SWAT.RC:
 
     var modernPromptKeys 0
+
+Modern prompt keys do not enable tcsh-style Ctrl-key editing. Run `tcsh cle`
+to enable its configurable prompt editor, or `tcsh` to enable both that
+editor and prefix history searching. Use `help tcsh` for its current default
+bindings and configuration.
 
 The `!' character followed by a number repeats that command in the 
 command history. (The standard Swat prompt includes a command 

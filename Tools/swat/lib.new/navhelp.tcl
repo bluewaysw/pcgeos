@@ -33,29 +33,57 @@
 [defcommand quickhelp {} top.swat_navigation
 {Display common keyboard and mouse shortcuts for navigating Swat.}
 {
+    global modernPromptKeys file-os cleChars historySearching
+
     echo {Swat navigation shortcuts}
     echo {}
-    echo {Prompt editing (modernPromptKeys):}
-    echo {  Left/Right        Move through the input line}
-    echo {  Home/End          Move to the start/end of the input line}
-    echo {  Delete            Delete the character under the cursor}
-    echo {  Ctrl-x            Erase the input line}
+    if {[null $modernPromptKeys] ||
+        [string c $modernPromptKeys 0] == 0 ||
+        [string c $modernPromptKeys off] == 0} {
+          echo {Legacy prompt keys (modernPromptKeys disabled):}
+          if {[string c ${file-os} unix] == 0} {
+            echo {  Linux mouse       Plain drag selects terminal text; no wheel support}
+          }
+    } else {
+      echo {Modern prompt keys (modernPromptKeys enabled):}
+      echo {  Left/Right        Move through the input line}
+      echo {  Home/End          Move to the start/end of the input line}
+      echo {  Delete            Delete the character under the cursor}
+      echo {  Backspace         Delete the character left of the cursor}
+      echo {  Up/Down           Previous/next command}
+      if {[string c ${file-os} unix] == 0} {
+        echo {  Linux mouse       Wheel scrolls srcwin; Shift+Left drag selects}
+      }
+    }
     echo {}
     echo {Command history:}
-    echo {  Up/Down           Previous/next command (modernPromptKeys)}
     echo {  Ctrl-p/Ctrl-n     Previous/next command}
     echo {  !! / !prefix      Repeat last command / last matching command}
     echo {}
-    echo {Main buffer:}
+    echo {tcsh prompt editor (independent of modernPromptKeys):}
+    if {[null $cleChars]} {
+      echo {  Disabled          Run "tcsh cle" to enable Ctrl-key editing}
+    } else {
+      echo {  Enabled           Ctrl-key bindings are set by "tcsh cle"}
+    }
+    if {[null $historySearching]} {
+      echo {  Prefix history    Disabled; "tcsh" enables it}
+    } else {
+      echo {  Prefix history    Enabled}
+    }
+    echo {  Ctrl-key list     See "help tcsh"}
+    echo {}
+    echo {Main buffer (when the prompt editor does not consume the key):}
     echo {  Ctrl-f/d/e        Forward one page / half page / line}
     echo {  Ctrl-b/u/y        Backward one page / half page / line}
     echo {}
-    echo {Mouse:}
-    echo {  Shift + Left drag Select Terminal Text (Linux)}
-    echo {  Left drag         Select text (DOS and Windows)}
-    echo {  Left double-click Select a word}
-    echo {  Right click       Paste selected text at the prompt}
-    echo {}
+    if {[string c ${file-os} unix] != 0} {
+      echo {Mouse:}
+      echo {  Left drag         Select text}
+      echo {  Left double-click Select a word}
+      echo {  Right click       Paste selected text at the prompt}
+      echo {}
+    }
     echo {Target control:}
     echo {  Ctrl-c            Stop the target and return to Swat}
     echo {  c                 Continue the target}
