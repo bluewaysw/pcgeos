@@ -3782,6 +3782,31 @@ CursesGetPendingChar(unsigned char *cPtr)
 }
 
 /***********************************************************************
+ *				CursesGetEscapeChar
+ ***********************************************************************
+ * SYNOPSIS:	    Wait briefly for the next byte of an escape sequence.
+ * RETURN:	    TRUE if a character was read.
+ *
+ ***********************************************************************/
+static int
+CursesGetEscapeChar(unsigned char *cPtr)
+{
+    fd_set	    readSet;
+    struct timeval  timeout;
+
+    FD_ZERO(&readSet);
+    FD_SET(0, &readSet);
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 50000;
+
+    if (select(1, &readSet, NULL, NULL, &timeout) <= 0) {
+	return FALSE;
+    }
+    *cPtr = (unsigned char)getch2();
+    return TRUE;
+}
+
+/***********************************************************************
  *				CursesDecodeEscape
  ***********************************************************************
  * SYNOPSIS:	    Decode common terminal escape sequences.
@@ -3800,13 +3825,13 @@ CursesDecodeEscape(void)
     int		    decoded;
     int		    digit;
 
-    if (!CursesGetPendingChar(&c) || ((c != '[') && (c != 'O'))) {
+    if (!CursesGetEscapeChar(&c) || ((c != '[') && (c != 'O'))) {
 	return -1;
     }
     seq[0] = c;
 
     for (i = 1; i < (int)sizeof(seq); i++) {
-	if (!CursesGetPendingChar(&seq[i])) {
+	if (!CursesGetEscapeChar(&seq[i])) {
 	    return -1;
 	}
 	c = seq[i];
@@ -3833,9 +3858,9 @@ CursesDecodeEscape(void)
 		if ((seq[0] == '[') && (i == 1)) {
 		    unsigned char   data[3];
 
-		    if (!CursesGetPendingChar(&data[0]) ||
-			!CursesGetPendingChar(&data[1]) ||
-			!CursesGetPendingChar(&data[2]))
+		    if (!CursesGetEscapeChar(&data[0]) ||
+			!CursesGetEscapeChar(&data[1]) ||
+			!CursesGetEscapeChar(&data[2]))
 		    {
 			return -1;
 		    }
@@ -3860,7 +3885,7 @@ CursesDecodeEscape(void)
 		return END_ASCII;
 	    case '~':
 		n = 0;
-		for (digit = 1; digit < (int)sizeof(seq) &&
+		for (digit = 1; digit < i &&
 		     isdigit(seq[digit]); digit++)
 		{
 		    n = (n * 10) + seq[digit] - '0';
@@ -6727,7 +6752,8 @@ CursesResetInput(Event event, Opaque callData, Opaque clientData)
 void
 Curses_Init(void)
 {
-    int	i;
+    int	    i;
+    char    *value;
 
     /* make sure all the key bindings are initialized to NULL */
     for(i = 0; i < 256; i++)
@@ -6757,7 +6783,8 @@ Curses_Init(void)
 	cbreak();
 #endif
 	noecho();
-	if (Tcl_GetVar(interp, "modernPromptKeys", TRUE)[0] == '\0') {
+	value = (char *)Tcl_GetVar(interp, "modernPromptKeys", TRUE);
+	if ((value == NULL) || (value[0] == '\0')) {
 	    Tcl_SetVar(interp, "modernPromptKeys", "1", TRUE);
 	}
 #if defined(_LINUX)

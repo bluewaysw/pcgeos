@@ -1594,9 +1594,14 @@ This section covers the features of Swat that make it easier to use when
 debugging an application.
 
 + Mouse support
-You can use the mouse to capture and paste text in the main Swat buffer. 
-Capture text by click-dragging with the left mouse button. Pressing the 
-right mouse button pastes the captured text to the Swat prompt line. 
+On DOS and Windows, Swat handles mouse selection itself. Click-drag with the
+left mouse button to capture text in the main Swat buffer. Press the right
+mouse button to paste the captured text to the Swat prompt line.
+
+On Linux, Swat enables xterm-compatible mouse reporting so the mouse wheel
+can scroll the source window. Mouse reporting sends ordinary mouse actions to
+Swat instead of starting the terminal emulator's native text selection. Hold
+Shift while click-dragging to select terminal text for copying.
 
 + Navigating the Main Buffer
 To scroll the main buffer, use Ctrl-u (up), Ctrl-d (down), Ctrl-y (back one 
@@ -1613,8 +1618,8 @@ Left and Right move within the current prompt line, Home and End move to
 the start and end of the prompt line, and Delete removes the character under
 the cursor. This does not replace the tcsh-style Ctrl-key commands; Ctrl-p
 and Ctrl-n remain available for history navigation. To disable the modern
-prompt keys, and Linux mouse-wheel source-window scrolling, add the
-following line to SWAT.RC:
+prompt keys and Linux mouse-wheel source-window scrolling, add the following
+line to SWAT.RC:
 
     var modernPromptKeys 0
 

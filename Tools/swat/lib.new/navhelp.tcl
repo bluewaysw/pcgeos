@@ -55,10 +55,11 @@
     echo {  Up/Down           Scroll one line}
     echo {  Left/Right        Scroll horizontally}
     echo {  Home/End          First/last source line}
-    echo {  Mouse wheel       Scroll (Linux, modernPromptKeys)}
+    echo {  Mouse wheel       Scroll source window (Linux)}
     echo {}
     echo {Mouse:}
-    echo {  Left drag         Select text}
+    echo {  Shift + Left drag Select Terminal Text (Linux)}
+    echo {  Left drag         Select text (DOS and Windows)}
     echo {  Left double-click Select a word}
     echo {  Right click       Paste selected text at the prompt}
     echo {}

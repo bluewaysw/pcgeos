@@ -1310,9 +1310,12 @@ if {[null $kernelVersion]} {
 #
 [defsubr quickhelp-startup-hint {why args}
 {
-    global quickhelp_startup_hint_event
+    global quickhelp_startup_hint_event file-os
 
-    echo {Hint: type "quickhelp" for Swat navigation shortcuts.}
+    if {[string c ${file-os} unix] == 0} {
+	echo {Linux mouse hint: hold Shift while dragging to select terminal text.}
+    }
+    echo {Type "quickhelp" for Swat navigation shortcuts.}
     event delete $quickhelp_startup_hint_event
     return EVENT_HANDLED
 }]
