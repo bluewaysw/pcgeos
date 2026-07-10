@@ -50,13 +50,6 @@
     echo {  Ctrl-f/d/e        Forward one page / half page / line}
     echo {  Ctrl-b/u/y        Backward one page / half page / line}
     echo {}
-    echo {Source window:}
-    echo {  Page Up/Down      Scroll one page}
-    echo {  Up/Down           Scroll one line}
-    echo {  Left/Right        Scroll horizontally}
-    echo {  Home/End          First/last source line}
-    echo {  Mouse wheel       Scroll source window (Linux)}
-    echo {}
     echo {Mouse:}
     echo {  Shift + Left drag Select Terminal Text (Linux)}
     echo {  Left drag         Select text (DOS and Windows)}
@@ -67,7 +60,7 @@
     echo {  Ctrl-c            Stop the target and return to Swat}
     echo {  c                 Continue the target}
     echo {}
-    echo {For more detail, "help" opens the interactive help browser.}
+    echo {"help" opens the interactive help browser.}
 }]
 
 [defhelp swat_navigation top
