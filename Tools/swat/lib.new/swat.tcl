@@ -1305,6 +1305,20 @@ if {[null $kernelVersion]} {
 	var kernelVersion 0
 }
 
+#
+# Show this after startup files have run, at the first stop before the prompt.
+#
+[defsubr quickhelp-startup-hint {why args}
+{
+    global quickhelp_startup_hint_event
+
+    echo {Hint: type "quickhelp" for Swat navigation shortcuts.}
+    event delete $quickhelp_startup_hint_event
+    return EVENT_HANDLED
+}]
+
+var quickhelp_startup_hint_event [event handle FULLSTOP quickhelp-startup-hint]
+
 #if the user doesn't specifically specific a startup and stop, and
 # we are just up to the loader then continue
 if {[string c ${file-os} dos] == 0 && ![null $continueStartup]} {
