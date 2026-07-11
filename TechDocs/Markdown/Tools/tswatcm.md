@@ -1630,8 +1630,41 @@ line to SWAT.RC:
 
 Modern prompt keys do not enable tcsh-style Ctrl-key editing. Run `tcsh cle`
 to enable its configurable prompt editor, or `tcsh` to enable both that
-editor and prefix history searching. Use `help tcsh` for its current default
-bindings and configuration.
+editor and prefix history searching. Neither tcsh feature is enabled by
+default. The following commands control the two tcsh features independently:
+
+    tcsh                 Enable Ctrl-key editing and prefix history
+    tcsh off             Disable both features
+    tcsh cle             Enable Ctrl-key editing only
+    tcsh cle off         Disable Ctrl-key editing only
+    tcsh hist            Enable prefix history only
+    tcsh hist off        Disable prefix history only
+
+With prefix history enabled, Ctrl-p and Ctrl-n search for commands beginning
+with the text already entered at the prompt. With it disabled, they walk the
+history sequentially.
+
+The default Ctrl-key editing specification is `aebfrvdtkyu`. Its eleven
+positions select the keys for beginning of line, end of line, backward
+character, forward character, backward word, forward word, delete character,
+forward delete word, kill region, yank, and kill line, respectively. Thus the
+default maps these operations to Ctrl-a, Ctrl-e, Ctrl-b, Ctrl-f, Ctrl-r,
+Ctrl-v, Ctrl-d, Ctrl-t, Ctrl-k, Ctrl-y, and Ctrl-u. Ctrl-w always deletes the
+previous word, and Ctrl-Space sets the mark where supported.
+
+An alternate eleven-character specification changes the Ctrl keys while
+retaining those operations and their order. For example, `tcsh qwertyuiopa`
+enables both tcsh features using that key sequence, while
+`tcsh cle qwertyuiopa` changes only the editor. This is key remapping, not a
+way to add new editing operations.
+
+The modern prompt layer is processed before the tcsh Ctrl-key editor, so both
+can be enabled together. On an empty prompt, tcsh editing keys that would have
+no editing effect normally fall through to other Swat bindings, such as the
+main-buffer scrolling keys. Yank is the exception. Add `tcsh` or `tcsh cle`
+to SWAT.RC to enable the desired behavior at every startup. The `quickhelp`
+command reports the current state, and `help tcsh` provides the command's
+on-line reference.
 
 The `!' character followed by a number repeats that command in the 
 command history. (The standard Swat prompt includes a command 
