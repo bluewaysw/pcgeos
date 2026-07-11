@@ -1628,43 +1628,48 @@ line to SWAT.RC:
 
     var modernPromptKeys 0
 
-Modern prompt keys do not enable tcsh-style Ctrl-key editing. Run `tcsh cle`
-to enable its configurable prompt editor, or `tcsh` to enable both that
-editor and prefix history searching. Neither tcsh feature is enabled by
-default. The following commands control the two tcsh features independently:
+The optional tcsh mode adds Ctrl-key editing and prefix history searching.
+It is disabled by default. To enable it for every Swat session, add this line
+to SWAT.RC:
 
-    tcsh                 Enable Ctrl-key editing and prefix history
-    tcsh off             Disable both features
-    tcsh cle             Enable Ctrl-key editing only
-    tcsh cle off         Disable Ctrl-key editing only
-    tcsh hist            Enable prefix history only
-    tcsh hist off        Disable prefix history only
+    tcsh
 
-With prefix history enabled, Ctrl-p and Ctrl-n search for commands beginning
-with the text already entered at the prompt. With it disabled, they walk the
-history sequentially.
+This enables the following default keys:
 
-The default Ctrl-key editing specification is `aebfrvdtkyu`. Its eleven
-positions select the keys for beginning of line, end of line, backward
-character, forward character, backward word, forward word, delete character,
-forward delete word, kill region, yank, and kill line, respectively. Thus the
-default maps these operations to Ctrl-a, Ctrl-e, Ctrl-b, Ctrl-f, Ctrl-r,
-Ctrl-v, Ctrl-d, Ctrl-t, Ctrl-k, Ctrl-y, and Ctrl-u. Ctrl-w always deletes the
-previous word, and Ctrl-Space sets the mark where supported.
++ Ctrl-a and Ctrl-e move to the beginning and end of the prompt line.
++ Ctrl-b and Ctrl-f move backward and forward one character.
++ Ctrl-r and Ctrl-v move backward and forward one word.
++ Ctrl-d deletes the character under the cursor.
++ Ctrl-t deletes forward by one word.
++ Ctrl-k kills the selected region, and Ctrl-y yanks it back.
++ Ctrl-u kills the whole prompt line.
++ Ctrl-w deletes the previous word, and Ctrl-Space sets the mark where
+  supported.
++ Ctrl-p and Ctrl-n search backward and forward for history entries beginning
+  with the text already typed. With an empty prompt, they move through history
+  normally.
 
-An alternate eleven-character specification changes the Ctrl keys while
-retaining those operations and their order. For example, `tcsh qwertyuiopa`
-enables both tcsh features using that key sequence, while
-`tcsh cle qwertyuiopa` changes only the editor. This is key remapping, not a
-way to add new editing operations.
+Use `tcsh cle` when only the Ctrl-key editing shortcuts are wanted. Ctrl-p and
+Ctrl-n then continue to move sequentially through history. Use `tcsh hist`
+when only prefix history searching is wanted and the editing shortcuts should
+remain disabled.
 
-The modern prompt layer is processed before the tcsh Ctrl-key editor, so both
-can be enabled together. On an empty prompt, tcsh editing keys that would have
-no editing effect normally fall through to other Swat bindings, such as the
-main-buffer scrolling keys. Yank is the exception. Add `tcsh` or `tcsh cle`
-to SWAT.RC to enable the desired behavior at every startup. The `quickhelp`
-command reports the current state, and `help tcsh` provides the command's
-on-line reference.
+Use `tcsh cle off` to remove the editing shortcuts, `tcsh hist off` to return
+Ctrl-p and Ctrl-n to sequential history, or `tcsh off` to disable both parts.
+
+The editing keys can be remapped by passing an eleven-character string to
+`tcsh` or `tcsh cle`. The characters replace, in order, the default keys
+`aebfrvdtkyu` listed above from beginning-of-line through kill-line. For
+example, `tcsh cle qwertyuiopa` enables the editor with those replacement
+Ctrl keys. This changes the keys, not the editing operations.
+
+Tcsh mode and modern prompt keys can be enabled together. The arrow keys,
+Home, End, and Delete continue to work, providing familiar alternatives to
+the tcsh Ctrl-key shortcuts. Up and Down always move sequentially through
+history; tcsh prefix searching applies to Ctrl-p and Ctrl-n. On an empty
+prompt, editing keys such as Ctrl-b and Ctrl-f can still perform their
+main-buffer scrolling functions. Use `quickhelp` to see which modes are
+currently enabled, and `help tcsh` for the on-line command reference.
 
 The `!' character followed by a number repeats that command in the 
 command history. (The standard Swat prompt includes a command 
