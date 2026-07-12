@@ -36,7 +36,9 @@ SYNOPSIS:	Init bx and si to point into the ditherMatrix
 
 PASS:		bReg	- optional register to use for  base dither address.
 			  Uses si if none supplied.
-
+		CMYKClrBitmap - optional parameter present if this macro
+			  is being used in cmykColorRaster.asm
+			  
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -47,17 +49,13 @@ REVISION HISTORY:
 	jim	2/11/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-InitDitherIndex		macro	bReg
-ifidn @CurSeg, <cmykcode>
-	dgseg	=	cs
-else
-	dgseg	=	ss
-endif
+InitDitherIndex		macro	bReg, CMYKClrBitmap
+	dgseg	=	fs
 	mov	bl, dgseg:[blackTopIndex]	; load index into dither
 	clr	bh
-ifidn 	@CurSeg, <CMYKClrBitmap>
-else
+ifb	<CMYKClrBitmap>
 	add	bx, offset dgseg:blackDither	; calc black base
+else
 endif
 	mov	dgseg:[blackBase], bx		; save for black
 	mov	bl, dgseg:[cyanTopIndex]
@@ -68,11 +66,11 @@ endif
 ifb	<bReg>
 	mov	si, bx				; use si for base
 else
-    ifidn 	@CurSeg, <CMYKClrBitmap>
-	mov	bReg, bx
-    else
+    ifb 	<CMYKClrBitmap>
 	mov	bReg, bx
 	clr	bh
+    else
+	mov	bReg, bx
     endif
 endif
 	mov	bl, dgseg:[blackLeftIndex]	; save this
@@ -103,11 +101,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 NextDitherScan		macro	bReg
-ifidn @CurSeg, <cmykcode>
-	dgseg	=	cs
-else
-	dgseg	=	ss
-endif
+	dgseg	=	fs
+
 		local	haveBlackBase, haveCyanBase
 		mov	bl, dgseg:[blackLeftIndex]	; save this
 		mov	dgseg:[blackIndex], bl
@@ -178,11 +173,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 NextDitherWord		macro	bReg
-ifidn @CurSeg, <cmykcode>
-	dgseg	=	cs
-else
-	dgseg	=	ss
-endif
+	dgseg	=	fs
+
 		local	newBlkIndex, newCyanIndex
 
 		push	si
@@ -243,11 +235,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 NextDitherByte		macro	bReg
 	local	haveNextCyan, haveNextBlack
-ifidn @CurSeg, <cmykcode>
-	dgseg	=	cs
-else
-	dgseg	=	ss
-endif
+	dgseg	=	fs
 
 		push	si		
 		mov	si, dgseg:[blackBase]
@@ -308,11 +296,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BumpDitherIndex		macro	
-ifidn @CurSeg, <cmykcode>
-	dgseg	=	cs
-else
-	dgseg	=	ss
-endif
+	dgseg	=	fs
+		
 	mov	bl, dgseg:[cyanIndex]
 	inc	bl
 	cmp	bl, CMYK_DITHER_WIDTH-1

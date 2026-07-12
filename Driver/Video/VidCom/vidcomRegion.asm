@@ -24,6 +24,10 @@ DESCRIPTION:
 	$Id: vidcomRegion.asm,v 1.1 97/04/18 11:41:54 newdeal Exp $
 
 -------------------------------------------------------------------------------@
+
+OP_MOV_AX_AX		=	0c08bh
+OP_JMP_SHORT		=	0ebh
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -65,9 +69,6 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 
-OP_MOV_AX_AX		=	0c08bh
-OP_JMP_SHORT		=	0ebh
-
 VDRGN_toDone:
 	jmp	VDRGN_done
 
@@ -81,22 +82,22 @@ VDRGN_toDone:
 VidDrawRegion	proc	near
 
 ifdef	LOGGING
-	mov	cs:[curRegFlags], 0
+	mov	gs:[curRegFlags], 0
 endif
 
-	mov	cs:[VDRGN_xOffset1],ax		;save offsets
-	mov	cs:[VDRGN_xOffset2],ax
-	mov	cs:[VDRGN_yOffset],bx
+	mov	gs:[VDRGN_xOffset1],ax		;save offsets
+	mov	gs:[VDRGN_xOffset2],ax
+	mov	gs:[VDRGN_yOffset],bx
 
-	mov	cs:[TRC_pointer],bp		;save paramter pointer
+	mov	gs:[TRC_pointer],bp		;save paramter pointer
 
 	; ds:di = region
 
 	mov	bp,ds
 	mov	ds,dx
 
-	mov	cs:[d_x1],cx		;save region pointer temporarily
-	mov	cs:[d_y1],dx
+	mov	fs:[d_x1],cx		;save region pointer temporarily
+	mov	fs:[d_y1],dx
 
 	mov	di,cx			;ds:di = bounds
 
@@ -111,10 +112,10 @@ endif
 	TranslCoord1	ch, TC_cx1, TC_cx2
 	TranslCoord1	dh, TC_dx1, TC_dx2
 
-	mov	di,cs:[VDRGN_xOffset1]
+	mov	di,gs:[VDRGN_xOffset1]
 	add	ax,di
 	add	cx,di
-	mov	di,cs:[VDRGN_yOffset]
+	mov	di,gs:[VDRGN_yOffset]
 	add	bx,di
 	add	dx,di
 
@@ -124,22 +125,22 @@ endif
 ifdef	LOGGING
 	pushf
 	jnc	noTrivial
-	ornf	cs:[curRegFlags], mask RF_TRIVIAL_REJECT_FROM_RECT_SETUP
+	ornf	gs:[curRegFlags], mask RF_TRIVIAL_REJECT_FROM_RECT_SETUP
 noTrivial:
 	popf
 endif
 	jc	VDRGN_toDone
-	mov	cs:[VDRGN_call],si
+	mov	gs:[VDRGN_call],si
 	mov	ax,OP_JMP_SHORT or ((VDRGN_checkTrivial-VDRGN_trivial-2) shl 8)
 	cmp	si, offset DrawSimpleRect
 	jnz	VDRGN_complex
 	mov	ax,OP_MOV_AX_AX
 VDRGN_complex:
-	mov	cs:[VDRGN_trivial],ax
+	mov	gs:[VDRGN_trivial],ax
 
-	mov	si,cs:[d_x1]
+	mov	si,fs:[d_x1]
 	add	si,size Rectangle	;skip bounds
-	mov	ds,cs:[d_y1]		;ds:si = region
+	mov	ds,fs:[d_y1]		;ds:si = region
 
 	; pointing at Y value, bx = top for this swath
 
@@ -226,11 +227,11 @@ VDRGN_done label near
 	pop	es
 	pop	ds
 
-NMEM <	cmp	cs:[xorHiddenFlag], 0				>
+NMEM <	cmp	fs:[xorHiddenFlag], 0				>
 NMEM <	jz	afterXORRedraw					>
 NMEM <	call	ShowXOR						>
 NMEM <afterXORRedraw:						>
-NMEM <	cmp	cs:[hiddenFlag],1	;was mouse erased	>
+NMEM <	cmp	fs:[hiddenFlag],1	;was mouse erased	>
 NMEM <	jne	VDRGN_noRedraw					>
 NMEM <	call	CondShowPtr					>
 NMEM <VDRGN_noRedraw:						>
@@ -259,7 +260,7 @@ NMEM <VDRGN_noRedraw:						>
 	;
 
 VDRGN_checkTrivial:
-	mov	es,cs:[PSL_saveWindow]
+	mov	es,gs:[PSL_saveWindow]
 
 	cmp 	bx, es:W_maskRect.R_bottom
 	jg	VDRGN_done
@@ -275,6 +276,7 @@ VDRGN_checkTrivial:
 	jmp	VDRGN_afterTrivial
 
 VidDrawRegion	endp
+
 
 COMMENT @----------------------------------------------------------------------
 

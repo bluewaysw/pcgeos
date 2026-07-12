@@ -1386,7 +1386,7 @@ SingleStepUnhookVideo	proc	far
 SingleStepUnhookVideo	endp
 SSProfile ends
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 IRQCode	segment resource
 else
 idata	segment
@@ -1430,7 +1430,7 @@ VideoBiosHandler	proc	far
 	iret
 VideoBiosHandler	endp
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 IRQCode	ends
 else
 idata	ends

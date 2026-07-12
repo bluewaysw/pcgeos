@@ -53,9 +53,9 @@ Char1In1Out	proc	near
 		uses    bx
 		.enter
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
 		sub     bp, 16
-		mov     bx, cs:[currentColor]   ; get current draw color
+		mov     bx, fs:[currentColor]   ; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -64,7 +64,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp						>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:
@@ -116,7 +116,7 @@ nextPix:
 		ret
 
 maybepageDCB:
-		mov     dx, cs:[pixelsLeft]
+		mov     dx, fs:[pixelsLeft]
 		cmp     dx, 8
 		ja      nopageDCB
 
@@ -170,9 +170,9 @@ Char2In2Out	proc	near
 		uses    bx
 		.enter
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
 		sub     bp, 32
-		mov     bx, cs:[currentColor]   ; get current draw color
+		mov     bx, fs:[currentColor]   ; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -182,7 +182,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp			; onto next scan line	>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:
@@ -221,9 +221,9 @@ Char3In3Out	proc	near
 		uses    bx
 		.enter
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
 		sub     bp, 48
-		mov     bx, cs:[currentColor]   ; get current draw color
+		mov     bx, fs:[currentColor]   ; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -234,7 +234,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp			; onto next scan line	>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:
@@ -273,9 +273,9 @@ Char4In4Out	proc	near
 		uses    bx
 		.enter
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
 		sub     bp, 64
-		mov     bx, cs:[currentColor]   ; get current draw color
+		mov     bx, fs:[currentColor]   ; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -287,7 +287,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp			; onto next scan line	>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:

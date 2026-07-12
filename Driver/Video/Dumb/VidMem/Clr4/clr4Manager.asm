@@ -58,9 +58,9 @@ Clr4Stack        ends
 endif		; if _4BIT
 
 
-clr4group       group   clr4data, Clr4, Clr4Stack
+clr4group       group   clr4data, Clr4Stack
 
-assume  ss:clr4group, ds:nothing, es:nothing
+assume  ss:clr4group, ds:nothing, es:nothing, fs:clr4group
 
 ;---------------------------------------------------------------------
 ;			Constants and Macros
@@ -100,8 +100,11 @@ clr4data	ends
 ;			Fixed Code
 ;------------------------------------------------------------------------------
 
+assume	gs:Clr4
+
 Clr4 segment 	resource
 
+include clr4Palette.asm			; color palette table
 include	vidcomOutput.asm		; common output routines
 include	vidcomChars.asm			; common character output routines
 include	clr4GenChar.asm			; routines for larger chars
@@ -112,7 +115,6 @@ include	vidcomEscape.asm		; support for some escape codes
 include	vidcomDither.asm		; 4-bit color dither tables
 include vidcomPalette.asm		; support for VidGetPixel
 include	clr4EscTab.asm			; escape code jump table
-include clr4Palette.asm			; color palette table
 include clr4Entry.asm			; color palette table
 include clr4Utils.asm			; misc utilities
 include clr4Output.asm			; basic output routines

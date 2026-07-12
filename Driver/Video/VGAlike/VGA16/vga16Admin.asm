@@ -32,6 +32,53 @@ VidSegment	Misc
 
 	
 if NT_DRIVER
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetupVGAAccess
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Created the real mode memory access for the screen memory
+		area.  This area is normally thought of as being at 0xA000.
+
+CALLED BY:	INTERNAL
+
+PASS:		none (looks at G_mainScreenBuffer)
+		fs - dgroup of video driver
+
+RETURN:		nothing
+
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		See if there 0 in G_mainScreenBuffer and if so,
+		setup a GPMI selector to the real address of 0xA000.
+		Then setup G_altScreenBuffer to be the area not used
+		by the video space for 'save under' stuff.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	lshields	12/5/2000	Created.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetupVGAAccess	proc	near
+	uses ax, cx
+	.enter
+	mov	ax, fs:G_mainScreenBuffer
+	xor	ax, ax
+	jne	done
+	mov	ax, 0xA000
+	mov	cx, 0xFFFF
+	call	SysMapRealSegment
+	mov	fs:G_mainScreenBuffer, ax
+done:
+	.leave
+	ret
+SetupVGAAccess	endp
+
 idata	segment
 vddHandle	word	0	; used by NT driver
 idata	ends
@@ -87,9 +134,9 @@ afterY:
 		;
 		; Clear video memory
 		;
+		call	SetupVGAAccess
 		mov	cx, 65536 / 2
-		mov	ax, 0xA000
-		mov	es, ax
+		mov	es, fs:[G_mainScreenBuffer]
 		clr	ax, di
 		rep	stosw
 		pop	ax, si, di, bx, dx
@@ -234,7 +281,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestVGA16	proc	near
-		mov	ax, VD_VESA_640x480_16
+		mov	ax, VD_VESA_640x480_16	; mode to check for
 		call	VidTestVESA
 		ret
 VidTestVGA16	endp
@@ -251,7 +298,6 @@ CALLED BY:	INTERNAL
 PASS:		nothing
 RETURN:		ax	- DevicePresent enum
 DESTROYED:	nothing
-
 PSEUDO CODE/STRATEGY:
 		
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -263,7 +309,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestSVGA16	proc	near
-		mov	ax, VD_VESA_800x600_16
+		mov	ax, VD_VESA_800x600_16	; mode to check for
 		call	VidTestVESA
 		ret
 VidTestSVGA16	endp
@@ -292,7 +338,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestUVGA16	proc	near
-		mov	ax, VD_VESA_1Kx768_16
+		mov	ax, VD_VESA_1Kx768_16	; mode to check for
 		call	VidTestVESA
 		ret
 VidTestUVGA16	endp
@@ -320,7 +366,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidTestHVGA16	proc	near
-		mov	ax, VD_VESA_1280x1K_16	
+		mov	ax, VD_VESA_1280x1K_16	; mode to check for
 		call	VidTestVESA
 		ret
 VidTestHVGA16	endp
@@ -527,7 +573,7 @@ SYNOPSIS:	Test for VESA compatible board
 CALLED BY:	INTERNAL
 		VidTestDevice
 
-PASS:		ax	- device index to check for
+PASS:		ax	- VESA mode to check for
 
 RETURN:		ax	- DevicePresent enum
 
@@ -547,7 +593,9 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 VidTestVESA	proc	near
-		uses	di, bx, cx
+
+regs		local	PMRealModeRegister
+		uses	es, ds, di, si, bx, cx, dx
 		.enter
 
 		push	es
@@ -574,27 +622,6 @@ VidTestVESA	proc	near
 noHost:
 		pop	ax
 
-		push	ax
-		mov	ax, HIF_API_VIDEO
-		call	HostIfDetect
-		mov	ss:[hostIfVersion], ax	; save it
-
-		cmp	ax, REQUIRED_HOSTIF_VIDEO_API
-		jb	noHost		; branch, if no compatible host found
-		
-		pop	ax
-
-		; save away the mode number
-		mov	ss:[vesaMode], ax	; save it
-
-		; if host video API is available
-		; we are able to use any compatible resolution we want
-		; so we just accept all of the defined device modes
-
-		mov	ax, DP_PRESENT		; yep, it's there
-		jmp	realDone
-noHost:
-		pop	ax
 if  NT_DRIVER
 	; Be lazy and only return true for the
 	; mode we know we support.
@@ -612,28 +639,77 @@ else ; NT_DRIVER
 
 		; allocate fixed block to get vesa info
 
-		;CheckHack <(size VESAInfoBlock) eq (size VESAModeInfo)>
+		CheckHack <(size VESAInfoBlock) eq (size VESAModeInfo)>
 
-		mov	ax, size VESAInfoBlock + size VESAModeInfo
+		mov	bx, size VESAInfoBlock
+		add	bx, 0x600
+		shr	bx, 4
 		mov	cx, ALLOC_FIXED
 		call	MemAlloc
-
+		push 	bx
+		;call SysAllocDOSBlock
 		; use extended BIOS function 0x4f - 0 to determine if this
 		; is a VESA compatible board, then check the table of 
 		; supported modes to determine if the 640x480x256-color mode
 		; is supported.
 
+
 		mov	es, ax
 		clr	di			; es:di -> VESAInfoBlock
+
 		mov	ah, VESA_BIOS_EXT 	; use VESA bios extensions
 		mov	al, VESA_GET_SVGA_INFO 	; basic info call
-		int	VIDEO_BIOS		; make bios call
+
+		; init regs
+                mov     ss:[regs.PMRMR_edi], 0 
+                ;mov     ss:[regs.PMRMR_esi], 0 
+                ;mov     ss:[regs.PMRMR_ebp], 0 
+                ;mov     ss:[regs.PMRMR_reseverd], 0 
+                ;mov     ss:[regs.PMRMR_ebx], 0 
+                ;mov     ss:[regs.PMRMR_edx], 0 
+                ;mov     ss:[regs.PMRMR_ecx], 0 
+                mov     ss:[regs.PMRMR_eax], eax
+                mov     ss:[regs.PMRMR_flags], 0 
+                mov     ss:[regs.PMRMR_es], 0x2000 
+                ;mov     ss:[regs.PMRMR_ds], 0 
+		;mov     ss:[regs.PMRMR_fs], 0 
+                ;mov     ss:[regs.PMRMR_gs], 0 
+                ;mov     ss:[regs.PMRMR_ip], 0 
+                ;mov     ss:[regs.PMRMR_cs], 0 
+                mov     ss:[regs.PMRMR_sp], 0x600
+                mov     ss:[regs.PMRMR_ss], 0x2000 
+
+		; regs are passed in es:di
+		lea	di, ss:regs
+		mov	dx, ss
+		mov	es, dx
+
+		mov	cx, 0
+		mov	bh, 0
+		mov 	bl, 10h ; VIDEO_BIOS
+
+		call    SysRealInterrupt
+		;int	VIDEO_BIOS		; make bios call
+
+                mov     eax, ss:[regs.PMRMR_eax]
 
 		; if al = VESA_BIOS_EXT, then there is a VESA compatible board
 		; there...actually, we need to check for the VESA signature too
 
 		cmp	ax, VESA_BIOS_EXT ; is this a VESA board ?
 		jne	notPresent		; no, exit
+		
+	
+		; PASS:	ax - real-mode segment
+		;	cx - limit of segment in bytes		
+		mov	ax, 0x2000
+		mov	cx, size VESAInfoBlock
+		call	SysMapRealSegment
+		
+		mov	es, ax
+		mov	di, 0
+
+
 		cmp	{word} es:[di].VIB_sig, 'VE' ; gimme a VE
 		jne	notPresent
 		cmp	{word} es:[di].VIB_sig[2], 'SA' ; gimme a SA
@@ -642,76 +718,82 @@ else ; NT_DRIVER
 		; OK, there is a VESA board out there.  Check the mode table
 		; for the correct mode.  
 
-		mov	di, 0x100		; start scan with modes
-						; starting 0x100, blow are
-						; non high-color modes
-checkLoop:
-		cmp	di, 0x8000		; stop at mode id 0x8000
-		je	notPresent
-		mov	ax, di
-		push	ax
-		push	bx
-		push	es
-		push	di
+		mov	ax, es:[di].VIB_modes.segment
+		mov	cx, 0xFFFF
+		call	SysMapRealSegment
 		
+		mov	di, es:[di].VIB_modes.offset
+		mov	es, ax
+
+		;les	di, es:[di].VIB_modes	; get pointer to mode info
+		mov	ax, ss:[vesaMode]	; mode to check for
+checkLoop:
+		cmp	es:[di], 0xffff		; at mode table terminator?
+		je	notPresent
+		scasw				; check this word
+		jne	checkLoop		;  nope, on to next mode
+
 		; OK, the mode is supported in the BIOS.  Now check to see if
 		; it is supported by the current card/monitor setup.  To do
 		; this, we need to call the GetModeInfo function.
 
-		call	MemDerefES
-		mov	di, size VESAInfoBlock	; es:di -> VESAModeInfo
+		;call	MemDerefES
+		;clr	di			; es:di -> VESAModeInfo
+		
 		mov	cx, ax			; cx = mode number
 		mov	ah, VESA_BIOS_EXT	; BIOS mode number
 		mov	al, VESA_GET_MODE_INFO	; get info about mode
-		int	VIDEO_BIOS		; get mode info
+
+		; init regs
+                mov     ss:[regs.PMRMR_edi], 0 
+                ;mov     ss:[regs.PMRMR_esi], 0 
+                ;mov     ss:[regs.PMRMR_ebp], 0 
+                ;mov     ss:[regs.PMRMR_reseverd], 0 
+                ;mov     ss:[regs.PMRMR_ebx], 0 
+                ;mov     ss:[regs.PMRMR_edx], 0 
+                mov     ss:[regs.PMRMR_ecx], ecx 
+                mov     ss:[regs.PMRMR_eax], eax
+                mov     ss:[regs.PMRMR_flags], 0 
+                mov     ss:[regs.PMRMR_es], 0x2000 
+                ;mov     ss:[regs.PMRMR_ds], 0 
+		;mov     ss:[regs.PMRMR_fs], 0 
+                ;mov     ss:[regs.PMRMR_gs], 0 
+                ;mov     ss:[regs.PMRMR_ip], 0 
+                ;mov     ss:[regs.PMRMR_cs], 0 
+                mov     ss:[regs.PMRMR_sp], 0x600
+                mov     ss:[regs.PMRMR_ss], 0x2000 
+
+		push	es
+		
+		; regs are passed in es:di
+		lea	di, ss:regs
+		mov	dx, ss
+		mov	es, dx
+
+		mov	cx, 0
+		mov	bh, 0
+		mov 	bl, 10h ; VIDEO_BIOS
+
+		call    SysRealInterrupt
+		;int	VIDEO_BIOS		; get mode info
+		
+		pop 	es
+		clr	di
 
 		; now see if the current hardware is cool.
-		
+
 		test	es:[di].VMI_modeAttr, mask VMA_SUPPORTED
-		jz	checkNext	
-
-		; check for right color
-		mov	al, es:[di].VMI_bitsPerPixel
-		cmp	al, 16
-		jne	checkNext
-		
-		; check for resolution
-		mov	bx, ss:[vesaMode]
-		mov	ax, cs:[vesaWidth][bx]
-		cmp	ax, es:[di].VMI_Xres
-		jne	checkNext
-		
-		mov	ax, cs:[vesaHeight][bx]
-		cmp	ax, es:[di].VMI_Yres
-		jne	checkNext
-
-		; Hit, found matching mode
-		pop	di
-		pop	es
-		pop	bx
-		pop	ax
-		mov	ss:[vesaMode], ax	; remember the VESA mode
+		jz	notPresent
 
 		; passed the acid test.  Use it.
-		mov	ax, DP_PRESENT		; yep, it's there
 
-		jmp	done
-checkNext::
-		pop	di
-		pop	es
-		pop	bx
-		pop	ax
-		
-		inc	di
-		jmp	checkLoop
-		
+		mov	ax, DP_PRESENT		; yep, it's there
 done:
 		; free allocated memory block
 		call	MemFree		; bx is handle to block to free
 endif  ; not NT_DRIVER
 realDone:
 		pop	es
-donedone:
 donedone:
 		.leave
 		ret
@@ -763,6 +845,7 @@ VidSetVESAFar	endp
 
 VidSetVESA	proc	near
 		uses	ax,bx,cx,dx,ds,si,es
+regs		local	PMRealModeRegister
 		.enter
 
 if ALLOW_BIG_MOUSE_POINTER
@@ -850,21 +933,144 @@ setResolution:
 regularSetup:
 		mov	ah, VESA_BIOS_EXT
 		mov	al, VESA_SET_MODE
-		mov	bx, ss:[vesaMode] 	; mode number, clear memory
-		int	VIDEO_BIOS
 
 commonSetup:
+		push	bx
 		segmov	es, ss, di		; es -> dgroup
 		lea	di, ss:[vesaInfo]	; es:di -> info block
 		mov	ah, VESA_BIOS_EXT	; use VESA bios extensions
 		mov	al, VESA_GET_SVGA_INFO	; basic info call
-		int	VIDEO_BIOS		; make bios call
 
-		lea	di, ss:[modeInfo]	; es:di -> info block
+		; init regs
+                mov     ss:[regs.PMRMR_edi], 0 
+                ;mov     ss:[regs.PMRMR_esi], 0 
+                ;mov     ss:[regs.PMRMR_ebp], 0 
+                ;mov     ss:[regs.PMRMR_reseverd], 0 
+                mov     ss:[regs.PMRMR_ebx], ebx 
+                ;mov     ss:[regs.PMRMR_edx], 0 
+                ;mov     ss:[regs.PMRMR_ecx], 0 
+                mov     ss:[regs.PMRMR_eax], eax
+                mov     ss:[regs.PMRMR_flags], 0 
+                mov     ss:[regs.PMRMR_es], 0x2000 
+                ;mov     ss:[regs.PMRMR_ds], 0 
+		;mov     ss:[regs.PMRMR_fs], 0 
+                ;mov     ss:[regs.PMRMR_gs], 0 
+                ;mov     ss:[regs.PMRMR_ip], 0 
+                ;mov     ss:[regs.PMRMR_cs], 0 
+                mov     ss:[regs.PMRMR_sp], 0x600
+                mov     ss:[regs.PMRMR_ss], 0x2000 
+
+		; regs are passed in es:di
+		lea	di, ss:regs
+		mov	dx, ss
+		mov	es, dx
+
+		mov	cx, 0
+		mov	bh, 0
+		mov 	bl, 10h ; VIDEO_BIOS
+
+		call    SysRealInterrupt
+		;int	VIDEO_BIOS		; make bios call
+
+		; create descriptor to real mode mem
+
+		; PASS:	ax - real-mode segment
+		;	cx - limit of segment in bytes		
+		mov	ax, 0x2000
+		mov	cx, size VESAInfoBlock
+		call	SysMapRealSegment
+		
+		; copy response over
+		mov	ds, ax
+		mov	si, 0
+		segmov	es, ss, di		; es -> dgroup
+		lea	di, ss:[vesaInfo]	; es:di -> info block
+		mov	cx, size VESAInfoBlock
+
+		rep	movsb		
+
+		;lea	di, ss:[modeInfo]	; es:di -> info block
 		mov	ah, VESA_BIOS_EXT	; use VESA bios extensions
 		mov	al, VESA_GET_MODE_INFO	; get info about mode
-		mov	cx, bx			; cx = mode number
-		int	VIDEO_BIOS		; make bios call
+		;mov	cx, bx			; cx = mode number
+		;mov	cx, ss:[vesaMode] 	; mode number, clear memory
+		pop	cx
+
+		; init regs
+                mov     ss:[regs.PMRMR_edi], 0 
+                ;mov     ss:[regs.PMRMR_esi], 0 
+                ;mov     ss:[regs.PMRMR_ebp], 0 
+                ;mov     ss:[regs.PMRMR_reseverd], 0 
+                ;mov     ss:[regs.PMRMR_ebx], ebx 
+                ;mov     ss:[regs.PMRMR_edx], 0 
+                mov     ss:[regs.PMRMR_ecx], ecx 
+                mov     ss:[regs.PMRMR_eax], eax
+                mov     ss:[regs.PMRMR_flags], 0 
+                mov     ss:[regs.PMRMR_es], 0x2000 
+                ;mov     ss:[regs.PMRMR_ds], 0 
+		;mov     ss:[regs.PMRMR_fs], 0 
+                ;mov     ss:[regs.PMRMR_gs], 0 
+                ;mov     ss:[regs.PMRMR_ip], 0 
+                ;mov     ss:[regs.PMRMR_cs], 0 
+                mov     ss:[regs.PMRMR_sp], 0x600
+                mov     ss:[regs.PMRMR_ss], 0x2000 
+
+		; regs are passed in es:di
+		lea	di, ss:regs
+		mov	dx, ss
+		mov	es, dx
+
+		mov	cx, 0
+		mov	bh, 0
+		mov 	bl, 10h ; VIDEO_BIOS
+
+		call    SysRealInterrupt
+		;int	VIDEO_BIOS		; make bios call
+
+		; copy response over
+		;mov	ds, ax
+		mov	si, 0
+		segmov	es, ss, di		; es -> dgroup
+		lea	di, ss:[modeInfo]	; es:di -> info block
+		mov	cx, size VESAModeInfo
+
+		rep	movsb		
+
+
+		;TODO for now use interrupt paging
+		mov	ss:[modeInfo].VMI_winFunc.segment, 0
+
+		; resolve win segments
+
+checkWin:
+		mov	ax, ss:[modeInfo].VMI_winASeg
+		tst	ax
+		jz	nextWin
+
+		; PASS:	ax - real-mode segment
+		;	cx - limit of segment in bytes		
+		mov	cx, 0xFFFF
+		call	SysMapRealSegment
+
+		mov	ss:[modeInfo].VMI_winASeg, ax	
+
+nextWin:
+		mov	ax, ss:[modeInfo].VMI_winBSeg
+		tst	ax
+		jz	winDone
+
+		; PASS:	ax - real-mode segment
+		;	cx - limit of segment in bytes		
+		mov	cx, 0xFFFF
+		call	SysMapRealSegment
+
+		mov	ss:[modeInfo].VMI_winBSeg, ax	
+
+
+
+winDone:
+		mov	bx, ss:[vesaMode] 	; mode number, clear memory
+
 
 else
 	;;  I should just create driver calls for the above ints, but
@@ -880,7 +1086,8 @@ else
 		mov	ss:[modeInfo].VMI_winBAttr, VESAWinAttr <0,0,0,0>
 		mov	ss:[modeInfo].VMI_winGran, 64
 		mov	ss:[modeInfo].VMI_winSize, 64
-		mov	ss:[modeInfo].VMI_winASeg, 0xa000
+		mov	ax, ss:[G_mainScreenBuffer]
+		mov	ss:[modeInfo].VMI_winASeg, ax
 		mov	ss:[modeInfo].VMI_winBSeg, 0
 		clrdw	ss:[modeInfo].VMI_winFunc
 		mov	ss:[modeInfo].VMI_scanSize, 640 * 2
@@ -903,7 +1110,8 @@ else
 		mov	ss:[modeInfo].VMI_winBAttr, VESAWinAttr <0,0,0,0>
 		mov	ss:[modeInfo].VMI_winGran, 64
 		mov	ss:[modeInfo].VMI_winSize, 64
-		mov	ss:[modeInfo].VMI_winASeg, 0xa000
+		mov	ax, ss:[G_mainScreenBuffer]
+		mov	ss:[modeInfo].VMI_winASeg, ax
 		mov	ss:[modeInfo].VMI_winBSeg, 0
 		clrdw	ss:[modeInfo].VMI_winFunc
 		mov	ss:[modeInfo].VMI_scanSize, 800 * 2
@@ -951,7 +1159,6 @@ applyRes:
 		mov	ss:[DriverTable].VDI_vRes, bx
 		mov	ss:[DriverTable].VDI_hRes, bx
 		mov	ss:[DriverTable].VDI_displayType, cl
-		
 		mov	ax, ss:[modeInfo].VMI_scanSize	; bytes per scan line
 		mov	ss:[DriverTable].VDI_bpScan, ax
 

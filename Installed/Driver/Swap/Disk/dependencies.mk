@@ -1,12 +1,12 @@
-DISK.obj \
-DISK.eobj: GEOS.DEF HEAP.DEF GEODE.DEF RESOURCE.DEF EC.DEF DRIVER.DEF \
-                LMEM.DEF SEM.DEF SYSTEM.DEF LOCALIZE.DEF SLLANG.DEF \
-                FILE.DEF INITFILE.DEF DRIVE.DEF DISK.DEF \
-                INTERNAL/HEAPINT.DEF INTERNAL/SEMINT.DEF SYSSTATS.DEF \
-                INTERNAL/FSDRIVER.DEF INTERNAL/FSD.DEF \
-                INTERNAL/DRIVEINT.DEF INTERNAL/DISKINT.DEF \
-                INTERNAL/FILEINT.DEF FILEENUM.DEF INTERNAL/DOS.DEF \
-                INTERNAL/DOSFSDR.DEF INTERNAL/INTERRUP.DEF \
-                INTERNAL/SWAPDR.DEF INTERNAL/SWAP.DEF
+disk.obj \
+disk.eobj: geos.def heap.def geode.def resource.def ec.def driver.def \
+                lmem.def sem.def system.def localize.def sllang.def \
+                file.def initfile.def drive.def disk.def \
+                Internal/heapInt.def Internal/semInt.def sysstats.def \
+                Internal/fsDriver.def Internal/fsd.def \
+                Internal/driveInt.def Internal/diskInt.def \
+                Internal/fileInt.def fileEnum.def Internal/dos.def \
+                Internal/dosFSDr.def Internal/interrup.def \
+                Internal/swapDr.def Internal/swap.def
 
-DiskEC.geo Disk.geo : geos.ldf swap.ldf
+diskEC.geo disk.geo : geos.ldf swap.ldf 

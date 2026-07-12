@@ -13,7 +13,7 @@ SRCS            = modemAdmin.asm modemEC.asm modemManager.asm\
 OBJS            = modemManager.obj
 LOBJS           =
 
-PRODUCTS        = DBCS
+PRODUCTS        = 
 
 SYSMAKEFILE     = geode.mk
 
@@ -30,6 +30,4 @@ SYSMAKEFILE     = geode.mk
 #include "$(DEPFILE)"
 #endif
 
-#if exists(DBCS/$(DEPFILE))
-#include "DBCS/$(DEPFILE)"
-#endif
+

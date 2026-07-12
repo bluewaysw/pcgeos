@@ -759,7 +759,7 @@ EC <	call	ECCheckGStateHandle					>
 
 	push	ds:[GS_window]		;save window to destroy
 	
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	clr		bx					; clean state segment for
 								; GPMI version
 	mov		ds, bx
@@ -933,7 +933,7 @@ doValidate:
 afterValidate:
 
 	call	FarVWinTree		; es <- idata
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	clr		di					; clean state segment for
 								; GPMI version
 	mov		ds, di

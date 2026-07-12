@@ -103,26 +103,26 @@ SetDither		proc	far
 		; check to see if we really need to re-create it.  If the color
 		; is the same, and the shift amount is the same, then we're OK.
 
-		cmp	dl, cs:[ditherColor].RGB_red
+		cmp	dl, fs:[ditherColor].RGB_red
 		jne	setNewDither
-		cmp	dh, cs:[ditherColor].RGB_green
+		cmp	dh, fs:[ditherColor].RGB_green
 		jne	setNewDither
-		cmp	bl, cs:[ditherColor].RGB_blue
+		cmp	bl, fs:[ditherColor].RGB_blue
 		jne	setNewDither
 		
 		; besides the color, we should check the rotation.
 
-		cmp	ax, {word} cs:[ditherRotX]	; same ?
+		cmp	ax, {word} fs:[ditherRotX]	; same ?
 		LONG je	done
 
 		; set up es:di -> at the dither matrix we are about to fill
 setNewDither:
-		mov	cs:[ditherColor].RGB_red, dl	; set new color
-		mov	cs:[ditherColor].RGB_green, dh
-		mov	cs:[ditherColor].RGB_blue, bl
-		mov	{word} cs:[ditherRotX], ax	; set rotation value
+		mov	fs:[ditherColor].RGB_red, dl	; set new color
+		mov	fs:[ditherColor].RGB_green, dh
+		mov	fs:[ditherColor].RGB_blue, bl
+		mov	{word} fs:[ditherRotX], ax	; set rotation value
 
-		segmov	es, cs, di
+		segmov	es, fs, di
 		mov	di, offset ditherMatrix		; es:di -> ditherMatrix
 
 		; init the matrix with the base values...
@@ -180,7 +180,7 @@ storeIt:
 
 		; finished, now rotate the dither matrix
 
-		mov	cx, {word} cs:[ditherRotX]	; get rotation amt
+		mov	cx, {word} fs:[ditherRotX]	; get rotation amt
 		jcxz	done
 		call	RotateDither
 done:
@@ -219,7 +219,7 @@ RotateDither	proc	near
 
 		tst	cl
 		jz	handleY
-		mov	si, offset cs:ditherMatrix
+		mov	si, offset fs:ditherMatrix
 		call	RotateX
 		add	si, 4
 		call	RotateX
@@ -230,7 +230,7 @@ RotateDither	proc	near
 handleY:
 		tst	ch
 		jz	done
-		mov	si, offset cs:ditherMatrix
+		mov	si, offset fs:ditherMatrix
 		call	RotateY
 		inc	si
 		call	RotateY

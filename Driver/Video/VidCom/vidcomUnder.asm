@@ -67,7 +67,7 @@ VidCheckUnder	proc	near
 EC <	call	ECVidCheckRectBounds					>
 
 if	SAVE_UNDER_COUNT	gt	0
-	cmp	cs:[suCount], 0			; any active save under areas?
+	cmp	fs:[suCount], 0			; any active save under areas?
 	jne	CheckForCollisions	; => yes, there are!
 endif
 	clr	al				; return no collisions
@@ -77,17 +77,17 @@ if	SAVE_UNDER_COUNT	gt	0
 CheckForCollisions:
 	; check for collision with save under areas
 
-	.assert segment suCount eq @CurSeg
+;;	.assert segment suCount eq @CurSeg
 	push	si, di, ds			; save trashed registers
 
 	mov_tr	di, ax			; di <- left
 
-	segmov	ds, cs, si			; ds <- code segment
+	segmov	ds, fs, si			; ds <- code segment
 
 	clr	al				; al <- no collisions initially
-	mov	ah, ds:[suCount]		; ah <- # of SU areas
+	mov	ah, fs:[suCount]		; ah <- # of SU areas
 
-	mov	si, offset ds:[suTable]		; si <- base of table
+	mov	si, offset fs:[suTable]		; si <- base of table
 
 VCU_loop:
 	cmp	di, ds:[si].SUS_right
@@ -112,7 +112,6 @@ VCU_Done::
 endif
 VidCheckUnder	endp
 	public	VidCheckUnder
-
 
 
 
@@ -166,10 +165,10 @@ VidInfoUnder	proc	near
 
 if	SAVE_UNDER_COUNT	gt	0
 ifdef	IS_CASIO
-	tst	cs:[suCount]		; there is only one save under area
+	tst	fs:[suCount]		; there is only one save under area
 	jz	NotInUse		;  for casio
 
-	segmov	ds, cs, si			; ds <- code segment
+	segmov	ds, fs, si			; ds <- code segment
 	mov	si, offset ds:[suTable]	; start at the top...
 
 	lodsw				; ax <- left
@@ -184,12 +183,12 @@ ifdef	IS_CASIO
 	xchg	ax, di				; di <- window
 						; ax <- left
 else
-	test	al, cs:[suFreeFlags]	; First, check to see if save under
+	test	al, fs:[suFreeFlags]	; First, check to see if save under
 					; area is actually free..
 	jnz	NotInUse		; if it is FREE, & not in use, return
 					; all zero's
 
-	segmov	ds, cs, si			; ds <- code segment
+	segmov	ds, fs, si			; ds <- code segment
 	mov	si, offset ds:[suTable]	; start at the top...
 
 	mov	dx, size SaveUnderStruct; preload constant
@@ -288,23 +287,23 @@ ifdef 	IS_JEDI
 	; to check if we have enough space only that we have no save
 	; under table entries available.
 	;
-	cmp	cs:[suFreePtr], offset dgroup:end_suTable
+	cmp	fs:[suFreePtr], offset dgroup:end_suTable
 	jne	VRU_removeNone
 else
 	
 ifdef	IS_CASIO
-	cmp	cs:[suCount], 0			; any active save under areas?
+	cmp	fs:[suCount], 0			; any active save under areas?
 	jz	VRU_removeNone			; If no save-unders, return
 else
 
 ifdef	IS_CANDT
-	cmp	cs:[suCount], 0			; any active save under areas?
+	cmp	fs:[suCount], 0			; any active save under areas?
 	jz	VRU_removeNone			; If no save-unders, return
 endif
 
 ifdef	ALT_VIDEO_RAM
 
-	tst_clc	cs:[suCount]			; any active save under areas?
+	tst_clc	fs:[suCount]			; any active save under areas?
 	je	VRU_removeNone			; If no save-unders, return
 
 	; See if a save under area needs to be removed
@@ -340,23 +339,23 @@ SVR<	EC<	ERROR_NZ VIDEO_BAD_SAVE_UNDER_BOUNDS			>>
 	; }
 
 ifdef	LARGE_VIDEO_RAM
-NOHALF< MRES <	movdw	bxcx, cs:[suSaveAreaSize]			>>
+NOHALF< MRES <	movdw	bxcx, fs:[suSaveAreaSize]			>>
 NOHALF<	FRES <	movdw	bxcx, SAVE_AREA_SIZE				>>
-NOHALF<	subdw	bxcx, cs:[suSaveFreePtr];cx = number of free bytes	>
-HALF<	movdw	bxcx, cs:[suSaveSpaceFree]				>
+NOHALF<	subdw	bxcx, fs:[suSaveFreePtr];cx = number of free bytes	>
+HALF<	movdw	bxcx, fs:[suSaveSpaceFree]				>
 	cmpdw	bxcx, dxax
 else
-NOHALF<	MRES <	mov	cx, cs:[suSaveAreaSize]				>>
+NOHALF<	MRES <	mov	cx, fs:[suSaveAreaSize]				>>
 NOHALF<	FRES <	mov	cx, SAVE_AREA_SIZE				>>
-NOHALF<	sub	cx, cs:[suSaveFreePtr]	;cx = number of free bytes	>
-HALF<	mov	cx, cs:[suSaveSpaceFree]				>
+NOHALF<	sub	cx, fs:[suSaveFreePtr]	;cx = number of free bytes	>
+HALF<	mov	cx, fs:[suSaveSpaceFree]				>
 	cmp	cx, ax
 endif	; LARGE_VIDEO_RAM
 	jb	VRU_removeOne
 
 endif
 
-	cmp	cs:[suFreePtr], offset dgroup:end_suTable
+	cmp	fs:[suFreePtr], offset dgroup:end_suTable
 	jne	VRU_removeNone
 
 ifdef	ALT_VIDEO_RAM
@@ -366,13 +365,13 @@ VRU_removeOne:
 LVR <	pushdw	dxax							>
 SVR <	push	ax							>
 if	BIT_SHIFTS le 2
-	mov	ax, cs:[suTable].SUS_unitsPerLine
+	mov	ax, fs:[suTable].SUS_unitsPerLine
 else
-	mov	al, cs:[suTable].SUS_unitsPerLine
+	mov	al, fs:[suTable].SUS_unitsPerLine
 	clr	ah
 endif	; BIT_SHIFTS le 2
 	ShiftLeftIf16	ax		; convert to bytes
-	mul	cs:[suTable].SUS_lines	; dxax = # bytes of 1st save-under area
+	mul	fs:[suTable].SUS_lines	; dxax = # bytes of 1st save-under area
 LVR <	adddw	bxcx, dxax						>
 LVR <	popdw	dxax							>
 LVR <	cmpdw	bxcx, dxax						>
@@ -386,8 +385,8 @@ endif
 endif	; CASIO
 endif	; JEDI
 
-	mov	al, cs:[suTable].SUS_flags
-	mov	bx, cs:[suTable].SUS_window
+	mov	al, fs:[suTable].SUS_flags
+	mov	bx, fs:[suTable].SUS_window
 	stc
 	ret
 
@@ -400,6 +399,7 @@ endif	; SAVE_UNDER_COUNT
 
 VidRequestUnder	endp
 	public	VidRequestUnder
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -465,7 +465,7 @@ if	SAVE_UNDER_COUNT	eq	0
 	stc
 	ret
 else
-	segmov	ds, cs
+	segmov	ds, fs
 	cmp	ds:[suCount], SAVE_UNDER_COUNT
 EC <	ERROR_A	VIDEO_TOO_MANY_SAVE_UNDERS				>
 
@@ -601,13 +601,13 @@ ifdef	ALT_VIDEO_RAM
 	; }
 
 ifdef	LARGE_VIDEO_RAM
-NOHALF<	MRES <	movdw	bxcx, cs:[suSaveAreaSize]			>>
+NOHALF<	MRES <	movdw	bxcx, fs:[suSaveAreaSize]			>>
 NOHALF<	FRES <	movdw	bxcx, SAVE_AREA_SIZE				>>
 NOHALF<	subdw	bxcx, ds:[suSaveFreePtr];cx = number of free bytes	>
 HALF<	movdw	bxcx, ds:[suSaveSpaceFree]				>
 	cmpdw	bxcx, dxax
 else
-NOHALF<	MRES <	mov	cx, cs:[suSaveAreaSize]				>>
+NOHALF<	MRES <	mov	cx, fs:[suSaveAreaSize]				>>
 NOHALF<	FRES <	mov	cx, SAVE_AREA_SIZE				>>
 NOHALF<	sub	cx, ds:[suSaveFreePtr]	;cx = number of free bytes	>
 HALF<	mov	cx, ds:[suSaveSpaceFree]				>
@@ -676,7 +676,7 @@ else
 endif
 
 endif
-CASIO <	mov	si, offset cs:[suTable]				>
+CASIO <	mov	si, offset fs:[suTable]				>
 	mov	ax, es:[W_header.LMBH_handle]
 	mov	ds:[si].SUS_window,ax	;store window handle
 
@@ -736,6 +736,7 @@ endif
 VidSaveUnder	endp
 	public	VidSaveUnder
 if	SAVE_UNDER_COUNT	gt	0
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -841,7 +842,7 @@ CALLED BY:	INTERNAL
 
 PASS:
 	si - index of save under area to remove
-	ds - cs
+	ds - fs
 
 RETURN:
 	none
@@ -898,7 +899,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 RemoveSaveUnder	proc	near
-
+	assume	ds:dgroup
 	; Free flag used for save under
 
 	mov	al,ds:[si].SUS_flags
@@ -960,7 +961,7 @@ ifdef	LARGE_VIDEO_RAM
 
 	movdw	cxsi, ds:[suSaveFreePtr]
 	subdw	cxsi, ds:[src]			;cxsi = # bytes
-	movdw	ds:[unitsToMove], cxsi
+	movdw	fs:[unitsToMove], cxsi
 	subdw	ds:[suSaveFreePtr], dxax	;update end pointer
 else
 	mov	di,ds:[bx].SUS_saveAddr		;es:di = dest (lower addr)
@@ -1009,13 +1010,13 @@ EGA <	call	InitEGAForUnder						>
 ifdef	LARGE_VIDEO_RAM
 	; Analogous to SetAltBuffer above, convert 32-bit offsets in
 	; save-under area to offsets in video RAM.
-	adddw	cs:[src], cs:[suSaveAreaStart], dx
-	adddw	cs:[dest], cs:[suSaveAreaStart], dx
+	adddw	fs:[src], fs:[suSaveAreaStart], dx
+	adddw	fs:[dest], fs:[suSaveAreaStart], dx
 endif
 
 ifdef	IS_HALF_SCREEN
-LVR<	adddw	cs:[suSaveSpaceFree], cxsi	; restore removed space	>
-SVR<	add	cs:[suSaveSpaceFree], ax	; restore removed space	>
+LVR<	adddw	fs:[suSaveSpaceFree], cxsi	; restore removed space	>
+SVR<	add	fs:[suSaveSpaceFree], ax	; restore removed space	>
 SVR<	mov_tr	ax, cx				; ax <- # of units to copy>
 RSU_copyScanLine:
 	;
@@ -1067,7 +1068,7 @@ endif	; IS_ALT_VIDEO_RAM
 	;		*destPtr++ = *sourcePtr++;
 	;	}
 
-	mov	si, cs				; es, ds <- cs (dgroup)
+	mov	si, fs				; es, ds <- fs (dgroup)
 	mov	ds, si
 	mov	es, si
 
@@ -1146,7 +1147,7 @@ PASS:
 
 RETURN:
 	si - index into table for save under area
-	ds - cs
+	ds - fs
 
 DESTROYED:
 	ax, bx, cx, dx
@@ -1165,7 +1166,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 FindSaveUnder	proc	near
-	segmov	ds, cs, si
+	segmov	ds, fs, si
 	mov	si,offset dgroup:suTable
 	mov	ax,es:[W_header.LMBH_handle]
 
@@ -1184,6 +1185,7 @@ FSU_found:
 
 FindSaveUnder	endp
 	public	FindSaveUnder
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -1202,7 +1204,7 @@ PASS:
 	si - index into suTable with these fields set:
 		SUS_left, SUS_top, SUS_right, SUS_bottom
 		SUS_id, SUS_window, SUS_saveAddr
-	ds - cs
+	ds - fs
 
 RETURN:
 	suTable entry filled
@@ -1232,7 +1234,7 @@ EC <	call	ECVidCheckRectBounds					>
 
 	call	CheckCursorCollision
 
-	cmp	cs:[xorRegionHandle],0
+	cmp	fs:[xorRegionHandle],0
 	jz	noXOR
 	call	CheckXORCollision
 noXOR:
@@ -1241,7 +1243,7 @@ EGA <	call	InitEGAForUnder						>
 
 CASIO <	push	bx							>
 CASIO <	mov	bx, 0x100				; auto-trans off>
-CASIO <	call	cs:[biosFunctions].CF_autoTransMode			>
+CASIO <	call	fs:[biosFunctions].CF_autoTransMode			>
 CASIO <	pop	bx							>
 
 	; calculate word positions for left and right
@@ -1291,11 +1293,11 @@ endif	; BIT_SHIFTS le 2
 	ShiftLeftIf16	ax			;;convert to byte
 	CalcScanLine	si, ax			;si = screen address
 ifdef	LARGE_VIDEO_RAM
-	mov	ax, cs:[curWinPage]		;axsi = offset in VRAM
+	mov	ax, fs:[curWinPage]		;axsi = offset in VRAM
 	movdw	ds:[di].SUS_screenAddr, axsi
-ALT <	movdw	cs:[src], axsi						>
+ALT <	movdw	fs:[src], axsi						>
 ALT <	clr	ax				;axbx = # units		>
-ALT <	movdw	cs:[unitsToMove], axbx					>
+ALT <	movdw	fs:[unitsToMove], axbx					>
 else
 	mov	ds:[di].SUS_screenAddr,si
 endif	; LARGE_VIDEO_RAM
@@ -1334,7 +1336,7 @@ endif
 	;  For half-buffer, make destination buffer same as screen and
 	;  determine how many pixels fit in half-buffer
 HALF<	segmov	es, ds, bp						>
-HALF<	mov	bp, cs:[suSpaceInHalfBuffer]				>
+HALF<	mov	bp, fs:[suSpaceInHalfBuffer]				>
 
 	; do copy: dx = # lines, ds:si = source, es:di = dest, bx = words/line
 	;	   ax = value to add to move to next scan line
@@ -1364,7 +1366,7 @@ LVR <	call	SaveUnderMemMove					>
 SVR <	MoveStrUnit							>
 endif
 
-LVR <	NextScanLVR	cs:[src], ax					>
+LVR <	NextScanLVR	fs:[src], ax					>
 SVR <	NextScan	si, ax						>
 
 CASIO <	mov	di, si							>
@@ -1377,7 +1379,7 @@ ifdef	IS_HALF_SCREEN
 IS16 <	shl	bp, 1				; words -> bytes	>
 	sub	bp, ALT_BUFFER_BYTE_WIDTH
 	NextSaveScan	di, bp
-	mov	cs:[suSaveFreePtr], di
+	mov	fs:[suSaveFreePtr], di
 
 ifdef	HAS_EXTRA_ALT
 	mov	bp, -1
@@ -1388,24 +1390,24 @@ IS8 <	mov	bp, ALT_BUFFER_BYTE_WIDTH				>
 IS16 <	mov	bp, ALT_BUFFER_BYTE_WIDTH / 2				>
 
 SS_saveSize::
-	mov	cs:[suSpaceInHalfBuffer], bp
+	mov	fs:[suSpaceInHalfBuffer], bp
 endif	
 
 SS_common label	near
 
-	cmp	cs:[xorHiddenFlag],0	;check for ptr hidden.
+	cmp	fs:[xorHiddenFlag],0	;check for ptr hidden.
 	jz	noRedrawXOR		;go and redraw it if it was hidden.
 	call	ShowXOR
 noRedrawXOR:
 
-	cmp	cs:[hiddenFlag],0
+	cmp	fs:[hiddenFlag],0
 	jz	SS_noRedraw
 	call	CondShowPtr
 SS_noRedraw:
 
 CASIO <	mov	bh, 1					; auto-trans on>
 CASIO <	mov	bl, CASIO_AT_VRAM_XFER					>
-CASIO <	call	cs:[biosFunctions].CF_autoTransMode			>
+CASIO <	call	fs:[biosFunctions].CF_autoTransMode			>
 
 	ret
 
@@ -1456,7 +1458,7 @@ InitEGAForUnder	proc	near	uses	ax
 	; set up ega registers, but set currentDrawMode to -1 to force
 	; later update
 
-	mov	cs:[currentDrawMode], 0xff
+	mov	fs:[currentDrawMode], 0xff
 
 	mov	dx, GR_CONTROL		; ega control register
 	mov	ax, WR_MODE_0
@@ -1490,7 +1492,7 @@ CALLED BY:	INTERNAL
 
 PASS:
 	si - index into suTable
-	ds - cs
+	ds - fs
 	es - window
 
 RETURN:
@@ -1531,7 +1533,7 @@ NOALT <	mov	ds:[d_bytes],0		;;use d_bytes to save saveAddr	>
 
 	call	CheckCursorCollision
 
-	cmp	cs:[xorRegionHandle],0
+	cmp	fs:[xorRegionHandle],0
 	jz	noXOR
 	call	CheckXORCollision
 noXOR:
@@ -1575,7 +1577,7 @@ RS_setClip:
 	call	WinValClipLine
 	pop	si,di
 	mov	bp,ds:[W_clipRect.R_bottom]
-	segmov	ds,cs
+	segmov	ds,fs
 
 RS_afterClip:
 
@@ -1628,7 +1630,7 @@ endif	; BIT_SHIFTS le 2
 ifdef	UNIT_MASK
 	and	bx,UNIT_MASK
 	ShiftLeftIf16	bx			;;convert to byte
-	mov	D_REG,ds:[bx][leftMaskTable]	;dx = left mask
+	mov	D_REG,gs:[bx][leftMaskTable]	;dx = left mask
 endif	; UNIT_MASK
 
 	mov	ax, es:[W_clipRect.R_right]
@@ -1652,7 +1654,7 @@ endif	; BIT_SHIFTS le 2
 ifdef	UNIT_MASK
 	and	bx,UNIT_MASK
 	ShiftLeftIf16	bx			;;convert to byte
-	mov	A_REG,ds:[bx][rightMaskTable]	;ax = right mask
+	mov	A_REG,gs:[bx][rightMaskTable]	;ax = right mask
 endif	; UNIT_MASK
 
 	push	bp
@@ -1666,7 +1668,7 @@ endif	; UNIT_MASK
 
 RS_beforeNext:
 
-	segmov	ds,cs
+	segmov	ds,fs
 	xchg	si,ds:[d_bytes]		;save index, get saveAddr
 
 RS_next:
@@ -1791,7 +1793,7 @@ CALLED BY:	INTERNAL
 
 PASS:
 	si - index to save under entry
-	ds - cs
+	ds - fs
 
 	ifdef	LARGE_VIDEO_RAM
 		[src] - source address for screen data
@@ -1840,8 +1842,8 @@ REVISION HISTORY:
 
 RestoreSimpleRect	proc	near
 ifdef	UNIT_MASK
-	mov	ds:[RSR_leftMask],D_REG
-	mov	ds:[RSR_rightMask],A_REG
+	mov	gs:[RSR_leftMask],D_REG
+	mov	gs:[RSR_rightMask],A_REG
 endif	; UNIT_MASK
 
 	;
@@ -1885,7 +1887,7 @@ ALT <	SetAltBuffer	ds, cx						>
 ifdef	LARGE_VIDEO_RAM
 ALT <	; Analogous to SetAltBuffer above, convert 32-bit offset in	>
 ALT <	; save-under area to offset in video RAM.			>
-ALT <	adddw	cs:[src], cs:[suSaveAreaStart], cx			>
+ALT <	adddw	fs:[src], fs:[suSaveAreaStart], cx			>
 endif	; LARGE_VIDEO_RAM
 endif
 
@@ -1959,9 +1961,9 @@ ifdef	IS_BITMAP
 ifndef	IS_MEGA
 ifdef	LARGE_VIDEO_RAM
 	push	dx		; save value to add to move to next line
-	movdw	axsi, cs:[src]
+	movdw	axsi, fs:[src]
 	call	SetWinNoOffsetSrc	; ds:si = addr to read
-	movdw	axdi, cs:[dest]
+	movdw	axdi, fs:[dest]
 	call	SetWinNoOffset		; es:di = addr to write
 endif	; LARGE_VIDEO_RAM
 	LOAD_UNIT		;get left word
@@ -1977,10 +1979,10 @@ endif
 	or	A_REG,C_REG
 	STORE_UNIT
 ifdef	LARGE_VIDEO_RAM
-IS8 <	adddw	cs:[src], <size byte>					>
-IS8 <	adddw	cs:[dest], <size byte>					>
-IS16 <	adddw	cs:[src], <size word>					>
-IS16 <	adddw	cs:[dest], <size word>					>
+IS8 <	adddw	fs:[src], <size byte>					>
+IS8 <	adddw	fs:[dest], <size byte>					>
+IS16 <	adddw	fs:[src], <size word>					>
+IS16 <	adddw	fs:[dest], <size word>					>
 endif	; LARGE_VIDEO_RAM
 endif	; !IS_MEGA
 endif	; IS_BITMAP
@@ -2065,9 +2067,9 @@ endif	; IS_NIKE_COLOR
 ifdef	IS_BITMAP
 ifndef	IS_MEGA
 ifdef	LARGE_VIDEO_RAM
-	movdw	axsi, cs:[src]
+	movdw	axsi, fs:[src]
 	call	SetWinNoOffsetSrc	; ds:si = addr to read
-	movdw	axdi, cs:[dest]
+	movdw	axdi, fs:[dest]
 	call	SetWinNoOffset		; es:di = addr to write
 	pop	dx		; restore value to add to move to next line
 endif	; LARGE_VIDEO_RAM
@@ -2084,10 +2086,10 @@ endif
 	or	A_REG,C_REG
 	STORE_UNIT
 ifdef	LARGE_VIDEO_RAM
-IS8 <	adddw	cs:[src], <size byte>					>
-IS8 <	adddw	cs:[dest], <size byte>					>
-IS16 <	adddw	cs:[src], <size word>					>
-IS16 <	adddw	cs:[dest], <size word>					>
+IS8 <	adddw	fs:[src], <size byte>					>
+IS8 <	adddw	fs:[dest], <size byte>					>
+IS16 <	adddw	fs:[src], <size word>					>
+IS16 <	adddw	fs:[dest], <size word>					>
 endif	; LARGE_VIDEO_RAM
 endif	; !IS_MEGA
 endif	; IS_BITMAP
@@ -2120,7 +2122,7 @@ ifdef	ALT_VIDEO_RAM
 	; in RestoreScreen we need to subtract the [suSaveAreaStart] value
 	; back from [src] which we added to earlier.  Otherwise, [src] will
 	; be incorrect when we are called again later.
-	subdw	cs:[src], cs:[suSaveAreaStart], ax
+	subdw	fs:[src], fs:[suSaveAreaStart], ax
 endif	; ALT_VIDEO_RAM
 endif	; LARGE_VIDEO_RAM
 
@@ -2184,7 +2186,7 @@ CALLED BY:	INTERNAL
 
 PASS:
 	si - index to save under entry
-	ds - cs
+	ds - fs
 
 	ifdef	LARGE_VIDEO_RAM
 		[src] - source address for screen data
@@ -2230,8 +2232,8 @@ REVISION HISTORY:
 
 RestoreMaskedRect	proc	near
 	mov	ax,ds:[si].SUS_scanMod
-LVR <	StoreNextScanModLVR	<ds:[RMR_nextScanOffset]>,ax		>
-SVR <	StoreNextScanMod	<ds:[RMR_nextScanOffset]>,ax		>
+;; ?? LVR <	StoreNextScanModLVR	<ds:[RMR_nextScanOffset]>,ax		>
+;; ?? SVR <	StoreNextScanMod	<ds:[RMR_nextScanOffset]>,ax		>
 
 if	BIT_SHIFTS le 2
 	; The original code uses currentDrawMode as a temporary variable for
@@ -2293,30 +2295,30 @@ ALT <	SetAltBuffer	ds, cx						>
 ifdef	LARGE_VIDEO_RAM
 ALT <	; Analogous to SetAltBuffer above, convert 32-bit offset in	>
 ALT <	; save-under area to offset in video RAM.			>
-ALT <	adddw	cs:[src], cs:[suSaveAreaStart], cx			>
+ALT <	adddw	fs:[src], fs:[suSaveAreaStart], cx			>
 endif	; LARGE_VIDEO_RAM
 endif
 
 ifdef	LARGE_VIDEO_RAM
-	movdw	axsi, cs:[src]
+	movdw	axsi, fs:[src]
 	FirstWinNoOffsetSrc		; ds:si = addr to read
-	movdw	axdi, cs:[dest]
+	movdw	axdi, fs:[dest]
 	FirstWinNoOffset		; es:di = addr to write
-	mov	dx, cs:[dest].high	; dx = dest win #
+	mov	dx, fs:[dest].high	; dx = dest win #
 	call	CalcLastScanPtr		; ax = offset to last scan line
-	mov	cs:[lastWinPtr], ax
+	mov	fs:[lastWinPtr], ax
 endif	; LARGE_VIDEO_RAM
 	
-	; do copy: bp = # lines, ds:si = source, es:di = dest, cs:bx = mask
+	; do copy: bp = # lines, ds:si = source, es:di = dest, fs:bx = mask
 	; if IS_HALF_SCREEN : ax = # if units left in scan line
 RMR_loop:
 if	BIT_SHIFTS le 2
-	mov	cx, cs:[unitsPerLine]
+	mov	cx, fs:[unitsPerLine]
 else
-	mov	cl,cs:[currentDrawMode]
+	mov	cl,fs:[currentDrawMode]
 	clr	ch
 endif	; BIT_SHIFTS le 2
-	mov	bx,cs:[d_x1]
+	mov	bx,fs:[d_x1]
 HALF<	push	bp				; save # of lines	>
 HALF<	mov_tr	bp, ax				; bp <- # of units left	>
 	
@@ -2324,14 +2326,14 @@ HALF<	mov_tr	bp, ax				; bp <- # of units left	>
 	; Read initial mask.
 if	BIT_SHIFTS le 0
 	push	cx		; save units per line
-	mov	D_REG, cs:[bx]
+	mov	D_REG, fs:[bx]
 IS16 <	xchg	dl, dh		; high bit of low byte goes first	>
-	mov	cl, cs:[leftMaskBitPos]
+	mov	cl, fs:[leftMaskBitPos]
 	shl	D_REG, cl	; fast-forward to first mask bit used
 IS8 <	sub	cl, 8							>
 IS16 <	sub	cl, 16							>
 	neg	cl
-	mov	cs:[maskBitsLeft], cl
+	mov	fs:[maskBitsLeft], cl
 	pop	cx		; cx = units per line
 endif	; BIT_SHIFTS le 0
 
@@ -2340,7 +2342,7 @@ RMR_innerLoop:
 ifdef	IS_VGALIKE
 	mov	dx,GR_CONTROL
 	mov	al,BITMASK
-	mov	ah,cs:[bx]
+	mov	ah,fs:[bx]
 	out	dx,ax			;set mask
 	push	bx
 	push	cx
@@ -2360,7 +2362,7 @@ ifdef	IS_NIKE_COLOR
 	mov_tr	cx, ax
 	lodsw
 	mov_tr	dx, ax
-	mov	ah, cs:[bx]
+	mov	ah, fs:[bx]
 	and	cl, ah
 	and	ch, ah
 	and	dl, ah
@@ -2432,7 +2434,7 @@ afterWrite:
 elif	BITS_PER_PIXEL eq 1
 
 	LOAD_UNIT			;get source
-	mov	D_REG,cs:[bx]		;get mask
+	mov	D_REG,fs:[bx]		;get mask
 	and	A_REG,D_REG		;ax = new bits
 	not	D_REG
 	and	D_REG,es:[di]		;di = old bits
@@ -2453,12 +2455,12 @@ HALF<RMR_afterSkip:							>
 
 ifdef	LARGE_VIDEO_RAM
 if	BITS_PER_PIXEL gt 8
-	add	cs:[src].low, BITS_PER_PIXEL / 8	; advance 1 pixel
+	add	fs:[src].low, BITS_PER_PIXEL / 8	; advance 1 pixel
 elif	BITS_PER_PIXEL eq 8
-	inc	cs:[src].low		; advance 1 pixel
+	inc	fs:[src].low		; advance 1 pixel
 elif	BITS_PER_PIXEL eq 1
-IS8 <	inc	cs:[src].low		; advance 1 unit		>
-IS16 <	add	cs:[src].low, size word	; advance 1 unit		>
+IS8 <	inc	fs:[src].low		; advance 1 unit		>
+IS16 <	add	fs:[src].low, size word	; advance 1 unit		>
 else
 	ErrMessage <Need to add custom code here.>
 endif	; BITS_PER_PIXEL gt 8
@@ -2467,16 +2469,16 @@ endif	; BITS_PER_PIXEL gt 8
 	push	dx			; save mask bits
 	NextWinNoOffsetSrc
 	pop	dx			; restore mask bits
-	inc	cs:[src].high		; carry over
+	inc	fs:[src].high		; carry over
 afterSrc:
 
 if	BITS_PER_PIXEL gt 8
-	add	cs:[dest].low, BITS_PER_PIXEL / 8	; advance 1 pixel
+	add	fs:[dest].low, BITS_PER_PIXEL / 8	; advance 1 pixel
 elif	BITS_PER_PIXEL eq 8
-	inc	cs:[dest].low		; advance 1 pixel
+	inc	fs:[dest].low		; advance 1 pixel
 elif	BITS_PER_PIXEL eq 1
-IS8 <	inc	cs:[dest].low		; advance 1 unit		>
-IS16 <	add	cs:[dest].low, size word	; advance 1 unit	>
+IS8 <	inc	fs:[dest].low		; advance 1 unit		>
+IS16 <	add	fs:[dest].low, size word	; advance 1 unit	>
 else
 	ErrMessage <Need to add custom code here.>
 endif	; BITS_PER_PIXEL gt 8
@@ -2485,17 +2487,17 @@ endif	; BITS_PER_PIXEL gt 8
 	push	dx			; save mask bits
 	NextWinNoOffset
 	pop	dx			; restore mask bits
-	inc	cs:[dest].high		; carry over
+	inc	fs:[dest].high		; carry over
 afterDest:
 endif	; LARGE_VIDEO_RAM
 
 	; *** Custom code depending on # bits per pixel and # bits of driver.
 	; Decrement mask bit counter.
 if	BIT_SHIFTS le 0
-	dec	cs:[maskBitsLeft]
+	dec	fs:[maskBitsLeft]
 	jnz	RMR_innerLoopNext	; => no need to read next mask word
-IS8 <	mov	cs:[maskBitsLeft], 8					>
-IS16 <	mov	cs:[maskBitsLeft], 16					>
+IS8 <	mov	fs:[maskBitsLeft], 8					>
+IS16 <	mov	fs:[maskBitsLeft], 16					>
 endif	; BIT_SHIFTS le 0
 
 	inc	bx
@@ -2504,7 +2506,7 @@ endif	; BIT_SHIFTS le 0
 	; *** Custom code depending on # bits per pixel and # bits of driver.
 	; Read mask for the next pixels.
 if	BIT_SHIFTS le 0
-	mov	D_REG, cs:[bx]
+	mov	D_REG, fs:[bx]
 IS16 <	xchg	dl, dh		; high bit of low byte goes first	>
 endif	; BIT_SHIFTS le 0
 
@@ -2518,8 +2520,8 @@ if	BIT_SHIFTS lt 0
 endif	; BIT_SHIFTS lt 0
 	loop	RMR_innerLoop
 
-LVR <	NextScanModLVR	cs:[dest], RMR_nextScanOffset			>
-LVR <	mov	di, cs:[dest].low					>
+LVR <	NextScanModLVR	fs:[dest], RMR_nextScanOffset			>
+LVR <	mov	di, fs:[dest].low					>
 SVR <	NextScanMod	di, RMR_nextScanOffset				>
 CASIO <	mov	si, di			; save area is to right		>
 CASIO <	add	si, SCREEN_BYTE_WIDTH					>
@@ -2535,7 +2537,7 @@ ifdef	ALT_VIDEO_RAM
 	; in RestoreScreen we need to subtract the [suSaveAreaStart] value
 	; back from [src] which we added to earlier.  Otherwise, [src] will
 	; be incorrect when we are called again later.
-	subdw	cs:[src], cs:[suSaveAreaStart], ax
+	subdw	fs:[src], fs:[suSaveAreaStart], ax
 endif	; ALT_VIDEO_RAM
 endif	; LARGE_VIDEO_RAM
 
@@ -2551,6 +2553,7 @@ IS16<	mov	bp, ALT_BUFFER_BYTE_WIDTH / 2				>
 endif
 RestoreMaskedRect	endp
 	public	RestoreMaskedRect
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -2570,7 +2573,7 @@ PASS:
 RETURN:
 	none
 
-DESTROYED:
+ODESTROYED:
 	none
 
 REGISTER/STACK USAGE:
@@ -2589,7 +2592,8 @@ REVISION HISTORY:
 SaveUnderCollision	proc	near
 	push	ax, bx, cx, dx, si, di, bp, ds
 
-	segmov	ds, cs
+	segmov	ds, fs
+	assume	ds:dgroup
 ifndef	IS_CASIO
 	mov	al,ds:[suCount]
 	dec	al
@@ -2627,11 +2631,11 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Move data within large video RAM using read and write windows.
 
 CALLED BY:	INTERNAL
-PASS:		cs:[src]	= 32-bit linear offset within video RAM
-		cs:[dest]	= 32-bit linear offset within video RAM
-		cs:[unitsToMove]= # bytes/words to move
-RETURN:		cs:[src]	= past end of src
-		cs:[dest]	= past end of dest
+PASS:		fs:[src]	= 32-bit linear offset within video RAM
+		fs:[dest]	= 32-bit linear offset within video RAM
+		fs:[unitsToMove]= # bytes/words to move
+RETURN:		fs:[src]	= past end of src
+		fs:[dest]	= past end of dest
 DESTROYED:	nothing
 SIDE EFFECTS:	
 
@@ -2645,8 +2649,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SaveUnderMemMove	proc	near
-unitsLeft	local	dword	push	cs:[unitsToMove].high, \
-					cs:[unitsToMove].low
+unitsLeft	local	dword	push	fs:[unitsToMove].high, \
+					fs:[unitsToMove].low
 len2		local	word
 len3		local	word
 	ForceRef	unitsLeft	; used in SUMMAdjLenAndMove
@@ -2660,11 +2664,11 @@ len3		local	word
 	;	len2 = b - a
 	;	len3 = 64K - (b - a)
 	;
-	mov	di, cs:[dest].low	; di = dest.low = b
+	mov	di, fs:[dest].low	; di = dest.low = b
 	mov	ax, di			; ax = b
 	neg	ax			; ax = -b = 64K - b
 	mov	cx, ax			; cx = len1 = 64K - b
-	mov	si, cs:[src].low	; si = src.low = a
+	mov	si, fs:[src].low	; si = src.low = a
 	add	ax, si			; ax = 64K - (b - a)
 	mov	ss:[len3], ax		; len3 = 64K - (b - a)
 	neg	ax			; ax = (b - a) - 64K = b - a
@@ -2707,9 +2711,9 @@ step1::
 	;
 	; STEP 1.
 	;
-	mov	ax, cs:[dest].high
+	mov	ax, fs:[dest].high
 	FirstWinNoOffset		; es = segment to write
-	mov	ax, cs:[src].high
+	mov	ax, fs:[src].high
 	FirstWinNoOffsetSrc		; ds = segment to read
 
 	call	SUMMAdjLenAndMove	; CF clear if done
@@ -2766,10 +2770,10 @@ done:
 	;
 	; Update src and dest.
 	;
-	movdw	dxax, cs:[unitsToMove]
+	movdw	dxax, fs:[unitsToMove]
 IS16<	shldw	dxax			; convert to bytes		>
-	adddw	cs:[src], dxax
-	adddw	cs:[dest], dxax
+	adddw	fs:[src], dxax
+	adddw	fs:[dest], dxax
 
 	popa
 	.leave
@@ -2829,6 +2833,7 @@ endif	; LARGE_VIDEO_RAM
 endif	; ALT_VIDEO_RAM
 
 endif
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ECVidCheckRectBounds

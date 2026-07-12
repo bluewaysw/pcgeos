@@ -85,12 +85,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidHidePtr	proc	near
-	inc	cs:[cursorCount]	; increment the nesting count
-	cmp	cs:[cursorCount],1	; if the cursor wasn't showing
+	inc	fs:[cursorCount]	; increment the nesting count
+	cmp	fs:[cursorCount],1	; if the cursor wasn't showing
 	jnz	VHP_done		;  then all done 
 	push	es
 	push	ds
-	mov	cx, cs
+	mov	cx, fs
 	mov	ds, cx
 	call	EraseCursor		;  else erase it
 	pop	ds
@@ -133,12 +133,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidShowPtr	proc	near
-	dec	cs:[cursorCount]	; set new value for nest count
+	dec	fs:[cursorCount]	; set new value for nest count
 EC <	ERROR_S	VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			>
 	jnz	VShP_done
 	push	es
 	push	ds
-	mov	cx, cs
+	mov	cx, fs
 	mov	ds, cx
 	call	DrawCursor		;  yes, draw it
 	pop	ds
@@ -184,12 +184,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidMovePtr	proc	near
-	mov	cx,cs
+	mov	cx,fs
 	mov	ds,cx
 
 	; erase cursor if visible
 
-	cmp	cs:[cursorCount],0
+	cmp	fs:[cursorCount],0
 	jnz	AfterCursorRedrawn
 
 	push	ax
@@ -199,14 +199,14 @@ VidMovePtr	proc	near
 
 	; if moving XOR region with pointer then do special stuff
 
-	cmp	cs:[xorFlags], 0
+	cmp	fs:[xorFlags], 0
 	jz	noXOR
 	pop	bx
 	pop	ax
 	push	ax
 	push	bx
-	sub	ax, cs:[cursorX]
-	sub	bx, cs:[cursorY]
+	sub	ax, fs:[cursorX]
+	sub	bx, fs:[cursorY]
 	call	UpdateXORForPtr
 noXOR:
 
@@ -226,7 +226,7 @@ AfterCursorRedrawn:
 	mov	ds:[cursorY],bx
 
 common:
-;	cmp	cs:[suCount], 0			; any active save under areas?
+;	cmp	fs:[suCount], 0			; any active save under areas?
 ;	jne	CheckSUAreas
 	clr	al
 	ret
@@ -280,18 +280,18 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidSetPtr	proc	near
 	push	es
-	cmp	cs:[cursorCount], 0	; see if it's currently on-screen
+	cmp	fs:[cursorCount], 0	; see if it's currently on-screen
 	jnz	VSPnoshow		;  no, safe to proceed
 	push	ds			; save passed params
 	push	si
-	segmov	ds, cs			; erase cursor wants ds -> cs
+	segmov	ds, fs			; erase cursor wants ds -> fs
 	call	EraseCursor		;  yes, restore screen before changing
 	pop	si
 	pop	ds
 VSPnoshow:
 	cmp	si, -1			;custom pointer ?
 	jne	VSP_custom
-	segmov	ds,cs
+	segmov	ds,fs
 	mov	si, offset pBasic
 VSP_custom:
 
@@ -305,14 +305,14 @@ EC <	ERROR_NE VIDEO_ONLY_SUPPORTS_16x16_CURSORS			>
 	mov	bx, {word}ds:[si][PD_hotX]	;bl = hotX, bh = hotY
 
 if ALLOW_BIG_MOUSE_POINTER
-	cmp	cs:[cursorSize], CUR_SIZE	;adjust hotX, hotY if double
+	cmp	fs:[cursorSize], CUR_SIZE	;adjust hotX, hotY if double
 	je	bp0				; sized mouse pointer
 	add	bx, bx				;bl = hotX, bh = hotY
 bp0:
 endif ; ALLOW_BIG_MOUSE_POINTER
 
-	mov	cs:[cursorHotX], bl	; store new x hot point
-	mov	cs:[cursorHotY], bh	; store new y hot point
+	mov	fs:[cursorHotX], bl	; store new x hot point
+	mov	fs:[cursorHotY], bh	; store new y hot point
 
 	; get pointer to cursor data.  We're going to copy the data to the area
 	; just past the bottom of the screen.  First the mask, with 8 copies
@@ -323,7 +323,7 @@ endif ; ALLOW_BIG_MOUSE_POINTER
 
 	; set the destination to be the buffer we have to store the mask
 
-	segmov	es, cs
+	segmov	es, fs
 	mov	di, offset ptrMaskBuffer 
 	mov	cx, (size ptrMaskBuffer)/2	; clearing mask 
 	mov	ax, 0xffff
@@ -333,7 +333,7 @@ endif ; ALLOW_BIG_MOUSE_POINTER
 	rep	stosw
 
 if ALLOW_BIG_MOUSE_POINTER
-	cmp	cs:[cursorSize], CUR_SIZE
+	cmp	fs:[cursorSize], CUR_SIZE
 	jne	setBigPointer
 endif ; ALLOW_BIG_MOUSE_POINTER
 
@@ -382,10 +382,10 @@ pSkipOne:
 drawCursor::
 	; draw new cursor
 
-	cmp	cs:[cursorCount],0
+	cmp	fs:[cursorCount],0
 	jnz	VSP_done
 	push	ds
-	segmov	ds, cs			;EraseCursor wants ds == cs
+	segmov	ds, fs			;EraseCursor wants ds == fs
 	call	DrawCursor
 	pop	ds
 VSP_done:
@@ -474,13 +474,13 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CondHidePtr	proc	near
-	cmp	cs:[cursorCount],0	;test for hidden
+	cmp	fs:[cursorCount],0	;test for hidden
 	jnz	THP_ret
-	cmp	cs:[hiddenFlag],0
+	cmp	fs:[hiddenFlag],0
 	jnz	THP_ret
 	push	ax, bx, cx, dx, si, di, bp, ds, es
 
-	segmov	ds,cs			;point at variables
+	segmov	ds,fs			;point at variables
 	mov	ds:[hiddenFlag],1	;set hidden
 	call	EraseCursor
 
@@ -501,7 +501,7 @@ CondShowPtrFar	endp
 
 CondShowPtr	proc	near
 	push	ds, es
-	segmov	ds,cs			;point at variables
+	segmov	ds,fs			;point at variables
 	mov	ds:[hiddenFlag],0
 	call	DrawCursor
 	pop	ds, es
@@ -551,11 +551,11 @@ DrawCursor	proc	near
 		uses	ax, bx, cx, dx, si, di, bp
 		.enter
 
-		mov	ax, cs:[cursorX]	; calc position to draw 
-		mov	bx, cs:[cursorY]
-		sub	al, cs:[cursorHotX]
+		mov	ax, fs:[cursorX]	; calc position to draw 
+		mov	bx, fs:[cursorY]
+		sub	al, fs:[cursorHotX]
 		sbb	ah, 0
-		sub	bl, cs:[cursorHotY]
+		sub	bl, fs:[cursorHotY]
 		sbb	bh, 0			; ax,bx = cursor position
 
 		; we'll need to calc the width and the height of the 
@@ -563,7 +563,7 @@ DrawCursor	proc	near
 		; cl = width, ch = height, dl = left offset, dh = scan offset
 
 		clr	dx
-		mov	cl, {byte}cs:[cursorSize]
+		mov	cl, {byte}fs:[cursorSize]
 		mov	ch, cl
 
 		; do different stuff if off left of screen 
@@ -573,8 +573,8 @@ DrawCursor	proc	near
 
 		; OK, it may be entirely inside the screen.  Check the right.
 	
-		mov	si, cs:[DriverTable].VDI_pageW	; get right side coord
-		sub	si, cs:[cursorSize]
+		mov	si, fs:[DriverTable].VDI_pageW	; get right side coord
+		sub	si, fs:[cursorSize]
 		cmp	ax, si			; check right side
 		LONG ja	offRight		;  else clip right side
 
@@ -584,8 +584,8 @@ checkHeight:
 		tst	bx			; see if off the top
 		LONG js	offTop			;  take less-traveled road
 
-		mov	si, cs:[DriverTable].VDI_pageH
-		sub	si, cs:[cursorSize]
+		mov	si, fs:[DriverTable].VDI_pageH
+		sub	si, fs:[cursorSize]
 		cmp	bx, si			; check off the bottom too
 		LONG ja	offBottom
 
@@ -598,30 +598,30 @@ checkHeight:
 		; 	bp = bytes left in this window
 		; 	ah = height
 calcIndex:
-		mov	cs:[cursorRegLeft], ax
-		mov	cs:[cursorRegTop], bx
+		mov	gs:[cursorRegLeft], ax
+		mov	gs:[cursorRegTop], bx
 		add	al, cl
 		adc	ah, 0
 		dec	ax
-		mov	cs:[cursorRegRight], ax
+		mov	gs:[cursorRegRight], ax
 		inc	ax
 		sub	al, cl
 		sbb	ah, 0
 		add	bl, ch
 		adc	bh, 0
 		dec	bx
-		mov	cs:[cursorRegBottom], bx
+		mov	gs:[cursorRegBottom], bx
 		inc	bx
 		sub	bl, ch
 		sbb	bh, 0
-		mov	cs:[backX], ax
-		mov	cs:[backY], bx
-		mov	cs:[backWidth], cl
-		mov	cs:[backHeight], ch
+		mov	fs:[backX], ax
+		mov	fs:[backY], bx
+		mov	fs:[backWidth], cl
+		mov	fs:[backHeight], ch
 
 		push	ax
 		mov	al, dh
-		mul	{byte}cs:[cursorSize]	; *cursorSize for scan index
+		mul	{byte}fs:[cursorSize]	; *cursorSize for scan index
 		clr	dh
 		add	dx, ax			; dx = index into picture
 		add	dx, dx			; dx = byte offset into picture
@@ -629,21 +629,21 @@ calcIndex:
 
 		mov	si, offset ptrMaskBuffer ; figure source address
 		add	si, dx			; 
-		segmov	ds, cs			; ds:si -> maskBuffer (source)
+		segmov	ds, fs			; ds:si -> maskBuffer (source)
 
 		mov	di, bx
 		mov	bx, ax
 		shl	bx, 1
 		CalcScanLineBoth di, bx, es, ds	; ds,es:[di] -> destination
 		shr	bx, 1
-		mov	bp, cs:[curWinEnd]	; calc #bytes left
+		mov	bp, fs:[curWinEnd]	; calc #bytes left
 		sub	bp, di			; bp = #bytes left 
 
-		mov	ax, cs:[modeInfo].VMI_scanSize ; get bytes per scan
-		mul	cs:[cursorSize]
+		mov	ax, fs:[modeInfo].VMI_scanSize ; get bytes per scan
+		mul	fs:[cursorSize]
 		cmp	ax, bp			; going to overflow window ?
 		mov	ah, ch			; ah = height
-		mov	bx, offset cs:backBuffer
+		mov	bx, offset fs:backBuffer
 		ja	careScanLoop
 
 		; finally, draw the sucker
@@ -652,16 +652,16 @@ calcIndex:
 		; cl	 - width loop counters
 		; ah	 - height loop counter
 		; al	 - scratch register
-		; cs:si	 - offset into cursor definition buffer
-		; cs:bx	 - offset into background save buffer
+		; fs:si	 - offset into cursor definition buffer
+		; fs:bx	 - offset into background save buffer
 drawLoop:
 		mov	ch, cl			; reload width
 		push	ax
 pixLoop:
 		mov	ax, ds:[di]		; get screen data
-		mov	cs:[bx], ax		; store background
-		and	ax, cs:[si]		; or in the mask
-		xor	ax, cs:[si+(size ptrMaskBuffer)] ; xor the picture data
+		mov	fs:[bx], ax		; store background
+		and	ax, fs:[si]		; or in the mask
+		xor	ax, fs:[si+(size ptrMaskBuffer)] ; xor the picture data
 		stosw
 		inc	si
 		inc	si
@@ -673,12 +673,12 @@ pixLoop:
 
 		shl	cx, 1			; 1 pixel = 2 bytes
 		sub	di, cx
-		add	si, cs:[cursorSize]
-		add	si, cs:[cursorSize]
+		add	si, fs:[cursorSize]
+		add	si, fs:[cursorSize]
 		sub	si, cx
 		shr	cx, 1
 
-		add	di, cs:[modeInfo].VMI_scanSize
+		add	di, fs:[modeInfo].VMI_scanSize
 		dec	ah
 		jnz	drawLoop
 done:
@@ -726,9 +726,9 @@ careScanLoop:
 		push	ax
 carePixLoop:
 		mov	ax, ds:[di]		; get screen data
-		mov	cs:[bx], ax		; store to background buffer
-		and	ax, cs:[si]		; or in the mask
-		xor	ax, cs:[si+(size ptrMaskBuffer)] ; xor the picture data
+		mov	fs:[bx], ax		; store to background buffer
+		and	ax, fs:[si]		; or in the mask
+		xor	ax, fs:[si+(size ptrMaskBuffer)] ; xor the picture data
 		stosw
 		inc	bx			; next background byte
 		inc	bx
@@ -740,8 +740,8 @@ carePixLoop:
 
 		shl	cx, 1			; 1 pixel = 2 bytes
 		sub	di, cx
-		add	si, cs:[cursorSize]
-		add	si, cs:[cursorSize]
+		add	si, fs:[cursorSize]
+		add	si, fs:[cursorSize]
 		sub	si, cx
 		shr	cx, 1
 
@@ -750,16 +750,16 @@ carePixLoop:
 		NextScanBoth di
 		jnc	careScanLoop
 
-		cmp	cx, cs:[pixelsLeft]	; if big enuf, just do it
+		cmp	cx, fs:[pixelsLeft]	; if big enuf, just do it
 		jbe	careScanLoop
 
-		mov	ch, cs:[pixelsLeft].low
+		mov	ch, fs:[pixelsLeft].low
 		push	ax
 splitScanLoop:
 		mov	ax, ds:[di]		; get screen data
-		mov	cs:[bx], ax		; store to background buffer
-		and	ax, cs:[si]		; or in the mask
-		xor	ax, cs:[si+(size ptrMaskBuffer)] ; xor the picture data
+		mov	fs:[bx], ax		; store to background buffer
+		and	ax, fs:[si]		; or in the mask
+		xor	ax, fs:[si+(size ptrMaskBuffer)] ; xor the picture data
 		stosw
 		inc	bx			; next background byte
 		inc	bx
@@ -773,13 +773,13 @@ splitScanLoop:
 		call	MidScanNextWin
 
 		mov	ch, cl
-		sub	ch, cs:[pixelsLeft].low
+		sub	ch, fs:[pixelsLeft].low
 		push	ax
 splitScanLoop2:
 		mov	ax, ds:[di]		; get screen data
-		mov	cs:[bx], ax		; store to background buffer
-		and	ax, cs:[si]		; or in the mask
-		xor	ax, cs:[si+(size ptrMaskBuffer)] ; xor the picture data
+		mov	fs:[bx], ax		; store to background buffer
+		and	ax, fs:[si]		; or in the mask
+		xor	ax, fs:[si+(size ptrMaskBuffer)] ; xor the picture data
 		stosw
 		inc	bx			; next background byte
 		inc	bx
@@ -809,7 +809,7 @@ PASS:		cursorByteX - cursor byte x position
 		cursorScreenAddr - screen address to start at
 		cursorLines - number of lines to draw
 		cursorBuffer - data to recover
-		ds - cs
+		ds - fs
 RETURN:		
 DESTROYED:	
 		ax, bx, cx, dx, si, di, bp
@@ -831,10 +831,10 @@ EraseCursor	proc	near
 		uses	ax, si, ds, di, es, bx, cx
 		.enter
 
-		mov	ax, cs:[backX]
-		mov	bx, cs:[backY]
-		mov	cl, cs:[backWidth]
-		mov	ch, cs:[backHeight]
+		mov	ax, fs:[backX]
+		mov	bx, fs:[backY]
+		mov	cl, fs:[backWidth]
+		mov	ch, fs:[backHeight]
 
 		; get ds:si -> frame buffer
 
@@ -842,15 +842,15 @@ EraseCursor	proc	near
 		shl	ax, 1
 		CalcScanLine	di, ax, es	; es:di -> frame buffer
 		shr	ax, 1
-		segmov	ds, cs, si
+		segmov	ds, fs, si
 		mov	si, offset backBuffer	; ds:si -> save area
 
-		mov	ax, cs:[modeInfo].VMI_scanSize
+		mov	ax, fs:[modeInfo].VMI_scanSize
 		mov	bx, ax			; save another copy
-		mul	cs:[cursorSize]
+		mul	fs:[cursorSize]
 		add	ax, di
 		jc	partialWindow
-		cmp	ax, cs:[curWinEnd]	; calc #bytes left
+		cmp	ax, fs:[curWinEnd]	; calc #bytes left
 		jae	partialWindow
 
 		; the area is entirely inside the current memory window, 
@@ -892,14 +892,14 @@ doneScan::
 		jnc	partLoop
 
 		mov	cl, bl
-		cmp	cx, cs:[pixelsLeft]
+		cmp	cx, fs:[pixelsLeft]
 		jbe	partLoop
-		mov	cx, cs:[pixelsLeft]
+		mov	cx, fs:[pixelsLeft]
 		rep	movsw
 
 		call	MidScanNextWin
 		mov	cl, bl
-		sub	cx, cs:[pixelsLeft]
+		sub	cx, fs:[pixelsLeft]
 		rep	movsw
 		dec	bh
 		jz	done
@@ -908,3 +908,4 @@ doneScan::
 		jmp	partLoop
 		
 EraseCursor	endp
+

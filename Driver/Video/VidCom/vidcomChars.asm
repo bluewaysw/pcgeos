@@ -108,25 +108,26 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 VidPutString	proc	near
+	assume	ds:nothing, es:nothing
 
 	; Save registers needed later.  These variables are all in self
 	; modified code in PutStringLow
 
-	mov	cs:[PSL_saveYPos],bx
-	mov	cs:[PSL_saveGState],ds
-	mov	cs:[fracPosition], dl
-	mov	cs:[fracYPosition], dh
-	mov	cs:[PSL_saveFont], cx		;save font seg
-	mov	cs:[PSL_saveWindow], es		;save window seg
+	mov	gs:[PSL_saveYPos],bx
+	mov	gs:[PSL_saveGState],ds
+	mov	fs:[fracPosition], dl
+	mov	fs:[fracYPosition], dh
+	mov	gs:[PSL_saveFont], cx		;save font seg
+	mov	gs:[PSL_saveWindow], es		;save window seg
 	mov	dx, ss:[bp].VPS_stringSeg
-	mov	cs:[PSL_saveStringSeg], dx	;save string seg
+	mov	gs:[PSL_saveStringSeg], dx	;save string seg
 
 SBCS <	mov	cx, ss:[bp].VPS_numChars	;cx <- # chars to draw	>
 
 	;
 	; Setup the ditherMatrix, if need be.  And the EGA hardware.
 
-	CheckSetDither	cs, GS_textAttr
+	CheckSetDither	fs, GS_textAttr
 
 ifdef IS_MONO
 ifdef IS_MEM
@@ -149,17 +150,17 @@ if DBCS_PCGEOS
 	mov	ds, cx				;ds <- seg addr of font
 	mov	dx, ds:FB_firstChar
 	mov	di, es				;di <-  window (interleaved)
-	mov	cs:CLF_firstChar, dx
+	mov	gs:CLF_firstChar, dx
 	mov	dx, ds:FB_lastChar
-	mov	cs:CLF_lastChar, dx
+	mov	gs:CLF_lastChar, dx
 	pop	ds
 	mov	cx, ss:[bp].VPS_numChars	;cx <- # chars to draw
 else
 	mov	dx, {word}ds:GS_fontFirstChar	;dl <- firstChar
 						;dh <- lastChar
-	mov	cs:CLF_firstChar, dl
+	mov	gs:CLF_firstChar, dl
 	mov	di, es				;di <-  window (interleaved)
-	mov	cs:CLF_lastChar, dh
+	mov	gs:CLF_lastChar, dh
 endif
 
 	;
@@ -167,45 +168,45 @@ endif
 	; minimum top side bound for fast vs. slow check.
 	;
 	mov	dx, ds:GS_minLSB
-	mov	cs:VPS_minLSB, dx
+	mov	gs:VPS_minLSB, dx
 
 	;
 	; self modification for drawing control-characters
 	;
 	mov	dl, ds:GS_drawCtrlOpcode
-	mov	cs:PSL_checkMapCtrlOp, dl
-	mov	cs:PSL_checkCtrlAdjustOpcode, dl
+	mov	gs:PSL_checkMapCtrlOp, dl
+	mov	gs:PSL_checkCtrlAdjustOpcode, dl
 
 	;
 	; self modification for textDrawOffset.
 	;
 	mov	dl, ds:GS_drawOffsetOpcode
-	mov	cs:PSL_drawOffsetOp, dl
+	mov	gs:PSL_drawOffsetOp, dl
 	
 	mov	dx, ds:GS_textDrawOffset
-	mov	cs:CLE_drawOffset, dx
+	mov	gs:CLE_drawOffset, dx
 
 	;
 	; self modification for soft-hyphens
 	;
 	mov	dl, ds:GS_hyphenOpcode		;dl <- hyphen opcode
-	mov	cs:PSL_hyphenOp, dl
+	mov	gs:PSL_hyphenOp, dl
 
 	;
 	; self modification for space padding (full justified only)
 	;
 	mov	dl, ds:GS_optSpacePad		;dl <- space opcode
-	mov	cs:PSL_spaceOpcode, dl		;save opcode
+	mov	gs:PSL_spaceOpcode, dl		;save opcode
 	cmp	dl, GO_SPECIAL_CASE
 	jne	VPS_afterPad			;additional work if padding
 if CHAR_JUSTIFICATION
 	mov	dl, ds:GS_optFullJust		;dl <- full justification opcode
-	mov	cs:PSL_fullJustOpcode, dl	;save opcode
+	mov	gs:PSL_fullJustOpcode, dl	;save opcode
 endif
 	mov	dl, ds:GS_textSpacePad.WBF_frac	;dl <- fractional padding
-	mov	cs:PSL_spacePadFrac, dl
+	mov	gs:PSL_spacePadFrac, dl
 	mov	dx, ds:GS_textSpacePad.WBF_int	;dx <- integer padding
-	mov	cs:PSL_spacePad, dx
+	mov	gs:PSL_spacePad, dx
 VPS_afterPad:
 	test	ds:GS_fontFlags, mask FBF_IS_REGION
 	jz	VPS_afterRegion
@@ -233,10 +234,10 @@ checkFunkyMixMode:
 nukeDither:
 
 	mov	dx, 0xffff
-	mov	{word} cs:[ditherMatrix]+0, dx
-	mov	{word} cs:[ditherMatrix]+2, dx
-	mov	{word} cs:[ditherMatrix]+4, dx
-	mov	{word} cs:[ditherMatrix]+6, dx
+	mov	{word} fs:[ditherMatrix]+0, dx
+	mov	{word} fs:[ditherMatrix]+2, dx
+	mov	{word} fs:[ditherMatrix]+4, dx
+	mov	{word} fs:[ditherMatrix]+6, dx
 	jmp	afterDither
 endif
 endif
@@ -254,23 +255,23 @@ VPS_afterRegion:
 	;
 	mov	dx, {word}ds:GS_complexOpcode	;dl <- complex opcode
 						;dh <- kerning opcode
-	mov	cs:PSL_complexOp1, dl
-	mov	cs:PSL_complexOp2, dl
-	mov	cs:CLF_kernOp, dh
-	mov	cs:CLC_kernOp, dh
+	mov	gs:PSL_complexOp1, dl
+	mov	gs:PSL_complexOp2, dl
+	mov	gs:CLF_kernOp, dh
+	mov	gs:CLC_kernOp, dh
 	cmp	dh, GO_SPECIAL_CASE
 	jne	VPS_afterKern			;additional work if kerning
 	push	ax
-	mov	cs:lastChar,0			;no kerning char
-	mov	cs:lastFlags,0			;no kerning flags
+	mov	fs:lastChar,0			;no kerning char
+	mov	fs:lastFlags,0			;no kerning flags
 	mov	al, ds:GS_complexOpcode		;al <- complex opcode
-	mov	cs:kernComplexOp1, al
-	mov	cs:kernComplexOp2, al		;store opcode in kern code
+	mov	gs:kernComplexOp1, al
+	mov	gs:kernComplexOp2, al		;store opcode in kern code
 	mov	ax, {word}ds:GS_trackKernValue	;ax <- track kern (BBFixed)
-	mov	cs:trackKernFrac, al		;store fraction
+	mov	gs:trackKernFrac, al		;store fraction
 	mov	al, ah				;al <- integer
 	cbw					;sign extend into ax
-	mov	cs:trackKernInt, ax		;store track kerning
+	mov	gs:trackKernInt, ax		;store track kerning
 	tst	ah				;test sign
 	pop	ax
 	js	VPS_useComplex			;have go slow with negatives
@@ -347,7 +348,7 @@ VPS_afterClip:
 	;
 
 	mov	di,ds:[W_clipRect.R_right]	;self modify one only use of
-	mov	cs:[CLF_saveLastON],di		;the GState in CharLowFast
+	mov	gs:[CLF_saveLastON],di		;the GState in CharLowFast
 
 ifdef	IS_MEM
 	jmp	VPS_useFast		; no cursor collisions for mem
@@ -373,10 +374,10 @@ VPS_useComplex:
 	jmp	VPS_drawIt		;Go do the drawing.
 
 VPS_useAlmostFast:
-	mov	dx, cs:VPS_minLSB
-	mov	cs:CLFC_minLSB, dx	    	;modify left edge check
+	mov	dx, gs:VPS_minLSB
+	mov	gs:CLFC_minLSB, dx	    	;modify left edge check
 	call	SetComplex
-	mov	cs:[PSL_saveRoutine],CHAR_LOW_FAST_CH
+	mov	gs:[PSL_saveRoutine],CHAR_LOW_FAST_CH
 	jmp	VPS_drawIt		;Go do the drawing.
 
 VPS_useFast:
@@ -398,13 +399,14 @@ VPS_minLSB equ (this word) + 1
 	add	dx, ax
 	cmp	dx, ds:W_clipRect.R_left
 	jl	VPS_useAlmostFast		;if before left then branch
-	mov	cs:[PSL_saveRoutine],CHAR_LOW_FAST
+	mov	gs:[PSL_saveRoutine],CHAR_LOW_FAST
 
 VPS_drawIt:
 
 	REAL_FALL_THRU	PutStringLow
 
 VidPutString	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -561,17 +563,17 @@ PSL_saveGState	equ  (this word) + 1
 	mov	bp,1234h		;MODIFIED
 	mov	ds,bp			;ds <- segment address of the GState.
 
-	mov	dx,cs:[PSL_saveStringSeg]
-NMEM < 	cmp	cs:[xorHiddenFlag],0	;check for ptr hidden.		>
+	mov	dx,gs:[PSL_saveStringSeg]
+NMEM < 	cmp	fs:[xorHiddenFlag],0	;check for ptr hidden.		>
 NMEM < 	LONG jnz PSL_redrawXOR		;go and redraw it if it was hidden.>
 NMEM <afterXORRedraw:							>
-NMEM < 	cmp	cs:[hiddenFlag],0	;check for ptr hidden.		>
+NMEM < 	cmp	fs:[hiddenFlag],0	;check for ptr hidden.		>
 NMEM < 	jnz	PSL_redraw		;go and redraw it if it was hidden.>
 
 NMEM <PutStringExit	label	near					>
-	mov	bp, cs:PSL_saveFont	;bp <- seg addr of font
-	mov	dl, cs:fracPosition
-	mov	dh, cs:fracYPosition
+	mov	bp, gs:PSL_saveFont	;bp <- seg addr of font
+	mov	dl, fs:fracPosition
+	mov	dh, fs:fracYPosition
 NullRoutine label near
 	ForceRef	NullRoutine
 	ret
@@ -615,9 +617,9 @@ DBCS <	mov	dx, C_HYPHEN_MINUS	;				>
 
 PSL_startComplex:
 	push	ax
-SBCS <	mov	dh, cs:fracPosition	;save x position (int:frac)	>
+SBCS <	mov	dh, fs:fracPosition	;save x position (int:frac)	>
 SBCS <	push	dx							>
-DBCS <	push	{word}cs:fracPosition-1	;save x position (int:frac)	>
+DBCS <	push	{word}fs:fracPosition-1	;save x position (int:frac)	>
 					;want fracPosition byte as high byte
 					;	of word being push
 	jmp	short PSL_afterStart
@@ -650,7 +652,7 @@ endif
 ;----------------------------------
 ; special case for padding spaces.
 PSL_checkSpace:
-	mov	ds, cs:PSL_saveStringSeg
+	mov	ds, gs:PSL_saveStringSeg
 SBCS <	cmp	{byte} ds:[si], C_SPACE					>
 DBCS <	cmp	{wchar} ds:[si], C_SPACE				>
 if CHAR_JUSTIFICATION
@@ -661,13 +663,13 @@ endif
 	; add in the spacing.
 	;
 PSL_spacePadFrac equ (this byte) + 5	;MODIFIED
-	add	cs:fracPosition, 0x12	;add in fractional padding
+	add	fs:fracPosition, 0x12	;add in fractional padding
 PSL_spacePad equ (this word) + 1	;MODIFIED
 	adc	ax, 0x1234		;add in integer padding
 	jmp	PSL_afterSpace
 
 PSL_checkAdjustForCtrl:
-	mov	ds, cs:PSL_saveStringSeg
+	mov	ds, gs:PSL_saveStringSeg
 DBCS <	cmp	{wchar} ds:[si], C_IDEOGRAPHIC_SPACE			>
 DBCS <	LONG je	PSL_doCtrlCharAdjustment				>
 SBCS <	cmp	{byte} ds:[si], C_SPACE	;Control char is <= C_SPACE	>
@@ -707,27 +709,27 @@ NMEM <	jmp	afterXORRedraw						>
 ;
 PSL_checkDrawOffset:
 	mov	dx, CHAR_LOW_EMPTY
-	xchg	dx, cs:PSL_saveRoutine	; save our new routine
+	xchg	dx, gs:PSL_saveRoutine	; save our new routine
 					; dx <- old routine
-	mov	cs:PSL_oldRoutine, dx	; save old routine.
+	mov	gs:PSL_oldRoutine, dx	; save old routine.
 	
 
 if DBCS_PCGEOS
-	mov	ds, cs:PSL_saveFont	;ds <- seg addr of font
+	mov	ds, gs:PSL_saveFont	;ds <- seg addr of font
 	mov	dx, ds:FB_firstChar
-	mov	cs:CLE_firstChar, dx
+	mov	gs:CLE_firstChar, dx
 	mov	dx, ds:FB_lastChar
-	mov	cs:CLE_lastChar, dx
-	mov	ds, cs:PSL_saveGState	; load ds with the gstate segment.
+	mov	gs:CLE_lastChar, dx
+	mov	ds, gs:PSL_saveGState	; load ds with the gstate segment.
 else
-	mov	ds, cs:PSL_saveGState	; load ds with the gstate segment.
+	mov	ds, gs:PSL_saveGState	; load ds with the gstate segment.
 	mov	dx, {word}ds:GS_fontFirstChar
-	mov	cs:CLE_firstChar, dl
-	mov	cs:CLE_lastChar, dh
+	mov	gs:CLE_firstChar, dl
+	mov	gs:CLE_lastChar, dh
 endif
 	
 	mov	dx, {word}ds:GS_complexOpcode
-	mov	cs:CLE_kernOp, dh
+	mov	gs:CLE_kernOp, dh
 	jmp	PSL_afterDrawOffset	; that's it...
 
 ;----------------------------------------
@@ -790,7 +792,7 @@ DBCS <	pop	ax							>
 ;-------------------------------
 
 PSL_doCtrlCharAdjustment:
-	mov	ds, cs:PSL_saveStringSeg
+	mov	ds, gs:PSL_saveStringSeg
 
 SBCS <	mov	dl, {byte} ds:[si]	; dl <- character from the stream>
 DBCS <	mov	dx, {wchar} ds:[si]	; dx <- character from the stream>
@@ -852,16 +854,16 @@ DBCS <	; bx	= Character we did draw					>
 	;
 	push	es, cx, di		; Save nuked registers
 DBCS <	push	bx			; save char actually drawn	>
-	segmov	es, cs:PSL_saveFont, bx	; es <- font segment
+	segmov	es, gs:PSL_saveFont, bx	; es <- font segment
 
 	call	dccm_GetCharWidth	; bx.cl <- old character width
-	add	cs:fracPosition, cl	; Update fractional position
+	add	fs:fracPosition, cl	; Update fractional position
 	adc	ax, bx			; ax <- new position to draw at
 
 SBCS <	mov	dl, dh			; dl <- character actually drawn>
 DBCS <	pop	dx			; dx <- character actually drawn>
 	call	dccm_GetCharWidth	; bx.cl <- new character width
-	sub	cs:fracPosition, cl	; Update fractional position
+	sub	fs:fracPosition, cl	; Update fractional position
 	sbb	ax, bx			; ax <- new position to draw at
 	pop	es, cx, di		; Save nuked registers
 
@@ -917,6 +919,7 @@ dccmGCW_useDefault:
 endif
 
 PutStringLow	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -948,10 +951,10 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 SetComplex	proc	near
-	mov	ds,cs:[PSL_saveGState]		;save GState segment.
+	mov	ds, gs:[PSL_saveGState]		;save GState segment.
 	mov	dl, ds:[GS_textAttr].CA_flags	;save flags.
-	mov	cs:[stateFlags], dl		;
-	mov	cs:[PSL_saveRoutine],CHAR_LOW_CHECK
+	mov	fs:[stateFlags], dl		;
+	mov	gs:[PSL_saveRoutine],CHAR_LOW_CHECK
 	ret
 
 SetComplex	endp
@@ -969,18 +972,18 @@ CALLED BY:	INTERNAL
 
 PASS:
 	dx - current character index (NOT value)
-	cs:lastChar - previous character drawn, if any
-	cs:lastFlags - CharTableFlags for previous character
-	ax.cs:fracPosition - x position
-	bx.cs:fracYPosition - y position
+	fs:lastChar - previous character drawn, if any
+	fs:lastFlags - CharTableFlags for previous character
+	ax.fs:fracPosition - x position
+	bx.fs:fracYPosition - y position
 	es - seg addr of font
 	es:di - ptr to CharTableEntry for current character
 
 RETURN:
 	ax:fracPosition - updated x
 	bx:fracYPosition - updated y
-	cs:lastChar - updated
-	cs:lastFlags - updated
+	fs:lastChar - updated
+	fs:lastFlags - updated
 
 DESTROYED:
 	dx
@@ -1009,9 +1012,9 @@ REVISION HISTORY:
 
 StartComplexKern	label	near
 	push	ax
-SBCS <	mov	dh, cs:fracPosition	;save x position (int:frac)	>
+SBCS <	mov	dh, fs:fracPosition	;save x position (int:frac)	>
 SBCS <	push	dx							>
-DBCS <	push	{word}cs:fracPosition-1	;save x position (int:frac)	>
+DBCS <	push	{word}fs:fracPosition-1	;save x position (int:frac)	>
 					;want fracPosition byte as high byte
 					;	of word being push
 	jmp	afterStartKern
@@ -1031,12 +1034,12 @@ else
 	mov	al, dl			;al <- character index
 	add	al, ds:FB_firstChar	;al <- character value
 	mov	ah, al			;both ah and al are char being drawn
-	xchg	ah, cs:[lastChar]	;ah = previous, al = current
+	xchg	ah, fs:[lastChar]	;ah = previous, al = current
 endif
 
 	test	ds:FB_charTable[di].CTE_flags, mask CTF_IS_SECOND_KERN
 	jz	notKernable		;branch if not kernable
-	test	cs:lastFlags, mask CTF_IS_FIRST_KERN
+	test	fs:lastFlags, mask CTF_IS_FIRST_KERN
 	jz	notKernable		;branch if not after kernable
 
 	push	di
@@ -1066,7 +1069,7 @@ trackKernInt equ	(this word) + 2	;MODIFIED
 	adc	cx, 0x1234		;add integer track kerning
 
 	mov	bl, ds:FB_charTable[di].CTE_flags
-	mov	cs:lastFlags, bl	;update kerning flags
+	mov	fs:lastFlags, bl	;update kerning flags
 	mov	bl, ds:FB_charTable[di].CTE_width.WBF_frac
 	mov	dx, ds:FB_charTable[di].CTE_width.WBF_int
 
@@ -1082,7 +1085,7 @@ trackKernInt equ	(this word) + 2	;MODIFIED
 	adc	cx, 0			;cx.bh <-  -(width)
 
 isForwardsMove:
-	add	cs:fracPosition, bh	;add fractional kerning
+	add	fs:fracPosition, bh	;add fractional kerning
 	adc	ax, cx			;add integer kerning
 
 	pop	bx, cx, ds
@@ -1097,7 +1100,7 @@ DoComplexKern:
 	add	sp, size WWFixed	;clear old position
 	push	bp
 	mov	bp, sp
-	mov	dh, cs:fracPosition
+	mov	dh, fs:fracPosition
 	mov	ss:[bp].CKF_oldX.WWF_frac.high, dh
 	mov	ss:[bp].CKF_oldX.WWF_int, ax
 	pop	bp
@@ -1152,11 +1155,11 @@ REVISION HISTORY:
 
 SlowReadLine	proc	near
 	push	es, di	
-	mov	di, cs	
+	mov	di, fs
 	mov	es, di		
 	mov	di, offset lineDataBuffer	
-	mov	cl,cs:[bytesToDraw]	;
-	sub	cl,cs:[extraBytesToDraw]
+	mov	cl,fs:[bytesToDraw]	;
+	sub	cl,fs:[extraBytesToDraw]
 	clr	ch			;
 	clr	bl			;extra bits (onlu used in bold)
 	rep	movsb			;copy all bytes
@@ -1267,13 +1270,13 @@ EC <	cmp		si, CHAR_NOT_BUILT	>
 EC <	ERROR_NE	FONT_BAD_CHAR_FLAG	>;shouldn't ever happen
 
 ifdef	LOGGING
-	xchg	di, cs:[logPtr]
-	ornf	cs:[di].CLE_info, mask CI_BUILD_CHAR
-	xchg	di, cs:[logPtr]
+	xchg	di, gs:[logPtr]
+	ornf	gs:[di].CLE_info, mask CI_BUILD_CHAR
+	xchg	di, gs:[logPtr]
 endif
 
 	call	VidBuildChar
-	mov	es, cs:PSL_saveFont	;es <- seg addr of font
+	mov	es, gs:PSL_saveFont	;es <- seg addr of font
 	jmp	CLR_afterBuild
 
 if DBCS_PCGEOS
@@ -1287,9 +1290,9 @@ CLR_afterLast:
 	; Update our self-modifications
 	;
 	mov	di, es:FB_firstChar
-	mov	cs:[CLR_firstChar], di
+	mov	gs:[CLR_firstChar], di
 	mov	di, es:FB_lastChar
-	mov	cs:[CLR_lastChar], di
+	mov	gs:[CLR_lastChar], di
 	jnc	CLR_afterDefault		;branch if character exists
 endif
 ;------------------------------------------------------------------------------
@@ -1297,9 +1300,9 @@ endif
 CLR_useDefault:
 
 ifdef	LOGGING
-	xchg	di, cs:[logPtr]
-	ornf	cs:[di].CLE_info, mask CI_SUBSTITUTED_DEFAULT
-	xchg	di, cs:[logPtr]
+	xchg	di, gs:[logPtr]
+	ornf	gs:[di].CLE_info, mask CI_SUBSTITUTED_DEFAULT
+	xchg	di, gs:[logPtr]
 endif
 
 DBCS <	mov	dx, es:FB_defaultChar					>
@@ -1317,14 +1320,14 @@ CharLowRegion	label	near
 	segmov	es, ds, cx
 
 ifdef	LOGGING
-	inc	cs:[numCharsLogged].low
+	inc	gs:[numCharsLogged].low
 	jnz	CLR_noInc
-	inc	cs:[numCharsLogged].high
+	inc	gs:[numCharsLogged].high
 CLR_noInc:
-	xchg	di, cs:[logPtr]
-	mov	cs:[di].CLE_char, dl
-	mov	cs:[di].CLE_info, 0
-	xchg	di, cs:[logPtr]
+	xchg	di, gs:[logPtr]
+	mov	gs:[di].CLE_char, dl
+	mov	gs:[di].CLE_info, 0
+	xchg	di, gs:[logPtr]
 endif
 
 	;
@@ -1371,19 +1374,19 @@ DBCS <	mov	es:[si].RCD_usage, dx			;update char usage >
 SBCS <	mov	es:FB_charTable[di].CTE_usage, dx	;update char usage >
 
 	mov	dx, ax			    	;dx <- x position
-	cmp	cs:fracPosition, 0x80
+	cmp	fs:fracPosition, 0x80
 	jb	CLR_noRound
 	inc	ax
 CLR_noRound:
 	;
 	; We also need to round the y position to an integer
 	;
-	cmp	cs:fracYPosition, 0x80
+	cmp	fs:fracYPosition, 0x80
 	jb	CLR_noRoundY
 	inc	bx
 CLR_noRoundY:
 	mov	cl, es:[di].FB_charTable.CTE_width.WBF_frac
-	add	cs:fracPosition, cl	    	;update fractional position
+	add	fs:fracPosition, cl	    	;update fractional position
 	adc	dx, es:[di].FB_charTable.CTE_width.WBF_int
 
 	push	dx				;save next char x position
@@ -1396,8 +1399,8 @@ CLR_noRoundY:
 	je	nullRegion
 	add	cx, offset RCD_bounds		;dx:cx <- ptr to region
 	mov	si, offset GS_textAttr		;si <- offset of attributes
-	mov	es, cs:PSL_saveWindow		;es <- seg addr of Window
-	mov	ds, cs:PSL_saveGState		;ds <- seg addr of GState
+	mov	es, gs:PSL_saveWindow		;es <- seg addr of Window
+	mov	ds, gs:PSL_saveGState		;ds <- seg addr of GState
 
 ifdef	LOGGING
 	call	LogBeforeCall
@@ -1421,9 +1424,9 @@ LogBeforeCall	proc	near	uses	ax, bx, cx, dx, si, bp, ds, es
 	.enter
 
 	push	ds, si
-	xchg	di, cs:[logPtr]
-	mov	cs:[di].CLE_pos.P_x, ax
-	mov	cs:[di].CLE_pos.P_y, bx
+	xchg	di, gs:[logPtr]
+	mov	gs:[di].CLE_pos.P_x, ax
+	mov	gs:[di].CLE_pos.P_y, bx
 
 	;
 	; Compare the current clipRect with the original maskRect
@@ -1431,21 +1434,21 @@ LogBeforeCall	proc	near	uses	ax, bx, cx, dx, si, bp, ds, es
 	;
 	push	ax
 	mov	ax, es:W_clipRect.R_left
-	mov	cs:[di].CLE_clipBefore.R_left, ax
+	mov	gs:[di].CLE_clipBefore.R_left, ax
 
 	mov	ax, es:W_clipRect.R_top
-	mov	cs:[di].CLE_clipBefore.R_top, ax
+	mov	gs:[di].CLE_clipBefore.R_top, ax
 
 	mov	ax, es:W_clipRect.R_right
-	mov	cs:[di].CLE_clipBefore.R_right, ax
+	mov	gs:[di].CLE_clipBefore.R_right, ax
 
 	mov	ax, es:W_clipRect.R_bottom
-	mov	cs:[di].CLE_clipBefore.R_bottom, ax
+	mov	gs:[di].CLE_clipBefore.R_bottom, ax
 	pop	ax
 
 	test	es:[W_grFlags], mask WGF_MASK_SIMPLE
 	jz	notSimple
-	ornf	cs:[di].CLE_info, mask CI_MASK_SIMPLE
+	ornf	gs:[di].CLE_info, mask CI_MASK_SIMPLE
 notSimple:
 	mov	ds, dx
 	mov	bp, cx			;ds:bp = region
@@ -1454,12 +1457,12 @@ notSimple:
 	add	ax, ds:[bp].R_left	;ax = real left
 	cmp	ax, es:[W_maskRect].R_right
 	jle	noClipLeft1
-	ornf	cs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_RIGHT_OF_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_RIGHT_OF_WINDOW
 	jmp	noClipLeft2
 noClipLeft1:
 	cmp	ax, es:[W_maskRect].R_left
 	jge	noClipLeft2
-	ornf	cs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_LEFT_OF_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_LEFT_OF_WINDOW
 noClipLeft2:
 	pop	ax
 
@@ -1467,12 +1470,12 @@ noClipLeft2:
 	add	ax, ds:[bp].R_right	;ax = real right
 	cmp	ax, es:[W_maskRect].R_left
 	jge	noClipRight1
-	ornf	cs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_LEFT_OF_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_LEFT_OF_WINDOW
 	jmp	noClipRight2
 noClipRight1:
 	cmp	ax, es:[W_maskRect].R_right
 	jle	noClipRight2
-	ornf	cs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_RIGHT_OF_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_RIGHT_OF_WINDOW
 noClipRight2:
 	pop	ax
 
@@ -1480,12 +1483,12 @@ noClipRight2:
 	add	bx, ds:[bp].R_top	;ax = real top
 	cmp	bx, es:[W_maskRect].R_bottom
 	jle	noClipTop1
-	ornf	cs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_BELOW_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_BELOW_WINDOW
 	jmp	noClipTop2
 noClipTop1:
 	cmp	bx, es:[W_maskRect].R_top
 	jge	noClipTop2
-	ornf	cs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_ABOVE_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_ABOVE_WINDOW
 noClipTop2:
 	pop	bx
 
@@ -1493,12 +1496,12 @@ noClipTop2:
 	add	bx, ds:[bp].R_bottom	;ax = real bottom
 	cmp	bx, es:[W_maskRect].R_top
 	jge	noClipBottom1
-	ornf	cs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_ABOVE_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_REJECTED_CHAR_ABOVE_WINDOW
 	jmp	noClipBottom2
 noClipBottom1:
 	cmp	bx, es:[W_maskRect].R_bottom
 	jle	noClipBottom2
-	ornf	cs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_BELOW_WINDOW
+	ornf	gs:[di].CLE_clipInfo, mask CCI_PART_CLIPPED_CHAR_BELOW_WINDOW
 noClipBottom2:
 	pop	bx
 	;
@@ -1511,20 +1514,20 @@ noClipBottom2:
 	mov	si, bp
 	cmp	ds:[si].R_left, ax
 	je	noRegionLeft
-	ornf	cs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_LEFT
+	ornf	gs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_LEFT
 noRegionLeft:
 	cmp	ds:[si].R_top, bx
 	je	noRegionTop
-	ornf	cs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_TOP
+	ornf	gs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_TOP
 noRegionTop:
 	cmp	ds:[si].R_right, cx
 	je	noRegionRight
-	ornf	cs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_RIGHT
+	ornf	gs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_RIGHT
 noRegionRight:
 	add	dx, 10				;special case for bottom
 	cmp	ds:[si].R_bottom, dx
 	jle	noRegionBottom
-	ornf	cs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_BOTTOM
+	ornf	gs:[di].CLE_info, mask CI_CHAR_REGION_MISMATCH_BOTTOM
 noRegionBottom:
 	;
 	; Make sure we're drawing in black
@@ -1535,9 +1538,9 @@ noRegionBottom:
 	cmp	ds:GS_textAttr.CA_maskType, SDM_100
 	je	isBlackText
 notBlackText:
-	ornf	cs:[di].CLE_info, mask CI_TEXT_NOT_SOLID_BLACK
+	ornf	gs:[di].CLE_info, mask CI_TEXT_NOT_SOLID_BLACK
 isBlackText:
-	xchg	di, cs:[logPtr]
+	xchg	di, gs:[logPtr]
 
 	.leave
 	ret
@@ -1549,7 +1552,7 @@ LogBeforeCall	endp
 LogAfterCall	proc	near	uses	ax, bx, cx, dx, si, bp, ds, es
 	.enter
 
-	xchg	di, cs:[logPtr]
+	xchg	di, gs:[logPtr]
 
 	;
 	; see if the clip rect has changed
@@ -1559,34 +1562,34 @@ LogAfterCall	proc	near	uses	ax, bx, cx, dx, si, bp, ds, es
 	mov	cx, es:W_clipRect.R_right
 	mov	dx, es:W_clipRect.R_bottom
 
-	mov	cs:[di].CLE_clipAfter.R_left, ax
-	mov	cs:[di].CLE_clipAfter.R_top, bx
-	mov	cs:[di].CLE_clipAfter.R_right, cx
-	mov	cs:[di].CLE_clipAfter.R_bottom, dx
+	mov	gs:[di].CLE_clipAfter.R_left, ax
+	mov	gs:[di].CLE_clipAfter.R_top, bx
+	mov	gs:[di].CLE_clipAfter.R_right, cx
+	mov	gs:[di].CLE_clipAfter.R_bottom, dx
 
-	cmp	cs:[di].CLE_clipBefore.R_left, ax
+	cmp	gs:[di].CLE_clipBefore.R_left, ax
 	jne	clipChanged
-	cmp	cs:[di].CLE_clipBefore.R_top, bx
+	cmp	gs:[di].CLE_clipBefore.R_top, bx
 	jne	clipChanged
-	cmp	cs:[di].CLE_clipBefore.R_right, cx
+	cmp	gs:[di].CLE_clipBefore.R_right, cx
 	jne	clipChanged
-	cmp	cs:[di].CLE_clipBefore.R_bottom, dx
+	cmp	gs:[di].CLE_clipBefore.R_bottom, dx
 	je	clipUnchanged
 clipChanged:
-	ornf	cs:[di].CLE_info, mask CI_CLIP_MISMATCH_PREVIOUS
+	ornf	gs:[di].CLE_info, mask CI_CLIP_MISMATCH_PREVIOUS
 clipUnchanged:
 
 	;
 	; Save the region drawing flags to show which
 	; region routines were called.
 	;
-	mov	al, cs:[curRegFlags]
-	mov	cs:[di].CLE_regFlags, al
+	mov	al, gs:[curRegFlags]
+	mov	gs:[di].CLE_regFlags, al
 
 	; check buffer for changes
 
 	SetBuffer	ds, ax			;ds = buffer
-	mov	ax, cs:[bm_bpScan]		;scan line width
+	mov	ax, fs:[bm_bpScan]		;scan line width
 	mul	ds:[B_height]			;ax = size
 	mov	cx, ax
 	shr	cx				;convert to words
@@ -1597,31 +1600,31 @@ sumLoop:
 	add	bx, ax
 	loop	sumLoop
 
-	cmp	bx, cs:[bufferSum]
+	cmp	bx, gs:[bufferSum]
 	jz	sumUnchanged
-	ornf	cs:[di].CLE_info, mask CI_BUFFER_CHANGED
+	ornf	gs:[di].CLE_info, mask CI_BUFFER_CHANGED
 sumUnchanged:
-	mov	cs:[bufferSum], bx
+	mov	gs:[bufferSum], bx
 
 	; check for pattern buffer all 0's
 
 ifndef IS_CLR24
 	push	ax
-	mov	ax, {word} cs:[ditherMatrix]+0
-	or	ax, {word} cs:[ditherMatrix]+2
-	or	ax, {word} cs:[ditherMatrix]+4
-	or	ax, {word} cs:[ditherMatrix]+6
+	mov	ax, {word} fs:[ditherMatrix]+0
+	or	ax, {word} fs:[ditherMatrix]+2
+	or	ax, {word} fs:[ditherMatrix]+4
+	or	ax, {word} fs:[ditherMatrix]+6
 	jnz	notAllZeros
-	ornf	cs:[di].CLE_info, mask CI_PATTERN_ALL_ZEROS
+	ornf	gs:[di].CLE_info, mask CI_PATTERN_ALL_ZEROS
 notAllZeros:
 
-	mov	ax, {word} cs:[ditherMatrix]+0
-	and	ax, {word} cs:[ditherMatrix]+2
-	and	ax, {word} cs:[ditherMatrix]+4
-	and	ax, {word} cs:[ditherMatrix]+6
+	mov	ax, {word} fs:[ditherMatrix]+0
+	and	ax, {word} fs:[ditherMatrix]+2
+	and	ax, {word} fs:[ditherMatrix]+4
+	and	ax, {word} fs:[ditherMatrix]+6
 	cmp	ax, 0xff
 	jnz	notAllOnes
-	ornf	cs:[di].CLE_info, mask CI_PATTERN_ALL_ONES
+	ornf	gs:[di].CLE_info, mask CI_PATTERN_ALL_ONES
 notAllOnes:
 	pop	ax
 endif
@@ -1634,7 +1637,7 @@ endif
 	mov	di, offset CharLog
 noWrap:
 
-	xchg	di, cs:[logPtr]
+	xchg	di, gs:[logPtr]
 	.leave
 	ret
 
@@ -1679,37 +1682,37 @@ ifdef LOGGING
 endif
 if DBCS_PCGEOS
 	push	ds
-	mov	ds, cs:PSL_saveFont		;ds <- seg addr of font
+	mov	ds, gs:PSL_saveFont		;ds <- seg addr of font
 	mov	dx, ds:FB_firstChar
-	mov	cs:CLR_firstChar, dx
+	mov	gs:CLR_firstChar, dx
 	mov	dx, ds:FB_lastChar
-	mov	cs:CLR_lastChar, dx		;save mods for first, last
+	mov	gs:CLR_lastChar, dx		;save mods for first, last
 	pop	ds
 else
 	mov	dx, {word}ds:GS_fontFirstChar	;dl <- first, dh <- last
-	mov	cs:CLR_firstChar, dl
-	mov	cs:CLR_lastChar, dh		;save mods for first, last
+	mov	gs:CLR_firstChar, dl
+	mov	gs:CLR_lastChar, dh		;save mods for first, last
 endif
-	mov	cs:PSL_saveRoutine, CHAR_LOW_REGION 	;set routine
+	mov	gs:PSL_saveRoutine, CHAR_LOW_REGION 	;set routine
 
 	mov	dx, {word}ds:GS_complexOpcode	;dl <- complex opcode
 						;dh <- kerning opcode
-	mov	cs:PSL_complexOp1, dl
-	mov	cs:PSL_complexOp2, dl
-	mov	cs:CLR_kernOp, dh
+	mov	gs:PSL_complexOp1, dl
+	mov	gs:PSL_complexOp2, dl
+	mov	gs:CLR_kernOp, dh
 	cmp	dh, GO_SPECIAL_CASE		;see if kerning
 	jne	afterKern			;additional work if kerning
 
 	push	ax
-	mov	cs:lastChar,0			;no kerning char
+	mov	fs:lastChar,0			;no kerning char
 	mov	al, ds:GS_complexOpcode		;al <- complex opcode
-	mov	cs:kernComplexOp1, al
-	mov	cs:kernComplexOp2, al		;store opcode in kern code
+	mov	gs:kernComplexOp1, al
+	mov	gs:kernComplexOp2, al		;store opcode in kern code
 	mov	ax, {word}ds:GS_trackKernValue	;ax <- track kern (BBFixed)
-	mov	cs:trackKernFrac, al		;store fraction
+	mov	gs:trackKernFrac, al		;store fraction
 	mov	al, ah				;al <- integer
 	cbw					;sign extend into ax
-	mov	cs:trackKernInt, ax		;store track kerning
+	mov	gs:trackKernInt, ax		;store track kerning
 	pop	ax
 afterKern:
 	jmp	PutStringLow
@@ -1750,9 +1753,9 @@ CLE_drawOffset	equ	(this word) + 2
 	; in PutStringLow() and jump to it.
 	;
 PSL_oldRoutine	equ	(this word) + 5
-	mov	cs:PSL_saveRoutine, 1234h	; MODIFIED
+	mov	gs:PSL_saveRoutine, 1234h	; MODIFIED
 
-	mov	di, cs:PSL_saveRoutine
+	mov	di, gs:PSL_saveRoutine
 	add	di, offset PSL_saveRoutineLabel + 3
 	jmp	di				; go to the routine...
 
@@ -1803,7 +1806,7 @@ CLE_kernOp equ (this byte) + 0
 	jmp	CLE_DoKern			;MODIFIED (JMP or MOV DH,xxx)
 CLE_afterKern:
 	mov	cl, ds:[di].FB_charTable.CTE_width.WBF_frac
-	add	cs:fracPosition, cl	    ;keep frac position up to date.
+	add	fs:fracPosition, cl	    ;keep frac position up to date.
 
 	adc	ax, ds:[di].FB_charTable.CTE_width.WBF_int
 
@@ -1819,9 +1822,9 @@ CLE_afterLast:
 	call	CallLockCharSetDS
 	push	ax
 	mov	ax, ds:FB_firstChar
-	mov	cs:CLE_firstChar, ax
+	mov	gs:CLE_firstChar, ax
 	mov	ax, ds:FB_lastChar
-	mov	cs:CLE_lastChar, ax
+	mov	gs:CLE_lastChar, ax
 	pop	ax
 	jnc	CLE_afterDefault		;branch if char exists
 endif
@@ -1851,7 +1854,6 @@ CHAR_LOW_FAST_CH =	offset CharLowFastCh - offset PSL_saveRoutineLabel - 3
 CHAR_LOW_CHECK	=	offset CharLowCheck - offset PSL_saveRoutineLabel - 3
 CHAR_LOW_REGION =	offset CharLowRegion - offset PSL_saveRoutineLabel - 3
 CHAR_LOW_EMPTY	=	offset CharLowEmpty - offset PSL_saveRoutineLabel - 3
-
 
 if DBCS_PCGEOS
 
@@ -1887,15 +1889,15 @@ CallLockCharSetDS	proc	near
 	; Lock the new font
 	;
 	push	bx, cx, dx, si, di
-	mov	si, offset PutStringState 	;cs:si <- ptr to table
+	mov	si, offset PutStringState 	;gs:si <- ptr to table
 	call	SaveVidState			;save self-modifcations
-	mov	ds, cs:PSL_saveGState		;ds <- seg addr of GState
-	VSem	cs, videoSem, TRASH_BX		;release the driver sem
+	mov	ds, gs:PSL_saveGState		;ds <- seg addr of GState
+	VSem	fs, videoSem, TRASH_BX		;release the driver sem
 	call	FontDrLockCharSet
-	PSem	cs, videoSem, TRASH_BX		;get the driver sem
+	PSem	fs, videoSem, TRASH_BX		;get the driver sem
 	mov	ds, ax				;ds <- new font seg addr
 	lahf					;ah <- flags
-	mov	si, offset PutStringState	;cs:si <- ptr to table
+	mov	si, offset PutStringState	;gs:si <- ptr to table
 	call	RestoreVidState			;restore self-modifications
 	sahf					;restore results
 	pop	bx, cx, dx, si, di
@@ -1903,11 +1905,11 @@ CallLockCharSetDS	proc	near
 	;
 	; update various self-modifications
 	;
-	mov	cs:[PSL_saveFont], ax		;<- new font seg
+	mov	gs:[PSL_saveFont], ax		;<- new font seg
 	mov	ax, ds:FB_firstChar
-	mov	cs:[CLF_firstChar], ax		;<- new first char
+	mov	gs:[CLF_firstChar], ax		;<- new first char
 	mov	ax, ds:FB_lastChar
-	mov	cs:[CLF_lastChar], ax		;<- new last char
+	mov	gs:[CLF_lastChar], ax		;<- new last char
 
 	.leave
 	ret

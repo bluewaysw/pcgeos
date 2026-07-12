@@ -143,7 +143,7 @@ DrawOptClustered	proc	near
 DOC_loop:
 		NextDitherScan				; update si
 		NextScan di
-		tst	cs:[bm_scansNext]	; if off end of bitmap 
+		tst	fs:[bm_scansNext]	; if off end of bitmap 
 		LONG js	DOC_done		;  then bail		
 blastStart:
 		push	di				; save pointer
@@ -161,14 +161,14 @@ blastStart:
 midLoop:
 		NextDitherWord			; ax = word of ditherMatrix
 		mov	es:[di], ax		; store yellow
-		mov	bx, cs:[bm_bpMask]	; onto cyan
-		mov	ax, cs:[cyanWord]
+		mov	bx, fs:[bm_bpMask]	; onto cyan
+		mov	ax, fs:[cyanWord]
 		mov	es:[di][bx], ax
 		shl	bx, 1			; onto magenta
-		mov	ax, cs:[magentaWord]
+		mov	ax, fs:[magentaWord]
 		mov	es:[di][bx], ax
-		add	bx, cs:[bm_bpMask]	; onto black
-		mov	ax, cs:[blackWord]
+		add	bx, fs:[bm_bpMask]	; onto black
+		mov	ax, fs:[blackWord]
 		mov	es:[di][bx], ax
 		add	di, 2
 		loop	midLoop
@@ -232,8 +232,8 @@ clMaskCommon	label	near
 		not	dx
 		or	ax, cx
 		mov	es:[di], ax
-		mov	bx, cs:[bm_bpMask]	; go to cyan plane
-		mov	ax, cs:[cyanWord]
+		mov	bx, fs:[bm_bpMask]	; go to cyan plane
+		mov	ax, fs:[cyanWord]
 		and	ax, dx
 		not	dx			; take inverse mask
 		mov	cx, es:[di][bx]
@@ -242,7 +242,7 @@ clMaskCommon	label	near
 		or	ax, cx
 		mov	es:[di][bx], ax
 		shl	bx, 1			; go to magenta plane
-		mov	ax, cs:[magentaWord]
+		mov	ax, fs:[magentaWord]
 		and	ax, dx
 		not	dx			; take inverse mask
 		mov	cx, es:[di][bx]
@@ -250,8 +250,8 @@ clMaskCommon	label	near
 		not	dx
 		or	ax, cx
 		mov	es:[di][bx], ax
-		add	bx, cs:[bm_bpMask]	; go to magenta plane
-		mov	ax, cs:[blackWord]
+		add	bx, fs:[bm_bpMask]	; go to magenta plane
+		mov	ax, fs:[blackWord]
 		and	ax, dx
 		not	dx			; take inverse mask
 		mov	cx, es:[di][bx]
@@ -301,7 +301,7 @@ DrawOptClusteredThin proc	near
 DOCT_loop:
 		NextDitherScan				; update si
 		NextScan di
-		tst	cs:[bm_scansNext]	; if off end of bitmap 
+		tst	fs:[bm_scansNext]	; if off end of bitmap 
 		js	DOCT_done		;  then bail		
 blastStart:
 		call	ClusterLeftMask			; store new dithers
@@ -368,14 +368,14 @@ DSC_loop:
 	inc	cx
 	NextDitherScan				; update si
 	NextScan	di
-	tst	cs:[bm_scansNext]	; if off end of bitmap 
+	tst	fs:[bm_scansNext]	; if off end of bitmap 
 	LONG js	DSC_done		;  then bail		
 
 blastSpecialStart:
 	and	cx, 7				; isolate low three bits
 	push	cx				; save mask index
 	mov	bx, cx				; bx = mask index
-	mov	bl, {byte} cs:[bx][maskBuffer]	; get draw mask byte
+	mov	bl, {byte} fs:[bx][maskBuffer]	; get draw mask byte
 	mov	bh, bl				;  make it a word
 	mov	cs:[CDM_mask], bx		; save mask
 	push	di
@@ -462,18 +462,18 @@ sclMaskCommon	label	near
 		mov	cx, es:[di]
 		call	ClusterDoMode
 		mov	es:[di], ax
-		mov	bx, cs:[bm_bpMask]	; go to cyan plane
-		mov	ax, cs:[cyanWord]
+		mov	bx, fs:[bm_bpMask]	; go to cyan plane
+		mov	ax, fs:[cyanWord]
 		mov	cx, es:[di][bx]
 		call	ClusterDoMode
 		mov	es:[di][bx], ax
 		shl	bx, 1			; go to magenta plane
-		mov	ax, cs:[magentaWord]
+		mov	ax, fs:[magentaWord]
 		mov	cx, es:[di][bx]
 		call	ClusterDoMode
 		mov	es:[di][bx], ax
-		add	bx, cs:[bm_bpMask]	; go to magenta plane
-		mov	ax, cs:[blackWord]
+		add	bx, fs:[bm_bpMask]	; go to magenta plane
+		mov	ax, fs:[blackWord]
 		mov	cx, es:[di][bx]
 		call	ClusterDoMode
 		mov	es:[di][bx], ax
@@ -520,14 +520,14 @@ DSCT_loop:
 	inc	cx
 	NextDitherScan				; update si
 	NextScan	di
-	tst	cs:[bm_scansNext]	; if off end of bitmap 
+	tst	fs:[bm_scansNext]	; if off end of bitmap 
 	js	DSCT_done		;  then bail		
 
 blastSpecialStart:
 	and	cx, 7				; isolate low three bits
 	push	cx				; save mask index
 	mov	bx, cx				; bx = mask index
-	mov	bl, {byte} cs:[bx][maskBuffer]	; get draw mask byte
+	mov	bl, {byte} fs:[bx][maskBuffer]	; get draw mask byte
 	mov	bh, bl				;  make it a word
 	mov	cs:[CDM_mask], bx		; save mask
 	call	SpecialLeftMask			; mask/write word
@@ -573,7 +573,7 @@ CDM_mask	equ	(this word) + 2
 		and	dx, 1234h
 		mov	si, ax			; load data from ditherMatrix
 		mov	ax, cx			; load screen content
-		call	cs:[modeRoutine]	; apply mode
+		call	fs:[modeRoutine]	; apply mode
 		.leave
 		ret
 ClusterDoMode	endp
@@ -683,7 +683,7 @@ REVISION HISTORY:
 C1I1OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	js	C1I1O_done
 
 Cluster1In1Out	proc		near
@@ -703,16 +703,16 @@ WriteChar1Byte	proc	near
 	mov	ah, al
 	not	ah			; ah = NOT mask
 	mov	cx, ax			; save masks
-	and	al, cs:ditherMatrix[bp]	; al = mask AND yellow
+	and	al, fs:ditherMatrix[bp]	; al = mask AND yellow
 	and	ah, es:[di]		; ah = screen AND mask
 	or	al, ah			; al = data to store
 	mov	es:[di], al
 	mov	ax, cx			; restore masks
-	mov	si, cs:[cyanBase]	; onto cyan
-	mov	bl, cs:[cyanIndex]	; get index too
-	mov	dx, cs:[bm_bpMask]	; #bytes per data plane
+	mov	si, fs:[cyanBase]	; onto cyan
+	mov	bl, fs:[cyanIndex]	; get index too
+	mov	dx, fs:[bm_bpMask]	; #bytes per data plane
 	clr	bh
-	and	al, cs:cyanDither[bx][si]
+	and	al, fs:cyanDither[bx][si]
 	xchg	bx, dx			; index to cyan plane, save cyanIndex
 	and	ah, es:[bx][di]
 	or	al, ah
@@ -720,17 +720,17 @@ WriteChar1Byte	proc	near
 	xchg	bx, dx			; restore regs
 	shl	dx, 1			; index to magenta next time
 	mov	ax, cx			; init masks again
-	and	al, cs:magentaDither[bx][si]
+	and	al, fs:magentaDither[bx][si]
 	xchg	bx, dx
 	and	ah, es:[bx][di]
 	or	al, ah
 	mov	es:[bx][di], al		; write magenta byte
 	xchg	dx, bx
-	mov	si, cs:[blackBase]
-	mov	bl, cs:[blackIndex]
-	add	dx, cs:[bm_bpMask]
+	mov	si, fs:[blackBase]
+	mov	bl, fs:[blackIndex]
+	add	dx, fs:[bm_bpMask]
 	mov	ax, cx			; re-init masks
-	and	al, cs:[bx][si]		; apply black dither
+	and	al, fs:[bx][si]		; apply black dither
 	mov	bx, dx			; restore pointer to black plane
 	and	ah, es:[bx][di]
 	or	al, ah
@@ -745,7 +745,7 @@ WriteChar1Byte	endp
 C1I2OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	js	C1I2O_done
 
 Cluster1In2Out	proc		near
@@ -772,8 +772,8 @@ WriteChar1Word	proc	near
 	not	dx
 	or	ax, cx
 	mov	es:[di], ax		; update yellow plane
-	mov	bx, cs:[bm_bpMask]	; bump to cyan plane
-	mov	ax, cs:[cyanWord]	; get next dither word
+	mov	bx, fs:[bm_bpMask]	; bump to cyan plane
+	mov	ax, fs:[cyanWord]	; get next dither word
 	and	ax, dx			; isolate bits of interest
 	mov	cx, es:[bx][di]		; grab cyan plane data
 	not	dx
@@ -782,7 +782,7 @@ WriteChar1Word	proc	near
 	or	ax, cx
 	mov	es:[bx][di], ax		; update cyan plane
 	shl	bx, 1			; onto magenta plane
-	mov	ax, cs:[magentaWord]
+	mov	ax, fs:[magentaWord]
 	and	ax, dx			; isolate bits of interest
 	mov	cx, es:[bx][di]
 	not	dx
@@ -790,8 +790,8 @@ WriteChar1Word	proc	near
 	not	dx
 	or	ax, cx
 	mov	es:[bx][di], ax		; update magenta plane
-	add	bx, cs:[bm_bpMask]	; finally, onto black plane
-	mov	ax, cs:[blackWord]	; get black dither
+	add	bx, fs:[bm_bpMask]	; finally, onto black plane
+	mov	ax, fs:[blackWord]	; get black dither
 	and	ax, dx
 	mov	cx, es:[bx][di]
 	not	dx
@@ -806,7 +806,7 @@ WriteChar1Word	endp
 C2I2OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	js	C2I2O_done
 
 Cluster2In2Out	proc		near
@@ -826,7 +826,7 @@ Cluster2In2Out	endp
 C2I3OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	js	C2I3O_done
 
 Cluster2In3Out	proc		near
@@ -856,7 +856,7 @@ Cluster2In3Out	endp
 C3I3OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	js	C3I3O_done
 
 Cluster3In3Out	proc		near
@@ -885,7 +885,7 @@ Cluster3In3Out	endp
 C3I4OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	LONG js	C3I4O_done
 
 Cluster3In4Out	proc		near
@@ -923,7 +923,7 @@ Cluster3In4Out	endp
 C4I4OC_loop:
 	NextDitherScan bp
 	NextScan di
-	tst	cs:[bm_scansNext]	; if off end of bitmap
+	tst	fs:[bm_scansNext]	; if off end of bitmap
 	js	C4I4O_done
 
 Cluster4In4Out	proc		near
@@ -1018,7 +1018,7 @@ ModeCLEAR	label near	; (screen^~(data^mask))v(data^mask^resetColor
 	not	dx
 	and	ax, dx
 	not	dx
-	and	dx, cs:[resetColor]
+	and	dx, fs:[resetColor]
 	or	ax, dx
 ModeNOP		label near
 	ret
@@ -1076,7 +1076,7 @@ ModeSET		label  near	; (screen^~(data^mask))v(data^mask^setColor)
 	not	dx
 	and	ax, dx
 	not	dx
-	and	dx, cs:[setColor]
+	and	dx, fs:[setColor]
 	or	ax, dx
 	ret
 

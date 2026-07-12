@@ -96,9 +96,7 @@ linkPos			local	dword
 		call	PathOpsRare_LoadVarSegDS
 		les	di, ds:[dosFinalComponent]
 		add	di, ds:[dosFinalComponentLength]
-DBCS <		add	di, ds:[dosFinalComponentLength]		>
-SBCS <		cmp	{byte} es:[di], 0				>
-DBCS <		cmp	{wchar} es:[di], 0				>
+		cmp	{byte} es:[di], 0
 		pop	ds, es, di
 		stc
 		jne	doneJMP
@@ -172,11 +170,10 @@ saveHandle:
 
 		les	di, ds:[FPLD_targetPath]
 		mov	cx, -1 
-		LocalLoadChar	ax, C_NULL
-		LocalFindChar
+		clr	al
+		repne	scasb
 		not	cx
 		dec	cx
-DBCS <		shl	cx, 1						>
 		mov	ss:[linkData].DLD_pathSize, cx
 
 	;
@@ -1317,11 +1314,10 @@ fileSize	local	word
 		mov	di, si
 
 		mov	cx, -1
-		LocalLoadChar	ax, C_NULL
-		LocalFindChar
+		clr	al
+		repne	scasb
 		not	cx
 
-DBCS <		shl	cx, 1						>
 		mov	ss:[trailingSize], cx
 
 	;
@@ -1390,20 +1386,16 @@ gotMem:
 		segmov	es, ds
 		lds	si, ss:[trail]
 		mov	cx, ss:[trailingSize]
-DBCS <		shr	cx, 1						>
-SBCS <		cmp	{char}es:[di-1], C_BACKSLASH			>
-DBCS <		cmp	{wchar}es:[di-2], C_BACKSLASH			>
+		cmp	{char}es:[di-1], '\\'
 		jne	copyTail
-SBCS <		tst	{char}ds:[si]					>
-DBCS <		tst	{wchar}ds:[si]					>
+		tst	{char}ds:[si]
 		jz	copyTail
-		LocalNextChar	dssi	; skip leading backslash in tail,
+		inc	si		; skip leading backslash in tail,
 		dec	cx		;  allowing trailing backslashes in
 					;  link...
 copyTail:
 		assume	es:nothing, ds:nothing
-SBCS <		rep	movsb						>
-DBCS <		rep	movsw						>
+		rep	movsb
 		
 	;
 	; Return buffer handle to caller
@@ -1487,7 +1479,7 @@ EC <		call	ECCheckStack			>
 		mov	dx, di		; ds:dx <- DOSLink
 		les	di, ss:[componentStart]
 		mov	si, ss:[nextComponent]
-		LocalPrevChar	essi
+		dec	si
 		call	DOSLinkGetData
 		mov	ss:[passedBX], ax	; mem handle of link data
 
@@ -1576,15 +1568,13 @@ findLinkLoop:
 	;
 		call	PathOps_LoadVarSegDS		
 		mov	si, offset dosNativeFFD.FFD_name
-DBCS <		shr	cx, 1		; size to length		>
 		repe	cmpsb
 		
 		jne	next		; carry is clear
 	;
 	; Make sure the next character is NULL in FFD_name 
 	;
-SBCS <		cmp	{byte} ds:[si], 0				>
-DBCS <		cmp	{wchar} ds:[si], 0				>
+		cmp	{byte} ds:[si], 0
 		je	done
 		
 next:
@@ -1711,8 +1701,7 @@ findLinkLoop:
 	;
 		push	si, cx
 		lea	di, es:[di].DLH_longName
-SBCS <		repe	cmpsb						>
-DBCS <		repe	cmpsw						>
+		repe	cmpsb
 		pop	si, cx
 		jne	next
 
@@ -1721,8 +1710,7 @@ DBCS <		repe	cmpsw						>
 	; filename in the file is null-terminated
 	;
 
-SBCS <		cmp	{byte} es:[di], 0				>
-DBCS <		cmp	{wchar} es:[di], 0				>
+		cmp	{byte} es:[di], 0
 		je	done
 next:
 		mov	di, dx			; es:di - destination

@@ -823,7 +823,7 @@ endif
 	; absolutely none of the stack is preserved.   -- Doug 6/9/92
 	;
 	call	SwitchToKernel		;ds <- idata
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	push	ax, di, es		;save notification message
 else
 	push	ax, di, ds:[threadDestroyTemp]		
@@ -1281,9 +1281,9 @@ else
 endif	; SUPPORT_32BIT_DATA_REGS
 RecoverFromPartialBlock label	near	; Jumped to by WakeUpLongQueue
 if	SUPPORT_32BIT_DATA_REGS
-	pop	gs
-	pop	fs
-	pop	es
+	SafePop	gs, cx
+	SafePop	fs, cx
+	SafePop	es, cx
 
 	pop	ecx			;ecx = (orig eax.high).(orig ebx.high)
 	ror	ebx, 16
@@ -1321,7 +1321,8 @@ if	SUPPORT_32BIT_DATA_REGS
 	pop	ecx
 	pop	edi
 	pop	esi
-	pop	ds
+
+	SafePop	ds, bx
 else
 	pop	cx
 	pop	di

@@ -57,14 +57,14 @@ DrawOptRect	proc	near
 
 		; check the dither flag and do the right thing
 
-		test	cs:[driverState], mask VS_DITHER
+		test	fs:[driverState], mask VS_DITHER
 		LONG jnz	BlastDitheredRect
 
 		; drawing a solid rectangle.  See if it's just one pixel wide,
 		; and use the quick one...
 
-NMEM <		mov	si, cs:[modeInfo].VMI_scanSize ; optimization	>
-		mov	al, cs:[currentColor]	; get current color index
+NMEM <		mov	si, fs:[modeInfo].VMI_scanSize ; optimization	>
+		mov	al, fs:[currentColor]	; get current color index
 		mov	ah, al
 		tst	dx
 		jz	oneByteWide
@@ -87,7 +87,7 @@ NMEM <		NextScan di, si			; adj ptr to next scan line >
 MEM <		NextScan di			; adj ptr to next scan line >
 NMEM <		jc	lastWinLine		; oops, on last line in win >
 NMEM <		jmp	lineLoop					>
-MEM <		tst	cs:[bm_scansNext]	; if negative, bogus	 >
+MEM <		tst	fs:[bm_scansNext]	; if negative, bogus	 >
 MEM <		jns	lineLoop					>
 done:
 		ret
@@ -95,9 +95,9 @@ done:
 ifndef	IS_MEM
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-		cmp	dx, cs:[pixelsLeft]	; if doing less, do normal
+		cmp	dx, fs:[pixelsLeft]	; if doing less, do normal
 		jbe	lineLoop
-		mov	cx, cs:[pixelsLeft]	; #pixels left in window
+		mov	cx, fs:[pixelsLeft]	; #pixels left in window
 		shr	cx, 1
 		jnc	doLastWords1
 		stosb
@@ -105,7 +105,7 @@ doLastWords1:
 		rep	stosw		
 		call	MidScanNextWin		; goto next window
 		mov	cx, dx			; setup remaining count
-		sub	cx, cs:[pixelsLeft]
+		sub	cx, fs:[pixelsLeft]
 		shr	cx, 1
 		jnc	doLastWords2
 		stosb
@@ -126,7 +126,7 @@ oneLoop:
 		jz	done
 NMEM <		NextScan di, si			; always enuf room todo 1 pix >
 MEM <		NextScan di			; always enuf room todo 1 pix >
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneLoop
 
@@ -170,7 +170,7 @@ BlastDitheredRect proc	near
 		shl	bx, 1			; *4
 		shl	bx, 1
 		and	bx, 0x0c		; pointer into tempDither
-NMEM <		mov	si, cs:[modeInfo].VMI_scanSize ; optimization	>
+NMEM <		mov	si, fs:[modeInfo].VMI_scanSize ; optimization	>
 
 		tst	dx
 		jz	oneByteWide
@@ -188,7 +188,7 @@ lineLoop:
 NMEM <		NextScan di,si			; adjust ptr to next scan line>
 NMEM <		jc	lastWinLine		; oops, on last line in wind.>
 MEM <		NextScan di			; adjust ptr to next scan line>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		jns	lineLoop					>
 NMEM <		jmp	lineLoop					>
 done:
@@ -197,15 +197,15 @@ done:
 ifndef	IS_MEM
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-		cmp	dx, cs:[pixelsLeft]	; if doing less, do normal
+		cmp	dx, fs:[pixelsLeft]	; if doing less, do normal
 		jbe	lineLoop
 		push	dx
-		mov	dx, cs:[pixelsLeft]
+		mov	dx, fs:[pixelsLeft]
 		call	BlastDitheredScan
 		call	MidScanNextWin		; goto next window
 		pop	dx
 		push	dx
-		sub	dx, cs:[pixelsLeft]
+		sub	dx, fs:[pixelsLeft]
 		call	BlastDitheredScan
 		pop	dx
 		dec	bp
@@ -218,7 +218,7 @@ endif
 
 		; it's only a byte wide.  Do it quickly.
 oneByteWide:
-		mov	al, cs:[tempDither][bx]
+		mov	al, fs:[tempDither][bx]
 		mov	es:[di], al		; store the color
 		dec	bp			; one less line to do
 		jz	done
@@ -226,7 +226,7 @@ oneByteWide:
 		and	bl, 0xc
 NMEM <		NextScan di, si			; always enuf room todo 1 pix >
 MEM <		NextScan di			; always enuf room todo 1 pix >
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneByteWide
 BlastDitheredRect endp
@@ -263,8 +263,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BlastDitheredScan	proc	near
-		mov	ax, {word} cs:[tempDither][bx]
-		mov	cx, {word} cs:[tempDither][bx+2]
+		mov	ax, {word} fs:[tempDither][bx]
+		mov	cx, {word} fs:[tempDither][bx+2]
 		push	dx
 		jmp	startLine
 pixLoop:
@@ -324,18 +324,18 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SetTempDither	proc	near
-		test	cs:[driverState], mask VS_DITHER
+		test	fs:[driverState], mask VS_DITHER
 		jnz	handleDither
-		mov	al, cs:[currentColor]
+		mov	al, fs:[currentColor]
 		mov	ah, al
-		mov	cs:{word} [tempDither], ax
-		mov	cs:{word} [tempDither+2], ax
-		mov	cs:{word} [tempDither+4], ax
-		mov	cs:{word} [tempDither+6], ax
-		mov	cs:{word} [tempDither+8], ax
-		mov	cs:{word} [tempDither+10], ax
-		mov	cs:{word} [tempDither+12], ax
-		mov	cs:{word} [tempDither+14], ax
+		mov	fs:{word} [tempDither], ax
+		mov	fs:{word} [tempDither+2], ax
+		mov	fs:{word} [tempDither+4], ax
+		mov	fs:{word} [tempDither+6], ax
+		mov	fs:{word} [tempDither+8], ax
+		mov	fs:{word} [tempDither+10], ax
+		mov	fs:{word} [tempDither+12], ax
+		mov	fs:{word} [tempDither+14], ax
 done:
 		ret
 handleDither:
@@ -345,49 +345,49 @@ handleDither:
 
 		; deal with si=0 or si=2
 
-		mov	ax, {word} cs:[ditherMatrix]
-		mov	{word} cs:[tempDither][si], ax
-		mov	ax, {word} cs:[ditherMatrix+4]
-		mov	{word} cs:[tempDither+4][si], ax
-		mov	ax, {word} cs:[ditherMatrix+8]
-		mov	{word} cs:[tempDither+8][si], ax
-		mov	ax, {word} cs:[ditherMatrix+12]
-		mov	{word} cs:[tempDither+12][si], ax
+		mov	ax, {word} fs:[ditherMatrix]
+		mov	{word} fs:[tempDither][si], ax
+		mov	ax, {word} fs:[ditherMatrix+4]
+		mov	{word} fs:[tempDither+4][si], ax
+		mov	ax, {word} fs:[ditherMatrix+8]
+		mov	{word} fs:[tempDither+8][si], ax
+		mov	ax, {word} fs:[ditherMatrix+12]
+		mov	{word} fs:[tempDither+12][si], ax
 		xor	si, 2
-		mov	ax, {word} cs:[ditherMatrix+2]
-		mov	{word} cs:[tempDither][si], ax
-		mov	ax, {word} cs:[ditherMatrix+6]
-		mov	{word} cs:[tempDither+4][si], ax
-		mov	ax, {word} cs:[ditherMatrix+10]
-		mov	{word} cs:[tempDither+8][si], ax
-		mov	ax, {word} cs:[ditherMatrix+14]
-		mov	{word} cs:[tempDither+12][si], ax
+		mov	ax, {word} fs:[ditherMatrix+2]
+		mov	{word} fs:[tempDither][si], ax
+		mov	ax, {word} fs:[ditherMatrix+6]
+		mov	{word} fs:[tempDither+4][si], ax
+		mov	ax, {word} fs:[ditherMatrix+10]
+		mov	{word} fs:[tempDither+8][si], ax
+		mov	ax, {word} fs:[ditherMatrix+14]
+		mov	{word} fs:[tempDither+12][si], ax
 		jmp	done
 
 		; have to wrap wierd, si=1 or si=3
 handleOdd:
 		dec	si
-		mov	ax, {word} cs:[ditherMatrix+1]
-		mov	{word} cs:[tempDither][si], ax
-		mov	ax, {word} cs:[ditherMatrix+5]
-		mov	{word} cs:[tempDither+4][si], ax
-		mov	ax, {word} cs:[ditherMatrix+9]
-		mov	{word} cs:[tempDither+8][si], ax
-		mov	ax, {word} cs:[ditherMatrix+13]
-		mov	{word} cs:[tempDither+12][si], ax
+		mov	ax, {word} fs:[ditherMatrix+1]
+		mov	{word} fs:[tempDither][si], ax
+		mov	ax, {word} fs:[ditherMatrix+5]
+		mov	{word} fs:[tempDither+4][si], ax
+		mov	ax, {word} fs:[ditherMatrix+9]
+		mov	{word} fs:[tempDither+8][si], ax
+		mov	ax, {word} fs:[ditherMatrix+13]
+		mov	{word} fs:[tempDither+12][si], ax
 		xor	si, 2
-		mov	al, cs:[ditherMatrix+3]
-		mov	ah, cs:[ditherMatrix+0]
-		mov	{word} cs:[tempDither][si], ax
-		mov	al, cs:[ditherMatrix+7]
-		mov	ah, cs:[ditherMatrix+4]
-		mov	{word} cs:[tempDither+4][si], ax
-		mov	al, cs:[ditherMatrix+11]
-		mov	ah, cs:[ditherMatrix+8]
-		mov	{word} cs:[tempDither+8][si], ax
-		mov	al, cs:[ditherMatrix+15]
-		mov	ah, cs:[ditherMatrix+12]
-		mov	{word} cs:[tempDither+12][si], ax
+		mov	al, fs:[ditherMatrix+3]
+		mov	ah, fs:[ditherMatrix+0]
+		mov	{word} fs:[tempDither][si], ax
+		mov	al, fs:[ditherMatrix+7]
+		mov	ah, fs:[ditherMatrix+4]
+		mov	{word} fs:[tempDither+4][si], ax
+		mov	al, fs:[ditherMatrix+11]
+		mov	ah, fs:[ditherMatrix+8]
+		mov	{word} fs:[tempDither+8][si], ax
+		mov	al, fs:[ditherMatrix+15]
+		mov	ah, fs:[ditherMatrix+12]
+		mov	{word} fs:[tempDither+12][si], ax
 		jmp	done	
 		
 SetTempDither	endp
@@ -421,12 +421,12 @@ REVISION HISTORY:
 
 DrawNOTRect	proc		near
 		push	ds
-NMEM <		mov	ds, cs:[readSegment]				>
+NMEM <		mov	ds, fs:[readSegment]				>
 MEM  <		segmov	ds, es						>
 
 		; see if we can do it in one byte
 
-NMEM <		mov	si, cs:[modeInfo].VMI_scanSize ; optimization	>
+NMEM <		mov	si, fs:[modeInfo].VMI_scanSize ; optimization	>
 		clr	bh
 		tst	dx
 		jz	oneByteWide	
@@ -449,7 +449,7 @@ NMEM <		NextScan di,si			; adjust ptr to next scan line>
 NMEM <		jc	lastWinLine					      >
 MEM <		NextScan di			; adjust ptr to next scan line>
 MEM <		segmov	ds, es			; make sure they match 	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	lineLoop
 done:
@@ -468,16 +468,16 @@ oneLoop:
 NMEM <		NextScan di,si						>
 MEM <		NextScan di						>
 MEM <		segmov	ds, es			; make sure they match 	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneLoop
 
 ifndef	IS_MEM
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-		cmp	dx, cs:[pixelsLeft]	; if doing less, do normal
+		cmp	dx, fs:[pixelsLeft]	; if doing less, do normal
 		jbe	lineLoop
-		mov	cx, cs:[pixelsLeft]	; #pixels left in window
+		mov	cx, fs:[pixelsLeft]	; #pixels left in window
 pixLoop1:
 		mov	bl, {byte} ds:[di]
 		mov	bl, cs:NOTtable[bx]
@@ -487,7 +487,7 @@ pixLoop1:
 		call	MidScanNextWinSrc	; goto next window
 		call	MidScanNextWin		; goto next window
 		mov	cx, dx			; setup remaining count
-		sub	cx, cs:[pixelsLeft]
+		sub	cx, fs:[pixelsLeft]
 pixLoop2:
 		mov	bl, {byte} ds:[di]
 		mov	bl, cs:NOTtable[bx]
@@ -542,12 +542,12 @@ REVISION HISTORY:
 DrawSpecialRect	proc		near
 
 		push	ds	
-NMEM <		mov	ds, cs:[readSegment]				>
+NMEM <		mov	ds, fs:[readSegment]				>
 MEM  <		segmov	ds, es						>
 
 		; check the dither flag and do the right thing
 
-		test	cs:[driverState], mask VS_DITHER
+		test	fs:[driverState], mask VS_DITHER
 		LONG jnz	SpecialDitheredRect
 
 		; setup ah to hold a bit flag to use in testing the mask
@@ -560,7 +560,7 @@ MEM  <		segmov	ds, es						>
 
 		; load up the color that we're gonna use to fill
 
-		mov	ah, cs:[currentColor]
+		mov	ah, fs:[currentColor]
 
 		; check for one byte wide
 
@@ -576,10 +576,10 @@ lineLoop:
 		mov	cx, dx			; setup count
 		mov	bh, bl			; reload tester
 pixelLoop:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixelDone
 		mov	al, ds:[di]		; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
 		mov	es:[di], al		; store result
 pixelDone:
 		inc	di
@@ -596,7 +596,7 @@ NMEM <		NextScan di			; adjust ptr to next scan line>
 NMEM <		jc	lastWinLine					>
 MEM <		NextScan di						>
 MEM <		segmov	ds, es			; update source reg	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		jns	lineLoop					>
 NMEM <		jmp	lineLoop					>
 done:
@@ -611,10 +611,10 @@ oneByteWide:
 		mov	si, cx			; mask index in si
 		mov	bh, bl			; reload tester
 oneByteLoop:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	lineDone
 		mov	al, ds:[di]		; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
 		mov	es:[di], al		; store result
 lineDone:
 		dec	bp			; fewer scans to do
@@ -624,22 +624,22 @@ lineDone:
 NMEM <		NextScan di			; adjust ptr to next scan line>
 MEM <		NextScan di			; adjust ptr to next scan line>
 MEM <		segmov	ds, es			; reload source reg	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneByteLoop
 
 ifndef	IS_MEM
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-		cmp	dx, cs:[pixelsLeft]	; if doing less, do normal
+		cmp	dx, fs:[pixelsLeft]	; if doing less, do normal
 		LONG jbe lineLoop
 		mov	bh, bl
-		mov	cx, cs:[pixelsLeft]	; #pixels left in window
+		mov	cx, fs:[pixelsLeft]	; #pixels left in window
 pixLoop1:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixDone1
 		mov	al, ds:[di]		; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
 		mov	es:[di], al		; store result
 pixDone1:
 		inc	di
@@ -651,12 +651,12 @@ nextPix1:
 		call	MidScanNextWinSrc	; goto next window
 		call	MidScanNextWin		; goto next window
 		mov	cx, dx			; setup remaining count
-		sub	cx, cs:[pixelsLeft]
+		sub	cx, fs:[pixelsLeft]
 pixLoop2:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixDone2
 		mov	al, ds:[di]		; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
 		mov	es:[di], al		; store result
 pixDone2:
 		inc	di
@@ -736,7 +736,7 @@ NMEM <		NextScan di			; adjust ptr to next scan >
 NMEM <		jc	lastWinLine		; oops, on last line in wind.>
 MEM <		NextScan di			; adjust ptr to next scan >
 MEM <		segmov	ds, es			; make sure they match 	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		jns	lineLoop					>
 NMEM <		jmp	lineLoop					>
 done:
@@ -745,7 +745,7 @@ done:
 
 		; it's only a byte wide.  Do it quickly.
 oneByteWide:
-		mov	al, cs:[tempDither][bx]
+		mov	al, fs:[tempDither][bx]
 		mov	es:[di], al		; store the color
 		dec	bp			; one less line to do
 		jz	done
@@ -756,23 +756,23 @@ oneByteWide:
 NMEM <		NextScan di			; always enuf room todo 1 pix >
 MEM <		NextScan di			; always enuf room todo 1 pix >
 MEM <		segmov	ds, es			; make sure they match 	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneByteWide
 
 ifndef	IS_MEM
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-		cmp	dx, cs:[pixelsLeft]	; if doing less, do normal
+		cmp	dx, fs:[pixelsLeft]	; if doing less, do normal
 		jbe	lineLoop
 		push	dx
-		mov	dx, cs:[pixelsLeft]
+		mov	dx, fs:[pixelsLeft]
 		call	BlastDitheredMaskedScan
 		call	MidScanNextWinSrc	; goto next window
 		call	MidScanNextWin		; goto next window
 		pop	dx
 		push	dx
-		sub	dx, cs:[pixelsLeft]
+		sub	dx, fs:[pixelsLeft]
 		call	BlastDitheredMaskedScan
 		pop	dx
 		dec	bp
@@ -827,8 +827,8 @@ BlastDitheredMaskedScan		proc	near
 		mov	ch, 80h			; bit zero
 		shr	ch, cl			; ah = single bit tester
 
-		mov	ax, {word} cs:[tempDither][bx]
-		mov	bx, {word} cs:[tempDither][bx+2]
+		mov	ax, {word} fs:[tempDither][bx]
+		mov	bx, {word} fs:[tempDither][bx+2]
 
 		mov	cl, al			; al gets trashed all the time
 		push	dx
@@ -904,10 +904,10 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 WriteSpecialPixel proc	near
-		test	ch, cs:[maskBuffer][si]
+		test	ch, fs:[maskBuffer][si]
 		jz	donePix
 		mov	al, ds:[di]
-		call	cs:[modeRoutine]
+		call	fs:[modeRoutine]
 		mov	es:[di], al
 donePix:
 		inc	di

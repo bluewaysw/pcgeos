@@ -43,6 +43,7 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		OptRectOneWord
@@ -82,7 +83,7 @@ OptRectOneWord	proc	near
 		mov	al, BITMASK			; set bitmask reg
 		mov	dx, GR_CONTROL
 		out	dx, ax				; set update mask
-		test	cs:driverState, mask VS_DITHER	; need to dither ?
+		test	fs:driverState, mask VS_DITHER	; need to dither ?
 		jnz	ditherIt
 		mov	cx, bp				; get loop count in cx
 		
@@ -109,19 +110,19 @@ ditherLoop:
 		mov	ah, es:[di]			; load latches
 		mov	ax, MAP_MASK_0			; enable blue plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix][si]	; get blue plane 
+		mov	al, fs:[ditherMatrix][si]	; get blue plane 
 		mov	es:[di], al			; write data
 		mov	ax, MAP_MASK_1			; enable green plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix+4][si]	; get green plane 
+		mov	al, fs:[ditherMatrix+4][si]	; get green plane 
 		mov	es:[di], al			; write data
 		mov	ax, MAP_MASK_2			; enable red plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix+8][si]	; get red plane 
+		mov	al, fs:[ditherMatrix+8][si]	; get red plane 
 		mov	es:[di], al			; write data
 		mov	ax, MAP_MASK_3			; enable hilite plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix+12][si]	; get plane data
+		mov	al, fs:[ditherMatrix+12][si]	; get plane data
 		mov	es:[di], al			; write data
 		inc	si				; onto next dither byte
 		NextScan di
@@ -169,17 +170,17 @@ DrawOptRect	proc	near
 
 	; check the dither flag and do the right thing
 
-	test	cs:[driverState], mask VS_DITHER
+	test	fs:[driverState], mask VS_DITHER
 	jnz	BlastDitheredRect
 
 	; calculate # of bytes in the middle of the line, offset to next line
 
 	dec	dx				;number of middle bytes
-	mov	cs:[BOR_middleCount],dx		;pass number of middle bytes
+	mov	gs:[BOR_middleCount],dx		;pass number of middle bytes
 
 	neg	dx
 	add	dx, BWID_SCR-1
-	mov	cs:[BOR_nextScanOffset], dx
+	mov	gs:[BOR_nextScanOffset], dx
 
 	mov	dx, GR_CONTROL			; set up control reg for ega
 	mov	al, BITMASK
@@ -218,8 +219,8 @@ BlastDitheredRect	proc	near
 
 		mov	si, cx				; get scan line in si
 		mov	cx, bp				; load loop count
-		mov	cs:[BDS_left], al		; store masks
-		mov	cs:[BDS_right], ah
+		mov	gs:[BDS_left], al		; store masks
+		mov	gs:[BDS_right], ah
 		dec	dx				; calc
 		mov	bp, dx				;   #middle bytes
 
@@ -236,22 +237,22 @@ scanLoop:
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_0			; enable blue plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix][si]
+		mov	cl, fs:[ditherMatrix][si]
 		call	BlastDitheredScan		; write plane zero
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_1			; enable green plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix+4][si]	; get green plane 
+		mov	cl, fs:[ditherMatrix+4][si]	; get green plane 
 		call	BlastDitheredScan		; write plane 
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_2			; enable red plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix+8][si]	; get red plane 
+		mov	cl, fs:[ditherMatrix+8][si]	; get red plane 
 		call	BlastDitheredScan
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_3			; enable hilite plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix+12][si]	; get hilite plane 
+		mov	cl, fs:[ditherMatrix+12][si]	; get hilite plane 
 		call	BlastDitheredScan
 		inc	si				; onto next dither byte
 
@@ -432,7 +433,7 @@ SpecialRectOneWord	proc	near
 		mov	bx, cx			; use bx as pattern index
 		clr	bh
 		and	ah, al
-		mov	cs:[SROW_mask], ah	; setup mask
+		mov	gs:[SROW_mask], ah	; setup mask
 		jmp	$+2			; XXX: clear prefetch queue
 						; so we don't get greebles
 						; on a 486. this could
@@ -445,13 +446,13 @@ SpecialRectOneWord	proc	near
 		
 		; need a different version if we're dithering colors
 
-		test	cs:[driverState], mask VS_DITHER 
+		test	fs:[driverState], mask VS_DITHER 
 		jnz	ditherIt
 
 		; loop for each scan line
 SROW_loop:
 		and	bx, 7
-		mov	ah, {byte} cs:[bx][maskBuffer]	; get pattern byte
+		mov	ah, {byte} fs:[bx][maskBuffer]	; get pattern byte
 SROW_mask equ (this byte) + 2
 		and	ah, 12h			; and in mask
 		out	dx, ax			; set update mask
@@ -463,7 +464,7 @@ SROW_mask equ (this byte) + 2
 
 		; version to do dithering
 ditherIt:
-		mov	cs:[SRD_mask], ah
+		mov	gs:[SRD_mask], ah
 		mov	si, bx				; get scan line in si
 		StartVGADither 				; do some common setup
 
@@ -474,7 +475,7 @@ ditherLoop:
 		and	si, 3				; only need low 2 bits
 		and	bx, 7				; only need low 3 bits
 		mov	ah, es:[di]			; load the latches
-		mov	ah, {byte} cs:[maskBuffer][bx]	; get mask byte
+		mov	ah, {byte} fs:[maskBuffer][bx]	; get mask byte
 SRD_mask	equ	(this byte) + 2
 		and	ah, 12h
 		mov	dx, GR_CONTROL
@@ -483,19 +484,19 @@ SRD_mask	equ	(this byte) + 2
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_0			; enable blue plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix][si]	; get blue plane 
+		mov	al, fs:[ditherMatrix][si]	; get blue plane 
 		mov	es:[di], al			; write data
 		mov	ax, MAP_MASK_1			; enable green plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix+4][si]	; get green plane 
+		mov	al, fs:[ditherMatrix+4][si]	; get green plane 
 		mov	es:[di], al			; write data
 		mov	ax, MAP_MASK_2			; enable red plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix+8][si]	; get red plane 
+		mov	al, fs:[ditherMatrix+8][si]	; get red plane 
 		mov	es:[di], al			; write data
 		mov	ax, MAP_MASK_3			; enable hilite plane
 		out	dx, ax
-		mov	al, cs:[ditherMatrix+12][si]	; get hilite plane 
+		mov	al, fs:[ditherMatrix+12][si]	; get hilite plane 
 		mov	es:[di], al			; write data
 		inc	si				; onto next dither byte
 		inc	bx
@@ -539,11 +540,11 @@ REVISION HISTORY:
 
 DrawSpecialRect	proc	near
 	LONG jz	SpecialRectOneWord
-	mov	word ptr cs:[d_LRmasks], ax	; store masks
+	mov	word ptr fs:[d_LRmasks], ax	; store masks
 
 	; check the dither flag and do the right thing
 
-	test	cs:[driverState], mask VS_DITHER
+	test	fs:[driverState], mask VS_DITHER
 	jnz	DrawSpecialRectDithered
 
 	; calculate # of bytes in the middle of the line, offset to next line
@@ -553,7 +554,7 @@ DrawSpecialRect	proc	near
 
 	neg	dx
 	add	dx, BWID_SCR-2
-	mov	cs:[BSR_nextScanOffset], dx
+	mov	gs:[BSR_nextScanOffset], dx
 
 	mov	dx, GR_CONTROL			; set up control reg for ega
 	mov	al, BITMASK
@@ -563,6 +564,7 @@ DrawSpecialRect	proc	near
 
 DrawSpecialRect	endp
 	public	DrawSpecialRect
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		BlastSpecialRect
@@ -617,8 +619,8 @@ BSR_nextScanOffset	=	BSR_1 + 2
 BlastSpecialRect	proc	near
 
 	; handle left byte specially
-	mov	ah, cs:[d_leftMask]
-	and	ah, {byte} cs:[maskBuffer][bx]	; and in pattern byte
+	mov	ah, fs:[d_leftMask]
+	and	ah, {byte} fs:[maskBuffer][bx]	; and in pattern byte
 	out	dx, ax
 	or	es:[di], al		;modify word
 	inc	di
@@ -628,7 +630,7 @@ BlastSpecialRect	proc	near
 	mov	cx,si
 
 	jcxz	BSR_noMiddle
-	mov	ah, {byte} cs:[maskBuffer][bx]	; and in pattern byte
+	mov	ah, {byte} fs:[maskBuffer][bx]	; and in pattern byte
 	out	dx, ax
 BSR_inner:
 	or	es:[di], al
@@ -637,8 +639,8 @@ BSR_inner:
 BSR_noMiddle:
 
 	; handle right word specially
-	mov	ah, cs:[d_rightMask]
-	and	ah, {byte} cs:[maskBuffer][bx]	; and in pattern byte
+	mov	ah, fs:[d_rightMask]
+	and	ah, {byte} fs:[maskBuffer][bx]	; and in pattern byte
 	out	dx, ax
 	or	es:[di], al		;modify word
 	inc	di
@@ -689,8 +691,8 @@ DrawSpecialRectDithered	proc	near
 		mov	bx, cx
 		clr	bh
 		mov	cx, bp				; load loop count
-		mov	cs:[MDS_left], al		; store masks
-		mov	cs:[MDS_right], ah
+		mov	gs:[MDS_left], al		; store masks
+		mov	gs:[MDS_right], ah
 		dec	dx				; calc
 		mov	bp, dx				;   #middle bytes
 
@@ -704,27 +706,27 @@ DrawSpecialRectDithered	proc	near
 scanLoop:
 		push	cx, bx				; save loop count
 		and	bx, 7
-		mov	ch, {byte} cs:[maskBuffer][bx]	; mask for scan line
+		mov	ch, {byte} fs:[maskBuffer][bx]	; mask for scan line
 		and	si, 3				; only need low 2 bits
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_0			; enable blue plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix][si]
+		mov	cl, fs:[ditherMatrix][si]
 		call	MaskDitheredScan		; write plane zero
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_1			; enable green plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix+4][si]	; get green plane 
+		mov	cl, fs:[ditherMatrix+4][si]	; get green plane 
 		call	MaskDitheredScan		; write plane 
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_2			; enable green plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix+8][si]	; get red plane 
+		mov	cl, fs:[ditherMatrix+8][si]	; get red plane 
 		call	MaskDitheredScan
 		mov	dx, GR_SEQUENCER
 		mov	ax, MAP_MASK_3			; enable hilite plane
 		out	dx, ax
-		mov	cl, cs:[ditherMatrix+12][si]	; get hilite plane 
+		mov	cl, fs:[ditherMatrix+12][si]	; get hilite plane 
 		call	MaskDitheredScan
 		inc	si				; onto next dither byte
 

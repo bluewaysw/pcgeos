@@ -74,14 +74,14 @@ C1I1O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C1I1O_endLoop		;  so bail			>
 
 Char1In1Out	proc		near
 	lodsb				;al = mask
 	ror	al,cl			;al = mask shifted correctly
 	mov	ah,al
-BIT <	and	al,byte ptr cs:[bx][ditherMatrix] ;al = mask AND pattern >
+BIT <	and	al,byte ptr fs:[bx][ditherMatrix] ;al = mask AND pattern >
 	not	ah			; ah = NOT mask
 RW <	xornf di, 1h							>
 	mov	dl, es:[di]		; dl = screen
@@ -97,14 +97,14 @@ RW <	xornf di, 1h							>
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C1I1O_endLoop		;  so bail			>
 
 
 	lodsb				;al = mask
 	ror	al,cl			;al = mask shifted correctly
 	mov	ah,al 
-BIT <	and	al,byte ptr cs:[bx][ditherMatrix] ;al = mask AND pattern >
+BIT <	and	al,byte ptr fs:[bx][ditherMatrix] ;al = mask AND pattern >
 	not	ah
 
 RW <	xornf di, 1h							>
@@ -130,7 +130,7 @@ C1I2O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C1I2O_endLoop		;  so bail			>
 
 Char1In2Out	proc		near
@@ -139,7 +139,7 @@ Char1In2Out	proc		near
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl, {byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl, {byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -162,7 +162,7 @@ endif
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C1I2O_endLoop		;  so bail			>
 
 	lodsb				;ax = mask
@@ -170,7 +170,7 @@ MEM <	js	C1I2O_endLoop		;  so bail			>
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -202,7 +202,7 @@ C2I2O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C2I2O_endLoop		;  so bail			>
 
 Char2In2Out	proc		near
@@ -210,7 +210,7 @@ Char2In2Out	proc		near
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -233,14 +233,14 @@ endif
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C2I2O_endLoop		;  so bail			>
 
 	lodsw				;ax = mask
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -272,7 +272,7 @@ C2I3O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C2I3O_endLoop		;  so bail			>
 
 Char2In3Out	proc		near
@@ -280,7 +280,7 @@ Char2In3Out	proc		near
 	clr	ah
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	dh,al
-BIT <	and	al,{byte} cs:[bx][ditherMatrix];al = mask AND pattern >
+BIT <	and	al,{byte} fs:[bx][ditherMatrix];al = mask AND pattern >
 RW <	xornf di, 1							>
 	mov	dl,es:[di]		;dl = screen
 RW <	xornf di, 1							>
@@ -300,7 +300,7 @@ endif
 
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -332,7 +332,7 @@ C3I3O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C3I3O_endLoop		;  so bail			>
 
 Char3In3Out	proc		near
@@ -340,7 +340,7 @@ Char3In3Out	proc		near
 	clr	ah
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	dh,al
-BIT <	and	al,{byte} cs:[bx][ditherMatrix];al = mask AND pattern >
+BIT <	and	al,{byte} fs:[bx][ditherMatrix];al = mask AND pattern >
 	not	dh			;dh = NOT mask
 RW <	xornf di, 1							>
 	mov	dl,es:[di]		;dl = screen
@@ -359,7 +359,7 @@ endif
 
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -391,7 +391,7 @@ C3I4O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C3I4O_endLoop		;  so bail			>
 
 Char3In4Out	proc		near
@@ -399,7 +399,7 @@ Char3In4Out	proc		near
 	clr	ah
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	dh,al
-BIT <	and	al,{byte} cs:[bx][ditherMatrix];al = mask AND pattern>
+BIT <	and	al,{byte} fs:[bx][ditherMatrix];al = mask AND pattern>
 	not	dh			;dh = NOT mask
 RW <	xornf di, 1							>
 	mov	dl,es:[di]		;dl = screen
@@ -417,7 +417,7 @@ endif
 	ror	ax,cl			;ax = mask shifted correctly
 	or	al,dl
 	mov	dh,al
-BIT <	and	al,{byte} cs:[bx][ditherMatrix];al = mask AND pattern >
+BIT <	and	al,{byte} fs:[bx][ditherMatrix];al = mask AND pattern >
 	not	dh			;dh = NOT mask
 RW <	xornf di, 1							>
 	mov	dl,es:[di]		;dl = screen
@@ -437,7 +437,7 @@ endif
 
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD
@@ -469,7 +469,7 @@ C4I4O_loop:
 	inc	bx			;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; if negative, off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]	; if negative, off end of bitmap >
 MEM <	js	C4I4O_endLoop		;  so bail			>
 
 Char4In4Out	proc		near
@@ -477,7 +477,7 @@ Char4In4Out	proc		near
 	clr	ah
 	ror	ax,cl			;ax = mask shifted correctly
 	mov	dh,al
-BIT <	and	al,{byte} cs:[bx][ditherMatrix];al = mask AND pattern>
+BIT <	and	al,{byte} fs:[bx][ditherMatrix];al = mask AND pattern>
 	not	dh			;dh = NOT mask
 RW <	xornf di, 1							>
 	mov	dl,es:[di]		;dl = screen
@@ -495,7 +495,7 @@ endif
 	ror	ax,cl			;ax = mask shifted correctly
 	or	al,dl
 	mov	dh,al
-BIT <	and	al,{byte} cs:[bx][ditherMatrix];al = mask AND pattern>
+BIT <	and	al,{byte} fs:[bx][ditherMatrix];al = mask AND pattern>
 	not	dh			;dh = NOT mask
 RW <	xornf di, 1							>
 	mov	dl,es:[di]		;dl = screen
@@ -514,7 +514,7 @@ endif
 
 	mov	bp,ax
 	not	bp			;bp = NOT mask
-	mov	dl,{byte} cs:[bx][ditherMatrix];dx = pattern
+	mov	dl,{byte} fs:[bx][ditherMatrix];dx = pattern
 	mov	dh,dl
 	and	ax,dx			;ax = mask AND pattern
 ifdef	REVERSE_WORD

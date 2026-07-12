@@ -36,7 +36,7 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 include	gpmi.def
 
 .386 
@@ -397,7 +397,7 @@ SysExitInterruptVerifyRegs endp
 
 endif
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 idata	segment
 contextSwitching	byte	0
 idata	ends
@@ -445,7 +445,7 @@ endif
 	tst	ds:[intWakeUpAborted]
 	jz	SEI_done
 	mov	ds:[intWakeUpAborted], 0
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	; a potential wake-up was aborted because interrupt code was running
 	; make sure that the highest priority thread is running
 
@@ -478,7 +478,7 @@ SEI_done:
 	ret
 SysExitInterrupt	endp
 
-else ; PRODUCT_GEOS32
+else ; PROTECTED_MODE
 
 EC <	cmp	ds:[runQueue],0						>
 EC <	ERROR_Z	SYS_EXIT_INTERRUPT_RUN_QUEUE_IS_ZERO			>
@@ -597,7 +597,7 @@ done:
 	pop	ds, ax
 	iret
 SysContextSwitch	endp
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -640,7 +640,7 @@ EC <		call	ECAssertValidTrueFarPointerXIP		>
 EC <		pop	bx, si					>
 endif
 		push	ds
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		push	cx, edx
 		push	bx
 
@@ -660,7 +660,7 @@ ifdef PRODUCT_GEOS32
 		call	GPMISetInterruptHandlerFar
 
 		pop	cx, edx
-else ; PRODUCT_GEOS32
+else ; PROTECTED_MODE
 		push	bx
 		clr	bx		; Interrupt table at segment 0
 		mov	ds, bx
@@ -680,7 +680,7 @@ else ; PRODUCT_GEOS32
 		mov	ax, ds:2[bx]
 		stosw			; Store segment portion
 		pop	ds:2[bx]	; Store passed segment
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 		jmp	popDS_popf_ret
 SysCatchInterrupt endp
 
@@ -723,7 +723,7 @@ endif
 
 		push	ds
 		push	bx
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		push	cx, edx
 
 		INT_OFF
@@ -921,7 +921,7 @@ SysCatchDeviceInterrupt	proc	far
 	xchg	ds:[bx].segment, ax	; Store passed segment
 	stosw				; Store segment portion in passed
 					;  buffer
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	bx, ds
 	pop	ds			; ds gets invalid here, so 
 					; revert it first
@@ -960,7 +960,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SysResetDeviceInterrupt	proc	far
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	pushf
 	push	bx
 	push	ds
@@ -1015,7 +1015,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CatchResetLocateVectorCommon	proc	near
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	bx, segment IRQCode
 	call	GPMIAliasFar		;bx = writable alias
 	mov	ds, bx
@@ -1141,7 +1141,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SysSwapIntercepts proc near
-ifndef PRODUCT_GEOS32  ; Is this still necessary? -dhunter 11/16/00
+ifndef PROTECTED_MODE  ; Is this still necessary? -dhunter 11/16/00
 		.enter
 		clr	ax
 		mov	es, ax

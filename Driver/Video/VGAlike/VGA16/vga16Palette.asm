@@ -297,31 +297,3 @@ currentPalette	byte	00h, 00h, 00h	; entry 0 -- black
 	byte	0xff, 0xff, 0xcc
 	byte	0xff, 0xff, 0xff
 
-
-COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		SetDevicePalette
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-SYNOPSIS:	Set hardware palette
-
-CALLED BY:	VidSetPalette
-PASS:		currentPalette OK
-RETURN:		nothing
-DESTROYED:	nothing
-
-PSEUDO CODE/STRATEGY:
-		
-KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	jim	10/15/92		Initial version
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-SetDevicePalette	proc	near
-		.enter
-		.leave
-		ret
-SetDevicePalette	endp
-

@@ -88,16 +88,6 @@ cleanUp:
 	; Now throw the thing away.
 	; 
 		call	MemDiscard
-
-	; Free the fixed block we allocated. Dunno if we're guarenteed to
-	; have allocated a block when we reach this, so put in a check.
-		mov	bx, ds:[ntsExecCodeHandle]
-		tst	bx
-		jz	noBlockAllocated
-		call	MemFree
-		clr	ds:[ntsExecCodeHandle]
-noBlockAllocated:
-
 	;
 	; Clear the EF_RUN_DOS flag, since we won't be doing so...
 	; 
@@ -109,9 +99,6 @@ done:
 		ret
 NTSShutdownAborted endp
 
-NTSMovableCode	ends
-
-idata	segment
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -122,7 +109,7 @@ SYNOPSIS:	Take note that all applications are now gone and the
 		shutdown of devices is about to take place.
 
 CALLED BY:	DR_TASK_APPS_SHUTDOWN
-PASS:		nothing
+PASS:		ds - dgroup
 RETURN:		nothing
 DESTROYED:	nothing
 
@@ -154,21 +141,8 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 NTSAppsShutdown	proc	far
-		uses	ds, bx, ax, si, bp, es, cx, di
+		uses	bx, ax, si, bp, es
 		.enter
-
-	; edigeron 12/15/00 - Moving this function and the next into fixed
-	; code. This is needed when EMS is enabled, or else this resource
-	; will most likely get loaded into the EMS page frame. This is very
-	; bad, as shortly after this function exits, GEOS will unload the EMS
-	; driver. Part of its shutdown process is to set the page frame to
-	; point back to the last thing it pointed at before GEOS started,
-	; which isn't going to be our code. So if we put this in fixed code,
-	; we're guarenteed to be near the bottom of the heap, instead of in
-	; the page frame.
-		
-		segmov	ds, dgroup, ax
-if 0
 	;
 	; Give our block an extra lock so it stays around.
 	; 
@@ -178,51 +152,20 @@ if 0
 	CheckHack <segment NTSShutdownComplete eq @CurSeg>
 
 		mov	ds:[ntsShutdownCompleteVector].segment, ax
-else
-		mov	ds:[ntsShutdownCompleteVector].segment, cs
-endif
 		mov	ds:[ntsShutdownCompleteVector].offset,
 				offset NTSShutdownComplete
-	; edigeron 12/15/00 -
-	; Due to the EMS page frame stuff, we gotta allocate a fixed block,
-	; and then copy the code into it. Not pretty, but gets the job done.
-	; Don't wanna know what complications HAF_CODE will or won't cause,
-	; so simply not worrying about it. We don't care about errors, as
-	; there is no way in hell we're going to not have enough memory free
-	; here. This hack is needed because we have *too much* free memory
-	; at the time this code gets called.
-
 	;
 	; Lock down the NTSExecCode block.
 	; 
-		push	ds
 		mov	bx, handle NTSExecCode
 		call	MemLock
-		mov	ds, ax
-		mov	ax, MGIT_SIZE
-		call	MemGetInfo
-		push	ax
-		mov	cx, mask HF_FIXED or (mask HAF_NO_ERR shl 8)
-		call	MemAlloc
-		push	bx
-		mov	es, ax
-		clr	di, si
-		pop	cx
-		shr	cx
-		rep	movsw	; Memory blocks are multiples of 16, right?
-		mov	bx, handle NTSExecCode
-		call	MemUnlock
-		pop	bx
-		pop	ds
-		
-		mov	ds:[ntsExecCodeVector].segment, es
+		mov	ds:[ntsExecCodeVector].segment, ax
 		mov	ds:[ntsExecCodeVector].offset, offset NTSExecRunIt
-		mov	ds:[ntsExecCodeHandle], bx
 
 	;
 	; Now lock the two disks involved in this operation.
 	; 
-		mov	ds, ax		; segment still in ax
+		mov	ds, ax
 		call	FSDLockInfoShared
 		mov	es, ax			; es:si <- cwd disk
 		mov	si, ds:[ntsExecFrame].NTSEF_args.DEA_cwd.DEDAP_disk
@@ -237,6 +180,7 @@ endif
 		.leave
 		ret
 NTSAppsShutdown	endp
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -437,4 +381,4 @@ setEnvBlock:
 		jmp	{fptr.far}ds:[21h*fptr]
 NTSShutdownComplete endp
 
-idata	ends
+NTSMovableCode	ends

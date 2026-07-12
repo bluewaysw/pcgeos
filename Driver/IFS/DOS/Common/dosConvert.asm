@@ -104,25 +104,27 @@ REVISION HISTORY:
 ; List of supported code pages, and corresponding ptrs
 ;
 
+ifdef SJIS_SUPPORT
+
 codePageList	DosCodePage \
 	CODE_PAGE_US,
-ifdef SJIS_SUPPORT
-	CODE_PAGE_SJIS,
-endif
-ifdef GB_2312_EUC_SUPPORT
-	CODE_PAGE_GB_2312_EUC,
-endif
+	CODE_PAGE_MULTILINGUAL,
+	CODE_PAGE_SJIS
+codePagePtrs	nptr \
+	offset codePageUS,				;default must be first
+	offset codePageMulti,
+	-1						;not used for SJIS
+
+else
+
+codePageList	DosCodePage \
+	CODE_PAGE_US,
 	CODE_PAGE_MULTILINGUAL
 
 codePagePtrs	nptr \
 	offset codePageUS,				;default must be first
-ifdef SJIS_SUPPORT
-	-1,						;not used for SJIS
-endif
-ifdef GB_2312_EUC_SUPPORT
-	-1,						;not used for GB
-endif
 	offset codePageMulti
+endif
 
 CheckHack <(length codePagePtrs) eq (length codePageList)>
 
@@ -156,7 +158,6 @@ gotCodePage:
 noCodePage:
 		clr	di				;di <- index of default
 		mov	ax, DTGSS_CODE_PAGE_NOT_SUPPORTED ;al <- DTGSS; ah <- 0
-		stc
 		jmp	gotCodePage
 GetCodePage	endp
 
@@ -242,16 +243,6 @@ EUCConvertRoutines CCPStruct <
 	DosEUCToGeosCharString,
 	GeosToDosEUCCharString,
 	-1
->
-endif
-
-ifdef GB_2312_EUC_SUPPORT
-GBConvertRoutines CCPStruct <
-	DosGBToGeosChar,
-	GeosToDosGBChar,
-	DosGBToGeosCharString,
-	GeosToDosGBCharString,
-	GeosToDosGBCharFileString
 >
 endif
 
@@ -888,28 +879,18 @@ gotCodePage:
 	;
 	; Figure out what routines to use
 	;
+		mov	di, offset SBCSConvertRoutines
 ifdef SJIS_SUPPORT
-		mov	di, offset SJISConvertRoutines
 		cmp	bx, CODE_PAGE_SJIS
-		je	gotRoutine
-		mov	di, offset EUCConvertRoutines
-		cmp	bx, CODE_PAGE_EUC_DB
+		jb	gotRoutine
+		mov	di, offset SJISConvertRoutines
 		je	gotRoutine
 		cmp	bx, CODE_PAGE_EUC
-		je	gotRoutine
+		mov	di, offset EUCConvertRoutines
+		jbe	gotRoutine
 		mov	di, offset JISConvertRoutines
-		cmp	bx, CODE_PAGE_JIS_DB
-		je	gotRoutine
-		cmp	bx, CODE_PAGE_JIS
-		je	gotRoutine
+gotRoutine:
 endif
-ifdef GB_2312_EUC_SUPPORT
-		mov	di, offset GBConvertRoutines
-		cmp	bx, CODE_PAGE_GB_2312_EUC
-		je	gotRoutine
-endif
-		mov	di, offset SBCSConvertRoutines
-gotRoutine::
 		ret
 FindCodePage		endp
 

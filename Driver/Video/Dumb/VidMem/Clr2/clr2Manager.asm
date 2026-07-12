@@ -59,9 +59,9 @@ Clr2Stack        ends
 endif		; if _2BIT
 
 
-clr2group       group   clr2data, Clr2, Clr2Stack
+clr2group       group   clr2data, Clr2Stack
 
-assume  ss:clr2group, ds:nothing, es:nothing
+assume  ss:clr2group, ds:nothing, es:nothing, fs:clr2group
 
 ;---------------------------------------------------------------------
 ;			Constants and Macros
@@ -100,6 +100,8 @@ clr2data	ends
 ;------------------------------------------------------------------------------
 ;			Fixed Code
 ;------------------------------------------------------------------------------
+
+assume	gs:Clr2
 
 Clr2 segment 	resource
 

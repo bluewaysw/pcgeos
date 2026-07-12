@@ -58,7 +58,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CalcDitherIndices proc	far
-		test	cs:[bm_flags], mask BM_CLUSTERED_DITHER	; clustered ?
+		test	fs:[bm_flags], mask BM_CLUSTERED_DITHER	; clustered ?
 		jnz	calcDither
 done:
 		ret
@@ -78,19 +78,19 @@ shiftIt:
 		mov	cl, MONO_DITHER_WIDTH-1
 		clr	ch
 		div	cx
-		mov	cs:[ditherLeftIndex], dl ; save it
+		mov	fs:[ditherLeftIndex], dl ; save it
 		mov	ax, bx			; do same for y direction
 		tst	ax
 		js	negHeight
 divHeight:
-		sub	ax, cs:[bigDitherRotY]
+		sub	ax, fs:[bigDitherRotY]
 		clr	dx
 		mov	cl, MONO_DITHER_HEIGHT	; ditherMatrix is 6 scans high
 		clr	ch
 		div	cx
 		shl	dl, 1
 		shl	dl, 1			; *4 (byte width)
-		mov	cs:[ditherTopIndex], dl	; save this too
+		mov	fs:[ditherTopIndex], dl	; save this too
 		pop	ax, cx, dx
 		jmp	done
 
@@ -114,7 +114,7 @@ CALLED BY:	SetDither
 PASS:		cl,ch,bl - red,green,blue components, respectively
 		es	- Window
 
-RETURN: 	cs:[ditherMatrix] - set
+RETURN: 	fs:[ditherMatrix] - set
 
 DESTROYED:	ax,bx,cx,ds
 
@@ -137,14 +137,14 @@ SetDitherClustered proc	near
 		; copy a component to the dither index over 
 
 		mov	ax, es:[W_ditherY]
-		mov	cs:[bigDitherRotY], ax
+		mov	fs:[bigDitherRotY], ax
 
 		; calculate the luminence of the pixel
 
 		mov	ax, cx
 	
 		call	GrCalcLuminance		; ax = luminance
-		tst	cs:colorTransfer		; if table non-zero...
+		tst	fs:colorTransfer		; if table non-zero...
 		jnz	doColorTransfer
 
 		; we need to map this luminence value (0-255) to a smaller 
@@ -176,7 +176,7 @@ haveLum:
 		; to more easily access the bytes, since it will be four bytes
 		; wide instead of three.
 
-		mov	cl, cs:[ditherRotX]
+		mov	cl, fs:[ditherRotX]
 		call	ShiftClusterPattern
 
 		; done with dither block
@@ -193,7 +193,7 @@ haveLum:
 doColorTransfer:
 		push	bx
 		xchg	cx, ax
-		mov	bx, cs:colorTransfer	; get block handle
+		mov	bx, fs:colorTransfer	; get block handle
 		call	MemLock
 		mov	ds, ax
 		xchg	cx, ax
@@ -237,9 +237,9 @@ ShiftClusterPattern	proc	near
 		uses	dx, es, di
 		.enter
 
-		segmov	es, cs, di
-		mov	di, offset cs:ditherMatrix
-		mov	dl, {byte} cs:[resetColor]	; XOR with reset color
+		segmov	es, fs, di
+		mov	di, offset fs:ditherMatrix
+		mov	dl, {byte} fs:[resetColor]	; XOR with reset color
 		mov	ch, MONO_DITHER_HEIGHT
 
 		; use ax to rotate each byte

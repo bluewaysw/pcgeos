@@ -970,7 +970,7 @@ endif
 	; nothing. Otherwise, we shift our destination focus back to the
 	; start of the buffer (this for FCFP with bx==0 on a non-std path).
 	; 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	ax, ds
 		tst	ax
 		jz	startCopy
@@ -1002,7 +1002,7 @@ EC <		ERROR_NE FILE_CONSTRUCTED_PATH_DOESNT_END_IN_BACKSLASH	>
 	; In no case do we go back before bufStart when compressing out ..,
 	; however...
 	; 
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 		cmp	dx, ss:[bufStart]
 		jae	copyLoop
 		mov	dx, ss:[bufStart]
@@ -4649,7 +4649,7 @@ notNested:
 	;
 	test	al, mask SPF_NUKE_ME
 	jz	done
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	clr	bx
 	mov	ds, bx
 endif

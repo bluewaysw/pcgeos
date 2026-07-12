@@ -24,113 +24,101 @@ DESCRIPTION:
 ;----------------------------------------------------------------------------
 
 driverJumpTable	label	word
-	dw	offset dgroup:VidInit		; initialization
-	dw	offset dgroup:VidExit		; last gasp
-	dw	offset dgroup:VidCallModNoSem	; suspend system
-	dw	offset dgroup:VidCallModNoSem	; unsuspend system
-	dw	offset dgroup:VidCallModNoSem	; test for device existance
-	dw	offset dgroup:VidCallModNoSem	; set device type
-	dw	offset dgroup:VidInfo		; get ptr to info block
-	dw	offset dgroup:VidGetExclusive	; get exclusive
-	dw	offset dgroup:VidStartExclusive	; start exclusive
-	dw	offset dgroup:VidEndExclusive	; end exclusive
+	dw	offset VideoCode:VidInit		; initialization
+	dw	offset VideoCode:VidExit		; last gasp
+	dw	offset VideoCode:VidCallMod		; suspend system
+	dw	offset VideoCode:VidCallMod		; unsuspend system
+	dw	offset VideoCode:VidCallMod		; test for device existance
+	dw	offset VideoCode:VidCallMod		; set device type
+	dw	offset VideoCode:VidInfo		; get ptr to info block
+	dw	offset VideoCode:VidGetExclusive	; get exclusive
+	dw	offset VideoCode:VidStartExclusive	; start exclusive
+	dw	offset VideoCode:VidEndExclusive	; end exclusive
 
-	dw	offset dgroup:VidGetPixel	; get pixel color
-	dw	offset dgroup:VidCallMod	; GetBits in another module
-	dw	offset dgroup:VidSetPtr		; set the ptr pic
-	dw	offset dgroup:VidHidePtr	; hide the cursor
-	dw	offset dgroup:VidShowPtr	; show the cursor
-	dw	offset dgroup:VidMovePtr	; move the cursor
-	dw	offset dgroup:VidSaveUnder	; set save under area
+	dw	offset VideoCode:VidGetPixel	; get pixel color
+	dw	offset VideoCode:VidCallMod	; GetBits in another module
+	dw	offset VideoCode:VidSetPtr		; set the ptr pic
+	dw	offset VideoCode:VidHidePtr	; hide the cursor
+	dw	offset VideoCode:VidShowPtr	; show the cursor
+	dw	offset VideoCode:VidMovePtr	; move the cursor
+	dw	offset VideoCode:VidSaveUnder	; set save under area
 if	SAVE_UNDER_COUNT	gt	0
-	dw	offset dgroup:VidRestoreUnder	; restore save under area
-	dw	offset dgroup:VidNukeUnder	; nuke save under area
+	dw	offset VideoCode:VidRestoreUnder	; restore save under area
+	dw	offset VideoCode:VidNukeUnder	; nuke save under area
 else
 	dw	0
 	dw	0
 endif
-	dw	offset dgroup:VidRequestUnder	; request save under
-	dw	offset dgroup:VidCheckUnder	; check save under
-	dw	offset dgroup:VidInfoUnder	; get save under info
-	dw	offset dgroup:CheckSaveUnderCollisionES ; check s.u. collision
-	dw	offset dgroup:VidSetXOR		; set xor region
-	dw	offset dgroup:VidClearXOR	; clear xor region
+	dw	offset VideoCode:VidRequestUnder	; request save under
+	dw	offset VideoCode:VidCheckUnder	; check save under
+	dw	offset VideoCode:VidInfoUnder	; get save under info
+	dw	offset VideoCode:CheckSaveUnderCollisionES ; check s.u. collision
+	dw	offset VideoCode:VidSetXOR		; set xor region
+	dw	offset VideoCode:VidClearXOR	; clear xor region
 
-	dw	offset dgroup:VidDrawRect	; rectangle
-	dw	offset dgroup:VidPutString	; char string
-	dw	offset dgroup:VidCallMod	; BitBlt in another module
-	dw	offset dgroup:VidCallMod	; PutBits in another module
-	dw	offset dgroup:VidCallMod	; DrawLine in another module
-	dw	offset dgroup:VidDrawRegion	; draws a region
-	dw	offset dgroup:VidCallMod	; PutLine in another module
-	dw	offset dgroup:VidCallMod	; Polygon in another module
-	dw	offset dgroup:VidCallMod	; ScreenOn in another module
-	dw	offset dgroup:VidCallMod	; ScreenOff in another module
-	dw	offset dgroup:VidCallMod	; Polyline in another module
-	dw	offset dgroup:VidCallMod	; DashLine in another module
-	dw	offset dgroup:VidCallMod	; DashFill in another module
-	dw	offset dgroup:VidSetPalette	; SetPalette 
-	dw	offset dgroup:VidGetPalette	; GetPalette 
+	dw	offset VideoCode:VidDrawRect	; rectangle
+	dw	offset VideoCode:VidPutString	; char string
+	dw	offset VideoCode:VidCallMod	; BitBlt in another module
+	dw	offset VideoCode:VidCallMod	; PutBits in another module
+	dw	offset VideoCode:VidCallMod	; DrawLine in another module
+	dw	offset VideoCode:VidDrawRegion	; draws a region
+	dw	offset VideoCode:VidCallMod	; PutLine in another module
+	dw	offset VideoCode:VidCallMod	; Polygon in another module
+	dw	offset VideoCode:VidCallMod	; ScreenOn in another module
+	dw	offset VideoCode:VidCallMod	; ScreenOff in another module
+	dw	offset VideoCode:VidCallMod	; Polyline in another module
+	dw	offset VideoCode:VidCallMod	; DashLine in another module
+	dw	offset VideoCode:VidCallMod	; DashFill in another module
+	dw	offset VideoCode:VidSetPalette	; SetPalette 
+	dw	offset VideoCode:VidGetPalette	; GetPalette 
 
 .assert ($-driverJumpTable) eq VidFunction
 
-	; this table holds offsets to the routines in different modules
-moduleTable	label	fptr
-	fptr	0 				; initialization
-	fptr	0				; last gasp
-	fptr	VideoMisc:VidSuspend		; suspend system
-	fptr	VideoMisc:VidUnsuspend		; unsuspend system
-	fptr	VideoMisc:VidTestDevice		; test for device existance
-	fptr	VideoMisc:VidSetDevice		; set device type
-	fptr	0				; get ptr to info block
-	fptr	0				; get exclusive
-	fptr	0				; start exclusive
-	fptr	0				; end exclusive
+	; this table holds offsets to the routines called after switching stacks
+moduleTable	label	word
+	dw	0 				; initialization
+	dw	0				; last gasp
+	dw	offset VideoCode:VidSuspend	; suspend system
+	dw	offset VideoCode:VidUnsuspend	; unsuspend system
+	dw	offset VideoCode:VidTestDevice	; test for device existance
+	dw	offset VideoCode:VidSetDevice	; set device type
+	dw	0				; get ptr to info block
+	dw	0				; get exclusive
+	dw	0				; start exclusive
+	dw	0				; end exclusive
 
-	fptr	0				; get pixel color
-	fptr	VideoGetBits:VidGetBits 	; GetBits in another module
-	fptr	0				; set the ptr pic
-	fptr	0				; hide the cursor
-	fptr	0				; show the cursor
-	fptr	0				; move the cursor
-	fptr	0				; set save under area
-	fptr	0				; restore save under area
-	fptr	0				; nuke save under area
-	fptr	0				; request save under
-	fptr	0				; check save under
-	fptr	0				; get save under info
-	fptr	0		 		; check s.u. collision
-	fptr	0				; set xor region
-	fptr	0				; clear xor region
+	dw	0				; get pixel color
+	dw	offset VideoCode:VidGetBits 	; GetBits in another module
+	dw	0				; set the ptr pic
+	dw	0				; hide the cursor
+	dw	0				; show the cursor
+	dw	0				; move the cursor
+	dw	0				; set save under area
+	dw	0				; restore save under area
+	dw	0				; nuke save under area
+	dw	0				; request save under
+	dw	0				; check save under
+	dw	0				; get save under info
+	dw	0		 		; check s.u. collision
+	dw	0				; set xor region
+	dw	0				; clear xor region
 
-	fptr	0				; rectangle
-	fptr	0				; char string
-	fptr	VideoBlt:VidBitBlt		; BitBlt in another module
-	fptr	VideoBitmap:VidPutBits  	; PutBits in another module
-	fptr	VideoLine:VidDrawLine		; DrawLine in another module
-	fptr	0				; draws a region
-	fptr	VideoPutLine:VidPutLine		; PutLine in another module
-	fptr	VideoPolygon:VidPolygon		; Polygon in another module
-	fptr	VideoMisc:VidScreenOn		; ScreenOn in another module
-	fptr	VideoMisc:VidScreenOff		; ScreenOff in another module
-	fptr	VideoLine:VidPolyline		; Polyline in another module
-	fptr	VideoLine:VidDashLine		; DashLine in another module
-	fptr	VideoLine:VidDashFill		; DashFill in another module
-	fptr	0				; SetPalette
-	fptr	0				; GetPalette
-.assert ($-moduleTable) eq (VidFunction*2)
-
-;----------------------------------------------------------------------------
-;		Exclusive access variables
-;----------------------------------------------------------------------------
-
-	; used for GrGrabExclusive, GrReleaseExclusive
-
-videoSem	Semaphore	<1,0>
-exclusiveGstate	hptr.GState
-exclusiveCausedAbort	word	FALSE
-exclBound	Rectangle
-	public	videoSem, exclusiveGstate, exclusiveCausedAbort
+	dw	0				; rectangle
+	dw	0				; char string
+	dw	offset VideoCode:VidBitBlt	; BitBlt in another module
+	dw	offset VideoCode:VidPutBits  	; PutBits in another module
+	dw	offset VideoCode:VidDrawLine		; DrawLine in another module
+	dw	0				; draws a region
+	dw	offset VideoCode:VidPutLine	; PutLine in another module
+	dw	offset VideoCode:VidPolygon	; Polygon in another module
+	dw	offset VideoCode:VidScreenOn	; ScreenOn in another module
+	dw	offset VideoCode:VidScreenOff	; ScreenOff in another module
+	dw	offset VideoCode:VidPolyline	; Polyline in another module
+	dw	offset VideoCode:VidDashLine	; DashLine in another module
+	dw	offset VideoCode:VidDashFill	; DashFill in another module
+	dw	0				; SetPalette
+	dw	0				; GetPalette
+.assert ($-moduleTable) eq (VidFunction)
 
 if	SAVE_UNDER_COUNT	gt	0
 ;---------------------------------------------------------------------------
@@ -227,25 +215,25 @@ ifndef	IS_CLR8			; 8-bit/pixel drivers have their own
 ifndef	BIT_CLR4
 ifndef	BIT_CLR2
 FCC_table	label	word
-	dw	offset dgroup:Char1In1Out	;load 1, draw 1
-	dw	offset dgroup:Char1In2Out	;load 1, draw 2
-	dw	offset dgroup:NullRoutine	;load 1, draw 3
-	dw	offset dgroup:NullRoutine	;load 1, draw 4
+	dw	offset VideoCode:Char1In1Out	;load 1, draw 1
+	dw	offset VideoCode:Char1In2Out	;load 1, draw 2
+	dw	offset VideoCode:NullRoutine	;load 1, draw 3
+	dw	offset VideoCode:NullRoutine	;load 1, draw 4
 
-	dw	offset dgroup:NullRoutine	;load 2, draw 1
-	dw	offset dgroup:Char2In2Out	;load 2, draw 2
-	dw	offset dgroup:Char2In3Out	;load 2, draw 3
-	dw	offset dgroup:NullRoutine	;load 2, draw 4
+	dw	offset VideoCode:NullRoutine	;load 2, draw 1
+	dw	offset VideoCode:Char2In2Out	;load 2, draw 2
+	dw	offset VideoCode:Char2In3Out	;load 2, draw 3
+	dw	offset VideoCode:NullRoutine	;load 2, draw 4
 
-	dw	offset dgroup:NullRoutine	;load 3, draw 1
-	dw	offset dgroup:NullRoutine	;load 3, draw 2
-	dw	offset dgroup:Char3In3Out	;load 3, draw 3
-	dw	offset dgroup:Char3In4Out	;load 3, draw 4
+	dw	offset VideoCode:NullRoutine	;load 3, draw 1
+	dw	offset VideoCode:NullRoutine	;load 3, draw 2
+	dw	offset VideoCode:Char3In3Out	;load 3, draw 3
+	dw	offset VideoCode:Char3In4Out	;load 3, draw 4
 
-	dw	offset dgroup:NullRoutine	;load 4, draw 1
-	dw	offset dgroup:NullRoutine	;load 4, draw 2
-	dw	offset dgroup:NullRoutine	;load 4, draw 3
-	dw	offset dgroup:Char4In4Out	;load 4, draw 4
+	dw	offset VideoCode:NullRoutine	;load 4, draw 1
+	dw	offset VideoCode:NullRoutine	;load 4, draw 2
+	dw	offset VideoCode:NullRoutine	;load 4, draw 3
+	dw	offset VideoCode:Char4In4Out	;load 4, draw 4
 endif
 endif
 endif

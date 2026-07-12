@@ -35,7 +35,7 @@ PASS:	ds:si	- CommonAttr structure
 	es 	- window segment
 
 RETURN:
-	cs:[ditherMatrix] - set
+	fs:[ditherMatrix] - set
 
 DESTROYED:
 	none
@@ -72,7 +72,7 @@ SetDither	proc		far
 
 	mov	ax, es:[W_pattPos]		; get patt ref point
 ifdef	MEM_MONO
-	test	cs:[bm_flags], mask BM_CLUSTERED_DITHER
+	test	fs:[bm_flags], mask BM_CLUSTERED_DITHER
 	jz	havePattPos
 	push	dx
 	mov	ax, es:[W_ditherY]		; only need it in y
@@ -100,58 +100,58 @@ endif
 	; check to see if we really need to re-create it.  If the color
 	; is the same, and the shift amount is the same, then we're OK.
 
-	cmp	cl, cs:[ditherColor].RGB_red
+	cmp	cl, fs:[ditherColor].RGB_red
 	jne	setNewDither
-	cmp	ch, cs:[ditherColor].RGB_green
+	cmp	ch, fs:[ditherColor].RGB_green
 	jne	setNewDither
-	cmp	bl, cs:[ditherColor].RGB_blue
+	cmp	bl, fs:[ditherColor].RGB_blue
 	jne	setNewDither
 		
 	; also need to check the map mode, as GrMapColorToGrey uses this
 	; information
 
-	cmp	bh, cs:[ditherMapMode]
+	cmp	bh, fs:[ditherMapMode]
 	jne	setNewDither
 
 	; besides the color, we should check the rotation.
 
-	cmp	ax, {word} cs:[ditherRotX]	; same ?
+	cmp	ax, {word} fs:[ditherRotX]	; same ?
 	je	done
 
 		; set up es:di -> at the dither matrix we are about to fill
 setNewDither:
-	mov	cs:[ditherColor].RGB_red, cl	; set new color
-	mov	cs:[ditherColor].RGB_green, ch
-	mov	cs:[ditherColor].RGB_blue, bl
-	mov	cs:[ditherMapMode], bh
-	mov	{word} cs:[ditherRotX], ax	; set rotation value
+	mov	fs:[ditherColor].RGB_red, cl	; set new color
+	mov	fs:[ditherColor].RGB_green, ch
+	mov	fs:[ditherColor].RGB_blue, bl
+	mov	fs:[ditherMapMode], bh
+	mov	{word} fs:[ditherRotX], ax	; set rotation value
 
 ifdef	MEM_MONO
-	test	cs:[bm_flags], mask BM_CLUSTERED_DITHER
+	test	fs:[bm_flags], mask BM_CLUSTERED_DITHER
 	jnz	clustered
 endif
 	mov	al, ds:[si].CA_colorIndex
-	mov	cs:[currentColor], al
+	mov	fs:[currentColor], al
 
 	call	GrMapColorToGrey		;makes ds:bx point at data
 						; if we're writing on black,
-	mov	cx, cs:[resetColor]		; this is setup already
+	mov	cx, fs:[resetColor]		; this is setup already
 	mov	ax,word ptr ds:[bx]
 	xor	ax, cx
-	mov	word ptr cs:[ditherMatrix],ax	; store pattern away
+	mov	word ptr fs:[ditherMatrix],ax	; store pattern away
 	mov	ax,word ptr ds:[bx][2]
 	xor	ax, cx
-	mov	word ptr cs:[ditherMatrix+2],ax
+	mov	word ptr fs:[ditherMatrix+2],ax
 	mov	ax,word ptr ds:[bx][4]
 	xor	ax, cx
-	mov	word ptr cs:[ditherMatrix+4],ax
+	mov	word ptr fs:[ditherMatrix+4],ax
 	mov	ax,word ptr ds:[bx][6]
 	xor	ax, cx
-	mov	word ptr cs:[ditherMatrix+6],ax
+	mov	word ptr fs:[ditherMatrix+6],ax
 
 	; shift the pattern buffer content
 
-	mov	ax, {word} cs:[ditherRotX]	; get patt ref point
+	mov	ax, {word} fs:[ditherRotX]	; get patt ref point
 	call	ShiftPattern			; shift the buffer content
 done:
 	.leave
@@ -165,11 +165,11 @@ clustered:
 		; if the color is black, do the quick fill.
 itsBlack:
 		mov	al, ds:[si].CA_colorIndex
-		mov	cs:[currentColor], al
-		mov	{word} cs:[ditherColor].RGB_red, cx	; set new color
-		mov	cs:[ditherColor].RGB_blue, bl
+		mov	fs:[currentColor], al
+		mov	{word} fs:[ditherColor].RGB_red, cx	; set new color
+		mov	fs:[ditherColor].RGB_blue, bl
 		push	es, di
-		segmov	es, cs, ax
+		segmov	es, fs, ax
 		mov	di, offset ditherMatrix
 		mov	ax, 0xffff
 		mov	cx, (length ditherMatrix)/2
@@ -190,7 +190,7 @@ CALLED BY:	INTERNAL
 
 PASS:		al		 - new x bit shift
 		ah		 - new y bit shift
-		cs:ditherMatrix - pattern buffer
+		fs:ditherMatrix - pattern buffer
 
 RETURN:		nothing
 
@@ -220,13 +220,13 @@ ShiftPattern	proc		near
  
 		; first get bytes into registers (can fit all but one)
 
-		mov	ah, {byte} cs:[ditherMatrix+1]	; use all regs but cl
-		mov	al, {byte} cs:[ditherMatrix+2]
-		mov	bh, {byte} cs:[ditherMatrix+3]
-		mov	bl, {byte} cs:[ditherMatrix+4]
-		mov	ch, {byte} cs:[ditherMatrix+5]
-		mov	dh, {byte} cs:[ditherMatrix+6]
-		mov	dl, {byte} cs:[ditherMatrix+7]
+		mov	ah, {byte} fs:[ditherMatrix+1]	; use all regs but cl
+		mov	al, {byte} fs:[ditherMatrix+2]
+		mov	bh, {byte} fs:[ditherMatrix+3]
+		mov	bl, {byte} fs:[ditherMatrix+4]
+		mov	ch, {byte} fs:[ditherMatrix+5]
+		mov	dh, {byte} fs:[ditherMatrix+6]
+		mov	dl, {byte} fs:[ditherMatrix+7]
 
 		; next, do rotates in x
 
@@ -234,7 +234,7 @@ ShiftPattern	proc		near
 		tst	cl				; see if neg
 		js	SP_absX				;  yes, shift left
 		jz	SP_Xshifted			; no change
-		ror	byte ptr cs:[ditherMatrix], cl	; shift all 8 bytes
+		ror	byte ptr fs:[ditherMatrix], cl	; shift all 8 bytes
 		ror	ah, cl
 		ror	al, cl
 		ror	bh, cl
@@ -256,17 +256,17 @@ SP_10:
 		xchg	bl, bh
 		xchg	bh, al
 		xchg	al, ah
-		xchg	ah, {byte} cs:[ditherMatrix]; start shuffling
+		xchg	ah, {byte} fs:[ditherMatrix]; start shuffling
 		dec	cl
 		jnz	SP_10
 SP_done:
-		mov	{byte} cs:[ditherMatrix+1], ah	; write out new values
-		mov	{byte} cs:[ditherMatrix+2], al
-		mov	{byte} cs:[ditherMatrix+3], bh
-		mov	{byte} cs:[ditherMatrix+4], bl
-		mov	{byte} cs:[ditherMatrix+5], ch
-		mov	{byte} cs:[ditherMatrix+6], dh
-		mov	{byte} cs:[ditherMatrix+7], dl
+		mov	{byte} fs:[ditherMatrix+1], ah	; write out new values
+		mov	{byte} fs:[ditherMatrix+2], al
+		mov	{byte} fs:[ditherMatrix+3], bh
+		mov	{byte} fs:[ditherMatrix+4], bl
+		mov	{byte} fs:[ditherMatrix+5], ch
+		mov	{byte} fs:[ditherMatrix+6], dh
+		mov	{byte} fs:[ditherMatrix+7], dl
 		mov	sp, bp				; restore stack ptr
 		pop	bp				; restore frame ptr
 		pop	bx, cx, dx
@@ -274,7 +274,7 @@ SP_done:
 
 SP_absX:
 		neg	cl			
-		rol	byte ptr cs:[ditherMatrix], cl	; shift all 8 bytes
+		rol	byte ptr fs:[ditherMatrix], cl	; shift all 8 bytes
 		rol	ah, cl
 		rol	al, cl
 		rol	bh, cl
@@ -287,7 +287,7 @@ SP_absX:
 SP_absY:
 		neg	cl
 SP_20:
-		xchg	ah, {byte} cs:[ditherMatrix]; start shuffling
+		xchg	ah, {byte} fs:[ditherMatrix]; start shuffling
 		xchg	ah, al
 		xchg	al, bh
 		xchg	bh, bl

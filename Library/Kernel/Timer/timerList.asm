@@ -593,7 +593,7 @@ InsertTimedAction	proc	near	uses cx, si, di
 EC <	push	ax							>
 EC <	pushf								>
 EC <	pop	ax							>
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 EC <	test	ax, mask CPU_INTERRUPT or mask CPU_DIRECTION					>
 else
 EC <	test	ax, mask CPU_DIRECTION					>

@@ -40,11 +40,30 @@ usernotes	"#FreeGEOS font driver to render TrueType fonts."
 resource Resident 	fixed code read-only shared
 resource InitMod	code read-only shared discard-only
 
-# Optionally make to segemnt fixed, to save even more inter-resource
-# calls to movable resources
-# Disabled by default, not much impact
-#resource ttmemory_TEXT	fixed code read-only shared
-#resource ttfile_TEXT 	fixed code read-only shared
+#resource WidthMod fixed code read-only shared
+#resource CharMod fixed code read-only shared
+#resource MetricsMod fixed code read-only shared
+resource ttcalc_TEXT fixed code read-only shared
+resource STRINGCODE fixed code read-only shared
+resource ttmemory_TEXT fixed code read-only shared
+resource MAINCODE fixed code read-only shared
+resource ttchars_TEXT fixed code read-only shared
+resource ttinit_TEXT fixed code read-only shared
+resource ttmetrics_TEXT fixed code read-only shared
+resource ttcharmapper_TEXT fixed code read-only shared 
+resource ttadapter_TEXT fixed code read-only shared
+resource ttwidths_TEXT fixed code read-only shared
+resource ttpath_TEXT fixed code read-only shared
+resource ttcache_TEXT fixed code read-only shared
+resource ttraster_TEXT fixed code read-only shared
+resource ttgload_TEXT fixed code read-only shared
+resource ttapi_TEXT fixed code read-only shared
+resource ftxkern_TEXT fixed code read-only shared
+resource ttinterp_TEXT fixed code read-only shared
+resource ttload_TEXT fixed code read-only shared
+resource ttfile_TEXT fixed code read-only shared
+resource ttcmap_TEXT fixed code read-only shared
+resource ttobjs_TEXT fixed code read-only shared
 
 resource InterpEntry	code read-only shared
 resource InterpInfreq	code read-only shared

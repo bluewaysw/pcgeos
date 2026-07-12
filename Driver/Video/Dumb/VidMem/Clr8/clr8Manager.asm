@@ -60,9 +60,9 @@ Clr8Stack        ends
 endif		; if _8BIT
 
 
-clr8group       group   clr8data, Clr8, Clr8Stack
+clr8group       group   clr8data, Clr8Stack
 
-assume  ss:clr8group, ds:nothing, es:nothing
+assume  ss:clr8group, ds:nothing, es:nothing, fs:clr8group
 
 ;---------------------------------------------------------------------
 ;			Constants and Macros
@@ -101,8 +101,11 @@ clr8data	ends
 ;			Fixed Code
 ;------------------------------------------------------------------------------
 
+assume	gs:Clr8
+
 Clr8 segment 	resource
 
+include clr8Palette.asm			; color palette table
 include	vidcomOutput.asm		; common output routines
 include	vidcomChars.asm			; common character output routines
 include vidcomFont.asm			; routines for building, rotating chars
@@ -115,7 +118,6 @@ include	clr8GenChar.asm			; routines for larger characters
 include	clr8Chars.asm			; character drawing routines
 include clr8Dither.asm			; dither generation tables
 include	clr8EscTab.asm			; escape code jump table
-include clr8Palette.asm			; color palette table
 include clr8Entry.asm			; color palette table
 include clr8Utils.asm			; misc utilities
 include vidmemUtils.asm			; HugeArray related utilities

@@ -111,7 +111,7 @@ waitForSomething:
 		push	ax
 
 		PTimedSem	ds, scrubSem, SCRUB_TIMEOUT, TRASH_AX_BX_CX
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 		jc	compactLoop	; Timeout => not in danger
 else
 	;

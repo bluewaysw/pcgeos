@@ -27,4 +27,6 @@ incminor
 
 export MIMEDRVGRAPHICEX
 
+resource ASM_FIXED code read-only shared fixed
+
 

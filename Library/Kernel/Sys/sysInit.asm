@@ -298,7 +298,7 @@ IS30:
 	; Try for the model byte at f000:fffe first, though
 	;
 		mov	bx, 0f000h
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		push	ax, cx
 		mov	ax, bx
 		mov	cx, -1
@@ -451,7 +451,7 @@ interceptHardwareIRQs:
 endif
 
 		mov	ds:[lastIntercept], dx
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	bx, segment IRQCode
 		push	bx
 		call	GPMIAliasFar		;bx = writable alias
@@ -467,7 +467,7 @@ interceptLoop:
 		add	di, IRQ_INTERCEPT_OLD_VECTOR_OFFSET
 		call	SysCatchDeviceInterruptInternal	; nukes ax, di, bx
 		mov	di, cx
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		movdw	es:[di+IRQ_INTERCEPT_DOS_VECTOR_OFFSET], \
 			es:[di+IRQ_INTERCEPT_OLD_VECTOR_OFFSET], \
 			ax
@@ -477,7 +477,7 @@ else
 			ax
 endif
 		pop	ax
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	bx, segment IRQCode
 else
 		mov	bx, ds
@@ -503,7 +503,7 @@ endif
 
 		mov	di, offset Irq3Intercept+IRQ_INTERCEPT_OLD_VECTOR_OFFSET
 		mov	ax, 3
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	cx, es:[di].segment
 		cmp	cx, ds:[loaderVars].KLV_swatKcode
 else
@@ -514,7 +514,7 @@ endif
 
 		mov	di, offset Irq4Intercept+IRQ_INTERCEPT_OLD_VECTOR_OFFSET
 		mov	ax, 4
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	cx, es:[di].segment
 		cmp	cx, ds:[loaderVars].KLV_swatKcode
 else
@@ -525,7 +525,7 @@ endif
 replaceSwatIRQ:
 		call	SysResetDeviceInterruptInternal
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;
 	; All done with modifying IRQCode.
 	;
@@ -541,7 +541,7 @@ if	USE_MOUSE_TO_REPLY_TO_SYS_ERROR_BOX
 else
 		mov	ds:[errorKbdQueue], bx
 endif
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;
 	; Trap the debug exception, which we're temporarily using to
 	; cause context switches.

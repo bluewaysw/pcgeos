@@ -6367,6 +6367,7 @@ static void _near Interp( UShort               p1,
       /* run this program for too long ?? (e.g. infinite loops) */
       if ( --ins_counter == 0 )
       {
+	EC_WARNING(-1);
         CUR.error = TT_Err_Execution_Too_Long;
         goto LErrorLabel_;
       }

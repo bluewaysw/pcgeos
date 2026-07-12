@@ -23,6 +23,7 @@ DESCRIPTION:
 	$Id: vidcomXOR.asm,v 1.1 97/04/18 11:41:53 newdeal Exp $
 
 -------------------------------------------------------------------------------@
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -86,7 +87,8 @@ REVISION HISTORY:
 VidSetXOR	proc	near	uses ds
 	.enter
 
-	segmov	ds, cs
+	segmov	ds, gs
+	assume	ds:VideoCode
 
 	; Remove any existing XOR region
 	
@@ -98,27 +100,27 @@ VidSetXOR	proc	near	uses ds
 	mov	ds:[xorPositionX2], ax
 	mov	ds:[xorPositionY], bx
 	mov	ax, ss:[bp].VXP_ax		;use rectangle structure to
-	mov	ds:[xorParams].R_left, ax	;address parameters
+	mov	fs:[xorParams].R_left, ax	;address parameters
 	mov	ax, ss:[bp].VXP_bx
-	mov	ds:[xorParams].R_top, ax
+	mov	fs:[xorParams].R_top, ax
 	mov	ax, ss:[bp].VXP_cx
-	mov	ds:[xorParams].R_right, ax
+	mov	fs:[xorParams].R_right, ax
 	mov	ax, ss:[bp].VXP_dx
-	mov	ds:[xorParams].R_bottom, ax
+	mov	fs:[xorParams].R_bottom, ax
 
 EC <	test	si, not mask VisXORFlags				>
 EC <	ERROR_NZ	BAD_FLAGS_TO_VID_SET_XOR			>
-	mov	ds:[xorFlags], si
+	mov	fs:[xorFlags], si
 
 EGA <	clr	ax							>
 EGA <	clr	bx							>
-EGA <	mov	al, ds:[cursorHotX]					>
-EGA <	mov	bl, ds:[cursorHotY]					>
+EGA <	mov	al, fs:[cursorHotX]					>
+EGA <	mov	bl, fs:[cursorHotY]					>
 EGA <	call	UpdateXORParams						>
 
 	; unlock old handle, if any
 
-	mov	bx, ds:[xorRegionHandle]
+	mov	bx, fs:[xorRegionHandle]
 	tst	bx
 	jz	noUnlock
 	call	MemUnlock
@@ -126,18 +128,18 @@ noUnlock:
 
 	; lock new handle
 
-	mov	ds:[xorRegionHandle], dx
+	mov	fs:[xorRegionHandle], dx
 	mov	bx, dx
 
 	call	MemLock
 EC <	ERROR_C		BAD_FLAGS_TO_VID_SET_XOR			>
-	mov	ds:[xorRegion].segment, ax
-	mov	ds:[xorRegion].offset, cx
+	mov	fs:[xorRegion].segment, ax
+	mov	fs:[xorRegion].offset, cx
 
 	; Account for any changes in mouse position since original call.
 	
-	mov	ax, ds:[cursorX]		;get current mouse position
-	mov	bx, ds:[cursorY]
+	mov	ax, fs:[cursorX]		;get current mouse position
+	mov	bx, fs:[cursorY]
 	sub	ax, ss:[bp].VXP_mousePos.P_x	;subtract passed mouse position
 	sub	bx, ss:[bp].VXP_mousePos.P_y
 	call	UpdateXORParams			;update parameters accordingly
@@ -146,7 +148,7 @@ EC <	ERROR_C		BAD_FLAGS_TO_VID_SET_XOR			>
 	
 	; redraw cursor if needed
 	
-	tst	ds:[hiddenFlag]
+	tst	fs:[hiddenFlag]
 	jz	noRedraw
 	call	CondShowPtr
 noRedraw:
@@ -203,7 +205,7 @@ REVISION HISTORY:
 VidClearXOR	proc	near	uses ds
 	.enter
 
-	segmov	ds, cs
+	segmov	ds, gs
 
 	; Remove existing XOR region
 
@@ -212,8 +214,8 @@ VidClearXOR	proc	near	uses ds
 	; Clear variables
 
 	clr	bx
-	mov	ds:[xorFlags], bx		;zero out flags
-	xchg	bx, ds:[xorRegionHandle]	;clear handle, no = handle
+	mov	fs:[xorFlags], bx		;zero out flags
+	xchg	bx, fs:[xorRegionHandle]	;clear handle, no = handle
 	tst	bx
 	jz	10$
 	call	MemUnlock
@@ -221,17 +223,17 @@ VidClearXOR	proc	near	uses ds
 
 	; redraw cursor if needed
 
-	tst	ds:[hiddenFlag]
+	tst	fs:[hiddenFlag]
 	jz	noRedraw
 	call	CondShowPtr
 noRedraw:
 
 	; Get values to return
 
-	mov	ax, ds:[xorParams].R_left
-	mov	bx, ds:[xorParams].R_top
-	mov	cx, ds:[xorParams].R_right
-	mov	dx, ds:[xorParams].R_bottom
+	mov	ax, fs:[xorParams].R_left
+	mov	bx, fs:[xorParams].R_top
+	mov	cx, fs:[xorParams].R_right
+	mov	dx, fs:[xorParams].R_bottom
 	mov	si, ds:[xorPositionX1]
 	mov	di, ds:[xorPositionY]
 
@@ -239,6 +241,7 @@ noRedraw:
 	ret
 
 VidClearXOR	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -274,21 +277,20 @@ REVISION HISTORY:
 UpdateXORForPtr	proc	near	uses si, ds
 	.enter
 
-	segmov	ds, cs
+	segmov	ds, gs
 
-	inc	ds:[hiddenFlag]			;mouse is already gone
+	inc	fs:[hiddenFlag]			;mouse is already gone
 	call	HideXOR
 	call	UpdateXORParams			;update parameters
 	call	ShowXOR				;redraw xor region
-	dec	ds:[hiddenFlag]
+	dec	fs:[hiddenFlag]
 
 	.leave
 	ret
 
 UpdateXORForPtr	endp
-		
-
 
+
 COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	UpdateXORParams
@@ -320,41 +322,41 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 UpdateXORParams	proc	near
-	mov	si, ds:[xorFlags]
+	assume	ds:dgroup
+	mov	si, fs:[xorFlags]
 	test	si, mask VXF_X_POS_FOLLOWS_MOUSE
 	jz	10$
-	add	ds:[xorPositionX1],ax
-	add	ds:[xorPositionX2],ax
+	add	gs:[xorPositionX1],ax
+	add	gs:[xorPositionX2],ax
 10$:
 
 	test	si, mask VXF_Y_POS_FOLLOWS_MOUSE
 	jz	20$
-	add	ds:[xorPositionY],bx
+	add	gs:[xorPositionY],bx
 20$:
 
 	test	si, mask VXF_AX_PARAM_FOLLOWS_MOUSE
 	jz	30$
-	add	ds:[xorParams].R_left,ax
+	add	fs:[xorParams].R_left,ax
 30$:
 
 	test	si, mask VXF_BX_PARAM_FOLLOWS_MOUSE
 	jz	40$
-	add	ds:[xorParams].R_top,bx
+	add	fs:[xorParams].R_top,bx
 40$:
 
 	test	si, mask VXF_CX_PARAM_FOLLOWS_MOUSE
 	jz	50$
-	add	ds:[xorParams].R_right,ax
+	add	fs:[xorParams].R_right,ax
 50$:
 
 	test	si, mask VXF_DX_PARAM_FOLLOWS_MOUSE
 	jz	60$
-	add	ds:[xorParams].R_bottom,bx
+	add	fs:[xorParams].R_bottom,bx
 60$:
 
 	ret
 UpdateXORParams	endp
-
 
 
 COMMENT @----------------------------------------------------------------------
@@ -388,12 +390,13 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 CheckXORCollision	proc	near
+	assume	ds:nothing, es:nothing
 
 	; is there an XOR region ?
 
-	cmp	cs:[xorRegionHandle], 0
+	cmp	fs:[xorRegionHandle], 0
 	jz	done
-	cmp	cs:[xorHiddenFlag],0
+	cmp	fs:[xorHiddenFlag],0
 	jnz	done
 
 	; check for collision
@@ -421,6 +424,7 @@ done:
 	ret
 
 CheckXORCollision	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -464,19 +468,20 @@ HideXOR	proc	near
 
 	; is there an XOR region ?
 
-	cmp	cs:[xorRegionHandle], 0
+	cmp	fs:[xorRegionHandle], 0
 	jz	done
-	cmp	cs:[xorHiddenFlag],0
+	cmp	fs:[xorHiddenFlag],0
 	jnz	done
 
 	call	DrawXOR
 
-	mov	cs:[xorHiddenFlag], 1
+	mov	fs:[xorHiddenFlag], 1
 
 done:
 	ret
 
 HideXOR	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -524,17 +529,18 @@ ShowXOR	proc	near
 
 	; is there an XOR region ?
 
-	cmp	cs:[xorRegionHandle], 0
+	cmp	fs:[xorRegionHandle], 0
 	jz	done
 
 	call	DrawXOR
 
-	mov	cs:[xorHiddenFlag], 0
+	mov	fs:[xorHiddenFlag], 0
 
 done:
 	ret
 
 ShowXOR	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -575,23 +581,23 @@ REVISION HISTORY:
 
 DrawXOR	proc	near	uses ax, bx, cx, dx, si, di, bp, ds, es
 	.enter
-	push	{word} cs:[maskBuffer]
-	push	{word} cs:[maskBuffer+2]
-	push	{word} cs:[maskBuffer+4]
-	push	{word} cs:[maskBuffer+6]
-	push	cs:[driverState]
-	push	cs:[rectRoutine]	; save routine address
-	push	cs:[TRC_pointer]
-EGA <	push	{word} cs:[currentDrawMode]				>
-NIKEC <	push	{word} cs:[currentDrawMode]				>
+	push	{word} fs:[maskBuffer]
+	push	{word} fs:[maskBuffer+2]
+	push	{word} fs:[maskBuffer+4]
+	push	{word} fs:[maskBuffer+6]
+	push	fs:[driverState]
+	push	gs:[rectRoutine]	; save routine address
+	push	gs:[TRC_pointer]
+EGA <	push	{word} fs:[currentDrawMode]				>
+NIKEC <	push	{word} fs:[currentDrawMode]				>
 
 	; set color and mode
 
-EGA <	mov	dh, cs:[currentColor]					>
+EGA <	mov	dh, fs:[currentColor]					>
 EGA <	mov	dl, MM_INVERT						>
 EGA <	call	SetEGAClrMode						>
 
-NIKEC <	mov	dh, cs:[currentColor]					>
+NIKEC <	mov	dh, fs:[currentColor]					>
 NIKEC <	mov	dl, MM_INVERT						>
 NIKEC <	call	SetNikeClrMode						>
 
@@ -600,57 +606,57 @@ ifdef	IS_CASIO
 	; for Casio driver, don't write into VRAM, just into DDRAM
 
 	clr	bx			; read the mode
-	call	cs:[biosFunctions].CF_autoTransMode
+	call	fs:[biosFunctions].CF_autoTransMode
 	push	bx			; save for later
 
 	mov	bh, 1			; set the mode
 	mov	bl, CASIO_AT_XOR
-	call	cs:[biosFunctions].CF_autoTransMode
+	call	fs:[biosFunctions].CF_autoTransMode
 
 endif
 	
-	and	cs:[driverState], not mask VS_DITHER	; don't dither
+	and	fs:[driverState], not mask VS_DITHER	; don't dither
 
 	; get region boundries and translate them
 
-	push	cs:[xorParams].R_bottom		;put params on stack
-	push	cs:[xorParams].R_right
-	push	cs:[xorParams].R_top
-	push	cs:[xorParams].R_left
-	mov	cs:[TRC_pointer],sp
+	push	fs:[xorParams].R_bottom		;put params on stack
+	push	fs:[xorParams].R_right
+	push	fs:[xorParams].R_top
+	push	fs:[xorParams].R_left
+	mov	gs:[TRC_pointer],sp
 
 	; set up mask buffer
 
 	mov	ax, -1
-	mov	{word} cs:[maskBuffer], ax
-	mov	{word} cs:[maskBuffer+2], ax
-	mov	{word} cs:[maskBuffer+4], ax
-	mov	{word} cs:[maskBuffer+6], ax
+	mov	{word} fs:[maskBuffer], ax
+	mov	{word} fs:[maskBuffer+2], ax
+	mov	{word} fs:[maskBuffer+4], ax
+	mov	{word} fs:[maskBuffer+6], ax
 
 	; compute the bounds
 
-	lds	si, cs:[xorRegion]		;ds:si = region
+	lds	si, fs:[xorRegion]		;ds:si = region
 
-	mov	dx, cs:[xorPositionX1]		;dx = x pos
+	mov	dx, gs:[xorPositionX1]		;dx = x pos
 	mov	cx, dx				;cx = x pos
-	mov	bx, cs:[xorPositionY]		;di = ypos
+	mov	bx, gs:[xorPositionY]		;di = ypos
 
 	lodsw
 	call	SlowTranslateCoord
 	add	dx, ax
-	mov	cs:[xorBoundsLeft], dx		;dx = left
+	mov	gs:[xorBoundsLeft], dx		;dx = left
 	lodsw
 	call	SlowTranslateCoord
 	add	bx, ax
-	mov	cs:[xorBoundsTop], bx		;bx = top
+	mov	gs:[xorBoundsTop], bx		;bx = top
 	lodsw
 	call	SlowTranslateCoord
 	add	cx, ax
-	mov	cs:[xorBoundsRight], cx		;cx = right
+	mov	gs:[xorBoundsRight], cx		;cx = right
 	lodsw
 	call	SlowTranslateCoord
-	add	ax, cs:[xorPositionY]
-	mov	cs:[xorBoundsBottom], ax
+	add	ax, gs:[xorPositionY]
+	mov	gs:[xorBoundsBottom], ax
 	xchg	ax, dx				;ax = left, dx = bottom
 
 	; check for mouse collision
@@ -660,41 +666,43 @@ endif
 	; set rectangle routine to use
 
 ifdef IS_CLR24
-	mov	cs:[rectRoutine], DRAW_SPECIAL_RECT
-	segmov	cs:[modeRoutine], cs:[drawModeTable][MM_INVERT*2]
+	mov	gs:[rectRoutine], DRAW_SPECIAL_RECT
+	segmov	fs:[modeRoutine], cs:[drawModeTable][MM_INVERT*2]
 else
 ifndef IS_MEGA
 ifdef IS_CASIO
-	mov	cs:[rectRoutine], DRAW_XOR_RECT
+	mov	gs:[rectRoutine], DRAW_XOR_RECT
 else
-BIT <	mov	cs:[rectRoutine], DRAW_NOT_RECT				>
+BIT <	mov	gs:[rectRoutine], DRAW_NOT_RECT				>
 endif
 endif
 endif ; IS_CLR24
 
-EGA <	mov	cs:[rectRoutine], DRAW_SPECIAL_RECT			>
+EGA <	mov	gs:[rectRoutine], DRAW_SPECIAL_RECT			>
 
 	; check for clipping
 
 	tst	ax				; left < 0 ?
 	js	complex
 FRES <	cmp	cx, SCREEN_PIXEL_WIDTH		; right > width ?	>
-MRES <	cmp	cx, cs:[DriverTable].VDI_pageW				>
+MRES <	cmp	cx, fs:[DriverTable].VDI_pageW				>
 	jge	complex
 	tst	bx				; top < 0 ?
 	js	complex
 FRES <	cmp	dx, SCREEN_HEIGHT		; bottom > height ?	>
-MRES <	cmp	dx, cs:[DriverTable].VDI_pageH	; bottom > height ?	>
+MRES <	cmp	dx, fs:[DriverTable].VDI_pageH	; bottom > height ?	>
 	jge	complex
 
-	mov	cs:[DXOR_call], offset DrawSimpleRect
-	mov	cs:[DXOR_trivial], OP_MOV_AX_AX
+	mov	gs:[DXOR_call], offset DrawSimpleRect
+	mov	gs:[DXOR_trivial], OP_MOV_AX_AX
 	jmp	common
 
 complex:
-	mov	cs:[DXOR_call], offset DrawXORComplexRect
-	mov	cs:[DXOR_trivial], \
-		    OP_JMP_SHORT or ((DXOR_checkTrivial-DXOR_trivial-2) shl 8)
+	mov	gs:[DXOR_call], offset DrawXORComplexRect
+	mov	gs:[DXOR_trivial], \
+		    OP_JMP_SHORT or ((DXOR_checkTrivial-DXOR_trivial-3) shl 8)
+	CheckHack <(DXOR_checkTrivial-DXOR_trivial-2) le 127>
+	CheckHack <(DXOR_checkTrivial-DXOR_trivial-2) ge -127>
 
 common:
 
@@ -732,6 +740,12 @@ xorPositionX2	=	DXOR_s3 + 2
 
 DXOR_trivial	label	word
 	jmp	short DXOR_checkTrivial	;selfModified
+
+	; May fall through to here, but skip over the afterTrivial
+	jmp	afterTrivial
+
+DXOR_checkTrivial:
+	jmp	DXOR_checkTrivialB
 
 afterTrivial:
 	push	bp
@@ -791,26 +805,26 @@ ifdef	IS_CASIO
 
 	pop	bx			; restore mode
 	mov	bh, 1			; not set the mode
-	call	cs:[biosFunctions].CF_autoTransMode
+	call	fs:[biosFunctions].CF_autoTransMode
 endif
 
 EGA <	pop	bx							>
 EGA <	mov	dl, bl
-EGA <	mov	dh, cs:[currentColor]					>
+EGA <	mov	dh, fs:[currentColor]					>
 EGA <	call	SetEGAClrMode						>
 
 NIKEC <	pop	bx							>
 NIKEC <	mov	dl, bl							>
-NIKEC <	mov	dh, cs:[currentColor]					>
+NIKEC <	mov	dh, fs:[currentColor]					>
 NIKEC <	call	SetNikeClrMode						>
 
-	pop	cs:[TRC_pointer]
-	pop	cs:[rectRoutine]	; save routine address
-	pop	cs:[driverState]	; restore state flags
-	pop	{word} cs:[maskBuffer+6]
-	pop	{word} cs:[maskBuffer+4]
-	pop	{word} cs:[maskBuffer+2]
-	pop	{word} cs:[maskBuffer]
+	pop	gs:[TRC_pointer]
+	pop	gs:[rectRoutine]	; save routine address
+	pop	fs:[driverState]	; restore state flags
+	pop	{word} fs:[maskBuffer+6]
+	pop	{word} fs:[maskBuffer+4]
+	pop	{word} fs:[maskBuffer+2]
+	pop	{word} fs:[maskBuffer]
 	.leave
 	ret
 
@@ -828,13 +842,13 @@ NIKEC <	call	SetNikeClrMode						>
 	;   this rectangle
 	;
 
-DXOR_checkTrivial:
+DXOR_checkTrivialB:
 FRES <	cmp 	bx, SCREEN_HEIGHT					>
-MRES <	cmp	bx, cs:[DriverTable].VDI_pageH				>
+MRES <	cmp	bx, fs:[DriverTable].VDI_pageH				>
 	jg	done
 
 FRES <	cmp	ax, SCREEN_PIXEL_WIDTH					>
-MRES <	cmp	ax, cs:[DriverTable].VDI_pageW				>
+MRES <	cmp	ax, fs:[DriverTable].VDI_pageW				>
 	jg	rejectLine
 	
 	tst	bp
@@ -894,12 +908,12 @@ DrawXORComplexRect	proc	near
 	; trivial reject ?
 
 FRES <	cmp	si, SCREEN_PIXEL_WIDTH		; left > width ?	>
-MRES <	cmp	si, cs:[DriverTable].VDI_pageW				>
+MRES <	cmp	si, fs:[DriverTable].VDI_pageW				>
 	jge	done
 	tst	di				; right < 0 ?
 	js	done
 FRES <	cmp	bx, SCREEN_HEIGHT		; top > height ?	>
-MRES <	cmp	bx, cs:[DriverTable].VDI_pageH	; top > height ?	>
+MRES <	cmp	bx, fs:[DriverTable].VDI_pageH	; top > height ?	>
 	jge	done
 	tst	bp				; bottom < 0 ?
 	js	done
@@ -914,10 +928,10 @@ MRES <	cmp	bx, cs:[DriverTable].VDI_pageH	; top > height ?	>
 	; clip right
 
 FRES <	cmp	di, SCREEN_PIXEL_WIDTH					>
-MRES <	cmp	di, cs:[DriverTable].VDI_pageW				>
+MRES <	cmp	di, fs:[DriverTable].VDI_pageW				>
 	jl	20$
 FRES <	mov	di, SCREEN_PIXEL_WIDTH-1				>
-MRES <	mov	di, cs:[DriverTable].VDI_pageW				>
+MRES <	mov	di, fs:[DriverTable].VDI_pageW				>
 MRES <	dec	di							>
 20$:
 
@@ -931,10 +945,10 @@ MRES <	dec	di							>
 	; clip bottom
 
 FRES <	cmp	bp, SCREEN_HEIGHT					>
-MRES <	cmp	bp, cs:[DriverTable].VDI_pageH				>
+MRES <	cmp	bp, fs:[DriverTable].VDI_pageH				>
 	jl	40$
 FRES <	mov	bp, SCREEN_HEIGHT-1					>
-MRES <	mov	bp, cs:[DriverTable].VDI_pageH				>
+MRES <	mov	bp, fs:[DriverTable].VDI_pageH				>
 MRES <	dec	bp							>
 40$:
 
@@ -947,3 +961,4 @@ MRES <	dec	bp							>
 done:
 	ret
 DrawXORComplexRect	endp
+

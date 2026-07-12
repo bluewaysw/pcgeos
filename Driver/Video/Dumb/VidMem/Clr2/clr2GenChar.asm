@@ -146,7 +146,7 @@ CLFC_minLSB	equ  (this word) + 2
 	sub	di, 1234h		    ;MODIFIED: minimum LSB for font
 	cmp	ax, di			    ;see if left edge clipped
 	jl	CLF_check		    ;special case: left edge clipped.
-	mov	cs:[PSL_saveRoutine],CHAR_LOW_FAST
+	mov	gs:[PSL_saveRoutine],CHAR_LOW_FAST
 
 CharLowFast	label near
 	;
@@ -193,17 +193,17 @@ CLF_afterKern:
 
 		    			    ;ASSUMES CTE_width.WBF_int.high == 0
 	mov	dx, ax			    ;dx <- x position
-	cmp	cs:fracPosition, 0x80
+	cmp	fs:fracPosition, 0x80
 	jb	CLF_noRound
 	inc	ax
 CLF_noRound:
 	mov	cl, ds:[di].FB_charTable.CTE_width.WBF_frac
-	add	cs:fracPosition, cl	    ;keep frac position up to date.
+	add	fs:fracPosition, cl	    ;keep frac position up to date.
 	adc	dx, ds:[di].FB_charTable.CTE_width.WBF_int
 	;
 	; We also need to round the y position to an integer
 	;
-	cmp	cs:fracYPosition, 0x80
+	cmp	fs:fracYPosition, 0x80
 	jb	CLF_noRoundY
 	inc	bx
 CLF_noRoundY:
@@ -487,17 +487,17 @@ CLC_afterKern:
 	; compute next character x position - first check fractional width flag
 	;
 	mov	dx, ax				;dx <- left edge.
-	cmp	cs:[fracPosition], 128		;
+	cmp	fs:[fracPosition], 128		;
 	jb	CLC_noRound			;
 	inc	ax				;round to nearest pixel.
 CLC_noRound:					;
 	mov	cl, es:[di].FB_charTable.CTE_width.WBF_frac
-	add	cs:[fracPosition], cl		;add in the fractional pos.
+	add	fs:[fracPosition], cl		;add in the fractional pos.
 	adc	dx, es:[di].FB_charTable.CTE_width.WBF_int
 	;
 	; We also need to round the y position to an integer
 	;
-	cmp	cs:fracYPosition, 0x80
+	cmp	fs:fracYPosition, 0x80
 	jb	CLC_noRoundY
 	inc	bx
 CLC_noRoundY:
@@ -593,7 +593,7 @@ CLCh_afterClip:
 	; check for collision with pointer
 	;
 BeforeFastCommon:
-	test	cs:[stateFlags], mask AO_MASK_1
+	test	fs:[stateFlags], mask AO_MASK_1
 	jz	CLCh_realSlow			;
 	mov	di, es				;
 	mov	ds, di				; ds <- font ptr.
@@ -813,10 +813,10 @@ CGS_realSlow:
 	jmp	CharGeneralRealSlow
 
 CharGeneralSlow	label near
-	test	cs:[stateFlags], mask AO_MASK_1
+	test	fs:[stateFlags], mask AO_MASK_1
 	jz	CGS_realSlow
-	mov	cs:[currentWin],ds	;save segment of window.
-	mov	cs:[currentLine],bx	;save current line of character.
+	mov	fs:[currentWin],ds	;save segment of window.
+	mov	fs:[currentLine],bx	;save current line of character.
 					;
 	call	CalcCharVars		;calculate drawing variables
 	shl	bp, 1			; get dither index on word boundaries
@@ -832,8 +832,8 @@ CGS_lineLoop:
 	;
 	; Check for clipping which requires special setup
 	;
-	mov	bx,cs:[currentLine]	; bx <- current character line.
-	inc	cs:[currentLine]	; advance to next one.
+	mov	bx,fs:[currentLine]	; bx <- current character line.
+	inc	fs:[currentLine]	; advance to next one.
 	tst	bx			; check for scan line off screen.
 	LONG js	CGS_afterLine		; skip to next one if it is.
 					;
@@ -867,7 +867,7 @@ CGS_writeLoop:
 	tst	bx 			;test for byte not on screen
 	LONG js	CGS_skipWrite		;skip to next byte if it is.
 
-MEM <	cmp	bx,cs:[bm_bpMask]	;check for off screen left.	>
+MEM <	cmp	bx,fs:[bm_bpMask]	;check for off screen left.	>
 NMEM <	cmp	bx, SCREEN_BYTE_WIDTH					>
 	LONG jge CGS_afterWrite		;skip to next line if it is.
 
@@ -875,7 +875,7 @@ NMEM <	cmp	bx, SCREEN_BYTE_WIDTH					>
 	; of the bitmap...
 
 MEM <	push	ds			; save some regs		>
-MEM <	mov	ds, cs:[bm_segment]	; get window segment		>
+MEM <	mov	ds, fs:[bm_segment]	; get window segment		>
 MEM <	and	al, ds:[size EditableBitmap][bx]  ; mask with region.	>
 MEM <	pop	ds			; restore regs			>
 NMEM <	and	al, ds:[bx][lineMaskBuffer]	;mask with region
@@ -884,7 +884,7 @@ NMEM <	and	al, ds:[bx][lineMaskBuffer]	;mask with region
 	; screen <- (screen & !mask) | (data & mask & pattern)
 
 	push	bp
-	mov	bp, {word} cs:[bp][ditherMatrix] ; bp = color dither for scan
+	mov	bp, {word} fs:[bp][ditherMatrix] ; bp = color dither for scan
 	call	DrawCharByte		; build out nibble-pixels, poss clip
 	pop	bp
 
@@ -908,10 +908,10 @@ CGS_afterLine:
 	pop	ds			;
 	assume	ds:dgroup
 	pop	si			;
-MEM <	tst	cs:[bm_scansNext]	; see if off the end of the bitmap >
+MEM <	tst	fs:[bm_scansNext]	; see if off the end of the bitmap >
 MEM <	js	CGS_end			;  if so, bail			>
 
-	dec	cs:[linesToDraw]	; one less line to draw.
+	dec	fs:[linesToDraw]	; one less line to draw.
 	LONG jnz CGS_lineLoop		; loop to do the next one.
 CGS_end::
 	pop	ax
@@ -977,13 +977,13 @@ CGRS_getDrawMask:
 	push	ax			;
 	mov	ds,cs:[PSL_saveGState]	;
 	mov	ax, {word} ds:[GS_textAttr.CA_mask]
-	mov	{word} cs:[drawMask], ax
+	mov	{word} fs:[drawMask], ax
 	mov	ax, {word} ds:[GS_textAttr.CA_mask+2]
-	mov	{word} cs:[drawMask+2], ax
+	mov	{word} fs:[drawMask+2], ax
 	mov	ax, {word} ds:[GS_textAttr.CA_mask+4]
-	mov	{word} cs:[drawMask+4], ax
+	mov	{word} fs:[drawMask+4], ax
 	mov	ax, {word} ds:[GS_textAttr.CA_mask+6]
-	mov	{word} cs:[drawMask+6], ax
+	mov	{word} fs:[drawMask+6], ax
 	pop	ax			;
 	pop	ds			;
 	jmp	short CGRS_afterMask	;
@@ -991,14 +991,14 @@ CGRS_getDrawMask:
 
 
 CharGeneralRealSlow	label  near
-	mov	cs:[currentWin],ds	;save segment of window.
-	mov	cs:[currentLine],bx	;save current line of character.
+	mov	fs:[currentWin],ds	;save segment of window.
+	mov	fs:[currentLine],bx	;save current line of character.
 	jmp	short CGRS_getDrawMask	;
 CGRS_afterMask:
 	call	CalcCharVars		;calculate drawing variables
 	shl	bx, 1			; build index into ditherMatrix
 	and	bx, 6
-	mov	cs:CGRS_ditherIndex, bx	; save for later
+	mov	gs:CGRS_ditherIndex, bx	; save for later
 
 CGRS_lineLoop:				;
 	call	SlowReadLine		; read data into lineDataBuffer
@@ -1007,15 +1007,15 @@ CGRS_lineLoop:				;
 	;
 	; Check for clipping which requires special setup
 	;
-	mov	bx,cs:[currentLine]	; bx <- current character line.
-	inc	cs:[currentLine]	; advance to next one.
+	mov	bx,fs:[currentLine]	; bx <- current character line.
+	inc	fs:[currentLine]	; advance to next one.
 	tst	bx			; check for scan line off screen.
 	LONG js	CGRS_afterLine		; skip to next one if it is.
 	push	di	
 	mov	cx, bx			; save it
 	and	bx, 7
-	mov	bl, cs:[bx][drawMask]
-	mov	cs:[CGRS_mask], bl
+	mov	bl, fs:[bx][drawMask]
+	mov	gs:[CGRS_mask], bl
 	mov	bx, cx			; restore it
 	call	SlowGenClip		; make sure clip info is correct
 	LONG jc	CGRS_afterWrite		;
@@ -1044,7 +1044,7 @@ CGRS_writeLoop:
 	;
 	tst	bx			;test for byte not on screen
 	LONG js	CGRS_skipWrite		;skip to next byte if it is.
-MEM <	cmp	bx,cs:[bm_bpMask]	;check for off screen left.	>
+MEM <	cmp	bx,fs:[bm_bpMask]	;check for off screen left.	>
 NMEM <	cmp	bx, SCREEN_BYTE_WIDTH					>
 	LONG jge CGRS_afterWrite	;skip to next line if it is.
 
@@ -1052,7 +1052,7 @@ NMEM <	cmp	bx, SCREEN_BYTE_WIDTH					>
 	; of the bitmap...
 
 MEM <	push	ds			; save some regs		>
-MEM <	mov	ds, cs:[bm_segment]	; get window segment		>
+MEM <	mov	ds, fs:[bm_segment]	; get window segment		>
 MEM <	and	al, ds:[size EditableBitmap][bx]  ; mask with region.	>
 MEM <	pop	ds			; restore regs			>
 NMEM <	and	al, ds:[bx][lineMaskBuffer]	;mask with region
@@ -1066,7 +1066,7 @@ CGRS_mask equ (this byte) + 1
 	push	bp
 CGRS_ditherIndex equ (this word) + 1				
 	mov	bp, 1234h						
-	mov	bp, {word} cs:[bp][ditherMatrix] ; bp = color dither for scan
+	mov	bp, {word} fs:[bp][ditherMatrix] ; bp = color dither for scan
 	call	DrawCharByte		; build out nibble-pixels, poss clip
 	pop	bp
 
@@ -1087,16 +1087,16 @@ CGRS_afterWrite:
 	mov	si, cs:[CGRS_ditherIndex]	
 	add	si, 2				; bump to next scan of dither
 	and	si, 6				; bound to ditherMatrix
-	mov	cs:[CGRS_ditherIndex], si	
+	mov	gs:[CGRS_ditherIndex], si	
 
 CGRS_afterLine:
 	pop	ds			;
 	assume	ds:dgroup
 	pop	si			;
-MEM <	tst	cs:[bm_scansNext]	; see if off the end of the bitmap >
+MEM <	tst	fs:[bm_scansNext]	; see if off the end of the bitmap >
 MEM <	js	CGRS_end		;  if so, bail			>
 
-	dec	cs:[linesToDraw]	;one less line to draw.
+	dec	fs:[linesToDraw]	;one less line to draw.
 	LONG jnz CGRS_lineLoop		;else loop to do the next 
 CGRS_end::
 	pop	ax
@@ -1161,9 +1161,9 @@ CGF_lineLoop:
 	; Init for each line.
 	;
 	push	di		
-	mov	cl, cs:[shiftCount]	; cl <- amount to shift italic.
-	mov	ch, cs:[bytesToDraw]	; ch <- bytes on each line.
-	mov	bl, cs:[linesToDraw]	; bl <- #scan lines high the char is
+	mov	cl, fs:[shiftCount]	; cl <- amount to shift italic.
+	mov	ch, fs:[bytesToDraw]	; ch <- bytes on each line.
+	mov	bl, fs:[linesToDraw]	; bl <- #scan lines high the char is
 	clr	dl			; clear overflow bits
 	;
 	; Loop for each byte -- load byte
@@ -1179,7 +1179,7 @@ CGF_writeLoop:
 	; screen <- (screen & !mask) | (data & mask & pattern)
 
 	push	bp			; save carry status (in ah from lahf)
-	mov	bp, {word} cs:[bp][ditherMatrix] ; bp = color dither for scan
+	mov	bp, {word} fs:[bp][ditherMatrix] ; bp = color dither for scan
 	call	DrawCharByte		; build out nibble-pixels
 	pop	bp
 
@@ -1188,7 +1188,7 @@ CGF_writeLoop:
 
 	pop	di	
 	NextScan di	
-MEM <	tst	cs:[bm_scansNext]	; see if off the end of the bitmap >
+MEM <	tst	fs:[bm_scansNext]	; see if off the end of the bitmap >
 MEM <	js	CGF_end			;  if so, bail			>
 
 	; for vidmem, we need to bump the pointers for the clustered dither
@@ -1253,9 +1253,9 @@ CharLarge label near
 					;
 	shr	ah,1			;
 	inc	ah			;ah = bytes to draw
-	mov	cs:[bytesToDraw],ah	;save.
+	mov	fs:[bytesToDraw],ah	;save.
 	sub	ah,al			;
-	mov	cs:[extraBytesToDraw],ah
+	mov	fs:[extraBytesToDraw],ah
 					;
 	mov	bp, bx			; bp will hold ditherIndex
 	shl	bp, 1			; dither scans are 2 bytes 
@@ -1263,7 +1263,7 @@ CharLarge label near
 
 CL_lineLoop:
 	push	di	
-	mov	bx, {word} cs:[bytesToDraw] ; bl = bytes to draw, bh = extra
+	mov	bx, {word} fs:[bytesToDraw] ; bl = bytes to draw, bh = extra
 	clr	dl			; start with zero overflow
 
 CL_loop:
@@ -1281,7 +1281,7 @@ CL_extra:
 	; screen <- (screen & !mask) | (data & mask & pattern)
 
 	push	bp
-	mov	bp, {word} cs:[bp][ditherMatrix] ; bp = color dither for scan
+	mov	bp, {word} fs:[bp][ditherMatrix] ; bp = color dither for scan
 	call	DrawCharByte		; build out nibble-pixels
 	pop	bp
 
@@ -1291,7 +1291,7 @@ CL_extra:
 
 	pop	di
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; see if off the end of the bitmap >
+MEM <	tst	fs:[bm_scansNext]	; see if off the end of the bitmap >
 MEM <	js	CL_end			;  if so, bail			>
 
 	; for vidmem, we need to bump the pointers for the clustered dither
@@ -1359,7 +1359,7 @@ REVISION HISTORY:
 CalcCharVars	proc	near
 	mov	bp, ax				; save x position
 	sar	ax, 3				; (arithmetic shift)
-	mov	cs:[charByteOffset],ax		; save offset for line.
+	mov	fs:[charByteOffset],ax		; save offset for line.
 	;
 	; cx = right byte offset
 	;
@@ -1376,10 +1376,10 @@ CalcCharVars	proc	near
 	clr	bp				; just wait for it when ready
 offsetOK:
 	and	al, 7				; we need to align this with 
-	mov	cs:[shiftCount], al		;  the screen
+	mov	fs:[shiftCount], al		;  the screen
 	sub	dx, bx				;
 	inc	dx				;
-	mov	cs:[linesToDraw], dl		;
+	mov	fs:[linesToDraw], dl		;
 	;
 	; set up screen offset
 	;
@@ -1403,13 +1403,13 @@ CCV_notAboveScreen:
 	; calculate number of bytes to draw to
 	;
 	inc	cx				; cx = # of bytes to draw
-	mov	cs:[bytesToDraw], cl		;
+	mov	fs:[bytesToDraw], cl		;
 	mov	ah, cl				; ah = bytes to draw
 	lodsb					; al = picture width (bits)
 	add	al, 7				; round up to full byte
 	shr	al, 3				;
 	sub	ah, al				; ah = extra bytes
-	mov	cs:[extraBytesToDraw], ah	;
+	mov	fs:[extraBytesToDraw], ah	;
 	add	si, CD_data-1			; ds:si = data
 	ret
 CalcCharVars	endp

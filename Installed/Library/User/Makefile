@@ -33,7 +33,7 @@ PROC            = procClass.asm procManager.asm procUndo.asm procUtils.asm\
                   procConstant.def procMacro.def procVariable.def
 TOKEN           = token.asm tokenC.asm tokenManager.asm tokenConstant.def\
                   tokenMacro.def tokenVariable.def
-UI              = uiDispCtrl.asm uiEMOM.asm uiEMTrigger.asm uiEdit.asm\
+UI              = uiDispCtrl.asm uiEdit.asm uiEMOM.asm uiEMTrigger.asm\
                   uiManager.asm uiPage.asm uiTool.asm uiView.asm\
                   uiExpress.asm uiEMCInteraction.def toyMain.ui\
                   uiDispCtrl.ui uiEdit.ui uiExpress.ui uiManager.ui\
@@ -63,6 +63,8 @@ LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ui
 
+PRODUCTS        = GEOS32 
+
 SYSMAKEFILE     = geode.mk
 
 #include <geos.mk>
@@ -76,4 +78,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(GEOS32/$(DEPFILE))
+#include "GEOS32/$(DEPFILE)"
 #endif

@@ -240,8 +240,8 @@ EC <	ERROR_NZ HANDLE_NOT_FOUND_IN_LIST_OF_MALLOC_BLOCKS		>
 EC <nullError:							>
 EC <	ERROR	FREE_CALLED_BEFORE_MALLOC			>
 RemoveHandleFromMallocList	endp
-
-if ERROR_CHECK
+
+if ERROR_CHECK
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ECCountFreeBlocksOnMallocList
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -557,14 +557,26 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 global _TT_Free:far
 _TT_Free	proc	far	p:fptr
-	uses	es, ds, di, si
+	uses	di, si
 	.enter
 
-;	Bail if the pointer argument itself is NULL.
-	tst	p.high
-	jz	exit
+	mov	ax, es
+	mov	bx, ds
+	tst	p.high				;no pointer passed
+	jz	noPtr				;nothing to do
+	les	si, p
+	cmp	ax, es:[si].high
+	jne	checkNext
+	clr	ax
+checkNext:
+	cmp	bx, es:[si].high
+	jne	noPtr
+	clr	bx
+noPtr:
+	push	ax, bx
 
-;	Dereference p: ES:SI = *p
+	tst	p.high				;no pointer passed
+	jz	exit				;nothing to do
 	les	si, p
 	tst	es:[si].high		; Is *p already NULL?
 	jz	exitZero		; Yes: nothing to do
@@ -616,6 +628,8 @@ exitZero:
 
 exit:
 	xor	ax, ax			; TT_Err_Ok  (1 cycle vs 2 for mov ax,0)
+
+	pop	es, ds
 	.leave
 	ret
 _TT_Free	endp

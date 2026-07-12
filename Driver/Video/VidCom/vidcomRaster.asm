@@ -323,7 +323,7 @@ BQ_up:
 		dec	bx			;  of block
 		add	dx, bp			; same for destination
 		dec	dx
-		mov	cs:[BQ_storejmp], offset BQU_loop - offset BQ_loopjmp 
+		mov	gs:[BQ_storejmp], offset BQU_loop - offset BQ_loopjmp 
 		jmp	BQ_calc
 
 ;------------------------------------------------------------------------
@@ -338,7 +338,7 @@ BltQuick	proc	near
 		mov	dx, ss:[d_y2]		; restore dest start
 		cmp	bx, dx			; see if going up or down
 		jl	BQ_up			;  up, handle as special caase
-		mov	cs:[BQ_storejmp], offset BQ_loop - offset BQ_loopjmp 
+		mov	gs:[BQ_storejmp], offset BQ_loop - offset BQ_loopjmp 
 BQ_calc		label	near
 		mov	bp, dx			; save dest scan line 
 		mov	cx, bx			; save source scan line too
@@ -368,11 +368,11 @@ MEM <		CalcScanLine	dx,di,es	; es:di - start of dest scan >
 endif
 		; figure out if we'll need to copy right->left or left->right
 
-		mov	cs:[BQ_jmpComplex], offset BQ_notSimple - offset BQ_simple
+		mov	gs:[BQ_jmpComplex], offset BQ_notSimple - offset BQ_simple
 		mov	dx, ss:[d_x1]		; get destination position
 		cmp	dx, ss:[d_x1src]	; going left or right ?
 		LONG jl	BQ_setClip		;  right, jump set right
-		mov	cs:[BQ_jmpComplex], offset BQ_notSimpleR - offset BQ_simple
+		mov	gs:[BQ_jmpComplex], offset BQ_notSimpleR - offset BQ_simple
 		jmp	BQ_setClip
 BQ_loop:
 		inc	bp			; bump scan line #
@@ -785,7 +785,8 @@ NMEM <VidEnds		GetBits	>
 MEM  <VidEnds		Misc	>
 
 
-VidSegment	Bitmap
+;;VidSegment	Bitmap
+VidSegment	Code
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -894,7 +895,7 @@ NIKEC <		call	SetNikeClrModeFar				>
 		rep	movsb			; copy the structure
 		mov	dx, bm.PBA_size
 		mov	ss:[d_bytes], dx	; and save it for later
-		mov	cs:[PBS_bumpSrc], dx	; and save it here too
+		mov	gs:[PBS_bumpSrc], dx	; and save it here too
 		mov	cx, bm.PBA_bm.B_width
 		mov	dx, bm.PBA_bm.B_height
 		pop	es
@@ -975,7 +976,7 @@ BIT <		mov	bl, ss:[currentDrawMode]			>
 BIT <		clr	bh						>
 BIT <		shl	bx, 1			; set to index into tab	>
 BIT <		mov	ax, cs:ByteModeRout[bx]				>
-BIT <		mov	ss:[modeRoutine], ax 				>
+BIT <		mov	fs:[modeRoutine], ax 				>
 ifdef IS_MONO
 BIT <		mov	ax, cs:ByteMixRout[bx]				>
 BIT <		mov	ss:[mixRoutine], ax				>
@@ -1002,7 +1003,7 @@ haveMaskSize:
 
 		; if there is a palette, store the address
 		
-		mov	ss:[bmPalette].segment, ss		; init no pal
+		mov	ss:[bmPalette].segment, gs		; init no pal
 ifndef IS_CMYK
 ifndef IS_CLR24
 		mov	ss:[bmPalette].offset, offset defBitmapPalette
@@ -1055,8 +1056,8 @@ else
 		mov	ax, cs:[putbitsTable][bx] ; get routine offset
 endif
 
-		sub	ax, offset cs:bitmapRelocLabel
-		mov	cs:[bitmapRoutine], ax	; re-use rect jump variable
+		sub	ax, offset gs:bitmapRelocLabel
+		mov	gs:[bitmapRoutine], ax	; re-use rect jump variable
 
 		; for CMYK vidmem, if we're drawing a color bitmap, lock down
 		; a few resources for the duration.
@@ -1130,7 +1131,7 @@ PASS:		ss:bp	- inherits PutBitsArgs structure
 		d_bytes	- # bytes/plane/scan line in bitmap data
 		d_color	- color to draw b/w bitmaps on color device
 
-		cs:Routine - address of routine to transfer a scan line
+		gs:Routine - address of routine to transfer a scan line
 
 RETURN:		nothing
 
@@ -1156,7 +1157,7 @@ REVISION HISTORY:
 		; if we're drawing up, modify some self-mods we did earlier
 drawingUp	label	near
 		neg	ss:[d_dy]
-		mov	cs:[loopModification], offset upLoop - offset afterLoop
+		mov	gs:[loopModification], offset upLoop - offset afterLoop
 		tst	ss:[d_y1]		; negative starting position ?
 		jns	checkUnderWindow
 		jmp	afterLoop		; yes, done
@@ -1183,7 +1184,7 @@ negStartLine	label	near
 bumpSrcCommon	label	near
 		sub	ss:[d_dy], ax		; fewer lines to do
 		LONG js	afterLoop		; can't do negative #lines
-		mov	dx, cs:[PBS_bumpSrc]	; #bytes/scan line
+		mov	dx, gs:[PBS_bumpSrc]	; #bytes/scan line
 		mul	dx			; calc # to bump si
 		add	si, ax			; bump bitmap data ptr
 		jmp	calcScanLine		; now do the drawing
@@ -1207,7 +1208,7 @@ bm		local	PutBitsArgs
 havePointer:
 		tst	ss:[d_dy]		; are we drawing up ?
 		js	drawingUp		;  no, continue
-		mov	cs:[loopModification],offset downLoop-offset afterLoop 
+		mov	gs:[loopModification],offset downLoop-offset afterLoop 
 		tst	ss:[d_y1]		; negative starting position ?
 		js	negStartLine
 
@@ -1378,9 +1379,9 @@ PBS_setClip:
 
 		; special case: not simple region
 PBS_notSimple:
-		mov	cx, cs:[bitmapRoutine]	; re-store it where we want it
-		add	cx, offset cs:bitmapRelocLabel-offset cs:bitmapReloc2
-		mov	cs:[clippedBitmapRoutine], cx
+		mov	cx, gs:[bitmapRoutine]	; re-store it where we want it
+		add	cx, offset gs:bitmapRelocLabel-offset gs:bitmapReloc2
+		mov	gs:[clippedBitmapRoutine], cx
 		mov	cx, si
 		mov	si, ds:W_maskReg
 		mov	si, ds:[si]
@@ -1578,4 +1579,6 @@ PutScanFront	proc	far
 		ret
 PutScanFront	endp
 
-VidEnds	Bitmap
+;;VidEnds	Bitmap
+VidEnds		Code
+

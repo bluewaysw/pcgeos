@@ -1207,7 +1207,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 SwapUsedFree	proc	near
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 EC <	call	CheckBX_SIAdjacent					>
 endif
 EC <	call	AssertHeapMine						>
@@ -1780,7 +1780,7 @@ REVISION HISTORY:
 
 -------------------------------------------------------------------------------@
 CombineBlocks	proc	near
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 EC <	call	CheckBX_SIAdjacent					>
 endif
 EC <	call	AssertHeapMine						>
@@ -2806,7 +2806,7 @@ EC <	ERROR_B	CORRUPTED_HEAP			;new block can't be bigger>
 CNN_LMemBlockContract label near		; needed for "showcalls -l"
 	ForceRef	CNN_LMemBlockContract
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;clr	dx
 	mov	ch, mask HAF_NO_ERR
 	call	DoReAlloc2			;make block new size.
@@ -2857,7 +2857,7 @@ done:
 	ret
 ContractNoNotify endp
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 
 include gpmi.def
 
@@ -3172,7 +3172,7 @@ GPMIGetInfoFar	proc far
                 pop     es
                 ret
 GPMIGetInfoFar	endp
-endif	; PRODUCT_GEOS32
+endif	; PROTECTED_MODE
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

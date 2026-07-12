@@ -700,11 +700,11 @@ FBS_skipPreload:
 	jnz	FBS_left		; more than one, don't combine masks
 	mov	ah, bl			; only one, combine masks
 	and	ah, bh
-	mov	cs:[FBS_rMask], ah	; store SELF MODIFIED and-immediate
+	mov	gs:[FBS_rMask], ah	; store SELF MODIFIED and-immediate
 	mov	bl, ch			; get initial shift out bits
 	jmp	short FBS_right
 FBS_left:
-	mov	cs:[FBS_rMask], bl	; store SELF MODIFIED and-immediates
+	mov	gs:[FBS_rMask], bl	; store SELF MODIFIED and-immediates
 	mov	bl, ch			; init shift out bits
 	clr	ah			; clear for future rotate
 	lodsb				; get next byte of bitmap
@@ -888,12 +888,12 @@ PBS_skipPreload:
 	jnz	PBS_left		;  more than one, don't combine masks
 	mov	ah, bl			;  only one, combine masks
 	and	ah, bh
-	mov	cs:[PBS_rMask], ah	; store SELF MODIFIED and-immediate
+	mov	gs:[PBS_rMask], ah	; store SELF MODIFIED and-immediate
 	mov	bl, ch			; get initial shift out bits
 	jmp	short	PBS_right
 PBS_left:
 	and	bl, ss:lineMask		; apply draw mask to right side mask
-	mov	cs:[PBS_rMask], bl	; store SELF MODIFIED and-immediates
+	mov	gs:[PBS_rMask], bl	; store SELF MODIFIED and-immediates
 	mov	bl, ch			; init shift out bits
 	clr	ah			; clear for future rotate
 	lodsb				; get next byte of bitmap
@@ -978,10 +978,10 @@ PutBWScanMask	proc	near
 	mov	ax, ss:[bmMaskSize]	; get mask size, store it in code
 	inc	ax			; one more, already did lodsb
 	neg	ax			; mask is stored first
-	mov	cs:[PBSM_mask1], ax	; store offset to mask
-	mov	cs:[PBSM_mask2], ax	; store offset to mask
-	mov	cs:[PBSM_mask3], ax	; store offset to mask
-	mov	cs:[PBSM_preM], ax	; preload mask as well
+	mov	gs:[PBSM_mask1], ax	; store offset to mask
+	mov	gs:[PBSM_mask2], ax	; store offset to mask
+	mov	gs:[PBSM_mask3], ax	; store offset to mask
+	mov	gs:[PBSM_preM], ax	; preload mask as well
 	mov	ax, ss:[bmRight]
 
 	; calculate # bytes to fill in
@@ -1021,12 +1021,12 @@ PBSM_skipPreload:
 	jne	PBSM_left		;  more than one, don't combine masks
 	xchg	ah, bl			;  only one, combine masks
 	and	ah, bh
-	mov	cs:[PBSM_rMask], ah	; store SELF MODIFIED and-immediate
+	mov	gs:[PBSM_rMask], ah	; store SELF MODIFIED and-immediate
 	xchg	bl, ch			; bl = initial overflow data, ch=mask
 	jmp	PBSM_right
 PBSM_left:
 	and	bl, ss:lineMask		; apply draw mask to right side mask
-	mov	cs:[PBSM_rMask], bl	; store SELF MODIFIED and-immediates
+	mov	gs:[PBSM_rMask], bl	; store SELF MODIFIED and-immediates
 	mov	bl, ch			; init shift out bits
 	mov	ch, ah			; ch = extra mask bits
 	clr	ah			; clear for future rotate
@@ -2312,7 +2312,7 @@ INV_CLR2 < not	al			>
 ByteAND	label	near		; screen^((data^mask^pattern)v~(data^mask))
 INV_CLR2 < not	al			>
 	not	ah		
-	mov	cs:[BMR_saveMask], ah
+	mov	gs:[BMR_saveMask], ah
 	not	ah
 	and	ah, dl
 	or	ah, cs:[BMR_saveMask]

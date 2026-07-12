@@ -803,7 +803,7 @@ gotFlags:
 	; Should also construct the full path if we were passed a NULL
 	; path, or a path that only contains a backslash.
 	;
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	push	ax
 	mov	ax, ds			; test segment = NULL
 	tst	ax

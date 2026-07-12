@@ -928,12 +928,15 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 CtrlSameOrientationAsParent	proc	far
+	mov	al, ds:[di].VCI_geoAttrs
 	push	si
 	call	VisSwapLockParent
+	jnc	done		; if no parent leave unchanged
 	call	CtrlBuild_DerefVisSpecDI
 	mov	al, ds:[di].VCI_geoAttrs
 	and	al, mask VCGA_ORIENT_CHILDREN_VERTICALLY
 	call	ObjSwapUnlock
+done:
 	pop	si
 	call	CtrlBuild_DerefVisSpecDI
 	and	ds:[di].VCI_geoAttrs, not mask VCGA_ORIENT_CHILDREN_VERTICALLY

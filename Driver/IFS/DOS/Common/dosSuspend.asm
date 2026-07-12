@@ -86,7 +86,13 @@ if _MS
 		mov	di, offset sftStart - offset SFTBH_next
 		clr	dx		; none free so far
 blockLoop:
-		lds	di, ds:[di].SFTBH_next
+		push	ax, cx
+		mov	ax, ds:[di].SFTBH_next.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	di, ds:[di].SFTBH_next.offset
+		mov	ds, ax
+		pop	ax, cx
 		cmp	di, NIL
 		je	blockLoopDone
 		mov	cx, ds:[di].SFTBH_numEntries

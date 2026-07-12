@@ -70,7 +70,7 @@ defaultPrompt   chunk.char      '$n$g', 0
 ;
 ; Default product name, in the absence of a .ini file preferences.
 ; 
-LocalDefString defaultProduct	<'Ensemble',0>
+LocalDefString defaultProduct	<'NewDeal',0>
 
 ;
 ;       Resident strings (null-terminated for NTSSizeWithProductName and

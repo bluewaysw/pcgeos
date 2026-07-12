@@ -149,7 +149,7 @@ BIT <		mov	bl, ss:[currentDrawMode]			>
 BIT <		clr	bh						>
 BIT <		shl	bx, 1			; set to index into tab	>
 BIT <		mov	ax, cs:PLByteModeRout[bx]			>
-BIT <		mov	ss:[modeRoutine], ax 				>
+BIT <		mov	fs:[modeRoutine], ax 				>
 ifdef	IS_MONO
 BIT <		mov	ax, cs:PLByteMixRout[bx]			>
 BIT <		mov	ss:[mixRoutine], ax				>

@@ -45,7 +45,6 @@ VD_VESA_1280x768_16             enum    VideoDevice
 VD_VESA_1280x800_16             enum    VideoDevice
 VD_VESA_1280x854_16             enum    VideoDevice
 VD_VESA_1280x960_16             enum    VideoDevice
-
 VD_VESA_1280x1K_16              enum    VideoDevice
 
 VD_VESA_1360_768_16              enum    VideoDevice
@@ -74,7 +73,7 @@ endif
 DriverExtendedInfoTable <
 		{},			; lmem header added by Esp
 			VideoDevice/2,                  ; DEIT_numDevices
-			offset VGA16StringTable,        ; DEIT_nameTable
+                        offset VGA16StringTable,        ; DEIT_nameTable
 			0                               ; DEIT_infoTable
 			>
 
@@ -146,7 +145,6 @@ LocalDefString VGA1280_768String <"VESA Compatible SuperVGA: 1280x768 64K-color"
 LocalDefString VGA1280_800String <"VESA Compatible SuperVGA: 1280x800 64K-color",0>
 LocalDefString VGA1280_854String <"VESA Compatible SuperVGA: 1280x854 64K-color",0>
 LocalDefString VGA1280_960String <"VESA Compatible SuperVGA: 1280x960 64K-color",0>
-
 LocalDefString HVGAString <"VESA Compatible SuperVGA: 1280x1024 64K-color",0>
 
 LocalDefString VGA1360_768String <"VESA Compatible SuperVGA: 1360x768 64K-color",0>

@@ -356,7 +356,7 @@ EC <		ERROR_E	GASP_CHOKE_WHEEZE				>
 	; 
 		push	ds
 		push	ax
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		segmov	ds, IRQCode, ax
 		assume	ds:IRQCode
 else
@@ -368,7 +368,7 @@ endif
 		mov	ss:TPD_callVector.segment, ax
 		pop	ax
 		pop	ds
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		assume	ds:dgroup
 endif
 	;

@@ -50,13 +50,13 @@ vidStackBot     label   byte
 endVidStack     label   byte
 MonoStack        ends
 
-monogroup       group   monodata, Mono, MonoStack
+monogroup       group   monodata, MonoStack
 
-assume  ss:monogroup, ds:nothing, es:nothing
+assume  ss:monogroup, ds:nothing, es:nothing, fs:monogroup
 
 ;---------------------------------------------------------------------
 ;		Constants and Macros
-;---------------------------------------------------------------------
+;-----------------------Clr24/clr24Manager.asm----------------------------------------------
 
 include vidmemConstant.def
 include monoConstant.def
@@ -93,8 +93,11 @@ monodata	ends
 ;			Main module Code
 ;------------------------------------------------------------------------------
 
+assume	gs:Mono
+
 Mono segment 	resource
 
+include dumbcomPalette.asm	; very small palette
 include	vidcomOutput.asm	; common output routines
 include	vidcomChars.asm		; common character output routines
 include	monoGenChar.asm		; routine for larger chars
@@ -106,7 +109,6 @@ include vidcomPalette.asm		; support for VidGetPixel
 include	dumbcomOutput.asm	; output routines
 include dumbcomUtils.asm	; misc utility routines
 include	dumbcomChars.asm	; character drawing routines
-include dumbcomPalette.asm	; very small palette
 include	monoEscTab.asm		; escape routine jump table
 include	monoEntry.asm		; entry point for Mono module
 include monoCluster.asm		; for cluster mode dithering

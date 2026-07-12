@@ -313,8 +313,8 @@ endif	; IDLE_UPDATE_ASYNC_VM
 	jnz	releaseHeader
 
 	mov	es:[di].VMBH_memHandle, 0	; Note no handle for block
-	mov	ax, offset FreeHandle		; Still need to free the handle
-	CheckHack	<segment FreeHandle eq @CurSeg>
+	mov	ax, offset DoFree		; Still need to free the handle
+	CheckHack	<segment DoFree eq @CurSeg>
 
 releaseHeader:
 	;

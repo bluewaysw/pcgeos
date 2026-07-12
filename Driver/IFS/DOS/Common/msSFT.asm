@@ -71,7 +71,13 @@ blockLoop:
 		; Reduce ax by number in this block and advance to next.
 		;
 		sub	ax, es:[di].SFTBH_numEntries
-		les	di, es:[di].SFTBH_next
+		push	ax, cx
+		mov	ax, es:[di].SFTBH_next.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	di, es:[di].SFTBH_next.offset
+		mov	es, ax
+		pop	ax, cx
 		cmp	di, NIL
 		stc
 		jz	done
@@ -294,7 +300,16 @@ endif
 	; block.
 	;
 		pop	di
-		les	di, es:[di].SFTBH_next
+		pushf
+		push	ax, cx
+;;		les	di, es:[di].SFTBH_next
+		mov	ax, es:[di].SFTBH_next.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	di, es:[di].SFTBH_next.offset
+		mov	es, ax
+		pop	ax, cx
+		popf
 		jne	nextBlock	; If didn't stop b/c of an unused slot,
 					;  check the next block
 		stc			; Signal error -- DO NOT TRY TO EXTEND

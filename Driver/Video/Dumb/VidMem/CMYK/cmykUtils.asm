@@ -96,7 +96,7 @@ magentaYellow	local	word
 
 		push	dx
 		mov	ax, es:[W_ditherY]		; only need it in y
-		mov	cs:[bigDitherRotY], ax		; save for later
+		mov	fs:[bigDitherRotY], ax		; save for later
 		cwd					; dxax = dividend
 		mov	bx, BLACK_DITHER_HEIGHT 		; bx = divisor
 		idiv	bx
@@ -106,7 +106,7 @@ magentaYellow	local	word
 haveBlackRem:
 		mov	ah, dl				; dl = remainder
 		mov	al, es:[W_pattPos].low 
-		mov	{word} cs:[ditherRotX], ax	; save window rotation
+		mov	{word} fs:[ditherRotX], ax	; save window rotation
 		mov	ax, es:[W_ditherY]		; only need it in y
 		cwd					; dxax = dividend
 		mov	bx, CMYK_DITHER_HEIGHT 		; bx = divisor
@@ -117,7 +117,7 @@ haveBlackRem:
 haveCyanRem:
 		mov	ah, dl				; dl = remainder
 		mov	al, es:[W_pattPos].low 
-		mov	{word} cs:[ditherCyanRotX], ax	; save window rotation
+		mov	{word} fs:[ditherCyanRotX], ax	; save window rotation
 
 		pop	dx
 		mov	cl, ds:[si].CA_colorRGB.RGB_red
@@ -127,17 +127,17 @@ haveCyanRem:
 		; check to see if we really need to re-create it.  If the color
 		; is the same, and the shift amount is the same, then we're OK.
 
-		cmp	cl, cs:[ditherColor].RGB_red
+		cmp	cl, fs:[ditherColor].RGB_red
 		jne	setNewDither
-		cmp	ch, cs:[ditherColor].RGB_green
+		cmp	ch, fs:[ditherColor].RGB_green
 		jne	setNewDither
-		cmp	ah, cs:[ditherColor].RGB_blue
+		cmp	ah, fs:[ditherColor].RGB_blue
 		jne	setNewDither
 
 		; OK, the color matches the one stored.  Unfortunately, if
 		; it's black, then the dither matrix might not be set up
 		; because black is 0,0,0 and that is the initial value of
-		; the RGB value stored in cs:[ditherColor].
+		; the RGB value stored in fs:[ditherColor].
 
 		tst	ah
 		jnz	nearDone
@@ -147,14 +147,14 @@ nearDone:
 
 		; see if black dither matrix is initialized
 checkBlackDither:
-		tst	cs:[blackDither]	; check for non-zero
+		tst	fs:[blackDither]	; check for non-zero
 		jnz	nearDone
 
 		; first store the values, then do some conversions
 setNewDither:
-		mov	cs:[ditherColor].RGB_red, cl
-		mov	cs:[ditherColor].RGB_green, ch
-		mov	cs:[ditherColor].RGB_blue, ah
+		mov	fs:[ditherColor].RGB_red, cl
+		mov	fs:[ditherColor].RGB_green, ch
+		mov	fs:[ditherColor].RGB_blue, ah
 
 		; There may be some color correction table stored in the
 		; printer driver.  If so, fetch it and do the correction.
@@ -162,13 +162,13 @@ setNewDither:
 		; specially to avoid the pain of interpolation.
 
 		
-		tst	cs:colorTransfer		; if table non-zero...
+		tst	fs:colorTransfer		; if table non-zero...
 		jz	convertToCMYK
 
 		; don't color correct black, except if we are on a CMY printer
 		; (no black ribbon).
 
-		mov	al, cs:[bm_cacheType] 
+		mov	al, fs:[bm_cacheType] 
 		and	al, mask BMT_FORMAT
 		cmp	al, BMF_3CMY			; do UC removal ?
 		LONG je	doColorTransfer
@@ -185,7 +185,7 @@ convertToCMYK:
 		sub	al, cl
 		sub	bl, ch
 		sub	bh, ah
-		mov	ah, cs:[bm_cacheType] 
+		mov	ah, fs:[bm_cacheType] 
 		and	ah, mask BMT_FORMAT
 		cmp	ah, BMF_3CMY			; do UC removal ?
 		mov	ah, 0				; don't use CLR
@@ -215,7 +215,7 @@ haveK:
 
 assume	ds:CMYKDither
 
-		mov	dx, cs:[resetColor]		; xor with this
+		mov	dx, fs:[resetColor]		; xor with this
 		clr	bh
 		mov	bl, cyanBlack.low		; get cyan value
 		mov	cl, 3
@@ -251,16 +251,16 @@ assume	ds:CMYKDither
 		mov	bx, ds:[ditherYellow][bx]	; get offset to dither
 		mov	ax, ds:[bx]
 		xor	ax, dx
-		mov	cs:[ditherMatrix], al
-		mov	cs:[ditherMatrix+1], al
-		mov	cs:[ditherMatrix+2], ah
-		mov	cs:[ditherMatrix+3], ah
+		mov	fs:[ditherMatrix], al
+		mov	fs:[ditherMatrix+1], al
+		mov	fs:[ditherMatrix+2], ah
+		mov	fs:[ditherMatrix+3], ah
 		mov	ax, ds:[bx+2]			; only four bytes
 		xor	ax, dx
-		mov	cs:[ditherMatrix+4], al
-		mov	cs:[ditherMatrix+5], al
-		mov	cs:[ditherMatrix+6], ah
-		mov	cs:[ditherMatrix+7], ah
+		mov	fs:[ditherMatrix+4], al
+		mov	fs:[ditherMatrix+5], al
+		mov	fs:[ditherMatrix+6], ah
+		mov	fs:[ditherMatrix+7], ah
 ; setBlack:
 		clr	bh
 		mov	bl, cyanBlack.high		; get black value
@@ -516,7 +516,7 @@ doTransfer:
 		xchg	dx, cx				; dl = red,dh = green
 							; ch = blue
 		push	ds
-		mov	bx, cs:[colorTransfer]		; get block handle
+		mov	bx, fs:[colorTransfer]		; get block handle
 		call	MemLock				; lock the block
 		mov	ds, ax				; ds -> block
 		;
@@ -640,7 +640,7 @@ bumpBlue:
 colorAdjusted:
 		mov	ah, ch				; ah = blue
 		mov	cx, dx				; cl = red, ch = green
-		mov	bx, cs:[colorTransfer]		; get block handle
+		mov	bx, fs:[colorTransfer]		; get block handle
 		call	MemUnlock			; lock the block
 		pop	ds
 		jmp	convertToCMYK
@@ -701,7 +701,7 @@ SYNOPSIS:	Initialize the common dither matrix from the dither resource
 
 CALLED BY:	SetDither
 PASS:		ds:si	- pointer to dither matrix in resource
-		cs:bx	- pointer to dither matrix to initialize
+		fs:bx	- pointer to dither matrix to initialize
 		dx	- resetColor
 RETURN:		
 DESTROYED:	
@@ -724,22 +724,22 @@ REVISION HISTORY:
 CopyCyanDither	proc	near
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[bx], ax	; store pattern away
-		mov	{byte} cs:[bx+5], al  ; store 2nd copy
+		mov	{word} fs:[bx], ax	; store pattern away
+		mov	{byte} fs:[bx+5], al  ; store 2nd copy
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[bx+2], ax
+		mov	{word} fs:[bx+2], ax
 		lodsw					; get word
 		xor	ax, dx
-		mov	{byte} cs:[bx+4], al
-		mov	{byte} cs:[bx+6], ah
-		mov	{byte} cs:[bx+11], ah
+		mov	{byte} fs:[bx+4], al
+		mov	{byte} fs:[bx+6], ah
+		mov	{byte} fs:[bx+11], ah
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[bx+7], ax
+		mov	{word} fs:[bx+7], ax
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[bx+9], ax
+		mov	{word} fs:[bx+9], ax
 		add	bx, 2*CMYK_DITHER_WIDTH		; 2 scans per call
 		ret
 CopyCyanDither	endp
@@ -772,40 +772,40 @@ REVISION HISTORY:
 CopyBlackDither	proc	near
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[blackDither], ax	; store pattern away
-		mov	{byte} cs:[blackDither+3], al ; store 2nd copy
+		mov	{word} fs:[blackDither], ax	; store pattern away
+		mov	{byte} fs:[blackDither+3], al ; store 2nd copy
 		lodsw					; get word
 		xor	ax, dx
-		mov	{byte} cs:[blackDither+2], al
-		mov	{byte} cs:[blackDither+4], ah
-		mov	{byte} cs:[blackDither+7], ah
+		mov	{byte} fs:[blackDither+2], al
+		mov	{byte} fs:[blackDither+4], ah
+		mov	{byte} fs:[blackDither+7], ah
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[blackDither+5], ax
+		mov	{word} fs:[blackDither+5], ax
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[blackDither+8], ax
-		mov	{byte} cs:[blackDither+11], al
+		mov	{word} fs:[blackDither+8], ax
+		mov	{byte} fs:[blackDither+11], al
 		lodsw					; get word
 		xor	ax, dx
-		mov	{byte} cs:[blackDither+10], al	
-		mov	{byte} cs:[blackDither+12], ah	
-		mov	{byte} cs:[blackDither+15], ah	
+		mov	{byte} fs:[blackDither+10], al	
+		mov	{byte} fs:[blackDither+12], ah	
+		mov	{byte} fs:[blackDither+15], ah	
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[blackDither+13], ax
+		mov	{word} fs:[blackDither+13], ax
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[blackDither+16], ax
-		mov	{byte} cs:[blackDither+19], al
+		mov	{word} fs:[blackDither+16], ax
+		mov	{byte} fs:[blackDither+19], al
 		lodsw					; get word
 		xor	ax, dx
-		mov	{byte} cs:[blackDither+18], al	
-		mov	{byte} cs:[blackDither+20], ah	
-		mov	{byte} cs:[blackDither+23], ah	
+		mov	{byte} fs:[blackDither+18], al	
+		mov	{byte} fs:[blackDither+20], ah	
+		mov	{byte} fs:[blackDither+23], ah	
 		lodsw					; get word
 		xor	ax, dx
-		mov	{word} cs:[blackDither+21], ax
+		mov	{word} fs:[blackDither+21], ax
 		ret
 CopyBlackDither	endp
 
@@ -849,14 +849,14 @@ shiftIt:
 		mov	cl, BLACK_DITHER_WIDTH-1
 		clr	ch
 		div	cx
-		mov	cs:[blackLeftIndex], dl ; save it
+		mov	fs:[blackLeftIndex], dl ; save it
 		mov	ax, bx			; do same for y direction
 		tst	ax
 		jns	divHeight
 		neg	ax
 divHeight:
 		mov	bx, ax			; save this for next time
-		sub	ax, cs:[bigDitherRotY]	; take window pos into account
+		sub	ax, fs:[bigDitherRotY]	; take window pos into account
 		cwd
 		mov	cl, BLACK_DITHER_HEIGHT	; ditherMatrix is 6 scans high
 		clr	ch
@@ -868,7 +868,7 @@ haveBlackRem:
 		mov	al, dl
 		shl	dl, 1			; *3 since this is the byte
 		add	dl, al			;  width of the ditherMatrix
-		mov	cs:[blackTopIndex], dl	; save this too
+		mov	fs:[blackTopIndex], dl	; save this too
 
 		; calc the cyan and magenta indices
 
@@ -877,9 +877,9 @@ haveBlackRem:
 		mov	cl, CMYK_DITHER_WIDTH-1
 		clr	ch
 		div	cx
-		mov	cs:[cyanLeftIndex], dl	; save index
+		mov	fs:[cyanLeftIndex], dl	; save index
 		mov	ax, bx
-		sub	al, cs:[ditherCyanRotY]
+		sub	al, fs:[ditherCyanRotY]
 		sbb	ah, 0
 		cwd
 		mov	cl, CMYK_DITHER_HEIGHT
@@ -893,10 +893,10 @@ haveCyanRem:
 		shl	dl, 1			; *2
 		shl	dl, 1			; *4
 		add	dl, al			; *5
-		mov	cs:[cyanTopIndex], dl
+		mov	fs:[cyanTopIndex], dl
 
 		and	bl, 3			; yellow matrix is 4 bytes hi
-		mov	cs:[yellowTopIndex], bl
+		mov	fs:[yellowTopIndex], bl
 		pop	ax, bx, cx, dx
 		ret
 CalcByteDitherIndices endp
@@ -917,14 +917,14 @@ shiftIt:
 		mov	cl, BLACK_DITHER_WIDTH-1
 		clr	ch
 		div	cx
-		mov	cs:[blackLeftIndex], dl ; save it
+		mov	fs:[blackLeftIndex], dl ; save it
 		mov	ax, bx			; do same for y direction
 		tst	ax
 		jns	divHeight
 		neg	ax
 divHeight:
 		mov	bx, ax			; save this for next time
-		sub	ax, cs:[bigDitherRotY]	; need to use the big kahuna
+		sub	ax, fs:[bigDitherRotY]	; need to use the big kahuna
 		cwd
 		mov	cl, BLACK_DITHER_HEIGHT	; ditherMatrix is 6 scans high
 		clr	ch
@@ -935,7 +935,7 @@ divHeight:
 haveBlackRem:
 		shl	dl, 1			; *4 since this is the byte
 		shl	dl, 1			;  width of the ditherMatrix
-		mov	cs:[blackTopIndex], dl	; save this too
+		mov	fs:[blackTopIndex], dl	; save this too
 
 		; calc the cyan and magenta indices
 
@@ -944,9 +944,9 @@ haveBlackRem:
 		mov	cl, CMYK_DITHER_WIDTH-1
 		clr	ch
 		div	cx
-		mov	cs:[cyanLeftIndex], dl	; save index
+		mov	fs:[cyanLeftIndex], dl	; save index
 		mov	ax, bx
-		sub	al, cs:[ditherCyanRotY]
+		sub	al, fs:[ditherCyanRotY]
 		sbb	ah, 0
 		cwd
 		mov	cl, CMYK_DITHER_HEIGHT
@@ -960,10 +960,10 @@ haveCyanRem:
 		mov	al, dl			; save it
 		shl	dl, 1			; *4
 		add	dl, al			; *6
-		mov	cs:[cyanTopIndex], dl
+		mov	fs:[cyanTopIndex], dl
 
 		and	bl, 3			; yellow matrix is 4 bytes hi
-		mov	cs:[yellowTopIndex], bl
+		mov	fs:[yellowTopIndex], bl
 		pop	ax, bx, cx, dx
 		ret
 

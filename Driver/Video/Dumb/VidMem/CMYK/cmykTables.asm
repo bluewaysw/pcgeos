@@ -241,7 +241,7 @@ moduleTable	label	fptr
 	fptr	0				; end exclusive
 
 	fptr	0				; get a pixel color
-	fptr	CMYKMisc:VidGetBits	 	; GetBits in another module
+	fptr	cmykcode:VidGetBits	 	; GetBits in another module
 	fptr	0				; set the ptr pic
 	fptr	0				; hide the cursor
 	fptr	0				; show the cursor
@@ -258,24 +258,17 @@ moduleTable	label	fptr
 
 	fptr	0				; rectangle
 	fptr	0				; char string
-	fptr	CMYKBlt:VidBitBlt		; BitBlt in another module
-	fptr	CMYKBitmap:VidPutBits	  	; PutBits in another module
-	fptr	CMYKLine:VidDrawLine		; DrawLine in another module
+	fptr	cmykcode:VidBitBlt		; BitBlt in another module
+	fptr	cmykcode:VidPutBits	  	; PutBits in another module
+	fptr	cmykcode:VidDrawLine		; DrawLine in another module
 	fptr	0				; draws a region
-	fptr	CMYKPutLine:VidPutLine		; PutLine in another module
-	fptr	CMYKLine:VidPolygon		; Polygon in another module
+	fptr	cmykcode:VidPutLine		; PutLine in another module
+	fptr	cmykcode:VidPolygon		; Polygon in another module
 	fptr	0				; ScreenOn in another module
 	fptr	0				; ScreenOff in another module
-	fptr	CMYKLine:VidPolyline		; Polyline in another module
-	fptr	CMYKLine:VidDashLine		; DashLine in another module
-	fptr	CMYKLine:VidDashFill		; DashFill in another module
+	fptr	cmykcode:VidPolyline		; Polyline in another module
+	fptr	cmykcode:VidDashLine		; DashLine in another module
+	fptr	cmykcode:VidDashFill		; DashFill in another module
 	fptr	0				; SetPalette elsewhere
 	fptr	0				; GetPalette elsewhere
 .assert ($-moduleTable) eq (VidFunction*2)
-
-;----------------------------------------------------------------------------
-;		Video Semaphores
-;----------------------------------------------------------------------------
-
-videoSem	Semaphore	<1,0>
-

@@ -126,14 +126,14 @@ oneWindow:
 
 		inc	cx
 		push	di, cx			; save real destination
-		segmov	es, cs, di
+		segmov	es, gs, di
 		mov	di, offset bltBuffer	; point at our space
 		mov	bl, ss:[readWindow]
 		call	SetWinPage
 		rep	movsb			; copy the source
 		pop	di, cx
 		segmov	es, ds, si
-		segmov	ds, cs, si
+		segmov	ds, gs, si
 		mov	si, offset bltBuffer
 		mov	bl, ss:[writeWindow]
 		mov	dx, ss:[curWinPage]
@@ -1095,7 +1095,7 @@ ByteAND		label  near
 		ret
 ByteINV		label  near
 		clr	bh
-		mov	bl, ss:NOTtable[bx]
+		mov	bl, cs:NOTtable[bx]
 		ret
 ByteXOR		label  near
 		xor	bl, dl

@@ -691,7 +691,7 @@ done:
 NullSegmentRegisters	endp
 
 NullSeg		proc	near
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	cmp	ax, 0xffff		;HACK FOR THE WINDOW SYSTEM
 	jz	done
 else
@@ -879,7 +879,7 @@ semOK	label	near
 
 CheckToP	endp
 
-ifndef PRODUCT_GEOS32	; No such thing in GEOS32 -dhunter 11/22/00
+ifndef PROTECTED_MODE	; No such thing in GEOS32 -dhunter 11/22/00
 
 COMMENT @----------------------------------------------------------------------
 
@@ -1079,7 +1079,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckHeapHandleSW	proc	far
-ifndef PRODUCT_GEOS32	; Pardon my hacks -dhunter 11/21/00
+ifndef PROTECTED_MODE	; Pardon my hacks -dhunter 11/21/00
 	pushf
 	INT_OFF
 	push	ds
@@ -1121,7 +1121,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 CheckHeapHandle	proc	far
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	ret
 else
 	push	ax
@@ -1215,7 +1215,7 @@ if	0
 corruptLMem:
 	ERROR	CORRUPTED_LMEM_BLOCK
 endif
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 
 CheckHeapHandle	endp
 

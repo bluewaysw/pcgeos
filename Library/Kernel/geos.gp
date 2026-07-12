@@ -64,7 +64,7 @@ endif
 
 resource kcode fixed code read-only
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 resource IRQCode fixed code read-only
 endif
 
@@ -2562,7 +2562,7 @@ endif
 incminor MouseWheelSupport
 
 incminor ProtectedMode
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 export SysMapRealSegment
 export SysAllocCodeAlias
 export SysFreeCodeAlias

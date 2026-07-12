@@ -2530,7 +2530,9 @@ notDir:
 	clr	cx
 	call	FileCreateLink
 	tst	cs:[si].DDI_toDir
-	jz	notToDir
+	jnz	setAttrs
+	push	es
+	jmp	notToDir
 setAttrs:
 	push	es
 	segmov	es, cs, ax

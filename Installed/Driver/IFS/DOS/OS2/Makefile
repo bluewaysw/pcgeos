@@ -40,7 +40,7 @@ SRCS            = dosCritical.asm dosDisk.asm dosDiskCopy.asm dosDrive.asm\
                   os2Utils.asm os2Interface.def os2Variable.def
 LOBJS           =
 
-PRODUCTS        = DBCS GB SJISGB
+PRODUCTS        = 
 
 #include	<geos.mk>		# system directory definitions
 #include	<gpath.mk>		# set search paths for files

@@ -54,7 +54,7 @@ ErrorHandlerContext	struct
 	EHC_stackBot	word
 ErrorHandlerContext	ends
 
-idata segment
+ASM_FIXED segment
 
 	SetDefaultConvention
 
@@ -97,4 +97,4 @@ _set_error_handler	endp
 
 	SetGeosConvention
 
-idata ends
+ASM_FIXED ends

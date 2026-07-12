@@ -65,7 +65,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 MEGA <Char1In1Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx, ax							>
 MEGA <	jmp	short Char1In1OutEntry					>
@@ -121,7 +121,7 @@ Char1In1Out	endp
 ;-------------------------------
 
 MEGA <Char1In2Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx,ax							>
 MEGA <	jmp	Char1In2OutEntry					>
@@ -178,7 +178,7 @@ Char1In2Out	endp
 ;-------------------------------
 
 MEGA <Char2In2Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx, ax							>
 MEGA <	jmp	Char2In2OutEntry					>
@@ -233,7 +233,7 @@ Char2In2Out	endp
 ;-------------------------------
 
 MEGA <Char2In3Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx, ax							>
 MEGA <	jmp	Char2In3OutEntry					>
@@ -282,7 +282,7 @@ Char2In3Out	endp
 ;-------------------------------
 
 MEGA <Char3In3Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx, ax							>
 MEGA <	jmp	Char3In3OutEntry					>
@@ -337,7 +337,7 @@ Char3In3Out	endp
 ;-------------------------------
 
 MEGA <Char3In4Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx, ax							>
 MEGA <	jmp	Char3In4OutEntry					>
@@ -398,7 +398,7 @@ Char3In4Out	endp
 ;-------------------------------
 
 MEGA <Char4In4Out	proc	near					>
-MEGA <	mov	ah, cs:[patternBuffer]					>
+MEGA <	mov	ah, fs:[patternBuffer]					>
 MEGA <	clr	al			; set color fill index		>
 MEGA <	out	dx, ax							>
 MEGA <	jmp	Char4In4OutEntry					>

@@ -698,7 +698,7 @@ CheckIfXMMPresent	proc	near
 	mov	ax, XMS_ADDRESS?	; es:bx = addr
 	int	2fh
 	movdw	ds:[xmsAddrUW], esbx
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 EC <	call	NullES			; to avoid ec segment crash	>
 endif
 	clc				; XMM present

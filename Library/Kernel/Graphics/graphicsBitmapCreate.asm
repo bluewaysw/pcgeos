@@ -667,7 +667,7 @@ EC <		ERROR_A GRAPHICS_BAD_FLAGS_RESERVED_MUST_BE_0		>
 		call	MemUnlockV		; release window
 
 		; kill the window and gstate
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		clr	ax
 		mov	ds, ax
 endif

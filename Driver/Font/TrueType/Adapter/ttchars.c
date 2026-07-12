@@ -548,6 +548,13 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
     else
         allocSize = (size + 255) & 0xFF00;
 
+if(MGI_TYPE_FLAGS(MemGetInfo(bitmapHandle, MGIT_FLAGS_AND_LOCK_COUNT)) & HF_DISCARDED)
+	{
+                MemReAlloc( bitmapHandle, MAX( size, INITIAL_BITMAP_BLOCKSIZE ), HAF_NO_ERR );
+                bitmapData = MemLock( bitmapHandle );
+        } else {
+                word  bitmapBlockSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
+
     bitmapData  = MemLock( bitmapHandle );
     currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );
         

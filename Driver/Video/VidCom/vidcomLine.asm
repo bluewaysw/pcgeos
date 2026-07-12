@@ -91,10 +91,10 @@ VidLineDDA	proc	far
 
 		; figure absolute differences, and select a routine to call
 
-		and	cs:[DX_test1st], 0xfe	; force CLC
-		or	cs:[DX_test1st], al	; force STC if al = 1
-		and	cs:[DY_test1st], 0xfe	; force CLC
-		or	cs:[DY_test1st], al	; force STC if al = 1
+		and	gs:[DX_test1st], 0xfe	; force CLC
+		or	gs:[DX_test1st], al	; force STC if al = 1
+		and	gs:[DY_test1st], 0xfe	; force CLC
+		or	gs:[DY_test1st], al	; force STC if al = 1
 		mov	ax, ss:[lineX2]		
 		sub	ax, ss:[lineX1]
 		mov	bp, 1
@@ -116,8 +116,8 @@ haveAbsY:
 
 		; save away the callback address and draw along y axis
 
-		mov	cs:[DY_call].offset, cx
-		mov	cs:[DY_call].segment, dx
+		mov	gs:[DY_call].offset, cx
+		mov	gs:[DY_call].segment, dx
 		call	DDA_Y			
 done:
 		.leave
@@ -125,8 +125,8 @@ done:
 
 		; save away the callback address and draw along x axis
 VLD_drawX:
-		mov	cs:[DX_call].offset, cx
-		mov	cs:[DX_call].segment, dx
+		mov	gs:[DX_call].offset, cx
+		mov	gs:[DX_call].segment, dx
 		call	DDA_X			; else along x axis
 		jmp	done
 VidLineDDA	endp
@@ -168,8 +168,8 @@ DDA_X		proc	near
 		mov	dx, bx
 		sub	dx, ax			; init d = 2dy - dx
 		sal	ax, 1			; ax = 2*abs(delta x)
-		mov	cs:[DX_dbumpy], ax	; store dec var bump amts
-		mov	cs:[DX_dbumpx], bx
+		mov	gs:[DX_dbumpy], ax	; store dec var bump amts
+		mov	gs:[DX_dbumpx], bx
 		mov	ax, ss:[lineX1]		; start at the beginning
 		mov	bx, ss:[lineY1]		; start at the beginning
 		mov	cx, ax			; init x2
@@ -179,8 +179,8 @@ DX_test1st equ  (this byte)
 
 		; if we're drawing right to left, we need to fix a few things
 testRightLeft:
-		and	cs:[DX_incx], not DECREMENT_BIT
-		and	cs:[DX_modJump], not LE_BIT
+		and	gs:[DX_incx], not DECREMENT_BIT
+		and	gs:[DX_modJump], not LE_BIT
 		tst	ss:[signX]		; see which way we're drawing
 		js	rightToLeft		;   drawing right to left
 		jmp	startX
@@ -240,10 +240,10 @@ skipFirstPixel:
 		js	bump1stX
 bump1stY:
 		add	bx, ss:[signY]
-		sub	dx, cs:[DX_dbumpy]
+		sub	dx, gs:[DX_dbumpy]
 bump1stX:
 		add	cx, ss:[signX]
-		add	dx, cs:[DX_dbumpx]
+		add	dx, gs:[DX_dbumpx]
 		mov	ax, cx
 		mov	ss:[lineX1], ax	
 		cmp	cx, ss:[lineX2]		; ready to draw ?
@@ -252,8 +252,8 @@ bump1stX:
 
 		; drawing right to left, slightly change one of the branches
 rightToLeft:
-		or	cs:[DX_incx], DECREMENT_BIT
-		or	cs:[DX_modJump], LE_BIT
+		or	gs:[DX_incx], DECREMENT_BIT
+		or	gs:[DX_modJump], LE_BIT
 		jmp	startX
 
 		; second part of skipFirstPixel
@@ -297,8 +297,8 @@ DDA_Y		proc	near
 		mov	cx, ax
 		sub	cx, bx			; init d = 2dx - dy
 		sal	bx, 1			; bx = 2*abs(delta y)
-		mov	cs:[DY_dbumpy], ax	; store dec var bump amts
-		mov	cs:[DY_dbumpx], bx
+		mov	gs:[DY_dbumpy], ax	; store dec var bump amts
+		mov	gs:[DY_dbumpx], bx
 		mov	ax, ss:[lineX1]		; start at the beginning
 		mov	bx, ss:[lineY1]		; start at the beginning
 		mov	dx, bx			; init y2
@@ -308,8 +308,8 @@ DY_test1st equ  (this byte)
 
 		; if we're drawing bottom to top, we need to fix a few things
 testUpDown:
-		and	cs:[DY_incy], not DECREMENT_BIT
-		and	cs:[DY_modJump], not LE_BIT
+		and	gs:[DY_incy], not DECREMENT_BIT
+		and	gs:[DY_modJump], not LE_BIT
 		tst	ss:[signY]		; see which way we're drawing
 		LONG js	bottomToTop		;   drawing right to left
 		jmp	startY
@@ -370,10 +370,10 @@ skipFirstPixel:
 		js	bump1stY
 bump1stX:
 		add	ax, ss:[signX]
-		sub	cx, cs:[DY_dbumpx]
+		sub	cx, gs:[DY_dbumpx]
 bump1stY:
 		add	dx, ss:[signY]
-		add	cx, cs:[DY_dbumpy]
+		add	cx, gs:[DY_dbumpy]
 		mov	bx, dx
 		mov	ss:[lineY1], bx	
 		cmp	dx, ss:[lineY2]		; ready to draw ?
@@ -388,8 +388,8 @@ checkDownUp:
 
 		; drawing right to left, slightly change one of the branches
 bottomToTop:
-		or	cs:[DY_incy], DECREMENT_BIT
-		or	cs:[DY_modJump], LE_BIT
+		or	gs:[DY_incy], DECREMENT_BIT
+		or	gs:[DY_modJump], LE_BIT
 		jmp	startY
 DDA_Y	endp
 
@@ -576,12 +576,12 @@ haveBrushHeight:
 		jns	haveBrushSize
 		clr	al
 haveBrushSize:
-		mov	cs:[PRD_incWidth], al	; bump width
-		mov	cs:[PRD_incHeight], ah	; bump height
-		mov	cs:[VP_incWidth], al	
-		mov	cs:[VP_incHeight], ah	
-		mov	cs:[VP_pointBuf], bx	; save segment address of buf
-		clr	cs:VDL_skip1st		; draw first pixel
+		mov	gs:[PRD_incWidth], al	; bump width
+		mov	gs:[PRD_incHeight], ah	; bump height
+		mov	gs:[VP_incWidth], al	
+		mov	gs:[VP_incHeight], ah	
+		mov	gs:[VP_pointBuf], bx	; save segment address of buf
+		clr	gs:VDL_skip1st		; draw first pixel
 		mov	dx, ds			; save GState pointer
 		mov	ds, bx			; init lineX2 and lineY2 with
 		lodsw				;  first point
@@ -662,7 +662,7 @@ VP_incHeight equ (this byte) + 2
 VDL_skip1st equ (this byte) + 1
 		mov	al, 12h			; 1 to skip first pixel in line
 		call	VidLineDDA		; do it
-		mov	cs:VDL_skip1st, 1	; skip 1st pixel on next line
+		mov	gs:VDL_skip1st, 1	; skip 1st pixel on next line
 nextLine:
 		pop	es			; pushed by RectSetup
 		pop	ds
@@ -694,7 +694,7 @@ foundSeparator:
 ;		pop	cx				; restore bogus count
 		jmp	done
 newLines:
-		clr	cs:[VDL_skip1st]		; draw first pixel
+		clr	gs:[VDL_skip1st]		; draw first pixel
 		mov	ss:[lineX2], ax
 		lodsw
 		mov	ss:[lineY2], ax
@@ -852,7 +852,7 @@ realPattern:
 
 		; set up as if for DrawLine
 
-		mov	cs:[firstPixelFlag], al	; save first pixel flag
+		mov	gs:[firstPixelFlag], al	; save first pixel flag
 		mov	si, bx			; restore attributes pointer
 		mov	ax, lineInfo.EDI_dash.DI_pt1.P_x
 		mov	ss:[lineX1], ax
@@ -972,7 +972,7 @@ DashLineDDA	proc	far
 		inc	dx			; dx = length of horiz line
 		tst	ss:[signX]		; see if we need to flip them
 		js	horizLeft
-		mov	cs:[rightYPos], bx
+		mov	gs:[rightYPos], bx
 rightLoop:
 		call	NextPatternRun
 		jnz	bumpRight
@@ -997,7 +997,7 @@ bumpRight:
 		
 horizLeft:
 		xchg	ax, cx
-		mov	cs:[leftYPos], bx
+		mov	gs:[leftYPos], bx
 leftLoop:
 		call	NextPatternRun
 		jnz	bumpLeft
@@ -1027,7 +1027,7 @@ vertical:
 		xchg	cx, dx			; dx = line length, cx = y2
 		tst	ss:[signY]		; see if we need to flip them
 		js	vertUp
-		mov	cs:[downXPos], ax
+		mov	gs:[downXPos], ax
 		mov	ax, bx			; set ax/cx = y1/y2
 
 		; we're going to loop around, calling the rect fill for each
@@ -1058,10 +1058,10 @@ bumpDown:
 		ret
 
 vertUp:
-		mov	cs:[upXPos], ax
+		mov	gs:[upXPos], ax
 		mov	ax, bx			; set ax/cx = y1/y2
 		xchg	ax, cx
-upLoop:
+upLoop_1:
 		call	NextPatternRun		; carry set if no draw 
 		jnz	bumpUp
 		
@@ -1084,7 +1084,7 @@ upXPos		equ	(this word) + 1
 bumpUp:
 		sub	ax, bx
 		tst	dx
-		jnz	upLoop
+		jnz	upLoop_1
 		ret
 DashLineDDA	endp
 
@@ -1328,10 +1328,10 @@ realPattern:
 
 		mov	si, bx			; restore attributes pointer
 
-		mov	cs:[xOffFill], ax	; store in callback routine
-		mov	cs:[yOffFill], cx
-		mov	cs:[gstateSeg], ds
-		mov	cs:[winSeg], es
+		mov	gs:[xOffFill], ax	; store in callback routine
+		mov	gs:[yOffFill], cx
+		mov	gs:[gstateSeg], ds
+		mov	gs:[winSeg], es
 
 		mov	ax, lineInfo.EDI_dash.DI_pt1.P_x
 		mov	ss:[lineX1], ax
@@ -1552,7 +1552,7 @@ bumpDown:
 vertUp:
 		mov	ax, bx			; set ax/cx = y1/y2
 		xchg	ax, cx
-upLoop:
+upLoop_2:
 		call	NextPatternRun		; carry set if no draw 
 		jnz	bumpUpClear
 		
@@ -1583,7 +1583,7 @@ bumpUpClear:
 bumpUp:
 		sub	ax, bx
 		tst	dx
-		jnz	upLoop
+		jnz	upLoop_2
 		ret
 DashFillDDA		endp
 
@@ -1643,7 +1643,7 @@ winSeg		equ	(this word) + 1
 		mov	cx, 4			; 4 points
 		clr	al			; always draw the polygon
 		call	VidPolygon		; do it
-		mov	cs:[winSeg], es		; may have moved
+		mov	gs:[winSeg], es		; may have moved
 		.leave
 		ret
 DrawDashPoly	endp

@@ -29,6 +29,11 @@ tokenid 0
 #
 
 #
+# Strategy routine and other fixed routines go here.
+#
+resource NTSResident code fixed
+
+#
 # this thing remains discarded until a DosExec takes place, at which point
 # it comes in and gets modified. hence the swap-only
 #

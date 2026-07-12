@@ -51,13 +51,13 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 Char1In1Out	proc	near
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
 		lodsb
 		mov	ah, al			; save data byte in al
-		mov	al, cs:[currentColor]	; get current draw color
+		mov	al, fs:[currentColor]	; get current draw color
 		shl	ah, 1			; test each bit (carry)
 		jnc	pix6
 		mov	es:[di], al
@@ -101,7 +101,7 @@ nextScan:
 		jz	done
 NMEM <		NextScan di,bp						>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:
@@ -206,8 +206,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 Char2In2Out	proc	near
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
-		mov	al, cs:[currentColor]	; get current draw color
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
+		mov	al, fs:[currentColor]	; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -219,7 +219,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp			; onto next scan line	>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:
@@ -254,8 +254,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 Char3In3Out	proc	near
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
-		mov	al, cs:[currentColor]	; get current draw color
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
+		mov	al, fs:[currentColor]	; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -269,7 +269,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp			; onto next scan line	>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:
@@ -304,8 +304,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 Char4In4Out	proc	near
 
-NMEM <		mov	bp, cs:[modeInfo].VMI_scanSize			>
-		mov	al, cs:[currentColor]	; get current draw color
+NMEM <		mov	bp, fs:[modeInfo].VMI_scanSize			>
+		mov	al, fs:[currentColor]	; get current draw color
 
 		; do next scan.  Load data byte and go for it.
 scanLoop:
@@ -321,7 +321,7 @@ scanLoop:
 		jz	done
 NMEM <		NextScan di,bp			; onto next scan line	>
 MEM <		NextScan di			; onto next scan line	>
-MEM <		tst	cs:[bm_scansNext]	; if zero, done		>
+MEM <		tst	fs:[bm_scansNext]	; if zero, done		>
 MEM <		jns	scanLoop					>
 NMEM <		jmp	scanLoop					>
 done:

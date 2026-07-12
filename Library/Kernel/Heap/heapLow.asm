@@ -514,7 +514,7 @@ EC <	ERROR_NZ ALLOC_BAD_FLAGS					>
 	;
 	push	ax			;allocate discarded -- get a handle
 	call	AllocateMemHandle
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	pop	ds:[bx][HM_size]	;set size
 else
 	mov_tr	ax, cx			;ax = flags
@@ -536,13 +536,13 @@ EC <	WARNING_Z	BLOCK_ALLOCATED_WITH_NO_FLAGS >
 discDone:
 	mov_tr	ax, bx			;ax = segment
 	mov_tr	bx, bp			;bx = handle
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 	jmp	done
 
 alloc:
 	call	AllocHandleAndBytes	;allocate a handle and bytes for it
 	jc	error			;if error then don't try to lock it
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	test	ch, mask HAF_CODE	;Code block?
 	jz	alloc2		; branch if not
 	push	bx
@@ -552,7 +552,7 @@ ifdef PRODUCT_GEOS32
 	pop	bx
 	mov	ds:[bx][HM_addr], ax
 alloc2:
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 	mov	ax,ds:[bx][HM_addr]
 	test	ch,mask HAF_LOCK	;check for lock also
 	jz	done
@@ -704,7 +704,7 @@ error:
 AllocationFailure	endp
 
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 COMMENT @-----------------------------------------------------------------------
 
 FUNCTION:	AllocHandleAndBytes
@@ -1070,7 +1070,7 @@ pseudoFixed:
 	mov	ds:[bx].HM_lockCount, LOCK_COUNT_MOVABLE_PERMANENTLY_FIXED
 	jmp	giveMem
 AllocHandleAndBytes	endp
-endif       ; not PRODUCT_GEOS32
+endif       ; not PROTECTED_MODE
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -1211,7 +1211,7 @@ inMem:
 
 	jz	doneGood		;if same then do nothing
 
-ifdef  PRODUCT_GEOS32
+ifdef  PROTECTED_MODE
 	mov	dx, NUMBER_OF_ALLOCATION_RETRIES
 tryAgain:	
 	push	bx, cx, dx
@@ -1260,7 +1260,7 @@ doneZeroInit:
 	clr	ax			;store zeros
 	rep stosw
 	pop	es
-else ; PRODUCT_GEOS32
+else ; PROTECTED_MODE
 	ja	makeLarger		;if more then branch to make larger
 
 	; allocating a block smaller -- split it into two blocks
@@ -1270,7 +1270,7 @@ else ; PRODUCT_GEOS32
 	xchg	ds:[bx].HM_addr, dx
 	call	SplitBlockFreeRemainder
 	xchg	ds:[bx].HM_addr, dx
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 
 doneGood:
 	tst	ds:[bx].HM_lockCount	; If block is locked, don't muck with
@@ -1289,7 +1289,7 @@ done:
 	; block is discarded -- allocate new bytes for it
 
 discarded:
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	push	cx			;save flags
 	push	dx, bx, di
 	mov	cl, ds:[bx].HM_flags
@@ -1335,7 +1335,7 @@ discardedHaveRoom:
 	dec	ds:[si].HM_lockCount
 endif 
 noCallBack:
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;
 	; Now that we've finished modifying the block, restore its status
 	; to a code block if it was once one.
@@ -1360,7 +1360,7 @@ doneRestoreFlags:
         mov     ds:[di].HM_prev, bx
 
 	jmp	short done
-else ; PRODUCT_GEOS32
+else ; PROTECTED_MODE
 	cmp	ds:[si].HM_lockCount, LOCK_COUNT_MOVABLE_PERMANENTLY_FIXED
 	pushf	
 	call	SwapHandles		;assign memory to correct handle
@@ -1496,10 +1496,10 @@ allocRoom:
 	mov	ds:[bx].HM_flags, dl
 	pop	dx
 	retn
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 DoReAlloc	endp
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 ; dx is address, not callback 
 DoReAlloc2	proc	near
 	InsertGenericProfileEntry PET_HEAP, 1, PMF_HEAP, bx
@@ -1640,9 +1640,9 @@ doneRestoreFlags:
 
 	jmp	short done
 DoReAlloc2	endp
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 
-ifndef PRODUCT_GEOS32	; Not much point in this for PM -dhunter 11/20/00
+ifndef PROTECTED_MODE	; Not much point in this for PM -dhunter 11/20/00
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		TryExpand
@@ -2199,10 +2199,10 @@ EC <	call	AssertHeapMine						>
 	mov	al,DEBUG_FREE		;notify debugger of freeing block
 	call	FarDebugMemory
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;check for memory associated with handle
 	test	ds:[bx][HM_flags], mask HF_DISCARDED or mask HF_SWAPPED
-	jnz	noMem
+	;jnz	noMem
 
 	; free the memory allocated to this block
 
@@ -2235,7 +2235,7 @@ endif
 	mov	ax, ds:[bx].HM_size
 	add	ds:[loaderVars].KLV_heapFreeSize, ax
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	; Unlink the handle from the heap list and free it.
 	push	si, di
 	mov	si, ds:[bx][HM_prev]	;si = prev block
@@ -2489,12 +2489,15 @@ FreeBlockData	proc	near
 	push	si
 EC <	call	AssertHeapMine						>
 
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
+      
 	call	DupHandle		;new handle returned in bx, old in si
 	mov	ds:[bx][HM_addr],dx
 	andnf	ds:[bx].HM_flags, not mask HF_DEBUG	; Swat can't be
 							;  interested...
 	call	FixLinks		;put new block in list
+else
+	mov	si, bx
 endif
 
 ; I can see no reason for not clearing both these bits (it used to just clear
@@ -2519,10 +2522,11 @@ endif
 ;10$:
 	ornf	ds:[si][HM_flags],al	;mark as discarded or swapped
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;mov	bx, ds:[si][HM_addr]
+	;mov	ds:[si][HM_addr],0
 	mov		bx, dx
-	call	GPMIMakeNotPresent
+	;call	GPMIMakeNotPresent
 else
 	mov	ds:[si][HM_addr],0	;mark as not associated with memory
 
@@ -2683,7 +2687,7 @@ next:
 SGI_SwapFreeSize	endp
 
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SafeNullSegmentRegs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

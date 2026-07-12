@@ -37,11 +37,11 @@ SRCS            = keyboard.asm keyboardHotkey.asm keyboardInit.asm\
                   keyboardVariable.def kmapUS.def kmapUSDBCS.def
 LOBJS           =
 
-SUBDIRS         = Canadian DBCS Danish Dutch Dvorak French GDI German\
+SUBDIRS         = Canadian Danish Dutch Dvorak French GDI German\
                   Italian Norwegian Portuguese Spanish Swedish Tandy1000\
                   Toshiba UK
 
-PRODUCTS	= DBCS
+PRODUCTS	= 
 
 #include	<geos.mk>		# system directory definitions
 #include	<gpath.mk>		# set search paths for files

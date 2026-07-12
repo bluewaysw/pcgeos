@@ -362,6 +362,8 @@ MSFetchCWDTable proc	near
 		mov	ax, es:[bx].DLOL_DCB.offset
 		mov	ds:[firstDCB].offset, ax
 		mov	ax, es:[bx].DLOL_DCB.segment
+		mov	cx, -1
+		call	FSMapRealSegment
 		mov	ds:[firstDCB].segment, ax
 
 		clr	cx
@@ -369,12 +371,26 @@ if _MS3
 		tst	ds:[dosVersionMinor]
 		jnz	not3_0
 		mov	cl, es:[bx].D3LOL_lastDrive
-		les	di, es:[bx].D3LOL_CWDs
+;;		les	di, es:[bx].D3LOL_CWDs
+		push	cx
+		mov	cx, 0xFFFF
+		mov	ax, es:[bx].D3LOL_CWDs.segment
+		call	FSMapRealSegment
+		mov	es, ax
+		pop	cx
+		mov	di, es:[bx].D3LOL_CWDs.offset
 		jmp	haveCWD
 not3_0:
 endif
 		mov	cl, es:[bx].DLOL_lastDrive
-		les	di, es:[bx].DLOL_CWDs
+;;		les	di, es:[bx].DLOL_CWDs
+		push	cx
+		mov	cx, 0xFFFF
+		mov	ax, es:[bx].DLOL_CWDs.segment
+		call	FSMapRealSegment
+		mov	es, ax
+		pop	cx
+		mov	di, es:[bx].D3LOL_CWDs.offset
 if _MS3
 haveCWD:
 endif
@@ -485,7 +501,12 @@ cdLoop:
 		jz	next
 
 		push	es, bx, cx
-		les	bx, es:[di].CD_DCB
+;;		les	bx, es:[di].CD_DCB
+		mov	bx, es:[di].CD_DCB.offset
+		mov	cx, -1
+		mov	ax, es:[di].CD_DCB.segment
+		call	FSMapRealSegment
+		mov	es, ax
 		call	MSCreateDriveFromDCB
 		pop	es, bx, cx
 next:
@@ -1804,7 +1825,16 @@ endif	; _MS3
 findSFTEndLoop:
 		cmp	es:[di].SFTBH_next.offset, NIL	; no next block?
 		je	haveSFTEnd
-		les	di, es:[di].SFTBH_next
+
+		push	ax, cx
+;;		les	di, es:[di].SFTBH_next
+		mov	ax, es:[di].SFTBH_next.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	di, es:[di].SFTBH_next.offset
+		mov	es, ax
+		pop	ax, cx
+
 		jmp	findSFTEndLoop
 haveSFTEnd:
 		mov	ds:[sftEnd].segment, es
