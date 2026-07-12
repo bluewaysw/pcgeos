@@ -196,6 +196,7 @@ EC(             ECCheckBounds( (void*)charData ) );
 
                 /* translate outline and render it */
                 TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin, -GLYPH_BBOX.yMin );
+		OUTLINE.dropout_mode = 4;
                 TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
 
 EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
@@ -540,8 +541,8 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
 {
         void* bitmapData = MemLock( bitmapHandle );
 
-        if( bitmapData == NULL )
-        {
+	if(MGI_TYPE_FLAGS(MemGetInfo(bitmapHandle, MGIT_FLAGS_AND_LOCK_COUNT)) & HF_DISCARDED)
+	{
                 MemReAlloc( bitmapHandle, MAX( size, INITIAL_BITMAP_BLOCKSIZE ), HAF_NO_ERR );
                 bitmapData = MemLock( bitmapHandle );
         } else {

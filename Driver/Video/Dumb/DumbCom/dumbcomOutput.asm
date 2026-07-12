@@ -64,7 +64,7 @@ REVISION HISTORY:
 DrawOptRect	proc	near
 
 ifdef	LOGGING
-	ornf	cs:[curRegFlags], mask RF_CALLED_DRAW_OPT_RECT
+	ornf	fs:[curRegFlags], mask RF_CALLED_DRAW_OPT_RECT
 endif
 
 	tst	dx
@@ -77,21 +77,21 @@ NMEM <	mov	ax,dx						>
 NMEM <	shl	ax,1				; compute #bytes in middle >
 NMEM <	add	ax, 4				; account for end words	>
 NMEM <	neg	ax							>
-NMEM <	StoreNextScanMod	<cs:[BOR_nextScanOffset]>,ax		>
+NMEM <	StoreNextScanMod	<gs:[BOR_nextScanOffset]>,ax		>
 
 	; compute left masks
 
 	mov	ax,cs:[si][leftMaskTable]	;get mask
-	mov	cs:[BOR_leftNewMask],ax
+	mov	gs:[BOR_leftNewMask],ax
 	not	ax
-	mov	cs:[BOR_leftOldMask],ax
+	mov	gs:[BOR_leftOldMask],ax
 
 	; compute right masks
 
 	mov	ax,cs:[bx][rightMaskTable]	;get mask
-	mov	cs:[BOR_rightNewMask],ax
+	mov	gs:[BOR_rightNewMask],ax
 	not	ax
-	mov	cs:[BOR_rightOldMask],ax
+	mov	gs:[BOR_rightOldMask],ax
 
 	mov	bx,cx				;pass pattern index in bx
 
@@ -153,11 +153,11 @@ OROW_loop:
 	inc	bx				;increment pattern pointer
 	and	bl,7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; check if off end of bitmap>
+MEM <	tst	fs:[bm_scansNext]		; check if off end of bitmap>
 MEM <	js	done				;  if so, bail		    >
 
 OROW_loopEntry:
-	mov	al,{byte} cs:[bx][ditherMatrix];get pattern byte
+	mov	al,{byte} fs:[bx][ditherMatrix];get pattern byte
 	mov	ah,al
 
 	and	ax,dx				;ax = new data bits
@@ -235,12 +235,12 @@ BOR_loop:
 	and	bl,7
 NMEM <	NextScanMod	di, BOR_nextScanOffset		>
 MEM  <	NextScan di					>
-MEM <	tst	cs:[bm_scansNext]		; check if off end of bitmap>
+MEM <	tst	fs:[bm_scansNext]		; check if off end of bitmap>
 MEM <	js	BOR_done			;  if so, bail		    >
 
 BlastOptRect	proc		near
 MEM  <	push	di					>
-	mov	al,{byte} cs:[bx][ditherMatrix] ;get pattern byte
+	mov	al,{byte} fs:[bx][ditherMatrix] ;get pattern byte
 	mov	ah,al
 
 	; handle left word specially
@@ -352,13 +352,13 @@ NMEM <	mov	ax,dx							>
 NMEM <	shl	ax,1				; calc #bytes in middle	>
 NMEM <	add	ax, 4				; account for end words >
 NMEM <	neg	ax							>
-NMEM <	StoreNextScanMod	<cs:[BNR_nextScanOffset]>,ax		>
+NMEM <	StoreNextScanMod	<gs:[BNR_nextScanOffset]>,ax		>
 
 	; compute right masks
 
 	mov	ax,cs:[bx][rightMaskTable]	;get mask
 	not	ax
-	mov	cs:[BNR_rightMask],ax
+	mov	gs:[BNR_rightMask],ax
 
 	; compute left masks
 
@@ -420,7 +420,7 @@ NOTRectOneWord	proc		near
 
 NROW_loop:
 	NextScan	di
-MEM <	tst	cs:[bm_scansNext]		; check if off end of bitmap>
+MEM <	tst	fs:[bm_scansNext]		; check if off end of bitmap>
 MEM <	js	done				;  if so, bail		    >
 
 NROW_loopEntry:
@@ -489,7 +489,7 @@ REVISION HISTORY:
 BNR_loop:
 NMEM <	NextScanMod	di, BNR_nextScanOffset				>
 MEM  <	NextScan	di						>
-MEM <	tst	cs:[bm_scansNext]		; check if off end of bitmap>
+MEM <	tst	fs:[bm_scansNext]		; check if off end of bitmap>
 MEM <	js	BNR_done			;  if so, bail		    >
 
 BlastNOTRect	proc		near
@@ -599,21 +599,21 @@ DrawSpecialRect	proc		near
 	; calculate # of words in the middle of the line, offset to next line
 
 	dec	dx				;number of middle words
-	mov	cs:[BSR_middleCount], dx	;save parameter
+	mov	gs:[BSR_middleCount], dx	;save parameter
 NMEM <	shl	dx, 1				; calc #middle bytes	>
 NMEM <	add	dx, 4				; account for end words >
 NMEM <	neg	dx							>
-NMEM <	StoreNextScanMod	<cs:[BSR_nextScanOffset]>,dx		>
+NMEM <	StoreNextScanMod	<gs:[BSR_nextScanOffset]>,dx		>
 
 	; compute left masks
 
 	mov	ax, cs:[si][leftMaskTable]	;get mask
-	mov	cs:[BSR_leftNewMask], ax
+	mov	gs:[BSR_leftNewMask], ax
 
 	; compute right masks
 
 	mov	ax, cs:[bx][rightMaskTable]	;get mask
-	mov	cs:[BSR_rightNewMask], ax
+	mov	gs:[BSR_rightNewMask], ax
 
 	mov	bx, cx				;pass pattern index in bx
 
@@ -668,7 +668,7 @@ REVISION HISTORY:
 SpecialOneWord	proc		near
 	mov	ax, cs:[si][leftMaskTable]	; get mask
 	and	ax, cs:[bx][rightMaskTable]	; composite mask
-	mov	cs:[SOW_newBits],ax
+	mov	gs:[SOW_newBits],ax
 	mov	bx, cx				; bx = pattern index
 	jmp	short SOW_loopEntry
 
@@ -676,14 +676,14 @@ SOW_loop:
 	inc	bx				; increment pattern pointer
 	and	bx, 7
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; check if off end of bitmap>
+MEM <	tst	fs:[bm_scansNext]		; check if off end of bitmap>
 MEM <	js	done				;  if so, bail		    >
 
 SOW_loopEntry:
-	mov	al, {byte} cs:[bx][ditherMatrix]; get pattern byte
+	mov	al, {byte} fs:[bx][ditherMatrix]; get pattern byte
 	mov	ah, al				; ax = pattern bits
 	mov	si, ax				; si = pattern bits
-	mov	dl, {byte} cs:[bx][maskBuffer]	; get draw mask byte
+	mov	dl, {byte} fs:[bx][maskBuffer]	; get draw mask byte
 	mov	dh, dl				; dx = draw mask
 SOW_newBits	equ	(this word) + 2
 	and	dx, 1234h			; apply left/right masks
@@ -692,7 +692,7 @@ ifdef	REVERSE_WORD
 else
 	mov	ax, es:[di]			; ax = screen
 endif
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 ifdef	REVERSE_WORD
 	call	MovESDIAX
 else
@@ -757,14 +757,14 @@ BSR_loop:
 	and	bx, 7
 NMEM <	NextScanMod	di, BSR_nextScanOffset			>
 MEM  <	NextScan	di					>
-MEM <	tst	cs:[bm_scansNext]		; check if off end of bitmap>
+MEM <	tst	fs:[bm_scansNext]		; check if off end of bitmap>
 MEM <	js	BSR_done			;  if so, bail		    >
 
 BlastSpecialRect	proc		near
 MEM  <	push	di						>
-	mov	al, {byte} cs:[bx][ditherMatrix]; get pattern byte
+	mov	al, {byte} fs:[bx][ditherMatrix]; get pattern byte
 	mov	ah, al				;  make it a word
-	mov	dl, {byte} cs:[bx][maskBuffer]; get draw mask byte
+	mov	dl, {byte} fs:[bx][maskBuffer]; get draw mask byte
 	mov	dh, dl				;  make it a word
 	push	bx				; save pattern index
 	mov	bx, dx				; bx,dx  = mask bits
@@ -779,7 +779,7 @@ ifdef	REVERSE_WORD
 else
 	mov	ax, es:[di]			; ax = screen
 endif
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 ifdef	REVERSE_WORD
 	call	DoStosw
 else
@@ -798,7 +798,7 @@ ifdef	REVERSE_WORD
 else
 	mov	ax, es:[di]			; ax = screen
 endif
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 ifdef	REVERSE_WORD
 	call	DoStosw
 else
@@ -817,7 +817,7 @@ endif
 	mov	dx, bx				; dx = mask bits
 BSR_rightNewMask	equ	(this word) + 2
 	and	dx, 1234h			; apply right-side mask
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 ifdef	REVERSE_WORD
 	call	DoStosw
 else
@@ -880,14 +880,14 @@ DrawSolidRect	proc	near
 	shl	ax,1				; compute #bytes in middle 
 	add	ax, 4				; account for end words	
 	neg	ax							
-	StoreNextScanMod	<cs:[BSoR_nextScanOffset]>,ax		
+	StoreNextScanMod	<gs:[BSoR_nextScanOffset]>,ax		
 
 	; compute left and right masks
 
 	mov	ax,cs:[si][leftMaskTable]	;get mask
-	mov	cs:[BSoR_leftNewMask],ax
+	mov	gs:[BSoR_leftNewMask],ax
 	mov	ax,cs:[bx][rightMaskTable]	;get mask
-	mov	cs:[BSoR_rightNewMask],ax
+	mov	gs:[BSoR_rightNewMask],ax
 	GOTO	 BlastSolidRect
 
 DrawSolidRect	endp
@@ -1074,7 +1074,7 @@ ModeCLEAR	label near	; (screen^~(data^mask))v(data^mask^resetColor
 	not	dx
 	and	ax, dx
 	not	dx
-	and	dx, cs:[resetColor]
+	and	dx, fs:[resetColor]
 	or	ax, dx
 ModeNOP		label near
 	ret
@@ -1095,7 +1095,7 @@ MA_orNotMask	word
 
 ModeAND		label  near	; (screen^((data^mask^pattern)v~(data^mask))
 	not	dx
-	mov	cs:[MA_orNotMask], dx
+	mov	gs:[MA_orNotMask], dx
 	not	dx
 	and	dx, si
 	or	dx, cs:[MA_orNotMask]
@@ -1111,7 +1111,7 @@ ModeINVERT	label  near	; screenXOR(data^mask)
 ;-----------------
 
 ModeXOR		label  near	; screenXOR(data^mask^pattern)
-INVRSE <tst	cs:[inverseDriver]					>
+INVRSE <tst	fs:[inverseDriver]					>
 INVRSE <jz	notInverse						>
 INVRSE <not	si							>
 	; Ok, this goes against style guidelines, but we need speed and
@@ -1132,7 +1132,7 @@ ModeSET		label  near	; (screen^~(data^mask))v(data^mask^setColor)
 	not	dx
 	and	ax, dx
 	not	dx
-	and	dx, cs:[setColor]
+	and	dx, fs:[setColor]
 	or	ax, dx
 	ret
 

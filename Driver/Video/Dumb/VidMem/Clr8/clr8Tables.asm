@@ -85,7 +85,7 @@ moduleTable	label	fptr
 	fptr	0				; end exclusive
 
 	fptr	0				; get a pixel color
-	fptr	Clr8Misc:VidGetBits	 	; GetBits in another module
+	fptr	Clr8:VidGetBits			; GetBits in another module
 	fptr	0				; set the ptr pic
 	fptr	0				; hide the cursor
 	fptr	0				; show the cursor
@@ -102,26 +102,20 @@ moduleTable	label	fptr
 
 	fptr	0				; rectangle
 	fptr	0				; char string
-	fptr	Clr8Blt:VidBitBlt		; BitBlt in another module
-	fptr	Clr8Bitmap:VidPutBits	  	; PutBits in another module
-	fptr	Clr8Line:VidDrawLine		; DrawLine in another module
+	fptr	Clr8:VidBitBlt			; BitBlt in another module
+	fptr	Clr8:VidPutBits			; PutBits in another module
+	fptr	Clr8:VidDrawLine		; DrawLine in another module
 	fptr	0				; draws a region
-	fptr	Clr8PutLine:VidPutLine		; PutLine in another module
-	fptr	Clr8Line:VidPolygon		; Polygon in another module
+	fptr	Clr8:VidPutLine			; PutLine in another module
+	fptr	Clr8:VidPolygon			; Polygon in another module
 	fptr	0				; ScreenOn in another module
 	fptr	0				; ScreenOff in another module
-	fptr	Clr8Line:VidPolyline		; Polyline in another module
-	fptr	Clr8Line:VidDashLine		; DashLine in another module
-	fptr	Clr8Line:VidDashFill		; DashFill in another module
+	fptr	Clr8:VidPolyline		; Polyline in another module
+	fptr	Clr8:VidDashLine		; DashLine in another module
+	fptr	Clr8:VidDashFill		; DashFill in another module
 	fptr	0				; SetPalette in another module
 	fptr	0				; SetPalette in another module
 .assert ($-moduleTable) eq (VidFunction*2)
-
-;----------------------------------------------------------------------------
-;		Video Semaphores
-;----------------------------------------------------------------------------
-
-videoSem	Semaphore	<1,0>
 
 ;------------------------------------------------------------------------------
 ;		Table of character drawing routines

@@ -150,7 +150,7 @@ CLFC_minLSB	equ  (this word) + 2
 	sub	di, 1234h		    ;MODIFIED: minimum LSB for font
 	cmp	ax, di			    ;see if left edge clipped
 	jl	CLF_check		    ;special case: left edge clipped.
-	mov	cs:[PSL_saveRoutine],CHAR_LOW_FAST
+	mov	gs:[PSL_saveRoutine],CHAR_LOW_FAST
 
 CharLowFast	label near
 	;
@@ -197,17 +197,17 @@ CLF_afterKern:
 
 		    			    ;ASSUMES CTE_width.WBF_int.high == 0
 	mov	dx, ax			    ;dx <- x position
-	cmp	cs:fracPosition, 0x80
+	cmp	fs:fracPosition, 0x80
 	jb	CLF_noRound
 	inc	ax
 CLF_noRound:
 	mov	cl, ds:[di].FB_charTable.CTE_width.WBF_frac
-	add	cs:fracPosition, cl	    ;keep frac position up to date.
+	add	fs:fracPosition, cl	    ;keep frac position up to date.
 	adc	dx, ds:[di].FB_charTable.CTE_width.WBF_int
 	;
 	; We also need to round the y position to an integer
 	;
-	cmp	cs:fracYPosition, 0x80
+	cmp	fs:fracYPosition, 0x80
 	jb	CLF_noRoundY
 	inc	bx
 CLF_noRoundY:
@@ -339,7 +339,7 @@ BIT <	and	bx,7			;bx = pattern index		>
 	add	al,ah			; Wow. The thing is small enough to
 	clr	ah			; draw quickly.
 	mov	bp,ax			; 
-	jmp	cs:[bp][FCC_table]	; Call the routine to do the draw.
+	jmp	fs:[bp][FCC_table]	; Call the routine to do the draw.
 
 ;------------------------------
 ; special case: complex clip for CharLowFastCheck
@@ -490,17 +490,17 @@ CLC_afterKern:
 	; compute next character x position - first check fractional width flag
 	;
 	mov	dx, ax				;dx <- left edge.
-	cmp	cs:[fracPosition], 128		;
+	cmp	fs:[fracPosition], 128		;
 	jb	CLC_noRound			;
 	inc	ax				;round to nearest pixel.
 CLC_noRound:					;
 	mov	cl, es:[di].FB_charTable.CTE_width.WBF_frac
-	add	cs:[fracPosition], cl		;add in the fractional pos.
+	add	fs:[fracPosition], cl		;add in the fractional pos.
 	adc	dx, es:[di].FB_charTable.CTE_width.WBF_int
 	;
 	; We also need to round the y position to an integer
 	;
-	cmp	cs:fracYPosition, 0x80
+	cmp	fs:fracYPosition, 0x80
 	jb	CLC_noRoundY
 	inc	bx
 CLC_noRoundY:
@@ -596,7 +596,7 @@ CLCh_afterClip:
 BeforeFastCommon:
 	call	CheckCollisionsDS
 	jc	CLCh_realSlow			;if collision, use slow case 
-	test	cs:[stateFlags], mask AO_MASK_1
+	test	fs:[stateFlags], mask AO_MASK_1
 	jz	CLCh_realSlow			;
 	mov	di, es				;
 	mov	ds, di				; ds <- font ptr.
@@ -819,7 +819,7 @@ REVISION HISTORY:
 ;		to the next char line to draw.
 
 CGS_lineClipped:
-	mov	ch,cs:[bytesToDraw]		;load and fall thru
+	mov	ch,fs:[bytesToDraw]		;load and fall thru
 	;;; FALL THRU to skipEOLN
 ;----------------------------------------------------
 ; special case: rest of line clipped
@@ -837,17 +837,17 @@ CGS_realSlow:
 	jmp	CharGeneralRealSlow
 
 CharGeneralSlow	label near
-	test	cs:[stateFlags], mask AO_MASK_1
+	test	fs:[stateFlags], mask AO_MASK_1
 	jz	CGS_realSlow
-	mov	cs:[currentWin],ds	;save segment of window.
-	mov	cs:[currentLine],bx	;save current line of character.
+	mov	fs:[currentWin],ds	;save segment of window.
+	mov	fs:[currentLine],bx	;save current line of character.
 					;
 	call	CalcCharVars		;calculate drawing variables
 	;
 	; bx == pattern index for bitmap drivers.  Save it for
 	;       mono EGA as well.
 	;
-	StoreNextScanMod	<cs:[CGS_nextScanOffset]>,cx
+	StoreNextScanMod	<gs:[CGS_nextScanOffset]>,cx
 
 CGS_lineLoop:
 	call	SlowReadLine		; read data into lineDataBuffer
@@ -857,8 +857,8 @@ CGS_lineLoop:
 	;
 	; Check for clipping which requires special setup
 	;
-	mov	bx,cs:[currentLine]	; bx <- current character line.
-	inc	cs:[currentLine]	; advance to next one.
+	mov	bx,fs:[currentLine]	; bx <- current character line.
+	inc	fs:[currentLine]	; advance to next one.
 	tst	bx			; check for scan line off screen.
 	LONG js	CGS_afterLine		; skip to next one if it is.
 					;
@@ -869,7 +869,7 @@ CGS_lineLoop:
 	;
 	mov	cx,cs			; ds <- driver segment.
 	mov	ds,cx			;
-	assume	ds:@CurSeg
+	assume	ds:dgroup
 	mov	si, offset lineDataBuffer ; si <- offset to char line
 					;       data.
 	mov	bx,ds:[charByteOffset]	; bx <- offset to char data.
@@ -906,7 +906,7 @@ EGA <	mov	dl,ah			;;dl = extra bits		>
 	; (dispersed) dithering as well.	
 
 BIT <	mov	dh,al			; save mask			>
-BIT <	mov	al, {byte} cs:[bp][ditherMatrix] ;al = pattern 		>
+BIT <	mov	al, {byte} fs:[bp][ditherMatrix] ;al = pattern 		>
 BIT <	and	al, dh			; al = mask AND pattern		>
 BIT <	not	dh			;;dh = NOT mask			>
 BIT <	RW <	xornf di, 1					>	>
@@ -936,7 +936,7 @@ CGS_afterLine:
 	assume	ds:dgroup
 	pop	si			;
 
-MEM <	tst	cs:[bm_scansNext]	; see if off the end		>
+MEM <	tst	fs:[bm_scansNext]	; see if off the end		>
 MEM <	js	CGS_end			;				>
 	;
 	; on bitmap driver we need to advance to the next pattern byte.
@@ -944,7 +944,7 @@ MEM <	js	CGS_end			;				>
 BIT <	inc	bp			;;increment pattern pointer	>
 BIT <	and	bp,7							>
 
-	dec	cs:[linesToDraw]	;one less line to draw.
+	dec	fs:[linesToDraw]	;one less line to draw.
 	jz	CGS_end			;quit if none left.
 	jmp	CGS_lineLoop		;else loop to do the next one.
 CGS_end:				;
@@ -1011,13 +1011,13 @@ CGRS_getDrawMask:
 	push	ax			;
 	mov	ds,cs:[PSL_saveGState]	;
 	mov	ax, {word} ds:[GS_textAttr.CA_mask]
-	mov	{word} cs:[drawMask], ax
+	mov	{word} fs:[drawMask], ax
 	mov	ax, {word} ds:[GS_textAttr.CA_mask+2]
-	mov	{word} cs:[drawMask+2], ax
+	mov	{word} fs:[drawMask+2], ax
 	mov	ax, {word} ds:[GS_textAttr.CA_mask+4]
-	mov	{word} cs:[drawMask+4], ax
+	mov	{word} fs:[drawMask+4], ax
 	mov	ax, {word} ds:[GS_textAttr.CA_mask+6]
-	mov	{word} cs:[drawMask+6], ax
+	mov	{word} fs:[drawMask+6], ax
 	pop	ax			;
 	pop	ds			;
 	jmp	short CGRS_afterMask	;
@@ -1027,24 +1027,24 @@ CGRS_getDrawMask:
 ;		skips 'bytesToDraw' bytes in the character definition to get
 ;		to the next char line to draw.
 CGRS_lineClipped:
-;	mov	ch,cs:[bytesToDraw]		;load and fall thru
+;	mov	ch,fs:[bytesToDraw]		;load and fall thru
 ;	mov	cl,ch
 
-	mov	cl,cs:[bytesToDraw]		;load and fall thru
+	mov	cl,fs:[bytesToDraw]		;load and fall thru
 	clr	ch
 	add	di,cx
 	jmp	CGRS_afterWrite
 
 ;----------------------------------------------------
 CharGeneralRealSlow	label  near
-	mov	cs:[currentWin],ds	;save segment of window.
-	mov	cs:[currentLine],bx	;save current line of character.
+	mov	fs:[currentWin],ds	;save segment of window.
+	mov	fs:[currentLine],bx	;save current line of character.
 	jmp	short CGRS_getDrawMask	;
 CGRS_afterMask:
 	call	CalcCharVars		;calculate drawing variables
 	mov	bp, bx			;
 	and	bp, 7			;bp <- index into drawMask.
-	StoreNextScanMod	<cs:[CGRS_nextScanOffset]>,cx
+	StoreNextScanMod	<gs:[CGRS_nextScanOffset]>,cx
 
 CGRS_lineLoop:				;
 	call	SlowReadLine		; read data into lineDataBuffer
@@ -1053,8 +1053,8 @@ CGRS_lineLoop:				;
 	;
 	; Check for clipping which requires special setup
 	;
-	mov	bx,cs:[currentLine]	; bx <- current character line.
-	inc	cs:[currentLine]	; advance to next one.
+	mov	bx,fs:[currentLine]	; bx <- current character line.
+	inc	fs:[currentLine]	; advance to next one.
 	tst	bx			; check for scan line off screen.
 BIT <	LONG js	CGRS_afterLine		; skip to next one if it is.	>
 	call	SlowGenClip		; make sure clip info is correct
@@ -1064,7 +1064,7 @@ BIT <	LONG js	CGRS_afterLine		; skip to next one if it is.	>
 	;
 	mov	cx,cs			; ds <- driver segment.
 	mov	ds,cx			;
-	assume	ds:@CurSeg
+	assume	ds:dgroup
 	mov	si, offset lineDataBuffer ; si <- offset to char line
 					;       data.
 	mov	bx,ds:[charByteOffset]	; bx <- offset to char data.
@@ -1101,13 +1101,13 @@ CGRS_notEOLN:				;
 	; screen <- ! ((!screen & !mask) | (data & !pattern & mask))
 	; screen <- screen & !(data & mask) | (data & pattern & mask)
 	;
-BIT <	and	al, {byte} cs:[bp][drawMask]		;		>
+BIT <	and	al, {byte} fs:[bp][drawMask]		;		>
 BIT <	mov	dl, al			; 				>
 BIT <	not	dl			;				>
 BIT <	RW <	xornf di, 1					>	>
 BIT <	and	es:[di],dl		; 				>
 BIT <	RW <	xornf di, 1					>	>
-BIT <	and	al, {byte} cs:[bp][ditherMatrix]	 ;		>
+BIT <	and	al, {byte} fs:[bp][ditherMatrix]	 ;		>
 BIT <	RW <	xornf di, 1					>	>
 BIT <	or	es:[di], al		;				>
 BIT <	RW <	xornf di, 1					>	>
@@ -1130,7 +1130,7 @@ CGRS_afterLine:
 	pop	ds			;
 	assume	ds:dgroup
 	pop	si			;
-MEM <	tst	cs:[bm_scansNext]	; see if off the end		>
+MEM <	tst	fs:[bm_scansNext]	; see if off the end		>
 MEM <	js	CGRS_end		;				>
 	;
 	; advance to the next pattern byte.
@@ -1138,7 +1138,7 @@ MEM <	js	CGRS_end		;				>
 	inc	bp			;increment pattern pointer
 	and	bp,7
 
-	dec	cs:[linesToDraw]	;one less line to draw.
+	dec	fs:[linesToDraw]	;one less line to draw.
 	jz	CGRS_end		;quit if none left.
 	jmp	CGRS_lineLoop		;else loop to do the next one.
 CGRS_end:				;
@@ -1196,22 +1196,22 @@ CharGeneralFast	label  near
 	.warn	-unreach
 	call	CalcCharVars		;calculate drawing variables
 	.warn	@unreach
-	StoreNextScanMod	<cs:[CGF_nextScanOffset]>,cx
-	mov	bl,cs:[linesToDraw]	;bl <- number of char lines to draw.
+	StoreNextScanMod	<gs:[CGF_nextScanOffset]>,cx
+	mov	bl,fs:[linesToDraw]	;bl <- number of char lines to draw.
 
 CGF_lineLoop:
 	;
 	; Init for each line.
 	;
-	mov	cl,cs:[shiftCount]	;cl <- amount to shift italic.
-	mov	ch,cs:[bytesToDraw]	;ch <- bytes on each line.
+	mov	cl,fs:[shiftCount]	;cl <- amount to shift italic.
+	mov	ch,fs:[bytesToDraw]	;ch <- bytes on each line.
 	clr	dl			;no bits from last byte
 	;
 	; Loop for each byte -- load byte
 	;
 CGF_writeLoop:
 	clr	al			;
-	cmp	ch,cs:[extraBytesToDraw]
+	cmp	ch,fs:[extraBytesToDraw]
 	jbe	CGF_extra		;
 	lodsb				;al = mask, ah = extra data
 CGF_extra:
@@ -1223,7 +1223,7 @@ CGF_extra:
 	; screen <- (screen & !mask) | (data & mask)
 	;
 BIT <	mov	dh,al							>
-BIT <	and	al, {byte} cs:[bp][ditherMatrix] ;al = pattern 		>
+BIT <	and	al, {byte} fs:[bp][ditherMatrix] ;al = pattern 		>
 BIT <	not	dh			;;dh = NOT mask			>
 BIT <	RW <	xornf di, 1					>	>
 BIT <	mov	dl,es:[di]		;;dl = screen			>
@@ -1240,7 +1240,7 @@ BIT <	mov	dl,ah			;;dl = extra bits		>
 	LONG jnz CGF_writeLoop		;loop to write out the next one.
 
 	NextScanMod	di, CGF_nextScanOffset
-MEM <	tst	cs:[bm_scansNext]	; see if off the end		>
+MEM <	tst	fs:[bm_scansNext]	; see if off the end		>
 MEM <	js	CGF_end			;				>
 	;
 	; For bitmap drivers.
@@ -1309,14 +1309,14 @@ CharLarge label near
 					;
 	shr	ah,1			;
 	inc	ah			;ah = bytes to draw
-	mov	cs:[bytesToDraw],ah	;save.
+	mov	fs:[bytesToDraw],ah	;save.
 	sub	ah,al			;
-	mov	cs:[extraBytesToDraw],ah
+	mov	fs:[extraBytesToDraw],ah
 					;
-	mov	al,cs:[bytesToDraw]	;bytes to draw
+	mov	al,fs:[bytesToDraw]	;bytes to draw
 	clr	ah			;
 	neg	ax			;
-	StoreNextScanMod	<cs:[CL_nextScanOffset]>,ax
+	StoreNextScanMod	<gs:[CL_nextScanOffset]>,ax
 
 	; for vidmem, we probably need to do some extra work for clustered
 	; dithers
@@ -1330,7 +1330,7 @@ BIT <	mov	bp,bx			;;bp = pattern pointer		>
 BIT <	mov	dl,ch			;line count			>
 
 CL_lineLoop:
-	mov	bx,word ptr cs:[bytesToDraw] ;bl = bytes to draw, bh = extra
+	mov	bx,word ptr fs:[bytesToDraw] ;bl = bytes to draw, bh = extra
 	clr	ch			;clear extra bits
 CL_loop:
 	clr	al			;assume this is an exra byte
@@ -1346,7 +1346,7 @@ CL_extra:
 	;	screen <- (screen & !mask) | (data & mask)
 	;
 BIT <	mov	dh,al							>
-BIT <	and	al, {byte} cs:[bp][ditherMatrix] ;al = pattern 		>
+BIT <	and	al, {byte} fs:[bp][ditherMatrix] ;al = pattern 		>
 BIT <	not	dh			;;dh = NOT mask			>
 BIT <	RW <	xornf di, 1					>	>
 BIT <	mov	ch,es:[di]		;;dl = screen			>
@@ -1366,7 +1366,7 @@ BIT <	inc	bp			;;increment pattern pointer	>
 BIT <	and	bp,7							>
 
 	NextScanMod	di, CL_nextScanOffset
-MEM <	tst	cs:[bm_scansNext]	; see if off the end		>
+MEM <	tst	fs:[bm_scansNext]	; see if off the end		>
 MEM <	js	CC_end			;				>
 	;
 	; One less line to do.
@@ -1432,7 +1432,7 @@ CalcCharVars	proc	near
 	sar	ax,1				;calculate left byte index
 	sar	ax,1				;shift in from high bit
 	sar	ax,1				;(arithmetic shift)
-	mov	cs:[charByteOffset],ax		;save offset for line.
+	mov	fs:[charByteOffset],ax		;save offset for line.
 	;
 	; cx = right byte offset
 	;
@@ -1445,10 +1445,10 @@ CalcCharVars	proc	near
 	;
 	xchg	ax, bp				; ax = xpos, bp = byte pos
 	and	al, 7				;al = shift count for one byte.
-	mov	cs:[shiftCount],al		;
+	mov	fs:[shiftCount],al		;
 	sub	dx,bx				;
 	inc	dx				;
-	mov	cs:[linesToDraw],dl		;
+	mov	fs:[linesToDraw],dl		;
 	;
 	; set up screen offset
 	;
@@ -1472,7 +1472,7 @@ BIT <	mov	bp,bx			;;bp = pattern index		>
 	; calculate number of bytes to draw to
 	;
 	inc	cx			;cx = # of bytes to draw
-	mov	cs:[bytesToDraw],cl	;
+	mov	fs:[bytesToDraw],cl	;
 	mov	ah,cl			;ah = bytes to draw
 	neg	cx			;cx = offset on next scan line
 					;
@@ -1482,7 +1482,7 @@ BIT <	mov	bp,bx			;;bp = pattern index		>
 	shr	al,1			;
 	shr	al,1			;
 	sub	ah,al			;ah = extra bytes
-	mov	cs:[extraBytesToDraw],ah
+	mov	fs:[extraBytesToDraw],ah
 					;
 	add	si,CD_data-1		;ds:si = data
 					;

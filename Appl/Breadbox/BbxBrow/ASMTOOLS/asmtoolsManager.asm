@@ -102,7 +102,7 @@ SETVIDBW	endp
 
 ASM_TEXT        ends
 
-idata	segment  ; this is fixed
+ASMCONN_TEXT	segment  public 'CODE' ; this is fixed
 
 tcpDomain	char	"TCPIP",0
 sa	label	SocketAddress
@@ -118,7 +118,7 @@ xa	label	TcpAccPntResolvedAddress
 
 OpenConnectionRoutine	proc	far
 		mov	bx, cx			; bx = quitSem
-		mov	cx, segment idata
+		mov	cx, segment ASMCONN_TEXT
 		mov	dx, offset sa
 		mov	bp, 3600
 		call	SocketOpenDomainMedium
@@ -147,6 +147,6 @@ OPENCONNECTION	proc	far	quitSem:word
 		ret
 OPENCONNECTION	endp
 
-idata	ends
+ASMCONN_TEXT	ends
 
 

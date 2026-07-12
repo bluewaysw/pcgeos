@@ -335,7 +335,7 @@ useDefault:
 	call	ProcessStartupList
 
 exit:
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	; ds is initialized to ini key value and the segments
 	; is going to be destroyed here, with will end in an
 	; protection fault.		
@@ -645,12 +645,12 @@ REVISION HISTORY:
 	Cheng	12/89		Initial version
 
 -------------------------------------------------------------------------------@
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 nomemFlag	char	'nomem', 0
 endif
 
 LoadMemoryDriver	proc	near
-ifndef PRODUCT_GEOS32 ; XXX: Load only the disk swap driver? -dhunter 11/25/00
+ifndef PROTECTED_MODE ; XXX: Load only the disk swap driver? -dhunter 11/25/00
 	;
 	; if /nomem passed, load only the disk swap driver.
 	;
@@ -682,7 +682,7 @@ load::
 LoadMemoryDriver	endp
 
 
-ifndef PRODUCT_GEOS32 ; XXX: Load only the disk swap driver? -dhunter 11/25/00
+ifndef PROTECTED_MODE ; XXX: Load only the disk swap driver? -dhunter 11/25/00
 
 COMMENT @-----------------------------------------------------------------------
 

@@ -70,17 +70,26 @@ VidInit		proc	near
 		uses	ax,bx,dx
 		.enter
 
+		; Create an alias to the VideoCode segment so we can
+		; do self-modifying code.
+		mov	bx, cs
+		call	SysAllocCodeAlias
+		jc	abort		; ??? Do we abort this way?
+					; -- lshields 12/5/2000
+		mov	fs:aliasToCode, bx
+
+
 		; reset the deviceEnum to prohibit any function calls from
 		; happening...
 
-		mov	cs:[DriverTable].VDI_device, 0xffff
+		mov	fs:[DriverTable].VDI_device, 0xffff
 
 		; we have our own little stack, so save away some important
 		; stuff
 
-		mov	cs:[TPD_stackBot], offset dgroup:vidStackBot
-		mov	cs:[TPD_blockHandle], handle dgroup
-		mov	cs:[TPD_processHandle], handle 0
+		mov	fs:[TPD_stackBot], offset dgroup:vidStackBot
+		mov	fs:[TPD_blockHandle], handle dgroup
+		mov	fs:[TPD_processHandle], handle 0
 
 if 0		;MOVED to Loader -EDS 3/6/93
 		; get the current video mode.  The VESA standard says that
@@ -89,7 +98,7 @@ if 0		;MOVED to Loader -EDS 3/6/93
   ifndef	IS_CASIO
 		mov	ah, GET_VMODE			; get current mode
 		int	VIDEO_BIOS
-		mov	cs:[prevVideoMode], al		; save it for later
+		mov	fs:[prevVideoMode], al		; save it for later
   endif
 endif
 
@@ -98,12 +107,11 @@ endif
 
 		mov	ax, SGIT_INITIAL_TEXT_MODE
 		call	SysGetInfo			;al = SysInitialTextMode
-		mov	cs:[prevVideoMode], al		; save it for later
-
-		call	SetDevicePalette
+		mov	fs:[prevVideoMode], al		; save it for later
 
 		clc
 
+abort:
 		.leave
 		ret
 
@@ -155,7 +163,7 @@ if NT_DRIVER
 		clr	ds:[vddHandle]
 		pop	ds
 endif
-		cmp	cs:[DriverTable].VDI_device, 0xffff
+		cmp	fs:[DriverTable].VDI_device, 0xffff
 		je	done
 
 if not NT_DRIVER
@@ -164,7 +172,7 @@ if not NT_DRIVER
 		; (VESA Super VGA Standard VS891001, page 6, 10/1/89)
 
 		mov	ah, SET_VMODE			; set current mode
-		mov	al, cs:[prevVideoMode]		; restore it 
+		mov	al, fs:[prevVideoMode]		; restore it 
 		int	VIDEO_BIOS
 endif
 done:
@@ -173,7 +181,7 @@ done:
 VidExit		endp
 
 
-VideoMisc	segment	resource
+VideoCode	segment	resource
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		VidSetDevice
@@ -239,12 +247,12 @@ notFound:
 		
 		endp
 
-idata	segment
+VideoCode segment
 VidSetPtrFar	proc	far
 		call	VidSetPtr
 		ret
 VidSetPtrFar	endp
-idata	ends
+VideoCode	ends
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -386,4 +394,4 @@ VidUnsuspend	proc	far
 		ret
 VidUnsuspend	endp
 
-VideoMisc	ends
+VideoCode	ends

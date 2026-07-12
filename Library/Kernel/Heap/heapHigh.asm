@@ -447,7 +447,7 @@ EC <	call	AssertInterruptsEnabled					>
 EC <	call	ECCheckMemHandleFar					>
 	push	dx
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	; Ensure we don't later pop the selector we're going to free.
 	call	SafeNullSegmentRegs
 endif

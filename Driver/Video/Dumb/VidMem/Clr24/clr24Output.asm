@@ -67,8 +67,8 @@ REVISION HISTORY:
 
 DrawOptRect	proc	near
 
-                mov     ax, {word}cs:[currentColor].RGB_red
-                mov     bl, {byte}cs:[currentColor].RGB_blue
+                mov     ax, {word}fs:[currentColor].RGB_red
+                mov     bl, {byte}fs:[currentColor].RGB_blue
 
 		; calculate #bytes in the middle of the line and
 		; offset to next line
@@ -89,7 +89,7 @@ optLoop1:
 		jz	done
 
 		NextScan di			; adj ptr to next scan line
-		tst	cs:[bm_scansNext]	; if negative, bogus
+		tst	fs:[bm_scansNext]	; if negative, bogus
 		jns	lineLoop
 done:
 		ret
@@ -157,12 +157,12 @@ lineLoop:
 		mov	cx, dx			; setup count
 		mov	bh, bl			; reload tester
 pixelLoop:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixelDone
 
 		mov	ax, {word}ds:[di]	; get screen pixel
 		mov	bl, {byte}ds:[di+2]	; al=red, ah=green, bl=blue
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
 		mov	{word}es:[di], ax	; store result
 		mov	{byte}es:[di+2], bl
 pixelDone:
@@ -178,7 +178,7 @@ haveTester:
 		and	si, 0x7
 		NextScan di
 		segmov	ds, es			; update source reg
-		tst	cs:[bm_scansNext]	;
+		tst	fs:[bm_scansNext]	;
 		jns	lineLoop
 done:
 		pop	ds
@@ -247,28 +247,28 @@ ModeCLEAR	label	near
 ModeNOP         label	near
 		ret
 ModeCOPY        label	near
-                mov     ax, {word} cs:[currentColor].RGB_red
-                mov     bl, cs:[currentColor].RGB_blue
+                mov     ax, {word} fs:[currentColor].RGB_red
+                mov     bl, fs:[currentColor].RGB_blue
 		ret
 ModeAND         label	near      
-                and     ax, {word} cs:[currentColor].RGB_red
-                and     bl, cs:[currentColor].RGB_blue
+                and     ax, {word} fs:[currentColor].RGB_red
+                and     bl, fs:[currentColor].RGB_blue
 		ret
 ModeINVERT      label	near
                 xor     ax, 0FFFFh
                 xor     bl, 0FFh
 		ret
 ModeXOR         label	near
-                xor     ax, {word} cs:[currentColor].RGB_red
-                xor     bl, cs:[currentColor].RGB_blue
+                xor     ax, {word} fs:[currentColor].RGB_red
+                xor     bl, fs:[currentColor].RGB_blue
 		ret
 ModeSET         label	near
                 mov     ax, 0FFFFh
                 mov     bl, 0FFh
 		ret
 ModeOR          label	near
-                or      ax, {word} cs:[currentColor].RGB_red
-                or      bl, cs:[currentColor].RGB_blue
+                or      ax, {word} fs:[currentColor].RGB_red
+                or      bl, fs:[currentColor].RGB_blue
 		ret
 
 ModeRoutines	endp

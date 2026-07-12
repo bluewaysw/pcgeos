@@ -100,7 +100,7 @@ moduleTable	label	fptr
 	fptr	0				; end exclusive
 
 	fptr	0				; get a pixel color
-	fptr	Clr4Misc:VidGetBits	 	; GetBits in another module
+	fptr	Clr4:VidGetBits			; GetBits in another module
 	fptr	0				; set the ptr pic
 	fptr	0				; hide the cursor
 	fptr	0				; show the cursor
@@ -117,26 +117,20 @@ moduleTable	label	fptr
 
 	fptr	0				; rectangle
 	fptr	0				; char string
-	fptr	Clr4Blt:VidBitBlt		; BitBlt in another module
-	fptr	Clr4Bitmap:VidPutBits	  	; PutBits in another module
-	fptr	Clr4Line:VidDrawLine		; DrawLine in another module
+	fptr	Clr4:VidBitBlt			; BitBlt in another module
+	fptr	Clr4:VidPutBits			; PutBits in another module
+	fptr	Clr4:VidDrawLine		; DrawLine in another module
 	fptr	0				; draws a region
-	fptr	Clr4PutLine:VidPutLine		; PutLine in another module
-	fptr	Clr4Line:VidPolygon		; Polygon in another module
+	fptr	Clr4:VidPutLine			; PutLine in another module
+	fptr	Clr4:VidPolygon			; Polygon in another module
 	fptr	0				; ScreenOn in another module
 	fptr	0				; ScreenOff in another module
-	fptr	Clr4Line:VidPolyline		; Polyline in another module
-	fptr	Clr4Line:VidDashLine		; DashLine in another module
-	fptr	Clr4Line:VidDashFill		; DashFill in another module
+	fptr	Clr4:VidPolyline		; Polyline in another module
+	fptr	Clr4:VidDashLine		; DashLine in another module
+	fptr	Clr4:VidDashFill		; DashFill in another module
 	fptr	0				; SetPalette in another module
 	fptr	0				; SetPalette in another module
 .assert ($-moduleTable) eq (VidFunction*2)
-
-;----------------------------------------------------------------------------
-;		Video Semaphores
-;----------------------------------------------------------------------------
-
-videoSem	Semaphore	<1,0>
 
 ;------------------------------------------------------------------------------
 ;		Table of character drawing routines

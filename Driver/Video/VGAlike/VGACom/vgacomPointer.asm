@@ -93,7 +93,7 @@ SYNOPSIS:	Erase the graphics pointer
 
 CALLED BY:	EXTERNAL
 
-PASS:		nothing
+PASS:		fs - video driver dgroup
 
 RETURN:		nothing
 
@@ -110,15 +110,16 @@ PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
 REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Jim	10/88		Initial version
+	Name		Date		Description
+	----		----		-----------
+	Jim		10/88		Initial version
+	lshields	12/5/2000	GEOS32 Version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
 VidHidePtr	proc	near
-	inc	cs:cursorCount		; increment the nesting count
-	cmp	cs:cursorCount, 1		; if the cursor wasn't showing
+	inc	fs:cursorCount		; increment the nesting count
+	cmp	fs:cursorCount, 1		; if the cursor wasn't showing
 	jne	VHPdone			;  then all done 
 	call	EraseCursor		;  else erase it
 VHPdone:
@@ -161,11 +162,11 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
 VidShowPtr	proc	near
-	dec	cs:cursorCount		; set new value for nest count
+	dec	fs:cursorCount		; set new value for nest count
 EC <	ERROR_S	VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			>
-	cmp	cs:cursorCount, 0		; see if we need to draw it
+	cmp	fs:cursorCount, 0		; see if we need to draw it
 	jg	VShPdone		;  no, just dec the visible flag
-	mov	cs:cursorCount, 0		; just in case it went neg.
+	mov	fs:cursorCount, 0		; just in case it went neg.
 	call	CalcPtrLoc		; calc current pointer location
 	call	DrawCursor		;  yes, draw it
 VShPdone:
@@ -185,6 +186,7 @@ CALLED BY:	INTERNAL
 
 PASS:		ax	- new x position
 		bx	- new y position
+		fs	- dgroup of video driver
 
 RETURN:		al	- mask of save-under areas that pointer hot-spot
 			  overlaps with
@@ -205,16 +207,17 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		none
 
 REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Jim	10/88...	Initial version
-	Doug	1/90		Added return of save-under data, for 
-				window enter/leave fixes (to work w/save under)
+	Name		Date		Description
+	----		----		-----------
+	Jim		10/88...	Initial version
+	Doug		1/90		Added return of save-under data, for 
+					window enter/leave fixes (to work w/save under)
+	lshields	12/5/2000	GEOS32 Version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 VidMovePtr	proc	near
-	cmp	cs:cursorCount, 0		; is cursor visible now ?
+	cmp	fs:cursorCount, 0		; is cursor visible now ?
 	jnz	VMPnewpos		;  no, don't have to erase it
 	push	ax			;  yes, save new position...
 	push	bx
@@ -229,27 +232,27 @@ VMPnewpos:
 	push	bx			; for save-under area check
 
 	clr	ch
-	mov	cl, cs:[cursorHotX]
+	mov	cl, fs:[cursorHotX]
 	sub	ax, cx			; translate from hot point
-	mov	cl, cs:[cursorHotY]
+	mov	cl, fs:[cursorHotY]
 	sub	bx, cx			; translate from hot point
 
 	; if moving XOR region with pointer then do special stuff
 
-	cmp	cs:[xorFlags], 0
+	cmp	fs:[xorFlags], 0
 	jz	noXOR
 	push	ax, bx			; save new position
-	sub	ax, cs:[cursorX]
-	sub	bx, cs:[cursorY]
+	sub	ax, fs:[cursorX]
+	sub	bx, fs:[cursorY]
 	call	UpdateXORForPtr
 	pop	ax, bx
 noXOR:
 
-	mov	cs:[cursorX], ax		; store them away
-	mov	cs:[cursorY], bx
+	mov	fs:[cursorX], ax		; store them away
+	mov	fs:[cursorY], bx
 
 ;	now positions are updated, redraw picture if necc
-	cmp	cs:[cursorCount], 0	; if zero, then it was visible
+	cmp	fs:[cursorCount], 0	; if zero, then it was visible
 	jnz	AfterCursorRedrawn
 
 ;	push	ax
@@ -265,7 +268,7 @@ AfterCursorRedrawn:
 	pop	bx			; Restore hot point position
 	pop	ax			; for save-under area check
 
-	cmp	cs:[suCount], 0			; any active save under areas?
+	cmp	fs:[suCount], 0			; any active save under areas?
 	jne	CheckSUAreas
 	clr	al
 	ret
@@ -308,15 +311,16 @@ KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		Currently cursor size is fixed at 16x16 pixels.  
 
 REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Jim	10/88...	Initial version
+	Name		Date		Description
+	----		----		-----------
+	Jim		10/88...	Initial version
+	lshields	12/5/2000	GEOS32 Version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
 VidSetPtr	proc	near
 	push	es			; save window seg
-	cmp	cs:cursorCount, 0	; see if it's currently on-screen
+	cmp	fs:cursorCount, 0	; see if it's currently on-screen
 	jnz	VSPnoshow		;  no, safe to proceed
 	push	ds, si			; save passed params
 	call	EraseCursor		;  yes, restore screen before changing
@@ -324,8 +328,10 @@ VidSetPtr	proc	near
 VSPnoshow:
 	cmp	si, -1			; see if want to use standard cursor
 	jne	VSPcom			;  no, skip ahead
-	segmov	ds, cs			; set up addressing ds->cs
-	mov	si, offset cs:pBasic	; ds:si -> basic cursor 
+	segmov	ds, fs			; set up addressing ds->cs
+	assume ds:dgroup
+
+	mov	si, offset ds:pBasic	; ds:si -> basic cursor 
 VSPcom:						; now both cases are the same
 EC <	mov	bl, ds:[si].PD_width					>
 EC <	and	bl, mask PDW_WIDTH	; Get width portion of byte	> 
@@ -337,21 +343,21 @@ EC <	ERROR_NE VIDEO_ONLY_SUPPORTS_16x16_CURSORS			>
 	; translate old current position to new one, based on new hotpoint
 
 	clr	ch
-	mov	ax, cs:[cursorX]		; get current x position
-	mov	cl, cs:[cursorHotX]	; remove effect of old hot point
+	mov	ax, fs:[cursorX]		; get current x position
+	mov	cl, fs:[cursorHotX]	; remove effect of old hot point
 	add	ax, cx
 	mov	cl, bl			; move over new hotpoint
 	sub	ax, cx
-	mov	cs:[cursorX], ax		; store new x position
-	mov	cs:[cursorHotX], bl	; store new x hot point
+	mov	fs:[cursorX], ax		; store new x position
+	mov	fs:[cursorHotX], bl	; store new x hot point
 
-	mov	ax, cs:[cursorY]		; get current y position
-	mov	cl, cs:[cursorHotY]	; remove effect of old hot point
+	mov	ax, fs:[cursorY]		; get current y position
+	mov	cl, fs:[cursorHotY]	; remove effect of old hot point
 	add	ax, cx
 	mov	cl, bh			; move over new hotpoint
 	sub	ax, cx
-	mov	cs:[cursorY], ax		; store new y position
-	mov	cs:[cursorHotY], bh	; store new y hot point
+	mov	fs:[cursorY], ax		; store new y position
+	mov	fs:[cursorHotY], bh	; store new y hot point
 
 ;	since the source is required to have all 32 bytes for both image
 ;	and mask, just move them over.  but wait -- if we alter the mask on
@@ -360,17 +366,20 @@ EC <	ERROR_NE VIDEO_ONLY_SUPPORTS_16x16_CURSORS			>
 ;	ourMask = !passedMask
 ;	ourImage = passedImage
 
-	segmov	es, cs			; get es:di pointing to local buffer
-	mov	di, offset cs:cursorImage ; get pointer to buffer
+	segmov	es, fs			; get es:di pointing to local buffer
+	assume	es:dgroup
+
+	mov	di, offset ds:cursorImage ; get pointer to buffer
 	mov	cx, CUR_IMAGE_SIZE	; two 32-byte buffers to fill
 	rep	movsw
 
 ; 	Invert the cursor's image if we're drawing on black.
-MEGA <	tst	cs:[inverseDriver]					>
+MEGA <	tst	ds:[inverseDriver]					>
 MEGA <	jz	noXOR							>
-MEGA <	mov	di, offset cs:cursorImage+CUR_IMAGE_SIZE; get ptr to buff >
-MEGA <	segmov	ds, cs			; get ds:si pointing to mask	>
-MEGA <	mov	si, offset cs:cursorImage ; get pointer to mask buffer	>
+MEGA <	mov	di, offset ds:cursorImage+CUR_IMAGE_SIZE; get ptr to buff >
+MEGA <	segmov	ds, fs			; get ds:si pointing to mask	>
+MEGA <	assume	ds:dgroup						>
+MEGA <	mov	si, offset ds:cursorImage ; get pointer to mask buffer	>
 MEGA <	mov	cx, CUR_IMAGE_SIZE	; one 32-byte buffers to fill	>
 MEGA <xorLoop:								>
 MEGA <	mov	al, ds:[si]						>
@@ -382,7 +391,7 @@ MEGA <noXOR:								>
 
 	; all done with the setup, so draw it if we need to
 
-	cmp	cs:cursorCount, 0	; see if cursor should be visible
+	cmp	fs:cursorCount, 0	; see if cursor should be visible
 	jnz	VSPquit			;  no, just quit
 	call	CalcPtrLoc		; calc new location
 	call	DrawCursor		;  yes, draw the new image to the scrn
@@ -392,7 +401,6 @@ VSPquit:
 
 VidSetPtr	endp
 	public	VidSetPtr
-
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -442,10 +450,10 @@ EraseCursor	proc	near
 	mov	dx, GR_CONTROL
 	mov	ds, si			; also set ds -> frame buffer
 	mov	si, CURSOR_BACK 	; set up source ptr to backing store
-	mov	di, cs:[d_ptrLoc]	; get index to pointer location
-	mov	ch, cs:[d_byteXPos]	; byte x position
+	mov	di, fs:[d_ptrLoc]	; get index to pointer location
+	mov	ch, fs:[d_byteXPos]	; byte x position
 	mov	cl, CUR_SIZE		; number of lines to do
-	mov	bp, cs:[cursorY]		; bp = current line number
+	mov	bp, fs:[cursorY]		; bp = current line number
 
 ;	do all the EGA setup stuff
 	mov	ax, EN_SR_ALL		; enable all bits in set/reset reg
@@ -455,7 +463,7 @@ EraseCursor	proc	near
 	mov	ax, DATA_ROT_COPY	; set to the copy function
 	out	dx, ax
 
-	cmp	cs:[d_wholeFlag], 1	; see if on screen
+	cmp	fs:[d_wholeFlag], 1	; see if on screen
 	je	EraseWholePtr
 	GOTO	ErasePartialPtr
 EraseCursor	endp
@@ -552,14 +560,14 @@ DrawCursor	proc	near
 
 ;	save the screen memory 
 	call	SaveBackground		; write screen mem to backing store
-	segmov	ds, cs			; set up data seg -> driver space
+	segmov	ds, fs			; set up data seg -> driver space
 
 ;	OR the cursor mask data
 	mov	ax, DATA_ROT_COPY	; OR the mask to the screen
 	out	dx, ax			;  this sets the white part of the cur
 	mov	ax, SR_BLACK		; set the color register to white
 	out	dx, ax			;  this sets the white part of the cur
-	mov	si, offset cs:cursorImage	; set up pointer to video mem
+	mov	si, offset fs:cursorImage	; set up pointer to video mem
 	call	CopyCursor		; OR the cursor mask
 
 ;	AND the cursor image data
@@ -567,7 +575,7 @@ DrawCursor	proc	near
 	out	dx, ax			;  this sets the black part of the cur
 	mov	ax, SR_WHITE		; set the color register to black
 	out	dx, ax			;  this sets the white part of the cur
-	mov	si, offset cs:cursorImage+CUR_IMAGE_SIZE
+	mov	si, offset fs:cursorImage+CUR_IMAGE_SIZE
 	call	CopyCursor		; AND the cursor image
 
 	GOTO	SetEGAState		; and reset state to former values
@@ -612,12 +620,12 @@ SaveBackground	proc	near
 	mov	dx, GR_CONTROL
 	mov	ds, si			; also set ds -> frame buffer
 
-	mov	si, cs:[d_ptrLoc]	; get pointer into frame buffer
+	mov	si, fs:[d_ptrLoc]	; get pointer into frame buffer
 	mov	di, CURSOR_BACK 	; set up dest ptr to backing store
 
-	mov	ch, cs:[d_byteXPos]	; ch = byte position (signed)
+	mov	ch, fs:[d_byteXPos]	; ch = byte position (signed)
 	mov	cl, CUR_SIZE		; cl = number of lines to do
-	mov	bp, cs:[cursorY]		; bp = current line number
+	mov	bp, fs:[cursorY]		; bp = current line number
 
 ;	do all the EGA setup stuff
 	mov	ax, EN_SR_ALL		; enable all bits in set/reset reg
@@ -627,7 +635,7 @@ SaveBackground	proc	near
 	mov	ax, DATA_ROT_COPY	; set to the copy function
 	out	dx, ax
 
-	cmp	cs:[d_wholeFlag], 1	; see if on screen
+	cmp	fs:[d_wholeFlag], 1	; see if on screen
 	je	SaveWholePtr
 	GOTO	SavePartialPtr
 SaveBackground	endp
@@ -735,21 +743,20 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 CopyCursor	proc	near
-	mov	di, cs:[d_ptrLoc]	; di = offset into frame buffer
-	mov	cl, cs:[d_byteXPos]
-	mov	cs:[d_temp1L], cl 	; save byte x position
-	mov	cl, byte ptr cs:[cursorX] ; get lo byte of x position
+	mov	di, fs:[d_ptrLoc]	; di = offset into frame buffer
+	mov	cl, fs:[d_byteXPos]
+	mov	fs:[d_temp1L], cl 	; save byte x position
+	mov	cl, byte ptr fs:[cursorX] ; get lo byte of x position
 	and	cl, 7			; cl = shift count
 	mov	bl, CUR_SIZE		; d_temp1+1 = # of lines to do
-	mov	cs:[d_temp1H], bl 
-	mov	bp, cs:[cursorY]		; bp = current line number
+	mov	fs:[d_temp1H], bl 
+	mov	bp, fs:[cursorY]		; bp = current line number
 
-	cmp	cs:[d_wholeFlag], 1	; see if on screen
+	cmp	fs:[d_wholeFlag], 1	; see if on screen
 	je	CopyWholePtr
 	GOTO	CopyPartialPtr
 CopyCursor	endp
 	public	CopyCursor
-
 
 CopyWholePtr	proc	near
 ;	implement separate loop for the no-shift case
@@ -828,7 +835,7 @@ CPPnsloop:
 	
 ;	for (xbytepos=curX; xbytepos < curX+width; xbytepos++)
 CPPndone:
-	mov	ch, cs:[d_temp1L]	; ch <- left side byte position
+	mov	ch, fs:[d_temp1L]	; ch <- left side byte position
 	or	ch, ch			; see if we're off the left edge
 	js	CPPnsx			;  yes, go to next byte
 	cmp	ch, BWID_SCR		; see if off right edge
@@ -866,7 +873,7 @@ CPPlineloop:
 	jge	CPPdone			;  then stop drawing altogether
 
 ;	for (xbytepos=curX; xbytepos < curX+width; xbytepos++)
-	mov	ch, cs:[d_temp1L]	; bh <- left side byte position
+	mov	ch, fs:[d_temp1L]	; bh <- left side byte position
 	mov	bh, 0			; start out shifting in zeroes
 	mov	al, ds:[si]		; get the next byte
 	mov	ah, al			; copy byte to upper half
@@ -928,8 +935,8 @@ PASS:		cursorX	- current x position
 RETURN:		cx	- xpos >> 3
 		di	- offset into frame buffer
 
-		cs:[d_ptrLoc] 	= di
-		cs:[d_byteXPos]	= cl
+		fs:[d_ptrLoc] 	= di
+		fs:[d_byteXPos]	= cl
 
 DESTROYED:	bp
 
@@ -947,32 +954,32 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 CalcPtrLoc	proc	near
-	mov	cx, cs:[cursorX]		; get x position
+	mov	cx, fs:[cursorX]		; get x position
 	and	cx, 0fff8h		; force to a byte boundary
-	mov	cs:[cursorRegLeft], cx	; save left side
+	mov	gs:[cursorRegLeft], cx	; save left side
 	mov	di, cx
 	add	di, 23
-	mov	cs:[cursorRegRight], di	; save left side
+	mov	gs:[cursorRegRight], di	; save left side
 
 	sar	cx, 1			; divide by 8 to get byte position
 	sar	cx, 1			; (yes, this all works with negative
 	sar	cx, 1			;   numbers)
-	mov	di, cs:[cursorY]		; di = current line number
-	mov	cs:[cursorRegTop], di	; save it
+	mov	di, fs:[cursorY]		; di = current line number
+	mov	gs:[cursorRegTop], di	; save it
 	mov	bp, di
 	add	bp, 15
-	mov	cs:[cursorRegBottom], bp	; save it
+	mov	gs:[cursorRegBottom], bp	; save it
 
 	mov	bp,cx			; offset into line
 	CalcScanLine	di, bp		;; calc offset into screen buffer,
 					;; add in bp
 
-	mov	cs:[d_ptrLoc], di	; and save it
-	mov	cs:[d_byteXPos], cl	; save byte offset into scan line
+	mov	fs:[d_ptrLoc], di	; and save it
+	mov	fs:[d_byteXPos], cl	; save byte offset into scan line
 
 ;	since we'll be all on-screen most of the time, do a check for it
 	mov	ch, 0			; assume whole cursor is not on screen
-	mov	bp, cs:[cursorY]		; get y position
+	mov	bp, fs:[cursorY]		; get y position
 	or	bp, bp			; first check y direction
 	js	CPLblocked		;  nope, partially off screen
 	cmp	bp, HEIGHT_SCR-CUR_SIZE	; see if fit on bottom
@@ -983,7 +990,7 @@ CalcPtrLoc	proc	near
 	jg	CPLblocked
 	inc	ch
 CPLblocked:
-	mov	cs:[d_wholeFlag], ch	; signal it is on screen
+	mov	fs:[d_wholeFlag], ch	; signal it is on screen
 	ret
 CalcPtrLoc	endp
 	public	CalcPtrLoc
@@ -1030,13 +1037,13 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 CondHidePtr	proc	near
-	cmp	cs:cursorCount, 0		; if it's gone, don't try to erase it
+	cmp	fs:cursorCount, 0		; if it's gone, don't try to erase it
 	jne	CHPend			;   again
-	cmp	cs:[hiddenFlag],0
+	cmp	fs:[hiddenFlag],0
 	jne	CHPend
 
 ;	we have a live candidate, erase it
-	mov	cs:[hiddenFlag], 1	; set the erased flag
+	mov	fs:[hiddenFlag], 1	; set the erased flag
 	push	ax, bx, cx, dx, si, di, bp, ds, es
 	call	EraseCursor		; then erase it
 	pop	ax, bx, cx, dx, si, di, bp, ds, es
@@ -1054,9 +1061,62 @@ CondShowPtrFar	endp
 CondShowPtr	proc	near
 	push	ds, es, bp
 	call	DrawCursor		;  yes, re-draw it
-	mov	cs:[hiddenFlag],0
+	mov	fs:[hiddenFlag],0
 	pop	ds, es, bp
 	ret
 
 CondShowPtr	endp
 	public	CondShowPtr
+
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetupVGAAccess
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Created the real mode memory access for the screen memory
+		area.  This area is normally thought of as being at 0xA000.
+
+CALLED BY:	INTERNAL
+
+PASS:		none (looks at G_mainScreenBuffer)
+		fs - dgroup of video driver
+
+RETURN:		nothing
+
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		See if there 0 in G_mainScreenBuffer and if so,
+		setup a GPMI selector to the real address of 0xA000.
+		Then setup G_altScreenBuffer to be the area not used
+		by the video space for 'save under' stuff.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	lshields	12/5/2000	Created.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetupVGAAccess	proc	near
+	uses ax, cx
+	.enter
+	mov	ax, fs:G_mainScreenBuffer
+	xor	ax, ax
+	jne	done
+	mov	ax, SCREEN_BUFFER
+	mov	cx, 0xFFFF
+	call	SysMapRealSegment
+	mov	fs:G_mainScreenBuffer, ax
+	mov	ax, ALT_SCREEN_BUFFER
+	mov	cx, SAVE_AREA_SIZE
+	call	SysMapRealSegment
+	mov	fs:G_altScreenBuffer, ax
+done:
+	.leave
+	ret
+SetupVGAAccess	endp

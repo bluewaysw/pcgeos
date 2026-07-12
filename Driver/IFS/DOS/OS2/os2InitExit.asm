@@ -76,10 +76,7 @@ OS2Init		proc	far
 		jc	haveCodePage		;  ...on error
 		mov_tr	ax, bx			; ax <- active code page
 haveCodePage:
-if DBCS_PCGEOS
-else
 		call	LocalSetCodePage
-endif
 		call	DOSInitUseCodePage
 ;registerDriver:	
 	;
@@ -104,12 +101,6 @@ endif
 
 		call	OS2LocateDrives
 
-if	SEND_DOCUMENT_FCN_ONLY
-ifdef	GPC
-		call	DOSInitEnhancedModeFlag
-endif	; GPC
-endif	; SEND_DOCUMENT_FCN_ONLY
-
 	;
 	; Figure the extent, location and usage of our JFT
 	;
@@ -117,12 +108,20 @@ endif	; SEND_DOCUMENT_FCN_ONLY
 		mov	ax, es:[PSP_numHandles]		; fetch and record
 		mov	ds:[jftSize], ax		;  number of handles
 		mov	ds:[jftEntries].Sem_value, ax	;  in the JFT
-
-		les	di, es:[PSP_jftAddr]		; locate and record
-		mov	ds:[jftAddr].offset, di		;  the JFT itself
-		mov	ds:[jftAddr].segment, es
-
-		xchg	ax, cx				; cx <- # handles
+	;
+	; Locate and record the JFT itself, getting a selector to
+	; this special table that isn't aliased by DOS extenders.
+	;
+		mov_tr	cx, ax				;cx = table size
+		push	cx				;save size
+		movdw	axdi, es:[PSP_jftAddr]		;ax = real mode segment
+		add	cx, di				;cx = JFT end offset
+		dec	cx				;cx = limit
+		call	SysMapRealSegment		;ax = selector
+		mov	ds:[jftAddr].offset, di
+		mov	ds:[jftAddr].segment, ax
+		mov	es, ax
+		pop	cx				;cx = table size
 		mov	al, NIL				; look for free handles
 countLoop:	
 		scasb					; Handle free?
@@ -131,6 +130,12 @@ countLoop:
 							;  available handle
 nextHandle:
 		loop	countLoop
+
+if	SEND_DOCUMENT_FCN_ONLY
+ifdef	GPC
+		call	DOSInitEnhancedModeFlag
+endif	; GPC
+endif	; SEND_DOCUMENT_FCN_ONLY
 
 EC <		segmov	es, ds	; avoid ec +segment death (es is PSP) >
 		call	DOSInitOpenFiles
@@ -433,8 +438,7 @@ EC <		pop	es						>
 	; 
 		mov	al, bl
 		add	al, 'A'			; form name of drive
-SBCS <		mov	ds:[driveName][0], al 				>
-DBCS <		mov	{byte}ds:[driveName][0], al 			>
+		mov	ds:[driveName][0], al
 		mov	bx, si			; bx <- private data
 		sub	al, 'A'			; al <- drive number again
 		mov	dx, ds:[fsdOffset]	; FSD to manage it (us)

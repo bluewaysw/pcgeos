@@ -127,14 +127,14 @@ VidSetPalette	proc	near
 
 		tst	ah			; 1=default
 		jz	setCustom
-		cmp	ah, cs:[defPalFlag]	; if already default, bail
+		cmp	ah, fs:[defPalFlag]	; if already default, bail
 		je	exit
 
 		; setup destination of write
 setCustom:
-		mov	cs:[defPalFlag], ah	; set new flag
+		mov	fs:[defPalFlag], ah	; set new flag
 		clr	ah
-		segmov	es, cs			
+		segmov	es, ds			
 		mov	di, offset currentPalette ; es:di -> dest buffer
 		mov	ds, dx			; ds:si -> source buffer
 
@@ -223,7 +223,7 @@ MONO <		mov	cl, 3			; need byte index	>
 MONO <		shr	ax, cl			; ax = byte index	>
 MONO <		add	si, ax			; ds:si -> right byte	>
 MONO <		lodsb				; get byte value	>
-MONO <		and	al, cs:[monoBitPos][bx]	; isolate byte		>
+MONO <		and	al, gs:[monoBitPos][bx]	; isolate byte		>
 MONO <		tst	al			; if set, move to first bit >
 MONO <		jz	haveIndex					>
 MONO <		mov	al, 1			; if not zero, it's one	>
@@ -248,8 +248,8 @@ C4 <		and	bx, 7			; isolate bit position 	>
 C4 <		mov	cl, 3			; need byte index	>
 C4 <		shr	ax, cl			; ax = byte index	>
 C4 <		add	si, ax			; ds:si -> right byte	>
-C4 <		mov	ah, cs:[pixelMask][bx]	; get pixel mask	>
-C4 <		mov	cl, cs:[pixelShift][bx]	; and shift count	>
+C4 <		mov	ah, gs:[pixelMask][bx]	; get pixel mask	>
+C4 <		mov	cl, gs:[pixelShift][bx]	; and shift count	>
 C4 <		call	ReadVGAPixel		; get pixel in al	>
 endif
 		; OK, we have the palette index.  Load up the components.
@@ -260,9 +260,9 @@ MONO <haveIndex:							>
 		mov	bx, ax			; *3 to index into palette
 		shl	ax, 1
 		add	bx, ax			; bx = palette byte index
-		mov	al, cs:[currentPalette][bx].RGB_red ; get RED
+		mov	al, gs:[currentPalette][bx].RGB_red ; get RED
 		mov	ah, cl			; restore index
-		mov	bx, {word}cs:[currentPalette][bx+1]
+		mov	bx, {word}gs:[currentPalette][bx+1]
 else
 		CLR24GetPixel
 endif

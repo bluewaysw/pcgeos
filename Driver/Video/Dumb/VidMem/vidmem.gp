@@ -36,8 +36,13 @@ tokenid		0
 # Make this module fixed so we can put the strategy routine there
 #
 resource Main fixed code read-only shared
-resource monogroup code discardable swapable shared
-resource clr4group code discardable swapable shared
-resource clr8group code discardable swapable shared
-resource clr24group code discardable swapable shared
-resource cmykgroup code discardable swapable shared
+resource Mono code discardable swapable shared
+resource Clr4 code discardable swapable shared
+resource Clr8 code discardable swapable shared
+resource Clr24 code discardable swapable shared
+resource cmykcode code discardable swapable shared
+resource monogroup fixed data shared
+resource clr4group fixed data shared
+resource clr8group fixed data shared
+resource clr24group fixed data shared
+resource cmykgroup fixed data shared

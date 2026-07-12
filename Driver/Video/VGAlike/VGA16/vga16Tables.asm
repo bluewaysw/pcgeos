@@ -25,10 +25,10 @@ DESCRIPTION:
 
 		; jump table for different (small) char drawing
 FCC_table	label	word
-	dw	offset dgroup:Char1In1Out	;load 1 byte
-	dw	offset dgroup:Char2In2Out	;load 2 bytes
-	dw	offset dgroup:Char3In3Out	;load 3 bytes
-	dw	offset dgroup:Char4In4Out	;load 4 bytes
+	dw	offset VideoCode:Char1In1Out	;load 1 byte
+	dw	offset VideoCode:Char2In2Out	;load 2 bytes
+	dw	offset VideoCode:Char3In3Out	;load 3 bytes
+	dw	offset VideoCode:Char4In4Out	;load 4 bytes
 
 
 drawModeTable	label	 word

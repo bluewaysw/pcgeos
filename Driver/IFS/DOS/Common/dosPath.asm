@@ -843,14 +843,19 @@ endif
 	;
 	; Copy the longname into the header.
 	; 
-		segxchg	ds, es
 		mov	si, di		; ds:si - longname
+				
+		LocalStrLength	includeNull
+		segxchg	ds, es
 		mov	di, offset dosInitHeader.GFH_longName
-		mov	cx, (size GFH_longName)/2
-		CheckHack <(size GFH_longName and 1) eq 0>
-		rep	movsw
+		;mov	cx, (size GFH_longName)/2
+		;CheckHack <(size GFH_longName and 1) eq 0>
+		
+		rep	movsb
 		segxchg	ds, es
 
+		pop		ax
+		push	ax
 	;
 	; Set the file type to that passed.
 	; 

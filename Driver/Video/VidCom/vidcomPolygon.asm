@@ -290,7 +290,7 @@ bottomOK:
 fillLoop:
 		shl	bx, 1			; access left-side buffer
 		mov	si, di			; set buffer to curr right
-NMEM <		xchg	si, cs:[polyEdge][bx]	; load left coordinate	>
+NMEM <		xchg	si, gs:[polyEdge][bx]	; load left coordinate	>
 MEM  <		mov	es, ss:[bm_segment]	; reload point buf segment >
 MEM  <		xchg	si, es:[VIDMEM_POINT_BUF][bx]			>
 		shr	bx, 1
@@ -351,7 +351,7 @@ ScanPolygonLeft	proc	near
 
 		push	es, di
 MEM  <		mov	es, ss:[bm_segment]	; es -> HugeArray dir block >
-NMEM <		segmov	es, cs, ax					>
+NMEM <		segmov	es, gs, ax					>
 		mov	ax, MAX_COORD		; use a big one
 		mov	cx, ss:[polyMaxY]	; get max Y value
 MEM <		mov	di, es:[EB_bm].CB_simple.B_height ; limit to dev size>
@@ -494,7 +494,7 @@ bottomOK:
 		mov	cx, dx
 		sub	cx, bx			; cx = #scans - 1
 		inc	cx			; cx = #scans to fill
-NMEM <		segmov	es, cs, dx		; es -> scan line buffer >
+NMEM <		segmov	es, gs, dx		; es -> scan line buffer >
 NMEM <		mov	di, offset polyEdge	; es:di -> edge buffer	 >
 MEM  <		mov	di, VIDMEM_POINT_BUF	; add offset to buffer	>
 		shl	bx, 1			; top coordinate

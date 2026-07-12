@@ -414,7 +414,7 @@ NOAXIP<	mov	ds:[TPD_dgroup], ax					>
 
 	; free the loader itself.
 
-ifndef PRODUCT_GEOS32       ; GEOS32 requires the loader for the GPMI routines
+ifndef PROTECTED_MODE       ; GEOS32 requires the loader for the GPMI routines
 NOAXIP <	mov	bx, ds:[loaderVars].KLV_handleBottomBlock	>
 NOAXIP <	mov	bx, ds:[bx].HM_prev				>
 NOAXIP <	call	MemFree						>

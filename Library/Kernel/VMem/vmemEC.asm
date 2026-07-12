@@ -1339,6 +1339,7 @@ VMCheckDSHeader	proc	far	uses ax, cx, si, es, di, dx
 	cmp	ds:[di].VMBH_sig, VMBT_DUP	; in-use?
 	jb	30$
 	mov	si, ds:[di].VMBH_memHandle	; in-use; in-core?
+check:
 	tst	si
 	jz	30$
 	cmp	es:[handleBeingForceMoved], si

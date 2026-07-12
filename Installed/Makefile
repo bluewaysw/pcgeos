@@ -7,44 +7,44 @@ MAKELIB	:	.USE
 #if defined(linux)
 	mkdir -p ../$(.TARGET)
 	cd ../$(.TARGET)
-	$(MAKE) -k -I../$(.TARGET) full lib
+	$(MAKE) -I../$(.TARGET) full lib
 #else
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full lib
+	$(MAKE) -I..\$(.TARGET:S/\//\\/g) full lib
 #endif
 
 MAKETOOL:	.USE
 #if defined(linux)
 	mkdir -p ../$(.TARGET)
 	cd ../$(.TARGET)
-	$(MAKE) -k -I../$(.TARGET) full
+	$(MAKE) -I../$(.TARGET) full
 #else
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
+	$(MAKE) -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
 MAKEDRV:	.USE
 #if defined(linux)
 	mkdir -p ../$(.TARGET)
 	cd ../$(.TARGET)
-	$(MAKE) -k -I../$(.TARGET) full
+	$(MAKE) -I../$(.TARGET) full
 #else
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
+	$(MAKE) -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
 MAKEAPPL:	.USE
 #if defined(linux)
 	mkdir -p ../$(.TARGET)
 	cd ../$(.TARGET)
-	$(MAKE) -k -I../$(.TARGET) full
+	$(MAKE) -I../$(.TARGET) full
 #else
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g) full
+	$(MAKE) -I..\$(.TARGET:S/\//\\/g) full
 #endif
 
 MAKESTUB:	.USE
@@ -53,13 +53,13 @@ MAKESTUB:	.USE
 	cd ../$(.TARGET)
 	cd ..
 	export SUBDIRS=$(.TARGET:X*\/Stub\/\\[*\\])
-	$(MAKE) -k -I../$(.TARGET)
+	$(MAKE) -I../$(.TARGET)
 #else
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
 	cd ..
 	set  SUBDIRS=$(.TARGET:X*\/Stub\/\\[*\\])
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g)
+	$(MAKE) -I..\$(.TARGET:S/\//\\/g)
 #endif
 
 MAKESTUB32:	.USE
@@ -68,13 +68,13 @@ MAKESTUB32:	.USE
 	cd ../$(.TARGET)
 	cd ..
 	export SUBDIRS=$(.TARGET:X*\/Stub32\/\\[*\\])
-	$(MAKE) -k -I../$(.TARGET)
+	$(MAKE) -I../$(.TARGET)
 #else
 	if not exist  ..\$(.TARGET:S/\//\\/g) mkdir ..\$(.TARGET:S/\//\\/g)
 	cd ..\$(.TARGET:S/\//\\/g)
 	cd ..
 	set  SUBDIRS=$(.TARGET:X*\/Stub32\/\\[*\\])
-	$(MAKE) -k -I..\$(.TARGET:S/\//\\/g)
+	$(MAKE) -I..\$(.TARGET:S/\//\\/g)
 #endif
 
 minimal		: minimalLoader minimalLibrary minimalDriver minimalAppl \
@@ -192,8 +192,8 @@ otherEnsemble	: conview reader term tedit geofile dirls  \
 #		  disk xms emm nonts epson9 epson24 sound_std
 
 minimalDriver	: nimbus ms4 ntfat os2 cdrom stream dri gdi keyboard modem gdipointer \
-		  standard winnt parallel serial disk vidmem svga \
-		  vga vga8 vga15 vga16 vga24 ega cga mcga hgc att6300 dscga \
+		  standard winnt parallel serial disk vidmem \
+		  vga16 \
 		  printerDriver ctm ctmabs imps2 \
 		  ps2 msys msser msbus kbmouse absgen genmouse emm extmem \
 		  xms filestr nonts taskmax bnf sblaster comm spooltd \

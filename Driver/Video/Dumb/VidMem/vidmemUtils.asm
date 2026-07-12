@@ -49,7 +49,7 @@ DESTROYED:	ax
 
 PSEUDO CODE/STRATEGY:
 		call HugeArrayLock, then add in offset stored at 
-		cs:bm_byteOffset
+		fs:bm_byteOffset
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		
@@ -65,30 +65,30 @@ LockHugeBlock	proc	far
 		.enter
 EC <		call	ECCheckWriteLock				>
 		clr	dx
-		mov	bx, cs:[bm_handle].segment 
-		mov	di, cs:[bm_handle].offset
+		mov	bx, fs:[bm_handle].segment 
+		mov	di, fs:[bm_handle].offset
 		call	HugeArrayLock
-		add	si, cs:[bm_dataOffset]	; accounts for mask
-		mov	cs:[bm_scansNext], ax
+		add	si, fs:[bm_dataOffset]	; accounts for mask
+		mov	fs:[bm_scansNext], ax
 		tst	ax			; if zero, elem # out of bounds
 		jz	badScan
-		mov	cs:[bm_scansPrev], cx
-		mov	cs:[bm_lastSeg], ds
-EC <		mov	cs:[bm_ec_lastOffset], si			>
-EC <		mov	cs:[bm_ec_lastLineSize], dx			>
+		mov	fs:[bm_scansPrev], cx
+		mov	fs:[bm_lastSeg], ds
+EC <		mov	fs:[bm_ec_lastOffset], si			>
+EC <		mov	fs:[bm_ec_lastLineSize], dx			>
 EC <		push	ax, cx, dx					>
 EC <		mov	cx, dx						>
 EC <		mul	cx			; bytes of data buffer	>
-EC <		mov	cs:[bm_ec_lastSliceSize], ax			>
+EC <		mov	fs:[bm_ec_lastSliceSize], ax			>
 EC <		pop	ax, cx, dx					>
-		add	si, cs:[bm_byteOffset] 
+		add	si, fs:[bm_byteOffset] 
 done:
 		.leave
 		ret
 
 		; scan line number that was passed is out of bounds
 badScan:
-		mov	cs:[bm_lastSeg], ax	; clear this -- nothing locked
+		mov	fs:[bm_lastSeg], ax	; clear this -- nothing locked
 		jmp	done
 LockHugeBlock	endp
 
@@ -97,23 +97,23 @@ LockHugeBlockSrc proc	far
 		.enter
 EC <		call	ECCheckReadLock					>
 		clr	dx
-		mov	bx, cs:[bm_handle].segment 
-		mov	di, cs:[bm_handle].offset
+		mov	bx, fs:[bm_handle].segment 
+		mov	di, fs:[bm_handle].offset
 		call	HugeArrayLock
-		add	si, cs:[bm_dataOffset]	; accounts for mask
-		mov	cs:[bm_scansNextSrc], ax
+		add	si, fs:[bm_dataOffset]	; accounts for mask
+		mov	fs:[bm_scansNextSrc], ax
 		tst	ax			; if zero, elem # out of bounds
 		jz	badScan
-		mov	cs:[bm_scansPrevSrc], cx
-		mov	cs:[bm_lastSegSrc], ds
-		add	si, cs:[bm_byteOffsetSrc] 
+		mov	fs:[bm_scansPrevSrc], cx
+		mov	fs:[bm_lastSegSrc], ds
+		add	si, fs:[bm_byteOffsetSrc] 
 done:
 		.leave
 		ret
 
 		; scan  line number that was passed is out of bounds
 badScan:
-		mov	cs:[bm_lastSegSrc], ax	; clear this -- nothing locked
+		mov	fs:[bm_lastSegSrc], ax	; clear this -- nothing locked
 		jmp	done
 LockHugeBlockSrc endp
 
@@ -146,29 +146,29 @@ NextHugeBlock		proc	far
 		uses	ax, dx, ds
 		.enter
 		segmov	ds, es, ax
-EC <		cmp	ax, cs:[bm_lastSeg]	; if these not ==, it's bad >
+EC <		cmp	ax, fs:[bm_lastSeg]	; if these not ==, it's bad >
 EC <		ERROR_NE VIDMEM_HUGE_ARRAY_PROBLEM ; 			>
 		xchg	si, di
-		sub	si, cs:[bm_byteOffset]	; back to beginning of scan
-		sub	si, cs:[bm_dataOffset]
+		sub	si, fs:[bm_byteOffset]	; back to beginning of scan
+		sub	si, fs:[bm_dataOffset]
 		call	HugeArrayDirty
 		call	HugeArrayNext
-		add	si, cs:[bm_dataOffset]	; accounts for mask
+		add	si, fs:[bm_dataOffset]	; accounts for mask
 		tst	ax			; if zero, store bogus value
 		jnz	storeNext
 		dec	ax			
 storeNext:
-		mov	cs:[bm_scansNext], ax	; store #scans in this block
-		mov	cs:[bm_lastSeg], ds	; save new data segment
-EC <		mov	cs:[bm_ec_lastOffset], si			>
+		mov	fs:[bm_scansNext], ax	; store #scans in this block
+		mov	fs:[bm_lastSeg], ds	; save new data segment
+EC <		mov	fs:[bm_ec_lastOffset], si			>
 EC <		push	ax, cx, dx					>
-EC <		mov	cx, cs:[bm_ec_lastLineSize]			>
+EC <		mov	cx, fs:[bm_ec_lastLineSize]			>
 EC <		mul	cx			; bytes of data buffer	>
-EC <		mov	cs:[bm_ec_lastSliceSize], ax			>
-EC <		mov	ax, cs:[bm_dataOffset]	; subtract mask room	>
-EC <		sub	cs:[bm_ec_lastSliceSize], ax			>
+EC <		mov	fs:[bm_ec_lastSliceSize], ax			>
+EC <		mov	ax, fs:[bm_dataOffset]	; subtract mask room	>
+EC <		sub	fs:[bm_ec_lastSliceSize], ax			>
 EC <		pop	ax, cx, dx					>
-		add	si, cs:[bm_byteOffset]	; index into scan line
+		add	si, fs:[bm_byteOffset]	; index into scan line
 		segmov	es, ds, ax
 		xchg	di, si
 
@@ -180,21 +180,21 @@ NextHugeBlockSrc	proc	far
 		uses	ax, dx, ds
 		.enter
 		segmov	ds, es, ax
-EC <		cmp	ax, cs:[bm_lastSegSrc]	; if these not ==, it's bad >
+EC <		cmp	ax, fs:[bm_lastSegSrc]	; if these not ==, it's bad >
 EC <		ERROR_NE VIDMEM_HUGE_ARRAY_PROBLEM ; 			>
 		xchg	si, di
-		sub	si, cs:[bm_byteOffsetSrc] ; back to beginning of scan
-		sub	si, cs:[bm_dataOffset]
+		sub	si, fs:[bm_byteOffsetSrc] ; back to beginning of scan
+		sub	si, fs:[bm_dataOffset]
 		call	HugeArrayDirty
 		call	HugeArrayNext
-		add	si, cs:[bm_dataOffset]	  ; accounts for mask
-		mov	cs:[bm_lastSegSrc], ds	  ; save new data segment
+		add	si, fs:[bm_dataOffset]	  ; accounts for mask
+		mov	fs:[bm_lastSegSrc], ds	  ; save new data segment
 		tst	ax			; if zero, store bogus value
 		jnz	storeNext
 		dec	ax			
 storeNext:
-		mov	cs:[bm_scansNextSrc], ax  ; store #scans in this block
-		add	si, cs:[bm_byteOffsetSrc] ; index into scan line
+		mov	fs:[bm_scansNextSrc], ax  ; store #scans in this block
+		add	si, fs:[bm_byteOffsetSrc] ; index into scan line
 		segmov	es, ds, ax
 		xchg	di, si
 		.leave
@@ -231,21 +231,21 @@ PrevHugeBlock		proc	far
 		uses	ax,dx,ds,si
 		.enter
 		segmov	ds, es, ax
-EC <		cmp	ax, cs:[bm_lastSeg]	; if these not ==, it's bad >
+EC <		cmp	ax, fs:[bm_lastSeg]	; if these not ==, it's bad >
 EC <		ERROR_NE VIDMEM_HUGE_ARRAY_PROBLEM ; 			>
 		mov	si, di
-		sub	si, cs:[bm_byteOffset]
-		sub	si, cs:[bm_dataOffset]
+		sub	si, fs:[bm_byteOffset]
+		sub	si, fs:[bm_dataOffset]
 		call	HugeArrayDirty
 		call	HugeArrayPrev
-		add	si, cs:[bm_dataOffset]	; accounts for mask
-		mov	cs:[bm_lastSeg], ds
+		add	si, fs:[bm_dataOffset]	; accounts for mask
+		mov	fs:[bm_lastSeg], ds
 		tst	ax			; if zero, store bogus value
 		jnz	storeNext
 		dec	ax			
 storeNext:
-		mov	cs:[bm_scansPrev], ax
-		add	si, cs:[bm_byteOffset]
+		mov	fs:[bm_scansPrev], ax
+		add	si, fs:[bm_byteOffset]
 		segmov	es, ds, ax
 		mov	di, si
 		.leave
@@ -256,21 +256,21 @@ PrevHugeBlockSrc	proc	far
 		uses	ax,dx,ds,si
 		.enter
 		segmov	ds, es, ax
-EC <		cmp	ax, cs:[bm_lastSegSrc]	; if these not ==, it's bad >
+EC <		cmp	ax, fs:[bm_lastSegSrc]	; if these not ==, it's bad >
 EC <		ERROR_NE VIDMEM_HUGE_ARRAY_PROBLEM ; 			>
 		mov	si, di
-		sub	si, cs:[bm_byteOffsetSrc]
-		sub	si, cs:[bm_dataOffset]
+		sub	si, fs:[bm_byteOffsetSrc]
+		sub	si, fs:[bm_dataOffset]
 		call	HugeArrayDirty
 		call	HugeArrayPrev
-		add	si, cs:[bm_dataOffset]	; accounts for mask
-		mov	cs:[bm_lastSegSrc], ds
+		add	si, fs:[bm_dataOffset]	; accounts for mask
+		mov	fs:[bm_lastSegSrc], ds
 		tst	ax			; if zero, store bogus value
 		jnz	storeNext
 		dec	ax			
 storeNext:
-		mov	cs:[bm_scansPrevSrc], ax
-		add	si, cs:[bm_byteOffsetSrc]
+		mov	fs:[bm_scansPrevSrc], ax
+		add	si, fs:[bm_byteOffsetSrc]
 		segmov	es, ds, ax
 		mov	di, si
 		.leave

@@ -248,11 +248,20 @@ DRIFetchCWDTable proc	near
 		mov	ax, es:[bx].DLOL_DCB.offset
 		mov	ds:[firstDCB].offset, ax
 		mov	ax, es:[bx].DLOL_DCB.segment
+		mov	cx, -1
+		call	FSMapRealSegment
 		mov	ds:[firstDCB].segment, ax
 
 		clr	cx
 		mov	cl, es:[bx].DLOL_lastDrive
-		les	di, es:[bx].DLOL_CWDs
+;;		les	di, es:[bx].DLOL_CWDs
+		push	cx
+		mov	cx, 0xFFFF
+		mov	ax, es:[bx].DLOL_CWDs.segment
+		call	FSMapRealSegment
+		mov	es, ax
+		pop	cx
+		mov	di, es:[bx].DLOL_CWDs.offset
 
 		mov	ds:[driveTable].offset, di
 		mov	ds:[driveTable].segment, es
@@ -371,7 +380,15 @@ cdLoop:
 findDCBLoop:
 		cmp	es:[bx].DCB_drive, al	;  that drive number
 		je	haveDCB
-		les	bx, es:[bx].DCB_nextDCB
+		
+		push	ax
+		mov	ax, es:[bx].DCB_nextDCB.offset
+		push	ax
+		mov	ax, es:[bx].DCB_nextDCB.segment
+		call	FSMapRealSegment
+		mov	es, ax
+		pop	bx
+		pop	ax
 		cmp	bx, -1			; End of chain?
 		je	popNext			; yes -- skip drive
 		jmp	findDCBLoop
@@ -661,6 +678,8 @@ EC <		pop	es						>
 
 		tst	ax
 		jz	privateDataComplete
+		call	FSMapRealSegment
+		
 		push	ds, si
 		mov	ds, ax
 		mov	si, es:[bx].DCB_deviceHeader.offset
@@ -1532,7 +1551,13 @@ DRILocateFileTable proc near
 		mov	ds:[jftSize], ax		;  number of handles
 		mov	ds:[jftEntries].Sem_value, ax	;  in the JFT
 
-		les	di, es:[PSP_jftAddr]		; locate and record
+		mov		di, {word} es:[PSP_jftAddr]		; locate and record		
+		push	ax
+		mov		ax, {word} es:[PSP_jftAddr+2]
+		call	FSMapRealSegment
+		mov		es, ax
+		pop		ax
+
 		mov	ds:[jftAddr].offset, di		;  the JFT itself
 		mov	ds:[jftAddr].segment, es
 
@@ -1579,8 +1604,11 @@ useGetData:
 						;  Novell...
 		mov	ax, DRI_GET_DATA
 		call	DOSUtilInt21
-		
-		mov	es, es:[bx+2]
+				
+		mov	ax, es:[bx+2]
+		call	FSMapRealSegment
+		mov	es, ax
+
 		pop	bx
 
 		cmp	bx, DVER_6_0	; 6.0 or later?
@@ -1599,13 +1627,30 @@ haveHandleTable:
 		mov	ah, MSDOS_GET_DOS_TABLES
 		call	DOSUtilInt21
 		
-		les	bx, es:[bx].DLOL_SFT
-		mov	ds:[sftStart].offset, bx	; Save for Swat...
+;;		les	bx, es:[bx].DLOL_SFT
+;;		mov	ds:[sftStart].offset, bx	; Save for Swat...
+;;		mov	ds:[sftStart].segment, es
+
+		mov	bx, es:[bx].DLOL_SFT.offset
+		mov	ax, es:[bx].DLOL_SFT.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	es, ax
 		mov	ds:[sftStart].segment, es
+		mov	ds:[sftStart].offset, bx
+
+
 		clr	ax
 sftCountLoop:
 		add	ax, es:[bx].SFTBH_numEntries
-		les	bx, es:[bx].SFTBH_next
+		push	ax, cx
+;;		les	bx, es:[bx].SFTBH_next
+		mov	ax, es:[bx].SFTBH_next.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	bx, es:[bx].SFTBH_next.offset
+		mov	es, ax
+		pop	ax, cx
 		cmp	bx, -1
 		jne	sftCountLoop
 		
@@ -1678,5 +1723,108 @@ DRIExit		proc	far
 		.leave
 		ret
 DRIExit		endp
+Resident	ends
+
+MAX_MAP_REAL_SEGS = 64
+
+idata	segment
+
+fsMapRealUsed	word	0
+fsMapRealSegs	word	MAX_MAP_REAL_SEGS dup (0)
+fsMapRealSels	word	MAX_MAP_REAL_SEGS dup (0)
+
+idata	ends
+
+Resident	segment	resource
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FSMapRealSegment
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Track the mapping of DOS segments in a table.
+
+CALLED BY:	Alot
+PASS:		ax = segment to map to selector
+		cx = limit of size (actually, we ignore it for now)
+RETURN:		ax = selector, carry clear
+		else carry set
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	lshields	1/10/2001	Initial
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FSMapRealSegment	proc	far
+	uses cx, es, di
+	.enter
+
+	; Get our data group
+	push	ax
+	mov	ax, dgroup
+	mov	es, ax
+	pop	ax
+
+	; Search for a matching segment in our list already
+	mov	di, offset fsMapRealSegs
+	mov	cx, es:fsMapRealUsed
+	jcxz	notFound
+maploop:
+	scasw
+	je	found
+	loop	maploop
+	; not found, let's try adding it
+
+notFound:
+	mov	di, es:fsMapRealUsed
+	cmp	di, MAX_MAP_REAL_SEGS
+	jae	outofslots
+
+	; Store the segment for now
+	shl	di, 1
+	add	di, offset fsMapRealSegs
+	mov	es:[di], ax
+
+	; Map a segment into a selector (cx = -1)
+	clr	cx
+	dec	cx
+	call	SysMapRealSegment
+	jc	failedToMap
+
+	; Store the new selector
+	add	di, offset fsMapRealSels - offset fsMapRealSegs
+	mov	es:[di], ax
+	inc	es:fsMapRealUsed
+	clc
+	jmp	done
+	
+found:
+	; Found via our search
+	add	di, offset fsMapRealSels - offset fsMapRealSegs - 2 ; back up one also
+	mov	ax, es:[di]
+	clc
+done:
+	.leave
+	ret
+outofslots:
+	mov	ax, -1
+	call	FatalError
+	stc
+	jmp	done
+failedToMap:
+	mov	ax, -1
+	call	FatalError
+	stc
+	jmp	done
+
+FSMapRealSegment	endp
 
 Resident	ends

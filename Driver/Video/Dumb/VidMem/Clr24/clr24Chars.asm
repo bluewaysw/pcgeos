@@ -62,7 +62,7 @@ scanLoop:
 		dec	ch			; one less scan to do
 		jz	done
 		NextScan di			; onto next scan line
-		tst	cs:[bm_scansNext]	; if zero, done
+		tst	fs:[bm_scansNext]	; if zero, done
 		jns	scanLoop
 done:
 		pop	ax
@@ -105,7 +105,7 @@ scanLoop:
 		dec	ch			; one less scan to do
 		jz	done
 		NextScan di			; onto next scan line
-		tst	cs:[bm_scansNext]	; if zero, done
+		tst	fs:[bm_scansNext]	; if zero, done
 		jns	scanLoop
 done:
 		pop	ax
@@ -149,7 +149,7 @@ scanLoop:
 		dec	ch			; one less scan to do
 		jz	done
 		NextScan di			; onto next scan line
-		tst	cs:[bm_scansNext]	; if zero, done
+		tst	fs:[bm_scansNext]	; if zero, done
 		jns	scanLoop
 done:
 		pop	ax
@@ -194,7 +194,7 @@ scanLoop:
 		dec	ch			; one less scan to do
 		jz	done
 		NextScan di			; onto next scan line
-		tst	cs:[bm_scansNext]	; if zero, done
+		tst	fs:[bm_scansNext]	; if zero, done
 		jns	scanLoop
 done:
 		pop	ax
@@ -226,8 +226,8 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DrawOneDataByte		proc	near
 		lodsb
-		mov	dx, {word}cs:[currentColor].RGB_red
-		mov	ah, {byte}cs:[currentColor].RGB_blue
+		mov	dx, {word}fs:[currentColor].RGB_red
+		mov	ah, {byte}fs:[currentColor].RGB_blue
 
 		shl	al, 1			; test each bit (carry)
 		jnc	pix6

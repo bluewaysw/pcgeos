@@ -121,7 +121,7 @@ VidSetPalette	proc	near
 
 		; setup destination of write
 
-		mov	es, cs			
+		mov	es, fs			
 		mov	di, offset palCurRGBValues ; es:di -> dest buffer
 		mov	ds, dx			; ds:si -> source buffer
 

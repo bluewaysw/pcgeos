@@ -357,11 +357,7 @@ DOSVirtCheckPossibleGeosFile proc	near
 		jnz	success
 
 		add	di, offset FFD_name
-
-		LocalStrLength
-		mov	di, dx
-		add	di, offset FFD_name
-
+		mov	cx, size FFD_name
 		mov	al, '.'
 		repne	scasb
 		jne	fail
@@ -1858,6 +1854,8 @@ DOSVirtMapCheckDevice	proc near
 
 		mov	si, dx		; ds:si - passed filename
 
+		clr	bx		; no current segment
+
 startLoop:
 		lodsb
 		tst	al
@@ -1885,18 +1883,12 @@ getNullDevice:
 
 		call	PathOps_LoadVarSegDS
 		les	di, ds:[dosNullDevice]
-		segmov	ds, ss
-
-checkDeviceLoop:
-	;
-	; Check for a null pointer (both 0000:0000 and xxxx:FFFF)
-	;
 		mov	ax, es
-
-		or	ax, di
-		jz	notFound	; => both 0
-		cmp	di, 0xFFFF
-		je	notFound
+		tst	ax		; abort early if the NULL device
+		jz	notFound	; header is not available
+		segmov	ds, ss
+checkDeviceLoop:
+	
 		add	di, offset DH_name
 
 		mov	si, sp		; ds:si <- space-padded form
@@ -1910,11 +1902,45 @@ checkDeviceLoop:
 	; DI is pointing at the name, and we want to 
 	; access the next pointer, so:
 	;
-		les	di, es:[di][offset DH_next - offset DH_name]
+		mov	ax, {word}es:[di][offset DH_next - offset DH_name + 2]
+		mov	di, {word}es:[di][offset DH_next - offset DH_name]
+	;
+	; Check for a null pointer (both 0000:0000 and xxxx:FFFF)
+	;
+		tst	ax		; segment = 0 should be sufficient
+		jz	notFound
+		cmp	di, 0xFFFF
+		je	notFound
+	;
+	; If AX points to a new segment, free the current selector and
+	; allocate a new one for the new segment.
+	;
+		tst	bx		; no current segment?
+		jz	freed		; don't free dosNullDevice
+		cmp	ax, bx		; new segment?
+		je	checkDeviceLoop	; nope, check next device
+		push	ax
+		mov	ax, es
+		segnull	es
+		call	SysUnmapRealSegment
+		pop	ax
+freed:
+		mov	bx, ax		; bx = new segment
+		mov	cx, -1		; usual limit
+		call	SysMapRealSegment	; ax = new selector
+		mov	es, ax
 		jmp	checkDeviceLoop
 notFound:
 		stc
 done:
+		pushf
+		tst	bx		; no current segment?
+		jz	freedES		; don't free selector
+		mov	ax, es
+		segnull	es
+		call	SysUnmapRealSegment
+freedES:
+		popf
 		mov	di, sp
 		lea	sp, ss:[di+DEVICE_NAME_SIZE]
 		pop	ds
@@ -1945,10 +1971,11 @@ else
 endif	; _MSLF
 	;
 	; Copy the device name into mapDTA, without the space-padding.
-	; 
+	;
+		push	es
 		segmov	es, ds
 		mov	si, sp
-		mov	ds, ss:[si+DEVICE_NAME_SIZE]
+		mov	ds, ss:[si+DEVICE_NAME_SIZE+2]
 		mov	si, dx
 if _MSLF
 		mov	di, offset dos7FindData.W32FD_fileName
@@ -1960,6 +1987,7 @@ copyDevNameLoop:
 		stosb
 		tst_clc	al
 		jnz	copyDevNameLoop
+		pop	es
 		jmp	done
 DOSVirtMapCheckDevice	endp
 
@@ -2118,9 +2146,7 @@ endif	;GSDOS
 	; skip this file, as we checked it during the first pass.
 	; 
 		lea	di, ds:[mapDTA].FFD_name
-		LocalStrLength
-
-		lea	di, ds:[mapDTA].FFD_name
+		mov	cx, size FFD_name
 		mov	al, '.'
 		repne	scasb
 		mov	al, 0

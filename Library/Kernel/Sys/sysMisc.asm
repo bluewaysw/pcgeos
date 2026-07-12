@@ -2049,7 +2049,7 @@ endif
 SysSetECLevel	endp
 
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SysMapRealSegment
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2361,12 +2361,12 @@ else
 NoPMSupportError proc 	far
 NoPMSupportError endp
 
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 
 
 
 Filemisc	segment
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SysCheckSegmentValid
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2397,7 +2397,7 @@ SysCheckSegmentValid proc	far
 		.leave
 		ret
 SysCheckSegmentValid endp
-endif ; PRODUCT_GEOS32
+endif ; PROTECTED_MODE
 
 
 

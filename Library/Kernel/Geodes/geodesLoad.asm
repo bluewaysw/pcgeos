@@ -3657,7 +3657,7 @@ if USE_PATCHES
 	pop	si
 endif
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;
 	; Having finished loading the resource, convert it to a code
 	; resource now to keep protected mode happy.

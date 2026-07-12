@@ -114,4 +114,3 @@ putlineTable	label	nptr				; FORMAT    mask? fill?
 		nptr	offset FillBWScan		; BMF_CMYK   yes   yes
 
 VidEnds		PutLine
-

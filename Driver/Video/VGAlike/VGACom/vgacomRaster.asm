@@ -67,7 +67,6 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
-VideoBlt	segment	resource
 
 COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		BltSimpleLine
@@ -627,10 +626,6 @@ DBM_doright:
 		and	ah, ds:[si][bp]		; combine with stored mask
 		jmp	short DB_right
 
-VideoBlt	ends
-
-
-VideoBitmap	segment	resource
 ifndef IS_MEGA
 
 COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -742,10 +737,10 @@ PutColorFrame	struct
 PutColorFrame	ends
 
 loadUpPalette	label	near
-		mov	dx, offset cs:LoadUp8PaletteOdd - 3
+		mov	dx, offset gs:LoadUp8PaletteOdd - 3
 		and	cl, mask PL_BYTE_BOUNDARY ; set this flag
 		jnz	load8SetJump
-		mov	dx, offset cs:LoadUp8Palette - 3
+		mov	dx, offset gs:LoadUp8Palette - 3
 		jmp	load8SetJump
 
 PutColorScan	proc	near
@@ -758,15 +753,15 @@ PCframe		local	PutColorFrame
 		mov	ax, ss:[bmRight]
 		mov	cl, al			; calc shift amount
 		and	cl, 7			; isolate low three bits
-		mov	cs:rightCount, cl	; save initial mask
-		mov	cs:rightShift, cl	; save initial mask
+		mov	gs:rightCount, cl	; save initial mask
+		mov	gs:rightShift, cl	; save initial mask
 		mov	cl, ss:lineMask		; optimize for inner loop
-		mov	cs:middleLineMask, cl
+		mov	gs:middleLineMask, cl
 		mov	cl, bl
 		and	cl, 7
-		mov	cs:leftCount, cl	; save initial mask
+		mov	gs:leftCount, cl	; save initial mask
 		mov	cl, ss:[bmShift]	
-		mov	cs:maskShift, cl	; amount to shift mask
+		mov	gs:maskShift, cl	; amount to shift mask
 		mov	dx, si			; calc mask pointer
 		sub	dx, ss:[bmMaskSize]	; get to beginning of mask
 		mov	PCframe.maskPointer, dx
@@ -784,18 +779,18 @@ PCframe		local	PutColorFrame
 
 		test	ss:[bmType], mask BMT_PALETTE
 		jnz	loadUpPalette
-		mov	dx, offset cs:LoadUp8PixelsOdd - 3
+		mov	dx, offset gs:LoadUp8PixelsOdd - 3
 		and	cl, mask PL_BYTE_BOUNDARY ; set this flag
 		jnz	load8SetJump
-		mov	dx, offset cs:LoadUp8Pixels - 3
+		mov	dx, offset gs:LoadUp8Pixels - 3
 load8SetJump	label	near
 		;
 		; Set to the correct offset and stuff the routine to call.
 		;
-		sub	dx, offset cs:load8routine1label
-		mov	cs:load8routine1, dx
-		add	dx, offset cs:load8routine1 - offset cs:load8routine2
-		mov	cs:load8routine2, dx
+		sub	dx, offset gs:load8routine1label
+		mov	gs:load8routine1, dx
+		add	dx, offset gs:load8routine1 - offset gs:load8routine2
+		mov	gs:load8routine2, dx
 
 		or	ch, cl
 		shr	cl, 1 
@@ -817,10 +812,10 @@ load8SetJump	label	near
 
 		; check for mask, bump source pointer over it if present
 
-		mov	cs:initLeftMask, 0xff
+		mov	gs:initLeftMask, 0xff
 		test	ss:[bmType], mask BMT_MASK ; mask present ?
 		jz	maskDone		;  yes, do some calculations
-		add	cl, cs:maskShift	; make sure shifting doesn't
+		add	cl, gs:maskShift	; make sure shifting doesn't
 		adc	ch, 0
 		shr	cx, 1			;  overflow to next byte
 		shr	cx, 1
@@ -829,7 +824,7 @@ load8SetJump	label	near
 
 		; if we need to preload, then preload the mask as well
 
-		mov	cs:initLeftMask, 0
+		mov	gs:initLeftMask, 0
 		test	PCframe.preloadflag, mask PL_FIRST_MASK 
 		jz	maskDone
 		mov	cx, bx			; save old bx
@@ -838,9 +833,9 @@ load8SetJump	label	near
 		mov	dh, ds:[bx]		; load mask byte
 		clr	dl
 		xchg	bx, cx			; restore bx
-		mov	cl, cs:[maskShift]	; get shift count
+		mov	cl, gs:[maskShift]	; get shift count
 		shr	dx, cl			; shift mask
-		mov	cs:[initLeftMask], dl	; save shifted preloaded mask
+		mov	gs:[initLeftMask], dl	; save shifted preloaded mask
 
 		; mask calcs done, set up controller: set draw mode
 maskDone:
@@ -853,10 +848,10 @@ maskDone:
 		out	dx, ax			; set mode
 		mov	bl, ss:[currentDrawMode] ; get mode
 		clr	bh			; make into a byte table index
-		mov	ah, ss:egaFunc[bx]	; grab ega mode equivalent
+		mov	ah, gs:egaFunc[bx]	; grab ega mode equivalent
 		mov	al, DATA_ROT		; set up right reg
 		out	dx, ax			; set data/rot register
-		mov	cs:rightTestBit, mask PL_BYTE_BOUNDARY
+		mov	gs:rightTestBit, mask PL_BYTE_BOUNDARY
 
 		; check to see if there is only one byte to draw.  if so, do
 		; some extra calcs and make like we're drawing the right side
@@ -867,9 +862,9 @@ maskDone:
 		jns	doLeftMask		; if negative, then one byte 
 		mov	cl, ss:[bmLMask]	; combine masks
 		and	ss:[bmRMask], cl
-		mov	cl, cs:leftCount	; new left side value
-		sub	cs:rightCount, cl	; new right side value
-		mov	cs:rightTestBit, mask PL_FIRST_DATA
+		mov	cl, gs:leftCount	; new left side value
+		sub	gs:rightCount, cl	; new right side value
+		mov	gs:rightTestBit, mask PL_FIRST_DATA
 		mov	bx, PCframe.maskPointer	; get pointer to mask data
 
 		; right side may need a pre-load too
@@ -886,9 +881,9 @@ maskDone:
 shiftPreload:
 		mov	cl, 4			; shift up a nibble
 		shl	al, cl			; do it
-		mov	cs:rightPreLoad, al
+		mov	gs:rightPreLoad, al
 jmptotheright:
-		mov	al, cs:initLeftMask	; combine masks
+		mov	al, gs:initLeftMask	; combine masks
 		test	ss:[bmType], mask BMT_MASK
 		LONG jz	sendRMask
 		jmp	doRightMask		;  only need to do right
@@ -899,13 +894,13 @@ doLeftMask:
 		mov	bx, PCframe.maskPointer	; get it
 		test	ss:[bmType], mask BMT_MASK ; may not do anything
 		jz	sendLMask
-		mov	cl, cs:maskShift
+		mov	cl, gs:maskShift
 		clr	ah
 		mov	al, ds:[bx]		; apply mask
 		ror	ax, cl
 initLeftMask	equ	(this byte) + 1
 		or	al, 0xff		; get last overflow mask bits
-		mov	cs:initMidMask, ah
+		mov	gs:initMidMask, ah
 		mov	ah, al			; set it up
 		inc	bx
 		mov	PCframe.maskPointer, bx	; set up next pointer
@@ -940,8 +935,8 @@ leftCount	equ (this byte) + 1		; init all the planes
 		shl	ch, cl			;   slot
 		mov	cl, mask PL_FIRST_DATA	; check for pre-loading first  
 		call	LoadUpSomePixels	; load up the plane data
-		mov	cs:middlePreLoad1, al	; save byte, just in case
-		mov	cs:middlePreLoad2, al	; save byte, just in case
+		mov	gs:middlePreLoad1, al	; save byte, just in case
+		mov	gs:middlePreLoad2, al	; save byte, just in case
 		Write8Pixels			; write out the pixels
 
 		mov	bx, PCframe.maskPointer
@@ -950,7 +945,7 @@ leftCount	equ (this byte) + 1		; init all the planes
 		mov	ah, ss:lineMask		; see if bit still set
 		mov	al, BITMASK
 		out	dx, ax			;  apply mask
-		mov	al, cs:middlePreLoad2	; save byte, just in case
+		mov	al, gs:middlePreLoad2	; save byte, just in case
 		jmp	anyMiddleLeft
 
 		; DO MIDDLE BYTES
@@ -962,13 +957,13 @@ load8routine1label:
 load8routine1	equ	(this word) + 1
 		call	LoadUp8Pixels		; MODIFIED
 
-		mov	cs:middlePreLoad1, al
+		mov	gs:middlePreLoad1, al
 anyMiddleLeft:
 		dec	PCframe.midCount	; any left ?
 		jns	nextMiddle
 		
 		mov	dx, GR_CONTROL
-		mov	cs:rightPreLoad, al
+		mov	gs:rightPreLoad, al
 		mov	al, 0xff		; set up whole mask 
 
 		; DO RIGHT SIDE BYTE
@@ -1020,7 +1015,7 @@ maskShift	equ	(this byte) + 1
 		ror	ax, cl
 initMidMask	equ	(this byte) + 1
 		or	al, 0xff		; get last overflow mask bits
-		mov	cs:initMidMask, ah
+		mov	gs:initMidMask, ah
 middleLineMask	equ	(this byte) + 1
 		and	al, 0xff		; see if bit still set
 		mov	ah, al
@@ -1035,7 +1030,7 @@ load8routine2	equ	(this word) + 1
 		call	LoadUp8Pixels		; load/write pixels
 
 		mov	dx, GR_CONTROL
-		mov	cs:middlePreLoad2, al
+		mov	gs:middlePreLoad2, al
 		pop	bx			; restore mask pointer
 anyMiddleLeftMask:
 		dec	PCframe.midCount	; any left ?
@@ -1045,11 +1040,11 @@ anyMiddleLeftMask:
 		; loadLeftPlane) but the value we want to store in rightPreLoad
 		; is still intact in middlePreLoad2.
 		;
-		mov	al, cs:middlePreLoad2	; reload al.
-		mov	cs:rightPreLoad, al
-		mov	al, cs:initMidMask
+		mov	al, gs:middlePreLoad2	; reload al.
+		mov	gs:rightPreLoad, al
+		mov	al, gs:initMidMask
 doRightMask:
-		mov	cl, cs:maskShift
+		mov	cl, gs:maskShift
 		mov	ah, ds:[bx]		; apply bitmap mask
 		shr	ah, cl
 		or	al, ah
@@ -1084,6 +1079,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 LoadUp8Pixels	proc	near
+	assume	ds:nothing, es:nothing, fs:dgroup, gs:VideoCode
 
 	; add in those four pixels
 
@@ -1097,7 +1093,7 @@ LoadUp8Pixels	proc	near
 	xor	ah, ah			; make them an index
 	xchg	di, ax			; restore originals, di -> table
 	shl	di, 1			; table entries are words
-	mov	bx, cs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
+	mov	bx, gs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
 	and	ax, 0xcc33		; isolate other (plane 0/1) bits
 	or	al, ah			; combine, as before
 	rol	al, 1			; rotate, so we can use the same table
@@ -1105,7 +1101,7 @@ LoadUp8Pixels	proc	near
 	xor	ah, ah			; make it an index
 	mov	di, ax			; setup to access table
 	shl	di, 1			; table entries are words
-	mov	cx, cs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
+	mov	cx, gs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
 
 	; make room for four more pixels
 
@@ -1127,7 +1123,7 @@ rejoinLoadUp8	label	near
 	xor	ah, ah			; make them an index
 	xchg	di, ax			; restore originals, di -> table
 	shl	di, 1			; table entries are words
-	or	bx, cs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
+	or	bx, gs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
 	and	ax, 0xcc33		; isolate other (plane 0/1) bits
 	or	al, ah			; combine, as before
 	rol	al, 1			; rotate, so we can use the same table
@@ -1135,7 +1131,7 @@ rejoinLoadUp8	label	near
 	xor	ah, ah			; make it an index
 	mov	di, ax			; setup to access table
 	shl	di, 1			; table entries are words
-	or	cx, cs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
+	or	cx, gs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
 	
 	pop	di			; restore index
 	Write8Pixels noControl	; write em out
@@ -1158,7 +1154,7 @@ LoadUp8Palette	proc	near
 	xor	ah, ah			; make them an index
 	xchg	di, ax			; restore originals, di -> table
 	shl	di, 1			; table entries are words
-	mov	bx, cs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
+	mov	bx, gs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
 	and	ax, 0xcc33		; isolate other (plane 0/1) bits
 	or	al, ah			; combine, as before
 	rol	al, 1			; rotate, so we can use the same table
@@ -1166,7 +1162,7 @@ LoadUp8Palette	proc	near
 	xor	ah, ah			; make it an index
 	mov	di, ax			; setup to access table
 	shl	di, 1			; table entries are words
-	mov	cx, cs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
+	mov	cx, gs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
 
 	; make room for four more pixels
 
@@ -1207,7 +1203,7 @@ LoadUp8PaletteOdd	proc	near
 	xor	ah, ah			; make them an index
 	xchg	di, ax			; restore originals, di -> table
 	shl	di, 1			; table entries are words
-	or	bx, cs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
+	or	bx, gs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
 	and	ax, 0xcc33		; isolate other (plane 0/1) bits
 	or	al, ah			; combine, as before
 	rol	al, 1			; rotate so we can use the same table
@@ -1215,7 +1211,7 @@ LoadUp8PaletteOdd	proc	near
 	xor	ah, ah			; make it an index
 	mov	di, ax			; setup to access table
 	shl	di, 1			; table entries are words
-	or	cx, cs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
+	or	cx, gs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
 	pop	di			; restore index
 
 	lodsw				; Grab 4 pixels at once.
@@ -1289,7 +1285,7 @@ LoadUp8PixelsOdd	proc	near
 	xor	ah, ah			; make them an index
 	xchg	di, ax			; restore originals, di -> table
 	shl	di, 1			; table entries are words
-	or	bx, cs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
+	or	bx, gs:splitTable[di]	; add in 8 bits (4 ea in bl and bh)
 	and	ax, 0xcc33		; isolate other (plane 0/1) bits
 	or	al, ah			; combine, as before
 	rol	al, 1			; rotate so we can use the same table
@@ -1297,7 +1293,7 @@ LoadUp8PixelsOdd	proc	near
 	xor	ah, ah			; make it an index
 	mov	di, ax			; setup to access table
 	shl	di, 1			; table entries are words
-	or	cx, cs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
+	or	cx, gs:splitTable[di]	; add in 8 bits (4 ea in cl and ch)
 	pop	di			; restore index
 
 	lodsw				; Grab 4 pixels at once.
@@ -1307,7 +1303,7 @@ rejoinLoad8Odd	label	near
 	mov	al, ah			; al <- last data byte
 	ShiftInPixel			; shift in pixel 7
 		
-	mov	cs:lu8poRestoreAL, al	; Save byte to restore below.
+	mov	gs:lu8poRestoreAL, al	; Save byte to restore below.
 	Write8Pixels noControl		; write em out
 lu8poRestoreAL	equ	(this byte) + 1
 	mov	al, 12h			; MODIFIED
@@ -1429,6 +1425,7 @@ LoadUpSomePixels endp
 
 
 endif
+
 
 COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FillBWScan
@@ -1516,7 +1513,7 @@ FBS_skipPreload:
 		mov	bx, {word} ss:[bmRMask]	; restore masks in bx
 		tst	bp		; test # bytes to draw
 		jz	oneByte			;  more than one, don't combine
-		mov	cs:[FBS_rMask+2], bl	; store SELF MODIFIED and-imm
+		mov	gs:[FBS_rMask+2], bl	; store SELF MODIFIED and-imm
 		mov	bl, ch			; init shift out bits
 		mov	ch, ss:lineMask		; get line mask
 		clr	ah			; clear for future rotate
@@ -1564,7 +1561,7 @@ FBS_rMask	label	byte
 oneByte:
 		mov	ah, bl			;  only one, combine masks
 		and	ah, bh
-		mov	cs:[FBS_rMask+2], ah	; store SELF MODIFIED and-imm
+		mov	gs:[FBS_rMask+2], ah	; store SELF MODIFIED and-imm
 		mov	bl, ch			; get initial shift out bits
 		mov	ch, ss:lineMask		; get line mask
 		jmp	short	FBS_right
@@ -1676,7 +1673,7 @@ PBS_skipPreload:
 		mov	bx, {word} ss:[bmRMask]	; restore masks in bx
 		tst	bp		; test # bytes to draw
 		LONG jz	oneByte			;  more than one, don't combine
-		mov	cs:[PBS_rMask], bl	; store SELF MODIFIED and-imm
+		mov	gs:[PBS_rMask], bl	; store SELF MODIFIED and-imm
 		mov	bl, ch			; init shift out bits
 		mov	ch, ss:lineMask		; get line mask
 		clr	ah			; clear for future rotate
@@ -1714,7 +1711,7 @@ PBS_rMask	equ (this byte) + 2
 oneByte:
 		mov	ah, bl			;  only one, combine masks
 		and	ah, bh
-		mov	cs:[PBS_rMask], ah	; store SELF MODIFIED and-imm
+		mov	gs:[PBS_rMask], ah	; store SELF MODIFIED and-imm
 		mov	bl, ch			; get initial shift out bits
 		mov	ch, ss:lineMask		; get line mask
 		jmp	PBS_right
@@ -1763,6 +1760,7 @@ DoMonoPalette	proc	near
 DoMonoPalette	endp
 
 endif
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		PutBWScanMask
@@ -1789,6 +1787,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 PutBWScanMask	proc	near
+		assume	ds:nothing, es:nothing, fs:dgroup, ss:dgroup, gs:VideoCode
 		uses	bp
 		.enter
 
@@ -1798,10 +1797,10 @@ PutBWScanMask	proc	near
 		mov	ax, ss:[bmMaskSize]	; get byte size of mask
 		inc	ax			; lodsb already done
 		neg	ax
-		mov	cs:[PBSM_mask1], ax	; self modify code
-		mov	cs:[PBSM_mask2], ax
-		mov	cs:[PBSM_mask3], ax
-		mov	cs:[PBSM_preM], ax
+		mov	gs:[PBSM_mask1], ax	; self modify code
+		mov	gs:[PBSM_mask2], ax
+		mov	gs:[PBSM_mask3], ax
+		mov	gs:[PBSM_preM], ax
 		mov	ax, ss:[bmRight]
 
 		; calculate # bytes to fill in
@@ -1854,7 +1853,7 @@ PBSM_skipPreload:
 		mov	bx, {word} ss:[bmRMask]	; restore masks in bx
 		tst	bp		; test # bytes to draw
 		LONG jz	oneByte			;  more than one, don't combine
-		mov	cs:[PBSM_rMask], bl	; store SELF MODIFIED and-imm
+		mov	gs:[PBSM_rMask], bl	; store SELF MODIFIED and-imm
 		mov	bl, ch			; init shift out bits
 		mov	ch, ah			; get line mask
 		clr	ah			; clear for future rotate
@@ -1920,11 +1919,12 @@ PBSM_mask3	equ (this word) + 2
 oneByte:
 		xchg	ah, bl			;  only one, combine masks
 		and	ah, bh
-		mov	cs:[PBSM_rMask], ah	; store SELF MODIFIED and-imm
+		mov	gs:[PBSM_rMask], ah	; store SELF MODIFIED and-imm
 		xchg	bl, ch			; get initial shift out bits
 		jmp	PBSM_right
 
 PutBWScanMask	endp
+
 
 NullBMScan	proc	near
 		ret
@@ -1960,7 +1960,7 @@ SetMEGAFillColor proc	near
 
 		mov	dx, GR_CONTROL					
 		xchg	ax, cx		; save ax			
-		mov	al, ss:[ditherMatrix]				
+		mov	al, fs:[ditherMatrix]				
 		clr	ah						
 		tst	ss:[inverseDriver]				
 		jnz doInverseDriverCase				
@@ -2122,7 +2122,7 @@ PCMY_skipPreload:
 		mov	bx, {word} ss:[bmRMask]	; restore masks in bx
 		tst	bp		; test # bytes to draw
 		LONG jz	oneByte			;  more than one, don't combine
-		mov	cs:[PCMY_rMask], bl	; store SELF MODIFIED and-imm
+		mov	gs:[PCMY_rMask], bl	; store SELF MODIFIED and-imm
 		mov	bl, ch			; init shift out bits
 		mov	ch, ss:lineMask		; get line mask
 		clr	ah			; clear for future rotate
@@ -2161,7 +2161,7 @@ PCMY_rMask	equ (this byte) + 2
 oneByte:
 		mov	ah, bl			;  only one, combine masks
 		and	ah, bh
-		mov	cs:[PCMY_rMask], ah	; store SELF MODIFIED and-imm
+		mov	gs:[PCMY_rMask], ah	; store SELF MODIFIED and-imm
 		mov	bl, ch			; get initial shift out bits
 		mov	ch, ss:lineMask		; get line mask
 		jmp	PCMY_right
@@ -2169,10 +2169,7 @@ oneByte:
 PutComponentScan	endp
 endif
 
-VideoBitmap	ends
 
-
-VideoGetBits	segment	resource
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GetOneScan
@@ -2355,10 +2352,6 @@ ReadOneByte	proc	near			; reads 4 bit planes into regs
 		ret
 ReadOneByte	endp
 
-VideoGetBits	ends
-
-
-VideoBitmap	segment	resource
 
 ifndef IS_MEGA
 
@@ -2631,4 +2624,4 @@ splitTable	label	word
 	word	0x0f0f	; 
 endif
 
-VideoBitmap	ends
+

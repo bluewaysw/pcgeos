@@ -26,8 +26,65 @@ DESCRIPTION:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-ifndef	IS_MEM			; don't need this for memory driver
+ifndef	IS_MEM
+
+COMMENT @----------------------------------------------------------------------
 
+FUNCTION:	CheckCursorCollision
+
+DESCRIPTION:	Check to see if the save under area collides with the cursor
+		and erase the cursor if so.
+
+CALLED BY:	INTERNAL
+		Utility
+
+PASS:
+	ax - left
+	bx - top
+	cx - right
+	dx - bottom
+
+RETURN:
+	none
+
+DESTROYED:
+	none
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	1/89		Initial version
+	Jim	8/89		Changed to use signed jump-conditionals
+
+------------------------------------------------------------------------------@
+
+CheckCursorCollision	proc	near
+
+	; check for collision with pointer
+
+	cmp	ax, gs:[cursorRegRight]
+	jg	CUC_noCollision			;drawing to the right -> branch
+	cmp	cx, gs:[cursorRegLeft]
+	jl	CUC_noCollision			;drawing to the left -> branch
+	cmp	bx, gs:[cursorRegBottom]
+	jg	CUC_noCollision			;drawing to the bottom -> branch
+	cmp	dx, gs:[cursorRegTop]
+	jl	CUC_noCollision			;drawing to the top -> branch
+	call	CondHidePtr
+CUC_noCollision:
+	ret
+
+CheckCursorCollision	endp
+
+endif
+
+ifndef	IS_MEM
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CheckCollisions
@@ -76,7 +133,7 @@ CheckCollisions	proc	far
 		call	CheckSaveUnderCollisionES	; check save under
 checkXOR:
 		pushf
-		cmp	cs:[xorRegionHandle],0
+		cmp	fs:[xorRegionHandle],0
 		jz	done
 		call	CheckXORCollision		; check XOR
 done:
@@ -92,68 +149,13 @@ CheckCollisionsDS proc	near
 		call	CheckSaveUnderCollisionDS	; check save under
 checkXOR:
 		pushf
-		cmp	cs:[xorRegionHandle],0
+		cmp	fs:[xorRegionHandle],0
 		jz	done
 		call	CheckXORCollision		; check XOR
 done:
 		popf
 		ret
 CheckCollisionsDS endp
-
-
-COMMENT @----------------------------------------------------------------------
-
-FUNCTION:	CheckCursorCollision
-
-DESCRIPTION:	Check to see if the save under area collides with the cursor
-		and erase the cursor if so.
-
-CALLED BY:	INTERNAL
-		Utility
-
-PASS:
-	ax - left
-	bx - top
-	cx - right
-	dx - bottom
-
-RETURN:
-	none
-
-DESTROYED:
-	none
-
-REGISTER/STACK USAGE:
-
-PSEUDO CODE/STRATEGY:
-
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-
-REVISION HISTORY:
-	Name	Date		Description
-	----	----		-----------
-	Tony	1/89		Initial version
-	Jim	8/89		Changed to use signed jump-conditionals
-
-------------------------------------------------------------------------------@
-
-CheckCursorCollision	proc	near
-
-	; check for collision with pointer
-
-	cmp	ax,cs:[cursorRegRight]
-	jg	CUC_noCollision			;drawing to the right -> branch
-	cmp	cx,cs:[cursorRegLeft]
-	jl	CUC_noCollision			;drawing to the left -> branch
-	cmp	bx,cs:[cursorRegBottom]
-	jg	CUC_noCollision			;drawing to the bottom -> branch
-	cmp	dx,cs:[cursorRegTop]
-	jl	CUC_noCollision			;drawing to the top -> branch
-	call	CondHidePtr
-CUC_noCollision:
-	ret
-
-CheckCursorCollision	endp
 
 
 COMMENT @----------------------------------------------------------------------
@@ -174,7 +176,7 @@ PASS:
 
 RETURN:
 	ds/es - window (may have moved)
-	cs:PSL_saveWindow - updated
+	gs:PSL_saveWindow - updated
 	carry - set if collision occurred
 
 DESTROYED:
@@ -206,7 +208,11 @@ endif
 
 CheckSaveUnderCollisionDS	endp
 
+endif ;ifndef	IS_MEM
+
+ifndef	IS_MEM
 CheckSaveUnderCollisionES	proc	near
+	assume	ds:nothing, es:nothing
 if	SAVE_UNDER_COUNT	eq	0
 	clc
 else
@@ -224,7 +230,7 @@ else
 CSUC_check:
 endif
 	pushf					;save flags
-	mov	ah,cs:[suCount]
+	mov	ah, fs:[suCount]
 
 SU_COUNT		=	0
 rept	SAVE_UNDER_COUNT
@@ -237,18 +243,18 @@ else
 	jmp	CSUC_noUnderCollisionPop
 ELABEL	<CSUC_skip>,%SU_COUNT
 endif
-	test	al,cs:[suTable+SU_INDEX].SUS_flags
+	test	al, fs:[suTable+SU_INDEX].SUS_flags
 	EBRANCH	<jz>,<CSUC_nc>,%SU_COUNT   ;;not affected by save under, branch
-	cmp	si,cs:[suTable+SU_INDEX].SUS_right
+	cmp	si, fs:[suTable+SU_INDEX].SUS_right
 	EBRANCH	<jg>,<CSUC_nc>,%SU_COUNT	;;drawing to right -> branch
-	cmp	cx,cs:[suTable+SU_INDEX].SUS_left
+	cmp	cx, fs:[suTable+SU_INDEX].SUS_left
 	EBRANCH	<jl>,<CSUC_nc>,%SU_COUNT	;;drawing to left -> branch
-	cmp	bx,cs:[suTable+SU_INDEX].SUS_bottom
+	cmp	bx, fs:[suTable+SU_INDEX].SUS_bottom
 	EBRANCH	<jg>,<CSUC_nc>,%SU_COUNT	;;drawing to bottom -> branch
-	cmp	dx,cs:[suTable+SU_INDEX].SUS_top
+	cmp	dx, fs:[suTable+SU_INDEX].SUS_top
 	EBRANCH	<jl>,<CSUC_nc>,%SU_COUNT	;;drawing to top -> branch
 	call	SaveUnderCollision
-	mov	cs:[PSL_saveWindow],es
+	mov	gs:[PSL_saveWindow],es
 	popf
 	stc					;indicate collision
 	pushf
@@ -305,7 +311,7 @@ SlowGenClip	proc	near
 	;
 	; make sure that clip info is correct
 	;
-	mov	ds,cs:[currentWin]	; 
+	mov	ds,fs:[currentWin]	; 
 	cmp	bx,ds:[W_maskRect].R_top	;check for clipped wrt mask
 	jl	VLM_doneClipped
 	cmp	bx,ds:[W_maskRect].R_bottom
@@ -369,13 +375,13 @@ EC <	pop	bx							>
 	; generate line mask
 	;
 	mov	ax,ds:[W_header.LMBH_handle]	;see if this window has line cached
-	cmp	ax,cs:[lineCacheHandle]	;if line is cached then
+	cmp	ax,fs:[lineCacheHandle]	;if line is cached then
 	jnz	VLM_genBuffer		;
 	test	cl,mask WGF_BUFFER_VALID	;check for data in buffer valid.
 	clc				;
 	jnz	VLM_done		;quit if it is.
 VLM_genBuffer:
-	mov	cs:[lineCacheHandle],ax	;mark line as cached
+	mov	fs:[lineCacheHandle],ax	;mark line as cached
 	push	di			;save registers.
 	push	es			;
 
@@ -388,10 +394,10 @@ MEM  <	mov	di, size EditableBitmap					>
 
 	;  ...instead of the core block 
 
-NMEM <	segmov	es,cs			;				>
+NMEM <	segmov	es,fs			;				>
 NMEM <	mov	di, offset lineMaskBuffer				>
 FRES <	mov	ax, SCREEN_PIXEL_WIDTH	;				>
-MRES <	mov	ax, cs:[DriverTable].VDI_pageW	;			>
+MRES <	mov	ax, fs:[DriverTable].VDI_pageW	;			>
 
 	call	WinGenLineMask		;generate mask for line.
 	pop	es			;
@@ -459,9 +465,9 @@ NMEM <		jnz	onBlack						>
 MEM  <		jz	onBlack						>
 		not	dx				; use all 1s
 onBlack:
-		mov	cs:[resetColor], dx
+		mov	fs:[resetColor], dx
 		not	dx
-		mov	cs:[setColor], dx
+		mov	fs:[setColor], dx
 
 		.leave
 		ret
@@ -510,6 +516,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 SetDither	proc	far
+		assume	ds:nothing, es:nothing
 		uses	ax,bx,cx,dx,es,di
 		.enter
 
@@ -526,23 +533,23 @@ ifdef	BIT_CLR4
 ;	We have to reset the dither matrix if it is set with a color index
 ;	instead.
 
-		tst	cs:[ditherOrColor]
+		tst	fs:[ditherOrColor]
 		jz	setNewDither
 endif
 
 		; check to see if we really need to re-create it.  If the color
 		; is the same, and the shift amount is the same, then we're OK.
 
-		cmp	cl, cs:[ditherColor].RGB_red
+		cmp	cl, fs:[ditherColor].RGB_red
 		jne	setNewDither
-		cmp	ch, cs:[ditherColor].RGB_green
+		cmp	ch, fs:[ditherColor].RGB_green
 		jne	setNewDither
-		cmp	bl, cs:[ditherColor].RGB_blue
+		cmp	bl, fs:[ditherColor].RGB_blue
 		jne	setNewDither
 		
 		; besides the color, we should check the rotation.
 
-		cmp	ax, {word} cs:[ditherRotX]	; same ?
+		cmp	ax, {word} fs:[ditherRotX]	; same ?
 		LONG je	done
 
 		; set up es:di -> at the dither matrix we are about to fill
@@ -551,14 +558,14 @@ ifdef	BIT_CLR4
 
 ;	Note that we are setting a dither pattern
 
-		mov	cs:[ditherOrColor], DOC_MATRIX_HOLDS_DITHER_PATTERN
+		mov	fs:[ditherOrColor], DOC_MATRIX_HOLDS_DITHER_PATTERN
 endif
-		mov	cs:[ditherColor].RGB_red, cl	; set new color
-		mov	cs:[ditherColor].RGB_green, ch
-		mov	cs:[ditherColor].RGB_blue, bl
-		mov	{word} cs:[ditherRotX], ax	; set rotation value
+		mov	fs:[ditherColor].RGB_red, cl	; set new color
+		mov	fs:[ditherColor].RGB_green, ch
+		mov	fs:[ditherColor].RGB_blue, bl
+		mov	{word} fs:[ditherRotX], ax	; set rotation value
 
-		segmov	es, cs, di
+		segmov	es, fs, di
 		mov	di, offset ditherMatrix
 
 		; calculate the luminence of the pixel, and use that to dither
@@ -599,24 +606,24 @@ ifdef	IS_VGALIKE
 
 		mov	dh, bh
 		clr	bh
-		mov	ax, {word} cs:[colorDither][bx]	; only four to move
+		mov	ax, {word} gs:[colorDither][bx]	; only four to move
 		stosw				; doing blue first (plane 0)
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw		
 		mov	bl, ch			; now do green plane (plane 1)
-		mov	ax, {word} cs:[colorDither][bx]
+		mov	ax, {word} gs:[colorDither][bx]
 		stosw
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw
 		mov	bl, cl			; finally, do red
-		mov	ax, {word} cs:[colorDither][bx]
+		mov	ax, {word} gs:[colorDither][bx]
 		stosw
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw
 		mov	bl, dh			; restore luminence
-		mov	ax, {word} cs:[colorDither][bx]
+		mov	ax, {word} gs:[colorDither][bx]
 		stosw
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw
 
 else
@@ -624,24 +631,24 @@ ifdef	IS_NIKE_COLOR
 
 		mov	dh, bh
 		clr	bh
-		mov	ax, {word} cs:[colorDither][bx]	; only four to move
+		mov	ax, {word} gs:[colorDither][bx]	; only four to move
 		stosw				; doing blue first (plane 0)
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw		
 		mov	bl, ch			; now do green plane (plane 1)
-		mov	ax, {word} cs:[colorDither][bx]
+		mov	ax, {word} gs:[colorDither][bx]
 		stosw
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw
 		mov	bl, cl			; finally, do red
-		mov	ax, {word} cs:[colorDither][bx]
+		mov	ax, {word} gs:[colorDither][bx]
 		stosw
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw
 		mov	bl, dh			; restore luminence
-		mov	ax, {word} cs:[colorDither][bx]
+		mov	ax, {word} gs:[colorDither][bx]
 		stosw
-		mov	ax, {word} cs:[colorDither+2][bx]
+		mov	ax, {word} gs:[colorDither+2][bx]
 		stosw
 
 else
@@ -651,42 +658,42 @@ else
 
 		mov	dh, bh			   ; use bx as adressing reg
 		clr	bh
-		mov	ax, {word} cs:[blueDither][bx]	   ; get blue component
+		mov	ax, {word} gs:[blueDither][bx]	   ; get blue component
 		xchg	bl, cl			   ; get red component
-		or	ax, {word} cs:[redDither][bx]	
+		or	ax, {word} gs:[redDither][bx]	
 		xchg	bl, ch			   ; get green component
-		or	ax, {word} cs:[greenDither][bx]   ;
+		or	ax, {word} gs:[greenDither][bx]   ;
 		xchg	bl, dh			   ;  dh = green
-		or	ax, {word} cs:[hiliteDither][bx]  ; bl=hilite,ch=red,
+		or	ax, {word} gs:[hiliteDither][bx]  ; bl=hilite,ch=red,
 		stosw				   ; cl=blue. Store 1st scan
 
-		mov	ax, {word} cs:[hiliteDither+2][bx]; 
+		mov	ax, {word} gs:[hiliteDither+2][bx]; 
 		xchg	bl, dh			   ; 
-		or	ax, {word} cs:[greenDither+2][bx] ; 
+		or	ax, {word} gs:[greenDither+2][bx] ; 
 		xchg	bl, ch
-		or	ax, {word} cs:[redDither+2][bx]   ; do red 
+		or	ax, {word} gs:[redDither+2][bx]   ; do red 
 		xchg	bl, cl			   ; do blue
-		or	ax, {word} cs:[blueDither+2][bx]  ; bl=blue,cl=red,
+		or	ax, {word} gs:[blueDither+2][bx]  ; bl=blue,cl=red,
 
 		stosw				   ;  ch=green,dh = hilite
 
-		mov	ax, {word} cs:[blueDither+4][bx]  ; get blue component
+		mov	ax, {word} gs:[blueDither+4][bx]  ; get blue component
 		xchg	bl, cl			   ; get red component
-		or	ax, {word} cs:[redDither+4][bx]	
+		or	ax, {word} gs:[redDither+4][bx]	
 		xchg	bl, ch			   ; get green component
-		or	ax, {word} cs:[greenDither+4][bx] ;
+		or	ax, {word} gs:[greenDither+4][bx] ;
 		xchg	bl, dh			   ;  dh = green
-		or	ax, {word} cs:[hiliteDither+4][bx]; bl=hilite,ch=red,
+		or	ax, {word} gs:[hiliteDither+4][bx]; bl=hilite,ch=red,
 
 		stosw				   ; cl=blue. Store 3rd scan
 
-		mov	ax, {word} cs:[hiliteDither+6][bx]; 
+		mov	ax, {word} gs:[hiliteDither+6][bx]; 
 		xchg	bl, dh			   ; 
-		or	ax, {word} cs:[greenDither+6][bx] ; do next two pixels
+		or	ax, {word} gs:[greenDither+6][bx] ; do next two pixels
 		xchg	bl, ch
-		or	ax, {word} cs:[redDither+6][bx]   ; do red 
+		or	ax, {word} gs:[redDither+6][bx]   ; do red 
 		xchg	bl, cl			   ; do blue
-		or	ax, {word} cs:[blueDither+6][bx]  ; bl=blue, cl=red,
+		or	ax, {word} gs:[blueDither+6][bx]  ; bl=blue, cl=red,
 
 		stosw				   ;  ch=green,dh=hilite
 endif
@@ -701,14 +708,14 @@ ifdef	LEFT_PIXEL_IN_LOW_NIBBLE
 ;	If the frame buffer is nibble-swapped, nibble swap the ditherMatrix
 
 		mov	cl, 4
-		ror	cs:[ditherMatrix], cl
-		ror	cs:[ditherMatrix+1], cl
-		ror	cs:[ditherMatrix+2], cl
-		ror	cs:[ditherMatrix+3], cl
-		ror	cs:[ditherMatrix+4], cl
-		ror	cs:[ditherMatrix+5], cl
-		ror	cs:[ditherMatrix+6], cl
-		ror	cs:[ditherMatrix+7], cl
+		ror	fs:[ditherMatrix], cl
+		ror	fs:[ditherMatrix+1], cl
+		ror	fs:[ditherMatrix+2], cl
+		ror	fs:[ditherMatrix+3], cl
+		ror	fs:[ditherMatrix+4], cl
+		ror	fs:[ditherMatrix+5], cl
+		ror	fs:[ditherMatrix+6], cl
+		ror	fs:[ditherMatrix+7], cl
 endif
 endif
 
@@ -746,18 +753,20 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 RotateDither	proc	near
+		assume	ds:nothing, es:nothing
 		uses	ax, bx, cx, ds, si
 		.enter
 
 		; if the new ditherRotation is zero, skip all this
 
-		mov	cx, {word} cs:[ditherRotX]
+		mov	cx, {word} fs:[ditherRotX]
 		and	cx, 0307h		; isolate important bits
 		jz	done
 
 		; load up the dither patterns.  Do them one by one.
 
-		segmov	ds, cs, si
+		segmov	ds, fs, si
+		assume	ds:dgroup
 		mov	si, offset ditherMatrix
 		call	Rotate4x8
 		mov	si, offset ditherMatrix+4
@@ -853,17 +862,19 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 RotateDither	proc	near
 		uses	ax, bx, cx, ds, si
+		assume	ds:nothing, es:nothing
 		.enter
 
 		; if the new ditherRotation is zero, skip all this
 
-		mov	cx, {word} cs:[ditherRotX]
+		mov	cx, {word} fs:[ditherRotX]
 		and	cx, 0307h		; isolate important bits
 		jz	done
 
 		; load up the dither patterns.  Do them one by one.
 
-		segmov	ds, cs, si
+		segmov	ds, fs, si
+		assume	ds:dgroup
 		mov	si, offset ditherMatrix
 		call	Rotate4x8
 		mov	si, offset ditherMatrix+4
@@ -956,19 +967,20 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 RotateDither	proc	near
 		uses	ax,bx,cx,dx,di
+		assume	ds:nothing, es:nothing
 		.enter
 
 		; load up the ditherMatrix.  We have 4 words, use ax,bx,dx,di
 
-		mov	ax, {word} cs:[ditherMatrix]
-		mov	bx, {word} cs:[ditherMatrix+2]
-		mov	dx, {word} cs:[ditherMatrix+4]
-		mov	di, {word} cs:[ditherMatrix+6]
+		mov	ax, {word} fs:[ditherMatrix]
+		mov	bx, {word} fs:[ditherMatrix+2]
+		mov	dx, {word} fs:[ditherMatrix+4]
+		mov	di, {word} fs:[ditherMatrix+6]
 
 		; we only need to rotate in X if the low bit is set, since
 		; we have packed pixels
 
-		mov	cx, {word} cs:[ditherRotX]	; get pixel position
+		mov	cx, {word} fs:[ditherRotX]	; get pixel position
 		test	cl, 1				; check low bit
 		jz	checkY
 
@@ -1024,3 +1036,5 @@ endif	; not NIKECOLOR
 endif	; not VGALIKE
 
 endif
+
+

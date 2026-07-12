@@ -63,30 +63,40 @@ EC <		js	funcOK				; >
 EC <		tst	cs:[driverJumpTable][di]	; if zero, we're hosed>
 EC <		ERROR_Z VIDMEM_BAD_MODULE_CALL				      >
 EC <funcOK:								>
-
-		PSem	cs, videoSem
+		;
+		; Setup fs to point at the video driver's group
+		; and gs to point to an alias to the code
+		;
+		push	fs, gs
+		segmov	fs, monogroup
+		tst	fs:aliasToCode
+		jz	getAlias
+gotAlias:
+		mov	gs, fs:aliasToCode
+		
+		PSem	fs, videoSem
 
 		; before we call away, store away some important info about
 		; the bitmap header location and the size of a scan line
 
 		push	ax, cx, ds
 		mov	ds, es:[W_bmSegment]		; store bitmap segment
-		mov	cs:[bm_segment], ds		; for local use
+		mov	fs:[bm_segment], ds		; for local use
 		mov	ax, es:[W_bitmap].segment
-		mov	cs:[bm_handle].segment, ax
+		mov	fs:[bm_handle].segment, ax
 		mov	ax, es:[W_bitmap].offset
-		mov	cs:[bm_handle].offset, ax
+		mov	fs:[bm_handle].offset, ax
 		mov	ax, ds:[EB_flags]		; need to store this
-		mov	cs:[bm_flags], ax		;  for later
+		mov	fs:[bm_flags], ax		;  for later
 		mov	ax, ds:[EB_color]
-		mov	cs:[colorTransfer], ax
+		mov	fs:[colorTransfer], ax
 		mov	al, ds:[EB_bm].CB_simple.B_type
 		mov	cx, ds:[EB_bm].CB_simple.B_width
-		cmp	cs:[bm_editedMask], 0		; if edit mask last,
+		cmp	fs:[bm_editedMask], 0		; if edit mask last,
 		jne	recalcWidth			;  then recalc things
-		cmp	al, cs:[bm_cacheType]		; if not same, recalc
+		cmp	al, fs:[bm_cacheType]		; if not same, recalc
 		jne	recalcWidth
-		cmp	cx, cs:[bm_cacheWid]
+		cmp	cx, fs:[bm_cacheWid]
 		jne	recalcWidth
 
 		; check the flag that determines if we are drawing to the 
@@ -97,34 +107,48 @@ rejoinEntry:
 		js	handleEscape
 		call	cs:[driverJumpTable][di]
 done:
-		VSem	cs, videoSem
-
+		VSem	fs, videoSem
+exit:
+		pop	fs, gs
 		ret
 
-		; we want to record in a local variable, the size of a scan
-		; line (in bytes).  
-recalcWidth:
-		clr	cs:[bm_dataOffset]		; assume no mask
-		mov	cs:[bm_cacheType], al		; store new cached vals
-		mov	cs:[bm_cacheWid], cx
-		add	cx, 7				; round up
-		shr	cx, 1				; divide by 8
-		shr	cx, 1
-		shr	cx, 1
-		mov	cs:[bm_bpMask], cx		; store scan line wid
-		test	al, mask BMT_MASK		; * 2 if mask
-		jz	haveWidth
-		mov	cs:[bm_dataOffset], cx		; offset to data
-		shl	cx, 1
-haveWidth:
-		mov	cs:[bm_bpScan], cx		; store scan line wid
-		clr	cs:[bm_editedMask]		; reset flag
-		jmp	rejoinEntry
+		; Create an alias to our code segment so we can
+		; do self-modifying code.
+getAlias:
+		push	bx
+		mov	bx, cs
+		call	SysAllocCodeAlias
+		jc	skipSet
+		mov	fs:aliasToCode, bx
+skipSet:
+		pop	bx
+		jc	exit
+		jmp	gotAlias
 
 		; call an escape function
 handleEscape:
 		call	MonoEscape
 		jmp	done
+
+		; we want to record in a local variable, the size of a scan
+		; line (in bytes).  
+recalcWidth:
+		clr	fs:[bm_dataOffset]		; assume no mask
+		mov	fs:[bm_cacheType], al		; store new cached vals
+		mov	fs:[bm_cacheWid], cx
+		add	cx, 7				; round up
+		shr	cx, 1				; divide by 8
+		shr	cx, 1
+		shr	cx, 1
+		mov	fs:[bm_bpMask], cx		; store scan line wid
+		test	al, mask BMT_MASK		; * 2 if mask
+		jz	haveWidth
+		mov	fs:[bm_dataOffset], cx		; offset to data
+		shl	cx, 1
+haveWidth:
+		mov	fs:[bm_bpScan], cx		; store scan line wid
+		clr	fs:[bm_editedMask]		; reset flag
+		jmp	rejoinEntry
 
 MonoEntry	endp
 
@@ -164,7 +188,7 @@ MonoEscape	proc	near
 		push	es		
 		segmov	es, cs, cx	; es -> driver segment
 		mov	ax, di		; setup match value
-		mov	di, offset monogroup:escCodes ; si -> esc code tab
+		mov	di, offset Mono:escCodes ; si -> esc code tab
 		mov	cx, NUM_ESC_ENTRIES ; init rep count
 		repne	scasw		; find the right one
 		pop	es
@@ -281,6 +305,12 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 MonoEditMask	proc	far
+		push	fs,gs
+		segmov	fs, monogroup
+		tst	fs:aliasToCode
+		jz	getAlias
+gotAlias:
+		mov	gs, fs:aliasToCode
 		push	ax,bx,cx,dx,ds
 		mov	ax, dgroup		; gain access to variables
 		mov	ds, ax			; ds -> dgroup
@@ -293,28 +323,43 @@ MonoEditMask	proc	far
 		
 		; now do the normal work of entering the video driver
 
-		PSem	cs, videoSem		; get our own semaphore
-		mov	cs:[bm_cacheType], al	; save vars
-		mov	cs:[bm_cacheWid], bx
-		mov	cs:[bm_bpScan], cx
-		mov	cs:[bm_bpMask], dx	; right side of scan line
-		clr	cs:[bm_dataOffset]	; editing mask
+		PSem	fs, videoSem		; get our own semaphore
+		mov	fs:[bm_cacheType], al	; save vars
+		mov	fs:[bm_cacheWid], bx
+		mov	fs:[bm_bpScan], cx
+		mov	fs:[bm_bpMask], dx	; right side of scan line
+		clr	fs:[bm_dataOffset]	; editing mask
 
 		; while we have some regs free, grab the other vars
 
 		mov	ds, es:[W_bmSegment]	; store bitmap segment
-		mov	cs:[bm_segment], ds	; for local use
+		mov	fs:[bm_segment], ds	; for local use
 		mov	ax, es:[W_bitmap].segment
-		mov	cs:[bm_handle].segment, ax
+		mov	fs:[bm_handle].segment, ax
 		mov	ax, es:[W_bitmap].offset
-		mov	cs:[bm_handle].offset, ax
+		mov	fs:[bm_handle].offset, ax
 		mov	ax, ds:[EB_flags]	; need to store this
-		mov	cs:[bm_flags], ax	;  for later
-		mov	cs:[bm_editedMask], 0xff ; set flag
+		mov	fs:[bm_flags], ax	;  for later
+		mov	fs:[bm_editedMask], 0xff ; set flag
 		pop	ax,bx,cx,dx,ds
 		call	cs:[driverJumpTable][di]
-		VSem	cs, videoSem
+		VSem	fs, videoSem
+exit:
+		pop	fs,gs
 		ret
+
+		; Create an alias to our code segment so we can
+		; do self-modifying code.
+getAlias:
+		push	bx
+		mov	bx, cs
+		call	SysAllocCodeAlias
+		jc	skipSet
+		mov	fs:aliasToCode, bx
+skipSet:
+		pop	bx
+		jc	exit
+		jmp	gotAlias
 MonoEditMask	endp
 
 
@@ -348,17 +393,17 @@ MonoCallMod	proc	near
 
 		; first, save away ax/bx since they are trashed by CallMod
 
-		mov	cs:[TPD_dataAX], ax		; trashed by CallMod
-		mov	cs:[TPD_dataBX], bx
+		mov	fs:[TPD_dataAX], ax		; trashed by CallMod
+		mov	fs:[TPD_dataBX], bx
 
 		; next, switch stacks so we still have access to 
 		; NOTE: the loading of ss *must* be followed by the loading
 		; of sp.
 
-		mov	cs:[saveSS], ss			; save caller's stack
-		mov	cs:[saveSP], sp
+		mov	fs:[saveSS], ss			; save caller's stack
+		mov	fs:[saveSP], sp
 		mov	bx, ss:[TPD_threadHandle]
-		mov	cs:[TPD_threadHandle], bx
+		mov	fs:[TPD_threadHandle], bx
 
 ;	Copy over TPD_dgroup and TPD_classPointer, because VMDirty is called
 ;	by the vidmem code, and if a dirty notification needs to be sent to
@@ -366,17 +411,17 @@ MonoCallMod	proc	near
 ;	6/18/96 - atw
 
 		mov	bx, ss:[TPD_dgroup]
-		mov	cs:[TPD_dgroup], bx
+		mov	fs:[TPD_dgroup], bx
 		mov	bx, ss:[TPD_classPointer].segment
-		mov	cs:[TPD_classPointer].segment, bx
+		mov	fs:[TPD_classPointer].segment, bx
 		mov	bx, ss:[TPD_classPointer].offset
-		mov	cs:[TPD_classPointer].offset, bx
+		mov	fs:[TPD_classPointer].offset, bx
 		mov	bx, ss:[TPD_processHandle]
-		mov	cs:[TPD_processHandle], bx
+		mov	fs:[TPD_processHandle], bx
 
 		mov	bx, {word}ss:[TPD_exclFSIRLocks]
-		mov	{word}cs:[TPD_exclFSIRLocks], bx
-		mov	ax, cs				; setup new stack
+		mov	{word}fs:[TPD_exclFSIRLocks], bx
+		mov	ax, fs				; setup new stack
 		mov	ss, ax
 		mov	sp, offset monogroup:endVidStack
 		mov	ss:[TPD_stackBot], offset monogroup:vidStackBot
@@ -391,7 +436,7 @@ MonoCallMod	proc	near
 
 		; done with operation, restore stack and exit
 
-		mov	ss, cs:[saveSS]			; restore old stack
-		mov	sp, cs:[saveSP]
+		mov	ss, fs:[saveSS]			; restore old stack
+		mov	sp, fs:[saveSP]
 		ret
 MonoCallMod	endp

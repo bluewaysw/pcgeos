@@ -130,7 +130,7 @@
   /*                                                                 */
   /* See TT_Access_Frame() and TT_Forget_Frame() for details.        */
 
-#define FRAME_CACHE_SIZE  2048
+#define FRAME_CACHE_SIZE  8192  /*2048*/
 
   /* The TFile_Component structure holds all the data that was */
   /* previously declared static or global in this component.   */

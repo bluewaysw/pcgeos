@@ -300,7 +300,7 @@ GenToolGroupBuildBranch	method dynamic	GenToolGroupClass,
 						MSG_SPEC_BUILD_BRANCH
 
 	mov	bx, di
-	mov	di, 600
+	mov	di, 700
 	call	ThreadBorrowStackSpace
 	push	di
 

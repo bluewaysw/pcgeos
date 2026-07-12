@@ -42,6 +42,10 @@ DriverTable	TaskDriverInfoStruct	<
 >
 public	DriverTable
 
+idata		ends
+
+NTSResident	segment	resource
+
 tsFunctions	label	nptr.near
 
 DefTSFunction	macro	routine, constant
@@ -327,7 +331,11 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 NTSShutdownCompleteStub proc near
 		jcxz	aborted
-		jmp	cs:[ntsShutdownCompleteVector]
+		push	ds
+		segmov	ds, dgroup
+		call	ds:[ntsShutdownCompleteVector]
+		pop	ds
+		ret
 aborted:
 	;
 	; If shutdown was aborted, we need to call that routine directly...
@@ -336,4 +344,4 @@ aborted:
 		ret
 NTSShutdownCompleteStub endp
 
-idata		ends
+NTSResident	ends

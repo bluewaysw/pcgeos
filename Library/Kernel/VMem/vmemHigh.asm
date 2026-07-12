@@ -2168,7 +2168,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 VMFree	proc	far
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	;
 	; Ensure we don't later pop the selector we're going to free.
 	;

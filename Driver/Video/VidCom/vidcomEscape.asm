@@ -60,7 +60,7 @@ VidQEscape	proc	near
 		push	di		; save a few regs
 		push	cx
 		push	es		
-		segmov	es, cs, cx	; es -> driver segment
+		segmov	es, gs, cx	; es -> driver segment
 		mov	di, offset escCodes ; es:di -> esc code tab
 		mov	cx, NUM_ESC_ENTRIES ; init rep count
 		repne	scasw		; find the right one
@@ -103,7 +103,7 @@ REVISION HISTORY:
 	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidUnsetDevice	proc	near
-		mov	cs:[DriverTable].VDI_device, 0xffff
+		mov	fs:[DriverTable].VDI_device, 0xffff
 		ret
 VidUnsetDevice	endp
 endif

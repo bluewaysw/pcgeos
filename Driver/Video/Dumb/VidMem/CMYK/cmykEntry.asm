@@ -67,27 +67,27 @@ EC <		tst	cs:[driverJumpTable][di]	; if zero, we're hosed>
 EC <		ERROR_Z VIDMEM_BAD_MODULE_CALL				      >
 EC <funcOK:						>
 
-		PSem	cs, videoSem
+		PSem	fs, videoSem
 
 		; before we call away, store away some important info about
 		; the bitmap header location and the size of a scan line
 
 		push	ax, cx, ds
 		mov	ds, es:[W_bmSegment]		; store bitmap segment
-		mov	cs:[bm_segment], ds		; for local use
+		mov	fs:[bm_segment], ds		; for local use
 		mov	ax, es:[W_bitmap].segment
-		mov	cs:[bm_handle].segment, ax
+		mov	fs:[bm_handle].segment, ax
 		mov	ax, es:[W_bitmap].offset
-		mov	cs:[bm_handle].offset, ax
+		mov	fs:[bm_handle].offset, ax
 		mov	ax, ds:[EB_flags]
-		mov	cs:[bm_flags], ax
+		mov	fs:[bm_flags], ax
 		mov	ax, ds:[EB_color]
-		mov	cs:[colorTransfer], ax
+		mov	fs:[colorTransfer], ax
 		mov	al, ds:[EB_bm].CB_simple.B_type
 		mov	cx, ds:[EB_bm].CB_simple.B_width
-		cmp	al, cs:[bm_cacheType]		; if not same, recalc
+		cmp	al, fs:[bm_cacheType]		; if not same, recalc
 		jne	recalcWidth
-		cmp	cx, cs:[bm_cacheWid]
+		cmp	cx, fs:[bm_cacheWid]
 		jne	recalcWidth
 rejoinEntry:
 		pop	ax, cx, ds
@@ -95,19 +95,19 @@ rejoinEntry:
 		js	handleEscape
 		call	cs:[driverJumpTable][di]
 done:
-		VSem	cs, videoSem
+		VSem	fs, videoSem
 		ret
 
 		; we want to record in a local variable, the size of a scan
 		; line (in bytes).  
 recalcWidth:
-		mov	cs:[bm_cacheType], al		; store new cached vals
-		mov	cs:[bm_cacheWid], cx
+		mov	fs:[bm_cacheType], al		; store new cached vals
+		mov	fs:[bm_cacheWid], cx
 		add	cx, 7				; round up
 		shr	cx, 1				; divide by 8
 		shr	cx, 1
 		shr	cx, 1
-		mov	cs:[bm_bpMask], cx		; store for char code
+		mov	fs:[bm_bpMask], cx		; store for char code
 		test	al, mask BMT_MASK		; * 2 if mask
 		mov	ax, 0				; DON'T USE CLR
 		jz	haveWidth
@@ -116,7 +116,7 @@ haveWidth:
 		shl	cx, 1				; 4 planes 
 		shl	cx, 1
 		add	cx, ax				; add in mask size
-		mov	cs:[bm_bpScan], cx		; store scan line wid
+		mov	fs:[bm_bpScan], cx		; store scan line wid
 		jmp	rejoinEntry
 
 
@@ -163,7 +163,7 @@ CMYKEscape	proc	near
 		push	es		
 		segmov	es, cs, cx	; es -> driver segment
 		mov	ax, di		; setup match value
-		mov	di, offset cmykgroup:escCodes ; si -> esc code tab
+		mov	di, offset cmykcode:escCodes ; si -> esc code tab
 		mov	cx, NUM_ESC_ENTRIES ; init rep count
 		repne	scasw		; find the right one
 		pop	es
@@ -287,17 +287,17 @@ CMYKCallMod	proc	near
 
 		; first, save away ax/bx since they are trashed by CallMod
 
-		mov	cs:[TPD_dataAX], ax		; trashed by CallMod
-		mov	cs:[TPD_dataBX], bx
+		mov	fs:[TPD_dataAX], ax		; trashed by CallMod
+		mov	fs:[TPD_dataBX], bx
 
 		; next, switch stacks so we still have access to 
 		; NOTE: the loading of ss *must* be followed by the loading
 		; of sp.
 
-		mov	cs:[saveSS], ss			; save caller's stack
-		mov	cs:[saveSP], sp
+		mov	fs:[saveSS], ss			; save caller's stack
+		mov	fs:[saveSP], sp
 		mov	bx, ss:[TPD_threadHandle]
-		mov	cs:[TPD_threadHandle], bx
+		mov	fs:[TPD_threadHandle], bx
 
 
 ;	Copy over TPD_dgroup and TPD_classPointer, because VMDirty is called
@@ -306,16 +306,16 @@ CMYKCallMod	proc	near
 ;	6/18/96 - atw
 
 		mov	bx, ss:[TPD_dgroup]
-		mov	cs:[TPD_dgroup], bx
+		mov	fs:[TPD_dgroup], bx
 		mov	bx, ss:[TPD_classPointer].segment
-		mov	cs:[TPD_classPointer].segment, bx
+		mov	fs:[TPD_classPointer].segment, bx
 		mov	bx, ss:[TPD_classPointer].offset
-		mov	cs:[TPD_classPointer].offset, bx
+		mov	fs:[TPD_classPointer].offset, bx
 		mov	bx, ss:[TPD_processHandle]
-		mov	cs:[TPD_processHandle], bx
+		mov	fs:[TPD_processHandle], bx
 
 		mov	bx, {word}ss:[TPD_exclFSIRLocks]
-		mov	{word}cs:[TPD_exclFSIRLocks], bx
+		mov	{word}fs:[TPD_exclFSIRLocks], bx
 		mov	ax, cs				; setup new stack
 		mov	ss, ax
 		mov	sp, offset cmykgroup:endVidStack
@@ -331,8 +331,8 @@ CMYKCallMod	proc	near
 
 		; done with operation, restore stack and exit
 
-		mov	ss, cs:[saveSS]			; restore old stack
-		mov	sp, cs:[saveSP]
+		mov	ss, fs:[saveSS]			; restore old stack
+		mov	sp, fs:[saveSP]
 		ret
 CMYKCallMod	endp
 

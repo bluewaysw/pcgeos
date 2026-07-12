@@ -94,7 +94,7 @@ PutColor24Mask	proc	far
 		; intialize some of our dither stuff
 
 		mov	cs:[colorWriteByte], offset WriteClr24Byte
-		InitDitherIndex	<ss:[yellowBase]>
+		InitDitherIndex	<ss:[yellowBase]>, CMYKClrBitmap
 
 		; since there is a mask, compute where it is...
 
@@ -165,7 +165,7 @@ PutColor24	proc	far
 		; intialize some of our dither stuff
 
 		mov	cs:[colorWriteByte], offset WriteClr24Byte
-		InitDitherIndex	<ss:[yellowBase]>
+		InitDitherIndex	<ss:[yellowBase]>, CMYKClrBitmap
 
 		; next, calculate the offsets into the source and destination
 		; scan lines.
@@ -328,7 +328,7 @@ PutColor8Mask	proc	far
 		; intialize some of our dither stuff
 
 		mov	cs:[colorWriteByte], offset WriteClr8Byte
-		InitDitherIndex	<ss:[yellowBase]>
+		InitDitherIndex	<ss:[yellowBase]>, CMYKClrBitmap
 
 		; since there is a mask, compute where it is...
 
@@ -398,7 +398,7 @@ PutColor8	proc	far
 		; intialize some of our dither stuff
 
 		mov	cs:[colorWriteByte], offset WriteClr8Byte
-		InitDitherIndex	<ss:[yellowBase]>
+		InitDitherIndex	<ss:[yellowBase]>, CMYKClrBitmap
 
 		; next, calculate the offsets into the source and destination
 		; scan lines.
@@ -553,7 +553,7 @@ PutColor4Mask	proc	far
 		; intialize some of our dither stuff
 
 		mov	cs:[colorWriteByte], offset WriteClr4Byte
-		InitDitherIndex	<ss:[yellowBase]>
+		InitDitherIndex	<ss:[yellowBase]>, CMYKClrBitmap
 
 		; since there is a mask, compute where it is...
 
@@ -710,7 +710,7 @@ PutColor4	proc	far
 		; intialize some of our dither stuff
 
 		mov	cs:[colorWriteByte], offset WriteClr4Byte
-		InitDitherIndex	<ss:[yellowBase]>
+		InitDitherIndex	<ss:[yellowBase]>, CMYKClrBitmap
 
 		; calculate the offsets into the source and destination
 		; scan lines.

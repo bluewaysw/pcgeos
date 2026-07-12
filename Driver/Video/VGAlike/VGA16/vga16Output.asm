@@ -58,8 +58,8 @@ DrawOptRect	proc	near
 		; drawing a solid rectangle.  See if it's just one pixel wide,
 		; and use the quick one...
 
-NMEM <		mov	si, cs:[modeInfo].VMI_scanSize ; optimization	>
-                mov     ax, cs:[currentColor]   ; get current color index
+NMEM <		mov	si, fs:[modeInfo].VMI_scanSize ; optimization	>
+                mov     ax, fs:[currentColor]   ; get current color index
 		tst	dx
 		jz	oneByteWide
 
@@ -68,7 +68,7 @@ NMEM <		mov	si, cs:[modeInfo].VMI_scanSize ; optimization	>
 
 		inc	dx			; total #bytes in line
 
-NMEM <          cmp     di, cs:[lastWinPtr]     ; is it in the last line   >
+NMEM <          cmp     di, fs:[lastWinPtr]     ; is it in the last line   >
 NMEM <          jae     firstPartial            ; check for complete line   >
 
 lineLoop:
@@ -82,7 +82,7 @@ NMEM <		NextScan di, si			; adj ptr to next scan line >
 MEM <		NextScan di			; adj ptr to next scan line >
 NMEM <		jc	lastWinLine		; oops, on last line in win >
 NMEM <		jmp	lineLoop					>
-MEM <		tst	cs:[bm_scansNext]	; if negative, bogus	 >
+MEM <		tst	fs:[bm_scansNext]	; if negative, bogus	 >
 MEM <		jns	lineLoop					>
 done:
 		ret
@@ -95,13 +95,13 @@ firstPartial:
 
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-		cmp	dx, cs:[pixelsLeft]	; if doing less, do normal
+		cmp	dx, fs:[pixelsLeft]	; if doing less, do normal
                 jb      lineLoop
-		mov	cx, cs:[pixelsLeft]	; #pixels left in window
+		mov	cx, fs:[pixelsLeft]	; #pixels left in window
                 rep	stosw
 		call	MidScanNextWin		; goto next window
                 mov     cx, dx                  ; setup remaining count
-                sub     cx, cs:[pixelsLeft]
+                sub     cx, fs:[pixelsLeft]
                 jcxz    null1
                 rep     stosw                   ; do remaining part of line
 null1:
@@ -120,7 +120,7 @@ oneLoop:
 		jz	done
 NMEM <		NextScan di, si			; always enuf room todo 1 pix >
 MEM <		NextScan di			; always enuf room todo 1 pix >
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneLoop
 
@@ -163,7 +163,7 @@ REVISION HISTORY:
 DrawSpecialRect	proc		near
 
 		push	ds	
-NMEM <		mov	ds, cs:[readSegment]				>
+NMEM <		mov	ds, fs:[readSegment]				>
 MEM  <		segmov	ds, es						>
 
 		; setup ah to hold a bit flag to use in testing the mask
@@ -184,7 +184,7 @@ MEM  <		segmov	ds, es						>
 		inc	dx			; number of bytes
 ;                mov     si, cx                  ; mask index in si
 
-NMEM <          cmp     di, cs:[lastWinPtr]     ; is it in the last line   >
+NMEM <          cmp     di, fs:[lastWinPtr]     ; is it in the last line   >
 NMEM <          LONG jae     firstPartial       ; check for complete line   >
 
 lineLoop:
@@ -192,10 +192,10 @@ lineLoop:
 		mov	cx, dx			; setup count
 		mov	bh, bl			; reload tester
 pixelLoop:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixelDone
                 mov     ax, ds:[di]             ; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
                 mov     es:[di], ax             ; store result
 pixelDone:
                 inc     di
@@ -213,7 +213,7 @@ NMEM <          NextScanBoth di                 ; adjust ptr to next scan line>
 NMEM <		jc	lastWinLine					>
 MEM <           NextScanBoth di                                         >
 MEM <		segmov	ds, es			; update source reg	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		jns	lineLoop					>
 NMEM <		jmp	lineLoop					>
 done:
@@ -228,10 +228,10 @@ oneByteWide:
 		mov	si, cx			; mask index in si
 		mov	bh, bl			; reload tester
 oneByteLoop:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	lineDone
                 mov     ax, ds:[di]             ; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
                 mov     es:[di], ax             ; store result
 lineDone:
 		dec	bp			; fewer scans to do
@@ -241,7 +241,7 @@ lineDone:
 NMEM <          NextScanBoth di                 ; adjust ptr to next scan line>
 MEM <           NextScanBoth di                 ; adjust ptr to next scan line>
 MEM <		segmov	ds, es			; reload source reg	>
-MEM <		tst	cs:[bm_scansNext]	;			>
+MEM <		tst	fs:[bm_scansNext]	;			>
 MEM <		js	done						>
 		jmp	oneByteLoop
 
@@ -255,15 +255,15 @@ firstPartial:
 
 		; the current line is no totally in the window, so take it slow
 lastWinLine:
-                cmp     dx, cs:[pixelsLeft]     ; if doing less, do normal
+                cmp     dx, fs:[pixelsLeft]     ; if doing less, do normal
                 LONG jb lineLoop
 		mov	bh, bl
-		mov	cx, cs:[pixelsLeft]	; #pixels left in window
+		mov	cx, fs:[pixelsLeft]	; #pixels left in window
 pixLoop1:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixDone1
                 mov     ax, ds:[di]             ; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
                 mov     es:[di], ax             ; store result
 pixDone1:
 		inc	di
@@ -276,13 +276,13 @@ nextPix1:
 		call	MidScanNextWinSrc	; goto next window
 		call	MidScanNextWin		; goto next window
 		mov	cx, dx			; setup remaining count
-		sub	cx, cs:[pixelsLeft]
+		sub	cx, fs:[pixelsLeft]
                 jcxz    null1
 pixLoop2:
-		test	cs:[maskBuffer][si], bh	; skip this pixel ?
+		test	fs:[maskBuffer][si], bh	; skip this pixel ?
 		jz	pixDone2
                 mov     ax, ds:[di]             ; get screen pixel
-		call	cs:[modeRoutine]	; apply mix mode
+		call	fs:[modeRoutine]	; apply mix mode
                 mov     es:[di], ax             ; store result
 pixDone2:
 		inc	di
@@ -335,22 +335,22 @@ ModeCLEAR	label near
 ModeNOP		label near
 		ret
 ModeCOPY	label  near	
-                mov     ax, cs:[currentColor]
+                mov     ax, fs:[currentColor]
 		ret
 ModeAND		label  near		
-                and     ax, cs:[currentColor]
+                and     ax, fs:[currentColor]
 		ret
 ModeINVERT	label  near
                 xor     ax, 0FFFFh
 		ret
 ModeXOR		label  near	
-                xor     ax, cs:[currentColor]
+                xor     ax, fs:[currentColor]
 		ret
 ModeSET		label  near	
                 mov     ax, 0xFFFF
 		ret
 ModeOR		label  near	
-                or      ax, cs:[currentColor]
+                or      ax, fs:[currentColor]
 		ret
 ModeRoutines	endp
 

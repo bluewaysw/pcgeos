@@ -133,8 +133,6 @@ endif
 
 if	SEND_DOCUMENT_FCN_ONLY
 ifdef	GPC
-EC <		segmov	es, NULL_SEGMENT	; avoid ec +segment death (es >
-EC <						;  is CWD table)	      >
 		call	DOSInitEnhancedModeFlag
 endif	; GPC
 endif	; SEND_DOCUMENT_FCN_ONLY
@@ -267,6 +265,8 @@ MSFetchCWDTable proc	near
 		mov	ax, es:[bx].DLOL_DCB.offset
 		mov	ds:[firstDCB].offset, ax
 		mov	ax, es:[bx].DLOL_DCB.segment
+		mov	cx, -1
+		call	FSMapRealSegment
 		mov	ds:[firstDCB].segment, ax
 
 		clr	cx
@@ -274,12 +274,28 @@ if _MS3
 		tst	ds:[dosVersionMinor]
 		jnz	not3_0
 		mov	cl, es:[bx].D3LOL_lastDrive
-		les	di, es:[bx].D3LOL_CWDs
+
+;;		les	di, es:[bx].D3LOL_CWDs
+		push	cx
+		mov	cx, 0xFFFF
+		mov	ax, es:[bx].D3LOL_CWDs.segment
+		call	FSMapRealSegment
+		mov	es, ax
+		pop	cx
+		mov	di, es:[bx].D3LOL_CWDs.offset
+
 		jmp	haveCWD
 not3_0:
 endif
 		mov	cl, es:[bx].DLOL_lastDrive
-		les	di, es:[bx].DLOL_CWDs
+;;		les	di, es:[bx].DLOL_CWDs
+		push	cx
+		mov	cx, 0xFFFF
+		mov	ax, es:[bx].DLOL_CWDs.segment
+		call	FSMapRealSegment
+		mov	es, ax
+		pop	cx
+		mov	di, es:[bx].DLOL_CWDs.offset
 if _MS3
 haveCWD:
 endif
@@ -390,7 +406,12 @@ cdLoop:
 		jz	next
 
 		push	es, bx, cx
-		les	bx, es:[di].CD_DCB
+;;		les	bx, es:[di].CD_DCB
+		mov	bx, es:[di].CD_DCB.offset
+		mov	cx, -1
+		mov	ax, es:[di].CD_DCB.segment
+		call	FSMapRealSegment
+		mov	es, ax
 		call	MSCreateDriveFromDCB
 		pop	es, bx, cx
 next:
@@ -464,22 +485,7 @@ MSCreateDriveFromDCB proc	near
 	;
 		mov	dl, es:[bx][DCB_drive]
 
-	; edigeron 3/15/01
-	; According to the comp.os.msdos.programmer FAQ, if I check the
-	; BIOS equipment byte at 0040:0010, bits 7-6 will be one less than
-	; the number of diskette drives. So, if those bits are 0, then we
-	; don't have a B: drive.
-
-		cmp	dl, 1
-		jne	notBDrive
-		push	es
-		mov	ax, BIOS_DATA_SEG
-		mov	es, ax
-		test	es:[BIOS_EQUIPMENT], mask EC_NUM_FLOPPIES
-		pop	es
-		jz	done
-
-notBDrive:
+		
 	;
 	; First see if the media type is declared as fixed in the device
 	; control block. If so, we assume it's there and waiting.
@@ -741,6 +747,7 @@ EC <		pop	es						>
 		tst	ax
 		jz	privateDataComplete
 		push	ds, si
+		call	FSMapRealSegment
 		mov	ds, ax
 		mov	si, es:[bx].DCB_deviceHeader.offset
 		test	ds:[si].DH_attr, mask DA_STDIN_HUGE
@@ -1677,7 +1684,13 @@ MSLocateFileTable proc near
 		mov	ds:[jftSize], ax		;  number of handles
 		mov	ds:[jftEntries].Sem_value, ax	;  in the JFT
 
-		les	di, es:[PSP_jftAddr]		; locate and record
+		mov		di, {word} es:[PSP_jftAddr]		; locate and record		
+		push	ax
+		mov		ax, {word} es:[PSP_jftAddr+2]
+		call	FSMapRealSegment
+		mov		es, ax
+		pop		ax
+
 		mov	ds:[jftAddr].offset, di		;  the JFT itself
 		mov	ds:[jftAddr].segment, es
 
@@ -1697,7 +1710,12 @@ nextHandle:
 		mov	ah, MSDOS_GET_DOS_TABLES
 		int	21h
 		
-		les	di, es:[bx].DLOL_SFT
+;;		les	di, es:[bx].DLOL_SFT
+		mov	di, es:[bx].DLOL_SFT.offset
+		mov	ax, es:[bx].DLOL_SFT.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		mov	es, ax
 		mov	ds:[sftStart].segment, es
 		mov	ds:[sftStart].offset, di
 
@@ -1724,7 +1742,17 @@ endif	; _MS3
 findSFTEndLoop:
 		cmp	es:[di].SFTBH_next.offset, NIL	; no next block?
 		je	haveSFTEnd
-		les	di, es:[di].SFTBH_next
+
+;;		les	di, es:[di].SFTBH_next
+		push	ax, bx, cx
+		push	es:[di].SFTBH_next.offset
+		mov	ax, es:[di].SFTBH_next.segment
+		mov	cx, -1
+		call	FSMapRealSegment
+		pop	di
+		mov	es, ax
+		pop	ax, bx, cx
+
 		jmp	findSFTEndLoop
 haveSFTEnd:
 		mov	ds:[sftEnd].segment, es
@@ -1795,5 +1823,107 @@ MSExit		proc	far
 		.leave
 		ret
 MSExit		endp
+Resident	ends
+
+MAX_MAP_REAL_SEGS = 64
+
+idata	segment
+
+fsMapRealUsed	word	0
+fsMapRealSegs	word	MAX_MAP_REAL_SEGS dup (0)
+fsMapRealSels	word	MAX_MAP_REAL_SEGS dup (0)
+
+idata	ends
+
+Resident	segment	resource
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FSMapRealSegment
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Track the mapping of DOS segments in a table.
+
+CALLED BY:	Alot
+PASS:		ax = segment to map to selector
+		cx = limit of size (actually, we ignore it for now)
+RETURN:		ax = selector, carry clear
+		else carry set
+DESTROYED:	none
+
+PSEUDO CODE/STRATEGY:
+		
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	lshields	1/10/2001	Initial
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FSMapRealSegment	proc	far
+	uses cx, es, di
+	.enter
+
+	; Get our data group
+	push	ax
+	mov	ax, dgroup
+	mov	es, ax
+	pop	ax
+
+	; Search for a matching segment in our list already
+	mov	di, offset fsMapRealSegs
+	mov	cx, es:fsMapRealUsed
+	jcxz	notFound
+maploop:
+	scasw
+	je	found
+	loop	maploop
+	; not found, let's try adding it
+
+notFound:
+	mov	di, es:fsMapRealUsed
+	cmp	di, MAX_MAP_REAL_SEGS
+	jae	outofslots
+
+	; Store the segment for now
+	shl	di, 1
+	add	di, offset fsMapRealSegs
+	mov	es:[di], ax
+
+	; Map a segment into a selector (cx = -1)
+	clr	cx
+	dec	cx
+	call	SysMapRealSegment
+	jc	failedToMap
+
+	; Store the new selector
+	add	di, offset fsMapRealSels - offset fsMapRealSegs
+	mov	es:[di], ax
+	inc	es:fsMapRealUsed
+	clc
+	jmp	done
+	
+found:
+	; Found via our search
+	add	di, offset fsMapRealSels - offset fsMapRealSegs - 2 ; back up one also
+	mov	ax, es:[di]
+	clc
+done:
+	.leave
+	ret
+outofslots:
+	mov	ax, -1
+	call	FatalError
+	stc
+	jmp	done
+failedToMap:
+	mov	ax, -1
+	call	FatalError
+	stc
+	jmp	done
+
+FSMapRealSegment	endp
 
 Resident	ends

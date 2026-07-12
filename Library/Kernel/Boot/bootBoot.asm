@@ -28,7 +28,7 @@ DESCRIPTION:
 
 	; Debugger hook from LoadResourceLow routine
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 kcode		segment
 else
 idata		segment
@@ -93,7 +93,7 @@ WritableFatalError	proc	far
 WritableFatalError	endp
 endif
 
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 idata	ends
 kcode		segment
 endif
@@ -239,7 +239,7 @@ DEBUG_MEMORY_ROUTINE	equ	FarDebugMemory
 DEBUG_LOAD_RESOURCE_ROUTINE	equ	FarDebugLoadResource
 endif
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 swatVectorTable	SwatVectorTable <
 	offset	currentThread,
 	offset	geodeListPtr,
@@ -1109,7 +1109,7 @@ endif
 	call	ResetWatchdog
 	call	ExitFSD
 
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	call	RestoreMovableInt	;reset INT
 endif
 

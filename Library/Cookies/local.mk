@@ -5,7 +5,8 @@ XGOCFLAGS = -L cookies
 
 # Force Borland C to create code that loads DS in function entry
 #XCCOMFLAGS = -WDE -d
-XCCOMFLAGS = -zu -zc 
+XCCOMFLAGS = -zu 
+#-zc 
 
 CCOMFLAGS += -DSSL_ENABLE
 GOCFLAGS += -DSSL_ENABLE

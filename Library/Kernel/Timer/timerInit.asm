@@ -140,7 +140,7 @@ SetTimerInterrupt	proc	near
 	.enter
 
 	; save old interrupt vector
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	bl, TIMER_INTERRUPT
 	call	GPMIGetInterruptHandlerFar	;cx:dx = vector
 	mov	ds:timerSave.offset,dx		;save old vector
@@ -158,7 +158,7 @@ endif
 	;set temporary vector for speed test
 
 	INT_OFF
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	cx, cs
 	mov	dx, offset STI_tempVector
 	call	GPMISetInterruptHandlerFar
@@ -179,7 +179,7 @@ endif
 	call	ComputeDispatchLoopSpeed
 
 	; set up real interrupt handler
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	bl, TIMER_INTERRUPT
 	mov	cx, segment TimerInterrupt
 	mov	dx, offset TimerInterrupt
@@ -329,7 +329,7 @@ if not KERNEL_EXECUTE_IN_PLACE and (not FULL_EXECUTE_IN_PLACE)
 
 	push	ds, es
 	segmov	ds, cs
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	bx, cs
 	call	GPMIAliasFar			;bx = writable cs
 	mov	es, bx
@@ -349,7 +349,7 @@ endif
 	mov	ax, 0x90		;nop
 	rep	stosb
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	segmov	es, NULL_SEGMENT, ax
 	call	GPMIFreeAliasFar
 endif
@@ -500,7 +500,7 @@ if not KERNEL_EXECUTE_IN_PLACE and (not FULL_EXECUTE_IN_PLACE)
 
 	push	ds
 	segmov	ds, cs
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	mov	bx, cs
 	call	GPMIAliasFar			;bx = writable cs
 	mov	es, bx
@@ -518,7 +518,7 @@ endif
 	mov	cx, ax
 	mov	ax, 0x90		;nop
 	rep	stosb
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	segmov	es, NULL_SEGMENT, ax
 	call	GPMIFreeAliasFar
 endif

@@ -78,16 +78,16 @@ DrawOptRect	proc	near
 	; a few more bits
 
 	mov	ax,cs:[si][leftMaskTable]	;get mask
-	mov	cs:[BOR_leftNewMask],ax
+	mov	gs:[BOR_leftNewMask],ax
 	not	ax
-	mov	cs:[BOR_leftOldMask],ax
+	mov	gs:[BOR_leftOldMask],ax
 
 	; compute right masks
 
 	mov	ax,cs:[bx][rightMaskTable]	;get mask
-	mov	cs:[BOR_rightNewMask],ax
+	mov	gs:[BOR_rightNewMask],ax
 	not	ax
-	mov	cs:[BOR_rightOldMask],ax
+	mov	gs:[BOR_rightOldMask],ax
 
 	mov	bx,cx				;pass pattern index in bx
 	shl	bx, 1				; 2-word/scan
@@ -154,11 +154,11 @@ OROW_loop:
 	add	bx, 2				;inc pattern ptr to next scan
 	and	bl, 6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap >
 MEM <	js	done				;  then bail		>
 
 OROW_loopEntry:
-	mov	ax, {word} cs:[bx][ditherMatrix] ;get dithered word
+	mov	ax, {word} fs:[bx][ditherMatrix] ;get dithered word
 INV_CLR2 <	not	ax						>
 	and	ax,dx				;ax = new data bits
 	mov	si,es:[di]
@@ -224,13 +224,13 @@ BOR_loop:
 	add	bx, 2			;increment pattern pointer to next scan
 	and	bl,6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap >
 MEM <	js	BOR_done			;  then bail		>
 
 BlastOptRect	proc		near
 	push	di					
 	
-	mov	ax, {word} cs:[bx][ditherMatrix] ;get dithered word
+	mov	ax, {word} fs:[bx][ditherMatrix] ;get dithered word
 INV_CLR2 <	not ax							>
 	; handle left word specially
 
@@ -318,7 +318,7 @@ DrawNOTRect	proc		near
 
 	mov	ax,cs:[bx][rightMaskTable]	;get mask
 	not	ax
-	mov	cs:[BNR_rightMask],ax
+	mov	gs:[BNR_rightMask],ax
 
 	; compute left masks
 
@@ -381,7 +381,7 @@ NOTRectOneWord	proc		near
 
 NROW_loop:
 	NextScan	di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap >
 MEM <	js	done				;  then bail		>
 
 NROW_loopEntry:
@@ -441,7 +441,7 @@ REVISION HISTORY:
 
 BNR_loop:
 	NextScan	di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap >
 MEM <	js	BNR_done			;  then bail		>
 
 BlastNOTRect	proc		near
@@ -528,17 +528,17 @@ DrawSpecialRect	proc		near
 	; calculate # of words in the middle of the line, offset to next line
 
 	dec	dx				;number of middle words
-	mov	cs:[BSR_middleCount], dx	;save parameter
+	mov	gs:[BSR_middleCount], dx	;save parameter
 
 	; compute left masks
 
 	mov	ax, cs:[si][leftMaskTable]	;get mask
-	mov	cs:[BSR_leftNewMask], ax
+	mov	gs:[BSR_leftNewMask], ax
 
 	; compute right masks
 
 	mov	ax, cs:[bx][rightMaskTable]	;get mask
-	mov	cs:[BSR_rightNewMask], ax
+	mov	gs:[BSR_rightNewMask], ax
 
 	mov	bx, cx				;pass pattern index in bx
 	shl	bx, 1				; 1-word scan lines
@@ -595,7 +595,7 @@ REVISION HISTORY:
 SpecialOneWord	proc		near
 	mov	ax, cs:[si][leftMaskTable]	; get mask
 	and	ax, cs:[bx][rightMaskTable]	; composite mask
-	mov	cs:[SOW_newBits],ax
+	mov	gs:[SOW_newBits],ax
 	mov	bx, cx				; bx = pattern index
 	shl	bx, 1				; 1-word/scan
    	and	bx, 6				; 4 scans
@@ -605,17 +605,17 @@ SOW_loop:
 	add	bx, 2				; increment pattern pointer
 	and	bl, 6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap >
 MEM <	js	done				;  then bail		>
 
 SOW_loopEntry:
-	mov	ax, {word} cs:[bx][ditherMatrix]; get dithered word
-	mov	dx, {word} cs:[bx][maskBuff2]	; get draw mask byte
+	mov	ax, {word} fs:[bx][ditherMatrix]; get dithered word
+	mov	dx, {word} fs:[bx][maskBuff2]	; get draw mask byte
 	mov	si, ax				; si = pattern bits
 SOW_newBits	equ	(this word) + 2
 	and	dx, 1234h			; apply left/right masks
 	mov	ax, es:[di]			; ax = screen
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 	mov	es:[di], ax
 
 	dec	bp				; loop to do all lines
@@ -674,13 +674,13 @@ BSR_loop:
 	add	bx, 2			;increment pattern pointer
 	and	bl, 6
 	NextScan	di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap >
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap >
 MEM <	LONG js	BSR_done			;  then bail		>
 
 BlastSpecialRect	proc		near
 	push	di
-	mov	ax, {word} cs:[bx][ditherMatrix]; get dithered word
-	mov	dx, {word} cs:[bx][maskBuff2]	; get draw mask byte
+	mov	ax, {word} fs:[bx][ditherMatrix]; get dithered word
+	mov	dx, {word} fs:[bx][maskBuff2]	; get draw mask byte
 	mov	si, ax				; si = pattern bits
 
 	; handle left word specially
@@ -688,7 +688,7 @@ BlastSpecialRect	proc		near
 BSR_leftNewMask	equ	(this word) + 2
 	and	dx,1234h			; apply left-side mask
 	mov	ax, es:[di]			; ax = screen
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 	stosw
 
 	; draw middle words
@@ -700,8 +700,8 @@ BSR_middleCount	equ	(this word) + 1
 	jz	BSR_noMiddle
 BSR_midLoop:
 	mov	ax, es:[di]			; ax = screen
-	mov	dx, {word} cs:[bx][maskBuff2]
-	call	cs:[modeRoutine]		; ax = word to write
+	mov	dx, {word} fs:[bx][maskBuff2]
+	call	fs:[modeRoutine]		; ax = word to write
 	stosw
 	dec	bp
 	jnz	BSR_midLoop
@@ -711,10 +711,10 @@ BSR_noMiddle:
 	; handle right word specially
 
 	mov	ax, es:[di]			; ax = screen
-	mov	dx, {word} cs:[bx][maskBuff2]
+	mov	dx, {word} fs:[bx][maskBuff2]
 BSR_rightNewMask	equ	(this word) + 2
 	and	dx, 1234h			; apply right-side mask
-	call	cs:[modeRoutine]		; ax = word to write
+	call	fs:[modeRoutine]		; ax = word to write
 	stosw
 
 	pop	di
@@ -801,7 +801,7 @@ MA_orNotMask	word
 
 ModeAND		label  near	; (screen^((data^mask^pattern)v~(data^mask))
 	not	dx
-	mov	cs:[MA_orNotMask], dx
+	mov	gs:[MA_orNotMask], dx
 	not	dx
 	and	dx, si
 	or	dx, cs:[MA_orNotMask]

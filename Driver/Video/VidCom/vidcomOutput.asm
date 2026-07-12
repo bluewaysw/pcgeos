@@ -87,25 +87,26 @@ rejectNoDraw 	label	near
 
 
 VidDrawRect	proc	near
+	assume	es:nothing, ds:nothing
 
 ifndef	IS_MEM					; no pointers,xor,save under
 						; for vidmem driver
  	; check for collision with pointer				
 
- 	cmp	ax,cs:[cursorRegRight]				
+ 	cmp	ax, gs:[cursorRegRight]				
  	jg	VDR_noCollision			;to the right,branch
- 	cmp	cx,cs:[cursorRegLeft]					
+ 	cmp	cx, gs:[cursorRegLeft]					
  	jl	VDR_noCollision			;to the left -> branch
- 	cmp	bx,cs:[cursorRegBottom]				
+ 	cmp	bx, gs:[cursorRegBottom]				
  	jg	VDR_noCollision			;to the bottom,branch
- 	cmp	dx,cs:[cursorRegTop]				
+ 	cmp	dx, gs:[cursorRegTop]				
  	jl	VDR_noCollision			;to the top -> branch
  	call	CondHidePtr					
 VDR_noCollision:					
 
 	; check for collision with XOR region	
 
-	cmp	cs:[xorRegionHandle], 0	
+	cmp	fs:[xorRegionHandle], 0	
 	jnz	VDR_checkXOR	
 VDR_afterXOR	label	near
 
@@ -161,7 +162,7 @@ VDR_clipped:
 
 	; set up dither matrix and optimization flags
 
-	CheckSetDither	cs
+	CheckSetDither	fs
 
 	test	es:[W_color], mask WCF_MASKED
 	jnz	special
@@ -190,7 +191,7 @@ BIT <	mov	bl,ds:[GS_mixMode]					>
 BIT <	clr	bh							>
 BIT <	shl	bx,1				;;handle draw mode	>
 BIT <	mov	dx,cs:[bx][drawModeTable]				>
-BIT <	mov	cs:[modeRoutine],dx					>
+BIT <	mov	fs:[modeRoutine],dx					>
 BIT <	mov	bx,cx							>
 endif
 
@@ -199,7 +200,7 @@ endif
 
 afterSpecial:
 
-	mov	cs:[rectRoutine],dx
+	mov	gs:[rectRoutine],dx
 
 	mov	si,ax				;si = left
 
@@ -224,11 +225,11 @@ VDR_afterDraw	label	near
 MEM <	ReleaseHugeArray		; release block		> 
 	; changed 4/7/93 to make AutoTransfer the default
 ;CASIO <CasioAutoXferOff	; turn off auto-transfer	>
-NMEM <	cmp	cs:[xorHiddenFlag], 0				>
+NMEM <	cmp	fs:[xorHiddenFlag], 0				>
 NMEM <	jz	afterXORRedraw					>
 NMEM <	call	ShowXOR						>
 NMEM <afterXORRedraw:						>
-NMEM < 	cmp	cs:[hiddenFlag],0				>
+NMEM < 	cmp	fs:[hiddenFlag],0				>
 NMEM < 	jz	afterPtrRedraw					>
 NMEM < 	call	CondShowPtr					>
 NMEM <afterPtrRedraw:						>
@@ -241,11 +242,12 @@ NMEM <afterPtrRedraw:						>
 	; special case: some clipping must be done
 
 VDR_complex:
-	mov	cs:[PSL_saveWindow],ds
+	mov	gs:[PSL_saveWindow],ds
 	call	DrawComplexRect
 	jmp	short VDR_afterDraw
 
 VidDrawRect	endp
+
 
 COMMENT @----------------------------------------------------------------------
 
@@ -283,24 +285,25 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 DrawComplexRect	proc	near
+	assume ds:nothing
 
 ifdef	LOGGING
-	ornf	cs:[curRegFlags], mask RF_CALLED_DRAW_COMPLEX_RECT
+	ornf	gs:[curRegFlags], mask RF_CALLED_DRAW_COMPLEX_RECT
 endif
 
 	push	ds
-	mov	ds,cs:[PSL_saveWindow]
+	mov	ds, gs:[PSL_saveWindow]
 
-	mov	cs:[d_x1],si
-	mov	cs:[d_x2],di
-	mov	cs:[d_y1],bx
-	mov	cs:[d_lineCount],bp
+	mov	fs:[d_x1],si
+	mov	fs:[d_x2],di
+	mov	fs:[d_y1],bx
+	mov	fs:[d_lineCount],bp
 
 DCR_loop:
 
 	; make sure that clip info is correct
 
-	mov	bx,cs:[d_y1]
+	mov	bx,fs:[d_y1]
 	mov	bp,ds:[W_clipRect.R_bottom]
 	cmp	bx,bp
 	jg	DCR_setClip
@@ -312,9 +315,9 @@ DCR_afterClip:
 
 	sub	bp,bx
 	inc	bp			;bp = # of valid lines from top
-	cmp	bp,cs:[d_lineCount]	;get max (valid lines, lines to draw)
+	cmp	bp,fs:[d_lineCount]	;get max (valid lines, lines to draw)
 	jb	DCR_noWrap
-	mov	bp,cs:[d_lineCount]
+	mov	bp,fs:[d_lineCount]
 DCR_noWrap:
 
 	; test for type of clipping region
@@ -338,8 +341,8 @@ DCR_noWrap:
 	; loop if not all done
 
 DCR_next:
-	add	cs:[d_y1],bp
-	sub	cs:[d_lineCount],bp
+	add	fs:[d_y1],bp
+	sub	fs:[d_lineCount],bp
 	jnz	DCR_loop
 
 	pop	ds
@@ -351,7 +354,7 @@ DCR_next:
 
 DCR_setClip:
 	call	WinValClipLine
-	mov	bp,ds:[W_clipRect.R_bottom]
+	mov	bp, ds:[W_clipRect.R_bottom]
 	jmp	short DCR_afterClip
 
 ;------------------------------
@@ -361,17 +364,17 @@ DCR_setClip:
 DCR_notSimple:
 	mov	si, ds:W_maskReg
 	mov	si, ds:[si]
-	add	si,ds:[W_clipPtr]		;test for within clip area
+	add	si, ds:[W_clipPtr]		;test for within clip area
 DCR_nsLoop:
 	lodsw					;get first ON point
 	cmp	ax, EOREGREC			;check for at end
 	jz	DCR_next
-	cmp	ax,cs:[d_x2]			;test for past right side
+	cmp	ax, fs:[d_x2]			;test for past right side
 	jg	DCR_next
 
 	mov	cx,ax				;cx = first ON point
 	lodsw					;ax = last ON point
-	cmp	ax,cs:[d_x1]			;test if before left
+	cmp	ax, fs:[d_x1]			;test if before left
 	jl	DCR_nsLoop
 
 	; need to draw part of this segment
@@ -446,17 +449,17 @@ DLRCR_ret:
 DrawLRClippedRect	proc  near
 
 ifdef	LOGGING
-	ornf	cs:[curRegFlags], mask RF_CALLED_DRAW_LRCLIPPED_RECT
+	ornf	fs:[curRegFlags], mask RF_CALLED_DRAW_LRCLIPPED_RECT
 endif
 
-	mov	si,cs:[d_x1]
+	mov	si,fs:[d_x1]
 	cmp	si,ax
 	jg	DLRCR_ret
 	cmp	si,cx
 	jg	DLRCR_10
 	mov	si,cx
 DLRCR_10:
-	mov	di,cs:[d_x2]
+	mov	di,fs:[d_x2]
 	cmp	di,cx
 	jl	DLRCR_ret
 	cmp	di,ax
@@ -471,6 +474,7 @@ MEM <	ret							>
 NMEM <	FALL_THRU	DrawSimpleRect				>
 
 DrawLRClippedRect	endp
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -509,10 +513,11 @@ REVISION HISTORY:
 	Tony	10/88		Initial version
 -------------------------------------------------------------------------------@
 
+	.warn	-fall_thru
 DrawSimpleRect	proc	near
 
 ifdef	LOGGING
-	ornf	cs:[curRegFlags], mask RF_CALLED_DRAW_SIMPLE_RECT
+	ornf	gs:[curRegFlags], mask RF_CALLED_DRAW_SIMPLE_RECT
 endif
 
 	mov	ax,si
@@ -553,7 +558,7 @@ ifdef	IS_MEM
 	add	ax, ax
 	add	ax, dx
 else
-	mul	cs:[pixelBytes]
+	mul	fs:[pixelBytes]
 endif
 	pop	dx
 elifdef	IS_CLR24
@@ -574,24 +579,28 @@ MEM  <	CalcScanLine	bx, ax, es					   >
 	xchg	bx,di				;bx = mask index, di = address
 
 	; (EGA) compute masks and check for one word write
-EGA <	mov	al,cs:[si][leftMaskTable]	;get mask		>
-EGA <	mov	ah,cs:[bx][rightMaskTable]	;get mask		>
+EGA <	mov	al,gs:[si][leftMaskTable]	;get mask		>
+EGA <	mov	ah,gs:[bx][rightMaskTable]	;get mask		>
 EGA <	tst	dx							>
 
-NIKEC <	mov	al,cs:[si][leftMaskTable]	;get mask		>
-NIKEC <	mov	ah,cs:[bx][rightMaskTable]	;get mask		>
+NIKEC <	mov	al,gs:[si][leftMaskTable]	;get mask		>
+NIKEC <	mov	ah,gs:[bx][rightMaskTable]	;get mask		>
 NIKEC <	tst	dx							>
 
 	; for memory video driver, check DITHER mode...
 ifdef IS_MEM
-MONO <	test	cs:[bm_flags], mask BM_CLUSTERED_DITHER	; check dither type >
+MONO <	test	fs:[bm_flags], mask BM_CLUSTERED_DITHER	; check dither type >
 MONO <	jnz	jumpClustered						    >
 CMYK <  jmp	ClusterMux						    >
 endif
 rectRoutineLabel label word
 rectRoutine	equ  rectRoutineLabel + 1
 	.warn	-unreach
-	jmp	near ptr DrawOptRect		;self modified
+;	jmp	near ptr DrawOptRect		;self modified
+;	Force to the correct assembly
+	.inst db	0xe9
+	.inst dw	DrawOptRect
+
 	.warn	@unreach
 
 ifdef MEM_MONO
@@ -599,6 +608,8 @@ jumpClustered:
 	jmp	ClusterMux			; figure out what to do there
 endif
 DrawSimpleRect	endp
+	.warn	 @fall_thru
+
 
 COMMENT @-----------------------------------------------------------------------
 
@@ -656,20 +667,20 @@ RectSetup	proc	near
 
 NMEM <	; check for collision with pointer				>
 
-NMEM <	cmp	ax,cs:[cursorRegRight]					>
+NMEM <	cmp	ax,gs:[cursorRegRight]					>
 NMEM <	jg	RectS_noCollision		;to the right -> branch	>
-NMEM <	cmp	cx,cs:[cursorRegLeft]					>
+NMEM <	cmp	cx,gs:[cursorRegLeft]					>
 NMEM <	jl	RectS_noCollision		;to the left -> branch	>
-NMEM <	cmp	bx,cs:[cursorRegBottom]					>
+NMEM <	cmp	bx,gs:[cursorRegBottom]					>
 NMEM <	jg	RectS_noCollision		;to the bottom -> branch>
-NMEM <	cmp	dx,cs:[cursorRegTop]					>
+NMEM <	cmp	dx,gs:[cursorRegTop]					>
 NMEM <	jl	RectS_noCollision		;to the top -> branch	>
 NMEM <	call	CondHidePtr						>
 NMEM <RectS_noCollision:						>
 
 	; check for collision with XOR region	
 
-NMEM <	cmp	cs:[xorRegionHandle], 0					>
+NMEM <	cmp	fs:[xorRegionHandle], 0					>
 NMEM <	jz	RectS_afterXOR						>
 NMEM <	call	CheckXORCollision					>
 NMEM <RectS_afterXOR	label	near					>
@@ -696,7 +707,7 @@ NMEM <RectS_noSU:							>
 
 	; set up dither matrix and optimization flags
 
-	CheckSetDither	cs
+	CheckSetDither	fs
 
 	test	es:[W_color], mask WCF_MASKED
 	jnz	special
@@ -725,7 +736,7 @@ BIT <	mov	bl,ds:[GS_mixMode]					>
 BIT <	clr	bh							>
 BIT <	shl	bx,1				;;handle draw mode	>
 BIT <	mov	dx,cs:[bx][drawModeTable]				>
-BIT <	mov	cs:[modeRoutine],dx					>
+BIT <	mov	fs:[modeRoutine],dx					>
 BIT <	mov	bx,cx							>
 endif
 
@@ -734,7 +745,7 @@ endif
 
 afterSpecial:
 
-	mov	cs:[rectRoutine],dx
+	mov	gs:[rectRoutine],dx
 
 	; ax = left, di = right, bx = top, bp = bottom
 
@@ -820,9 +831,10 @@ RectS_complexCheck:
 	cmp	al,TRRT_OUT
 	jz	RectS_returnTotallyClipped
 
-	mov	cs:[PSL_saveWindow],ds
+	mov	gs:[PSL_saveWindow],ds
 	mov	si, offset DrawComplexRect
 	clc
 	ret
 
 RectSetup	endp
+

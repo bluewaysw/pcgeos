@@ -28,7 +28,6 @@ DESCRIPTION:
 kcode		segment para public 'CODE'
 	cgroup	group	kcode, stack
 
-PRODUCT_GEOS32 = 1
 include main.asm
 include locate.asm
 include strings.asm

@@ -25,5 +25,7 @@ incminor
 
 export MIMEDRVGRAPHICEX
 
+resource ASM_FIXED code read-only shared fixed
+
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

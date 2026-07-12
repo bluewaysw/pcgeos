@@ -74,42 +74,42 @@ VidBuildChar	proc  near
 	call	ThreadBorrowStackSpace
 	push	di
 
-NMEM <	cmp	cs:[xorHiddenFlag],0	;check for ptr hidden.		>
+NMEM <	cmp	fs:[xorHiddenFlag],0	;check for ptr hidden.		>
 NMEM <	jz	noRedrawXOR		;go and redraw it if it was hidden.>
 NMEM <	call	ShowXOR							>
 NMEM <noRedrawXOR:							>
 
-NMEM < 	cmp	cs:[hiddenFlag],0		;check for ptr hidden.	>
+NMEM < 	cmp	fs:[hiddenFlag],0		;check for ptr hidden.	>
 NMEM < 	je	noRedraw			;branch if not hidden >
 NMEM <	push	dx				;>
 NMEM <	call	CondShowPtr			;redraw it if it was hidden.>
 NMEM <	pop	dx				;>
 NMEM <noRedraw:					;>
 
-	mov	si, offset PutStringState 	; cs:si <- ptr to table
+	mov	si, offset PutStringState 	; gs:si <- ptr to table
 	call	SaveVidState			; save self-modifcations
-	mov	bp, cs:[PSL_saveGState]		; bp <- seg addr of gstate
-	mov	es, cs:[PSL_saveFont]		; es <- seg addr of font
+	mov	bp, gs:[PSL_saveGState]		; bp <- seg addr of gstate
+	mov	es, gs:[PSL_saveFont]		; es <- seg addr of font
 
-	VSem	cs, videoSem, TRASH_AX_BX	;release the driver sem
+	VSem	fs, videoSem, TRASH_AX_BX	;release the driver sem
 	mov	di, DR_FONT_GEN_CHAR		;di <- driver function
 SBCS <	add	dl, es:[FB_firstChar]		;dl <- character (Chars)>
 SBCS <	clr	dh				;dx <- character (Chars)>
 DBCS <	add	dx, es:[FB_firstChar]		;dx <- character (Chars)>
 	mov	ax, es:[FB_maker]		;ax <- font manufacturer
 	call	GrCallFontDriverID
-	PSem	cs, videoSem, TRASH_AX_BX	 ;get the driver sem
+	PSem	fs, videoSem, TRASH_AX_BX	 ;get the driver sem
 
-	mov	cs:[PSL_saveFont], es		 ; store (new) font seg
-	mov	si, offset PutStringState	 ; cs:si <- ptr to table
+	mov	gs:[PSL_saveFont], es		 ; store (new) font seg
+	mov	si, offset PutStringState	 ; gs:si <- ptr to table
 	call	RestoreVidState			 ; restore self-modifications
 
-EGA <	mov	dh, cs:[currentColor]					>
-EGA <	mov	dl, cs:[currentDrawMode]				>
+EGA <	mov	dh, fs:[currentColor]					>
+EGA <	mov	dl, fs:[currentDrawMode]				>
 EGA <	call	SetEGAClrMode						>
 
-NIKEC <	mov	dh, cs:[currentColor]					>
-NIKEC <	mov	dl, cs:[currentDrawMode]				>
+NIKEC <	mov	dh, fs:[currentColor]					>
+NIKEC <	mov	dl, fs:[currentDrawMode]				>
 NIKEC <	call	SetNikeClrMode						>
 
 NMEM <	call	CondHidePtr			;>
@@ -118,8 +118,8 @@ NMEM <	clr	ax							>
 NMEM <	clr	bx							>
 FRES <	mov	cx, SCREEN_PIXEL_WIDTH					>
 FRES <	mov	dx, SCREEN_HEIGHT					>
-MRES <	mov	cx, cs:[DriverTable].VDI_pageW				>
-MRES <	mov	dx, cs:[DriverTable].VDI_pageH				>
+MRES <	mov	cx, fs:[DriverTable].VDI_pageW				>
+MRES <	mov	dx, fs:[DriverTable].VDI_pageH				>
 NMEM <	call	CheckXORCollision			;>
 
 	pop	di
@@ -209,6 +209,7 @@ endif
 ;
 EndPSS:
 
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SaveVidState
@@ -218,10 +219,10 @@ SYNOPSIS:	Save necessary state variables on the stack.
 
 CALLED BY:	INTERNAL: VidBuildChar
 
-PASS:		cs:si - table of addresses of variables to save
+PASS:		gs:si - table of addresses of variables to save
 			format:
 			dw	# WORDS
-			dw	address #1 (in cs)
+			dw	address #1 (in gs)
 			dw	address #2
 			...
 			dw	address #n
@@ -245,11 +246,11 @@ SaveVidState	proc	near
 
 	XchgTopStack	bx		;bx <- return address
 
-	mov	cx, cs:[si]		;cx <- # words to save
+	mov	cx, gs:[si]		;cx <- # words to save
 	add	si, 2			;si <- ptr to first address
 SVS_loop:
-	mov	di, cs:[si]		;di <- address of value to save
-	push	cs:[di]			;save value on stack
+	mov	di, gs:[si]		;di <- address of value to save
+	push	gs:[di]			;save value on stack
 	add	si, 2			;advance to next address
 	loop	SVS_loop		;loop while more words
 
@@ -265,10 +266,10 @@ SYNOPSIS:	Restore state variables from the stack.
 
 CALLED BY:	INTERNAL: VidBuildChar
 
-PASS:		cs:si - table of addresses of variables to restore
+PASS:		gs:si - table of addresses of variables to restore
 			format:
 			dw	# WORDS
-			dw	address #1 (in cs)
+			dw	address #1 (in gs)
 			dw	address #2
 			...
 			dw	address #n
@@ -292,14 +293,14 @@ RestoreVidState	proc	near
 
 	pop	bx			;bx <- return address
 
-	mov	cx, cs:[si]		;cx <- # words to save
+	mov	cx, gs:[si]		;cx <- # words to save
 	mov	dx, cx
 	shl	dx, 1			;dx = # words *2
 	add	si, dx
 
 RVS_loop:
-	mov	di, cs:[si]		;di <- address to restore to
-	pop	cs:[di]			;recover value from stack
+	mov	di, gs:[si]		;di <- address to restore to
+	pop	gs:[di]			;recover value from stack
 	sub	si, 2			;advance to previous address
 	loop	RVS_loop		;loop while more words
 
@@ -351,31 +352,31 @@ DoComplexMove	proc	near
 	add	di, 2 + 6*2			;skip return addr, saved regs
 	segmov	es, ss				;es:di <- ptr to old x
 
-	mov	ds, cs:PSL_saveWindow
+	mov	ds, gs:PSL_saveWindow
 	mov	si, offset W_curTMatrix		;ds:si <- addr of xform
 
-	mov	dl, cs:fracPosition
+	mov	dl, fs:fracPosition
 	sub	dl, es:[di].WWF_frac.high
 	sbb	ax, es:[di].WWF_int		;ax.dl <- (new x - old x)
 
 	xchg	es:[di].WWF_frac.high, dl
 	xchg	es:[di].WWF_int, ax
 	clr	es:[di].WWF_frac.low		;es:di <- ptr to (new x - old x)
-	mov	cs:fracPosition, dl		;ax.fracPosition <- old x
+	mov	fs:fracPosition, dl		;ax.fracPosition <- old x
 
 	test	ds:[si].TM_flags, TM_ROTATED	;see if rotated
 	jz	notRotated			;branch if not rotated
 	push	si
 	add	si, offset TM_12		;ds:si <- ptr to tm12
 	call	GrMulWWFixedPtr			;rotate difference by tm12
-	add	cs:fracYPosition, ch
+	add	fs:fracYPosition, ch
 	adc	bx, dx				;bx.fracYPosition <- new y pos
-	mov	cs:PSL_saveYPos, bx		;store PutStringLow copy
+	mov	gs:PSL_saveYPos, bx		;store PutStringLow copy
 	pop	si
 notRotated:
 	add	si, offset TM_11		;ds:si <- ptr to tm11
 	call	GrMulWWFixedPtr			;scale difference by tm11
-	add	cs:fracPosition, ch
+	add	fs:fracPosition, ch
 	adc	ax, dx				;ax.fracPosition <- new x pos
 
 	.leave

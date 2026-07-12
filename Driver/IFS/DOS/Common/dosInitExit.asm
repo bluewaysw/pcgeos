@@ -535,12 +535,11 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 if SEND_DOCUMENT_FCN_ONLY
 
-desktopDir	TCHAR	"DESKTOP"
-nullDir		TCHAR	C_NULL
+desktopDir	char	"DESKTOP"
+nullDir		char	0
 .assert	desktopDir + size desktopDir eq nullDir
 
 DOSInitRecordDocPaths	proc	near
-DBCS <	pathBuf	local	PathName					>
 	uses	ds, es
 	.enter
 	pusha
@@ -559,22 +558,12 @@ endif	; GPC
 	;
 	clr	dx			; no drive name
 	mov	bx, SP_DOCUMENT
-if DBCS_PCGEOS
-	segmov	es, ss
-	lea	di, ss:[pathBuf]	; es:di = pathBuf
-	mov	cx, size pathBuf
-else
 	segmov	es, ds			; es = dgroup
 	mov	di, offset docPath	; es:di = docPath
 	mov	cx, size docPath
-endif	; DBCS_PCGEOS
 	segmov	ds, cs
 	mov	si, offset nullDir	; ds:si = nullDir
 	call	FileConstructFullPath
-if DBCS_PCGEOS
-	mov	di, offset docPath
-	call	copyDBCSToSBCS		; es:di = NULL
-endif	; DBCS_PCGEOS
 	sub	di, offset docPath + size char	; don't count leading '\' or
 						;  null
 	mov	es:[docPathLengthNoBS], di
@@ -583,18 +572,9 @@ endif	; DBCS_PCGEOS
 	; Then get SP_WASTE_BASKET.
 	;
 	mov	bx, SP_WASTE_BASKET
-if DBCS_PCGEOS
-	segmov	es, ss
-	lea	di, ss:[pathBuf]	; es:di = pathBuf
-else
 	mov	di, offset wbPath	; es:di = wbPath
 		CheckHack <size wbPath eq size docPath>
-endif	; DBCS_PCGEOS
 	call	FileConstructFullPath
-if DBCS_PCGEOS
-	mov	di, offset wbPath
-	call	copyDBCSToSBCS		; es:di = NULL
-endif	; DBCS_PCGEOS
 	sub	di, offset wbPath + size char	; don't count leading '\' or
 						;  null
 	mov	es:[wbPathLengthNoBS], di
@@ -603,18 +583,9 @@ endif	; DBCS_PCGEOS
 	; Then get SP_APPLICATION.
 	;
 	mov	bx, SP_APPLICATION
-if DBCS_PCGEOS
-	segmov	es, ss
-	lea	di, ss:[pathBuf]	; es:di = pathBuf
-else
 	mov	di, offset appPath	; es:di = appPath
 		CheckHack <size appPath eq size docPath>
-endif	; DBCS_PCGEOS
 	call	FileConstructFullPath
-if DBCS_PCGEOS
-	mov	di, offset appPath
-	call	copyDBCSToSBCS		; es:di = NULL
-endif	; DBCS_PCGEOS
 	sub	di, offset appPath + size char	; don't count leading '\' or
 						;  null
 	mov	es:[appPathLengthNoBS], di
@@ -623,19 +594,10 @@ endif	; DBCS_PCGEOS
 	; Then get SP_TOP\DESKTOP.
 	;
 	mov	bx, SP_TOP
-if DBCS_PCGEOS
-	segmov	es, ss
-	lea	di, ss:[pathBuf]	; es:di = pathBuf
-else
 	mov	di, offset desktopPath	; es:di = desktopPath
 		CheckHack <size desktopPath eq size docPath>
-endif	; DBCS_PCGEOS
 	mov	si, offset desktopDir	; ds:si = desktopDir
 	call	FileConstructFullPath
-if DBCS_PCGEOS
-	mov	di, offset desktopPath
-	call	copyDBCSToSBCS		; es:di = NULL
-endif	; DBCS_PCGEOS
 	sub	di, offset desktopPath + size char	; don't count leading
 							; '\' or null
 	segmov	ds, es			; ds = dgroup
@@ -649,32 +611,6 @@ done::
 	popa
 	.leave
 	ret
-
-if DBCS_PCGEOS
-;
-; Pass:		di	= offset of SBCS buffer in dgroup to copy to
-;		pathBuf	= DBCS string to copy from
-; Return:	es:di	= points at NULL in SBCS buffer
-; Destroyed:	ax
-;
-copyDBCSToSBCS	label	near
-	push	ds, si
-
-	segmov	ds, ss
-	lea	si, pathBuf
-	segmov	es, dgroup		; es:di = dest
-
-copyLoop:
-	lodsw				; ax = DBCS char
-	stosb				; store SBCS char
-	tst	ax			; reached NULL?
-	jnz	copyLoop		; => no, loop until NULL
-	dec	di			; es:di points at NULL
-
-	pop	ds, si
-	retn
-endif	; DBCS_PCGEOS
-
 DOSInitRecordDocPaths	endp
 
 ifdef	GPC

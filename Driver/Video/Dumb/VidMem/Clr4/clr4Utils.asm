@@ -57,13 +57,13 @@ CalcDitherIndices		proc	far
 		.enter
 		shr	ax, 1
 		and	al, 3			; do mask index
-		mov	cs:[buff4Left], al
+		mov	fs:[buff4Left], al
 		and	ax, 1			; dither matrix is 1-word wide
-		mov	{word} cs:[ditherLeftIndex], ax
+		mov	{word} fs:[ditherLeftIndex], ax
 		and	bx, 7			; 8 scans in buffer4
 		shl	bx, 1			; *4 since 4bytes/scan
 		shl	bx, 1
-		mov	cs:[buff4Top], bl	
+		mov	fs:[buff4Top], bl	
 		.leave
 		ret
 CalcDitherIndices		endp
@@ -117,13 +117,13 @@ endif
 		clr	bh
 		shl	bx, 1				;Change to word index
 		mov	bx, cs:[nibbleTable][bx]	; do first 4 pixels
-		mov	cs:[dataBuff4], bx
+		mov	fs:[dataBuff4], bx
 		mov	bl, al
 		and	bl, 0xf
 		clr	bh
 		shl	bx, 1				; 2 bytes/entry
 		mov	bx, cs:[nibbleTable][bx]
-		mov	cs:[dataBuff4+2], bx
+		mov	fs:[dataBuff4+2], bx
 		
 		.leave
 		ret
@@ -172,13 +172,13 @@ endif
 		clr	bh
 		shl	bx, 1				;Change to word index
 		mov	bx, cs:[nibbleTable][bx]	; do first 4 pixels
-		mov	cs:[dataMask4], bx
+		mov	fs:[dataMask4], bx
 		mov	bl, al
 		and	bl, 0xf
 		clr	bh
 		shl	bx, 1				; 2 bytes/entry
 		mov	bx, cs:[nibbleTable][bx]
-		mov	cs:[dataMask4+2], bx
+		mov	fs:[dataMask4+2], bx
 		
 		.leave
 		ret
@@ -227,34 +227,34 @@ BuildMasks4	proc	far
 		uses	bx, ax, es, di, cx
 		.enter
 
-		segmov	es, cs, di
+		segmov	es, fs, di
 		mov	di, offset maskBuff4
 
 		mov	cl, 4
 		clr	bh
 
-		mov	bl, cs:maskBuffer	; do first byte
+		mov	bl, fs:maskBuffer	; do first byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+1	; do second byte
+		mov	bl, fs:maskBuffer+1	; do second byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+2	; do third byte
+		mov	bl, fs:maskBuffer+2	; do third byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+3	; do fourth byte
+		mov	bl, fs:maskBuffer+3	; do fourth byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+4	; do fifth byte
+		mov	bl, fs:maskBuffer+4	; do fifth byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+5	; do sixth byte
+		mov	bl, fs:maskBuffer+5	; do sixth byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+6	; do seventh byte
+		mov	bl, fs:maskBuffer+6	; do seventh byte
 		MapByteToNibbles
 
-		mov	bl, cs:maskBuffer+7	; do eigth byte
+		mov	bl, fs:maskBuffer+7	; do eigth byte
 		MapByteToNibbles
 
 		.leave

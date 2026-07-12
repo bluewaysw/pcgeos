@@ -56,11 +56,11 @@ REVISION HISTORY:
 
 	; just a little macro to create named offsets to the 16 different
 	; color cache entries (see cmykColorRaster.asm)
-cacheOff = offset CMYKClrBitmap:colorCache
+cacheOff = offset cmykcode:colorCache
 irpc	entry, <0123456789ABCDEF>
 	CACHE_&entry = cacheOff
 	cacheOff = cacheOff + (size ColorCacheEntry)
-	ditherOff = offset CMYKClrBitmap:dither&entry
+	ditherOff = offset cmykcode:dither&entry
 	DITHER_&entry = ditherOff
 endm
 
@@ -82,17 +82,6 @@ done:
 
 		; bitmap is color.  Do some initialization
 initColor:
-		mov	bx, handle CMYKClrBitmap	; lock down code res
-		call	MemLock
-		mov	cs:[modifyCMYK4], ax
-		mov	cs:[modifyCMYK8], ax
-		mov	cs:[modifyCMYK24], ax
-		mov	cs:[modifyCMYK4mask], ax
-		mov	cs:[modifyCMYK8mask], ax
-		mov	cs:[modifyCMYK24mask], ax
-		push	ds
-		mov	ds, ax
-		assume	ds:CMYKClrBitmap
 		mov	bl, ss:[currentDrawMode]	; get draw mode
 		clr	bh
 		shl	bx, 1
@@ -168,8 +157,6 @@ doDither:
 		jz	done
 		call	MemUnlock
 		mov	ss:[colorDitherSeg], 0
-		mov	bx, handle CMYKClrBitmap
-		call	MemUnlock
 done:
 		ret
 CMYKColorBitmapCleanup	endp
@@ -768,40 +755,33 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-SelfModFarCall	macro	target, lbl
-	.inst	byte 9ah
-	.inst	word offset target
-lbl	label	word
-	.inst	word 0
-	endm
-
 PutCMYKColor4 proc	near
-		SelfModFarCall <CMYKClrBitmap:PutColor4>, modifyCMYK4
+		call	cmykcode:PutColor4
 		ret
 PutCMYKColor4 endp
 
 PutCMYKColor8 proc	near
-		SelfModFarCall <CMYKClrBitmap:PutColor8>, modifyCMYK8
+		call	cmykcode:PutColor8
 		ret
 PutCMYKColor8 endp
 
 PutCMYKColor24 proc	near
-		SelfModFarCall <CMYKClrBitmap:PutColor24>, modifyCMYK24
+		call	cmykcode:PutColor24
 		ret
 PutCMYKColor24 endp
 
 PutCMYKColor4Mask proc	near
-		SelfModFarCall <CMYKClrBitmap:PutColor4Mask>, modifyCMYK4mask
+		call	cmykcode:PutColor4Mask
 		ret
 PutCMYKColor4Mask endp
 
 PutCMYKColor8Mask proc	near
-		SelfModFarCall <CMYKClrBitmap:PutColor8Mask>, modifyCMYK8mask
+		call	cmykcode:PutColor8Mask
 		ret
 PutCMYKColor8Mask endp
 
 PutCMYKColor24Mask proc	near
-		SelfModFarCall <CMYKClrBitmap:PutColor24Mask>, modifyCMYK24mask
+		call	cmykcode:PutColor24Mask
 		ret
 PutCMYKColor24Mask endp
 

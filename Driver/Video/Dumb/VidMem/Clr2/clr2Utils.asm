@@ -56,7 +56,7 @@ CalcDitherIndices	proc	far
 		.enter
 		and	bx, 7			; 8 scans in buffer2
 		shl	bx, 1			; * 2 since 2 bytes/scan
-		mov	cs:[buff2Top], bl	
+		mov	fs:[buff2Top], bl	
 		.leave
 		ret
 CalcDitherIndices	endp

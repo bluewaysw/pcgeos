@@ -6728,6 +6728,7 @@ static TT_F26Dot6 _far FarCUR_Func_project( EXEC_OPS TT_Vector*  v1, TT_Vector* 
       /* run this program for too long ?? (e.g. infinite loops) */
       if ( ++ins_counter > MAX_RUNNABLE_OPCODES )
       {
+	EC_WARNING(-1);
         CUR.error = TT_Err_Execution_Too_Long;
         goto LErrorLabel_;
       }

@@ -197,12 +197,15 @@ EC(     ECCheckMemHandle( varBlock ) );
 
 
         /* get trueTypeVar block */
-        trueTypeVars = MemLock( varBlock );
-        if( trueTypeVars == NULL )
+	if(MGI_TYPE_FLAGS(MemGetInfo(varBlock, MGIT_FLAGS_AND_LOCK_COUNT)) & HF_DISCARDED)
         {
                 MemReAlloc( varBlock, sizeof( TrueTypeVars ), HAF_NO_ERR | HAF_ZERO_INIT );
                 trueTypeVars = MemLock( varBlock );
         }
+	else
+	{
+		trueTypeVars = MemLock( varBlock );
+	}
 
         /* go to font/ttf directory */
         FilePushDir();

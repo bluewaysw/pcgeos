@@ -33,6 +33,7 @@ VIDEO_STACK_SIZE	equ	512	; set size of local stack
 include vidcomGeode.def			; common includes
 include initfile.def
 include hostif.def
+include gpmi.def
 
 ;---------------------------------------------------------------------
 ;		Constants and Macros
@@ -51,7 +52,6 @@ idata	segment
 
 include vga16DevInfo.asm		; device info block
 include vidcomTables.asm		; common tables
-include vga16Tables.asm			; important tabular information
 
 idata	ends
 
@@ -76,7 +76,8 @@ VideoDevices	ends
 ;			Fixed Code
 ;------------------------------------------------------------------------------
 
-idata 		segment 
+VideoCode	segment 
+assume	fs:dgroup, gs:VideoCode
 
 include vidcomEntry.asm			; entry point,jump tab
 include vidcomOutput.asm		; common output routines
@@ -99,8 +100,7 @@ include vga16Pointer.asm		; pointer support
 include vga16EscTab.asm			; escape code jump table
 include vga16Palette.asm		; color palette table
 include vga16Dither.asm			; dither cutoff matrix
-
-idata		ends
+include vga16Tables.asm			; important tabular information
 
 ;------------------------------------------------------------------------------
 ;			Movable Code
@@ -113,5 +113,7 @@ include vidcomRaster.asm		; raster primitive support
 include vga16Raster.asm			; raster primitive support
 include vga16Admin.asm			; misc admin routines
 include vidcomExclBounds.asm		; bounds calculating code
+
+VideoCode	ends
 
 	end

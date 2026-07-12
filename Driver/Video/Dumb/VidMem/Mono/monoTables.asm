@@ -87,7 +87,7 @@ moduleTable	label	fptr
 	fptr	0				; end exclusive
 
 	fptr	0				; get a pixel color
-	fptr	MonoMisc:VidGetBits  		; GetBits in another module
+	fptr	Mono:VidGetBits  		; GetBits in another module
 	fptr	0				; set the ptr pic
 	fptr	0				; hide the cursor
 	fptr	0				; show the cursor
@@ -104,26 +104,20 @@ moduleTable	label	fptr
 
 	fptr	0				; rectangle
 	fptr	0				; char string
-	fptr	MonoBlt:VidBitBlt		; BitBlt in another module
-	fptr	MonoBitmap:VidPutBits  		; PutBits in another module
-	fptr	MonoLine:VidDrawLine		; DrawLine in another module
+	fptr	Mono:VidBitBlt			; BitBlt in another module
+	fptr	Mono:VidPutBits  		; PutBits in another module
+	fptr	Mono:VidDrawLine		; DrawLine in another module
 	fptr	0				; draws a region
-	fptr	MonoPutLine:VidPutLine		; PutLine in another module
-	fptr	MonoLine:VidPolygon		; Polygon in another module
+	fptr	Mono:VidPutLine			; PutLine in another module
+	fptr	Mono:VidPolygon			; Polygon in another module
 	fptr	0				; ScreenOn in another module
 	fptr	0				; ScreenOff in another module
-	fptr	MonoLine:VidPolyline		; Polyline in another module
-	fptr	MonoLine:VidDashLine		; DashLine in another module
-	fptr	MonoLine:VidDashFill		; DashFill in another module
+	fptr	Mono:VidPolyline		; Polyline in another module
+	fptr	Mono:VidDashLine		; DashLine in another module
+	fptr	Mono:VidDashFill		; DashFill in another module
 	fptr	0				; SetPalette in another module
 	fptr	0				; SetPalette in another module
 .assert ($-moduleTable) eq (VidFunction*2)
-
-;----------------------------------------------------------------------------
-;		Video Semaphores
-;----------------------------------------------------------------------------
-
-videoSem	Semaphore	<1,0>
 
 ;------------------------------------------------------------------------------
 ;		Table of character drawing routines

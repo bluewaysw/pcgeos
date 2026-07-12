@@ -163,4 +163,7 @@ resource   WindowOpenFrameResource    object
 export     WindowOpenInteractionClass
 endif
 
+resource   ASMCONN_TEXT              code fixed
+
+
 usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"

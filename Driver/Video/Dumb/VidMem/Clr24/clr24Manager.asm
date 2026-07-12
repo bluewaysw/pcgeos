@@ -64,9 +64,9 @@ ForceRef	vidStackBot
 endif		; if _24BIT
 
 
-clr24group       group   clr24data, Clr24, VidStack
+clr24group       group   clr24data, VidStack
 
-assume  ss:clr24group, ds:nothing, es:nothing
+assume  ss:clr24group, ds:nothing, es:nothing, fs:clr24group
 
 ;---------------------------------------------------------------------
 ;			Constants and Macros
@@ -105,6 +105,8 @@ clr24data	ends
 ;------------------------------------------------------------------------------
 ;			Fixed Code
 ;------------------------------------------------------------------------------
+
+assume	gs:Clr24
 
 Clr24 segment 	resource
 

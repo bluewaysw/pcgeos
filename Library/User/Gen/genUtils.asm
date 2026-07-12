@@ -3100,11 +3100,13 @@ EC <	ERROR_NC	BAD_ASSUMPTION_IN_GenCheckIfFullyUsable		>
 	test	ds:[di].VI_attrs, mask VA_REALIZED
 
 EC <	jz	afterOpt						>
+EC <	pushf								>
 EC <	push	cx							>
 EC <	mov	cx, -1			; no optimizations		>
 EC <	call	GenCheckIfFullyUsable					>
 EC <	pop	cx							>
 EC <	ERROR_NC	BAD_ASSUMPTION_IN_GenCheckIfFullyUsable		>
+EC <	popf								>
 
 	stc				; if REALIZED, then must be
 					; FULLY_USABLE.

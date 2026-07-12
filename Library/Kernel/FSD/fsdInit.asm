@@ -54,7 +54,7 @@ REVISION HISTORY:
 	tony	5/91		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 IRQCode	segment resource
 else
 idata	segment
@@ -86,7 +86,7 @@ SSP <	call	RestoreSingleStepping			>
 	ret	2	; return flags from DOS, not from entry!
 Int21Intercept	endp
 
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 dosAddr		fptr.far ?	;initial value of int 21 vector. Used so app
 				;can take over int 21 to provide emulation for
 				;DOS program, if we ever get around to it...
@@ -151,7 +151,7 @@ endif
 	; DOS application if the thing is "well-behaved". We'll see if it
 	; ever happens.
 	;
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	bx, segment IRQCode
 		push	bx
 		call	GPMIAliasFar		;bx = writable alias
@@ -416,7 +416,7 @@ loadIniDrivers:
 		mov	cx, FS_PROTO_MAJOR
 		mov	dx, FS_PROTO_MINOR
 		call	ProcessStartupList
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		; ds is initialized to ini key value and the segments
 		; is going to be destroyed here, with will end in an
 		; protection fault.		
@@ -1072,7 +1072,7 @@ REVISION HISTORY:
 FSDUnsuspend		proc	near
 		uses	es, di, bx, cx, ax
 		.enter
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	bx, segment IRQCode
 		push	bx
 		call	GPMIAliasFar		;bx = writable alias
@@ -1202,7 +1202,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 ResetInt21		proc	near
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		uses	bx
 		.enter
 

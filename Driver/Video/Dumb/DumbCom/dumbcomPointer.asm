@@ -103,12 +103,12 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
 VidHidePtr	proc	near
-	inc	cs:[cursorCount]	; increment the nesting count
-	cmp	cs:[cursorCount],1	; if the cursor wasn't showing
+	inc	fs:[cursorCount]	; increment the nesting count
+	cmp	fs:[cursorCount],1	; if the cursor wasn't showing
 	jnz	VHP_done		;  then all done 
 	push	es
 	push	ds
-	mov	cx, cs
+	mov	cx, fs
 	mov	ds, cx
 	call	EraseCursor		;  else erase it
 	pop	ds
@@ -153,12 +153,12 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 
 VidShowPtr	proc	near
-	dec	cs:[cursorCount]	; set new value for nest count
+	dec	fs:[cursorCount]	; set new value for nest count
 EC <	ERROR_S	VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			>
 	jnz	VShP_done
 	push	es
 	push	ds
-	mov	cx, cs
+	mov	cx, fs
 	mov	ds, cx
 	call	DrawCursor		;  yes, draw it
 	pop	ds
@@ -207,12 +207,12 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 VidMovePtr	proc	near
-	mov	cx,cs
+	mov	cx,fs
 	mov	ds,cx
 
 	; erase cursor if visible
 
-	cmp	cs:[cursorCount],0
+	cmp	fs:[cursorCount],0
 	jnz	noCursorCheckXOR
 
 	push	ax, bx
@@ -221,12 +221,12 @@ VidMovePtr	proc	near
 
 	; if moving XOR region with pointer then do special stuff
 
-	cmp	cs:[xorFlags], 0
+	cmp	fs:[xorFlags], 0
 	jz	noXOR
 	pop	ax, bx
 	push	ax, bx
-	sub	ax, cs:[cursorX]
-	sub	bx, cs:[cursorY]
+	sub	ax, fs:[cursorX]
+	sub	bx, fs:[cursorY]
 	call	UpdateXORForPtr
 noXOR:
 
@@ -246,7 +246,7 @@ AfterCursorRedrawn:
 
 common:
 if	SAVE_UNDER_COUNT	gt	0
-	cmp	cs:[suCount], 0			; any active save under areas?
+	cmp	fs:[suCount], 0			; any active save under areas?
 	jne	CheckSUAreas
 endif
 	clr	al
@@ -254,11 +254,11 @@ endif
 
 	; there is not cursor, but check the XOR update, will you ?
 noCursorCheckXOR:
-	cmp	cs:[xorFlags], 0
+	cmp	fs:[xorFlags], 0
 	jz	AfterCursorRedrawn
 	push	ax, bx
-	sub	ax, cs:[cursorX]
-	sub	bx, cs:[cursorY]
+	sub	ax, fs:[cursorX]
+	sub	bx, fs:[cursorY]
 	call	UpdateXORForPtr
 	pop	ax, bx
 	jmp	AfterCursorRedrawn
@@ -314,11 +314,11 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
 VidSetPtr	proc	near
 	push	es
-	cmp	cs:[cursorCount], 0	; see if it's currently on-screen
+	cmp	fs:[cursorCount], 0	; see if it's currently on-screen
 	jnz	VSPnoshow		;  no, safe to proceed
 	push	ds			; save passed params
 	push	si
-	segmov	ds, cs			; erase cursor wants ds -> cs
+	segmov	ds, fs			; erase cursor wants ds -> fs
 	call	EraseCursor		;  yes, restore screen before changing
 	pop	si
 	pop	ds
@@ -337,8 +337,8 @@ EC <	and	bl, mask PDW_WIDTH	; Get width portion of byte	>
 EC <	cmp	bl, 16			; only support these for now	>
 EC <	ERROR_NE VIDEO_ONLY_SUPPORTS_16x16_CURSORS			>
 	mov	bx,word ptr ds:[si][PD_hotX]	;bl = hotX, bh = hotY
-	mov	cs:[cursorHotX], bl	; store new x hot point
-	mov	cs:[cursorHotY], bh	; store new y hot point
+	mov	fs:[cursorHotX], bl	; store new x hot point
+	mov	fs:[cursorHotY], bh	; store new y hot point
 
 	; get pointer to cursor data
 	;copy data, changing mask,image to ZEROS, ONES
@@ -346,12 +346,12 @@ EC <	ERROR_NE VIDEO_ONLY_SUPPORTS_16x16_CURSORS			>
 	; ones = data
 
 	add	si, size PointerDef	; ds:si -> data
-	segmov	es,cs
+	segmov	es,fs
 	mov	di,offset cursorImage
 	mov	cx,CUR_SIZE		;handle 16 words
 
 	; Test for inverse mono drivers: are we in inverse mode?
-INVRSE <mov	dl, cs:[inverseDriver]					>
+INVRSE <mov	dl, fs:[inverseDriver]					>
 
 VSP_loop:
 	lodsw				;get mask word
@@ -378,10 +378,10 @@ INVRSE <continueLoadPointer:						>
 
 	; draw new cursor
 
-	cmp	cs:[cursorCount],0
+	cmp	fs:[cursorCount],0
 	jnz	VSP_done
 	push	ds
-	segmov	ds, cs			;EraseCursor wants ds == cs
+	segmov	ds, fs			;EraseCursor wants ds == cs
 	call	DrawCursor
 	pop	ds
 VSP_done:
@@ -423,13 +423,13 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 CondHidePtr	proc	near
-	cmp	cs:[cursorCount],0	;test for hidden
+	cmp	fs:[cursorCount],0	;test for hidden
 	jnz	THP_ret
-	cmp	cs:[hiddenFlag],0
+	cmp	fs:[hiddenFlag],0
 	jnz	THP_ret
 	push	ax, bx, cx, dx, si, di, bp, ds, es
 
-	segmov	ds,cs			;point at variables
+	segmov	ds,fs			;point at variables
 	mov	ds:[hiddenFlag],1	;set hidden
 	call	EraseCursor
 
@@ -450,7 +450,7 @@ CondShowPtrFar	endp
 
 CondShowPtr	proc	near
 	push	ds, es
-	segmov	ds,cs			;point at variables
+	segmov	ds,fs			;point at variables
 	mov	ds:[hiddenFlag],0
 	call	DrawCursor
 	pop	ds, es
@@ -494,7 +494,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 DrawCursor	proc	near
-	mov	ax,cs
+	mov	ax,fs
 	mov	ds,ax
 
 	; calculate X variables
@@ -780,7 +780,7 @@ PASS:
 	cursorScreenAddr - screen address to start at
 	cursorLines - number of lines to draw
 	cursorBuffer - data to recover
-	ds - cs
+	ds - fs
 
 RETURN:
 

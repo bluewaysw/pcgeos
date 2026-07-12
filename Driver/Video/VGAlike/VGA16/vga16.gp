@@ -36,3 +36,4 @@ tokenid		0
 # declare our extended info block specially
 #
 resource VideoDevices   lmem, shared, read-only, conforming
+resource VideoCode	code, fixed

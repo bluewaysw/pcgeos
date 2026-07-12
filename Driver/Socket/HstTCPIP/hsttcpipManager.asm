@@ -60,7 +60,9 @@ include localize.def
 include initfile.def
 include chunkarr.def
 include assert.def
-
+ifdef PROTECTED_MODE
+include gpmi.def
+endif
 include Objects/processC.def
 include medium.def
 

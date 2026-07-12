@@ -65,7 +65,7 @@ char1Loop:
 	add	bx, 2			;increment pattern pointer
 	and	bl, 6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; off end of bitmap ?		>
+MEM <	tst	fs:[bm_scansNext]	; off end of bitmap ?		>
 MEM <	js	C1_done							>
 
 Char1In		proc		near
@@ -74,7 +74,7 @@ Char1In		proc		near
 	lodsb				; al = character data
 	ror	ax, cl			; al = data shifted correctly, carry=of
 	mov	dl, ah			; save overflow, if any
-	mov	bp, {word} cs:[bx][ditherMatrix] ; ax = color dither
+	mov	bp, {word} fs:[bx][ditherMatrix] ; ax = color dither
 	call	DrawCharByte		; lay down a single byte
 
 	; see if the high byte has anything in it.  We know it can only be
@@ -107,7 +107,7 @@ INV_CLR4 <not	bp						>
 	push	dx
 	call	BuildDataByte		; build out 4-byte buffer
 	mov	ax, bp			; save for next word
-	mov	dx, cs:[dataBuff4]
+	mov	dx, fs:[dataBuff4]
 	and	ax, dx			; ax = char data in color
 	not	dx			; dx = NOT char data
 	and	dx, es:[di]		; dx = screen and NOT char data
@@ -115,7 +115,7 @@ INV_CLR4 <not	bp						>
 	stosw
 
 	mov	ax, bp			; restore dither word
-	mov	dx, cs:[dataBuff4+2]
+	mov	dx, fs:[dataBuff4+2]
 	and	ax, dx			; ax = char data in color
 	not	dx			; dx = NOT char data
 	and	dx, es:[di]		; dx = screen and NOT char data
@@ -132,7 +132,7 @@ char2Loop:
 	add	bx, 2			;increment pattern pointer
 	and	bl, 6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; off end of bitmap ?		>
+MEM <	tst	fs:[bm_scansNext]	; off end of bitmap ?		>
 MEM <	js	C2_done							>
 
 Char2In	proc		near
@@ -141,7 +141,7 @@ Char2In	proc		near
 	lodsb				; ax = char data
 	ror	ax, cl
 	mov	dl, ah			; save overflow
-	mov	bp, {word} cs:[bx][ditherMatrix] ; ax = color dither
+	mov	bp, {word} fs:[bx][ditherMatrix] ; ax = color dither
 	call	DrawCharByte
 	clr	ah
 	lodsb				; get second byte
@@ -176,7 +176,7 @@ char3Loop:
 	add	bx, 2			;increment pattern pointer
 	and	bl, 6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; off end of bitmap ?		>
+MEM <	tst	fs:[bm_scansNext]	; off end of bitmap ?		>
 MEM <	js	C3_done							>
 
 Char3In	proc		near
@@ -185,7 +185,7 @@ Char3In	proc		near
 	lodsb				; ax = char data
 	ror	ax, cl
 	mov	dl, ah			; save overflow
-	mov	bp, {word} cs:[bx][ditherMatrix] ; ax = color dither
+	mov	bp, {word} fs:[bx][ditherMatrix] ; ax = color dither
 	call	DrawCharByte
 	clr	ah
 	lodsb				; get second byte
@@ -226,7 +226,7 @@ char4Loop:
 	add	bx, 2			;increment pattern pointer
 	and	bl, 6
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]	; off end of bitmap ?		>
+MEM <	tst	fs:[bm_scansNext]	; off end of bitmap ?		>
 MEM <	js	C4_done							>
 
 Char4In	proc		near
@@ -235,7 +235,7 @@ Char4In	proc		near
 	lodsb				; ax = char data
 	ror	ax, cl
 	mov	dl, ah			; save overflow bits
-	mov	bp, {word} cs:[bx][ditherMatrix] ; ax = color dither
+	mov	bp, {word} fs:[bx][ditherMatrix] ; ax = color dither
 	call	DrawCharByte
 	clr	ah
 	lodsb				; do second byte

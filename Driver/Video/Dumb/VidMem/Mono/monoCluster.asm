@@ -72,7 +72,7 @@ REVISION HISTORY:
 ClusterMux	proc	near
 EC <		cmp	di, 22			; size of HugeArrayBlock >
 EC <		ERROR_B	VIDMEM_BAD_FRAME_BUFFER_PTR			>
-		mov	ax, cs:[rectRoutine]		; see what we were
+		mov	ax, gs:[rectRoutine]		; see what we were
 		cmp	ax, DRAW_SPECIAL_RECT
 		LONG je	DrawSpecialClustered
 		cmp	ax, DRAW_NOT_RECT
@@ -123,16 +123,16 @@ DrawOptClustered	proc	near
 	; compute left masks
 
 	mov	ax,cs:[si][leftMaskTable]	; get left mask
-	mov	cs:[DOC_leftNewMask],ax
+	mov	gs:[DOC_leftNewMask],ax
 	not	ax
-	mov	cs:[DOC_leftOldMask],ax
+	mov	gs:[DOC_leftOldMask],ax
 
 	; compute right masks
 
 	mov	ax,cs:[bx][rightMaskTable]	; get right mask
-	mov	cs:[DOC_rightNewMask],ax
+	mov	gs:[DOC_rightNewMask],ax
 	not	ax
-	mov	cs:[DOC_rightOldMask],ax
+	mov	gs:[DOC_rightOldMask],ax
 
 	InitDitherIndex				; setup bx and si
 	jmp	blastStart
@@ -141,7 +141,7 @@ DrawOptClustered	proc	near
 DOC_loop:
 	NextDitherScan				; update si
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	done
 blastStart:
 	push	di
@@ -218,9 +218,9 @@ DrawOptClusteredThin proc	near
 
 		mov	ax, cs:[si][leftMaskTable]	; get left mask
 		and	ax, cs:[bx][rightMaskTable]	; combine w/ right mask
-		mov	cs:[DOCT_newMask], ax
+		mov	gs:[DOCT_newMask], ax
 		not	ax
-		mov	cs:[DOCT_oldMask], ax
+		mov	gs:[DOCT_oldMask], ax
 
 		InitDitherIndex				; setup bx and si
 		jmp	blastStart
@@ -228,7 +228,7 @@ DrawOptClusteredThin proc	near
 DOCT_loop:
 		NextDitherScan				; update si
 		NextScan di
-MEM <		tst	cs:[bm_scansNext]		; if off end of bitmap>
+MEM <		tst	fs:[bm_scansNext]		; if off end of bitmap>
 MEM <		js	done				; then bail	   >
 
 blastStart:
@@ -289,17 +289,17 @@ DrawSpecialClustered	proc		near
 
 	dec	dx				; if no middle words, use 
 	LONG js	DrawSpecialClusteredThin	;  short routine
-	mov	cs:[DSC_middleCount], dx	; save middle count
+	mov	gs:[DSC_middleCount], dx	; save middle count
 
 	; compute left masks
 
 	mov	ax, cs:[si][leftMaskTable]	;get mask
-	mov	cs:[DSC_leftNewMask], ax
+	mov	gs:[DSC_leftNewMask], ax
 
 	; compute right masks
 
 	mov	ax, cs:[bx][rightMaskTable]	;get mask
-	mov	cs:[DSC_rightNewMask], ax
+	mov	gs:[DSC_rightNewMask], ax
 
 	InitDitherIndex				; init bx and si
 	jmp	blastSpecialStart
@@ -308,16 +308,16 @@ DSC_loop:
 	inc	cx
 	NextDitherScan				; update si
 	NextScan	di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	done
 
 blastSpecialStart:
 	and	cx, 7				; isolate low three bits
 	push	cx				; save mask index
 	xchg	cx, bx				; bx = mask index
-	mov	bl, {byte} cs:[bx][maskBuffer]	; get draw mask byte
+	mov	bl, {byte} fs:[bx][maskBuffer]	; get draw mask byte
 	mov	bh, bl				;  make it a word
-	mov	cs:[CDM_mask], bx		; save mask
+	mov	gs:[CDM_mask], bx		; save mask
 	mov	bx, cx				; restore bx
 	push	di
 
@@ -394,7 +394,7 @@ DrawSpecialClusteredThin proc	near
 
 	mov	ax, cs:[si][leftMaskTable]	; get left mask
 	and	ax, cs:[bx][rightMaskTable]	; combine right mask
-	mov	cs:[DSCT_newMask], ax		; self-modify the code
+	mov	gs:[DSCT_newMask], ax		; self-modify the code
 
 	InitDitherIndex				; init bx and si
 	jmp	blastSpecialStart
@@ -403,16 +403,16 @@ DSCT_loop:
 	inc	cx
 	NextDitherScan				; update si
 	NextScan	di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	done
 
 blastSpecialStart:
 	and	cx, 7				; isolate low three bits
 	push	cx				; save mask index
 	xchg	cx, bx				; bx = mask index
-	mov	bl, {byte} cs:[bx][maskBuffer]	; get draw mask byte
+	mov	bl, {byte} fs:[bx][maskBuffer]	; get draw mask byte
 	mov	bh, bl				;  make it a word
-	mov	cs:[CDM_mask], bx		; save mask
+	mov	gs:[CDM_mask], bx		; save mask
 	mov	bx, cx				; restore bx
 
 	; handle mask
@@ -465,7 +465,7 @@ CDM_mask	equ	(this word) + 2
 		and	dx, 1234h
 		mov	si, ax			; load data from ditherMatrix
 		mov	ax, cx			; load screen content
-		call	cs:[modeRoutine]	; apply mode
+		call	fs:[modeRoutine]	; apply mode
 		.leave
 		ret
 ClusterDoMode	endp
@@ -575,7 +575,7 @@ REVISION HISTORY:
 C1I1OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C1I1O_endCLoop
 
 Cluster1In1Out	proc		near
@@ -583,7 +583,7 @@ Cluster1In1Out	proc		near
 	ror	al, cl			;al = mask shifted correctly
 	mov	ah, al
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = mask AND pattern
+	and	al, {byte} fs:[bx][si]	; al = mask AND pattern
 	xchg	bp, si
 	not	ah			;ah = NOT mask
 
@@ -596,14 +596,14 @@ Cluster1In1Out	proc		near
 
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C1I1O_endCLoop
 
 	lodsb				;al = mask
 	ror	al, cl			;al = mask shifted correctly
 	mov	ah, al
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = mask AND pattern
+	and	al, {byte} fs:[bx][si]	; al = mask AND pattern
 	xchg	bp, si
 	not	ah			;ah = NOT mask
 
@@ -625,7 +625,7 @@ Cluster1In1Out	endp
 C1I2OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C1I2O_endCLoop
 
 Cluster1In2Out	proc		near
@@ -635,7 +635,7 @@ Cluster1In2Out	proc		near
 	mov	dx, ax			; 
 	not	dx			; dx = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result
@@ -645,7 +645,7 @@ Cluster1In2Out	proc		near
 
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C1I2O_endCLoop
 
 	lodsb				; ax = char data
@@ -654,7 +654,7 @@ MEM <	js	C1I2O_endCLoop
 	mov	dx, ax
 	not	dx			; dx = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result
@@ -673,7 +673,7 @@ Cluster1In2Out	endp
 C2I2OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C2I2O_endCLoop
 
 Cluster2In2Out	proc		near
@@ -682,7 +682,7 @@ Cluster2In2Out	proc		near
 	mov	dx, ax
 	not	dx			; dx = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result
@@ -692,7 +692,7 @@ Cluster2In2Out	proc		near
 
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C2I2O_endCLoop
 
 	lodsw				; ax = char data
@@ -700,7 +700,7 @@ MEM <	js	C2I2O_endCLoop
 	mov	dx, ax
 	not	dx			; bp = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result
@@ -719,7 +719,7 @@ Cluster2In2Out	endp
 C2I3OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C2I3O_endCLoop
 
 Cluster2In3Out	proc		near
@@ -729,7 +729,7 @@ Cluster2In3Out	proc		near
 	mov	dl, al
 	not	dl			; dl = NOT char data
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = dither applied to char data
+	and	al, {byte} fs:[bx][si]	; al = dither applied to char data
 	xchg	bp, si
 	BumpDitherIndex bx
 	and	dl, es:[di]		; dl = screen and NOT char data
@@ -743,7 +743,7 @@ Cluster2In3Out	proc		near
 	mov	dx, ax
 	not	dx			; dx = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result
@@ -763,7 +763,7 @@ Cluster2In3Out	endp
 C3I3OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C3I3O_endCLoop
 
 Cluster3In3Out	proc		near
@@ -773,7 +773,7 @@ Cluster3In3Out	proc		near
 	mov	dl, al
 	not	dl			; dl = NOT char data
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = dither applied to char data
+	and	al, {byte} fs:[bx][si]	; al = dither applied to char data
 	xchg	bp, si
 	BumpDitherIndex bx
 	and	dl, es:[di]		; dl = screen and NOT char data
@@ -786,7 +786,7 @@ Cluster3In3Out	proc		near
 	mov	dx, ax
 	not	dx			; dx = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen AND NOT char data
 	or	ax, dx			; ax = final result
@@ -805,7 +805,7 @@ Cluster3In3Out	endp
 C3I4OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C3I4O_endCLoop
 
 Cluster3In4Out	proc		near
@@ -815,7 +815,7 @@ Cluster3In4Out	proc		near
 	mov	dl, al
 	not	dl			; dl = NOT char data
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = dither applied to char data
+	and	al, {byte} fs:[bx][si]	; al = dither applied to char data
 	xchg	bp, si
 	BumpDitherIndex bx
 	and	dl, es:[di]		; dl = screen and NOT char data
@@ -829,7 +829,7 @@ Cluster3In4Out	proc		near
 	mov	dl, al			; 
 	not	dl			; dl = NOT char data
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = dither applied to char data
+	and	al, {byte} fs:[bx][si]	; al = dither applied to char data
 	xchg	bp, si
 	BumpDitherIndex bx
 	and	dl, es:[di]		; dl = screen and NOT char data
@@ -843,7 +843,7 @@ Cluster3In4Out	proc		near
 	mov	dx, ax
 	not	dx			; bp = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result
@@ -862,7 +862,7 @@ Cluster3In4Out	endp
 C4I4OC_loop:
 	NextDitherScan bp
 	NextScan di
-MEM <	tst	cs:[bm_scansNext]		; if off end of bitmap,	>
+MEM <	tst	fs:[bm_scansNext]		; if off end of bitmap,	>
 MEM <	js	C4I4O_endCLoop
 
 Cluster4In4Out	proc		near
@@ -872,7 +872,7 @@ Cluster4In4Out	proc		near
 	mov	dl, al
 	not	dl			; dl = NOT char data
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = dither applied to char data
+	and	al, {byte} fs:[bx][si]	; al = dither applied to char data
 	xchg	bp, si
 	BumpDitherIndex bx
 	and	dl, es:[di]		; dl = screen and NOT char data
@@ -886,7 +886,7 @@ Cluster4In4Out	proc		near
 	mov	dl, al
 	not	dl			; dl = NOT char data
 	xchg	bp, si
-	and	al, {byte} cs:[bx][si]	; al = dither applied to char data
+	and	al, {byte} fs:[bx][si]	; al = dither applied to char data
 	xchg	bp, si
 	BumpDitherIndex bx
 	and	dl, es:[di]		; dl = screen and NOT char data
@@ -899,7 +899,7 @@ Cluster4In4Out	proc		near
 	mov	dx, ax	
 	not	dx			; dx = NOT char data
 	xchg	bp, si
-	and	ax, {word} cs:[bx][si]	; ax = dither applied to char data
+	and	ax, {word} fs:[bx][si]	; ax = dither applied to char data
 	xchg	bp, si
 	and	dx, es:[di]		; dx = screen and NOT char data
 	or	ax, dx			; ax = final result

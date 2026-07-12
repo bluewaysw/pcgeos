@@ -536,8 +536,24 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 global _TT_Free:far
 _TT_Free	proc	far	p:fptr
-	uses	es, ds, di, si
-	.enter		
+	uses	di, si
+	.enter
+
+	mov	ax, es
+	mov	bx, ds
+	tst	p.high				;no pointer passed
+	jz	noPtr				;nothing to do
+	les	si, p
+	cmp	ax, es:[si].high
+	jne	checkNext
+	clr	ax
+checkNext:
+	cmp	bx, es:[si].high
+	jne	noPtr
+	clr	bx
+noPtr:
+	push	ax, bx
+
 	tst	p.high				;no pointer passed
 	jz	exit				;nothing to do
 	les	si, p
@@ -568,7 +584,6 @@ smallBlockFree:
 						; global heap.
 
 ;	If the block is now empty, free it.
-
 	cmp	ds:[LMBH_totalFree], MALLOC_SMALL_BLOCK_SIZE - size LMemBlockHeader
 	jne	exitZero			; Branch if block is non-empty
 
@@ -587,6 +602,8 @@ exitZero:
 	mov	es:[si+2], ax
 exit:
 	mov	ax, 0				;TT_Err_Ok
+
+	pop	es, ds
 	.leave
 	ret
 _TT_Free	endp

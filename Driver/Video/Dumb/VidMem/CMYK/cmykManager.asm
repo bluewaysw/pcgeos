@@ -60,9 +60,9 @@ endVidStack     label   byte
 CMYKStack        ends
 endif	; if _CMYK
 
-cmykgroup       group   cmykdata, cmykcode, CMYKStack
+cmykgroup       group   cmykdata, CMYKStack
 
-assume  ss:cmykgroup, ds:nothing, es:nothing
+assume  ss:cmykgroup, ds:nothing, es:nothing, fs:cmykgroup
 
 ;---------------------------------------------------------------------
 ;			Constants and Macros
@@ -103,6 +103,8 @@ cmykdata	ends
 ;------------------------------------------------------------------------------
 ;			Fixed Code
 ;------------------------------------------------------------------------------
+
+assume	gs:cmykcode
 
 cmykcode segment 	resource
 

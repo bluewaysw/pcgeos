@@ -23,7 +23,4 @@ ASMFLAGS	+= -i
 
 .PATH.asm .PATH.def: ../../VidCom $(INSTALL_DIR:H)/../VidCom
 
-# for special WIN32DBCS version
-ASMFLAGS        += $(.TARGET:MWIN32*:S/$(.TARGET)/-DWIN32 -DHARDWARE_TYPE=PC/)
-
 #include	<$(SYSMAKEFILE)>

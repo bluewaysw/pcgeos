@@ -31,6 +31,8 @@ DESCRIPTION:
 	$Id: vgacomUtils.asm,v 1.1 97/04/18 11:42:20 newdeal Exp $
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+
+if 0
 
 COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		PixelAddr
@@ -84,6 +86,9 @@ PixelAddr	proc	near
 	ret
 PixelAddr	endp
 	public	PixelAddr
+
+endif
+
 
 COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		SetEGAClrMode
@@ -96,6 +101,7 @@ CALLED BY:	INTERNAL
 
 PASS:		dh 	- color to use
 		dl	- draw mode to use
+		fs	- video driver dgroup
 
 RETURN:		color set
 		dx	- set to GR_CONTROL address
@@ -120,6 +126,7 @@ SetEGAClrModeFar	proc	far
 SetEGAClrModeFar	endp
 
 SetEGAClrMode	proc	near
+	assume	fs:dgroup
 	uses	ax, bx
 	.enter
 
@@ -128,16 +135,16 @@ SetEGAClrMode	proc	near
 
 ;	set up the EGA registers with color in set/reset reg, enable all planes
 
-	mov	cs:d_savMODE, 0			; set write mode 0, read mode 0
-	mov	cs:d_savENABLE_SR, 0fh		; enable all bit planes
+	mov	fs:d_savMODE, 0			; set write mode 0, read mode 0
+	mov	fs:d_savENABLE_SR, 0fh		; enable all bit planes
 	clr	bh				; make into a word
 	test	bl, 1				; see if need alternate source
 	jne	SECM10
-	mov	ah, cs:constSrcTab[bx]		;  yes, grab constant value
+	mov	ah, gs:constSrcTab[bx]		;  yes, grab constant value
 SECM10:
-	mov	cs:[d_savSET_RESET], ah
-	mov	ah, cs:egaFunc[bx]		; get EGA function to use
-	mov	cs:[d_savDATA_ROT], ah
+	mov	fs:[d_savSET_RESET], ah
+	mov	ah, gs:egaFunc[bx]		; get EGA function to use
+	mov	fs:[d_savDATA_ROT], ah
 
 	call	SetEGAState		; do all the outs
 
@@ -180,16 +187,16 @@ REVISION HISTORY:
 
 SetEGAState	proc	near
 	mov	dx, GR_CONTROL			; set up address of ega port
-	mov	ah, cs:d_savMODE		; get the mode
+	mov	ah, fs:d_savMODE		; get the mode
 	mov	al, WR_MODE			; index to mode register
 	out	dx, ax
-	mov	ah, cs:d_savENABLE_SR		; get the enable set/res reg
+	mov	ah, fs:d_savENABLE_SR		; get the enable set/res reg
 	mov	al, EN_SETRESET			; index to register
 	out	dx, ax
-	mov	ah, cs:d_savSET_RESET		; get the set/reset reg
+	mov	ah, fs:d_savSET_RESET		; get the set/reset reg
 	mov	al, SETRESET			; index to register
 	out	dx, ax
-	mov	ah, cs:d_savDATA_ROT		; get the data/rotate reg
+	mov	ah, fs:d_savDATA_ROT		; get the data/rotate reg
 	mov	al, DATA_ROT			; index to register
 	out	dx, ax
 	ret

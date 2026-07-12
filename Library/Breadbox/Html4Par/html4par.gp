@@ -94,7 +94,7 @@ resource   EntityResource  lmem read-only shared
 resource   ColorResource   lmem read-only shared
 resource   PointerResource lmem read-only shared
 resource   FormButtonResource lmem read-only shared
-resource   ASM_TEXT fixed
+resource   ASM_TEXT fixed code
 
 # only needed if IN_PLACE_TEXT_ENTRY in options.goh
 resource   FormElementTextEntryResource object

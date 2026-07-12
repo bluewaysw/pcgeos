@@ -759,7 +759,7 @@ static word AllocFontBlock( word        additionalSpace,
         if( *fontHandle == NullHandle )
         {
                 *fontHandle = MemAllocSetOwner( FONT_MAN_ID, size, 
-                        HF_SWAPABLE | HF_SHARABLE | HF_DISCARDABLE,
+                        HF_SWAPABLE | HF_SHARABLE /*| HF_DISCARDABLE*/,
                         HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
 EC(             ECCheckMemHandle( *fontHandle ) );
                 HandleP( *fontHandle );

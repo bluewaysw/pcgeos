@@ -6,7 +6,7 @@
 GEODE           = cdados
 ASM_TO_OBJS     = manager.asm
 UI_TO_RDFS      =
-SRCS            = CDAMain.asm manager.asm CDAStrat.asm
+SRCS            = CDAMain.asm CDAStrat.asm manager.asm
 OBJS            = manager.obj
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf

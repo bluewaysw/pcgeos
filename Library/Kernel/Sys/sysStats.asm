@@ -350,7 +350,7 @@ endif
 SGI_PhysMemTotal	endp
 
 SGI_PhysMemUsed		proc	near
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 		mov	bx, GPMI_INFO_PHYS_MEM_USED
 		call	GPMIGetInfoFar
 		mov	dx, bx

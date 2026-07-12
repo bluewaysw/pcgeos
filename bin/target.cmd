@@ -39,15 +39,6 @@ IF EXIST ensemble\init.bat (
 start %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf
 cd %OLD_PATH%
 @cls
-:waitForFile
-@IF EXIST %destdir%\localpc\IPX_STAT.txt GOTO foundFile
-@sleep 1s
-@echo|set /p="."
-@GOTO waitForFile
-:foundFile
-FINDSTR /r /c:"127.0.0.1 from port" %destdir%\localpc\IPX_STAT.txt | perl -e "my $status = <>; $status =~  m/(\d+)$/; printf('%%04X', $1);" > %destdir%\localpc\IPX_PORT.txt
-set /p IPX_PORT=<%destdir%\localpc\IPX_PORT.txt
-cls
 rem mode 120,50
 IF EXIST "%USERPROFILE%\swat.rc" (
    set CUSTOM_TCL_LOCATION=%USERPROFILE%\swat.rc
@@ -56,5 +47,5 @@ IF EXIST "%USERPROFILE%\swat.rc" (
 ) ELSE (
    set CUSTOM_TCL_LOCATION=
 )
-sleep 20
-swat
+sleep 3
+swat 

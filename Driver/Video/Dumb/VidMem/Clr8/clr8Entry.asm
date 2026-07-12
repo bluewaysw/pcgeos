@@ -63,24 +63,34 @@ EC <		js	funcOK				; >
 EC <		tst	cs:[driverJumpTable][di]	; if zero, we're hosed>
 EC <		ERROR_Z VIDMEM_BAD_MODULE_CALL				      >
 EC <funcOK:						>
+		;
+		; Setup fs to point at the video driver's group
+		; and gs to point to an alias to the code
+		;
+		push	fs, gs
+		segmov	fs, clr8group
+		tst	fs:aliasToCode
+		jz	getAlias
+gotAlias:
+		mov	gs, fs:aliasToCode
 
-		PSem	cs, videoSem
+		PSem	fs, videoSem
 
 		; before we call away, store away some important info about
 		; the bitmap header location and the size of a scan line
 
 		push	ax, cx, ds
 		mov	ds, es:[W_bmSegment]		; store bitmap segment
-		mov	cs:[bm_segment], ds		; for local use
+		mov	fs:[bm_segment], ds		; for local use
 		mov	ax, es:[W_bitmap].segment
-		mov	cs:[bm_handle].segment, ax
+		mov	fs:[bm_handle].segment, ax
 		mov	ax, es:[W_bitmap].offset
-		mov	cs:[bm_handle].offset, ax
+		mov	fs:[bm_handle].offset, ax
 		mov	al, ds:[EB_bm].CB_simple.B_type
 		mov	cx, ds:[EB_bm].CB_simple.B_width
-		cmp	al, cs:[bm_cacheType]		; if not same, recalc
+		cmp	al, fs:[bm_cacheType]		; if not same, recalc
 		jne	recalcWidth
-		cmp	cx, cs:[bm_cacheWid]
+		cmp	cx, fs:[bm_cacheWid]
 		jne	recalcWidth
 rejoinEntry:
 		pop	ax, cx, ds
@@ -88,40 +98,55 @@ rejoinEntry:
 		js	handleEscape
 		call	cs:[driverJumpTable][di]
 done:
-		VSem	cs, videoSem
+		VSem	fs, videoSem
+exit:
+		pop	fs, gs
 		ret
 
-		; we want to record in a local variable, the size of a scan
-		; line (in bytes).  
-recalcWidth:
-		clr	cs:[bm_dataOffset]
-		mov	cs:[bm_cacheType], al		; store new cached vals
-		mov	cs:[bm_cacheWid], cx
-		mov	cs:[bm_bpScan], cx		; store this
-		shr	cx, 1				; calc #bytes
-		shr	cx, 1
-		shr	cx, 1
-		mov	cs:[bm_bpMaskRndDwn], cx	; # bytes, rounded down
-		mov	cx, cs:[bm_bpScan]
-		and	cx, 7				; determine number of
-		mov	cs:[bm_nonIntegralPixels], cx	; ..non-integral pixels
-		mov	cx, cs:[bm_bpScan]
-		add	cx, 7				; round up
-		shr	cx, 1				; calc #bytes
-		shr	cx, 1
-		shr	cx, 1
-		mov	cs:[bm_bpMask], cx		;  code
-		test	al, mask BMT_MASK		; * 2 if mask
-		jz	haveWidth
-		mov	cs:[bm_dataOffset], cx
-		add	cs:[bm_bpScan], cx
-haveWidth:
-		jmp	rejoinEntry
+		; Create an alias to our code segment so we can
+		; do self-modifying code.
+getAlias:
+		push	bx
+		mov	bx, cs
+		call	SysAllocCodeAlias
+		jc	skipSet
+		mov	fs:aliasToCode, bx
+skipSet:
+		pop	bx
+		jc	exit
+		jmp	gotAlias
 
 		; call an escape function
 handleEscape:
 		call	Clr8Escape
 		jmp	done
+
+		; we want to record in a local variable, the size of a scan
+		; line (in bytes).  
+recalcWidth:
+		clr	fs:[bm_dataOffset]
+		mov	fs:[bm_cacheType], al		; store new cached vals
+		mov	fs:[bm_cacheWid], cx
+		mov	fs:[bm_bpScan], cx		; store this
+		shr	cx, 1				; calc #bytes
+		shr	cx, 1
+		shr	cx, 1
+		mov	fs:[bm_bpMaskRndDwn], cx	; # bytes, rounded down
+		mov	cx, fs:[bm_bpScan]
+		and	cx, 7				; determine number of
+		mov	fs:[bm_nonIntegralPixels], cx	; ..non-integral pixels
+		mov	cx, fs:[bm_bpScan]
+		add	cx, 7				; round up
+		shr	cx, 1				; calc #bytes
+		shr	cx, 1
+		shr	cx, 1
+		mov	fs:[bm_bpMask], cx		;  code
+		test	al, mask BMT_MASK		; * 2 if mask
+		jz	haveWidth
+		mov	fs:[bm_dataOffset], cx
+		add	fs:[bm_bpScan], cx
+haveWidth:
+		jmp	rejoinEntry
 
 Clr8Entry	endp
 
@@ -161,7 +186,7 @@ Clr8Escape	proc	near
 		push	es		
 		segmov	es, cs, cx	; es -> driver segment
 		mov	ax, di		; setup match value
-		mov	di, offset clr8group:escCodes ; si -> esc code tab
+		mov	di, offset Clr8:escCodes ; si -> esc code tab
 		mov	cx, NUM_ESC_ENTRIES ; init rep count
 		repne	scasw		; find the right one
 		pop	es
@@ -281,17 +306,17 @@ Clr8CallMod	proc	near
 
 		; first, save away ax/bx since they are trashed by CallMod
 
-		mov	cs:[TPD_dataAX], ax		; trashed by CallMod
-		mov	cs:[TPD_dataBX], bx
+		mov	fs:[TPD_dataAX], ax		; trashed by CallMod
+		mov	fs:[TPD_dataBX], bx
 
 		; next, switch stacks so we still have access to 
 		; NOTE: the loading of ss *must* be followed by the loading
 		; of sp.
 
-		mov	cs:[saveSS], ss			; save caller's stack
-		mov	cs:[saveSP], sp
+		mov	fs:[saveSS], ss			; save caller's stack
+		mov	fs:[saveSP], sp
 		mov	bx, ss:[TPD_threadHandle]
-		mov	cs:[TPD_threadHandle], bx
+		mov	fs:[TPD_threadHandle], bx
 
 ;	Copy over TPD_dgroup and TPD_classPointer, because VMDirty is called
 ;	by the vidmem code, and if a dirty notification needs to be sent to
@@ -299,17 +324,17 @@ Clr8CallMod	proc	near
 ;	6/18/96 - atw
 
 		mov	bx, ss:[TPD_dgroup]
-		mov	cs:[TPD_dgroup], bx
+		mov	fs:[TPD_dgroup], bx
 		mov	bx, ss:[TPD_classPointer].segment
-		mov	cs:[TPD_classPointer].segment, bx
+		mov	fs:[TPD_classPointer].segment, bx
 		mov	bx, ss:[TPD_classPointer].offset
-		mov	cs:[TPD_classPointer].offset, bx
+		mov	fs:[TPD_classPointer].offset, bx
 		mov	bx, ss:[TPD_processHandle]
-		mov	cs:[TPD_processHandle], bx
+		mov	fs:[TPD_processHandle], bx
 
 		mov	bx, {word}ss:[TPD_exclFSIRLocks]
-		mov	{word}cs:[TPD_exclFSIRLocks], bx
-		mov	ax, cs				; setup new stack
+		mov	{word}fs:[TPD_exclFSIRLocks], bx
+		mov	ax, fs				; setup new stack
 		mov	ss, ax
 		mov	sp, offset clr8group:endVidStack
 		mov	ss:[TPD_stackBot], offset clr8group:vidStackBot
@@ -324,8 +349,8 @@ Clr8CallMod	proc	near
 
 		; done with operation, restore stack and exit
 
-		mov	ss, cs:[saveSS]			; restore old stack
-		mov	sp, cs:[saveSP]
+		mov	ss, fs:[saveSS]			; restore old stack
+		mov	sp, fs:[saveSP]
 		ret
 Clr8CallMod	endp
 

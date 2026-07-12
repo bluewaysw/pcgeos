@@ -130,7 +130,7 @@
 /*                                                                       */
 /* Do NOT DEFINE THIS is you build a thread-safe version of the engine   */
 /*                                                                       */
-#undef TT_CONFIG_OPTION_STATIC_INTERPRETER
+//#undef TT_CONFIG_OPTION_STATIC_INTERPRETER
 
 
 /*************************************************************************/

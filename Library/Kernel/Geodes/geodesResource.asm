@@ -1628,7 +1628,7 @@ if	ERROR_CHECK
 	; ensure that interrupts are on here...
 
 AssertInterruptsEnabled	proc	near
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	; Can't do this under DPMI implementation where CLI/STI are
 	; emulated but interrupts are always on/off in real CPU flags.
 	pushf
@@ -3120,7 +3120,7 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 RestoreMovableInt	proc	far
-ifndef PRODUCT_GEOS32
+ifndef PROTECTED_MODE
 	INT_OFF
 	push	si, di, es
 	clr	ax

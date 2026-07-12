@@ -146,7 +146,7 @@ REVISION HISTORY:
 
 ReplaceMovableVector	proc	far
 	INT_OFF
-ifdef PRODUCT_GEOS32
+ifdef PROTECTED_MODE
 	; loop to set up all interrupts
 
 	mov	bl, RESOURCE_CALL_INT_BASE
