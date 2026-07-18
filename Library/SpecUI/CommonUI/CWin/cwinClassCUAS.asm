@@ -1005,9 +1005,8 @@ endif
 	call	WinCommon_DerefVisSpec_DI
 	add	ds:[di].OLWI_titleBarBounds.R_left, cx
 
-ISUI_SYS_MENU_FUDGE	equ	8
-
-ISU <	add	ds:[di].OLWI_titleBarBounds.R_left, ISUI_SYS_MENU_FUDGE >
+ISU <	add	ds:[di].OLWI_titleBarBounds.R_left, \
+				ISUI_SYS_MENU_RESERVED_WIDTH_EXTRA	>
 
 	or	bh, mask OLWSI_SYS_MENU		; flag so System menu button
 						; will be visible
@@ -1147,7 +1146,8 @@ adjustTitleForClose:
 	call	OpenCheckIfKeyboardOnly		; carry set if so
 	jc	40$
 
-	sub	ds:[di].OLWI_titleBarBounds.R_right, CUAS_WIN_ICON_WIDTH+1
+	sub	ds:[di].OLWI_titleBarBounds.R_right, \
+				ISUI_CLOSE_BUTTON_RESERVED_WIDTH
 40$:
 endif
 
@@ -1254,7 +1254,7 @@ if _ISUI
 endif
 	mov_tr	ax, cx
 	call	OpenWinGetSysMenuButtonWidth	; cx = button width
-ISU <	add	cx, ISUI_SYS_MENU_FUDGE		; ISUI sysMenuButton is wider>
+ISU <	add	cx, ISUI_SYS_MENU_RESERVED_WIDTH_EXTRA		>
 	sub	ax, cx
 	mov_tr	cx, ax
 
@@ -1326,7 +1326,8 @@ noRightGroupPosition:
 	mov	ax, offset SMI_Close		;chunk handle of menu item
 	mov	bl, mask OLWSI_CLOSABLE		;mask for Close icon
 if _ISUI
-	add	cx, 2				;gap between min/max & close
+	add	cx, ISUI_CLOSE_BUTTON_LEFT_SPACING
+						;gap between min/max and close
 	mov	bp, offset SMI_CloseIcon	;chunk handle of icon
 else
 	clr	bp				;pass: no icon
@@ -1391,11 +1392,28 @@ OpenWinGetTitleBarGroupSize	proc	far
 	mov	dx, mask RSA_CHOOSE_OWN_SIZE
 	mov	ax, MSG_VIS_RECALC_SIZE
 ;	mov	ax, MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED
+	;
+	; Allow UI-specific gaps between either title group and the adjacent
+	; window controls. Preserve bp across the size call to identify which
+	; group receives spacing.
+	;
+	push	bp				; preserve title-group selector
 	call	WinCommon_ObjCallInstanceNoLock	; cx = width, dx = height
 	call	OpenCheckIfBW
-	jnc	unlockDone
-	jcxz	unlockDone			; keep non-negative
+	jnc	haveGroupWidth
+	jcxz	haveGroupWidth			; keep non-negative
 	dec	cx				; so we overlap adjacent button
+haveGroupWidth:
+	pop	bp				; restore title-group selector
+	cmp	bp, offset OLWI_titleBarLeftGroup
+	jne	checkRightGroup
+	add	cx, TITLE_LEFT_GROUP_CONTROL_SPACING
+	jmp	unlockDone
+checkRightGroup:
+	cmp	bp, offset OLWI_titleBarRightGroup
+	jne	unlockDone
+	add	cx, TITLE_RIGHT_GROUP_CONTROL_SPACING
+						; gap before standard controls
 unlockDone:
 	call	ObjSwapUnlock
 done:
@@ -1446,12 +1464,25 @@ OpenWinPositionTitleBarGroup	proc	near
 	;  actually the wrong height!  See OLWinGetTitleBarHeight
 	;  for more details -- this code needs to match that code.
 	;
+	;  UPDATE 07/2026: Motif now calls OLWinGetTitleBarHeight
+	;  directly, so the warning above no longer applies there.
+	;  The other UIs still use the duplicated calculation below,
+	;  (see "else") which must remain synchronized.
+	;
+if _MOTIF
+	push	bx, bp, cx, dx			; preserve group and position
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinCommon_ObjCallInstanceNoLock
+	mov	ax, dx				; ax = canonical title height
+	pop	bx, bp, cx, dx
+else
 	mov	ax, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	ax, ds:[di].OLWI_titleBarBounds.R_top	; ax = title bar height
 if _ISUI
 	call	OpenCheckIfBW			; that's all for BW
 	jc	gotHeight
-	sub	ax, 4				; margins = 2 above / 2 below
+	sub	ax, ISUI_TITLE_BUTTON_VERTICAL_INSET
+						; margins = 2 above / 2 below
 gotHeight:
 else
 	call	OpenCheckIfBW			; that's all for BW
@@ -1460,17 +1491,7 @@ else
 	dec	ax
 gotHeight:
 endif
-	;
-	; Fairly bad hack to match menu bar height.  -cbh 5/12/92
-	; Must match similar hack in OLBaseWinUpdateExpressToolArea.
-	;
-	call	OpenWinCheckIfSquished		; running CGA?
-	jc	205$				; yes, skip this
-	call	OpenWinCheckMenusInHeader	; are we in the header?
-	jnc	205$				; nope, done
-	add	ax, 3				; else expand to match menu bar
-205$:
-
+endif
 	mov	si, ({optr} ds:[di][bp]).chunk
 	call	ObjSwapLock			; *ds:si = title bar group
 						; (bx = OLWin block handle)
@@ -1489,8 +1510,11 @@ endif
 	push	cx, dx				; save position
 	mov	cx, mask RSA_CHOOSE_OWN_SIZE
 	mov	dx, ax
+	push	dx				; save canonical title height
 	mov	ax, MSG_VIS_RECALC_SIZE
 	call	WinCommon_ObjCallInstanceNoLock	; cx = width, dx = height
+	pop	bp				; bp = canonical title height
+	mov	dx, bp				; group matches system controls
 	push	cx				; save untweaked width
 
 	push	dx
@@ -1500,8 +1524,27 @@ endif
 	pop	ax				; ax = untweaked width
 	pop	cx, dx				; get position for group
 
+	push	bp
 	mov	ax, MSG_VIS_POSITION_BRANCH
 	call	WinCommon_ObjCallInstanceNoLock
+	pop	bp
+
+	;
+	; Reapply the canonical height to each control in the title group.
+	;
+	push	bx				; preserve old block handle
+	clr	bx
+	push	bx, bx				; start with first child
+	mov	bx, offset VI_link
+	push	bx
+	mov	bx, SEGMENT_CS
+	push	bx
+	mov	bx, offset SetTitleGroupChildHeight
+	push	bx
+	mov	bx, offset Vis_offset
+	mov	di, offset VCI_comp
+	call	ObjCompProcessChildren
+	pop	bx
 	;
 	;  Last thing to do is set the bits on the object to say
 	;  the geometry has been calculated.
@@ -1525,6 +1568,27 @@ done:
 	.leave
 	ret
 OpenWinPositionTitleBarGroup	endp
+
+SetTitleGroupChildHeight	proc	far
+	;
+	; Match every title-group control to the system-control bounds.
+	;
+	mov	bx, ds:[si]
+	add	bx, ds:[bx].Vis_offset
+	mov	cx, ds:[bx].VI_bounds.R_left
+	mov	bx, es:[di]
+	add	bx, es:[bx].Vis_offset
+	mov	dx, es:[bx].VI_bounds.R_top
+	push	bp
+	mov	ax, MSG_VIS_POSITION_BRANCH
+	call	ObjCallInstanceNoLock		; align child with group top
+	pop	bp
+	call	VisGetSize			; cx = current child width
+	mov	dx, bp				; dx = canonical title height
+	call	VisSetSize
+	clc					; continue with remaining children
+	ret
+SetTitleGroupChildHeight	endp
 
 
 COMMENT @----------------------------------------------------------------------
@@ -1640,13 +1704,15 @@ endif
 if _ISUI
 	cmp	bp, ds:[di].OLWI_sysMenuButton	; sysMenu button is 3 pixels
 	jne	notSysMenuButton		; wider and is as tall as the
-	add	ax, 3+4				; titlebar in ISUI
-						; more room for icon
+	add	ax, ISUI_SYS_MENU_BUTTON_WIDTH_EXTRA + \
+		    ISUI_SYS_MENU_MONIKER_WIDTH_EXTRA
+						; widen button and its moniker area
 	jmp	afterAdjustment
 notSysMenuButton:
 	call	OpenCheckIfBW			; that's all for BW
 	jc	10$
-	sub	dx, 4				; margins = 2 above / 2 below
+	sub	dx, ISUI_TITLE_BUTTON_VERTICAL_INSET
+						; margins = 2 above / 2 below
 10$:
 	; we need to adjust the width of the button if it is a SMI_CloseIcon
 	; button for GenPrimary and we are in ConsumerUI
@@ -1682,18 +1748,23 @@ notSysMenuButton:
 afterAdjustment:
 endif
 
+if _MOTIF
 	;
-	; Fairly bad hack to match menu bar height.  -cbh 5/12/92
-	; Must match similar hack in OLBaseWinUpdateExpressToolArea.
+	; Use the same final height as title-bar buttons.  The color path
+	; below removes two pixels, so include them in its input.
+	; The canonical height calculation already handles squished/CGA
+	; header sizing and the B&W title-button adjustment.
 	;
-
-	call	OpenWinCheckIfSquished		; running CGA?
-	jc	5$				; yes, skip this
-	call	OpenWinCheckMenusInHeader	; are we in the header?
-	jnc	5$				; nope, done
-	add	dx, 3				; else expand to match menu bar
-5$:
-
+	push	ax, bx, bp			; preserve width, flags and icon
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinCommon_ObjCallInstanceNoLock
+	call	OpenCheckIfBW
+	jc	haveCanonicalHeight
+	add	dx, MO_TITLE_BUTTON_COLOR_INSET
+						; canceled by color inset below
+haveCanonicalHeight:
+	pop	ax, bx, bp			; restore width, flags and icon
+endif
 	mov	di, dx
 	pop	cx, dx
 readyWithWidthHeight:
@@ -1743,7 +1814,7 @@ MO <	mov	ds, ax							>
 MO <	test	ds:[moCS_flags], mask CSF_BW	; Is this a B&W display?>
 MO <	pop	ds							>
 MO <	jnz	20$				;   skip if so...	>
-MO <	sub	dx, 2				; Nest icon inside resize  >
+MO <	sub	dx, MO_TITLE_BUTTON_COLOR_INSET	; Nest icon inside resize  >
 MO <	dec	cx				;   bars & title in a color>
 MO <20$:					;   display		   >
 
