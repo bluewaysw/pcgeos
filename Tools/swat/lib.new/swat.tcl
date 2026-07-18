@@ -1305,6 +1305,29 @@ if {[null $kernelVersion]} {
 	var kernelVersion 0
 }
 
+#
+# Show this after startup files have run, at the first stop before the prompt.
+#
+[defsubr quickhelp-startup-hint {why args}
+{
+    global quickhelp_startup_hint_event file-os modernPromptKeys
+
+    if {[string c ${file-os} unix] == 0} {
+	if {[null $modernPromptKeys] ||
+	    [string c $modernPromptKeys 0] == 0 ||
+	    [string c $modernPromptKeys off] == 0} {
+	    echo {Linux mouse hint: plain drag selects terminal text.}
+	} else {
+	    echo {Linux mouse hint: hold Shift while dragging to select terminal text.}
+	}
+    }
+    echo {Type "quickhelp" for Swat navigation shortcuts.}
+    event delete $quickhelp_startup_hint_event
+    return EVENT_HANDLED
+}]
+
+var quickhelp_startup_hint_event [event handle FULLSTOP quickhelp-startup-hint]
+
 #if the user doesn't specifically specific a startup and stop, and
 # we are just up to the loader then continue
 if {[string c ${file-os} dos] == 0 && ![null $continueStartup]} {
