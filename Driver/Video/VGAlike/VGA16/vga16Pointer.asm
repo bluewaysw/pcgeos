@@ -133,18 +133,18 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VidShowPtr	proc	near
-	dec	cs:[cursorCount]	; set new value for nest count
+		dec	cs:[cursorCount]	; set new value for nest count
 EC <	ERROR_S	VIDEO_HIDE_CURSOR_COUNT_UNDERFLOW			>
-	jnz	VShP_done
-	push	es
-	push	ds
-	mov	cx, cs
-	mov	ds, cx
-	call	DrawCursor		;  yes, draw it
-	pop	ds
-	pop	es
+		jnz	VShP_done
+		push	es
+		push	ds
+		mov	cx, cs
+		mov	ds, cx
+		call	DrawCursor		;  yes, draw it
+		pop	ds
+		pop	es
 VShP_done:
-	ret
+		ret
 
 VidShowPtr	endp
 
@@ -228,6 +228,17 @@ AfterCursorRedrawn:
 common:
 ;	cmp	cs:[suCount], 0			; any active save under areas?
 ;	jne	CheckSUAreas
+
+	; Balance the extra hide left by VID_ESC_UPDATE_DEVICE once
+	; ImSetPtrWin has hidden around the new pointer window.
+	mov	al, cs:[updateHideCount]
+	tst	al
+	jz	noUpdateHide
+	cmp	cs:[cursorCount], al
+	jbe	noUpdateHide
+	dec	cs:[cursorCount]
+	clr	cs:[updateHideCount]
+noUpdateHide:
 	clr	al
 	ret
 

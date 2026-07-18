@@ -66,11 +66,25 @@ VidEscSetDeviceAgain 	proc	near
 		cmp	di, 0xFFFF
 		je	done
 
+		;
+		; Keep the pointer off-screen while the mode is reset.
+		; VidMovePtr balances this hide after the new pointer window
+		; has been established.
+		;
+		mov	al, cs:[cursorCount]
+		push	ax
+		call	VidHidePtr
+
 		; do any device-specific initialization
 		mov	dx, cs
 		mov	si, 0
 		mov	di, DRE_SET_DEVICE
 		call	VidCallMod
+
+		pop	ax
+		inc	al
+		mov	cs:[cursorCount], al
+		mov	cs:[updateHideCount], al
 done:
 		.leave
 		mov	di, 0		; function executed
