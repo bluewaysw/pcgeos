@@ -276,6 +276,8 @@ consoleConvertKeyToDos(int ntVirtualKey)
 	return PAGE_UP_ASCII;
     case PAGE_DOWN_EXTENDED:
 	return PAGE_DOWN_ASCII;
+    case DELETE_EXTENDED:
+	return DELETE_ASCII;
     case UP_ARROW_EXTENDED:
 	return UP_ARROW_ASCII;
     case DOWN_ARROW_EXTENDED:

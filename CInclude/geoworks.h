@@ -503,8 +503,9 @@ typedef enum /* word */ {
     CIF_BITMAP,
     CIF_SOUND_SYNTH,
     CIF_SOUND_SAMPLE,
-    CIF_ICON_LIST,
-    CIF_FAX_FILE_PAGE_WITH_INK
+    CIF_ICON_LIST,			/* list of icons, original icon editor */
+    CIF_FAX_FILE_PAGE_WITH_INK,
+    CIF_EXT_ICON_LIST			/* list of icons, updated icon editor */
 } ClipboardItemFormat;
 
 /*

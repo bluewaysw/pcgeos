@@ -1594,9 +1594,19 @@ This section covers the features of Swat that make it easier to use when
 debugging an application.
 
 + Mouse support
-You can use the mouse to capture and paste text in the main Swat buffer. 
-Capture text by click-dragging with the left mouse button. Pressing the 
-right mouse button pastes the captured text to the Swat prompt line. 
+On DOS and Windows, Swat handles mouse selection itself. Click-drag with the
+left mouse button to capture text in the main Swat buffer. Press the right
+mouse button to paste the captured text to the Swat prompt line.
+
+On Linux with modern prompt keys enabled (the default), Swat enables
+xterm-compatible mouse reporting so the mouse wheel can scroll the source
+window. Mouse reporting sends ordinary mouse actions to Swat instead of
+starting the terminal emulator's native text selection. Hold Shift while
+click-dragging to select terminal text for copying.
+
+When modern prompt keys are disabled, Swat does not enable Linux mouse
+reporting. Plain click-drag selects terminal text, but the mouse wheel does
+not scroll the source window.
 
 + Navigating the Main Buffer
 To scroll the main buffer, use Ctrl-u (up), Ctrl-d (down), Ctrl-y (back one 
@@ -1607,6 +1617,60 @@ line), Ctrl-e (forward one line), Ctrl-b (backward page) and Ctrl-f
 By pressing Ctrl-p several times, you can call previous commands up to 
 the Swat prompt. If you go past the command that you want, use Ctrl-n 
 to go forward in the history.
+On Linux terminals and Windows consoles, Swat also enables modern prompt
+keys by default: the Up and Down arrow keys move through command history,
+Left and Right move within the current prompt line, Home and End move to
+the start and end of the prompt line, and Delete removes the character under
+the cursor. This does not replace the tcsh-style Ctrl-key commands; Ctrl-p
+and Ctrl-n remain available for history navigation. To disable the modern
+prompt keys and Linux mouse-wheel source-window scrolling, add the following
+line to SWAT.RC:
+
+    var modernPromptKeys 0
+
+The optional tcsh mode adds Ctrl-key editing and prefix history searching.
+It is disabled by default. To enable it for every Swat session, add this line
+to SWAT.RC:
+
+    tcsh
+
+This enables the following default keys:
+
++ Ctrl-a and Ctrl-e move to the beginning and end of the prompt line.
++ Ctrl-b and Ctrl-f move backward and forward one character.
++ Ctrl-r and Ctrl-v move backward and forward one word.
++ Ctrl-d deletes the character under the cursor.
++ Ctrl-t deletes forward by one word.
++ Ctrl-k kills the selected region, and Ctrl-y yanks it back.
++ Ctrl-u kills the whole prompt line.
++ Ctrl-w deletes the previous word, and Ctrl-Space sets the mark where
+  supported.
++ Ctrl-p and Ctrl-n search backward and forward for history entries beginning
+  with the text already typed. With an empty prompt, they move through history
+  normally.
+
+Use `tcsh cle` when only the Ctrl-key editing shortcuts are wanted. Ctrl-p and
+Ctrl-n then continue to move sequentially through history. Use `tcsh hist`
+when only prefix history searching is wanted and the editing shortcuts should
+remain disabled.
+
+Use `tcsh cle off` to remove the editing shortcuts, `tcsh hist off` to return
+Ctrl-p and Ctrl-n to sequential history, or `tcsh off` to disable both parts.
+
+The editing keys can be remapped by passing an eleven-character string to
+`tcsh` or `tcsh cle`. The characters replace, in order, the default keys
+`aebfrvdtkyu` listed above from beginning-of-line through kill-line. For
+example, `tcsh cle qwertyuiopa` enables the editor with those replacement
+Ctrl keys. This changes the keys, not the editing operations.
+
+Tcsh mode and modern prompt keys can be enabled together. The arrow keys,
+Home, End, and Delete continue to work, providing familiar alternatives to
+the tcsh Ctrl-key shortcuts. Up and Down always move sequentially through
+history; tcsh prefix searching applies to Ctrl-p and Ctrl-n. On an empty
+prompt, editing keys such as Ctrl-b and Ctrl-f can still perform their
+main-buffer scrolling functions. Use `quickhelp` to see which modes are
+currently enabled, and `help tcsh` for the on-line command reference.
+
 The `!' character followed by a number repeats that command in the 
 command history. (The standard Swat prompt includes a command 
 number which may be used for this.) e.g. !184 will execute the 184th 

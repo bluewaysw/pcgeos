@@ -59,6 +59,7 @@ resource GenAppInterface ui-object
 resource Interface ui-object
 resource PrimaryInterface ui-object
 resource FileOperationUI ui-object
+resource DOSLauncherResource ui-object
 resource MenuMoveUI ui-object
 resource MenuRecoverUI ui-object
 resource MenuCopyUI ui-object
@@ -148,6 +149,7 @@ export ShellObjectClass
 export DesktopViewClass
 export FolderClass
 export DeskApplicationClass
+export WFileSelectorClass
 export DeskToolClass
 export DirToolClass
 export DriveToolClass
