@@ -276,9 +276,6 @@ void FormElementRemoveSelectList(void);
 
                     if (p_formData->HFD_value)  {
 			word textLen;
-                        NamePoolUseToken(
-                                  pself->HTI_namePool,
-                                  p_formData->HFD_value);
 
                         /* Allocate a block to put it into */
 			textLen = NamePoolStrLength(pself->HTI_namePool,
@@ -296,11 +293,6 @@ void FormElementRemoveSelectList(void);
 				p_formData->HFD_value,
 				NULL);
 			    MemUnlock(mem) ;
-			} else {
-			    /* didn't use token */
-			    NamePoolReleaseToken(
-				pself->HTI_namePool,
-				p_formData->HFD_value);
 			}
 
                         /* Record the new block */
@@ -413,6 +405,16 @@ void FormElementRemoveSelectList(void);
 
 #define FORM_STRING_INITIALIZE_SIZE   (256 - sizeof(T_formString))
 #define FORM_STRING_ALLOCATE_SIZE     128
+#define FORM_STRING_MAX_BLOCK_SIZE    0xfff0
+#define FORM_STRING_MAX_DATA_SIZE     \
+    (FORM_STRING_MAX_BLOCK_SIZE - sizeof(T_formString))
+#define FORM_STRING_FLAG_TRUNCATED     0x4000
+
+/*
+ * ATTENTION: A FormString occupies one 16-bit block.  If it fills, form
+ * submission rolls back the current field and keeps the completed fields.
+ * Chained storage is the upgrade path if forms must exceed this ceiling.
+ */
 
 MemHandle _export FormStringCreate(void)
 {
@@ -440,21 +442,53 @@ MemHandle _export FormStringCreate(void)
     return mem ;
 }
 
-static T_formString *FormStringLockAndGrow(MemHandle mem, word len)
+static T_formString *FormStringTruncateAndUnlock(
+    MemHandle mem,
+    T_formString *p_formString)
+{
+    if (!(p_formString->flags & FORM_STRING_FLAG_TRUNCATED)) {
+        p_formString->flags |= FORM_STRING_FLAG_TRUNCATED;
+        EC_WARNING(WARNING_FORM_STRING_TRUNCATED);
+    }
+    MemUnlock(mem);
+    return (void *)0;
+}
+
+static T_formString *FormStringLockAndGrow(MemHandle mem, dword len)
 {
     T_formString *p_formString ;
+    MemHandle resizedH;
+    dword required;
+    dword newAllocated;
 
     /* See if we need to make space for the appended data */
     p_formString = MemLock(mem) ;
-    while ((p_formString->numChars + len) > p_formString->numAllocated)  {
-        MemReAlloc(
+    if (p_formString->flags & FORM_STRING_FLAG_TRUNCATED) {
+        MemUnlock(mem);
+        return (void *)0;
+    }
+
+    required = (dword)p_formString->numChars + len;
+    if (required > (dword)FORM_STRING_MAX_DATA_SIZE - 1) {
+        return FormStringTruncateAndUnlock(mem, p_formString);
+    }
+
+    while (required >= p_formString->numAllocated) {
+        newAllocated =
+            (dword)p_formString->numAllocated + FORM_STRING_ALLOCATE_SIZE;
+        if (newAllocated > FORM_STRING_MAX_DATA_SIZE) {
+            newAllocated = FORM_STRING_MAX_DATA_SIZE;
+        }
+        resizedH = MemReAlloc(
             mem,
-            p_formString->numAllocated +
-                FORM_STRING_ALLOCATE_SIZE +
-                sizeof(T_formString),
+            (word)(newAllocated + sizeof(T_formString)),
             0);
+        if (!resizedH) {
+            p_formString = MemDeref(mem);
+            return FormStringTruncateAndUnlock(mem, p_formString);
+        }
         p_formString = MemDeref(mem) ;
-        p_formString->numAllocated += FORM_STRING_ALLOCATE_SIZE ;
+        p_formString->numAllocated = (word)newAllocated;
     }
     return p_formString;
 }
@@ -476,9 +510,9 @@ typedef byte FormStringTargetFormat;
 #define FORM_STRING_AS_UTF8              3
 #define FORM_STRING_AS_UTF8_AND_URL      4
 
-static unsigned int FormStringCalculateConvertedLength(char* p_string, FormStringTargetFormat mode)
+static dword FormStringCalculateConvertedLength(char* p_string, FormStringTargetFormat mode)
 {
-    unsigned int length = 0;
+    dword length = 0;
     HTMLEntityTable* xlate_table;
     int i = 0;
     char c = *p_string;
@@ -499,6 +533,19 @@ static unsigned int FormStringCalculateConvertedLength(char* p_string, FormStrin
         {
             c = *p_string;
 
+@ifndef DO_DBCS
+            if (c == C_LOGO &&
+                ((mode == FORM_STRING_AS_UTF8) ||
+                 (mode == FORM_STRING_AS_UTF8_AND_URL))) {
+                length += 4;
+            }
+            else if (c == C_OPTHYPHEN &&
+                     ((mode == FORM_STRING_AS_UTF8) ||
+                      (mode == FORM_STRING_AS_UTF8_AND_URL))) {
+                length += (mode == FORM_STRING_AS_UTF8_AND_URL) ? 6 : 2;
+            }
+            else
+@endif
             if (c < 128)
             {
                 if (c == 13)
@@ -561,6 +608,11 @@ static unsigned int FormStringCalculateConvertedLength(char* p_string, FormStrin
                         }
                         i++;
                     }
+                    if ((xlate_table[i].num == 0) ||
+                        (xlate_table[i].c == 0)) {
+                        length +=
+                            (mode == FORM_STRING_AS_UTF8_AND_URL) ? 3 : 1;
+                    }
                 }
                 else if (mode == FORM_STRING_AS_LATIN_AND_URL)
                 {   // characters over 128 are non-ascii and have to be %XX encoded if we want URL encoding
@@ -593,13 +645,23 @@ static byte FormStringGeosCharToUTF8Char(char c, char* output)
 {
     HTMLEntityTable* xlate_table;
     byte i = 0;
-    unsigned int codepoint = 0;
+    unsigned int codepoint = '?';
     word length;
 
+@ifndef DO_DBCS
+    if (c == C_LOGO) {
+        STRCPYSB(output, "GEOS");
+        return 4;
+    }
+
+    if (c == C_OPTHYPHEN) {
+        codepoint = 0x00ad;
+    }
+    else
+@endif
     if (c < 128)
     {
-        output[0] = c;
-	length = 1;
+        codepoint = c;
     }
     else
     {
@@ -611,29 +673,27 @@ static byte FormStringGeosCharToUTF8Char(char c, char* output)
             if (c == xlate_table[i].c)
             {
                 codepoint = xlate_table[i].num;
-                if (codepoint <= 0x7F)
-                {
-                    output[0] = codepoint;
-                    length = 1;
-                }
-                else if (codepoint <= 0x7FF)
-                {
-                    output[0] = 0xC0 | ((codepoint >> 6) & 0x1F);
-                    output[1] = 0x80 | (codepoint & 0x3F);
-		    length = 2;
-                }
-                else
-                {
-                    output[0] = 0xE0 | ((codepoint >> 12) & 0x0F);
-                    output[1] = 0x80 | ((codepoint >> 6) & 0x3F);
-                    output[2] = 0x80 | (codepoint & 0x3F);
-		    length = 3;
-                }
 		break;
             }
             i++;
         }
 	MemUnlock(OptrToHandle(@xlateTable));
+    }
+
+    if (codepoint <= 0x7F) {
+        output[0] = codepoint;
+        length = 1;
+    }
+    else if (codepoint <= 0x7FF) {
+        output[0] = 0xC0 | ((codepoint >> 6) & 0x1F);
+        output[1] = 0x80 | (codepoint & 0x3F);
+	length = 2;
+    }
+    else {
+        output[0] = 0xE0 | ((codepoint >> 12) & 0x0F);
+        output[1] = 0x80 | ((codepoint >> 6) & 0x3F);
+        output[2] = 0x80 | (codepoint & 0x3F);
+	length = 3;
     }
 
     output[length] = '\0';
@@ -654,17 +714,17 @@ static void FormStringConvert(TCHAR* p_string, char* p_dest, FormStringTargetFor
     byte c ;
     char *p_char ;
     static char hexTable[16] = "0123456789ABCDEF" ;
-    static char utf8Char[5] = {0};
+    char utf8Char[5];
     byte utf8CharSize = 0;
     byte z = 0;
 
     if (mode == FORM_STRING_AS_LATIN)
     {
 	word len = strlen(p_string);
-        // FIXME: check if we include the "0" at the end or not... otherwise pass len of string...
         memcpy(p_dest, p_string, len);
         LocalGeosToCodePage(p_dest, len, CODE_PAGE_LATIN_1, '.');
 	p_dest += len;
+        *p_dest = '\0';
     }
     else // FORM_STRING_AS_UTF8, FORM_STRING_AS_LATIN_AND_URL, FORM_STRING_AS_UTF8_AND_URL
     {
@@ -672,6 +732,15 @@ static void FormStringConvert(TCHAR* p_string, char* p_dest, FormStringTargetFor
         {
             c = *p_char ;
 
+@ifndef DO_DBCS
+            if (c == C_LOGO &&
+                ((mode == FORM_STRING_AS_UTF8) ||
+                 (mode == FORM_STRING_AS_UTF8_AND_URL))) {
+                STRCPYSB(p_dest, "GEOS");
+                p_dest += 3;
+            }
+            else
+@endif
             // Convert characters
             if (c == 32)
             {
@@ -749,19 +818,117 @@ static void FormStringConvert(TCHAR* p_string, char* p_dest, FormStringTargetFor
     }
 }
 
+@ifndef DO_DBCS
+#ifdef DO_ERROR_CHECKING
+static void FormStringValidateThreeByteUTF8(
+    char geosChar,
+    byte b0,
+    byte b1,
+    byte b2,
+    char *url)
+{
+    char input[2];
+    char output[10];
+
+    input[0] = geosChar;
+    input[1] = '\0';
+    EC_ERROR_IF(FormStringCalculateConvertedLength(
+                    input, FORM_STRING_AS_UTF8) != 3,
+                ERROR_FORM_STRING_UTF8_INVALID);
+    EC_ERROR_IF(FormStringCalculateConvertedLength(
+                    input, FORM_STRING_AS_UTF8_AND_URL) != 9,
+                ERROR_FORM_STRING_UTF8_INVALID);
+    FormStringConvert(input, output, FORM_STRING_AS_UTF8);
+    EC_ERROR_IF((byte)output[0] != b0 ||
+                (byte)output[1] != b1 ||
+                (byte)output[2] != b2 ||
+                output[3] != '\0',
+                ERROR_FORM_STRING_UTF8_INVALID);
+    FormStringConvert(input, output, FORM_STRING_AS_UTF8_AND_URL);
+    EC_ERROR_IF(STRCMPSB(output, url),
+                ERROR_FORM_STRING_UTF8_INVALID);
+}
+
+static void FormStringValidateUTF8Conversion(void)
+{
+    static Boolean validated = FALSE;
+    char input[2];
+    char output[16];
+
+    if (validated) {
+        return;
+    }
+    validated = TRUE;
+    input[1] = '\0';
+
+    input[0] = 'A';
+    output[1] = '?';
+    FormStringConvert(input, output, FORM_STRING_AS_LATIN);
+    EC_ERROR_IF(output[0] != 'A' || output[1] != '\0',
+                ERROR_FORM_STRING_UTF8_INVALID);
+
+    input[0] = C_LOGO;
+    EC_ERROR_IF(FormStringCalculateConvertedLength(
+                    input, FORM_STRING_AS_UTF8) != 4,
+                ERROR_FORM_STRING_UTF8_INVALID);
+    EC_ERROR_IF(FormStringCalculateConvertedLength(
+                    input, FORM_STRING_AS_UTF8_AND_URL) != 4,
+                ERROR_FORM_STRING_UTF8_INVALID);
+    FormStringConvert(input, output, FORM_STRING_AS_UTF8);
+    EC_ERROR_IF(STRCMPSB(output, "GEOS"),
+                ERROR_FORM_STRING_UTF8_INVALID);
+    FormStringConvert(input, output, FORM_STRING_AS_UTF8_AND_URL);
+    EC_ERROR_IF(STRCMPSB(output, "GEOS"),
+                ERROR_FORM_STRING_UTF8_INVALID);
+
+    input[0] = C_OPTHYPHEN;
+    EC_ERROR_IF(FormStringCalculateConvertedLength(
+                    input, FORM_STRING_AS_UTF8) != 2,
+                ERROR_FORM_STRING_UTF8_INVALID);
+    EC_ERROR_IF(FormStringCalculateConvertedLength(
+                    input, FORM_STRING_AS_UTF8_AND_URL) != 6,
+                ERROR_FORM_STRING_UTF8_INVALID);
+    FormStringConvert(input, output, FORM_STRING_AS_UTF8);
+    EC_ERROR_IF((byte)output[0] != 0xc2 ||
+                (byte)output[1] != 0xad ||
+                output[2] != '\0',
+                ERROR_FORM_STRING_UTF8_INVALID);
+    FormStringConvert(input, output, FORM_STRING_AS_UTF8_AND_URL);
+    EC_ERROR_IF(STRCMPSB(output, "%C2%AD"),
+                ERROR_FORM_STRING_UTF8_INVALID);
+
+    FormStringValidateThreeByteUTF8(
+        C_CURRENCY, 0xe2, 0x82, 0xac, "%E2%82%AC");
+    FormStringValidateThreeByteUTF8(
+        C_QUOTEDBLLEFT, 0xe2, 0x80, 0x9c, "%E2%80%9C");
+    FormStringValidateThreeByteUTF8(
+        C_EMDASH, 0xe2, 0x80, 0x94, "%E2%80%94");
+}
+#endif
+@endif
+
 static void FormStringAppendTargetFormat(MemHandle mem, TCHAR *p_string, FormStringTargetFormat mode)
 {
-    word len ;
+    dword len ;
     T_formString *p_formString ;
     char *p_dest ;
+
+@ifndef DO_DBCS
+#ifdef DO_ERROR_CHECKING
+    FormStringValidateUTF8Conversion();
+#endif
+@endif
 
     len = FormStringCalculateConvertedLength(p_string, mode);
 
     p_formString = FormStringLockAndGrow(mem, len);
+    if (!p_formString) {
+        return;
+    }
 
     // Now let's create the new string (at the ending null)
     p_dest = p_formString->data + p_formString->numChars - 1 ;
-    p_formString->numChars += len;
+    p_formString->numChars += (word)len;
 
     FormStringConvert(p_string, p_dest, mode);
 
@@ -785,10 +952,59 @@ void * _export FormStringDerefData(MemHandle mem)
 
 void FormStringAppendNull(MemHandle mem)
 {
-    T_formString *p_formString = FormStringLockAndGrow(mem, 1);
+    T_formString *p_formString;
 
-    p_formString->data[(p_formString->numChars++) - 1] = '\0';
+    p_formString = FormStringLockAndGrow(mem, 1);
+    if (!p_formString) {
+        return;
+    }
+    p_formString->data[p_formString->numChars] = '\0';
+    p_formString->numChars++;
+    EC_ERROR_IF(p_formString->data[p_formString->numChars - 1] != '\0' ||
+                p_formString->data[p_formString->numChars - 2] != '\0',
+                ERROR_FORM_STRING_STORAGE_INVALID);
     MemUnlock(mem);
+}
+
+static void FormStringAppendFinalNull(MemHandle mem)
+{
+    T_formString *p_formString;
+
+    p_formString = MemLock(mem);
+    EC_ERROR_IF(p_formString->numChars >= p_formString->numAllocated,
+                ERROR_FORM_STRING_STORAGE_INVALID);
+    p_formString->data[p_formString->numChars] = '\0';
+    p_formString->numChars++;
+    MemUnlock(mem);
+}
+
+static word FormStringMark(MemHandle mem)
+{
+    T_formString *p_formString;
+    word mark;
+
+    p_formString = MemLock(mem);
+    mark = p_formString->numChars;
+    MemUnlock(mem);
+    return mark;
+}
+
+static Boolean FormStringRollbackIfTruncated(MemHandle mem, word mark)
+{
+    T_formString *p_formString;
+    Boolean truncated;
+
+    p_formString = MemLock(mem);
+    truncated =
+        (p_formString->flags & FORM_STRING_FLAG_TRUNCATED) != 0;
+    if (truncated) {
+        EC_ERROR_IF(mark == 0 || mark > p_formString->numChars,
+                    ERROR_FORM_STRING_STORAGE_INVALID);
+        p_formString->numChars = mark;
+        p_formString->data[mark - 1] = '\0';
+    }
+    MemUnlock(mem);
+    return truncated;
 }
     
 /*------------------------------------------------------------------------*/
@@ -847,6 +1063,9 @@ static dword FormStringLengthMulti(T_formString *postData);
     T_formString *p_formString ;
     word imageSubmit = 0xffff;  /* nothing yet */
     word argsOffset = 0xffff;
+    word fieldStart;
+    Boolean truncated = FALSE;
+    Boolean actionTruncated = FALSE;
 
 @ifdef DO_DBCS
     /* set code page for form submit */
@@ -914,26 +1133,49 @@ static dword FormStringLengthMulti(T_formString *postData);
 			    argsOffset = p_formString->numChars;
 			    MemUnlock(formString);
 			}
+                        fieldStart = FormStringMark(formString);
                         prefix = @call oself::MSG_HTML_TEXT_FORM_APPEND_ELEMENT(
                                        formString,
                                        i,
                                        prefix,
 				       enctype) ;
+                        truncated = FormStringRollbackIfTruncated(
+                            formString, fieldStart);
+                        if (truncated) {
+                            if (p_formData->HFD_itemType == HTML_FORM_HEADER) {
+                                actionTruncated = TRUE;
+                            }
+                            break;
+                        }
                     }
                 }
             }
 	    /* now, add the nameless submit image info, if any */
-	    if (imageSubmit != 0xffff) {
-		p_formData = ChunkArrayElementToPtr(array, i, &size);
+	    if (!truncated && imageSubmit != 0xffff) {
 		/* don't need final prefix */
+                fieldStart = FormStringMark(formString);
 		(void)(@call oself::MSG_HTML_TEXT_FORM_APPEND_ELEMENT(
 		    formString, imageSubmit, prefix, enctype));
+                truncated = FormStringRollbackIfTruncated(
+                    formString, fieldStart);
 	    }
             MemUnlock(OptrToHandle(array)) ;
 
             /* Send the block */
             if ((method == HTML_OPT_METHOD_GET) ||
                 (method == HTML_OPT_METHOD_DEFAULT))  {
+                if (actionTruncated) {
+                    MemFree(formString);
+                    pself = ObjDerefVis(oself);
+                    NamePoolUseToken(pself->HTI_namePool, urlToken);
+                    NamePoolUseToken(pself->HTI_namePool, targetToken);
+                    @send, forceQueue self::MSG_HTML_TEXT_HOTSPOT_SELECT(
+                        pself->HTI_namePool,
+                        urlToken,
+                        targetToken,
+                        NullHandle);
+                    return;
+                }
 		/* check length of URL, if too long, pass GET URL
 		   using POST data block */
 		p_formString = MemLock(formString);
@@ -973,7 +1215,7 @@ static dword FormStringLengthMulti(T_formString *postData);
             } else if (method == HTML_OPT_METHOD_POST)  {
 		if (enctype == HTML_OPT_ENCODING_MULTI) {
 		    /* Fill in special fields before posting the FormString. */
-		    FormStringAppendNull(formString); /* last field */
+		    FormStringAppendFinalNull(formString); /* last field */
 		    p_formString = MemLock(formString);
 		    p_formString->encoding = FORM_STRING_ENCODING_MULTI;
 		    p_formString->callback = (cb_FormStringCallback*)FormStringCallbackMulti;
@@ -1656,7 +1898,7 @@ FormStringCallbackStatus _pascal _export FormStringCallbackMulti(
 	/* This is our first call, setup a few things. */
 	postData->callbackData = MemAlloc(sizeof(T_formStringCallbackData),
 					  HF_DYNAMIC, HAF_NO_ERR | HAF_LOCK);
-	data = (T_formStringCallbackData *) MemLock(postData->callbackData);
+	data = (T_formStringCallbackData *) MemDeref(postData->callbackData);
 	data->state = FSCMS_START;
 	data->datapos = STRLENSB(postData->data) + 1; /* start at first field */
 	data->string = NullChunk;
@@ -1664,7 +1906,11 @@ FormStringCallbackStatus _pascal _export FormStringCallbackMulti(
 	data->file = NullHandle;
     }
     else
-	data = (T_formStringCallbackData *) MemLock(postData->callbackData);
+	data = (T_formStringCallbackData *) MemDeref(postData->callbackData);
+
+    EC_ERROR_IF(MGI_LOCK_COUNT(MemGetInfo(postData->callbackData,
+                    MGIT_FLAGS_AND_LOCK_COUNT)) != 1,
+                ERROR_FORM_STRING_CALLBACK_ERROR);
 
     if (bufferSize == 0)
     {
