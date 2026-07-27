@@ -412,8 +412,8 @@ void FormElementRemoveSelectList(void);
 
 /*
  * ATTENTION: A FormString occupies one 16-bit block.  If it fills, form
- * submission rolls back the current field and keeps the completed fields.
- * Chained storage is the upgrade path if forms must exceed this ceiling.
+ * submission aborts without sending any fields.  Chained storage is the
+ * upgrade path if forms must exceed this ceiling.
  */
 
 MemHandle _export FormStringCreate(void)
@@ -978,18 +978,7 @@ static void FormStringAppendFinalNull(MemHandle mem)
     MemUnlock(mem);
 }
 
-static word FormStringMark(MemHandle mem)
-{
-    T_formString *p_formString;
-    word mark;
-
-    p_formString = MemLock(mem);
-    mark = p_formString->numChars;
-    MemUnlock(mem);
-    return mark;
-}
-
-static Boolean FormStringRollbackIfTruncated(MemHandle mem, word mark)
+static Boolean FormStringIsTruncated(MemHandle mem)
 {
     T_formString *p_formString;
     Boolean truncated;
@@ -997,12 +986,6 @@ static Boolean FormStringRollbackIfTruncated(MemHandle mem, word mark)
     p_formString = MemLock(mem);
     truncated =
         (p_formString->flags & FORM_STRING_FLAG_TRUNCATED) != 0;
-    if (truncated) {
-        EC_ERROR_IF(mark == 0 || mark > p_formString->numChars,
-                    ERROR_FORM_STRING_STORAGE_INVALID);
-        p_formString->numChars = mark;
-        p_formString->data[mark - 1] = '\0';
-    }
     MemUnlock(mem);
     return truncated;
 }
@@ -1046,6 +1029,13 @@ FormStringCallbackStatus _pascal _export FormStringCallbackMulti(
     T_formString *postData, byte *buffer, word bufferSize, word *bufferUsed);
 static dword FormStringLengthMulti(T_formString *postData);
 
+@start FormStringCallbackMultiStrings, data;
+
+@chunk TCHAR FormStringSubmitFailedMessage[] =
+    _TEXT("The form could not be submitted because it is too large or there is not enough memory.");
+
+@end FormStringCallbackMultiStrings;
+
 /* Submit the form text */
 @extern method HTMLTextClass, MSG_HTML_TEXT_FORM_SUBMIT
 {
@@ -1063,9 +1053,7 @@ static dword FormStringLengthMulti(T_formString *postData);
     T_formString *p_formString ;
     word imageSubmit = 0xffff;  /* nothing yet */
     word argsOffset = 0xffff;
-    word fieldStart;
     Boolean truncated = FALSE;
-    Boolean actionTruncated = FALSE;
 
 @ifdef DO_DBCS
     /* set code page for form submit */
@@ -1110,8 +1098,13 @@ static dword FormStringLengthMulti(T_formString *postData);
 			/* For multipart mime encoding, generate a boundary
 			   string now, before any elements are processed. */
 			if (enctype == HTML_OPT_ENCODING_MULTI
-			    && method == HTML_OPT_METHOD_POST)
+			    && method == HTML_OPT_METHOD_POST) {
 			    AddBoundaryString(formString);
+                            truncated = FormStringIsTruncated(formString);
+                            if (truncated) {
+                                break;
+                            }
+                        }
                     }
 
 		    /* for a nameless submit image that was pressed, we want
@@ -1133,18 +1126,13 @@ static dword FormStringLengthMulti(T_formString *postData);
 			    argsOffset = p_formString->numChars;
 			    MemUnlock(formString);
 			}
-                        fieldStart = FormStringMark(formString);
                         prefix = @call oself::MSG_HTML_TEXT_FORM_APPEND_ELEMENT(
                                        formString,
                                        i,
                                        prefix,
 				       enctype) ;
-                        truncated = FormStringRollbackIfTruncated(
-                            formString, fieldStart);
+                        truncated = FormStringIsTruncated(formString);
                         if (truncated) {
-                            if (p_formData->HFD_itemType == HTML_FORM_HEADER) {
-                                actionTruncated = TRUE;
-                            }
                             break;
                         }
                     }
@@ -1153,29 +1141,29 @@ static dword FormStringLengthMulti(T_formString *postData);
 	    /* now, add the nameless submit image info, if any */
 	    if (!truncated && imageSubmit != 0xffff) {
 		/* don't need final prefix */
-                fieldStart = FormStringMark(formString);
 		(void)(@call oself::MSG_HTML_TEXT_FORM_APPEND_ELEMENT(
 		    formString, imageSubmit, prefix, enctype));
-                truncated = FormStringRollbackIfTruncated(
-                    formString, fieldStart);
+                truncated = FormStringIsTruncated(formString);
 	    }
             MemUnlock(OptrToHandle(array)) ;
+
+            if (truncated) {
+                MemFree(formString);
+                UserStandardDialogOptr(
+                    (char *)0,
+                    (void *)0,
+                    NullOptr,
+                    NullOptr,
+                    @FormStringSubmitFailedMessage,
+                    (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                        (GIT_NOTIFICATION <<
+                            CDBF_INTERACTION_TYPE_OFFSET));
+                return;
+            }
 
             /* Send the block */
             if ((method == HTML_OPT_METHOD_GET) ||
                 (method == HTML_OPT_METHOD_DEFAULT))  {
-                if (actionTruncated) {
-                    MemFree(formString);
-                    pself = ObjDerefVis(oself);
-                    NamePoolUseToken(pself->HTI_namePool, urlToken);
-                    NamePoolUseToken(pself->HTI_namePool, targetToken);
-                    @send, forceQueue self::MSG_HTML_TEXT_HOTSPOT_SELECT(
-                        pself->HTI_namePool,
-                        urlToken,
-                        targetToken,
-                        NullHandle);
-                    return;
-                }
 		/* check length of URL, if too long, pass GET URL
 		   using POST data block */
 		p_formString = MemLock(formString);
