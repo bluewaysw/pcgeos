@@ -1971,7 +1971,7 @@ int LOCAL HandleTag(MemHandle localHeap)
     register int c,p;
     int ce,q;
     char *e;
-    Boolean openTag,closeTag;
+    Boolean openTag,closeTag,tagTooLong;
     word tagStyle;
     HTMLStylesTable tagStyleEntry;
     optr paramArray;
@@ -1993,16 +1993,26 @@ int LOCAL HandleTag(MemHandle localHeap)
 
     /* get tag name */
     p=0;                                /* start tag */
+    tagTooLong=FALSE;
     while( c!='>' && c!='<' && c!='=' && c!='/' && c!=' ' && 
            c!='\r' && c!='\t' && c!=EOF )
     {
       if(p<HTML_MAXTAG)
         tag[p++]=(char)((c>='a' && c<='z')?(c-32):c);
                                         /* get tag name */
+      else
+        tagTooLong=TRUE;
       if(c=='!') break;                 /* "!": single character tag */
       c=HTMLgetc();
     }
     tag[p]=0;                           /* terminate tag */
+
+    /* Resolve the tag before parsing parameters.  Unknown and truncated
+       names must not allocate parameter storage or alias a real tag. */
+    tagStyle = tagTooLong ? 0 : StyleNum(tag,&spec);
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
 
     paramArray = NullOptr;              /* no parameters yet */
     paramBytes = 0;
@@ -2067,7 +2077,7 @@ int LOCAL HandleTag(MemHandle localHeap)
 
         /* Filter before GetText so rejected values cannot allocate overflow. */
         attribute = CA_NULL_ELEMENT;
-        discard = argTooLong || !arg[0];
+        discard = closeTag || !tagStyle || argTooLong || !arg[0];
         if(!discard)
         {
           attribute = FindHTMLAttribute(arg);
@@ -2167,17 +2177,14 @@ int LOCAL HandleTag(MemHandle localHeap)
       closeTag = TRUE;
     }
 
-    /* copy entry from HTML tag style definitions: */
-    MemLock( OptrToHandle(@HTMLStylesChunk) );
-    tagStyle = StyleNum(tag,&spec);     /* find if tag has an assigned style */
-    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
-    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
-
     if(openTag) {                       /* opening a tag */
         if (!ignoreTags) {
             if(tagStyleEntry.spec==SPEC_SCRIPT)
             {
               c = Open_SCRIPT(paramArray, c);
+              /* SCRIPT is not pushed, so release its parameters here. */
+              if(paramArray)
+                LMemFree(paramArray);
               tagStyleEntry.flags &= ~TAG_IGNORE_TAGS;
             }
             else
