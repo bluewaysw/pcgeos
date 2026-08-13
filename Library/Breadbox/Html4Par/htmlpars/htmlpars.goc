@@ -35,6 +35,10 @@
 /* keep blocks with arrays below this size */
 #define PARSE_ARRAY_MEM_SIZE_LIMIT 30000
 
+/* Bound transient tag parameters in the shared 16-bit LMem heap. */
+#define HTML_PARAM_TAG_SIZE_LIMIT  (12*1024)
+#define HTML_PARAM_HEAP_SIZE_LIMIT 49152L
+
 /***************************************************************************
  *              Default style constants
  ***************************************************************************/
@@ -1291,6 +1295,63 @@ word LOCAL StyleNum(char *name, SpecialTagType *spec)
     return ret;
 }
 
+word LOCAL FindHTMLAttribute(char *name)
+{
+    word first, last, middle, result;
+    int compare;
+    HTMLAttributeName *namesP;
+
+    MemLock(OptrToHandle(@HTMLAttributeNames));
+    namesP = LMemDeref(@HTMLAttributeNames);
+
+    first = 0;
+    last = HTML_ATTRIBUTE_COUNT;
+    result = CA_NULL_ELEMENT;
+    while(first < last)
+    {
+      middle = first + (last-first)/2;
+      compare = STRCMPSB(name, namesP[middle].name);
+      if(compare > 0)
+        first = middle+1;
+      else
+        last = middle;
+    }
+    if(first < HTML_ATTRIBUTE_COUNT &&
+       !STRCMPSB(name, namesP[first].name))
+      result = first;
+
+    MemUnlock(OptrToHandle(@HTMLAttributeNames));
+    return result;
+}
+
+Boolean LOCAL HTMLParameterHeapHasRoom(MemHandle localHeapH, word growth)
+{
+    LMemBlockHeader *headerP;
+    dword used;
+
+    headerP = MemDeref(localHeapH);
+    used = (dword)headerP->LMBH_blockSize-headerP->LMBH_totalFree;
+    return used+growth <= HTML_PARAM_HEAP_SIZE_LIMIT;
+}
+
+#if ERROR_CHECK
+void LOCAL ECCheckHTMLAttributes(void)
+{
+    word i;
+    HTMLAttributeName *namesP;
+
+    MemLock(OptrToHandle(@HTMLAttributeNames));
+    namesP = LMemDeref(@HTMLAttributeNames);
+    for(i=0; i<HTML_ATTRIBUTE_COUNT; i++)
+    {
+      if(!namesP[i].name[0] || STRLENSB(namesP[i].name)>HTML_MAXTAG ||
+         (i && STRCMPSB(namesP[i-1].name, namesP[i].name)>=0))
+        FatalError(ERROR_HTML_ATTRIBUTE_TABLE_INVALID);
+    }
+    MemUnlock(OptrToHandle(@HTMLAttributeNames));
+}
+#endif
+
 void LOCAL FreeStoredContent(void)
 {
     /* Release buffer for storage of TITLE, OPTION, TEXTAREA elements */
@@ -1420,6 +1481,7 @@ int LOCAL HTMLgetc(void)
  *    terminated when the buffer is full; instead, excessive characters are
  *    flushed to the next terminator. In addition, the value of c2 is not
  *    touched, and delaying of whitespaces does not take place.
+ *  truncatedP is set when parameter characters have to be flushed.
  *
  *  Global variables changed: c2.
  */
@@ -1427,7 +1489,8 @@ int LOCAL HTMLgetc(void)
 /* longer arguments are specially handled */
 #define PARSE_BUF_LEN 256
 
-int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowBuf)
+int LOCAL GetText(int cc, int ce, char *buf, word formMode,
+                  MemHandle *overflowBuf, Boolean *truncatedP)
   #define FORM_MODE_HTML      0         /* tags, entities, white compression */
   #define FORM_MODE_PARAM     1         /* (see above, otherwise like HTML) */
   #define FORM_MODE_PRE       2         /* PRE */
@@ -1490,7 +1553,11 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 	  (formMode!=FORM_MODE_PARAM && p>=PARSE_BUF_LEN-HTML_MAXTAG-2) )
       {
         if(formMode==FORM_MODE_PARAM)   /* no: flush characters? */
+        {
+          if(truncatedP)
+            *truncatedP = TRUE;
           c = HTMLgetc();               /* yes: just skip over char */
+        }
         else
           break;                        /* no: abort immediately */
       }
@@ -1925,6 +1992,8 @@ int LOCAL HandleTag(MemHandle localHeap)
     optr paramArray;
     SpecialTagType spec;
     char tag[HTML_MAXTAG+1];
+    byte seenAttributes[HTML_ATTRIBUTE_SEEN_BYTES];
+    word paramBytes;
 
     c=HTMLgetc();
     if(c=='/')
@@ -1951,6 +2020,8 @@ int LOCAL HandleTag(MemHandle localHeap)
     tag[p]=0;                           /* terminate tag */
 
     paramArray = NullOptr;              /* no parameters yet */
+    paramBytes = 0;
+    memset(seenAttributes, 0, sizeof(seenAttributes));
 
     /* quickly skip over comments */
     if(tag[0]=='!')                     /* <!--..--> or <!..> */
@@ -1987,21 +2058,52 @@ int LOCAL HandleTag(MemHandle localHeap)
         /* buf -- room for PARSE_BUF_LEN + one entity expansion */
         char arg[HTML_MAXTAG+1],buf[PARSE_BUF_LEN+HTML_MAXTAG];
 	MemHandle overflowBuf = 0;
+        MemHandle *overflowBufP;
+        word attribute, argLen, overflowLen, elementSize, growth;
+        Boolean discard, argTooLong, valueTruncated;
 
         /* skip whites */
         while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
 
         /* get argument name */
         p=0;                            /* start tag */
+        argTooLong=FALSE;
         while( c!='=' && c!=' ' && c!='\r' && c!='\t' && c!='>' && c!='<' &&
                c!='/' && c!=EOF )
         {
           if(p<HTML_MAXTAG)
             arg[p++]=(char)((c>='a' && c<='z')?(c-32):c);
+          else
+            argTooLong=TRUE;
                                         /* get argument name */
           c=HTMLgetc();
         }
         arg[p]=0;                       /* terminate arg name */
+
+        /* Filter before GetText so rejected values cannot allocate overflow. */
+        attribute = CA_NULL_ELEMENT;
+        discard = argTooLong || !arg[0];
+        if(!discard)
+        {
+          attribute = FindHTMLAttribute(arg);
+          if(attribute == CA_NULL_ELEMENT)
+            discard = TRUE;
+          else if(seenAttributes[attribute/8] & (1<<(attribute&7)))
+            discard = TRUE;
+          else
+            seenAttributes[attribute/8] |= (1<<(attribute&7));
+        }
+
+        argLen = STRLENSB(arg);
+        growth = argLen+2+sizeof(word)+1;
+        if(!paramArray)
+          growth += sizeof(ChunkArrayHeader)+sizeof(word);
+        if(!discard &&
+           (paramBytes+growth > HTML_PARAM_TAG_SIZE_LIMIT ||
+            !HTMLParameterHeapHasRoom(localHeap, growth)))
+          discard = TRUE;
+        overflowBufP = discard ? (void *)0 : &overflowBuf;
+        valueTruncated = FALSE;
 
         /* skip whites */
         while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
@@ -2022,36 +2124,50 @@ int LOCAL HandleTag(MemHandle localHeap)
           else
             ce=' ';                     /* whitespace terminates */
 
-          c = GetText(c, ce, buf, FORM_MODE_PARAM, &overflowBuf);
+          c = GetText(c, ce, buf, FORM_MODE_PARAM, overflowBufP,
+                      &valueTruncated);
                                         /* parse text up to terminator,
                                            flush rest if too long */
         }
         else
           *buf=0;                       /* no value */
 
-        if(arg[0])                      /* only if argument has been found */
+        if(valueTruncated)
+          discard = TRUE;
+
+        if(!discard)
         {
-	  word overflowLen = 0;
+	  overflowLen = 0;
 	  if (overflowBuf)
 	      overflowLen = STRLENSB(MemDeref(overflowBuf));
 
-          if(!paramArray)               /* no array yet? */
-            paramArray = ConstructOptr( localHeap,
-              ChunkArrayCreate( localHeap, 0, 0, 0 ) );
+          elementSize = argLen+overflowLen+STRLENSB(buf)+2;
+          growth = elementSize+sizeof(word)+1;
+          if(!paramArray)
+            growth += sizeof(ChunkArrayHeader)+sizeof(word);
+
+          if(paramBytes+growth <= HTML_PARAM_TAG_SIZE_LIMIT &&
+             HTMLParameterHeapHasRoom(localHeap, growth))
+          {
+            if(!paramArray)             /* no array yet? */
+              paramArray = ConstructOptr( localHeap,
+                ChunkArrayCreate( localHeap, 0, 0, 0 ) );
                                         /* create array for parameters */
 
-          e = ChunkArrayAppend( paramArray, STRLENSB(arg)+overflowLen+STRLENSB(buf)+2 );
+            e = ChunkArrayAppend(paramArray, elementSize);
                                         /* add array for parameters (will be
                                            freed in OpenTag() or later...) */
+            paramBytes += growth;
 
-          STRCPYSB(e,arg);                /* copy argument name */
-	  if (overflowBuf) {
-	      int argLenPlus = STRLENSB(arg)+1;
-	      /* append overflow and value */
-	      STRCPYSB(e+argLenPlus, MemDeref(overflowBuf));
-	      STRCPYSB(e+argLenPlus+overflowLen, buf);
-	  } else
-          STRCPYSB(e+STRLENSB(arg)+1,buf);  /* append value */
+            STRCPYSB(e,arg);              /* copy argument name */
+	    if (overflowBuf) {
+	        int argLenPlus = argLen+1;
+	        /* append overflow and value */
+	        STRCPYSB(e+argLenPlus, MemDeref(overflowBuf));
+	        STRCPYSB(e+argLenPlus+overflowLen, buf);
+	    } else
+            STRCPYSB(e+argLen+1,buf);      /* append value */
+          }
         }
 	if (overflowBuf) MemFree(overflowBuf);
       }
@@ -2184,6 +2300,9 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     ignoreTags = 0;  /* allow tags on startup */
 
     EC_BOUNDS(ext);
+#if ERROR_CHECK
+    ECCheckHTMLAttributes();
+#endif
 
     /*
      * Initialize local memory
@@ -2289,7 +2408,8 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
         else
           formMode = FORM_MODE_HTML;
 
-        c = GetText(c, (formMode==FORM_MODE_HTML)?0:'\r', buf, formMode, 0);
+        c = GetText(c, (formMode==FORM_MODE_HTML)?0:'\r', buf, formMode,
+                    0, 0);
 
         /*
          * Transfer parsed characters into HTML text object or process
