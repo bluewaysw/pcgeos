@@ -623,6 +623,7 @@ word LOCAL ParseImage(optr paramArray, word element, Boolean parseName)
     return ret;                         /* return image index */
 }
 
+#if JAVASCRIPT_SUPPORT
 void LOCAL ParseEvent(optr paramArray, char *name, HTMLEventType evt,
                       HTMLEventObjectType type, word obj)
 {
@@ -659,6 +660,7 @@ void ParseEvents(optr paramArray, HTMLEventObjectType type, word obj)
     ParseEvent(paramArray, "ONUNLOAD",    HTML_EVENT_UNLOAD,    type, obj);
     }
 }
+#endif
 
 void _pascal Open_A(TagOpenArguments *arg)
 {
@@ -1659,9 +1661,12 @@ void _pascal Open_BLOCKQUOTE_MENU(TagOpenArguments *arg)
 
 void _pascal Open_NOSCRIPT(TagOpenArguments *arg)
 {
-    /* show contents if JavaScript is off */
-    if(!(HTMLext->HE_options & HTML_JAVASCRIPT))
-      arg->flags &= ~(TAG_FLUSH_TEXT | TAG_IGNORE_TAGS);
+    /* Non-JavaScript builds always show fallback content. */
+#if JAVASCRIPT_SUPPORT
+    if(HTMLext->HE_options & HTML_JAVASCRIPT)
+      return;
+#endif
+    arg->flags &= ~(TAG_FLUSH_TEXT | TAG_IGNORE_TAGS);
 }
 
 #pragma argsused

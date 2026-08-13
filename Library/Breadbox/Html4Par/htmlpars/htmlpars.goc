@@ -129,7 +129,9 @@ Boolean G_isParsing = FALSE ;
 NameToken storedContent;
 
 /* Index of script fragment on page */
+#if JAVASCRIPT_SUPPORT
 static word scriptCount;
+#endif
 
 #ifdef DO_DBCS
 /* code page for parsing, and later for drawing form elements, etc.
@@ -574,6 +576,7 @@ long LOCAL AddParagraph(VisTextCharAttr *ca, VisTextParaAttr *pa, char *text)
     return pos;
 }
 
+#if JAVASCRIPT_SUPPORT
 /*
  * Add n character from the passed buffer to the JavaScript array
  * (creating it if necessary). The routine returns the starting index
@@ -689,6 +692,7 @@ void CleanupJavaScript(long pos1, long pos2)
       HugeArrayDelete(HTMLext->HE_vmFile,
         VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos-pos1), pos1);
 }
+#endif
 
 void SetDocumentCharset(char *p)
 {
@@ -792,10 +796,12 @@ word ModifyHypertextArray(word array, void *rec, word elsize, word element)
         ofs = word_offsetof(HypertextArrayBlockHeader, HABH_metaArray);
         size = sizeof(HTMLmetaData);
         break;
+#if JAVASCRIPT_SUPPORT
       case HTA_EVENT_ARRAY:
         ofs = word_offsetof(HypertextArrayBlockHeader, HABH_eventArray);
         size = sizeof(HTMLeventData);
         break;
+#endif
 EC(   default: FatalError(-1); )
     }
 
@@ -1748,106 +1754,77 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode,
 /*
  * Script parsing
  *
- * This code is placed here because it implements are different mode of parsing
- * from the usual HTML code handling. As it also has to deal with all sorts of
- * non well-formed (in the XML sense) files, it completely bypasses the normal
- * parser and pipes the script source straight into the transfer item.
+ * SCRIPT raw text uses a different parsing mode from normal HTML and bypasses
+ * the normal tag parser. JavaScript builds may also copy it to the transfer
+ * item for execution.
  */
 
 const char endScript[] = "</SCRIPT";
 
-#define C_COMMENT 0x8000
-#define CC_COMMENT 0x4000
-#define QUOTE_CHAR 0x00ff
-
-char pbuf[3] = {0, 0, 0};  /* only accessed by single parsing thread */
-
-word LOCAL HandleScriptChar(word flags, int c, char p)
+/*
+ * SCRIPT is a raw-text element even when JavaScript support is absent.
+ * Consume its contents without interpreting embedded markup.
+ */
+int LOCAL SkipScriptContent(int c)
 {
-    if (flags & CC_COMMENT) {
-@ifdef DO_DBCS
-	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
-@else
-	if (c==C_CR || c==C_LF ||
-@endif
-	    (pbuf[0]=='-' && pbuf[1]=='-' && p=='>')) {
-	    flags &= ~CC_COMMENT;
-	}
-    } else if (flags & C_COMMENT) {
-	if (c=='/' && p=='*') {
-	    flags &= ~C_COMMENT;
-	}
-    } else if (flags & QUOTE_CHAR) {
-@ifdef DO_DBCS
-	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
-@else
-	if (c==C_CR || c==C_LF ||
-@endif
-            (c==(flags & QUOTE_CHAR) && p!='\\')) {
-	    flags &= ~QUOTE_CHAR;
-	}
-    } else {
-	if ((c=='"' || c=='\'') && p!='\\') {
-	    flags = (flags & ~QUOTE_CHAR) | c;
-	} else if (c=='*' && p=='/') {
-	    flags |= C_COMMENT;
-	} else if (c=='/' && p=='/') {
-	    flags |= CC_COMMENT;
-	}
-    }
-    return flags;
+    int n;
+
+    if(c=='>')                          // skip over ">" of script tag
+        c=HTMLgetc();
+
+    do {
+        while(c!=EOF && c!=endScript[0])
+            c=HTMLgetc();
+
+        n = 0;
+        while(c!=EOF && c<128 && (toupper(c)==endScript[n]))
+        {
+            n++;
+            c=HTMLgetc();
+        }
+    } while(c!=EOF && endScript[n]);
+
+    return c;
 }
 
-int LOCAL HandleScript(int c, Boolean accept)
+#if JAVASCRIPT_SUPPORT
+int LOCAL HandleScript(int c)
 {
     char buf[128];
     int n;
     long pos1,pos2;
-    char p = 0;
-    word charFlags = 0;
 
     if(c=='>')                          // skip over ">" of script tag
       c=HTMLgetc();
 
-    if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
-      pos1 = AddJavaScript("\n", 1);
+    pos1 = AddJavaScript("\n", 1);
     
     n = 0;
     do {
-      while(n<sizeof(buf) && c!=EOF && ((charFlags & (QUOTE_CHAR | C_COMMENT)) || c!=endScript[0]))
+      while(n<sizeof(buf) && c!=EOF && c!=endScript[0])
       {
         buf[n++] = (char)c;
-	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
         c=HTMLgetc();
-	charFlags = HandleScriptChar(charFlags, c, p);
       }
       
       if(n)                             // transfer script body
       {
-        if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
-          AddJavaScript(buf, n);        
+        AddJavaScript(buf, n);
         n = 0;                          // characters have been dealt with
       }
       
       while (c!=EOF && c<128 && (toupper(c)==endScript[n]))
       {
         buf[n++] = (char)c;
-	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
         c=HTMLgetc();
-	charFlags = HandleScriptChar(charFlags, c, p);
       }
     } while(c!=EOF && endScript[n]);    // until end-of-script or end-of-file
 
-    if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
-    {
-      pos2 = AddJavaScript("\n", 1);    // make sure contents are properly split
-      CleanupJavaScript(pos1, pos2);    // remove comments around script code
-    }
+    pos2 = AddJavaScript("\n", 1);      // make sure contents are properly split
+    CleanupJavaScript(pos1, pos2);      // remove comments around script code
 
     /* handle script code */
-#if JAVASCRIPT_SUPPORT
-    if (accept && (HTMLext->HE_options & HTML_JAVASCRIPT) &&
-	HTMLext->HE_scriptHandler && 
+    if (HTMLext->HE_scriptHandler &&
         (!(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)))
     {
 	((pcfm_ScriptHandlerCallback *)ProcCallFixedOrMovable_pascal)(
@@ -1855,7 +1832,6 @@ int LOCAL HandleScript(int c, Boolean accept)
 	    pos1, HTMLext->HE_frame,
 	    HTMLext->HE_scriptHandler);
     }
-#endif
 
     return c;   
 }
@@ -1936,7 +1912,6 @@ Boolean LOCAL HandleExternalScript(char *p)
 @endif
    
     /* handle script code */
-#if JAVASCRIPT_SUPPORT
     if (handled && HTMLext->HE_scriptHandler && 
         (!(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)))
     {
@@ -1945,7 +1920,6 @@ Boolean LOCAL HandleExternalScript(char *p)
 	    pos1, HTMLext->HE_frame,
 	    HTMLext->HE_scriptHandler);
     }
-#endif
 
     return handled;
 }
@@ -1962,24 +1936,35 @@ int Open_SCRIPT(optr paramArray, int c)
       (STRNCMPISB(p, "JavaScript", 10)==0 || 
        STRNCMPISB(p, "JScript", 7)==0)));
 
+    if(!accept)
+    {
+      htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_NON_JS_SCRIPT;
+      return SkipScriptContent(c);
+    }
+
+    if(!(HTMLext->HE_options & HTML_JAVASCRIPT))
+      return SkipScriptContent(c);
+
     /* Possibly read external script if specified*/
     p = GetParamValue(paramArray, "SRC");
-    if(p && *p && accept && (HTMLext->HE_options & HTML_JAVASCRIPT))
+    if(p && *p)
     {
       /* NS and IE ignore the contents of the tag if a SRC is specified */
-      ret = HandleScript(c, FALSE);
-
+      ret = SkipScriptContent(c);
       HandleExternalScript(p);
     }
     else
-      ret = HandleScript(c, accept);
-
-    /* Flag scripts that we can't deal with... */
-    if(!accept)
-      htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_NON_JS_SCRIPT;
+      ret = HandleScript(c);
 
     return ret;
 }
+#else
+int Open_SCRIPT(optr paramArray, int c)
+{
+    (void)paramArray;
+    return SkipScriptContent(c);
+}
+#endif
 
 int LOCAL HandleTag(MemHandle localHeap)
 {
@@ -2375,7 +2360,9 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     insertCell = FALSE;
     currentCellLevel = 0;               /* Currently outside any table */
 
+#if JAVASCRIPT_SUPPORT
     scriptCount = 0;                    /* no script found yet */
+#endif
 
     MemLock( OptrToHandle(@HTMLStylesChunk) );
     GetCurrentStyles();                 /* initialize style caching */

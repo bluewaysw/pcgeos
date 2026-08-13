@@ -312,7 +312,9 @@ word ModifyHypertextArray(word array, void *rec, word elsize, word element);
   #define HTA_CELL_ARRAY        5
   #define HTA_MAP_ARRAY         6
   #define HTA_META_ARRAY        7
+#if JAVASCRIPT_SUPPORT
   #define HTA_EVENT_ARRAY       8
+#endif
 
 #define AppendToHypertextArray(array, rec) \
   ModifyHypertextArray(array, rec, 0, CA_NULL_ELEMENT);
@@ -374,7 +376,11 @@ HTMLmultiLength ParseMultiLength(char *p, word n);
 Boolean ParseBGCOLOR(optr paramArray, ByteFlags *cellFlags, ColorQuad *qc);
 Boolean ParseVALIGN(optr paramArray, ByteFlags *cellFlags);
 Boolean ParseALIGN(optr paramArray, VisTextParaAttrAttributes *vtpaa);
+#if JAVASCRIPT_SUPPORT
 void ParseEvents(optr paramArray, HTMLEventObjectType type, word obj);
+#else
+#define ParseEvents(paramArray, type, obj)
+#endif
 
 word FindRegionAtPosition(T_regionArrayHandle regionArray, dword pos) ;
 
