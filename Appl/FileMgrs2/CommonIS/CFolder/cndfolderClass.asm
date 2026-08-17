@@ -36,7 +36,7 @@ PASS:		*ds:si - NDFolderClass object
 
 RETURN:		none
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -124,7 +124,7 @@ bringUpMenu:
 	pop	cx, dx				; restore menu optr
 
 	call	NDStartPopUp
-exit:
+exit::
 	.leave
 	ret
 NDWhiteSpacePopUp	endp
@@ -138,7 +138,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Called when an EndMoveCopy on glyph (object) of a folder has
 		happend, signaling that the selection's pop-up should appear.
 		Sets the NDFOI_popUpType variable to WPUT_SELECTION or
-		WPUT_OBJECT depending on whether or not the glyph the user 
+		WPUT_OBJECT depending on whether or not the glyph the user
 		clicked on was part of a selection or not.
 
 CALLED BY:	FolderEndMoveCopy
@@ -333,8 +333,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	es:di is a an opened single selection, if it has an opened
-		folder (as opposed to an opened document or executable that 
-		has no associated open folder) we set the Sor/View UI from 
+		folder (as opposed to an opened document or executable that
+		has no associated open folder) we set the Sor/View UI from
 		the folder of that opened selection.
 
 CALLED BY:	NDObjectPopUp
@@ -345,7 +345,7 @@ PASS:		*ds:si	- NDFolderClass object of containing folder
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -419,7 +419,7 @@ PASS:		*ds	- object block of folder object bringing up this popup
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -449,7 +449,7 @@ NDGlobalMenuGrabSortViewUI	proc	near
 
 	mov	ax, MSG_GEN_FIND_PARENT
 	call	ObjMessageCallFixup
-	
+
 	xchg	bx, cx				; swap parent and child
 	xchg	si, dx				; so ^bx:si is parent and
 	tst	bx				; ^lcx:dx is child
@@ -480,7 +480,7 @@ noParent:
 	or	ss:[globalMenuState].GMB_low, mask GMBL_SORT
 done:
 	.leave
-exit:	
+exit:
 	ret
 NDGlobalMenuGrabSortViewUI	endp
 
@@ -500,7 +500,7 @@ PASS:		*ds:si	= NDFolderClass object
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, bp, di
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -547,7 +547,7 @@ REVISION HISTORY:
 	dlitwin	3/10/93		Changed to be message and check targetFolder
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDFolderBringUpPopUp	method dynamic NDFolderClass, 
+NDFolderBringUpPopUp	method dynamic NDFolderClass,
 					MSG_ND_FOLDER_BRING_UP_POPUP
 	.enter
 
@@ -606,7 +606,7 @@ PASS:		*ds:si	= EMCControlPanelClass object
 		dx	= size CreateExpressMenuControlItemParams
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -622,7 +622,7 @@ REVISION HISTORY:
 
 if _NEWDESKBA
 
-EMCControlPanelCreateItem	method dynamic EMCControlPanelClass, 
+EMCControlPanelCreateItem	method dynamic EMCControlPanelClass,
 					MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM
 	cmp	ss:[bp].CEMCIP_feature, CEMCIF_UTILITIES_PANEL
 	jne	callSuper
@@ -636,7 +636,7 @@ EMCControlPanelCreateItem	method dynamic EMCControlPanelClass,
 
 callSuper:
 	mov	di, offset EMCControlPanelClass
-	GOTO	ObjCallSuperNoLock	
+	GOTO	ObjCallSuperNoLock
 
 EMCControlPanelCreateItem	endm
 
@@ -663,7 +663,7 @@ RETURN:		cxdx	- updated correctly
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -709,17 +709,17 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		BADosCoursewareShowBoomarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Figures out if bookmarks should be a menu option for 
+SYNOPSIS:	Figures out if bookmarks should be a menu option for
 		the given piece of courseware
 
 CALLED BY:	BABookmarksMenuItemCheck
 PASS:		es:di				; courseware name
 		bx				; diskhandle, 0
-		PWD = class 
+		PWD = class
 RETURN:		CarrySet	if bookmarks stays in menu
 		CarryClear	if bookmarks should be removed.
 DESTROYED:	nothing
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		See if it is the users home dir by comparing the path
@@ -743,7 +743,7 @@ BADosCoursewareShowBoomarks	proc	near
 	uses	ax,bx,cx,dx,si,di,bp,es,ds
 pBuffer	local	PathName
 lname	local	USER_ID_LENGTH dup (char)
-fullName local	USER_FULL_NAME_LENGTH + 8 dup  (char)	
+fullName local	USER_FULL_NAME_LENGTH + 8 dup  (char)
 ; 8 is for DESKTOP
 	.enter
 
@@ -766,7 +766,7 @@ fullName local	USER_FULL_NAME_LENGTH + 8 dup  (char)
 		segmov	ds, cs
 		mov	si, offset homeString
 		rep	movsb
-		
+
 		; Get current path to compare to.
 
 		mov	cx, size PathName
@@ -778,17 +778,17 @@ fullName local	USER_FULL_NAME_LENGTH + 8 dup  (char)
 		lea	di, fullName
 						; es:di --> built name
 						; ds:si --> path of folder
-	
+
 		; compare the 2 strings
 		clr	cx
 		call	LocalCmpStrings
-		
-		
+
+
 		pop	bx, es, di		; disk handle, CW name
 
 		jz	inHome
 EC <	call	ECCheckFolderRecordESDI			>
-		
+
 		segmov	ds, es
 		mov	dx, di			; ds:dx = courseware name
 		segmov	es, ss
@@ -810,7 +810,7 @@ bye:	.leave
 inHome:
 	clc
 	jmp	bye
-	
+
 BADosCoursewareShowBoomarks	endp
 
 
@@ -831,7 +831,7 @@ RETURN:		cxdx	- updated correctly
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -895,7 +895,7 @@ EC <	call	ECCheckFolderRecordESDI			>
 	test	es:[di].FR_state, mask FRSF_OPENED
 	stc
 	jnz	done					; remove menu
-							; items that 
+							; items that
 	and	cx, not(UNOPENED_MENU_ITEMS_HIGH)	;  apply only to opened
 	and	dx, not(UNOPENED_MENU_ITEMS_LOW)	;   objects
 	clc
@@ -992,7 +992,7 @@ EC <	call	ECCheckFolderRecordESDI			>
 	jne	exit
 
 	call	NDGetDriveNumberFromFolderRecord
-	call	NDSetDriveUIIfRemovable	
+	call	NDSetDriveUIIfRemovable
 
 exit:
 	.leave
@@ -1016,7 +1016,7 @@ PASS:		*ds:si - NDFolderClass object
 RETURN:		al - drive number of drive link
 DESTROYED:	ah
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -1040,7 +1040,7 @@ if 0
 EC <	cmp	es:[di].FR_desktopInfo.DI_objectType, WOT_DRIVE	>
 EC<	ERROR_NE	INVALID_DESKTOP_OBJECT_TYPE		>
 endif
-		
+
 	call	FilePushDir
 
 	call	Folder_GetDiskAndPath
@@ -1062,7 +1062,7 @@ endif
 	call	FSDLockInfoShared
 	mov	es, ax
 	call	DriveLocateByName
-	add	sp, size PathName			; pop buffer off stack 
+	add	sp, size PathName			; pop buffer off stack
 
 	mov	al, es:[si].DSE_number
 	call	FSDUnlockInfoShared
@@ -1105,11 +1105,11 @@ NDSetDriveUIIfRemovable	proc	near
 
 	;
 	; See if the thing is formattable, and only set the CopyDisk
-	; and FormatDisk items usable if so (is this correct?)  
+	; and FormatDisk items usable if so (is this correct?)
 	;
 
 	call	DriveGetExtStatus
-	
+
 	push	ax
 	test	ax, mask DES_FORMATTABLE
 
@@ -1199,7 +1199,7 @@ done:
 	ret
 NDIsItemInSelectionList	endp
 
- 
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		NDGetFlagsForMultipleSelections
@@ -1212,7 +1212,7 @@ SYNOPSIS:	Runs down the selection list and takes the AND of the
 		in multiple selection menus even though all the objects
 		contain these menus.
 			New stuff:  If we have selected a single opened item,
-		chances are it is a folder type object and so we need to 
+		chances are it is a folder type object and so we need to
 		set the Sort/View UI to the opened folder, not the folder
 		containing the icon of the opened folder, as it would otherwise
 		default to.
@@ -1220,7 +1220,7 @@ SYNOPSIS:	Runs down the selection list and takes the AND of the
 CALLED BY:	NDObjectPopUp
 
 PASS:		*ds:si - NDFolderClass object
-		es    - segment of the locked down folderBuffer 
+		es    - segment of the locked down folderBuffer
 
 RETURN:		cxdx - double word of GlobalMenuBitfield flags
 
@@ -1337,7 +1337,7 @@ PASS:		cxdx - GlobalMenuBitfield flags for the selection
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -1351,7 +1351,7 @@ NDClearSortViewUI	proc	near
 	uses	ax,bx,cx,dx,si,di,bp
 
 	;
-	; if any one of the selections is not Opened, then GMBL_SORT won't 
+	; if any one of the selections is not Opened, then GMBL_SORT won't
 	; be set (as it is an opened item type) and so if it is set then we
 	; know that all are set.  Of course if the multiple menu doesn't
 	; contain Sort and View, this doesn't matter either.  There is nothing
@@ -2144,7 +2144,7 @@ PASS:		*ds:si	= NDFolderClass object
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -2153,7 +2153,7 @@ REVISION HISTORY:
 	dlitwin	3/27/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDFolderSetPopupType	method dynamic NDFolderClass, 
+NDFolderSetPopupType	method dynamic NDFolderClass,
 					MSG_ND_FOLDER_SET_POPUP_TYPE
 	.enter
 
@@ -2172,9 +2172,9 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 DESCRIPTION:	This is a message that is used by the drop-down template
 		menus of each folderwindow's primary.  These messages go
-		directly to the folder object by because they are  sent to 
+		directly to the folder object by because they are  sent to
 		TO_OBJ_BLOCK_OUTPUT which is connected to their personal
-		folder object.  This sets the folder's popUpType to 
+		folder object.  This sets the folder's popUpType to
 		whitespace (because dropdown menus are the same as white-
 		space menus) and then sends the message, so the folder
 		thinks it received it from a whitespace click.
@@ -2184,13 +2184,13 @@ PASS:		*ds:si	- NDFolderClass object
 		cx	- message to send to dummy or real object
 		dx	- message data to pass in cx when sending message
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	all
 
 REGISTER/STACK USAGE:
-PSEUDO CODE/STRATEGY:	
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2229,13 +2229,13 @@ PASS:		*ds:si	- NDFolderClass object
 		bp	- error code (DesktopErrors) to display if no file
 				is selected
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	all
 
 REGISTER/STACK USAGE:
-PSEUDO CODE/STRATEGY:	
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2297,13 +2297,13 @@ PASS:		*ds:si	- NDFolderClass object
 		bp	- error code (DesktopErrors) to display if no file
 				is selected
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	all
 
 REGISTER/STACK USAGE:
-PSEUDO CODE/STRATEGY:	
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2334,7 +2334,7 @@ pastSelectionCheck:
 	mov	cx, dx				; put data into cx
 	GOTO	ObjCallInstanceNoLock		; EXIT
 
-		
+
 error:
 	mov	ax, bp				; put error code into ax
 	call	DesktopOKError
@@ -2367,13 +2367,13 @@ PASS:		*ds:si	- NDFolderClass object
 		cx	- message to send to dummy or real object
 		dx	- message data to pass in cx when sending message
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	all
 
 REGISTER/STACK USAGE:
-PSEUDO CODE/STRATEGY:	
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2402,7 +2402,7 @@ NDFolderSendFromPopUp	method	dynamic	NDFolderClass,
 	; the item (glyph) or a dummy object of the same WOT and stuffed with
 	; the path of the item.
 	;
-sendToObject:				
+sendToObject:
 	mov	di, ds:[bx].FOI_selectList
 	cmp	ds:[bx].NDFOI_popUpType, WPUT_SELECTION
 	je	gotFirstObject
@@ -2449,8 +2449,8 @@ RETURN:		carry clear if OK
 DESTROYED:	ax, bx, bp
 
 REGISTER/STACK USAGE:
-PSEUDO CODE/STRATEGY:	
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2486,7 +2486,7 @@ EC <	call	ECCheckFolderRecordESDI		>
 	push	bp					; save message + data
 	push	cx
 	;
-	; Build out the full path to test if it is already opened and 
+	; Build out the full path to test if it is already opened and
 	; to stuff the dummy object with if not.
 	;	  **NOTE**
 	; This is done despite the immediate call to FileConstructActualPath
@@ -2620,10 +2620,10 @@ RETURN:		carry set if folder type WOT (*not* handled)
 		      clear if it *not* a folder type, handled
 
 DESTROYED:	ax, bx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2664,13 +2664,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Checks to see if an object is a folder type object or not.
 
 CALLED BY:	CheckAndHandleNonFolderWOT, NDSetSortViewUIForOpenedFolder
- 
+
 PASS:		bp	- NewDeskObjectType
 RETURN:		carry	- set if object is a folder type WOT
 			- clear if it is *not* a folder type WOT
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -2723,13 +2723,13 @@ PASS:		ds:[si]	- FolderRecord of object to find
 
 RETURN:		carry	- clear if it wasn't found
 				ds:[si] preserved as FolderRecord of object
-				bx, si preserved as passed in 
+				bx, si preserved as passed in
 			- set if it was found
 				^lbx:si is object
 
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -2757,7 +2757,7 @@ CheckHack< offset FR_name eq 0 >
 	call	FSDLockInfoShared
 	mov	es, ax
 	call	DriveLocateByName
-	add	sp, size PathName			; pop buffer off stack 
+	add	sp, size PathName			; pop buffer off stack
 
 	clr	ax					; make sure ah is zero
 	mov	al, es:[si].DSE_number			; al is drive number
@@ -2824,10 +2824,10 @@ SYNOPSIS:	Makes certain items in a drop down menu of a folder WOT
 			*NOTE*  This could have been put in the subclass
 		handler of the MSG_ND_FOLDER_SETUP message for each WOT,
 		in fact the NDDriveClass (WOT_DRIVE) does just that to
-		determine format/copy permissions on different types of 
+		determine format/copy permissions on different types of
 		drives.
 			This was *NOT* handled this way because it would
-		require handlers for every single WOT, and the tabling 
+		require handlers for every single WOT, and the tabling
 		scheme that is used is simple and flexible like the
 		GlobalMenuBitfield tables.
 
@@ -2839,7 +2839,7 @@ PASS:		*ds:si - NDFolderClass Object or subclass
 RETURN:		none
 DESTROYED:	none
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 	This is implemented by a table of tables of tables.
 	UserType determines the first set of tables.  For each UserType
 	there is a table for each WOT.  This table contains the offset
@@ -2850,12 +2850,12 @@ PSEUDO CODE/STRATEGY:
 	UserType or UserType/WOT combination.
 
 		AAARRRGGGHHH!!!   As it turns out this whole general,
-	flexible architecture for menu restrictions (constraints) is 
+	flexible architecture for menu restrictions (constraints) is
 	pretty much unneeded because constraints are only necessary in
 	**very** few places.  While I could rip out all this code and
 	replace it with a few special hacks, I'd rather leave it in as
 	it doesn't take up much space (because of the lack of unnecessary
-	tables) and is fairly quick (only a few memory references to 
+	tables) and is fairly quick (only a few memory references to
 	determine nothing needs to be constrained).
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2950,7 +2950,7 @@ BADropDownTableOfTablesTable	word	\
 	0,	;  no restrictions for a teacher	; UT_TEACHER
 	offset BAStudentDropDownTablesTable		; UT_OFFICE
 		; it turns out the office worker has the very same
-		; restriction that a student has...  ah well, someone 
+		; restriction that a student has...  ah well, someone
 		; might really use this damn scheme one day...
 
 BAStudentDropDownTablesTable	word	\
@@ -3028,7 +3028,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		BAGetCreateFolderOffset
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	returns the chunk handle of the CreateFolder menu item for a 
+SYNOPSIS:	returns the chunk handle of the CreateFolder menu item for a
 		particular WOT's template.
 
 CALLED BY:	BAReCheckFolderPermissions
@@ -3036,7 +3036,7 @@ PASS:		si	- NewDeskObjectType
 RETURN:		si	- chunk handle of the menu item
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -3065,7 +3065,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	This is a message that is used to open the first object in the
 	folder object's FolderRecord buffer whose NewDeskObjectType matches the
-	NewDeskObjectType passed in dx. 
+	NewDeskObjectType passed in dx.
 
 CALLED BY:	MSG_ND_FOLDER_OPEN_NEWDESK_OBJECT
 PASS:		*ds:si	= NDFolderClass object
@@ -3080,9 +3080,9 @@ RETURN:		if carry clear
 		if carry set
 			The object was not found or the buffer block
 			couldn't be locked.
-	
+
 DESTROYED:	bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3092,7 +3092,7 @@ REVISION HISTORY:
  	JS	12/16/92   	Parts copied from Allen Yuen's Open Roster code
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDFolderOpenNewDeskObject	method dynamic NDFolderClass, 
+NDFolderOpenNewDeskObject	method dynamic NDFolderClass,
 					MSG_ND_FOLDER_OPEN_NEWDESK_OBJECT
 
 	call	FolderLockBuffer	; return bx = hptr, es = sptr, ZF
@@ -3129,7 +3129,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		NDFolderSetControlButtonMoniker
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Replace the moniker of the primary with the small 
+SYNOPSIS:	Replace the moniker of the primary with the small
 		control button moniker so that when it is built out
 		the UI will stuff this into the control button place.
 
@@ -3166,9 +3166,9 @@ NDFolderSetControlButtonMoniker	method NDFolderClass,
 	mov	cx,	(VMS_TOOL shl offset VMSF_STYLE) or	\
 			mask VMSF_GSTRING
 
-	push	cx, cx		; VisMonikerSearchFlags, any old bogus size 
+	push	cx, cx		; VisMonikerSearchFlags, any old bogus size
 	clr	cx				; return us a block
-	call	TokenLoadMoniker		; block returned in di, 
+	call	TokenLoadMoniker		; block returned in di,
 	pop	bx				;  cx is length in bytes
 	call	MemDerefDS			; fixup ds
 	jc	exit				;  exit if no icon found
@@ -3302,15 +3302,15 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		NDFolderHelp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
 CALLED BY:	MSG_ND_FOLDER_HELP
 PASS:		*ds:si	= NDFolderClass object
 		ds:di	= NDFolderClass instance data
 
-RETURN:		
-DESTROYED:	
-SIDE EFFECTS:	
+RETURN:
+DESTROYED:
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3320,7 +3320,7 @@ REVISION HISTORY:
 	dlitwin	1/21/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDFolderHelp	method dynamic NDFolderClass, 
+NDFolderHelp	method dynamic NDFolderClass,
 					MSG_ND_FOLDER_HELP
 	.enter
 
@@ -3392,7 +3392,7 @@ REVISION HISTORY:
 	martin	11/26/92   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderCloseAndSave	method dynamic FolderClass, 
+FolderCloseAndSave	method dynamic FolderClass,
 					MSG_FOLDER_CLOSE_AND_SAVE
 
 		test	ds:[di].FOI_folderState, mask FOS_BOGUS
@@ -3409,13 +3409,13 @@ BA <		jc	afterSave					>
 ;updated twice (one here and once again for the file positions)
 		push	bp
 		mov	ax, MSG_FOLDER_SET_CUR_PATH
-		call	ObjCallInstanceNoLock 
+		call	ObjCallInstanceNoLock
 		pop	bp
 		jc	afterSave
 
 		call	UtilCheckWriteDirInfo
 		jc	afterSave
-		
+
 		push	ds, si			; *ds:si - folder
 NOFXIP<		segmov	ds, dgroup, dx		; ds:dx - filename to open >
 FXIP	<	GetResourceSegmentNS dgroup, ds				>
@@ -3425,7 +3425,7 @@ FXIP	<	GetResourceSegmentNS dgroup, ds				>
 		pop	cx			; ss:cx = FolderWindowInfo
 		pop	ds, si			; *ds:si - folder
 		jc	afterSave		; unable to open file
-		
+
 		push	bx, bp, es
 
 		mov	bx, bp
@@ -3479,15 +3479,15 @@ PASS:		*ds:si	- NDFolderClass object
 		ds:di	- NDFolderClass instance data
 		es	- dgroup
 
-RETURN:		
+RETURN:
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 	Maybe we should do this on MSG_META_OBJ_FREE ?
 
 REVISION HISTORY:
@@ -3497,14 +3497,14 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-NDFolderClose	method	dynamic	NDFolderClass, 
+NDFolderClose	method	dynamic	NDFolderClass,
 					MSG_FOLDER_CLOSE
 	uses	ax,cx,dx,bp
 	.enter
 
 	tst	ds:[di].NDFOI_child.handle
 	jz	afterChild
-	
+
 	clr	cx, dx
 	movdw	bxsi, ds:[di].NDFOI_child
 	mov	ax, MSG_ND_FOLDER_SET_PARENT_OPTR
@@ -3542,15 +3542,15 @@ PASS:		*ds:si	- NDFolderClass object
 		ds:di	- NDFolderClass instance data
 		es	- dgroup
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3559,7 +3559,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-NDFolderSetParentOptr	method	dynamic	NDFolderClass, 
+NDFolderSetParentOptr	method	dynamic	NDFolderClass,
 					MSG_ND_FOLDER_SET_PARENT_OPTR
 	movdw	ds:[di].NDFOI_parent, cxdx
 	ret
@@ -3577,15 +3577,15 @@ PASS:		*ds:si	- NDFolderClass object
 		ds:di	- NDFolderClass instance data
 		es	- dgroup
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
-KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3594,7 +3594,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-NDFolderSetChildOptr	method	dynamic	NDFolderClass, 
+NDFolderSetChildOptr	method	dynamic	NDFolderClass,
 					MSG_ND_FOLDER_SET_CHILD_OPTR
 
 	movdw	ds:[di].NDFOI_child, cxdx
@@ -3620,13 +3620,13 @@ SYNOPSIS:	Checks to see if a WOT is valid, and if not errors in the EC
 		A document is the catch all if we don't know what something
 		is, and so if we don't know the WOT, this is our default.
 
-CALLED BY:	
+CALLED BY:
 
 PASS:		bp - NewDeskObjectType (supposedly)
 RETURN:		bp - valid NewDeskObjectType
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 REVISION HISTORY:
 	Name	Date		Description
@@ -3701,7 +3701,7 @@ BuildPathAndGetNewDeskObjectType	proc	far
 
 	segmov	es, ds, di
 	mov	di, si					;es:[di] is
-							;FolderRecord 
+							;FolderRecord
 CheckHack < offset FR_name eq 0 >
 	; (checking the first . is fine since a real BAT/COM/EXE will
 	; only have one .)
@@ -3744,7 +3744,7 @@ PASS:		*ds:si	= NDFolderClass object
 		bp(high)= scan code
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3754,7 +3754,7 @@ REVISION HISTORY:
 	JS	3/11/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDFolderKbdChar	method dynamic NDFolderClass, 
+NDFolderKbdChar	method dynamic NDFolderClass,
 					MSG_META_KBD_CHAR
 	test	dl, mask CF_FIRST_PRESS or mask CF_REPEAT_PRESS
 	jz	callSuper
@@ -3786,7 +3786,7 @@ checkShortCuts:
 
 callSuper:
 	mov	di, offset NDFolderClass
-	GOTO	ObjCallSuperNoLock		
+	GOTO	ObjCallSuperNoLock
 
 NDFolderKbdChar	endm
 
@@ -3869,10 +3869,10 @@ PASS:		*ds:si	= NDFolder object
 		cx	= drive (A:=0 .. Z:=25)
 RETURN:		nothing
 DESTROYED:	ax, bx, cx, dx, di, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3914,10 +3914,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	???
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3988,10 +3988,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4020,10 +4020,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4050,10 +4050,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4082,10 +4082,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4112,10 +4112,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4144,10 +4144,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	???
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4177,10 +4177,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4207,10 +4207,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4237,10 +4237,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4269,10 +4269,10 @@ PASS:		*ds:si = NDFolder object
 		ds:di = folder instance data
 RETURN:		nothing
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4301,7 +4301,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	sent to every opened folder on startup to make sure we update
-		our UI wrt Create Folder permissions, as they might have 
+		our UI wrt Create Folder permissions, as they might have
 		changed since we last logged out.
 
 CALLED BY:	MSG_UPDATE_CREATE_FOLDER_PERMISSIONS
@@ -4313,7 +4313,7 @@ PASS:		*ds:si	= BAFolderClass object
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -4322,12 +4322,12 @@ REVISION HISTORY:
 	dlitwin	6/ 3/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-BAUpdateCreateFolderPermissions	method dynamic NDFolderClass, 
+BAUpdateCreateFolderPermissions	method dynamic NDFolderClass,
 					MSG_UPDATE_CREATE_FOLDER_PERMISSIONS
 	uses	ax, cx, dx, bp
 	.enter
 
-	mov	ax, cx				; passed in Usable/notUsable 
+	mov	ax, cx				; passed in Usable/notUsable
 	mov	bx, handle DesktopMenuCreateFolder
 	cmp	ds:[di].NDFOI_ndObjType, WOT_DESKTOP
 	je	gotHandle

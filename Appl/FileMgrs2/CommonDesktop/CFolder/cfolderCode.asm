@@ -71,7 +71,7 @@ FolderDraw	method	dynamic FolderClass, MSG_DV_DRAW
 	mov	ax, MSG_RESCAN			; rescan folder
 	call	ObjCallInstanceNoLock
 	pop	ax, bp				; retrieve gState
-	DerefFolderObject	ds, si, di 
+	DerefFolderObject	ds, si, di
 
 scanned:
 	test	ds:[di].FOI_folderState, mask FOS_BOGUS	; will be closed?
@@ -187,9 +187,9 @@ PASS:		*ds:si - FolderClass object
 
 RETURN:		FOI_displayType updated
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -202,7 +202,7 @@ REVISION HISTORY:
 AssertFolderDisplayType	proc	near
 
 	class	FolderClass
-	
+
 	uses	bx, bp
 
 	.enter
@@ -238,7 +238,7 @@ SYNOPSIS:	Deal with the new view bounds
 PASS:		*ds:si - folder object
 		cx, dx - new window bounds
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -254,7 +254,7 @@ REVISION HISTORY:
 	martin	11/22/92	reworked to handle icon positioning
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderViewSizeChanged	method	dynamic	FolderClass, 
+FolderViewSizeChanged	method	dynamic	FolderClass,
 				MSG_META_CONTENT_VIEW_SIZE_CHANGED,
 				MSG_META_CONTENT_VIEW_WIN_OPENED
 
@@ -271,9 +271,9 @@ set:
 		ornf	ds:[di].FOI_positionFlags, mask FIPF_RECALC
 		cmp	ax, MSG_META_CONTENT_VIEW_SIZE_CHANGED
 		jne	afterInval
-		
+
 		mov	ax, MSG_REDRAW		; actually, invalidate.
-		call	ObjCallInstanceNoLock 
+		call	ObjCallInstanceNoLock
 afterInval:
 		call	FolderFixLayout
 
@@ -294,11 +294,11 @@ CALLED BY:	FolderViewSizeChanged, FolderDraw
 
 PASS:		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -315,7 +315,7 @@ FolderFixLayout	proc near
 
 		.enter
 
-		DerefFolderObject	ds, si, di 
+		DerefFolderObject	ds, si, di
 
 		test	ds:[di].FOI_positionFlags, mask FIPF_RECALC
 		jz	done
@@ -331,7 +331,7 @@ if _NEWDESK
 
 placeUnpositioned:
 endif		; if _NEWDESK
-		
+
 	;
 	; Handle any needed repositioning of icons if changed.
 	;
@@ -369,7 +369,7 @@ CALLED BY:	MSG_META_GAINED_TARGET_EXCL
 PASS:		*ds:si - Folder object
 		ds:bx, ds:di - Folder instance data
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -384,7 +384,7 @@ REVISION HISTORY:
 	brianc	8/31/89		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderGainTarget	method	dynamic FolderClass, 
+FolderGainTarget	method	dynamic FolderClass,
 					MSG_META_GAINED_TARGET_EXCL
 
 
@@ -494,7 +494,7 @@ PASS:		*ds:si - FolderClass object
 		ds:di - FolderClass instance data
 		ds:bx - FolderClass instance data
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -598,11 +598,11 @@ CALLED BY:	FolderLostTarget(MSG_GEN_SET_NOT_ENABLED)
 PASS:		ax - message to send
 		*ds:si - folder object
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 called from FolderLostTarget(MSG_GEN_SET_NOT_ENABLED)
 	will not call UpdateFileMenuCommon
@@ -781,7 +781,7 @@ UpdateFileMenuCommon	proc	far
 	uses	ax, bx, cx, dx, di, si, bp
 	.enter
 
-	DerefFolderObject	ds, si, di 
+	DerefFolderObject	ds, si, di
 	mov	ax, MSG_GEN_SET_NOT_ENABLED
 	cmp	ds:[di].FOI_selectList, NIL	; empty select list?
 	je	updateIt			; yes, disable
@@ -811,7 +811,7 @@ if _ZMGR or _BMGR
 	;
 	push	ax				; save enable message
 	mov	si, FOLDER_OBJECT_OFFSET
-	DerefFolderObject	ds, si, di 
+	DerefFolderObject	ds, si, di
 	mov	di, ds:[di].FOI_selectList
 	cmp	di, NIL				; empty select list?
 	je	afterOpenHack			; yes, handled above
@@ -836,7 +836,7 @@ if INSTALLABLE_TOOLS
 		CheckHack <MSG_GEN_SET_ENABLED eq MSG_GEN_SET_NOT_ENABLED-1>
 	mov_tr	cx, ax
 	sub	cx, MSG_GEN_SET_NOT_ENABLED
-	
+
 	mov	bx, handle ToolGroup
 	mov	si, offset ToolGroup
 	mov	ax, MSG_TM_SET_FILE_SELECTION_STATE
@@ -868,9 +868,9 @@ CALLED BY:	MSG_META_CONTENT_SET_VIEW
 PASS:		ds:si - folder instance
 		cx:dx - OD of GenView
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 		If the windowBlock is zero then the folder was created
@@ -920,7 +920,7 @@ PASS:		*ds:si	= FolderClass object
 RETURN:		cx - handle of window block
 DESTROYED:	none
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -929,7 +929,7 @@ REVISION HISTORY:
 	dlitwin	3/26/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderGetWindowBlock	method dynamic FolderClass, 
+FolderGetWindowBlock	method dynamic FolderClass,
 					MSG_FOLDER_GET_WINDOW_BLOCK
 	.enter
 
@@ -1013,7 +1013,7 @@ supported:
 	; default to copy for ALL quick transfers.  The correct solution will
 	; be implemented at some later date.  We accomplish this by just setting
 	; the remote flag of the source, so it will still check for illegal
-	; destinations, but always be a copy in the event of a valid 
+	; destinations, but always be a copy in the event of a valid
 	; destination.  dlitwin 6/4/93
 BA<	mov	bx, -1			; set remote flag	>
 	call	GetDefaultMoveCopyResponse
@@ -1152,7 +1152,7 @@ afterUnlock:
 	tst	ds:[bx].FOI_remoteFlag
 	jnz	itsCopy				; copy if destination is remote
 
-	
+
 	;
 	; Compare disk handles.  It's a MOVE if they're the same, and
 	; a COPY if different.
@@ -1160,7 +1160,7 @@ afterUnlock:
 	cmp	ax, ds:[bx].FOI_actualDisk
 	mov	ax, CQTF_MOVE
 	je	done
-				
+
 itsCopy:
 	mov	ax, CQTF_COPY
 
@@ -1184,7 +1184,7 @@ SYNOPSIS:	determine the move/copy default given the source and
 CALLED BY:	FolderPtr
 
 PASS:		es:di - FolderRecord of destination file
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 		ax - true diskhandle of source
 
 RETURN:		ax -  CQTF_MOVE, CQTF_COPY or CQTF_CLEAR
@@ -1211,7 +1211,7 @@ tempBuffer	local	PathName
 	.enter
 
 	;
-	; if we are on any kind of remote destination that *isn't* a 
+	; if we are on any kind of remote destination that *isn't* a
 	; StandardPath make it a copy.  If it is a remote StandardPath,
 	; then it will be creating a local version and we should check
 	; for the case where this will be on the same drive and therefore
@@ -1261,10 +1261,10 @@ ND<	call	GetDefaultMoveCopyResponseFromDriveLink		>
 ND<	jc	afterConstructActual				>
 ND<	tst	bx						>
 ND<	jnz	afterConstructActual				>
-	; drive was removable and so we determined move/copy status on 
+	; drive was removable and so we determined move/copy status on
 	; the drive number.  This isn't perfect (any B: item will be a move
 	; to another B: directory, even if they are different drives), but
-	; it is as good as we can do without seeking the disk, which is a 
+	; it is as good as we can do without seeking the disk, which is a
 	; horrible thing to do when just passing the mouse over a drive icon.
 ND<	pop	ds, si, es, di					>
 ND<	call	FilePopDir					>
@@ -1285,7 +1285,7 @@ ND<afterConstructActual:					>
 	call	DriveGetStatus
 	test	ah, mask DS_MEDIA_REMOVABLE
 	jz	notRemovable
-	
+
 	DerefFolderObject	ds, si, si
 	mov	ds:[si].FOI_invalidate, di
 notRemovable:
@@ -1325,13 +1325,13 @@ SYNOPSIS:	Get the appropriate response given the file is remote.
 CALLED BY:	GetDefaultMoveCopyResponse
 
 PASS:		es:di - FolderRecord of destination file
-		*ds:si - FolderClass object 
+		*ds:si - FolderClass object
 		ax - true diskhandle of source
 
 RETURN:		ax -  CQTF_MOVE, CQTF_COPY or CQTF_CLEAR
 DESTROYED:	bx, cx, si (because our parent routine preserves them)
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -1354,7 +1354,7 @@ GetRemoteMoveCopyResponseESDI	proc	near
 	jne	exit
 
 	;
-	; OK, so we know we are copying from the system disk to a 
+	; OK, so we know we are copying from the system disk to a
 	; remote directory, and so if it is a standard path itself
 	; we switch to CQTF_MOVE, if it is a non-standard path subdir
 	; of a standard path we leave it as CQTF_COPY
@@ -1376,7 +1376,7 @@ GetRemoteMoveCopyResponseESDI	proc	near
 	jnz	exit
 
 	call	FileParseStandardPath
-	LocalIsNull	es:[di]			; get first char of relative 
+	LocalIsNull	es:[di]			; get first char of relative
 						;  path.
 	mov	ax, CQTF_MOVE			; if it is a StandardPath,
 	jz	exit				;   a remote file is a move.
@@ -1395,7 +1395,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GetDefaultMoveCopyResponseFromDriveLink
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Gets the move copy default from a FolderRecord of a 
+SYNOPSIS:	Gets the move copy default from a FolderRecord of a
 		NewDesk Drive object
 
 CALLED BY:	GetDefaultMoveCopyResponseESDI
@@ -1416,9 +1416,9 @@ RETURN:		carry	- clear if no errors have occured
 			- set on error
 DESTROYED:	none
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1455,9 +1455,9 @@ GetDefaultMoveCopyResponseFromDriveLink	proc	near
 	; folderbuffer, which isn't saved.
 	jnc	exit
 
-	clr	bx			; if DiskRegisterDisk fails, 
+	clr	bx			; if DiskRegisterDisk fails,
 	mov	ax, CQTF_CLEAR		; don't allow copy
-	clc				; carry cleared by clr macro, but 
+	clc				; carry cleared by clr macro, but
 	jmp	exit			;  then again, it might change...
 
 isRemovable:
@@ -1468,7 +1468,7 @@ isRemovable:
 	je	isMove
 	mov	ax, CQTF_COPY		; else copy
 isMove:
-	clr	bx	
+	clr	bx
 exit:
 	.leave
 	ret
@@ -1645,9 +1645,9 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		ToggleFolderDragDest
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
-CALLED BY:	
+CALLED BY:
 
 PASS:		*ds:si = FolderObject
 		cx - X position of mouse, in doc coords of receiving object
@@ -1726,7 +1726,7 @@ ToggleFolderDragDest	endp
 ForceExposeFolderObjectIcon	proc	near
 		class	FolderClass
 		uses	ax,bx
-		.enter			
+		.enter
 		DerefFolderObject	ds, si, bx
 		mov	ax, ds:[bx].FOI_folderState	; save TARGET state
 		push	ax
@@ -1773,8 +1773,8 @@ RETURN:		CARRY SET if object was clicked on
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-	Loop through ENTIRE display list, and return the offset 
-	to the folder record closest to the end of the list. 
+	Loop through ENTIRE display list, and return the offset
+	to the folder record closest to the end of the list.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 	O(n) in all cases.
@@ -1813,12 +1813,12 @@ startLoop:
 	; If this icon is unpositioned, then its current bounds are
 	; invalid, so skip it.
 	;
-		
+
 	test	es:[di].FR_state, mask FRSF_UNPOSITIONED
 	jnz	checkNext
-		
+
 EC <	call	ECCheckFolderRecordESDI		>
-		
+
 	cmp	bx, TRUE			; force icon and name checking?
 	je	iconMode			; yes
 
@@ -1834,13 +1834,13 @@ EC <	call	ECCheckFolderRecordESDI		>
 	jg	checkNext			; if so, check next object
 	cmp	dx, es:[di].FR_boundBox.R_bottom ; check if below item bottom
 	jg	checkNext
-	jmp	gotObject	
+	jmp	gotObject
 
 iconMode:
 	;
 	; icon mode, check name and icon regions seperately
 	;
-		
+
 	cmp	cx, es:[di].FR_iconBounds.R_left ; check if left of icon left
 	jl	checkName			; if so, check name
 	cmp	dx, es:[di].FR_iconBounds.R_top	; check if above icon top
@@ -1897,7 +1897,7 @@ PASS:		*ds:si - folder object
 		cx - window block
 		bp - disk handle for folder window
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -1928,13 +1928,13 @@ FolderInit	method	dynamic FolderClass, MSG_INIT
 	mov	ds:[di].FOI_anchor.P_x, -1	; no anchor point
 
 	mov	ax, NIL
-	mov	ds:[di].FOI_displayList, ax 
-	mov	ds:[di].FOI_selectList, ax 
+	mov	ds:[di].FOI_displayList, ax
+	mov	ds:[di].FOI_selectList, ax
 	mov	ds:[di].FOI_cursor, ax		; no cursor
 	mov	ds:[di].FOI_anchorIcon, ax	; no last toggled icon
 
 	;
-	; Fetch the display options from the UI.  Most of this UI doesn't 
+	; Fetch the display options from the UI.  Most of this UI doesn't
 	; exist for NewDesk and Zoomer, so we have to load from defaults
 	; for those cases.
 	;
@@ -1954,7 +1954,7 @@ else
 	LoadBXSI	DisplayOptionsList
 	call	ObjMessageCallFixup
 	push	ax
-	
+
 	mov	ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
 	LoadBXSI	DisplaySortByList
 	call	ObjMessageCallFixup
@@ -1982,9 +1982,9 @@ endif
 	ECCheckFlags	ch, FI_DisplayTypes
 	ECCheckFlags	dl, FI_DisplaySort
 	ECCheckFlags	dh, FI_DisplayMode
-	ECMakeSureNonZero	cl		
+	ECMakeSureNonZero	cl
 	ECMakeSureNonZero	ch
-	ECMakeSureNonZero	dl		
+	ECMakeSureNonZero	dl
 	ECMakeSureNonZero	dh
 
 	mov	ds:[di].FOI_displayAttrs, cl
@@ -2001,7 +2001,7 @@ if GPC_NAMES_AND_DETAILS_TITLES
 	;
 	call	EnableNamesAndDetails	; preserves ah = FI_displayMode
 endif
-		
+
 	;
 	; set open size for window depending on display mode
 	;
@@ -2014,7 +2014,7 @@ FolderInit	endm
 if GPC_NAMES_AND_DETAILS_TITLES
 EnableNamesAndDetails	proc	far
 		class	FolderClass
-		
+
 		call	SetFileBoxWidthHeight
 		DerefFolderObject	ds, si, di
 .assert (offset NDFolderTitleName) eq (offset NDDriveTitleName)
@@ -2122,11 +2122,11 @@ CALLED BY:	FolderInit
 PASS:		*ds:si 	- FolderClass instance data
 		ah 	- FI_DisplayMode
 
-RETURN:		nothing  
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,si,di,bp
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2180,7 +2180,7 @@ ND <		add	cx, 20				; for scrollbar	>
 		call	FolderCheckIfCGA
 		jc	cga
 
-	;	
+	;
 	; Make the large icon size 4 x 3
 	;
 		shl	cx
@@ -2239,11 +2239,11 @@ CALLED BY:	CreateFolderWindowCommon, FolderRemovedFloppy,
 
 PASS:		*ds:si - FolderClass object
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	none
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2345,13 +2345,34 @@ if _NEWDESK
 	;
 	; set moniker again, using nice normalized name from path object
 	;
+	mov	si, FOLDER_OBJECT_OFFSET
+	DerefFolderObject	ds, si, di
+	.warn -private
+	cmp	ds:[di].NDFOI_ndObjType, WOT_WASTEBASKET
+	.warn @private
+	jne	notWasteBasket
+
+isWasteBasket::
+	push	bp
+	mov	si, FOLDER_WINDOW_OFFSET
+	mov	cx, cs
+	mov	dx, offset fspmWastebasketName
+	mov	bp, VUM_NOW
+	mov	ax, MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	call	ObjMessageCallFixup
+	pop	bp
+	jmp	afterSetWasteMoniker
+
+notWasteBasket:
 	push	bp
 	mov	dx, ss
 	lea	bp, ss:[locals].SPMV_folderName
 	mov	ax, MSG_VIS_TEXT_GET_ALL_PTR
 	call	ObjMessageCallFixup
 	pop	bp
+
 	call	CopyInAndSetNewMoniker		; do it
+afterSetWasteMoniker:
 endif
 noPathInfo:
 endif
@@ -2375,16 +2396,16 @@ else
 endif
 	;
 	; Might be root.
-	; 
+	;
 	test	ss:[locals].SPMV_diskHandle, DISK_IS_STD_PATH_MASK	; standard path?
 	jz	disableUpDir				; no => really is root
 
 	cmp	ss:[locals].SPMV_diskHandle, SP_TOP	; SP_TOP?
 	jne	notRoot					; no => can't be root
-	
+
 	tst	ss:[topLevelIsRoot]
 	jz	notRoot
-	
+
 disableUpDir:
 	mov	ax, MSG_GEN_SET_NOT_ENABLED	; yes, root!
 notRoot:
@@ -2476,6 +2497,7 @@ endif  ; _NEWDESK
 
 if _NEWDESK
 fspmDesktopPath	char	ND_DESKTOP_RELATIVE_PATH, 0
+fspmWastebasketName	TCHAR	"Wastebasket", 0
 endif
 FolderSetPrimaryMoniker	endm
 
@@ -2491,11 +2513,11 @@ PASS:		bx = Folder Window's block
 		scanFolderNameBuffer = moniker string
 		di = past last byte in scanFolderNameBuffer
 
-RETURN:		
+RETURN:
 
 DESTROYED:	ax,cx,dx, etc.
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
@@ -2515,7 +2537,7 @@ endif
 	;
 	; set up new visual moniker and copy it into folder window chunk
 	;
-	mov	ss:[locals].SPMV_moniker.VM_type, 
+	mov	ss:[locals].SPMV_moniker.VM_type,
 		VisMonikerType <
 			0,		; VMT_MONIKER_LIST (false)
 			0,		; VMT_GSTRING (false)
@@ -2532,7 +2554,7 @@ endif
 	segmov	es, ss
 	LocalStrSize	includeNull		; cx = number of bytes to copy
 	pop	es, ax
-	
+
 	add	cx, size VisMoniker + size VMT_mnemonicOffset
 						; bx:si = Folder Window
 	mov	si, FOLDER_WINDOW_OFFSET	; common offset
@@ -2573,7 +2595,7 @@ RETURN:		folderName truncated
 
 DESTROYED:	none
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 REVISION HISTORY:
 	Name	Date		Description
@@ -2632,7 +2654,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		BuildFolderWindowHeader
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
 CALLED BY:	FolderSetPrimaryMoniker
 
@@ -2640,9 +2662,9 @@ PASS:		*ds:si - folder object
 
 RETURN:		di - past last byte in new window header moniker
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -2675,7 +2697,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Convert the current path for a Folder object into a readable
 		string in the usual form.
 
-CALLED BY:	BuildFolderWindowHeader, 
+CALLED BY:	BuildFolderWindowHeader,
 		DiskNameAndPathnameForFolderInfo
 
 PASS:		*ds:si	= Folder object
@@ -2685,10 +2707,10 @@ RETURN:		es:di	= past last used byte in buffer
 DESTROYED:	ax, dx, bx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2727,10 +2749,10 @@ RETURN:		es:di	= after the null-terminator
 DESTROYED:	ax, dx, bx
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2744,7 +2766,7 @@ BuildDiskAndPathNameFromVarData proc	far
 	.enter
 	;
 	; Get the current path.
-	; 
+	;
 	call	GenPathFetchDiskHandleAndDerefPath	; ax <- disk,
 							; ds:bx <- GenFilePath
 	;
@@ -2767,7 +2789,7 @@ else
 	call	DriveGetName		; store name
 	;
 	; Separate drive from volume by ':['
-	; 
+	;
 SBCS <	mov	ax, ':' or ('[' shl 8)					>
 DBCS <	mov	ax, ':'							>
 	stosw
@@ -2778,7 +2800,7 @@ SBCS <	dec	cx							>
 DBCS <	sub	cx, 2*(size wchar)					>
 	;
 	; Copy in volume name we've already got.
-	; 
+	;
 	call	DiskGetVolumeName
 SBCS <	clr	al		; skip to null				>
 DBCS <	clr	ax		; skip to null				>
@@ -2788,7 +2810,7 @@ DBCS <	clr	ax		; skip to null				>
 DBCS <	inc	cx							>
 	;
 	; Separate volume name from path by '] '
-	; 
+	;
 SBCS <	mov	ax, ']' or (' ' shl 8)					>
 DBCS <	mov	ax, ']'							>
 	stosw
@@ -2796,7 +2818,7 @@ DBCS <	mov	al, ' '							>
 DBCS <	stosw								>
 	;
 	; Build full path from data
-	; 
+	;
 	pop	si
 	add	si, offset GFP_path
 	clr	dx
@@ -2830,9 +2852,9 @@ PASS:		*ds:si - FolderClass object
 			TRUE if maximized
 			FALSE if not maximized
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2872,7 +2894,7 @@ RETURN:		cl - file types to display
 		dl - sort field
 		dh - display modes
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2908,10 +2930,10 @@ RETURN:		ax	= disk handle (0 if path invalid)
 DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -2957,11 +2979,11 @@ CALLED BY:	MSG_UPDATE_FREE_SPACE
 
 PASS:		object stuff
 		cx:dx - bytes free
-		bp - disk handle 
+		bp - disk handle
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2977,16 +2999,16 @@ REVISION HISTORY:
 FolderUpdateFreeSpace	method	FolderClass, MSG_UPDATE_FREE_SPACE
 		call	Folder_GetDiskAndPath
 
-	
+
 		cmp	bp, ax
 		je	thisDisk
 
 	;
 	; They're not the same.  If the folder's disk handle is a
 	; standard path, then compare bp against the top level disk
-	; handle. 
+	; handle.
 	;
-		
+
 		test	ax, DISK_IS_STD_PATH_MASK
 		jz	done
 
@@ -2996,8 +3018,8 @@ NOFXIP	<	segmov	es, dgroup, bx					>
 		cmp	bp, es:[geosDiskHandle]
 		pop	es
 		jne	done
-thisDisk:		
-		DerefFolderObject	ds, si, di	
+thisDisk:
+		DerefFolderObject	ds, si, di
 		cmpdw	ds:[di].FOI_diskInfo.DIS_freeSpace, cxdx
 		je	done			; if same, don't waste time
 						; else, save new free space
@@ -3005,7 +3027,7 @@ thisDisk:
 		call	PrintFolderInfoString
 
 done:
-		ret	
+		ret
 FolderUpdateFreeSpace	endm
 
 
@@ -3014,16 +3036,16 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	send current display options for this folder to
-		display options dialog box 
+		display options dialog box
 
 CALLED BY:	MSG_SEND_DISPLAY_OPTIONS
 			FolderGainTarget
 
 PASS:		*ds:si - folder object
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3075,7 +3097,7 @@ PASS:		*ds:si	- Folder object
 RETURN:		none
 DESTROYED:	all
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 	See header before code.
 
@@ -3097,7 +3119,7 @@ if not _FCAB
 	; Don't allow passing in zero, as the UI objects always
 	; have to have valid states.
 	;
-		
+
 	ECMakeSureNonZero	cl
 	ECMakeSureNonZero	ch
 	ECMakeSureNonZero	dl
@@ -3123,7 +3145,7 @@ if _NEWDESK
 	pop	cx, dx, si
 notBrowse:
 endif
-		
+
 	;
 	; Set the DisplayViewModes
 	;
@@ -3200,9 +3222,9 @@ CALLED BY:	MSG_HIDE_SELECTION
 
 PASS:		ds:si - instance of Folder object
 
-RETURN:	
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 		uninvert all files in selection list; doesn't do anything to
@@ -3295,11 +3317,11 @@ CALLED BY:
 PASS:		*ds:si - FolderClass object
 		dx - DrawFolderObjectIconFlags
 
-RETURN:		nothing 
+RETURN:		nothing
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -3357,7 +3379,7 @@ PASS:		ds:si = instance handle
 
 RETURN:		cx - state flags
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3388,13 +3410,13 @@ CALLED BY:	MSG_META_INITIALIZE_VAR_DATA
 PASS:		*ds:si	= Folder object
 		cx	= vardata type that wants initializing
 RETURN:		ds:ax	= initialized vardata entry
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3402,33 +3424,33 @@ REVISION HISTORY:
 	ardeb	1/29/92		Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-FolderMetaInitializeVarData method dynamic FolderClass, 
+FolderMetaInitializeVarData method dynamic FolderClass,
 			    		MSG_META_INITIALIZE_VAR_DATA
 
 		cmp	cx, ATTR_FOLDER_PATH_DATA
 		je	initFolderPathData
 		cmp	cx, ATTR_FOLDER_ACTUAL_PATH
 		je	initFolderPathData
-		
+
 		mov	di, offset FolderClass
 		GOTO	ObjCallSuperNoLock
 
 initFolderPathData:
 	;
 	; Add the data to the object.
-	; 
+	;
 		mov_tr	ax, cx
 		ornf	ax, mask VDF_SAVE_TO_STATE
 		mov	cx, size GenFilePath
 		call	ObjVarAddData
 	;
 	; Initialize it to SP_TOP (what the hell.... :)
-	; 
+	;
 		mov	ds:[bx].GFP_disk, SP_TOP
 		mov	ds:[bx].GFP_path[0], 0
 	;
 	; Return offset in ax
-	; 
+	;
 		mov_tr	ax, bx
 		ret
 FolderMetaInitializeVarData endm
@@ -3453,7 +3475,7 @@ PASS:		*ds:si	= object
 RETURN:		carry - set if error
 		bp - unchanged
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -3479,11 +3501,11 @@ FXIP  <	GetResourceSegmentNS dgroup, es, TRASH_BX			>
 noQuit:
 	cmp	ax, MSG_META_RELOCATE
 	je	relocate			; relocate
-	
+
 	;
 	; tell GenPath mechanism we're outta here
 	;
-	mov	ax, ATTR_FOLDER_PATH_DATA 
+	mov	ax, ATTR_FOLDER_PATH_DATA
 	mov	dx, TEMP_FOLDER_SAVED_DISK_HANDLE
 	call	GenPathUnrelocObjectPath
 
@@ -3508,7 +3530,7 @@ relocate:
 	; If no path bound yet, then object is in the process of being
 	; duplicated, rather than restored, so do nothing, as FolderInit and
 	; CreateFolderWindowCommon will do all the right things.
-	; 
+	;
 	mov	ax, ATTR_FOLDER_PATH_DATA
 	call	ObjVarFindData
 	LONG jnc	exit
@@ -3539,9 +3561,9 @@ BA<	jc	markBogus				>
 	call	FileConstructFullPath
 	call	ShellFreePathBuffer
 	pop	es, di, si
-	
+
 	mov	ds:[di].FOI_actualDisk, bx
-	
+
 
 
 	clr	ax
@@ -3601,7 +3623,7 @@ exit:
 markBogus:
 	;
 	; Close the thing down ASAP
-	; 
+	;
 	call	FolderSendCloseViaQueue
 	mov	di, ds:[si]
 	clr	ax			; clear AX for finishReInit
@@ -3620,7 +3642,7 @@ SYNOPSIS:	If we are restarting from state and a folder window was left
 		drive configuration), we need to intercept this error before
 		it happens, because the regular UI error doesn't explain that
 		this might have been caused by logging into a machine with a
-		different drive configuration (because in regular GEOS this 
+		different drive configuration (because in regular GEOS this
 		doesn't happen).
 
 CALLED BY:	FolderRelocate
@@ -3629,7 +3651,7 @@ RETURN:		carry set if there was an error (the error is handled *inside*
 						 this routine)
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -3675,7 +3697,7 @@ PASS:		*ds:si	- NDFolderObject
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:

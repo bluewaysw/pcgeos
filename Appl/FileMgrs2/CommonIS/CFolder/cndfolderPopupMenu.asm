@@ -2,8 +2,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 	Copyright (c) GeoWorks 1993 -- All Rights Reserved
 
-PROJECT:	
-MODULE:		
+PROJECT:
+MODULE:
 FILE:		cndfolderPopupMenu.asm
 
 AUTHOR:		Joon Song, Mar 19, 1993
@@ -12,7 +12,7 @@ ROUTINES:
 	Name			Description
 	----			-----------
 
-	
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -21,7 +21,7 @@ REVISION HISTORY:
 
 DESCRIPTION:
 	This file contains code for NDPopupMenuClass
-		
+
 
 	$Id: cndfolderPopupMenu.asm,v 1.2 98/06/03 13:11:37 joon Exp $
 
@@ -42,7 +42,7 @@ PASS:		*ds:si	= NDPopupMenuClass object
 		bp	= 0 if top window, else window for object to open on
 RETURN:		nothing
 DESTROYED:	ax,cx,dx,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -53,7 +53,7 @@ REVISION HISTORY:
 	dlitwin 3/27/93		added the "folderInitiated" check
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDPopupMenuVisOpen	method dynamic NDPopupMenuClass, 
+NDPopupMenuVisOpen	method dynamic NDPopupMenuClass,
 					MSG_VIS_OPEN
 	uses	ax, si, bp, es
 	.enter
@@ -107,13 +107,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Sends a message back to the folder class associated with
 		this window (the window of the drop down menu) to set its
 		instance data as if this were brought up like a whitespace
-		popup, so the Sort/View UI will send its messages to the 
+		popup, so the Sort/View UI will send its messages to the
 		right place.  This basically nukes the need for the
 		"send as whitespace" message, but the "send as selected" and
 		"send as single selection" messages still have use in that
 		they do selection checking and error handling as well as
 		setting the popup type.  Not worth changing all the "send as
-		whitespace" messages, as they will do the right thing now, 
+		whitespace" messages, as they will do the right thing now,
 		albeit a bit redundantly.
 
 CALLED BY:	NDPopupMenuVisOpen
@@ -122,7 +122,7 @@ PASS:		*ds:si	- NDPopupMenu object
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -172,7 +172,7 @@ PASS:		*ds:si	= NDPopupMenuClass object
 RETURN:		none
 DESTROYED:	none
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -181,7 +181,7 @@ REVISION HISTORY:
 	dlitwin	3/27/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDPopupMenuSetFolderInitiated method dynamic NDPopupMenuClass, 
+NDPopupMenuSetFolderInitiated method dynamic NDPopupMenuClass,
 					MSG_ND_POPUP_MENU_SET_FOLDER_INITIATED
 	.enter
 
@@ -208,7 +208,7 @@ PASS:		*ds:si	= NDPopupMenuClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax,cx,dx,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 		This should work since all UI objects are run by
@@ -220,10 +220,10 @@ REVISION HISTORY:
 	JS	3/19/93   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDPopupVisClose	method dynamic NDPopupMenuClass, 
+NDPopupVisClose	method dynamic NDPopupMenuClass,
 					MSG_VIS_CLOSE
 	mov	di, offset NDPopupMenuClass
-	call	ObjCallSuperNoLock		
+	call	ObjCallSuperNoLock
 
 	segmov	es, dgroup, ax
 	;
@@ -237,7 +237,7 @@ NDPopupVisClose	method dynamic NDPopupMenuClass,
 	;
 	mov	es:[popupMenu].handle, NULL
 done:
-	ret	
+	ret
 NDPopupVisClose	endm
 
 
@@ -247,7 +247,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		NDSortViewPopupVisOpen
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Attach the GlobalMenuSortAndView to ourselves in the 
+SYNOPSIS:	Attach the GlobalMenuSortAndView to ourselves in the
 		subinteraction and child position specified in our instance
 		data.
 
@@ -258,7 +258,7 @@ PASS:		*ds:si	= NDPopupMenuClass object
 RETURN:		nothing
 DESTROYED:	all
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -349,8 +349,8 @@ noParent:
 	mov	si, offset GlobalMenuViewMode
 	mov	ax, MSG_GEN_INTERACTION_SET_VISIBILITY
 	mov	cl, GIV_POPUP
-	test	ds:[di].NDSVPM_sortViewFlags, NDSVPMF_VIEW_NOT_SUBMENU
-	jnz	notSubMenu
+	test	ds:[di].NDSVPM_sortViewFlags, mask NDSVPMF_VIEW_NOT_SUBMENU
+	jz	notSubMenu
 	mov	cl, GIV_SUB_GROUP
 notSubMenu:
 	call	ObjMessageCallFixup
@@ -414,7 +414,7 @@ PASS:		*ds:si	= NDPopupMenuClass object
 RETURN:		nothing
 DESTROYED:	nothing
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 PSEUDO CODE/STRATEGY:
 
 REVISION HISTORY:
@@ -450,7 +450,7 @@ PASS:		*ds:si	= NDSortViewPopupMenuClass object
 		ax	= message #
 RETURN:		nothing
 DESTROYED:	ax,cx,dx,bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -460,7 +460,7 @@ REVISION HISTORY:
 	ed	3/18/02   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-NDSortViewPopupVisClose	method dynamic NDSortViewPopupMenuClass, 
+NDSortViewPopupVisClose	method dynamic NDSortViewPopupMenuClass,
 					MSG_VIS_CLOSE
 	.enter
 
