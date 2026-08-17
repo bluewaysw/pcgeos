@@ -35,6 +35,10 @@
 /* keep blocks with arrays below this size */
 #define PARSE_ARRAY_MEM_SIZE_LIMIT 30000
 
+/* Bound transient tag parameters in the shared 16-bit LMem heap. */
+#define HTML_PARAM_TAG_SIZE_LIMIT  (12*1024)
+#define HTML_PARAM_HEAP_SIZE_LIMIT 49152L
+
 /***************************************************************************
  *              Default style constants
  ***************************************************************************/
@@ -125,7 +129,9 @@ Boolean G_isParsing = FALSE ;
 NameToken storedContent;
 
 /* Index of script fragment on page */
+#if JAVASCRIPT_SUPPORT
 static word scriptCount;
+#endif
 
 #ifdef DO_DBCS
 /* code page for parsing, and later for drawing form elements, etc.
@@ -570,6 +576,7 @@ long LOCAL AddParagraph(VisTextCharAttr *ca, VisTextParaAttr *pa, char *text)
     return pos;
 }
 
+#if JAVASCRIPT_SUPPORT
 /*
  * Add n character from the passed buffer to the JavaScript array
  * (creating it if necessary). The routine returns the starting index
@@ -685,6 +692,7 @@ void CleanupJavaScript(long pos1, long pos2)
       HugeArrayDelete(HTMLext->HE_vmFile,
         VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos-pos1), pos1);
 }
+#endif
 
 void SetDocumentCharset(char *p)
 {
@@ -788,10 +796,12 @@ word ModifyHypertextArray(word array, void *rec, word elsize, word element)
         ofs = word_offsetof(HypertextArrayBlockHeader, HABH_metaArray);
         size = sizeof(HTMLmetaData);
         break;
+#if JAVASCRIPT_SUPPORT
       case HTA_EVENT_ARRAY:
         ofs = word_offsetof(HypertextArrayBlockHeader, HABH_eventArray);
         size = sizeof(HTMLeventData);
         break;
+#endif
 EC(   default: FatalError(-1); )
     }
 
@@ -1291,6 +1301,63 @@ word LOCAL StyleNum(char *name, SpecialTagType *spec)
     return ret;
 }
 
+word LOCAL FindHTMLAttribute(char *name)
+{
+    word first, last, middle, result;
+    int compare;
+    HTMLAttributeName *namesP;
+
+    MemLock(OptrToHandle(@HTMLAttributeNames));
+    namesP = LMemDeref(@HTMLAttributeNames);
+
+    first = 0;
+    last = HTML_ATTRIBUTE_COUNT;
+    result = CA_NULL_ELEMENT;
+    while(first < last)
+    {
+      middle = first + (last-first)/2;
+      compare = STRCMPSB(name, namesP[middle].name);
+      if(compare > 0)
+        first = middle+1;
+      else
+        last = middle;
+    }
+    if(first < HTML_ATTRIBUTE_COUNT &&
+       !STRCMPSB(name, namesP[first].name))
+      result = first;
+
+    MemUnlock(OptrToHandle(@HTMLAttributeNames));
+    return result;
+}
+
+Boolean LOCAL HTMLParameterHeapHasRoom(MemHandle localHeapH, word growth)
+{
+    LMemBlockHeader *headerP;
+    dword used;
+
+    headerP = MemDeref(localHeapH);
+    used = (dword)headerP->LMBH_blockSize-headerP->LMBH_totalFree;
+    return used+growth <= HTML_PARAM_HEAP_SIZE_LIMIT;
+}
+
+#if ERROR_CHECK
+void LOCAL ECCheckHTMLAttributes(void)
+{
+    word i;
+    HTMLAttributeName *namesP;
+
+    MemLock(OptrToHandle(@HTMLAttributeNames));
+    namesP = LMemDeref(@HTMLAttributeNames);
+    for(i=0; i<HTML_ATTRIBUTE_COUNT; i++)
+    {
+      if(!namesP[i].name[0] || STRLENSB(namesP[i].name)>HTML_MAXTAG ||
+         (i && STRCMPSB(namesP[i-1].name, namesP[i].name)>=0))
+        FatalError(ERROR_HTML_ATTRIBUTE_TABLE_INVALID);
+    }
+    MemUnlock(OptrToHandle(@HTMLAttributeNames));
+}
+#endif
+
 void LOCAL FreeStoredContent(void)
 {
     /* Release buffer for storage of TITLE, OPTION, TEXTAREA elements */
@@ -1420,6 +1487,7 @@ int LOCAL HTMLgetc(void)
  *    terminated when the buffer is full; instead, excessive characters are
  *    flushed to the next terminator. In addition, the value of c2 is not
  *    touched, and delaying of whitespaces does not take place.
+ *  truncatedP is set when parameter characters have to be flushed.
  *
  *  Global variables changed: c2.
  */
@@ -1427,7 +1495,8 @@ int LOCAL HTMLgetc(void)
 /* longer arguments are specially handled */
 #define PARSE_BUF_LEN 256
 
-int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowBuf)
+int LOCAL GetText(int cc, int ce, char *buf, word formMode,
+                  MemHandle *overflowBuf, Boolean *truncatedP)
   #define FORM_MODE_HTML      0         /* tags, entities, white compression */
   #define FORM_MODE_PARAM     1         /* (see above, otherwise like HTML) */
   #define FORM_MODE_PRE       2         /* PRE */
@@ -1490,7 +1559,11 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 	  (formMode!=FORM_MODE_PARAM && p>=PARSE_BUF_LEN-HTML_MAXTAG-2) )
       {
         if(formMode==FORM_MODE_PARAM)   /* no: flush characters? */
+        {
+          if(truncatedP)
+            *truncatedP = TRUE;
           c = HTMLgetc();               /* yes: just skip over char */
+        }
         else
           break;                        /* no: abort immediately */
       }
@@ -1681,106 +1754,77 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode, MemHandle *overflowB
 /*
  * Script parsing
  *
- * This code is placed here because it implements are different mode of parsing
- * from the usual HTML code handling. As it also has to deal with all sorts of
- * non well-formed (in the XML sense) files, it completely bypasses the normal
- * parser and pipes the script source straight into the transfer item.
+ * SCRIPT raw text uses a different parsing mode from normal HTML and bypasses
+ * the normal tag parser. JavaScript builds may also copy it to the transfer
+ * item for execution.
  */
 
 const char endScript[] = "</SCRIPT";
 
-#define C_COMMENT 0x8000
-#define CC_COMMENT 0x4000
-#define QUOTE_CHAR 0x00ff
-
-char pbuf[3] = {0, 0, 0};  /* only accessed by single parsing thread */
-
-word LOCAL HandleScriptChar(word flags, int c, char p)
+/*
+ * SCRIPT is a raw-text element even when JavaScript support is absent.
+ * Consume its contents without interpreting embedded markup.
+ */
+int LOCAL SkipScriptContent(int c)
 {
-    if (flags & CC_COMMENT) {
-@ifdef DO_DBCS
-	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
-@else
-	if (c==C_CR || c==C_LF ||
-@endif
-	    (pbuf[0]=='-' && pbuf[1]=='-' && p=='>')) {
-	    flags &= ~CC_COMMENT;
-	}
-    } else if (flags & C_COMMENT) {
-	if (c=='/' && p=='*') {
-	    flags &= ~C_COMMENT;
-	}
-    } else if (flags & QUOTE_CHAR) {
-@ifdef DO_DBCS
-	if (c==C_CARRIAGE_RETURN || c==C_LINE_FEED ||
-@else
-	if (c==C_CR || c==C_LF ||
-@endif
-            (c==(flags & QUOTE_CHAR) && p!='\\')) {
-	    flags &= ~QUOTE_CHAR;
-	}
-    } else {
-	if ((c=='"' || c=='\'') && p!='\\') {
-	    flags = (flags & ~QUOTE_CHAR) | c;
-	} else if (c=='*' && p=='/') {
-	    flags |= C_COMMENT;
-	} else if (c=='/' && p=='/') {
-	    flags |= CC_COMMENT;
-	}
-    }
-    return flags;
+    int n;
+
+    if(c=='>')                          // skip over ">" of script tag
+        c=HTMLgetc();
+
+    do {
+        while(c!=EOF && c!=endScript[0])
+            c=HTMLgetc();
+
+        n = 0;
+        while(c!=EOF && c<128 && (toupper(c)==endScript[n]))
+        {
+            n++;
+            c=HTMLgetc();
+        }
+    } while(c!=EOF && endScript[n]);
+
+    return c;
 }
 
-int LOCAL HandleScript(int c, Boolean accept)
+#if JAVASCRIPT_SUPPORT
+int LOCAL HandleScript(int c)
 {
     char buf[128];
     int n;
     long pos1,pos2;
-    char p = 0;
-    word charFlags = 0;
 
     if(c=='>')                          // skip over ">" of script tag
       c=HTMLgetc();
 
-    if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
-      pos1 = AddJavaScript("\n", 1);
+    pos1 = AddJavaScript("\n", 1);
     
     n = 0;
     do {
-      while(n<sizeof(buf) && c!=EOF && ((charFlags & (QUOTE_CHAR | C_COMMENT)) || c!=endScript[0]))
+      while(n<sizeof(buf) && c!=EOF && c!=endScript[0])
       {
         buf[n++] = (char)c;
-	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
         c=HTMLgetc();
-	charFlags = HandleScriptChar(charFlags, c, p);
       }
       
       if(n)                             // transfer script body
       {
-        if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
-          AddJavaScript(buf, n);        
+        AddJavaScript(buf, n);
         n = 0;                          // characters have been dealt with
       }
       
       while (c!=EOF && c<128 && (toupper(c)==endScript[n]))
       {
         buf[n++] = (char)c;
-	pbuf[0] = pbuf[1]; pbuf[1] = pbuf[2]; pbuf[2] = p = c;
         c=HTMLgetc();
-	charFlags = HandleScriptChar(charFlags, c, p);
       }
     } while(c!=EOF && endScript[n]);    // until end-of-script or end-of-file
 
-    if(accept && (HTMLext->HE_options & HTML_JAVASCRIPT)) 
-    {
-      pos2 = AddJavaScript("\n", 1);    // make sure contents are properly split
-      CleanupJavaScript(pos1, pos2);    // remove comments around script code
-    }
+    pos2 = AddJavaScript("\n", 1);      // make sure contents are properly split
+    CleanupJavaScript(pos1, pos2);      // remove comments around script code
 
     /* handle script code */
-#if JAVASCRIPT_SUPPORT
-    if (accept && (HTMLext->HE_options & HTML_JAVASCRIPT) &&
-	HTMLext->HE_scriptHandler && 
+    if (HTMLext->HE_scriptHandler &&
         (!(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)))
     {
 	((pcfm_ScriptHandlerCallback *)ProcCallFixedOrMovable_pascal)(
@@ -1788,7 +1832,6 @@ int LOCAL HandleScript(int c, Boolean accept)
 	    pos1, HTMLext->HE_frame,
 	    HTMLext->HE_scriptHandler);
     }
-#endif
 
     return c;   
 }
@@ -1869,7 +1912,6 @@ Boolean LOCAL HandleExternalScript(char *p)
 @endif
    
     /* handle script code */
-#if JAVASCRIPT_SUPPORT
     if (handled && HTMLext->HE_scriptHandler && 
         (!(htbh->HTBH_other.HTBHO_fileInfo & HTML_FI_EXT_SCRIPT)))
     {
@@ -1878,7 +1920,6 @@ Boolean LOCAL HandleExternalScript(char *p)
 	    pos1, HTMLext->HE_frame,
 	    HTMLext->HE_scriptHandler);
     }
-#endif
 
     return handled;
 }
@@ -1895,36 +1936,49 @@ int Open_SCRIPT(optr paramArray, int c)
       (STRNCMPISB(p, "JavaScript", 10)==0 || 
        STRNCMPISB(p, "JScript", 7)==0)));
 
+    if(!accept)
+    {
+      htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_NON_JS_SCRIPT;
+      return SkipScriptContent(c);
+    }
+
+    if(!(HTMLext->HE_options & HTML_JAVASCRIPT))
+      return SkipScriptContent(c);
+
     /* Possibly read external script if specified*/
     p = GetParamValue(paramArray, "SRC");
-    if(p && *p && accept && (HTMLext->HE_options & HTML_JAVASCRIPT))
+    if(p && *p)
     {
       /* NS and IE ignore the contents of the tag if a SRC is specified */
-      ret = HandleScript(c, FALSE);
-
+      ret = SkipScriptContent(c);
       HandleExternalScript(p);
     }
     else
-      ret = HandleScript(c, accept);
-
-    /* Flag scripts that we can't deal with... */
-    if(!accept)
-      htbh->HTBH_other.HTBHO_fileInfo |= HTML_FI_NON_JS_SCRIPT;
+      ret = HandleScript(c);
 
     return ret;
 }
+#else
+int Open_SCRIPT(optr paramArray, int c)
+{
+    (void)paramArray;
+    return SkipScriptContent(c);
+}
+#endif
 
 int LOCAL HandleTag(MemHandle localHeap)
 {
     register int c,p;
     int ce,q;
     char *e;
-    Boolean openTag,closeTag;
+    Boolean openTag,closeTag,tagTooLong;
     word tagStyle;
     HTMLStylesTable tagStyleEntry;
     optr paramArray;
     SpecialTagType spec;
     char tag[HTML_MAXTAG+1];
+    byte seenAttributes[HTML_ATTRIBUTE_SEEN_BYTES];
+    word paramBytes;
 
     c=HTMLgetc();
     if(c=='/')
@@ -1939,18 +1993,30 @@ int LOCAL HandleTag(MemHandle localHeap)
 
     /* get tag name */
     p=0;                                /* start tag */
+    tagTooLong=FALSE;
     while( c!='>' && c!='<' && c!='=' && c!='/' && c!=' ' && 
            c!='\r' && c!='\t' && c!=EOF )
     {
       if(p<HTML_MAXTAG)
         tag[p++]=(char)((c>='a' && c<='z')?(c-32):c);
                                         /* get tag name */
+      else
+        tagTooLong=TRUE;
       if(c=='!') break;                 /* "!": single character tag */
       c=HTMLgetc();
     }
     tag[p]=0;                           /* terminate tag */
 
+    /* Resolve the tag before parsing parameters.  Unknown and truncated
+       names must not allocate parameter storage or alias a real tag. */
+    tagStyle = tagTooLong ? 0 : StyleNum(tag,&spec);
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
+
     paramArray = NullOptr;              /* no parameters yet */
+    paramBytes = 0;
+    memset(seenAttributes, 0, sizeof(seenAttributes));
 
     /* quickly skip over comments */
     if(tag[0]=='!')                     /* <!--..--> or <!..> */
@@ -1987,21 +2053,52 @@ int LOCAL HandleTag(MemHandle localHeap)
         /* buf -- room for PARSE_BUF_LEN + one entity expansion */
         char arg[HTML_MAXTAG+1],buf[PARSE_BUF_LEN+HTML_MAXTAG];
 	MemHandle overflowBuf = 0;
+        MemHandle *overflowBufP;
+        word attribute, argLen, overflowLen, elementSize, growth;
+        Boolean discard, argTooLong, valueTruncated;
 
         /* skip whites */
         while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
 
         /* get argument name */
         p=0;                            /* start tag */
+        argTooLong=FALSE;
         while( c!='=' && c!=' ' && c!='\r' && c!='\t' && c!='>' && c!='<' &&
                c!='/' && c!=EOF )
         {
           if(p<HTML_MAXTAG)
             arg[p++]=(char)((c>='a' && c<='z')?(c-32):c);
+          else
+            argTooLong=TRUE;
                                         /* get argument name */
           c=HTMLgetc();
         }
         arg[p]=0;                       /* terminate arg name */
+
+        /* Filter before GetText so rejected values cannot allocate overflow. */
+        attribute = CA_NULL_ELEMENT;
+        discard = closeTag || !tagStyle || argTooLong || !arg[0];
+        if(!discard)
+        {
+          attribute = FindHTMLAttribute(arg);
+          if(attribute == CA_NULL_ELEMENT)
+            discard = TRUE;
+          else if(seenAttributes[attribute/8] & (1<<(attribute&7)))
+            discard = TRUE;
+          else
+            seenAttributes[attribute/8] |= (1<<(attribute&7));
+        }
+
+        argLen = STRLENSB(arg);
+        growth = argLen+2+sizeof(word)+1;
+        if(!paramArray)
+          growth += sizeof(ChunkArrayHeader)+sizeof(word);
+        if(!discard &&
+           (paramBytes+growth > HTML_PARAM_TAG_SIZE_LIMIT ||
+            !HTMLParameterHeapHasRoom(localHeap, growth)))
+          discard = TRUE;
+        overflowBufP = discard ? (void *)0 : &overflowBuf;
+        valueTruncated = FALSE;
 
         /* skip whites */
         while(c==' ' || c=='\r' || c=='\t') c=HTMLgetc();
@@ -2022,36 +2119,50 @@ int LOCAL HandleTag(MemHandle localHeap)
           else
             ce=' ';                     /* whitespace terminates */
 
-          c = GetText(c, ce, buf, FORM_MODE_PARAM, &overflowBuf);
+          c = GetText(c, ce, buf, FORM_MODE_PARAM, overflowBufP,
+                      &valueTruncated);
                                         /* parse text up to terminator,
                                            flush rest if too long */
         }
         else
           *buf=0;                       /* no value */
 
-        if(arg[0])                      /* only if argument has been found */
+        if(valueTruncated)
+          discard = TRUE;
+
+        if(!discard)
         {
-	  word overflowLen = 0;
+	  overflowLen = 0;
 	  if (overflowBuf)
 	      overflowLen = STRLENSB(MemDeref(overflowBuf));
 
-          if(!paramArray)               /* no array yet? */
-            paramArray = ConstructOptr( localHeap,
-              ChunkArrayCreate( localHeap, 0, 0, 0 ) );
+          elementSize = argLen+overflowLen+STRLENSB(buf)+2;
+          growth = elementSize+sizeof(word)+1;
+          if(!paramArray)
+            growth += sizeof(ChunkArrayHeader)+sizeof(word);
+
+          if(paramBytes+growth <= HTML_PARAM_TAG_SIZE_LIMIT &&
+             HTMLParameterHeapHasRoom(localHeap, growth))
+          {
+            if(!paramArray)             /* no array yet? */
+              paramArray = ConstructOptr( localHeap,
+                ChunkArrayCreate( localHeap, 0, 0, 0 ) );
                                         /* create array for parameters */
 
-          e = ChunkArrayAppend( paramArray, STRLENSB(arg)+overflowLen+STRLENSB(buf)+2 );
+            e = ChunkArrayAppend(paramArray, elementSize);
                                         /* add array for parameters (will be
                                            freed in OpenTag() or later...) */
+            paramBytes += growth;
 
-          STRCPYSB(e,arg);                /* copy argument name */
-	  if (overflowBuf) {
-	      int argLenPlus = STRLENSB(arg)+1;
-	      /* append overflow and value */
-	      STRCPYSB(e+argLenPlus, MemDeref(overflowBuf));
-	      STRCPYSB(e+argLenPlus+overflowLen, buf);
-	  } else
-          STRCPYSB(e+STRLENSB(arg)+1,buf);  /* append value */
+            STRCPYSB(e,arg);              /* copy argument name */
+	    if (overflowBuf) {
+	        int argLenPlus = argLen+1;
+	        /* append overflow and value */
+	        STRCPYSB(e+argLenPlus, MemDeref(overflowBuf));
+	        STRCPYSB(e+argLenPlus+overflowLen, buf);
+	    } else
+            STRCPYSB(e+argLen+1,buf);      /* append value */
+          }
         }
 	if (overflowBuf) MemFree(overflowBuf);
       }
@@ -2066,17 +2177,14 @@ int LOCAL HandleTag(MemHandle localHeap)
       closeTag = TRUE;
     }
 
-    /* copy entry from HTML tag style definitions: */
-    MemLock( OptrToHandle(@HTMLStylesChunk) );
-    tagStyle = StyleNum(tag,&spec);     /* find if tag has an assigned style */
-    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
-    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
-
     if(openTag) {                       /* opening a tag */
         if (!ignoreTags) {
             if(tagStyleEntry.spec==SPEC_SCRIPT)
             {
               c = Open_SCRIPT(paramArray, c);
+              /* SCRIPT is not pushed, so release its parameters here. */
+              if(paramArray)
+                LMemFree(paramArray);
               tagStyleEntry.flags &= ~TAG_IGNORE_TAGS;
             }
             else
@@ -2184,6 +2292,9 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     ignoreTags = 0;  /* allow tags on startup */
 
     EC_BOUNDS(ext);
+#if ERROR_CHECK
+    ECCheckHTMLAttributes();
+#endif
 
     /*
      * Initialize local memory
@@ -2256,7 +2367,9 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     insertCell = FALSE;
     currentCellLevel = 0;               /* Currently outside any table */
 
+#if JAVASCRIPT_SUPPORT
     scriptCount = 0;                    /* no script found yet */
+#endif
 
     MemLock( OptrToHandle(@HTMLStylesChunk) );
     GetCurrentStyles();                 /* initialize style caching */
@@ -2289,7 +2402,8 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
         else
           formMode = FORM_MODE_HTML;
 
-        c = GetText(c, (formMode==FORM_MODE_HTML)?0:'\r', buf, formMode, 0);
+        c = GetText(c, (formMode==FORM_MODE_HTML)?0:'\r', buf, formMode,
+                    0, 0);
 
         /*
          * Transfer parsed characters into HTML text object or process
