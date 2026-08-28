@@ -2906,7 +2906,7 @@ the Ink Database routines.
         /* Return this value if the object under the point is run by a different
          * thread and you want to hold up input (don't do anything with the incoming
          * MSG_META_START_SELECT) `til obj sends MSG_GEN_APPLICATION_INK_QUERY_REPLY
-         * to the applicaiton object. */
+         * to the application object. */
     } InkReturnValue;
 
 This enumerated type is used by objects to let the system know whether 

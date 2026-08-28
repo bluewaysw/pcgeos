@@ -440,7 +440,7 @@ if no one has objected to the removal of the card. The driver, at this point, is
 about to be unloaded.
 
 __Pass:__
-  - cx -> Socket nuber.
+  - cx -> Socket number.
   - di -> DR_PCMCIA_CLOSE_SOCKET
 
 __Returns:__
