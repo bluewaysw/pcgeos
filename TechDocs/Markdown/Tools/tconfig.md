@@ -274,7 +274,7 @@ SUBUI   Demonstrates the subclassing of a Generic UI gadget. In this case, a new
 
 TICTAC  Demonstrates the manipulation of Vis objects, illustrated by a number of game pieces which the user may move with the mouse on the game board.
 
-TRIGGERED    Demonstrates how a simple trigger can be made much more versatile by fitting it with a trigger data area.
+TRIGGERED   Demonstrates how a simple trigger can be made much more versatile by fitting it with a trigger data area.
 
 TUTORIAL    This directory contains the application developed in the Tutorial book. The tutorial shows how the application was developed in several stages. Each subdirectory shows a stage of development.
 
