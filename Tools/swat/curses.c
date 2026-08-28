@@ -77,11 +77,27 @@ static char *rcsid =
 
 #define SWATWCTL_FOCUS		"swatwctl focus >/dev/null 2>&1"
 #define SWATWCTL_RESTORE	"swatwctl restore >/dev/null 2>&1"
+#define XTERM_MOUSE_ON		"\033[?1000h\033[?1006h"
+#define XTERM_MOUSE_OFF		"\033[?1006l\033[?1000l"
 
 #else
 #include <ntcurses/curses.h>
 #endif
 #include <compat/file.h>
+
+#ifndef UP_ARROW_ASCII
+#define UP_ARROW_ASCII		0xc8
+#define DOWN_ARROW_ASCII	0xd0
+#define LEFT_ARROW_ASCII	0xcb
+#define RIGHT_ARROW_ASCII	0xcd
+#define PAGE_UP_ASCII		0xc9
+#define PAGE_DOWN_ASCII	0xd1
+#define HOME_ASCII		0xc7
+#define END_ASCII		0xcf
+#endif
+#ifndef DELETE_ASCII
+#define DELETE_ASCII		0xd3
+#endif
 
 #if defined(_WIN32)
 #define _WIN32_WINNT    0x0500
@@ -298,6 +314,8 @@ static char *CursesGetMouseHighlight(int *value1, int *value2);
 
 static void CursesScrollInput(unsigned char c, CursesInputState *state);
 static void CursesEndScroll(CursesInputState *state);
+static int CursesUseModernPromptKeys(void);
+static int CursesInputKey(unsigned char c, CursesInputState *state);
 extern DosInvertScreenRegion(short start, short end);
 extern DosCopyScreenRegion(char *buf, short start, short end);
 
@@ -2780,6 +2798,114 @@ CursesHonk(void)
 
 
 /***********************************************************************
+ *				CursesUseModernPromptKeys
+ ***********************************************************************
+ * SYNOPSIS:	    Return whether modern prompt keys should be active.
+ * RETURN:	    TRUE unless the Tcl flag explicitly disables them.
+ *
+ ***********************************************************************/
+static int
+CursesUseModernPromptKeys(void)
+{
+    char    *value;
+
+    value = (char *)Tcl_GetVar(interp, "modernPromptKeys", TRUE);
+    if (value == NULL) {
+	return TRUE;
+    }
+    if ((value[0] == '\0') ||
+	(strcmp(value, "0") == 0) ||
+	(strcmp(value, "off") == 0))
+    {
+	return FALSE;
+    }
+    return TRUE;
+}
+
+
+/***********************************************************************
+ *				CursesInputKey
+ ***********************************************************************
+ * SYNOPSIS:	    Handle normalized editing keys at the prompt.
+ * CALLED BY:	    CursesReadInput
+ * RETURN:	    TRUE if the key was consumed.
+ * SIDE EFFECTS:    May move the cursor or alter the current input line.
+ *
+ * STRATEGY:
+ *	Keep prompt-editing keys from being stolen by global bind-key
+ *	handlers. Page keys are left for those handlers.
+ *
+ ***********************************************************************/
+static int
+CursesInputKey(unsigned char c, CursesInputState *state)
+{
+    int	    len;
+    int	    curX;
+    int	    curY;
+    char    *cp;
+
+    if (!(cursesFlags & CURSES_ECHO)) {
+	return FALSE;
+    }
+
+    switch (c) {
+	case LEFT_ARROW_ASCII:
+	    if (state->cursPos) {
+		CursesBackSpace(curWin, FALSE);
+		state->cursPos--;
+	    }
+	    return TRUE;
+	case RIGHT_ARROW_ASCII:
+	    if (state->cursPos < state->lineLength) {
+		waddch(curWin,
+		       Buf_GetAll(state->input, &len)[state->cursPos]);
+		state->cursPos++;
+	    }
+	    return TRUE;
+	case HOME_ASCII:
+	    while (state->cursPos--) {
+		CursesBackSpace(curWin, FALSE);
+	    }
+	    state->cursPos = 0;
+	    return TRUE;
+	case END_ASCII:
+	    if (state->cursPos < state->lineLength) {
+		waddstr(curWin,
+			((WADDSTR_CAST)Buf_GetAll(state->input, &len)) +
+			state->cursPos);
+		state->cursPos = state->lineLength;
+	    }
+	    return TRUE;
+	case DELETE_ASCII:
+	    if (state->cursPos < state->lineLength) {
+		Buf_DelBytesMiddle(state->input, 1, state->cursPos);
+		state->lineLength--;
+		if (state->markPos > state->cursPos) {
+		    state->markPos--;
+		}
+
+		curX = curWin->_curx;
+		curY = curWin->_cury;
+		cp = (char *)Buf_GetAll(state->input, &len);
+		waddstr(curWin, (WADDSTR_CAST)(cp + state->cursPos));
+		waddch(curWin, ' ');
+		curWin->_curx = curX;
+		curWin->_cury = curY;
+	    }
+	    return TRUE;
+	case UP_ARROW_ASCII:
+	    CursesInputChar('\020', state);
+	    return TRUE;
+	case DOWN_ARROW_ASCII:
+	    CursesInputChar('\016', state);
+	    return TRUE;
+	default:
+	    return FALSE;
+    }
+}
+
+
+/***********************************************************************
  *				CursesInputChar
  ***********************************************************************
  * SYNOPSIS:	    Handle the receipt of a single character for the
@@ -3547,6 +3673,255 @@ int getch2() {
 }
 #endif
 
+#if defined(_LINUX)
+typedef struct {
+    char	    *name;
+    char	    *cap;
+    unsigned char   key;
+} CursesTermcapKey;
+
+static CursesTermcapKey cursesTermcapKeys[] = {
+    {"ku", NULL, UP_ARROW_ASCII},
+    {"kd", NULL, DOWN_ARROW_ASCII},
+    {"kl", NULL, LEFT_ARROW_ASCII},
+    {"kr", NULL, RIGHT_ARROW_ASCII},
+    {"kh", NULL, HOME_ASCII},
+    {"@7", NULL, END_ASCII},
+    {"kH", NULL, END_ASCII},
+    {"kD", NULL, DELETE_ASCII},
+    {"kP", NULL, PAGE_UP_ASCII},
+    {"kN", NULL, PAGE_DOWN_ASCII}
+};
+
+static void
+CursesInitTermcapKeys(void)
+{
+    int	    i;
+
+    for (i = 0; i < (int)(sizeof(cursesTermcapKeys) /
+			  sizeof(cursesTermcapKeys[0])); i++)
+    {
+	cursesTermcapKeys[i].cap = getcap(cursesTermcapKeys[i].name);
+    }
+}
+
+/* Prefer termcap keys; keep the xterm parser below as fallback. */
+static int
+CursesDecodeTermcapKey(unsigned char *seq, int len)
+{
+    CursesTermcapKey	*key;
+    int			i;
+
+    for (i = 0; i < (int)(sizeof(cursesTermcapKeys) /
+			  sizeof(cursesTermcapKeys[0])); i++)
+    {
+	key = &cursesTermcapKeys[i];
+	if ((key->cap != NULL) &&
+	    (key->cap[0] == 0x1b) &&
+	    (strlen(key->cap + 1) == len) &&
+	    (memcmp(key->cap + 1, seq, len) == 0))
+	{
+	    return key->key;
+	}
+    }
+    return -1;
+}
+
+/***********************************************************************
+ *				CursesSetXtermMouse
+ ***********************************************************************
+ * SYNOPSIS:	    Enable or disable xterm mouse reporting.
+ *
+ ***********************************************************************/
+static void
+CursesSetXtermMouse(int enable)
+{
+    char    *term;
+    static int mouseEnabled = FALSE;
+
+    term = getenv("TERM");
+    if ((term == NULL) ||
+	(strstr(term, "xterm") == NULL &&
+	 strstr(term, "screen") == NULL &&
+	 strstr(term, "tmux") == NULL &&
+	 strstr(term, "rxvt") == NULL &&
+	 strstr(term, "kitty") == NULL &&
+	 strstr(term, "alacritty") == NULL &&
+	 strstr(term, "wezterm") == NULL &&
+	 strstr(term, "vte") == NULL))
+    {
+	return;
+    }
+    if (enable == mouseEnabled) {
+	return;
+    }
+
+    fputs(enable ? XTERM_MOUSE_ON : XTERM_MOUSE_OFF, stdout);
+    fflush(stdout);
+    mouseEnabled = enable;
+}
+
+/***********************************************************************
+ *				CursesGetPendingChar
+ ***********************************************************************
+ * SYNOPSIS:	    Read one queued character without blocking.
+ * RETURN:	    TRUE if a character was read.
+ *
+ ***********************************************************************/
+static int
+CursesGetPendingChar(unsigned char *cPtr)
+{
+    int	    ready;
+
+    ready = 0;
+    if ((ioctl(0, FIONREAD, &ready) < 0) || (ready <= 0)) {
+	return FALSE;
+    }
+    *cPtr = (unsigned char)getch2();
+    return TRUE;
+}
+
+/***********************************************************************
+ *				CursesGetEscapeChar
+ ***********************************************************************
+ * SYNOPSIS:	    Wait briefly for the next byte of an escape sequence.
+ * RETURN:	    TRUE if a character was read.
+ *
+ ***********************************************************************/
+static int
+CursesGetEscapeChar(unsigned char *cPtr)
+{
+    fd_set	    readSet;
+    struct timeval  timeout;
+
+    FD_ZERO(&readSet);
+    FD_SET(0, &readSet);
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 50000;
+
+    if (select(1, &readSet, NULL, NULL, &timeout) <= 0) {
+	return FALSE;
+    }
+    *cPtr = (unsigned char)getch2();
+    return TRUE;
+}
+
+/***********************************************************************
+ *				CursesDecodeEscape
+ ***********************************************************************
+ * SYNOPSIS:	    Decode common terminal escape sequences.
+ * CALLED BY:	    CursesReadInput
+ * RETURN:	    Normalized PC-style key byte, or -1 for unknown.
+ *
+ ***********************************************************************/
+static int
+CursesDecodeEscape(void)
+{
+    unsigned char   seq[32];
+    unsigned char   c;
+    int		    i;
+    int		    n;
+    int		    button;
+    int		    decoded;
+    int		    digit;
+
+    if (!CursesGetEscapeChar(&c) || ((c != '[') && (c != 'O'))) {
+	return -1;
+    }
+    seq[0] = c;
+
+    for (i = 1; i < (int)sizeof(seq); i++) {
+	if (!CursesGetEscapeChar(&seq[i])) {
+	    return -1;
+	}
+	c = seq[i];
+
+	if ((c == '~') || ((c >= 0x40) && (c <= 0x7e))) {
+	    decoded = CursesDecodeTermcapKey(seq, i + 1);
+	    if (decoded >= 0) {
+		return decoded;
+	    }
+	}
+
+	switch (c) {
+	    case 'M':
+		if ((seq[0] == '[') && (seq[1] == '<')) {
+		    button = 0;
+		    for (n = 2; n < i && isdigit(seq[n]); n++) {
+			button = (button * 10) + seq[n] - '0';
+		    }
+		    if (button & 0x40) {
+			return (button & 1) ? PAGE_DOWN_ASCII : PAGE_UP_ASCII;
+		    }
+		    return -1;
+		}
+		if ((seq[0] == '[') && (i == 1)) {
+		    unsigned char   data[3];
+
+		    if (!CursesGetEscapeChar(&data[0]) ||
+			!CursesGetEscapeChar(&data[1]) ||
+			!CursesGetEscapeChar(&data[2]))
+		    {
+			return -1;
+		    }
+		    button = (data[0] - ' ') & 0xff;
+		    if (button & 0x40) {
+			return (button & 1) ? PAGE_DOWN_ASCII : PAGE_UP_ASCII;
+		    }
+		    return -1;
+		}
+		return -1;
+	    case 'A':
+		return UP_ARROW_ASCII;
+	    case 'B':
+		return DOWN_ARROW_ASCII;
+	    case 'C':
+		return RIGHT_ARROW_ASCII;
+	    case 'D':
+		return LEFT_ARROW_ASCII;
+	    case 'H':
+		return HOME_ASCII;
+	    case 'F':
+		return END_ASCII;
+	    case '~':
+		n = 0;
+		for (digit = 1; digit < i &&
+		     isdigit(seq[digit]); digit++)
+		{
+		    n = (n * 10) + seq[digit] - '0';
+		}
+		switch (n) {
+		    case 1:
+		    case 7:
+			return HOME_ASCII;
+		    case 3:
+			return DELETE_ASCII;
+		    case 4:
+		    case 8:
+			return END_ASCII;
+		    case 5:
+			return PAGE_UP_ASCII;
+		    case 6:
+			return PAGE_DOWN_ASCII;
+		    default:
+			return -1;
+		}
+	    default:
+		if ((seq[0] == '[') && (seq[1] == '<') && (c == 'm'))
+		{
+		    return -1;
+		}
+		if ((c >= 0x40) && (c <= 0x7e)) {
+		    return -1;
+		}
+		break;
+	}
+    }
+
+    return -1;
+}
+#endif
+
 /***********************************************************************
  *				CursesReadInput
  ***********************************************************************
@@ -3572,51 +3947,28 @@ CursesReadInput(int 	    stream,
     unsigned char    	buf[1];
     unsigned char    	*cp;
     int	    	i;
+#if defined(_LINUX)
+    int	    	decoded;
+#endif
     unsigned long chr;
     CursesInputState	*istate = (CursesInputState *)data;
 
 #if defined(unix) || defined(_LINUX)
-    chr = getch2();
 #if defined(_LINUX)
-    /* map ESC code to PC like scan codes for selected codes */
-    if (chr == 0x1B) {
-	(void)getch2();
-	chr = getch2();
-	switch ( chr ) {
-	    case 'A':
-	    	chr = 0xC8;
-		break;
-	    case 'B':
-    	    	chr = 0xD0;
-    		break;
-	    case 'C':
-	    	chr = 0xCD;
-		break;
-	    case 'D':
-    	    	chr = 0xCB;
-    		break;
-	    case 0x35:	/* page up */
-		(void)getch2();	/* skip 0x7E following */
-	    	chr = 0xC9;
-		break;
-	    case 0x36:	/* page down */
-		(void)getch2();	/* skip 0x7E following */
-    	    	chr = 0xD1;
-    		break;
-	    case 0x48:	/* pos1 */
-	 	//(void)getch2();	/* skip 0x7E following */
-        	chr = 0xC7;
-        	break;
-	    case 0x46:	/* end */
-		//(void)getch2();	/* skip 0x7E following */
-            	chr = 0xCF;
-            	break;
-
-	    default:
-	    	chr = 0x80;
-		break;
-	}
+    CursesSetXtermMouse(CursesUseModernPromptKeys());
+    if (!CursesGetPendingChar(buf)) {
+	return;
     }
+    chr = buf[0];
+    if (chr == 0x1B) {
+	decoded = CursesDecodeEscape();
+	if (decoded < 0) {
+	    return;
+	}
+	chr = decoded;
+    }
+#else
+    chr = getch2();
 #endif
     buf[0] = chr;
     i = 1;
@@ -3670,6 +4022,14 @@ CursesReadInput(int 	    stream,
 	chr = 0x80 + (chr >> 8);
     }
 #endif
+
+    if ((istate->inProc == CursesInputChar) &&
+	CursesUseModernPromptKeys() &&
+	CursesInputKey((unsigned char)(chr & 0xff), istate))
+    {
+	wrefresh(cmdWin);
+	return;
+    }
 
     /*
      * see if this key is currently bound to anything, if so then
@@ -4752,6 +5112,9 @@ See also:\n\
     /*
      * Take down window system...
      */
+#if defined(_LINUX)
+    CursesSetXtermMouse(FALSE);
+#endif
 #if defined(unix)
     osgb = _tty;
 #endif
@@ -4782,6 +5145,11 @@ See also:\n\
     _tty = osgb;
     (void)ioctl(_tty_ch, TIOCSETN, &_tty);
     (void)ioctl(_tty_ch, TIOCSLTC, &oltc);
+#endif
+#if defined(_LINUX)
+    if (CursesUseModernPromptKeys()) {
+	CursesSetXtermMouse(TRUE);
+    }
 #endif
     wrefresh(curscr);
 
@@ -6059,6 +6427,9 @@ CursesReadLine(char *line)
 static void
 CursesExit(void)
 {
+#if defined(_LINUX)
+    CursesSetXtermMouse(FALSE);
+#endif
     /*
      * Move to lower-left corner
      */
@@ -6381,7 +6752,8 @@ CursesResetInput(Event event, Opaque callData, Opaque clientData)
 void
 Curses_Init(void)
 {
-    int	i;
+    int	    i;
+    char    *value;
 
     /* make sure all the key bindings are initialized to NULL */
     for(i = 0; i < 256; i++)
@@ -6411,6 +6783,16 @@ Curses_Init(void)
 	cbreak();
 #endif
 	noecho();
+	value = (char *)Tcl_GetVar(interp, "modernPromptKeys", TRUE);
+	if ((value == NULL) || (value[0] == '\0')) {
+	    Tcl_SetVar(interp, "modernPromptKeys", "1", TRUE);
+	}
+#if defined(_LINUX)
+	CursesInitTermcapKeys();
+	if (CursesUseModernPromptKeys()) {
+	    CursesSetXtermMouse(TRUE);
+	}
+#endif
 	cursesFlags = CURSES_ECHO;
 #undef CTRL
 #define CTRL(c) (c & 037)

@@ -31,8 +31,6 @@ export FileFindVLTextClass
 
 platform geos201
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
-
 #
 # END OF FILE:  FFIND.GP
 #

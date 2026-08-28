@@ -78,6 +78,7 @@ number	local	IEEE64
 	mov	number.IEEE64_wd1, cx
 	mov	number.IEEE64_wd2, bx
 	mov	number.IEEE64_wd3, ax
+	segmov	ds, ss, si
 	lea	si, number
 	call	FloatIEEE64ToGeos80
 	.leave
@@ -97,6 +98,7 @@ number	local	IEEE64
         mov	ax, es:6[si]
 	mov	number.IEEE64_wd3, ax
 	lea	si, number
+	segmov	ds, ss, ax
 	call	FloatIEEE64ToGeos80
 	.leave
 	ret
@@ -116,6 +118,7 @@ number	local	IEEE64
         mov	ax, ss:6[si]
 	mov	number.IEEE64_wd3, ax
 	lea	si, number
+	segmov	ds, ss, ax
 	call	FloatIEEE64ToGeos80
 	.leave
 	ret

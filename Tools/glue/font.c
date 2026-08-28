@@ -193,7 +193,7 @@ FontWrite(void	    *base,  	/* Base of file buffer */
 #if defined(__HIGHC__)
     i = open(outfile, O_BINARY|O_WRONLY|O_CREAT, S_IREAD | S_IWRITE);
 #else
-    i = open(outfile, O_WRONLY|O_CREAT, 0666);
+    i = open(outfile, O_BINARY|O_WRONLY|O_CREAT, 0666);
 #endif
     if (i < 0) {
 	perror(outfile);

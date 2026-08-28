@@ -59,6 +59,7 @@
 [autoload print 2 print]
 [autoload _print 1 print]
 [autoload print-cur-regs 1 curregs]
+[autoload quickhelp 0 navhelp]
 [autoload ps 1 ps]
 [autoload pscope 1 whatis]
 [autoload ref 1 ref]
