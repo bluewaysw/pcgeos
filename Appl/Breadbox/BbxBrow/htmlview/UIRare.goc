@@ -169,6 +169,35 @@ void UpdateTitleAndURL(NameToken title, NameToken url)
     }
 }
 
+@extern method HTMLVProcessClass, MSG_HMLVP_DEFAULT_FONT_CHANGED
+{
+    EventHandle evt;
+    FontID currentFont;
+
+    if(selection != FID_DTC_URW_ROMAN &&
+       selection != FID_DTC_URW_SANS &&
+       selection != FID_DTC_URW_MONO)
+        return;
+
+    currentFont = @call CurrentURLText::MSG_URL_ENTRY_GET_FONT_ID();
+    if(currentFont == (FontID)selection)
+        return;
+
+    @call CurrentURLText::MSG_VIS_TEXT_SET_FONT_ID(
+        (FontID)selection, 0, 0);
+
+    if(UserGetDefaultUILevel()==UIIL_INTRODUCTORY)
+        InitFileWriteInteger(HTMLVIEW_CATEGORY, "introDefaultFont",
+                             selection);
+    else
+        InitFileWriteInteger(HTMLVIEW_CATEGORY, "defaultFont", selection);
+
+    evt = @record URLDocumentClass::MSG_URL_DOCUMENT_CLEAR_OBJ_CACHE();
+    @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+    evt = @record URLDocumentClass::MSG_URL_DOCUMENT_RELOAD();
+    @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+}
+
 @ifdef TV_BW_OPTION
 @extern method HTMLVProcessClass, MSG_HMLVP_TV_BW_CHANGED
 {
