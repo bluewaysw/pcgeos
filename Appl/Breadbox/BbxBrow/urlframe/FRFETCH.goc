@@ -53,7 +53,6 @@
 @extern chunk MsgLoading;
 @extern chunk MsgLoadCache;
 @extern chunk MsgLoadError;
-@extern chunk MsgAborted;
 @extern chunk MsgAuthorize;
 
 /* abort handling */
@@ -791,10 +790,6 @@ Boolean LOCAL DialogError(optr errorChunk, optr document)
     unsigned char entityChar;
 @endif
 
-    /* User-initiated Stop is not an error and needs no notification. */
-    if(errorChunk == @MsgAborted)
-        return TRUE;
-
     /* only in AUI */
     if (UserGetDefaultUILevel() <= UIIL_INTRODUCTORY) return FALSE;
 @ifdef COMPILE_OPTION_AUTO_BROWSE
@@ -1425,13 +1420,8 @@ Boolean LOCAL testScriptCode(VMFileHandle file, VMBlockHandle code, dword offset
     switch(URLRequestGetRet(retType))
     {
       case URL_RET_ABORTED:
-@ifdef GLOBAL_INTERNET_BUILD
-     /* no error message, just keep current page and restore URL field */
-     /* update URL field, and other navigation items */
-     @send, forceQueue document::MSG_META_GAINED_MODEL_EXCL();
-@else
-        htmlMsg = @MsgAborted;          /* error message in buffer */
-@endif
+        /* Keep the partial page and restore the navigation state. */
+        @send, forceQueue document::MSG_META_GAINED_MODEL_EXCL();
 @ifdef RELOAD_ERROR_PAGE
 	errorPage = TRUE;
 @endif
