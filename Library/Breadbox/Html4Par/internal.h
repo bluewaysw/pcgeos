@@ -14,6 +14,12 @@
 #include <hwlib.h>
 #include "regiont.h"
 
+#if JAVASCRIPT_SUPPORT || COMPILE_OPTION_AUTO_BROWSE
+#define HTML_SCRIPT_SUPPORT 1
+#else
+#define HTML_SCRIPT_SUPPORT 0
+#endif
+
 #ifdef DO_DBCS
 /* simple SB AnsiC versions */
 #define STRCPYSB(s,t) strcpysbcs(s,t)
@@ -442,7 +448,7 @@ typedef struct {
     char name[HTML_MAXTAG+1];
 } HTMLAttributeName;
 
-#if JAVASCRIPT_SUPPORT
+#if HTML_SCRIPT_SUPPORT
 #define HTML_ATTRIBUTE_COUNT 72
 #else
 #define HTML_ATTRIBUTE_COUNT 58
