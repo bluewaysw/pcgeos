@@ -1762,7 +1762,7 @@ const char endStyle[] = "</STYLE";
  */
 int LOCAL SkipRawTextContent(const char *endTag, int c)
 {
-    int n;
+    int n, quote;
 
     if(c=='>')                          // skip over ">" of script tag
         c=HTMLgetc();
@@ -1772,12 +1772,28 @@ int LOCAL SkipRawTextContent(const char *endTag, int c)
             c=HTMLgetc();
 
         n = 0;
-        while(c!=EOF && c<128 && (toupper(c)==endTag[n]))
+        while(c!=EOF && c<128 && endTag[n] &&
+              (toupper(c)==endTag[n]))
         {
             n++;
             c=HTMLgetc();
         }
-    } while(c!=EOF && endTag[n]);
+
+        if(!endTag[n] &&
+           (c=='>' || c=='/' || c==' ' || c=='\r' || c=='\t'))
+        {
+            quote = 0;
+            while(c!=EOF && (c!='>' || quote))
+            {
+                if(!quote && (c=='"' || c=='\''))
+                    quote = c;
+                else if(c==quote)
+                    quote = 0;
+                c=HTMLgetc();
+            }
+            return c;
+        }
+    } while(c!=EOF);
 
     return c;
 }
@@ -1785,7 +1801,8 @@ int LOCAL SkipRawTextContent(const char *endTag, int c)
 int LOCAL HandleScript(int c)
 {
     char buf[128];
-    int n;
+    int n, quote;
+    Boolean endFound;
     long pos1,pos2;
 
     if(c=='>')                          // skip over ">" of script tag
@@ -1794,6 +1811,7 @@ int LOCAL HandleScript(int c)
     pos1 = AddJavaScript("\n", 1);
     
     n = 0;
+    endFound = FALSE;
     do {
       while(n<sizeof(buf) && c!=EOF && c!=endScript[0])
       {
@@ -1807,12 +1825,32 @@ int LOCAL HandleScript(int c)
         n = 0;                          // characters have been dealt with
       }
       
-      while (c!=EOF && c<128 && (toupper(c)==endScript[n]))
+      while (c!=EOF && c<128 && endScript[n] &&
+             (toupper(c)==endScript[n]))
       {
         buf[n++] = (char)c;
         c=HTMLgetc();
       }
-    } while(c!=EOF && endScript[n]);    // until end-of-script or end-of-file
+
+      if(!endScript[n] &&
+         (c=='>' || c=='/' || c==' ' || c=='\r' || c=='\t'))
+      {
+        n = 0;                          // discard the end tag name
+        quote = 0;
+        while(c!=EOF && (c!='>' || quote))
+        {
+          if(!quote && (c=='"' || c=='\''))
+            quote = c;
+          else if(c==quote)
+            quote = 0;
+          c=HTMLgetc();
+        }
+        endFound = TRUE;
+      }
+    } while(c!=EOF && !endFound);       // until end-of-script or end-of-file
+
+    if(n)                               // flush an unterminated end-tag prefix
+      AddJavaScript(buf, n);
 
     pos2 = AddJavaScript("\n", 1);      // make sure contents are properly split
     CleanupJavaScript(pos1, pos2);      // remove comments around script code

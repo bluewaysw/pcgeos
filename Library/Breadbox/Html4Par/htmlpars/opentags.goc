@@ -514,7 +514,8 @@ Boolean LOCAL ParseSrcsetDensity(char *start, char *end,
     return TRUE;
 }
 
-char * LOCAL FindSmallestSrcset(char *srcset, char *buf, word bufSize)
+char * LOCAL FindSmallestSrcset(char *srcset, char *src,
+                               char *buf, word bufSize)
 {
     char *p, *candidate, *candidateEnd, *descriptor, *descriptorEnd;
     char *urlEnd, *q;
@@ -598,6 +599,13 @@ char * LOCAL FindSmallestSrcset(char *srcset, char *buf, word bufSize)
         p = *candidateEnd ? candidateEnd + 1 : candidateEnd;
     }
 
+    /* SRC supplies 1x only when the density set has no smaller choice. */
+    if(!haveWidth && haveDensity && bestDensity > 0x10000UL && src) {
+        while(*src == ' ')
+            src++;
+        if(*src)
+            return src;
+    }
     return (haveWidth || haveDensity) ? buf : (char *)0;
 }
 
@@ -612,7 +620,7 @@ word LOCAL ParseImage(optr paramArray, word element, Boolean parseName)
     HTMLimageData id;
     VisTextCharAttr vcaImage;
     VisTextGraphic vtg;
-    char *altName, *p, *srcset;
+    char *altName, *p, *src, *srcset;
     char selectedSrc[SRCSET_URL_BUFFER_SIZE];
 @ifdef DO_DBCS
     const char c_graphic[] = {C_SUBSTITUTE, 0};
@@ -651,12 +659,13 @@ word LOCAL ParseImage(optr paramArray, word element, Boolean parseName)
 	}
     }
 
+    src = GetParamValue(paramArray, "SRC");
     srcset = parseName ? GetParamValue(paramArray, "SRCSET") : (char *)0;
     p = (srcset && *srcset) ?
-        FindSmallestSrcset(srcset, selectedSrc, sizeof(selectedSrc)) :
+        FindSmallestSrcset(srcset, src, selectedSrc, sizeof(selectedSrc)) :
         (char *)0;
     if(!p)
-        p = GetParamValue(paramArray, "SRC");
+        p = src;
     if(p && *p)                         /* image filename */
     {
       while (*p == ' ') p++;            /* skip leading spaces */
