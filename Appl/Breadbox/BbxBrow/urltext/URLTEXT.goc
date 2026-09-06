@@ -64,6 +64,15 @@ extern void UserAbortEnd(void);
 
 @classdecl URLTextClass;
 
+typedef struct {
+    word index;
+    NameToken nameT;
+    Boolean objCache;
+#if PROGRESS_DISPLAY
+    Boolean progressCanceled;
+#endif
+} URLTextRequestGraphic;
+
 @extern method URLTextClass, MSG_META_CLIPBOARD_COPY ;
 @extern method URLTextClass, MSG_URL_TEXT_COPY_IMAGE_TO_CLIPBOARD ;
 
@@ -219,30 +228,27 @@ extern Boolean G_fetchWhileImport;
 @method URLTextClass, MSG_URL_TEXT_LOAD_GRAPHIC_PROGRESS
 {
     static TCHAR nullName[] = _TEXT("");
+    URLTextRequestGraphic *requestP;
+    Boolean canceled;
     extern Boolean G_stopped;
 
     if (loadProgressDataP) {
-    if(G_stopped)
+    canceled = G_stopped;
+    if(!canceled)
+        canceled = !ImportThreadRequestImportGraphic(
+          oself,
+          loadProgressDataP->LPD_nameT,
+          loadProgressDataP->LPD_mimeType,
+          nullName,  /* have data stream, don't need filename */
+          FALSE, loadProgressDataP);
+    if(canceled)
     {
-        ThreadPSem(loadProgressDataP->LPD_sem);
-        loadProgressDataP->LPD_callback = 0;
-        ThreadVSem(loadProgressDataP->LPD_sem);
-#ifdef ALLOW_FETCH_WHILE_IMPORTING
-        if(G_fetchWhileImport)
-            G_importActive[loadProgressDataP->LPD_loadThread] = FALSE;
-        else
-#endif
-            ThreadVSem(loadProgressDataP->LPD_importSync);
-        /* Fetch acknowledgement owns the name token and pending count. */
-        return;
-    }
-    if(!ImportThreadRequestImportGraphic(
-        oself,
-        loadProgressDataP->LPD_nameT,
-        loadProgressDataP->LPD_mimeType,
-        nullName,  /* have data stream, don't need filename */
-        FALSE, loadProgressDataP))
-    {
+EC(     EC_ERROR_IF(!loadProgressDataP->LPD_request, -1); )
+        URLFetchExtraMemoryLock(loadProgressDataP->LPD_request);
+        requestP = URLFetchExtraMemoryDeref(
+          loadProgressDataP->LPD_request);
+        requestP->progressCanceled = TRUE;
+        URLFetchExtraMemoryUnlock(loadProgressDataP->LPD_request);
         ThreadPSem(loadProgressDataP->LPD_sem);
         loadProgressDataP->LPD_callback = 0;
         ThreadVSem(loadProgressDataP->LPD_sem);
@@ -685,12 +691,6 @@ word _pascal _export LoadGraphicProgressCallback(_LoadProgressParams_,
 }
 @endif
 
-typedef struct {
-    word index ;
-    NameToken nameT ;
-    Boolean objCache ;
-} URLTextRequestGraphic ;
-
 void IReplaceGraphic(optr oself, ObjCacheToken oct, HTMLimageData *p, word i,
 		     word invalFrom, word invalTo);
 
@@ -763,6 +763,9 @@ EC(   NamePoolIsTokenValid(namePool, nameT, TRUE) ; )
       /* Token is released when request is finished */
 
       p_request->objCache = objCache ;
+#if PROGRESS_DISPLAY
+      p_request->progressCanceled = FALSE;
+#endif
       URLFetchExtraMemoryUnlock(request) ;
 
 #if PROGRESS_DISPLAY
@@ -770,6 +773,7 @@ EC(   NamePoolIsTokenValid(namePool, nameT, TRUE) ; )
       loadProgressData.LPD_callback = loadProgressCallback;
       loadProgressData.LPD_textObj = oself;
       loadProgressData.LPD_nameT = nameT;
+      loadProgressData.LPD_request = request;
       /* other fields are initialized by fetch thread */
       URLFetchRequest(
           nameT,
@@ -1007,8 +1011,9 @@ EC( NamePoolIsTokenValid(namePool, request.nameT, TRUE) ; )
 
     /* A fetch acknowledgement can arrive after the import abort barrier. */
 #if PROGRESS_DISPLAY
-    if(G_stopped && ret != URL_RET_PROGRESS &&
-       ret != URL_RET_PROGRESS_ABORT)
+    if(request.progressCanceled ||
+       (G_stopped && ret != URL_RET_PROGRESS &&
+        ret != URL_RET_PROGRESS_ABORT))
 #else
     if(G_stopped)
 #endif
@@ -1016,7 +1021,8 @@ EC( NamePoolIsTokenValid(namePool, request.nameT, TRUE) ; )
         if(ret == URL_RET_MESSAGE && OptrToHandle(result.htmlMsg) &&
            OptrToChunk(result.htmlMsg) == 0)
             MemFree(OptrToHandle(result.htmlMsg));
-        if(temporary && ret == URL_RET_FILE)
+        if(temporary &&
+           (ret == URL_RET_FILE || ret == URL_RET_PROGRESS))
             FileDelete(result.curHTML);
         @call oself::MSG_URL_TEXT_INTERNAL_CANCEL_LIKE_GRAPHICS(
           request.nameT);
@@ -2235,6 +2241,9 @@ extern void PCAddRemoveHostFromURL(TCHAR *url, ParentalControlFlags *, Boolean a
 	p_request->index = 0;  /* not used */
 	p_request->nameT = fullURL;
 	p_request->objCache = objCache;
+#if PROGRESS_DISPLAY
+	p_request->progressCanceled = FALSE;
+#endif
 	URLFetchExtraMemoryUnlock(request);
 	URLFetchRequest(
 	    fullURL,
