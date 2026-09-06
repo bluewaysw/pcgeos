@@ -488,8 +488,16 @@ Boolean HandleJumpword(TCHAR *url)
 @extern method HTMLVProcessClass, MSG_HMLVP_JUMP
 {
     MemHandle jumpBlk, jumpArgs;
-    word jumpSize, jumpURLLen;
-    TCHAR *jumpURL, *jumpArgP;
+    word jumpSize, jumpURLLen, jumpArgLen;
+    dword jumpBlockSize;
+    TCHAR *jumpURL;
+    char *jumpArgP;
+    T_formString *jumpArgsP;
+    Boolean encoded;
+    int jLen;
+@ifdef DO_DBCS
+    word i;
+@endif
     NameToken url;
     EventHandle evt;
 #ifdef SECURE_INI_URLS
@@ -520,36 +528,77 @@ Boolean HandleJumpword(TCHAR *url)
     if (jumpBlk) {
 #endif
     if (jumpSize) {
-        int jLen;
         jLen = @call JumpEntry::MSG_VIS_TEXT_GET_TEXT_SIZE();
-        MemReAlloc(jumpBlk, jumpSize+((jLen+1)*sizeof(TCHAR)), HAF_STANDARD);
-        jumpURL = MemLock(jumpBlk);
-        jumpURLLen = strlen(jumpURL);
-        /* append jumpword to jump URL, temporarily */
-        @call JumpEntry::MSG_VIS_TEXT_GET_ALL_PTR(
-        jumpURL+jumpURLLen);
-        /* URL-encode jumpword, if any */
-        if (*(jumpURL+jumpURLLen)) {
-            jumpArgs = FormStringCreate();
-            if (jumpArgs) {
-                FormStringConvertAndAppend(jumpArgs, jumpURL+jumpURLLen);
-                jumpArgP = MemLock(jumpArgs);
-                if (jumpArgP &&
-                    !(((T_formString *)jumpArgP)->flags &
-                      FORM_STRING_FLAG_TRUNCATED)) {
-                    jumpArgP = FormStringDerefData(jumpArgs);
-                    /* append URL-encoded jumpword */
-                    strcpy(jumpURL+jumpURLLen, jumpArgP);
-                    url = NamePoolTokenize(namePool, jumpURL, TRUE);
-                    evt = @record URLDocumentClass::
-                    MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
-                    @send application::MSG_META_SEND_CLASSED_EVENT(
-                        evt, TO_APP_MODEL);
+        jumpBlockSize =
+            ((dword)jumpSize + (dword)jLen + 1) * sizeof(TCHAR);
+        if (jumpBlockSize <= 0xfff0L &&
+            MemReAlloc(jumpBlk, (word)jumpBlockSize, HAF_NO_ERR)) {
+            jumpURL = MemLock(jumpBlk);
+            jumpURLLen = strlen(jumpURL);
+            /* append jumpword to jump URL, temporarily */
+            @call JumpEntry::MSG_VIS_TEXT_GET_ALL_PTR(
+                jumpURL+jumpURLLen);
+            /* URL-encode jumpword, if any */
+            if (*(jumpURL+jumpURLLen)) {
+                jumpArgs = FormStringCreate();
+                if (jumpArgs) {
+                    FormStringConvertAndAppend(
+                        jumpArgs, jumpURL+jumpURLLen);
+                    encoded = FALSE;
+                    jumpArgsP = MemLock(jumpArgs);
+                    if (jumpArgsP &&
+                        !(jumpArgsP->flags & FORM_STRING_FLAG_TRUNCATED)) {
+                        jumpArgLen = jumpArgsP->numChars;
+                        encoded = TRUE;
+                    }
+                    if (jumpArgsP) {
+                        MemUnlock(jumpArgs);
+                    }
+                    MemUnlock(jumpBlk);
+
+                    if (encoded) {
+                        jumpBlockSize =
+                            ((dword)jumpURLLen + jumpArgLen) *
+                                sizeof(TCHAR);
+                        if (jumpBlockSize <= 0xfff0L &&
+                            MemReAlloc(jumpBlk, (word)jumpBlockSize,
+                                       HAF_NO_ERR)) {
+                            jumpURL = MemLock(jumpBlk);
+                            jumpArgsP = MemLock(jumpArgs);
+                            jumpArgP = FormStringDerefData(jumpArgs);
+@ifdef DO_DBCS
+                            EC_ERROR_IF(jumpArgLen !=
+                                strlensbcs(jumpArgP)+1, -1);
+@else
+                            EC_ERROR_IF(jumpArgLen !=
+                                strlen(jumpArgP)+1, -1);
+@endif
+                            EC_ERROR_IF((dword)MemGetInfo(
+                                jumpBlk, MGIT_SIZE) < jumpBlockSize, -1);
+                            /* append URL-encoded jumpword */
+@ifdef DO_DBCS
+                            for (i = 0; i < jumpArgLen; i++) {
+                                jumpURL[jumpURLLen+i] =
+                                    (byte)jumpArgP[i];
+                            }
+@else
+                            strcpy(jumpURL+jumpURLLen, jumpArgP);
+@endif
+                            url = NamePoolTokenize(namePool, jumpURL, TRUE);
+                            evt = @record URLDocumentClass::
+                            MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+                            @send application::MSG_META_SEND_CLASSED_EVENT(
+                                evt, TO_APP_MODEL);
+                            MemUnlock(jumpArgs);
+                            MemUnlock(jumpBlk);
+                        }
+                    }
+                    MemFree(jumpArgs);
+                } else {
+                    MemUnlock(jumpBlk);
                 }
-                if (jumpArgP) {
-                    MemUnlock(jumpArgs);
-                }
-                MemFree(jumpArgs);
+            } else {
+                MemUnlock(jumpBlk);
             }
         }
     }
