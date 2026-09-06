@@ -243,15 +243,16 @@ extern Boolean G_fetchWhileImport;
         nullName,  /* have data stream, don't need filename */
         FALSE, loadProgressDataP))
     {
+        ThreadPSem(loadProgressDataP->LPD_sem);
+        loadProgressDataP->LPD_callback = 0;
+        ThreadVSem(loadProgressDataP->LPD_sem);
 #ifdef ALLOW_FETCH_WHILE_IMPORTING
         if(G_fetchWhileImport)
             G_importActive[loadProgressDataP->LPD_loadThread] = FALSE;
         else
 #endif
             ThreadVSem(loadProgressDataP->LPD_importSync);
-        @call oself::MSG_URL_TEXT_INTERNAL_CANCEL_LIKE_GRAPHICS(
-          loadProgressDataP->LPD_nameT);
-        @call oself::MSG_URL_TEXT_DEC_PENDING();
+        /* Fetch acknowledgement owns the name token and pending count. */
     }
     }
 }
