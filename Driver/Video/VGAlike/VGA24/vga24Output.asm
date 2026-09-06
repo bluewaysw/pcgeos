@@ -63,13 +63,14 @@ NMEM <          mov     si, cs:[modeInfo].VMI_scanSize  ; optimization   >
                 mov     bl, cs:[currentColor].RGB_blue
                 mov     ax, {word} cs:[currentColor].RGB_red  ; get current color index
                 xchg    al, ah                          ; different byte order
-
+              
 		; calculate #bytes in the middle of the line and
 		; offset to next line
 
 		inc	dx			; total #bytes in line
 
 		mov	cx, dx			; setup count
+                jcxz    done
                 mov     dx, cs:[pixelRestBytes]        
 
 NMEM <          cmp     di, cs:[lastWinPtr]     ; is it in the last line   >

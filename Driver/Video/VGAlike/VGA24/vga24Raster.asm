@@ -2383,12 +2383,10 @@ noteven:
 
                 pop     es
 
-                xchg    al, ah
-
-                xchg    bx, bp
+                xchg    cx, bp
                 test    dh, 0x80
                 call    PutSplitedPixelMask
-                xchg    bx, bp
+                xchg    cx, bp
                 pop     ax, bx
                 rol     dh
                 xor     dl, 1
