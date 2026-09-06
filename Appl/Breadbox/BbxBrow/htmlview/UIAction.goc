@@ -531,19 +531,26 @@ Boolean HandleJumpword(TCHAR *url)
         /* URL-encode jumpword, if any */
         if (*(jumpURL+jumpURLLen)) {
             jumpArgs = FormStringCreate();
-            FormStringConvertAndAppend(jumpArgs, jumpURL+jumpURLLen);
-            jumpArgP = MemLock(jumpArgs);
-            if (jumpArgP) {
-                jumpArgP = FormStringDerefData(jumpArgs);
-                /* append URL-encoded jumpword */
-                strcpy(jumpURL+jumpURLLen, jumpArgP);
-                url = NamePoolTokenize(namePool, jumpURL, TRUE);
-                evt = @record URLDocumentClass::
-                MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
-                @send application::MSG_META_SEND_CLASSED_EVENT(
-                    evt, TO_APP_MODEL);
+            if (jumpArgs) {
+                FormStringConvertAndAppend(jumpArgs, jumpURL+jumpURLLen);
+                jumpArgP = MemLock(jumpArgs);
+                if (jumpArgP &&
+                    !(((T_formString *)jumpArgP)->flags &
+                      FORM_STRING_FLAG_TRUNCATED)) {
+                    jumpArgP = FormStringDerefData(jumpArgs);
+                    /* append URL-encoded jumpword */
+                    strcpy(jumpURL+jumpURLLen, jumpArgP);
+                    url = NamePoolTokenize(namePool, jumpURL, TRUE);
+                    evt = @record URLDocumentClass::
+                    MSG_URL_DOCUMENT_LOAD_URL(url, DIR_GO);
+                    @send application::MSG_META_SEND_CLASSED_EVENT(
+                        evt, TO_APP_MODEL);
+                }
+                if (jumpArgP) {
+                    MemUnlock(jumpArgs);
+                }
+                MemFree(jumpArgs);
             }
-            MemFree(jumpArgs);
         }
     }
     MemFree(jumpBlk);
