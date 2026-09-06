@@ -88,9 +88,9 @@ $TARGET_LANGUAGE = $ENV{TARGET_LANG} || "english";   # start out with English
 use File::Find;
 use File::Copy;
 use File::Path qw(rmtree);
+use Getopt::Long qw(GetOptions);
 
-require "newgetopt.pl";
-NGetOpt("debug", "help", "i=s", "s=s", "nolocal", "noprompt", "template", "xip");
+GetOptions("debug", "help", "i=s", "s=s", "nolocal", "noprompt", "template", "xip");
 
 $opt_help = $opt_help;			# To get rid of warning
 if ( $opt_help ) {
