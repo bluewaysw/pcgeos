@@ -89,7 +89,7 @@ endif
 	mov	dx, TEMP_GEN_PATH_SAVED_DISK_HANDLE
 	call	BuildDiskAndPathNameFromVarData
 
-if GPC_FILE_OP_DIALOG_PATHNAME
+if GPC_FILE_OP_DIALOG_PATHNAME or _NEWDESK
 	mov	di, sp		; es:di = path
 	clr	bx		; path contains drive name
 	call	FileParseStandardPath
@@ -188,7 +188,7 @@ endif
 done:
 	ret
 
-if GPC_FILE_OP_DIALOG_PATHNAME
+if GPC_FILE_OP_DIALOG_PATHNAME or _NEWDESK
 getStrLen:
 SBCS <	clr	al >
 DBCS <	clr	ax >
