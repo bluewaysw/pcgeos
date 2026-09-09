@@ -60,6 +60,92 @@
 
 /******************************************************************************/
 
+/* Attributes whose values are consumed by this parser.
+ * Keep this list in sync with GetParamValue and ParseEvent consumers when
+ * adding or changing tag attribute handling.
+ */
+@chunk HTMLAttributeName HTMLAttributeNames[HTML_ATTRIBUTE_COUNT] =
+{
+  {"ACCEPT"},
+  {"ACTION"},
+  {"ALIGN"},
+  {"ALT"},
+  {"BACKGROUND"},
+  {"BGCOLOR"},
+  {"BORDER"},
+  {"CELLPADDING"},
+  {"CELLSPACING"},
+  {"CHARSET"},
+  {"CHECKED"},
+  {"CLEAR"},
+  {"COLOR"},
+  {"COLS"},
+  {"COLSPAN"},
+  {"CONTENT"},
+  {"COORDS"},
+  {"ENCODING"},
+  {"ENCTYPE"},
+  {"FACE"},
+  {"FRAMEBORDER"},
+  {"HEIGHT"},
+  {"HREF"},
+  {"HSPACE"},
+  {"HTTP-EQUIV"},
+  {"ISMAP"},
+#if HTML_SCRIPT_SUPPORT
+  {"LANGUAGE"},
+#endif
+  {"LEFTMARGIN"},
+  {"LINK"},
+  {"MARGINHEIGHT"},
+  {"MARGINWIDTH"},
+  {"MAXLENGTH"},
+  {"METHOD"},
+  {"MULTIPLE"},
+  {"NAME"},
+  {"NOWRAP"},
+#if HTML_SCRIPT_SUPPORT
+  {"ONABORT"},
+  {"ONBLUR"},
+  {"ONCHANGE"},
+  {"ONCLICK"},
+  {"ONERROR"},
+  {"ONFOCUS"},
+  {"ONLOAD"},
+  {"ONMOUSEOUT"},
+  {"ONMOUSEOVER"},
+  {"ONRESET"},
+  {"ONSELECT"},
+  {"ONSUBMIT"},
+  {"ONUNLOAD"},
+#endif
+  {"READONLY"},
+  {"ROWS"},
+  {"ROWSPAN"},
+  {"SCROLLING"},
+  {"SELECTED"},
+  {"SEQNUM"},
+  {"SHAPE"},
+  {"SIZE"},
+  {"SKIP"},
+  {"SRC"},
+  {"SRCSET"},
+  {"START"},
+  {"STYLE"},
+  {"TARGET"},
+  {"TEXT"},
+  {"TOPMARGIN"},
+  {"TYPE"},
+  {"USEMAP"},
+  {"VALIGN"},
+  {"VALUE"},
+  {"VLINK"},
+  {"VSPACE"},
+  {"WIDTH"}
+};
+
+/******************************************************************************/
+
 @chunk HTMLStylesTable HTMLStylesChunk[] =
 {
   {"",          OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
@@ -81,11 +167,19 @@
         },
   {"APPLET",    OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_NONE,
-        TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT,
+        TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT|TAG_IGNORE_TAGS,
         },
   {"AREA",      OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_AREA,
         0,
+        },
+  {"ARTICLE",   OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_PAR_STYLE,
+        },
+  {"ASIDE",     OptrToChunk(@vcdNone), OptrToChunk(@vpdBlockquote),
+        SPEC_NONE,
+        TAG_PAR_SPACING|TAG_IS_PAR_STYLE,
         },
   {"B",         OptrToChunk(@vcdBold),   OptrToChunk(@vpdNone),
     SPEC_NONE,
@@ -143,7 +237,10 @@
         TAG_IS_PAR_STYLE,
         },
 
-  /*** DEL: to be implemented ***/
+  {"DEL",      OptrToChunk(@vcdStrike), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_CHAR_STYLE,
+        },
 
   {"DFN",       OptrToChunk(@vcdItalic), OptrToChunk(@vpdNone),
     SPEC_NONE,
@@ -178,9 +275,21 @@
 
   /*** FIELDSET: to be implemented ***/
 
+  {"FIGCAPTION",OptrToChunk(@vcdSmall), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_PAR_STYLE,
+        },
+  {"FIGURE",    OptrToChunk(@vcdNone), OptrToChunk(@vpdBlockquote),
+        SPEC_NONE,
+        TAG_PAR_SPACING|TAG_IS_PAR_STYLE,
+        },
   {"FONT",      OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_FONT,
     TAG_IS_CHAR_STYLE,
+        },
+  {"FOOTER",    OptrToChunk(@vcdSmall), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_PAR_STYLE,
         },
   {"FORM",     OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_FORM,
@@ -222,6 +331,10 @@
     SPEC_HEAD,
         TAG_IS_PAR_STYLE|TAG_NO_FORMATTING,
         },
+  {"HEADER",    OptrToChunk(@vcdNone), OptrToChunk(@vpdHeading),
+        SPEC_NONE,
+        TAG_PAR_SPACING|TAG_IS_PAR_STYLE,
+        },
   {"HR",        OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
     SPEC_HR,
     0,
@@ -256,7 +369,10 @@
     0,
         },
 
-  /*** INS: to be implemented ***/
+  {"INS",      OptrToChunk(@vcdUnderline), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_CHAR_STYLE,
+        },
   /*** ISINDEX: to be implemented. ***/
 
   {"KBD",       OptrToChunk(@vcdMono),   OptrToChunk(@vpdNone),
@@ -278,6 +394,10 @@
 
   /*** LINK: to be implemented? ***/
 
+  {"MAIN",      OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
+        SPEC_NONE,
+        TAG_IS_PAR_STYLE,
+        },
   {"MAP",       OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_MAP,
         TAG_IS_PAR_STYLE|TAG_NO_FORMATTING,
@@ -289,6 +409,10 @@
   {"META",      OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_META,
         0,
+        },
+  {"NAV",       OptrToChunk(@vcdNone), OptrToChunk(@vpdMenu),
+        SPEC_NONE,
+        TAG_IS_PAR_STYLE,
         },
 
   {"NOBR",         OptrToChunk(@vcdNOBR),   OptrToChunk(@vpdNone),
@@ -357,6 +481,10 @@
         SPEC_SCRIPT,
         TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT|TAG_IGNORE_TAGS,
         },
+  {"SECTION",   OptrToChunk(@vcdNone), OptrToChunk(@vpdHeading),
+        SPEC_NONE,
+        TAG_PAR_SPACING|TAG_IS_PAR_STYLE,
+        },
   {"SELECT",    OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_SELECT,
         TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT,
@@ -379,7 +507,7 @@
         },
   {"STYLE",    OptrToChunk(@vcdNone), OptrToChunk(@vpdNone),
         SPEC_STYLE,
-        TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT,
+        TAG_IS_PAR_STYLE|TAG_NO_FORMATTING|TAG_FLUSH_TEXT|TAG_IGNORE_TAGS,
         },
   {"SUB",       OptrToChunk(@vcdSubscript), OptrToChunk(@vpdNone),
     SPEC_NONE,

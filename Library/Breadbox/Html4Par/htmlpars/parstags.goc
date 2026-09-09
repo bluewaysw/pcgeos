@@ -1010,6 +1010,7 @@ void OpenTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
 {
     TagOpenArguments arg;
     word i;
+    Boolean paramsPreserved;
 
     MemLock( OptrToHandle(@HTMLStylesChunk) );
     memcpy( &arg.ca, LMemDerefHandles( OptrToHandle(@HTMLStylesChunk),
@@ -1026,6 +1027,7 @@ void OpenTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
     arg.paramArray = paramArray;
     arg.tagStack = LMemDeref(tagStackO);
     arg.preserveParams = FALSE;
+    paramsPreserved = FALSE;
     arg.countStart = 1;
     arg.flags = tagStyleEntry->flags;   /* allow tag handler to modify flags */
 
@@ -1065,6 +1067,7 @@ void OpenTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
       arg.tagStack[tagStackPtr].spec = arg.spec;
       arg.tagStack[tagStackPtr].count = arg.countStart;
       arg.tagStack[tagStackPtr].startPos = textpos;
+      paramsPreserved = arg.preserveParams;
 
       if(arg.flags & TAG_IS_PAR_STYLE)  /* handling for paragraph tags */
       {
@@ -1076,7 +1079,8 @@ void OpenTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
     }
 
     GetCurrentStyles();                 /* refresh cached style data */
-    if(paramArray && !arg.preserveParams)
+    /* Only a pushed stack entry takes ownership of preserved parameters. */
+    if(paramArray && !paramsPreserved)
                                         /* if there is one to be released... */
       LMemFree(paramArray);             /* forget array with parameters */
 }
