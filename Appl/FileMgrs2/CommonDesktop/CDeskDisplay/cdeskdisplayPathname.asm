@@ -209,7 +209,7 @@ PathnameStorageSetPathname	endm
 
 FileOperation ends
 
-if GPC_FILE_OP_DIALOG_PATHNAME
+if GPC_FILE_OP_DIALOG_PATHNAME or _NEWDESK
 FileOpDialogStrings	segment lmem LMEM_TYPE_GENERAL
 docDirText	chunk
 	TCHAR	"Documents\\", 0  
