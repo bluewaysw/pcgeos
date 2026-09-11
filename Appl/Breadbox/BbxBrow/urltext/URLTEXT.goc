@@ -691,6 +691,67 @@ word _pascal _export LoadGraphicProgressCallback(_LoadProgressParams_,
 }
 @endif
 
+typedef struct {
+    word index ;
+    NameToken nameT ;
+    Boolean objCache ;
+} URLTextRequestGraphic ;
+
+#define IMAGE_URL_EXTENSION_MAX 16
+
+/*
+ * Return TRUE only when the URL gives us a known image type and no installed
+ * MIME driver handles it. Unknown and extensionless URLs must reach HTTP.
+ */
+static Boolean _pascal
+ImageURLGetUnsupportedFormat(NameToken nameT)
+{
+    TCHAR url[HTML_STATIC_BUF];
+    TCHAR extension[IMAGE_URL_EXTENSION_MAX];
+    TCHAR mimeType[MIME_MAXBUF];
+    FileLongName driver;
+    TCHAR *urlP;
+    TCHAR *end;
+    TCHAR *fragment;
+    TCHAR *slash;
+    TCHAR *dot;
+    word extensionLength;
+    Boolean unsupported;
+
+    unsupported = FALSE;
+    NamePoolCopy(namePool, url, sizeof(url), nameT, &urlP);
+
+    end = strchr(urlP, '?');
+    fragment = strchr(urlP, '#');
+    if(!end || (fragment && fragment < end))
+        end = fragment;
+    if(end)
+        *end = 0;
+
+    slash = strrchr(urlP, '/');
+    dot = strrchr(urlP, '.');
+    if(dot && (!slash || dot > slash) && dot[1])
+    {
+        extensionLength = strlen(dot + 1);
+        if(extensionLength < IMAGE_URL_EXTENSION_MAX)
+        {
+            strcpy(extension, dot + 1);
+            strupr(extension);
+            if(NameAssocFindAssociation(assocExtType, extension,
+                 mimeType, sizeof(mimeType), TRUE, (void *)0) &&
+               !LocalCmpStringsNoCase(mimeType, _TEXT("image/"), 6) &&
+               !NameAssocFindAssociation(assocTypeDriver, mimeType,
+                 driver, sizeof(driver), TRUE, (void *)0))
+            {
+                unsupported = TRUE;
+            }
+        }
+    }
+
+    NamePoolDestroyIfDynamic(urlP);
+    return unsupported;
+}
+
 void IReplaceGraphic(optr oself, ObjCacheToken oct, HTMLimageData *p, word i,
 		     word invalFrom, word invalTo);
 
@@ -746,6 +807,11 @@ Boolean LOCAL ProcessSingleGraphic(HTMLimageData *p, optr oself,
 	 ObjCacheUnlockItem(oct);
 	 NamePoolReleaseToken(namePool, nameT);
      }
+    }
+    else if(ImageURLGetUnsupportedFormat(nameT))
+    {
+      @call oself::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(OCT_NULL,
+        nameT, 0, 0xFFFF);
     }
     else if ((loadUnknownSize || !p->size.XYS_height || !p->size.XYS_width) && (!G_stopped))
     {                                   // possibly load even if size unknown
