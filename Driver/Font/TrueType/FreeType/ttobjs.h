@@ -195,7 +195,6 @@
     Short          delta_shift;
 
     Byte           instruct_control;
-    Bool           scan_control;
     Int            scan_type;
 
     UShort         gep0;
@@ -257,7 +256,6 @@
     Int    Range;     /* in which code range is it located ? */
     UShort Start;     /* where does it start ?               */
     Int    Opc;       /* function #, or instruction code     */
-    Bool   Active;    /* is it active ?                      */
   };
 
   typedef struct TDefRecord_  TDefRecord;
@@ -317,8 +315,7 @@
 #define CALL_INTERPRETER  ( engineInstance.interpreterActive ? RunIns( exec ) : TT_Err_Ok )
 
   /* Rounding function, as used by the interpreter */
-  typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance,
-                                                TT_F26Dot6 compensation );
+  typedef TT_F26Dot6  TRound_Function( EXEC_OPS TT_F26Dot6 distance );
 
   /* Point displacement along the freedom vector routine, as */
   /* used by the interpreter                                 */
@@ -336,7 +333,6 @@
   {
     TT_Fixed    xx, xy; /* transformation */
     TT_Fixed    yx, yy; /*     matrix     */
-    TT_F26Dot6  ox, oy; /*    offsets     */
   };
 
   typedef struct TTransform_  TTransform;
@@ -356,8 +352,8 @@
 
     TGlyph_Zone  zone;
 
-    Long         arg1;  /* first argument  */
-    Long         arg2;  /* second argument */
+    Short        arg1;  /* first argument  */
+    Short        arg2;  /* second argument */
 
     UShort       element_flag;    /* current load element flag */
 
@@ -432,15 +428,10 @@
 
     UShort      resolution;  /* device resolution in dpi. */
     UShort      ppem;        /* maximum ppem size */
-    Long        x_scale1;
-
-    Long        units_per_em;
 
     Long        ratio;       /* current ratio     */
     Long        scale1;
     Long        scale2;      /* scale for ppem */
-
-    TT_F26Dot6  compensations[4];  /* device-specific compensations */
   };
 
   typedef struct TIns_Metrics_  TIns_Metrics;
@@ -560,9 +551,6 @@
     PDefArray        IDefs;     /* table of IDefs entries            */
 
     Int              maxFunc;   /* maximum function definition id    */
-    Int              maxIns;    /* maximum instruction definition id */
-
-    TCodeRangeTable  codeRangeTable;
 
     TGraphicsState   GS;
 
@@ -585,7 +573,6 @@
   struct  TExecution_Context_
   {
     PFace           face;
-    PInstance       instance;
 
     /* instructions state */
 
@@ -617,8 +604,6 @@
     Byte            opcode;    /* current opcode              */
     Int             length;    /* length of current opcode    */
 
-    Bool            step_ins;  /* true if the interpreter must */
-                               /* increment IP after ins. exec */
     UShort          cvtSize;
     PLong           cvt;
 
@@ -634,7 +619,6 @@
     PDefRecord      IDefs;     /* table of IDefs entries             */
 
     Int             maxFunc;
-    Int             maxIns;
 
     Int             callTop,    /* top of call stack during execution */
                     callSize;   /* size of call stack */
@@ -657,8 +641,6 @@
 #ifdef DEBUG_INTERPRETER
     Bool            instruction_trap;  /* If True, the interpreter will */
 #endif                                 /* exit after each instruction   */
-
-    Bool            is_composite;  /* ture if the glyph is composite */
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
    Bool            pedantic_hinting;  /* if true, read and write array   */
@@ -718,18 +700,6 @@
                             UShort              IP );
 
 
-  /* Set a given code range properties */
-  LOCAL_DEF
-  TT_Error  Set_CodeRange( PExecution_Context  exec,
-                           Int                 range,
-                           void*               base,
-                           UShort              length );
-
-  /* Clear a given coderange */
-  LOCAL_DEF
-  TT_Error  Clear_CodeRange( PExecution_Context  exec, Int  range );
-
-
   LOCAL_DEF
   PExecution_Context  New_Context( PFace  face );
 
@@ -743,11 +713,11 @@
                           PInstance           ins );
 
   LOCAL_DEF
-  void      Context_Save( PExecution_Context  exec,
-                          PInstance           ins );
-
-  LOCAL_DEF
+  #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
   TT_Error  Context_Run( PExecution_Context  exec );
+  #else
+  void      Context_Run( PExecution_Context  exec );
+  #endif
 
   LOCAL_DEF
   TT_Error  Instance_Init( PInstance  ins );

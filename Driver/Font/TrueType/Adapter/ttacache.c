@@ -114,7 +114,7 @@ Boolean _pascal TrueType_Cache_LoadFontBlock(VMFileHandle cacheFile, const TCHAR
 			    {
 				*fontHandle = MemAllocSetOwner( FONT_MAN_ID, size, 
 						HF_SWAPABLE | HF_SHARABLE,
-						HAF_NO_ERR | HAF_LOCK | HAF_ZERO_INIT );
+						HAF_NO_ERR | HAF_LOCK );
 EC(             		ECCheckMemHandle( *fontHandle ) );
 				HandleP( *fontHandle );
 			    }

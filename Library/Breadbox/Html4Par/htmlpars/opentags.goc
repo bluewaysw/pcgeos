@@ -24,6 +24,7 @@
 #include <Ansi/stdlib.h>
 #include <Ansi/ctype.h>
 #include <geoMisc.h>
+#include <localize.h>
 @include <initfile.h>
 
 @include <html4par.goh>
@@ -442,6 +443,177 @@ Boolean ParseVALIGN(optr paramArray, ByteFlags *cellFlags)
     return FALSE;
 }
 
+#define IS_SRCSET_SPACE(c) \
+    ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\f' || (c) == '\r')
+
+Boolean LOCAL ParseSrcsetDensity(char *start, char *end,
+                                 WWFixedAsDWord *density)
+{
+    char *p, *mantissaEnd, *parseEnd;
+    WWFixedAsDWord value;
+    word digits, exponent, i;
+    Boolean exponentNegative;
+
+    p = start;
+    digits = 0;
+    while(p < end && isdigit((unsigned char)*p)) {
+        p++;
+        digits++;
+    }
+    if(p < end && *p == '.') {
+        p++;
+        if(p == end || !isdigit((unsigned char)*p))
+            return FALSE;
+        while(p < end && isdigit((unsigned char)*p)) {
+            p++;
+            digits++;
+        }
+    }
+    if(!digits)
+        return FALSE;
+
+    mantissaEnd = p;
+    exponent = 0;
+    exponentNegative = FALSE;
+    if(p < end && (*p == 'e' || *p == 'E')) {
+        p++;
+        if(p < end && (*p == '+' || *p == '-')) {
+            exponentNegative = (*p == '-') ? TRUE : FALSE;
+            p++;
+        }
+        if(p == end || !isdigit((unsigned char)*p))
+            return FALSE;
+        while(p < end && isdigit((unsigned char)*p)) {
+            if(exponent <= 9)
+                exponent = exponent * 10 + (*p - '0');
+            p++;
+        }
+    }
+    if(p != end || exponent > 9)
+        return FALSE;
+
+    value = LocalAsciiToFixed(start, &parseEnd);
+    if(parseEnd != mantissaEnd || !value || value > 0x7fffffffUL)
+        return FALSE;
+
+    for(i = 0; i < exponent; i++) {
+        if(exponentNegative) {
+            value = (value + 5) / 10;
+        } else {
+            if(value > 0x7fffffffUL / 10)
+                return FALSE;
+            value *= 10;
+        }
+    }
+    if(!value)
+        return FALSE;
+
+    *density = value;
+    return TRUE;
+}
+
+char * LOCAL FindSmallestSrcset(char *srcset, char *src, word *selectedLen)
+{
+    char *p, *candidate, *candidateEnd, *descriptor, *descriptorEnd;
+    char *urlEnd, *q, *selected;
+    dword width, bestWidth;
+    WWFixedAsDWord density, bestDensity;
+    word urlLen, bestLen;
+    Boolean haveWidth, haveDensity, valid;
+
+    if(!srcset || !selectedLen)
+        return (char *)0;
+
+    haveWidth = FALSE;
+    haveDensity = FALSE;
+    selected = (char *)0;
+    bestLen = 0;
+    p = srcset;
+
+    /* ATTENTION: This deliberately uses simple comma splitting and WWFixed.
+       A full WHATWG parser is the upgrade path for wider URL/number syntax. */
+    while(*p) {
+        candidateEnd = p;
+        while(*candidateEnd && *candidateEnd != ',')
+            candidateEnd++;
+
+        candidate = p;
+        while(candidate < candidateEnd && IS_SRCSET_SPACE(*candidate))
+            candidate++;
+        descriptorEnd = candidateEnd;
+        while(descriptorEnd > candidate &&
+              IS_SRCSET_SPACE(descriptorEnd[-1]))
+            descriptorEnd--;
+
+        descriptor = descriptorEnd;
+        while(descriptor > candidate &&
+              !IS_SRCSET_SPACE(descriptor[-1]))
+            descriptor--;
+
+        urlEnd = descriptor;
+        while(urlEnd > candidate && IS_SRCSET_SPACE(urlEnd[-1]))
+            urlEnd--;
+
+        valid = (descriptor > candidate && urlEnd > candidate &&
+                 descriptor < descriptorEnd) ? TRUE : FALSE;
+        for(q = candidate; valid && q < urlEnd; q++) {
+            if(IS_SRCSET_SPACE(*q))
+                valid = FALSE;
+        }
+
+        urlLen = (word)(urlEnd - candidate);
+        if(valid) {
+            if(descriptorEnd[-1] == 'w') {
+                width = 0;
+                q = descriptor;
+                if(q == descriptorEnd - 1)
+                    valid = FALSE;
+                while(valid && q < descriptorEnd - 1) {
+                    if(!isdigit((unsigned char)*q) ||
+                       width > (0xffffffffUL - (*q - '0')) / 10) {
+                        valid = FALSE;
+                    } else {
+                        width = width * 10 + (*q - '0');
+                    }
+                    q++;
+                }
+                if(valid && width && (!haveWidth || width < bestWidth)) {
+                    selected = candidate;
+                    bestLen = urlLen;
+                    bestWidth = width;
+                    haveWidth = TRUE;
+                }
+            } else if(descriptorEnd[-1] == 'x' && !haveWidth &&
+                      ParseSrcsetDensity(descriptor, descriptorEnd - 1,
+                                         &density)) {
+                if(!haveDensity || density < bestDensity) {
+                    selected = candidate;
+                    bestLen = urlLen;
+                    bestDensity = density;
+                    haveDensity = TRUE;
+                }
+            }
+        }
+
+        p = *candidateEnd ? candidateEnd + 1 : candidateEnd;
+    }
+
+    /* SRC supplies 1x only when the density set has no smaller choice. */
+    if(!haveWidth && haveDensity && bestDensity > 0x10000UL && src) {
+        while(*src == ' ')
+            src++;
+        if(*src) {
+            *selectedLen = STRLENSB(src);
+            return src;
+        }
+    }
+    if(haveWidth || haveDensity) {
+        *selectedLen = bestLen;
+        return selected;
+    }
+    return (char *)0;
+}
+
 /*
  *  Handle attributes specific to image-style elements (including
  *  graphical submit buttons) and add entry to image array. If an
@@ -453,7 +625,8 @@ word LOCAL ParseImage(optr paramArray, word element, Boolean parseName)
     HTMLimageData id;
     VisTextCharAttr vcaImage;
     VisTextGraphic vtg;
-    char *altName, *p;
+    char *altName, *p, *src, *srcset;
+    word selectedSrcLen;
 @ifdef DO_DBCS
     const char c_graphic[] = {C_SUBSTITUTE, 0};
 @else
@@ -491,7 +664,14 @@ word LOCAL ParseImage(optr paramArray, word element, Boolean parseName)
 	}
     }
 
-    p = GetParamValue(paramArray, "SRC");
+    src = GetParamValue(paramArray, "SRC");
+    srcset = parseName ? GetParamValue(paramArray, "SRCSET") : (char *)0;
+    selectedSrcLen = 0;
+    p = (srcset && *srcset) ?
+        FindSmallestSrcset(srcset, src, &selectedSrcLen) :
+        (char *)0;
+    if(!p)
+        p = src;
     if(p && *p)                         /* image filename */
     {
       while (*p == ' ') p++;            /* skip leading spaces */
@@ -518,7 +698,9 @@ word LOCAL ParseImage(optr paramArray, word element, Boolean parseName)
 
       id.imageALT = NAME_POOL_NONE;     /* default: no alternative text */
       if (p && *p) {
-	  id.imageURL = NamePoolTokenizeDOS(NamePool, p, FALSE);
+	  id.imageURL = selectedSrcLen ?
+            NamePoolTokenizeLenDOS(NamePool, p, selectedSrcLen, FALSE) :
+            NamePoolTokenizeDOS(NamePool, p, FALSE);
       } else {
 	  id.imageURL = NAME_POOL_NONE;
       }
