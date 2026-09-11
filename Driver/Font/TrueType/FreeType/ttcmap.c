@@ -572,9 +572,9 @@ UShort  code_to_index4( UShort  charCode,
 LOCAL_FUNC
 TT_Error getCharMap( TT_Face face, TT_Face_Properties* faceProperties, TT_CharMap* charMap )
 {
-        TT_UShort           platform;
-        TT_UShort           encoding;
-        UShort              map;
+  TT_UShort  platform;
+  TT_UShort  encoding;
+  UShort     map;
 
 
 	for ( map = 0; map < faceProperties->num_CharMaps; ++map ) 

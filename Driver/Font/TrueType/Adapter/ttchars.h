@@ -27,8 +27,6 @@
  *      varaibles initialized by driver
  ***********************************************************************/
 
-extern word       bitmapSize;
-
 
 /***********************************************************************
  *      functions called by driver

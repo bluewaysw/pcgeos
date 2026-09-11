@@ -166,7 +166,9 @@ void LoadMimeTypes(void)
 
     NameAssocAssociate(assocExtType, _TEXT("HTM"), _TEXT("text/html"));
     NameAssocAssociate(assocExtType, _TEXT("TXT"), _TEXT("text/plain"));
+@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
     NameAssocAssociate(assocExtType, _TEXT("JS"), _TEXT("application/x-javascript"));
+@endif
 
     while (!InitFileReadStringSectionBlock(HTMLVIEW_CATEGORY, "mimeDrivers",
                                            i++, &iniData, IFRF_READ_ALL,
@@ -545,7 +547,8 @@ void SetPortalCookie(void)
         if (formUserInfo) {
             FormStringConvertAndAppend(formUserInfo, userInfoP);
             formUserInfoP = MemLock(formUserInfo);
-            if (formUserInfoP) {
+            if (formUserInfoP &&
+                !(formUserInfoP->flags & FORM_STRING_FLAG_TRUNCATED)) {
                 FileSetStandardPath(SP_PRIVATE_DATA);
                 cookieFile = FileOpen(_TEXT("cookies.txt"),
                                       FILE_DENY_W | FILE_ACCESS_RW);
@@ -591,6 +594,9 @@ void SetPortalCookie(void)
                     /* successfully wrote cookie, don't do it again */
                     InitFileDeleteEntry("browserSetup", "userInfo");
                 }
+            }
+            if (formUserInfoP) {
+                MemUnlock(formUserInfo);
             }
             MemFree(formUserInfo);
         }

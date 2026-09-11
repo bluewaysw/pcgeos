@@ -305,6 +305,7 @@ static void ConvertWidths( TRUETYPE_VARS, FontHeader* fontHeader, FontBuf* fontB
         word             currentChar;
         CharTableEntry*  charTableEntry = (CharTableEntry*) (((byte*)fontBuf) + sizeof( FontBuf ));
         WWFixedAsDWord   scaledWidth;
+        TT_Glyph_Metrics glyphMetrics;
         const word       winDescent = FACE_PROPERTIES.os2->usWinDescent;
         const word       winAscent  = FACE_PROPERTIES.os2->usWinAscent;
 
@@ -329,10 +330,10 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 else
                 {
                         /* load metrics */
-                        TT_Get_Index_Metrics( FACE, charIndex, &GLYPH_METRICS );
+                        TT_Get_Index_Metrics( FACE, charIndex, &glyphMetrics );
 
                         /* compute scaled advance width for glyph */
-                        scaledWidth = GrMulWWFixed( MakeWWFixed( GLYPH_METRICS.advance), SCALE_WIDTH );
+                        scaledWidth = GrMulWWFixed( MakeWWFixed( glyphMetrics.advance), SCALE_WIDTH );
 
                         /* fill CharTableEntry */
                         charTableEntry->CTE_width.WBF_int  = INTEGER_OF_WWFIXEDASDWORD( scaledWidth );
@@ -343,13 +344,13 @@ EC(             ECCheckBounds( (void*)charTableEntry ) );
                 
                
                         /* set flags in CTE_flags if needed */
-                        if( GLYPH_BBOX.xMin < 0 )
+                        if( glyphMetrics.bbox.xMin < 0 )
                                 charTableEntry->CTE_flags |= CTF_NEGATIVE_LSB;
                         
-                        if( -GLYPH_BBOX.yMin > winDescent )
+                        if( -glyphMetrics.bbox.yMin > winDescent )
                                 charTableEntry->CTE_flags |= CTF_BELOW_DESCENT;
 
-                        if( GLYPH_BBOX.yMax > winAscent )
+                        if( glyphMetrics.bbox.yMax > winAscent )
                                 charTableEntry->CTE_flags |= CTF_ABOVE_ASCENT;
                 }
 
@@ -446,84 +447,106 @@ EC_ERROR_IF(    indexRightChar > fontHeader->FH_lastChar - fontHeader->FH_firstC
  *      20.12.22  JK        Initial Revision
  *******************************************************************/
 #pragma code_seg(ttcharmapper_TEXT)
-void ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
+void
+ConvertKernPairs( TRUETYPE_VARS, FontBuf* fontBuf )
 {
         TT_Kerning        kerningDir;
         TT_UShort         table;
         TT_Kern_0_Pair*   pairs;
         LookupEntry*      indices;
         word              kernCount = 0;
-        const word        minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
         char              left, right;
+        KernPair*         kernPair;
+        BBFixed*          kernValue;
 
-        
-        KernPair*  kernPair  = (KernPair*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernPairs );
-        BBFixed*   kernValue = (BBFixed*) ( ( (byte*)fontBuf ) + fontBuf->FB_kernValues );
-        
-EC(     ECCheckBounds( (void*)trueTypeVars) );
-EC(     ECCheckBounds( (void*)kernPair ) );
-EC(     ECCheckBounds( (void*)kernValue ) );
+
+        /* Nothing to convert if no kerning pairs */
+        if( fontBuf->FB_kernCount == 0 )
+                return;
+
+        kernPair = (KernPair*)(((byte*)fontBuf) + fontBuf->FB_kernPairs);
+        kernValue = (BBFixed*)(((byte*)fontBuf) + fontBuf->FB_kernValues);
+
+EC(     ECCheckBounds((void*)trueTypeVars) );
+EC(     ECCheckBounds((void*)kernPair) );
+EC(     ECCheckBounds((void*)kernValue) );
 
         /* load kerning directory */
-        if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
+        if( TT_Load_Kerning_Directory(FACE, &kerningDir) )
                 return;
 
         if( kerningDir.nTables == 0 )
+        {
+                TT_Kerning_Directory_Done(&kerningDir);
                 return;
+        }
 
         /* get pointer to lookup table */
-EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
-        indices = GEO_LOCK( LOOKUP_TABLE );
-EC(     ECCheckBounds( indices ) );
+EC(     ECCheckMemHandle(LOOKUP_TABLE) );
+        indices = GEO_LOCK(LOOKUP_TABLE);
+EC(     ECCheckBounds(indices) );
 
-        /* search for format 0 subtable */
+        /* search for format 0 subtables */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
-                word        i;
-                
+                word              i;
+                TT_Kern_Subtable* subtable = &kerningDir.tables[table];
 
-                if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
+                if( TT_Load_Kerning_Table( FACE, &kerningDir, table) )
                         continue;
 
-                if( kerningDir.tables->format != 0 )
+                if( subtable->format != 0 )
                         continue;
 
-EC(             ECCheckMemHandle( kerningDir.tables->t.kern0.pairsBlock ) );
-                pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
-EC(             ECCheckBounds( pairs ) );
+EC(             ECCheckMemHandle( subtable->t.kern0.pairsBlock) );
 
-                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
+                pairs = GEO_LOCK(subtable->t.kern0.pairsBlock);
+
+EC(             ECCheckBounds(pairs) );
+
+                for( i = 0; i < subtable->t.kern0.nPairs; ++i )
                 {
+                        WWFixedAsDWord scaledKernValue;
+
                         /* discard pairs with small kerning values */
-                        if( ABS( pairs[i].value ) <= minKernValue )
+                        if( ABS(pairs[i].value) <= UNITS_PER_EM / KERN_VALUE_DIVIDENT )
                                 continue;
 
-                        left = GetGEOSCharForIndex( indices, pairs[i].left );
-                        right = GetGEOSCharForIndex( indices, pairs[i].right );
+                        left  = GetGEOSCharForIndex( indices, pairs[i].left);
+                        right = GetGEOSCharForIndex( indices, pairs[i].right);
 
-                        if( left && right )
+                        if( !left || !right )
+                                continue;
+
+                        /* Never write beyond the kerning arrays */
+                        if( kernCount >= fontBuf->FB_kernCount )
                         {
-                                WWFixedAsDWord  scaledKernValue;
-
-
-                                kernPair->KP_charLeft  = left;
-                                kernPair->KP_charRight = right;
-
-                                /* save scaled kerning value */
-                                scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
-                                kernValue->BBF_int = IntegerOf( scaledKernValue );
-                                kernValue->BBF_frac = FractionOf( scaledKernValue ) >> 8;
-
-                                ++kernPair;
-                                ++kernValue;
-                                ++kernCount;
+                                GEO_UNLOCK(subtable->t.kern0.pairsBlock);
+                                goto cleanup;
                         }
+
+                        kernPair->KP_charLeft  = left;
+                        kernPair->KP_charRight = right;
+
+                        /* save scaled kerning value */
+                        scaledKernValue = SCALE_WORD( pairs[i].value, SCALE_WIDTH );
+
+                        kernValue->BBF_int  = IntegerOf(scaledKernValue);
+                        kernValue->BBF_frac = FractionOf(scaledKernValue) >> 8;
+
+                        ++kernPair;
+                        ++kernValue;
+                        ++kernCount;
                 }
-                GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
-                TT_Kerning_Directory_Done( &kerningDir );
+
+                GEO_UNLOCK(subtable->t.kern0.pairsBlock);
         }
-        EC_ERROR_IF(kernCount != fontBuf->FB_kernCount, -1);
-        GEO_UNLOCK( LOOKUP_TABLE );
+
+cleanup:
+        GEO_UNLOCK(LOOKUP_TABLE);
+        TT_Kerning_Directory_Done(&kerningDir);
+
+EC(     EC_ERROR_IF( kernCount != fontBuf->FB_kernCount, -1) );
 }
 #pragma code_seg()
 
