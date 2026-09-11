@@ -1851,17 +1851,13 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode,
  * Script parsing
  *
  * SCRIPT raw text uses a different parsing mode from normal HTML and bypasses
- * the normal tag parser. JavaScript builds may also copy it to the transfer
- * item for execution.
+ * the normal tag parser. Script-support builds may also copy it to the
+ * transfer item for analysis or execution.
  */
 
 const char endScript[] = "</SCRIPT";
 const char endStyle[] = "</STYLE";
 
-#if HTML_SCRIPT_SUPPORT
-#define C_COMMENT 0x8000
-#define CC_COMMENT 0x4000
-#define QUOTE_CHAR 0x00ff
 /*
  * SCRIPT and STYLE are raw-text elements.  Consume their contents without
  * interpreting embedded markup.
@@ -1903,11 +1899,10 @@ int LOCAL SkipRawTextContent(const char *endTag, int c)
 
     return c;
 }
-#endif
 
+#if HTML_SCRIPT_SUPPORT
 int LOCAL HandleScript(int c)
 {
-#if HTML_SCRIPT_SUPPORT
     char buf[128];
     int n, match, quote;
     Boolean endFound;
@@ -1978,30 +1973,8 @@ int LOCAL HandleScript(int c)
 #endif
 
     return c;   
-#else
-    int n;
-
-    //(void)accept;
-    if(c=='>')
-      c=HTMLgetc();
-
-    do {
-      while(c!=EOF && c!=endScript[0])
-        c=HTMLgetc();
-
-      n=0;
-      while(c!=EOF && c<128 && toupper(c)==endScript[n])
-      {
-        n++;
-        c=HTMLgetc();
-      }
-    } while(c!=EOF && endScript[n]);
-
-    return c;
-#endif
 }
 
-#if HTML_SCRIPT_SUPPORT
 Boolean LOCAL HandleExternalScript(char *p)
 {
     word read;
@@ -2124,9 +2097,6 @@ int Open_SCRIPT(optr paramArray, int c)
     else
       ret = HandleScript(c);
 
-    if(paramArray)
-      LMemFree(paramArray);
-
     return ret;
 }
 #endif
@@ -2191,7 +2161,33 @@ int LOCAL HandleTag(MemHandle localHeap)
         c=HTMLgetc();
       }
 
-      c=HandleScript(c);
+      c=SkipRawTextContent(endScript, c);
+      if(c=='>')
+        c=HTMLgetc();
+      return c;
+    }
+
+    /* Resolve the tag before parsing parameters.  Unknown and truncated
+       names must not allocate parameter storage or alias a real tag. */
+    tagStyle = tagTooLong ? 0 : StyleNum(tag,&spec);
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
+
+    /* STYLE is raw text and must not let CSS markup affect tag parsing. */
+    if(openTag && !ignoreTags && tagStyleEntry.spec==SPEC_STYLE)
+    {
+      ce=0;
+      while(c!=EOF && (c!='>' || ce))
+      {
+        if(!ce && (c=='"' || c=='\''))
+          ce=c;
+        else if(c==ce)
+          ce=0;
+        c=HTMLgetc();
+      }
+
+      c=SkipRawTextContent(endStyle, c);
       if(c=='>')
         c=HTMLgetc();
       return c;
