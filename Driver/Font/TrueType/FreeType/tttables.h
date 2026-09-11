@@ -67,15 +67,6 @@
 
   /* 'cmap' tables */
 
-  struct  TCMapDir_
-  {
-    UShort  tableVersionNumber;
-    UShort  numCMaps;
-  };
-
-  typedef struct TCMapDir_  TCMapDir;
-  typedef TCMapDir*         PCMapDir;
-
   struct  TCMapDirEntry_
   {
     UShort  platformID;

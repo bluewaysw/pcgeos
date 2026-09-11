@@ -698,7 +698,7 @@ word LoadURLToFile(NameToken *url, TCHAR *tempname, TCHAR *mime,
     TCHAR urlbuf[HTML_STATIC_BUF], *urlP;
     TCHAR localMime[MIME_MAXBUF];
 @ifdef COMPILE_OPTION_PARENTAL_CONTROL
-    MemHandle hostBlk;
+    MemHandle hostBlk = NullHandle;
     TCHAR *host;
 @endif
     word type;
@@ -738,13 +738,29 @@ word LoadURLToFile(NameToken *url, TCHAR *tempname, TCHAR *mime,
 	word dataSize;
 	MemHandle unURLB;
 	char *unURLP;
+	T_formString *postDataP;
+	Boolean postDataTruncated;
 	/* replace old POST data, if any, with original URL */
 	if (postData) {
 	    MemFree(postData);
 	}
 	postData = FormStringCreate();
+	if (!postData) {
+	    type = URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE;
+	    goto endLoop;
+	}
 	FormStringAppend(postData, _TEXT("url="));
 	FormStringConvertAndAppend(postData, urlP);
+	postDataP = MemLock(postData);
+	postDataTruncated =
+	    (postDataP->flags & FORM_STRING_FLAG_TRUNCATED) != 0;
+	MemUnlock(postData);
+	if (postDataTruncated) {
+	    MemFree(postData);
+	    postData = NullHandle;
+	    type = URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE;
+	    goto endLoop;
+	}
         loadMode = ULM_ALWAYS;
 	InitFileReadStringBlock(HTMLVIEW_CATEGORY, "unSupportedExtURL",
 				 &unURLB, 0, &dataSize);

@@ -475,6 +475,17 @@ typedef byte T_columnIndex ;            /* Type value for accessing columns in i
 #define HTML_MAXTABLE     16            /* maximum # of table nesting levels */
 #define HTML_MAXPOLYCOORD 32            /* maximum # of coords in map POLY */
 
+typedef struct {
+    char name[HTML_MAXTAG+1];
+} HTMLAttributeName;
+
+#if HTML_SCRIPT_SUPPORT
+#define HTML_ATTRIBUTE_COUNT 72
+#else
+#define HTML_ATTRIBUTE_COUNT 58
+#endif
+#define HTML_ATTRIBUTE_SEEN_BYTES ((HTML_ATTRIBUTE_COUNT+7)/8)
+
 /* When we limit the number of cells, we are also limiting the number of regions. */
 #if COMPILE_OPTION_HUGE_ARRAY_CELLS && COMPILE_OPTION_HUGE_ARRAY_REGIONS
 #define DEFAULT_CELL_LIMIT 50000        /* no real limit */
@@ -602,4 +613,3 @@ typedef struct {
 #define DEFAULT_IMAGE_WIDTH 20
 
 #define PARSE_ABORT_TIMEOUT  (3*60)
-
