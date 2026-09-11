@@ -129,7 +129,9 @@ Boolean G_isParsing = FALSE ;
 NameToken storedContent;
 
 /* Index of script fragment on page */
+#if HTML_SCRIPT_SUPPORT
 static word scriptCount;
+#endif
 
 #ifdef DO_DBCS
 /* code page for parsing, and later for drawing form elements, etc.
@@ -579,6 +581,7 @@ long LOCAL AddParagraph(VisTextCharAttr *ca, VisTextParaAttr *pa, char *text)
  * (creating it if necessary). The routine returns the starting index
  * of the string in the array. The buffer may be modified.
  */
+#if HTML_SCRIPT_SUPPORT
 long AddJavaScript(char *buf, int n)
 {
     long pos;
@@ -689,6 +692,7 @@ void CleanupJavaScript(long pos1, long pos2)
       HugeArrayDelete(HTMLext->HE_vmFile,
         VMCHAIN_GET_VM_BLOCK(htbh->HTBH_scriptCode), (word)(pos-pos1), pos1);
 }
+#endif
 
 void SetDocumentCharset(char *p)
 {
@@ -792,10 +796,12 @@ word ModifyHypertextArray(word array, void *rec, word elsize, word element)
         ofs = word_offsetof(HypertextArrayBlockHeader, HABH_metaArray);
         size = sizeof(HTMLmetaData);
         break;
+#if HTML_SCRIPT_SUPPORT
       case HTA_EVENT_ARRAY:
         ofs = word_offsetof(HypertextArrayBlockHeader, HABH_eventArray);
         size = sizeof(HTMLeventData);
         break;
+#endif
 EC(   default: FatalError(-1); )
     }
 
@@ -1468,6 +1474,7 @@ dword data;
 int LOCAL HTMLgetcLow()
 {
     int c;
+    /* document.write output only; SCRIPT SRC is read by HandleExternalScript. */
 #if JAVASCRIPT_SUPPORT
     if(HTMLext->HE_scriptSrc) {
 	ScriptSrcHeader *scriptSrc = LMemDeref(HTMLext->HE_scriptSrc);
@@ -1851,6 +1858,10 @@ int LOCAL GetText(int cc, int ce, char *buf, word formMode,
 const char endScript[] = "</SCRIPT";
 const char endStyle[] = "</STYLE";
 
+#if HTML_SCRIPT_SUPPORT
+#define C_COMMENT 0x8000
+#define CC_COMMENT 0x4000
+#define QUOTE_CHAR 0x00ff
 /*
  * SCRIPT and STYLE are raw-text elements.  Consume their contents without
  * interpreting embedded markup.
@@ -1892,9 +1903,11 @@ int LOCAL SkipRawTextContent(const char *endTag, int c)
 
     return c;
 }
+#endif
 
 int LOCAL HandleScript(int c)
 {
+#if HTML_SCRIPT_SUPPORT
     char buf[128];
     int n, match, quote;
     Boolean endFound;
@@ -1965,8 +1978,30 @@ int LOCAL HandleScript(int c)
 #endif
 
     return c;   
+#else
+    int n;
+
+    (void)accept;
+    if(c=='>')
+      c=HTMLgetc();
+
+    do {
+      while(c!=EOF && c!=endScript[0])
+        c=HTMLgetc();
+
+      n=0;
+      while(c!=EOF && c<128 && toupper(c)==endScript[n])
+      {
+        n++;
+        c=HTMLgetc();
+      }
+    } while(c!=EOF && endScript[n]);
+
+    return c;
+#endif
 }
 
+#if HTML_SCRIPT_SUPPORT
 Boolean LOCAL HandleExternalScript(char *p)
 {
     word read;
@@ -2089,8 +2124,12 @@ int Open_SCRIPT(optr paramArray, int c)
     else
       ret = HandleScript(c);
 
+    if(paramArray)
+      LMemFree(paramArray);
+
     return ret;
 }
+#endif
 
 int LOCAL HandleTag(MemHandle localHeap)
 {
@@ -2134,9 +2173,13 @@ int LOCAL HandleTag(MemHandle localHeap)
     tag[p]=0;                           /* terminate tag */
 
     /* Skip scripts before allocating their potentially huge attributes. */
+#if HTML_SCRIPT_SUPPORT
     if(openTag &&
        !(HTMLext->HE_options & HTML_JAVASCRIPT) &&
        !STRCMPSB(tag, "SCRIPT"))
+#else
+    if(openTag && !STRCMPSB(tag, "SCRIPT"))
+#endif
     {
       ce=0;
       while(c!=EOF && (c!='>' || ce))
@@ -2148,33 +2191,7 @@ int LOCAL HandleTag(MemHandle localHeap)
         c=HTMLgetc();
       }
 
-      c=SkipRawTextContent(endScript, c);
-      if(c=='>')
-        c=HTMLgetc();
-      return c;
-    }
-
-    /* Resolve the tag before parsing parameters.  Unknown and truncated
-       names must not allocate parameter storage or alias a real tag. */
-    tagStyle = tagTooLong ? 0 : StyleNum(tag,&spec);
-    MemLock( OptrToHandle(@HTMLStylesChunk) );
-    tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
-    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
-
-    /* STYLE is raw text and must not let CSS markup affect tag parsing. */
-    if(openTag && !ignoreTags && tagStyleEntry.spec==SPEC_STYLE)
-    {
-      ce=0;
-      while(c!=EOF && (c!='>' || ce))
-      {
-        if(!ce && (c=='"' || c=='\''))
-          ce=c;
-        else if(c==ce)
-          ce=0;
-        c=HTMLgetc();
-      }
-
-      c=SkipRawTextContent(endStyle, c);
+      c=HandleScript(c, FALSE);
       if(c=='>')
         c=HTMLgetc();
       return c;
@@ -2345,6 +2362,7 @@ int LOCAL HandleTag(MemHandle localHeap)
 
     if(openTag) {                       /* opening a tag */
         if (!ignoreTags) {
+#if HTML_SCRIPT_SUPPORT
             if(tagStyleEntry.spec==SPEC_SCRIPT)
             {
               c = Open_SCRIPT(paramArray, c);
@@ -2354,6 +2372,7 @@ int LOCAL HandleTag(MemHandle localHeap)
               tagStyleEntry.flags &= ~TAG_IGNORE_TAGS;
             }
             else
+#endif
               OpenTag( tagStyle, &tagStyleEntry, paramArray );
         }
         if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
@@ -2537,7 +2556,9 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     insertCell = FALSE;
     currentCellLevel = 0;               /* Currently outside any table */
 
+#if HTML_SCRIPT_SUPPORT
     scriptCount = 0;                    /* no script found yet */
+#endif
 
     MemLock( OptrToHandle(@HTMLStylesChunk) );
     GetCurrentStyles();                 /* initialize style caching */
