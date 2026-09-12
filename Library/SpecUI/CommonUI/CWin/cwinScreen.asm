@@ -304,13 +304,8 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	push	bx
 	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
 
-	push    ax,bx,cx,dx,si,di,bp,es
-	mov	di, DR_VID_HIDEPTR
-	call	ds:[si].DIS_strategy
-	pop  	ax,bx,cx,dx,si,di,bp,es
-
 	; call update escape function
-	mov	di, VID_ESC_UPDATE_DEVICE 
+	mov	di, VID_ESC_UPDATE_DEVICE
 	call	ds:[si].DIS_strategy
 
 	; update screen coordinates
@@ -424,18 +419,15 @@ OLScreenNotify	method	dynamic	OLScreenClass, MSG_META_NOTIFY
 	tst	ax
 	jz	done				; no mouse driver, no pointer
 
-
 	push 	si, ds, di
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
-	mov	bx, ds:[di].GSCI_videoDriver	
+	mov	bx, ds:[di].GSCI_videoDriver
 
 	; get driver strategy
 	call	GeodeInfoDriver		; ds:si = DriverInfoStruct
 
 	push    ax,bx,cx,dx,si,di,bp
-	mov	di, DR_VID_SHOWPTR
-	call	ds:[si].DIS_strategy
 	mov	di, DR_VID_SHOWPTR
 	call	ds:[si].DIS_strategy
 	pop    ax,bx,cx,dx,si,di,bp
@@ -445,6 +437,7 @@ done:
 
 
 callSuper:
+	segmov	es, <segment OLScreenClass>, bx
 	mov	di, offset OLScreenClass
 	GOTO	ObjCallSuperNoLock
 
