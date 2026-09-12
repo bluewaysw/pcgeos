@@ -9,14 +9,14 @@ FILE:		copenButtonClass.asm
 ROUTINES:
 	Name			Description
 	----			-----------
-    MTD MSG_SPEC_UPDATE_VIS_MONIKER 
+    MTD MSG_SPEC_UPDATE_VIS_MONIKER
 				Handles updating of a vis moniker.
 
-    MTD MSG_SPEC_VIS_OPEN_NOTIFY 
+    MTD MSG_SPEC_VIS_OPEN_NOTIFY
 				Handle notification that an object with
 				GA_NOTIFY_VISIBILITY has been opened
 
-    MTD MSG_SPEC_VIS_CLOSE_NOTIFY 
+    MTD MSG_SPEC_VIS_CLOSE_NOTIFY
 				Handle notification that an object with
 				GA_NOTIFY_VISIBILITY has been opened
 
@@ -26,11 +26,11 @@ ROUTINES:
     INT VisCloseNotifyCommon    Handle notification that an object with
 				GA_NOTIFY_VISIBILITY has been opened
 
-    INT VisOpenCloseNotifyCommon 
+    INT VisOpenCloseNotifyCommon
 				Handle notification that an object with
 				GA_NOTIFY_VISIBILITY has been opened
 
-    INT MaybeInvalidateReplyMonikerSize 
+    INT MaybeInvalidateReplyMonikerSize
 				Forces a moniker's cached size to
 				disappear, if there is some reason to
 				believe it is not correct.
@@ -40,7 +40,7 @@ ROUTINES:
     INT RudyConvertHintSlot     Converts a HINT_SEEK_SLOT to the appropiate
 				ATTR_GEN_POSITION_Y position.
 
-    INT SetInReplyBarFlagBasedOnParent 
+    INT SetInReplyBarFlagBasedOnParent
 				Sets the reply bar flag if parent has any
 				oversized children. Doesn't affect whether
 				the button actually can receive the default
@@ -59,36 +59,36 @@ ROUTINES:
     INT OLButtonMovePenCalcSize Move the graphics pen and calculate the
 				size of this button.
 
-    INT OLButtonChooseBWRegionSet 
+    INT OLButtonChooseBWRegionSet
 				This procedure determines which region
 				definitions should be used to calculate
 				geometry and draw a B&W button.
 
-    INT OLButtonChooseBWRegionSet 
+    INT OLButtonChooseBWRegionSet
 				This procedure determines which region
 				definitions should be used to calculate
 				geometry and draw a B&W button.
 
-    INT CheckForOtherButtonLooks 
+    INT CheckForOtherButtonLooks
 				Check this button's hints for the other
 				buttons hints and set bp to the appropriate
 				region if one is set.
 
-    INT OLButtonSetMonoBitmapColor 
+    INT OLButtonSetMonoBitmapColor
 				set the area color to use in case the
 				moniker for this object is a monochrome
 				bitmap
 
-    INT OLButtonGetGenAndSpecState 
+    INT OLButtonGetGenAndSpecState
 				This is a utility routine used by the draw
 				routines.
 
-    INT OLButtonSetupMonikerAttrs 
+    INT OLButtonSetupMonikerAttrs
 				This procedure is used to setup some
 				argument flags before calling
 				OpenDrawMoniker.
 
-    INT OLButtonSetupMonikerAttrsBX 
+    INT OLButtonSetupMonikerAttrsBX
 				This procedure is used to setup some
 				argument flags before calling
 				OpenDrawMoniker.
@@ -97,14 +97,14 @@ ROUTINES:
 				argument flags before calling
 				OpenDrawMoniker.
 
-    MTD MSG_GEN_FIND_KBD_ACCELERATOR 
+    MTD MSG_GEN_FIND_KBD_ACCELERATOR
 				Find keyboard accelerator (and beep is
 				necessary)
 
-    INT OpenButtonCheckIfFullyEnabled 
+    INT OpenButtonCheckIfFullyEnabled
 				Checks to see if fully enabled.
 
-    INT OpenButtonCheckIfAlwaysEnabled 
+    INT OpenButtonCheckIfAlwaysEnabled
 				Checks to see if this button opens a menu.
 
     GLB CheckIfPushpin          Checks if the passed object is a pushpin
@@ -116,7 +116,7 @@ ROUTINES:
 				object. In some cases, this is the same
 				object.
 
-    MTD MSG_META_GAINED_FOCUS_EXCL 
+    MTD MSG_META_GAINED_FOCUS_EXCL
 				Handle gaining the focus for a visual
 				button
 
@@ -127,14 +127,14 @@ ROUTINES:
 				we'll be undoing the damage in its
 				MSG_VIS_DRAW handler.
 
-    INT AdjustCurPosIfReplyPopup 
+    INT AdjustCurPosIfReplyPopup
 				Hacks in space around reply popups so
 				they'll line up with other reply buttons.
 
-    MTD MSG_VIS_NOTIFY_GEOMETRY_VALID 
+    MTD MSG_VIS_NOTIFY_GEOMETRY_VALID
 				Notification of complete geometry.
 
-    MTD MSG_META_GET_ACTIVATOR_BOUNDS 
+    MTD MSG_META_GET_ACTIVATOR_BOUNDS
 				Gets bounds of activator.
 
 REVISION HISTORY:
@@ -153,7 +153,7 @@ CommonUIClassStructures segment resource
 
 	OLButtonClass		mask CLASSF_DISCARD_ON_SAVE or \
 				mask CLASSF_NEVER_SAVED
-				
+
 	method	VupCreateGState, OLButtonClass, MSG_VIS_VUP_CREATE_GSTATE
 
 ;	method VisCallParent, OLButtonClass, MSG_VIS_VUP_RELEASE_ALL_MENUS
@@ -195,7 +195,7 @@ REVISION HISTORY:
 OLButtonSpecChangeUsable method	private static OLButtonClass, \
 						MSG_SPEC_SET_USABLE,
 						MSG_SPEC_SET_NOT_USABLE
-	
+
 	;
 	; If setting not usable, we'll look up the guy's parent now so
 	; we'll have it after the thing has been disconnected. -cbh 3/ 9/93
@@ -207,7 +207,7 @@ OLButtonSpecChangeUsable method	private static OLButtonClass, \
 	mov	cx, si			;parent in ^lbx:cx
 	pop	si
 10$:
-	
+
 	;cannot use CallSuper macro, because we do not know the method #
 	;at assembly time.
 
@@ -320,7 +320,7 @@ Geometry segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonUpdateVisMoniker -- 
+METHOD:		OLButtonUpdateVisMoniker --
 		MSG_SPEC_UPDATE_VIS_MONIKER for OLButtonClass
 
 DESCRIPTION:	Handles updating of a vis moniker.
@@ -333,7 +333,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -351,7 +351,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 OLButtonUpdateVisMoniker	method dynamic	OLButtonClass, \
-				MSG_SPEC_UPDATE_VIS_MONIKER, 
+				MSG_SPEC_UPDATE_VIS_MONIKER,
 				MSG_SPEC_UPDATE_KBD_ACCELERATOR
 	;
 	; Make sure everything in the menu gets their geometry redone.
@@ -375,7 +375,7 @@ OLButtonUpdateVisMoniker	method dynamic	OLButtonClass, \
 inMenu:
 	push	dx, ax, es
 	mov	dl, VUM_MANUAL
-	mov	cl, mask VOF_GEOMETRY_INVALID 
+	mov	cl, mask VOF_GEOMETRY_INVALID
 	mov	ax, MSG_VIS_MARK_INVALID
 	call	CallOLWin
 	pop	dx, ax, es
@@ -671,7 +671,38 @@ CUAS <	mov	dx, ax			;use minimum height		>
 	;
 	mov	ax, ATTR_OL_BUTTON_IN_TITLE_BAR
 	call	ObjVarFindData
+	jc	inTitleBar
+if _ISUI
+	;
+	; ISUI suppresses the menu-bar frame when the bar is embedded in a
+	; maximized header; the window draws the combined frame instead.
+	; Its menu buttons must therefore use the same usable height as the
+	; title-bar controls when menus-in-header mode is active.
+	;
+	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR
+	jz	notInTitleBar
+	call	OpenCheckMenusInHeaderOnMax
 	jnc	notInTitleBar
+	push	cx			; save width
+	mov	ax, MSG_OL_WIN_IS_MAXIMIZED
+	call	CallOLWin
+	pop	cx			; restore width
+	jnc	notInTitleBar
+	jmp	inTitleBar
+else
+	;
+	; Motif menu buttons stay at their normal 16-pixel height; the menu
+	; bar adds two pixels of margins to match the 18-pixel title bar.
+	; During state restore the window already reports itself maximized
+	; here, while a freshly maximized window does not yet do so. Using
+	; that state to promote menu buttons to title-bar height would make
+	; the restored menu bar 20 pixels high, leaving its 18-pixel title
+	; controls looking two pixels short. Only buttons carrying
+	; ATTR_OL_BUTTON_IN_TITLE_BAR above use the title-bar height.
+	;
+	jmp	notInTitleBar
+endif
+inTitleBar:
 	push	cx			; save width
 	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
 	call	CallOLWin		; dx = height
@@ -683,16 +714,16 @@ notInTitleBar:
 ifdef POPUP_DYNAMIC_SCROLLING_LISTS_EARLY_BUILD_OUT
 	;
 	; If this opens a popup list, build the list out now.
-	; 
+	;
 	mov	ax, ATTR_OL_BUTTON_OPENS_POPUP_LIST
 	call	ObjVarFindData
 	jnc	afterUpdatePopup
 
 	push	si, cx, dx
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	si, ds:[di].OLBI_genChunk	;get popup window
-	call	UpdatePopupAndGetSize	
+	call	UpdatePopupAndGetSize
 	pop	si, cx, dx
 
 afterUpdatePopup:
@@ -703,7 +734,7 @@ OLButtonRerecalcSize	endp
 
 OLButtonApplySizeHints	proc	near
 	push	si
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	si, ds:[di].OLBI_genChunk
 	CallMod	VisApplySizeHints	;account for initial hint here
@@ -722,13 +753,13 @@ SYNOPSIS:	Converts a HINT_SEEK_SLOT to the appropiate
 
 CALLED BY:	OLButtonRerecalcSize
 PASS:		ax 	= slot position (0-3)
-		dx	= height of button 
+		dx	= height of button
 RETURN:		dx unchanged
 DESTROYED:	ax, bx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
@@ -769,12 +800,12 @@ SetInReplyBarFlagBasedOnParent	proc	near		uses	cx
 	.enter
 	call	OpenCheckDefaultRings
 	jnc	exit
-	call	OpenGetParentMoreFlagsIfCtrl	
+	call	OpenGetParentMoreFlagsIfCtrl
 	test	cl, mask OLCOF_OVERSIZED_CHILDREN
 	jz	exit
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	or	ds:[di].OLBI_fixedAttrs, mask OLBFA_IN_REPLY_BAR 
+	or	ds:[di].OLBI_fixedAttrs, mask OLBFA_IN_REPLY_BAR
 exit:
 	.leave
 	ret
@@ -785,7 +816,7 @@ SetInReplyBarFlagBasedOnParent	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonGetExtraSize -- 
+METHOD:		OLButtonGetExtraSize --
 		MSG_SPEC_GET_EXTRA_SIZE for OLButtonClass
 
 DESCRIPTION:	Returns non-moniker size of button.
@@ -830,7 +861,7 @@ if _MOTIF or _ISUI ;----------------------------------------------------------
 	jz	10$			;skip if not...
 
 	add	cx, MO_REPLY_BUTTON_INSET_X*2
-	add	dx, MO_REPLY_BUTTON_INSET_Y*2	
+	add	dx, MO_REPLY_BUTTON_INSET_Y*2
 
 	call	OpenCheckIfCGA
 	jnc	10$
@@ -843,7 +874,7 @@ OLButtonGetExtraSize	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonMkrPos - 
+METHOD:		OLButtonMkrPos -
 		MSG_GET_FIRST_MKR_POS for OLButtonClass
 
 DESCRIPTION:	Returns the position of the button's moniker.
@@ -852,7 +883,7 @@ PASS:
 	*ds:si - instance data
 	es - segment of OLButtonClass
 	di - MSG_GET_FIRST_MKR_POS
-		
+
 RETURN:
 	carry set (method handled) if there is a moniker at all
 	ax, cx -- starting position of moniker
@@ -932,7 +963,7 @@ OLButtonGetCenter	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonGetMenuCenter -- MSG_SPEC_GET_MENU_CENTER 
+METHOD:		OLButtonGetMenuCenter -- MSG_SPEC_GET_MENU_CENTER
 		for OLButtonClass
 
 DESCRIPTION:	Returns the center of the button.
@@ -942,7 +973,7 @@ PASS:		*ds:si - instance data
 		di - MSG_SPEC_GET_MENU_CENTER
 		cx	- monikers space found, so far
 		dx	- accel space found, so far
-		bp	- non-zero if any items found so far are marked as 
+		bp	- non-zero if any items found so far are marked as
 				having valid geometry
 
 RETURN:		cx, dx, bp - possibly updated
@@ -982,14 +1013,14 @@ OLButtonGetMenuCenter	method	OLButtonClass, MSG_SPEC_GET_MENU_CENTER
 
 checkWrapping:
 	;
-	; Now see if whether ourselves or one of our children is allowing 
+	; Now see if whether ourselves or one of our children is allowing
 	; wrapping.  If so, clear the only-recalc-size flag.  -cbh 1/18/93
 	;
 	test	bp, mask SGMCF_ALLOWING_WRAPPING
 	jz	exit
 	and	ds:[di].VI_geoAttrs, not mask VGA_ONLY_RECALC_SIZE_WHEN_INVALID
 	or	ds:[di].OLBI_moreAttrs, mask OLBMA_EXPAND_WIDTH_TO_FIT_PARENT
-exit: 
+exit:
 	ret
 OLButtonGetMenuCenter	endp
 
@@ -1006,20 +1037,20 @@ CALLED BY:	OLButtonRerecalcSize, OLButtonGetCenter
 PASS:		*ds:si -- handle of button
 		ss:bp -- space allocated for OpenMonikerArgs
 
-RETURN:	
+RETURN:
 	*es:bx - gen object to use
 
     I AM NOT SURE IF CL NEED BE RETURNED.
 	cl - how to draw moniker: OpenMonikerFlags
 
-	ss:bp  - OpenMonikerArgs:  
+	ss:bp  - OpenMonikerArgs:
 	    ss:[bp].OMA_drawMonikerFlags	word	;justification & clipping flags
 	    ss:[bp].OMA_monikerAttrs	word	;OLMonikerAttrs: cursored etc.
 	    ss:[bp].OMA_drawMonikerFlags	word	;low byte = DrawMonikerFlags <>
 	    ss:[bp].OMA_bottomInset	 	word	;bottom inset
 	    ss:[bp].OMA_rightInset	 	word	;right inset
 	    ss:[bp].OMA_topInset	 	word	;top inset
-	    ss:[bp].OMA_leftInset		word	;left inset 
+	    ss:[bp].OMA_leftInset		word	;left inset
 	    openMkrMaxLen		word    ;max len to draw (internal)
 	    openMkrState		lptr GState ;handle of graphics state
 	ax - MINIMUM HEIGHT
@@ -1044,14 +1075,14 @@ REVISION HISTORY:
 
 SetupMonikerArgs	proc	near
 	class	OLButtonClass
-	
+
 	;get region definition for this button, and grab some positioning
 	;info from it (see copenButtonData.asm).
 
 	push	bp, ds
 	; pass: *ds:si = object pointer
 	call	OLButtonChooseBWRegionSet
-	; return: ds:bp = Region table 
+	; return: ds:bp = Region table
 
 	mov	dl, ds:[bp].BWBRSS_monikerXInset
 	clr	dh
@@ -1097,7 +1128,7 @@ endif
 
 if	(BUTTON_BW_TOOLBOX_X_INSET ne BUTTON_TOOLBOX_X_INSET)
 	call	OpenCheckIfBW			;color, done
-	jnc	15$				
+	jnc	15$
 	add	cx, BUTTON_BW_TOOLBOX_X_INSET - BUTTON_TOOLBOX_X_INSET
 	add	dx, BUTTON_BW_TOOLBOX_Y_INSET - BUTTON_TOOLBOX_Y_INSET
 endif
@@ -1132,7 +1163,7 @@ noFrame:
 doneInsets:
 endif ;------------------------------------------------------------------------
 
-	
+
 CUAS <	push	cx				;save minimum height	>
 	clr	ss:[bp].OMA_gState			;set have no GState...
 	mov	ss:[bp].OMA_leftInset, dx		;pass as left inset
@@ -1213,7 +1244,7 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 OLButtonGenActivate	method	OLButtonClass, MSG_GEN_ACTIVATE
-	call	OpenButtonCheckIfFullyEnabled	
+	call	OpenButtonCheckIfFullyEnabled
 	jnc	exit			;not fully enabled, exit
 
 	;if the button is not yet CURSORED or HAS_MOUSE_GRAB-ed, then save
@@ -1303,7 +1334,7 @@ if _KBD_NAVIGATION	;------------------------------------------------------
 	test	dl, mask CF_STATE_KEY or mask CF_TEMP_ACCENT or \
 		    mask CF_REPEAT_PRESS or mask CF_RELEASE
 	jnz	ignoreKey		;quit if not character.
-	
+
 	test	dh, mask SS_LALT or mask SS_RALT or mask SS_LCTRL or \
 							mask SS_RCTRL
 	jnz	ignoreKey		;one of these pressed, branch
@@ -1421,10 +1452,10 @@ RETURN:		ds:bp = region table (is in idata, which is fixed. Regions
 			definitions themselves are in B&W resource.)
 
 DESTROYED:	Nothing
-		
+
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 	Note that DS is NOT preserved.
-	
+
 	Also, the region returned from this routine may be overridden
 	by various functions in the Stylus UI in the case of a button
 	on the left or right edge of the title bar.
@@ -1443,13 +1474,13 @@ if _OL_STYLE	;--------------------------------------------------------------
 
 OLButtonChooseBWRegionSet	proc	far
 	class	OLButtonClass
-	
+
 	push	bx
-	
+
 	mov	bx, ds:[si]
 	add	bx, ds:[bx].Vis_offset
 	mov	bx, ds:[bx].OLBI_specState
-	
+
 	mov	bp, segment idata
 	mov	ds, bp			;ds points at regions
 
@@ -1483,7 +1514,7 @@ OLButtonChooseBWRegionSet	proc	far
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	bx, ds:[di].OLBI_specState
-	
+
 	mov	bp, offset MOBWButtonRegionSet_systemMenuButton
 	test	bx, mask OLBSS_SYS_ICON		;system menu icon?
 	jnz	done				;skip if so...
@@ -1593,7 +1624,7 @@ endif
 	mov	ax, segment idata
 	mov	ds, ax				;ds points at regions
 	pop	ax
-	
+
 	.leave
 	ret
 
@@ -1616,10 +1647,10 @@ CALLED BY:	OLButtonChooseBWRegionSet
 PASS:		*ds:si	= button object
 RETURN:		bp	= new region, or (if no edge hints found) unchanged
 DESTROYED:	ax, bx
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -1739,12 +1770,12 @@ endif	; _BLACK_NORMAL_BUTTON
 30$:
 if	_BLACK_NORMAL_BUTTON
 	;
-	;	Need to set bitmap in the reverse color if it is a 
+	;	Need to set bitmap in the reverse color if it is a
 	;	normally black button.
 	;
 	xchg	dx, si				; *es:si = object
 	call	BWButtonInvertColorIfNeeded
-	xchg	dx, si			
+	xchg	dx, si
 endif	; _BLACK_NORMAL_BUTTON
 
 notEnabled:
@@ -1768,7 +1799,7 @@ PASS:		*ds:si	= instance data for object
 
 RETURN:		bx	= OLBI_specState
 		cl	= OLBI_optFlags
-		dl	= GI_states for object 
+		dl	= GI_states for object
 		dh	= VI_attrs for object
 
 DESTROYED:	NOTHING
@@ -1872,7 +1903,7 @@ OLButtonSetupMonikerAttrsBX	proc	far	;no longer called!
 15$:
 	;We'll allow menu down marks in CUA again.  We'll just won't set the
 	;flag if we don't want them.  -cbh 5/18/92   Also, we'll draw the
-	;outline around the edge of a popup list button, so we don't have 
+	;outline around the edge of a popup list button, so we don't have
 	;different outlines depending on what is selected.  -cbh 11/23/92
 
 if	not SELECTION_BOX
@@ -1884,11 +1915,11 @@ if	not SELECTION_BOX
 endif
 	test	bx, mask OLBSS_MENU_RIGHT_MARK
 	jz	20$
-	ORNF	cx, mask OLMA_DISP_RT_ARROW	
+	ORNF	cx, mask OLMA_DISP_RT_ARROW
 20$:
 	;if moniker is in a menu, set flag.
 	;(display-keyboard-moniker is set later).
-	
+
 	test	bx, mask OLBSS_IN_MENU
 	jz	25$				;not in menu, branch
 	ORNF	cx, mask OLMA_IS_MENU_ITEM
@@ -2030,7 +2061,7 @@ KbdNavigation	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonActivateObjectWithMnemonic -- 
+METHOD:		OLButtonActivateObjectWithMnemonic --
 		MSG_SPEC_ACTIVATE_OBJECT_WITH_MNEMONIC for OLButtonClass
 
 DESCRIPTION:	Looks at its vis moniker to see if its mnemonic matches that
@@ -2071,7 +2102,7 @@ OLButtonActivateObjectWithMnemonic method OLButtonClass, \
 	call	VisCheckMnemonic		;see if mnemonic matches
 	pop	si				;restore visual handle
 	jnc	exit				;no, exit
-	
+
 	call	OpenButtonCheckIfFullyEnabled
 	jc	activate			;fully enabled, activate
 
@@ -2109,7 +2140,7 @@ PASS:		*ds:si	= OLButtonClass object
 		bp high	= scan code
 RETURN:		carry set if accelerator found
 DESTROYED:	ax, cx, dx, bp
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
 
@@ -2119,7 +2150,7 @@ REVISION HISTORY:
 	Joon	6/ 2/94   	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-OLButtonFindKbdAccelerator	method dynamic OLButtonClass, 
+OLButtonFindKbdAccelerator	method dynamic OLButtonClass,
 					MSG_GEN_FIND_KBD_ACCELERATOR
 	call	GenCheckKbdAccelerator		;see if we have a match
 	jnc	exit				;nope, exit with carry clear
@@ -2140,7 +2171,7 @@ OLButtonFindKbdAccelerator	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonKbdActivate -- 
+METHOD:		OLButtonKbdActivate --
 		MSG_OL_BUTTON_KBD_ACTIVATE for OLButtonClass
 
 DESCRIPTION:	Activates the button, and gives it the gadget exclusive.
@@ -2187,7 +2218,7 @@ ActionObscure	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLButtonMakeDefaultAction -- 
+METHOD:		OLButtonMakeDefaultAction --
 		MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION for OLButtonClass
 
 DESCRIPTION:	Set this trigger as temporary default.
@@ -2348,7 +2379,7 @@ CALLED BY:	GLOBAL
 PASS:		*ds:si - OLButton object
 RETURN:		carry set if pushpin
 DESTROYED:	nada
- 
+
 PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
@@ -2376,13 +2407,13 @@ CheckIfPushpin	proc	far
 
 	push	es
 	mov	di, segment GenTriggerClass
-	mov	es, di							
+	mov	es, di
 	mov	di, offset GenTriggerClass
-	call	ObjIsObjectInClass					
+	call	ObjIsObjectInClass
 	pop	es
 	jnc	exit		;Exit w/carry clear if not a subclass of
 				; GenTrigger
-	
+
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -2532,7 +2563,7 @@ COMMENT @----------------------------------------------------------------------
 
 ROUTINE:	InsetBoundsIfReplyPopup
 
-SYNOPSIS:	Do horrible things to the button's bounds if we're a popup 
+SYNOPSIS:	Do horrible things to the button's bounds if we're a popup
 		list in a reply bar, so that everything draws right from here
 		on out.   Since this only affects menu buttons, we'll be
 		undoing the damage in its MSG_VIS_DRAW handler.
@@ -2561,11 +2592,11 @@ REVISION HISTORY:
 InsetBoundsIfReplyPopup	proc	far		uses	bp
 	.enter
 	;
-	; If we're a popup list in a reply bar kind of situation, temporarily 
+	; If we're a popup list in a reply bar kind of situation, temporarily
 	; muck with bounds so things like the cursor and the down arrow draw in
 	; the right place.   Also, move the pen position left a bit.
 	;
-	mov	bp, ds:[si]			
+	mov	bp, ds:[si]
 	add	bp, ds:[bp].Vis_offset
 	test	ds:[bp].OLBI_specState, mask OLBSS_DEFAULT_TRIGGER
 	jz	10$
@@ -2644,7 +2675,7 @@ AdjustCurPosIfReplyPopup	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLButtonNotifyGeometryValid -- 
+		OLButtonNotifyGeometryValid --
 		MSG_VIS_NOTIFY_GEOMETRY_VALID for OLButtonClass
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -2654,10 +2685,10 @@ PASS:		*ds:si 	- instance data
 		es     	- segment of MetaClass
 		ax 	- MSG_VIS_NOTIFY_GEOMETRY_VALID
 
-RETURN:		
+RETURN:
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2681,7 +2712,7 @@ OLButtonNotifyGeometryValid	method dynamic	OLButtonClass, \
 	mov	di, offset OLButtonClass
 	call	ObjCallSuperNoLock
 
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	mov	di, ds:[di].OLBI_genChunk
 	cmp	si, di
@@ -2719,7 +2750,7 @@ endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		OLButtonGetActivatorBounds -- 
+		OLButtonGetActivatorBounds --
 		MSG_META_GET_ACTIVATOR_BOUNDS for OLButtonClass
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -2732,7 +2763,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		carry set if an activating object found
 		ax, bp, cx, dx - screen bounds of object
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -2767,7 +2798,7 @@ OLButtonGetActivatorBounds	method dynamic	OLButtonClass, \
 	; "Left" bounds now in ax, right bounds in cx, top/bottom in bx.
 	;
 	mov	di, bp		;DI <- GState handle
-	
+
 	; Check if "right" is in window bounds.  If not, return carry clear.
 
 	xchg	ax, cx
