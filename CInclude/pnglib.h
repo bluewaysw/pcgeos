@@ -30,7 +30,7 @@ const unsigned char PNG_SIGNATURE[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A
 #define PNG_MAX_PALETTE_ENTRIES 256
 
 // max IDAT chunk entries
-#define PNG_MAX_IDAT_CHUNKS 100
+#define PNG_MAX_IDAT_CHUNKS 256
 
 // mximum scanline size
 // 8192 = 8KB limit, equals 2048px width in RGBA and 1024px in 16-bit RGBA.
