@@ -139,7 +139,7 @@ nav_order: 5
 [9.1 GenView Overview](Objects/ogenvew.md#91-genview-overview)  
 [9.1.1 GenView Model](Objects/ogenvew.md#911-genview-model)  
 [9.1.2 View Features and Goals](Objects/ogenvew.md#912-view-features-and-goals)  
-[9.1.3 The GenViewControl Objec](Objects/ogenvew.md#913-the-genviewcontrol-object)  
+[9.1.3 The GenViewControl Object](Objects/ogenvew.md#913-the-genviewcontrol-object)  
 [9.2 Getting Started: View Basics](Objects/ogenvew.md#92-getting-started:-view-basics)  
 [9.2.1 Graphics System Review](Objects/ogenvew.md#921-graphics-system-review)  
 [9.2.2 Defining the Basic View](Objects/ogenvew.md#922-defining-the-basic-view)  

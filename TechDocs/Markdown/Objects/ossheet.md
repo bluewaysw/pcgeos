@@ -956,7 +956,7 @@ cached data from the file. For example, if you revert the file to its last-saved
 state, the spreadsheet will have to reread all its cached data. To do this, send 
 MSG_SPREADSHEET_READ_CACHED_DATA to the spreadsheet object. This 
 message takes two arguments: the file handle, and the spreadsheet map 
-block's **VMBlockHandle**. These supercede the handles stored in the 
+block's **VMBlockHandle**. These supersede the handles stored in the 
 spreadsheet's instance data. The spreadsheet responds to this message by 
 opening the specified map block and rereading its instance data from this 
 block. Applications which use the Document Control objects should send this 

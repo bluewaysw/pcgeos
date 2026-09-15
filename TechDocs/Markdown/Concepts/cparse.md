@@ -153,7 +153,7 @@ exception of the backslash, i.e. "\". This character signals that the character
 (or characters) which immediately follow it are to be interpreted literally. 
 Backslash-codes include the following:
 
-|Code |Decription|
+|Code |Description|
 |:----|:---------|
 |\"   |This code represents a double-quote character (i.e. ASCII 0x22, or "); it indicates that the double-quote should be copied into the string, instead of read as a string delimiter.|
 |\n   |This code represents a newline control code (i.e. ASCII 0x0A, or control-J).  |

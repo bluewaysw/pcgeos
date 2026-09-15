@@ -164,7 +164,7 @@ To maintain a consistent look-and-feel for all Nokia 9000i applications, it is i
 ![](Art/menu_example1.gif)  
 *"Call", "Voice mailbox" and "Recent calls" are this application's triggers. "Call" is in slot 0, "Voice mailbox" is in slot 2, etc. This particular application does not use slot 3.*
 
-The application specifies what these triggers are and which slot (0, 1, 2, or 3) each of these triggers belongs in. Newer versions of the Communicator (software verions 4.8 or later) support a fifth trigger, the menu trigger (see [below](#menu_trigger)). In general, applications should use:
+The application specifies what these triggers are and which slot (0, 1, 2, or 3) each of these triggers belongs in. Newer versions of the Communicator (software versions 4.8 or later) support a fifth trigger, the menu trigger (see [below](#menu_trigger)). In general, applications should use:
 
     HINT_SEEK_SLOT = 0
 

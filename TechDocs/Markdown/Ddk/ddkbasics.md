@@ -63,7 +63,7 @@ is more likely to tolerate a larger size to get faster response. (This depends,
 of course, on the driver. A print driver, for example, doesn’t need to be nearly
 as efficient as a video driver.)
 
-Drivers may also disable interrupts to perfrom their functions. They are the
+Drivers may also disable interrupts to perform their functions. They are the
 only geodes permitted to do this. However, drivers should do this only when
 absolutely necessary. Very few GEOS system routines may be called with
 interrupts disabled. In practice, you should re-enable interrupts before
