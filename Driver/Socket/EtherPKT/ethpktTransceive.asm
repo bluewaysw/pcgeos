@@ -238,7 +238,12 @@ PASS:		Always:
 			ds:si	= buffer
 RETURN:		es:di	= buffer (0:0 to reject packet)
 DESTROYED:	
-SIDE EFFECTS:	
+SIDE EFFECTS:	Don't clobber CX in 'AX=0' case as newer packet driver specs
+		1.10+ require it to hold the packet size (buffer length).
+		This makes the driver work again with Dosemu2.
+		The case 'AX=1' could be fixed too in future where CX should
+		contain the number of bytes copied. But this doesn't hurt at
+		the moment.
 
 PSEUDO CODE/STRATEGY:
 	We don't need to call SysEnterInterrupt/SysExitInterrupt, because
@@ -248,6 +253,7 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	ed	04/24/02    	Initial version
+	bolle	09/15/26	Keep packet length in CX
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 EthPktRecvHandler	proc	far
@@ -294,8 +300,9 @@ EC <	WARNING_Z OUT_OF_RECV_BUFFERS					>
 	jz	reject
 	mov	ax, es:[di].RB_nextLink
 	mov	es:[recvBufFreeList], ax
-	sub	cx, size MACHeader
-	mov	es:[di].RB_size, cx
+	mov	ax, cx
+	sub	ax, size MACHeader
+	mov	es:[di].RB_size, ax
 	lea	di, es:[di].RB_macHeader
 
 exit:
