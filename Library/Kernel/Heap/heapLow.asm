@@ -2202,7 +2202,7 @@ EC <	call	AssertHeapMine						>
 ifdef PROTECTED_MODE
 	;check for memory associated with handle
 	test	ds:[bx][HM_flags], mask HF_DISCARDED or mask HF_SWAPPED
-	;jnz	noMem
+	jnz	noMem
 
 	; free the memory allocated to this block
 
@@ -2244,13 +2244,11 @@ ifdef PROTECTED_MODE
 	mov	ds:[di][HM_prev], si	; and next points to prev
 	pop	si, di
 	call	FreeHandle
+noMem:
 else
 	call	CombineBX
 endif
 	ret
-
-noMem:
-	jmp	FreeHandle
 
 DoFreeNoDeleteSwap	endp
 
@@ -2489,16 +2487,12 @@ FreeBlockData	proc	near
 	push	si
 EC <	call	AssertHeapMine						>
 
-ifndef PROTECTED_MODE
       
 	call	DupHandle		;new handle returned in bx, old in si
 	mov	ds:[bx][HM_addr],dx
 	andnf	ds:[bx].HM_flags, not mask HF_DEBUG	; Swat can't be
 							;  interested...
 	call	FixLinks		;put new block in list
-else
-	mov	si, bx
-endif
 
 ; I can see no reason for not clearing both these bits (it used to just clear
 ; HF_SWAPPED, formerly HF_MEM_SWAP), but only if HF_DISCARDED wasn't passed in.
@@ -2522,16 +2516,9 @@ endif
 ;10$:
 	ornf	ds:[si][HM_flags],al	;mark as discarded or swapped
 
-ifdef PROTECTED_MODE
-	;mov	bx, ds:[si][HM_addr]
-	;mov	ds:[si][HM_addr],0
-	mov		bx, dx
-	;call	GPMIMakeNotPresent
-else
 	mov	ds:[si][HM_addr],0	;mark as not associated with memory
 
 	call	DoFreeNoDeleteSwap	;free memory
-endif
 
 	clc				;just in case anyone cares
 	mov	bx,si
