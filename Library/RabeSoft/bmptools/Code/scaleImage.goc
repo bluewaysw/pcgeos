@@ -1,0 +1,1487 @@
+/**************************************************************************
+ *
+ * PROJECT:      Bitmap Tools library
+ *
+ * FILE:         scaleImage.goc
+ *		 Scale images using system routines or bilinear scaling / area resampling
+ *		 Programmed by RABE-Soft for FreeGEOS project
+ *
+ *	BTScaleBitmapSystem --	Use system function to scale the bitmap.
+ *				This routine fixes a bug that causes color distortion
+ *				in bitmaps with a palette and processes transparent bitmaps correctly.
+ *
+ *	BTScaleBitmapBilinear -- Use bilinear algorithm for upscaling and area resampling for
+ * 				 downscaling.
+ *				 The scaled bitmap will always be a true color bitmap
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 09/16/2026	initial revision
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+
+@include "bmptools.goh"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+
+// Display progress as dots ....
+#define ScaleDisplayProgress(progressTextObj) { if (progressTextObj) @call progressTextObj::MSG_VIS_TEXT_APPEND_PTR(".", 0); }
+
+void ToolExpandMonoLineTo8Bit(byte *pixelData, byte *buffer, int width);
+
+@include "Code/rtools.goh"
+
+/*---------------------------------------------------------------------------
+	Tools
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- ToolCreateBitmap ---------------------
+ *  Purpose:	Create an empty bitmap and clear bitmap data
+ *  Context:
+ *  Strategy:	We use BTCreateOffscreenBitmap from bmptools library,
+ *		therefore we have to use HugeArrayDestroy() to free the bitmap
+ *  Parameters:	vmFile,
+ 		bmfmt  bitmap format for the new bitmap
+ 		width, height: size of the bitmap
+ 		clear:	Clear bitmap data
+ *  Return:	Handle of the bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolCreateBitmap(VMFileHandle vmFile, BMFormat bmfmt, int width, int height, PaletteEntry *palette, Boolean clear) {
+VMBlockHandle bmp;
+BitmapAccessRecord	bar;
+byte	*data;
+int  line, numBytes, maskBytes;
+
+
+    bmp = BTCreateOffscreenBitmap(vmFile, bmfmt, width, height, palette);
+
+    if (clear) {
+
+    	// The byte-size of a bitmap line depends on the bitmap format
+        switch (bmfmt & BMT_FORMAT) {
+	case BMF_MONO:
+	    numBytes = (width+7)/8;
+	    break;
+    	case BMF_4BIT:
+	    numBytes = (width+1)/2;
+	    break;
+        case BMF_8BIT:
+	    numBytes = width;
+	    break;
+    	default: 	// 24 Bit
+	    numBytes = 3*width;
+	}
+
+        if ( bmfmt & BMT_MASK) { maskBytes = (width+7)/8; }
+        		else   { maskBytes = 0; }
+
+	/*
+	 * Set the mask to zero and the data bits to “white”.
+	 * This is mainly to be compatible with the old IconEditor.
+	 * The new icon editor (2026) uses these scaling routines.
+	 */
+	data = BTBitmapLock(vmFile, bmp, &bar, 0);	// lock first line
+    	for (line = 0; line < height; line++ ) {
+    	    if ( maskBytes ) {
+    	    	memset(data, 0, maskBytes);
+    	    	data += maskBytes;
+    	    	}
+    	    if ( (bmfmt & BMT_FORMAT) == BMF_MONO) {memset(data, 0x00, numBytes);}
+	  	else { memset(data, 0xFF, numBytes); }
+	    data = BTBitmapNext(&bar, TRUE);		// fast lock next line
+	    if (!data) break;
+	    }
+	BTBitmapUnlock(&bar, TRUE);			// unlock all
+    }
+
+    return bmp;
+}
+
+
+/*-------------------- ToolChangePaletteBit ---------------------
+ *  Purpose:	Change the bit BMT_PALETTE for a bitmap
+ *  Context:	System bugfix. The system handles palette indices wrong
+ *		in some cases when drawing a bitmap if there is a palette.
+ *  Strategy:
+ *	- lock the bitmap header and modify CB_simple.B_type value
+ *	- mark block dirty to be sure that the changes are permanent
+ *  Parameters:	vmFile, bmp: affected bitmap
+ *		newState: zero: clear the bit
+ *			  non zero: set the bit
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolChangePaletteBit(VMFileHandle vmFile, VMBlockHandle bmp, int newState) {
+MemHandle  mh;
+CBitmap    *cBmp;
+   cBmp = BTBitmapToolLockHeader(vmFile, bmp, &mh);
+   if (newState) {
+   	cBmp->CB_simple.B_type |= BMT_PALETTE;
+   } else {
+   	cBmp->CB_simple.B_type &= ~BMT_PALETTE;
+   }
+   VMDirty(mh);
+   VMUnlock(mh);
+}
+
+/*-------------------- BTScaleBitmapSystem ---------------------
+ *  Purpose:	Use system function to scale the bitmap.
+ *		This routine fixes a bug that causes color distortion
+ *		in bitmaps with a palette and processes transparent bitmaps correctly.
+ *  Context:
+ *  Strategy:	- create target image
+ *		- extract mask, if we have one
+ *		- scale image and, for masked images, mask
+ *		- for masked images: re-combine mask and color planes
+ *
+ *  Note: 	If the bitmap to scale has a palette, we need write access to
+ *		this bitmap to fix a system bug (R.B. 09/2026)
+ *
+ *  Parameters:	srcFile, srcBmp: bitmap to scale
+ * 		destFile: file for the new bitmap
+ *		newWidth, newHeight: size of the new bitmap
+ *  Return:	VMBlock handle of the new (scaled) bitmap
+ *		The color depth and palette are identical to those of the original bitmap.
+ *		Zero in case of error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTScaleBitmapSystem(VMFileHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile, int newWidth, int newHeight) {
+int format, width, height, compact;
+WWFixedAsDWord scaleX, scaleY;
+VMBlockHandle destBmp, srcMaskBmp, destMaskBmp;
+VMFileHandle  maskFile;
+PaletteEntry *palette = 0;
+GStateHandle	maskGS, bmpGS;
+Boolean hasMask;
+
+    /*
+     * calculate scale factors
+     */
+    format = BTGetMoreBitmapInfos(srcFile, srcBmp, &width, &height, &compact);
+    scaleX = GrSDivWWFixed(MakeWWFixed(newWidth), MakeWWFixed(width));
+    scaleY = GrSDivWWFixed(MakeWWFixed(newHeight), MakeWWFixed(height));
+
+    /*
+     * Create destination image
+     */
+    if ( format & BMT_PALETTE ) {
+    	int numColors = ((format & BMT_FORMAT) == BMF_4BIT) ? 16 : 256;
+    	palette = malloc(numColors*sizeof(PaletteEntry));
+    	BTGetBitmapPalette(srcFile, srcBmp, palette, numColors);
+    }
+    destBmp = ToolCreateBitmap(destFile, format, newWidth, newHeight, palette, TRUE);
+
+    /*
+     * Separate masks, if we have any. Store mask bitmap in destFile (as we know it is writable)
+     * Create and initialize gstates
+     */
+    hasMask = (format & BMT_MASK) ? TRUE : FALSE;
+    if (hasMask) {
+	maskFile = destFile;
+	srcMaskBmp = BTExtractTransparencyMask(srcFile, srcBmp, maskFile, 0);
+	destMaskBmp = BTExtractTransparencyMask(destFile, destBmp, maskFile, 0);
+
+	maskGS = GrEditBitmap(maskFile, destMaskBmp, NULL);
+	GrApplyScale(maskGS, scaleX, scaleY);
+    }
+
+    bmpGS = GrEditBitmap(destFile, destBmp, NULL);
+    GrApplyScale(bmpGS, scaleX, scaleY);
+
+    /*
+     * Draw images: mask and picture separately
+     * Fix a system bug that disorders colors if the bitmap has a palette
+     * Then recombine scaled mask and scaled bitmap
+     */
+    if (format & BMT_PALETTE) {
+    	ToolChangePaletteBit(srcFile, srcBmp, FALSE);
+    	ToolChangePaletteBit(destFile, destBmp, FALSE);
+    }
+
+    GrDrawHugeBitmap(bmpGS, 0, 0, srcFile, srcBmp);
+    if (hasMask) {
+    	GrDrawHugeBitmap(maskGS, 0, 0, maskFile, srcMaskBmp);
+    	BTApplyTransparencyMask(destFile, destBmp, 0, maskFile, destMaskBmp, 0);
+    }
+
+    if (format & BMT_PALETTE) {
+    	ToolChangePaletteBit(srcFile, srcBmp, TRUE);
+    	ToolChangePaletteBit(destFile, destBmp, TRUE);
+    }
+
+    /*
+     * clean up
+     */
+    if ( palette ) free(palette);
+    if (hasMask) {
+    	HugeArrayDestroy(maskFile, srcMaskBmp);
+    	HugeArrayDestroy(maskFile, destMaskBmp);
+    	GrDestroyState(maskGS);
+    }
+    GrDestroyState(bmpGS);
+
+    return destBmp;
+}
+
+
+/*-------------------- ToolConvertPixelLineTo24Bit ---------------------
+ *  Purpose:	Convert a line of pixels to its RGB values
+ *  Context:
+ *  Strategy:	- The buffer must be large enough and the palette pointer must already be
+ *		  set up properly
+ *		- conversion algorithm depends on the color depth (srcFormat) of the source pixels
+ *  Parameters:	srcData:	pixels to convert
+ *		srcFormat:	color depth of the source pixels (BMF_-constant)
+ *		width:		number of pixels in the source
+ *		palette:	pointer to the used palette. may be the GEOS standard palette)
+ *		destBuffer:	buffer to write to. Must be at least 3*width bytes
+ *  Return:	number of bytes in a source line
+ ---------------------------------------------------------------------------*/
+int ToolConvertPixelLineTo24Bit(byte *srcData, int srcFormat, int width, PaletteEntry *palette, PaletteEntry* destBuffer) {
+PaletteEntry white = { 255, 255, 255 },
+	     black = { 0, 0, 0 };
+byte mask, val;
+int i, x, numBytes;
+
+
+    /*
+     * Handling  depends on the color format
+     */
+    switch (srcFormat & BMT_FORMAT ) {
+
+    case BMF_MONO:			/* one bit per pixel, starting width bit 7 */
+        mask = 0x80;
+        i = 0;
+        val = srcData[i];
+	for ( x = 0; x < width; x++)  {
+	    if ( val & mask ) {	destBuffer[x] = black; }
+	    		else  {	destBuffer[x] = white; }
+	    mask >>= 1;			/* next pixel */
+	    if ( !mask ) {		/* next source byte */
+	    	mask = 0x80;
+	    	i++;
+	    	val = srcData[i];
+	    }
+	}
+	numBytes = (width+7)/8;
+	break;
+
+    case BMF_4BIT:			/* two pixels per byte. 16 color palette */
+	for ( x = 0; x < width; x++)  {
+	    if ( x & 1 ) { destBuffer[x] = palette[ srcData[x/2] & 0x0F ]; }
+		    else { destBuffer[x] = palette[ srcData[x/2] >> 4   ]; }
+	}
+	numBytes = (width+1)/2;
+	break;
+
+    case BMF_8BIT:			/* one byte per pixel, 256 color palette  */
+	for ( x = 0; x < width; x++)  {
+	    destBuffer[x] = palette[srcData[x]];
+	}
+	numBytes = width;
+	break;
+
+    case BMF_24BIT:			/* already true color. just copy it */
+	numBytes = 3*width;
+        memcpy(destBuffer, srcData, numBytes);
+	break;
+    }
+
+    return numBytes;
+}
+
+
+/*-------------------- DownScaleImageX ---------------------
+ *  Purpose:	Downscale an image in x-direction only
+ *  Context:
+ *  Strategy:	The source image can have any format. Every line will be
+ *		converted to true color as first step.
+ *		The target image (scaledBmp) must already exist and must be
+ *		a true color image.
+ *
+ *		The color value of each target pixel is calculated as the
+ *		average over a pixel region of the source image.
+ *		This region is as large as the downscale factor (the
+ *		inverse of the *scale* parameter). The left and right
+ *		border pixels are weighted only according to their proportion
+ *		of the region.
+ *
+ *		Mask plane pixels (if we have one) are handled in similar way.
+ *
+ * 		To avoid (slower) dword summation, as well as rounding problems
+ * 		when calculating the new color, we accept a limitation
+ * 		for the downscale factor to 254 without any message.
+ * 		In fact, this is not a real limit. A 22-MB-image (~6000x4000 pixels)
+ * 		will be downscaled to 24x16 pixels with this factor.
+ *
+ *  Parameters:	srcFile, srcBmp: 	bitmap to scale
+ *		destFile, scaledBmp: 	an existing bitmap
+ *					scaled pixels will be written here
+ *  Return:	scaledBmp is filled in properly
+ ---------------------------------------------------------------------------*/
+void DownScaleImageX(VMBlockHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile, VMBlockHandle scaledBmp,
+			WWFixedAsDWord scale, optr progressText) {
+BitmapAccessRecord	srcBar, destBar;
+int srcWidth, height, srcMaskBytes, srcFormat;
+int destWidth, destMaskBytes, x, y;
+int numBytes;
+PaletteEntry	*srcBuffer, *palette;
+PaletteEntry	*srcPixel, *destPixel;
+byte *srcOrigData, *bPtr;
+Boolean freePalette;
+WWFixedAsDWord	iScale;		/* inverse scale factor. GrMulWWFixed is much faster than GrSDivWWFixed  */
+
+WWFixedAsDWord	left, right, t0, t1;
+word 	l0, l1, r0, sumR, sumG, sumB;
+word		a0, a1;
+PaletteEntry	col0, col1;
+int c;
+
+byte *srcMaskData8Bit, *destMaskPtr;
+word dMask;
+dword sumM;
+WWFixedAsDWord wwfVal;
+Boolean hasMask;
+
+
+    /*
+     * Fetch all important information (sizes, palette) and allocate a buffer to hold
+     * the source line as RGB values
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBmp, &srcWidth, &height, NULL);
+
+    if (srcFormat & BMT_PALETTE) {
+    	int numColors = ((srcFormat & BMT_FORMAT) == BMF_4BIT) ? 16 : 256;
+    	palette = malloc(numColors*sizeof(PaletteEntry));
+    	BTGetBitmapPalette(srcFile, srcBmp, palette, numColors);
+    	freePalette = TRUE;
+    } else {
+    	freePalette = FALSE;
+    	switch ( srcFormat & BMT_FORMAT ) {
+    	case BMF_4BIT:
+    	case BMF_8BIT:
+    	    palette = BTLockGEOSStandardPalette();
+    	    break;
+    	default:  palette = 0;
+    	}
+    }
+
+    srcBuffer = malloc(srcWidth * sizeof(PaletteEntry));
+
+    BTGetMoreBitmapInfos(destFile, scaledBmp, &destWidth, NULL, NULL);
+    iScale = GrSDivWWFixed(MakeWWFixed(1), scale);
+
+    if ( srcFormat & BMT_MASK ) {
+    	hasMask = TRUE;
+	srcMaskBytes = (srcWidth + 7)/8;
+	destMaskBytes = (destWidth + 7)/8;
+	srcMaskData8Bit = malloc(srcWidth);
+    } else {
+    	hasMask = FALSE;
+	srcMaskBytes = 0;
+	destMaskBytes = 0;
+	srcMaskData8Bit = 0;
+    }
+
+    /*
+     * lock firts first and set up pointers
+     * - convert mask pixels into a one-byte-per-pixel buffer
+     * - scale source
+     */
+    bPtr = BTBitmapLock(srcFile, srcBmp, &srcBar, 0);
+    srcOrigData = bPtr + srcMaskBytes;
+    if (hasMask) ToolExpandMonoLineTo8Bit(bPtr, srcMaskData8Bit, srcWidth);
+
+    bPtr = BTBitmapLock(destFile, scaledBmp, &destBar, 0);
+    destMaskPtr = bPtr;
+    destPixel = (PaletteEntry*)(bPtr + destMaskBytes);
+
+    /*
+     * lock bitmaps line by line and convert color pixels to 24 bit
+     * the scale the line
+     */
+    for ( y = 0; y < height; y++) {
+         if ( (y & 0x0F) == 0 ) ScaleDisplayProgress(progressText);
+
+        /*
+         * fill buffer width converted pixels
+         */
+        numBytes = ToolConvertPixelLineTo24Bit(srcOrigData, srcFormat, srcWidth, palette, srcBuffer);
+        srcPixel = srcBuffer;
+
+
+    	/*
+    	 * For every destination pixel x :
+    	 *	- calculate corresponding source range
+    	 *		left: position of the left border of the pixel
+    	 *		      left = iScale*x
+    	 *		l0 = int(left)	: left rounded down: leftmost affected pixel number
+    	 *		l1 = l0 + 1: 	: left rounded up
+    	 *		right: position of the right border of the pixel
+    	 *		      right = iScale*(x+1)
+    	 *		r0 = int(right) : right rounded down: rightmost affected pixel number
+    	 *	- calculate weight if source pixels
+    	 *		t0 = l1-left	: weight of pixel l0
+    	 *		t1 = right-r0	: weight of pixel r0
+    	 *
+    	 *	Example: downscale image from 120 to 37 pixels
+    	 *	    scale = 31/120, iScale = 120/37 = 3.243
+    	 *	    We look at pixel 1
+    	 *		left position:		 left = 3.243
+    	 *		leftmost affected pixel: l0 = 3
+    	 *					 l1 = 4
+    	 *		right position:		 r = 6.486
+    	 *		rightmost affected pixel:r0 = 6
+    	 *		weight for pixel 3:	 t0 = 0.757		( = 4 - 3.243)
+    	 *		weight for pixel 6:	 t1 = 0.486		( = 6.486 - 6)
+    	 *
+    	 *	- calculate weighted sum:  sum = t0*color(l0) + t1*color(r0)
+    	 *	- if there are pixel between the leftmost and rightmost
+    	 *	  affected pixels (as in our example are): add their color
+    	 *	  values to sum.
+    	 *	  In our example, this are two pixels (pixel no. 4 and 5).
+    	 *	  The first of these pixels is pixel no. l1, their number is r0 - l1
+    	 *	  If r0 is equal to l1, there are no such pixels.
+    	 *
+    	 *	Mask plane pixels are handled in the same way.
+    	 *
+    	 *	As we can see above, right value in one turn is the left value in the
+    	 *	next turn. Also, right-left is equal to iScale. So we can replace
+    	 *	multiplication by a simple addition.
+    	 *
+    	 *	Also we replace WWFixed multiplication by word-size operations.
+    	 */
+
+
+    	dMask = 0x80;
+    	right = 0;
+    	for ( x = 0; x < destWidth; x++) {
+
+    	    left = right;
+    	    l0 = left >> 16;				// l0 = int(left)
+    	    l1 = l0 + 1;
+
+	    right = left + iScale;			// == iScale*(x+1)
+	    r0 = right >> 16;
+	    if (r0 >= srcWidth) {			// rounding issue -> fix it
+	    	r0 = srcWidth-1;
+	    }
+
+	    t0 = MakeWWFixed(l1) - left;
+	    t1 = right & 0xFFFF;			// == right - MakeWWFixed(r)
+
+	    /*
+	     * As explained in UpScaleImageX, we can speed up things significantly when
+	     * we are using word-sized multiplication instead of WWFixed operations.
+	     * To do that, we reduce the decimal places from 16 bit to 8 bit, which
+	     * is sufficient for our purpose.
+	     */
+	    a0 = t0 >> 8;
+	    a1 = t1 >> 8;
+
+	    if ( hasMask ) {
+
+		/* calculate mask sum */
+
+		/* left most and right most pixel */
+		sumM = (srcMaskData8Bit[l0] * a0  + 0x80 ) >> 8;
+		sumM += (srcMaskData8Bit[r0] * a1  + 0x80 ) >> 8;
+
+		/* middle pixels */
+		if ( r0 > l1 ) {
+	   	    int i;
+	   	    for ( i = l1 ; i < r0;i++ ) {
+	   		sumM += srcMaskData8Bit[i];
+	   	    }
+	    	}
+
+		/*
+		 * Find out if the destination mask bit must be set: bit = sum/iScale.
+		 * This is equal to bit = sum * scale.
+		 * We do our best, round the value and see if the result is greater than
+		 * 0.5 or not.
+		 * Unfortunately, we cannot be sure if a border pixel, that has 'color'
+		 * gets a non-transparent mask pixel or vice versa. So, white borders or
+		 * clipped pixels may occur. I cannot see a way to avoid this.
+		 */
+		wwfVal = (((dword)sumM * scale) + MakeWWFixed(0.5));
+		if ( wwfVal > MakeWWFixed(0.5) ) {
+		    *destMaskPtr |= dMask;
+		}
+
+		/* Update destination mask */
+		dMask >>= 1;
+		if (!dMask) {
+		    dMask = 0x80;
+		    destMaskPtr++;
+		}
+	    }
+
+	    /* calculate color sum */
+
+	    /* left most and right most pixel */
+	    col0 = srcPixel[l0];
+	    col1 = srcPixel[r0];
+
+	    sumR = (col0.rt * a0  + 0x80 ) >> 8;
+	    sumR += (col1.rt * a1  + 0x80 ) >> 8;
+
+	    sumG = (col0.gn * a0  + 0x80 ) >> 8;
+	    sumG += (col1.gn * a1 + 0x80 ) >> 8;
+
+	    sumB = (col0.bl * a0 + 0x80 ) >> 8;
+	    sumB += (col1.bl * a1 + 0x80 ) >> 8;
+
+
+	    /* middle pixels */
+	    if ( r0 > l1 ) {
+	   	int i;
+	   	for ( i = l1 ; i < r0;i++ ) {
+	   	    sumR += srcPixel[i].rt;
+	   	    sumG += srcPixel[i].gn;
+	   	    sumB += srcPixel[i].bl;
+	   	}
+	    }
+
+	    /*
+	     * Calculate and store new color: colVal = sum/iScale.
+	     * This is equal to colVal = sum * scale. There is no significant
+	     * speed difference between both variants.
+	     * Because sum may up to 0xFFFF, we cannot use word sized multiplication,
+	     * but dword sized multiplication works and is very much faster than
+	     * WWFixed operations.
+	     *
+	     * Note: It is important to round the color value here, or the
+	     * color gets a little bit darker and we can never reach "real
+	     * white" (0xFF values) for example.
+	     *
+	     * Because we’re performing calculations using fixed-point arithmetic,
+	     * rounding errors may occur during summation. However, an overflow (color
+	     * value greater than 0xFF) should not occur because a0 and a1 are
+	     * rounded down from t0 and t1. I’ve also tested this extensively and never
+	     * found an overflow.
+	     *
+	     * Just to be on the safe side, I'm testing this here, even if it
+	     * costs a little (about 2%) of performance.
+	     */
+	    c = (((dword)sumR * scale) + MakeWWFixed(0.5)) >> 16;
+	    if (c > 0xFF) c = 0xFF;
+	    destPixel->rt = c;
+
+	    c = (((dword)sumG * scale) + MakeWWFixed(0.5)) >> 16;
+	    if (c > 0xFF) c = 0xFF;
+	    destPixel->gn = c;
+
+	    c = (((dword)sumB * scale) + MakeWWFixed(0.5)) >> 16;
+	    if (c > 0xFF) c = 0xFF;
+	    destPixel->bl = c;
+
+	    // next pixel
+  	    destPixel++;
+
+    	}
+
+    	/* enter next line */
+	bPtr = BTBitmapNext(&srcBar, FALSE);
+        srcOrigData = bPtr + srcMaskBytes;
+	if (hasMask) ToolExpandMonoLineTo8Bit(bPtr, srcMaskData8Bit, srcWidth);
+
+	bPtr = BTBitmapNext(&destBar, TRUE);
+	destMaskPtr = bPtr;
+	destPixel = (PaletteEntry*)(bPtr + destMaskBytes);
+    }
+
+    /*
+     * clean up
+     */
+    BTBitmapUnlock(&srcBar, FALSE);
+    BTBitmapUnlock(&destBar, TRUE);
+
+    if ( palette ) {
+    	if ( freePalette ) {
+    	    free(palette);
+    	} else {
+    	    BTUnlockGEOSStandardPalette();
+    	}
+    }
+
+    if (srcBuffer)   free(srcBuffer);
+    if (srcMaskData8Bit) free(srcMaskData8Bit);
+}
+
+
+
+/*-------------------- DownScaleImageY ---------------------
+ *  Purpose:	Downscale an image in y-direction only
+ *  Context:
+ *  Strategy:	This is is the 2nd scaling step. Therefore, the source image is
+ *		ia already a true color image.
+ *		The target image (scaledBmp) must already exist and must be
+ *		also a true color image
+ *
+ *		The color value of each target pixel is calculated as the
+ *		average over a pixel vertical region of the source image.
+ *		This region is as large as the downscale factor (the
+ *		inverse of the *scale* parameter). The top and bottom
+ *		border pixels are weighted only according to their proportion
+ *		of the region.
+ *		Mask plane pixels (if we have any) are handled in the same way.
+ *
+ * 		To avoid (slower) dword summation, as well as rounding problems
+ * 		when calculating the new color, we accept a limitation
+ * 		for the downscale factor to 254 without any message.
+ * 		In fact, this is not a real limit. A 22-MB-image (~6000x4000 pixels)
+ * 		will be downscaled to 24x16 pixels with this factor.
+ *
+ *  Parameters:	srcFile, srcBmp: 	bitmap to scale (true color bitmap)
+ *		destFile, scaledBmp: 	an existing bitmap
+ *					scaled pixels will be written here
+ *  Return:	scaledBmp is filled in properly
+ ---------------------------------------------------------------------------*/
+void DownScaleImageY(VMBlockHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile, VMBlockHandle scaledBmp,
+		WWFixedAsDWord scale, optr progressText) {
+int 	width, srcHeight, destHeight, maskBytes, numColorBytes;
+int	x, y, srcFormat;
+byte 	*srcPtr, *destPtr;
+BitmapAccessRecord	srcBar, destBar;
+PaletteEntry 	*destPixel, *srcPixel;
+WWFixedAsDWord	iScale, top, bottom, t0, t1;
+
+word 	*sumRPtr, *sumGPtr, *sumBPtr;
+int	bottom0, top0, top1, curLine;
+word a0, a1;
+
+byte	*srcMaskData8Bit, *destMaskPtr;
+word 	*sumMPtr, dMask;
+Boolean hasMask;
+
+
+    /*
+     * Fetch important data
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBmp, &width, &srcHeight, 0);
+    BTGetMoreBitmapInfos(destFile, scaledBmp, NULL, &destHeight, 0);
+
+    if (srcFormat & BMT_MASK ) {
+    	hasMask = TRUE;
+    	maskBytes = (width+7)/8;
+    	srcMaskData8Bit = malloc(width);
+    	sumMPtr = malloc(width*sizeof(word));
+    } else  {
+    	hasMask = FALSE;
+    	maskBytes = 0;
+    	srcMaskData8Bit = 0;
+    	sumMPtr = 0;
+    }
+    numColorBytes = 3*width;
+
+    iScale = GrSDivWWFixed(MakeWWFixed(1), scale);
+
+    /*
+     * allocate data buffer for color sums
+     */
+    sumRPtr = malloc(width*sizeof(word));
+    sumGPtr = malloc(width*sizeof(word));
+    sumBPtr = malloc(width*sizeof(word));
+
+    destPtr = BTBitmapLock(destFile, scaledBmp, &destBar, 0);
+    destMaskPtr = destPtr;
+    destPixel = (PaletteEntry*)(destPtr + maskBytes);
+
+    /*
+     *	For every destination line (y):
+     *	- calculate source range
+     *	- sum colors in the source range; weight border pixels
+     *	- new color is the average of the color sum
+     *	- handle mask plane in the same way
+     */
+    srcPtr = BTBitmapLock(srcFile, srcBmp, &srcBar, 0);
+    srcPixel = (PaletteEntry*)(srcPtr + maskBytes);
+    if ( hasMask) ToolExpandMonoLineTo8Bit(srcPtr, srcMaskData8Bit, width);
+
+    curLine = 0;
+    bottom = 0;
+
+    for ( y = 0 ; y < destHeight; y++ ) {
+         if ( (y & 0x0F) == 0 ) ScaleDisplayProgress(progressText);
+
+	/*
+	 * calculate source line numbers - similar to DownScaleImageX
+	 *	top: source-position of the top of the line y (WWFixed)
+	 *		top = iScale * y
+	 *	top0: top rounded down: topmost affected line number
+	 *	top1: top rounded up, top1 := top0 + 1
+	 *	bottom: source-position of the bottom of the line y (WWFixed)
+	 *		bottom = iScale * (y+1)
+	 *	bottom0: bottom rounded down: last affected line number
+	 *
+    	 *	t0 = top1-top: 	weight of line top0
+    	 *	t1 = bottom-bottom0	: weight of line bottom0
+    	 *	a0, a1:		integer variant of t0 and t1
+	 */
+
+	top = bottom;
+    	top0 = top >> 16;
+    	top1 = top0 + 1;
+
+	bottom = top + iScale;
+	bottom0 = bottom >> 16;
+
+	t0 = MakeWWFixed(top1) - top;
+	t1 = bottom & 0xFFFF;			// == bottom - MakeWWFixed(bottom0)
+        a0 = t0 >> 8;
+	a1 = t1 >> 8;
+
+	/*
+	 * lock first affected line (top0) and initialize sum-array
+	 */
+	if (top0 > curLine) {
+		srcPtr = BTBitmapNext(&srcBar, FALSE);
+		srcPixel = (PaletteEntry*)(srcPtr + maskBytes);
+		curLine++;
+	}
+
+	for ( x = 0; x < width; x++) {
+	    sumRPtr[x] = (srcPixel[x].rt * a0 + 0x80 ) >> 8;
+	    sumGPtr[x] = (srcPixel[x].gn * a0 + 0x80 ) >> 8;
+	    sumBPtr[x] = (srcPixel[x].bl * a0 + 0x80 ) >> 8;
+	}
+	if ( hasMask) {
+	    ToolExpandMonoLineTo8Bit(srcPtr, srcMaskData8Bit, width);
+	    for ( x = 0; x < width; x++) { sumMPtr[x] = (srcMaskData8Bit[x] * a0 + 0x80 ) >> 8; }
+	}
+
+
+	/*
+	 * sum all pixel in the middle - if we have any
+	 */
+	while ( curLine < (bottom0 - 1) ) {
+	    srcPtr = BTBitmapNext(&srcBar, FALSE);
+	    srcPixel = (PaletteEntry*)(srcPtr + maskBytes);
+	    curLine++;
+	    for ( x = 0; x < width; x++) {
+		sumRPtr[x] += srcPixel[x].rt;
+		sumGPtr[x] += srcPixel[x].gn;
+		sumBPtr[x] += srcPixel[x].bl;
+	    }
+	    if ( hasMask) {
+	        ToolExpandMonoLineTo8Bit(srcPtr, srcMaskData8Bit, width);
+	        for ( x = 0; x < width; x++) { sumMPtr[x] += srcMaskData8Bit[x]; }
+	    }
+	}
+
+	/*
+	 * lock last affected line and sum its color values
+	 * There is a special case that BTBitmapNext tries to
+	 * lock a non existing line. a1 and srcPtr becomes zero then.
+	 */
+	srcPtr = BTBitmapNext(&srcBar, FALSE);
+	srcPixel = (PaletteEntry*)(srcPtr + maskBytes);
+	curLine++;
+
+	if (srcPtr) {
+	    for ( x = 0; x < width; x++) {
+		sumRPtr[x] += (srcPixel[x].rt * a1 + 0x80 ) >> 8;
+		sumGPtr[x] += (srcPixel[x].gn * a1 + 0x80 ) >> 8;
+		sumBPtr[x] += (srcPixel[x].bl * a1 + 0x80 ) >> 8;
+	    }
+	    if ( hasMask) {
+	        ToolExpandMonoLineTo8Bit(srcPtr, srcMaskData8Bit, width);
+	    	for ( x = 0; x < width; x++) { sumMPtr[x] += (srcMaskData8Bit[x] * a1 + 0x80 ) >> 8; }
+	    }
+	}
+
+	/*
+	 * Calculate the new color values and store it in the scaled bitmap
+	 * Check the color value for overflow (for safety only).
+	 */
+	dMask = 0x80;
+	for ( x = 0; x < width; x++) {
+	    int c;
+	    WWFixedAsDWord	val;
+
+	    if ( hasMask) {	/* downscale mask */
+
+		val = (((dword)sumMPtr[x] * scale) + MakeWWFixed(0.5));
+		if ( val > MakeWWFixed(0.5) ) {
+		    *destMaskPtr |= dMask;
+		}
+
+		/* Update destination mask */
+		dMask >>= 1;
+		if (!dMask) {
+		    dMask = 0x80;
+		    destMaskPtr++;
+		}
+	    }
+
+	    /* downscale colors */
+	    c = (((dword)sumRPtr[x] * scale) + MakeWWFixed(0.5)) >> 16;
+	    if (c > 0xFF) c = 0xFF;
+	    destPixel->rt = c;
+
+	    c = (((dword)sumGPtr[x] * scale) + MakeWWFixed(0.5)) >> 16;
+	    if (c > 0xFF) c = 0xFF;
+	    destPixel->gn = c;
+
+	    c = (((dword)sumBPtr[x] * scale) + MakeWWFixed(0.5)) >> 16;
+	    if (c > 0xFF) c = 0xFF;
+	    destPixel->bl = c;
+
+	    // next destination pixel
+  	    destPixel++;
+	}
+    /*
+     * enter next destination line
+     */
+    destPtr = BTBitmapNext(&destBar, TRUE);
+    destMaskPtr = destPtr;
+    destPixel = (PaletteEntry*)(destPtr + maskBytes);
+
+    }
+
+
+    /*
+     * clean up
+     */
+    BTBitmapUnlock(&destBar, TRUE);
+    BTBitmapUnlock(&srcBar, FALSE);
+
+    free(sumRPtr);
+    free(sumGPtr);
+    free(sumBPtr);
+
+    if (sumMPtr)	free(sumMPtr);
+    if (srcMaskData8Bit) free(srcMaskData8Bit);
+
+}
+
+
+/*-------------------- ToolExpandMonoLineTo8Bit ---------------------
+ *  Purpose:	Convert a monochrome pixel line to a one-byte-per-pixel buffer
+ *  Context:	This makes the access to monochrome pixels more easy, in
+ *		particular, because we often need to access two consecutive
+ *		pixels that may be stored in different bytes.
+ *  Strategy:	if the source pixel x is white, buffer[x] will be zero
+ *		if it is black buffer[x] will be 0xFF
+ *  Parameters:	pixelData:	Pointer to monochrome pixel line (8 Pixel/Byte)
+ *		buffer:		Pointer to a buffer of at least with bytes
+ *		width:		Number of pixels to handle
+ *  Return:	buffer is filled in
+ ---------------------------------------------------------------------------*/
+void ToolExpandMonoLineTo8Bit(byte *pixelData, byte *buffer, int width) {
+byte sMask;
+int x;
+
+    memset(buffer, 0, width);
+    sMask = 0x80;
+    for ( x = 0; x < width; x++) {
+	if ( *pixelData & sMask ) { buffer[x] = 255; }
+	sMask >>= 1;
+	if ( !sMask ) {
+	    sMask = 0x80;
+	    pixelData++;
+	}
+    }
+
+}
+
+
+/*-------------------- UpScaleImageX ---------------------
+ *  Purpose:	Upscale an image in x-direction only
+ *  Context:
+ *  Strategy:	- scale the image line by line, using linear interpolation (see code)
+ *		- the source bitmap may have any format.
+ *		  so we have to convert any source line to 24 bit first
+ *		- the scaledBmp bitmap must already exist and have the same height as the source bitmap
+ *		  it must be a 24 bit bitmap
+ *		- for every destination pixel, calculate the source position
+ *		- calculate new color by interpolating between the real pixel on the left (x0) and on the
+ *	  	  right (x1) of the calculated position
+ *		- do the same for mask plane, if we have one
+ *  Parameters:	srcFile, srcBmp: 	bitmap to scale
+ *		destFile, scaledBmp: 	an existing 24 bit bitmap width mask
+ *					scaled pixels will be written here
+ *  Return:	scaledBmp is filled in properly
+ ---------------------------------------------------------------------------*/
+void UpScaleImageX(VMBlockHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile, VMBlockHandle scaledBmp,
+				WWFixedAsDWord scale, optr progressText) {
+BitmapAccessRecord	srcBar, destBar;
+int srcWidth, height, srcMaskBytes, srcFormat;
+int destWidth, destMaskBytes, x, y, x0, x1, col;
+int numBytes;
+WWFixedAsDWord	pos, t;
+PaletteEntry	*srcBuffer, *palette;
+PaletteEntry	*srcPixel, *destPixel;
+PaletteEntry	col0, col1;
+byte *srcMaskPtr, *destMaskPtr, *srcData;
+Boolean freePalette;
+WWFixedAsDWord	iScale;		/* inverse scale factor. GrMulWWFixed is much faster than GrSDivWWFixed  */
+word a, a1, wVal;
+
+byte 	pix1, pix2;
+byte 	*destPtr;
+byte 	*srcMaskData8Bit;
+word  	dMask;
+Boolean hasMask;
+
+
+    /*
+     * Fetch all important information (sizes, palette) and allocate a buffer to hold
+     * the source line as RGB values as well as a buffer to hold mask data
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBmp, &srcWidth, &height, NULL);
+
+    if (srcFormat & BMT_PALETTE) {
+    	int numColors = ((srcFormat & BMT_FORMAT) == BMF_4BIT) ? 16 : 256;
+    	palette = malloc(numColors*sizeof(PaletteEntry));
+    	BTGetBitmapPalette(srcFile, srcBmp, palette, numColors);
+    	freePalette = TRUE;
+    } else {
+    	freePalette = FALSE;
+    	switch ( srcFormat & BMT_FORMAT ) {
+    	case BMF_4BIT:
+    	case BMF_8BIT:
+    	    palette = BTLockGEOSStandardPalette();
+    	    break;
+    	default:  palette = 0;
+    	}
+    }
+
+    srcBuffer = malloc(srcWidth * sizeof(PaletteEntry));
+    BTGetMoreBitmapInfos(destFile, scaledBmp, &destWidth, NULL, NULL);
+
+    iScale = GrSDivWWFixed(MakeWWFixed(1), scale);
+
+    if ( srcFormat & BMT_MASK ) {
+	hasMask = TRUE;
+	srcMaskBytes = (srcWidth + 7)/8;
+	destMaskBytes = (destWidth + 7)/8;
+	srcMaskData8Bit = malloc(srcWidth);
+    } else {
+	hasMask = FALSE;
+	srcMaskBytes = 0;
+	destMaskBytes = 0;
+	srcMaskData8Bit = 0;
+    }
+
+    /*
+     * lock bitmaps line by line
+     * - convert source to 24 bit
+     * - scale source
+     */
+    srcMaskPtr = BTBitmapLock(srcFile, srcBmp, &srcBar, 0);
+    srcData = srcMaskPtr + srcMaskBytes;
+
+    destMaskPtr = BTBitmapLock(destFile, scaledBmp, &destBar, 0);
+    destPixel = (PaletteEntry*)(destMaskPtr + destMaskBytes);
+
+    for ( y = 0; y < height; y++) {
+
+         if ( (y & 0x0F) == 0 ) ScaleDisplayProgress(progressText);
+
+        /*
+         * fill buffer width converted pixels
+         */
+
+        numBytes = ToolConvertPixelLineTo24Bit(srcData, srcFormat, srcWidth, palette, srcBuffer);
+        srcPixel = srcBuffer;
+
+    	/*
+    	 * Handle special case "scale == 1"
+    	 */
+        if ( scale == MakeWWFixed(1) ) {
+            if (hasMask) memcpy(destMaskPtr, srcMaskPtr, srcMaskBytes);
+            memcpy(destPixel, srcPixel, 3*srcWidth);
+            goto nextLine;
+        }
+	/*
+	 * convert source line mask bits into a one-byte-per-pixel buffer
+	 */
+
+	if (hasMask) ToolExpandMonoLineTo8Bit(srcMaskPtr, srcMaskData8Bit, srcWidth);
+
+    	/*
+    	 * For every destination pixel x:
+    	 * 	- calculate source pixel position (pos as WWFixed value)
+    	 *	- interpolate between the real pixel on the left (x0) and on the
+    	 *	  right (x1) of the calculated position
+    	 *	  handle borders by clipping
+    	 *
+    	 * The source pixel position pos for the pixel x is calculated by
+    	 *	pos = (x + 0.5)*iScale - 0.5
+    	 * This calculates the source position of the middle of the pixel.
+    	 * The source pixel position pos1 for the pixel (x+1) is therefore
+    	 *	pos1 = pos + iScale
+    	 * This allows us to replace the slow multiplication by a fast addition
+    	 * - start width x0 = 0.5*iScale - 0.5
+    	 * - add iScale to pos at the end of the loop
+    	 */
+    	pos = GrMulWWFixed(MakeWWFixed(0.5), iScale) - MakeWWFixed(0.5);
+    	dMask = 0x80;
+    	destPtr = destMaskPtr;
+    	if (hasMask) memset(destMaskPtr, 0, destMaskBytes);
+
+
+    	for ( x = 0; x < destWidth; x++) {
+
+	    /*
+	     * convert pos (WWFixed) to real pixel position x0 and next right
+	     * pixel x1. Clip borders.
+	     */
+    	    x0 = pos >> 16;			/* WWFixed to integer */
+    	    if (x0 < 0) { x0 = 0; }
+    	    	else {  if (x0 >= srcWidth) x0 = srcWidth - 1; }
+    	    x1 = x0 + 1; if (x1 >= srcWidth) x1 = srcWidth - 1;
+
+
+	    /*
+	     * Interpolate colors and mask
+	     * t is is the weight factor for the pixel at position x1 - that means if
+	     * pos is equal to x0, x1 has a weight factor of zero.
+	     * Note that the start value of pos is negative but t cannot be negative
+	     * The weight factor of x0 is  1.0 - t.
+	     * For performance, we map the 16 bit fractional part to 8 bit. This allows
+	     * word-sized multiplication (see below).
+	     */
+	    t = pos - MakeWWFixed(x0);
+	    if ((sdword)t < 0) t = 0;
+	    a = t >> 8;
+	    a1 = 0x100-a;
+
+
+	    /*
+	     * First interpolate mask, if we have one
+	     */
+	    if (hasMask) {
+		pix1 = srcMaskData8Bit[x0];
+		pix2 = srcMaskData8Bit[x1];
+
+		/*
+		 * Now we had to calculate the weighted average of pix1 and pix2 as
+		 *	val = pix1 * a1 + pix2 * a		(where a1 = 1.0 - t)
+		 * But because pix1 and pix2 can only be on or off, there is no need to
+		 * multiply, we can simply add a and a1 if the pixel is on.
+		 */
+
+		if ( pix1 )  { wVal = a1; }
+			else { wVal = 0; }
+		if ( pix2 ) wVal += a;
+
+		if ( wVal > 127 ) {
+		    *destPtr |= dMask;
+		}
+
+		/* Update destination mask */
+		dMask >>= 1;
+		if (!dMask) {
+		    dMask = 0x80;
+		    destPtr++;
+		}
+	    }
+
+	    /*
+	     * Next we have to calculate the new color (red channel as example) as
+	     *	rt = col0.rt * t1 + col1.rt * t		(where t1 = 1.0 - t)
+	     * t as well as t1 are in the range from 0.0 to 1.0,
+	     * So, the resulting color value is in the range from 0.0 to 255.0
+	     * 1.0 is 0x10000 as WWFixed, colors (like rt) goes from 0 to 255,
+	     * so the WWFixed result goes from x0000 to 0xFF0000.
+	     * 		Worst case: col0.rt and col1.rr are both 255
+	     *		--> rt = 255*(t + t1) --- but t+t1 == 1 --> rt = 255
+	     *
+	     * The problem is, that GrMulWWFixed() is the slowest option we have.
+	     * DWord multiplication is much faster, but a word multiplication is
+	     * the fastest option - about 5 times faster than GrMulWWFixed.
+	     *
+	     * Therefore we have shifted t and t1 above 8 bit to right (to a and a1,
+	     * new range is range 0x00 to 0x100)
+	     *		a = t >> 8;
+	     *		a1 = 0x100-a;
+	     * and the multiply result will not break the word limit
+	     * because the result range is from 0x00 to 0xFF00 now.
+	     * As we can see, it's save to add 0x80 for rounding purpose,
+	     * because 0x80 correspondents to 0.5 when 0xFF00 correspondents to 255.0.
+	     * It is also save for the (unexpected) case that the result is slightly
+	     * larger than 0xFF00.
+	     * Finally, we shift the result 8 bit to right to get the correct color value.
+	     *
+	     * Another problem is, that some pixels may be masked out. These pixels are
+	     * internal set to "a color" (e.g. white) and this affects the neighbor (unmasked) pixels.
+	     * So I have tried to ignore these pixels or to use gray instead of it's color, but
+	     * I cannot say that the results were visibly better. It's just slower because of
+	     * the additional tests that are required. Therefore I still use the simple version.
+	     */
+
+
+	    col0 = srcPixel[x0];
+	    col1 = srcPixel[x1];
+
+	    wVal = col0.rt * a1  + col1.rt * a;
+	    col = (wVal  + 0x80 ) >> 8;
+EC(	    if ( col > 255) { col = 255; MessageBox("UpScaleX rt>255");  } )
+	    destPixel->rt = col;
+
+	    wVal = col0.gn * a1  + col1.gn * a;
+	    col = (wVal  + 0x80 ) >> 8;
+EC(	    if ( col > 255) { col = 255; MessageBox("UpScaleX gn>255");  } )
+	    destPixel->gn = col;
+
+	    wVal = col0.bl * a1  + col1.bl * a;
+	    col = (wVal  + 0x80 ) >> 8;
+EC(	    if ( col > 255) { col = 255; MessageBox("UpScaleX bl>255");  } )
+	    destPixel->bl = col;
+
+	    // next pixel
+  	    destPixel++;
+	    pos = pos + iScale;
+
+    	}
+
+    nextLine:
+
+    	/* enter next line */
+	srcMaskPtr = BTBitmapNext(&srcBar, FALSE);
+	srcData = srcMaskPtr + srcMaskBytes;
+
+	destMaskPtr = BTBitmapNext(&destBar, TRUE);
+	destPixel = (PaletteEntry*)(destMaskPtr + destMaskBytes);
+	destPtr = destMaskPtr;
+    }
+
+    /*
+     * clean up
+     */
+    BTBitmapUnlock(&srcBar, FALSE);
+    BTBitmapUnlock(&destBar, TRUE);
+
+    if ( palette ) {
+    	if ( freePalette ) {
+    	    free(palette);
+    	} else {
+    	    BTUnlockGEOSStandardPalette();
+    	}
+    }
+    if (srcBuffer)	free(srcBuffer);
+    if (srcMaskData8Bit) free(srcMaskData8Bit);
+
+}
+
+/*-------------------- UpScaleImageY ---------------------
+ *  Purpose:	Upscale an true color image in y-direction only
+ *  Context:
+ *  Strategy:	- for every destination pixel: use a linear interpolation between two rows
+ *		- the scaledBmp bitmap must already exist and have the same width as the source bitmap
+ *		  it also must be a true color bitmap with mask
+ *  Parameters:	srcFile, srcBmp: 	bitmap to scale - this is already a true color image
+ *		destFile, scaledBmp: 	an existing true color bitmap
+ *					scaled pixels will be written here
+ *  Return:	scaledBmp is filled in properly
+ ---------------------------------------------------------------------------*/
+void UpScaleImageY(VMBlockHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile, VMBlockHandle scaledBmp,
+	WWFixedAsDWord scale, optr progressText) {
+int 	width, srcHeight, destHeight, maskBytes, numColorBytes;
+int	x, y, y0, y1;
+int 	srcFormat;
+word	col;
+byte 	*srcPtr, *destPtr;
+BitmapAccessRecord	srcBar, destBar;
+PaletteEntry 	*srcLine0, *srcLine1, col0, col1, *destPixel;
+WWFixedAsDWord	iScale, pos, t;
+word a, a1, val;
+
+byte pix1, pix2, *srcMaskLine0, *srcMaskLine1, *destMaskPtr;
+word dMask, wVal;
+Boolean hasMask;
+
+    /*
+     * Fetch important data
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBmp, &width, &srcHeight, 0);
+    BTGetMoreBitmapInfos(destFile, scaledBmp, NULL, &destHeight, 0);
+
+    if (srcFormat & BMT_MASK ) {
+    	hasMask = TRUE;
+    	maskBytes = (width+7)/8;
+    }
+    else  {
+    	hasMask = FALSE;
+    	maskBytes = 0;
+    }
+    numColorBytes = 3*width;
+
+    iScale = GrSDivWWFixed(MakeWWFixed(1), scale);
+
+    /*
+     * allocate data buffers for first line
+     */
+    srcLine0 = malloc(numColorBytes);
+    if ( hasMask) {
+	srcMaskLine0 = malloc(width);
+	srcMaskLine1 = malloc(width);
+    } else {
+	srcMaskLine0 = 0;
+	srcMaskLine1 = 0;
+    }
+
+    destPtr = BTBitmapLock(destFile, scaledBmp, &destBar, 0);
+    destMaskPtr = destPtr;
+    destPixel = (PaletteEntry*)(destPtr + maskBytes);
+
+
+    /*
+     *	For every destination line (y):
+     *  - calculate the source line (y0) and the next bottom line (y1)
+     *    y0 = (y + 0,5) *iScale - 0,5;
+     *    y1 = y0 + 1;
+     *  - limit y0, y1 to be valid
+     *  - lock source lines and copy data (we cannot have two pixel lines
+     *	  locked at the same time)
+     *  - lock destination line
+     *  - calculate weight factors (t, t1)
+     *	- interpolate all pixels in the line - mask and colors
+     */
+
+    for ( y = 0 ; y < destHeight; y++ ) {
+         if ( (y & 0x0F) == 0 ) ScaleDisplayProgress(progressText);
+
+	/*
+	 * Handle special case 'unscaled'
+	 */
+	if ( scale == MakeWWFixed(1) ) {
+	    srcPtr = BTBitmapLock(srcFile, srcBmp, &srcBar, y);
+	    memcpy(destPtr, srcPtr, numColorBytes + maskBytes);
+	    BTBitmapUnlock(&srcBar, FALSE);
+	    goto nextLine;
+	}
+	/*
+	 * calculate source line numbers
+	 */
+    	pos = GrMulWWFixed(MakeWWFixed(y) + 0x8000, iScale) - 0x8000;
+
+	y0 = pos >> 16;
+	if (y0 < 0) { y0 = 0; }
+    	    else {  if (y0 >= srcHeight) y0 = srcHeight - 1; }
+	y1 = y0 + 1; if (y1 >= srcHeight) y1 = srcHeight - 1;
+
+	/*
+	 * Interpolate colors and mask
+	 * t is is the weight factor for the pixel at position y1 - that means if
+	 * pos is equal to y0, y1 has a weight factor of zero.
+	 * Note that the start value of pos is negative but t cannot be negative
+	 * The weight factor of x0 is  1.0 - t and calculated below
+	 */
+	t = pos - MakeWWFixed(y0);
+	if ((sdword)t<0) t = 0;
+	/*
+	 * Map fractional part WWFixed to integer (range 0x00 to 0x100 for t = 1.0)
+	 * See UpScaleImageX for detailed explanation.
+	 */
+	a = t >> 8;
+	a1 = 0x100-a;
+
+	/*
+	 * Unfortunately we can have only one bitmap line locked at the same time.
+	 * Therefore we copy the first line into a buffer and keep only the second line
+	 * locked.
+	 * Because y1 is usually equal to y0 + 1, we can use the high performance
+	 * routine BTBitmapNext() to lock the second line,
+	 */
+	srcPtr = BTBitmapLock(srcFile, srcBmp, &srcBar, y0);
+	memcpy(srcLine0, srcPtr + maskBytes, numColorBytes);
+	if (hasMask) ToolExpandMonoLineTo8Bit(srcPtr, srcMaskLine0, width);
+
+	if ( y1 > y0 ) {
+		srcPtr = BTBitmapNext(&srcBar, FALSE);
+		srcLine1 = (PaletteEntry*)(srcPtr + maskBytes);
+		if (hasMask) ToolExpandMonoLineTo8Bit(srcPtr, srcMaskLine1, width);
+	} else {
+		/* both lines are the same */
+		srcLine1 = srcLine0;
+		if (hasMask) memcpy(srcMaskLine1, srcMaskLine0, width);
+	}
+
+    	/*
+    	 * Interpolate all pixels in the line
+    	 */
+    	dMask = 0x80;
+    	for ( x = 0; x < width; x++) {
+
+	    if (hasMask) {		/* interpolate mask pixels if we have a mask */
+
+		pix1 = srcMaskLine0[x];
+		pix2 = srcMaskLine1[x];
+
+		/*
+		 * Now we had to calculate the weighted average of pix1 and pix2 as
+		 *	val = pix1 * t1 + pix2 * t		(where t1 = 1.0 - t)
+		 * But as stated in UpScaleImageX, we can simply add t and t1 if the pixel is on.
+		 */
+		if ( pix1 ) { wVal = a1; }
+		       else { wVal = 0; }
+		if ( pix2 ) wVal += a;
+
+		if ( wVal > 127 ) {
+		    *destMaskPtr |= dMask;
+		}
+
+		/* next pixel */
+		dMask >>= 1;
+		if ( !dMask ) {
+		    dMask = 0x80;
+		    destMaskPtr++;
+		}
+	    }
+
+	    /*
+	     * Next we have to calculate the new color (red channel as example) as
+	     *	rt = col0.rt * t1 + col1.rt * t		(where t1 = 1.0 - t)
+	     * As we have mapped t and t1 to integers (a and a1) we can use word-sized
+	     * multiplication instead of the significantly slower GrMulWWFixed().
+	     * See UpScaleImageX for detailed explanation.
+	     */
+
+	    col0 = srcLine0[x];
+	    col1 = srcLine1[x];
+
+	    val = col0.rt * a1  + col1.rt * a;
+	    col = (val  + 0x80 ) >> 8;
+EC(	    if ( col > 255) { col = 255; MessageBox("UpScaleY rt>255"); } )
+	    destPixel->rt = col;
+
+	    val = col0.gn * a1  + col1.gn * a;
+	    col = (val  + 0x80 ) >> 8;
+EC(	    if ( col > 255) { col = 255; MessageBox("UpScaleY gn>255"); } )
+	    destPixel->gn = col;
+
+	    val = col0.bl * a1  + col1.bl * a;
+	    col = (val  + 0x80 ) >> 8;
+EC(	    if ( col > 255) { col = 255;  MessageBox("UpScaleY bl>255"); } )
+	    destPixel->bl = col;
+
+	    // next pixel
+  	    destPixel++;
+
+    	}
+
+	/* unlock the second source line */
+	BTBitmapUnlock(&srcBar, FALSE);
+
+nextLine:
+    	/* enter next destination line */
+ 	destPtr = BTBitmapNext(&destBar, TRUE);
+	destMaskPtr = destPtr;
+	destPixel = (PaletteEntry*)(destPtr + maskBytes);
+
+    }
+
+    /*
+     * clean up
+     */
+    BTBitmapUnlock(&destBar, TRUE);
+
+    free(srcLine0);
+    if (srcMaskLine0)	free(srcMaskLine0);
+    if (srcMaskLine1)	free(srcMaskLine1);
+
+}
+
+/*-------------------- BTScaleBitmapBilinear ---------------------
+ *  Purpose:	Use bilinear / area sampling algorithm to scale a bitmap
+ *  Context:
+ *  Strategy:	The scaled bitmap will always be a true color bitmap
+ *		Scaling is done in two steps: 1st: x-scaling, 2nd: y-scaling
+ *		- create two 24-bit bitmaps: an x-scaled and a final bitmap
+ *		- use different routines for upscaling and downscaling
+ *  Parameters:	srcFile, srcBmp: Bitmap to scale
+ *		destFile: VMFile for the scaled bitmap
+ *		newWidth, newHeight: size of the scaled bitmap
+ *		progressText: text object to display "progress dots"
+ *  Return:	VMBlock handle of the new (scaled) bitmap
+ *		This will always be a true color bitmap
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTScaleBitmapBilinear(VMFileHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile,
+				int newWidth, int newHeight, optr progressText) {
+int srcFormat, width, height, destFormat, compact;
+WWFixedAsDWord scaleX, scaleY;
+VMBlockHandle xScaledBmp, destBmp;
+
+
+
+    /*
+     * calculate scale factors
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBmp, &width, &height, &compact);
+    scaleX = GrSDivWWFixed(MakeWWFixed(newWidth), MakeWWFixed(width));
+    scaleY = GrSDivWWFixed(MakeWWFixed(newHeight), MakeWWFixed(height));
+
+    /*
+     * ensure that the source bitmap is not compacted
+     */
+    if (compact) {
+    	srcBmp = GrUncompactBitmap(srcFile, srcBmp, destFile);
+    	srcFile = destFile;
+    }
+
+
+
+    /*
+     * Create destination and temporary images. We always need a true color bitmap as destination.
+     * Scaling is done in two steps: 1st: x-scaling, 2nd: y-scaling
+     * Therefore temporary we need an x-scaled bitmap of original height.
+     */
+    destFormat = BMF_24BIT;
+    if ( srcFormat & BMT_MASK ) destFormat |= BMT_MASK;
+    xScaledBmp = ToolCreateBitmap(destFile, destFormat, newWidth, height, 0, TRUE);
+    destBmp = ToolCreateBitmap(destFile, destFormat, newWidth, newHeight, 0, TRUE);
+
+
+    /*
+     * Now do two-step scaling - first scale in x-direction, then scale in y-direction
+     *
+     * Depending on the scale factors, we use separate routines for upscaling and downscaling
+     * Upscale routines also handle a scale factor of one
+     */
+
+    if ( scaleX < MakeWWFixed(1) ) {
+	DownScaleImageX(srcFile, srcBmp, destFile, xScaledBmp, scaleX, progressText);
+    } else {
+	UpScaleImageX(srcFile, srcBmp, destFile, xScaledBmp, scaleX, progressText);
+    }
+
+    if ( scaleY < MakeWWFixed(1) ) {
+	DownScaleImageY(destFile, xScaledBmp, destFile, destBmp, scaleY, progressText);
+    } else {
+	UpScaleImageY(destFile, xScaledBmp, destFile, destBmp, scaleY, progressText);
+    }
+
+    /*
+     * clean up. free  uncpomacted copy if we have one
+     */
+    HugeArrayDestroy(destFile, xScaledBmp);
+    if (compact) HugeArrayDestroy(srcFile, srcBmp);
+
+    return destBmp;
+}
+
+
+
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file scaleImage.goc ********************/
+

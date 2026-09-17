@@ -5,12 +5,12 @@
 #
 GEODE           = bmptools
 CODE            = access.goc bmptools.goc disptool.goc floyd.goc mask.goc\
-                  mediancut.goc moretool.goc replace.goc shiftImage.goc\
-                  transform.goc rtools.goh
+                  mediancut.goc moretool.goc replace.goc scaleImage.goc\
+                  shiftImage.goc transform.goc rtools.goh
 UI_TO_RDFS      =
 OBJS            = access.obj bmptools.obj disptool.obj floyd.obj mask.obj\
-                  mediancut.obj moretool.obj replace.obj shiftImage.obj\
-                  transform.obj
+                  mediancut.obj moretool.obj replace.obj scaleImage.obj\
+                  shiftImage.obj transform.obj
 COMMON          =
 MODULES         =
 CMODULES        = Code
