@@ -98,6 +98,7 @@ static char *rcsid =
 #ifndef DELETE_ASCII
 #define DELETE_ASCII		0xd3
 #endif
+#include "cursesKeys.h"
 
 #if defined(_WIN32)
 #define _WIN32_WINNT    0x0500
@@ -3872,13 +3873,10 @@ CursesDecodeEscape(void)
 		}
 		return -1;
 	    case 'A':
-		return UP_ARROW_ASCII;
 	    case 'B':
-		return DOWN_ARROW_ASCII;
 	    case 'C':
-		return RIGHT_ARROW_ASCII;
 	    case 'D':
-		return LEFT_ARROW_ASCII;
+		return CursesDecodeArrow(seq, i + 1);
 	    case 'H':
 		return HOME_ASCII;
 	    case 'F':
@@ -4014,12 +4012,12 @@ CursesReadInput(int 	    stream,
     /*
      * if the low byte is zero then we have a non-ascii value, the high byte
      * is the scan code, so we translate the scan code into a non-ascii
-     * value by adding 0xff
+     * value by adding 0x80
      */
     i = 1;
     if (!buf[0])
     {
-	chr = 0x80 + (chr >> 8);
+	chr = CursesDecodeDosExtendedKey(chr >> 8);
     }
 #endif
 
@@ -4521,11 +4519,11 @@ CursesReadChar(int 	    stream,
     }
     /* if the low byte is zero then we have a non-ascii value, the high byte
      * is the scan code, so we translate the scan code into a non-ascii
-     * value by adding 0xff
+     * value by adding 0x80
      */
     if (!buf[0])
     {
-	chr = 0x80 + (chr >> 8);
+	chr = CursesDecodeDosExtendedKey(chr >> 8);
     }
 
 #endif

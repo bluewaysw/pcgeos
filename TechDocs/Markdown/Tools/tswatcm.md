@@ -292,8 +292,11 @@ The **doc** command looks for information in the technical documentation
 relevant to the passed keyword. The keyword may be any GEOS symbol. The 
 **doc** command finds one or more places in the SDK technical documentation 
 where the keyword is mentioned. It will display one place-to view the 
-others, use the **doc-next** and **doc-previous** command. The documentation will appear in the source window. As when viewing source code using **srcwin**, you can scroll the view using the <Page Up> and <Page Down> and 
-arrow keys.
+others, use the **doc-next** and **doc-previous** command. The documentation
+will appear in the source window. As when viewing source code using **srcwin**,
+use <Page Up> and <Page Down> to scroll half a window, or Ctrl+Up and Ctrl+Down
+to scroll one line. Plain arrow keys scroll the view when modern prompt keys
+are disabled.
 
 ----------
 #### help
@@ -837,8 +840,10 @@ and **sstep** is used for stepping through C source code.
 The srcwin command will display the source code surrounding the presently 
 executing code any time execution is stopped. The presently executing line 
 will be highlighted. You may set breakpoints with the mouse by clicking on 
-the line numbers which appear to the side. To scroll the srcwin buffer use the 
-arrow keys, the <PgUp> key, and the <PgDn> key.
+the line numbers which appear to the side. <PgUp> and <PgDn> scroll the srcwin
+buffer by half a window. With modern prompt keys enabled, Ctrl+Up and Ctrl+Down
+scroll by one line, and Ctrl+Left and Ctrl+Right scroll horizontally. When
+modern prompt keys are disabled, plain arrow keys scroll the source window.
 
 ----------
 **istep, sstep**
