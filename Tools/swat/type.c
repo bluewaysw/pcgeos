@@ -2650,6 +2650,78 @@ TypeEnumHasValue(Enum	e,  	    	/* Enum to check */
     return (e->value - value);
 }
 
+/***********************************************************************
+ *				TypeResolveTypedefs
+ ***********************************************************************
+ * SYNOPSIS:	    Follow any chain of typedefs to the type that actually
+ *		    describes the data.
+ * CALLED BY:	    (INTERNAL) the Type_*Enum* routines
+ * RETURN:	    The underlying type, or the type we were given if it
+ *		    isn't a typedef (or if the chain is broken).
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *	An enumerated type that reaches us from Esp always carries its own
+ *	name, so sym find type hands back an OSYM_ETYPE and the external
+ *	branches of the Type_*Enum* routines -- which iterate the symbol's
+ *	scope -- find the members.
+ *
+ *	A C compiler is a different matter. Goc emits a class's messages as
+ *	    typedef enum { ... } <class>Messages;
+ *	(Tools/goc/parse.y), i.e. an anonymous enum with a name only on the
+ *	typedef. Glue notices the type has no name of its own and invents
+ *	one for it, marking the symbol OSYM_NAMELESS (Tools/glue/codeview.c),
+ *	so the only symbol actually called <class>Messages is an
+ *	OSYM_TYPEDEF. Iterating *its* scope yields nothing, which is why
+ *	map-method used to fall back on printing the raw message number for
+ *	any class defined in C.
+ *
+ *	Rather than teach each routine the same trick, we resolve the
+ *	typedef up front. Type_GetArrayData has done this for a long time;
+ *	this is the same idea, factored out.
+ *
+ *	The loop is bounded: a symbol file with a typedef cycle in it would
+ *	otherwise hang the debugger.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+#define TYPE_MAX_TYPEDEF_DEPTH	16
+
+static Type
+TypeResolveTypedefs(Type    type)
+{
+    int	    depth;
+
+    for (depth = 0; depth < TYPE_MAX_TYPEDEF_DEPTH; depth++) {
+	TypePtr	t;
+	Sym	sym;
+
+	if (!TypeInternalize(type, &t, &sym)) {
+	    break;
+	}
+
+	if (t != NULL) {
+	    /*
+	     * Internal form, so there's no typedef left to see through.
+	     */
+	    CLEANUP_TYPE(t);
+	    break;
+	}
+
+	if (Sym_Type(sym) != OSYM_TYPEDEF) {
+	    break;
+	}
+
+	type = Sym_GetTypeData(sym);
+    }
+
+    return(type);
+}
+
+
 /*-
  *-----------------------------------------------------------------------
  * Type_GetEnumValue --
@@ -2672,6 +2744,13 @@ Type_GetEnumValue(Type	type,	    	/* Type to check */
     LstNode 	  	ln;
     Enum    	  	e;
     Sym	    	    	sym;
+
+    /*
+     * See through any typedef, so that enums that only have a name on
+     * their typedef -- all of them, in modules built from C -- can be
+     * searched just like the ones Esp gives us.
+     */
+    type = TypeResolveTypedefs(type);
 
     MAKE_TYPE(type, t, sym);
 
@@ -2755,6 +2834,13 @@ Type_GetEnumName(Type	type,	    	/* Type to examine */
     LstNode 	  	ln;
     Enum    	  	e;
     Sym	    	    	sym;
+
+    /*
+     * See through any typedef, so that enums that only have a name on
+     * their typedef -- all of them, in modules built from C -- can be
+     * searched just like the ones Esp gives us.
+     */
+    type = TypeResolveTypedefs(type);
 
     MAKE_TYPE(type, t, sym);
 
@@ -2848,6 +2934,13 @@ Type_GetEnumData(Type	type,	    	/* Type to check */
     TypePtr	  	t;
     Sym	    	    	sym;
 
+    /*
+     * See through any typedef, so that enums that only have a name on
+     * their typedef -- all of them, in modules built from C -- can be
+     * searched just like the ones Esp gives us.
+     */
+    type = TypeResolveTypedefs(type);
+
     MAKE_TYPE(type, t, sym);
 
     if (t != NULL) {
@@ -2891,6 +2984,13 @@ Type_ForEachEnum(Type	type,	    /* Type through which to iterate */
     LstNode 	  	ln;
     Enum    	  	e;
     Sym	    	    	sym;
+
+    /*
+     * See through any typedef, so that enums that only have a name on
+     * their typedef -- all of them, in modules built from C -- can be
+     * searched just like the ones Esp gives us.
+     */
+    type = TypeResolveTypedefs(type);
 
     MAKE_TYPE(type, t, sym);
 
