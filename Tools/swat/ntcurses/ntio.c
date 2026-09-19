@@ -40,9 +40,6 @@ DESCRIPTION:
 
 #include <curses.h>
 #include "curspriv.h"
-#define CURSES_KEYS_CONTROL
-#include "../cursesKeys.h"
-#undef CURSES_KEYS_CONTROL
 //#include <alloc.h>
 
 extern HANDLE hConIn;
@@ -268,42 +265,51 @@ consoleKeytst(void)
 }
 
 int
-consoleConvertKeyToDos(int ntVirtualKey, int control)
+consoleConvertKeyToDos(int ntVirtualKey)
 {
-    int key;
-
     switch (ntVirtualKey) {
     case HOME_EXTENDED:
-	key = HOME_ASCII;
-	break;
+	return HOME_ASCII;
     case END_EXTENDED:
-	key = END_ASCII;
-	break;
+	return END_ASCII;
     case PAGE_UP_EXTENDED:
-	key = PAGE_UP_ASCII;
-	break;
+	return PAGE_UP_ASCII;
     case PAGE_DOWN_EXTENDED:
-	key = PAGE_DOWN_ASCII;
-	break;
+	return PAGE_DOWN_ASCII;
     case DELETE_EXTENDED:
-	key = DELETE_ASCII;
-	break;
+	return DELETE_ASCII;
     case UP_ARROW_EXTENDED:
-	key = UP_ARROW_ASCII;
-	break;
+	return UP_ARROW_ASCII;
     case DOWN_ARROW_EXTENDED:
-	key = DOWN_ARROW_ASCII;
-	break;
+	return DOWN_ARROW_ASCII;
     case LEFT_ARROW_EXTENDED:
-	key = LEFT_ARROW_ASCII;
-	break;
+	return LEFT_ARROW_ASCII;
     case RIGHT_ARROW_EXTENDED:
-	key = RIGHT_ARROW_ASCII;
-	break;
+	return RIGHT_ARROW_ASCII;
     default:
 	return 0;      /* not a supported key */
     }
-    return CursesControlArrowKey(key, control);
+}
+
+int
+consoleConvertCtrlKeyToDos(int ntVirtualKey)
+{
+    switch (ntVirtualKey) {
+    case UP_ARROW_EXTENDED:
+	return CTRL_UP_ARROW_ASCII;
+    case DOWN_ARROW_EXTENDED:
+	return CTRL_DOWN_ARROW_ASCII;
+    case LEFT_ARROW_EXTENDED:
+	return CTRL_LEFT_ARROW_ASCII;
+    case RIGHT_ARROW_EXTENDED:
+	return CTRL_RIGHT_ARROW_ASCII;
+    case HOME_EXTENDED:
+	return CTRL_HOME_ASCII;
+    case END_EXTENDED:
+	return CTRL_END_ASCII;
+    default:
+	return 0;      /* no separate code for this one */
+    }
 }
 
 unsigned long
@@ -324,10 +330,23 @@ consoleGetChar(void)
 		    valueReturned = inputEvent.Event.KeyEvent.uChar.AsciiChar;
 		    break;
 		} else {
+		    /*
+		     * Windows hands us the same virtual key code whether or
+		     * not Ctrl is down, so look at dwControlKeyState first
+		     * and give the Ctrl variants codes of their own. Without
+		     * this nothing downstream can tell Ctrl+Left from Left.
+		     */
+		    if (inputEvent.Event.KeyEvent.dwControlKeyState &
+			(LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
+		    {
+			valueReturned = consoleConvertCtrlKeyToDos(
+			    inputEvent.Event.KeyEvent.wVirtualKeyCode);
+			if (valueReturned != 0) {
+			    break;
+			}
+		    }
 		    valueReturned = consoleConvertKeyToDos(
-			inputEvent.Event.KeyEvent.wVirtualKeyCode,
-			inputEvent.Event.KeyEvent.dwControlKeyState &
-			(LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED));
+			inputEvent.Event.KeyEvent.wVirtualKeyCode);
 		    if (valueReturned != 0) {
 			break;
 		    }
