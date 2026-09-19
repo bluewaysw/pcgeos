@@ -98,7 +98,14 @@ static char *rcsid =
 #ifndef DELETE_ASCII
 #define DELETE_ASCII		0xd3
 #endif
-#include "cursesKeys.h"
+#ifndef CTRL_UP_ARROW_ASCII
+#define CTRL_UP_ARROW_ASCII	0x8d
+#define CTRL_DOWN_ARROW_ASCII	0x91
+#define CTRL_LEFT_ARROW_ASCII	0xf3
+#define CTRL_RIGHT_ARROW_ASCII	0xf4
+#define CTRL_END_ASCII		0xf5
+#define CTRL_HOME_ASCII		0xf7
+#endif
 
 #if defined(_WIN32)
 #define _WIN32_WINNT    0x0500
@@ -3404,6 +3411,12 @@ CursesInputChar(unsigned char c, CursesInputState *state)
 		(c == PAGE_UP_ASCII) ||
 		(c == PAGE_DOWN_ASCII) ||
 		(c == HOME_ASCII) ||
+		(c == CTRL_UP_ARROW_ASCII) ||
+		(c == CTRL_DOWN_ARROW_ASCII) ||
+		(c == CTRL_LEFT_ARROW_ASCII) ||
+		(c == CTRL_RIGHT_ARROW_ASCII) ||
+		(c == CTRL_HOME_ASCII) ||
+		(c == CTRL_END_ASCII) ||
 		(c == END_ASCII))
 	    {
 		if (c == UP_ARROW_ASCII) {
@@ -3873,10 +3886,13 @@ CursesDecodeEscape(void)
 		}
 		return -1;
 	    case 'A':
+		return UP_ARROW_ASCII;
 	    case 'B':
+		return DOWN_ARROW_ASCII;
 	    case 'C':
+		return RIGHT_ARROW_ASCII;
 	    case 'D':
-		return CursesDecodeArrow(seq, i + 1);
+		return LEFT_ARROW_ASCII;
 	    case 'H':
 		return HOME_ASCII;
 	    case 'F':
@@ -4012,12 +4028,12 @@ CursesReadInput(int 	    stream,
     /*
      * if the low byte is zero then we have a non-ascii value, the high byte
      * is the scan code, so we translate the scan code into a non-ascii
-     * value by adding 0x80
+     * value by adding 0xff
      */
     i = 1;
     if (!buf[0])
     {
-	chr = CursesDecodeDosExtendedKey(chr >> 8);
+	chr = 0x80 + (chr >> 8);
     }
 #endif
 
@@ -4519,11 +4535,11 @@ CursesReadChar(int 	    stream,
     }
     /* if the low byte is zero then we have a non-ascii value, the high byte
      * is the scan code, so we translate the scan code into a non-ascii
-     * value by adding 0x80
+     * value by adding 0xff
      */
     if (!buf[0])
     {
-	chr = CursesDecodeDosExtendedKey(chr >> 8);
+	chr = 0x80 + (chr >> 8);
     }
 
 #endif

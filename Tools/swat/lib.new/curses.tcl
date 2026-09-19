@@ -822,7 +822,7 @@ See also:
 }
 {
     global srcwindisp srcwinevents _view_filename
-    global srcwincurpos srcwinmode file-os
+    global srcwincurpos srcwinmode file-os modernPromptKeys
 
     if {![null $srcwindisp]} {
 
@@ -844,11 +844,13 @@ See also:
     	    unbind-key \315
     	    unbind-key \307
     	    unbind-key \317
+    	    unbind-key \215
+    	    unbind-key \221
+    	    unbind-key \363
+    	    unbind-key \364
+    	    unbind-key \365
+    	    unbind-key \367
         }
-	unbind-key \363
-	unbind-key \364
-	unbind-key \361
-	unbind-key \362
     	
     }
     #
@@ -882,28 +884,42 @@ See also:
     	#if {[string c ${file-os} unix] != 0} {
     	    # page down
             bind-key \321 [format {dss %d} [expr $numLines/2]]
-       	    # arrow down
-	    bind-key \320 {dss 1}
     	    # page up
     	    bind-key \311 [format {dss %d} [expr -$numLines/2]]
-    	    # arrow up
-	    bind-key \310 {dss -1}
-	    # control-up scrolls up with modern prompt keys
-	    bind-key \361 {dss -1}
-	    # control-down scrolls down with modern prompt keys
-	    bind-key \362 {dss 1}
-    	    # scroll left
-    	    bind-key \313 {dslr -5}
-    	    # scroll right
-    	    bind-key \315 {dslr 5}
-    	    # control-left scrolls left with modern prompt keys
+    	    # ctrl-arrow up/down: scroll a line at a time
+	    bind-key \215 {dss -1}
+	    bind-key \221 {dss 1}
+    	    # ctrl-arrow left/right: scroll sideways
     	    bind-key \363 {dslr -5}
-    	    # control-right scrolls right with modern prompt keys
     	    bind-key \364 {dslr 5}
-    	    # home (go to top of file)
-    	    bind-key \307 {dss 1 1}
-    	    # end (end of file)
-    	    bind-key \317 {dss 1000000}
+    	    # ctrl-home/ctrl-end: top and bottom of the file
+    	    bind-key \367 {dss 1 1}
+    	    bind-key \365 {dss 1000000}
+    	    #
+    	    # The plain arrow, home and end keys belong to the prompt
+    	    # when modernPromptKeys is on: CursesInputKey claims them
+    	    # before bind-key ever sees them, so binding them here would
+    	    # take effect only by accident -- while the output buffer
+    	    # happens to be in scroll mode, which is when inProc isn't
+    	    # CursesInputChar. Bind them in legacy mode only; the ctrl
+    	    # variants above work in both.
+    	    #
+    	    if {[null $modernPromptKeys] ||
+    	        [string c $modernPromptKeys 0] == 0 ||
+    	        [string c $modernPromptKeys off] == 0} {
+    		# arrow down
+    		bind-key \320 {dss 1}
+    		# arrow up
+    		bind-key \310 {dss -1}
+    		# scroll left
+    		bind-key \313 {dslr -5}
+    		# scroll right
+    		bind-key \315 {dslr 5}
+    		# home (go to top of file)
+    		bind-key \307 {dss 1 1}
+    		# end (end of file)
+    		bind-key \317 {dss 1000000}
+    	    }
     	#}
     	return $srcwindisp
     }
