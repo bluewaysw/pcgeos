@@ -3403,6 +3403,22 @@ CursesInputChar(unsigned char c, CursesInputState *state)
 	    Buf_AddByte(state->input, (Byte)c);
 	    state->flags |= CISF_LINEREADY;
 	} else if (!iscntrl(c) || isspace(c)) {
+	    /*
+	     * The ctrl-modified navigation keys exist only for bind-key
+	     * handlers. If nothing is bound to one -- no source window,
+	     * say -- drop it instead of stuffing it into the input line:
+	     * the codes are >= 0x80, so the iscntrl() above lets them
+	     * through. This holds on every platform that produces them.
+	     */
+	    if ((c == CTRL_UP_ARROW_ASCII) ||
+		(c == CTRL_DOWN_ARROW_ASCII) ||
+		(c == CTRL_LEFT_ARROW_ASCII) ||
+		(c == CTRL_RIGHT_ARROW_ASCII) ||
+		(c == CTRL_HOME_ASCII) ||
+		(c == CTRL_END_ASCII))
+	    {
+		goto check_end;
+	    }
 #if defined(_WIN32)
 	    if ((c == UP_ARROW_ASCII) ||
 		(c == DOWN_ARROW_ASCII) ||
@@ -3411,12 +3427,6 @@ CursesInputChar(unsigned char c, CursesInputState *state)
 		(c == PAGE_UP_ASCII) ||
 		(c == PAGE_DOWN_ASCII) ||
 		(c == HOME_ASCII) ||
-		(c == CTRL_UP_ARROW_ASCII) ||
-		(c == CTRL_DOWN_ARROW_ASCII) ||
-		(c == CTRL_LEFT_ARROW_ASCII) ||
-		(c == CTRL_RIGHT_ARROW_ASCII) ||
-		(c == CTRL_HOME_ASCII) ||
-		(c == CTRL_END_ASCII) ||
 		(c == END_ASCII))
 	    {
 		if (c == UP_ARROW_ASCII) {
@@ -3821,6 +3831,50 @@ CursesGetEscapeChar(unsigned char *cPtr)
 }
 
 /***********************************************************************
+ *				CursesEscapeModifier
+ ***********************************************************************
+ * SYNOPSIS:	    Fetch the modifier parameter of a CSI sequence.
+ * CALLED BY:	    (INTERNAL) CursesDecodeEscape
+ * RETURN:	    The parameter following the first ';', or 1 (meaning
+ *		    no modifier) if there isn't one.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *	A terminal reports a modified cursor key as CSI 1 ; <mod> <final>,
+ *	e.g. ESC [ 1 ; 5 D for Ctrl+Left, where <mod> is 1 plus a bit mask
+ *	of 1 for Shift, 2 for Alt and 4 for Ctrl. Without the modifier the
+ *	same key is just CSI <final>, so an absent parameter means 1.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+#define ESC_MOD_HAS_CTRL(m)	((((m) - 1) & 4) != 0)
+
+static int
+CursesEscapeModifier(const unsigned char *seq, int len)
+{
+    int	    i;
+    int	    mod;
+
+    for (i = 1; i < len; i++) {
+	if (seq[i] != ';') {
+	    continue;
+	}
+
+	mod = 0;
+	for (i++; (i < len) && isdigit(seq[i]); i++) {
+	    mod = (mod * 10) + seq[i] - '0';
+	}
+	return (mod != 0) ? mod : 1;
+    }
+
+    return 1;
+}
+
+
+/***********************************************************************
  *				CursesDecodeEscape
  ***********************************************************************
  * SYNOPSIS:	    Decode common terminal escape sequences.
@@ -3838,6 +3892,7 @@ CursesDecodeEscape(void)
     int		    button;
     int		    decoded;
     int		    digit;
+    int		    mod;
 
     if (!CursesGetEscapeChar(&c) || ((c != '[') && (c != 'O'))) {
 	return -1;
@@ -3856,6 +3911,8 @@ CursesDecodeEscape(void)
 		return decoded;
 	    }
 	}
+
+	mod = CursesEscapeModifier(seq, i);
 
 	switch (c) {
 	    case 'M':
@@ -3886,17 +3943,21 @@ CursesDecodeEscape(void)
 		}
 		return -1;
 	    case 'A':
-		return UP_ARROW_ASCII;
+		return ESC_MOD_HAS_CTRL(mod) ? CTRL_UP_ARROW_ASCII
+					     : UP_ARROW_ASCII;
 	    case 'B':
-		return DOWN_ARROW_ASCII;
+		return ESC_MOD_HAS_CTRL(mod) ? CTRL_DOWN_ARROW_ASCII
+					     : DOWN_ARROW_ASCII;
 	    case 'C':
-		return RIGHT_ARROW_ASCII;
+		return ESC_MOD_HAS_CTRL(mod) ? CTRL_RIGHT_ARROW_ASCII
+					     : RIGHT_ARROW_ASCII;
 	    case 'D':
-		return LEFT_ARROW_ASCII;
+		return ESC_MOD_HAS_CTRL(mod) ? CTRL_LEFT_ARROW_ASCII
+					     : LEFT_ARROW_ASCII;
 	    case 'H':
-		return HOME_ASCII;
+		return ESC_MOD_HAS_CTRL(mod) ? CTRL_HOME_ASCII : HOME_ASCII;
 	    case 'F':
-		return END_ASCII;
+		return ESC_MOD_HAS_CTRL(mod) ? CTRL_END_ASCII : END_ASCII;
 	    case '~':
 		n = 0;
 		for (digit = 1; digit < i &&
@@ -3907,12 +3968,14 @@ CursesDecodeEscape(void)
 		switch (n) {
 		    case 1:
 		    case 7:
-			return HOME_ASCII;
+			return ESC_MOD_HAS_CTRL(mod) ? CTRL_HOME_ASCII
+						     : HOME_ASCII;
 		    case 3:
 			return DELETE_ASCII;
 		    case 4:
 		    case 8:
-			return END_ASCII;
+			return ESC_MOD_HAS_CTRL(mod) ? CTRL_END_ASCII
+						     : END_ASCII;
 		    case 5:
 			return PAGE_UP_ASCII;
 		    case 6:
