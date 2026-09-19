@@ -847,6 +847,8 @@ See also:
         }
 	unbind-key \363
 	unbind-key \364
+	unbind-key \361
+	unbind-key \362
     	
     }
     #
@@ -886,6 +888,10 @@ See also:
     	    bind-key \311 [format {dss %d} [expr -$numLines/2]]
     	    # arrow up
 	    bind-key \310 {dss -1}
+	    # control-up scrolls up with modern prompt keys
+	    bind-key \361 {dss -1}
+	    # control-down scrolls down with modern prompt keys
+	    bind-key \362 {dss 1}
     	    # scroll left
     	    bind-key \313 {dslr -5}
     	    # scroll right
