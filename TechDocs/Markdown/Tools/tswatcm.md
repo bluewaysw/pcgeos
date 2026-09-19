@@ -838,7 +838,8 @@ The srcwin command will display the source code surrounding the presently
 executing code any time execution is stopped. The presently executing line 
 will be highlighted. You may set breakpoints with the mouse by clicking on 
 the line numbers which appear to the side. To scroll the srcwin buffer use the 
-arrow keys, the <PgUp> key, and the <PgDn> key.
+<PgUp> and <PgDn> keys, Up and Down, and Ctrl+Left and Ctrl+Right. When modern
+prompt keys are disabled, plain Left and Right also scroll horizontally.
 
 ----------
 **istep, sstep**

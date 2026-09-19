@@ -98,6 +98,7 @@ static char *rcsid =
 #ifndef DELETE_ASCII
 #define DELETE_ASCII		0xd3
 #endif
+#include "cursesKeys.h"
 
 #if defined(_WIN32)
 #define _WIN32_WINNT    0x0500
@@ -3876,9 +3877,8 @@ CursesDecodeEscape(void)
 	    case 'B':
 		return DOWN_ARROW_ASCII;
 	    case 'C':
-		return RIGHT_ARROW_ASCII;
 	    case 'D':
-		return LEFT_ARROW_ASCII;
+		return CursesDecodeHorizontalArrow(seq, i + 1);
 	    case 'H':
 		return HOME_ASCII;
 	    case 'F':

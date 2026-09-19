@@ -40,6 +40,9 @@ DESCRIPTION:
 
 #include <curses.h>
 #include "curspriv.h"
+#define CURSES_KEYS_CONTROL
+#include "../cursesKeys.h"
+#undef CURSES_KEYS_CONTROL
 //#include <alloc.h>
 
 extern HANDLE hConIn;
@@ -265,30 +268,42 @@ consoleKeytst(void)
 }
 
 int
-consoleConvertKeyToDos(int ntVirtualKey)
+consoleConvertKeyToDos(int ntVirtualKey, int control)
 {
+    int key;
+
     switch (ntVirtualKey) {
     case HOME_EXTENDED:
-	return HOME_ASCII;
+	key = HOME_ASCII;
+	break;
     case END_EXTENDED:
-	return END_ASCII;
+	key = END_ASCII;
+	break;
     case PAGE_UP_EXTENDED:
-	return PAGE_UP_ASCII;
+	key = PAGE_UP_ASCII;
+	break;
     case PAGE_DOWN_EXTENDED:
-	return PAGE_DOWN_ASCII;
+	key = PAGE_DOWN_ASCII;
+	break;
     case DELETE_EXTENDED:
-	return DELETE_ASCII;
+	key = DELETE_ASCII;
+	break;
     case UP_ARROW_EXTENDED:
-	return UP_ARROW_ASCII;
+	key = UP_ARROW_ASCII;
+	break;
     case DOWN_ARROW_EXTENDED:
-	return DOWN_ARROW_ASCII;
+	key = DOWN_ARROW_ASCII;
+	break;
     case LEFT_ARROW_EXTENDED:
-	return LEFT_ARROW_ASCII;
+	key = LEFT_ARROW_ASCII;
+	break;
     case RIGHT_ARROW_EXTENDED:
-	return RIGHT_ARROW_ASCII;
+	key = RIGHT_ARROW_ASCII;
+	break;
     default:
 	return 0;      /* not a supported key */
     }
+    return CursesControlArrowKey(key, control);
 }
 
 unsigned long
@@ -310,7 +325,9 @@ consoleGetChar(void)
 		    break;
 		} else {
 		    valueReturned = consoleConvertKeyToDos(
-			inputEvent.Event.KeyEvent.wVirtualKeyCode);
+			inputEvent.Event.KeyEvent.wVirtualKeyCode,
+			inputEvent.Event.KeyEvent.dwControlKeyState &
+			(LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED));
 		    if (valueReturned != 0) {
 			break;
 		    }

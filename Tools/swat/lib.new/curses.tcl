@@ -845,6 +845,8 @@ See also:
     	    unbind-key \307
     	    unbind-key \317
         }
+	unbind-key \363
+	unbind-key \364
     	
     }
     #
@@ -888,6 +890,10 @@ See also:
     	    bind-key \313 {dslr -5}
     	    # scroll right
     	    bind-key \315 {dslr 5}
+    	    # control-left scrolls left with modern prompt keys
+    	    bind-key \363 {dslr -5}
+    	    # control-right scrolls right with modern prompt keys
+    	    bind-key \364 {dslr 5}
     	    # home (go to top of file)
     	    bind-key \307 {dss 1 1}
     	    # end (end of file)

@@ -20,7 +20,8 @@ Use `help command` for more info.
 
 `Page Up` / `↑` — Scroll forward 1-pg/1-line  
 `Page Down` / `↓` — Scroll backward 1-pg/1-line  
-`←` / `→` — Scroll left/right  
+`Ctrl+←` / `Ctrl+→` — Scroll left/right with modern prompt keys  
+`←` / `→` — Scroll left/right with legacy prompt keys  
 
 ## Downloading & Running
 

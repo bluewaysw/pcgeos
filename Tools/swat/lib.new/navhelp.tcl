@@ -51,6 +51,7 @@
       echo {  Delete            Delete the character under the cursor}
       echo {  Backspace         Delete the character left of the cursor}
       echo {  Up/Down           Previous/next command}
+      echo {  Ctrl+Left/Right   Scroll srcwin left/right}
       if {[string c ${file-os} unix] == 0} {
         echo {  Linux mouse       Wheel scrolls srcwin; Shift+Left drag selects}
       }
