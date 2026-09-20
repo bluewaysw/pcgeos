@@ -92,18 +92,9 @@ typedef struct {
 #define DELETE_ASCII		0xd3
 
 /*
- * Ctrl+arrow. Windows reports the same virtual key code for these as
- * for the plain arrows and puts the modifier in dwControlKeyState, so
- * consoleGetChar has to map them itself. The values are the extended
- * scan codes an enhanced keyboard produces for the combinations, which
- * keeps them clear of the codes above.
+ * The control-modified navigation keys are defined in cursesKeys.h,
+ * which is shared with the other curses backend and with swat itself.
  */
-#define CTRL_UP_ARROW_ASCII	0x8d
-#define CTRL_DOWN_ARROW_ASCII	0x91
-#define CTRL_LEFT_ARROW_ASCII	0xf3
-#define CTRL_RIGHT_ARROW_ASCII	0xf4
-#define CTRL_END_ASCII		0xf5
-#define CTRL_HOME_ASCII		0xf7
 
 #ifndef	 bool
 #define  bool		char		/* boolean type */
@@ -171,6 +162,8 @@ typedef struct {
 #define KEY_ABORT      0x15c        /*  Abort/Terminate key (any) */
 #define KEY_SHELP      0x15d        /* Short help */
 #define KEY_LHELP      0x15e        /* Long help */
+
+#define KEY_RESIZE     0x200		/* special key event for changed console size */
 
 /* type declarations */
 
@@ -287,6 +280,9 @@ extern	int	 gettmode(void);
 extern	void	 idlok(void);
 	/* curses initialization */
 extern	int	 initscr(void);
+extern	int	 reinitscr(void);
+	/* resize an existing window, preserving what fits */
+extern	WINDOW	 *resizewin(WINDOW *win, int num_lines, int num_columns);
 	/* get char at stdscr cursor */
 extern  ntcCell *inch(void);
 	/* insert character in stdscr */

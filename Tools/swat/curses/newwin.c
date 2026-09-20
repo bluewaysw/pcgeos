@@ -81,6 +81,131 @@ int	num_lines, num_cols, begy, begx;
 	return win;
 }
 
+/****************************************************************/
+/* Resizewin() changes the size of an existing window, keeping	*/
+/* as much of the old contents as still fits. When the window	*/
+/* gets shorter, lines come off the top if that is what it	*/
+/* takes to keep the cursor on screen, otherwise off the		*/
+/* bottom. Returns the window, or ERR -- in which case the	*/
+/* window is left exactly as it was.				*/
+/****************************************************************/
+
+WINDOW *resizewin(WINDOW *win, int num_lines, int num_columns)
+{
+    char    **newLine;
+    short    *newFirstch;
+    short    *newLastch;
+    int       drop;
+    int       keep;
+    int       copyCols;
+    int       i;
+    int       j;
+
+    if ((win == (WINDOW *)NULL) || (num_lines <= 0) || (num_columns <= 0)) {
+	return((WINDOW *) ERR);
+    }
+    if ((num_lines == win->_maxy) && (num_columns == win->_maxx)) {
+	return(win);
+    }
+
+    /*
+     * Everything is allocated before anything is changed, so that running
+     * out of memory part way through leaves the window untouched rather
+     * than half converted.
+     */
+    newLine = (char **) calloc(num_lines, sizeof(char *));
+    if (newLine == (char **)NULL) {
+	return((WINDOW *) ERR);
+    }
+    for (j = 0; j < num_lines; j++) {
+	newLine[j] = (char *) malloc((unsigned) num_columns);
+	if (newLine[j] == (char *)NULL) {
+	    while (--j >= 0) {
+		free(newLine[j]);
+	    }
+	    free((char *)newLine);
+	    return((WINDOW *) ERR);
+	}
+    }
+
+    newFirstch = (short *) malloc(sizeof(short) * num_lines);
+    newLastch = (short *) malloc(sizeof(short) * num_lines);
+    if ((newFirstch == (short *)NULL) || (newLastch == (short *)NULL)) {
+	if (newFirstch != (short *)NULL) {
+	    free((char *)newFirstch);
+	}
+	if (newLastch != (short *)NULL) {
+	    free((char *)newLastch);
+	}
+	for (j = 0; j < num_lines; j++) {
+	    free(newLine[j]);
+	}
+	free((char *)newLine);
+	return((WINDOW *) ERR);
+    }
+
+    /*
+     * Decide which of the old lines survive. Lines are only taken off the
+     * top when the cursor would otherwise end up below the last line of
+     * the smaller window.
+     */
+    drop = 0;
+    if (win->_cury >= num_lines) {
+	drop = win->_cury - num_lines + 1;
+    }
+    keep = win->_maxy - drop;
+    if (keep > num_lines) {
+	keep = num_lines;
+    }
+    if (keep < 0) {
+	keep = 0;
+    }
+
+    copyCols = (win->_maxx < num_columns) ? win->_maxx : num_columns;
+
+    for (j = 0; j < num_lines; j++) {
+	for (i = 0; i < num_columns; i++) {
+	    newLine[j][i] = ' ';
+	}
+	if (j < keep) {
+	    for (i = 0; i < copyCols; i++) {
+		newLine[j][i] = win->_y[drop + j][i];
+	    }
+	}
+	newFirstch[j] = 0;
+	newLastch[j] = num_columns - 1;
+    }
+
+    for (j = 0; j < win->_maxy; j++) {
+	free(win->_y[j]);
+    }
+    free((char *)win->_y);
+    free((char *)win->_firstch);
+    free((char *)win->_lastch);
+
+    win->_y = newLine;
+    win->_firstch = newFirstch;
+    win->_lastch = newLastch;
+    win->_maxy = num_lines;
+    win->_maxx = num_columns;
+
+    win->_cury -= drop;
+    if (win->_cury >= num_lines) {
+	win->_cury = num_lines - 1;
+    }
+    if (win->_cury < 0) {
+	win->_cury = 0;
+    }
+    if (win->_curx >= num_columns) {
+	win->_curx = num_columns - 1;
+    }
+    if (win->_curx < 0) {
+	win->_curx = 0;
+    }
+
+    return(win);
+}
+
 WINDOW *
 subwin(orig, num_lines, num_cols, begy, begx)
 reg WINDOW	*orig;

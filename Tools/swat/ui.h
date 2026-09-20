@@ -30,4 +30,11 @@ extern void 	Ui_AllowInterrupts(Boolean);
 extern Boolean	Ui_Interrupt (void);
 extern volatile void	Ui_TopLevel (void);
 
+/*
+ * Screen-resize handling. Curses_HandleResize does the work;
+ * Curses_CheckResize acts on a SIGWINCH the handler only flagged.
+ */
+extern void	Curses_HandleResize (void);
+extern void	Curses_CheckResize (void);
+
 #endif /* _UI_H_ */
