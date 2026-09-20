@@ -109,10 +109,21 @@ initscr() {
 	return stdscr;
 }
 
-WINDOW * reinitscr() {
+/****************************************************************/
+/* Reinitscr() picks up the terminal's current size and resizes	*/
+/* curscr to match. Returns OK when the size had in fact	*/
+/* changed and the resize succeeded, so that the caller knows	*/
+/* it has to redo its layout, and ERR otherwise -- including	*/
+/* the common case of nothing having changed at all.		*/
+/****************************************************************/
 
-    int newLINES = 0;
-    int newCOLS = 0;
+int
+reinitscr()
+{
+
+    int     newLINES = 0;
+    int     newCOLS = 0;
+    WINDOW  *resized;
 
 # ifdef TIOCGWINSZ
 	struct winsize win;
@@ -138,21 +149,23 @@ WINDOW * reinitscr() {
 		newCOLS = 80;
 
 
-    if((newLINES != LINES) || (newCOLS != COLS)) {
-    
-        LINES = newLINES;
-        COLS = newCOLS;
-
-		printf("NEW_SIZE %d %d,", COLS, LINES); fflush(stdout);
-
-
-        if ((curscr = resizewin(curscr,LINES,COLS)) == (WINDOW *)ERR) {
-            exit(1);
-        }
-        wrefresh(curscr);
-        return(OK);
+    if ((newLINES == LINES) && (newCOLS == COLS)) {
+	return(ERR);
     }
-    return (ERR);
 
-	return OK;
+    /*
+     * Only commit to the new size once the screen has actually been
+     * resized, so a failure leaves LINES and COLS describing what is
+     * really there.
+     */
+    resized = resizewin(curscr, newLINES, newCOLS);
+    if (resized == (WINDOW *)ERR) {
+	return(ERR);
+    }
+
+    curscr = resized;
+    LINES = newLINES;
+    COLS = newCOLS;
+    wrefresh(curscr);
+    return(OK);
 }

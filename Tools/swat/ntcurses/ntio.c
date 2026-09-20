@@ -40,6 +40,9 @@ DESCRIPTION:
 
 #include <curses.h>
 #include "curspriv.h"
+#define CURSES_KEYS_CONTROL
+#include "../cursesKeys.h"
+#undef CURSES_KEYS_CONTROL
 //#include <alloc.h>
 
 extern HANDLE hConIn;
@@ -252,7 +255,6 @@ consoleKeytst(void)
 	    if ((inputrec[i].EventType == KEY_EVENT) && 
 		(inputrec[i].Event.KeyEvent.bKeyDown == TRUE)) 
 	    {
-            consoleBeep();
 		return (TRUE);
 	    }
 	    if ((inputrec[i].EventType == MOUSE_EVENT) && 
@@ -260,62 +262,57 @@ consoleKeytst(void)
 		((inputrec[i].Event.MouseEvent.dwButtonState == 1) ||
 		 (inputrec[i].Event.MouseEvent.dwButtonState == 2)))
 		return (TRUE);
-        if (inputrec[i].EventType == WINDOW_BUFFER_SIZE_EVENT)
-        {
-            consoleBeep();
-            return (TRUE); 
-        }
+	    if (inputrec[i].EventType == WINDOW_BUFFER_SIZE_EVENT) {
+		return (TRUE);
+	    }
 	}
     }
     return (FALSE);
 }
 
 int
-consoleConvertKeyToDos(int ntVirtualKey)
+consoleConvertKeyToDos(int ntVirtualKey, int control)
 {
+    int key;
+
     switch (ntVirtualKey) {
     case HOME_EXTENDED:
-	return HOME_ASCII;
+	key = HOME_ASCII;
+	break;
     case END_EXTENDED:
-	return END_ASCII;
+	key = END_ASCII;
+	break;
     case PAGE_UP_EXTENDED:
-	return PAGE_UP_ASCII;
+	key = PAGE_UP_ASCII;
+	break;
     case PAGE_DOWN_EXTENDED:
-	return PAGE_DOWN_ASCII;
+	key = PAGE_DOWN_ASCII;
+	break;
     case DELETE_EXTENDED:
-	return DELETE_ASCII;
+	key = DELETE_ASCII;
+	break;
     case UP_ARROW_EXTENDED:
-	return UP_ARROW_ASCII;
+	key = UP_ARROW_ASCII;
+	break;
     case DOWN_ARROW_EXTENDED:
-	return DOWN_ARROW_ASCII;
+	key = DOWN_ARROW_ASCII;
+	break;
     case LEFT_ARROW_EXTENDED:
-	return LEFT_ARROW_ASCII;
+	key = LEFT_ARROW_ASCII;
+	break;
     case RIGHT_ARROW_EXTENDED:
-	return RIGHT_ARROW_ASCII;
+	key = RIGHT_ARROW_ASCII;
+	break;
     default:
 	return 0;      /* not a supported key */
     }
-}
 
-int
-consoleConvertCtrlKeyToDos(int ntVirtualKey)
-{
-    switch (ntVirtualKey) {
-    case UP_ARROW_EXTENDED:
-	return CTRL_UP_ARROW_ASCII;
-    case DOWN_ARROW_EXTENDED:
-	return CTRL_DOWN_ARROW_ASCII;
-    case LEFT_ARROW_EXTENDED:
-	return CTRL_LEFT_ARROW_ASCII;
-    case RIGHT_ARROW_EXTENDED:
-	return CTRL_RIGHT_ARROW_ASCII;
-    case HOME_EXTENDED:
-	return CTRL_HOME_ASCII;
-    case END_EXTENDED:
-	return CTRL_END_ASCII;
-    default:
-	return 0;      /* no separate code for this one */
-    }
+    /*
+     * Windows hands us the same virtual key code whether or not Ctrl is
+     * down and puts the modifier in dwControlKeyState, so the caller
+     * passes it along and the shared mapping decides.
+     */
+    return CursesControlKey(key, control);
 }
 
 unsigned long
@@ -336,23 +333,10 @@ consoleGetChar(void)
 		    valueReturned = inputEvent.Event.KeyEvent.uChar.AsciiChar;
 		    break;
 		} else {
-		    /*
-		     * Windows hands us the same virtual key code whether or
-		     * not Ctrl is down, so look at dwControlKeyState first
-		     * and give the Ctrl variants codes of their own. Without
-		     * this nothing downstream can tell Ctrl+Left from Left.
-		     */
-		    if (inputEvent.Event.KeyEvent.dwControlKeyState &
-			(LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))
-		    {
-			valueReturned = consoleConvertCtrlKeyToDos(
-			    inputEvent.Event.KeyEvent.wVirtualKeyCode);
-			if (valueReturned != 0) {
-			    break;
-			}
-		    }
 		    valueReturned = consoleConvertKeyToDos(
-			inputEvent.Event.KeyEvent.wVirtualKeyCode);
+			inputEvent.Event.KeyEvent.wVirtualKeyCode,
+			inputEvent.Event.KeyEvent.dwControlKeyState &
+			(LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED));
 		    if (valueReturned != 0) {
 			break;
 		    }
@@ -376,11 +360,10 @@ consoleGetChar(void)
 		  ((inputEvent.Event.MouseEvent.dwMousePosition.X & 0xff));
 		break;
 	    }
-	} else if (inputEvent.EventType == WINDOW_BUFFER_SIZE_EVENT ) {
-        consoleBeep();
-        valueReturned = KEY_RESIZE;
-        break;
-    }
+	} else if (inputEvent.EventType == WINDOW_BUFFER_SIZE_EVENT) {
+	    valueReturned = KEY_RESIZE;
+	    break;
+	}
 	/* 
 	 * else, we discard the event and get another one
 	 */

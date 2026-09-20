@@ -145,12 +145,12 @@ wgetch(WINDOW *win)
 	    /* translate cr */
 	    key = '\n';
 	}
+	if (key == KEY_RESIZE) {	/* not a character -- pass it up */
+	    return(key);
+	}
 	if (_cursvar.echo && (key < 0x100)) {	/* check if echo */
 	    waddch(w, key);
 	    wrefresh(w);
-	}
-	if(key == KEY_RESIZE) {
-		return key;
 	}
 	if (_cursvar.raw || _cursvar.cbreak) {	/* if no buffering */
 	    return(key);

@@ -844,13 +844,13 @@ See also:
     	    unbind-key \315
     	    unbind-key \307
     	    unbind-key \317
-    	    unbind-key \215
-    	    unbind-key \221
-    	    unbind-key \363
-    	    unbind-key \364
-    	    unbind-key \365
-    	    unbind-key \367
         }
+	unbind-key \361
+	unbind-key \362
+	unbind-key \363
+	unbind-key \364
+	unbind-key \365
+	unbind-key \367
     	
     }
     #
@@ -887,8 +887,8 @@ See also:
     	    # page up
     	    bind-key \311 [format {dss %d} [expr -$numLines/2]]
     	    # ctrl-arrow up/down: scroll a line at a time
-	    bind-key \215 {dss -1}
-	    bind-key \221 {dss 1}
+	    bind-key \361 {dss -1}
+	    bind-key \362 {dss 1}
     	    # ctrl-arrow left/right: scroll sideways
     	    bind-key \363 {dslr -5}
     	    bind-key \364 {dslr 5}

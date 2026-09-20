@@ -2225,6 +2225,13 @@ RpcWait(int poll)
 	}
 	nstreams = select(FD_SETSIZE, &readMask, &writeMask, &exceptMask,
 			  timeout);
+#if defined(_LINUX)
+	/*
+	 * A SIGWINCH interrupts the select above; the handler only sets a
+	 * flag, so this is where the screen actually gets resized.
+	 */
+	Curses_CheckResize();
+#endif
 #elif defined(_MSDOS)
 	/*
 	 * In the DOS world, we only look for the keyboard and our serial
@@ -2485,15 +2492,11 @@ RpcWait(int poll)
 			     * the other input records
 			     */
 			    ReadConsoleInput(hConIn, &inputrec, 1, &dwRead);
-				if( dwRead == 1) {
-					if(inputrec.EventType == WINDOW_BUFFER_SIZE_EVENT) {
-						//consoleBeep();
-						if(reinitscr() == OK)
-						{
-							CursesRedoLayout();
-						}
-					}
-				}
+			    if ((dwRead == 1) &&
+				(inputrec.EventType == WINDOW_BUFFER_SIZE_EVENT))
+			    {
+				Curses_HandleResize();
+			    }
 			}
 		    }
 		} else {

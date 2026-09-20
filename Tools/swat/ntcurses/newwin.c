@@ -198,153 +198,129 @@ WINDOW *newwin(int	num_lines,
     return(win);
 } /* newwin */
 
-WINDOW* resizewin(WINDOW* win, int num_lines, int num_columns) 
+/****************************************************************/
+/* Resizewin() changes the size of an existing window, keeping	*/
+/* as much of the old contents as still fits. When the window	*/
+/* gets shorter, lines come off the top if that is what it	*/
+/* takes to keep the cursor on screen, otherwise off the		*/
+/* bottom. Returns the window, or ERR -- in which case the	*/
+/* window is left exactly as it was.				*/
+/****************************************************************/
+
+WINDOW *resizewin(WINDOW *win, int num_lines, int num_columns)
 {
-    int j;
-    if(num_lines < win->_maxy) {
+    ntcCell **newLine;
+    short     *newMinChng;
+    short     *newMaxChng;
+    int       drop;
+    int       keep;
+    int       copyCols;
+    int       i;
+    int       j;
 
-        /* remove lines at the beginning */
-        while(win->_cury >= num_lines) {
-
-            int c=1;
-            free(win->_line[0]);
-            for(c=1; c < win->_maxy; c++)
-            {
-                win->_line[c-1] = win->_line[c];
-            }
-            win->_maxy--;
-            win->_cury--;
-        }
-
-        /* free removed lines */
-	    for (j = num_lines; j < win->_maxy; j++) 
-        {
-            free(win->_line[j]);
-        }
-
-        /* realloc the others */
-        for(j = 0; j < num_lines; j++)
-        {
-            ntcCell *newLine = (ntcCell *) realloc(win->_line[j], sizeof(ntcCell)*num_columns);
-            if(newLine == NULL)
-            {
-    	        return((WINDOW *) ERR);
-            }
-            win->_line[j] = newLine;
-        }
-
-        /* fill new chars */
-        for(j=0; j < num_lines; j++) {
-            int x=0;
-            for(x=win->_maxx; x < num_columns; x++) {
-
-                (void *)makeNtcCell(&win->_line[j][x], ' ');
-            }
-
-            win->_minchng[j]=0;
-            win->_maxchng[j]=num_columns-1;
-        }
-
-        win->_maxx = num_columns;
-        win->_maxy = num_lines;
+    if ((win == (WINDOW *)NULL) || (num_lines <= 0) || (num_columns <= 0)) {
+	return((WINDOW *) ERR);
     }
-    else /*if(num_lines > win->_maxy)*/ 
-    {
-        void *newMinChg;
-        void *newMaxChg;
-
-        /* more lines now */
-        ntcCell** newLines = realloc(win->_line, sizeof(ntcCell*) * num_lines);
-        if(newLines == NULL)
-        {
-	        return((WINDOW *) ERR);
-        }
-        win->_line = newLines;
-
-        newMinChg = realloc(win->_minchng, sizeof(short) * num_lines);
-        if(newMinChg == NULL)
-        {
-	        return((WINDOW *) ERR);
-        }
-        win->_minchng = newMinChg;
-
-        newMaxChg = realloc(win->_maxchng, sizeof(short) * num_lines);
-        if(newMaxChg == NULL)
-        {
-	        return((WINDOW *) ERR);
-        }
-        win->_maxchng = newMaxChg;
-
-        /* allocate new lines*/
-        for(j = win->_maxy; j < num_lines; j++)
-        {
-            newLines[j] = (ntcCell *) calloc(num_columns,
-					    sizeof(ntcCell));
-            if(newLines[j] == NULL)
-            {
-                /* free all new lines*/
-                j--;
-                while(j >= num_lines)
-                {
-                    free(newLines[j]);
-                    j--;
-                }
-    	        return((WINDOW *) ERR);
-            }
-        }
-
-        /* realloc the others */
-        for(j = 0; j < win->_maxy; j++)
-        {
-            ntcCell *newLine = (ntcCell *) realloc(win->_line[j], sizeof(ntcCell)*num_columns);
-            if(newLine == NULL)
-            {
-                /* free all new lines*/
-                j = num_lines;
-                j--;
-                while(j >= 0)
-                {
-                    free(win->_line[j]);
-                    j--;
-                }
-    	        return((WINDOW *) ERR);
-            }
-            win->_line[j] = newLine;
-        }
-
-        /* fill new chars */
-        for(j=0; j < num_lines; j++) {
-            int x=0;
-            if(win->_maxx< num_columns)
-            {
-                for(x=win->_maxx; x < num_columns; x++) {
-
-                    (void *)makeNtcCell(&win->_line[j][x], ' ');
-                }
-            }
-            if(j >= win->_maxy)
-            {
-                int width = win->_maxx;
-                int a=0;
-                if(width >= num_columns)
-                {
-                    width = num_columns;
-                }
-                for(a=0; a < width; a++) 
-                {
-
-                    (void *)makeNtcCell(&win->_line[j][a], ' ');
-                }
-            }
-
-            win->_minchng[j]=0;
-            win->_maxchng[j]=num_columns-1;
-        }
-
-        win->_maxx = num_columns;
-        win->_maxy = num_lines;
+    if ((num_lines == win->_maxy) && (num_columns == win->_maxx)) {
+	return(win);
     }
-    return win;
+
+    /*
+     * Everything is allocated before anything is changed, so that running
+     * out of memory part way through leaves the window untouched rather
+     * than half converted.
+     */
+    newLine = (ntcCell **) calloc(num_lines, sizeof(ntcCell *));
+    if (newLine == (ntcCell **)NULL) {
+	return((WINDOW *) ERR);
+    }
+    for (j = 0; j < num_lines; j++) {
+	newLine[j] = (ntcCell *) calloc(num_columns, sizeof(ntcCell));
+	if (newLine[j] == (ntcCell *)NULL) {
+	    while (--j >= 0) {
+		free(newLine[j]);
+	    }
+	    free(newLine);
+	    return((WINDOW *) ERR);
+	}
+    }
+
+    newMinChng = (short *) malloc(sizeof(short) * num_lines);
+    newMaxChng = (short *) malloc(sizeof(short) * num_lines);
+    if ((newMinChng == (short *)NULL) || (newMaxChng == (short *)NULL)) {
+	if (newMinChng != (short *)NULL) {
+	    free(newMinChng);
+	}
+	if (newMaxChng != (short *)NULL) {
+	    free(newMaxChng);
+	}
+	for (j = 0; j < num_lines; j++) {
+	    free(newLine[j]);
+	}
+	free(newLine);
+	return((WINDOW *) ERR);
+    }
+
+    /*
+     * Decide which of the old lines survive. Lines are only taken off the
+     * top when the cursor would otherwise end up below the last line of
+     * the smaller window.
+     */
+    drop = 0;
+    if (win->_cury >= num_lines) {
+	drop = win->_cury - num_lines + 1;
+    }
+    keep = win->_maxy - drop;
+    if (keep > num_lines) {
+	keep = num_lines;
+    }
+    if (keep < 0) {
+	keep = 0;
+    }
+
+    copyCols = (win->_maxx < num_columns) ? win->_maxx : num_columns;
+
+    for (j = 0; j < num_lines; j++) {
+	for (i = 0; i < num_columns; i++) {
+	    (void) makeNtcCell(&newLine[j][i], ' ');
+	}
+	if (j < keep) {
+	    for (i = 0; i < copyCols; i++) {
+		newLine[j][i] = win->_line[drop + j][i];
+	    }
+	}
+	newMinChng[j] = 0;
+	newMaxChng[j] = num_columns - 1;
+    }
+
+    for (j = 0; j < win->_maxy; j++) {
+	free(win->_line[j]);
+    }
+    free(win->_line);
+    free(win->_minchng);
+    free(win->_maxchng);
+
+    win->_line = newLine;
+    win->_minchng = newMinChng;
+    win->_maxchng = newMaxChng;
+    win->_maxy = num_lines;
+    win->_maxx = num_columns;
+
+    win->_cury -= drop;
+    if (win->_cury >= num_lines) {
+	win->_cury = num_lines - 1;
+    }
+    if (win->_cury < 0) {
+	win->_cury = 0;
+    }
+    if (win->_curx >= num_columns) {
+	win->_curx = num_columns - 1;
+    }
+    if (win->_curx < 0) {
+	win->_curx = 0;
+    }
+
+    return(win);
 }
 
 /****************************************************************/
