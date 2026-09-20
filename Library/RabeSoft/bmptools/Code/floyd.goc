@@ -1,0 +1,1274 @@
+/**************************************************************************
+ *
+ * PROJECT:      Bitmap Tools library
+ *
+ * FILE:         floyd.goc
+ *		 Dithering using Floyd-Steinberg algorithm.
+ *		 Some special cases are implemented in replace.goc
+ *               Programmed by RABE-Soft 03/2025 - 09/2026
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 03/2025		Initial revision 16 colors only
+ *	RainerB 08/23/2026	256 color dithering
+ *	RainerB 09/08/2026	Handling any case, including "no dithering possible/required"
+ *
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+@include <Objects/colorC.goh>
+
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+
+// Display progress as dots ....
+void DitherDisplayProgress(optr progressTextObj)  {if (progressTextObj) @call progressTextObj::MSG_VIS_TEXT_APPEND_PTR(".", 0); }
+
+
+/*##########################################################################
+	$ID Dithering using Floyd-Steinberg algorithm
+ ###########################################################################*/
+
+
+/*--------------------------------------------------------------------------
+	OneWordFixed: My own data type for calculations with color values
+		      10 integer bits, 6 fractional bits
+ ---------------------------------------------------------------------------*/
+
+typedef	sword OneWordFixed;
+	/* 16 Bit with 10 Bit Integer part
+	 * ---------------------------------------------
+	 * | VZ | <- 9 Bit Integer -> | 6 Bit Fraction |
+	 * ---------------------------------------------
+	 * range: -512.xxxx bis +511.xxxx
+	 * precision: 1/64 = 0,015625
+	 * --> Rechnen mit Byte-Werten führt weder bei Subraktion
+	 *     noch bei Addition zu Überträgen
+	 * --> Operations on byte values do not produce an overflow,
+	 *     neither during subtraction nor during addition.	 */
+
+
+#define OWF_FracMask	0x3F
+#define	OWF_SHIFT	6	/* Verschiebung für int --> OneWordFixed */
+#define OWF_0_POINT_5	0x20	/* 0.5 in OneWordFixed */
+
+#define	OWF_1	0x0040
+#define	OWF_255	0x3FC0		/* == ((sword)255 << OWF_SHIFT) */
+
+#define IntToOWF(i)	( ((sword)(i)) << OWF_SHIFT )
+
+
+/* --------------------  Strukturen und Macros für Floyd-Steinber Dithering ------------------- */
+
+typedef struct {		/* Ein Pixel, RGB jeweils als OneWordFixed */
+	OneWordFixed	rt,
+			gn,
+			bl;
+	} ThreeWordColor;
+
+     /*
+      * Macro FloydErrorPart / FloydAddErrorPart
+      * The color error is distributed as 7/16, 3/16, 5/16 and 1/16 among the neighboring
+      * pixels. Division by 16 is implemented as '>> 4'.
+      * Negative color errors require special handling.
+      *
+      * Using FloydAddErrorPart(a, b, c) instead of a += FloydErrorPart(b, c)
+      * speeds up the entire (!) algorithm by about 5%.
+      */
+#define FloydErrorPart(fak, owf)  owf<0 ? fak*( -(-owf >> 4) ) : fak*(owf >> 4)
+
+#define FloydAddErrorPart(res, fak, owf)  \
+	if (owf<0) { (res) += (fak)*( -(-owf >> 4) ); } \
+	else { (res) += (fak)*(owf >> 4); }
+
+
+
+     /*
+      * Macro OneWordFixedToByte
+      * Rounds a OneWordFixed value to 0 .. 255 (RGB value).
+      * Clamps the result if it falls outside the byte range.
+      */
+#define OneWordFixedToByte(rgb, owf) \
+if ( owf < 0 ) { 	\
+    rgb = 0;		\
+} else {		\
+    OneWordFixed tmp = (owf + OWF_0_POINT_5) >> OWF_SHIFT; \
+    if ( tmp > 255) {	\
+    	rgb = 255;	\
+    } else {		\
+	rgb = tmp;	\
+    }			\
+}
+
+    /* Macro GrayOWFFromRGB
+     * convert an rgb color to its gray value
+     * usually is: gray = 0.299*rt + 0.587*gn + 0.144*bl
+     * but because of downward rounding this returns 3EC1 (251 as OWF) for white (255/255/255)
+     * so we use: gray = 0.300*rt + 0.588*gn + 0.145*bl
+     * which returns exactly 3FC0 (255 as OWF) for white (255/255/255)
+     */
+#define  GrayOWFFromRGB(r, g, b)	( ((word)(0x3F*300)/1000) * (word)(r) + ((word)(0x3F*588)/1000) * (word)(g) + ((word)(0x3F*145)/1000) * (word)(b) )
+
+
+    /* Macro GrayIntFromIndex
+     * convert an rgb color, given by a palette entry, to its gray value
+     * See comments to GrayOWFFromRGB for more details
+     */
+#define GrayIntFromIndex(palette, idx) (GrayOWFFromRGB(palette[idx].rt, palette[idx].gn, palette[idx].bl) >> OWF_SHIFT)
+
+/* --------------------  Header der Tool-Routinen ------------------- */
+
+void FloydToolDitherLine(ThreeWordColor *workingLine, ThreeWordColor *errLine,
+				byte *pixPtr, int width,
+				PaletteEntry *palette, int palColors);
+
+void FloydToolRGBLineToWord(PaletteEntry *rgbLine, ThreeWordColor *destLine, int width);
+void FloydTool8BitLineToWord(byte *pixelLine, ThreeWordColor *destLine,
+				int width, PaletteEntry *palette);
+
+VMBlockHandle FloydSteinbergDitherToMono(VMFileHandle srcFile, VMBlockHandle srcBitmap,
+			VMFileHandle destFile, optr progressText);
+
+VMBlockHandle FloydToolConvertTo24Bit(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			optr progressText);
+VMBlockHandle FloydToolCovertMonoToColor(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int numPalColors, optr progressText);
+
+
+/*--------------------- FloydToolRGBLineToWord ---------------------
+ * Task:      	Convert an RGB pixel row to OneWordFixed values
+ *		Each color value (1 byte) is converted to a OneWordFixed value (2 bytes)
+ * Parameters:	rgbLine:  RGB color values
+ *		destLine: Colors as OneWordFixed values (return values)
+ *		width:    Width of the line in pixels
+ * ---------------------------------------------------------------------------*/
+void FloydToolRGBLineToWord(PaletteEntry *rgbLine, ThreeWordColor *destLine,
+		int width) {
+int	n;
+
+     for ( n  = 0 ; n < width; n++ ) {
+	destLine[n].rt = IntToOWF(rgbLine[n].rt);
+	destLine[n].gn = IntToOWF(rgbLine[n].gn);
+	destLine[n].bl = IntToOWF(rgbLine[n].bl);
+	}
+}
+
+
+/*--------------------- FloydTool8BitLineToWord ---------------------
+ * Purpose:      Convert an 8-bit pixel row to OneWordFixed values
+ *		 Each color value (1 byte) is converted to three OneWordFixed values
+ *		 (2 bytes each) --> 3 words per pixel
+ * Parameters:	 pixelLine:  color values (palette index)
+ *		 destLine:   Colors as OneWordFixed values (return values)
+ *		 width:	     Width of the line in pixels
+ *		 palette:    color map table
+ ---------------------------------------------------------------------------*/
+void FloydTool8BitLineToWord(byte *pixelLine, ThreeWordColor *destLine,
+		int width, PaletteEntry *palette) {
+int	n;
+int idx;
+PaletteEntry entry;
+
+     for ( n  = 0 ; n < width; n++ ) {
+	idx = pixelLine[n];
+	entry = palette[idx];			// speed up a little bit
+	destLine[n].rt = IntToOWF(entry.rt);
+	destLine[n].gn = IntToOWF(entry.gn);
+	destLine[n].bl = IntToOWF(entry.bl);
+	}
+}
+
+
+/*--------------------- FloydTool4BitLineToWord ---------------------
+ * Purpose:      Convert a 4-bit pixel line to OneWordFixed values
+ *		 Each color index (4 bits) is converted to three OneWordFixed values
+ *		 (2 bytes each) --> 3 words per pixel
+ * Parameters:	 pixelLine:  color values (palette index)
+ *		 destLine:   Colors as OneWordFixed values (return values)
+ *		 width:	     Width of the line in pixels
+ *		 palette:    color map table
+ ---------------------------------------------------------------------------*/
+void FloydTool4BitLineToWord(byte *pixelLine, ThreeWordColor *destLine,
+		int width, PaletteEntry *palette) {
+int	n;
+int idx;
+PaletteEntry entry;
+
+    for ( n = 0; n < width; n++ ) {
+	if ( n & 1 ) idx = pixelLine[n>>1] & 0x0F;
+		else idx = pixelLine[n>>1] >> 4;
+	entry = palette[idx];
+	destLine[n].rt = IntToOWF(entry.rt);
+	destLine[n].gn = IntToOWF(entry.gn);
+	destLine[n].bl = IntToOWF(entry.bl);
+	}
+}
+
+/*--------------------- FloydTool8BitTo4Bit ---------------------
+ * Task:        Convert a pixel line with 8 bit per pixel to 4 bit per pixel
+ * Parameters:	pixPtr: pointer to source pixel line - 8 bit per pixel, but only 4 bits used
+ *			the line may contain a mask area
+ *			fourBitPtr: pointer to target pixel line
+ *			width:	  Number of pixels
+ *			maskLen:  Number of mask bytes
+ ---------------------------------------------------------------------------*/
+void FloydTool8BitTo4Bit(byte *pixPtr, byte *fourBitPtr, int width, int maskLen) {
+int n;
+
+
+    if (maskLen) {
+        memcpy(fourBitPtr, pixPtr, maskLen);
+        fourBitPtr += maskLen;
+        pixPtr += maskLen;
+    }
+
+    for ( n  = 0 ; n < width; n++ ) {
+        if ( n & 1 ) {
+            *fourBitPtr |= pixPtr[n];
+            fourBitPtr++;
+        } else {
+            *fourBitPtr = pixPtr[n] << 4;
+        }
+
+    }
+
+}
+
+/*--------------------- FloydToolDitherLine ---------------------
+ * Purpose:     Dither a line (colors are stored as OneWordFixed values)
+ *              using Floyd-Steinberg
+ * Parameters:  workingLine: Colors as OneWordFixed values
+ *              errLine:     Storage for color errors during dithering
+ *              pixPtr:      Dithered color values (palette index, return value)
+ *              width:       Width of the line in pixels
+ *              palette:     Target palette to use
+ *              palColors:   Number of palette entries to use
+ * Strategy:    Code is optimized for runtime
+ *              All calculations are performed using OneWordFixed values
+ * Return:
+ ---------------------------------------------------------------------------*/
+void FloydToolDitherLine(ThreeWordColor *workingLine, ThreeWordColor *errLine,
+				byte *pixPtr, int width,
+				PaletteEntry *palette, int palColors) {
+PaletteEntry color, approx;
+ThreeWordColor 	error;
+int 	n, index;
+
+    /* Dithern nach Floyd-Steinberg */
+
+    for ( n = 0; n < width; n++ ) {
+
+	/* Genauen Farbwert (OneWordFixed) auf Paletteneintrag (0 .. 255) runden */
+	OneWordFixedToByte(color.rt, workingLine->rt);
+	OneWordFixedToByte(color.gn, workingLine->gn);
+	OneWordFixedToByte(color.bl, workingLine->bl);
+
+	/* Approximieren und Farbfehler, der dadurch entstand, ermitteln */
+	index = BTApproxRGBPaletteLinear(palette, color, palColors);
+	pixPtr[n] = index;
+	approx = palette[index];
+
+	error.rt = workingLine->rt - IntToOWF(approx.rt);
+	error.gn = workingLine->gn - IntToOWF(approx.gn);
+	error.bl = workingLine->bl - IntToOWF(approx.bl);
+
+
+	/* Distribute the color error to the surrounding pixels using Floyd-Steinberg */
+
+	/* 7/16 is added to the pixel to the right of the current pixel */
+	/* Accumulation may exceed the byte range --> Clamp */
+	if ( (n + 1) < width ) {
+
+		workingLine++;
+
+		FloydAddErrorPart(workingLine->rt, 7, error.rt);
+		if (workingLine->rt > OWF_255) workingLine->rt = OWF_255;
+		if (workingLine->rt < 0) workingLine->rt = 0;
+
+		FloydAddErrorPart(workingLine->gn, 7, error.gn);
+		if (workingLine->gn > OWF_255) workingLine->gn = OWF_255;
+		if (workingLine->gn < 0) workingLine->gn = 0;
+
+		FloydAddErrorPart(workingLine->bl, 7, error.bl);
+		if (workingLine->bl > OWF_255) workingLine->bl = OWF_255;
+		if (workingLine->bl < 0) workingLine->bl = 0;
+
+		workingLine--;
+
+		}
+
+	/* an errLine pixel can contain at most 10/16 of an error value
+	 * -> error values themselves can be at most +/- 255
+	 * No overflow is possible */
+
+	/* 3/16 bekommt das Pixel links unten */
+	if ( n > 0 ) {
+	        errLine--;
+		FloydAddErrorPart(errLine->rt, 3, error.rt);
+		FloydAddErrorPart(errLine->gn, 3, error.gn);
+		FloydAddErrorPart(errLine->bl, 3, error.bl);
+		errLine++;
+		}
+
+	/* 5/16 bekommt das Pixel unter dem aktuelle Pixel */
+		FloydAddErrorPart(errLine->rt, 5, error.rt);
+		FloydAddErrorPart(errLine->gn, 5, error.gn);
+		FloydAddErrorPart(errLine->bl, 5, error.bl);
+
+	/* 1/16 bekommt das Pixel rechts unten  - das ist auch das 'aktuelle' Pixel für den nächste Durchlauf*/
+	if ( (n + 1) < width ) {
+		errLine++;
+		FloydAddErrorPart(errLine->rt, 1, error.rt);
+		FloydAddErrorPart(errLine->gn, 1, error.gn);
+		FloydAddErrorPart(errLine->bl, 1, error.bl);
+		errLine--;
+		}
+
+	/* Select next pixel */
+	errLine++;
+	workingLine++;
+	}
+
+}
+
+/*--------------------- FloydToolDitherMaskedLine ---------------------
+ * Purpose:     Dither a line (colors are stored as OneWordFixed values)
+ *		using Floyd-Steinberg
+ *		Consider mask
+ * Parameters:	workingLine: Colors as OneWordFixed values
+ *		errLine:     Storage for color errors during dithering
+ *		pixPtr:	     Dithered color values (palette index, return value)
+ *		width:	     Width of the line in pixels
+ *		maskPtr:     Pointer to mask bytes
+ *		palette:     Target palette to use
+ *		palColors:   Number of palette entries to use
+ *		defaultIndex: Use this index if the source pixel is masked out.
+ *		              We have no color error in this case.
+ * Strategy:	Runtime-optimized code
+ *		All calculations are performed using OneWordFixed values
+ * Return:
+ ---------------------------------------------------------------------------*/
+void FloydToolDitherMaskedLine(ThreeWordColor *workingLine, ThreeWordColor *errLine,
+				byte *pixPtr, int width, byte *maskPtr,
+				PaletteEntry *palette, int palColors, int defaultIndex) {
+PaletteEntry color, approx;
+ThreeWordColor 	error;
+int 	n, index, dMask;
+
+    /* Dithern nach Floyd-Steinberg */
+
+    dMask = 0;
+    maskPtr--;
+    for ( n = 0; n < width; n++ ) {
+
+        /* select next mask pixel */
+        dMask >>= 1;
+        if ( !dMask ) {
+            dMask = 0x80;
+            maskPtr++;
+        }
+
+        /* use default index for masked pixels */
+        if ( !(*maskPtr & dMask) ) {
+            pixPtr[n] = defaultIndex;
+            goto nextPixel;
+        }
+
+	/* round exact color value (OneWordFixed) to palette entry (0 .. 255) */
+	OneWordFixedToByte(color.rt, workingLine->rt);
+	OneWordFixedToByte(color.gn, workingLine->gn);
+	OneWordFixedToByte(color.bl, workingLine->bl);
+
+	/* Approximate and calculate resulting color error */
+	index = BTApproxRGBPaletteLinear(palette, color, palColors);
+	pixPtr[n] = index;
+	approx = palette[index];
+
+	error.rt = workingLine->rt - IntToOWF(approx.rt);
+	error.gn = workingLine->gn - IntToOWF(approx.gn);
+	error.bl = workingLine->bl - IntToOWF(approx.bl);
+
+
+	/* Distribute the color error to the surrounding pixels using Floyd-Steinberg */
+
+	/* 7/16 bekommt das Pixel rechts vom aktuellen Pixel */
+	/* Durch das Aufsummieren kann der Byte-Bereich verlassen werden --> Begrenzen */
+	if ( (n + 1) < width ) {
+
+		workingLine++;
+
+		FloydAddErrorPart(workingLine->rt, 7, error.rt);
+		if (workingLine->rt > OWF_255) workingLine->rt = OWF_255;
+		if (workingLine->rt < 0) workingLine->rt = 0;
+
+		FloydAddErrorPart(workingLine->gn, 7, error.gn);
+		if (workingLine->gn > OWF_255) workingLine->gn = OWF_255;
+		if (workingLine->gn < 0) workingLine->gn = 0;
+
+		FloydAddErrorPart(workingLine->bl, 7, error.bl);
+		if (workingLine->bl > OWF_255) workingLine->bl = OWF_255;
+		if (workingLine->bl < 0) workingLine->bl = 0;
+
+		workingLine--;
+
+		}
+
+	/* an errLine pixel can contain at most 10/16 of an error value
+	 * -> error values themselves can be at most +/- 255
+	 * No overflow is possible */
+
+	/* 3/16 bekommt das Pixel links unten */
+	if ( n > 0 ) {
+	        errLine--;
+		FloydAddErrorPart(errLine->rt, 3, error.rt);
+		FloydAddErrorPart(errLine->gn, 3, error.gn);
+		FloydAddErrorPart(errLine->bl, 3, error.bl);
+		errLine++;
+		}
+
+	/* 5/16 bekommt das Pixel unter dem aktuelle Pixel */
+		FloydAddErrorPart(errLine->rt, 5, error.rt);
+		FloydAddErrorPart(errLine->gn, 5, error.gn);
+		FloydAddErrorPart(errLine->bl, 5, error.bl);
+
+	/* 1/16 bekommt das Pixel rechts unten  - das ist auch das 'aktuelle' Pixel für den nächste Durchlauf*/
+	if ( (n + 1) < width ) {
+		errLine++;
+		FloydAddErrorPart(errLine->rt, 1, error.rt);
+		FloydAddErrorPart(errLine->gn, 1, error.gn);
+		FloydAddErrorPart(errLine->bl, 1, error.bl);
+		errLine--;
+		}
+
+	/* Select next pixel */
+nextPixel:
+	errLine++;
+	workingLine++;
+	}
+
+}
+
+/*--------------------- BTDitherByFloydSteinberg ---------------------
+ * Purpose:	Convert a bitmap to a color-reduced bitmap
+ *		using Floyd-Steinberg dithering
+ * Strategy:	- the source bitmap may have any color depth
+ *		- Dithering 16 -> 16/256 and 256 -> 16/256 is allowed because the
+ *		  palettes may differ
+ *	        - we use a separate routine if the target is monochrome
+ *		- if we have a masked bitmap, mask is preserved
+ *		- use separate loops for masked and unmasked bitmaps
+ *
+ *		For each line do:
+ *		- Convert line to ThreeWordColor values (where r,g,b are OneWordFixed values)
+ *		- dither the line using OneWordFixed arithmetic into one-byte per pixel values
+ *		- for 16 color targets: convert result back to 4 bit per pixel
+ *
+ * Note:	This routine handles any combination of source colors and target colors.
+ *		Even cases where color reduction is not possible or necessary — such as converting
+ *		from a 16-color standard palette to a 256-color standard palette — are handled
+ *		correctly. However, the routine is not optimized for these exotic cases.
+ *
+ * Parameters:	srcFile
+ *		srcBlock:    bitmap to be converted
+ *		destFile:    Destination file
+ *		destFormat:  target format: BMF_4BIT, BMF_8BIT, BMF_24BIT or BMF_MONO
+ * 			     all other BMF_bits are ignored
+ *              palette:     Target palette to be used
+ *			     Pass NULL pointer to use the GEOS standard palette
+ *              palColors    Number of valid colors in the palette
+ *                    	     often 16 or 256; other values are also allowed
+ *              progressText: Text object for displaying progress indicators
+ *                    	      Null if no progress indicator is needed
+ *    Return:	Handle of the new bitmap
+ *           	Zero on error:	out of memory
+ * ---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTDitherByFloydSteinberg(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int palColors, optr progressText) {
+VMBlockHandle  newBitmap;
+int	width, height, line, size, n, format, srcColors, compact;
+PaletteEntry 	*srcPalette;		// Palette des zu dithernden Bildes, ggf Standard-Palette
+byte	*pixPtr, *srcPtr, *fourBitPtr, *destPtr;
+ThreeWordColor	*workingLine, *errLine, *srcLine, *tempPtr;
+Boolean is4Bit = FALSE;
+int maskLen;
+byte *srcMaskPtr, *destMaskPtr;
+Boolean	isGEOSPalette = FALSE;
+
+
+    /*
+     * initialize all clean-up relevant variables with zero
+     */
+    compact =FALSE;
+    isGEOSPalette = FALSE;
+    workingLine = NULL;
+    errLine = NULL;
+    srcLine = NULL;
+    destPtr = NULL;
+    fourBitPtr = NULL;
+    srcPalette = NULL;
+    newBitmap = NULL;
+
+    /*
+     * Get source bitmap information and ensure uncompacted bitmap
+     */
+    format = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, &compact);
+    if ( compact ) {
+	srcBitmap = GrUncompactBitmap(srcFile, srcBitmap, destFile);
+	srcFile = destFile;
+    }
+
+
+    /*
+     * check destination format for special cases
+     */
+    destFormat &= BMT_FORMAT;
+    switch (destFormat) {
+    case BMF_MONO: 	newBitmap = FloydSteinbergDitherToMono(srcFile, srcBitmap, destFile, progressText);
+    			goto cleanUp;
+    case BMF_4BIT:	is4Bit = TRUE;
+    case BMF_8BIT:	break;
+    case BMF_24BIT:	newBitmap = FloydToolConvertTo24Bit(srcFile, srcBitmap, destFile, progressText);
+    			goto cleanUp;
+    }
+
+    /*
+     * set up important information, handle the next special case
+     */
+    srcColors = format & BMT_FORMAT;
+    if ( srcColors == BMF_MONO ) {
+    	newBitmap = FloydToolCovertMonoToColor(srcFile, srcBitmap, destFile, destFormat & BMT_FORMAT,
+    					palette, palColors, progressText);
+	goto cleanUp;
+    }
+
+
+    if ( format & BMT_MASK ) { maskLen = (width+7)/8; }
+		    	else { maskLen = 0; }
+
+    if ( !palette) {
+    	isGEOSPalette = TRUE;
+    	palette = BTLockGEOSStandardPalette();
+    } else {
+    	isGEOSPalette = FALSE;
+    	destFormat |= BMT_PALETTE;
+    }
+
+    if ( format & BMT_MASK ) destFormat |= BMT_MASK;
+
+
+    /*
+     * Create a new bitmap with a height of zero (!)
+     */
+    newBitmap = BTCreateOffscreenBitmap(destFile,
+		    destFormat | BMT_HUGE | BMT_COMPLEX , width, 0/*height*/, palette );
+    if (!newBitmap) goto cleanUp;
+    BTSetBitmapHeight(destFile, newBitmap, height);
+
+    /*
+     * Concept: The newly dithered lines are appended at the bottom using HugeArrayAppend().
+     * The alternative would be to create the bitmap here with its full height and lock the
+     * appropriate line at the bottom using HugeArrayLock() - memcpy() - HugeArrayDirty() - HugeArrayUnlock().
+     * This makes no difference for 640x480, but locking could take longer for larger bitmaps.
+     * --> I will leave it as it is.
+     */
+
+    /* Allocate memory */
+    workingLine = malloc( sizeof(ThreeWordColor)*width );	memset(workingLine, 0, sizeof(ThreeWordColor)*width);
+    errLine = malloc( sizeof(ThreeWordColor)*width );	memset(errLine, 0, sizeof(ThreeWordColor)*width);
+    srcLine = malloc( sizeof(ThreeWordColor)*width );	memset(srcLine, 0, sizeof(ThreeWordColor)*width);
+
+
+    destPtr = malloc(width + maskLen);	// one byte per pixel + mask
+    if (is4Bit) { fourBitPtr = malloc((width+1)/2 + maskLen);
+    } else { fourBitPtr = NULL; }
+
+    /* Error check - do not check fourBitPtr, it can be zero!  */
+    if ( !workingLine || !errLine || !srcLine || !destPtr ) {
+	HugeArrayDestroy(destFile, newBitmap);
+	newBitmap = 0;
+	goto cleanUp;
+	}
+
+    /*
+     * Lock source palette
+     */
+    if ( srcColors != BMF_24BIT ) {
+    	if ( format & BMT_PALETTE ) {
+    	    int numColors = (srcColors == BMF_4BIT) ? 16 :  256;
+    	    srcPalette = malloc(numColors*sizeof(PaletteEntry));
+    	    BTGetBitmapPalette(srcFile, srcBitmap, srcPalette, numColors);
+    	} else {
+    	    srcPalette = BTLockGEOSStandardPalette();
+    	}
+    }
+
+
+    /*
+     * use different loops if the Bitmap is masked or not
+     */
+    if ( format & BMT_MASK ) {	/* The bitmap is masked */
+        int defaultIndex;	/* index to use if the bit is masked out */
+        PaletteEntry white = { 0xFF, 0xFF, 0xFF };
+        defaultIndex = BTApproxRGBPaletteLinear(palette, white, palColors);
+
+	destMaskPtr = destPtr;
+	pixPtr = destPtr + maskLen;
+    	for ( line = 0; line < height;line ++ ) {
+
+	    if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	    /*
+	     * Lock line, set up pointers and copy mask to destination
+	     */
+	    HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	    srcPtr = srcMaskPtr + maskLen;
+	    memcpy(destMaskPtr, srcMaskPtr, maskLen);
+
+	    switch (srcColors) {
+	    case BMF_4BIT:
+	    	FloydTool4BitLineToWord(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    case BMF_8BIT:
+	    	FloydTool8BitLineToWord(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    default: // BMF_24BIT
+	    	FloydToolRGBLineToWord((PaletteEntry *)srcPtr, srcLine, width);
+	    }
+	    HugeArrayUnlock(srcMaskPtr);
+
+	    /*
+	     * Sum the error values: workingLine[] currently contains the errors from the
+	     * previous line: workingLine[] = error values[] + srcLine[]
+	     */
+	    for ( n = 0; n < width; n++ ) {
+		workingLine[n].rt += srcLine[n].rt;
+		workingLine[n].gn += srcLine[n].gn;
+		workingLine[n].bl += srcLine[n].bl;
+		}
+
+
+	    /* dither line and append result to bitmap */
+	    FloydToolDitherMaskedLine(workingLine, errLine, pixPtr,
+				width, destMaskPtr, palette, palColors, defaultIndex);
+
+	    if ( is4Bit ) {
+	    	FloydTool8BitTo4Bit(destMaskPtr, fourBitPtr, width, maskLen);
+	    	HugeArrayAppend(destFile, newBitmap, 1, fourBitPtr);
+	    } else {
+	    	HugeArrayAppend(destFile, newBitmap, 1, destMaskPtr);
+	    }
+
+
+	    /* Make the line containing the color errors to be the current line */
+	    tempPtr = workingLine;
+	    workingLine = errLine;
+	    errLine = tempPtr;
+
+	    /* clear next error line */
+	    memset(errLine, 0, sizeof(ThreeWordColor)*width );
+	}
+    } else {
+    	/*
+    	 * Loop for unmasked bitmap
+    	 */
+	pixPtr = destPtr;
+    	for ( line = 0; line < height;line ++ ) {
+
+	    if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	    /*
+	     * Lock line, Convert Line to true colors
+	     */
+	    HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcPtr, (word*)&size);
+
+	    switch (srcColors) {
+	    case BMF_4BIT:
+	    	FloydTool4BitLineToWord(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    case BMF_8BIT:
+	    	FloydTool8BitLineToWord(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    default: // BMF_24BIT
+	    	FloydToolRGBLineToWord((PaletteEntry *)srcPtr, srcLine, width);
+	    }
+	    HugeArrayUnlock(srcPtr);
+
+	    /*
+	     * Sum the error values: workingLine[] currently contains the errors from the
+	     * previous line: workingLine[] = error values[] + srcLine[]
+	     */
+	    for ( n = 0; n < width; n++ ) {
+		workingLine[n].rt += srcLine[n].rt;
+		workingLine[n].gn += srcLine[n].gn;
+		workingLine[n].bl += srcLine[n].bl;
+		}
+
+
+	    /* dither line and append result to bitmap */
+	    FloydToolDitherLine(workingLine, errLine, pixPtr,
+				width, palette, palColors);
+
+	    if ( is4Bit ) {
+	    	FloydTool8BitTo4Bit(pixPtr, fourBitPtr, width, 0);
+	    	HugeArrayAppend(destFile, newBitmap, 1, fourBitPtr);
+	    } else {
+	    	HugeArrayAppend(destFile, newBitmap, 1, pixPtr);
+	    }
+
+
+	    /* Make the line containing the color errors to be the current line */
+	    tempPtr = workingLine;
+	    workingLine = errLine;
+	    errLine = tempPtr;
+
+	    /* clear next error line */
+	    memset(errLine, 0, sizeof(ThreeWordColor)*width );
+	}
+
+    }
+
+cleanUp:
+
+    if ( compact ) {
+    	/* destroy uncompacted copy */
+	HugeArrayDestroy(srcFile, srcBitmap);
+    }
+
+    if (isGEOSPalette) {
+    	BTUnlockGEOSStandardPalette();
+    	}
+
+    if ( workingLine )	free(workingLine);
+    if ( errLine )	free(errLine);
+    if ( srcLine ) 	free(srcLine);
+    if ( destPtr )	free(destPtr);
+    if (fourBitPtr)	free(fourBitPtr);
+
+    if ( srcPalette ) {
+    	if ( format & BMT_PALETTE ) {
+    	    free(srcPalette);
+    	} else {
+    	    BTUnlockGEOSStandardPalette();
+    	}
+    }
+
+    return newBitmap;
+}
+
+
+/* ====================================================================================
+ *	$ID Monochrome Dithering
+ * ==================================================================================== */
+
+/*--------------------- FloydToolRGBLineToGray ---------------------
+ * Purpose:      Convert an RGB pixel line to OneWordFixed grayscale values
+ *		 Each pixel (3 bytes) is converted to a OneWordFixed value (2 bytes)
+ *
+ * Parameters:	 rgbLine:  RGB color values
+ *		 destLine: Grayscale values as OneWordFixed values (return values)
+ *		 width:	  Width of the line in pixels
+ ---------------------------------------------------------------------------*/
+void FloydToolRGBLineToGray(PaletteEntry *rgbLine, OneWordFixed *destLine, int width) {
+int	n;
+
+     for ( n  = 0 ; n < width; n++ ) {
+	destLine[n] = GrayOWFFromRGB(rgbLine[n].rt, rgbLine[n].gn, rgbLine[n].bl);
+	}
+}
+
+/*--------------------- FloydTool8BitLineToGray ---------------------
+ * Purpose:      Convert an 8-bit pixel line to OneWordFixed gray-scale values
+ *		 Each pixel (1 byte) is converted to a OneWordFixed value (2 bytes)
+ *
+ * Parameters:	 pixelLine:  Color values (1 byte per pixel)
+ *		 destLine:   Gray-scale values as OneWordFixed values (return values)
+ *		 width:	     Width of the line in pixels
+ *		 palette:    color map table to use
+ ---------------------------------------------------------------------------*/
+void FloydTool8BitLineToGray(byte *pixelLine, OneWordFixed *destLine,
+		int width, PaletteEntry *palette) {
+int	n;
+int idx;
+PaletteEntry entry;
+
+     for ( n  = 0 ; n < width; n++ ) {
+	idx = pixelLine[n];
+	entry = palette[idx];
+	destLine[n] = GrayOWFFromRGB(entry.rt, entry.gn, entry.bl);
+	}
+}
+
+
+/*--------------------- FloydTool4BitLineToGray ---------------------
+ * Purpose:	Convert a 4-bit pixel line to OneWordFixed gray-scale values
+ *		Each pixel (1 byte) is converted to a OneWordFixed value (2 bytes)
+ *
+ * Parameters:	 pixelLine:  Color values (4 bits per pixel)
+ *		 destLine:   Gray-scale values as OneWordFixed values (return values)
+ *		 width:	     Width of the line in pixels
+ *		palette:    color map table to use
+ ---------------------------------------------------------------------------*/
+void FloydTool4BitLineToGray(byte *pixelLine, OneWordFixed *destLine,
+		int width, PaletteEntry *palette) {
+
+int	n;
+int idx;
+PaletteEntry entry;
+
+    for ( n = 0; n < width; n++ ) {
+	if ( n & 1 ) idx = pixelLine[n>>1] & 0x0F;
+		else idx = pixelLine[n>>1] >> 4;
+	entry = palette[idx];
+	destLine[n] = GrayOWFFromRGB(entry.rt, entry.gn, entry.bl);
+    }
+
+}
+
+
+/*--------------------- FloydTool8BitToMono ---------------------
+ * Task:        Convert a pixel line with 8 bit per pixel monochrome pixel line
+ * Parameters:	pixPtr: pointer to source pixel line - 8 bit per pixel, but
+ *			the values are 0x00 or 0x01 only
+ *			the line may contain a mask area
+ *		monoPtr: pointer to target pixel line
+ *		width:	  Number of pixels
+ *		maskLen:  Number of mask bytes
+ ---------------------------------------------------------------------------*/
+void FloydTool8BitToMono(byte *pixPtr, byte *monoPtr, int width, int maskLen) {
+int n, bit, numBytes;
+
+
+    if (maskLen) {
+        memcpy(monoPtr, pixPtr, maskLen);
+        monoPtr += maskLen;
+        pixPtr += maskLen;
+    }
+
+    numBytes = (width+7)/8;
+    memset(monoPtr, 0, numBytes);
+    bit = 0x80;
+
+    for ( n  = 0 ; n < width; n++ ) {
+        if ( *pixPtr ) *monoPtr |= bit;
+        pixPtr++;
+        bit >>= 1;
+        if (!bit ) {
+            bit = 0x80;
+            monoPtr++;
+        }
+    }
+
+}
+
+
+
+/*--------------------- FloydToolDitherMaskedMonoLine ---------------------
+ * Task:	Dither a single line (with a mask) to monochrome
+ * Context:
+ * Strategy:
+ * Parameters:	workingLine: original pixels, already converted to gray
+ *		errLine:     buffer to hold approximation errors
+ *		pixPtr:	     return buffer (dithered values) - one byte per pixel
+ *			     The values will be 0 (white) or 1 (black)
+ *		width:	     number of pixels in the line
+ *		maskPtr:     pointer to mask area
+ * Return:
+ ---------------------------------------------------------------------------*/
+void FloydToolDitherMaskedMonoLine(OneWordFixed *workingLine, OneWordFixed *errLine,
+				byte *pixPtr, int width, byte *maskPtr) {
+int 	n, dMask;
+OneWordFixed	grayVal, err;
+
+
+    /* Dithern nach Floyd-Steinberg */
+    dMask = 0;
+    maskPtr--;
+    for ( n = 0; n < width; n++ ) {
+
+        /* nächstes Masken-Pixel anwählen */
+        dMask >>= 1;
+        if ( !dMask ) {
+            dMask = 0x80;
+            maskPtr++;
+        }
+
+        /* default index benutzen, wenn Pixel maskiert ist */
+        if ( !(*maskPtr & dMask) ) {
+            pixPtr[n] = 0;		// White
+            goto nextPixel;
+        }
+
+	/* Approximieren und Farbfehler, der dadurch entstand, ermitteln */
+	grayVal = *workingLine;
+	if ( grayVal < IntToOWF(127) ) {
+	    pixPtr[n] = 1;		// Black pixel
+	    err = grayVal;
+	} else {
+	    pixPtr[n] = 0;		// White pixel
+	    err = grayVal - OWF_255;
+	}
+
+
+	/* Distribute the color error to the surrounding pixels using Floyd-Steinberg */
+
+	/* 7/16 is added to the pixel to the right of the current pixel */
+	/* Accumulation may exceed the byte range --> Clamp */
+	if ( (n + 1) < width ) {
+
+		workingLine++;
+
+		FloydAddErrorPart(*workingLine, 7, err);
+		if (*workingLine > OWF_255) *workingLine = OWF_255;
+		if (*workingLine < 0) *workingLine = 0;
+
+		workingLine--;
+
+		}
+
+	/* an errLine pixel can contain at most 10/16 of an error value
+	 * -> error values themselves can be at most +/- 255
+	 * No overflow is possible */
+
+	/* 3/16 is added to the pixel to the lower left */
+	if ( n > 0 ) {
+	        errLine--;
+		FloydAddErrorPart(*errLine, 3, err);
+		errLine++;
+		}
+
+	/* 5/16 bekommt das Pixel unter dem aktuelle Pixel */
+		FloydAddErrorPart(*errLine, 5, err);
+
+	/* 1/16 bekommt das Pixel rechts unten  - das ist auch das 'aktuelle' Pixel für den nächste Durchlauf*/
+	if ( (n + 1) < width ) {
+		errLine++;
+		FloydAddErrorPart(*errLine, 1, err);
+		errLine--;
+		}
+
+	/* Select next pixel */
+nextPixel:
+	errLine++;
+	workingLine++;
+	}
+
+}
+
+/*--------------------- FloydToolDitherMonoLine ---------------------
+ * Task:	Dither a single line (without mask) to monochrome
+ * Context:
+ * Strategy:
+ * Parameters:	workingLine: original pixels, already converted to gray
+ *		errLine:     buffer to hold approximation errors
+ *		pixPtr:	     return buffer (dithered values) - one byte per pixel
+ *			     The values will be 0 (white) or 1 (black)
+ *		width:	     number of pixels in the line
+ * Return:
+ ---------------------------------------------------------------------------*/
+void FloydToolDitherMonoLine(OneWordFixed *workingLine, OneWordFixed *errLine,
+				byte *pixPtr, int width) {
+int 	n;
+OneWordFixed	grayVal, err;
+
+
+    /* Dithern nach Floyd-Steinberg */
+    for ( n = 0; n < width; n++ ) {
+
+
+	/* Approximieren und Farbfehler, der dadurch entstand, ermitteln */
+	grayVal = *workingLine;
+	if ( grayVal < IntToOWF(127) ) {
+	    pixPtr[n] = 1;		// Black pixel
+	    err = grayVal;
+	} else {
+	    pixPtr[n] = 0;		// White pixel
+	    err = grayVal - OWF_255;
+	}
+
+
+	/* Distribute the color error to the surrounding pixels using Floyd-Steinberg */
+
+	/* 7/16 is added to the pixel to the right of the current pixel */
+	/* Accumulation may exceed the byte range --> Clamp */
+	if ( (n + 1) < width ) {
+
+		workingLine++;
+
+		FloydAddErrorPart(*workingLine, 7, err);
+		if (*workingLine > OWF_255) *workingLine = OWF_255;
+		if (*workingLine < 0) *workingLine = 0;
+
+		workingLine--;
+
+		}
+
+	/* an errLine pixel can contain at most 10/16 of an error value
+	 * -> error values themselves can be at most +/- 255
+	 * No overflow is possible */
+
+	/* 3/16 is added to the pixel to the lower left */
+	if ( n > 0 ) {
+	        errLine--;
+		FloydAddErrorPart(*errLine, 3, err);
+		errLine++;
+		}
+
+	/* 5/16 bekommt das Pixel unter dem aktuelle Pixel */
+		FloydAddErrorPart(*errLine, 5, err);
+
+	/* 1/16 bekommt das Pixel rechts unten  - das ist auch das 'aktuelle' Pixel für den nächste Durchlauf*/
+	if ( (n + 1) < width ) {
+		errLine++;
+		FloydAddErrorPart(*errLine, 1, err);
+		errLine--;
+		}
+
+	/* Select next pixel */
+	errLine++;
+	workingLine++;
+	}
+
+}
+
+/*--------------------- FloydSteinbergDitherToMono ---------------------
+ * Task:	Dither an colored image to a monochrome image
+ *		using Floyd-Steinberg dithering
+ * Strategy:	- the source bitmap must be colored (not monochrome)
+ *		- if we have a masked bitmap, mask is preserved
+ *		- use separate loops for masked and unmasked bitmaps
+ *
+ *		For each line do:
+ *		- Convert line to gray values as OneWordFixed
+ *		- dither the line using OneWordFixed arithmetic into one-byte per pixel values
+ *		- convert result back to monochrome line
+ * Parameters:	srcFile
+ *		srcBlock:    bitmap to be converted
+ *		destFile:    Destination file
+ *              progressText: Text object for displaying progress indicators
+ *                    	      Null if no progress indicator is needed
+ *    Return:	Handle of the new bitmap
+ *           	Zero on error:	- source bitmap is compacted (should never happen!)
+ *				- out of memory
+ *---------------------------------------------------------------------------*/
+VMBlockHandle FloydSteinbergDitherToMono(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			optr progressText) {
+VMBlockHandle  newBitmap;
+
+int	width, height, line, size, n, format, srcColors, compact;
+int bufferSize, maskLen;
+int destFormat;
+
+PaletteEntry 	*srcPalette = NULL;	// Palette des zu dithernden Bildes, ggf Standard-Palette
+byte	*pixPtr, *srcPtr, *monoPtr, *destPtr;
+byte *srcMaskPtr, *destMaskPtr;
+OneWordFixed	*workingLine, *errLine, *srcLine, *tempPtr;
+
+    /*
+     * get important information and do error check
+     */
+    format = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, &compact);
+    if ( compact ) return 0;
+
+    srcColors = format & BMT_FORMAT;
+    if ( srcColors == BMF_MONO ) return BTCopyBitmap(srcFile, destFile, srcBitmap); /* nice case :-) */
+
+    destFormat = BMF_MONO;
+    if ( format & BMT_MASK ) { maskLen = (width+7)/8; destFormat |= BMT_MASK; }
+		    	else { maskLen = 0; }
+
+
+    /*
+     * Create a new bitmap with a height of zero (!)
+     */
+    newBitmap = BTCreateOffscreenBitmap(destFile,
+		    destFormat | BMT_HUGE | BMT_COMPLEX, width, 0/*height*/, NULL /*palette*/ );
+    if (!newBitmap) return 0;
+    BTSetBitmapHeight(destFile, newBitmap, height);
+
+    /*
+     * Lock source palette
+     */
+    if ( srcColors != BMF_24BIT ) {
+    	if ( format & BMT_PALETTE ) {
+    	    int numColors = (srcColors == BMF_4BIT) ? 16 :  256;
+    	    srcPalette = malloc(numColors*sizeof(PaletteEntry));
+    	    BTGetBitmapPalette(srcFile, srcBitmap, srcPalette, numColors);
+    	} else {
+    	    srcPalette = BTLockGEOSStandardPalette();
+    	}
+    }
+
+    /*
+     * Concept: The newly dithered lines are appended at the bottom using HugeArrayAppend().
+     * The alternative would be to create the bitmap here with its full height and lock the
+     * appropriate line at the bottom using HugeArrayLock() - memcpy() - HugeArrayDirty() - HugeArrayUnlock().
+     * This makes no difference for 640x480, but locking could take longer for larger bitmaps.
+     * --> I will leave it as it is.
+     */
+
+    /* Allocate memory */
+    bufferSize = sizeof(OneWordFixed)*width;
+    workingLine = malloc(bufferSize);	memset(workingLine, 0, bufferSize);
+    errLine = malloc(bufferSize);	memset(errLine, 0, bufferSize);
+    srcLine = malloc(bufferSize);	memset(srcLine, 0, bufferSize);
+
+
+    destPtr = malloc(width + maskLen);		// one byte per pixel + mask
+    monoPtr = malloc((width+7)/8 + maskLen);	// monochrome pixels + mask
+
+    /* Fehlercheck */
+    if ( !workingLine || !errLine || !srcLine || !destPtr || !monoPtr ) {
+	HugeArrayDestroy(destFile, newBitmap);
+	if ( workingLine ) free(workingLine);
+	if ( errLine ) 	   free(errLine);
+	if ( srcLine ) 	   free(srcLine);
+	if ( destPtr )      free(destPtr);
+	if ( monoPtr )      free(monoPtr);
+	return 0;
+	}
+
+    /*
+     * use different loops if the Bitmap is masked or not
+     */
+    if ( format & BMT_MASK ) {	/* The bitmap is masked */
+	destMaskPtr = destPtr;
+	pixPtr = destPtr + maskLen;
+
+    	for ( line = 0; line < height;line ++ ) {
+	    if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	    /*
+	     * Lock line, set up pointers and copy mask to destination
+	     */
+	    HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	    srcPtr = srcMaskPtr + maskLen;
+	    memcpy(destMaskPtr, srcMaskPtr, maskLen);
+
+	    switch (srcColors) {
+	    case BMF_4BIT:
+	    	FloydTool4BitLineToGray(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    case BMF_8BIT:
+	    	FloydTool8BitLineToGray(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    default: // BMF_24BIT
+	    	FloydToolRGBLineToGray((PaletteEntry *)srcPtr, srcLine, width);
+	    }
+	    HugeArrayUnlock(srcMaskPtr);
+
+	    /*
+	     * Sum the error values: workingLine[] currently contains the errors from the
+	     * previous line: workingLine[] = error values[] + srcLine[]
+	     */
+	    for ( n = 0; n < width; n++ ) {
+		workingLine[n] += srcLine[n];
+		}
+
+
+	    /* dither line and append result to bitmap */
+	    FloydToolDitherMaskedMonoLine(workingLine, errLine, pixPtr,
+				width, destMaskPtr);
+	    FloydTool8BitToMono(destMaskPtr, monoPtr, width, maskLen);
+	    HugeArrayAppend(destFile, newBitmap, 1, monoPtr);
+
+	    /* Make the line containing the color errors to be the current line */
+	    tempPtr = workingLine;
+	    workingLine = errLine;
+	    errLine = tempPtr;
+
+	    /* Clear next error line */
+	    memset(errLine, 0, bufferSize);
+	}
+
+    } else {
+    	/*
+    	 * Loop for unmasked bitmap
+    	 */
+	pixPtr = destPtr;
+
+    	for ( line = 0; line < height;line ++ ) {
+	    if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	    /*
+	     * Lock line, set up pointers
+	     */
+	    HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcPtr, (word*)&size);
+
+	    switch (srcColors) {
+	    case BMF_4BIT:
+	    	FloydTool4BitLineToGray(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    case BMF_8BIT:
+	    	FloydTool8BitLineToGray(srcPtr, srcLine, width, srcPalette);
+	    	break;
+	    default: // BMF_24BIT
+	    	FloydToolRGBLineToGray((PaletteEntry *)srcPtr, srcLine, width);
+	    }
+	    HugeArrayUnlock(srcPtr);
+
+	    /*
+	     * Sum the error values: workingLine[] currently contains the errors from the
+	     * previous line: workingLine[] = error values[] + srcLine[]
+	     */
+	    for ( n = 0; n < width; n++ ) {
+		workingLine[n] += srcLine[n];
+		}
+
+
+	    /* dither line and append result to bitmap */
+	    FloydToolDitherMonoLine(workingLine, errLine, pixPtr, width);
+	    FloydTool8BitToMono(destPtr, monoPtr, width, 0);
+	    HugeArrayAppend(destFile, newBitmap, 1, monoPtr);
+
+	    /* Make the line containing the color errors to be the current line */
+	    tempPtr = workingLine;
+	    workingLine = errLine;
+	    errLine = tempPtr;
+
+	    /* Clear next error line */
+	    memset(errLine, 0, bufferSize);
+	}
+    }
+
+    free(destPtr);
+    free(workingLine);
+    free(errLine);
+    free(srcLine);
+    free(monoPtr);
+
+    if ( srcPalette ) {
+    	if ( format & BMT_PALETTE ) {
+    	    free(srcPalette);
+    	} else {
+    	    BTUnlockGEOSStandardPalette();
+    	}
+    }
+
+    return newBitmap;
+}
+
+
+
+/*---------------------  ---------------------
+ * Purpose:
+ * Context:
+ * Strategy:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+
+/* ----------------- end of file: floyd.goc --------------------------- */
+
+

@@ -1,0 +1,723 @@
+/**************************************************************************
+ *
+ * PROJECT:      Bitmap Tools library
+ *
+ * FILE:         shiftImage.goc
+ *		 Shift image content one or more pixels in any direction
+ *		 Copyright (c) by RABE-Soft 09/2026
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 09/08/2026	initial revison
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+@include "bmptools.goh"
+
+
+void ToolShiftImageDown(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText);
+void ToolShiftImageUp(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText);
+void ToolShiftImageToLeft(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText);
+void ToolShiftImageToRight(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText);
+
+// Display progress as dots ....
+#define ShiftDisplayProgress(progressTextObj) { if (progressTextObj) @call progressTextObj::MSG_VIS_TEXT_APPEND_PTR(".", 0); }
+
+/*--------------------- ToolShiftMonoLineLeft ---------------------
+ *  Purpose:	Shift a monochrome or mask line one pixel to the left
+ *  Context:
+ *  Strategy:
+ *	- store leftmost pixel in bit 0 of pix0
+ *	- skip shifting data bits if we have only one data byte
+ *	- For every data byte with the exception of the last one:
+ *	  shift it by one bit and ad the top most bit of the next data byte
+ *	- store the leftmost pixel in the last used pixel of the
+ *	  last data byte
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShiftMonoLineLeft(byte *data, int width) {
+int b, n, numBytes, pix0, unusedBits;
+
+    /*
+     * Fetch the leftmost pixel into bit 0 of variable pix0.
+     */
+    numBytes = (width+7)/8;
+    pix0 = (*data & 0x80) >> 7;
+
+    if (numBytes < 2) goto handleLastbyte;
+
+    for (n = 0; n < numBytes-1; n++) {
+	/*
+	 * Shift the current data byte one pixel to the left and mix in
+	 * bit 7 of the next data byte as bit 0 of the current data byte.
+	 * Store the new value and move pointer to next data byte
+	 */
+    	b = *data;
+    	b = (b << 1) + ( ( (data[1] & 0x80) >> 7 ) & 0x01);
+    	*data = b;
+    	data++;
+    }
+
+handleLastbyte:
+    unusedBits = 8*numBytes - width;	// unused pixels in last byte
+
+    b = (*data <<1);			// fetch last data byte and shift it up
+    b |= pix0 << unusedBits;		// store pix0 at the right place
+    *data = b;
+}
+
+/*--------------------- ToolShift4BitLineLeft ---------------------
+ *  Purpose:	Shift a 4 bit color line one pixel to the left
+ *  Context:
+ *  Strategy:
+ *	- every data byte contains two pixels (each in a half-byte)
+ *	- if the pixel is even (0, 2, 4 ..)
+ *	  move the lower half-byte of the data byte to the upper half-byte
+ *	  of this data byte
+ *	- if the pixel is odd (1, 3, 5, ..)
+ *	  copy the upper half-byte of data byte on the right of that pixel
+ *        to the lower half-byte of the data byte that contains the pixel
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShift4BitLineLeft(byte *data, int width) {
+byte *srcPtr, *destPtr;
+int x, srcByte, destByte, pix0 ;
+
+    srcPtr = data;
+    destPtr = data;
+
+    /*
+     * initialize the data bytes we need
+     */
+    srcByte = *srcPtr;
+    destByte = *destPtr;
+    pix0 = srcByte & 0xF0;
+
+    /*
+     * Iterate over the line. x is the pixel to write to (destination)
+     * Note that the rightmost pixel is not handled in the loop.
+     */
+    for (x = 0; x < (width-1); x++) {
+	if ( x & 1 ) {
+	   /*
+	    * For an odd pixel (x), color stored is in the lower half-byte
+	    * We need the color from the upper half-byte of the source
+	    */
+	   destByte |= (srcByte & 0xF0) >> 4;
+
+	   /*
+	    * Store the two pixels and move the destination pointer
+	    */
+	   *destPtr = destByte;
+	   destPtr++;
+
+	} else {
+	   /*
+	    * If x is an even pixel, we take the lower half-byte of the source
+	    * and store it in the upper half-byte of the destination.
+	    * Then move the source pointer an read next two source pixels
+	    */
+	    destByte = (srcByte & 0x0F) << 4;
+	    srcPtr++;
+	    srcByte = *srcPtr;
+	}
+    }
+
+    /*
+     * write rightmost pixel
+     */
+    if (x & 1 ) {
+        destByte |= pix0 >> 4;
+	*destPtr = destByte;
+    } else {
+    	*destPtr = pix0;
+    }
+
+}
+
+/*--------------------- ToolShift8BitLineLeft ---------------------
+ *  Purpose:	Shift an 8 bit color line one pixel to the left
+ *  Context:
+ *  Strategy:
+ *	- store top left pixel
+ *	- copy pixel by pixel
+ *	- store top left as the right pixel
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShift8BitLineLeft(byte *data, int width) {
+byte *pixelPtr, color0;
+int x;
+
+    pixelPtr = (void*)data;
+    color0 = *pixelPtr;
+    for (x = 0; x < (width-1); x++) {
+	*pixelPtr = pixelPtr[1];
+	pixelPtr++;
+    }
+    *pixelPtr = color0;
+}
+
+/*--------------------- ToolShift24BitLineLeft ---------------------
+ *  Purpose:	Shift an 24 bit color line one pixel to the left
+ *  Context:
+ *  Strategy:
+ *	- store top left pixel
+ *	- copy pixel by pixel
+ *	- store top left as the right pixel
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShift24BitLineLeft(byte *data, int width) {
+PaletteEntry *pixelPtr, color0;
+int x;
+
+    pixelPtr = (void*)data;
+    color0 = *pixelPtr;
+    for (x = 0; x < (width-1); x++) {
+	*pixelPtr = pixelPtr[1];
+	pixelPtr++;
+    }
+    *pixelPtr = color0;
+
+}
+
+/*--------------------- ToolShiftMonoLineRight ---------------------
+ *  Purpose:	Shift a monochrome or mask line one pixel to the right
+ *  Context:
+ *  Strategy:
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShiftMonoLineRight(byte *data, int width) {
+int b, b1, n, numBytes, unusedBits;
+byte *bPtr;
+
+    numBytes = (width+7)/8;
+
+    /*
+     * Fetch the rightmost pixel into bit 0 of variable b.
+     */
+    unusedBits = 8*numBytes - width;	// unused pixels in last byte
+    b = data[numBytes-1];
+    b >>= unusedBits;
+
+    bPtr = data;
+
+    for (n = 0; n < numBytes; n++) {
+	/*
+	 * b1: byte to work on, b: byte on the left side of b1 (already
+	 * filled in at this point)
+	 *
+	 * Fetch data byte and shift it one pixel to the right.
+	 * then mix in bit 0 from variable b
+	 */
+    	b1 = *bPtr;
+	b1 >>=  1;
+	b1  |= (b << 7);
+
+	/*
+	 * Fetch the current data byte for next step into variable b
+	 * Store the new data (b1) and move the pointer
+	 */
+	b = *bPtr;
+	*bPtr = b1;
+	bPtr++;
+    }
+
+}
+
+/*--------------------- ToolShift4BitLineRight ---------------------
+ *  Purpose:	Shift a 4 bit color line one pixel to the right
+ *  Context:
+ *  Strategy:
+ *	- every data byte contains two pixels (each in a half-byte)
+ *	- if the pixel is even (0, 2, 4 ..)
+ *	  move the upper half-byte of the data byte to the lower half-byte
+ *	  of this data byte
+ *	- if the pixel is odd (1, 3, 5, ..)
+ *	  copy the lower half-byte of data byte on the left of that pixel
+ *        to the upper half-byte of the data byte that contains the pixel
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShift4BitLineRight(byte *data, int width) {
+int b, b1, x;
+byte *bPtr;
+
+
+    /*
+     * Fetch the rightmost pixel into the higher half-byte of variable b.
+     * If the image width is even, the pixel is in the lower half-byte
+     * of the last data byte, otherwise the pixel is in the higher half-byte
+     * of the last data byte.
+     */
+    b = data[(width-1)/2];
+    if ( (width & 1) == 0 ) b <<= 4;
+    b &= 0xF0;
+
+    bPtr = data;
+    for (x = 0; x < width; x++) {
+	/*
+	 * b1: byte to work on, b: byte on the left side of b1
+	 */
+    	if ( x & 1) {
+	    /*
+	     * odd pixel: read pixel (into b) and store the two pixels
+	     * in b1. Move data pointer to right
+	     */
+	    b = *bPtr;
+	    b <<= 4;
+	    *bPtr = b1;
+	    bPtr++;
+
+	} else {
+	    /*
+	     * even pixel: read pixel (into b1) and shift it to the right
+	     * mix in the pixel from the left (b)
+	     */
+	    b1 = *bPtr;
+	    b1 >>= 4;
+	    b1 |= b;
+	}
+
+    }
+
+    /*
+     * store the rightmost pixel if the image width is odd
+     */
+    if ( width & 1 ) *bPtr = b1;
+}
+
+/*--------------------- ToolShift8BitLineRight ---------------------
+ *  Purpose:	Shift an 8 bit color line one pixel to the right
+ *  Context:
+ *  Strategy:
+ *	- remember rightmost pixel color
+ *	- copy left pixel to the right - pixel by pixel
+ *	- store rightmost pixel as leftmost pixel
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShift8BitLineRight(byte *data, int width) {
+byte *pixelPtr, color0;
+int n;
+
+    pixelPtr = (void*)(data + width - 1);
+    color0 = *pixelPtr;			// remember rightmost pixel
+
+    for (n = 0; n < (width-1); n++) {
+        pixelPtr--;			// point to the next source pixel
+	pixelPtr[1] = *pixelPtr;	// copy pixel to the right
+    }
+    *pixelPtr = color0;			// store rightmost pixel as leftmost pixel
+}
+
+/*--------------------- ToolShift24BitLineRight ---------------------
+ *  Purpose:	Shift an 24 bit color line one pixel to right
+ *  Context:
+ *  Strategy:
+ *	- remember rightmost pixel color
+ *	- copy left pixel to the right - pixel by pixel
+ *	- store rightmost pixel as leftmost pixel
+ *  Parameters:	data: pointer to data buffer
+ *		width: width of the bitmap
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolShift24BitLineRight(byte *data, int width) {
+PaletteEntry *pixelPtr, color0;
+int n;
+
+    pixelPtr = (void*)data;
+    pixelPtr += width - 1;
+    color0 = *pixelPtr;			// remember rightmost pixel
+
+    for (n = 0; n < (width-1); n++) {
+        pixelPtr--;			// point to the next source pixel
+	pixelPtr[1] = *pixelPtr;	// copy pixel to the right
+    }
+    *pixelPtr = color0;			// store rightmost pixel as leftmost pixel
+
+}
+
+
+/*---------------------------------------------------------------------------
+ *  	Shift image tool routines
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- ToolGetNumBytesPerLine ---------------------
+ *  Purpose:	Find out the width of a singe pixel line, including mask data
+ *		and some other bitmap data
+ *  Context:	Tool
+ *  Strategy:
+ *  Parameters:	vmFile, bmp:  affected bitmap
+ *		widthPtr:   pointer to fill in with the bitmap's width
+ *		heightPtr:   pointer to fill in with the bitmap's height
+ *		formatPtr:   pointer to fill in with the bitmap's format value
+ *  Return:	Number of bytes in a line
+ *		zero if the bitmap is compacted
+ ---------------------------------------------------------------------------*/
+word ToolGetNumBytesPerLine(VMFileHandle vmFile, VMBlockHandle bmp, int *widthPtr, int *heightPtr, int *formatPtr) {
+int	format, width, height, compress;
+int	numBytes;
+
+    format = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, &compress);
+    if(heightPtr) *heightPtr = height;
+    if(widthPtr)  *widthPtr =  width;
+    if(formatPtr)  *formatPtr =  format;
+    if (compress) return 0;
+
+    switch (format & BMT_FORMAT) {
+    case BMF_MONO:
+	  numBytes = (width+7)/8;
+	  break;
+    case BMF_4BIT:
+	  numBytes = (width+1)/2;
+	  break;
+    case BMF_8BIT:
+	  numBytes = width;
+	  break;
+    default: 	// 24 Bit
+	  numBytes = 3*width;
+    }
+    numBytes += (width+7)/8;		/* number of mask-data bytes */
+
+    return numBytes;
+}
+
+
+/*---------------------------------------------------------------------------
+ *  	Shift image main routines
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- ToolShiftImageDown ---------------------
+ *  Purpose:	Shift the image one pixel down (modify current bitmap)
+ *  Context:
+ *  Strategy:
+ *	- find out the number of bytes in a line (including mask data)
+ *	- alloc two buffers
+ *	- lock lines from top to bottom and copy data into the line below
+ *	- copy data of the last line into the first line
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolShiftImageDown(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText) {
+byte *bmpData, *buffer1, *buffer2, *tmp;
+BitmapAccessRecord bar;
+int	y, height, numBytes;
+
+    numBytes = ToolGetNumBytesPerLine(vmFile, bmp, NULL, &height, NULL);
+    if (!numBytes) return;
+    if ( height < 2 ) return;
+
+    /*
+     * Unfortunately, we cannot have two or more lines locked at
+     * the same time. Therefore allocate buffers to hold data.
+     */
+    buffer1 = malloc(numBytes);
+    if (!buffer1) return;
+    buffer2 = malloc(numBytes);
+    if (!buffer2) { free(buffer1); return; }
+
+
+    /*
+     * Lock lines from top to bottom.
+     * Start with the first line and save the data (including mask) to buffer1.
+     */
+    bmpData = BTBitmapLock(vmFile, bmp, &bar, 0);
+    memcpy(buffer1, bmpData, numBytes);
+
+    for ( y = 0; y < (height-1); y++ ) {
+        if ( (y & 0x0F) == 0 ) ShiftDisplayProgress(progressText);
+
+	/*
+	 * Lock next line and copy it to buffer2
+	 * The replace the bmpData by buffer1
+	 */
+	bmpData = BTBitmapNext(&bar, TRUE);
+	memcpy(buffer2, bmpData, numBytes);
+	memcpy(bmpData, buffer1, numBytes);
+
+
+	/*
+	 * swap pointers. buffer1 now contains the data of locked line
+	 */
+	tmp = buffer1;
+	buffer1 = buffer2;
+	buffer2 = tmp;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+    /*
+     * Lock first line again and fill it with the data from line 1 (buffer1)
+     * Then unlock the line and free the buffers.
+     */
+    bmpData = BTBitmapRelock(&bar, 0);
+    memcpy(bmpData, buffer1, numBytes);
+
+    BTBitmapUnlock(&bar, TRUE);
+    free(buffer1);
+    free(buffer2);
+
+}
+
+
+/*--------------------- ToolShiftImageUp ---------------------
+ *  Purpose:	Shift the image one pixel up  (modify current bitmap)
+ *  Context:
+ *  Strategy:
+ *	- find out the number of bytes in a line (including mask data)
+ *	- alloc two buffers
+ *	- lock lines from bottom to top and copy data into the line above
+ *	- copy data of the first line into the last line
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolShiftImageUp(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText) {
+byte *bmpData, *buffer1, *buffer2, *tmp;
+BitmapAccessRecord bar;
+int	y, height, numBytes;
+
+    numBytes = ToolGetNumBytesPerLine(vmFile, bmp, NULL, &height, NULL);
+    if (!numBytes) return;
+    if ( height < 2 ) return;
+
+    /*
+     * Unfortunately, we cannot have two or more lines locked at
+     * the same time. Therefore allocate buffers to hold data.
+     */
+    buffer1 = malloc(numBytes);
+    if (!buffer1) return;
+    buffer2 = malloc(numBytes);
+    if (!buffer2) { free(buffer1); return; }
+
+
+    /*
+     * Lock lines from bottom to top.
+     * Start with the last line and save the data (including mask) to buffer1.
+     */
+    bmpData = BTBitmapLock(vmFile, bmp, &bar, height - 1);
+    memcpy(buffer1, bmpData, numBytes);
+
+    for ( y = height-1; y >= 1; y-- ) {
+
+        if ( (y & 0x0F) == 0 ) ShiftDisplayProgress(progressText);
+
+	/*
+	 * Lock previous line and copy it to buffer2
+	 * The replace the bmpData by buffer1
+	 */
+	bmpData = BTBitmapPrev(&bar, TRUE);
+	memcpy(buffer2, bmpData, numBytes);
+	memcpy(bmpData, buffer1, numBytes);
+
+
+	/*
+	 * swap pointers. buffer1 now contains the data of locked line
+	 */
+	tmp = buffer1;
+	buffer1 = buffer2;
+	buffer2 = tmp;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+    /*
+     * Lock last line again and fill it with the data from line 1 (buffer1)
+     * Then unlock the line and free the buffers.
+     */
+    bmpData = BTBitmapRelock(&bar, height-1);
+    memcpy(bmpData, buffer1, numBytes);
+
+    BTBitmapUnlock(&bar, TRUE);
+    free(buffer1);
+    free(buffer2);
+}
+
+
+/*--------------------- ToolShiftImageToLeft ---------------------
+ *  Purpose:	Shift the image one pixel to left (modify current bitmap)
+ *  Context:
+ *  Strategy:
+ *	- lock bitmap line by line
+ *	- shift every line, depending on the color depth
+ *  Parameters:	vmFile, bmp: bitmap to handle
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolShiftImageToLeft(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText) {
+byte *bmpData, *maskData;
+BitmapAccessRecord bar;
+int	y, width, height, numBytes, format, maskLen;
+
+    numBytes = ToolGetNumBytesPerLine(vmFile, bmp, &width, &height, &format);
+    if (!numBytes) return;
+    if ( format & BMT_MASK)  { maskLen = (width+7)/8; }
+    			else { maskLen = 0; }
+
+    /*
+     * Lock lines from top to bottom.
+     */
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+    bmpData = maskData + maskLen;
+
+    for ( y = 0; y < height; y++ ) {
+
+        if ( (y & 0x0F) == 0 ) ShiftDisplayProgress(progressText);
+
+	switch ( format & BMT_FORMAT ) {
+	case BMF_MONO:
+	    if (maskLen) ToolShiftMonoLineLeft(maskData, width);
+	    ToolShiftMonoLineLeft(bmpData, width);
+	    break;
+	case BMF_4BIT:
+	    if (maskLen) ToolShiftMonoLineLeft(maskData, width);
+	    ToolShift4BitLineLeft(bmpData, width);
+	    break;
+	case BMF_8BIT:
+	    if (maskLen) ToolShiftMonoLineLeft(maskData, width);
+	    ToolShift8BitLineLeft(bmpData, width);
+	    break;
+	default: 	// 24 Bit
+	    if (maskLen) ToolShiftMonoLineLeft(maskData, width);
+	    ToolShift24BitLineLeft(bmpData, width);
+	}
+
+	maskData = BTBitmapNext(&bar, TRUE);
+	bmpData = maskData + maskLen;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+}
+
+
+/*--------------------- ToolShiftImagetoRight ---------------------
+ *  Purpose:	Shift the image one pixel to right  (modify current bitmap)
+ *  Context:
+ *  Strategy:
+ *	- lock bitmap line by line
+ *	- shift every line, depending on the color depth
+ *  Parameters:	vmFile, bmp: bitmap to handle
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolShiftImageToRight(VMFileHandle vmFile, VMBlockHandle bmp, optr progressText) {
+byte *bmpData, *maskData;
+BitmapAccessRecord bar;
+int	y, width, height, numBytes, format, maskLen;
+
+    numBytes = ToolGetNumBytesPerLine(vmFile, bmp, &width, &height, &format);
+    if (!numBytes) return;
+    if ( format & BMT_MASK)  { maskLen = (width+7)/8; }
+    			else { maskLen = 0; }
+
+    /*
+     * Lock lines from top to bottom.
+     */
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+    bmpData = maskData + maskLen;
+
+    for ( y = 0; y < height; y++ ) {
+
+        if ( (y & 0x0F) == 0 ) ShiftDisplayProgress(progressText);
+
+	switch ( format & BMT_FORMAT ) {
+	case BMF_MONO:
+	    if (maskLen) ToolShiftMonoLineRight(maskData, width);
+	    ToolShiftMonoLineRight(bmpData, width);
+	    break;
+	case BMF_4BIT:
+	    if (maskLen) ToolShiftMonoLineRight(maskData, width);
+	    ToolShift4BitLineRight(bmpData, width);
+	    break;
+	case BMF_8BIT:
+	    if (maskLen) ToolShiftMonoLineRight(maskData, width);
+	    ToolShift8BitLineRight(bmpData, width);
+	    break;
+	default: 	// 24 Bit
+	    if (maskLen) ToolShiftMonoLineRight(maskData, width);
+	    ToolShift24BitLineRight(bmpData, width);
+	}
+
+	maskData = BTBitmapNext(&bar, TRUE);
+	bmpData = maskData + maskLen;
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+
+}
+
+/*--------------------- BTShiftImage ---------------------
+ *  Purpose:	Shift a bitmap image to left/right, up/down or both
+ *		The bitmap must be uncompacted or it will not shifted
+ *  Context:
+ *  Strategy:	We modify the bitmap itself
+ *  Parameters:	vmFile, bmp:	bitmap to handle
+ *		horiz:	horizontal shift amount
+ *				positive: right shift
+ *				negative: left shift
+ *		vert:	vertical shift amount
+ *				positive: shift down	(according to geos coordinate system)
+ *				negative: shift up
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT BTShiftImage(VMFileHandle vmFile, VMBlockHandle bmp, int horiz, int vert, optr progressText) {
+int n;
+
+    if (horiz > 0) {
+    	for (n = 0; n < horiz; n++ ) {
+    	    ToolShiftImageToRight(vmFile, bmp, progressText);
+    	    if (progressText) @call progressText::MSG_VIS_TEXT_APPEND_PTR(" ", 0);
+
+    	}
+    }
+    if (horiz < 0) {
+    	for (n = 0; n < (-horiz); n++ ) {
+    	    ToolShiftImageToLeft(vmFile, bmp, progressText);
+    	    if (progressText) @call progressText::MSG_VIS_TEXT_APPEND_PTR(" ", 0);
+    	}
+    }
+
+    if (vert > 0) {
+    	for (n = 0; n < vert; n++ ) {
+    	    ToolShiftImageDown(vmFile, bmp, progressText);
+    	    if (progressText) @call progressText::MSG_VIS_TEXT_APPEND_PTR(" ", 0);
+    	}
+    }
+    if (vert < 0) {
+    	for (n = 0; n < (-vert); n++ ) {
+    	    ToolShiftImageUp(vmFile, bmp, progressText);
+    	    if (progressText) @call progressText::MSG_VIS_TEXT_APPEND_PTR(" ", 0);
+    	}
+    }
+
+}
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+
+/* *********** End of file shiftImage.goc ********************/
+
+

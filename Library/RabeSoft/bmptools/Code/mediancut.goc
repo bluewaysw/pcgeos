@@ -1,0 +1,956 @@
+/**************************************************************************
+ *
+ * PROJECT:     Bitmap Tools Library
+ *
+ * FILE:        mediancut.goc
+ *		Generate an optimized color palette using the Median Cut algorithm
+ *		Sources: Colorreduktion: ChatGPT-Code from MeyerK
+ *			Median Cut: my own ChatGPT discussion
+ *
+ *              Copyright (c) by RABE-Soft 04/2025 - 2026
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 04/2025		Initial revision for splash screen viewer (16 colors only)
+ *	RainerB 08/23/2026	Expanded to handle up to 256 colors
+ *
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+
+
+/* **********************************************************************
+
+    Median Cut palette reduction steps
+    ----------------------------------
+
+    1. Reduce colors from 24-bit RGB to 12-bit (4 bits per channel). In principle, 15-bit
+       (5 bits per channel) would also be possible, but this requires a complete 64K block
+       and the analysis takes about 10 times as long (tested!).
+
+    2. Count colors.
+       Perform the color reduction for each pixel and create a histogram showing how often
+       each (reduced) color occurs in the image. The color values themselves are also summed.
+       Due to the color reduction, the histogram is an array with a 12-bit index.
+
+    3. Sort the histogram.
+       The histogram is recursively divided into (usually) 16 or 256 "boxes".
+       The first box contains the complete histogram.
+       - Reduce the histogram to the colors that actually occur.
+       - Find the box with the largest color variance. For R, G, and B separately, this is
+         the difference between the smallest and largest color value in the box.
+       - Sort this box by the selected color component.
+       - Split the box into two equally sized boxes.
+
+    4. Determine the "average color" for each of the resulting boxes.
+       These average colors form the "optimized" palette.
+
+
+    Schrittefolge für Median Cut Palette Reduktion
+    ----------------------------------------------
+
+    1. Farbreduktion von 24 Bit RGB auf 12 Bit (4 Bit pro Kanal). Im Prinzip wären auch
+       15 Bit (5 Bit pro Kanal) möglich, dann brauche  man aber einen kompletten 64k Block
+       und die Analyse dauert ca 10 Mal so lange (getestet!).
+
+    2. Farben zählen.
+       Für jedes Pixel die Farbreduktion durchgeführt und ein Histogramm erstellt, wie oft die
+       (reduzierte) Farbe im Bild vorkommt. Außerdem werden die Frabwerte selbst aufaddiert.
+       Durch die Farbreduktion ist das Histogramm ein Array mit einem 15-Bit oder 12-Bit Index.
+
+    3. Histogramm sortieren.
+       Das Histogramm wird rekursiv in 16 (resp. 256) "Boxen" aufgeteilt.
+       Die erste Box ist das komplette Histogramm.
+       - Reduziere das Histogramm auf die wirklich vorkommenden Farben.
+       - Finde die Box mit der größten Farbvarianz. Das ist, getrennt nach R, G und B, der
+         Unterschied zwischen dem kleinsten und dem größten Farbwert in der Box.
+       - Sortiere diese Box nach dieser Farbe.
+       - Teile die Box in zwei gleich große Boxen
+
+    4. Für jede der 16 (resp. 256) Boxen wird der "Farbmittelwert" ermittelt.
+       Diese Farbmittelwerte bilden die "optimierte" Palette.
+
+ * **********************************************************************/
+
+
+/* **********************************************************************
+ *	$ID Structures and constants for Median Cut algorithm
+ * **********************************************************************/
+
+
+
+#define PALETTE_COLORS     16
+#define BITS_PER_COLOR_CHAN 4		/* for reduced color value */
+#define COLOR_CHANEL_MASK   0x0F	/* <-- muss zu BITS_PER_COLOR_CHAN passen
+				 * BITS_PER_COLOR_CHAN = 4 --> 0x0F
+				 * BITS_PER_COLOR_CHAN = 3 --> 0x07 */
+#define HISTO_SLOTS       (1 << (BITS_PER_COLOR_CHAN * 3))  // 4096 for 4/4/4
+
+
+	/*
+	 * The color histogram is stored in a HugeArray. Its elements contain, for each color,
+	 * information about how often this color and its components occur in the image.
+	 * A color reduction to 4 bits per color is performed so that the "color value"
+	 * fits into a word. Index = r << 8 | g << 4 | b for 4 bits per color
+	 *	+--------------+--------------+---------------+
+	 *	|   r (4 Bit)  |  g (4 Bit)   |   b (4 Bit)   |
+	 *	+--------------+--------------+---------------+
+	 */
+typedef struct {
+/* index currently unused (was useful fopr debugging) and commented out
+    word  index;	// contains the color in the form [ r | g | b ], where r, g, and b
+    			// are reduced color values (4 bits).
+*/
+    dword count;	// Number of times the (reduced) color was found
+    dword rSum,
+    	  gSum,
+    	  bSum;		// Sum of all r, g, and b values WITHOUT color reduction
+} ColorHistogramEntry;
+
+
+	/*
+	 * The reference to the HugeArray containing the histogram is stored in a structure
+	 * that is passed to all routines that need it.
+	 */
+typedef struct {
+    VMFileHandle    vmFile;
+    VMBlockHandle   histoArray;
+    word	*colorList;		// List of colors used for splitting into ColorBoxes
+    int		targetColors;		/* Number of colors in the palette to build */
+
+/*  entrycount is currently not used, only allocated (grep HISTO_SLOTS)
+    word 	entryCount;		// Deleting/commenting it out is easier than adding it later.
+*/
+    } HistoArrayReference;
+
+    /*
+     * The color space is recursively divided into ColorBoxes.
+     * These are regions of the histogram from which the representative colors are generated.
+     * For this purpose, the histogram is sorted several times.
+     */
+typedef struct {
+    int startIndex;	// Start of the range in the color list
+    int entryCount;	// Number of colors in the  box
+    int rangeR, rangeG, rangeB;		// Variance of the color values
+} ColorBox;
+
+
+/*
+ * Function Header
+ */
+void BuildColorHistogramFromTC(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+			int width, int height, int format, HistoArrayReference histoRef,
+			/*int bitsPerChan, */ optr progressOptr);
+void BuildColorHistogramFrom256(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+			int width, int height, int format, HistoArrayReference histoRef,
+			/*int bitsPerChan, */ optr progressOptr);
+
+void UpdateBoxColorRanges(ColorBox *box, HistoArrayReference histoRef);
+
+int FindBoxWithLargestColorRange(ColorBox *boxes, int numBoxes);
+
+void SplitColorBox(ColorBox box, ColorBox *box1, ColorBox *box2, HistoArrayReference histoRef);
+
+PaletteEntry CalculateAverageColor(ColorBox box, HistoArrayReference histoRef);
+
+Boolean ExtractPaletteByMedianCut(PaletteEntry *palette, HistoArrayReference histoRef, optr progressTextOptr);
+
+
+
+/* **********************************************************************
+ *	$ID Fast access to the HugeArray containing the histogram data
+ * **********************************************************************/
+typedef struct {
+    VMFileHandle	vmFile;
+    VMBlockHandle	histoArray;
+EC(    word		elemCount; )
+    ColorHistogramEntry *ptrFirstEntry;	// zero if not locked
+
+    word	minIndex;		// minimum index in locked block
+    word	maxIndex;		// maximum index in locked block
+    Boolean	needDirty;
+
+    } HistoArrayControl;
+
+void InitializeControl(HistoArrayReference histoRef, HistoArrayControl *control);
+ColorHistogramEntry *HistogramIndexToPtr(HistoArrayControl *control, word index);
+ColorHistogramEntry *RelocHistogram(HistoArrayControl *control, word index);
+void UnlockHistogram(HistoArrayControl *control);
+
+#define HistogramMakeDirty(control) (control).needDirty = TRUE
+
+/*--------------------- InitializeControl ---------------------
+ *	Task:	initialoize HistoArrayControl structure
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void InitializeControl(HistoArrayReference histoRef, HistoArrayControl *control) {
+    memset(control, 0, sizeof(HistoArrayControl));
+    control->vmFile = histoRef.vmFile;
+    control->histoArray = histoRef.histoArray;
+EC(    control->elemCount = HugeArrayGetCount(histoRef.vmFile, histoRef.histoArray); )
+}
+
+/*--------------------- HistogramIndexToPtr ---------------------
+ *	Purpose:	Get a pointer to a histogram entry
+ *			Lock the corresponding element if necessary
+ *	Return:
+ ---------------------------------------------------------------------------*/
+ColorHistogramEntry *HistogramIndexToPtr(HistoArrayControl *control, word index) {
+
+    if( !(control->ptrFirstEntry ) ) return RelocHistogram(control, index);
+    if( index < control->minIndex ) return RelocHistogram(control, index);
+    if( index > control->maxIndex ) return RelocHistogram(control, index);
+
+    return control->ptrFirstEntry + (index - control->minIndex);
+}
+
+
+/*--------------------- RelocHistogram ---------------------
+ *	Purpose:	Get a pointer to a histogram entry if the array is not locked
+ *			or the requested index is not within the locked range
+ *	Return:
+ ---------------------------------------------------------------------------*/
+ColorHistogramEntry *RelocHistogram(HistoArrayControl *control, word index) {
+ColorHistogramEntry *entryPtr;
+dword retVal;
+word  size;
+
+    UnlockHistogram(control); 	// ggf Dirty machen und dann unlocken
+
+    EC( if (index > control->elemCount) { MessageBox("RelocHistogram: index zu gross"); return NULL; } )
+
+    retVal = HugeArrayLock(control->vmFile, control->histoArray, index, (void**)&entryPtr, &size);
+    control->maxIndex = index + (retVal & 0xFFFF) - 1;
+    control->minIndex = index - ((retVal>>16) & 0xFFFF) + 1;
+    control->ptrFirstEntry =  entryPtr - (index - control->minIndex);
+
+    return entryPtr;
+    }
+
+
+/*--------------------- UnlockHistogram ---------------------
+ *	Aufgabe:	Unlock Historgram
+ *			Make HugeArray dirty if required
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void UnlockHistogram(HistoArrayControl *control) {
+
+    if ( control->ptrFirstEntry ) {
+    	// Array ist gelockt -> ggf dirty und dann unlocken
+    	if ( control->needDirty ) {
+    	    HugeArrayDirty(control->ptrFirstEntry);
+    	    control->needDirty = FALSE;
+    	    }
+    	HugeArrayUnlock(control->ptrFirstEntry);
+    	control->ptrFirstEntry = NULL;
+    }
+}
+
+
+/* **********************************************************************
+ *	$ID Implementation of the Median Cut algorithm
+ * **********************************************************************/
+
+/*--------------------- BTCreatePaletteByMedianCut ---------------------
+ * Purpose:	Generate an optimized color palette using the Median Cut algorithm
+ * Context:
+ * Strategy:	- Handle special cases:
+ *			current color depth <= targetColors:
+ *			--> return the currently used palette
+ *		otherwise:
+ *		- Analyze the image:
+ *		  * Reduce colors to 4 bits per color
+ *		  * Histogram with a ColorHistogramEntry for each reduced color
+ *		- Analyze the histogram according to the Median Cut algorithm
+ *		- Build a new palette
+ * Parameters:	vmFile, bmpBlock: Bitmap to analyze
+ *		*palette: Return: optimized palette
+ *			  must be able to hold at least 'targetColors' entries
+ *		targetColors: Number of colors in the new palette
+ *			      Usually 16 or 256, but any other value <= 256 is also possible.
+ *		tempFile: VM file for storing the histogram
+ *			  NULL: Use ClipboardFile
+ *		progressTextOptr: Text object to receive status and
+ *				progress messages
+ *Return:	FALSE: Everything OK
+ *		TRUE:  Error, e.g. out of memory
+ ---------------------------------------------------------------------------*/
+extern Boolean RS_EXPORT BTCreatePaletteByMedianCut(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+		PaletteEntry *palette, int targetColors, VMFileHandle tempFile, optr progressTextOptr) {
+int width, height, format, compressed;
+word n;
+HistoArrayReference	histoRef;
+ColorHistogramEntry	entry;
+Boolean	ok = TRUE;
+PaletteEntry *palPtr;
+
+   /*
+    * Savety check
+    */
+   if (targetColors > 256) targetColors = 256;
+   if (targetColors < 2) targetColors = 2;
+
+    /*
+     * Check if color reduction is required.
+     * If not use standard palette oder source palette
+     */
+    format = BTGetMoreBitmapInfos(vmFile, bmpBlock, &width, &height, &compressed);
+    switch ( format & (BMT_FORMAT | BMT_PALETTE)) {
+    case BMF_MONO:
+    case BMF_MONO | BMT_PALETTE:	/* savety - should never happen */
+    	/*
+    	 * Nothing to do. return (parts of) the standard palette
+    	 */
+    	palPtr = BTLockGEOSStandardPalette();
+    	memcpy(palette, palPtr, targetColors * sizeof(PaletteEntry));
+    	BTUnlockGEOSStandardPalette();
+    	return FALSE;
+
+    case BMF_4BIT:
+    case BMF_4BIT | BMT_PALETTE:
+        /*
+         * Do median cut only if the number of target colors is less than 16
+         * use (parts of..) the standard palette in all other cases
+         * Copy source palette, if we have one
+         */
+        if ( targetColors < 16 ) goto doMedianCut;
+
+        // targetColors is equal to 16
+    	palPtr = BTLockGEOSStandardPalette();
+    	memcpy(palette, palPtr, targetColors * sizeof(PaletteEntry));
+    	BTUnlockGEOSStandardPalette();
+
+    	if (format & BMT_PALETTE) BTGetBitmapPalette(vmFile, bmpBlock, palette, 16);
+    	return FALSE;
+
+    case BMF_8BIT:
+    case BMF_8BIT | BMT_PALETTE:
+        /*
+         * Do median cut if the number of target colors is less than 256
+         * For 256 target colors use standard palette oder source palette
+         */
+        if ( targetColors < 256 ) { goto doMedianCut; }
+
+    	if (format & BMT_PALETTE) {
+    	    BTGetBitmapPalette(vmFile, bmpBlock, palette, 256);
+	} else {
+    	    palPtr = BTLockGEOSStandardPalette();
+    	    memcpy(palette, palPtr, targetColors * sizeof(PaletteEntry));
+    	    BTUnlockGEOSStandardPalette();
+	}
+    	return FALSE;
+    // default:	Always use median cut for true color images
+    }
+
+
+
+
+    /*  */
+doMedianCut:
+    if (!tempFile ) tempFile = ClipboardGetClipboardFile();
+
+    /*
+     * Ensure that the bitmap is not compacted
+     */
+    if ( compressed ) {
+    	bmpBlock = GrUncompactBitmap(vmFile, bmpBlock, tempFile);
+    	vmFile = tempFile;
+    }
+
+
+    /*
+     * Initialize HugeArray and HistoArrayReference sructure
+     */
+    memset(&histoRef, 0, sizeof(HistoArrayReference));
+    histoRef.vmFile = tempFile;
+    histoRef.histoArray = HugeArrayCreate(histoRef.vmFile, sizeof(ColorHistogramEntry), 0);
+    histoRef.targetColors = targetColors;
+
+
+//    histoRef.entryCount = HISTO_SLOTS;
+
+
+    if (histoRef.histoArray == 0) {
+    	EC( MessageBox("Error create histoArray"); )
+    	return TRUE;
+    }
+
+    /*
+     * initialize Histogram
+     */
+    memset(&entry, 0, sizeof(ColorHistogramEntry));
+    for ( n = 0; n < HISTO_SLOTS; n++) {
+//    	entry.index = n;
+    	HugeArrayAppend(histoRef.vmFile, histoRef.histoArray, 1, &entry);
+    }
+
+
+    /*
+     * Create Histograms.
+     * Create Palette.
+     * Clean up
+     */
+    if ( ( format & BMT_FORMAT ) == BMF_8BIT ) {
+    	BuildColorHistogramFrom256(vmFile, bmpBlock, width, height, format, histoRef, /*BITS_PER_COLOR_CHAN,*/ progressTextOptr);
+    } else {
+    	BuildColorHistogramFromTC(vmFile, bmpBlock, width, height, format, histoRef, /*BITS_PER_COLOR_CHAN,*/ progressTextOptr);
+    }
+
+    if (progressTextOptr) ProgressDisplaySpace(progressTextOptr);
+    ok = !ExtractPaletteByMedianCut(palette, histoRef, progressTextOptr);
+
+    /*
+     * Destroy histogam and uncompaced copy of the bitmap
+     */
+    HugeArrayDestroy(histoRef.vmFile, histoRef.histoArray);
+    if ( compressed ) HugeArrayDestroy(vmFile, bmpBlock);
+
+    return ok ? FALSE : TRUE;
+}
+
+
+
+/*--------------------- BuildColorHistogramFromTC ---------------------
+ *  Purpose: 	Scan a 24-bit bitmap and count colors
+ *  Context:
+ *  Strategy:	For every unmasked pixel
+ *		- Perform color reduction.
+ *		- Build the histogram index from the reduced colors
+ *			Index in histogram:  +-----+----+-----+	= 12 bits
+ *			r, g, b each 4 bits  |  r  | g  |  b  |
+ *					     +-----+----+-----+
+ *		- Update histogram: increment the count of occurrences
+ *		  Sum the actual color values (without reduction) for later use
+ *
+ *		We use 4 bit per chanel, but the routine is prepared to
+ *		work with other values.
+ *
+ *  Parameters: vmFile, bmpBlock: 24-bit bitmap
+ *		width, height:    Size of the bitmap
+ *		format:		  target bitmap format	- only BMT_MASK is relevant
+ *		histoRef:	  Reference to histogram
+ *		progressOptr: Text object for progress display
+ *				 One dot every 16 lines --> ....
+ *				 NULL: no progress display
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void BuildColorHistogramFromTC(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+			int width, int height, int format, HistoArrayReference histoRef,
+			/*int bitsPerChan, */ optr progressOptr) {
+BitmapAccessRecord	bar;
+PaletteEntry *pixel;
+ColorHistogramEntry	*histoEntry;
+int 	x, y;//, shiftVal;
+word idx;
+byte r, g, b;
+byte *maskPtr, maskBit;
+int numMaskBytes;
+
+HistoArrayControl  control;
+
+    InitializeControl(histoRef, &control);
+
+    // shiftVal = 8 - bitsPerChan;		// Use a variable, if bitsPerChan is a parameter
+#define shiftVal (8 - BITS_PER_COLOR_CHAN)
+
+    maskPtr = BTBitmapLock(vmFile, bmpBlock, &bar, 0);
+
+    if ( format & BMT_MASK ) {
+    	numMaskBytes = (width+7)/8;
+	pixel = (PaletteEntry*)(maskPtr + numMaskBytes);
+    } else {
+    	numMaskBytes = 0;
+    	pixel = (PaletteEntry*)maskPtr;
+    }
+
+    for ( y = 0; y < height; y++ )
+	{
+	if ( progressOptr) {
+	    if ( (y & 0x0F) == 0 ) @call progressOptr::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+
+	maskBit = 0x80;
+	for ( x = 0; x < width; x++) {
+
+	    /*
+	     * Handle mask, if we have one. Skip masked pixels.
+	     */
+	    if (numMaskBytes) {
+	    	int bit;
+	    	bit = *maskPtr & maskBit;
+	    	maskBit >>= 1;		/* update maskBit and maskPtr */
+	    	if ( maskBit == 0 ) {	/* next mask byte */
+	    	    maskBit = 0x80;
+	    	    maskPtr++;
+	    	}
+	    	if (bit == 0) continue;	/* skip if pixel is transparent */
+	    }
+
+            r = pixel->rt;
+            g = pixel->gn;
+            b = pixel->bl;
+
+
+            idx = ((r >> shiftVal) << (BITS_PER_COLOR_CHAN * 2)) | ( (g >> shiftVal) << BITS_PER_COLOR_CHAN) | (b  >> shiftVal);
+		// Bsp: r=0x7C, b = 0x42, g = 0xd7, bitsPerChan = 4
+		// --> shiftVal = 4  --> r = 0x07 --> idx = 0x74d
+
+	    histoEntry = HistogramIndexToPtr(&control, idx);
+
+            histoEntry->count++;
+            histoEntry->rSum += r;
+            histoEntry->gSum += g;
+            histoEntry->bSum += b;
+
+	    HistogramMakeDirty(control);
+
+	    pixel++;
+	    }
+	maskPtr = BTBitmapNext(&bar, TRUE);
+	if (!maskPtr) { break; }
+	pixel = (PaletteEntry*)(maskPtr + numMaskBytes);
+	}
+
+    BTBitmapUnlock(&bar, TRUE);
+    UnlockHistogram(&control);
+
+
+}
+
+
+/*--------------------- BuildColorHistogram256 ---------------------
+ *  Purpose: 	Scan a 8-bit bitmap and count colors
+ *  Context:
+ *  Strategy:	For every unmasked pixel
+ *		- Perform color reduction.
+ *		- Build the histogram index from the reduced colors
+ *			Index in histogram:  +-----+----+-----+	= 12 bits
+ *			r, g, b each 4 bits  |  r  | g  |  b  |
+ *					     +-----+----+-----+
+ *		- Update histogram: increment the count of occurrences
+ *		  Sum the actual color values (without reduction) for later use
+
+ *  Parameters: vmFile, bmpBlock: 8-bit bitmap
+ *		width, height:    Size of the bitmap
+ *		format:		  target bitmap format	- only BMT_MASK is relevant
+ *		histoRef:	  Reference to histogram
+ *		progressOptr: Text object for progress display
+ *				 One dot every 16 lines --> ....
+ *				 NULL: no progress display
+ *	Return:
+ ---------------------------------------------------------------------------*/
+void BuildColorHistogramFrom256(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+			int width, int height, int format, HistoArrayReference histoRef,
+			/*int bitsPerChan, */ optr progressOptr) {
+BitmapAccessRecord	bar;
+PaletteEntry *palette;
+byte *pixel;
+ColorHistogramEntry	*histoEntry;
+int 	x, y; //, shiftVal;
+word idx;
+byte r, g, b;
+
+HistoArrayControl  control;
+
+byte *maskPtr, maskBit;
+int numMaskBytes;
+
+    /*
+     * Get the palette. The indices are converted to RGB values using this palete, so that
+     * the rest of the routine works the same way as the true-color variant.
+     */
+
+    palette = malloc(256*sizeof(PaletteEntry));
+    EC( if (!palette) {ProgError("BuildColorHistogramFromTC: Kein Speicher für Palette"); } )
+    if (!palette) return;
+    if ( format & BMT_PALETTE ) {
+    	BTGetBitmapPalette(vmFile, bmpBlock, palette, 256);
+    } else {
+    	memcpy(palette, BTLockGEOSStandardPalette(), 256*sizeof(PaletteEntry));
+    	BTUnlockGEOSStandardPalette();
+    }
+
+    InitializeControl(histoRef, &control);
+
+    // shiftVal = 8 - bitsPerChan;		// Use a variable, if bitsPerChan is a parameter
+#define shiftVal (8 - BITS_PER_COLOR_CHAN)
+
+    maskPtr = BTBitmapLock(vmFile, bmpBlock, &bar, 0);
+
+    if ( format & BMT_MASK ) {
+    	numMaskBytes = (width+7)/8;
+	pixel = maskPtr + numMaskBytes;
+    } else {
+    	numMaskBytes = 0;
+    	pixel = maskPtr;
+    }
+
+    for ( y = 0; y < height; y++ )
+	{
+	if ( progressOptr) {
+	    if ( (y & 0x0F) == 0 ) @call progressOptr::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+	}
+
+	maskBit = 0x80;
+	for ( x = 0; x < width; x++) {
+
+	    /*
+	     * Handle mask, if we have one. Skip masked pixels.
+	     */
+	    if (numMaskBytes) {
+	    	int bit;
+	    	bit = *maskPtr & maskBit;
+	    	maskBit >>= 1;		/* update maskBit and maskPtr */
+	    	if ( maskBit == 0 ) {	/* next mask byte */
+	    	    maskBit = 0x80;
+	    	    maskPtr++;
+	    	}
+	    	if (bit == 0) continue;	/* skip if pixel is transparent */
+	    }
+
+            r = palette[*pixel].rt;
+            g = palette[*pixel].gn;
+            b = palette[*pixel].bl;
+            idx = ((r >> shiftVal) << (BITS_PER_COLOR_CHAN * 2)) | ( (g >> shiftVal) << BITS_PER_COLOR_CHAN) | (b  >> shiftVal);
+		// Bsp: r=0x7C, b = 0x42, g = 0xd7, bitsPerChan = 4
+		// --> shiftVal = 4  --> r = 0x07 --> idx = 0x74d
+
+	    histoEntry = HistogramIndexToPtr(&control, idx);
+
+            histoEntry->count++;
+            histoEntry->rSum += r;
+            histoEntry->gSum += g;
+            histoEntry->bSum += b;
+
+	    HistogramMakeDirty(control);
+
+	    pixel++;
+	    }
+	maskPtr = BTBitmapNext(&bar, TRUE);
+	if (!maskPtr) { break; }
+	pixel = maskPtr + numMaskBytes;
+	}
+
+    BTBitmapUnlock(&bar, TRUE);
+    UnlockHistogram(&control);
+    free(palette);
+
+}
+
+
+
+
+
+/*--------------------- ExtractPaletteByMedianCut ---------------------
+ * Purpose:	Build a palette from the histogram using the Median Cut algorithm
+ *Comment:
+ *Strategy:
+ *Parameters:
+ *Return:	TRUE on error (out of memory)
+ *		FALSE: everything OK
+ ---------------------------------------------------------------------------*/
+Boolean ExtractPaletteByMedianCut(PaletteEntry *palette, HistoArrayReference histoRef, optr progressTextOptr) {
+ColorBox  *boxList, box1, box2;
+int numBoxes, nr, n, i;
+word *colorList, numColors;
+ColorHistogramEntry	*histoEntry;
+HistoArrayControl  control;
+
+    /*
+     * Count all colors that occur. A color occurs in the image only if
+     * histoEntry->count is at least 1.
+     */
+    InitializeControl(histoRef, &control);
+    numColors = 0;
+    for ( n = 0; n < HISTO_SLOTS; n++ ) {
+  	histoEntry = HistogramIndexToPtr(&control, n);
+    	if ( histoEntry->count ) numColors++;
+
+    }
+    // UnlockHistogram is performed after the second step, below
+
+    /*
+     * Create a list of all colors that occur. Only as much memory as actually needed
+     * is allocated.
+     */
+    colorList = malloc(sizeof(word)*numColors);	// max 8 kB
+    if (!colorList) {
+    	EC( MessageBox("ExtractPaletteByMedianCut: kein Speicher"); )
+    	return TRUE;
+    }
+
+    memset(colorList, 0, sizeof(word)*numColors);
+    i = 0;
+    for ( n = 0; n < HISTO_SLOTS; n++ ) {
+
+  	histoEntry = HistogramIndexToPtr(&control, n);
+
+    	if ( histoEntry->count ) {
+    	    colorList[i] = n;
+    	    i++;
+    	}
+
+    }
+    UnlockHistogram(&control);
+
+     /*
+     * Delete all boxes.
+     * Initialize the first box: it contains the complete color range.
+     * Then split the boxes until there are histoRef.targetColors
+     * (usually 16 or 256) boxes.
+     *
+     * The algorithm also works if there are fewer than
+     * histoRef.targetColors colors.
+     * In this case, however, boxes with box.entryCount == 0 are created. This must be
+     * taken into account when building the palette in CalculateAverageColor().
+     */
+    histoRef.colorList = colorList;
+    boxList = malloc(histoRef.targetColors*sizeof(ColorBox));
+    memset(boxList, 0, histoRef.targetColors*sizeof(ColorBox));
+
+    boxList[0].startIndex = 0;		// Beginn des Bereichs
+    boxList[0].entryCount = numColors;	// Anzahl Farben im Bereich
+    UpdateBoxColorRanges(&boxList[0], histoRef);
+    numBoxes = 1;
+
+
+    while (numBoxes < histoRef.targetColors) {
+
+        if (progressTextOptr) if ( (numBoxes & 0x07) == 0) @call progressTextOptr::MSG_VIS_TEXT_APPEND_PTR(".", 0);
+
+    	/*
+    	 * Find the box with the largest color variance and split it.
+    	 * Replace the old box and add the new one.
+    	 */
+
+    	nr = FindBoxWithLargestColorRange(boxList, numBoxes);
+    	SplitColorBox(boxList[nr], &box1, &box2, histoRef);
+    	boxList[nr] = box1;
+    	boxList[numBoxes] = box2;
+    	numBoxes++;
+    }
+
+    // Calculate the average color of each box for the palette
+    for (i = 0; i < histoRef.targetColors; i++) {
+            palette[i] = CalculateAverageColor(boxList[i], histoRef);
+    }
+
+    free(colorList);
+    free(boxList);
+    return FALSE;
+}
+
+
+/*--------------------- UpdateBoxColorRanges ---------------------
+ * Purpose:	Find and store the minimum and maximum color value for each color channel
+ * Context:
+ * Strategy:	The colors in the box are stored in histoRef.colorList,
+ *		starting at index box->startIndex
+ *		The index is calculated from the color:
+ *		idx = (r << (BITS_PER_COLOR_CHAN * 2)) | (g << BITS_PER_COLOR_CHAN) | b;
+ * Parameters:	box:	affected color box
+ *		histoRef: importatnt informations
+ * Return:
+ ---------------------------------------------------------------------------*/
+void UpdateBoxColorRanges(ColorBox *box, HistoArrayReference histoRef) {
+int n, idx;
+int r, g, b;
+int rMin, rMax, gMin, gMax, bMin, bMax;
+
+    rMin = gMin = bMin = 255;
+    rMax = gMax = bMax = 0;
+
+    for (n = 0; n < box->entryCount; n++) {
+
+    	idx = histoRef.colorList[box->startIndex + n];
+    	// Structure of the Index: idx = (r << (BITS_PER_COLOR_CHAN * 2)) | (g << BITS_PER_COLOR_CHAN) | b;
+	r = (idx >> (BITS_PER_COLOR_CHAN * 2)) & COLOR_CHANEL_MASK;
+	g = (idx >> (BITS_PER_COLOR_CHAN)) & COLOR_CHANEL_MASK;
+	b = idx & COLOR_CHANEL_MASK;
+
+        if (r < rMin) rMin = r;
+            else if (r > rMax) rMax = r;
+        if (g < gMin) gMin = g;
+            else if (g > gMax) gMax = g;
+        if (b < bMin) bMin = b;
+            else if (b > bMax) bMax = b;
+    }
+
+    box->rangeR = rMax - rMin;
+    box->rangeG = gMax - gMin;
+    box->rangeB = bMax - bMin;
+
+}
+
+/*--------------------- FindBoxWithLargestColorRange ---------------------
+ * Purpose:	Find the box with the largest color range in one of the channels (R, G, B)
+ * Context:	This box is then split further
+ * Strategy:	The color range values are already stored in the box structure
+ * Parameters:
+ * Return:	Box number (zero-based)
+ ---------------------------------------------------------------------------*/
+int FindBoxWithLargestColorRange(ColorBox *boxes, int numBoxes) {
+int selectedIndex = 0;
+int maxRange = 0;
+int i;
+int maxColorRange;
+
+    maxRange = 0;
+    for (i = 0; i < numBoxes; i++) {
+        ColorBox box = boxes[i];
+        if (box.entryCount == 1) continue;	// unsplitable
+
+        maxColorRange = (box.rangeR > box.rangeG) ? ((box.rangeR > box.rangeB) ? box.rangeR : box.rangeB) : ((box.rangeG > box.rangeB) ? box.rangeG : box.rangeB);
+
+        if (maxColorRange > maxRange) {
+            maxRange = maxColorRange;
+            selectedIndex = i;
+        }
+    }
+
+    return selectedIndex;
+}
+
+
+/*--------------------- SortColorList ---------------------
+ * Purpose:	Sort a range of the color list (belonging to a ColorBox) by a
+ *		specific color channel
+ * Context:
+ * Strategy:	The color list (integer) contains the colors in the form [ r | g | b ]
+ *		The parameter mask selects the desired color channel for comparison,
+ *		e.g. --> [ 0 | g | 0 ]
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+void SortColorList(word *list, int anz, int mask) {
+int n, k;
+
+    for ( n = 0; n < anz-1; n++ ) {
+    	for ( k = n+1; k <= anz-1; k++) {
+    	    /*
+    	     * Compare values. mask selects the desired color channel for comparison from index
+    	     */
+    	    if ( (list[k] & mask) < (list[n] & mask) ) {
+    	    	int tmp = list[k];
+    	    	list[k] = list[n];
+    	    	list[n] = tmp;
+    	    	}
+    	    }
+    	}		// for (n)
+}
+
+
+/*--------------------- SplitColorBox ---------------------
+ * Purpose:	Split a ColorBox into two equal-sized boxes
+ * Context:
+ * Strategy:	1. Determine which color channel has the largest color range (rangeR/G/B)
+ *		2. Sort the index list (starting at box.startIndex) by this color channel
+ *		3. Split the box into two equally sized sub-boxes
+ * Parameters:	box: box to split
+ *		box1, box2: new (splitted) boxes
+ *		histoRef: importatnt informations
+ * Return:
+ ---------------------------------------------------------------------------*/
+void SplitColorBox(ColorBox box, ColorBox *box1, ColorBox *box2, HistoArrayReference histoRef) {
+int mid, channel;
+
+    channel = (box.rangeR >= box.rangeG && box.rangeR >= box.rangeB) ? 0 : (box.rangeG >= box.rangeB ? 1 : 2);
+
+    switch (channel) {
+        case 0: SortColorList(&histoRef.colorList[box.startIndex], box.entryCount, 0xF00); break;
+        case 1: SortColorList(&histoRef.colorList[box.startIndex], box.entryCount, 0x0F0); break;
+        case 2: SortColorList(&histoRef.colorList[box.startIndex], box.entryCount, 0x00F); break;
+    }
+
+    mid = box.entryCount / 2;
+
+    box1->startIndex = box.startIndex;
+    box1->entryCount = mid;
+    box2->startIndex = box.startIndex + mid;
+    box2->entryCount = box.entryCount - mid;
+
+    UpdateBoxColorRanges(box1, histoRef);
+    UpdateBoxColorRanges(box2, histoRef);
+
+}
+
+/*--------------------- CalculateAverageColor ---------------------
+ * Purpose:	As the name says
+ * Context:
+ * Strategy:
+ * Parameters:	box: box to handle
+ *		histoRef: importatnt informations
+ * Return:
+ ---------------------------------------------------------------------------*/
+PaletteEntry CalculateAverageColor(ColorBox box, HistoArrayReference histoRef) {
+dword totalR = 0, totalG = 0, totalB = 0, count;
+PaletteEntry avgColor;
+ColorHistogramEntry	*histoEntry;
+word i, idx;
+HistoArrayControl  control;
+
+    InitializeControl(histoRef, &control);
+    for (i = 0; i < box.entryCount; i++) {
+
+    	idx = histoRef.colorList[box.startIndex + i];
+
+	histoEntry = HistogramIndexToPtr(&control, idx);
+        count = histoEntry->count;
+        EC(if (!count) { MessageBox("histPtr->count = 0"); continue; }	)
+        totalR += histoEntry->rSum/count;
+        totalG += histoEntry->gSum/count;
+        totalB += histoEntry->bSum/count;
+
+
+    }
+    UnlockHistogram(&control);
+
+    if (!box.entryCount) {
+    	/* this occurs, if tehre are fewer than histoRef.targetColors colors */
+    	memset(&avgColor, 0x80, sizeof(PaletteEntry));  // <-- Grau
+    } else {
+	avgColor.rt = totalR / box.entryCount;
+	avgColor.gn = totalG / box.entryCount;
+	avgColor.bl = totalB / box.entryCount;
+   }
+
+    return avgColor;
+}
+
+
+
+/*--------------------- ProgressDisplaySpace ---------------------
+ * Purpose:	Append a space to progress text object
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+@extern object @ProgressSpace;
+void ProgressDisplaySpace(optr progressText) {
+   @call progressText::MSG_VIS_TEXT_APPEND_OPTR(@ProgressSpace, 0);
+}
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+
+/* ----------------- end of file: mediancut.goc --------------------------- */
+
+

@@ -24,7 +24,7 @@ library         ui
 resource DataResource      lmem read-only shared
 resource PaletteResource   lmem read-only shared
 
-usernotes	"International version 1.0.7"
+usernotes	"International version 1.1.0"
 
 
 
@@ -103,3 +103,13 @@ export BTSETCOLORFORMASKEDPIXELS
 export BTLOCKGEOSSTANDARDPALETTE
 export BTUNLOCKGEOSSTANDARDPALETTE
 export BTAPPROXRGBPALETTELINEAR
+
+#incminor
+export BTCREATEPALETTEBYMEDIANCUT
+export BTDITHERBYFLOYDSTEINBERG
+export BTCONVERTBITMAPCOLORSBYREPLACE
+export BTSHIFTIMAGE
+export BTSCALEBITMAPSYSTEM
+export BTSCALEBITMAPBILINEAR
+
+
