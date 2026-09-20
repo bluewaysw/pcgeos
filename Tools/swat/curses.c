@@ -1825,26 +1825,67 @@ scroll(WINDOW *win)
 	 */
 	LinePtr	lp;
 
+	cursesChar    *newLine = (cursesChar *)NULL;
+
+	lp = NullLine;
+
 	if (numSaved < maxSaved) {
-	    lp = (LinePtr)malloc_tagged(sizeof(LineRec), TAG_CURSES);
-	    lp->line = win->_y[0];
-	    win->_y[0] = (cursesChar *)malloc_tagged(win->_maxx
-						     * sizeof(cursesChar),
-						     TAG_CURSES);
-	    numSaved++;
-	} else {
 	    /*
-	     * Take the last record off the end and use it.
+	     * Room for another record. Both allocations have to succeed
+	     * before anything is handed over, or we'd be left holding a
+	     * half-built record -- or worse, a window line that is now a
+	     * null pointer.
+	     */
+	    lp = (LinePtr)malloc_tagged(sizeof(LineRec), TAG_CURSES);
+	    if (lp != NullLine) {
+		newLine = (cursesChar *)malloc_tagged(win->_maxx
+						      * sizeof(cursesChar),
+						      TAG_CURSES);
+		if (newLine == (cursesChar *)NULL) {
+		    free((void *)lp);
+		    lp = NullLine;
+		}
+	    }
+
+	    if (lp != NullLine) {
+		lp->line = win->_y[0];
+		win->_y[0] = newLine;
+		numSaved++;
+	    }
+	}
+
+	if ((lp == NullLine) && (lineTail != NullLine)) {
+	    /*
+	     * Either the buffer is full or we couldn't grow it. Take the
+	     * last record off the end and use it.
 	     */
 	    cursesChar    *l;
 
 	    lp = lineTail;
 	    lineTail = lp->prev;
-	    lineTail->next = NullLine;
+	    if (lineTail != NullLine) {
+		lineTail->next = NullLine;
+	    } else {
+		lineHead = NullLine;
+	    }
 
 	    l = lp->line;
 	    lp->line = win->_y[0];
 	    win->_y[0] = l;
+	}
+
+	if (lp == NullLine) {
+	    /*
+	     * Out of memory with nothing to recycle, which can only
+	     * happen while the buffer is still empty. Scroll without
+	     * saving the line rather than dying over it; scrollnow blanks
+	     * the line it rotates to the bottom either way.
+	     */
+	    scrollnow_hideMouse(win, 1);
+#if defined(_MSDOS)
+	    CursesUpdateHighlight(1);
+#endif
+	    return;
 	}
 	/*
 	 * Link new record in at head.
@@ -2089,6 +2130,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	/*
 	 * Get to the LineRec beyond the one on the bottom of the screen
@@ -2136,6 +2184,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	/*
 	 * Trick the highlight update code into doing the right thing.
@@ -2174,6 +2229,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	/*
 	 * Get to the LineRec beyond the one on the bottom of the screen
@@ -2199,6 +2261,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	if (lineCur->next != NullLine) {
 	    lineCur = lineCur->next;
@@ -5257,6 +5326,7 @@ See also:\n\
     int	    height;
     int	    i;
     WINDOW  *w;
+    Boolean createdBorder = FALSE;
 
     if (argc != 2) {
 	Tcl_Error(interp, "Usage: wcreate <height>");
@@ -5304,6 +5374,7 @@ See also:\n\
     (void)Lst_AtEnd(windows, (LstClientData)w);
 
     if (borderWin == (WINDOW *)NULL) {
+	createdBorder = TRUE;
 	if (windowsOnTop) {
 	    borderWin = newwin(1, 0, height, 0);
 	} else {
@@ -5331,7 +5402,24 @@ See also:\n\
      * top of the window -- no need to refresh since they're still the
      * same on-screen.
      */
-    resizewin(cmdWin, cmdWin->_maxy-height, COLS);
+    if (resizewin(cmdWin, cmdWin->_maxy-height, COLS) == (WINDOW *)ERR) {
+	LstNode	wln;
+
+	/*
+	 * Couldn't make room, so undo everything this command has done
+	 * rather than leave a window in the list that isn't on screen.
+	 */
+	wln = Lst_Member(windows, (LstClientData)w);
+	if (wln != NILLNODE) {
+	    (void)Lst_Remove(windows, wln);
+	}
+	delwin(w);
+	if (createdBorder) {
+	    delwin(borderWin);
+	    borderWin = (WINDOW *)NULL;
+	}
+	Tcl_Error(interp, "couldn't resize the command window");
+    }
     if (windowsOnTop) {
 	cmdWin->_begy += height;
 	/*
@@ -5637,12 +5725,13 @@ See also:\n\
      */
     if (windowsOnTop) {
 	i = cmdWin->_begy-y;
-	resizewin(cmdWin, cmdWin->_maxy+i, COLS);
-	mvwin(cmdWin, y, 0);
+	if (resizewin(cmdWin, cmdWin->_maxy+i, COLS) != (WINDOW *)ERR) {
+	    mvwin(cmdWin, y, 0);
+	}
     } else {
 
 	i = y - cmdWin->_maxy;
-	resizewin(cmdWin, cmdWin->_maxy+i, COLS);
+	(void)resizewin(cmdWin, cmdWin->_maxy+i, COLS);
 #if defined(_MSDOS)
 	/*
 	 * Check if there's a highlight onscreen (lines <= 0) and if it
@@ -5996,7 +6085,14 @@ CursesRedoLayout(void)
     for (ln = Lst_First(windows); ln != NILLNODE; ln = Lst_Succ(ln)) {
 	w = (WINDOW *)Lst_Datum(ln);
 
-	resizewin(w, w->_maxy, COLS);
+	if (resizewin(w, w->_maxy, COLS) == (WINDOW *)ERR) {
+	    /*
+	     * Leave the layout half done rather than move a window that
+	     * is still the old width onto a narrower screen, which would
+	     * have us drawing outside curscr.
+	     */
+	    return;
+	}
 	if (!windowsOnTop) {
 	    y -= w->_maxy;
 	}
@@ -6009,7 +6105,9 @@ CursesRedoLayout(void)
     }
 
     if (borderWin != NULL) {
-	resizewin(borderWin, borderWin->_maxy, COLS);
+	if (resizewin(borderWin, borderWin->_maxy, COLS) == (WINDOW *)ERR) {
+	    return;
+	}
 	if (windowsOnTop) {
 	    mvwin(borderWin, height, 0);
 	} else {
@@ -6024,7 +6122,9 @@ CursesRedoLayout(void)
 	height += borderWin->_maxy;
     }
 
-    resizewin(cmdWin, LINES-height, COLS);
+    if (resizewin(cmdWin, LINES-height, COLS) == (WINDOW *)ERR) {
+	return;
+    }
     if (windowsOnTop) {
 	mvwin(cmdWin, height, 0);
     } else {
@@ -6915,10 +7015,6 @@ Curses_Init(void)
 	 */
 	Shell_Init();
     } else {
-	/*
-	 * Don't need stdscr since we do our own windows
-	 */
-	delwin(stdscr);
 
 	/*
 	 * Character-by-character and don't echo until we tell it to.
