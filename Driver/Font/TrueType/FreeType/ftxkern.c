@@ -481,8 +481,7 @@ EC( ECCheckBounds( faze ) );
                                    TT_Kerning*  directory,
                                    TT_UShort    kern_index )
   {
-    TT_Error   error;
-    TT_Stream  stream;
+    TT_Error           error;
     TT_Kern_Subtable*  sub;
 
 
@@ -509,12 +508,10 @@ EC( ECCheckBounds( directory ) );
     if ( sub->loaded )
       return TT_Err_Ok;
 
-    /* now access stream */
-    if ( USE_Stream( faze->stream, stream ) )
-      return error;
+    error = TT_Seek_File( faze->stream, sub->offset );
 
-    if ( FILE_Seek( sub->offset ) )
-      goto Fail;
+    if( error )
+      return error;
 
     if ( sub->format == 0 )
       error = Subtable_Load_0( &sub->t.kern0, faze );
@@ -527,9 +524,6 @@ EC( ECCheckBounds( directory ) );
       sub->loaded = TRUE;
 
   Fail:
-    /* release stream */
-    DONE_Stream( stream );
-
     return error;
   }
 

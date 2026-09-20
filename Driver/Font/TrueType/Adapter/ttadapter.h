@@ -375,17 +375,12 @@ typedef struct
     WWFixedAsDWord              scaleHeight;
     WWFixedAsDWord              scaleWidth;
 
-    /* render glyphs */
-    TT_Raster_Map               rasterMap;
-
     /* general purpose */
     TT_Face                     face;
     TT_Face_Properties          faceProperties; 
     TT_Instance                 instance;
     TT_Glyph                    glyph;
-    TT_Glyph_Metrics            glyphMetrics;
     TT_CharMap                  charMap;
-    TT_Outline                  outline;
 
     /* lookuptable for truetype indices */
     MemHandle                   lookupTable;
@@ -407,10 +402,6 @@ typedef struct
 #define INSTANCE                trueTypeVars->instance
 #define GLYPH                   trueTypeVars->glyph
 #define CHAR_MAP                trueTypeVars->charMap
-#define OUTLINE                 trueTypeVars->outline
-#define GLYPH_METRICS           trueTypeVars->glyphMetrics
-#define GLYPH_BBOX              trueTypeVars->glyphMetrics.bbox
-#define RASTER_MAP              trueTypeVars->rasterMap
 #define SCALE_HEIGHT            trueTypeVars->scaleHeight
 #define SCALE_WIDTH             trueTypeVars->scaleWidth
 #define TTFILE                  trueTypeVars->ttfile
@@ -505,6 +496,6 @@ extern WWFixedAsDWord
 
 Boolean TrueType_Lock_Face(TRUETYPE_VARS, TrueTypeOutlineEntry* entry);
 void TrueType_Unlock_Face(TRUETYPE_VARS);
-void TrueType_Free_Face(TRUETYPE_VARS);
+
 
 #endif /* _TTADAPTER_H_ */

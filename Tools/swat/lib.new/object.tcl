@@ -1107,6 +1107,31 @@ See also:
 	var retVal [range $base
     	    	    	[expr [string last :: $base]+2] end chars]$suffix
     }
+
+    #
+    # Watcom's C compiler gives the class record the public name of the C
+    # object, which carries a leading underscore, so the class symbol is
+    # _FooClass. The types Goc emits beside it -- FooMessages, FooInstance
+    # -- come from the compiler's type records and have no underscore, so
+    # the name we just built can be one underscore away from the type we're
+    # after. If it doesn't name a type, but the version without the
+    # underscore does, use that instead.
+    #
+    if {[null [sym find type $retVal]]} {
+	var uc [string last :: $retVal]
+	if {$uc == -1} {
+	    var pfx {} last $retVal
+	} else {
+	    var pfx [range $retVal 0 [expr $uc+1] chars]
+	    var last [range $retVal [expr $uc+2] end chars]
+	}
+	if {[string first _ $last] == 0} {
+	    var alt [format {%s%s} $pfx [range $last 1 end chars]]
+	    if {![null [sym find type $alt]]} {
+		var retVal $alt
+	    }
+	}
+    }
     if {$cClass} {
     	# goc(Metaware) puts out 'struct _foo' things, while goc(borland)
     	# puts out 'foo' only for the struct foo things so we will first

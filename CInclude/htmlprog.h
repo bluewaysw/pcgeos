@@ -59,6 +59,7 @@ typedef struct {
     word LPD_fileDone;          /* finished writing */
     LoadProgressStreamState LPD_streamState;       /* data stream state */
     dword LPD_updateTime;       /* last notification for LPCT_WRITE */
+    optr LPD_request;           /* opaque client request state */
 } LoadProgressData;
 
 #define _LoadProgressParams_ LoadProgressData *loadProgressDataP

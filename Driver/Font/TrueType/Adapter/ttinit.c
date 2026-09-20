@@ -60,19 +60,15 @@ static word getNameFromNameTable(
 
 void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
-static char GetDefaultChar(     TRUETYPE_VARS, char firstChar );
-
 word GetKernCount(       TRUETYPE_VARS );
 
 static word toHash( const char* str );
 
 static word strlen( const char* str );
 
-static char* strcpy( char* dest, const char* source );
+static void strcpoy( char* dest, const char* source );
 
 static int strcmp( const char* s1, const char* s2 );
-
-static Boolean activateBytecodeInterpreter();
 
 
 /********************************************************************
@@ -106,7 +102,9 @@ TT_Error _pascal Init_FreeType()
         if ( error != TT_Err_Ok )
                 return error;
 
-        engineInstance.interpreterActive = activateBytecodeInterpreter();
+        if( InitFileReadBoolean( TTFDRIVER_CATEGORY,
+                BYTECODEINTERPRETER_KEY, &engineInstance.interpreterActive ) )
+                engineInstance.interpreterActive = TRUE;
 
         return TT_Err_Ok;
 }
@@ -396,7 +394,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 
                 /* get pointer to FontInfo and fill it */
 		fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
-                strcpy( fontInfo->FI_faceName, familyName );
+                strcopy( fontInfo->FI_faceName, familyName );
                 fontInfo->FI_fileHandle   = NullHandle;
                 fontInfo->FI_fontID       = fontID;
                 fontInfo->FI_family       = FA_USEFUL | FA_OUTLINE | ( mappedFont ? FA_FAMILY : 0 );
@@ -429,7 +427,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 		trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
 
                 /* fill TrueTypeOutlineEntry */
-                strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
+                strcopy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
             	trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
 		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
 							trueTypeOutlineEntry->TTOE_fontFileSize);
@@ -492,7 +490,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 	
                 /* fill TrueTypeOutlineEntry */
                 trueTypeOutlineEntry = LMemDerefHandles( fontInfoBlock, trueTypeOutlineChunk );
-                strcpy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
+                strcopy( trueTypeOutlineEntry->TTOE_fontFileName, fileName );
 		trueTypeOutlineEntry->TTOE_fontFileSize = FileSize(truetypeFile);
 		trueTypeOutlineEntry->TTOE_magicWord = CalcMagicNumber(truetypeFile, 
 							trueTypeOutlineEntry->TTOE_fontFileSize);
@@ -1014,7 +1012,8 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         fontHeader->FH_numChars = CountValidGeosChars( CHAR_MAP, 
                                                        &fontHeader->FH_firstChar, 
                                                        &fontHeader->FH_lastChar ); 
-        fontHeader->FH_defaultChar = GetDefaultChar( trueTypeVars, fontHeader->FH_firstChar );
+        fontHeader->FH_defaultChar = TT_Char_Index( CHAR_MAP, GeosCharToUnicode(
+                        DEFAULT_CHAR ) ) ? DEFAULT_CHAR : fontHeader->FH_firstChar;
         fontHeader->FH_kernCount   = GetKernCount( trueTypeVars );
         fontHeader->FH_initialized = TRUE;
 
@@ -1026,80 +1025,6 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                                 fontHeader);
 }
 #pragma code_seg()
-
-/********************************************************************
- *                      GetDefaultChar
- ********************************************************************
- * SYNOPSIS:       Determines the default character for a given TrueType 
- *                 font, verifying if the standard default character is 
- *                 available in the font's character map.
- * 
- * PARAMETERS:     TRUETYPE_VARS
- *                    Cached variables needed by the driver.
- *                 char firstChar
- *                    The fallback character to use if the standard default 
- *                    character is not present in the font.
- * 
- * RETURNS:        char
- *                    The character to be used as the default. Returns 
- *                    DEFAULT_CHAR if it exists in the font, 
- *                    otherwise returns firstChar.
- * 
- * STRATEGY:       - Check if the default character (DEFAULT_CHAR) 
- *                   is present in the font's character map.
- *                 - If it exists, return DEFAULT_CHAR.
- *                 - Otherwise, return the provided firstChar as the fallback.
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      23.04.23  JK        Initial Revision
- *******************************************************************/
-
-static char GetDefaultChar( TRUETYPE_VARS, char firstChar )
-{
-        if ( !TT_Char_Index( CHAR_MAP, GeosCharToUnicode( DEFAULT_CHAR ) ) )
-                return firstChar;  
-
-        return DEFAULT_CHAR; 
-}
-
-
-/********************************************************************
- *                      activateBytecodeInterpreter
- ********************************************************************
- * SYNOPSIS:       Activates or determines if the bytecode interpreter 
- *                 should be active for the TrueType font driver. Reads 
- *                 the configuration setting from geos.ini.
- * 
- * PARAMETERS:     None
- * 
- * RETURNS:        Boolean
- *                    TRUE if the bytecode interpreter should be active 
- *                    (default behavior) or the value retrieved from the 
- *                    initialization file if it is successfully read.
- * 
- * STRATEGY:       - Attempt to read the BYTECODEINTERPRETER_KEY from the 
- *                   initialization file under the TTFDRIVER_CATEGORY.
- *                 - If the key is successfully read, return the retrieved value.
- *                 - If reading fails, return TRUE as the default behavior.
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      17.11.24  jk        Initial Revision
- *******************************************************************/
-
-static Boolean activateBytecodeInterpreter()
-{
-        Boolean  bytecodeInterpreterActive;
-
-
-        if( !InitFileReadBoolean( TTFDRIVER_CATEGORY, BYTECODEINTERPRETER_KEY, &bytecodeInterpreterActive ) )
-                return bytecodeInterpreterActive;
-
-        return TRUE;
-}
 
 
 /********************************************************************
@@ -1133,50 +1058,57 @@ static Boolean activateBytecodeInterpreter()
  *      11/08/23  JK        Initial Revision
  *******************************************************************/
 #pragma code_seg(ttcharmapper_TEXT)
-word GetKernCount( TRUETYPE_VARS )
+word
+GetKernCount( TRUETYPE_VARS )
 {
         TT_Kerning        kerningDir;
         word              table;
         TT_Kern_0_Pair*   pairs;
         word              numGeosKernPairs = 0;
         LookupEntry*      indices;
+        const word        minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
 
         if( TT_Load_Kerning_Directory( FACE, &kerningDir ) )
                 return 0;
 
         if( kerningDir.nTables == 0 )
-                return 0;        
+        {
+                TT_Kerning_Directory_Done( &kerningDir );
+                return 0;
+        }
 
         /* get pointer to lookup table */
         indices = GEO_LOCK( LOOKUP_TABLE );
 EC(     ECCheckBounds( indices ) );
 
-        /* search for format 0 subtable */
+        /* search for format 0 subtables */
         for( table = 0; table < kerningDir.nTables; ++table )
         {
                 word i;
-                word minKernValue = UNITS_PER_EM / KERN_VALUE_DIVIDENT;
+                TT_Kern_Subtable* subtable = &kerningDir.tables[table];
 
                 if( TT_Load_Kerning_Table( FACE, &kerningDir, table ) )
                         continue;
 
-                if( kerningDir.tables->format != 0 )
+                if( subtable->format != 0 )
                         continue;
 
-                pairs = GEO_LOCK( kerningDir.tables->t.kern0.pairsBlock );
+                pairs = GEO_LOCK( subtable->t.kern0.pairsBlock );
+EC(             ECCheckBounds( pairs ) );
 
-                for( i = 0; i < kerningDir.tables->t.kern0.nPairs; ++i )
+                for( i = 0; i < subtable->t.kern0.nPairs; ++i )
                 {
                         if( ABS( pairs[i].value ) <= minKernValue )
                                 continue;
 
-                        if ( GetGEOSCharForIndex( indices, pairs[i].left ) && 
-                             GetGEOSCharForIndex( indices, pairs[i].right ) )
+                        if( GetGEOSCharForIndex( indices, pairs[i].left ) &&
+                            GetGEOSCharForIndex( indices, pairs[i].right ) )
                                 ++numGeosKernPairs;
                 }
 
-                GEO_UNLOCK( kerningDir.tables->t.kern0.pairsBlock );
+                GEO_UNLOCK( subtable->t.kern0.pairsBlock );
         }
+
         GEO_UNLOCK( LOOKUP_TABLE );
         TT_Kerning_Directory_Done( &kerningDir );
 
@@ -1199,10 +1131,9 @@ static word strlen( const char* str )
 }
 
 
-static char* strcpy( char* dest, const char* source )
+static void strcopy( char* dest, const char* source )
 {
         while( (*dest++ = *source++) != '\0' );
-        return dest;
 }
 
 

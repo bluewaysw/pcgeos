@@ -171,7 +171,7 @@
 
   static TT_Pos  Scale( PIns_Metrics  metrics, TT_Pos  val )
   {
-    return TT_MulDiv( val, metrics->x_scale1, metrics->units_per_em );
+    return TT_MulDiv( val, metrics->scale1, metrics->scale2 );
   }
 
 
@@ -238,13 +238,9 @@
 
     if ( FILE_Read( exec->glyphIns, n_ins ) )
       return error;
-
-    if ( (error = Set_CodeRange( exec,
-                                 TT_CodeRange_Glyph,
-                                 exec->glyphIns,
-                                 n_ins )) != TT_Err_Ok )
-      return error;
-
+   
+    exec->codeRangeTable[TT_CodeRange_Glyph - 1].Base = exec->glyphIns;
+    exec->codeRangeTable[TT_CodeRange_Glyph - 1].Size = n_ins;
 
     /* read the flags */
 
@@ -303,6 +299,7 @@
           y += GET_Short();
 
       vec[j].y = y;
+      flag[j] = f & TT_Flag_On_Curve;
     }
 
     FORGET_Frame();
@@ -319,9 +316,6 @@
     vec[n_points+1].y = 0;
 
     /* clear the touch flags */
-
-    for ( j = 0; j < n_points; ++j )
-      exec->pts.touch[j] &= TT_Flag_On_Curve;
 
     exec->pts.touch[n_points    ] = 0;
     exec->pts.touch[n_points + 1] = 0;
@@ -366,16 +360,14 @@
         /* now consider hinting */
         if ( n_ins > 0 )
         {
-          exec->is_composite     = FALSE;
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
-#endif
 
           error = Context_Run( exec );
-
-#ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
           if (error && exec->pedantic_hinting)
             return error;
+#else
+          Context_Run( exec );
 #endif
         }
       }
@@ -429,13 +421,8 @@
       if ( FILE_Read( exec->glyphIns, n_ins ) )
         return error;
 
-      error = Set_CodeRange( exec,
-                             TT_CodeRange_Glyph,
-                             exec->glyphIns,
-                             n_ins );
-
-      if ( error )
-        return error;
+      exec->codeRangeTable[TT_CodeRange_Glyph - 1].Base = exec->glyphIns;
+      exec->codeRangeTable[TT_CodeRange_Glyph - 1].Size = n_ins;
     }
 
 
@@ -450,9 +437,6 @@
     /* add phantom points */
     pts->cur[n_points - 2] = subg->pp1;
     pts->cur[n_points - 1] = subg->pp2;
-
-    //pts->touch[n_points - 1] = 0;  REDUNDANT!
-    //ts->touch[n_points - 2] = 0;
 
     /* if hinting, round the phantom points */
     if ( subg->is_hinted )
@@ -469,7 +453,6 @@
     /* now consider hinting */
     if ( subg->is_hinted && n_ins > 0 )
     {
-      exec->is_composite     = TRUE;
 #ifdef TT_CONFIG_OPTION_SUPPORT_PEDANTIC_HINTING
       exec->pedantic_hinting = load_flags & TTLOAD_PEDANTIC;
 
@@ -524,9 +507,6 @@
     element->transform.yx = 0;
     element->transform.yy = 1L << 16;
 
-    element->transform.ox = 0;
-    element->transform.oy = 0;
-
     element->metrics.bearingX = 0;
     element->metrics.advance  = 0;
   }
@@ -563,7 +543,7 @@
 
     Short   table;
     UShort  load_top;
-    Long    k, l;
+    Short   k, l;
     UShort  new_flags;
     Short   index;
     UShort  u, v;
@@ -654,8 +634,9 @@ EC( ECCheckBounds( exec ) );
 
     /* now access stream */
 
-    if ( USE_Stream( face->stream, stream ) )
-      goto Fin;
+    /*if ( USE_Stream( face->stream, stream ) )
+      goto Fin;*/
+    stream = face->stream;
 
     /* Main loading loop */
 
@@ -895,12 +876,6 @@ EC( ECCheckBounds( exec ) );
         subglyph->arg1 = k;
         subglyph->arg2 = l;
 
-        if ( new_flags & ARGS_ARE_XY_VALUES )
-        {
-          subglyph->transform.ox = k;
-          subglyph->transform.oy = l;
-        }
-
         xx = 1L << 16;
         xy = 0;
         yx = 0;
@@ -934,10 +909,10 @@ EC( ECCheckBounds( exec ) );
         subglyph->transform.yx = yx;
         subglyph->transform.yy = yy;
 
-        k = TT_MulFix( xx, yy ) -  TT_MulFix( xy, yx );
+        x = TT_MulFix( xx, yy ) -  TT_MulFix( xy, yx );
 
         /* disable hinting in case of scaling/slanting */
-        if ( ABS( k ) != (1L << 16) )
+        if ( ABS( x ) != (1L << 16) )
           subglyph2->is_hinted = FALSE;
 
         subglyph->file_offset = FILE_Pos();
@@ -1028,8 +1003,8 @@ EC( ECCheckBounds( exec ) );
           {
             /* apply offset */
 
-            x = subglyph->transform.ox;
-            y = subglyph->transform.oy;
+            x = subglyph->arg1;
+            y = subglyph->arg2;
 
             if ( load_flags & TTLOAD_SCALE_GLYPH )
             {
@@ -1155,7 +1130,6 @@ EC( ECCheckBounds( exec ) );
 
   Fail_File:
   Fail:
-    DONE_Stream( stream );
 
   Fin:
 

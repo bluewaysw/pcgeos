@@ -1,3 +1,18 @@
+#
+# mkmf finds product directories by their is_a_product marker and records
+# them in the generated Makefile's PRODUCTS variable. Keep that list
+# available for explicit builds, but clear it before geode.mk so the
+# products do not become dependencies of the default full target.
+# Override this default on the command line, for example:
+#     pmake "PRODUCTS=DBCS AB ABDBCS" full
+#
+PRODUCTS =
+
+# BbxBrow's regular build is SBCS with neither JavaScript nor AutoBrowse.
+# DBCS changes character mode only. AB enables COMPILE_OPTION_AUTO_BROWSE;
+# ABDBCS enables it together with DBCS. JavaScript or AutoBrowse causes the
+# matching Html4Par build to derive HTML_SCRIPT_SUPPORT.
+#
 #include <$(SYSMAKEFILE)>
 
 COMPILE_OPTIONS ?=
@@ -29,5 +44,3 @@ XCCOMFLAGS = -zu $(COMPILE_OPTIONS:S|JAVASCRIPT_SUPPORT|JAVASCRIPT_SUPPORT=1|g)
 # Set Copyright notice
 #XLINKFLAGS = -N (C)98\20Breadbox\20Computer\20Company $(COMPILE_OPTIONS)
 XLINKFLAGS = $(COMPILE_OPTIONS)
-
-full	:: AB

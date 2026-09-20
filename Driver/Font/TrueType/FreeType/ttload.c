@@ -831,7 +831,7 @@
     Long   off, table_start, entry_offset;
     Short  n, limit;
 
-    TCMapDir       cmap_dir;
+    UShort         numCMaps;
     PCMapTable     cmap;
 
 
@@ -844,20 +844,18 @@
          ( ACCESS_Frame( 4 ) ) )           /* 4 bytes cmap header */
       return error;
 
-    cmap_dir.tableVersionNumber = GET_UShort();
-    cmap_dir.numCMaps           = GET_UShort();
+    SKIP( 2 );
+    numCMaps   = GET_UShort();
 
     FORGET_Frame();
 
     off = FILE_Pos();  /* save offset to cmapdir[] which follows */
 
     /* save space in face table for cmap tables */
-    if ( ALLOC_ARRAY( face->cMaps,
-                      cmap_dir.numCMaps,
-                      TCMapTable ) )
+    if ( ALLOC_ARRAY( face->cMaps, numCMaps, TCMapTable ) )
       return error;
 
-    face->numCMaps = cmap_dir.numCMaps;
+    face->numCMaps = numCMaps;
 
     limit = face->numCMaps;
     cmap  = face->cMaps;

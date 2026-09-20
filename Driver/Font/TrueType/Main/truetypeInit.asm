@@ -37,7 +37,6 @@ CALLED BY:	DR_INIT - TrueTypeStrategy
 
 PASS:		none
 RETURN:		bitmapHandle - handle of block to use for bitmaps
-		bitmapSize - size of above block (0 at start)
 		variableHandle - handle of block containing variables
 		carry - clear
 DESTROYED:	none
@@ -71,7 +70,6 @@ TrueTypeInit	proc	far
 		 or (mask HAF_NO_ERR shl 8) 	;cl, ch <- alloc flags
 	call	MemAllocSetOwner
 	mov	ds:bitmapHandle, bx		;save handle of block
-	mov	ds:bitmapSize, 0		;no bytes yet
 	;
 	; We also need a block to use for variables. We don't
 	; need it yet, either.

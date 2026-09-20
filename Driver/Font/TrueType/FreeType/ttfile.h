@@ -70,49 +70,12 @@
   void      TT_Close_Stream( TT_Stream*  stream );
 
 
-  /* Informs the component that we're going to use the file   */
-  /* opened in 'org_stream', and report errors to the 'error' */
-  /* variable.                                                */
-
-  /* in non re-entrant builds, 'org_stream' is simply copied   */
-  /* to 'stream'. Otherwise, the latter is a duplicate handle  */
-  /* for the file opened with 'org_stream'                     */
-
-  EXPORT_DEF
-  TT_Error  TT_Use_Stream( TT_Stream   org_stream,
-                           TT_Stream*  stream );
-
-  /* Informs the component that we don't need to perform file */
-  /* operations on the stream 'stream' anymore.  This must be */
-  /* used with streams "opened" with TT_Use_Stream() only!    */
-
-  /* in re-entrant builds, this will really discard the stream */
-
-  EXPORT_DEF
-  void      TT_Done_Stream( TT_Stream*  stream );
-
-  /* Closes the stream's file handle to release system resources */
-  /* The function TT_Use_Stream automatically re-activates a     */
-  /* flushed stream when it uses one                             */
-
-  EXPORT_DEF
-  TT_Error  TT_Flush_Stream( TT_Stream*  stream );
-
 /* The macros STREAM_ARGS and STREAM_ARG let us build a thread-safe */
 /* or re-entrant implementation depending on a single configuration */
 /*define.                                                           */
 
-#ifdef TT_CONFIG_OPTION_THREAD_SAFE
-
 #define STREAM_ARGS   TT_Stream  stream,
 #define STREAM_ARG    TT_Stream  stream
-
-#else
-
-#define STREAM_ARGS   /* void */
-#define STREAM_ARG    void
-
-#endif /* TT_CONFIG_OPTION_THREAD_SAFE */
 
 
   /****************************************************************/
@@ -157,11 +120,6 @@
   EXPORT_DEF
   Long  TT_File_Pos( STREAM_ARG );
 
-  /* Return length of a given stream, even if it is flushed */
-
-  EXPORT_DEF
-  Long  TT_Stream_Size( TT_Stream  stream );
-
 
   /********************************************************************/
   /*                                                                  */
@@ -178,26 +136,12 @@
   {
     Byte*  address;  /* frame buffer                     */
     Byte*  cursor;   /* current cursor position in frame */
-    Short  size;     /* frame size                       */
   };
 
   typedef struct TFileFrame_  TFileFrame;
 
   EXPORT_DEF
   const TFileFrame  TT_Null_FileFrame;
-
-
-/* The macro ZERO_Frame is used to define and init a frame.      */
-/* It is important to have a default frame of { NULL, NULL, 0 }  */
-/* before a call to TT_Access_Frame().  Otherwise, the call will */
-/* fail with a TT_Err_Nested_Frame_Accesses error.               */
-
-#define ZERO_Frame( frame )     \
-      {                         \
-        (frame).address = NULL; \
-        (frame).cursor  = NULL; \
-        (frame).size    = 0;    \
-      }
 
 
 #define CHECK_FILE( _handle_ )  EC( ECCheckFileHandle( _handle_ ) )
@@ -207,17 +151,8 @@
 /* or re-entrant implementation depending on a single configuration */
 /* define                                                           */
 
-#ifdef TT_CONFIG_OPTION_THREAD_SAFE
-
 #define FRAME_ARGS   TFileFrame*  frame,
 #define FRAME_ARG    TFileFrame*  frame
-
-#else
-
-#define FRAME_ARGS   /* void */
-#define FRAME_ARG    void
-
-#endif /* TT_CONFIG_OPTION_THREAD_SAFE */
 
 
   /* Access the next 'size' bytes from current position. */

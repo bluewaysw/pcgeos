@@ -22,21 +22,6 @@
  *   The same source code can be used for thread-safe and re-entrant
  *   builds of the library.
  *
- *  Changes between 2.0 and 2.1 :
- *
- *  - it is now possible to close a stream's file handle explicitely
- *    through the new API "TT_Flush_Stream". This will simply close
- *    a stream's file handle (useful to save system resources when
- *    dealing with lots of opened fonts). Of course, the function
- *    "TT_Use_Stream" will automatically re-open a stream's handle if
- *    necessary.
- *
- *  - added "TT_Stream_Size" to replace "TT_File_Size" which wasn't
- *    used anyway. This one returns the size of any stream, even
- *    flushed one (when the previous TT_File_Size could only return
- *    the size of the current working stream). This is used by the
- *    new "Load_TrueType_Any" function in the tables loader.
- *
  ******************************************************************/
 
 #include "ttconfig.h"
@@ -58,12 +43,10 @@
 /* For now, we don't define additional error messages in the core library */
 /* to report open-on demand errors. Define these error as standard ones   */
 
-#define TT_Err_Could_Not_ReOpen_File  TT_Err_Could_Not_Open_File
-#define TT_Err_Could_Not_ReSeek_File  TT_Err_Could_Not_Open_File
 
   /* This definition is mandatory for each file component! */
   EXPORT_FUNC
-  const TFileFrame  TT_Null_FileFrame = { NULL, 0, 0 };
+  const TFileFrame  TT_Null_FileFrame = { NULL, 0 };
 
 /* It has proven useful to do some bounds checks during development phase. */
 /* They should probably be undefined for speed reasons in a later release. */
@@ -88,7 +71,6 @@
 
   struct  TStream_Rec_
   {
-    Long        position;                /* current position within the file */
     FileHandle  file;                    /* file handle                      */
     Long        size;                    /* stream size in file              */
   };
@@ -102,313 +84,7 @@
 
 #define STREAM2REC( x )  ( (TStream_Rec*)HANDLE_Val( x ) )
 
-  static  TT_Error  Stream_Activate  ( PStream_Rec  stream );
-  static  void      Stream_Deactivate( PStream_Rec  stream );
 
-
-#ifndef TT_CONFIG_OPTION_THREAD_SAFE
-
-  /*******************************************************************/
-  /*******************************************************************/
-  /*******************************************************************/
-  /****                                                           ****/
-  /****  N O N   R E E N T R A N T   I M P L E M E N T A T I O N  ****/
-  /****                                                           ****/
-  /*******************************************************************/
-  /*******************************************************************/
-  /*******************************************************************/
-
-  /* in non-rentrant builds, we allocate a single block where we'll  */
-  /* place all the frames smaller than FRAME_CACHE_SIZE, rather than */
-  /* allocating a new block on each access.  Bigger frames will be   */
-  /* malloced normally in the heap.                                  */
-  /*                                                                 */
-  /* See TT_Access_Frame() and TT_Forget_Frame() for details.        */
-
-#define FRAME_CACHE_SIZE  2048
-
-  /* The TFile_Component structure holds all the data that was */
-  /* previously declared static or global in this component.   */
-  /*                                                           */
-  /* It is accessible through the 'engine.file_component'      */
-  /* variable in re-entrant builds, or directly through the    */
-  /* static 'files' variable in other builds.                  */
-
-  struct  TFile_Component_
-  {
-    Byte*        frame_cache; /* frame cache     */
-    PStream_Rec  stream;      /* current stream  */
-    TFileFrame   frame;       /* current frame   */
-  };
-
-  typedef struct TFile_Component_  TFile_Component;
-
-  static TFile_Component  files;
-
-#define CUR_Stream  files.stream
-#define CUR_Frame   files.frame
-
-#define STREAM_VARS  /* void */
-#define STREAM_VAR   /* void */
-
-/* The macro CUR_Stream denotes the current input stream.            */
-/* Note that for the re-entrant version, the 'stream' name has been  */
-/* chosen according to the macro STREAM_ARGS.                        */
-
-/* The macro CUR_Frame denotes the current file frame.              */
-/* Note that for the re-entrant version, the 'frame' name has been  */
-/* chosen according to the macro FRAME_ARGS.                        */
-
-/* The macro STREAM_VAR is used when calling public functions */
-/* that need an 'optional' stream argument.                   */
-
-
-#ifndef __GEOS__
-/*******************************************************************
- *
- *  Function    :  TTFile_Init
- *
- *  Description :  Initializes the File component.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  TTFile_Init( PEngine_Instance  engine )
-  {
-    TT_Error  error;
-
-
-    files.stream = NULL;
-    ZERO_Frame( files.frame );
-
-    if ( ALLOC( files.frame_cache, FRAME_CACHE_SIZE ) )
-      return error;
-
-    return TT_Err_Ok;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TTFile_Done
- *
- *  Description :  Finalizes the File component.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  TTFile_Done( PEngine_Instance  engine )
-  {
-    FREE( files.frame_cache );
-
-    return TT_Err_Ok;
-  }
-#endif
-
-
-/*******************************************************************
- *
- *  Function    : TT_Use_Stream
- *
- *  Description : Copies or duplicates a given stream.
- *
- *  Input  :  org_stream   original stream
- *            stream       target stream (copy or duplicate)
- *
- *  Output :  Error code.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Use_Stream( TT_Stream   org_stream,
-                           TT_Stream*  stream )
-  {
-     *stream = org_stream;                    /* copy the stream    */
-     files.stream = STREAM2REC(org_stream);   /* set current stream */
-
-     Stream_Activate( files.stream );
-
-     return TT_Err_Ok;
-  }
-
-
-/*******************************************************************
- *
- *  Function    : TT_Done_Stream
- *
- *  Description : Releases a given stream.
- *
- *  Input  :  stream  target stream
- *
- *  Output :  void.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Done_Stream( TT_Stream*  stream )
-  {
-     HANDLE_Set( *stream, NULL );
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Access_Frame
- *
- *  Description :  Notifies the component that we're going to read
- *                 'size' bytes from the current file position.
- *                 This function should load/cache/map these bytes
- *                 so that they will be addressed by the GET_xxx
- *                 functions easily.
- *
- *  Input  :  size   number of bytes to access.
- *
- *  Output :  SUCCESS on success. FAILURE on error.
- *
- *  Notes:    The function fails if the byte range is not within the
- *            the file, or if there is not enough memory to cache
- *            the bytes properly (which usually means that `size' is
- *            too big in both cases).
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size )
-  {
-    TT_Error  error;
-
-
-    if ( CUR_Frame.address != NULL )
-      return TT_Err_Nested_Frame_Access;
-
-    if ( size <= FRAME_CACHE_SIZE )
-    {
-      /* use the cache */
-      CUR_Frame.address = files.frame_cache;
-      CUR_Frame.size    = FRAME_CACHE_SIZE;
-    }
-    else
-    {
-      if ( ALLOC( CUR_Frame.address, size ) )
-        return error;
-      CUR_Frame.size    = size;
-    }
-
-    error = TT_Read_File( STREAM_VARS (void*)CUR_Frame.address, size );
-    if (error)
-    {
-      if ( size > FRAME_CACHE_SIZE )
-        FREE( CUR_Frame.address );
-      CUR_Frame.address = NULL;
-      CUR_Frame.size    = 0;
-    }
-
-    CUR_Frame.cursor = CUR_Frame.address;
-    return error;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Check_And_Access_Frame
- *
- *  Description :  Notifies the component that we're going to read
- *                 `size' bytes from the current file position.
- *                 This function should load/cache/map these bytes
- *                 so that they will be addressed by the GET_xxx
- *                 functions easily.
- *
- *  Input  :  size   number of bytes to access.
- *
- *  Output :  SUCCESS on success. FAILURE on error.
- *
- *  Notes:    The function truncates `size' if the byte range is not
- *            within the file.
- *
- *            It will fail if there is not enough memory to cache
- *            the bytes properly (which usually means that `size' is
- *            too big).
- *
- *            It will fail if you make two consecutive calls
- *            to TT_Access_Frame(), without a TT_Forget_Frame() between
- *            them.
- *
- *            The only difference with TT_Access_Frame() is that we
- *            check that the frame is within the current file.  We
- *            otherwise truncate it.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Check_And_Access_Frame( STREAM_ARGS FRAME_ARGS Short  size )
-  {
-    TT_Error  error;
-    Long      readBytes, requested;
-
-
-    if ( CUR_Frame.address != NULL )
-      return TT_Err_Nested_Frame_Access;
-
-    if ( size <= FRAME_CACHE_SIZE )
-    {
-      /* use the cache */
-      CUR_Frame.address = files.frame_cache;
-      CUR_Frame.size    = FRAME_CACHE_SIZE;
-    }
-    else
-    {
-      if ( ALLOC( CUR_Frame.address, size ) )
-        return error;
-      CUR_Frame.size    = size;
-    }
-
-    requested = size;
-    readBytes = CUR_Stream->size - TT_File_Pos( STREAM_VAR );
-    if ( size > readBytes )
-      size = readBytes;
-
-    error = TT_Read_File( STREAM_VARS (void*)CUR_Frame.address, size );
-    if (error)
-    {
-      if ( requested > FRAME_CACHE_SIZE )
-        FREE( CUR_Frame.address );
-      CUR_Frame.address = NULL;
-      CUR_Frame.size    = 0;
-    }
-
-    CUR_Frame.cursor = CUR_Frame.address;
-    return error;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Forget_Frame
- *
- *  Description :  Releases a cached frame after reading.
- *
- *  Input  :  None
- *
- *  Output :  SUCCESS on success. FAILURE on error.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Forget_Frame( FRAME_ARG )
-  {
-    if ( CUR_Frame.address == NULL )
-      return TT_Err_Nested_Frame_Access;
-
-    if ( CUR_Frame.size > FRAME_CACHE_SIZE )
-      FREE( CUR_Frame.address );
-
-    ZERO_Frame( CUR_Frame );
-
-    return TT_Err_Ok;
-  }
-
-
-#else /* TT_CONFIG_OPTION_THREAD_SAFE */
 
   /*******************************************************************/
   /*******************************************************************/
@@ -426,82 +102,6 @@
 #define STREAM_VARS  stream,
 #define STREAM_VAR   stream
 
-
-#ifndef __GEOS__
-
-/*******************************************************************
- *
- *  Function    :  TTFile_Init
- *
- *  Description :  Initializes the File component.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  TTFile_Init( PEngine_Instance  engine )
-  {
-    return TT_Err_Ok;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  TTFile_Done
- *
- *  Description :  Finalizes the File component.
- *
- ******************************************************************/
-
-  LOCAL_FUNC
-  TT_Error  TTFile_Done( PEngine_Instance  engine )
-  {
-    return TT_Err_Ok;
-  }
-  
-#endif
-
-
-/*******************************************************************
- *
- *  Function    :  TT_Use_Stream
- *
- *  Description :  Duplicates a stream for a new usage.
- *
- *  Input  :  input_stream   source stream to duplicate
- *            copy           address of target duplicate stream
- *
- *  Output :  error code.
- *            The target stream is set to NULL in case of failure.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Use_Stream( TT_Stream   input_stream,
-                           TT_Stream*  copy )
-  {
-    PStream_Rec  rec = STREAM2REC( input_stream );
-
-    return TT_Open_Stream( rec->file, copy );
-  }
-
-
-/*******************************************************************
- *
- *  Function    : TT_Done_Stream
- *
- *  Description : Releases a given stream.
- *
- *  Input  :  stream  target stream
- *
- *  Output :  void.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  void  TT_Done_Stream( TT_Stream*  stream )
-  {
-    TT_Close_Stream( stream );
-  }
 
 
 /*******************************************************************
@@ -536,13 +136,11 @@
 
     if ( ALLOC( CUR_Frame.address, size ) )
       return error;
-    CUR_Frame.size    = size;
 
     error = TT_Read_File( STREAM_VARS (void*)CUR_Frame.address, size );
     if ( error )
     {
       FREE( CUR_Frame.address );
-      CUR_Frame.size    = 0;
     }
 
     CUR_Frame.cursor = CUR_Frame.address;
@@ -593,7 +191,6 @@
 
     if ( ALLOC( CUR_Frame.address, size ) )
       return error;
-    CUR_Frame.size    = size;
 
     readBytes = CUR_Stream->size - TT_File_Pos( STREAM_VAR );
     if ( size > readBytes )
@@ -603,7 +200,6 @@
     if ( error )
     {
       FREE( CUR_Frame.address );
-      CUR_Frame.size    = 0;
     }
 
     CUR_Frame.cursor = CUR_Frame.address;
@@ -630,12 +226,10 @@
       return TT_Err_Nested_Frame_Access;
 
     FREE( CUR_Frame.address );
-    ZERO_Frame( CUR_Frame );
+    CUR_Frame.cursor = NULL;
 
     return TT_Err_Ok;
   }
-
-#endif /* TT_CONFIG_OPTION_THREAD_SAFE */
 
 
   /*******************************************************************/
@@ -647,99 +241,6 @@
   /*******************************************************************/
   /*******************************************************************/
   /*******************************************************************/
-
-/*******************************************************************
- *
- *  Function    :  Stream_Activate
- *
- *  Description :  activates a stream, this will either:
- *                   - open a new file handle if the stream is closed
- *                   - move the stream to the head of the linked list
- *
- *  Input  :  stream   the stream to activate
- *
- *  Output :  error condition.
- *
- *  Note   :  This function is also called with fresh new streams
- *            created by TT_Open_Stream().  They have their 'size'
- *            field set to -1.
- *
- ******************************************************************/
-
-  static  TT_Error  Stream_Activate( PStream_Rec  stream )
-  {
-    if ( !stream->file )
-      return TT_Err_Could_Not_ReOpen_File;
-
-    /* A newly created stream has a size field of -1 */
-    if ( stream->size < 0 )
-      stream->size = FileSize( stream->file );
-
-    /* Reset cursor in file */
-    if ( stream->position )
-    {
-      FilePos( stream->file, stream->position, FILE_POS_START);
-      if ( ThreadGetError() != NO_ERROR_RETURNED )
-        return TT_Err_Could_Not_ReSeek_File;
-    }
-    return TT_Err_Ok;
-  }
-
-
-/*******************************************************************
- *
- *  Function    :  Stream_DeActivate
- *
- *  Description :  deactivates a stream, this will :
- *                   - close its file handle if it was opened
- *                   - remove it from the opened list if necessary
- *
- *  Input  :  stream   the stream to deactivate
- *
- *  Output :  void
- *
- *  Note   :  the function is called whenever a stream is deleted
- *            (_not_ when a stream handle's is closed due to an
- *             activation). However, the stream record isn't
- *            destroyed by it..
- *
- ******************************************************************/
-
-  static  void  Stream_Deactivate( PStream_Rec  stream )
-  {
-    /* Save its current position within the file */
-    stream->position = FilePos( stream->file, 0, FILE_POS_RELATIVE );  
-  }
-
-
-#ifndef __GEOS__
-
-/*******************************************************************
- *
- *  Function    :  TT_Stream_Size
- *
- *  Description :  Returns the length of a given stream, even if it
- *                 is flushed.
- *
- *  Input  :  stream     the stream
- *
- *  Output :  Length of stream in bytes.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  Long  TT_Stream_Size( TT_Stream  stream )
-  {
-    PStream_Rec  rec = STREAM2REC( stream );
-
-
-    if ( rec )
-      return rec->size;
-
-    return 0;  /* invalid stream - return 0 */
-  }
-
-#endif
 
 
 /*******************************************************************
@@ -758,39 +259,40 @@
  *
  ******************************************************************/
 
-  LOCAL_FUNC
-  TT_Error  TT_Open_Stream( const FileHandle  file,
-                            TT_Stream*        stream )
-  {
-    TT_Error     error;
-    PStream_Rec  stream_rec;
+LOCAL_FUNC
+TT_Error TT_Open_Stream( const FileHandle file,
+                               TT_Stream* stream )
+{
+  TT_Error     error;
+  PStream_Rec  stream_rec;
 
-    CHECK_FILE( file );
+  CHECK_FILE( file );
 
-    if ( ALLOC( *stream, sizeof ( TStream_Rec ) ) )
-      return error;
-
-    stream_rec = STREAM2REC( *stream );
-
-    stream_rec->file     = file;
-    stream_rec->size     = -1L;
-    stream_rec->position = 0;
-
-    error = Stream_Activate( stream_rec );
-    if ( error )
-      goto Fail;
-
-#ifndef TT_CONFIG_OPTION_THREAD_SAFE
-    CUR_Stream = stream_rec;
-#endif
-
-    return TT_Err_Ok;
-
-  Fail:
-    FREE( stream_rec );
+  if ( ALLOC( *stream, sizeof ( TStream_Rec ) ) )
     return error;
+
+  stream_rec = STREAM2REC( *stream );
+
+  stream_rec->file = file;
+
+  if ( !stream_rec->file )
+  {
+    error = TT_Err_Could_Not_Open_File;
+    goto Fail;
   }
 
+  stream_rec->size = FileSize( file );
+
+#ifndef TT_CONFIG_OPTION_THREAD_SAFE
+  CUR_Stream = stream_rec;
+#endif
+
+  return TT_Err_Ok;
+
+Fail:
+  FREE( stream_rec );
+  return error;
+}
 
 /*******************************************************************
  *
@@ -810,47 +312,10 @@
     PStream_Rec  rec = STREAM2REC( *stream );
 
 
-    Stream_Deactivate( rec );
     FREE( rec );
 
     HANDLE_Set( *stream, NULL );
   }
-
-
-#ifndef __GEOS__
-
-/*******************************************************************
- *
- *  Function    : TT_Flush_Stream
- *
- *  Description : Flushes a stream, i.e., closes its file handle.
- *
- *  Input  :  stream         address of target TT_Stream structure
- *
- *  Output :  Error code
- *
- *  NOTE : Never flush the current opened stream.  This means that
- *         you should _never_ call this function between a
- *         TT_Use_Stream() and a TT_Done_Stream()!
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  TT_Error  TT_Flush_Stream( TT_Stream*  stream )
-  {
-    PStream_Rec  rec = STREAM2REC( *stream );
-
-
-    if ( rec )
-    {
-      Stream_Deactivate( rec );
-      return TT_Err_Ok;
-    }
-
-    return TT_Err_Invalid_Argument;
-  }
-
-#endif /* __GEOS__ */
 
 
 /*******************************************************************
@@ -941,12 +406,16 @@
                                          void*  buffer,
                                          Short  count )
   {
-    TT_Error  error;
+    PStream_Rec streamRec = STREAM2REC( stream );
 
 
-    if ( (error = TT_Seek_File( STREAM_VARS position ))      != TT_Err_Ok ||
-         (error = TT_Read_File( STREAM_VARS buffer, count )) != TT_Err_Ok )
-      return error;
+    FilePos( streamRec->file, position, FILE_POS_START );
+
+    if( ThreadGetError() != NO_ERROR_RETURNED )
+      return TT_Err_Invalid_File_Offset;
+
+    if( FileRead( streamRec->file, buffer, count, FALSE ) != count )
+      return TT_Err_Invalid_File_Read;
 
     return TT_Err_Ok;
   }
@@ -969,91 +438,6 @@
   {
     return FilePos( CUR_Stream->file, 0, FILE_POS_RELATIVE );
   }
-
-
-#ifndef __GEOS__
-/*******************************************************************
- *
- *  Function    :  GET_Char
- *
- *  Description :  Extracts a signed byte from the current file frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted char.
- *
- ******************************************************************/
-  EXPORT_FUNC
-  Char  TT_Get_Char( FRAME_ARG )
-  {
-    CHECK_FRAME( CUR_Frame, 1 );
-
-    return (Char)(*CUR_Frame.cursor++);
-  }
-#endif
-
-
-#ifndef __GEOS__
-/*******************************************************************
- *
- *  Function    :  GET_Short
- *
- *  Description :  Extracts a short from the current file frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted short.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  Short  TT_Get_Short( FRAME_ARG )
-  {
-    Short  getshort;
-
-
-    CHECK_FRAME( CUR_Frame, 2 );
-
-    getshort = (Short)((CUR_Frame.cursor[0] << 8) | 
-                        CUR_Frame.cursor[1]);
-
-    CUR_Frame.cursor += 2;
-
-    return getshort;
-  }
-#endif
-
-#ifndef __GEOS__
-/*******************************************************************
- *
- *  Function    :  GET_Long
- *
- *  Description :  Extracts a long from the frame.
- *
- *  Input  :  None or current frame
- *
- *  Output :  Extracted long.
- *
- ******************************************************************/
-
-  EXPORT_FUNC
-  Long  TT_Get_Long( FRAME_ARG )
-  {
-    Long  getlong;
-
-
-    CHECK_FRAME( CUR_Frame, 4 );
-
-    getlong = ((Long)CUR_Frame.cursor[0] << 24) |
-              ((Long)CUR_Frame.cursor[1] << 16) |
-              ((Long)CUR_Frame.cursor[2] << 8 ) |
-               (Long)CUR_Frame.cursor[3];
-
-    CUR_Frame.cursor += 4;
-
-    return getlong;
-  }
-#endif
 
 
 /* END */

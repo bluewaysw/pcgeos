@@ -1421,13 +1421,8 @@ Boolean LOCAL testScriptCode(VMFileHandle file, VMBlockHandle code, dword offset
     switch(URLRequestGetRet(retType))
     {
       case URL_RET_ABORTED:
-@ifdef GLOBAL_INTERNET_BUILD
-     /* no error message, just keep current page and restore URL field */
-     /* update URL field, and other navigation items */
-     @send, forceQueue document::MSG_META_GAINED_MODEL_EXCL();
-@else
-        htmlMsg = @MsgAborted;          /* error message in buffer */
-@endif
+        /* Keep the partial page and restore the navigation state. */
+        @send, forceQueue document::MSG_META_GAINED_MODEL_EXCL();
 @ifdef RELOAD_ERROR_PAGE
 	errorPage = TRUE;
 @endif
@@ -1577,7 +1572,9 @@ Boolean LOCAL testScriptCode(VMFileHandle file, VMBlockHandle code, dword offset
         break;
 
       case URL_RET_MESSAGE:
-        htmlMsg = result.htmlMsg ;      /* HTML mesage from URL Driver */
+        /* The frame uses MsgAborted for its synthetic Stop acknowledgement. */
+        if (result.htmlMsg != @MsgAborted)
+          htmlMsg = result.htmlMsg ;    /* HTML message from URL Driver */
         break;
 
       default:

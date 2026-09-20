@@ -199,6 +199,131 @@ WINDOW *newwin(int	num_lines,
 } /* newwin */
 
 /****************************************************************/
+/* Resizewin() changes the size of an existing window, keeping	*/
+/* as much of the old contents as still fits. When the window	*/
+/* gets shorter, lines come off the top if that is what it	*/
+/* takes to keep the cursor on screen, otherwise off the		*/
+/* bottom. Returns the window, or ERR -- in which case the	*/
+/* window is left exactly as it was.				*/
+/****************************************************************/
+
+WINDOW *resizewin(WINDOW *win, int num_lines, int num_columns)
+{
+    ntcCell **newLine;
+    short     *newMinChng;
+    short     *newMaxChng;
+    int       drop;
+    int       keep;
+    int       copyCols;
+    int       i;
+    int       j;
+
+    if ((win == (WINDOW *)NULL) || (num_lines <= 0) || (num_columns <= 0)) {
+	return((WINDOW *) ERR);
+    }
+    if ((num_lines == win->_maxy) && (num_columns == win->_maxx)) {
+	return(win);
+    }
+
+    /*
+     * Everything is allocated before anything is changed, so that running
+     * out of memory part way through leaves the window untouched rather
+     * than half converted.
+     */
+    newLine = (ntcCell **) calloc(num_lines, sizeof(ntcCell *));
+    if (newLine == (ntcCell **)NULL) {
+	return((WINDOW *) ERR);
+    }
+    for (j = 0; j < num_lines; j++) {
+	newLine[j] = (ntcCell *) calloc(num_columns, sizeof(ntcCell));
+	if (newLine[j] == (ntcCell *)NULL) {
+	    while (--j >= 0) {
+		free(newLine[j]);
+	    }
+	    free(newLine);
+	    return((WINDOW *) ERR);
+	}
+    }
+
+    newMinChng = (short *) malloc(sizeof(short) * num_lines);
+    newMaxChng = (short *) malloc(sizeof(short) * num_lines);
+    if ((newMinChng == (short *)NULL) || (newMaxChng == (short *)NULL)) {
+	if (newMinChng != (short *)NULL) {
+	    free(newMinChng);
+	}
+	if (newMaxChng != (short *)NULL) {
+	    free(newMaxChng);
+	}
+	for (j = 0; j < num_lines; j++) {
+	    free(newLine[j]);
+	}
+	free(newLine);
+	return((WINDOW *) ERR);
+    }
+
+    /*
+     * Decide which of the old lines survive. Lines are only taken off the
+     * top when the cursor would otherwise end up below the last line of
+     * the smaller window.
+     */
+    drop = 0;
+    if (win->_cury >= num_lines) {
+	drop = win->_cury - num_lines + 1;
+    }
+    keep = win->_maxy - drop;
+    if (keep > num_lines) {
+	keep = num_lines;
+    }
+    if (keep < 0) {
+	keep = 0;
+    }
+
+    copyCols = (win->_maxx < num_columns) ? win->_maxx : num_columns;
+
+    for (j = 0; j < num_lines; j++) {
+	for (i = 0; i < num_columns; i++) {
+	    (void) makeNtcCell(&newLine[j][i], ' ');
+	}
+	if (j < keep) {
+	    for (i = 0; i < copyCols; i++) {
+		newLine[j][i] = win->_line[drop + j][i];
+	    }
+	}
+	newMinChng[j] = 0;
+	newMaxChng[j] = num_columns - 1;
+    }
+
+    for (j = 0; j < win->_maxy; j++) {
+	free(win->_line[j]);
+    }
+    free(win->_line);
+    free(win->_minchng);
+    free(win->_maxchng);
+
+    win->_line = newLine;
+    win->_minchng = newMinChng;
+    win->_maxchng = newMaxChng;
+    win->_maxy = num_lines;
+    win->_maxx = num_columns;
+
+    win->_cury -= drop;
+    if (win->_cury >= num_lines) {
+	win->_cury = num_lines - 1;
+    }
+    if (win->_cury < 0) {
+	win->_cury = 0;
+    }
+    if (win->_curx >= num_columns) {
+	win->_curx = num_columns - 1;
+    }
+    if (win->_curx < 0) {
+	win->_curx = 0;
+    }
+
+    return(win);
+}
+
+/****************************************************************/
 /* Subwin() creates a sub-window in the 'orig' window, with	*/
 /* size num_lines * num_columns, and with origin begx, begy	*/
 /* relative to the SCREEN. Special case: if num_lines and/or	*/

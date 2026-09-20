@@ -254,9 +254,6 @@ extern TEngine_Instance engineInstance;
     Short     traceOfs;             /* current offset in target bitmap */
     Short     traceOfsLastLine;     /* offset in traget region before line step */
     Short     traceIncr;            /* sweep's increment in target bitmap */
-#ifdef __GEOS__
-    Bool      regionStarted;        /* true after region output was initialized */
-#endif
 
     /* dispatch variables */
 
@@ -315,18 +312,8 @@ extern TEngine_Instance engineInstance;
       return FAILURE;
     }
 
-    if ( aState == Unknown )
-    {
-      ras.error = Raster_Err_Invalid;
-      return FAILURE;
-    }
-    ras.cProfile->flow = ( aState == Ascending ) ? TT_Flow_Up : TT_Flow_Down;
-
-    ras.cProfile->start  = 0;
-    ras.cProfile->height = 0;
+    ras.cProfile->flow   = ( aState == Ascending ) ? TT_Flow_Up : TT_Flow_Down;
     ras.cProfile->offset = ras.top;
-    ras.cProfile->link   = (PProfile)0;
-    ras.cProfile->next   = (PProfile)0;
 
     if ( !ras.gProfile )
       ras.gProfile = ras.cProfile;
@@ -374,7 +361,6 @@ extern TEngine_Instance engineInstance;
 
       ras.top             += AlignProfileSize;
 
-      ras.cProfile->height = 0;
       ras.cProfile->offset = ras.top;
       oldProfile->next     = ras.cProfile;
       ++ras.num_Profs;
@@ -406,40 +392,36 @@ extern TEngine_Instance engineInstance;
   static Bool _near  Insert_Y_Turn( RAS_ARGS  Int  y )
   {
     PStorage  y_turns;
-    Int       y2, n;
+    Int       n;
 
-    n       = ras.numTurns-1;
+    n       = ras.numTurns - 1;
     y_turns = ras.sizeBuff - ras.numTurns;
 
     /* look for first y value that is <= */
     while ( n >= 0 && y < y_turns[n] )
       --n;
 
-    /* if it is <, simply insert it, ignore if == */
-    if ( n >= 0 && y > y_turns[n] )
-      while ( n >= 0 )
-      {
-        y2 = y_turns[n];
-        y_turns[n] = y;
-        y = y2;
-        --n;
-      }
+    /* ignore duplicate y values */
+    if ( n >= 0 && y == y_turns[n] )
+      return SUCCESS;
 
-    if ( n < 0 )
+    if ( ras.maxBuff <= ras.top + 1 )
     {
-      if (ras.maxBuff <= ras.top + 1)
-      {
-        ras.error = Raster_Err_Overflow;
-        return FAILURE;
-      }
-      --ras.maxBuff;
-      ++ras.numTurns;
-      ras.sizeBuff[-ras.numTurns] = y;
+      ras.error = Raster_Err_Overflow;
+      return FAILURE;
     }
 
-    return SUCCESS;
-  }
+    /* Make room for the new turn. The turn table grows downwards */
+    /* from the end of the render pool.                           */
+  if ( n >= 0 )
+    MEM_Move( y_turns - 1, y_turns, (n + 1) * sizeof ( Storage ) );
 
+  --ras.maxBuff;
+  ++ras.numTurns;
+  y_turns[n] = y;
+
+  return SUCCESS;
+}
 
 /****************************************************************************/
 /*                                                                          */
@@ -604,10 +586,10 @@ extern TEngine_Instance engineInstance;
       ++e1;
     }
     else if ( ras.joint )
-      {
-        ras.top--;
-        ras.joint = FALSE;
-      }
+    {
+      ras.top--;
+      ras.joint = FALSE;
+    }
 
     ras.joint = ( f2 == 0 );
 
@@ -835,51 +817,36 @@ extern TEngine_Instance engineInstance;
 
   static Bool _near  Line_To( RAS_ARGS Long  x, Long  y )
   {
-    /* First, detect a change of direction */
+    TStates  newState;
 
-    switch ( ras.state )
+
+    /* Horizontal segments don't change the profile and don't */
+    /* contribute any scanline intersections.                 */
+    if ( y != ras.lastY )
     {
-    case Unknown:
-      if ( y > ras.lastY )
+      newState = y > ras.lastY ? Ascending : Descending;
+
+      /* Detect a change of direction. */
+      if ( ras.state != newState )
       {
-        if ( New_Profile( RAS_VARS  Ascending ) ) return FAILURE;
-      } 
-      else if ( y < ras.lastY )
-      {
-          if ( New_Profile( RAS_VARS  Descending ) ) return FAILURE;
+        if ( ras.state != Unknown && End_Profile( RAS_VAR ) )
+          return FAILURE;
+
+        if ( New_Profile( RAS_VARS newState ) )
+          return FAILURE;
       }
-      break;
 
-    case Ascending:
-      if ( y < ras.lastY )
+      /* Compute the line according to its direction. */
+      if ( newState == Ascending )
       {
-        if ( End_Profile( RAS_VAR ) ||
-             New_Profile( RAS_VARS  Descending ) ) return FAILURE;
+        if ( Line_Up( RAS_VARS ras.lastX, ras.lastY, x, y, ras.minY, ras.maxY ) )
+          return FAILURE;
       }
-      break;
-
-    case Descending:
-      if ( y > ras.lastY )
+      else
       {
-        if ( End_Profile( RAS_VAR ) ||
-             New_Profile( RAS_VARS  Ascending ) ) return FAILURE;
+        if ( Line_Down( RAS_VARS ras.lastX, ras.lastY, x, y, ras.minY, ras.maxY ) )
+          return FAILURE;
       }
-      break;
-    }
-
-    /* Then compute the lines */
-
-    if ( ras.state == Ascending )
-    {
-      if ( Line_Up ( RAS_VARS  ras.lastX, ras.lastY,
-                     x, y, ras.minY, ras.maxY ) )
-        return FAILURE;
-    }
-    else if ( ras.state == Descending )
-    {
-      if ( Line_Down( RAS_VARS ras.lastX, ras.lastY,
-                      x, y, ras.minY, ras.maxY ) )
-        return FAILURE;
     }
 
     ras.lastX = x;
@@ -973,7 +940,7 @@ extern TEngine_Instance engineInstance;
 
         /* compute */
 
-        switch ( ras.state )
+        switch ( state_bez )
         {
         case Ascending:
           if ( Bezier_Up ( RAS_VARS ras.minY, ras.maxY ) )
@@ -1156,8 +1123,6 @@ extern TEngine_Instance engineInstance;
 
 
     ras.fProfile         = NULL;
-    ras.joint            = FALSE;
-    ras.fresh            = FALSE;
     ras.maxBuff          = ras.sizeBuff - AlignProfileSize;
     ras.numTurns         = 0;
     ras.cProfile         = (PProfile)ras.top;
@@ -1193,12 +1158,6 @@ extern TEngine_Instance engineInstance;
 
     if (Finalize_Profile_Table( RAS_VAR ))
       return FAILURE;
-
-    if ( ras.top >= ras.maxBuff )
-    {
-      ras.error = Raster_Err_Overflow;
-      return FAILURE;
-    }
 
     return SUCCESS;
   }
@@ -1476,18 +1435,9 @@ extern TEngine_Instance engineInstance;
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Vertical_Region_Sweep_Init( RAS_ARGS Short*  min )
+  static void _near  Null_Sweep_Init( RAS_ARGS Short* min )
   {
-    (void)min;
-
-    if ( !ras.regionStarted )
-    {
-      ras.traceOfs         = 0;
-      ras.traceOfsLastLine = -1;
-      ras.regionStarted    = TRUE;
-    }
-
-    ras.traceIncr = 0;
+    (void)raster, (void)min;
   }
 
   static void _near  Vertical_Region_Sweep_Span( RAS_ARGS Short       y,
@@ -1512,14 +1462,6 @@ extern TEngine_Instance engineInstance;
     }
   }
 
-  static void _near  Vertical_Region_Sweep_Drop( RAS_ARGS Short       y,
-                                                          TT_F26Dot6  x1,
-                                                          TT_F26Dot6  x2,
-                                                          PProfile    left,
-                                                          PProfile    right )
-  {
-    (void)raster, (void)y, (void)x1, (void)x2, (void)left, (void)right;
-  } 
 
   static void _near  Vertical_Region_Sweep_Step( RAS_ARGS Short y )
   {
@@ -1577,12 +1519,7 @@ extern TEngine_Instance engineInstance;
 /*                                                                     */
 /***********************************************************************/
 
-  static void _near  Horizontal_Sweep_Init( RAS_ARGS Short*  min )
-  {
-    (void)raster, (void)min;
-  }
-
-
+ 
   static void _near  Horizontal_Sweep_Span( RAS_ARGS Short y,
                                                      TT_F26Dot6  x1,
                                                      TT_F26Dot6  x2 )
@@ -1969,8 +1906,7 @@ extern TEngine_Instance engineInstance;
 
     y = min_Y;
 
-    if ( ras.numTurns > 0 &&
-         ras.sizeBuff[-ras.numTurns] == min_Y )
+    if ( ras.sizeBuff[-ras.numTurns] == min_Y )
       --ras.numTurns;
 
     while ( ras.numTurns > 0 )
@@ -2028,13 +1964,12 @@ extern TEngine_Instance engineInstance;
             x2 = xs;
           }
 
-          if ( x2-x1 <= PRECISION )
+          if ( x2-x1 <= PRECISION && ras.dropOutControl != 0)
           {
             e1 = FLOOR( x1 );
             e2 = CEILING( x2 );
 
-            if ( ras.dropOutControl != 0 &&
-                 (e1 > e2 || e2 == e1 + PRECISION) )
+            if ( e1 > e2 || e2 == e1 + PRECISION )
             {
               /* a drop out was detected */
 
@@ -2132,8 +2067,7 @@ Scan_DropOuts :
         e1 = FLOOR( x1 );
         e2 = CEILING( x2 );
 
-        if ( ras.dropOutControl != 0 &&
-             ( e1 > e2 || e2 == e1 + PRECISION ) )
+        if ( e1 > e2 || e2 == e1 + PRECISION )
         {
           ras.Proc_Sweep_Drop( RAS_VARS  y,
                                x1,
@@ -2166,18 +2100,14 @@ Scan_DropOuts :
 
   static TT_Error  Render_Single_Pass( RAS_ARGS Bool  flipped )
   {
-    Short  i, j, k;
-    TBand  band;
-    Int    band_top = 1;
+    Short     i, j, k;
+    TBand     band;
+    Int       band_top = 1;
+    PStorage  buffer;
 
 
-    /*
-     * Treat band_stack as a stack of pending bands.  When a band overflows,
-     * push the upper half first and the lower half last so that the lower
-     * half is processed first.  Bitmap rendering is order independent, but
-     * GEOS region output is not: it appends scanline records and must see
-     * bands in ascending y order.
-     */
+    buffer = ras.sizeBuff - ( RASTER_RENDER_POOL_SIZE >> 2 );
+
     while ( band_top > 0 )
     {
       band = ras.band_stack[--band_top];
@@ -2185,7 +2115,7 @@ Scan_DropOuts :
       ras.maxY = (Long)band.y_max * PRECISION;
       ras.minY = (Long)band.y_min * PRECISION;
 
-      ras.top = MemDeref( ras.buffer );
+      ras.top = buffer;
 
       ras.error = Raster_Err_None;
 
@@ -2198,17 +2128,8 @@ Scan_DropOuts :
         i = band.y_min;
         j = band.y_max;
 
-        if ( i >= j )
-        {
-          ras.error = Raster_Err_Overflow;
+        if ( i >= j || band_top > MaxBand - 2 )
           return ras.error;
-        }
-
-        if ( band_top > MaxBand - 2 )
-        {
-          ras.error = Raster_Err_Overflow;
-          return ras.error;
-        }
 
         k = ( i + j ) >> 1;
 
@@ -2298,7 +2219,7 @@ EC( ECCheckBounds( (void*)target_map ) );
 
     if ( ras.dropOutControl != 0 )
     {
-      ras.Proc_Sweep_Init   = Horizontal_Sweep_Init;
+      ras.Proc_Sweep_Init   = Null_Sweep_Init;
       ras.Proc_Sweep_Span   = Horizontal_Sweep_Span;
       ras.Proc_Sweep_Drop   = Horizontal_Sweep_Drop;
       ras.Proc_Sweep_Step   = Horizontal_Sweep_Step;
@@ -2348,18 +2269,20 @@ EC( ECCheckBounds( (void*)map ) );
     /* disable drop-out control */
     ras.dropOutControl = 0;
 
-    /* Vertical Sweep */
-    ras.Proc_Sweep_Init   = Vertical_Region_Sweep_Init;
+    /* Region rendering disables drop-out control, so Proc_Sweep_Drop */
+    /* is never called and does not need to be initialized here.      */
+    ras.Proc_Sweep_Init   = Null_Sweep_Init;
     ras.Proc_Sweep_Span   = Vertical_Region_Sweep_Span;
-    ras.Proc_Sweep_Drop   = Vertical_Region_Sweep_Drop;
     ras.Proc_Sweep_Step   = Vertical_Region_Sweep_Step;
 
     ras.band_stack[0].y_min = 0;
     ras.band_stack[0].y_max = ras.target.rows - 1;
 
-    ras.bWidth        = ras.target.cols;
-    ras.bTarget       = (PByte)ras.target.bitmap;
-    ras.regionStarted = FALSE;
+    ras.bWidth           = ras.target.cols;
+    ras.bTarget          = (PByte)ras.target.bitmap;
+    ras.traceOfs         = 0;
+    ras.traceOfsLastLine = -1;
+    ras.traceIncr        = 0;
 
 
     /* lock renderpool cache */

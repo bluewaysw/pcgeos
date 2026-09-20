@@ -22,11 +22,13 @@
 #include "ttcmap.h"
 #include "tttags.h"
 #include "ttmemory.h"
+#include "ttload.h"
 #include <ec.h>
 #include <geode.h>
 #include <heap.h>
 
 static int strcmp( const char* s1, const char* s2 );
+static void TrueType_Free_Face(TRUETYPE_VARS);
 
 
 #pragma code_seg(ttapi_TEXT)
@@ -82,10 +84,15 @@ EC(     ECCheckFileHandle( TTFILE) );
                 goto Fail;
         if ( TT_New_Instance( FACE, &INSTANCE ) )
                 goto Fail;
+        if( TT_New_Glyph( FACE, &GLYPH ) )
+                goto Fail;
 
         /* create lookup table for kernpairs if face supports kerning */
         LOOKUP_TABLE = CreateIndexLookupTable( CHAR_MAP );
 EC(     ECCheckMemHandle( LOOKUP_TABLE ) );
+
+        /* runtime rendering does not require font name information. */
+        Free_TrueType_Names( HANDLE_Face( FACE ) );
 
         /* font has been fully loaded */
         trueTypeVars->entry = *entry;
@@ -142,10 +149,11 @@ void TrueType_Unlock_Face(TRUETYPE_VARS)
  * 
  *******************************************************************/
 
-void TrueType_Free_Face(TRUETYPE_VARS)
+static void TrueType_Free_Face(TRUETYPE_VARS)
 {
         if ( trueTypeVars->entry.TTOE_fontFileName[0] )
         {
+            TT_Done_Glyph( GLYPH );
             TT_Done_Instance( INSTANCE );
             TT_Close_Face( FACE );
             trueTypeVars->entry.TTOE_fontFileName[0] = 0;

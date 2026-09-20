@@ -1442,6 +1442,25 @@ void HandleErrorFunc(T_HTTPConnection *p_conn, Boolean *retry)
 }
 #endif
 
+#if PROGRESS_DISPLAY
+/* Stop clears the shared callback under LPD_sem. Release the semaphore
+   before invoking the snapshot: the callback also acquires LPD_sem. */
+static void * _pascal LoadProgressCallbackSnapshot(LoadProgressData *loadProgressDataP)
+{
+    void *callbackP;
+
+    if (!loadProgressDataP) {
+        return (void *)0;
+    }
+
+    ThreadPSem(loadProgressDataP->LPD_sem);
+    callbackP = loadProgressDataP->LPD_callback;
+    ThreadVSem(loadProgressDataP->LPD_sem);
+
+    return callbackP;
+}
+#endif
+
 /* we'll try twice with SSL2/SSL3/TLS1, then twice with SSL2 */
 #define NUM_SSL_ALL_RETRIES 2
 #define NUM_SSL_S2_RETRIES 2
@@ -1486,6 +1505,9 @@ word HTTPGet(HTTPConnectionHandle conn)
     word responseCode;
 #ifdef GET_RANGE
     Boolean deleteFile = FALSE;
+#endif
+#if PROGRESS_DISPLAY
+    void *loadProgressCallbackP;
 #endif
     MemHandle pathB = 0;
     int urlLen;
@@ -2364,7 +2386,9 @@ word HTTPGet(HTTPConnectionHandle conn)
         /* disable loading progress if small file */
         if (contentlength < progressMinCL) {
             if (p_conn->loadProgressDataP) {
+                ThreadPSem(p_conn->loadProgressDataP->LPD_sem);
                 p_conn->loadProgressDataP->LPD_callback = NULL;
+                ThreadVSem(p_conn->loadProgressDataP->LPD_sem);
             }
         }
 #endif
@@ -2453,10 +2477,14 @@ word HTTPGet(HTTPConnectionHandle conn)
 
 #if PROGRESS_DISPLAY
                 /* notify of loading progress (only first time through) */
-                if ((length == 0) && p_conn->loadProgressDataP && p_conn->loadProgressDataP->LPD_callback) {
-                    ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
-                        p_conn->loadProgressDataP, LPCT_OPEN, 0, 0,
-                        p_conn->loadProgressDataP->LPD_callback);
+                if ((length == 0) && p_conn->loadProgressDataP) {
+                    loadProgressCallbackP = LoadProgressCallbackSnapshot(
+                        p_conn->loadProgressDataP);
+                    if (loadProgressCallbackP) {
+                        ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
+                            p_conn->loadProgressDataP, LPCT_OPEN, 0, 0,
+                            loadProgressCallbackP);
+                    }
                 }
 #endif
 
@@ -2470,12 +2498,14 @@ word HTTPGet(HTTPConnectionHandle conn)
 
 #if PROGRESS_DISPLAY
                         /* update loading progress data stream */
-                        if (p_conn->loadProgressDataP && p_conn->loadProgressDataP->LPD_callback) {
+                        loadProgressCallbackP = LoadProgressCallbackSnapshot(
+                            p_conn->loadProgressDataP);
+                        if (loadProgressCallbackP) {
                             /* notify of new data available */
                             ((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
                                 p_conn->loadProgressDataP, LPCT_WRITE,
                                 p_conn->buffer, i,
-                                p_conn->loadProgressDataP->LPD_callback);
+                                loadProgressCallbackP);
                         }
 #endif
                     }
@@ -2557,12 +2587,14 @@ word HTTPGet(HTTPConnectionHandle conn)
 
 #if PROGRESS_DISPLAY
                 /* finish loading progress data stream */
-                if (p_conn->loadProgressDataP && p_conn->loadProgressDataP->LPD_callback) {
+                loadProgressCallbackP = LoadProgressCallbackSnapshot(
+                    p_conn->loadProgressDataP);
+                if (loadProgressCallbackP) {
                     /* if have data, notify of data finished */
 		    if (length) {
 			((pcfm_LoadProgressCallback *)ProcCallFixedOrMovable_pascal)(
 			    p_conn->loadProgressDataP, LPCT_CLOSE, 0, 0,
-			    p_conn->loadProgressDataP->LPD_callback);
+			    loadProgressCallbackP);
 			/* signal progress finished (unless aborted) */
 			if (p_conn->aborted) {
 			    rcode = URLRequestMakeRet(URL_RET_PROGRESS_ABORT) | ((rcode & URB_RF_NOCACHE) ? URB_RF_NOCACHE : 0);

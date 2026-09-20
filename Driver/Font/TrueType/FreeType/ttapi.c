@@ -466,39 +466,37 @@ Fail:
  ******************************************************************/
 
   EXPORT_FUNC
-  TT_Error  TT_Set_Instance_CharSize_And_Resolutions( TT_Instance  instance,
-                                                      TT_F26Dot6   charSize,
-                                                      TT_UShort    resolution )
-  {
-    PInstance   ins = HANDLE_Instance( instance );
-    TT_F26Dot6  scale1;
+  TT_Error TT_Set_Instance_CharSize_And_Resolutions( TT_Instance instance,
+                                                     TT_F26Dot6 charSize,
+                                                     TT_UShort resolution )
+{
+        PInstance   ins = HANDLE_Instance( instance );
+        TT_F26Dot6  scale1;
 
-EC( ECCheckBounds( ins ) );
+EC(     ECCheckBounds( ins ) );
 
-    if ( charSize < 1 * 64 )
-      charSize = 1 * 64;
+        if( charSize < 1 * 64 )
+                charSize = 1 * 64;
 
-    scale1 = ( charSize * resolution ) / 72;
+        if( ins->valid &&
+            ins->metrics.resolution == resolution &&
+            ins->metrics.pointSize == charSize )
+                return TT_Err_Ok;
 
-    if ( ins->owner->fontHeader.Flags & 8 )
-      scale1 = ( scale1 + 32 ) & -64;
+        scale1 = ( charSize * resolution ) / 72;
 
-    if ( ins->valid                        &&
-         ins->metrics.resolution == resolution &&
-         ins->metrics.x_scale1   == scale1     &&
-         ins->metrics.pointSize  == charSize )
-      return TT_Err_Ok;
+        if( ins->owner->fontHeader.Flags & 8 )
+                scale1 = ( scale1 + 32 ) & -64;
 
-    ins->metrics.resolution   = resolution;
-    ins->metrics.x_scale1     = scale1;
-    ins->metrics.units_per_em = ins->owner->fontHeader.Units_Per_EM;
-    ins->metrics.ppem         = scale1 >> 6;
-    ins->metrics.pointSize    = charSize;
-    ins->valid                = FALSE;
+        ins->metrics.resolution = resolution;
+        ins->metrics.scale1 = scale1;
+        ins->metrics.scale2 = ins->owner->fontHeader.Units_Per_EM;
+        ins->metrics.ppem = scale1 >> 6;
+        ins->metrics.pointSize = charSize;
+        ins->valid = FALSE;
 
-    return Instance_Reset( ins );
-  }
-
+        return Instance_Reset( ins );
+}
 
 /*******************************************************************
  *
@@ -743,7 +741,7 @@ EC( ECCheckBounds( _glyph ) );
     DEFINE_ALL_LOCALS;
 
     PFace     faze = HANDLE_Face(face);
-    Long      table;
+    Short     table;
     PStorage  glyphLocations;
     Short     bearing;
     UShort    advance;
@@ -759,8 +757,7 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
       return TT_Err_Glyf_Table_Missing;
 
     /* now access stream */
-    if ( USE_Stream( faze->stream, stream ) )
-      return error;
+    stream = faze->stream;
 
     glyphLocations = GEO_LOCK( faze->glyphLocationBlock );
 
@@ -807,7 +804,6 @@ EC_ERROR_IF( index >= faze->numGlyphs, TT_Err_Invalid_Argument );
     metrics->bearingX = bearing;
 
   Fail:
-    DONE_Stream( stream );
     return error;
   }
 
@@ -1129,7 +1125,6 @@ EC_ERROR_IF( charmapIndex >= faze->numCMaps, TT_Err_Invalid_Argument );
                             TT_UShort    charmapIndex,
                             TT_CharMap*  charMap )
   {
-    TT_Stream   stream;
     PCMapTable  cmap;
     TT_Error    error = TT_Err_Ok;
     PFace       faze = HANDLE_Face( face );
@@ -1141,19 +1136,14 @@ EC_ERROR_IF( charmapIndex >= faze->numCMaps, TT_Err_Invalid_Argument );
     cmap = faze->cMaps + charmapIndex;
 
     /* Load table if needed */
-    if ( !cmap->loaded )
+    if( !cmap->loaded )
     {
-      (void)USE_Stream( faze->stream, stream );
-      if ( !error )
-      {
-        error = CharMap_Load( cmap, stream );
-        DONE_Stream( stream );
-      }
+        error = CharMap_Load( cmap, faze->stream );
 
-      if ( error )
-        cmap = NULL;
-      else
-        cmap->loaded = TRUE;
+        if( error )
+          cmap = NULL;
+        else
+          cmap->loaded = TRUE;
     }
 
     HANDLE_Set( *charMap, cmap );

@@ -37,8 +37,6 @@
  *      internal functions
  ***********************************************************************/
 
-int _pascal compareLookupEntries(const void *a, const void *b);
-
 
 word geosCharMap[] = 
 {

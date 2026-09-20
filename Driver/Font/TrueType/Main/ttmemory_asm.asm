@@ -47,18 +47,18 @@ NOTES:
 	if it isn't, we free it up (so we have at most one empty lmem block
 	hanging around per geode).
 
-	In the GeodePrivData for each geode we keep 2 words - the first one
-	is the handle of a block containing a list of handles of lmem blocks
-	used for the small allocation scheme. The second one is the handle
-	of a block containing a list of handles of global memory blocks 
-	containing blocks allocated via the large allocation scheme.
+	In the GeodePrivData we keep the handle of a block containing
+    	a list of LMem blocks used by the small allocation scheme.
+
+    	Large allocations don't require a handle list.  Their memory
+    	handle is stored immediately before the user data and can be
+    	retrieved directly when the block is freed.
 	The format of these blocks is as follows:
 
-		word	numberOfEntriesInList	;This includes any empty slots
-		word	entry1
-		word	entry2
-		word	entry3
-			.
+	  word	numberOfEntriesInList	;This includes any empty slots
+	  word	entry1
+	  word	entry2
+	  word	entry3
 			.
 			.
 
@@ -466,8 +466,8 @@ largeAlloc:
 	jc	errRet
 
 	mov	ds:[0], bx		; Store handle before user data
-	mov	di, offset largeListHandle
 	mov	ax, LARGE_BLOCK_OFFSET	; AX = user data offset
+	jmp	zinitAndExit
 
 mallocCommon:
 	push	ds			; Save allocated block segment
@@ -537,7 +537,7 @@ PSEUDO CODE/STRATEGY:
 	Bail out silently if p itself is NULL (p.high == 0).
 	Bail out silently if *p is NULL (es:[si].high == 0).
 	If the block offset equals LARGE_BLOCK_OFFSET it was allocated
-	as a single global-heap block: remove from large list and free.
+	as a single global-heap block: retrieve its handle and free it.
 	Otherwise it is an lmem chunk: free the chunk via LMemFree.
 	If the lmem block is now completely empty, remove it from the
 	small list and free it too.
@@ -545,9 +545,6 @@ PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 	Accepts p == NULL or *p == NULL gracefully.
-	*p is zeroed only on the small-block path (exitZero); the large-
-	block path falls through to exit without zeroing *p -- this
-	matches the original behaviour.
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -556,6 +553,7 @@ REVISION HISTORY:
 	JK	23.05.2026	AI supported optimization:
 				- xor ax,ax replaces mov ax,0 and clr ax
 				- stosw pair replaces two mov [mem],ax stores
+	JK	30.08.2026	Large blocks no longer use a handle list
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 global _TT_Free:far
 _TT_Free	proc	far	p:fptr
@@ -576,18 +574,11 @@ _TT_Free	proc	far	p:fptr
 	jne	smallBlockFree
 
 ;	Large block: allocated as a single global-heap block.
-;	Remove from large list and free.
-NOFXIP<	segmov	ds, <segment udata>, di					>
-FXIP <	mov	bx, handle dgroup					>
-FXIP <	call	MemDerefDS			; ds = dgroup		>
-	mov	cx, ds:[largeListHandle]	; CX = large block list handle
-
-freeAndRemoveBlock:
-	mov	ds, es:[si+2]			; DS = segment of block to free
-	call	RemoveHandleFromMallocList
-	mov	bx, ds:[LMBH_handle]
+;	The block handle is stored immediately before the user data.
+	mov	ds, es:[si+2]		; DS = segment of block to free
+	mov	bx, ds:[0]		; BX = stored memory handle
 	call	MemFree
-	jmp	exit
+	jmp	exitZero
 
 smallBlockFree:
 ;	Small block: free the lmem chunk only.  The lmem block itself
@@ -607,7 +598,13 @@ FXIP <	call	MemDerefDS			; ds = dgroup		>
 EC <	call	ECCountFreeBlocksOnMallocList				>
 EC <	cmp	dx, 2							>
 EC <	ERROR_A	MORE_THAN_ONE_FREE_MALLOC_BLOCK				>
-	jmp	freeAndRemoveBlock
+
+;	Remove the now-empty LMem block from the small-block list
+;	and free the global-heap block.
+	mov	ds, es:[si+2]		; DS = LMem block segment
+	call	RemoveHandleFromMallocList
+	mov	bx, ds:[LMBH_handle]
+	call	MemFree
 
 exitZero:
 ;	Zero *p so the caller sees NULL after the free.
@@ -653,8 +650,7 @@ NOFXIP<	segmov	ds, <segment udata>, di					>
 FXIP <	mov	bx, handle dgroup					>
 FXIP <	call	MemDerefDS			; ds = dgroup		>
 	clr     bx
-	mov	ds:[smallListHandle], bx	;initialize: no lists yet
-	mov	ds:[largeListHandle], bx
+	mov	ds:[smallListHandle], bx	;initialize: no list yet
 	mov	ax, 0				; TT_Err_Ok
 	.leave
 	ret

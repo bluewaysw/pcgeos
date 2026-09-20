@@ -118,7 +118,7 @@ export     FormStringDerefData
 resource   FormElementTextAreaEntryResource object
 export     InPlaceTextAreaEntryClass
 
-export	   FreeHTMLTransferItem	
+export	   FreeHTMLTransferItem
 
 export	   NAMEPOOLVMUNLOAD
 
@@ -144,3 +144,7 @@ export     HTMLTRANSLATECHARNUM
 export     HTMLTRANSLATECHAR
 
 export     NAMEPOOLTOKENIZELENDOS
+
+incminor
+
+resource   FormStringCallbackMultiStrings lmem read-only shared

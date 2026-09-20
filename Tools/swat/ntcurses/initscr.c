@@ -92,8 +92,8 @@ Initscr_PrepConsole(void)
     if (GetConsoleMode(hConIn, &dwMode)) {
 	dwMode &= ~ENABLE_LINE_INPUT;
         dwMode &= ~ENABLE_ECHO_INPUT;
-	dwMode &= ~ENABLE_WINDOW_INPUT;
 	dwMode |= ENABLE_MOUSE_INPUT;
+    dwMode |= ENABLE_WINDOW_INPUT ;
 	SetConsoleMode(hConIn, dwMode);
     }
 }
@@ -156,4 +156,41 @@ initscr(void)
     curscr->_clear = FALSE;
     consoleClearRect(0, 0, LINES - 1, COLS - 1);
     return(OK);
-  } /* initscr */
+} /* initscr */
+
+/****************************************************************/
+/* Reinitscr() picks up the terminal's current size and resizes	*/
+/* curscr to match. Returns OK when the size had in fact	*/
+/* changed and the resize succeeded, so that the caller knows	*/
+/* it has to redo its layout, and ERR otherwise -- including	*/
+/* the common case of nothing having changed at all.		*/
+/****************************************************************/
+
+int
+reinitscr(void)
+{
+    int     newLINES = InitscrGetLines();
+    int     newCOLS = InitscrGetCols();
+    WINDOW  *resized;
+
+    if ((newLINES == LINES) && (newCOLS == COLS)) {
+	return(ERR);
+    }
+
+    /*
+     * Only commit to the new size once the screen has actually been
+     * resized, so a failure leaves LINES and COLS describing what is
+     * really there.
+     */
+    resized = resizewin(curscr, newLINES, newCOLS);
+    if (resized == (WINDOW *)ERR) {
+	return(ERR);
+    }
+
+    curscr = resized;
+    LINES = newLINES;
+    COLS = newCOLS;
+    wrefresh(curscr);
+    return(OK);
+} /* reinitscr */
+

@@ -73,11 +73,10 @@ static void _near RegionPathConicTo( Handle handle, const TT_Vector* v_control, 
 
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate );
 
-static void CalcScaleAndScaleOutline( TRUETYPE_VARS );
+static void CalcScaleAndScaleOutline( TRUETYPE_VARS, TT_Outline* outline );
 
 static void InitDriversTransformMatrix( TRUETYPE_VARS,
                                         TransformMatrix*  transMatrix,
-                                        FontHeader*       fontHeader,
                                         WWFixedAsDWord    pointSize,
                                         TextStyle         stylesToImplement,
                                         Byte              width,
@@ -130,6 +129,7 @@ void _pascal TrueType_Gen_Path(
         TrueTypeVars*          trueTypeVars;
         TrueTypeOutlineEntry*  trueTypeOutline;
         FontHeader*            fontHeader;
+        TT_Outline             outline;
         TransMatrix            transMatrix;
         TT_UShort              charIndex;
         WWFixedAsDWord         pointSize;
@@ -172,10 +172,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 GrSaveState( gstate );
         
         /* load glyph and scale its outline to 1000 units per em */
-        TT_New_Glyph( FACE, &GLYPH );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_HINT_GLYPH );
-        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
-        CalcScaleAndScaleOutline( trueTypeVars );
+        TT_Get_Glyph_Outline( GLYPH, &outline );
+        CalcScaleAndScaleOutline( trueTypeVars, &outline );
 
         /* write comment with glyph parameters */
         WriteComment( trueTypeVars, gstate );
@@ -225,7 +224,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         renderFunctions.Proc_ConicTo = ConicTo;
         
         /* convert outline into GrDraw...() calls */
-        ConvertOutline( gstate, &OUTLINE, &renderFunctions );
+        ConvertOutline( gstate, &outline, &renderFunctions );
 
         /* write epilogue */
         if( pathFlags & FGPF_SAVE_STATE )
@@ -278,6 +277,7 @@ void _pascal TrueType_Gen_In_Region(
         TrueTypeVars*          trueTypeVars;
         FontHeader*            fontHeader;
         TrueTypeOutlineEntry*  trueTypeOutline;
+        TT_Outline             outline;
         TT_UShort              charIndex;
         RenderFunctions        renderFunctions;
         TransformMatrix        transform;
@@ -314,12 +314,11 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
                 goto Fail;
 
         /* load glyph */
-        TT_New_Glyph( FACE, &GLYPH );
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, 0 );
-        TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
+        TT_Get_Glyph_Outline( GLYPH, &outline );
 
         /* store font matrix */
-        InitDriversTransformMatrix( trueTypeVars, &transform, fontHeader, pointSize, stylesToImplement, width, weight );
+        InitDriversTransformMatrix( trueTypeVars, &transform, pointSize, stylesToImplement, width, weight );
         CalcDriversTransformMatrix( &transform, gstate, GrGetWinHandle( gstate ) );
 
         /* get current cursor position */
@@ -327,9 +326,9 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         result = GrTransform( gstate, DWORD_X(cursorPos), DWORD_Y(cursorPos) );
 
         /* transform glyphs outline */
-        TT_Transform_Outline( &OUTLINE, &transform.TM_matrix );
-        TT_Transform_Outline( &OUTLINE, &flipMatrix );
-        TT_Translate_Outline( &OUTLINE, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
+        TT_Transform_Outline( &outline, &transform.TM_matrix );
+        TT_Transform_Outline( &outline, &flipMatrix );
+        TT_Translate_Outline( &outline, DWORD_X(result) + transform.TM_heightX + transform.TM_scriptX, 
                                         DWORD_Y(result) + transform.TM_heightY + transform.TM_scriptY );
 
         /* set render functions */
@@ -337,7 +336,7 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
         renderFunctions.Proc_LineTo  = RegionPathLineTo;
         renderFunctions.Proc_ConicTo = RegionPathConicTo;
 
-        ConvertOutline( regionPath, &OUTLINE, &renderFunctions );
+        ConvertOutline( regionPath, &outline, &renderFunctions );
 
 Fail:
         TrueType_Unlock_Face( trueTypeVars );
@@ -395,13 +394,11 @@ EC(     ECCheckBounds( (void*)outline ) );
                 v_start   = outline->points[first];
                 v_last    = outline->points[last];
 
-                v_control = v_start;
-
                 point = outline->points + first;
                 tags  = outline->flags  + first;
 
                 /* check first point to determine origin */
-                if ( *tags & CURVE_TAG_CONIC )
+                if ( !(*tags & CURVE_TAG_ON ) )
                 {
                         /* first point is conic control. Yes, this happens. */
                         if ( outline->flags[last] & CURVE_TAG_ON )
@@ -730,17 +727,18 @@ static void CalcTransformMatrix( TransMatrix*    transMatrix,
 #define NUM_PARAMS              6
 static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
 {
-        word            params[NUM_PARAMS];
+        word              params[NUM_PARAMS];
+        TT_Glyph_Metrics  glyphMetrics;
        
 
-        TT_Get_Glyph_Metrics( GLYPH, &GLYPH_METRICS );
+        TT_Get_Glyph_Metrics( GLYPH, &glyphMetrics );
 
-        params[0] = SCALE_WORD( GLYPH_METRICS.advance, SCALE_WIDTH ) >> 16;
+        params[0] = SCALE_WORD( glyphMetrics.advance, SCALE_WIDTH ) >> 16;
         params[1] = 0;
-        params[2] = SCALE_WORD( GLYPH_BBOX.xMin, SCALE_WIDTH ) >> 16;
-        params[3] = SCALE_WORD( GLYPH_BBOX.yMin, SCALE_HEIGHT ) >> 16;
-        params[4] = SCALE_WORD( GLYPH_BBOX.xMax, SCALE_WIDTH ) >> 16;
-        params[5] = SCALE_WORD( GLYPH_BBOX.yMax, SCALE_HEIGHT ) >> 16;
+        params[2] = SCALE_WORD( glyphMetrics.bbox.xMin, SCALE_WIDTH ) >> 16;
+        params[3] = SCALE_WORD( glyphMetrics.bbox.yMin, SCALE_HEIGHT ) >> 16;
+        params[4] = SCALE_WORD( glyphMetrics.bbox.xMax, SCALE_WIDTH ) >> 16;
+        params[5] = SCALE_WORD( glyphMetrics.bbox.yMax, SCALE_HEIGHT ) >> 16;
 
         GrComment( gstate, params, NUM_PARAMS * sizeof( word ) );
 }
@@ -762,14 +760,15 @@ static void WriteComment( TRUETYPE_VARS, GStateHandle gstate )
  *      18/11/23  JK        Initial Revision
  *******************************************************************/
 
-static void CalcScaleAndScaleOutline( TRUETYPE_VARS )
+static void CalcScaleAndScaleOutline( TRUETYPE_VARS, 
+                                      TT_Outline* outline )
 {
         TT_Matrix      scaleMatrix = { 0, 0, 0, 0 };
 
 
         SCALE_HEIGHT = SCALE_WIDTH = scaleMatrix.xx = scaleMatrix.yy = GrUDivWWFixed( STANDARD_GRIDSIZE, UNITS_PER_EM );
 
-        TT_Transform_Outline( &OUTLINE, &scaleMatrix );
+        TT_Transform_Outline( outline, &scaleMatrix );
 }
 
 
@@ -782,7 +781,6 @@ static void CalcScaleAndScaleOutline( TRUETYPE_VARS )
  * PARAMETERS:    TRUETYPE_VARS         Cached variables needed by driver.
  *                *transmatrix          Ptr. to drivers transformation 
  *                                      matrix to fill.
- *                *fontHeader           Ptr to FontHeader structure.
  *                pointsize             Desired point size.
  *                stylesToImplement     Styles that must be added.
  *                width                 Desired glyph width.
@@ -798,7 +796,6 @@ static void CalcScaleAndScaleOutline( TRUETYPE_VARS )
 
 static void InitDriversTransformMatrix( TRUETYPE_VARS,
                                         TransformMatrix*  transMatrix,
-                                        FontHeader*       fontHeader,
                                         WWFixedAsDWord    pointSize,
                                         TextStyle         stylesToImplement,
                                         Byte              width,

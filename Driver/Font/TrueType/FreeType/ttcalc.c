@@ -132,49 +132,66 @@
   TT_Long  TT_MulDiv( TT_Long  a, TT_Long  b, TT_Long  c )
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
+
     __asm {
-        mov     eax, a          ; edx:eax = a * b
-        imul    b               ; signed multiplication (64-bit result)
+      ; Preserve existing division-by-zero semantics.
+      mov     ebx, c
+      test    ebx, ebx
+      jz      divide_by_zero
 
-        ; check for division by zero
-        mov     ebx, c
-        test    ebx, ebx
-        jz      divide_by_zero
+      ; a == 0 -> 0
+      mov     eax, a
+      test    eax, eax
+      jz      done
 
-        ; prepare rounding value: abs(c) / 2
-        mov     ecx, ebx
-        sar     ecx, 31         ; Create sign mask (0xFFFFFFFF if c < 0, else 0)
-        xor     ebx, ecx
-        sub     ebx, ecx        ; ebx = abs(c)
-        shr     ebx, 1          ; ebx = abs(c) / 2
+      ; Load b once for the remaining fast paths and multiplication.
+      mov     ecx, b
 
-        ; apply rounding based on the sign of the product (in edx)
-        test    edx, edx
-        js      is_negative     ; product is negative (bit 31 of edx set)
+      ; b == 0 -> 0
+      test    ecx, ecx
+      jz      result_zero
 
-        ; product is positive: add rounding offset
-        add     eax, ebx
-        adc     edx, 0
-        jmp     do_div
+      ; b == c -> a
+      cmp     ecx, ebx
+      je      done
+
+      ; edx:eax = a * b
+      imul    ecx
+
+      ; prepare rounding value: abs(c) / 2
+      mov     ecx, ebx
+      sar     ecx, 31
+      xor     ebx, ecx
+      sub     ebx, ecx
+      shr     ebx, 1
+
+      ; apply rounding based on the sign of the product
+      test    edx, edx
+      js      is_negative
+
+      add     eax, ebx
+      adc     edx, 0
+      jmp     do_div
 
     is_negative:
-        ; product is negative: subtract rounding offset (round away from zero)
-        sub     eax, ebx
-        sbb     edx, 0
+      sub     eax, ebx
+      sbb     edx, 0
 
     do_div:
-        ; divide: edx:eax / c
-        idiv    c               ; signed division: result in eax
-        jmp     done
+      idiv    c
+      jmp     done
+
+    result_zero:
+      xor     eax, eax
+      jmp     done
 
     divide_by_zero:
-        ; handle division by zero (returning max 32-bit signed integer)
-        mov     eax, 7FFFFFFFh
+      mov     eax, 7FFFFFFFh
 
     done:
-        ; result into dx:ax for 16:16 return format
-        mov     edx, eax
-        shr     edx, 16
+      ; result into DX:AX
+      mov     edx, eax
+      shr     edx, 16
     }
   #else
     long   s;
@@ -225,21 +242,56 @@
   TT_Long   TT_MulFix( TT_Long  a, TT_Long  b )
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
-    __asm {
-      ; signed multiplication
-      mov     eax, a
-      imul    b
+     __asm {
+        ; Load a.  Keep it in EAX because EAX is also the
+        ; result register for the general multiplication.
+        mov     eax, a
 
-      ; rounding
-      add     eax, 0x8000
-      adc     edx, 0
+        ; a == 0 -> 0
+        test    eax, eax
+        jz      mulfix_done
 
-      ; fixed point scaling
-      shrd    eax, edx, 16
+        ; a == 1.0 -> b
+        cmp     eax, 0x10000
+        je      mulfix_return_b
 
-      ; return value alignment
-      mov     edx, eax 
-      shr     edx, 16
+        ; Load b once.  ECX can later be used directly by IMUL.
+        mov     ecx, b
+
+        ; b == 0 -> 0
+        test    ecx, ecx
+        jz      mulfix_zero
+
+        ; b == 1.0 -> a
+        cmp     ecx, 0x10000
+        je      mulfix_done
+
+        ; signed multiplication
+        ; EDX:EAX = a * b
+        imul    ecx
+
+        ; round to nearest, preserving the existing
+        ; symmetric handling of negative values
+        bt      edx, 31
+        cmc
+        adc     eax, 0x7fff
+        adc     edx, 0
+
+        ; fixed point scaling
+        shrd    eax, edx, 16
+        jmp     mulfix_done
+
+    mulfix_return_b:
+        mov     eax, b
+        jmp     mulfix_done
+
+    mulfix_zero:
+        xor     eax, eax
+
+    mulfix_done:
+        ; Return Long in DX:AX
+        mov     edx, eax
+        shr     edx, 16
     }
   #else
     long   s;
@@ -452,54 +504,63 @@
   {
   #ifdef TT_CONFIG_OPTION_USE_ASSEMBLER_IMPLEMENTATION
     __asm {
-        mov     esi, l
-        mov     eax, [esi]       ; eax = l->lo
-        mov     edx, [esi+4]     ; edx = l->hi
+        push    es
 
-        ; check for 0 and 1
-        test    edx, edx
-        jnz     start_calc
+        les     si, l                     ; es:si = l
+        mov     eax, dword ptr es:[si]    ; edx:eax = l
+        mov     edx, dword ptr es:[si+4]
+
+        test    edx, edx                  ; handle 0 and 1
+        jnz     sqrt_start
         test    eax, eax
-        jz      done             ; return 0
+        jz      sqrt_done
         cmp     eax, 1
-        je      done             ; return 1
+        je      sqrt_done
 
-    start_calc:
-        mov     ebx, edx
-        test    ebx, ebx
-        jnz     guess_hi
+  sqrt_start:
+        ; determine floor(log2(l))
+        test    edx, edx
+        jnz     sqrt_guess_hi
+
         bsr     ecx, eax
-        jmp     set_guess
-    guess_hi:
+        jmp     sqrt_set_guess
+
+sqrt_guess_hi:
         bsr     ecx, edx
         add     ecx, 32
-    set_guess:
-        shr     ecx, 1           ; n / 2
-        mov     ebx, 1
-        shl     ebx, cl          ; ebx = x
 
-    sqrt_loop:
-        ; Newton: next = (x + (l / x)) / 2
-        mov     eax, [esi]       ; l->lo
-        mov     edx, [esi+4]     ; l->hi
-        div     ebx              ; eax = l / x
-        
-        add     eax, ebx         ; eax = x + (l/x)
-        shr     eax, 1           ; eax = (x + (l/x)) / 2
-        
+sqrt_set_guess:
+        shr     ecx, 1
+        inc     ecx
+
+        mov     ebx, 1
+        shl     ebx, cl
+
+sqrt_loop:
+        ; quotient = l / x
+        mov     eax, dword ptr es:[si]
+        mov     edx, dword ptr es:[si+4]
+        div     ebx
+
+        ; next = (x + quotient) / 2
+        add     eax, ebx
+        rcr     eax, 1
+
         cmp     eax, ebx
-        jae     sqrt_finished    ; if next >= x, finished
-        
-        mov     ebx, eax         ; x = next
+        jae     sqrt_finished
+        mov     ebx, eax
         jmp     sqrt_loop
 
-    sqrt_finished:
-        mov     eax, ebx         ; return x
-    done:
-        mov     edx, eax         ; store result in dx:ax
+sqrt_finished:
+        mov     eax, ebx
+
+sqrt_done:
+        pop     es
+
+        mov     edx, eax      ; store result in dx:ax
         shr     edx, 16
     }
-  #else
+#else
 	  long  x = l->hi ? l->hi >> 1 : l->lo >> 1;
 	
     if (l->hi == 0 )
