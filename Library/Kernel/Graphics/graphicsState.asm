@@ -1697,14 +1697,42 @@ EC <		Assert	ne, es:[bx].HM_otherInfo, 1			>
 	; it can support at one time
 		
 	; Responder is known to use 4 bit color 
+
+	; If the window is a bitmap (vidmem), its HugeArray directory has
+	; to be locked for DR_VID_INFO, as vidmem reads the device info
+	; from there via W_bmSegment. EnterGraphics does that for drawing
+	; operations, but we can get here from GrSet{Area,Line,Text}Color
+	; outside of one, with W_bmSegment still 0.
+
+		clr	bx			; assume nothing to unlock
+		tst	es:[W_bitmap].segment	; bitmap window?
+		jz	callVidInfo
+		tst	es:[W_bmSegment]	; already locked?
+		jnz	callVidInfo
+		push	ax
+		mov	bx, es:[W_bitmap].segment
+		mov	di, es:[W_bitmap].offset
+		call	HugeArrayLockDir	; ax = dir block segment
+		mov	es:[W_bmSegment], ax
+		pop	ax
+		mov	bx, TRUE		; unlock it when done
+callVidInfo:
+		push	bx
 		mov	di, DR_VID_INFO
 		call	es:[W_driverStrategy]
+		pop	bx
 		mov	ds, dx			; ds:si = VideoDriverInfo
 		mov	dl, 0xff		; assume we can use 255 colors
 		cmp	ds:[si].VDI_nColors, 4
 		ja	haveMaxColors
 		mov	dl, 0xf			; nope, only use first 16 colors
 haveMaxColors:
+		tst	bx			; did we lock the bitmap?
+		jz	checkPalette
+		mov	ds, es:[W_bmSegment]
+		mov	es:[W_bmSegment], 0
+		call	HugeArrayUnlockDir
+checkPalette:
 		tst	es:[W_palette]		; check for palette
 		jz	getDefault
 		segmov	ds, es, si

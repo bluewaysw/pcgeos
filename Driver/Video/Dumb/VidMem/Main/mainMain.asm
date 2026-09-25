@@ -380,6 +380,9 @@ VidInfo	proc	near
 		uses	ax, ds
 		.enter
 
+EC <		tst	es:[W_bmSegment]	; if zero, hosed	>
+EC <		ERROR_Z	VIDMEM_HUGE_ARRAY_PROBLEM			>
+
 		mov	ds, es:[W_bmSegment]	; get segment of bitmap
 		mov	dx, ds			; this is where we return in
 		mov	ax, ds:[EB_flags]	; get edit-mask flag
