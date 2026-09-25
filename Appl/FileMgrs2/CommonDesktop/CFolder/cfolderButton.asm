@@ -840,7 +840,7 @@ exactNotFound:
 		mov	si, FOLDER_OBJECT_OFFSET
 		call	checkIfDesktop
 		popa	;ax, bx, cx, dx, si, bp
-		LONG 	jc	openNewWindow
+	LONG	jc	openNewWindow
 	;
 	; if opening wastebasket, use regular routine (will bring
 	; already opened wastebasket window to the front)
