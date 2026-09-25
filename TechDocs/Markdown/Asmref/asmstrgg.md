@@ -216,7 +216,7 @@ sending the message.
 
 This structure defines a specific GCN list type. A GCN list type consists of a 
 manufacturer ID describing each unique manufacturer and a specific list 
-type defined for that manufactuer ID.
+type defined for that manufacturer ID.
 
 **Library:** Objects/metaC.def
 
