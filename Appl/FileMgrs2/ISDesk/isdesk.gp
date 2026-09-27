@@ -104,10 +104,12 @@ resource InitDOSSHCMonikerResource1 shared lmem read-only
 resource InitDOSSHCMonikerResource2 shared lmem read-only
 resource InitDOSTHCMonikerResource shared lmem read-only
 
-
+ifdef _ICON_AREA
 resource AppDrivesSCMonikerResource shared lmem read-only
 resource AppDrivesSMMonikerResource shared lmem read-only
 resource AppDrivesSCGAMonikerResource shared lmem read-only
+endif
+
 resource DeskStringsCommon lmem shared read-only
 resource DeskStringsRare lmem shared read-only
 resource DeskTriggerMonikers lmem shared read-only

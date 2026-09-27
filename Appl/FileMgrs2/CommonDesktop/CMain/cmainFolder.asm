@@ -3,7 +3,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 
 PROJECT:	PC GEOS
-MODULE:		
+MODULE:
 FILE:		cmainFolder.asm
 
 AUTHOR:		Chris Boyke
@@ -18,7 +18,7 @@ REVISION HISTORY:
 	cdb	7/15/92   	Initial version.
 
 DESCRIPTION:
-	
+
 
 	$Id: cmainFolder.asm,v 1.2 98/06/03 13:37:33 joon Exp $
 
@@ -45,7 +45,7 @@ LONG	jne	callSuper
 LONG	jne	callSuper
 
 	tst	bp			; no data block, oh well...
-	jz	callSuper
+LONG	jz	callSuper
 
 	;
 	; make es = dgroup
@@ -145,19 +145,19 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CheckNumberOfFolders
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	
+SYNOPSIS:
 
 CALLED BY:	DesktopNotifyDCState
 PASS:		cx = 0 means that we're going from full size to
 			overlapping, else the other way
 		es = dgroup
-	
-RETURN:		nothing 
+
+RETURN:		nothing
 DESTROYED:	nothing
 SIDE EFFECTS:	closes excess folders if they are open
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -214,11 +214,11 @@ SYNOPSIS:	rescan Tree Window and all Folder Windows
 
 CALLED BY:	MSG_WINDOWS_REFRESH_ALL
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -311,11 +311,11 @@ SYNOPSIS:	close all Folder Windows and Directory Tree
 
 CALLED BY:	MSG_WINDOWS_CLOSE_ALL
 
-PASS:		
+PASS:
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -334,7 +334,7 @@ DesktopWindowsCloseAll	method	DesktopClass, \
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
 	call	BroadcastToFolderWindows	; send to 'em all
 if not _ZMGR
-if _TREE_MENU		
+if _TREE_MENU
 ifndef GEOLAUNCHER	; no Tree Window for GeoLauncher
 	;
 	; close Tree Window
@@ -367,7 +367,7 @@ PASS:		ax - method number
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -434,7 +434,7 @@ PASS:		ax - method number
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -511,7 +511,7 @@ PASS:		cx - genItem data
 
 RETURN:		nothing
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -580,9 +580,9 @@ PASS:		ax,cx,dx,bp - message data
 RETURN:		ax,cx,dx,bp - returned from folders called
 		CARRY SET if enumeration stopped by folder
 
-DESTROYED:	nothing 
+DESTROYED:	nothing
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 
@@ -605,14 +605,14 @@ FXIP<	mov	bx, di							>
 startLoop:
 						; bx = handle of opened window
 	mov	bx, es:[folderTrackingTable][di].FTE_folder.handle
-	tst	bx		
+	tst	bx
 	jz	next
 
 	mov	si, ss:[folderTrackingTable][di].FTE_folder.chunk
 	push	di
 	mov	di, mask MF_CALL
 	call	ObjMessage
-	pop	di	
+	pop	di
 	jc	done
 
 next:
@@ -640,16 +640,16 @@ PASS:		*ds:si	- DesktopClass object
 		es	- segment of DesktopClass
 		cx	- disk handle
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
 REGISTER/STACK USAGE:
 
-PSEUDO CODE/STRATEGY:	
+PSEUDO CODE/STRATEGY:
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
-	If passed a disk that's not currently in the drive, just bail.	
+	If passed a disk that's not currently in the drive, just bail.
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -658,11 +658,11 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-DesktopUpdateFreeSpace	method	dynamic	DesktopClass, 
+DesktopUpdateFreeSpace	method	dynamic	DesktopClass,
 					MSG_DESKTOP_UPDATE_FREE_SPACE
 
 	; Convert from a disk handle to a drive number, and then back
-	; again. 
+	; again.
 
 		mov	bx, cx
 		call	DiskGetDrive			; al - drive #
@@ -705,8 +705,8 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Checks to see if duplicate messages have the same disk
-		handle. 
-CALLED BY:	
+		handle.
+CALLED BY:
 PASS:	ds:bx	= HandleEvent of an event already on queue
 	ax	= message of the new event
 	cx,dx,bp = data in the new event
@@ -715,10 +715,10 @@ RETURN:	bp	= new value to be passed in bp in new event
 	di	= one of the PROC_SE_* values
 CAN DESTROY:	si
 
-SIDE EFFECTS:	
+SIDE EFFECTS:
 
 PSEUDO CODE/STRATEGY:
-		
+
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -729,7 +729,7 @@ REVISION HISTORY:
 CheckMainDuplicateUpdate	proc	far
 	.enter
 
-	cmp	ds:[bx].HE_method, ax	; see if MSG_DESKTOP_UPDATE_FREE_SPACE 
+	cmp	ds:[bx].HE_method, ax	; see if MSG_DESKTOP_UPDATE_FREE_SPACE
 	je	found
 CheckHack <PROC_SE_CONTINUE eq 0>
 notFound:
