@@ -103,6 +103,12 @@ NotifyStub	proc	near
 		ret
 NotifyStub	endp
 
+; Everything from here up to the start of the stack is saved right after
+; entering protected mode and copied back on SST_RESTART (see
+; LoaderSaveRestartSnapshot). NotifyStub is left out on purpose, so the
+; hook Swat patched into it survives a restart.
+LoaderRestartSnapshotStart	label	byte
+
 	assume cs:kcode, ds:kcode, es:kcode
 
 
@@ -175,6 +181,19 @@ gpmiStarted:
 	mov	ax, es:[PSP_envBlk]
 	mov	ds:[loaderVars].KLV_envSegment, ax
 
+	; Remember our stack for LoaderRestartSystem. Nothing has been
+	; pushed yet, so SP is still the entry SP.
+	mov	ds:[loaderSSSelector], ss
+	mov	ds:[loaderInitialSP], sp
+
+	; Keep a pristine copy of the loader state and flag all selectors
+	; allocated so far as our own, so SysShutdown(SST_RESTART) can bring
+	; the loader back to exactly this point.
+	call	LoaderSaveRestartSnapshot
+
+	; LoaderRestartSystem continues here after a SST_RESTART shutdown.
+	; GPMI is already running and our state has been restored.
+LoaderRestartEntry	label	near
 	mov	ds, cs:[loaderDSSelector]
 	mov	es, cs:[loaderDSSelector]
 
@@ -456,6 +475,10 @@ ReportLoaderLocation	endp
 ;common variables:
 
 loaderDSSelector	word	0
+loaderSSSelector	word	0	; our stack selector and entry SP,
+loaderInitialSP		word	0	;  used by LoaderRestartSystem
+loaderRestartSnapshot	word	0	; selector of the pristine copy of our
+					;  state, 0 if restart is not possible
 loaderVars	KernelLoaderVars	<>
 
 PC <kdataSize	word							?>
@@ -484,6 +507,23 @@ stack	ends
 ;InitHeap to record the size of the loader in the heap.
 
 LOADER_CODE_AND_STACK_SIZE	equ	(offset cgroup:endStack)
+
+;Range of the loader that is saved/restored for a system restart: all of
+;kcode after NotifyStub, but not the stack (we are running on it).
+
+; In front of the snapshot, the snapshot block holds all protected mode
+; interrupt vectors and exception handlers as they were at the first start.
+LOADER_VEC_PM_OFF	equ	0
+LOADER_VEC_EXC_OFF	equ	256 * 4
+LOADER_VECTOR_SAVE_SIZE	equ	(256 + 32) * 4
+
+LOADER_RESTART_SNAPSHOT_START	equ	(offset cgroup:LoaderRestartSnapshotStart)
+; Both ends of the range must be labels in kcode: the difference of labels in
+; two different segments of the group is NOT computed group-relative by
+; Esp/Glue (it came out as 0 - 0Bh, i.e. 64K, and the snapshot covered and
+; later overwrote everything behind the loader in conventional memory).
+LOADER_RESTART_SNAPSHOT_SIZE	equ	(offset LoaderRestartSnapshotEnd) - \
+					(offset LoaderRestartSnapshotStart)
 
 ;------------------------------------------------------------------------------
 ;	The data from this point forward is NOT moved with the loader
@@ -723,3 +763,233 @@ LimitLoaderSize	proc	near
 	.leave
 	ret
 LimitLoaderSize	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LoaderSaveRestartSnapshot
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Save the loader's pristine state for a later system restart
+		and mark all GPMI selectors allocated so far as resident.
+
+CALLED BY:	LoadGeos (first start only, right after entering PM)
+PASS:		nothing
+RETURN:		loaderRestartSnapshot set (0 if out of memory, in which
+		case a SST_RESTART simply exits to DOS)
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	In real mode the system restarts by loading loader.exe again with
+	MSDOS_EXEC/LOAD_OVERLAY. In protected mode the loader stays resident
+	(it provides the GPMI to the kernel), so instead we jump back into
+	it. Its many static variables (loaderVars, kdataSize, simpleAllocPtr,
+	...) then have to be reset, which is done by copying back this
+	snapshot.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (PM restart support, #665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LoaderSaveRestartSnapshot	proc	near
+	uses	ax, bx, cx, si, di, ds, es
+	.enter
+
+	mov	ds, cs:[loaderDSSelector]
+
+	clr	bx
+	mov	cx, LOADER_RESTART_SNAPSHOT_SIZE
+	add	cx, LOADER_VECTOR_SAVE_SIZE	; vectors live in front
+	call	GPMIAllocateBlock		; bx = selector
+	jc	done				; => no restart possible
+
+	; store the selector before copying, so the snapshot contains it
+	mov	ds:[loaderRestartSnapshot], bx
+
+	; Everything we own at this point (including the snapshot block)
+	; survives a restart; everything allocated later belongs to the
+	; kernel and gets freed by GPMIFreeNonResident.
+	call	GPMIMarkResident
+
+	mov	es, bx
+	mov	di, LOADER_VECTOR_SAVE_SIZE
+	segmov	ds, cs
+	mov	si, LOADER_RESTART_SNAPSHOT_START
+	mov	cx, LOADER_RESTART_SNAPSHOT_SIZE
+	rep	movsb
+
+	call	LoaderSaveVectors		; es = snapshot block
+done:
+	.leave
+	ret
+LoaderSaveRestartSnapshot	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LoaderSaveVectors / LoaderRestoreVectors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Record all protected mode interrupt vectors and exception
+		handlers at the first start; put back whatever the old
+		incarnation left changed when the system restarts.
+
+PASS:		es	= snapshot block (vectors live in front of the snapshot)
+
+PSEUDO CODE/STRATEGY:
+	When a DPMI client ends, the DPMI host resets everything the client
+	hooked. A restart inside the same client has to do that itself:
+	any vector still pointing into the old incarnation's (freed) code
+	crashes the new one as soon as that interrupt or exception occurs
+	(the kernel e.g. leaves the hardware interrupt vectors 09h-0Fh and
+	70h-77h and vectors 80h-8Fh pointing into its code). Setting a vector
+	back to the DPMI host's default also makes the host undo its own real
+	mode hooks for it.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LoaderSaveVectors	proc	near
+	uses	ax, bx, cx, dx, di
+	.enter
+	clr	bx
+	mov	di, LOADER_VEC_PM_OFF
+pmLoop:
+	mov	ax, 0204h			; DPMI: get pm interrupt vector
+	int	31h
+	mov	es:[di], dx
+	mov	es:[di+2], cx
+	add	di, 4
+	inc	bl
+	jnz	pmLoop
+	mov	di, LOADER_VEC_EXC_OFF
+excLoop:
+	mov	ax, 0202h			; DPMI: get exception handler
+	int	31h
+	mov	es:[di], dx
+	mov	es:[di+2], cx
+	add	di, 4
+	inc	bl
+	cmp	bl, 32
+	jb	excLoop
+	.leave
+	ret
+LoaderSaveVectors	endp
+
+LoaderRestoreVectors	proc	near
+	uses	ax, bx, cx, dx, di
+	.enter
+	clr	bx
+	mov	di, LOADER_VEC_PM_OFF
+pmLoop:
+	mov	ax, 0204h
+	int	31h
+	cmp	dx, es:[di]
+	jne	pmDiff
+	cmp	cx, es:[di+2]
+	je	pmNext
+pmDiff:
+	mov	dx, es:[di]
+	mov	cx, es:[di+2]
+	mov	ax, 0205h			; DPMI: set pm interrupt vector
+	int	31h
+pmNext:
+	add	di, 4
+	inc	bl
+	jnz	pmLoop
+
+	mov	di, LOADER_VEC_EXC_OFF
+excLoop:
+	mov	ax, 0202h
+	int	31h
+	cmp	dx, es:[di]
+	jne	excDiff
+	cmp	cx, es:[di+2]
+	je	excNext
+excDiff:
+	mov	dx, es:[di]
+	mov	cx, es:[di+2]
+	mov	ax, 0203h			; DPMI: set exception handler
+	int	31h
+excNext:
+	add	di, 4
+	inc	bl
+	cmp	bl, 32
+	jb	excLoop
+	.leave
+	ret
+LoaderRestoreVectors	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LoaderRestartSystem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Reload the system after a SST_RESTART shutdown.
+		Published to the kernel as GPMI_CALL_RESTART_LOADER.
+
+CALLED BY:	EndGeos (via reloadSystemVector, JUMPED to)
+PASS:		nothing
+RETURN:		never
+DESTROYED:	everything
+
+PSEUDO CODE/STRATEGY:
+	Switch to our own stack: the kernel's stack is about to be freed.
+	Clear the segment registers that may still hold kernel selectors.
+	Free all selectors and memory of the old kernel incarnation.
+	Copy back the loader snapshot (resets all loader variables).
+	Continue in LoadGeos right after the one-time PM setup; that
+	re-reads the .ini files (the reason for most restarts), detects
+	video, shows the splash screen and loads the kernel again.
+	The kernel has already put "/r" into the PSP command tail.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (PM restart support, #665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LoaderRestartSystem	proc	far
+	cli
+	mov	ss, cs:[loaderSSSelector]
+	mov	sp, cs:[loaderInitialSP]
+	sti
+	cld
+
+	clr	ax
+	mov	es, ax
+	mov	fs, ax
+	mov	gs, ax
+	mov	ds, cs:[loaderDSSelector]
+
+	tst	ds:[loaderRestartSnapshot]
+	jz	cannotRestart
+
+	; Put back every interrupt vector and exception handler the old
+	; incarnation left changed, before its memory is freed.
+	mov	es, ds:[loaderRestartSnapshot]
+	call	LoaderRestoreVectors
+	clr	ax
+	mov	es, ax
+
+	; Free everything the previous kernel incarnation allocated.
+	call	GPMIFreeNonResident
+
+	; Bring the loader's variables back to their pristine state.
+	mov	es, ds:[loaderDSSelector]
+	mov	di, LOADER_RESTART_SNAPSHOT_START
+	mov	cx, LOADER_RESTART_SNAPSHOT_SIZE
+	mov	ds, ds:[loaderRestartSnapshot]
+	mov	si, LOADER_VECTOR_SAVE_SIZE
+	rep	movsb
+
+	jmp	LoaderRestartEntry
+
+cannotRestart:
+	; No snapshot (out of memory at startup) -- the best we can do is
+	; to return to DOS.
+	mov	ax, MSDOS_QUIT_APPL shl 8
+	int	21h
+	.UNREACHED
+LoaderRestartSystem	endp

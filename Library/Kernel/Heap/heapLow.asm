@@ -1310,6 +1310,28 @@ ifdef PROTECTED_MODE
 skip:
 	pop	dx, bx, di
 	jc	doneRestoreFlags
+	;
+	; Honor HAF_ZERO_INIT. The memory GPMIMakePresent just got for the
+	; block comes straight from DPMI and is not necessarily zero (it may
+	; well hold data of an earlier DPMI client or of an earlier system
+	; incarnation after SST_RESTART). Callers rely on it, e.g. the
+	; TrueType driver's variable block.
+	;
+	push	bp
+	mov	bp, sp
+	test	{byte} ss:[bp+3], mask HAF_ZERO_INIT ; ch of the cx pushed above
+	pop	bp
+	jz	noZeroInitDiscarded
+	push	ax, cx, di, es
+	mov	es, ds:[bx][HM_addr]
+	mov	cx, ds:[bx][HM_size]	;paragraphs
+	shl	cx, 1
+	shl	cx, 1
+	shl	cx, 1			;words
+	clr	ax, di
+	rep stosw
+	pop	ax, cx, di, es
+noZeroInitDiscarded:
 
 	tst	dx			;callback function ?
 	jz	noCallBack

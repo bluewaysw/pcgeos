@@ -148,6 +148,15 @@ REVISION HISTORY:
 VidExit		proc	near
 		uses	ax,bx
 		.enter
+ifdef __HOSTIF
+		;
+		; We are one of the drivers using the host interface and stay
+		; loaded until system exit. HostIf's own process is not detached
+		; then, so tell it to stop handling host events now, while the
+		; system is still alive (see HostIfShutdown).
+		;
+		call	HostIfShutdown
+endif
 if NT_DRIVER
 		push	ds
 		;

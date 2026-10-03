@@ -50,6 +50,9 @@ include Internal/geodeStr.def
 include Internal/dos.def
 include Internal/interrup.def
 include Internal/debug.def
+ifdef PROTECTED_MODE
+include gpmi.def			; GPMI_CALL_*, GPMI_EXCEPTION_* (PM restart)
+endif
 include Internal/fileInt.def
 
 UseDriver Internal/fsDriver.def

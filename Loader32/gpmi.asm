@@ -57,7 +57,7 @@ DESCRIPTION:
 ------------------------------------------------------------------------------@
 
 include gpmi.def
-include Internal\gpmiInt.def
+include Internal/gpmiInt.def
 
 .386p
 ; -------------------------------------------------------------------------
@@ -122,6 +122,7 @@ GPMIVectorTable	fptr \
 		GPMIFreeDOSBlock,
 		GPMIRealModeCallback,
 		GPMIFreeRealModeCallback,
+		LoaderRestartSystem,	; GPMI_CALL_RESTART_LOADER (main.asm)
 		0  ; Last one must be a null pointer (to mark end of table)
 
 ; Given a selector, find the offset to the GPMISelector in 
@@ -1026,15 +1027,18 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GPMIFreeRealModeCallback
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Destroy a previously created alias
-CALLED BY:	Loader, Kernel
-PASS:		bx	= descriptor to alias
+SYNOPSIS:	Free a real mode callback allocated by GPMIRealModeCallback
+CALLED BY:	Loader, Kernel (SysFreeRealModeCallback)
+PASS:		cx:dx	= segment:offset of the real mode callback
 RETURN:		carry	= clear if success, else set if failed
-DESTROYED:	
+DESTROYED:	nothing
 
 PSEUDO CODE/STRATEGY:
-	Check to see that this is really an alias
-	Free it from DPMI
+	This used to be a copy of GPMIFreeAlias and therefore never released
+	the callback (DPMI only has a handful of them). That did not matter
+	as long as GEOS was only started once per DPMI session, but every
+	SST_RESTART would leak the callbacks of the previous incarnation
+	until allocation fails.
 
 KNOWN BUGS/SIDE EFFECTS/IDEAS:
 		
@@ -1043,30 +1047,14 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	LES	12/16/99	Initial version
+		2026		Actually free the callback (needed for restart)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 GPMIFreeRealModeCallback	proc far
-	uses	cx, bx, si, ds
+	uses	ax
 	.enter
-
-	IGPMIGetDataSelector
-
-	; Make sure this is an alias we are trying to free (and not
-	; anything else)
-	mov	si, bx
-	mov	cx, bx
-	SelectorToOffset si
-	mov	bl, [si].GPMIS_type
-	cmp	bl, GPMI_SELECTOR_TYPE_ALIAS
-	jne	failed
-
-	; Do the actual free now
-	mov	bx, cx
-	call	IGPMIFreeDescriptor
-	jmp	done
-failed:
-	stc
-done:
+	mov	ax, DPMI_FUNC_FREE_REAL_MODE_CALLBACK
+	int	31h			; cx:dx = callback address
 	.leave
 	ret
 GPMIFreeRealModeCallback	endp
@@ -2192,6 +2180,118 @@ IGPMIFreeDescriptor	proc near
 	clr	[si].GPMIS_data2
 	ret
 IGPMIFreeDescriptor	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GPMIMarkResident
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Flag every selector that is in use right now as belonging to
+		the loader itself, so it survives a system restart.
+CALLED BY:	LoaderSaveRestartSnapshot (once, before the kernel is loaded)
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Walk the whole selector table and set GPMISF_resident on all
+	entries that are not GPMI_SELECTOR_TYPE_NOT_USED.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (PM restart support)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GPMIMarkResident	proc	near
+	uses	cx, si, ds
+	.enter
+	IGPMIGetDataSelector
+	clr	si
+	mov	cx, GPMI_NUM_SELECTORS
+markLoop:
+	cmp	[si].GPMIS_type, GPMI_SELECTOR_TYPE_NOT_USED
+	je	next
+	ornf	[si].GPMIS_flags, mask GPMISF_resident
+next:
+	add	si, size GPMISelector
+	loop	markLoop
+	.leave
+	ret
+GPMIMarkResident	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GPMIFreeNonResident
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Release every selector (and the linear memory behind it)
+		that was allocated after GPMIMarkResident, i.e. everything
+		that belonged to the kernel incarnation that just shut down.
+CALLED BY:	LoaderRestartSystem
+PASS:		nothing. No segment register may hold a selector that
+		is about to be freed (caller clears es, fs, gs).
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	The kernel's heap does not free its blocks on exit, so this is the
+	only place where the memory of the old incarnation gets released.
+		MEMORY		-> DPMI 0502h + free descriptor
+		NOT_PRESENT, ALIAS, EMPTY, PHYSICAL_ADDRESS
+				-> free descriptor
+		REAL_SEGMENT	-> keep: selectors from DPMI 0002h can't be
+				   freed and are handed out again for the same
+				   segment anyway.
+	The table is indexed by selector & SELECTOR_INDEX_MASK; the TI/RPL
+	bits are the same for all our selectors, so take them from CS.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (PM restart support)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GPMIFreeNonResident	proc	near
+	uses	ax, bx, cx, dx, si, di, ds
+	.enter
+	IGPMIGetDataSelector
+
+	mov	dx, cs
+	andnf	dx, not SELECTOR_INDEX_MASK	; dx = TI + RPL bits
+
+	clr	bx				; bx = table offset
+	mov	cx, GPMI_NUM_SELECTORS
+freeLoop:
+	mov	al, [bx].GPMIS_type
+	cmp	al, GPMI_SELECTOR_TYPE_NOT_USED
+	je	next
+	test	[bx].GPMIS_flags, mask GPMISF_resident
+	jnz	next
+	cmp	al, GPMI_SELECTOR_TYPE_REAL_SEGMENT
+	je	next
+
+	cmp	al, GPMI_SELECTOR_TYPE_MEMORY
+	jne	freeDescriptor
+
+	; release the linear memory block (handle in data1:data2, see
+	; GPMIFreeBlock)
+	mov	si, [bx].GPMIS_data1
+	mov	di, [bx].GPMIS_data2
+	mov	ax, DPMI_FUNC_FREE_MEMORY_BLOCK
+	int	31h				; ignore errors, keep going
+
+freeDescriptor:
+	push	bx
+	or	bx, dx				; table offset -> selector
+	call	IGPMIFreeDescriptor		; destroys ax, si
+	pop	bx
+
+next:
+	add	bx, size GPMISelector
+	loop	freeLoop
+
+	.leave
+	ret
+GPMIFreeNonResident	endp
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		GPMIReleaseSegmentAccess

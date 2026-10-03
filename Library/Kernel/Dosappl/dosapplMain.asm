@@ -1428,6 +1428,16 @@ endif
 
 DosExecLocateLoader endp
 
+ifndef PROTECTED_MODE
+;
+; Real-mode restart: reload loader.exe with MSDOS_EXEC/LOAD_OVERLAY on top
+; of dgroup. None of this works in protected mode (code written through a
+; code selector, code selector loaded into SS, LOAD_OVERLAY with selectors,
+; and a real-mode loader started inside a running DPMI client). The
+; protected-mode version of DosExecPrepareForRestart is further down
+; (DosExecLocateLoader above stays: it is exported in geos.gp).
+;
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1673,6 +1683,95 @@ errFreeBlock:
 		stc
 		jmp	done
 DosExecPrepareForRestart endp
+
+else	; PROTECTED_MODE
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DosExecPrepareForRestart (protected mode)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Prepare the system to restart itself.
+
+CALLED BY:	SysShutdown (SST_RESTART)
+PASS:		nothing
+RETURN:		carry set if couldn't set up for restart
+		carry clear if ok.
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	In protected mode the loader stays resident, as it provides the
+	GPMI services. So rather than loading loader.exe again we have
+	EndGeos jump back into it (GPMI_CALL_RESTART_LOADER). The loader
+	frees all selectors/memory of this incarnation, resets its own
+	state and loads the kernel again.
+
+	A loader that predates GPMI_CALL_RESTART_LOADER has the vector
+	table's null terminator in that slot => refuse the restart.
+
+	As in real mode, prepend /r to the command tail (it's still the
+	same PSP) so the next incarnation knows it was restarted.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	5/ 5/92		Initial version (real mode)
+		2026		Protected mode version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DosExecPrepareForRestart proc	far
+		uses	ax, cx, si, di, ds, es
+		.enter
+		LoadVarSeg	ds, ax
+	;
+	; Does the loader know how to restart us?
+	;
+		les	si, ds:[loaderVars].KLV_GPMIVectorTable
+		mov	ax, es:[si+GPMI_CALL_RESTART_LOADER].offset
+		mov	cx, es:[si+GPMI_CALL_RESTART_LOADER].segment
+		jcxz	noRestart
+	;
+	; EndGeos jumps there once the system has shut down completely.
+	;
+		mov	ds:[reloadSystemVector].offset, ax
+		mov	ds:[reloadSystemVector].segment, cx
+		ornf	ds:[exitFlags], mask EF_RESTART
+	;
+	; If SCF_RESTARTED isn't already set, prepend /r to the command tail
+	; to tell ourselves we restarted when we are re-incarnated by the
+	; loader.
+	;
+		test	ds:[sysConfig], mask SCF_RESTARTED
+		jnz	ok
+
+		mov	ax, ds:[loaderVars].KLV_pspSegment	; PSP selector
+		mov	ds, ax
+		mov	es, ax
+		mov	al, ds:[PSP_cmdTail][0]
+		cmp	al, 124			; room for 2 more chars + CR?
+		ja	ok			; no -- restart without /r
+		clr	ah
+		mov	si, ax
+		mov_tr	cx, ax
+		add	si, offset PSP_cmdTail+1	; ds:si <- CR at end of tail
+		lea	di, ds:[si+2]
+		std
+		inc	cx			; include the CR
+		rep	movsb
+		cld
+		mov	{word}ds:[PSP_cmdTail][1], '/' or ('r' shl 8)
+		add	ds:[PSP_cmdTail][0], 2
+ok:
+		clc
+done:
+		.leave
+		ret
+noRestart:
+		stc
+		jmp	done
+DosExecPrepareForRestart endp
+
+endif	; PROTECTED_MODE
 
 
 

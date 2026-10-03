@@ -1129,6 +1129,22 @@ tripleFault:
 	; unfortunate to have us catch the NMI and attempt to put up a
 	; SysNotify box about it...
 	call	ThreadRestoreExceptions
+ifdef PROTECTED_MODE
+	;
+	; InitSys hooked the DPMI debug exception (SysContextSwitchReflector).
+	; Put the original handler back; the old one lives in kcode, which
+	; will be gone after a restart.
+	;
+	tst	ds:[oldDebugExceptionHandler].segment
+	jz	debugExceptionRestored
+	mov	bl, GPMI_EXCEPTION_DEBUG
+	mov	cx, ds:[oldDebugExceptionHandler].segment
+	mov	dx, ds:[oldDebugExceptionHandler].offset
+	les	si, ds:[loaderVars].KLV_GPMIVectorTable
+	call	{fptr}es:[si+GPMI_CALL_SET_EXCEPTION_HANDLER]
+	mov	ds:[oldDebugExceptionHandler].segment, 0
+debugExceptionRestored:
+endif
 	call	SysResetIntercepts
 
 	call	RestoreTimerInterrupt
@@ -1264,6 +1280,36 @@ useOldExit:
 resetMachine:
 	; Reset the machine now we've shut down.
 
+ifdef PROTECTED_MODE
+	;
+	; We can't vault to the real-mode reset vector from protected mode
+	; (and segment 40h isn't addressable directly). Set the warm-start
+	; flag through a selector and pulse the CPU reset line through the
+	; keyboard controller.
+	;
+	mov	ax, BIOS_DATA_SEG
+	mov	cx, 0ffh
+	call	SysMapRealSegment		; ax = selector
+	mov	es, ax
+	mov	es:[BIOS_RESET_FLAG], BRF_WARM_START
+	INT_OFF
+	mov	cx, 0ffffh
+waitKbc:
+	in	al, 64h
+	test	al, 2				; input buffer full?
+	loopnz	waitKbc
+	mov	al, 0feh			; pulse reset line
+	out	64h, al
+	mov	cx, 0ffffh
+waitReset:
+	loop	waitReset
+	;
+	; Still alive -- at least return to DOS rather than hang.
+	;
+	INT_ON
+	mov	ax, 4c00h
+	int	21h
+else	; not PROTECTED_MODE
 if 0	; Doesn't work on many machines. The floppy just spins...
 	int	19h
 else
@@ -1279,10 +1325,20 @@ else
 	mov	es:[BIOS_RESET_FLAG], BRF_WARM_START
 	jmp	BIOSSeg:Reset
 endif
+endif	; PROTECTED_MODE
 
 
 reloadSystem:
 	; Set up to reload the system.
+ifdef PROTECTED_MODE
+	;
+	; reloadSystemVector points into the resident loader
+	; (GPMI_CALL_RESTART_LOADER, see DosExecPrepareForRestart). Tell the
+	; stub first -- in real mode DosExecRestartSystem does that.
+	;
+	mov	al, DEBUG_RESTART_SYSTEM
+	call	FarDebugProcess
+endif
 	jmp	ds:[reloadSystemVector]
 
 powerOff:

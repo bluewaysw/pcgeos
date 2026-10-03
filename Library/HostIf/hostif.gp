@@ -53,3 +53,4 @@ export HostIfDetect
 export HOSTIFDETECT
 export HostIfCall
 export HOSTIFCALL
+export HostIfShutdown

@@ -2945,7 +2945,8 @@ GPMIRealModeCallbackFar	endp
 GPMIFreeRealModeCallbackFar	proc	far
 		push	ds
 		LoadVarSeg	ds
-		call	GPMIFreeAlias
+		call	GPMIFreeRealModeCallback	; was GPMIFreeAlias, which
+						;  never freed the callback
 		pop	ds
 		ret
 GPMIFreeRealModeCallbackFar	endp
