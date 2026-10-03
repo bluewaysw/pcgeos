@@ -44,6 +44,10 @@ ifndef NO_AUTODETECT
   include videoDetect.asm
 endif
 
+; End of the loader's code and data, for the restart snapshot (main.asm).
+; Must stay the last thing in kcode.
+LoaderRestartSnapshotEnd	label	byte
+
 kcode ends
 
 end	LoadGeos

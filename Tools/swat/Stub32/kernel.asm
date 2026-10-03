@@ -1117,18 +1117,37 @@ afterXIP:
 RestartSys:
 
 	;
-	; Note we should be looking for 4b03 and that we're no longer attached
-	; to the kernel.
-	; 
-
-		mov	ds:[reloadState], RS_WATCH_EXEC
-		andnf	ds:[sysFlags], not mask attached
-		mov	ds:[kernelCore], 0
+	; Protected mode: the loader stays resident and the kernel
+	; restarts by jumping back into it (GPMI_CALL_RESTART_LOADER). There
+	; is no MSDOS_EXEC/LOAD_OVERLAY to watch for, so send Swat both
+	; messages it gets in real mode, right away and in the same order:
 	;
-	; And pass a really big size up to Swat so it knows what's going on.
-	; 
+	; 1. RPC_DOS_RUN: the system is going away. Swat drops all patients,
+	;    makes the loader the current patient (with a current thread)
+	;    and continues. Without this Swat keeps the old kernel's patients
+	;    and threads and fails with "no current thread".
+	;
+		mov	ds:[reloadState], RS_IGNORE
+		andnf	ds:[sysFlags], not mask attached
+		mov	ds:[kernelCore], 0		; kernel core block unknown
+
 		mov	{word}ds:[rpc_ToHost], -1
 		mov	ax, RPC_DOS_RUN
+		mov	cx, size word
+		push	cs			; load cgroup into ES
+		pop	es
+		mov	bx, offset rpc_ToHost
+		call	Rpc_Call
+	;
+	; 2. RPC_RELOAD_SYS: what KernelReloadSys does once it sees the 4b03
+	;    in real mode. The hook in the loader's NotifyStub is still in
+	;    place, so the loader's DEBUG_LOADER_MOVED/DEBUG_KERNEL_LOADED
+	;    notifications reattach us to the new kernel.
+	;
+		andnf	ds:[sysFlags], not (mask dosexec or mask nomap)
+		mov	ax, ds:[loaderBase]
+		mov	{word}ds:[rpc_ToHost], ax
+		mov	ax, RPC_RELOAD_SYS
 		mov	cx, size word
 		.assert	$ eq send
 send:

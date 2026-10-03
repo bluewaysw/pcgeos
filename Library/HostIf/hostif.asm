@@ -27,6 +27,7 @@ DESCRIPTION:
 include geos.def
 include ec.def
 include heap.def
+include system.def		; SysMapRealSegment (PM restart support)
 include geode.def
 include resource.def
 include library.def
@@ -57,6 +58,22 @@ DefLib hostif.def
 ;------------------------------------------------------------------------------
 HOST_API_INTERRUPT 	equ 	0xA0
 MAX_ASYNC_OP_SLOTS	equ	16
+
+;
+; The host (basebox) raises HOST_API_INTERRUPT whenever it queues an event,
+; and it offers no way to stop doing so. Once our handler is gone, the
+; interrupt ends up in the real mode vector (the DPMI host reflects it
+; there), which DOSBox leaves at 0000:0000. We point it at the BIOS dummy
+; interrupt handler instead, an IRET at F000:FF53 (IBM BIOS convention,
+; also provided by DOSBox).
+;
+IRET_STUB_SEGMENT	equ	0f000h
+IRET_STUB_OFFSET	equ	0ff53h
+IRET_OPCODE		equ	0cfh
+
+if ERROR_CHECK
+HOSTIF_ASYNC_RESULT_WITHOUT_WAITER			enum	Warnings
+endif
 
 AsyncSlotData		struct
 ASD_registers		word 6 dup (?)
@@ -91,6 +108,10 @@ idata   ends
 udata   segment
 
     	hostIfGeode		hptr
+	hostIfDetached		BooleanByte	; set once HostIfShutdown has
+						;  unhooked the event interrupt
+	hostIfPresent		BooleanByte	; host interface detected and
+						;  event interrupt registered
 
 udata   ends
 
@@ -143,6 +164,13 @@ EC <	call	ECCheckStack						>
 	INT_ON
 
 	segmov	ds, dgroup
+	;
+	; The host can still raise the event interrupt while we are going
+	; away (e.g. socket state changes of connections that are still
+	; open). Don't send to a process that is detaching.
+	;
+	tst	ds:hostIfDetached
+	jnz	done
 	mov	bx, ds:hostIfGeode
 
 	;mov_trash	ax, bx
@@ -217,12 +245,15 @@ eventLoop:
 	shl	cx
 	mov	si, cx
 
-EC <	mov	ax, ds:asyncOpTable[si].offset 				>
-EC <	or 	ax, ds:asyncOpTable[si].segment				>
-EC <	ERROR_Z -1							>
-
+	;
+	; A result for a slot nobody is waiting on (e.g. a stale result of a
+	; previous system incarnation before a restart) is dropped.
+	;
 	mov	bp, ds:asyncOpTable[si].offset
-	mov	ds, ds:asyncOpTable[si].segment
+	mov	ax, ds:asyncOpTable[si].segment
+	tst	ax
+	jz	noWaiter
+	mov	ds, ax
 	pop	ax, cx, si
 
 	mov	ds:[bp].ASD_registers, ax
@@ -236,6 +267,12 @@ EC <	ERROR_Z -1							>
 
 	pop	ds, bp
 	jmp eventLoop
+
+noWaiter:
+EC <	WARNING	HOSTIF_ASYNC_RESULT_WITHOUT_WAITER			>
+	pop	ax, cx, si
+	pop	ds, bp
+	jmp	eventLoop
 
 doEvent:
 	; Record the message
@@ -313,6 +350,18 @@ HostIfAttach	method dynamic HostIfProcessClass,
 		mov	ds:hostIfGeode, bx
 
 		pop		ds
+	;
+	; Without a host interface there are no events to handle.
+	;
+		mov	ax, HIF_API_HOST
+		call	HostIfDetect
+		tst	ax
+		jz	done
+	;
+	; Make sure a host event that arrives after we are gone lands on an
+	; IRET rather than on 0000:0000.
+	;
+		call	HostIfGuardRealModeVector
 	; 
 	; Setup interrupt handle
 	;
@@ -325,11 +374,21 @@ HostIfAttach	method dynamic HostIfProcessClass,
 		call	SysCatchInterrupt
 
 	;
+	; Drop events still queued by the host from a previous incarnation
+	; (system restart). The host raises the event interrupt only when its
+	; queue changes from empty to non-empty, so left-over events would keep
+	; us from ever being notified again.
+	;
+		call	HostIfDrainEvents
+	;
 	; Register event interrupt
 	;
 		mov	ax, HIF_SET_EVENT_INTERRUPT
 		call	HostIfCall
 
+		segmov	ds, dgroup, ax
+		mov	ds:hostIfPresent, BB_TRUE
+done:
 	.leave
 	ret
 HostIfAttach	endm
@@ -365,6 +424,12 @@ HostIfDetach	method dynamic HostIfProcessClass,
 					MSG_META_DETACH
 	uses	ax, bx, cx, dx
 	.enter
+	;
+	; Normally HostIfShutdown has already been called by our client
+	; driver at system exit (a library process is not detached then).
+	; Doing it here as well covers the library actually being unloaded.
+	;
+		call	HostIfShutdown
 
 	.leave
 	mov	di, offset HostIfProcessClass
@@ -372,6 +437,184 @@ HostIfDetach	method dynamic HostIfProcessClass,
 
 	ret
 HostIfDetach	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfShutdown
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Stop handling host events for good: unhook the event
+		interrupt and discard all events still queued by the host.
+
+CALLED BY:	GLOBAL. Client drivers that stay loaded until system exit
+		(the video driver, from DR_EXIT) must call this, because
+		HostIf's process is not detached when the system shuts down.
+		HostIfDetach.
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		The host cannot be told to stop raising HOST_API_INTERRUPT.
+		So:
+		- set hostIfDetached, so a late interrupt no longer posts
+		  to our (possibly gone) process,
+		- put the previous vector back; together with the IRET in the
+		  real mode vector (HostIfGuardRealModeVector) a host event
+		  after this is harmless, also after a system restart or
+		  after exiting to DOS,
+		- drain the host's event queue, so the next incarnation gets
+		  notified again (the host only raises the interrupt when the
+		  queue changes from empty to non-empty).
+		Asynchronous host operations can not complete after this.
+		Safe to call more than once.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfShutdown	proc	far
+		uses	ax, di, ds, es
+		.enter
+		segmov	ds, dgroup, ax
+		tst	ds:hostIfDetached
+		jnz	done
+		mov	ds:hostIfDetached, BB_TRUE
+
+		tst	ds:oldIntVec.segment
+		jz	notHooked
+		segmov	es, ds
+		mov	di, offset oldIntVec
+		mov	ax, HOST_API_INTERRUPT
+		call	SysResetInterrupt
+		clrdw	ds:oldIntVec
+notHooked:
+		tst	ds:hostIfPresent
+		jz	done
+		call	HostIfDrainEvents
+done:
+		.leave
+		ret
+HostIfShutdown	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfGuardRealModeVector
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Point the real mode HOST_API_INTERRUPT vector at an IRET,
+		unless it is already set.
+
+CALLED BY:	HostIfAttach
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		In protected mode the DPMI host reflects an interrupt nobody
+		handles in protected mode to the real mode vector. DOSBox only
+		initializes vectors 00h-5Fh and 68h-6Fh, so A0h is 0000:0000.
+		Use the BIOS dummy interrupt handler (an IRET at F000:FF53),
+		after checking the IRET really is there. The vector is left
+		that way when we exit; it is harmless.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfGuardRealModeVector	proc	near
+		uses	ax, bx, cx, dx, es
+		.enter
+ifdef PROTECTED_MODE
+		mov	bl, HOST_API_INTERRUPT
+		mov	ax, 0200h		; DPMI: get real mode interrupt vector
+		int	31h			; cx:dx <- vector
+		jc	done
+		or	cx, dx
+		jnz	done			; already set, leave it alone
+	;
+	; Make sure there is an IRET at the stub address.
+	;
+		mov	ax, IRET_STUB_SEGMENT
+		mov	cx, 0ffffh
+		call	SysMapRealSegment	; ax <- selector
+		mov	es, ax
+		mov	bl, es:[IRET_STUB_OFFSET]
+		segmov	es, ds			; don't keep the selector loaded
+		call	SysUnmapRealSegment
+		cmp	bl, IRET_OPCODE
+		jne	done
+
+		mov	bl, HOST_API_INTERRUPT
+		mov	cx, IRET_STUB_SEGMENT
+		mov	dx, IRET_STUB_OFFSET
+		mov	ax, 0201h		; DPMI: set real mode interrupt vector
+		int	31h
+else
+		clr	ax
+		mov	es, ax
+		mov	ax, es:[HOST_API_INTERRUPT*4].offset
+		or	ax, es:[HOST_API_INTERRUPT*4].segment
+		jnz	done			; already set, leave it alone
+		mov	ax, IRET_STUB_SEGMENT
+		mov	es, ax
+		cmp	{byte} es:[IRET_STUB_OFFSET], IRET_OPCODE
+		jne	done
+		clr	ax
+		mov	es, ax
+		INT_OFF
+		mov	es:[HOST_API_INTERRUPT*4].offset, IRET_STUB_OFFSET
+		mov	es:[HOST_API_INTERRUPT*4].segment, IRET_STUB_SEGMENT
+		INT_ON
+endif
+done:
+		.leave
+		ret
+HostIfGuardRealModeVector	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfDrainEvents
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Fetch and discard all events queued by the host.
+
+CALLED BY:	HostIfAttach, HostIfShutdown
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		HIF_GET_EVENT until HIF_NOT_FOUND. Bounded, in case the host
+		keeps producing events.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfDrainEvents	proc	near
+		uses	ax, bx, cx, dx, si, di, bp
+		.enter
+		mov	bp, 256			; upper bound
+drainLoop:
+		mov	ax, HIF_GET_EVENT
+		push	bp
+		call	HostIfCall
+		pop	bp
+		cmp	ax, HIF_NOT_FOUND
+		je	done
+		dec	bp
+		jnz	drainLoop
+done:
+		.leave
+		ret
+HostIfDrainEvents	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

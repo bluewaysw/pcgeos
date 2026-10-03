@@ -22,6 +22,8 @@ Here are some entry points to the main volumes:
   - [Assembly Reference](asmref.md)
   - [Driver Development Kit](ddk.md)
 - _Third Party software_: this could become a place in the future to document add-on software in this repository that was developed by people/companies other than Geoworks (e.g. Breadbox, New Deal)
+- [System Internals](internals.md): implementation details of the system software itself, for people working on the kernel, loader and low-level libraries.
+  - [Protected Mode](Internals/iprotmode.md): the resident loader, the GPMI, and system restart and reboot in protected mode.
 - [Device Specifics](devices.md): developer information about various "historic" PDAs and smartphones that were shipped with GEOS.
   - Casio Z-7000 ("Zoomer")
   - Nokia 9000/9110 Communicator

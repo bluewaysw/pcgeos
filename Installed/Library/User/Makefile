@@ -63,7 +63,7 @@ LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = ui
 
-PRODUCTS        = GEOS32 
+PRODUCTS        =
 
 SYSMAKEFILE     = geode.mk
 
@@ -80,6 +80,3 @@ SYSMAKEFILE     = geode.mk
 #include "$(DEPFILE)"
 #endif
 
-#if exists(GEOS32/$(DEPFILE))
-#include "GEOS32/$(DEPFILE)"
-#endif

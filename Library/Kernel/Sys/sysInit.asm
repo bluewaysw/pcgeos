@@ -548,6 +548,16 @@ ifdef PROTECTED_MODE
 	;
 		test	ds:[sysConfig], mask SCF_UNDER_SWAT
 		jnz	checkRestartedArg
+	;
+	; Remember the current handler so EndGeos can put it back -- after
+	; a restart our kcode, and with it SysContextSwitchReflector, is gone.
+	;
+		mov	bl, GPMI_EXCEPTION_DEBUG
+                les     si, ds:[loaderVars].KLV_GPMIVectorTable
+                call    {fptr}es:[si+GPMI_CALL_GET_EXCEPTION_HANDLER]
+		mov	ds:[oldDebugExceptionHandler].offset, dx
+		mov	ds:[oldDebugExceptionHandler].segment, cx
+
 		mov	bl, 1
 		mov	cx, segment SysContextSwitchReflector
 		mov	dx, offset SysContextSwitchReflector
