@@ -14,7 +14,7 @@
 
 name inetmsg.lib
 
-longname "Breadbox Internet Msg Library"
+longname "Internet Msg Library"
 
 ###########################################################################
 
@@ -50,10 +50,5 @@ export AELPROCESSDATA       # AELProcessData
 export AELCREATESESSION     # AELCreateSession
 export AELDESTROYSESSION    # AELDestroySession
 export AELRECYCLEDATABLOCKS # AELRecycleDataBlocks
-
-
-###########################################################################
-
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 ###########################################################################

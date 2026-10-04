@@ -1,5 +1,5 @@
 name            sstor.lib
-longname        "Breadbox Docfile (SS) Library"
+longname        "Docfile (SS) Library"
 
 type            library, single
 
@@ -21,5 +21,4 @@ export          StgStreamPos
 export          StgStreamGetLastError
 export          StgStreamClose
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

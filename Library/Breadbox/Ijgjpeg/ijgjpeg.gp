@@ -3,12 +3,12 @@
 # PROJECT:      IJGJPEG
 # FILE:         IJGJPEG.gp
 #
-# AUTHOR:       Marcus Grîber
+# AUTHOR:       Marcus Gr‚Äùber
 #
 ##############################################################################
 
 name            ijgjpeg.lib
-longname        "Breadbox IJG JPEG Library"
+longname        "IJG JPEG Library"
 tokenchars      "IJPG"
 tokenid         16424
 
@@ -70,5 +70,4 @@ export JPEG_INIT_LOADPROGRESS
 
 export JPEG_SET_ERROR_HANDLER_CONTEXT
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

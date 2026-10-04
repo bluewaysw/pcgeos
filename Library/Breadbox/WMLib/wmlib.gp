@@ -1,5 +1,5 @@
 name wmlib.lib
-longname "Breadbox Word Matcher Library"
+longname "Word Matcher Library"
 type    library, single, c-api
 tokenchars "WMLb"
 tokenid 16431
@@ -18,5 +18,4 @@ export WMCREATENEWDB
 export WMADDWORDTONEWDBUNCHECKED
 export WMFINISHNEWDB
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

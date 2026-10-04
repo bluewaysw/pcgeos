@@ -8,7 +8,7 @@
 ##############################################################################
 
 name flllib.app
-longname "Breadbox File List Library"
+longname "File List Library"
 type    library, single, c-api
 tokenchars "None"
 tokenid 16431
@@ -18,7 +18,6 @@ library ansic
 
 #platform geos201
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 # ---------------------------------------------------- PROTOTYPE 1.0 -----
 export GenFileListClass

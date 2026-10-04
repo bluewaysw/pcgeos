@@ -1,5 +1,5 @@
 name ibms.lib
-longname "Breadbox Index Based Mem Lib"
+longname "Index Based Mem Lib"
 type    library, single, c-api
 tokenchars "None"
 tokenid 16431
@@ -59,5 +59,4 @@ export IBTreeEntryMoveTo
 # ---------------------------------------------------- PROTOTYPE 1.1 -----
 # incminor
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

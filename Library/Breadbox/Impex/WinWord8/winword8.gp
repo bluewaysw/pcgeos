@@ -17,10 +17,9 @@
 
 name winword8.lib
 
-longname "Breadbox Word 8 Translator"
+longname "Word 8 Translator"
 tokenchars "TLTX"
 tokenid 16431
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 type    library, single
 

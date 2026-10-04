@@ -21,7 +21,7 @@
 name n2txt.lib
 
 #Long Name                                                                    #
-longname "Breadbox Num to Text Library"
+longname "Num to Text Library"
 
 tokenchars   "bb01"
 tokenid 16431
@@ -41,5 +41,4 @@ resource NumberStrings data object
 
 export NUMTOTEXT
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

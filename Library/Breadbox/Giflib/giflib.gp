@@ -1,6 +1,6 @@
 name giflib.lib
 
-longname "Breadbox Gif Library"
+longname "Gif Library"
 
 type library, single
 
@@ -11,7 +11,6 @@ library geos
 library ansic 
 library extgraph
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 # proto 1.0
 

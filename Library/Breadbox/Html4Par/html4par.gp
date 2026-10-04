@@ -8,7 +8,7 @@
 ##############################################################################
 
 name       html4par.lib
-longname   "Breadbox HTML 4 Parse Library"
+longname   "HTML 4 Parse Library"
 tokenchars "HTML"
 tokenid    16431
 
@@ -130,7 +130,6 @@ export     NAMEPOOLINITIALIZEDYNAMIC
 export     NAMEPOOLISDYNAMIC
 export     NAMEPOOLRESIZEDYNAMIC
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 export	   PARSEABORT
 

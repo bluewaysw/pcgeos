@@ -8,7 +8,7 @@
 ##############################################################################
 name impdoc.lib
 
-longname "Breadbox Doc Import Library"
+longname "Doc Import Library"
 
 type library, single, c-api
 entry LIBRARYENTRY
@@ -27,5 +27,4 @@ export MIMEDRVNOTHING
 export MIMEDRVINFO
 export MIMEDRVMAIN
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

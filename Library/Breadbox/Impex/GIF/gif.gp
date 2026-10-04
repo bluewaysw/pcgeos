@@ -1,6 +1,6 @@
 name gif.lib
 
-longname "Breadbox Gif Translator"
+longname "Gif Translator"
 
 tokenchars "TLGR"
 tokenid 0
@@ -28,5 +28,4 @@ export TransImport
 export TransExport
 export TransGetFormat
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
