@@ -7,17 +7,17 @@ vga16Manager.eobj: vidcomGeode.def geos.def heap.def geode.def resource.def \
                 Internal/tmatrix.def Internal/fontDr.def file.def \
                 Internal/window.def Internal/interrup.def \
                 Internal/threadIn.def Internal/videoDr.def hugearr.def \
-                initfile.def hostif.def vga16Constant.def \
+                initfile.def hostif.def gpmi.def vga16Constant.def \
                 vidcomConstant.def vga16Macro.def vidcomMacro.def \
-                vga16DevInfo.asm vidcomTables.asm vga16Tables.asm \
-                vidcomVariable.def vga16Variable.def vga16StringTab.asm \
-                vidcomEntry.asm vidcomOutput.asm vidcomChars.asm \
-                vidcomFont.asm vga16Under.asm vidcomUtils.asm \
-                vidcomRegion.asm vidcomXOR.asm vidcomInfo.asm \
-                vidcomEscape.asm vga16Escape.asm vidcomPalette.asm \
-                vga16Output.asm vga16GenChar.asm vga16Utils.asm \
-                vga16Chars.asm vga16Pointer.asm vga16EscTab.asm \
-                vga16Palette.asm vga16Dither.asm vidcomPolygon.asm \
+                vga16DevInfo.asm vidcomTables.asm vidcomVariable.def \
+                vga16Variable.def vga16StringTab.asm vidcomEntry.asm \
+                vidcomOutput.asm vidcomChars.asm vidcomFont.asm \
+                vga16Under.asm vidcomUtils.asm vidcomRegion.asm \
+                vidcomXOR.asm vidcomInfo.asm vidcomEscape.asm \
+                vga16Escape.asm vidcomPalette.asm vga16Output.asm \
+                vga16GenChar.asm vga16Utils.asm vga16Chars.asm \
+                vga16Pointer.asm vga16EscTab.asm vga16Palette.asm \
+                vga16Dither.asm vga16Tables.asm vidcomPolygon.asm \
                 vidcomLine.asm vidcomPutLine.asm vidcomRaster.asm \
                 vga16Raster.asm vga16Admin.asm vidcomExclBounds.asm
 
