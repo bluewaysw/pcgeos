@@ -23,6 +23,8 @@ LOBJS           =
 LIBNAME         = video
 PROTOCONST      = VIDEO
 
+PRODUCTS        = WIN32DBCS 
+
 SYSMAKEFILE     = geode.mk
 
 #include <geos.mk>
@@ -36,4 +38,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(WIN32DBCS/$(DEPFILE))
+#include "WIN32DBCS/$(DEPFILE)"
 #endif

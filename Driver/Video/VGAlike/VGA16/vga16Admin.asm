@@ -637,6 +637,9 @@ else ; NT_DRIVER
 
 		mov	ss:[vesaMode], ax	; save it
 
+		call	VidGetVesaBuffer	; DOS buffer for the BIOS calls
+		LONG jc	noBuffer
+
 		; allocate fixed block to get vesa info
 
 		CheckHack <(size VESAInfoBlock) eq (size VESAModeInfo)>
@@ -670,14 +673,16 @@ else ; NT_DRIVER
                 ;mov     ss:[regs.PMRMR_ecx], 0 
                 mov     ss:[regs.PMRMR_eax], eax
                 mov     ss:[regs.PMRMR_flags], 0 
-                mov     ss:[regs.PMRMR_es], 0x2000 
+		push	ss:[vesaBufSeg]		; our DOS buffer, not a fixed 2000h
+		pop	ss:[regs.PMRMR_es]
                 ;mov     ss:[regs.PMRMR_ds], 0 
 		;mov     ss:[regs.PMRMR_fs], 0 
                 ;mov     ss:[regs.PMRMR_gs], 0 
                 ;mov     ss:[regs.PMRMR_ip], 0 
                 ;mov     ss:[regs.PMRMR_cs], 0 
-                mov     ss:[regs.PMRMR_sp], 0x600
-                mov     ss:[regs.PMRMR_ss], 0x2000 
+		mov	ss:[regs.PMRMR_sp], VESA_BUF_SIZE ; stack at end of buffer
+		push	ss:[vesaBufSeg]
+		pop	ss:[regs.PMRMR_ss]
 
 		; regs are passed in es:di
 		lea	di, ss:regs
@@ -702,9 +707,7 @@ else ; NT_DRIVER
 	
 		; PASS:	ax - real-mode segment
 		;	cx - limit of segment in bytes		
-		mov	ax, 0x2000
-		mov	cx, size VESAInfoBlock
-		call	SysMapRealSegment
+		mov	ax, ss:[vesaBufSel]		; buffer selector
 		
 		mov	es, ax
 		mov	di, 0
@@ -754,14 +757,16 @@ checkLoop:
                 mov     ss:[regs.PMRMR_ecx], ecx 
                 mov     ss:[regs.PMRMR_eax], eax
                 mov     ss:[regs.PMRMR_flags], 0 
-                mov     ss:[regs.PMRMR_es], 0x2000 
+		push	ss:[vesaBufSeg]		; our DOS buffer, not a fixed 2000h
+		pop	ss:[regs.PMRMR_es]
                 ;mov     ss:[regs.PMRMR_ds], 0 
 		;mov     ss:[regs.PMRMR_fs], 0 
                 ;mov     ss:[regs.PMRMR_gs], 0 
                 ;mov     ss:[regs.PMRMR_ip], 0 
                 ;mov     ss:[regs.PMRMR_cs], 0 
-                mov     ss:[regs.PMRMR_sp], 0x600
-                mov     ss:[regs.PMRMR_ss], 0x2000 
+		mov	ss:[regs.PMRMR_sp], VESA_BUF_SIZE ; stack at end of buffer
+		push	ss:[vesaBufSeg]
+		pop	ss:[regs.PMRMR_ss]
 
 		push	es
 		
@@ -778,6 +783,7 @@ checkLoop:
 		;int	VIDEO_BIOS		; get mode info
 		
 		pop 	es
+		mov	es, ss:[vesaBufSel]	; mode info is in our buffer
 		clr	di
 
 		; now see if the current hardware is cool.
@@ -801,7 +807,94 @@ donedone:
 notPresent::
 		mov	ax, DP_NOT_PRESENT	; 
 		jmp	done
+noBuffer:
+		mov	ax, DP_NOT_PRESENT
+		jmp	realDone
 VidTestVESA	endp
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		VidGetVesaBuffer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Get the DOS memory block used for the VESA BIOS calls:
+		info/mode info buffer at offset 0, real mode stack at the end.
+
+CALLED BY:	VidTestVESA, VidSetVESA
+PASS:		ss	= dgroup
+RETURN:		carry set if no block could be allocated
+		vesaBufSeg, vesaBufSel set otherwise
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		The BIOS calls used to put their buffer and stack at the fixed
+		real mode segment 2000h, i.e. into whatever DOS, the DPMI host,
+		the loader or the Swat stub kept there. Allocate a block once
+		and keep it until VidExit.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+VidGetVesaBuffer	proc	near
+		uses	ax, bx, dx
+		.enter
+		tst	ss:[vesaBufSel]		; clears carry
+		jnz	done
+		mov	bx, VESA_BUF_SIZE / 16	; paragraphs
+		call	SysAllocDOSBlock	; ax <- segment, dx <- selector
+		jc	done
+		mov	ss:[vesaBufSeg], ax
+		mov	ss:[vesaBufSel], dx
+done:
+		.leave
+		ret
+VidGetVesaBuffer	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		VidMapVesaWinSeg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Get a selector for a VESA window segment, reusing the one
+		created for the same segment before.
+
+CALLED BY:	VidSetVESA
+PASS:		ax	= real mode segment
+		ss:di	= VesaSegCache
+RETURN:		ax	= selector
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		VidSetVESA runs again on every display size change. Mapping the
+		window segments each time used to leak two selectors per change.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+VidMapVesaWinSeg	proc	near
+		uses	cx
+		.enter
+		cmp	ax, ss:[di].VSC_realSeg
+		jne	newSeg
+		mov	cx, ss:[di].VSC_selector
+		jcxz	newSeg
+		mov	ax, cx
+		jmp	done
+newSeg:
+		mov	ss:[di].VSC_realSeg, ax
+		mov	cx, 0xFFFF
+		call	SysMapRealSegment	; ax <- selector
+		mov	ss:[di].VSC_selector, ax
+done:
+		.leave
+		ret
+VidMapVesaWinSeg	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -918,6 +1011,16 @@ dpiMode:
 		div	cx
 		mov	bx, ax		
 
+		; never ask for more than our buffers can handle
+		; (lineMaskBuffer, polyEdge -- see VGA16_MAX_WIDTH)
+		cmp	si, VGA16_MAX_WIDTH
+		jbe	widthOK
+		mov	si, VGA16_MAX_WIDTH and 0xFFF8
+widthOK:
+		cmp	bx, VGA16_MAX_HEIGHT
+		jbe	heightOK
+		mov	bx, VGA16_MAX_HEIGHT
+heightOK:
 		jmp	setResolution
 regularMode:
 		mov	si, cs:[vesaWidth][bx]
@@ -935,6 +1038,10 @@ regularSetup:
 		mov	al, VESA_SET_MODE
 
 commonSetup:
+		push	ax
+		call	VidGetVesaBuffer	; DOS buffer for the BIOS calls
+		pop	ax
+		LONG jc	noBuffer
 		push	bx
 		segmov	es, ss, di		; es -> dgroup
 		lea	di, ss:[vesaInfo]	; es:di -> info block
@@ -951,14 +1058,16 @@ commonSetup:
                 ;mov     ss:[regs.PMRMR_ecx], 0 
                 mov     ss:[regs.PMRMR_eax], eax
                 mov     ss:[regs.PMRMR_flags], 0 
-                mov     ss:[regs.PMRMR_es], 0x2000 
+		push	ss:[vesaBufSeg]		; our DOS buffer, not a fixed 2000h
+		pop	ss:[regs.PMRMR_es]
                 ;mov     ss:[regs.PMRMR_ds], 0 
 		;mov     ss:[regs.PMRMR_fs], 0 
                 ;mov     ss:[regs.PMRMR_gs], 0 
                 ;mov     ss:[regs.PMRMR_ip], 0 
                 ;mov     ss:[regs.PMRMR_cs], 0 
-                mov     ss:[regs.PMRMR_sp], 0x600
-                mov     ss:[regs.PMRMR_ss], 0x2000 
+		mov	ss:[regs.PMRMR_sp], VESA_BUF_SIZE ; stack at end of buffer
+		push	ss:[vesaBufSeg]
+		pop	ss:[regs.PMRMR_ss]
 
 		; regs are passed in es:di
 		lea	di, ss:regs
@@ -976,9 +1085,7 @@ commonSetup:
 
 		; PASS:	ax - real-mode segment
 		;	cx - limit of segment in bytes		
-		mov	ax, 0x2000
-		mov	cx, size VESAInfoBlock
-		call	SysMapRealSegment
+		mov	ax, ss:[vesaBufSel]		; buffer selector
 		
 		; copy response over
 		mov	ds, ax
@@ -1006,14 +1113,16 @@ commonSetup:
                 mov     ss:[regs.PMRMR_ecx], ecx 
                 mov     ss:[regs.PMRMR_eax], eax
                 mov     ss:[regs.PMRMR_flags], 0 
-                mov     ss:[regs.PMRMR_es], 0x2000 
+		push	ss:[vesaBufSeg]		; our DOS buffer, not a fixed 2000h
+		pop	ss:[regs.PMRMR_es]
                 ;mov     ss:[regs.PMRMR_ds], 0 
 		;mov     ss:[regs.PMRMR_fs], 0 
                 ;mov     ss:[regs.PMRMR_gs], 0 
                 ;mov     ss:[regs.PMRMR_ip], 0 
                 ;mov     ss:[regs.PMRMR_cs], 0 
-                mov     ss:[regs.PMRMR_sp], 0x600
-                mov     ss:[regs.PMRMR_ss], 0x2000 
+		mov	ss:[regs.PMRMR_sp], VESA_BUF_SIZE ; stack at end of buffer
+		push	ss:[vesaBufSeg]
+		pop	ss:[regs.PMRMR_ss]
 
 		; regs are passed in es:di
 		lea	di, ss:regs
@@ -1027,8 +1136,15 @@ commonSetup:
 		call    SysRealInterrupt
 		;int	VIDEO_BIOS		; make bios call
 
-		; copy response over
-		;mov	ds, ax
+		; copy response over -- but only if the BIOS call succeeded and
+		; the mode info is usable. Taking a failed or empty answer would
+		; leave e.g. VMI_scanSize 0, and the next line drawn divides by it
+		; (CalcLastScanPtr). Keep the previous mode info instead.
+		cmp	{word} ss:[regs.PMRMR_eax], VESA_BIOS_EXT
+		LONG jne	badModeInfo
+		mov	ds, ss:[vesaBufSel]
+		tst	ds:[VMI_scanSize]
+		LONG jz	badModeInfo
 		mov	si, 0
 		segmov	es, ss, di		; es -> dgroup
 		lea	di, ss:[modeInfo]	; es:di -> info block
@@ -1049,8 +1165,8 @@ checkWin:
 
 		; PASS:	ax - real-mode segment
 		;	cx - limit of segment in bytes		
-		mov	cx, 0xFFFF
-		call	SysMapRealSegment
+		mov	di, offset winASegCache
+		call	VidMapVesaWinSeg	; reuses the selector
 
 		mov	ss:[modeInfo].VMI_winASeg, ax	
 
@@ -1061,8 +1177,8 @@ nextWin:
 
 		; PASS:	ax - real-mode segment
 		;	cx - limit of segment in bytes		
-		mov	cx, 0xFFFF
-		call	SysMapRealSegment
+		mov	di, offset winBSegCache
+		call	VidMapVesaWinSeg	; reuses the selector
 
 		mov	ss:[modeInfo].VMI_winBSeg, ax	
 
@@ -1214,6 +1330,13 @@ storeRWWin:
 		div	bl				; al = #to bump
 		mov	ss:[nextWinInc], ax		; set increment
 
+		.leave
+		ret
+
+		; No usable mode info, or no DOS buffer for the BIOS calls:
+		; keep the previous mode info and window settings.
+badModeInfo:
+noBuffer:
 		.leave
 		ret
 

@@ -157,6 +157,22 @@ ifdef __HOSTIF
 		;
 		call	HostIfShutdown
 endif
+ifdef VESA_DOS_BUFFER
+		;
+		; Free the DOS block used for the VESA BIOS calls. It is not
+		; freed by anybody else, neither on a system restart.
+		;
+		push	dx
+		mov	dx, fs:[vesaBufSel]
+		tst	dx
+		jz	noVesaBufPop
+		call	SysFreeDOSBlock		; dx = selector (DPMI 0101h)
+		clr	ax
+		mov	fs:[vesaBufSel], ax
+		mov	fs:[vesaBufSeg], ax
+noVesaBufPop:
+		pop	dx
+endif
 if NT_DRIVER
 		push	ds
 		;

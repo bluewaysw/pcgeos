@@ -370,6 +370,12 @@ endif
 	; Flag initialization complete.
 	; 
 		ornf	ds:[sysFlags], mask initialized
+	;
+	; Catch GEOS's final exit to DOS (see StubInt21). Done before the
+	; loader runs, so the loader records the hook with all other vectors
+	; and keeps it across a system restart.
+	;
+		call	MainHookDOSExit
 
 
 
@@ -668,6 +674,91 @@ MainFinishLoaderLoad endp
 
 
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainHookDOSExit / StubInt21 / MainRMExit
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Handle GEOS exiting to DOS in protected mode.
+
+PSEUDO CODE/STRATEGY:
+	In real mode, DOS returns to MainGeosExited when the loader process
+	terminates (its PSP_saveQuit points there), and the stub tells Swat.
+	In protected mode the stub, the loader and GEOS share one DPMI
+	session, which belongs to the loader's process (the stub enters
+	protected mode after loading the loader). GEOS's final int 21h/4Ch
+	ends that session, and DOS then returns to MainGeosExited in real
+	mode, where none of the stub's selectors are valid. Swat never got
+	RPC_EXIT and hung after "Thread 0 of ui exited".
+
+	So hook int 21h in protected mode:
+	- GEOS calls 4Ch (geosgone not set yet): go to MainGeosExited
+	  right away, still in protected mode. It tells Swat (RPC_EXIT) or,
+	  without Swat, exits directly; both end in RpcExit.
+	- RpcExit calls 4Ch itself (geosgone set by then): before passing
+	  it on, point the loader PSP's terminate address at MainRMExit.
+	  The DPMI host ends the session, DOS terminates the loader process
+	  and returns to MainRMExit in real mode, which terminates the stub
+	  as well, back to the shell.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+oldInt21	fptr.far	0		; previous protected mode int 21h
+
+MainHookDOSExit	proc	near
+		push	eax, ebx, ecx, edx
+		mov	bl, 21h
+		call	GPMIGetInterruptHandler	; cx:edx <- current vector
+		mov	ds:[oldInt21].offset, dx
+		mov	ds:[oldInt21].segment, cx
+		xor	edx, edx
+		mov	dx, offset StubInt21
+		mov	cx, cs
+		mov	bl, 21h
+		call	GPMISetInterruptHandler
+		pop	eax, ebx, ecx, edx
+		ret
+MainHookDOSExit	endp
+
+StubInt21	proc	far
+		cmp	ah, MSDOS_QUIT_APPL
+		je	quit
+chain:
+		jmp	cs:[oldInt21]
+quit:
+		test	cs:[sysFlags], mask geosgone
+		jnz	finalExit
+	;
+	; GEOS is exiting: handle it here, in protected mode.
+	;
+		sti
+		jmp	MainGeosExited
+finalExit:
+	;
+	; Our own final exit: make DOS come back to real mode code that is
+	; valid there once the loader process (and the DPMI session) ends.
+	;
+		push	es
+		mov	es, cs:[PSP]		; loader's PSP (selector)
+		mov	es:[PSP_saveQuit].offset, offset MainRMExit
+		pop	es
+		jmp	chain
+StubInt21	endp
+
+;
+; Reached in REAL MODE when DOS has terminated the loader process (the
+; segment of PSP_saveQuit is the stub's real mode code segment, set in
+; MainFinishLoaderLoad). The stub's PSP is current again: exit too.
+;
+MainRMExit	proc	far
+		mov	ax, MSDOS_QUIT_APPL shl 8
+		int	21h
+MainRMExit	endp
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		MainGeosExited
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

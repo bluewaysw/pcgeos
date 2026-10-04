@@ -3753,6 +3753,47 @@ Kernel_FillMem	endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		KernelSelectorPresent
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	See if a selector can be used to access memory.
+
+CALLED BY:	Kernel_ReadAbs, Kernel_WriteAbs, Kernel_FillAbs
+PASS:		bx	= selector
+RETURN:		carry set if bx is no valid selector, or its segment is
+		not present
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+		LAR fails for invalid selectors and returns the access rights
+		otherwise; bit 15 is the present bit. VERR does not look at
+		the present bit. Swat reads memory of blocks GEOS has already
+		freed (e.g. right after GEOS exited); in protected mode that
+		faulted inside the stub ("Segment not present").
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+KernelSelectorPresent	proc	near
+		push	ax
+		.inst db 00fh, 002h, 0c3h	; lar ax, bx
+		jnz	bad			; invalid selector
+		test	ax, 8000h		; present?
+		jz	bad
+		pop	ax
+		clc
+		ret
+bad:
+		pop	ax
+		stc
+		ret
+KernelSelectorPresent	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		Kernel_ReadAbs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -3790,9 +3831,14 @@ Kernel_ReadAbs	proc	near
 		mov     dx, ({AbsReadArgs}CALLDATA).ara_offset
 		.inst db 00fh, 000h, 0e3h	; verr bx
 		jnz	selectorBad		; branch if selector unreadable
+		call	KernelSelectorPresent	; verr ignores the present bit
+		jc	selectorBad
                 call    GPMISelectorCheckLimits
 		jc	selectorBad		; branch if GPMI objects
+		push	ax
+		mov	ax, bx			; GPMITestPresent takes ax
 		call	GPMITestPresent
+		pop	ax
 		jc	selectorBad		; branch if not present
 		les	si, dword ptr ({AbsReadArgs}CALLDATA).ara_offset
 dontUseSelector:
@@ -3844,6 +3890,9 @@ Kernel_WriteAbs	proc	near
 		; 
 		call	Rpc_Length
 		sub	cx, size AbsWriteArgs
+		mov	bx, ({AbsWriteArgs}CALLDATA).awa_segment
+		call	KernelSelectorPresent
+		jc	writeSkip		; write nothing to a bad selector
 		les	di, dword ptr ({AbsWriteArgs}CALLDATA).awa_offset
 		mov	si, offset CALLDATA + size AbsWriteArgs
 
@@ -3870,6 +3919,7 @@ endif	;_WRITE_ONLY_WORDS
 		;
 		; Restore ES to cgroup for the reply (which is NULL)
 		; 
+writeSkip:
 		pop	es
 		clr	cx
 		call	Rpc_Reply
@@ -3985,6 +4035,9 @@ Kernel_FillAbs	proc	near
 		; loaded from the afa_offset and afa_segment fields.
 		; 
 		mov	cx, ({AbsFillArgs}CALLDATA).afa_length
+		mov	bx, ({AbsFillArgs}CALLDATA).afa_segment
+		call	KernelSelectorPresent
+		jc	fillSkip		; fill nothing at a bad selector
 		les	di, dword ptr ({AbsFillArgs}CALLDATA).afa_offset
 		cld
 		
@@ -4006,6 +4059,7 @@ KFAWord:
 KFADone:
 		mov_tr	ax, bx
 		call	Kernel_RestoreWriteProtect
+fillSkip:
 		;
 		; Restore ES to cgroup for the reply (which is NULL)
 		; 
