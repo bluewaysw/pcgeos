@@ -93,7 +93,7 @@ This flag indicates that this event may be discarded if the system
 is running extremely low on handles and requires more space 
 immediately.
 
-Additionally, @call alows the use of several special expressions in place of the 
+Additionally, @call allows the use of several special expressions in place of the 
 recipient:
 
 **self** - Send the message to the object issuing the @call command. e.g.
@@ -345,7 +345,7 @@ the following arguments:
 The @define directive defines a Goc macro. You can define C macros with the 
 \#define directive; macros that use Goc operators, keywords, or code must be 
 defined with @define. Similarly, macros defined with @define must be later 
-used with the "@" marker preceeding them; otherwise, the Goc processor will 
+used with the "@" marker preceding them; otherwise, the Goc processor will 
 scan over the macro and will not evaluate it. The arguments of @define are 
 listed below:
 
@@ -606,7 +606,7 @@ possible if you will be using @**call**, passing arguments, or what have you):
 ### gcnList
     gcnList(<manufID>,<lname>) = <oname> [, <oname>]*;
 
-The gcnList keyword, which does not have the keyword marker @ preceeding 
+The gcnList keyword, which does not have the keyword marker @ preceding 
 it, puts the listed objects onto the specified notification list. GCN lists are 
 specified by both manufacturer ID and list type. The arguments of the gcnList 
 keyword are given below:
@@ -763,7 +763,7 @@ will look first in the standard include directories.
     @instance <insType> <iname> = <default>;
 
 The @instance keyword declares an instance data field for a class. This 
-keyword will appear between the class delimeters @class and @endc. Its 
+keyword will appear between the class delimiters @class and @endc. Its 
 arguments are shown below:
 
 *insType* - The data type of the instance data field. Must be a valid C data 

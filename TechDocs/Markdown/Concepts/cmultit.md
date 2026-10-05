@@ -338,7 +338,7 @@ ThreadAttachToQueue()
 To create an event-driven thread (one that handles messages sent to 
 certain objects), send a MSG_PROCESS_CREATE_EVENT_THREAD to your 
 application's primary thread, passing as arguments the object class for the 
-new thread (a sublass of **ProcessClass**) and the stack size for the new 
+new thread (a subclass of **ProcessClass**) and the stack size for the new 
 thread (1 K bytes is usually a good value, or around 3 K bytes for threads 
 that will handle keyboard navigation or manage a text object). This 
 message is detailed in ["System Classes", Chapter 1 of the Object Reference 

@@ -2461,7 +2461,7 @@ MSG_GEN_SET_KBD_ACCELERATOR sets the keyboard accelerator of the
 object the message is sent to. The message must pass the keyboard 
 accelerator to use along with a **VisUpdateMode**. If you wish to remove a 
 keyboard accelerator from an object, pass this message with a keyboard 
-acclerator of zero.
+accelerator of zero.
 
 MSG_GEN_CHANGE_ACCELERATOR changes the keyboard accelerator using 
 a low-level replace operation.
@@ -3523,7 +3523,7 @@ HINT_ALIGN_LEFT_EDGE_WITH_OBJECT,
 HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT, and 
 HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT all line up an object's edge 
 with the same edge of the object these hints are set to. One of these hints can 
-be used in each direction. The same concerns over superceding the default 
+be used in each direction. The same concerns over superseding the default 
 geometry manager in the above attributes are valid here as well. Therefore, 
 avoid using these hints if possible.
 

@@ -294,7 +294,7 @@ signed 32-bit integer.
 
 This routine converts a 32-bit unsigned integer to its ASCII representation 
 and writes it to the specified buffer. It returns the length of the string (not 
-counting the nulll termination, if any). The routine is passed the following 
+counting the null termination, if any). The routine is passed the following 
 arguments:
 *buffer* - This is a pointer to a character buffer. The buffer must be long 
 enough to accommodate the largest string; that is, there must 

@@ -203,7 +203,7 @@ library to ensure compatibility across all platforms.
 
 If a reference is ever made to an entry point in a library that would cause the 
 executable to depend upon a later version of the library than specified in the 
-platform file, glue will complain. For example, if the specified platoform used 
+platform file, glue will complain. For example, if the specified platform used 
 GrObj version 534.1 and glue found a reference to an entry point that didn't 
 exist until GrObj 534.3 (ie., an entry point exported following 3 'incminor's in 
 grobj.gp), glue will spit out an error message like: 

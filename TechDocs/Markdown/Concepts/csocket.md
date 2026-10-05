@@ -110,7 +110,7 @@ The connection was lost, probably due to some low-level link failure. There may 
 
 SE\_CONNECTION\_RESET
 
-The connection was lost, probably due to this side of the connection intentially making a low-level disconnection; *e.g.* , the sort of disconnection that results from `SocketCloseDomainMedium()` or the Socket's owning thread exiting.
+The connection was lost, probably due to this side of the connection intentionally making a low-level disconnection; *e.g.* , the sort of disconnection that results from `SocketCloseDomainMedium()` or the Socket's owning thread exiting.
 
 SE\_TIMED\_OUT
 

@@ -39,7 +39,7 @@ AAF_STATE_FILE_PASSED will also be set.
     typedef struct {
         /* AIR_fileName:
          * Application being launched. Pathname is relative to application 
-         * directory (which, of course, may be overriden with a direct path
+         * directory (which, of course, may be overridden with a direct path
          * to the application). */
         PathName                AIR_fileName;
         /* AIR_stateFile:

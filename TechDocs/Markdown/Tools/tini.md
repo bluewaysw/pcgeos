@@ -229,7 +229,7 @@ each category, with a description of each key and the values you can set.
     device = <full name of device>
     driver = <file name of driver>
     oldDevice = <full name of device formerly used>
-    oldDriver = <file name of drivr formerly used)
+    oldDriver = <file name of driver formerly used)
 
     [serial]
     port <number of serial port> = <level of port>
@@ -470,7 +470,7 @@ This is the number of user-defined envelope sizes.
 `newSizes = <list of paper size codes>`
 
 This list contains a list of all user-defined envelope sizes. The paper size 
-information for each of these sizes will be stored in a catgory named 
+information for each of these sizes will be stored in a category named 
 [envel*num*], where *num* is the three-letter code in this list.
 
 #### order
@@ -693,7 +693,7 @@ required).
 
 `doubleClickTime = <number of ticks>`
 
-This field specifies the time threshhold between clicks which should be 
+This field specifies the time threshold between clicks which should be 
 recognized as a double-click. This time is expressed in 1/60th second "ticks". 
 The default value is 20.
 
@@ -912,7 +912,7 @@ This is the number of user-defined label sizes.
 `newSizes = <list of paper size codes>`
 
 This list contains a list of all user-defined label sizes. The paper size 
-information for each of these sizes will be stored in a catgory named 
+information for each of these sizes will be stored in a category named 
 [label*num*], where *num* is the three-letter code in this list.
 
 #### order
@@ -1246,7 +1246,7 @@ This is the number of user-defined paper sizes.
 `newSizes = <list of paper size codes>`
 
 This list contains a list of all user-defined paper sizes. The paper size 
-information for each of these sizes will be stored in a catgory named 
+information for each of these sizes will be stored in a category named 
 [paper*num*], where *num* is the three-letter code in this list.
 
 #### order

@@ -383,7 +383,7 @@ which the memory manager assigns to it directly (via calls to memory
 routines or data-space assigned at startup) or indirectly (through other 
 libraries, such as the VM library). This also means that you should not save 
 pointers to movable memory after unlocking the memory block. If you are not 
-careful, you can accidently access memory which no longer contains your 
+careful, you can accidentally access memory which no longer contains your 
 data, with sometimes-fatal results.
 
 Another rule is to minimize the amount of memory you keep locked at a time. 

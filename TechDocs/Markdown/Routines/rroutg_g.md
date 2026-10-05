@@ -167,7 +167,7 @@ change has occurred) by the message queue.
 The *dataBlock* parameter contains the memory handle of an extra data block 
 to be sent with the notification, if any; this block should also be specified in 
 the classed event. If no data block is required, pass a NullHandle. If a data 
-block with a reference cound is used, increment the reference count by one 
+block with a reference count is used, increment the reference count by one 
 before calling this routine; this routine decrements the count and frees the 
 block if the count reaches zero.
 
@@ -1291,7 +1291,7 @@ The return value can be any one of **GSRetType**, a byte-size field:
 ----------
 ### GrCreateBitmap()
     VMBlockHandle GrCreateBitmap(
-            BMFormat        initFormat,     /* color fomat of bitmap */
+            BMFormat        initFormat,     /* color format of bitmap */
             word            initWidth,      /* initial width of bitmap */
             word            initHeight,     /* initial height of bitmap */
             VMFileHandle    vmFile,         /* VM file to hold bitmap's data*/
@@ -1343,8 +1343,8 @@ the video driver. (Don't worry that you don't know the size of
 this structure; remember that the CBitmap structure contains 
 the offsets of the bitmap and palette data areas.)
 
-Pallette Information (optional)  
-If the bitmap has its own pallette, this is where the palette data 
+Palette Information (optional)  
+If the bitmap has its own palette, this is where the palette data 
 will be stored; it will consist of an array of 3-byte entries. 
 Depending on how many colors the bitmap supports, there may 
 be 16 or 256 entries in this array.
@@ -1383,7 +1383,7 @@ Initialize the table entries to the default palette for the device.
     GStateHandle GrCreateState(
             WindowHandle win);  /* Window in which GState will be active */
 
-Create a graphics state (GState) block containg default GState information.
+Create a graphics state (GState) block containing default GState information.
 
 If zero is passed, then the GState created will have no window associated 
 with it.
@@ -1569,7 +1569,7 @@ Draw a Bezier curve.
             GStateHandle        gstate,         /* GState to draw to */
             const Point         *points);       /* array of three Points */
 
-Draw a Bezier curve, using the current postion as the first point.
+Draw a Bezier curve, using the current position as the first point.
 
 **Include:** graphics.h 
 
@@ -2985,7 +2985,7 @@ Start drawing exclusively to a video driver.
     void    GrInitDefaultTransform(
             GStateHandle    gstate);            /* subject GState */
 
-Initialize the GState's default transformation to hold hte value of the current 
+Initialize the GState's default transformation to hold the value of the current 
 transformation.
 
 **Include:** graphics.h 

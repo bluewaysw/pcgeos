@@ -583,7 +583,7 @@ This structure is passed to GrSetPalette.
     SoundBasicStatus        struct
         SBS_blockHandle     word 0              ; handle of block
         SBS_ID              word SOUND_ID       ; Says this struct is a sound
-        SBS_mutExSem        hptr 0              ; mutual exclusive sempahore
+        SBS_mutExSem        hptr 0              ; mutual exclusive semaphore
         SBS_type            SoundType 0         ; the type of block
         SBS_priority        SoundPriority 0     ; current priority
         SBS_EOS             EndOfSongFlags 0    ; what to do at EOS

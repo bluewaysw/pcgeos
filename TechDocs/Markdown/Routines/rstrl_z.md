@@ -508,7 +508,7 @@ automatically maintained by the LMem routines.
 
 ----------
 ### LMemType
-    typdef enum {
+    typedef enum {
         LMEM_TYPE_GENERAL,
         LMEM_TYPE_WINDOW,
         LMEM_TYPE_OBJ_BLOCK,

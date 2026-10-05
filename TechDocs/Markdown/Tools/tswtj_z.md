@@ -2257,7 +2257,7 @@ words of data in cx, dx, and bp.
 **Synopsis:**  
 Prints a nicely formatted representation of an object, with option message, 
 register data, label, hex address, & carriage return. The class indication may 
-also be overriden.
+also be overridden.
 
 **Notes:**
 

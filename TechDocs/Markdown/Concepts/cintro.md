@@ -443,7 +443,7 @@ This introduces you to Swat, the powerful system debugger supplied in
 the SDK. This chapter also gives you the most popular Swat commands 
 and explains how you can put them to use for you.
 
-4. [Swat Referenc](../Tools/tswta_i.md)  
+4. [Swat Reference](../Tools/tswta_i.md)  
 This gives detailed command reference entries for each Swat command. 
 You should use this section when you need to know the specifics of one or 
 more Swat commands.
