@@ -60,6 +60,17 @@ REVISION HISTORY:
 VidEscSetDeviceAgain 	proc	near
 		uses	ax, bx, cx, ds, bp, si, ds
 		.enter
+		;
+		; Escapes are dispatched without videoSem, but re-initializing
+		; the device must not run while another thread is drawing:
+		; DRE_SET_DEVICE runs on the driver's single stack (VidCallMod)
+		; and rewrites the mode, video memory windows and segments the
+		; drawing code is using. This is called by the UI thread on a
+		; host display size change (OLScreenNotify), which used to crash
+		; a concurrent text output in protected mode.
+		; (fs = dgroup, set up by DriverStrategy)
+		;
+		PSem	fs, videoSem, TRASH_AX_BX
 		mov	ax, dgroup
 		mov	ds, ax
 		mov	di, ds:[DriverTable].VDI_device	; save it
@@ -76,6 +87,7 @@ VidEscSetDeviceAgain 	proc	near
 		pop	ax
 		mov	ds:[cursorCount], al
 done:
+		VSem	fs, videoSem, TRASH_AX_BX
 		.leave
 		mov	di, 0		; function executed
 		ret

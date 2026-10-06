@@ -513,11 +513,56 @@ To build the stub, run `pmake SUBDIRS=LowMem LowMem/swat.exe` in
 `Installed/Tools/swat/Stub32` and copy `LowMem/swat.exe` into the
 target's `ensemble` directory.
 
-Tested: 20 restarts under the stub with no Swat host attached, both EC
-and NC. The behaviour with a Swat host attached has not been tested yet:
-the Linux build of the Swat host crashes while attaching
-(`curPatient` is NULL in `FrameCmd`, `cmdAM.c`), which is a separate
-problem.
+#### 1.9.1 Exit to DOS Under the Stub
+
+In real mode the stub gets control back when GEOS's final `int 21h/4Ch`
+terminates the loader process: the loader's DOS terminate address
+(`PSP_saveQuit`) points to `MainGeosExited`, which sends `RPC_EXIT` to
+Swat. In protected mode the stub, the loader and GEOS share one DPMI
+session. The session belongs to the loader's process, because the stub
+loads the loader first (`4B01h`) and only then enters protected mode
+through the loader's GPMI. GEOS's `4Ch` therefore ends the session, and
+DOS returns to `MainGeosExited` in real mode, where none of the stub's
+selectors are valid. Swat never got `RPC_EXIT` and hung after
+"Thread 0 of ui exited". This problem existed independently of the
+restart work.
+
+The stub now installs a protected-mode `int 21h` hook
+(`MainHookDOSExit`, `StubInt21` in `Stub32/main.asm`) before the loader
+starts, so the loader records it with all other vectors and keeps it
+across restarts:
+
+- When GEOS calls `4Ch` (`geosgone` not set yet), the hook jumps to
+  `MainGeosExited` while still in protected mode. That path sends
+  `RPC_EXIT` to Swat, or exits directly if no Swat host is connected;
+  both end in `RpcExit`.
+- When `RpcExit` finally calls `4Ch` itself (`geosgone` set), the hook
+  first points the loader PSP's terminate address at `MainRMExit`, a
+  real-mode routine that terminates the stub as well. The DPMI host
+  then ends the session, DOS terminates the loader process and returns
+  to `MainRMExit`, and that returns control to the DOS shell.
+
+After `GEOS Exited`, Swat stops at its prompt and shows a leftover
+position. Nothing is running anymore at that point.
+
+Right after the exit, Swat still reads memory of blocks GEOS has
+already freed. `Kernel_ReadAbs` checked selectors with `VERR`, which
+ignores the present bit, so such a read faulted inside the stub
+("Segment not present"). `KernelSelectorPresent` (`LAR`, bit 15) now
+guards `Kernel_ReadAbs`, `Kernel_WriteAbs` and `Kernel_FillAbs`.
+`Kernel_ReadAbs` also passed the selector to `GPMITestPresent` in `BX`,
+while that routine expects it in `AX`.
+
+#### 1.9.2 Test Status
+
+Tested with the Swat host attached (the Linux build of Swat): exit to
+DOS, three restarts in a row, and a restart followed by exit to DOS.
+Swat re-attaches after each restart and shows `GEOS Exited` at the end;
+DOS continues.
+
+Open: under the stub **without** a Swat host connected, a restart hangs
+before the video driver exits. This also happens with the stub before
+the exit hook, and not with a host attached.
 
 ### 1.10 Testing the Restart
 
@@ -597,3 +642,93 @@ from the main README. A few points are specific to this branch:
 - An interrupted build can leave truncated object files behind. `glue`
   then reports "invalid object module (not VM or MS format)". Delete the
   affected `.obj`/`.eobj` file and build again.
+
+### 1.12 Video Driver Re-Initialization and videoSem
+
+`DriverStrategy` (`Driver/Video/VidCom/vidcomEntry.asm`) serializes the
+drawing functions with `videoSem`, but dispatches escape codes without
+it. On a host display size change, the UI's screen object
+(`OLScreenNotify`, `CommonUI/CWin/cwinScreen.asm`) calls the escape
+`VID_ESC_UPDATE_DEVICE` on the UI thread, while other threads may be in
+the middle of drawing. In `vga16` this escape re-initializes the device
+through `DRE_SET_DEVICE`, which:
+
+- runs on the driver's single shared stack (`VidCallMod`, `endVidStack`),
+- rewrites the mode, the video memory windows and the segments the
+  drawing code is using.
+
+In real mode the race produced drawing glitches at most. In protected
+mode it crashed a concurrent text output with a protection violation in
+`SlowGenClip` (`mov ds, fs:[currentWin]`), seen in the browser while the
+display was rescaled in a DPI mode. `VidEscSetDeviceAgain`
+(`vga16Escape.asm`) now holds `videoSem` while it re-initializes the
+device. `DRE_SET_DEVICE` does not call back into `DriverStrategy`, so
+this cannot deadlock.
+
+The general lesson: code that relied on a race being harmless in real
+mode, because a stale segment value only produced garbage, now faults
+in protected mode, because loading a stale selector raises an
+exception.
+
+### 1.13 Real-Mode Buffers for BIOS Calls
+
+Protected-mode code that calls a real-mode service through DPMI `0300h`
+(`SysRealInterrupt`) needs real-mode memory for buffers and for the
+real-mode stack. That memory must be **allocated** (`SysAllocDOSBlock`),
+not taken from a fixed segment.
+
+`VidSetVESA` and `VidTestVESA` in `vga16` (`vga16Admin.asm`) used the
+fixed segment `2000h` for the VESA info and mode info buffers, at offset
+0, and for the real-mode stack, at offset `600h`. On every display
+change this wrote into whatever DOS, the DPMI host, the loader or the
+Swat stub kept at linear address `20000h`. Hardware interrupts that
+occur while the DPMI host is in real mode for the BIOS call are handled
+on the same real-mode stack, including the host's switch to the
+protected-mode handler. The stack could therefore grow down into the
+mode info buffer before it was copied, which is a plausible cause of
+the divide error in `CalcLastScanPtr` (a zero `VMI_scanSize`) seen after
+switching to full screen in a DPI mode.
+
+The driver now:
+
+- allocates one DOS block for the buffer and a 4 KB real-mode stack
+  (`VidGetVesaBuffer`), and frees it in `VidExit`. A 512-byte stack was
+  not enough in tests.
+- takes the mode info only if `int 10h/4F01h` returned `004Fh` and the
+  scan size is not zero. Otherwise it keeps the previous mode info.
+- reuses the selectors for the VESA window segments
+  (`VidMapVesaWinSeg`) instead of creating new ones on every display
+  change.
+
+`SysFreeDOSBlock` expects the selector in `DX` (DPMI `0101h`), although
+its header comment says `AX`.
+
+These changes were tested only partially: the mode info was correct for
+every switch in a traced run, but the emulator under test was too slow
+at large DPI resolutions to tell a hang from a slow redraw.
+
+### 1.14 Driver Buffers and Large Screens
+
+`vga16` supports screen sizes chosen at run time (`MULT_RESOLUTIONS`). Some
+of its buffers are nevertheless sized for a maximum screen:
+
+- `lineMaskBuffer` (`vidcomVariable.def`) holds the clip mask for one
+  scan line, one bit per pixel. `ValLineMask` generates the mask for the
+  full current width (`VDI_pageW`).
+- `polyEdge` (`vidcomPolygon.asm`) holds one word per scan line for
+  polygon fills.
+
+Their sizes come from `MAX_MASK_BUFFER` and `MAX_POLYGON_EDGE_TABLE` in
+`vga16Constant.def`, which were 161 bytes (1280 pixels) and 768 lines.
+In a DPI mode on a large host display, the driver asks basebox for up
+to 2040×1536 pixels. The line mask then overran its buffer and
+overwrote the driver variables behind it: `currentWin` (a protection
+fault in `SlowGenClip` on `mov ds, fs:[currentWin]`), `drawMask`,
+`stateFlags`, and others. The result was crashes in varying places after
+switching to full screen. In real mode the same overrun mostly produced
+garbage on screen.
+
+Both buffers are now derived from `VGA16_MAX_WIDTH` and
+`VGA16_MAX_HEIGHT` (2040×1536, basebox's limit). `VidSetVESA` clamps the
+size it requests in a DPI mode to these values, so the buffers cannot be
+overrun even if the host's limits change.
