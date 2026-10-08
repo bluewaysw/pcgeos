@@ -225,6 +225,7 @@ calcMore:
 	; Carry set if the line in bx.di was not just created
 	;
 	clrdwf	ss:[bp].LICL_deletedSpace	; Doesn't nuke carry
+	call	RepairPreviousRegionHeight	; Doesn't nuke carry
 
 EC <	call	ECValidateTotals				>
 EC <	call	ECValidatePreviousRegion			>
@@ -334,6 +335,10 @@ afterOrphanCheck:
 ;-----------------------------------------------------------------------------
 
 CR_quit label near
+	push	cx
+	mov	cx, ss:[bp].LICL_region		; The last region calculated
+	call	RepairRegionHeight		;  is complete now as well
+	pop	cx
 EC <	call	ECValidateRegionAndLineHeights		>
 EC <	call	ECValidateRegionCounts			>
 EC <	call	ECValidateLineStructures		>
@@ -2968,6 +2973,115 @@ BltStuffForDeletedRegions	endp
 
 
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RepairPreviousRegionHeight / RepairRegionHeight
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Make the stored height of a region match the sum of the
+		heights of its lines.
+
+CALLED BY:	CalculateRegions
+PASS:		*ds:si	= Instance ptr
+		ss:bp	= LICL_vars
+		cx	= Region (RepairRegionHeight only;
+			  RepairPreviousRegionHeight uses LICL_region - 1)
+RETURN:		nothing
+DESTROYED:	nothing, flags preserved
+
+PSEUDO CODE/STRATEGY:
+	CalculateRegions keeps the region heights up to date incrementally
+	(UpdateRegionHeight adds LICL_insertedSpace - LICL_deletedSpace).
+	Space that ripples out of later regions (LICL_rippleHeight) is handed
+	out region by region, at most the stored height of each region (see
+	FigureNextRegionChangeAndComputeRippleHeight). When lines move between
+	regions and change their height on the way -- WebMagick lays out each
+	table cell in its own region, and empty cells contain lines whose
+	height changes from 0 when they are recalculated -- the amounts no
+	longer line up with the region boundaries, and height is attributed
+	to the wrong region. The total stays right, but single regions end up
+	too low or too high (EC: SUM_OF_LINE_HGTS_IN_REGION_DOES_NOT_MATCH_
+	STORED_COMPUTED_HGT).
+
+	When calculation leaves a region (and at the end of calculation for
+	the last region calculated), the lines of that region are final. So
+	at that point we set its height to the sum of its line heights, which
+	is the invariant ECValidateSingleRegion checks. The difference is
+	added to LICL_totalChange so that later regions are moved/redrawn.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+RepairPreviousRegionHeight	proc	near
+	pushf
+	push	cx
+	mov	cx, ss:[bp].LICL_region
+	jcxz	quit				; No previous region
+	dec	cx
+	call	RepairRegionHeight
+quit:
+	pop	cx
+	popf
+	ret
+RepairPreviousRegionHeight	endp
+
+RepairRegionHeight	proc	near
+	uses	ax, bx, cx, dx, di
+	pushf
+	.enter
+	push	cx				; Save region
+	call	TR_RegionGetTopLine		; bx.di <- first line
+	call	TR_RegionGetLineCount		; cx <- # of lines
+	jcxz	noLines
+	clr	dx				; dx.ax <- end of range
+	mov	ax, cx
+	adddw	dxax, bxdi
+	clr	cx				; No flags to set
+	call	TL_LineSumAndMarkRange		; cx.dx.ax <- sum of line heights
+	jmp	gotSum
+noLines:
+	clr	dx
+	clr	ax
+gotSum:
+	mov	di, dx				; di.bl <- sum of line heights
+	mov	bl, ah
+	pop	cx				; cx <- region
+	call	TR_RegionGetHeight		; dx.al <- stored height
+	cmp	di, dx
+	jne	repair
+	cmp	bl, al
+	je	done
+repair:
+EC <	WARNING	WARNING_TEXT_REGION_HEIGHT_REPAIRED		>
+	;
+	; di.bl <- difference (sum - stored), applied to the region
+	;
+	sub	bl, al
+	sbb	di, dx
+	mov	dx, di
+	mov	al, bl
+	call	TR_RegionAdjustHeight		; Update the height
+	;
+	; Account for it in the total change (sign extended to DWFixed).
+	;
+	mov	ah, bl				; bx.dx.ax <- difference
+	clr	al
+	mov	dx, di
+	clr	bx
+	tst	dx
+	jns	gotDiff
+	dec	bx
+gotDiff:
+	adddwf	ss:[bp].LICL_totalChange, bxdxax
+	mov	ss:[bp].LICL_linesToDraw, 2	; Force an update
+done:
+	.leave
+	popf
+	ret
+RepairRegionHeight	endp
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		UpdateRegionHeight
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
