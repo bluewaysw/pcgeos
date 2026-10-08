@@ -707,6 +707,9 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 oldInt21	fptr.far	0		; previous protected mode int 21h
+oldInt28	fptr.far	0		; previous protected mode int 28h
+oldInt2F	fptr.far	0		; previous protected mode int 2Fh
+haltPending	byte	FALSE		; Ctrl-C arrived outside GEOS code
 
 MainHookDOSExit	proc	near
 		push	eax, ebx, ecx, edx
@@ -719,13 +722,96 @@ MainHookDOSExit	proc	near
 		mov	cx, cs
 		mov	bl, 21h
 		call	GPMISetInterruptHandler
+ifndef NETWARE
+ifndef WINCOM
+	;
+	; The idle interrupts, so that a stop request (Ctrl-C) that came in
+	; while GEOS idled in real mode is carried out when GEOS gets back
+	; to its own code (see StubIdleCheck, BreakOnComReturn). Serial
+	; line stub only: com.asm (BreakOnComReturn) is not part of the
+	; NetWare and WinCom stubs.
+	;
+		mov	bl, 28h
+		call	GPMIGetInterruptHandler
+		mov	ds:[oldInt28].offset, dx
+		mov	ds:[oldInt28].segment, cx
+		xor	edx, edx
+		mov	dx, offset StubInt28
+		mov	cx, cs
+		mov	bl, 28h
+		call	GPMISetInterruptHandler
+		mov	bl, 2fh
+		call	GPMIGetInterruptHandler
+		mov	ds:[oldInt2F].offset, dx
+		mov	ds:[oldInt2F].segment, cx
+		xor	edx, edx
+		mov	dx, offset StubInt2F
+		mov	cx, cs
+		mov	bl, 2fh
+		call	GPMISetInterruptHandler
+endif	; !WINCOM
+endif	; !NETWARE
 		pop	eax, ebx, ecx, edx
 		ret
 MainHookDOSExit	endp
 
+ifndef NETWARE
+ifndef WINCOM
+StubInt28	proc	far
+		pushf				; simulate the interrupt
+		call	cs:[oldInt28]
+		jmp	StubIdleCheck
+StubInt28	endp
+
+StubInt2F	proc	far
+		pushf				; simulate the interrupt
+		call	cs:[oldInt2F]
+		jmp	StubIdleCheck
+StubInt2F	endp
+
+;
+; Common tail of StubInt28/StubInt2F, reached with the caller's interrupt
+; frame (ip, cs, flags) on the stack and the flags the original handler
+; returned in the flags register (which we return, hence retf 2).
+; If a stop request is pending, stop right where the caller continues:
+; that is GEOS code (DOSIdleHook), so the one-time breakpoint is safe.
+;
+StubIdleCheck	proc	far
+		pushf
+		cmp	cs:[haltPending], FALSE
+		je	noHalt
+		push	bp, ds, ax, bx, cx, dx, si
+		mov	ds, cs:[stubDSSelector]
+		mov	ds:[haltPending], FALSE
+		mov	bp, sp
+		add	bp, 7 * 2 + 2		; ss:bp <- caller's frame
+		call	BreakOnComReturn
+		pop	bp, ds, ax, bx, cx, dx, si
+noHalt:
+		popf
+		retf	2
+StubIdleCheck	endp
+endif	; !WINCOM
+endif	; !NETWARE
+
 StubInt21	proc	far
 		cmp	ah, MSDOS_QUIT_APPL
 		je	quit
+ifndef NETWARE
+ifndef WINCOM
+	;
+	; A stop request is pending (Ctrl-C came in while the client was in
+	; real mode, e.g. in a DOS call): stop when this DOS call returns to
+	; the client (see StubIdleCheck). Without a pending stop, int 21h
+	; goes straight on as before.
+	;
+		cmp	cs:[haltPending], FALSE
+		je	chain
+		pushf				; simulate the interrupt
+		call	cs:[oldInt21]
+		jmp	StubIdleCheck
+endif	; !WINCOM
+endif	; !NETWARE
 chain:
 		jmp	cs:[oldInt21]
 quit:

@@ -36,6 +36,31 @@ DESCRIPTION:
 -------------------------------------------------------------------------------@
 
 
+ifdef PROTECTED_MODE
+;
+; Restore a segment register SendMessage saved for the caller (no
+; MF_FIXUP_DS/MF_FIXUP_ES). The message may have freed the block the
+; caller's register still pointed to -- e.g. C code leaves ES at a huge
+; array block it has just unlocked, and the message reorganizes the huge
+; array. In real mode the stale value is harmless; loading the freed
+; selector faults in protected mode. If the selector is no longer valid,
+; load a null selector instead.
+; Destroys di. Changes no flag except ZF (the carry is the message's
+; return value).
+;
+SMPopSegSafe	macro	sreg
+	local	valid
+	pop	di
+	push	di
+	.inst byte 0fh, 02h, 0ffh	;lar di, di: ZF set if di is a valid selector
+	pop	di
+	jz	valid
+	mov	di, NULL_SEGMENT
+valid:
+	mov	sreg, di
+endm
+endif
+
 COMMENT @----------------------------------------------------------------------
 
 FUNCTION:	SendMessage
@@ -219,14 +244,23 @@ popThenFixup:
 
 SM_fixupNone label near
 	InsertMessageProfileEntry PET_END_CALL, 1, ax
+ifdef PROTECTED_MODE
+	SMPopSegSafe	es
+	SMPopSegSafe	ds
+else
 	pop	es
 	pop	ds
+endif
 	mov	di,0			;don't trash the carry
 	ret
 
 SM_fixupDS label near
 	InsertMessageProfileEntry PET_END_CALL, 1, ax
+ifdef PROTECTED_MODE
+	SMPopSegSafe	es
+else
 	pop	es
+endif
 	pop	di			;recover handle of ds passed
 EC <	call	CheckMemHandleNSDI					>
 	mov	ds,ds:[di][HM_addr]

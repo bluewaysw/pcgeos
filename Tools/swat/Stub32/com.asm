@@ -1486,7 +1486,13 @@ doRpcStuff:
                 pop     bx
                 jne     continueDoRpcStuff
 
+		; ss:bp <- the interrupt's return frame (ip, cs, flags), above
+		; the line status word and ds, dx, cx, bx, ax pushed on entry
+                push    bp
+                mov     bp, sp
+                add     bp, 2 + 2 + 5 * 2
                 call BreakOnComReturn
+                pop     bp
                 jmp ComCheckTrans
 
 continueDoRpcStuff:
@@ -1563,9 +1569,10 @@ SYNOPSIS:	Set a self-clearing break point when the ComInterrupt
 		returns so that we can halt the machine.
 
 CALLED BY:	EXTERNAL
-PASS:		nothing
+PASS:		ss:bp	= return frame (ip, cs, flags) of the interrupted code
+		ds	= stub data
 RETURN:		nothing
-DESTROYED:	ax, bx, cx
+DESTROYED:	ax, bx, cx, dx
 
 PSEUDO CODE/STRATEGY:
 		
@@ -1580,7 +1587,15 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 BreakOnComReturn	proc	near
-                uses si, bp
+		;
+		; di and es must be preserved as well: our callers only restore
+		; ax, bx, cx, dx, ds for the interrupted code, and Bpt_Set /
+		; Bpt_Install change di. A Ctrl-C used to hand a wrong di back to
+		; the interrupted code -- e.g. the kernel's Idle loop, which then
+		; called through a garbage pointer ("call {fptr} ds:[di]") and
+		; faulted when Swat continued.
+		;
+                uses si, di, bp, es
 		.enter
    DPS      DEBUG_CTRL_C, <BreakOnComReturn>
 		; We need a regular break point
@@ -1595,30 +1610,60 @@ BreakOnComReturn	proc	near
 		mov	ds:[si].BC_handler, offset OneTimeBreakHandler
 		mov	ds:[si].BC_flags, 0
 
-		; HACK ALERT!  DPMI calls ComInterrupt via reflector.
-		; This means the immediate iret doesn't go back to the
-		; place in the code where all of this started.  In fact,
-		; it built out it's own special stack for us to play
-		; work within.  But, they did do two nice things
 		;
-		; 1) The stack is always the same size of 1K
-		; 2) The return vector to the actual code (not the
-		;    reflector) is the top 6 bytes of the stack.
+		; Where to stop: the place the serial interrupt returns to.
 		;
-		; With the above two assumptions, we have the top as
-		; follows:
-		;    SS:0xFFE - flags
-		;    SS:0xFFC - cs
-		;    SS:0xFFA - ip
+		; The original code took the return address from the top of
+		; the stack (ss:0FFAh/0FFCh), assuming the DPMI host calls us
+		; via a reflector on a 1K stack with the real return frame at
+		; its top. HDPMI does not do that, so the breakpoint (a single
+		; INT 3 byte) went to a random address: either it was never
+		; hit ("Couldn't stop GEOS: Call timed out"), or it overwrote
+		; a byte of live code or data -- e.g. the kernel's idle routine
+		; table, faulting at "call {fptr} ds:[di]" in Idle after Swat
+		; continued.
 		;
-		; We just grab the suckers and set a breakpoint.
-		; This even works if we are an interrut within an
-		; another exception reflector (although I think 
-		; something gets trashed).
-
-                mov     bp, sp
-                mov cx, ss:[0xFFC]
-                mov dx, ss:[0xFFA]
+		; The caller passes the interrupt's own return frame. Only use
+		; it if cs is a valid code segment of ours and ip lies within
+		; it. If the interrupt came in while the client was in real
+		; mode (a DOS call, idling), the frame returns into the DPMI
+		; host instead: then set no breakpoint rather than patching
+		; some random byte. Swat reports a timeout; stopping again
+		; will catch the client in protected mode.
+		;
+		; ss:bp = return frame (ip, cs, flags)
+		;
+                mov     cx, ss:[bp+2]           ; cs
+                mov     dx, ss:[bp]             ; ip
+		push	ax
+		.inst byte 00fh, 002h, 0c1h	; lar ax, cx
+		jnz	badFrame		; not a valid selector for us
+		and	ax, 01800h		; S (code/data) and executable bits
+		cmp	ax, 01800h
+		jne	badFrame		; not a code segment
+		.inst byte 00fh, 003h, 0c1h	; lsl ax, cx
+		jnz	badFrame
+		cmp	dx, ax
+		ja	badFrame		; ip beyond the segment's limit
+		pop	ax
+		;
+		; It must also be GEOS code. A valid code segment can still be
+		; the DPMI host's own ring 3 code: when the interrupt came in
+		; while the client was in real mode (GEOS idles with int 28h /
+		; int 2Fh in DOSIdleHook), the host calls us on its locked
+		; stack and returns into its own code. Stopping there and
+		; continuing corrupts the host's state (protection fault in
+		; Idle afterwards). Before the kernel is loaded, accept any
+		; valid code segment.
+		;
+		tst	ds:[kernelCore]
+		jz	frameOK
+		push	ax, bx, cx, dx, es
+		mov	ax, BPT_NOT_XIP
+		call	Kernel_SegmentToHandle	; carry set if no GEOS block
+		pop	ax, bx, cx, dx, es
+		jc	notGeosCode
+frameOK:
                 mov     ax, BPT_NOT_XIP
 
 		mov	bx, si		; bx <- client data
@@ -1651,6 +1696,17 @@ done:
 		.leave
 		ret
 
+badFrame:
+		pop	ax
+notGeosCode:
+		;
+		; No usable return address: don't patch anything. Have the
+		; idle interrupt hooks (StubIdleCheck in main.asm) stop the
+		; machine when the client gets back to its own code.
+		;
+		mov	ds:[haltPending], TRUE
+		call	Bpt_Free		; si = client data
+		jmp	done
 noRoomFreeClient:
 		mov	si, bx
 		call	Bpt_Free

@@ -553,16 +553,75 @@ guards `Kernel_ReadAbs`, `Kernel_WriteAbs` and `Kernel_FillAbs`.
 `Kernel_ReadAbs` also passed the selector to `GPMITestPresent` in `BX`,
 while that routine expects it in `AX`.
 
-#### 1.9.2 Test Status
+#### 1.9.2 Stopping With Ctrl-C
+
+Swat stops a running system (Ctrl-C) by sending `RPC_INTERRUPT`. The
+stub's serial interrupt handler (`ComInterrupt`, `Stub32/com.asm`) does
+not process it right away: `BreakOnComReturn` sets a one-time breakpoint
+(`INT 3`) at the place the serial interrupt returns to, and the machine
+stops there. Two bugs made this fail in protected mode:
+
+- **Wrong return address.** `BreakOnComReturn` took the return address
+  from the top of the stack (`ss:0FFAh`/`0FFCh`), assuming a DPMI host
+  that calls hardware interrupt handlers through a reflector on a 1 KB
+  stack. HDPMI does not do that, so the breakpoint byte went to a random
+  address: either it was never hit ("Couldn't stop GEOS: Call timed
+  out"), or it overwrote live code or data. The caller now passes the
+  interrupt's actual return frame.
+- **Clobbered registers.** `Bpt_Set`/`Bpt_Install` change `di`, and
+  neither `BreakOnComReturn` nor `ComInterrupt` restored it. The
+  interrupted code continued with a wrong `di`. In the kernel's `Idle`
+  loop that is the pointer into `idleRoutineTable`, so after Swat
+  continued, `call {fptr} ds:[di]` faulted. `BreakOnComReturn` now
+  preserves `di` and `es` as well.
+
+A further complication is idling. GEOS idles in `DOSIdleHook` with
+`int 28h` and `int 2Fh` (`AX = 1680h`), which the DPMI host carries out
+in real mode. A serial interrupt that arrives then is delivered on the
+host's locked stack, and its return frame points into the host's own
+ring 3 code. Stopping there and continuing corrupts the host's state.
+So the breakpoint is only set if the return address is GEOS code: a
+valid code selector, `ip` within its limit, and a block in the kernel's
+handle table (`Kernel_SegmentToHandle`). Otherwise the stop is recorded
+(`haltPending`), and the stub's protected-mode hooks on `int 28h` and
+`int 2Fh` (`StubInt28`, `StubInt2F`, `StubIdleCheck` in
+`Stub32/main.asm`) set the breakpoint at their own return address when
+the idle call returns to GEOS -- right behind the `int` in
+`DOSIdleHook`. They return the original handler's flags (`retf 2`).
+While a stop is pending, the stub's `int 21h` hook does the same for DOS
+calls (`StubInt21`); otherwise `int 21h` goes straight on as before.
+This catches Ctrl-C while GEOS is busy with DOS, e.g. loading during
+startup. `RpcInterrupt` clears a pending stop once the request is
+serviced. The idle hooks exist in the serial-line stub only (LowMem);
+`com.asm` is not part of the NetWare and WinCom stubs.
+
+Tested with the Swat host attached:
+
+- GEOS idle: five Ctrl-C / continue cycles in a row, each stopping in
+  `DOSIdleHook` and continuing without a fault.
+- GEOS starting up: Ctrl-C stops in `FSDInt21` (the kernel's DOS call),
+  continuing works.
+
+Open: in rare cases a stop request still times out ("Couldn't stop
+GEOS"); GEOS then simply continues, and Ctrl-C can be pressed again.
+
+#### 1.9.3 Test Status
 
 Tested with the Swat host attached (the Linux build of Swat): exit to
 DOS, three restarts in a row, and a restart followed by exit to DOS.
 Swat re-attaches after each restart and shows `GEOS Exited` at the end;
 DOS continues.
 
-Open: under the stub **without** a Swat host connected, a restart hangs
-before the video driver exits. This also happens with the stub before
-the exit hook, and not with a host attached.
+Also tested: the stub **without** a Swat host connected, NC and EC,
+with several restarts followed by exit to DOS. GEOS restarts, exits,
+and the stub returns to DOS.
+
+Earlier test runs where a restart under the unconnected stub seemed to
+hang were most likely caused by the test target, not the stub: in one
+such run, a dialog was waiting for input during shutdown ("Could not
+create state file. DOS or network error encountered. Press Enter to
+continue."). On freshly built targets the problem did not occur. When a
+shutdown seems to hang, check the screen for such a dialog first.
 
 ### 1.10 Testing the Restart
 
@@ -732,3 +791,42 @@ Both buffers are now derived from `VGA16_MAX_WIDTH` and
 `VGA16_MAX_HEIGHT` (2040×1536, basebox's limit). `VidSetVESA` clamps the
 size it requests in a DPI mode to these values, so the buffers cannot be
 overrun even if the host's limits change.
+
+### 1.15 Stale Segment Registers
+
+In real mode a segment register that still holds the address of a freed
+or moved block is harmless as long as nobody accesses memory through it.
+In protected mode, merely **loading** a freed selector into a segment
+register raises a protection violation (interrupt 13). Code that saves
+and restores segment registers around calls is therefore affected even
+if the caller never uses the restored value.
+
+The kernel's `SendMessage` (`Library/Kernel/Object/objectClass.asm`)
+saves the caller's ES, and DS when DS is not an object block, and
+restores them when the message returns (`SM_fixupNone`, `SM_fixupDS`).
+Unless `MF_FIXUP_ES` is passed, ES is not guaranteed to survive a
+message anyway; the EC build even clears ES before sending if it points
+to an object block (`NullESIfObjBlock`). Watcom C treats ES as a scratch
+register and often leaves it pointing at the last far pointer it used.
+
+WebMagick ran into this while loading a page with many table cells:
+`_IRegionRepositionResizeAndReflow` (`htmltcel.goc`) adjusts the lines
+of a cell in the text object's line array, unlocks the array block, and
+then calls `MSG_VIS_TEXT_INVALIDATE_RANGE`, with ES still pointing at
+that block. The recalculation reorganized the line array and freed the
+block, and the `pop es` in `SendMessage` faulted.
+
+In protected mode, `SendMessage` now restores these registers with
+`SMPopSegSafe`: it checks the saved selector with `LAR` and loads a null
+selector if it is no longer valid. A selector that is valid but not
+present (a discarded block) is restored as before. The check changes no
+flag except ZF, because the carry carries the message's result.
+
+When writing protected-mode code that saves segment registers across
+calls that can free memory, either re-derive the segment from a handle
+afterwards (as `MF_FIXUP_DS`/`MF_FIXUP_ES` do) or validate it before
+reloading it.
+
+The test application (`Appl/RstTest`, ini key `estest = 1`) reproduces
+the case: it loads ES with a block's selector, then calls a message that
+frees the block.

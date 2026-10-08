@@ -800,6 +800,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 RpcInterrupt	proc	near
+		mov	ds:[haltPending], FALSE	; serviced (see BreakOnComReturn)
 		;
 		; Reply with the current thread.
 		; 
