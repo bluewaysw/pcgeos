@@ -184,6 +184,14 @@ EC(         ECCheckBounds( (void*)trueTypeVars ) );
  *      15.07.22  JK        Initial Revision
  *******************************************************************/
 
+/* FBF_IS_GREY if [truetype] forceGrey = true: request greyscale glyphs */
+/* for every font, for testing before the font manager requests them.  */
+byte trueTypeForceGrey = 0;
+
+/* FALSE if [truetype] greyHinting = false: load greyscale glyphs without */
+/* hinting, so they keep the proportions of the linear advance widths.   */
+Boolean trueTypeGreyHinting = TRUE;
+
 void _pascal TrueType_InitFonts( MemHandle fontInfoBlock, MemHandle varBlock )
 {
         word            numFiles;
@@ -206,6 +214,20 @@ EC(     ECCheckMemHandle( varBlock ) );
 	{
 		trueTypeVars = MemLock( varBlock );
 	}
+
+        /* test switch: force greyscale glyphs */
+        {
+                Boolean forceGrey = FALSE;
+
+                if( !InitFileReadBoolean( TRUETYPE_CATEGORY, FORCE_GREY_KEY, &forceGrey ) && forceGrey )
+                        trueTypeForceGrey = FBF_IS_GREY;
+        }
+        {
+                Boolean greyHinting = TRUE;
+
+                if( !InitFileReadBoolean( TRUETYPE_CATEGORY, GREY_HINTING_KEY, &greyHinting ) && !greyHinting )
+                        trueTypeGreyHinting = FALSE;
+        }
 
         /* go to font/ttf directory */
         FilePushDir();

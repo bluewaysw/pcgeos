@@ -6,7 +6,7 @@
 #include <Ansi/string.h>
 
 #define TTF_CACHE_MAJOR_VERSION 2
-#define TTF_CACHE_MINOR_VERSION 0
+#define TTF_CACHE_MINOR_VERSION 4	/* 2.1: RCD_size incl. header, 2.2: TTCBS_flags, 2.3/2.4: grey phases */
 
 VMFileHandle _pascal TrueType_Cache_Init() {
 
@@ -101,7 +101,8 @@ Boolean _pascal TrueType_Cache_LoadFontBlock(VMFileHandle cacheFile, const TCHAR
 			if( (dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_pointSize == bufSpec->TTCBS_pointSize) &&
 				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_width == bufSpec->TTCBS_width) &&
 				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_weight == bufSpec->TTCBS_weight) &&
-				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_stylesToImplement == bufSpec->TTCBS_stylesToImplement) 
+				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_stylesToImplement == bufSpec->TTCBS_stylesToImplement) &&
+				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_flags == bufSpec->TTCBS_flags) 
 			) {
 
 			    MemHandle blockMem;
@@ -147,6 +148,23 @@ EC(             		ECCheckMemHandle( *fontHandle ) );
     return FALSE;
 }
 
+/*
+ * EC: the font block to cache must not be larger than its fontbuf may
+ * grow (FontDrGetMaxBufSize: 10K, or 48K for greyscale fontbufs), plus
+ * room for the header part (char table, kern pairs), which large fonts
+ * may need beyond that. This used to be a fixed 13000 bytes.
+ */
+#if ERROR_CHECK
+static void ECCheckCacheBufSize( MemHandle fontBuf, word memSize )
+{
+        FontBuf*  fb      = MemLock( fontBuf );
+        word      maxSize = FontDrGetMaxBufSize( fb );
+
+        MemUnlock( fontBuf );
+        EC_ERROR_IF( (dword)memSize > (dword)maxSize + 4096, -1 );
+}
+#endif
+
 void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR* fontFileName,
                 dword fontFileSize, word fontFileMagic, 
 		TrueTypeCacheBufSpec* bufSpec, MemHandle fontBuf) {
@@ -181,7 +199,8 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 			if( (dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_pointSize == bufSpec->TTCBS_pointSize) &&
 				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_width == bufSpec->TTCBS_width) &&
 				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_weight == bufSpec->TTCBS_weight) &&
-				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_stylesToImplement == bufSpec->TTCBS_stylesToImplement) 
+				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_stylesToImplement == bufSpec->TTCBS_stylesToImplement) &&
+				(dirEntry[loopCount].TTCE_bufEntry[loopCount2].TTCBE_spec.TTCBS_flags == bufSpec->TTCBS_flags) 
 			) {
 
 			    /* update if new/current block is larger */
@@ -195,7 +214,7 @@ void _pascal TrueType_Cache_UpdateFontBlock(VMFileHandle cacheFile, const TCHAR*
 				VMUnlock(dirMem);
 
 				VMLock(cacheFile, thisBlock, &blockMem);
-				EC_ERROR_IF( memSize > 13000, -1);
+				EC(	ECCheckCacheBufSize( fontBuf, memSize ) );
 				MemReAlloc(blockMem, memSize, HAF_NO_ERR);
 				{
 				    byte* destPtr = MemDeref(blockMem);

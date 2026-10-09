@@ -239,6 +239,25 @@ InitFontsParams	ends
 GrInitFonts	proc	near
 	uses	ds
 	.enter
+ifdef PROTECTED_MODE
+	;
+	; Greyscale text switched on? Read here, at startup, rather than
+	; when fonts are looked up with font blocks locked.
+	;
+	push	ax, cx, dx, si, ds
+	segmov	ds, cs
+	mov	si, offset greyCategory		;ds:si <- category
+	mov	cx, cs
+	mov	dx, offset greyKey		;cx:dx <- key
+	clr	ax
+	call	InitFileReadBoolean		;ax <- TRUE/FALSE
+	jnc	gotGreyIni
+	clr	ax				;not set: off
+gotGreyIni:
+	LoadVarSeg	ds, cx
+	mov	ds:[greyIniOn], al
+	pop	ax, cx, dx, si, ds
+endif
 
 	push	ds
 	segmov	ds, cs
@@ -404,6 +423,11 @@ EC <	mov	es, ax							>
 	ret
 
 GrInitFonts	endp
+
+ifdef PROTECTED_MODE
+greyCategory	char	"text", 0
+greyKey		char	"greyscale", 0
+endif
 
 maxFontFilesString	char	"maxfontfiles", 0
 

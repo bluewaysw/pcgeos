@@ -26,15 +26,22 @@
 
 
 static void CopyChar( FontBuf* fontBuf, word geosChar, void* charData, word charDataSize );
-static void ShrinkFontBuf( FontBuf* fontBuf );
+static void ShrinkFontBuf( FontBuf* fontBuf, word sizeNewChar );
 static int FindLRUChar( FontBuf* fontBuf, int numOfChars );
 static void AdjustPointers( CharTableEntry* charTableEntries, 
                             CharTableEntry* lruEntry, 
                             word sizeLRUEntry,
                             word numOfChars );
-static word ShiftCharData( FontBuf* fontBuf, CharData* charData );
-static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData );
+static word RemoveCharData( FontBuf* fontBuf, word offsetCharData );
 static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size );
+static sword RenderGreyChar( TRUETYPE_VARS, TransformMatrix* transformMatrix,
+                             sword width, sword height, word phases,
+                             MemHandle bitmapHandle, void** charDataPtr );
+static void RenderGreyFallback( TRUETYPE_VARS, sword width, sword height,
+                                word pad, word phases,
+                                byte* out, word greyCols, word phaseSize,
+                                byte* work, word workSize );
+static byte GreyCoverage( const byte* row, word hiCols, word hiWidth, sword col );
 
 
 /********************************************************************
@@ -119,7 +126,13 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
         TT_New_Glyph( FACE, &GLYPH );
 
         /* load glyph and load glyphs outline */
-        TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
+        /* Greyscale glyphs may be loaded without hinting: then they */
+        /* keep the proportions of their linear advance widths, which */
+        /* gives more even spacing; the smoothing makes up for the    */
+        /* softer stems.                                              */
+        TT_Load_Glyph( INSTANCE, GLYPH, charIndex,
+                       ( ( fontBuf->FB_flags & FBF_IS_GREY ) && !trueTypeGreyHinting ) ?
+                                TTLOAD_SCALE_GLYPH : TTLOAD_DEFAULT );
         TT_Get_Glyph_Outline( GLYPH, &OUTLINE );
 
         TT_Transform_Outline( &OUTLINE, &transformMatrix->TM_matrix );
@@ -167,13 +180,21 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
                                                         transformMatrix->TM_heightX + ( GLYPH_BBOX.xMin >> 6 );
                 ((RegionCharData*)charData)->RCD_yoff = transformMatrix->TM_scriptY + 
                                                         transformMatrix->TM_heightY - ( GLYPH_BBOX.yMax >> 6 ); 
-                ((RegionCharData*)charData)->RCD_size = RASTER_MAP.size;
+                /* RCD_size is the size of the character including its */
+                /* header, as for all font drivers (see fontDr.def).    */
+                ((RegionCharData*)charData)->RCD_size = RASTER_MAP.size + SIZE_REGION_HEADER;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_right  = width;
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
                 size = RASTER_MAP.size + SIZE_REGION_HEADER;
+        }
+        else if( fontBuf->FB_flags & FBF_IS_GREY )
+        {
+                size = RenderGreyChar( trueTypeVars, transformMatrix, width, height,
+                                       ( fontBuf->FB_flags & FBF_GREY_PHASES ) ? GREY_PHASES : 1,
+                                       bitmapHandle, &charData );
         }
         else
         {      
@@ -212,8 +233,8 @@ EC_ERROR_IF(    size < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
         TT_Done_Glyph( GLYPH );
 
-        if( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
-                ShrinkFontBuf( fontBuf );
+        /* make room for the new char, within the limit for this fontbuf */
+        ShrinkFontBuf( fontBuf, size );
 
         /* realloc FontBuf if necessary */
         fontBufHandle = MemPtrToHandle( fontBuf );
@@ -243,6 +264,7 @@ EC(             ECCheckBounds( (void*)fontBuf ) );
             bufSpec.TTCBS_width = widthIn;
             bufSpec.TTCBS_weight = weight;
             bufSpec.TTCBS_stylesToImplement = stylesToImplement;
+            bufSpec.TTCBS_flags = transformMatrix->TM_greyRequest;
 
             if( !( fontBuf->FB_flags & FBF_IS_COMPLEX ) ) {
                 TrueType_Cache_UpdateFontBlock(
@@ -320,33 +342,28 @@ EC(     ECCheckBounds( (void*)(((byte*)fontBuf) + fontBuf->FB_dataSize  + charDa
  *      12/23/22  JK        Initial Revision
  *******************************************************************/
 
-static void ShrinkFontBuf( FontBuf* fontBuf ) 
+static void ShrinkFontBuf( FontBuf* fontBuf, word sizeNewChar ) 
 {
         const word       numOfChars       = fontBuf->FB_lastChar - fontBuf->FB_firstChar + 1;
         CharTableEntry*  charTableEntries = (CharTableEntry*) ( ( (byte*)fontBuf ) + sizeof( FontBuf ) );
-        word  sizeCharData;
+        const word       maxSize          = FontDrGetMaxBufSize( fontBuf );
+        word             sizeCharData;
 
 
 EC(     ECCheckBounds( (void*)charTableEntries ) );
 
-        /* shrink fontBuf if necessary */
-        while( fontBuf->FB_dataSize > MAX_FONTBUF_SIZE )
+        /* shrink fontBuf until the new char fits within the limit */
+        while( (dword)fontBuf->FB_dataSize + sizeNewChar > maxSize )
         {
                 int   indexLRUChar = FindLRUChar( fontBuf, numOfChars );
-                void* charData = ((byte*)fontBuf) + charTableEntries[indexLRUChar].CTE_dataOffset;
 
 
                 /* ensure that we have a char to remove */
                 if( indexLRUChar == -1 )
                         return;
 
-EC(             ECCheckBounds( (void*)charData ) );
-
-                /* remove CharData of lru char */
-                if( fontBuf->FB_flags & FBF_IS_REGION )
-                        sizeCharData = ShiftRegionCharData( fontBuf, (RegionCharData*)charData );
-                else
-                        sizeCharData = ShiftCharData( fontBuf, (CharData*)charData );
+                /* remove data of lru char */
+                sizeCharData = RemoveCharData( fontBuf, charTableEntries[indexLRUChar].CTE_dataOffset );
 
                 /* adjust pointers in CharTableEntries */
                 AdjustPointers( charTableEntries, &charTableEntries[indexLRUChar], sizeCharData, numOfChars );
@@ -442,76 +459,34 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
 
 
 /********************************************************************
- *                      ShiftCharData
+ *                      RemoveCharData
  ********************************************************************
- * SYNOPSIS:	  Shift rendered glyphs as bitmap to fill gaps after 
- *                removing a glyph from FontBuf.
- * 
- * PARAMETERS:    *fontBuf              Ptr to font data structure.    
- *                *charData             Ptr to removed rendered glyph 
- *                                      as bitmap. 
- * 
- * RETURNS:       void
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      12/23/22  JK        Initial Revision
+ * SYNOPSIS:       Remove the data of a char from the fontbuf by
+ *                 shifting the following data down.
+ *
+ * PARAMETERS:     *fontBuf             Ptr to font data structure.
+ *                 offsetCharData       Offset of the char's data.
+ *
+ * RETURNS:        word                 Size of the removed data.
+ *
+ * STRATEGY:       The size comes from the kernel (FontDrCharDataSize),
+ *                 which knows every char data format.
  *******************************************************************/
-
-static word ShiftCharData( FontBuf* fontBuf, CharData* charData )
+static word RemoveCharData( FontBuf* fontBuf, word offsetCharData )
 {
-        const word    dataSize = ( ( charData->CD_pictureWidth + 7 ) >> 3 ) * charData->CD_numRows + SIZE_CHAR_HEADER;
-        const word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
+        const word    dataSize    = FontDrCharDataSize( fontBuf, offsetCharData );
+        const word    bytesToMove = fontBuf->FB_dataSize - offsetCharData - dataSize;
+        byte*         charData    = ((byte*)fontBuf) + offsetCharData;
 
 
         if( bytesToMove == 0 )
                 return dataSize;
 
 EC(     ECCheckBounds( (void*)charData ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove - 1) ) );
- 
-        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
+EC(     ECCheckBounds( (void*)(charData + dataSize ) ) );
+EC(     ECCheckBounds( (void*)(charData + dataSize + bytesToMove - 1) ) );
 
-        return dataSize;
-}
-
-/********************************************************************
- *                      ShiftRegionCharData
- ********************************************************************
- *SYNOPSIS:	  Shift rendered glyphs as region to fill gaps after 
- *                removing a glyph from FontBuf.
- * 
- * PARAMETERS:    *fontBuf              Ptr to font data structure.    
- *                *charData             Ptr to removed rendered glyph 
- *                                      as region. 
- * 
- * RETURNS:       void
- * 
- * STRATEGY:      
- * 
- * REVISION HISTORY:
- *      Date      Name      Description
- *      ----      ----      -----------
- *      12/23/22  JK        Initial Revision
- *******************************************************************/
-static word ShiftRegionCharData( FontBuf* fontBuf, RegionCharData* charData )
-{
-        const word    dataSize = charData->RCD_size + SIZE_REGION_HEADER;
-        const word    bytesToMove = fontBuf->FB_dataSize - PtrToOffset( charData ) - dataSize;
-
-
-        if( bytesToMove == 0 )
-                return dataSize;
-
-EC(     ECCheckBounds( (void*)charData ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize ) ) );
-EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove  - 1) ) );
-
-        memmove( charData, ((byte*)charData) + dataSize, bytesToMove );
+        memmove( charData, charData + dataSize, bytesToMove );
 
         return dataSize;
 }
@@ -536,6 +511,217 @@ EC(     ECCheckBounds( (void*)(((byte*)charData) + dataSize + bytesToMove  - 1) 
  *      ----      ----      -----------
  *      12/23/22  JK        Initial Revision
  *******************************************************************/
+
+/********************************************************************
+ *                      RenderGreyFallback
+ ********************************************************************
+ * SYNOPSIS:       If the oversampled outline can't be rendered, render
+ *                 it at the real size, 1 bit, and use full coverage
+ *                 for its pixels (better than an empty glyph), in all
+ *                 subpixel phases.
+ *
+ * PARAMETERS:     trueTypeVars         Driver variables (OUTLINE scaled
+ *                                      by GREY_OVERSAMPLING, shifted by
+ *                                      one pixel).
+ *                 width, height        Size of the glyph in pixels.
+ *                 *out                 Greyscale data (all phases).
+ *                 greyCols, phaseSize  Bytes per row, per phase.
+ *                 *work, workSize      Scratch space.
+ *******************************************************************/
+static void RenderGreyFallback( TRUETYPE_VARS, sword width, sword height,
+                                word pad, word phases,
+                                byte* out, word greyCols, word phaseSize,
+                                byte* work, word workSize )
+{
+        TT_Matrix  unscale  = { 0x10000L / GREY_OVERSAMPLING, 0,
+                                0, 0x10000L / GREY_OVERSAMPLING };
+        word       monoCols = ( width + pad + 7 ) >> 3;
+        word       x, y, k;
+
+
+        memset( work, 0, workSize );
+        TT_Transform_Outline( &OUTLINE, &unscale );
+        RASTER_MAP.rows   = height;
+        RASTER_MAP.width  = width + pad;
+        RASTER_MAP.cols   = monoCols;
+        RASTER_MAP.size   = monoCols * height;
+        RASTER_MAP.bitmap = work;
+        TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
+
+        for( k = 0; k < phases; k++ )
+                for( y = 0; y < height; y++ )
+                        for( x = 0; x < width + pad; x++ )
+                                if( work[y * monoCols + ( x >> 3 )] & ( 0x80 >> ( x & 7 ) ) )
+                                        out[k * phaseSize + y * greyCols + ( x >> 1 )] |=
+                                                ( x & 1 ) ? ( GREY_LEVELS - 1 ) : ( ( GREY_LEVELS - 1 ) << 4 );
+}
+
+/********************************************************************
+ *                      GreyCoverage
+ ********************************************************************
+ * SYNOPSIS:       Count the set subpixels of one oversampled column
+ *                 (GREY_OVERSAMPLING rows).
+ *
+ * PARAMETERS:     *row                 First of the oversampled rows.
+ *                 hiCols, hiWidth      Bytes per row, width in bits.
+ *                 col                  Column (may be outside: 0).
+ *******************************************************************/
+static byte GreyCoverage( const byte* row, word hiCols, word hiWidth, sword col )
+{
+        byte   count = 0;
+        byte   mask;
+        word   i;
+
+
+        if( col < 0 || col >= hiWidth )
+                return 0;
+        mask = 0x80 >> ( col & 7 );
+        row += col >> 3;
+        for( i = 0; i < GREY_OVERSAMPLING; i++, row += hiCols )
+                if( *row & mask )
+                        count++;
+        return count;
+}
+
+/********************************************************************
+ *                      RenderGreyChar
+ ********************************************************************
+ * SYNOPSIS:       Render the glyph outline as greyscale character data
+ *                 (GreyCharData, 4 bits per pixel, GREY_PHASES subpixel
+ *                 phases, see fontDr.def).
+ *
+ * PARAMETERS:     trueTypeVars         Driver variables (OUTLINE,
+ *                                      GLYPH_BBOX, RASTER_MAP).
+ *                 *transformMatrix     For the char's offsets.
+ *                 width, height        Size of the glyph in pixels.
+ *                 bitmapHandle         Block for rendering.
+ *                 **charDataPtr        Returns ptr to the char data.
+ *
+ * RETURNS:        sword                Size of the char data incl.
+ *                                      header.
+ *
+ * STRATEGY:       Scale the outline by GREY_OVERSAMPLING (4) and render
+ *                 it once with the 1 bit rasterizer into a 4x4 times
+ *                 larger bitmap behind the char data, one pixel from
+ *                 the left edge. The character is 2 pixels wider than
+ *                 the glyph (an empty column on each side), so that it
+ *                 can be shifted by a fraction of a pixel either way:
+ *                 with 4x oversampling a quarter pixel is exactly one
+ *                 oversampled column. Phase k counts, for output pixel
+ *                 x, the 4x4 subpixels starting at column
+ *                 4x - (k - GREY_PHASE_ZERO); 0..16 set subpixels map to
+ *                 coverage 0..GREY_LEVELS-1. The video driver picks the
+ *                 phase from the fractional pen position.
+ *******************************************************************/
+static sword RenderGreyChar( TRUETYPE_VARS, TransformMatrix* transformMatrix,
+                             sword width, sword height, word phases,
+                             MemHandle bitmapHandle, void** charDataPtr )
+{
+        TT_Matrix          scale = { (TT_Fixed)GREY_OVERSAMPLING << 16, 0,
+                                     0, (TT_Fixed)GREY_OVERSAMPLING << 16 };
+        word               outWidth, greyCols, phaseSize, hiCols, hiWidth, hiSize;
+        word               pad = ( phases > 1 ) ? 1 : 0;   /* empty column each side */
+        word               x, y, k;
+        sword              size;
+        byte*              charData;
+        byte*              hiBitmap;
+        byte*              out;
+
+
+        /* Avoid heights of 0 pixels */
+        if( height == 0 && width > 0 )
+                height = 1;
+        /* room for the empty column on each side */
+        if( width > 255 - 2 * pad )
+                width = 255 - 2 * pad;
+
+        outWidth  = width + 2 * pad;
+        greyCols  = ( outWidth + 1 ) >> 1;             /* 2 pixels per byte  */
+        phaseSize = greyCols * height;
+        size      = phases * phaseSize + SIZE_GREY_CHAR_HEADER;
+        hiWidth   = outWidth * GREY_OVERSAMPLING;      /* oversampled bits   */
+        hiCols    = ( hiWidth + 7 ) >> 3;
+        hiSize    = hiCols * height * GREY_OVERSAMPLING;
+
+        /* char data, followed by the oversampled bitmap (zeroed) */
+        charData = EnsureBitmapBlock( bitmapHandle, size + hiSize );
+EC(     ECCheckBounds( (void*)charData ) );
+        hiBitmap = charData + size;
+
+        RASTER_MAP.rows   = height * GREY_OVERSAMPLING;
+        RASTER_MAP.width  = hiWidth;
+        RASTER_MAP.cols   = hiCols;
+        RASTER_MAP.size   = hiSize;
+        RASTER_MAP.bitmap = hiBitmap;
+
+        /* translate outline one pixel from the origin, scale it, render it */
+        TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin + pad * 64, -GLYPH_BBOX.yMin );
+        TT_Transform_Outline( &OUTLINE, &scale );
+        OUTLINE.dropout_mode = 2;
+        {
+                /* The rasterizer sizes its render pool (and precision) */
+                /* by y_ppem: tell it about the oversampled size, or    */
+                /* glyphs with many edges (like 'w') overflow the pool  */
+                /* and come out empty.                                  */
+                TT_UShort  ppem = OUTLINE.y_ppem;
+                TT_Error   error;
+
+                OUTLINE.y_ppem = ppem * GREY_OVERSAMPLING;
+                error = TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
+                OUTLINE.y_ppem = ppem;
+
+                if( error )
+                {
+                        /* fall back to the 1 bit glyph: full coverage */
+                        RenderGreyFallback( trueTypeVars, width, height, pad, phases,
+                                            charData + SIZE_GREY_CHAR_HEADER,
+                                            greyCols, phaseSize, hiBitmap, hiSize );
+                        goto fillHeader;
+                }
+        }
+
+EC_ERROR_IF(    hiSize < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
+
+        /* downsample every phase: count the subpixels of each 4x4 block */
+        out = charData + SIZE_GREY_CHAR_HEADER;
+        for( k = 0; k < phases; k++ )
+        {
+                sword  shift = ( phases > 1 ) ? (sword)k - GREY_PHASE_ZERO : 0;
+
+                for( y = 0; y < height; y++ )
+                {
+                        const byte*  row = hiBitmap + y * GREY_OVERSAMPLING * hiCols;
+
+                        for( x = 0; x < outWidth; x++ )
+                        {
+                                sword  col   = (sword)( x * GREY_OVERSAMPLING ) - shift;
+                                word   count = GreyCoverage( row, hiCols, hiWidth, col ) +
+                                               GreyCoverage( row, hiCols, hiWidth, col + 1 ) +
+                                               GreyCoverage( row, hiCols, hiWidth, col + 2 ) +
+                                               GreyCoverage( row, hiCols, hiWidth, col + 3 );
+                                byte   level = (byte)( ( count * ( GREY_LEVELS - 1 ) + 8 ) >> 4 );
+
+                                if( x & 1 )
+                                        out[x >> 1] |= level;
+                                else
+                                        out[x >> 1] = level << 4;
+                        }
+                        out += greyCols;
+                }
+        }
+
+fillHeader:
+        /* fill header of charData (same layout as CharData) */
+        ((GreyCharData*)charData)->GCD_pictureWidth = outWidth;
+        ((GreyCharData*)charData)->GCD_numRows      = height;
+        ((GreyCharData*)charData)->GCD_xoff         = transformMatrix->TM_scriptX +
+                                                      transformMatrix->TM_heightX + ( GLYPH_BBOX.xMin >> 6 ) - pad;
+        ((GreyCharData*)charData)->GCD_yoff         = transformMatrix->TM_scriptY +
+                                                      transformMatrix->TM_heightY - ( GLYPH_BBOX.yMax >> 6 );
+
+        *charDataPtr = charData;
+        return size;
+}
 
 static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
 {

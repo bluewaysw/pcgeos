@@ -238,7 +238,10 @@ ResizeFontBufForChar	proc	near
 	mov	cx, ds:[FB_dataSize]		; cx = current FontBuf size
 	mov	bx, cx
 	add	bx, ax				; bx = new size
-	cmp	bx, MAX_FONT_SIZE		; will be too big?
+	push	ax
+	call	FontDrGetMaxBufSize		; ax = limit for this font
+	cmp	bx, ax				; will be too big?
+	pop	ax
 	jbe	sizeOK				; nope, allocate it
 	call	FontDrDeleteLRUChar		; else, delete LRU char
 	mov	cx, ds:[FB_dataSize]		; cx = shrunken size

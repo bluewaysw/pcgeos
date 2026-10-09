@@ -15,10 +15,11 @@ vga16Manager.eobj: vidcomGeode.def geos.def heap.def geode.def resource.def \
                 vga16Under.asm vidcomUtils.asm vidcomRegion.asm \
                 vidcomXOR.asm vidcomInfo.asm vidcomEscape.asm \
                 vga16Escape.asm vidcomPalette.asm vga16Output.asm \
-                vga16GenChar.asm vga16Utils.asm vga16Chars.asm \
-                vga16Pointer.asm vga16EscTab.asm vga16Palette.asm \
-                vga16Dither.asm vga16Tables.asm vidcomPolygon.asm \
-                vidcomLine.asm vidcomPutLine.asm vidcomRaster.asm \
-                vga16Raster.asm vga16Admin.asm vidcomExclBounds.asm
+                vga16GenChar.asm vga16Grey.asm vga16Utils.asm \
+                vga16Chars.asm vga16Pointer.asm vga16EscTab.asm \
+                vga16Palette.asm vga16Dither.asm vga16Tables.asm \
+                vidcomPolygon.asm vidcomLine.asm vidcomPutLine.asm \
+                vidcomRaster.asm vga16Raster.asm vga16Admin.asm \
+                vidcomExclBounds.asm
 
 vga16EC.geo vga16.geo : geos.ldf hostif.ldf 

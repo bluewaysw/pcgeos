@@ -11,6 +11,7 @@ typedef struct {
     byte 		TTCBS_width;
     byte 		TTCBS_weight;
     TextStyle 		TTCBS_stylesToImplement;
+    byte		TTCBS_flags;		/* FBF_IS_GREY if greyscale was requested */
 } TrueTypeCacheBufSpec;
 
 typedef struct {

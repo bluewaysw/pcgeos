@@ -199,6 +199,8 @@ CLF_kernOp equ (this byte) + 0
 CLF_afterKern:
 
 					;ASSUMES CTE_width.WBF_int.high == 0
+	mov	cl, fs:fracPosition	;fraction of this char's position,
+	mov	fs:[greyFrac], cl	;  for subpixel phases (GreyBlit)
 	mov	dx, ax			;dx <- x position
 	cmp	fs:fracPosition, 0x80
 	jb	CLF_noRound
@@ -295,6 +297,12 @@ REVISION HISTORY:
 
 
 FastCharCommon	label	near
+	call	GreyCheck		;greyscale font?
+	jz	FCC_notGrey
+	mov	bp, cx			;bp <- clip right = right edge
+	mov	cx, ax			;cx <- clip left = left edge
+	jmp	GreyBlit		;blend it in (vga16Grey.asm)
+FCC_notGrey:
 	mov	bp,ax			;save left
 	;
 	; set up segment registers
@@ -484,6 +492,8 @@ CLC_afterKern:
 	; es:si = index to CharTableEntry for character
 	; compute next character x position - first check fractional width flag
 	;
+	mov	cl, fs:[fracPosition]		;fraction of this char's
+	mov	fs:[greyFrac], cl		;  position (GreyBlit)
 	mov	dx, ax				;dx <- left edge.
 	cmp	fs:[fracPosition], 128		;
 	jb	CLC_noRound			;
@@ -629,6 +639,10 @@ CLCh_setClip:
 ; special case: character partially visible
 
 CLCh_CharClip:
+	call	GreyCheck		;greyscale font?
+	jz	CLCh_notGrey
+	jmp	GreyClipChar		;clip to the simple clip rect
+CLCh_notGrey:
 	jmp	CharClip
 
 ;------------------------------
@@ -753,6 +767,17 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 CharClip	label	near
+	;
+	; CharGeneralSlow draws 1 bit characters itself (solid mask), or
+	; goes on to CharGeneralRealSlow: convert a greyscale character
+	; here already (GreyToMono doesn't convert twice).
+	;
+	call	GreyCheck
+	jz	CC_notGrey
+	jmp	GreyMaskChar		;blend, clipped per row
+CharClipMono	label	near		;from GreyMaskChar: 1 bit way
+	call	GreyToMono		;es:si <- 1 bit CharData
+CC_notGrey:
 	call	CheckCollisionsDS
 	REAL_FALL_THRU CharGeneralSlow, no
 
@@ -943,6 +968,14 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 CharGeneralRealSlow	label	near
+	;
+	; This code only draws 1 bit characters: convert a greyscale one
+	; (es:si) first, unless CharClip has done so already.
+	;
+	call	GreyCheck
+	jz	CGRS_notGrey
+	call	GreyToMono		;es:si <- 1 bit CharData
+CGRS_notGrey:
 
 		; copy the draw mask over
 

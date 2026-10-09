@@ -2583,3 +2583,20 @@ export NoPMSupportError as SysFreeDOSBlock
 export NoPMSupportError as SysAllocRealModeCallback
 export NoPMSupportError as  SysFreeRealModeCallback
 endif
+
+#
+# Font buffer limits and character data size: the size limit of a font
+# buffer is a property of the buffer (format), see FontDrGetMaxBufSize.
+#
+incminor FontBufLimits
+export FontDrGetMaxBufSize
+export FontDrCharDataSize
+export FONTDRGETMAXBUFSIZE
+export FONTDRCHARDATASIZE
+
+#
+# Greyscale text: a video driver that draws greyscale characters
+# registers itself.
+#
+incminor GreyTextDriver
+export GrSetGreyTextDriver

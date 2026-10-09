@@ -59,7 +59,6 @@ extern TEngine_Instance engineInstance;
 
 
 #define MAX_BITMAP_SIZE		                125
-#define MAX_FONTBUF_SIZE                    ( 10 * 1024 )
 #define INITIAL_BITMAP_BLOCKSIZE            ( 2 * 1024 )
 #define REGION_SAFETY                       400
 
@@ -190,6 +189,8 @@ typedef ByteFlags FontGenPathFlags;
 typedef ByteFlags FontBufFlags;
 #define FBF_DEFAULT_FONT    0x80
 #define FBF_MAPPED_FONT     0x40
+#define FBF_IS_GREY         0x20    /* GreyCharData, protected mode only */
+#define FBF_GREY_PHASES     0x01    /* greyscale chars have GREY_PHASES phases */
 #define FBF_IS_OUTLINE      0x10
 #define FBF_IS_REGION       0x08
 #define FBF_IS_COMPLEX      0x04
@@ -240,6 +241,11 @@ typedef	struct
     FontBufFlags                FB_flags;
     word                        FB_heapCount;
 } FontBuf;
+
+/* Kernel helpers (fontDr.def): the size limit of a fontbuf is a property */
+/* of the fontbuf; the size of a char's data depends on the data format.  */
+extern word _pascal FontDrGetMaxBufSize( FontBuf* fontBuf );
+extern word _pascal FontDrCharDataSize( FontBuf* fontBuf, word charDataOffset );
 
 
 /*
@@ -302,6 +308,7 @@ typedef struct
     sword                       TM_heightY;
     word                        TM_resX;
     word                        TM_resY;
+    byte                        TM_greyRequest;    /* FBF_IS_GREY if greyscale was requested */
 } TransformMatrix;
 
 typedef ByteFlags TransFlags;
@@ -337,6 +344,39 @@ typedef struct
     sbyte                       CD_xoff;
     byte                        CD_data;
 } CharData;
+
+/*
+ * Greyscale character data (FBF_IS_GREY), see fontDr.def: same header as
+ * CharData, width in pixels, 4 bits per pixel (high nibble = left pixel),
+ * rows padded to a byte, 0 = background .. GREY_LEVELS-1 = full ink.
+ */
+typedef struct
+{
+    byte                        GCD_pictureWidth;
+    byte                        GCD_numRows;
+    sbyte                       GCD_yoff;
+    sbyte                       GCD_xoff;
+    byte                        GCD_data;
+} GreyCharData;
+
+#define SIZE_GREY_CHAR_HEADER       ( sizeof( GreyCharData ) - 1 )
+#define GREY_LEVELS                 16
+#define GREY_PHASES                 4      /* subpixel phases, see fontDr.def */
+#define GREY_PHASE_ZERO             2      /* phase without shift             */
+
+/* Greyscale glyphs only up to this pixel height (larger sizes: 1 bit / regions). */
+#define MAX_GREY_PIXEL_HEIGHT       96
+/* Subpixel phases (FBF_GREY_PHASES) only up to this pixel height: the     */
+/* rounding of the glyph position is visible at small sizes, where the gaps */
+/* between letters are 1-3 pixels, while phases cost 4 times the data.     */
+#define MAX_SUBPIXEL_PIXEL_HEIGHT   24
+/* Oversampling factor for greyscale glyphs (4 x 4 subpixels per pixel). */
+#define GREY_OVERSAMPLING           4
+
+/* FBF_IS_GREY if greyscale glyphs are forced for testing (ttinit.c) */
+extern byte trueTypeForceGrey;
+/* FALSE: greyscale glyphs are loaded without hinting (ttinit.c) */
+extern Boolean trueTypeGreyHinting;
 
 #define SIZE_CHAR_HEADER        ( sizeof( CharData ) - 1 )
 

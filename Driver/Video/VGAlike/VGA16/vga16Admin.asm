@@ -1330,6 +1330,17 @@ storeRWWin:
 		div	bl				; al = #to bump
 		mov	ss:[nextWinInc], ax		; set increment
 
+ifdef PROTECTED_MODE
+		;
+		; We draw greyscale characters (vga16Grey.asm): tell the font
+		; manager, so that it requests greyscale fonts for our windows.
+		;
+		push	cx, dx
+		mov	cx, cs
+		mov	dx, offset DriverStrategy
+		call	GrSetGreyTextDriver
+		pop	cx, dx
+endif
 		.leave
 		ret
 

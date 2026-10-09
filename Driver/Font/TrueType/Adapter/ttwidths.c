@@ -148,6 +148,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                         const OutlineEntry*  firstEntry,
                         TextStyle            stylesToImplement,
                         FontMatrix*          windowMatrix,
+                        byte                 requestGrey,
                         MemHandle            varBlock ) 
 {
         TrueTypeOutlineEntry*  trueTypeOutline;
@@ -183,7 +184,12 @@ EC(     ECCheckBounds( (void*)fontHeader ) );
 
         InitConvertHeader( trueTypeVars, fontHeader );
 
+        /* Greyscale requested? (font manager, or forced for testing via */
+        /* [truetype] forceGrey = true, read at driver init)            */
+        requestGrey = ( requestGrey | trueTypeForceGrey ) & FBF_IS_GREY;
+
         /* alloc Block for FontBuf, CharTableEntries, KernPairs and kerning values */
+        bufSpec.TTCBS_flags = requestGrey;
         bufSpec.TTCBS_pointSize = pointSize;
         bufSpec.TTCBS_width = width;
         bufSpec.TTCBS_weight = weight;
@@ -239,9 +245,21 @@ EC(             ECCheckBounds( (void*)transMatrix ) );
                 /* adjust FB_height, FB_minTSB, FB_pixHeight and FB_baselinePos */
                 AdjustFontBuf( transMatrix, fontMatrix, fontBuf );
 
-                /* Are the glyphs rendered as regions? */
+                /* Are the glyphs rendered as regions? Otherwise greyscale, */
+                /* if requested and the font is small. Scaled (zoom) and    */
+                /* rotated fonts too: the outline is transformed before it  */
+                /* is rendered, for 1 bit and greyscale glyphs alike.       */
+                transMatrix->TM_greyRequest = requestGrey;
                 if( IsRegionNeeded( transMatrix, fontBuf ) )
                         fontBuf->FB_flags |= FBF_IS_REGION;
+                else if( requestGrey &&
+                         fontBuf->FB_pixHeight <= MAX_GREY_PIXEL_HEIGHT )
+                {
+                        fontBuf->FB_flags |= FBF_IS_GREY;
+                        /* subpixel phases for small sizes */
+                        if( fontBuf->FB_pixHeight <= MAX_SUBPIXEL_PIXEL_HEIGHT )
+                                fontBuf->FB_flags |= FBF_GREY_PHASES;
+                }
 
                 AdjustTransMatrix( transMatrix, windowMatrix );
 

@@ -156,10 +156,13 @@ deleteChar:
 	je	noChars				;branch if no chars left
 	call	AdjustPointers			;adjust pointers after char
 	call	ShiftData			;shift data downward
-	mov	bx, ds:FB_dataSize		;bx <- current size
-	add	bx, ax				;bx <- size + new char
-	sub	bx, MAX_FONT_SIZE		;see if small enough
-	ja	deleteChar			;if so, keep deleting
+	push	ax
+	mov	bx, ax				;bx <- size of new char
+	add	bx, ds:FB_dataSize		;bx <- size + new char
+	call	FontDrGetMaxBufSize		;ax <- limit for this block
+	cmp	bx, ax				;see if small enough
+	pop	ax
+	ja	deleteChar			;if not, keep deleting
 
 noChars:
 EC <	push	ax							>
@@ -172,6 +175,114 @@ EC <	pop	ax							>
 FontDrDeleteLRUChar	endp
 
 
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FontDrGetMaxBufSize
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Return the maximum size (FB_dataSize) a font buffer may grow
+		to before characters are deleted to make room.
+CALLED BY:	Font Drivers (GLOBAL), FontDrDeleteLRUChar
+		C: word _pascal FontDrGetMaxBufSize(FontBuf *fontBuf);
+
+PASS:		ds - seg addr of font buffer
+RETURN:		ax - maximum size of the font buffer (bytes)
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	The limit is a property of the font buffer (its format), so it is
+	decided here and nowhere else:
+	    greyscale (FBF_IS_GREY, protected mode only) -> MAX_FONT_SIZE_GREY
+	    everything else                              -> MAX_FONT_SIZE
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FontDrGetMaxBufSize	proc	far
+ifdef PROTECTED_MODE
+	test	ds:FB_flags, mask FBF_IS_GREY
+	jz	notGrey
+	mov	ax, MAX_FONT_SIZE_GREY
+	ret
+notGrey:
+endif
+	mov	ax, MAX_FONT_SIZE
+	ret
+FontDrGetMaxBufSize	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FontDrCharDataSize
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Return the size of a character's data in a font buffer,
+		including its header, for whatever format the buffer uses.
+CALLED BY:	Font Drivers (GLOBAL), FindLRUChar, ECCheckFontBufAX
+		C: word _pascal FontDrCharDataSize(FontBuf *fontBuf,
+						  word charDataOffset);
+
+PASS:		ds - seg addr of font buffer
+		di - offset of the character's data (CharData/RegionCharData)
+RETURN:		ax - size of the character's data, including header
+DESTROYED:	nothing (flags)
+
+PSEUDO CODE/STRATEGY:
+	Region characters (FBF_IS_REGION): RCD_size, which holds the size
+	of the character including its header (as set by the font drivers).
+	Greyscale characters (FBF_IS_GREY): SIZE_GREY_CHAR_HEADER +
+	phases * GCD_numRows * ((GCD_pictureWidth + 1) / 2), 4 bits per
+	pixel; phases = GREY_PHASES with FBF_GREY_PHASES, else 1.
+	Bitmap characters: SIZE_CHAR_HEADER + CD_numRows * bytes per row.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FontDrCharDataSize	proc	far
+	test	ds:FB_flags, mask FBF_IS_REGION
+	jz	bitmapChar
+	mov	ax, ds:[di].RCD_size		;ax <- size including header
+	ret
+
+bitmapChar:
+	test	ds:FB_flags, mask FBF_IS_GREY
+	jnz	greyChar
+	push	bx
+	clr	ah
+	mov	al, ds:[di].CD_pictureWidth	;ax <- width in bits
+	add	ax, 7				;round to next byte (as a word:
+	shr	ax, 1				;  widths up to 255 bits)
+	shr	ax, 1
+	shr	ax, 1				;al <- width in bytes
+	mov	bl, ds:[di].CD_numRows		;bl <- height of char
+	mul	bl				;ax <- size of char data
+	add	ax, SIZE_CHAR_HEADER		;add size of header
+	pop	bx
+	ret
+
+greyChar:
+	push	bx
+	clr	ah
+	mov	al, ds:[di].GCD_pictureWidth	;ax <- width in pixels
+	inc	ax				;two pixels per byte,
+	shr	ax, 1				;  rounded up
+	mov	bl, ds:[di].GCD_numRows	;bl <- height of char
+	mul	bl				;ax <- size of one phase
+	test	ds:FB_flags, mask FBF_GREY_PHASES
+	jz	onePhase
+	shl	ax, 1				;GREY_PHASES (4) phases
+	shl	ax, 1
+onePhase:
+	add	ax, SIZE_GREY_CHAR_HEADER	;add size of header
+	pop	bx
+	ret
+FontDrCharDataSize	endp
+.assert GREY_PHASES eq 4			;FontDrCharDataSize shifts by 2
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		FindLRUChar
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -239,30 +350,14 @@ nextChar:
 	cmp	si, -1				;see if no chars left
 	je	afterSize			;branch if no chars left
 	mov	di, bp				;di <- ptr to LRU char data
-	test	ds:FB_flags, mask FBF_IS_REGION
-	jz	bitmapChars			;branch if not region chars
-	mov	bx, ds:[di].RCD_size		;bx <- size of character
+	push	ax
+	call	FontDrCharDataSize		;ax <- size of character
+	mov	bx, ax				;bx <- size of character
+	pop	ax
 afterSize:
 
 	.leave
 	ret
-
-bitmapChars:
-	;
-	; The font is a bitmap font. We don't normally expect to
-	; need to do the LRU thing on bitmap fonts, but it may
-	; happen as: pointsize -> 128 && # chars -> 255
-	;
-	mov	al, ds:[di].CD_pictureWidth	;al <- width in bits
-	add	al, 7				;round to next byte
-	shr	al, 1
-	shr	al, 1
-	shr	al, 1				;al <- width in bytes
-	mov	bl, ds:[di].CD_numRows		;bl <- height of char
-	mul	bl				;ax <- size of char data
-	add	ax, SIZE_CHAR_HEADER		;add size of header
-	mov	bx, ax				;bx <- size of char
-	jmp	afterSize
 FindLRUChar	endp
 
 
