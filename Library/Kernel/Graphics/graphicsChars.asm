@@ -273,6 +273,15 @@ transform	local	fptr.TMatrix	push	bp, si
 	je	isSimple			;branch if simple transform
 	mov	bl, mask FBF_IS_COMPLEX		;bl <- check complex flag
 isSimple:
+ifdef PROTECTED_MODE
+	;
+	; Greyscale requested is part of the key (see AddInUseEntry).
+	;
+	call	FontGreyRequested		;carry set if greyscale
+	jnc	notGrey
+	ornf	bl, mask FBF_IS_GREY
+notGrey:
+endif
 	;
 	; Get the start & end of the chunk
 	;
@@ -351,6 +360,98 @@ endList:
 IsFontInUse	endp
 
 
+ifdef PROTECTED_MODE
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FontGreyRequested
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Should fonts for this GState be greyscale?
+CALLED BY:	IsFontInUse, AddInUseEntry, CheckCallDriver
+PASS:		es	- seg addr of GState
+RETURN:		carry set if greyscale characters are wanted
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Greyscale is requested when
+	    - it is switched on ([text] greyscale = true, read by
+	      GrInitFonts),
+	    - a video driver that draws greyscale characters has
+	      registered itself (GrSetGreyTextDriver),
+	    - and the GState draws to a window on that driver.
+	GStates without a window (gstrings, printing) and windows on other
+	drivers (bitmaps in memory) keep 1 bit characters. The font driver
+	decides on top of that (size limits, transformation) by setting
+	FBF_IS_GREY in the font buffer or not.
+
+	This is called with font blocks locked, so it only looks at
+	values set beforehand and calls nothing that could block.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FontGreyRequested	proc	near
+	uses	ax, bx, cx, dx, ds
+	.enter
+	LoadVarSeg	ds, ax
+	tst	ds:[greyIniOn]
+	jz	notWanted
+	movdw	cxdx, ds:[greyVideoStrategy]
+	jcxz	notWanted			;no greyscale driver
+	mov	bx, es:GS_window
+	tst	bx
+	jz	notWanted			;no window: gstring, print
+	call	MemDerefDS			;ds <- window
+	cmp	cx, ds:[W_driverStrategy].segment
+	jne	notWanted
+	cmp	dx, ds:[W_driverStrategy].offset
+	jne	notWanted
+	stc
+	jmp	done
+notWanted:
+	clc
+done:
+	.leave
+	ret
+FontGreyRequested	endp
+endif	; PROTECTED_MODE
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GrSetGreyTextDriver
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	A video driver that draws greyscale characters (FBF_IS_GREY,
+		GreyCharData, see VID_ESC_GREY_TEXT) registers itself.
+CALLED BY:	Video drivers (GLOBAL), when their device is set
+PASS:		cx:dx	- the driver's strategy routine (0:0 to unregister)
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Only windows on this driver get greyscale fonts (FontGreyRequested).
+	In real mode this does nothing (greyscale fonts need the larger
+	font blocks of protected mode).
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GrSetGreyTextDriver	proc	far
+ifdef PROTECTED_MODE
+	uses	ax, ds
+	.enter
+	LoadVarSeg	ds, ax
+	movdw	ds:[greyVideoStrategy], cxdx
+	.leave
+endif
+	ret
+GrSetGreyTextDriver	endp
+
+
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		IsFontAvail
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -901,6 +1002,18 @@ REVISION HISTORY:
 CheckCallDriver	proc	near
 	uses	cx
 	.enter
+ifdef PROTECTED_MODE
+	;
+	; Request greyscale characters from the font driver through
+	; GS_fontFlags (see FBF_IS_GREY). UpdateFontOpts replaces the bit
+	; with the font buffer's own flag afterwards.
+	;
+	andnf	es:GS_fontFlags, not mask FBF_IS_GREY
+	call	FontGreyRequested		;carry set if greyscale
+	jnc	noGreyRequest
+	ornf	es:GS_fontFlags, mask FBF_IS_GREY
+noGreyRequest:
+endif
 
 	mov	ax, ds:[di].FI_maker		;ax <- font manufacturer
 	mov	cx, si				;bp:cx <- ptr to transform
@@ -992,12 +1105,21 @@ CheckHack <(size FontCommonAttrs)-(size TextStyle) eq (offset FCA_textStyle)>
 	pop	ds, es, di, si
 	pop	ax
 	mov	ds:[di].FIUE_attrs.FCA_textStyle, al
-	
+	;
+	; Greyscale requested? (part of the key, see IsFontInUse)
+	;
+	clr	al
+ifdef PROTECTED_MODE
+	call	FontGreyRequested		;carry set if greyscale
+	jnc	gotGrey
+	mov	al, mask FBF_IS_GREY
+gotGrey:
+endif
 	;
 	; A simple transformation or complex?
 	;
 	mov	es, bp				;es <- seg addr of xform
-	mov	ds:[di].FIUE_flags, 0		;assume simple xform
+	mov	ds:[di].FIUE_flags, al		;assume simple xform
 	test	es:[si].TM_flags, TM_COMPLEX	;see if complex xform
 	je	isSimple			;branch if is simple
 	;
@@ -2155,6 +2277,14 @@ DBCS <		sub	cx, ds:FB_firstChar				>
 SBCS <		sub	cl, ds:FB_firstChar				>
 SBCS <		clr	ch						>
 		inc	cx				;cx <- # of chars
+		mov	al, ds:FB_flags
+		and	al, mask FBF_IS_REGION or mask FBF_IS_GREY
+		cmp	al, mask FBF_IS_REGION or mask FBF_IS_GREY
+		ERROR_E FONTMAN_FONT_BUF_CORRUPTED	;one data format only
+		mov	al, ds:FB_flags
+		and	al, mask FBF_GREY_PHASES or mask FBF_IS_GREY
+		cmp	al, mask FBF_GREY_PHASES
+		ERROR_E FONTMAN_FONT_BUF_CORRUPTED	;phases only if grey
 		clr	si
 charLoop:
 	;
@@ -2171,15 +2301,12 @@ charLoop:
 	;
 	; Make sure the pointer + data is within the block size
 	;
-		mov	al, ds:[di].CD_pictureWidth
-		add	al, 0x7
-		shr	al, 1
-		shr	al, 1
-		shr	al, 1				;al <- byte width
-		mul	ds:[di].CD_numRows		;ax <- data size
-		add	ax, (size CharData)-1
+		call	FontDrCharDataSize		;ax <- size incl. header,
+						;  for any char format
+		add	ax, di				;ax <- end of char data
+		ERROR_C FONTMAN_FONT_BUF_CORRUPTED
 		cmp	ax, ds:FB_dataSize
-		ERROR_AE FONTMAN_FONT_BUF_CORRUPTED
+		ERROR_A FONTMAN_FONT_BUF_CORRUPTED
 	;
 	; Go to the next char
 	;

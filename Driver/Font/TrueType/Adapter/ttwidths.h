@@ -45,6 +45,7 @@ MemHandle _pascal TrueType_Gen_Widths(
                                 const OutlineEntry*  firstEntry,
                                 TextStyle            stylesToImplement,
                                 FontMatrix*          windowMatrix,
+                                byte                 requestGrey,
                                 MemHandle            varBlock
 );
 

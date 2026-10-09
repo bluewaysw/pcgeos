@@ -33,6 +33,9 @@
  ***********************************************************************/
 
 #define FONTMAPPING_CATEGORY            "FontMapping" 
+#define TRUETYPE_CATEGORY               "truetype"
+#define FORCE_GREY_KEY                  "forceGrey"
+#define GREY_HINTING_KEY                "greyHinting"
 #define TTFDRIVER_CATEGORY              "ttfDriver"
 #define BYTECODEINTERPRETER_KEY         "bytecodeInterpreterActive"
 

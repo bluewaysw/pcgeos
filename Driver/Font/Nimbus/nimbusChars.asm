@@ -459,7 +459,10 @@ EC <	call	ECCheckFontHandle		;>
 	mov	cx, ds:FB_dataSize		;cx <- current size of font
 	mov	dx, cx
 	add	dx, ax				;add char size to current
-	cmp	dx, MAX_FONT_SIZE		;see if font too big
+	push	ax
+	call	FontDrGetMaxBufSize		;ax <- limit for this font
+	cmp	dx, ax				;see if font too big
+	pop	ax
 	jbe	sizeOK				;branch if OK
 	call	FontDrDeleteLRUChar		;shrink me jesus
 	mov	cx, ds:FB_dataSize		;cx <- new size of font

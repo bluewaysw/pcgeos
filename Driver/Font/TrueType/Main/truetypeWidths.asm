@@ -121,6 +121,15 @@ pass_matrix:
 	push 	W_TMatrix
 
 pass_varblock:
+	;
+	; Greyscale requested? The font manager sets FBF_IS_GREY in
+	; GS_fontFlags before DR_FONT_GEN_WIDTHS when it wants greyscale
+	; characters (protected mode only, see fontDr.def).
+	;
+	clr	ah
+	mov	al, es:GS_fontFlags
+	andnf	al, mask FBF_IS_GREY
+	push	ax			;pass requestGrey
 	segmov	ds, dgroup, dx
 	push	ds:variableHandle	;pass varBlock
 	call	TRUETYPE_GEN_WIDTHS

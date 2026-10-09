@@ -4292,7 +4292,61 @@ GRGETFONT	proc	far
 GRGETFONT	endp
 
 
+COMMENT @----------------------------------------------------------------------
+
+C FUNCTION:	FontDrGetMaxBufSize
+
+C DECLARATION:	extern word
+			_pascal FontDrGetMaxBufSize(FontBuf *fontBuf);
+
+		fontBuf must point to the start of its block, as every
+		FontBuf does (the asm interface takes just the segment).
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version
+
+------------------------------------------------------------------------------@
+FONTDRGETMAXBUFSIZE	proc	far	fontBuf:fptr
+	uses	ds
+	.enter
+EC <	tst	ss:fontBuf.offset		; a FontBuf always starts	>
+EC <	ERROR_NZ FONTMAN_FONT_BUF_CORRUPTED	;  its block		>
+	mov	ds, ss:fontBuf.segment
+	call	FontDrGetMaxBufSize		;ax <- limit
+	.leave
+	ret
+FONTDRGETMAXBUFSIZE	endp
+
+COMMENT @----------------------------------------------------------------------
+
+C FUNCTION:	FontDrCharDataSize
+
+C DECLARATION:	extern word
+			_pascal FontDrCharDataSize(FontBuf *fontBuf,
+						   word charDataOffset);
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version
+
+------------------------------------------------------------------------------@
+FONTDRCHARDATASIZE	proc	far	fontBuf:fptr, charDataOffset:word
+	uses	ds, di
+	.enter
+EC <	tst	ss:fontBuf.offset		; a FontBuf always starts	>
+EC <	ERROR_NZ FONTMAN_FONT_BUF_CORRUPTED	;  its block		>
+	mov	ds, ss:fontBuf.segment
+	mov	di, ss:charDataOffset
+	call	FontDrCharDataSize		;ax <- size incl. header
+	.leave
+	ret
+FONTDRCHARDATASIZE	endp
+
 if FULL_EXECUTE_IN_PLACE
+
 C_Graphics	ends
 GeosCStubXIP	segment	resource
 endif

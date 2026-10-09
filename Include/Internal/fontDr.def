@@ -35,6 +35,10 @@ StartKernel
 global GrCallFontDriver:far
 global GrCallFontDriverID:far
 global FontDrDeleteLRUChar:far
+global FontDrGetMaxBufSize:far
+global FontDrCharDataSize:far
+global FONTDRGETMAXBUFSIZE:far		; C stubs of the above
+global FONTDRCHARDATASIZE:far
 global FontDrFindFontInfo:far
 global FontDrFindOutlineData:far
 global FontDrAddFont:far
@@ -120,9 +124,18 @@ CHAR_MISSING		=	3		; <= is one of the above
 KERNEL_STYLES		=	mask TS_UNDERLINE or mask TS_STRIKE_THRU
 
 ;
-; maximum size of a font before resize occurs:
+; maximum size of a font before resize occurs. Don't compare against this
+; directly: the limit is a property of the font block, ask
+; FontDrGetMaxBufSize() (which currently returns MAX_FONT_SIZE for every
+; block; protected mode will allow larger blocks for some formats).
 ;
 MAX_FONT_SIZE	=	1024 * 10
+;
+; ...and for greyscale font buffers (FBF_IS_GREY), which only exist in
+; protected mode, where blocks can grow up to 64K. Leaves room for the
+; header, the char table and one more character below 64K.
+;
+MAX_FONT_SIZE_GREY =	1024 * 48
 
 ;
 ; "Handle ID" of the font manager. Included here so the font
@@ -144,6 +157,48 @@ CharData	struct
 CharData	ends
 
 SIZE_CHAR_HEADER	= (size CharData)-1
+
+;------------------------------------------------------------------------------
+;	structure of greyscale character data (font buffers with FBF_IS_GREY)
+;------------------------------------------------------------------------------
+;
+; Same header layout as CharData, so that everything that only follows
+; CTE_dataOffset works unchanged. The data is 4 bits per pixel coverage:
+; the high nibble of a byte is the left pixel, rows are padded to a byte,
+; 0 = background, GREY_LEVELS-1 = full ink.
+;
+; Subpixel positioning (font buffers with FBF_GREY_PHASES, small sizes):
+; the data holds GREY_PHASES bitmaps of the glyph, one after the other,
+; shifted by (phase - GREY_PHASE_ZERO) / GREY_PHASES pixels relative to
+; the (rounded) position the character is drawn at: -1/2, -1/4, 0, +1/4.
+; The video driver picks the phase from the fractional part of the pen
+; position. GCD_pictureWidth includes one empty column on each side for
+; the shifts (GCD_xoff is one less). Without FBF_GREY_PHASES (larger
+; sizes, where the rounding is hardly visible) there is just one,
+; unshifted bitmap.
+;
+; Size of a character: SIZE_GREY_CHAR_HEADER + phases *
+;		       GCD_numRows * ((GCD_pictureWidth + 1) / 2)
+;		       (phases = GREY_PHASES with FBF_GREY_PHASES, else 1)
+;
+GreyCharData	struct
+    GCD_pictureWidth	byte		;width of picture data in PIXELS
+    GCD_numRows		byte		;number of rows of data
+    GCD_yoff		sbyte		;(signed) offset to first row
+    GCD_xoff		sbyte		;(signed) offset to first column
+    GCD_data		byte		;data for character
+GreyCharData	ends
+
+SIZE_GREY_CHAR_HEADER	= (size GreyCharData)-1
+GREY_LEVELS		= 16		;coverage values 0..15
+GREY_PHASES		= 4		;subpixel positions per pixel
+GREY_PHASE_ZERO		= 2		;phase without shift
+
+.assert (offset GCD_pictureWidth) eq (offset CD_pictureWidth)
+.assert (offset GCD_numRows) eq (offset CD_numRows)
+.assert (offset GCD_yoff) eq (offset CD_yoff)
+.assert (offset GCD_xoff) eq (offset CD_xoff)
+.assert (offset GCD_data) eq (offset CD_data)
 
 ;------------------------------------------------------------------------------
 ;	structure of region character data
@@ -233,12 +288,16 @@ KernPair	ends
 FontBufFlags	record
 	FBF_DEFAULT_FONT:1	;TRUE if font is default (GState only)
 	FBF_MAPPED_FONT:1	;TRUE if font is substituted (GState only)
-	:1
+	FBF_IS_GREY:1		;TRUE if character data is greyscale
+				;  (GreyCharData). Protected mode only.
+				;  Never together with FBF_IS_REGION.
 	FBF_IS_OUTLINE:1	;TRUE if generated from outline data
 	FBF_IS_REGION:1		;TRUE if character data stored as regions
 	FBF_IS_COMPLEX:1	;TRUE if complex transformation used
 	FBF_IS_INVALID:1	;TRUE if font is no longer avail
-	:1		;pad to a byte only
+	FBF_GREY_PHASES:1	;TRUE if greyscale characters have
+				;  GREY_PHASES subpixel phases (small
+				;  sizes). Only with FBF_IS_GREY.
 FontBufFlags	end
 
 FONT_GS_FLAGS = mask FBF_DEFAULT_FONT or mask FBF_MAPPED_FONT

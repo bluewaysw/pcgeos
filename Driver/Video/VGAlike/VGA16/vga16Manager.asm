@@ -94,6 +94,7 @@ include vga16Escape.asm			; support vga16 specific escape codes
 include vidcomPalette.asm		; support for VidGetPixel
 include vga16Output.asm			; output routines
 include vga16GenChar.asm		; routines for larger characters
+include vga16Grey.asm			; greyscale characters
 include vga16Utils.asm			; misc utility routines
 include vga16Chars.asm			; character drawing routines
 include vga16Pointer.asm		; pointer support
