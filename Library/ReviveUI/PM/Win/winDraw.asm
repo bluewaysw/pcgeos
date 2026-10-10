@@ -1131,7 +1131,7 @@ EC <	call	GenCheckGenAssumption	;Make sure gen data exists 	>
 	pop	ds
 
 	xchg	bp, di				;bp = GState, di = inst. data
-	call	OpenWinGCMSetTitleFontSize
+;	call	OpenWinGCMSetTitleFontSize
 	xchg	bp, di				;di = GState, bp = inst. data
 	call	OpenWinGetHeaderTitleBounds	;get title bounds from
 						;instance data
@@ -1191,7 +1191,7 @@ notCGA:
 	;restore original point size
 
 	mov	bp, di
-	call	OpenWinGCMResetTitleFontSize
+	;call	OpenWinGCMResetTitleFontSize
 done:
 	pop	ax, cx, bp, es		;get color scheme, draw flags
 exit:					;and pointer to instance data

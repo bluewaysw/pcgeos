@@ -880,7 +880,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _PM	;----------------------------------------------------------------------
+if _ISUI or _PM	;----------------------------------------------------------------------
 
 OLFieldCreateWindowListEntry method dynamic OLFieldClass, 
 					MSG_OL_FIELD_CREATE_WINDOW_LIST_ENTRY

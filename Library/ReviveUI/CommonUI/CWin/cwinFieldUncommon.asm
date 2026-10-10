@@ -1244,7 +1244,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if _PM	;----------------------------------------------------------------------
+if _ISUI	;----------------------------------------------------------------------
 
 OLFieldSelectWindowListEntry	method	dynamic OLFieldClass,
 					MSG_OL_FIELD_SELECT_WINDOW_LIST_ENTRY
@@ -1297,7 +1297,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _PM	;----------------------------------------------------------------------
+if _ISUI	;----------------------------------------------------------------------
 
 OLFieldWindowListCloseWindow	method dynamic OLFieldClass,
 					MSG_OL_FIELD_WINDOW_LIST_CLOSE_WINDOW

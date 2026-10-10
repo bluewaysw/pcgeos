@@ -487,8 +487,11 @@ endif	; CURSOR_ON_BACKGROUND_COLOR and (not CURSOR_OUTSIDE_BOUNDS) ----------
 if _OL_STYLE	;--------------------------------------------------------------
 	mov	al, (J_LEFT shl offset DMF_X_JUST) or \
 		    (J_CENTER shl offset DMF_Y_JUST)
-	mov	dx, (BUTTON_INSET_Y shl 8)
-
+	;mov	dx, (BUTTON_INSET_Y shl 8)
+	clr	dx				;Maximize moniker space to
+						;allow express menu buttons
+						;to draw themselves completely.
+						;-cbh 11/ 3/92
 	push	di
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset	;ds:di = specificInstance
@@ -1887,7 +1890,7 @@ NOFXIP<	segmov	ds, cs							>
 	mov	si, ds:[bp].CBR_rightBottom
 	call	GrDrawRegionAtCP
 
-if _PM or _ODIE	;--------------------------------------------------------------
+if _ODIE	;--------------------------------------------------------------
 if _ODIE
 	mov	al, C_BLACK
 else
@@ -1914,7 +1917,7 @@ drawExtraBorder:
 	call	GrDrawRegionAtCP
 done:
 
-endif		; PM or ODIE --------------------------------------------------
+endif		; ODIE --------------------------------------------------
 
 FXIP <	push	bx							>
 FXIP <	mov	bx, handle DrawColorRegions				>

@@ -2862,13 +2862,13 @@ OLMenuedWinLostSysExcl	method dynamic	OLMenuedWinClass, \
 	; that has completed, before nuked the gadget excl, otherwise we can
 	; end up in some nested update situations.	-- Doug 9/17/92
 	;
-	mov	ax, MSG_VIS_TAKE_GADGET_EXCL
-	clr	cx			;grab active exclusive semaphore:
-	clr	dx			;will notify open menu and force it to
+	;mov	ax, MSG_VIS_TAKE_GADGET_EXCL
+	;clr	cx			;grab active exclusive semaphore:
+	;clr	dx			;will notify open menu and force it to
 					;close up toute suite.
-	mov	bx, ds:[LMBH_handle]
-	mov	di, mask MF_FORCE_QUEUE or mask MF_INSERT_AT_FRONT
-	call	ObjMessage
+	;mov	bx, ds:[LMBH_handle]
+	;mov	di, mask MF_FORCE_QUEUE or mask MF_INSERT_AT_FRONT
+	;call	ObjMessage
 
 	pop	ax
 	mov	di, offset OLMenuedWinClass

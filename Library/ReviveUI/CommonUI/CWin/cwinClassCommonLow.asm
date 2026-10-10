@@ -3355,9 +3355,12 @@ if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
 	; we do to make the neat shadow.
 	call	WinCommon_DerefVisSpec_DI
 	test	ds:[di].OLWI_attrs, mask OWA_SHADOW
+	jnz	makeTransparent
+	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
 	jz	afterShadowTest
 
-	ORNF	ah, mask WCF_TRANSPARENT
+makeTransparent:
+	ORNF	ah, mask WCF_TRANSPARENT or WCF_PLAIN
 afterShadowTest:
 endif			;------------------------------------------------------
 
@@ -5069,6 +5072,7 @@ afterMoveResize::
 
 	call	WinCommon_DerefVisSpec_DI
 CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW			>
+OLS <	cmp	ds:[di].OLWI_type, OLWT_BASE_WINDOW			>
 	jne	afterExpressToolArea
 	call	OLBaseWinUpdateExpressToolArea
 afterExpressToolArea:
@@ -5317,6 +5321,8 @@ OpenWinCheckVisibleConstraints	proc	far
 
 	mov	cx, WIN_VISIBLE_MARGIN	;default margins for most UIs
 	mov	dx, WIN_VISIBLE_MARGIN
+
+OLS <	jmp	short keepThisMarginVisible				>
 
 	;Motif/CUA: if window has a title bar, make sure it stays visible
 

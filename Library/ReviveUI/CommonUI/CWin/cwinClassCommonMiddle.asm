@@ -1428,6 +1428,21 @@ OpenWinUpdateHeader	method dynamic	OLWinClass, MSG_OL_WIN_UPDATE_HEADER
 
 	;if header color or focus state changed, draw everything
 
+OLS <	test	dl, mask OLWHS_HEADER_AREA_INVALID or \
+			mask OLWHS_FOCUS_AREA_INVALID or \
+			mask OLWHS_HEADER_MARK_IMAGES_INVALID >
+
+					;OpenLook: focus changes force full
+					;redraw. So do "mark" changes for now,
+					;until we optimize by redrawing just the
+					;mark (see below).
+CUAS <	test	dl, mask OLWHS_HEADER_AREA_INVALID >
+
+	jz	headerOK
+
+OLS <	call	OpenWinDrawHeaderBackground				>
+OLS <	call	OpenWinDrawHeaderMarks					>
+
 CUAS <	test	dl, mask OLWHS_HEADER_AREA_INVALID >
 
 	jz	headerOK
@@ -1476,12 +1491,31 @@ endif
 	call	OpenWinHeaderResetInvalid
 	jmp	done
 
+;------------------------------------------------------------------------------
 headerOK:
+
+if _OL_STYLE	;--------------------------------------------------------------
+;THIS IS A FUTURE ENHANCEMENT
+;	;see if marks need redrawing
+;
+;	test	dl, mask OLWHS_HEADER_MARK_IMAGES_INVALID
+;	jz	marksOK
+;
+;	push	dx
+;	call	OpenWinDrawHeaderMarksBackground	;erase old mark
+;	call	OpenWinDrawHeaderMarks
+;	pop	dx
+;marksOK:
+endif 		;--------------------------------------------------------------
+
+;------------------------------------------------------------------------------
 	;
 	; we might want to test for the case where the title area is invalid
 	; but the title image is still valid - can just redraw background
 	; and bitblt image to new position.
 	;
+OLS <	test	dl, mask OLWHS_TITLE_AREA_INVALID or \
+					mask OLWHS_TITLE_IMAGE_INVALID >
 CUAS <	test	dl, mask OLWHS_TITLE_AREA_INVALID or \
 					mask OLWHS_TITLE_IMAGE_INVALID or \
 					mask OLWHS_FOCUS_AREA_INVALID >

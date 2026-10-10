@@ -803,6 +803,7 @@ if	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
 						mask UIFA_FEATURES) shl 8
 	jz	OWP_QuitProcessed	;skip if no button pressed
 
+testOl:
 	test	ds:[di].OLWI_attrs, mask OWA_PINNABLE
 	jz	OWP_90			;skip if not...
 
@@ -1994,6 +1995,11 @@ openMenu:
 	mov	ax, MSG_OL_POPUP_ACTIVATE
 	call	WinOther_ObjCallInstanceNoLock	;open the menu
 
+	mov	cx, TRUE				; grab gadget exclusive
+	mov	ax, MSG_MO_MW_ENTER_STAY_UP_MODE
+	call	WinOther_ObjCallInstanceNoLock
+	
+
 OWSM_60:
 	pop	si
 
@@ -2035,7 +2041,7 @@ REVISION HISTORY:
 
 if _OPEN_LOOK	;START of OPENLOOK specific code -------------------------------
 
-OpenWinEnsureMenu	proc	near
+OpenWinEnsureMenu	proc	far
 	call	WinOther_DerefVisSpec_DI
 	tst	ds:[di].OLWI_menu
 	jnz	done			;skip if already has menu...
@@ -2050,13 +2056,16 @@ OpenWinEnsureMenu	proc	near
 
 	mov	bx, handle WindowMenuResource
 	mov	dx, offset WindowMenu
-	call	FatalError
-	;call	OpenWinCreateChildObject
+	mov	cx, ds:[LMBH_handle]
+	call	OpenWinCreateChildObject
 
 	;update the "Close", "FullSize", "Restore", and "Quit" items
 	;in this menu.
-
+	push	ds
+	push	si
 	call	OpenWinUpdateWindowMenuItems
+	pop		si
+	pop		ds
 	jmp	done
 
 testForPopupMenu:
@@ -2068,12 +2077,89 @@ testForPopupMenu:
 
 	mov	bx, handle PopupMenuResource
 	mov	dx, offset PopupMenu
-	;call	OpenWinCreateChildObject
-	call FatalError
+	mov	cx, ds:[LMBH_handle]
+	call	OpenWinCreateChildObject
 
 done:
 	ret
 OpenWinEnsureMenu	endp
+
+; ax    - offset into ds to store chunk
+; bx:dx - obj to copy
+; cx    - handle of target block
+; si    - parten object chunk
+;
+; ret ds:*si - menu created
+OpenWinCreateChildObject	proc near
+
+	; ATTENTION!! (TODO) Concurrency between different application might
+	; cause problem with this solution
+	mov	di, si
+	push	si
+	push 	cx
+	push	bx
+	mov	bx, 0
+	mov ax, TGIT_THREAD_HANDLE
+	call	ThreadGetInfo
+	pop	bx
+	call	MemModifyOtherInfo
+
+	mov	si, dx
+
+	clr	dx			;do not attempt to add new
+	mov	dx, di
+	mov	bp, mask CCF_MARK_DIRTY
+
+	; bx:si - gen tree to copy
+	; bp    - CompChildFlags
+	mov	ax, MSG_GEN_COPY_TREE
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+					;returns ^lcx:dx = handle of icon object
+	pop		bx
+	call	MemDerefDS		;Fixup LMem segment
+	pop	si
+
+	; add menu oject via one-way link
+	; Now set generic parent link for child to be OLWinClass obj.
+	; We don't want this to be a legitimate generic child of the OLWinClass
+	; object, because that might confuse applications.
+	;	*ds:si = OLWinClass (parent)
+	;	cx:dx = new child
+	;
+	;call	GenAddChildUpwardLinkOnly
+
+	; remember new menu chunk
+	call	WinOther_DerefVisSpec_DI
+	mov	ds:[di].OLWI_menu, dx
+
+	; Replace all "OLTPT_WINDOW" params in menu with the menu OD,
+	; rather than using the template ExpressMenu as the OD which had been 
+	; done previously.  5/25/94 cbh
+	;
+	push	cx, dx, bp, si, ds
+
+	; bx:si - copy if the menu
+	; cx:dx - need to be the windows
+	mov bp, bx
+	mov bx, cx
+	mov cx, si
+	mov si, dx
+	mov dx, bp
+	xchg dx, cx
+	mov	bp, OLTPT_WINDOW	; replace this constant
+
+	mov	ax, MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage
+	pop	cx, dx, bp, si, ds
+
+
+	; ensure *ds:si
+	;mov	si, dx	
+
+	ret
+OpenWinCreateChildObject	endp
 
 endif		;END of OPEN LOOK specific code -------------------------------
 

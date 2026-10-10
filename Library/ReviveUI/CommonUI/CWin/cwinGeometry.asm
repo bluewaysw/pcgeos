@@ -872,6 +872,12 @@ ifdef OWA_FOOTER
 endif
 
 noFooter:
+
+	test	ds:[di].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
+	jz	afterCustomWindow
+	clr	cx, dx
+
+afterCustomWindow:
 	call	ReturnAxBpCxDx		;put margins in right registers
 	ret
 
@@ -910,23 +916,19 @@ ReturnAxBpCxDx	proc	near
 	; Move margins from dl/dh/cl/ch to bp/dx/ax/cx.
 	;
 	clr	ax
-	mov	al, cl
+	mov	al, dl
 	tst	al
 	jns	1$
 	dec	ah
 1$:
 	mov	bp, ax
 	
-	mov ax, dx
-
-	mov	dl, ch
+	mov	dl, dh
 	clr	dh
 	tst	dl
 	jns	2$
 	dec	dh
 2$:
-	mov cx, ax
-	
 	clr	ax
 	mov	al, cl
 	tst	al

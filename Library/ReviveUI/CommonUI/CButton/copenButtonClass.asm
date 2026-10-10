@@ -781,6 +781,11 @@ endif		;--------------------------------------------------------------
 
 if _OL_STYLE ;-------------------------------------------------------------
 
+	;test	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
+	;jz	500$
+	;add	ax,BUTTON_INSET_X * 2
+	;add	ax,BUTTON_INSET_X * 2
+500$:
 	add	ax,BUTTON_INSET_X * 2
 5$:
 endif

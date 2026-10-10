@@ -1521,7 +1521,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _PM	; We will be adding this window to the window list --------------------
+if _ISUI or _PM	; We will be adding this window to the window list --------------------
 
 OLBaseWinSetWindowEntryMoniker	method OLBaseWinClass, 
 				MSG_OL_BASE_WIN_SET_WINDOW_ENTRY_MONIKER
@@ -4039,7 +4039,12 @@ if EVENT_MENU
 	sub	ds:[di].OLWI_titleBarBounds.R_right, bp
 endif
 else
+if _OPEN_LOOK
+	add bp, OLS_WIN_HEADER_FIELD_ICON_RIGHT_MARGIN
+	sub	ds:[di].OLWI_titleBarBounds.R_right, bp
+else
 	add	ds:[di].OLWI_titleBarBounds.R_left, bp
+endif
 endif
 
 done:
@@ -5109,10 +5114,16 @@ endif
 noRightGroup:
 	pop	bx, si
 else
+if _OPEN_LOOK
+	mov	ax, ds:[di].OLWI_titleBarBounds.R_right
+	mov	bx, ds:[di].OLWI_titleBarBounds.R_top
+	call	OLBaseWinGetExpressMenuButtonWidth
+else
 	mov	ax, ds:[di].OLWI_titleBarBounds.R_left
 	mov	bx, ds:[di].OLWI_titleBarBounds.R_top
 	call	OLBaseWinGetExpressMenuButtonWidth	; bp = width of area
 	sub	ax, bp					; pass left edge for
+endif
 endif							; tool area
 
 	inc	bx		; One down from there, actually, seems to be
@@ -5200,6 +5211,15 @@ MO <	pop	ds							>
 MO <	jnz	20$				;   skip if so...	>
 MO <	sub	cx, 2				; Nest icon inside resize  >
 MO <20$:					;   display		   >
+
+OL <	push	ds							>
+OL <	mov	ax, segment dgroup					>
+OL <	mov	ds, ax							>
+OL <	test	ds:[moCS_flags], mask CSF_BW	; Is this a B&W display?>
+OL <	pop	ds							>
+OL <	jnz	20$				;   skip if so...	>
+OL <	sub	cx, 2				; Nest icon inside resize  >
+OL <20$:					;   display		   >
 
 PMAN <	push	ds							>
 PMAN <	mov	ax, segment dgroup					>

@@ -2937,7 +2937,7 @@ endif
 					 mask OLBMA_CAN_CLIP_MONIKER_HEIGHT)
 	jz	20$
 15$:
-	or	ss:[bp].OMA_drawMonikerFlags, mask DMF_CLIP_TO_MAX_WIDTH
+	;or	ss:[bp].OMA_drawMonikerFlags, mask DMF_CLIP_TO_MAX_WIDTH
 20$:
 if _JEDIMOTIF
 	;

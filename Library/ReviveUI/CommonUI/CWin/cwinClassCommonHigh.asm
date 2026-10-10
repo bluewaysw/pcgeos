@@ -1437,6 +1437,7 @@ endif	; _GCM
 	;
 CUAS <	call	OpenWinEnsureSysMenu					     >
 CUAS <	call	OpenWinEnsureSysMenuIcons				     >
+;OLS <	call	OpenWinEnsureMenu							 >
 	;
 	; Now that we have setup the system menu, we can go ahead and 
 	; find the title monikers for OLMenued windows.  (And destroy

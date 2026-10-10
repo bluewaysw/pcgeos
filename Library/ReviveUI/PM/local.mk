@@ -20,14 +20,17 @@
 ###############################################################################
 
 # search inside COMMENT blocks for tags
-PCTAGSFLAGS	+= -c
+#PCTAGSFLAGS	+= -c
 
 PROTOCONST	= SPUI
+
+GEODE		= pm
 
 #
 #	Pass flag to MASM to define the specific UI that we're making
 #
-ASMFLAGS	+= -DPM -wprivate -wunref -wunref_local
+#ASMFLAGS	+= -DPM -wprivate -wunref -wunref_local
+ASMFLAGS	+= -DPM
 
 UICFLAGS	+= -DPM
 

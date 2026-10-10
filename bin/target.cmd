@@ -8,7 +8,7 @@ IF NOT DEFINED BASEBOX (SET BASEBOX=dosbox)
 set OLD_PATH=%cd%
 cd /D %LOCAL_ROOT%\gbuild\localpc 
 del /F %LOCAL_ROOT%\gbuild\localpc\IPX_STAT.txt
-start /B %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf -noconsole
+start %BASEBOX% -conf %ROOT_DIR%\bin\basebox.conf -conf %LOCAL_ROOT%\basebox_user.conf
 cd %OLD_PATH%
 @cls
 :waitForFile
@@ -28,4 +28,5 @@ IF EXIST "%USERPROFILE%\swat.rc" (
 ) ELSE (
    set CUSTOM_TCL_LOCATION=
 )
+
 swat -net 00000000:7F000001%IPX_PORT%:003F

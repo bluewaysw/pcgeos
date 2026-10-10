@@ -3,15 +3,15 @@
 # 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
 #
 # PROJECT:	PC GEOS
-# MODULE:	PM -- Makefile
+# MODULE:	Motif -- Makefile
 # FILE: 	Makefile
-# AUTHOR: 	Gene Anderson, Mon Jan 26 22:51:40 PST 1998
+# AUTHOR: 	Gene Anderson, Mon Jan 26 22:50:05 PST 1998
 #
 # TARGETS:
 # 	Name			Description
 #	----			-----------
-#	pmec.geo		create an error-checking version
-#	pm.geo		create a non error-checking version
+#	motifec.geo		create an error-checking version
+#	motif.geo		create a non error-checking version
 #	full			create both of the above, plus tags
 #	part			create only the error-checking version
 #	tags			create a tags file from all the sources

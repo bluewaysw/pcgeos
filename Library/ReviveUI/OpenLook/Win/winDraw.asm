@@ -223,6 +223,8 @@ OpenWinDraw	method	OLWinClass, MSG_VIS_DRAW
 	jmp	short afterBackground
 
 noShadow:
+	test	ds:[bp].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW			
+	jnz	noBackground
 	call	OpenWinDrawBackground	;draw flat background without OL shadow
 
 afterBackground:
@@ -237,6 +239,7 @@ afterBackground:
 	call	OpenWinDrawHeaderMarks	;draw close mark, pushpin
 	call	OpenWinDrawHeaderTitle	;draw title moniker
 
+noBackground:
 	;draw long term message
 
 	;draw status message
@@ -635,7 +638,7 @@ OpenWinDrawHeaderTitle	proc	near
 	call	OpenWinGetHeaderTitleBounds
 	sub	cx, ax			;set cx = width of title area
 	inc	cx
-
+	push cx
 	;point to generic instance data and grab textual(?) moniker
 
 	mov	bp, di			;gstate in bp 
@@ -650,6 +653,7 @@ OpenWinDrawHeaderTitle	proc	near
 
 ;Removed for now. -Eric
 ;	call	ChrisFontHack		;lower title if font size = 12
+	inc bx
 
 	mov	dx, ax			;dx = width of title area		
 	sub	dx, cx			;dx = amount of space around text (in X)
@@ -666,11 +670,12 @@ OpenWinDrawHeaderTitle	proc	near
 	pop	cx			;get left bound for title
 	add	dx, cx
 
-	mov	cl, (J_LEFT shl offset DMF_X_JUST) or \
-		(J_LEFT shl offset DMF_Y_JUST) or \
-		mask DMF_CLIP_TO_MAX_WIDTH				      
+	;mov	cl, (J_LEFT shl offset DMF_X_JUST) or \
+	;	(J_LEFT shl offset DMF_Y_JUST) or \
+	;	mask DMF_CLIP_TO_MAX_WIDTH				      
 	pop	di			 ;restore gstate
-		
+	pop	cx			 ; title width for maxium
+
 	push	bp
 	sub	sp, size DrawMonikerArgs		;make room for args
 	mov	bp, sp					;pass pointer in bp
@@ -708,7 +713,7 @@ done:
 
 OpenWinDrawHeaderTitle	endp
 
-;ChrisFontHack	proc	near
+ChrisFontHack	proc	near
 ;	; temporary hack (cbh) -- the 10 point font has slightly strange 
 ;	; dimensions, and getting the font's size (rather than its true box
 ;	; height) to calculate the header height exasperates things.  For now,
@@ -719,7 +724,7 @@ OpenWinDrawHeaderTitle	endp
 ;	inc	bx			;else bump the height
 ;5$:
 ;	ret
-;ChrisFontHack	endp
+ChrisFontHack	endp
 
 
 COMMENT @----------------------------------------------------------------------
@@ -855,7 +860,7 @@ OpenWinDrawBitmapPlane	proc	near
 	mov	ax, dx			;get X position
 	clr	cx
 	clr	dx
-	call	GrDrawBitmap		;draw dark plane of bitmap
+	call	GrFillBitmap		;draw dark plane of bitmap
 	mov	dx, ax			;restore X position value
 	pop	cx
 done:

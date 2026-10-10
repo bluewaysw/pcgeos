@@ -39,7 +39,7 @@ _Mouse			= 1
 ; The following constants are used in mouseCommon.asm -- see that
 ; file for documentation.
 ;
-MOUSE_NUM_BUTTONS = 3	; Assume 3 for now -- we'll set it in MouseDevInit
+MOUSE_NUM_BUTTONS = 2	; Assume 3 for now -- we'll set it in MouseDevInit
 MOUSE_CANT_SET_RATE	=1	; Microsoft driver doesn't specify a function
 				;  to change the report rate.
 MOUSE_SEPARATE_INIT	= 1	; We use a separate Init resource
