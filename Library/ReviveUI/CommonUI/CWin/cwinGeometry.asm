@@ -878,6 +878,7 @@ noFooter:
 	clr	cx, dx
 
 afterCustomWindow:
+	xchg	cx, dx			;assume horizontal, switch registers
 	call	ReturnAxBpCxDx		;put margins in right registers
 	ret
 

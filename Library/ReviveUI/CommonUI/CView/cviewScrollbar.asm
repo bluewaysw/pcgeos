@@ -947,7 +947,52 @@ EC <	ERROR_Z	OL_ERROR						>
 GetParentValueField	endp
 endif
 
-endif		;END of MOTIF/CUA specific code -----------------------
+elif _OL_STYLE		;START of OpenLook code ----------------------------------
+
+COMMENT @----------------------------------------------------------------------
+
+METHOD:		OLScrollbarRecalcSize -- MSG_VIS_RECALC_SIZE for OpenLook
+
+DESCRIPTION:	OpenLook scrollbars have a fixed width. Their length is at
+		least that of the minimum scrollbar (elevator only), then of
+		the abbreviated one (elevator and anchors), then of the full
+		one (with cable and proportion indicator).
+
+		Restored from the 1992 CommonUI (OLScrollbarRerecalcSize).
+
+PASS:		*ds:si - instance data
+		ds:di	- vis instance data
+		cx, dx  - RecalcSizeArgs
+
+RETURN:		cx, dx  - size to use
+
+------------------------------------------------------------------------------@
+OLScrollbarRecalcSize	method dynamic	OLScrollbarClass, \
+						MSG_VIS_RECALC_SIZE
+	ornf	ds:[di].OLSBI_state, mask OLSS_INVALID_OFFSETS or \
+				     mask OLSS_INVALID_IMAGE
+	call	SwapIfHorizontal		;dx <- length
+	mov	cx, SCROLLBAR_WIDTH		;width always this
+	andnf	dx, not mask RSA_CHOOSE_OWN_SIZE
+	cmp	dx, MIN_HEIGHT			;below minimum?
+	ja	checkAbbr
+	mov	dx, MIN_HEIGHT			;if so, use minimum
+	jmp	short swapBack
+checkAbbr:
+	cmp	dx, ABBR_HEIGHT			;below abbreviated?
+	ja	checkFull
+	mov	dx, ABBR_HEIGHT			;if so, use abbreviated
+	jmp	short swapBack
+checkFull:
+	cmp	dx, MIN_FULL_HEIGHT		;below full?
+	ja	swapBack
+	mov	dx, MIN_FULL_HEIGHT		;if so, use full
+swapBack:
+	call	SwapIfHorizontal
+	ret
+OLScrollbarRecalcSize	endm
+
+endif		;END of MOTIF/CUA/OpenLook specific code ---------------
 
 
 Geometry ends
@@ -1058,7 +1103,11 @@ drawIt:
 
 MO   <	call	SetElevLen			;get length of elevator >
 PMAN <	call	SetElevLen			;get length of elevator >
+OLS  <	call	SetPropIndLen			;length of prop indicator>
 	call	SetElevOffset			;resize these
+OLS  <	call	SetPropIndOffset		;center it on elevator   >
+OLS  <	mov	di, ds:[si]					>
+OLS  <	add	di, ds:[di].Vis_offset				>
 	andnf	ds:[di].OLSBI_state, not (mask OLSS_INVALID_OFFSETS)
 
 validOffsets2:
@@ -1067,6 +1116,7 @@ validOffsets2:
 CUA <	CallMod	DrawBWScrollbar						>
 MO <   	call	DrawScrollbar						>
 PMAN <	call	DrawScrollbar						>
+OLS <	call	DrawOLScrollbar						>
 						;note: si trashed at this point.
 						;so is ds, for that matter.
 exit:
@@ -1194,6 +1244,7 @@ endif
 
 NOT_MO <	sub	cx, MO_UNUSED_HEIGHT				>
 PMAN   <	sub	cx, MO_UNUSED_HEIGHT				>
+OLS    <	sub	cx, UNUSED_HEIGHT		;ignore anchors		>
 
 MO     <	push	ax						>
 MO     <	mov	ax, ds:[di].OLSBI_arrowSize			>
@@ -2487,37 +2538,36 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@
 
 if _OL_STYLE ;================================
-
-   	;NOT updated for 32 bits!!!
 	
 SetPropIndLen	proc	near
+	uses	bp
 	class	OLScrollbarClass
-	
-	mov	di, ds:[si]			
-	add	di, ds:[di].Gen_offset
-	;mov	dx, ds:[di].GRI_maxValue     ;get range
-	mov	di, ds:[si]			
+	.enter
+	;
+	; Length of the proportion indicator: the visible part of the
+	; range, relative to the scroll area (like SetElevLen for Motif),
+	; but never smaller than the elevator plus a bit.
+	;
+	mov	bp, GVT_RANGE_LENGTH
+	mov	ax, MSG_GEN_VALUE_GET_VALUE_RATIO
+	call	ObjCallInstanceNoLock	     ;dx.cx <- visible part / range
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	;mov	cx, ds:[di].OLSBI_winLen     ;get length of window
-      	mov	ax, ds:[di].OLSBI_scrArea    ;get area in scroll bar
-	cmp	dx, cx			     ;see if scrollable
-	jbe	setElevHt	     	     ;nope, propIndLen = scrArea
-	cmp	ax, ELEV_HEIGHT+4	     ;see if small scroll area	    
+	mov	ax, ds:[di].OLSBI_scrArea    ;get area in scroll bar
+	tst	dx			     ;everything visible?
+	jnz	setElevHt		     ;yes, propIndLen = scrArea
+	cmp	ax, ELEV_HEIGHT+4	     ;see if small scroll area
 	jbe	setElevHt		     ;yes, just use scroll area
-
-	mul	cx			     ;result in dx:ax
-	mov	di, ds:[si]			
-	add	di, ds:[di].Gen_offset
-	;div	ds:[di].GRI_maxValue	     ;result in ax
-
-	cmp	ax, ELEV_HEIGHT+4	     ;smaller than elevator?	    
-	jae	setElevHt 	     	     ;no, branch
-	mov	ax, ELEV_HEIGHT+4	     ;else use this size	    
-
+	mov	bx, ax
+	mov_tr	ax, cx
+	mul	bx			     ;dx <- scrArea * ratio
+	mov_tr	ax, dx
+	cmp	ax, ELEV_HEIGHT+4	     ;smaller than elevator?
+	jae	setElevHt		     ;no, branch
+	mov	ax, ELEV_HEIGHT+4	     ;else use this size
 setElevHt:
-	mov	di, ds:[si]			
-	add	di, ds:[di].Vis_offset
-	mov	ds:[di].OLSBI_propIndLen,ax  ;store
+	mov	ds:[di].OLSBI_propIndLen, ax ;store
+	.leave
 	ret
 SetPropIndLen	endp
 

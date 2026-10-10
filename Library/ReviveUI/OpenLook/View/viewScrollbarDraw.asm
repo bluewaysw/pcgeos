@@ -747,6 +747,86 @@ TwoSwapIfHoriz	endp
 
 
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DrawOLScrollbar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw an OpenLook scrollbar. Connects the common
+		OLScrollbarDraw to the GEOS 1.x drawing code in this file:
+		clear the scrollbar, set up the trace arguments from the
+		instance data (SetScrollDrawParams) and trace it in color or
+		black and white (DrawColorScrollbar, DrawBWScrollbar).
+
+CALLED BY:	OLScrollbarDraw
+
+PASS:		*ds:si	- scrollbar
+		di	- gstate
+		cl	- DrawFlags
+		ch	- 0 if drawing, -1 if updating
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, bp, si, es
+
+PSEUDO CODE/STRATEGY:
+	The 1.x code redrew only the cables on updates (UpdateScroll) and
+	whited out the old elevator. Here the whole scrollbar is cleared
+	and traced again, which is simpler and fast enough.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived OpenLook)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DrawOLScrollbar	proc	near
+	class	OLScrollbarClass
+
+	sub	sp, size ScrollArgs
+	mov	bp, sp				;ss:bp <- trace arguments
+	push	si				;save chunk
+	;
+	; Clear the scrollbar in the window color (white in black and
+	; white).
+	;
+	call	OpenCheckIfBW			;carry set if B/W
+	pushf
+	push	ds
+	mov	ax, segment moCS_flags
+	mov	ds, ax
+	mov	al, ds:[moCS_dsLightColor]
+	pop	ds
+	jnc	haveBackColor
+	mov	al, C_WHITE
+haveBackColor:
+	mov	ah, CF_INDEX
+	call	GrSetAreaColor
+	mov	al, SDM_100
+	call	GrSetAreaMask
+	mov	bx, ds:[si]
+	add	bx, ds:[bx].Vis_offset
+	mov	ax, ds:[bx].VI_bounds.R_left
+	mov	cx, ds:[bx].VI_bounds.R_right
+	mov	dx, ds:[bx].VI_bounds.R_bottom
+	mov	bx, ds:[bx].VI_bounds.R_top
+	call	GrFillRect
+	;
+	; Trace arguments from the instance data, then trace.
+	;
+	mov	si, ds:[si]			;ds:si <- instance
+	call	SetScrollDrawParams		;cx, dx <- where to draw
+	popf
+	jc	drawBW
+	call	DrawColorScrollbar
+	jmp	short done
+drawBW:
+	call	DrawBWScrollbar
+done:
+	pop	si
+	add	sp, size ScrollArgs
+	ret
+DrawOLScrollbar	endp
+
 ScrollbarCommon	ends
 
 			

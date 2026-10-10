@@ -3360,7 +3360,7 @@ if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
 	jz	afterShadowTest
 
 makeTransparent:
-	ORNF	ah, mask WCF_TRANSPARENT or WCF_PLAIN
+	ORNF	ah, mask WCF_TRANSPARENT
 afterShadowTest:
 endif			;------------------------------------------------------
 

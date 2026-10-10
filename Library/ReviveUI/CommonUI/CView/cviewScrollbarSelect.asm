@@ -132,7 +132,7 @@ REVISION HISTORY:
 
 NO_XOR_ELEVATOR		=	-1		;used in OLSBI_xorElevOff
 			
-if _CUA_STYLE		;START of MOTIF/PM/CUA specific code -----
+if _CUA_STYLE or _OL_STYLE	;START of MOTIF/PM/CUA/OpenLook code -----
 
 OLScrollbarSelect	method OLScrollbarClass, MSG_META_START_SELECT,   \
 						 MSG_META_END_SELECT,	\
@@ -206,6 +206,7 @@ endif
 
 NOT_MO<	mov	ax, MO_SCR_AREA_MARGIN		;assume a normal scrollbar>
 PMAN<	mov	ax, MO_SCR_AREA_MARGIN		;assume a normal scrollbar>
+OLS<	mov	ax, ANCHOR_HEIGHT		;scroll area starts after anchor>
 MO<	mov	ax, ds:[di].OLSBI_arrowSize				>
 
 if	_MOTIF
@@ -261,7 +262,8 @@ PMAN <	cmp	ds:[di].OLSBI_elevOffset, NO_THUMB_ELEV_OFFSET		>
 	je	skipCheck
 
 	push	cx
-	mov	cx, ds:[di].OLSBI_elevLen
+CUAS <	mov	cx, ds:[di].OLSBI_elevLen					>
+OLS  <	mov	cx, ds:[di].OLSBI_propIndLen	;indicator fills the area?	>
 	cmp	cx, ds:[di].OLSBI_scrArea
 	pop	cx
 	jz	processed			;exit if nothing to scroll
@@ -351,7 +353,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if	_CUA_STYLE
+if	_CUA_STYLE or _OL_STYLE
 	
 OLScrollbarStartPress	proc	near
 	;
@@ -480,7 +482,7 @@ exit:						;Say processed if ptr in bounds
 	ret
 OLScrollbarStartPress	endp
 
-endif	; _CUA_STYLE
+endif	; _CUA_STYLE or _OL_STYLE
 	
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -509,7 +511,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if	_CUA_STYLE 
+if	_CUA_STYLE or _OL_STYLE
 	
 OLScrollbarEndPress	proc	near
 	mov	di, ds:[si]
@@ -568,10 +570,14 @@ exit:						;Say processed if ptr in bounds
 	ret
 OLScrollbarEndPress	endp
 
-endif	; _CUA_STYLE
+endif	; _CUA_STYLE or _OL_STYLE
 
 	
-if	_OL_STYLE
+;
+; The GEOS 1.x OpenLook version of OLScrollbarEndPress. The revived
+; OpenLook uses the common one above (with the common start press).
+;
+if	0
 	
 OLScrollbarEndPress	proc near
 	call	CancelScrollbarTimer		;turn off timer
@@ -1277,6 +1283,86 @@ DoScrollCriteria	endp
 
 endif		;END of PM specific code --------------------
 
+if _OL_STYLE	;START of OpenLook specific code -----
+
+COMMENT @----------------------------------------------------------------------
+
+ROUTINE:	DoScrollCriteria (OpenLook)
+
+SYNOPSIS:	Which part of an OpenLook scrollbar is at a position: the
+		anchors at the ends, the cable above and below the elevator
+		(page up/down), and the up arrow, drag area and down arrow of
+		the elevator. Abbreviated scrollbars have no drag area, minimum
+		ones no anchors either.
+
+		Restored from the 1992 CommonUI.
+
+PASS:		*ds:si - scrollbar
+		ds:di	- vis instance
+		cx	- offset across the scrollbar
+		dx	- offset along the scrollbar, from the start of the
+			  scroll area (after the top anchor)
+
+RETURN:		al	- OLSS_DOWN_FLAGS value, 0 if outside
+
+DESTROYED:	nothing
+
+------------------------------------------------------------------------------@
+DoScrollCriteria	proc	near
+	class	OLScrollbarClass
+	push	cx				;we'll be destroying this...
+	clr	al
+	cmp	cx, SCROLLBAR_WIDTH		;see if in scroll bar bounds
+	ja	exit				;not in bounds, exit
+	mov	al, OLSS_BEG_ANCHOR
+	;
+	; See if abbreviated or full...
+	;
+	mov	cx, -(ANCHOR_HEIGHT+1)		;assume abbreviated, account for
+						;  no anchor
+	cmp	ds:[di].OLSBI_scrArea, ABBR_HEIGHT-UNUSED_HEIGHT
+	jb	checkPageUp			;abbreviated, branch
+	tst	dx				;in top anchor?
+	js	exit				;yes, branch
+	mov	cx, ds:[di].OLSBI_elevOffset	;in cable area above elevator?
+checkPageUp:
+	mov	al, OLSS_PAGE_UP		;else assume in page up area
+	cmp	dx, cx
+	jl	exit				;yes, branch
+	mov	al, OLSS_INC_UP			;assume in up arrow area
+	add	cx, SCR_BUTTON_HEIGHT		;in up arrow area?
+	cmp	dx, cx
+	jl	exit				;yes, branch
+	mov	al, OLSS_DRAG_AREA		;assume in drag area
+	;
+	; Are we doing a full or abbreviated scrollbar?
+	;
+	cmp	ds:[di].OLSBI_scrArea, MIN_FULL_HEIGHT-UNUSED_HEIGHT
+	jl	checkDownArrow			;no, skip check of drag area
+	add	cx, SCR_BUTTON_HEIGHT		;in drag area?
+	cmp	dx, cx
+	jl	exit				;yes, branch
+checkDownArrow:
+	mov	al, OLSS_INC_DOWN
+	add	cx, SCR_BUTTON_HEIGHT		;in down arrow area?
+	cmp	dx, cx
+	jl	exit				;yes, branch
+	mov	al, OLSS_PAGE_DOWN		;assume in lower cable
+	mov	cx, ds:[di].OLSBI_scrArea	;get bottom of scroll area
+	cmp	dx, cx				;see if in scroll area
+	jbe	exit				;yes, branch
+	mov	al, OLSS_END_ANCHOR
+	add	cx, ANCHOR_HEIGHT+1		;else make sure in bottom anchor
+	cmp	dx, cx
+	jbe	exit				;we are, branch
+	clr	al				;else we're nowhere
+exit:
+	pop	cx				;restore cx
+	ret
+DoScrollCriteria	endp
+
+endif		;END of OpenLook specific code --------------------
+
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		CheckSpinnerAtEnd
@@ -1815,6 +1901,16 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DoEndAnchor	proc	near
+if	_OL_STYLE
+	;
+	; OpenLook: the anchor at the end goes to the end of the range.
+	;
+	mov	dx, 1				;ratio 1.0
+	clr	cx
+	mov	bp, GVT_VALUE_AS_RATIO_OF_AVAILABLE_RANGE
+	mov	ax, MSG_GEN_VALUE_SET_VALUE_FROM_RATIO
+	call	ValueSendMsg
+endif
 	ret
 DoEndAnchor	endp
 
@@ -1846,6 +1942,15 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 DoBegAnchor	proc	near
+if	_OL_STYLE
+	;
+	; OpenLook: the anchor at the start goes to the start of the range.
+	;
+	clr	dx, cx				;ratio 0
+	mov	bp, GVT_VALUE_AS_RATIO_OF_AVAILABLE_RANGE
+	mov	ax, MSG_GEN_VALUE_SET_VALUE_FROM_RATIO
+	call	ValueSendMsg
+endif
        	ret
 DoBegAnchor	endp
 
@@ -1883,7 +1988,7 @@ REVISION HISTORY:
 DoDragArea	proc	near
 	class	OLScrollbarClass
 	
-CUAS <	push	cx, dx			     ;save old position	         >
+	push	cx, dx			     ;save old position (popped at exit, all styles)
    
 	test	bp, mask BI_PRESS		
 	jnz	short exit		     ;exit if this is a press
@@ -1904,6 +2009,7 @@ CUAS <	push	cx, dx			     ;save old position	         >
 CUA <	sub 	bx, MO_THUMB_HEIGHT					   >
 MO <	sub	bx, ds:[di].OLSBI_elevLen    				   >
 PMAN <	sub	bx, ds:[di].OLSBI_elevLen    				   >
+OLS  <	sub	bx, ELEV_HEIGHT		     ;elevator length		   >
 
 	cmp	dx, bx			     ;see if over maximum
 	jbe	divide			     ;no, branch
@@ -1944,6 +2050,15 @@ if	_CUA_STYLE ;--------------------------------------------------------
 	jz	exit
 	call	FinishDrag
 
+endif ;----------------------------------------------------------------------
+if	_OL_STYLE ;--------------------------------------------------------
+	;
+	; OpenLook moves the elevator itself while dragging (no xor
+	; outline): set the value right away, the scrollbar redraws from it.
+	;
+	mov	bp, GVT_VALUE_AS_RATIO_OF_AVAILABLE_RANGE
+	mov	ax, MSG_GEN_VALUE_SET_VALUE_FROM_RATIO
+	call	ValueSendMsg
 endif ;----------------------------------------------------------------------
 
 exit:
