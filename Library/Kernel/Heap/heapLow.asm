@@ -2266,11 +2266,14 @@ ifdef PROTECTED_MODE
 	mov	ds:[di][HM_prev], si	; and next points to prev
 	pop	si, di
 	call	FreeHandle
-noMem:
 else
 	call	CombineBX
 endif
 	ret
+
+noMem:
+	; The data is gone, but the handle must still be released.
+	jmp	FreeHandle
 
 DoFreeNoDeleteSwap	endp
 
