@@ -3442,7 +3442,10 @@ EC <	call	VMCheckStrucs						>
 	call	ExitVMFile
 
 VMPop_NoExitVMFile	label 	far
-	pop	si, bx, cx, dx, di, bp, ds, es
+	; VM eviction may have freed a saved caller selector.
+	SafePop	es, cx
+	SafePop	ds, cx
+	pop	si, bx, cx, dx, di, bp
 				on_stack	retf
 EC <	call	NullSegmentRegisters					>
 FarRet	label	far
