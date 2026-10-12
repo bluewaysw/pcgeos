@@ -93,7 +93,7 @@ allow:
 	; Don't include menu bar in centering operations if the primary is
 	; being centered.
 	;
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ORNF	ds:[di].VI_geoAttrs, mask VGA_DONT_CENTER
 
@@ -140,7 +140,7 @@ REVISION HISTORY:
 	Eric	7/89		Motif extensions, more documentation
 	Doug	6/91		Added sending of MSG_SPEC_BUILD on to
 				the transient group, which was somehow left
-				out of the original code.  Caused bug in 
+				out of the original code.  Caused bug in
 				new America Online being release w/V1.2, in
 				which adopted display menus were missing after
 				restoring an iconfied instance of the app.
@@ -156,7 +156,7 @@ EC <	call	VisCheckVisAssumption	; Make sure vis data exists	>
 	jc	alreadyBuilt
 
 	call	VisSpecBuildSetEnabledState	;set enabled state correctly
-	
+
 	;add ourself to the visual world
 
 	push	bp
@@ -208,7 +208,7 @@ OLMenuBarSpecBuild	endp
 
 
 MBBuild_DerefVisSpecDI	proc	near
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	ret
 MBBuild_DerefVisSpecDI	endp
@@ -310,7 +310,7 @@ DESCRIPTION:	This procedure is called by OLMenuBarBuildInfo to see
 		is inside a GenDisplay. We want that menu to open from
 		the GenPrimary's menu bar.
 
-CALLED BY:	OLMenuBarBuildInfo	
+CALLED BY:	OLMenuBarBuildInfo
 
 PASS:
 	ds:*si	- instance data
@@ -337,7 +337,7 @@ REVISION HISTORY:
 
 OLMenuBarTestForDisplayMenu	proc	near
 	class	OLMenuBarClass
-	
+
 	test	bp, mask OLBF_MENU_IN_DISPLAY
 					;(clears carry flag)
 	jz	done			;skip if not in display (cy=0)...
@@ -404,7 +404,7 @@ OLMenuBarGetVisParent	method	dynamic OLMenuBarClass, \
 	; so that menu bar popout windows avoid expanding unnecessarily.
 	;
 	pushf					;save carry returned
-	mov	di, ds:[si]			
+	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLPOI_flags, mask OLPOF_ALLOWED
 	jz	done				; exit w/carry clear
@@ -441,7 +441,7 @@ MenuBarCommon segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuBarGetSpacing -- 
+METHOD:		OLMenuBarGetSpacing --
 		MSG_VIS_COMP_GET_CHILD_SPACING for OLMenuBarClass
 
 DESCRIPTION:	Returns spacing for the object.
@@ -452,7 +452,7 @@ PASS:		*ds:si 	- instance data
 
 RETURN:		cx 	- spacing between children
 		dx	- spacing between lines of wrapped children
-		
+
 DESTROYED:	bx, si, di, ds, es
 
 PSEUDO CODE/STRATEGY:
@@ -475,7 +475,7 @@ OLMenuBarGetSpacing	endp
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuBarGetMargins -- 
+METHOD:		OLMenuBarGetMargins --
 		MSG_VIS_COMP_GET_MARGINS for OLMenuBarClass
 
 DESCRIPTION:	Returns margins and margins for the object.
@@ -656,7 +656,7 @@ PASS:
 RETURN:		nothing
 
 DESTROYED:	everything
-	
+
 
 PSEUDO CODE/STRATEGY:
 	A presentation manager menu bar is framed by the window frame on
@@ -699,9 +699,26 @@ ISU <	mov	dl, ah				; Pass Display type in dl >
 	mov	cl, al				; Pass color scheme in cl
 						; (ax & bx get trashed)
 	;
-	; call procedure in DrawBW or DrawColor resource
+	; Normally the menu bar is a separate row and needs its inset frame.
+	; If ISUI's combined-header option is enabled, query the window because
+	; only maximized windows actually move the menu bar into the title row.
+	; Preserve the drawing arguments across that query, and skip the inset
+	; frame when the window already draws one around the combined header.
 	;
+ISU <	call	OpenCheckMenusInHeaderOnMax				>
+ISU <	jnc	drawMenuBarFrame					>
+ISU <	push	ax							>
+ISU <	push	cx							>
+ISU <	push	dx							>
+ISU <	mov	ax, MSG_OL_WIN_IS_MAXIMIZED				>
+ISU <	call	VisCallParent						>
+ISU <	pop	dx							>
+ISU <	pop	cx							>
+ISU <	pop	ax							>
+ISU <	jc	noMenuBarFrame						>
+ISU <drawMenuBarFrame:							>
 	call	DrawColorOrBWMenuBar
+ISU <noMenuBarFrame:							>
 	pop	ax, bp, si, es, cx
 
 if HIGHLIGHT_MNEMONICS	;------------------------------------------------------
@@ -791,11 +808,11 @@ endif		;CUA_STYLE -----------------------------------------------------
 endif
 
 
-if 	not NO_MENU_BAR_DRAWING		
+if 	not NO_MENU_BAR_DRAWING
 if	_MOTIF or _ISUI
-	
+
 DrawColorOrBWMenuBar	proc	far
-	cmp	dl, DC_GRAY_1			;B&W display?	          
+	cmp	dl, DC_GRAY_1			;B&W display?
 	pushf
 
 if	(0)		; just having fun with colors :)
@@ -816,8 +833,8 @@ endif
 	xchg	al, ah				;make outset rect
 	xchg	ax, bp
 	call	VisGetBounds			;get normal bounds
-	popf								  
-	jne	10$				;skip if color...         
+	popf
+	jne	10$				;skip if color...
 
 	;In B/W, do some despicable things above, left, and right of the menu
 	;  bar to make things overlap properly.
@@ -831,10 +848,10 @@ if (not _ISUI)
 	inc	cx				;right
 endif ; (not _ISUI)
 
-10$:								  
+10$:
 	call	OpenDrawRect
 done::
-	ret			
+	ret
 DrawColorOrBWMenuBar	endp
 
 endif
@@ -883,7 +900,7 @@ KbdNavigation	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuBarActivateObjectWithMnemonic -- 
+METHOD:		OLMenuBarActivateObjectWithMnemonic --
 		MSG_SPEC_ACTIVATE_OBJECT_WITH_MNEMONIC for OLMenuBarClass
 
 DESCRIPTION:	Finds any mnemonics in this branch.  If the menu bar doesn't
@@ -918,7 +935,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-OLMenuBarActivateObjectWithMnemonic	method dynamic OLMenuBarClass, 
+OLMenuBarActivateObjectWithMnemonic	method dynamic OLMenuBarClass,
 			MSG_SPEC_ACTIVATE_OBJECT_WITH_MNEMONIC
 	test	dh, mask SS_LALT or mask SS_RALT ;alt pressed, call superclass
 	jnz	callSuper
@@ -928,7 +945,7 @@ OLMenuBarActivateObjectWithMnemonic	method dynamic OLMenuBarClass,
 	call	VisCallParent			;see if menu bar has focus
 	pop	cx, dx, bp
 	jnc	exit				;it don't, exit
-	
+
 callSuper:
 	mov	ax, MSG_SPEC_ACTIVATE_OBJECT_WITH_MNEMONIC
 	mov	di, offset OLMenuBarClass
@@ -945,7 +962,7 @@ MenuBarCommon	segment resource
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuBarRecalcSize -- 
+METHOD:		OLMenuBarRecalcSize --
 		MSG_VIS_RECALC_SIZE for OLMenuBarClass
 
 DESCRIPTION:	Recalcs size for the menu bar.
@@ -958,7 +975,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		cx, dx - size to use
 		ax, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -991,10 +1008,21 @@ OLMenuBarRecalcSize	method dynamic	OLMenuBarClass, \
 	pop	ax
 	jnc	20$
 	push	ax
+	push	cx
+	;
+	; Use title bounds only when both icon reservations fit the width.
+	;
 	mov	ax, MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 	call	VisCallParent
 	sub	cx, ax				;subtract left icon widths
+	jc	restoreWidth
 	sub	cx, bp				;and right icon widths
+	jc	restoreWidth
+	add	sp, size word			;discard saved width
+	jmp	short widthDone
+restoreWidth:
+	pop	cx				;ignore impossible title bounds
+widthDone:
 	pop	ax
 20$:
 	call	MenuBarPassMarginInfo
@@ -1007,7 +1035,7 @@ OLMenuBarRecalcSize	endm
 
 COMMENT @----------------------------------------------------------------------
 
-METHOD:		OLMenuBarPositionBranch -- 
+METHOD:		OLMenuBarPositionBranch --
 		MSG_VIS_POSITION_BRANCH for OLMenuBarClass
 
 DESCRIPTION:	Positions a branch.
@@ -1021,7 +1049,7 @@ PASS:		*ds:si 	- instance data
 RETURN:		nothing
 		ax, cx, dx, bp - destroyed
 
-ALLOWED TO DESTROY:	
+ALLOWED TO DESTROY:
 		bx, si, di, ds, es
 
 REGISTER/STACK USAGE:
@@ -1054,10 +1082,10 @@ OLMenuBarPositionBranch	method dynamic	OLMenuBarClass, \
 	push	ax
 	mov	ax, MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS
 	call	VisCallParent
-	mov	cx, ax				;use title left edge 
+	mov	cx, ax				;use title left edge
 	pop	ax
 20$:
-	call	MenuBarPassMarginInfo	
+	call	MenuBarPassMarginInfo
 
 	call	VisCompPosition
 
@@ -1106,7 +1134,7 @@ MenuBarPassMarginInfo	endp
 
 ; I can find no need whatso-ever for this -- superclasses in the spui don't
 ; use these messages, & the VisClass default handler just sends them on to
-; the visible parent, which is all that OLCI_visParent it.  Let's give it 
+; the visible parent, which is all that OLCI_visParent it.  Let's give it
 ; a shot -- Doug 2/5/93
 ;
 ;
