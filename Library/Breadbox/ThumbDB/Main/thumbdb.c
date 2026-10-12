@@ -6,6 +6,7 @@
 #include <thumbdb.h>
 #include <library.h>
 #include <graphics.h>
+#include <gstring.h>
 #include <Ansi/string.h>
 #include <sem.h>
 #include <dbase.h>
@@ -201,6 +202,10 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
     MemHandle mem;
     byte *ptr;
     byte type;
+    Rectangle sourceBounds;
+    GStateHandle sourceGString = 0;
+    GSRetType drawResult;
+    word element;
     WWFixedAsDWord sx, sy;
     VMBlockHandle uncompact;
     GStateHandle gstate;
@@ -231,70 +236,111 @@ ThumbCreateItem(FileLongName name, dword size, FileDateAndTime date,
 
     if(ty == TST_HUGE_BITMAP)
     {
-/*****  extended graphics library */
         ptr = VMLock(file, block, &mem);
-
         width = ptr[0x1a]+256*(ptr[0x1b]);
         height = ptr[0x1c]+256*(ptr[0x1d]);
         type = ptr[0x1f] & 7;
         VMUnlock(mem);
-/*****/
-
-        /* creating thumbnail */
-        sx=GrSDivWWFixed(MakeWWFixed(THUMB_WIDTH), MakeWWFixed(width));
-        sy=GrSDivWWFixed(MakeWWFixed(THUMB_HEIGHT), MakeWWFixed(height));
-
-        /* bigger scaling is the used scale in sx */
-        if(sx > sy)
-            sx = sy;
-
-        size_x = IntegerOf(GrMulWWFixed(MakeWWFixed(width),sx));
-        if(size_x == 0) size_x = 1;
-        size_y = IntegerOf(GrMulWWFixed(MakeWWFixed(height),sx));
-        if(size_y == 0) size_y = 1;
-
-        if(type == BMF_24BIT)
-            type = BMF_8BIT;
-        
-        uncompact = GrCreateBitmap(type, size_x, size_y,
-                        thumbDBFile, 0, &gstate);
-
-        GrApplyScale(gstate, sx, sx);
-        GrDrawHugeBitmap(gstate, 0, 0, file, block);
-        GrDestroyBitmap(gstate, BMD_LEAVE_DATA);
-
-        compact = GrCompactBitmap(thumbDBFile, uncompact,
-                                                thumbDBFile);
-
-        VMFreeVMChain(thumbDBFile,
-                            VMCHAIN_MAKE_FROM_VM_BLOCK(uncompact));
-  
-        /* transfer the standard data */
-        initItem.TDBI_bitmap.B_width = size_x ;
-        initItem.TDBI_bitmap.B_height = size_y ;
-        initItem.TDBI_bitmap.B_compact = BMC_PACKBITS ;
-        initItem.TDBI_bitmap.B_type = type;
-
-        /* get bitmap data size */
-        loopCount = 0 ;        
-        while(loopCount < size_y) {
-        
-            byte *p_data ;
-
-            HugeArrayLock(thumbDBFile, compact, loopCount, (void**) &p_data, &elemSize) ;
-
-            bitmapSize += elemSize ;
-
-            HugeArrayUnlock(p_data) ;
-            
-            loopCount++ ;
+    }
+    else if(ty == TST_GSTRING)
+    {
+        sourceGString = GrLoadGString(file, GST_VMEM, block);
+        if((sourceGString == 0) ||
+           !GrGetGStringBounds(sourceGString, 0, 0, &sourceBounds))
+        {
+            if(sourceGString != 0)
+                GrDestroyGString(sourceGString, 0, GSKT_LEAVE_DATA);
+            ThreadReleaseThreadLock(thumbLockSem);
+            return(TE_THUMBNAIL_NOT_FOUND);
         }
+        width = sourceBounds.R_right - sourceBounds.R_left;
+        height = sourceBounds.R_bottom - sourceBounds.R_top;
+        type = BMF_8BIT;
     }
     else
     {
         ThreadReleaseThreadLock(thumbLockSem);
-
         return(TE_WRONG_SOURCE_TYPE);
+    }
+
+    if((width == 0) || (height == 0))
+    {
+        if(sourceGString != 0)
+            GrDestroyGString(sourceGString, 0, GSKT_LEAVE_DATA);
+        ThreadReleaseThreadLock(thumbLockSem);
+        return(TE_THUMBNAIL_NOT_FOUND);
+    }
+
+    /* creating thumbnail */
+    sx=GrSDivWWFixed(MakeWWFixed(THUMB_WIDTH), MakeWWFixed(width));
+    sy=GrSDivWWFixed(MakeWWFixed(THUMB_HEIGHT), MakeWWFixed(height));
+
+    /* bigger scaling is the used scale in sx */
+    if(sx > sy)
+        sx = sy;
+
+    size_x = IntegerOf(GrMulWWFixed(MakeWWFixed(width),sx));
+    if(size_x == 0) size_x = 1;
+    size_y = IntegerOf(GrMulWWFixed(MakeWWFixed(height),sx));
+    if(size_y == 0) size_y = 1;
+
+    if(type == BMF_24BIT)
+        type = BMF_8BIT;
+
+    uncompact = GrCreateBitmap(type, size_x, size_y,
+                    thumbDBFile, 0, &gstate);
+    if((uncompact == 0) || (gstate == 0))
+    {
+        if(sourceGString != 0)
+            GrDestroyGString(sourceGString, 0, GSKT_LEAVE_DATA);
+        ThreadReleaseThreadLock(thumbLockSem);
+        return(TE_THUMBNAIL_NOT_FOUND);
+    }
+
+    GrApplyScale(gstate, sx, sx);
+    if(ty == TST_HUGE_BITMAP)
+    {
+        GrDrawHugeBitmap(gstate, 0, 0, file, block);
+    }
+    else
+    {
+        drawResult = GrDrawGString(gstate, sourceGString,
+                         -sourceBounds.R_left, -sourceBounds.R_top,
+                         0, &element);
+        GrDestroyGString(sourceGString, 0, GSKT_LEAVE_DATA);
+        if(drawResult == GSRT_FAULT)
+        {
+            GrDestroyBitmap(gstate, BMD_KILL_DATA);
+            ThreadReleaseThreadLock(thumbLockSem);
+            return(TE_THUMBNAIL_NOT_FOUND);
+        }
+    }
+    GrDestroyBitmap(gstate, BMD_LEAVE_DATA);
+
+    compact = GrCompactBitmap(thumbDBFile, uncompact, thumbDBFile);
+    VMFreeVMChain(thumbDBFile, VMCHAIN_MAKE_FROM_VM_BLOCK(uncompact));
+    if(compact == 0)
+    {
+        ThreadReleaseThreadLock(thumbLockSem);
+        return(TE_THUMBNAIL_NOT_FOUND);
+    }
+
+    /* transfer the standard data */
+    initItem.TDBI_bitmap.B_width = size_x ;
+    initItem.TDBI_bitmap.B_height = size_y ;
+    initItem.TDBI_bitmap.B_compact = BMC_PACKBITS ;
+    initItem.TDBI_bitmap.B_type = type;
+
+    /* get bitmap data size */
+    loopCount = 0 ;
+    while(loopCount < size_y) {
+        byte *p_data ;
+
+        HugeArrayLock(thumbDBFile, compact, loopCount,
+                      (void**) &p_data, &elemSize) ;
+        bitmapSize += elemSize ;
+        HugeArrayUnlock(p_data) ;
+        loopCount++ ;
     }
 
     /* add the created thumbnail to the data base */

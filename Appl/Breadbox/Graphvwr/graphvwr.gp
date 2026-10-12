@@ -23,6 +23,7 @@ library ui
 library ansic
 library extui
 library color
+library svglib
 
 library giflib
 exempt giflib
@@ -30,12 +31,16 @@ exempt giflib
 library pnglib
 exempt pnglib
 
+library webplib
+exempt webplib
+
 library thumbdb
 library ijgjpeg
 
 exempt thumbdb
 exempt extui
 exempt ijgjpeg
+exempt svglib
 
 resource AppResource ui-object
 resource Interface ui-object

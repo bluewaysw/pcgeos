@@ -148,3 +148,5 @@ export     NAMEPOOLTOKENIZELENDOS
 incminor
 
 resource   FormStringCallbackMultiStrings lmem read-only shared
+incminor   HTMLImageSources
+export     PARSEANYFILEWITHIMAGESOURCES
