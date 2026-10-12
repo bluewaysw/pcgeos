@@ -98,6 +98,7 @@ static char *rcsid =
 #ifndef DELETE_ASCII
 #define DELETE_ASCII		0xd3
 #endif
+#include "cursesKeys.h"
 
 #if defined(_WIN32)
 #define _WIN32_WINNT    0x0500
@@ -658,6 +659,21 @@ CursesTstp(void)
 
     /* Redisplay the screen */
     wrefresh(curscr);
+}
+#endif
+
+#if defined(_LINUX)
+/*
+ * Set from the SIGWINCH handler and acted on by Curses_CheckResize from
+ * the main loop. The handler must not do the work itself: resizing goes
+ * through malloc and free, which are not safe to call from a signal.
+ */
+static volatile sig_atomic_t	cursesResizePending = 0;
+
+static void
+CursesResize(int sig)
+{
+    cursesResizePending = 1;
 }
 #endif
 
@@ -1809,26 +1825,67 @@ scroll(WINDOW *win)
 	 */
 	LinePtr	lp;
 
+	cursesChar    *newLine = (cursesChar *)NULL;
+
+	lp = NullLine;
+
 	if (numSaved < maxSaved) {
-	    lp = (LinePtr)malloc_tagged(sizeof(LineRec), TAG_CURSES);
-	    lp->line = win->_y[0];
-	    win->_y[0] = (cursesChar *)malloc_tagged(win->_maxx
-						     * sizeof(cursesChar),
-						     TAG_CURSES);
-	    numSaved++;
-	} else {
 	    /*
-	     * Take the last record off the end and use it.
+	     * Room for another record. Both allocations have to succeed
+	     * before anything is handed over, or we'd be left holding a
+	     * half-built record -- or worse, a window line that is now a
+	     * null pointer.
+	     */
+	    lp = (LinePtr)malloc_tagged(sizeof(LineRec), TAG_CURSES);
+	    if (lp != NullLine) {
+		newLine = (cursesChar *)malloc_tagged(win->_maxx
+						      * sizeof(cursesChar),
+						      TAG_CURSES);
+		if (newLine == (cursesChar *)NULL) {
+		    free((void *)lp);
+		    lp = NullLine;
+		}
+	    }
+
+	    if (lp != NullLine) {
+		lp->line = win->_y[0];
+		win->_y[0] = newLine;
+		numSaved++;
+	    }
+	}
+
+	if ((lp == NullLine) && (lineTail != NullLine)) {
+	    /*
+	     * Either the buffer is full or we couldn't grow it. Take the
+	     * last record off the end and use it.
 	     */
 	    cursesChar    *l;
 
 	    lp = lineTail;
 	    lineTail = lp->prev;
-	    lineTail->next = NullLine;
+	    if (lineTail != NullLine) {
+		lineTail->next = NullLine;
+	    } else {
+		lineHead = NullLine;
+	    }
 
 	    l = lp->line;
 	    lp->line = win->_y[0];
 	    win->_y[0] = l;
+	}
+
+	if (lp == NullLine) {
+	    /*
+	     * Out of memory with nothing to recycle, which can only
+	     * happen while the buffer is still empty. Scroll without
+	     * saving the line rather than dying over it; scrollnow blanks
+	     * the line it rotates to the bottom either way.
+	     */
+	    scrollnow_hideMouse(win, 1);
+#if defined(_MSDOS)
+	    CursesUpdateHighlight(1);
+#endif
+	    return;
 	}
 	/*
 	 * Link new record in at head.
@@ -2073,6 +2130,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	/*
 	 * Get to the LineRec beyond the one on the bottom of the screen
@@ -2120,6 +2184,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	/*
 	 * Trick the highlight update code into doing the right thing.
@@ -2158,6 +2229,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	/*
 	 * Get to the LineRec beyond the one on the bottom of the screen
@@ -2183,6 +2261,13 @@ CursesScrollInput(unsigned char c, CursesInputState *state)
 	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
 						   * sizeof(cursesChar),
 						   TAG_CURSES);
+	    if (junkLine == NULL) {
+		/*
+		 * Nowhere to park the line we're about to displace, so
+		 * leave the display alone rather than lose track of it.
+		 */
+		return;
+	    }
 	}
 	if (lineCur->next != NullLine) {
 	    lineCur = lineCur->next;
@@ -3395,6 +3480,22 @@ CursesInputChar(unsigned char c, CursesInputState *state)
 	    Buf_AddByte(state->input, (Byte)c);
 	    state->flags |= CISF_LINEREADY;
 	} else if (!iscntrl(c) || isspace(c)) {
+	    /*
+	     * The ctrl-modified navigation keys exist only for bind-key
+	     * handlers. If nothing is bound to one -- no source window,
+	     * say -- drop it instead of stuffing it into the input line:
+	     * the codes are >= 0x80, so the iscntrl() above lets them
+	     * through. This holds on every platform that produces them.
+	     */
+	    if ((c == CTRL_UP_ASCII) ||
+		(c == CTRL_DOWN_ASCII) ||
+		(c == CTRL_LEFT_ASCII) ||
+		(c == CTRL_RIGHT_ASCII) ||
+		(c == CTRL_HOME_ASCII) ||
+		(c == CTRL_END_ASCII))
+	    {
+		goto check_end;
+	    }
 #if defined(_WIN32)
 	    if ((c == UP_ARROW_ASCII) ||
 		(c == DOWN_ARROW_ASCII) ||
@@ -3806,6 +3907,7 @@ CursesGetEscapeChar(unsigned char *cPtr)
     return TRUE;
 }
 
+
 /***********************************************************************
  *				CursesDecodeEscape
  ***********************************************************************
@@ -3824,6 +3926,7 @@ CursesDecodeEscape(void)
     int		    button;
     int		    decoded;
     int		    digit;
+    int		    ctrl;
 
     if (!CursesGetEscapeChar(&c) || ((c != '[') && (c != 'O'))) {
 	return -1;
@@ -3842,6 +3945,8 @@ CursesDecodeEscape(void)
 		return decoded;
 	    }
 	}
+
+	ctrl = ESC_MOD_HAS_CTRL(CursesEscapeModifier(seq, i + 1));
 
 	switch (c) {
 	    case 'M':
@@ -3872,17 +3977,17 @@ CursesDecodeEscape(void)
 		}
 		return -1;
 	    case 'A':
-		return UP_ARROW_ASCII;
+		return CursesControlKey(UP_ARROW_ASCII, ctrl);
 	    case 'B':
-		return DOWN_ARROW_ASCII;
+		return CursesControlKey(DOWN_ARROW_ASCII, ctrl);
 	    case 'C':
-		return RIGHT_ARROW_ASCII;
+		return CursesControlKey(RIGHT_ARROW_ASCII, ctrl);
 	    case 'D':
-		return LEFT_ARROW_ASCII;
+		return CursesControlKey(LEFT_ARROW_ASCII, ctrl);
 	    case 'H':
-		return HOME_ASCII;
+		return CursesControlKey(HOME_ASCII, ctrl);
 	    case 'F':
-		return END_ASCII;
+		return CursesControlKey(END_ASCII, ctrl);
 	    case '~':
 		n = 0;
 		for (digit = 1; digit < i &&
@@ -3893,12 +3998,12 @@ CursesDecodeEscape(void)
 		switch (n) {
 		    case 1:
 		    case 7:
-			return HOME_ASCII;
+			return CursesControlKey(HOME_ASCII, ctrl);
 		    case 3:
 			return DELETE_ASCII;
 		    case 4:
 		    case 8:
-			return END_ASCII;
+			return CursesControlKey(END_ASCII, ctrl);
 		    case 5:
 			return PAGE_UP_ASCII;
 		    case 6:
@@ -3990,6 +4095,14 @@ CursesReadInput(int 	    stream,
 	Tcl_Eval(interp, execString, 0, NULL);
 	return;
     }
+    else if (chr == KEY_RESIZE) {
+	/*
+	 * Not a key at all -- the console was resized while we were
+	 * waiting for input.
+	 */
+	Curses_HandleResize();
+	return;
+    }
     buf[0] = chr;
     i = 1;
     if (buf[0] == '\r') {
@@ -4014,12 +4127,13 @@ CursesReadInput(int 	    stream,
     /*
      * if the low byte is zero then we have a non-ascii value, the high byte
      * is the scan code, so we translate the scan code into a non-ascii
-     * value by adding 0xff
+     * value -- usually by adding 0x80, but see CursesDecodeDosExtendedKey
+     * for the codes that would collide with control characters
      */
     i = 1;
     if (!buf[0])
     {
-	chr = 0x80 + (chr >> 8);
+	chr = CursesDecodeDosExtendedKey(chr >> 8);
     }
 #endif
 
@@ -4521,11 +4635,12 @@ CursesReadChar(int 	    stream,
     }
     /* if the low byte is zero then we have a non-ascii value, the high byte
      * is the scan code, so we translate the scan code into a non-ascii
-     * value by adding 0xff
+     * value -- usually by adding 0x80, but see CursesDecodeDosExtendedKey
+     * for the codes that would collide with control characters
      */
     if (!buf[0])
     {
-	chr = 0x80 + (chr >> 8);
+	chr = CursesDecodeDosExtendedKey(chr >> 8);
     }
 
 #endif
@@ -5209,9 +5324,9 @@ See also:\n\
 ")
 {
     int	    height;
-    LinePtr lp;
     int	    i;
     WINDOW  *w;
+    Boolean createdBorder = FALSE;
 
     if (argc != 2) {
 	Tcl_Error(interp, "Usage: wcreate <height>");
@@ -5259,6 +5374,7 @@ See also:\n\
     (void)Lst_AtEnd(windows, (LstClientData)w);
 
     if (borderWin == (WINDOW *)NULL) {
+	createdBorder = TRUE;
 	if (windowsOnTop) {
 	    borderWin = newwin(1, 0, height, 0);
 	} else {
@@ -5276,77 +5392,41 @@ See also:\n\
      * lastch
      */
     wrefresh(cmdWin);
-
     /*
-     * Shift the top lines into the save buffer.
+     * Note that the lines which fall off the top are dropped rather
+     * than pushed into the scroll buffer -- resizewin frees them.
      */
-    for (i = 0; i < height; i++) {
-	if (cmdWin->_cury == cmdWin->_maxy - 1) {
-	    /*
-	     * No more lines to biff. Save the top-most line in the scroll
-	     * buffer.
-	     */
-	    if (windowsOnTop) {
-		if (numSaved < maxSaved) {
-		    lp = (LinePtr)malloc_tagged(sizeof(LineRec), TAG_CURSES);
-		    numSaved++;
-		} else {
-		    lp = lineTail;
-		    free((void *)lp->line);
-		    lineTail = lineTail->prev;
-		    lineTail->next = NullLine;
-		}
-
-		lp->line = cmdWin->_y[i];
-		lp->prev = NullLine;
-		lp->next = lineHead;
-
-		if (lineTail != NullLine) {
-		    lineHead->prev = lp;
-		    lineHead = lp;
-		} else {
-		    lineHead = lineTail = lp;
-		}
-	    } else {
-		scroll(cmdWin);
-	    }
-	} else {
-	    if (windowsOnTop) {
-		/*
-		 * Shift the window down one line, nuking the final one.
-		 */
-		scrollnow_hideMouse(cmdWin, -1);
-	    }
-	    /*
-	     * Increase _cury to deal with subtraction when this loop is
-	     * done.
-	     */
-	    cmdWin->_cury += 1;
-	}
-    }
 
     /*
      * Adjust max and beginning y, then copy the remaining lines to the
      * top of the window -- no need to refresh since they're still the
      * same on-screen.
      */
-    cmdWin->_maxy -= height;
-    cmdWin->_cury -= height;
+    if (resizewin(cmdWin, cmdWin->_maxy-height, COLS) == (WINDOW *)ERR) {
+	LstNode	wln;
+
+	/*
+	 * Couldn't make room, so undo everything this command has done
+	 * rather than leave a window in the list that isn't on screen.
+	 */
+	wln = Lst_Member(windows, (LstClientData)w);
+	if (wln != NILLNODE) {
+	    (void)Lst_Remove(windows, wln);
+	}
+	delwin(w);
+	if (createdBorder) {
+	    delwin(borderWin);
+	    borderWin = (WINDOW *)NULL;
+	}
+	Tcl_Error(interp, "couldn't resize the command window");
+    }
     if (windowsOnTop) {
 	cmdWin->_begy += height;
-	bcopy((char *)&cmdWin->_y[height], (char *)&cmdWin->_y[0],
-	      cmdWin->_maxy * sizeof(cursesChar *));
 	/*
 	 * Shift the border to just above the command window and redraw it
 	 */
 	mvwin(borderWin, cmdWin->_begy - 1, 0);
     } else {
-	/*
-	 * Free up excess lines allocated by scrolling.
-	 */
-	for (i = cmdWin->_maxy; i < cmdWin->_maxy+height; i++) {
-	    free((void *)cmdWin->_y[i]);
-	}
 	/*
 	 * Shift the border to just below the command window and redraw it
 	 */
@@ -5525,7 +5605,6 @@ See also:\n\
 ")
 {
     LstNode 	wln, ln;
-    LinePtr 	lp;
     int	    	i;
     WINDOW  	*w;
     int	    	y;
@@ -5534,9 +5613,6 @@ See also:\n\
     int 	startX, startY, endX, endY;
     int     lines = 1;
     Boolean scrolledUp = FALSE;
-#endif
-#if defined(_WIN32)
-    int		j;
 #endif
 
     if (argc != 2) {
@@ -5649,85 +5725,13 @@ See also:\n\
      */
     if (windowsOnTop) {
 	i = cmdWin->_begy-y;
-	cmdWin->_begy = y;
-	/*
-	 * Shift the lines up to make room at the top.
-	 */
-	bcopy((char *)&cmdWin->_y[0], (char *)&cmdWin->_y[i],
-	      cmdWin->_maxy * sizeof(cursesChar *));
-	cmdWin->_maxy += i;
-	cmdWin->_cury += i;
-
-	for (lp = lineHead, i--; i >= 0; i--, lp = lineHead) {
-	    cmdWin->_y[i] = lp->line;
-	    touchline(cmdWin,i,0,cmdWin->_maxx-1);
-	    lineHead = lineHead->next;
-	    free((char *)lp);
+	if (resizewin(cmdWin, cmdWin->_maxy+i, COLS) != (WINDOW *)ERR) {
+	    mvwin(cmdWin, y, 0);
 	}
-
     } else {
 
 	i = y - cmdWin->_maxy;
-
-	/*
-	 * Scroll in the lines from the scroll buffer.
-	 */
-	if (junkLine == (cursesChar *)NULL) {
-	    junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
-						   * sizeof(cursesChar),
-						   TAG_CURSES);
-	}
-	for (lp = lineHead, i--; i >= 0; i--, lp = lineHead) {
-	    if (lp == NullLine) {
-		/*
-		 * Creation was optimized to just (visually) steal a portion
-		 * of cmdWin, rather than scrolling things off, so just give
-		 * the portion back again. The extra lines in the _y array
-		 * were freed during that transition, so we need to allocate
-		 * a new line for it.
-		 */
-#if !defined(_WIN32)
-		memset(junkLine, ' ', cmdWin->_maxx);
-#else
-		for(j=0; j<cmdWin->_maxx; j++) {
-		    makeNtcCell(&junkLine[j], ' ');
-		}
-
-#endif
-		cmdWin->_y[cmdWin->_maxy++] = junkLine;
-		junkLine = (cursesChar *)malloc_tagged(cmdWin->_maxx
-						       * sizeof(cursesChar),
-						       TAG_CURSES);
-		touchline(cmdWin,cmdWin->_maxy-1,0,cmdWin->_maxx-1);
-	    } else {
-		/*
-		 * Give scrollnow something to move around.
-		 */
-		cmdWin->_y[cmdWin->_maxy++] = junkLine;
-		/*
-		 * Scroll window down (shifts junkLine to _y[0]...).
-		 */
-		scrollnow_hideMouse(cmdWin,-1);
-		/*
-		 * Replace first line with saved line and force complete
-		 * update.
-		 */
-		cmdWin->_y[0] = lp->line;
-		touchline(cmdWin,0,0,cmdWin->_maxx-1);
-		/*
-		 * Take line out of the scroll buffer.
-		 */
-		lineHead = lineHead->next;
-		free((char *)lp);
-	    }
-	    /*
-	     * Keep _cury in the same place, relatively. Can't just add i to
-	     * it before we go through all this, as that places _cury out
-	     * of bounds and causes vscrollnow to louse things up on systems
-	     * where scrolling can't be done intelligently.
-	     */
-	    cmdWin->_cury += 1;
-	}
+	(void)resizewin(cmdWin, cmdWin->_maxy+i, COLS);
 #if defined(_MSDOS)
 	/*
 	 * Check if there's a highlight onscreen (lines <= 0) and if it
@@ -6043,6 +6047,246 @@ See also:\n\
     wrefresh(curWin);
     return(TCL_OK);
 }
+
+/***********************************************************************
+ *				CursesRedoLayout
+ ***********************************************************************
+ * SYNOPSIS:	    Lay the windows out again for the current screen size
+ * CALLED BY:	    Curses_HandleResize
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    Every window is resized to the screen width and moved
+ *	    	    to its place; cmdWin gets whatever height is left.
+ *
+ * STRATEGY:
+ *	    Walk the windows in order, stacking them from the top or the
+ *	    bottom according to windowsOnTop, then put the border and
+ *	    cmdWin after them.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+void
+CursesRedoLayout(void)
+{
+    int	    	height;
+    LstNode 	ln;
+    WINDOW  	*w;
+    int	    	y;
+    int 		i;
+
+    y = 0;
+    height = 0;
+    if (!windowsOnTop) {
+	y = LINES;
+    }
+
+    for (ln = Lst_First(windows); ln != NILLNODE; ln = Lst_Succ(ln)) {
+	w = (WINDOW *)Lst_Datum(ln);
+
+	if (resizewin(w, w->_maxy, COLS) == (WINDOW *)ERR) {
+	    /*
+	     * Leave the layout half done rather than move a window that
+	     * is still the old width onto a narrower screen, which would
+	     * have us drawing outside curscr.
+	     */
+	    return;
+	}
+	if (!windowsOnTop) {
+	    y -= w->_maxy;
+	}
+	mvwin(w, y, 0);
+	if (windowsOnTop) {
+	    y += w->_maxy;
+	}
+	height += w->_maxy;
+	wrefresh(w);
+    }
+
+    if (borderWin != NULL) {
+	if (resizewin(borderWin, borderWin->_maxy, COLS) == (WINDOW *)ERR) {
+	    return;
+	}
+	if (windowsOnTop) {
+	    mvwin(borderWin, height, 0);
+	} else {
+	    mvwin(borderWin, LINES-height-1, 0);
+	}
+
+	wclear(borderWin);
+	for (i = 0; i < COLS; i++) {
+	    waddch(borderWin, '=');
+	}
+	wrefresh(borderWin);
+	height += borderWin->_maxy;
+    }
+
+    if (resizewin(cmdWin, LINES-height, COLS) == (WINDOW *)ERR) {
+	return;
+    }
+    if (windowsOnTop) {
+	mvwin(cmdWin, height, 0);
+    } else {
+	mvwin(cmdWin, 0, 0);
+    }
+    wrefresh(cmdWin);
+}
+
+/***********************************************************************
+ *				CursesResizeScrollBuffer
+ ***********************************************************************
+ * SYNOPSIS:	    Reformat the saved lines for a new screen width
+ * CALLED BY:	    Curses_HandleResize
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    Every line in the scroll buffer is reallocated;
+ *	    	    junkLine is thrown away so it gets reallocated at the
+ *	    	    new width on next use.
+ *
+ * STRATEGY:
+ *	The lines in the scroll buffer are plain cursesChar arrays that
+ *	were allocated at whatever the width was at the time, and
+ *	CursesScrollInput installs them into cmdWin->_y as they are. Once
+ *	the screen is wider than they are, everything past their old end is
+ *	read out of bounds -- which is what you see as garbage cells after
+ *	scrolling back. So they have to be widened here, with the new cells
+ *	blanked the same way a fresh window is blanked.
+ *
+ *	If that runs out of memory the rest of the buffer is discarded
+ *	rather than left at the old width: losing scrollback is a great
+ *	deal better than reading past the end of a line.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+static void
+CursesResizeScrollBuffer(int oldCols, int newCols)
+{
+    LinePtr	    lp;
+    LinePtr	    next;
+    cursesChar	    *newBuf;
+    int		    copyCols;
+    int		    i;
+
+    if (junkLine != (cursesChar *)NULL) {
+	free((void *)junkLine);
+	junkLine = (cursesChar *)NULL;
+    }
+
+    if (oldCols == newCols) {
+	return;
+    }
+
+    copyCols = (oldCols < newCols) ? oldCols : newCols;
+
+    for (lp = lineHead; lp != NullLine; lp = lp->next) {
+	newBuf = (cursesChar *)malloc_tagged(newCols * sizeof(cursesChar),
+					     TAG_CURSES);
+	if (newBuf == (cursesChar *)NULL) {
+	    /*
+	     * Drop this line and everything behind it.
+	     */
+	    if (lp->prev != NullLine) {
+		lp->prev->next = NullLine;
+		lineTail = lp->prev;
+	    } else {
+		lineHead = lineTail = NullLine;
+	    }
+	    while (lp != NullLine) {
+		next = lp->next;
+		free((void *)lp->line);
+		free((void *)lp);
+		numSaved--;
+		lp = next;
+	    }
+	    return;
+	}
+
+	for (i = 0; i < newCols; i++) {
+#if defined(_WIN32)
+	    (void)makeNtcCell(&newBuf[i], ' ');
+#else
+	    newBuf[i] = ' ';
+#endif
+	}
+	for (i = 0; i < copyCols; i++) {
+	    newBuf[i] = lp->line[i];
+	}
+
+	free((void *)lp->line);
+	lp->line = newBuf;
+    }
+}
+
+/***********************************************************************
+ *				Curses_HandleResize
+ ***********************************************************************
+ * SYNOPSIS:	    Take note of a screen that has changed size
+ * CALLED BY:	    RpcWait, CursesReadInput, Curses_CheckResize
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    The screen and all the windows on it are resized.
+ *
+ * STRATEGY:
+ *	    reinitscr returns OK only when the size really did change and
+ *	    the screen could be resized, so there is nothing to redo
+ *	    otherwise.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+void
+Curses_HandleResize(void)
+{
+    int	    oldCols = COLS;
+
+    /*
+     * While the output buffer is scrolled back, the lines on screen
+     * belong to the scroll buffer, so cmdWin and the buffer hold the
+     * same pointers. Resizing in that state would free them twice, so
+     * put everything back where it belongs first.
+     */
+    if ((inStateTop != 0) && (inStateTop->inProc == CursesScrollInput)) {
+	CursesEndScroll(inStateTop);
+    }
+
+    if (reinitscr() == OK) {
+	CursesResizeScrollBuffer(oldCols, COLS);
+	CursesRedoLayout();
+    }
+}
+
+#if defined(_LINUX)
+/***********************************************************************
+ *				Curses_CheckResize
+ ***********************************************************************
+ * SYNOPSIS:	    Act on a SIGWINCH that arrived while we were elsewhere
+ * CALLED BY:	    RpcWait
+ * RETURN:	    Nothing
+ * SIDE EFFECTS:    The screen and all the windows on it may be resized.
+ *
+ * STRATEGY:
+ *	    The signal handler only sets a flag, since the work involves
+ *	    malloc and free. This is where the work actually happens, with
+ *	    the main loop in charge.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+void
+Curses_CheckResize(void)
+{
+    if (cursesResizePending) {
+	cursesResizePending = 0;
+	Curses_HandleResize();
+    }
+}
+#endif
 
 /***********************************************************************
  *				CursesWTopCmd
@@ -6771,10 +7015,6 @@ Curses_Init(void)
 	 */
 	Shell_Init();
     } else {
-	/*
-	 * Don't need stdscr since we do our own windows
-	 */
-	delwin(stdscr);
 
 	/*
 	 * Character-by-character and don't echo until we tell it to.
@@ -6861,7 +7101,16 @@ Curses_Init(void)
 #if defined(unix)
 	(void)signal(SIGTSTP, CursesTstp);
 #endif
-
+#if defined(_LINUX)
+	{
+		struct sigaction act, oact;
+		memset(&act, 0, sizeof(act));
+		act.sa_handler = CursesResize;
+		sigemptyset(&act.sa_mask);
+		act.sa_flags = SA_RESTART;
+		sigaction(SIGWINCH, &act, &oact);
+	}
+#endif
 	/*
 	 * Install the commands we support
 	 */

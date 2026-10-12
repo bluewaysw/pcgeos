@@ -1,0 +1,1157 @@
+/**************************************************************************
+ *
+ * PROJECT:      Bitmap Tools library
+ *
+ * FILE:         replace.goc
+ *		 Color reduction by "replace with nearest color"
+ *		 Including some special cases for Floyd-Steinberg dithering
+ *               Copyright (c) by RABE-Soft 03/2025
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 09/08/2026	Splitted from floyd.goc
+ *				Handling any case, including "no color replacement
+ *				possible/required"
+ *
+ *	Note: Comments were translated from German to English with AI support
+ *	and were not always manually reviewed in detail. Some may sound
+ *	a little odd as a result.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <Ansi/stdlib.h>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+@include <Objects/colorC.goh>
+
+
+@include "bmptools.goh"
+@include "Code/rtools.goh"
+
+
+/* ====================================================================================
+ *	We use some routines from floyd.goc
+ * ==================================================================================== */
+
+void DitherDisplayProgress(optr progressTextObj);
+void FloydTool8BitTo4Bit(byte *pixPtr, byte *fourBitPtr, int width, int maskLen);
+VMBlockHandle FloydToolConvertTo24Bit(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			optr progressText);
+VMBlockHandle FloydToolCovertMonoToColor(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int numPalColors, optr progressText);
+
+/* ====================================================================================
+ *	$ID Floyd-Steinberg: Special cases (mono and 24 bit, no dithering)
+ * ==================================================================================== */
+
+/*--------------------- FloydTool4BitLineToRGB ---------------------
+ * Purpose:      Convert a 4-bit pixel line to RGB values
+ * Parameters:	 pixelLine:  color values (palette index)
+ *		 destLine:   RGB values (return values)
+ *		 width:	     Width of the line in pixels
+ *		 palette:    color map table
+ ---------------------------------------------------------------------------*/
+void FloydTool4BitLineToRGB(byte *pixelLine, PaletteEntry *destLine,
+		int width, PaletteEntry *palette) {
+int	n;
+int idx;
+
+    for ( n = 0; n < width; n++ ) {
+	if ( n & 1 ) idx = pixelLine[n>>1] & 0x0F;
+		else idx = pixelLine[n>>1] >> 4;
+	destLine[n] = palette[idx];
+	}
+}
+
+/*--------------------- FloydTool8BitLineToRGB ---------------------
+ * Purpose:      Convert a 4-bit pixel line to RGB values
+ *		 Each color index (4 bits) is converted to three OneWordFixed values
+ *		 (2 bytes each) --> 3 words per pixel
+ * Parameters:	 pixelLine:  color values (palette index)
+ *		 destLine:   Colors as OneWordFixed values (return values)
+ *		 width:	     Width of the line in pixels
+ *		 palette:    color map table
+ ---------------------------------------------------------------------------*/
+void FloydTool8BitLineToRGB(byte *pixelLine, PaletteEntry *destLine,
+		int width, PaletteEntry *palette) {
+int	n;
+int idx;
+
+    for ( n = 0; n < width; n++ ) {
+	idx = pixelLine[n];
+	destLine[n] = palette[idx];
+	}
+}
+
+/*--------------------- FloydToolConvertTo24Bit ---------------------
+ * Purpose:	Convert an image to a 24 bit (true color) image
+ * Context:	Handles a "no dither required" special case for BTDitherByFloydSteinberg()
+ * Strategy:
+ * Parameters:	srcFile, srcBitmap: bitmap to convert
+ *		destFile: 	VMFile for new bitmap
+ *		progressText: text object to print out "progress dots"
+ * Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle FloydToolConvertTo24Bit(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			optr progressText) {
+VMBlockHandle  newBitmap;
+
+int	width, height, size, format, srcColors, compact, maskLen;
+PaletteEntry *srcPalette;
+byte *srcMaskPtr, *srcDataPtr;
+
+int bufferSize, destFormat, line;
+byte *destMaskPtr, *destDataPtr;
+
+    /*
+     * get important information, handle special cases and do error check
+     */
+    format = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, &compact);
+    if ( compact ) return 0;
+
+    srcColors = format & BMT_FORMAT;
+    if ( srcColors == BMF_24BIT ) return BTCopyBitmap(srcFile, destFile, srcBitmap); /* nice case :-) */
+    if ( srcColors == BMF_MONO ) return  FloydToolCovertMonoToColor(srcFile, srcBitmap, destFile, BMF_24BIT, 0, 0, progressText);
+
+    destFormat = BMF_24BIT;
+    if ( format & BMT_MASK ) { maskLen = (width+7)/8; destFormat |= BMT_MASK; }
+		    	else { maskLen = 0; }
+
+
+    /*
+     * Create a new bitmap with a height of zero
+     */
+    newBitmap = BTCreateOffscreenBitmap(destFile,
+		    destFormat | BMT_HUGE | BMT_COMPLEX, width, 0/*height*/, NULL /*palette*/ );
+    if (!newBitmap) return 0;
+    BTSetBitmapHeight(destFile, newBitmap, height);
+
+    /*
+     * Lock source palette
+     */
+    if ( format & BMT_PALETTE ) {
+	int numColors = (srcColors == BMF_4BIT) ? 16 :  256;
+	srcPalette = malloc(numColors*sizeof(PaletteEntry));
+	BTGetBitmapPalette(srcFile, srcBitmap, srcPalette, numColors);
+    } else {
+	srcPalette = BTLockGEOSStandardPalette();
+    }
+
+
+    /*
+     * allocate memory - using 3 bytes per pixel + mask size (if we have one)
+     */
+    bufferSize = width*sizeof(PaletteEntry) + maskLen;	// maskLen may be zero
+    destMaskPtr = malloc(bufferSize);
+    destDataPtr = destMaskPtr + maskLen;
+
+    /*
+     * loop over every line
+     */
+    for (line = 0; line < height; line++ ) {
+
+	if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	/*
+	 * Lock line, set up pointers and copy mask to destination (if we have one)
+	 */
+	HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	srcDataPtr = srcMaskPtr + maskLen;
+	if (maskLen) memcpy(destMaskPtr, srcMaskPtr, maskLen);
+
+
+	/*
+	 * Convert color values to RGB and append it to new bitmap
+	 * BMF_MONO and BMF_24BIT are handled above
+	 */
+	if (srcColors == BMF_4BIT) {
+	    FloydTool4BitLineToRGB(srcDataPtr, (PaletteEntry*)destDataPtr, width, srcPalette);
+	} else /* BMF_8BIT */ {
+	    FloydTool8BitLineToRGB(srcDataPtr, (PaletteEntry*)destDataPtr, width, srcPalette);
+	}
+	HugeArrayUnlock(srcMaskPtr);
+
+	HugeArrayAppend(destFile, newBitmap, 1, destMaskPtr);
+
+    }
+
+    /*
+     * clean up
+     */
+    free(destMaskPtr);
+    if ( srcPalette ) {
+    	if ( format & BMT_PALETTE ) {
+    	    free(srcPalette);
+    	} else {
+    	    BTUnlockGEOSStandardPalette();
+    	}
+    }
+
+    return newBitmap;
+}
+
+
+/*--------------------- FloydToolMonoLineToRGB ---------------------
+ * Purpose:      Convert a monochrome pixel line to RGB values
+ * Parameters:	 pixelLine:  monochrome data (8 pixel per byte)
+ *		 destLine:   RGB values (return values)
+ *		 width:	     Width of the line in pixels
+ ---------------------------------------------------------------------------*/
+void FloydToolMonoLineToRGB(byte *pixelLine, PaletteEntry *destLine, int width) {
+int	n;
+int bit, val;
+PaletteEntry black = { 0, 0, 0 };
+
+    memset(destLine, 0xFF, sizeof(PaletteEntry) * width);	/* default: white */
+
+    bit = 0x80;
+    val = *pixelLine;
+
+    for ( n = 0; n < width; n++ ) {
+
+        if (val & bit ) destLine[n] = black;
+
+        bit >>= 1;
+        if (!bit) {
+            bit = 0x80;
+            pixelLine++;
+            val = *pixelLine;
+        }
+    }
+}
+
+/*--------------------- FloydToolMonoLineTo8Bit ---------------------
+ * Purpose:      Convert a monochrome pixel line to 8 bit values
+ * Parameters:	 pixelLine:  monochrome data (8 pixel per byte)
+ *		 destLine:   8 bit index values (return values)
+ *		 width:	     Width of the line in pixels
+ *		 wIdx:	     index for "white"
+ *		 bIdx:	     index for "black"
+ ---------------------------------------------------------------------------*/
+void FloydToolMonoLineTo8Bit(byte *pixelLine, byte *destLine, int width, int wIdx, int bIdx) {
+int	n;
+int bit, val;
+
+    memset(destLine, wIdx, width);	/* default: white */
+
+    bit = 0x80;
+    val = *pixelLine;
+
+    for ( n = 0; n < width; n++ ) {
+
+        if (val & bit ) destLine[n] = bIdx;	// set this pixel to black
+
+        bit >>= 1;
+        if (!bit) {
+            bit = 0x80;
+            pixelLine++;
+            val = *pixelLine;
+        }
+    }
+}
+
+/*--------------------- FloydToolMonoLineTo4Bit ---------------------
+ * Purpose:      Convert a monochrome pixel line to RGB values
+ * Parameters:	 pixelLine:  monochrome data (8 pixel per byte)
+ *		 destLine:   4 bit index values (return values, two pixel per byte)
+ *		 width:	     Width of the line in pixels
+ *		 wIdx:	     index for "white"
+ *		 bIdx:	     index for "black"
+ ---------------------------------------------------------------------------*/
+void FloydToolMonoLineTo4Bit(byte *pixelLine, byte *destLine, int width, int wIdx, int bIdx) {
+int	n;
+int bit, val, colVal;
+
+    wIdx &= 0x0F;
+    bIdx &= 0x0F;	// must be 4 bit only
+
+    memset(destLine, wIdx + (wIdx << 4), (width+1)/2);	/* default: all pixels white */
+
+    bit = 0x80;
+    val = *pixelLine;
+
+    for ( n = 0; n < width; n++ ) {
+
+	/*
+	 * Set pixel to black (bIdx) if the
+	 * bit in the monochrome line is set.
+	 * Depending on the current pixel position we have to change the
+	 * upper or the lower nibble.
+	 */
+    	if ( n & 1 ) {
+    	    if ( val & bit ) { colVal = *destLine & 0xF0;	// lower nibble
+    	    			*destLine = colVal | bIdx;
+    	    			}
+    	    destLine++;
+	} else {
+    	    if ( val & bit ) //  *destLine  &= 0x0F;
+    	    			*destLine = (*destLine & 0x0F) | (bIdx << 4);
+	}
+
+        bit >>= 1;
+        if (!bit) {
+            bit = 0x80;
+            pixelLine++;
+            val = *pixelLine;
+        }
+    }
+
+}
+
+
+/*--------------------- FloydToolCovertMonoToColor ---------------------
+ * Purpose:	Convert a monochrome image to a colored image
+ * Context:	Handles a "no dither possible" special case for BTDitherByFloydSteinberg()
+ * Strategy:
+ * Parameters:	srcFile, srcBitmap:	Bitmap to convert
+ *		destFile:	VMFile for the new bitmap
+ *		destFormat:	color depth of the new bitmap
+ *		palette:	Custom palette, if there is any. Index for white and black are
+ *				taken from this palette.
+ *				Pass NULL to use the standard palette (or if destFormat is BMF_24BIT)
+ *		numPalColors	number of colors in the palette
+ *				ignored if palette is a NULL pointer
+ *              progressText: 	Text object for displaying progress indicators
+ *                    	      	Null if no progress indicator is needed
+ * Return:	VMBlockHandle of the new bitmap
+ *		Zero if: the source is not a monochrome bitmap
+ *			 the source is compacted
+ *			 ! both should never happen because this routine is internal
+ ---------------------------------------------------------------------------*/
+VMBlockHandle FloydToolCovertMonoToColor(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int numPalColors, optr progressText) {
+VMBlockHandle  newBitmap;
+
+int	width, height, size, format, compact, maskLen;
+byte *srcMaskPtr, *srcDataPtr;
+
+int bufferSize, line, wIdx, bIdx;
+byte *destMaskPtr, *destDataPtr;
+
+    /*
+     * get important information, handle special cases and do error check
+     */
+    format = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, &compact);
+    if ( compact ) return 0;
+    if ( (format & BMT_FORMAT) != BMF_MONO ) return 0;	/* emergency exits */
+
+    destFormat &= BMT_FORMAT;
+    if ( destFormat == BMF_MONO ) return BTCopyBitmap(srcFile, destFile, srcBitmap); /* nice case :-) */
+    if ( format & BMT_MASK ) { maskLen = (width+7)/8; destFormat |= BMT_MASK; }
+		    	else { maskLen = 0; }
+
+    /*
+     * find out index for "white" and "black"
+     */
+    if (!palette) {
+    	wIdx = C_WHITE;		/* standard palette or true color */
+    	bIdx = C_BLACK;
+    } else {
+    	PaletteEntry w = { 0xFF, 0xFF, 0xFF }, b = { 0, 0, 0 };
+    	wIdx = BTApproxRGBPaletteLinear(palette, w, numPalColors);
+    	bIdx = BTApproxRGBPaletteLinear(palette, b, numPalColors);
+    	destFormat |= BMT_PALETTE;
+    }
+
+    /*
+     * Create a new bitmap with a height of zero
+     */
+    newBitmap = BTCreateOffscreenBitmap(destFile,
+		    destFormat | BMT_HUGE | BMT_COMPLEX, width, 0/*height*/, palette );
+    if (!newBitmap) return 0;
+    BTSetBitmapHeight(destFile, newBitmap, height);
+
+
+    /*
+     * allocate memory - using 3 bytes per pixel + mask size (if we have one)
+     */
+    bufferSize = width*sizeof(PaletteEntry) + maskLen;	// maskLen may be zero
+    destMaskPtr = malloc(bufferSize);
+    destDataPtr = destMaskPtr + maskLen;
+
+    /*
+     * loop over every line
+     */
+    for (line = 0; line < height; line++ ) {
+
+	if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	/*
+	 * Lock line, set up pointers and copy mask to destination (if we have one)
+	 */
+	HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	srcDataPtr = srcMaskPtr + maskLen;
+	if (maskLen) memcpy(destMaskPtr, srcMaskPtr, maskLen);
+
+
+	/*
+	 * Convert monochrome line to color
+	 */
+	switch (destFormat & BMT_FORMAT) {
+	case BMF_4BIT:
+	    FloydToolMonoLineTo4Bit(srcDataPtr, destDataPtr, width, wIdx, bIdx);
+	    break;
+	case BMF_8BIT:
+	    FloydToolMonoLineTo8Bit(srcDataPtr, destDataPtr, width, wIdx, bIdx);
+	    break;
+	case BMF_24BIT:
+	    FloydToolMonoLineToRGB(srcDataPtr, (PaletteEntry*)destDataPtr, width);
+	    break;
+	}
+
+	HugeArrayUnlock(srcMaskPtr);
+
+	HugeArrayAppend(destFile, newBitmap, 1, destMaskPtr);
+
+    }
+
+    /*
+     * clean up
+     */
+    free(destMaskPtr);
+    return newBitmap;
+
+}
+
+
+
+/* ====================================================================================
+ *	$ID Color Reduction by replace
+ * ==================================================================================== */
+
+/*--------------------- ToolCreatePaletteMapTable ---------------------
+ * Purpose:	Create a color conversion tabe to replace a color from one palette by the
+ *		nearest color of another palette
+ * Context:
+ * Strategy:
+ * Parameters:	srcPalette:	original palette
+ *		numSrcEntries:	number of entries in the original palette
+ *		destPalette:	target palette
+ *		numDestEntries:	number of entries in the target palette
+ *		mapTable:	conversion table.
+ *				Must be able to hold at least 'numSrcEntries' byte-sized entries
+ *				use: newIndex = mapTable[srcIndex]
+ * Return:
+ ---------------------------------------------------------------------------*/
+void ToolCreatePaletteMapTable(PaletteEntry *srcPalette, int numSrcEntries,
+				PaletteEntry *destPalette, int numDestEntries, byte *mapTable) {
+int n;
+
+    for ( n = 0; n < numSrcEntries; n++ ) {
+	mapTable[n] = BTApproxRGBPaletteLinear(destPalette, srcPalette[n], numDestEntries);
+    }
+}
+
+
+/*--------------------- ToolConvert8BitLineViaTable ---------------------
+ * Purpose:	convert a 8 bit pixel line to another colors, using an index map table
+ * Context:
+ * Strategy:
+ * Parameters:	srcPixel:  line to convert (one byte per pixel)
+ *			   may have a mask area
+ *		destPixel: converted colors (one byte per pixel)
+ *		width:	   number of pixel to convert
+ *		maskLen:   number of mask bytes
+ *			   zero if we have no mask
+ *		mapTable:  color index mapping table
+ *		defaultIndex: index to use if the pixel is masked out
+ * Return:	destPixel is filled in
+ ---------------------------------------------------------------------------*/
+void ToolConvert8BitLineViaTable(byte *srcPixel, byte *destPixel, int width, int maskLen, byte *mapTable, int defaultIndex) {
+int n, dMask;
+byte *maskPtr;
+
+
+    if (maskLen) {
+    	/*
+    	 * copy mask and update pointer to data bytes
+    	 */
+        memcpy(destPixel, srcPixel, maskLen);
+        maskPtr = srcPixel;
+        srcPixel += maskLen;
+        destPixel += maskLen;
+
+    	/*
+    	 * fill in destination line
+    	 */
+	dMask = 0x80;
+	for (n = 0; n < width; n++ ) {
+	    if ( *maskPtr & dMask ) {
+	   	// visible pixel - map color index
+		destPixel[n] = mapTable[srcPixel[n]];
+	    } else {
+	   	// transparent pixel: use default index
+	   	destPixel[n] = defaultIndex;
+	    }
+
+	    /* next mask pixel */
+	    dMask >>= 1;
+            if ( !dMask ) {
+        	dMask = 0x80;
+           	maskPtr++;
+	    }
+	}
+
+    } else {
+    	// unmasked case is simple - map any color index
+	for (n = 0; n < width; n++ ) destPixel[n] = mapTable[srcPixel[n]];
+    }
+}
+
+
+/*--------------------- ToolConvert4BitLineViaTable ---------------------
+ * Purpose:	convert a 4 bit pixel line to another colors, using an index map table
+ * Context:
+ * Strategy:
+ * Parameters:	srcPixel:  line to convert (two pixel per byte)
+ *			   may have a mask area
+ *		destPixel: converted colors (one byte per pixel)
+ *		width:	   number of pixel to convert
+ *		maskLen:   number of mask bytes
+ *			   zero if we have no mask
+ *		mapTable:  color index mapping table
+ *		defaultIndex: index to use if the pixel is masked out
+ * Return:	destPixel is filled in
+ ---------------------------------------------------------------------------*/
+void ToolConvert4BitLineViaTable(byte *srcPixel, byte *destPixel, int width, int maskLen, byte *mapTable, int defaultIndex) {
+int n, dMask, idx;
+byte *maskPtr;
+
+
+    if (maskLen) {
+    	/*
+    	 * copy mask and update pointer to data bytes
+    	 */
+        memcpy(destPixel, srcPixel, maskLen);
+        maskPtr = srcPixel;
+        srcPixel += maskLen;
+        destPixel += maskLen;
+
+    	/*
+    	 * fill in destination line
+    	 */
+	dMask = 0x80;
+	for (n = 0; n < width; n++ ) {
+	    if ( n & 1 ) idx = srcPixel[n>>1] & 0x0F;
+		    else idx = srcPixel[n>>1] >> 4;
+	    if ( *maskPtr & dMask ) {
+	   	// visible pixel - map color index
+		destPixel[n] = mapTable[idx];
+	    } else {
+	   	// transparent pixel: use default index
+	   	destPixel[n] = defaultIndex;
+	    }
+
+	    /* next mask pixel */
+	    dMask >>= 1;
+            if ( !dMask ) {
+        	dMask = 0x80;
+           	maskPtr++;
+	    }
+	}
+
+    } else {
+    	// unmasked case is more simple - map any color index
+	for (n = 0; n < width; n++ ) {
+	    if ( n & 1 ) idx = srcPixel[n>>1] & 0x0F;
+		    else idx = srcPixel[n>>1] >> 4;
+	    destPixel[n] = mapTable[idx];
+	}
+    }
+}
+
+/*--------------------- ToolConvertRGBLineToIndex ---------------------
+ * Purpose:	convert a RGB pixel line to index colors
+ * Context:
+ * Strategy:
+ * Parameters:	srcPixel:  line to convert (one byte per pixel)
+ *			   may have a mask area
+ *		destPixel: converted colors (one byte per pixel)
+ *		width:	   number of pixel to convert
+ *		maskLen:   number of mask bytes
+ *			   zero if we have no mask
+ *		palette:   targte palette to use
+ *		numPalColors: number of entries in the target palette
+ *		defaultIndex: index to use if the pixel is masked out
+ * Return:	destPixel is filled in
+ ---------------------------------------------------------------------------*/
+void ToolConvertRGBLineToIndex(byte *srcPixel, byte *destPixel, int width, int maskLen, PaletteEntry *palette, int numPalColors, int defaultIndex) {
+int n, dMask;
+byte *maskPtr;
+PaletteEntry *srcDataPtr;
+
+
+
+    if (maskLen) {
+    	/*
+    	 * copy mask and update pointer to data bytes
+    	 */
+        memcpy(destPixel, srcPixel, maskLen);
+        maskPtr = srcPixel;
+        srcPixel += maskLen;
+        srcDataPtr = (PaletteEntry*)srcPixel;
+        destPixel += maskLen;
+
+    	/*
+    	 * fill in destination line
+    	 */
+	dMask = 0x80;
+	for (n = 0; n < width; n++ ) {
+	    if ( *maskPtr & dMask ) {
+	   	// visible pixel - Approximate color
+		destPixel[n] = BTApproxRGBPaletteLinear(palette, srcDataPtr[n], numPalColors);
+	    } else {
+	   	// transparent pixel: use default index
+	   	destPixel[n] = defaultIndex;
+	    }
+
+	    /* next mask pixel */
+	    dMask >>= 1;
+            if ( !dMask ) {
+        	dMask = 0x80;
+           	maskPtr++;
+	    }
+	}
+
+    } else {
+    	// unmasked case is simple - Approximate color for every pixel
+    	srcDataPtr = (PaletteEntry*)srcPixel;
+	for (n = 0; n < width; n++ ) destPixel[n] = BTApproxRGBPaletteLinear(palette, srcDataPtr[n], numPalColors);
+    }
+}
+
+/*--------------------- ToolConvertIndexBitmapByReplace ---------------------
+ * Purpose:	Convert a index color bitmap (4 bit or 8 bit, uncompacted) to another
+ *		index color bitmap by replacing colors by nearest available color.
+ *		Conversion  to monochrome or true color is handled in separate routines
+ * Context:
+ * Strategy:	We have four possible cases (4 bit -> 8 bit, 4 bit -> 4 bit,
+ * 		8 bit -> 4 bit, 8 bit -> 8 bit). None of these cases are trivial at all,
+ *		because both bitmaps may have a (different) palette.
+ *
+ *		Note: We don't handle rare, trivial cases, such as conversions within
+ *		      the same color palette, separately, to avoid unnecessarily
+ *		      complicating the code.
+ *
+ *		- fetch color and mas information for both bitmaps
+ *		- get a pointer to the source palette and the target palette,
+ *		  even if they are the standard palette
+ *		- create a color index mapping table
+ *		- convert colors line by line using the mapping table
+ *		  we use two separate loops, one for 8 bit source bitmap an one
+ *		  for 4 bit source bitmaps
+ *
+ * Parameters:	srcFile, srcBitmap: Bitmap to cenvert
+ *				This must be a 4 bit or a 8 bit bitmap only
+ *		destFile,
+ *		destFormat: 	Pass BMF_4BIT or BMF_8BIT - other values are rejected
+ *		palette:	Palette to use for the new bitmap
+ *				Pass zero to use the standard palette
+ *		palColors:	number of valid colors in the palette
+ *				May be smaller than color-depth(destForat). Only palColors colors are used then.
+ *		progressText:	text object to display "progress dots"
+ *				zero for no progress report
+ * Return:	VMBlockHandle of the new bitmap
+ *		Zero in case of error
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolConvertIndexBitmapByReplace(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int palColors, optr progressText) {
+int srcFormat, width, height, numSrcColors;
+int numDestColors, line, maskLen, size;
+VMBlockHandle newBmp;
+PaletteEntry *srcPalette, *destPalette;
+byte *mapTable;
+byte *srcMaskPtr, *srcDataPtr;
+byte *destMaskPtr, *destDataPtr, *fourBitPtr;
+
+PaletteEntry white = { 0xFF, 0xFF, 0xFF };
+int defaultIndex;
+
+    /*
+     * Set all pointers to zero. This is rerquired for save clean up below.
+     */
+    newBmp = 0;
+    srcPalette = 0;
+    mapTable = 0;
+    destMaskPtr = 0;
+    fourBitPtr = 0;
+
+    /*
+     * calculate number of available colors
+     * for source: ask bitmap
+     * for destination: ask destFormat
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, 0);
+    switch (srcFormat & BMT_FORMAT) {
+    case BMF_4BIT:	numSrcColors = 16; 	break;
+    case BMF_8BIT:	numSrcColors = 256; 	break;
+    EC( default: ProgError("Invaild source format in ToolConvertIndexBitmapByReplace"); return 0; )
+    }
+
+    destFormat &= BMT_FORMAT;
+    switch (destFormat) {
+    case BMF_4BIT:	numDestColors = 16; 	break;
+    case BMF_8BIT:	numDestColors = 256; 	break;
+    EC( default: ProgError("Invaild destFormat in ToolConvertIndexBitmapByReplace"); return 0; )
+    }
+    if ( palColors < numDestColors ) numDestColors = palColors;
+
+
+    /*
+     * Find out if the source bitmap has a mask.
+     * Set up destFormat and maskLen properly
+     */
+    if (srcFormat & BMT_MASK) {
+    	destFormat |= BMT_MASK;
+    	maskLen = (width+7)/8;
+    } else {
+    	maskLen = 0;
+    }
+
+    /*
+     * Find out if the source bitmap has a palette.
+     * Fetch it or use the strandard palette (required to create the map table).
+     */
+    if (srcFormat & BMT_PALETTE) {
+    	srcPalette = malloc(numSrcColors * sizeof(PaletteEntry));
+    	if (!srcPalette) goto cleanUp;
+    	BTGetBitmapPalette(srcFile, srcBitmap, srcPalette, numSrcColors);
+    } else {
+    	srcPalette = BTLockGEOSStandardPalette();
+    }
+
+    /*
+     * Find out if the target bitmap should have a palette.
+     * 'palette' pointer is non-zero then. Otherwise use the
+     * strandard palette (required to create the map table).
+     */
+    if ( palette ) {
+    	destPalette = palette;
+    	destFormat |= BMT_PALETTE;
+    } else {
+    	destPalette = BTLockGEOSStandardPalette();
+    }
+    defaultIndex = BTApproxRGBPaletteLinear(destPalette, white, numDestColors);
+
+    /*
+     * create palette map table
+     */
+    mapTable = malloc(numSrcColors);
+    if (!mapTable) goto cleanUp;
+    ToolCreatePaletteMapTable(srcPalette, numSrcColors, destPalette, numDestColors, mapTable);
+
+    /*
+     * Create traget bitmap with an inital height of zero. The real bitmap lines will
+     * be appended lyine by line after converting.
+     */
+    newBmp = BTCreateOffscreenBitmap(destFile, destFormat, width, 0/*height*/, palette);
+    if (!newBmp) goto cleanUp;
+    BTSetBitmapHeight(destFile, newBmp, height);
+
+
+    /*
+     * Allocate memory
+     */
+    destMaskPtr = malloc(width + maskLen);
+    destDataPtr = destMaskPtr + maskLen;
+    if ((destFormat & BMT_FORMAT) == BMF_4BIT) fourBitPtr = malloc((width+1)/2 + maskLen);
+
+    /*
+     * Convert image line by line. As we have four cases, we use separate loops
+     * depending in the source bitmap color depth
+     */
+    if ( (srcFormat & BMT_FORMAT) == BMF_8BIT ) {
+      for (line = 0; line < height; line++ ) {
+
+	if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	/*
+	 * Lock source line, set up pointers and copy mask to destination (if we have one)
+	 */
+	HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	srcDataPtr = srcMaskPtr + maskLen;
+
+	/*
+	 * Convert pixel colors. we have only the cases 4 bit and 8 bit for the target
+	 */
+	if ( (destFormat & BMT_FORMAT) == BMF_4BIT) {
+	    ToolConvert8BitLineViaTable(srcMaskPtr, destMaskPtr, width, maskLen, mapTable, defaultIndex);
+	    FloydTool8BitTo4Bit(destMaskPtr, fourBitPtr, width, maskLen);
+	    HugeArrayAppend(destFile, newBmp, 1, fourBitPtr);
+	} else {
+	    ToolConvert8BitLineViaTable(srcMaskPtr, destMaskPtr, width, maskLen, mapTable, defaultIndex);
+	    HugeArrayAppend(destFile, newBmp, 1, destMaskPtr);
+	}
+
+	/*
+	 * Unlock source line
+	 */
+	HugeArrayUnlock(srcMaskPtr);
+
+      }
+    } else {
+      for (line = 0; line < height; line++ ) {
+
+	if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	/*
+	 * Lock source line, set up pointers and copy mask to destination (if we have one)
+	 */
+	HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	srcDataPtr = srcMaskPtr + maskLen;
+
+	/*
+	 * Convert pixel colors. we have only the cases 4 bit and 8 bit for the target
+	 */
+	if ( (destFormat & BMT_FORMAT) == BMF_4BIT) {
+	    ToolConvert4BitLineViaTable(srcMaskPtr, destMaskPtr, width, maskLen, mapTable, defaultIndex);
+	    FloydTool8BitTo4Bit(destMaskPtr, fourBitPtr, width, maskLen);
+	    HugeArrayAppend(destFile, newBmp, 1, fourBitPtr);
+	} else {
+	    ToolConvert4BitLineViaTable(srcMaskPtr, destMaskPtr, width, maskLen, mapTable, defaultIndex);
+	    HugeArrayAppend(destFile, newBmp, 1, destMaskPtr);
+	}
+
+	/*
+	 * Unlock source line
+	 */
+	HugeArrayUnlock(srcMaskPtr);
+
+      }
+    }
+
+
+
+
+cleanUp:
+    /*
+     * clean up. check all pointers for zero to be save tht they are valid
+     */
+    if (srcFormat & BMT_PALETTE) {
+        if (srcPalette) free(srcPalette);
+    } else {
+    	if (srcPalette) BTUnlockGEOSStandardPalette();
+    }
+    if (mapTable) 	free(mapTable);
+    if (destMaskPtr) 	free(destMaskPtr);
+    if (fourBitPtr)	free(fourBitPtr);
+
+    if ( !palette ) 	BTUnlockGEOSStandardPalette();	/* no target palette passed */
+
+    return newBmp;
+
+}
+
+/*--------------------- ToolConvertToMono ---------------------
+ * Purpose:	Convert a (uncompacted) bitmap to a monochrome bitmap by "replace colors"
+ * Context:
+ * Strategy:	To avoid large black or white areas we use the system draw routines
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolConvertToMono(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile) {
+int srcFormat, width, height, destFormat;
+VMBlockHandle newBmp;
+GStateHandle gs;
+word line, maskLen;
+byte *srcPtr, *destPtr;
+BitmapAccessRecord	sbar, dbar;
+
+    /*
+     * create monochrome target bitmap
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, 0);
+    if ( (srcFormat & BMT_FORMAT) == BMF_MONO) return BTCopyBitmap(srcFile, destFile, srcBitmap);
+
+    destFormat = BMF_MONO;
+    if (srcFormat & BMT_MASK) destFormat |= BMT_MASK;
+    newBmp = BTCreateOffscreenBitmap(destFile, destFormat, width, height, 0);
+    if( !newBmp) return 0;
+
+    /*
+     * Clear bitmap - in the hope that GrDrawHugeBitmap() does not touch
+     * pixels that are masked out
+     */
+    if (srcFormat & BMT_MASK) { maskLen = (width+7)/8; }
+    			else  { maskLen = 0; }
+    destPtr = (byte*)BTBitmapLock(destFile, newBmp, &dbar, 0);
+    for ( line = 0; line < height; line++) {
+	memset(destPtr, 0, (width+7)/8 + maskLen);
+	destPtr = (byte*)BTBitmapNext(&dbar, FALSE);
+    }
+    BTBitmapUnlock(&dbar, FALSE);
+
+
+    /*
+     * Draw bitmap into monochrome nitmap
+     */
+    gs = GrEditBitmap(destFile, newBmp, NULL);
+    GrDrawHugeBitmap(gs, 0, 0, srcFile, srcBitmap);
+    GrDestroyBitmap(gs, BMD_LEAVE_DATA);
+
+    /*
+     * Copy mask, if we have one
+     */
+    if (srcFormat & BMT_MASK) {
+    	srcPtr = (byte*)BTBitmapLock(srcFile, srcBitmap, &sbar, 0);
+    	destPtr = (byte*)BTBitmapLock(destFile, newBmp, &dbar, 0);
+
+    	for ( line = 0; line < height; line++) {
+	    memcpy(destPtr, srcPtr, maskLen);
+	    srcPtr = (byte*)BTBitmapNext(&sbar, FALSE);
+	    destPtr = (byte*)BTBitmapNext(&dbar, TRUE);
+    	}
+
+    BTBitmapUnlock(&sbar, FALSE);
+    BTBitmapUnlock(&dbar, TRUE);
+
+    }
+
+    return newBmp;
+
+}
+
+
+/*--------------------- ToolConvert24BitByReplace ---------------------
+ * Purpose:	Convert a true color bitmap to an index color bitmap (16 or 256 colors)
+ * Context:
+ * Strategy:
+ * Parameters:	srcFile, srcBitmap:	bitmap to convert (24 bit)
+ *		destFile:	file for converted bitmap
+ *		destFormat:	target format; may be BMF_4BIT or BMF_8BIT
+ *		palette:	target palette to use
+ *		palColors:	number of palette entries
+ *		progressText:	text object to display "progress dots"
+ *				zero for no progress report
+ * Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ToolConvert24BitByReplace(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int palColors, optr progressText) {
+int width, height;
+int srcFormat, numDestColors, line, maskLen, size;
+VMBlockHandle newBmp;
+PaletteEntry *destPalette;
+byte *srcMaskPtr, *srcDataPtr;
+byte *destMaskPtr, *destDataPtr, *fourBitPtr;
+
+PaletteEntry white = { 0xFF, 0xFF, 0xFF };
+int defaultIndex;
+
+    /*
+     * Set all pointers to zero. This is rerquired for save clean up below.
+     */
+    newBmp = 0;
+    destMaskPtr = 0;
+    fourBitPtr = 0;
+
+    /*
+     * get source information
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBitmap, &width, &height, 0);
+    EC (if ( (srcFormat & BMT_FORMAT) != BMF_24BIT) { ProgError("Invaild source in ToolConvert24BitByReplace"); return 0; } )
+
+    /*
+     * calculate number of available colors
+     */
+    destFormat &= BMT_FORMAT;
+    switch (destFormat) {
+    case BMF_4BIT:	numDestColors = 16; 	break;
+    case BMF_8BIT:	numDestColors = 256; 	break;
+    EC( default: ProgError("Invaild destFormat in ToolConvert24BitByReplace"); return 0; )
+    }
+    if ( palColors < numDestColors ) numDestColors = palColors;
+
+    /*
+     * Find out if the source bitmap has a mask.
+     * Set up destFormat and maskLen properly
+     */
+    if (srcFormat & BMT_MASK) {
+    	destFormat |= BMT_MASK;
+    	maskLen = (width+7)/8;
+    } else {
+    	maskLen = 0;
+    }
+
+    /*
+     * Find out if the target bitmap should have a palette.
+     * 'palette' pointer is non-zero then. Otherwise use the
+     * strandard palette (required to create the map table).
+     */
+    if ( palette ) {
+    	destPalette = palette;
+    	destFormat |= BMT_PALETTE;
+    } else {
+    	destPalette = BTLockGEOSStandardPalette();
+    }
+    defaultIndex = BTApproxRGBPaletteLinear(destPalette, white, numDestColors);
+
+
+    /*
+     * Create traget bitmap with an inital height of zero. The real bitmap lines will
+     * be appended lyine by line after converting.
+     */
+    newBmp = BTCreateOffscreenBitmap(destFile, destFormat, width, 0/*height*/, palette);
+    if (!newBmp) goto cleanUp;
+    BTSetBitmapHeight(destFile, newBmp, height);
+
+
+    /*
+     * Allocate memory
+     */
+    destMaskPtr = malloc(width*sizeof(PaletteEntry) + maskLen);
+    destDataPtr = destMaskPtr + maskLen;
+    if ((destFormat & BMT_FORMAT) == BMF_4BIT) fourBitPtr = malloc((width+1)/2 + maskLen);
+
+    /*
+     * Convert image line by line.
+     */
+    for (line = 0; line < height; line++ ) {
+
+	if ((line & 0x0F) == 0) DitherDisplayProgress(progressText);
+
+	/*
+	 * Lock source line, set up pointers and copy mask to destination (if we have one)
+	 */
+	HugeArrayLock(srcFile, srcBitmap, line, (void**)&srcMaskPtr, (word*)&size);
+	srcDataPtr = srcMaskPtr + maskLen;
+
+	/*
+	 * Convert pixel colors. we have only the cases 4 bit and 8 bit for the target
+	 */
+	if ( (destFormat & BMT_FORMAT) == BMF_4BIT) {
+	    ToolConvertRGBLineToIndex(srcMaskPtr, destMaskPtr, width, maskLen, destPalette, numDestColors, defaultIndex);
+	    FloydTool8BitTo4Bit(destMaskPtr, fourBitPtr, width, maskLen);
+	    HugeArrayAppend(destFile, newBmp, 1, fourBitPtr);
+	} else {
+	    ToolConvertRGBLineToIndex(srcMaskPtr, destMaskPtr, width, maskLen, destPalette, numDestColors, defaultIndex);
+	    HugeArrayAppend(destFile, newBmp, 1, destMaskPtr);
+	}
+
+	/*
+	 * Unlock source line
+	 */
+	HugeArrayUnlock(srcMaskPtr);
+
+    }
+
+cleanUp:
+    /*
+     * clean up. check all pointers for zero to be save tht they are valid
+     */
+    if (destMaskPtr) 	free(destMaskPtr);
+    if (fourBitPtr)	free(fourBitPtr);
+
+    if ( !palette ) 	BTUnlockGEOSStandardPalette();	/* no target palette passed */
+
+    return newBmp;
+
+}
+
+/*--------------------- BTConvertBitmapColorsByReplace ---------------------
+ * Purpose:	Convert a bitmap to a color-reduced bitmap by replacing the pixel colors
+ *		by the neares available color in the target colors
+
+ * Strategy:	- if destFormat is BMF_24BIT or BMF_MONO: use already existing
+ *		  routines: FloydToolConvertTo24Bit() and ToolConvertToMono()
+ *		- depending on the source color depth use different converiosn routines
+ *		  + FloydToolCovertMonoToColor()
+ *		  + ToolConvertIndexBitmapByReplace();
+ *		  + ToolConvert24BitByReplace();
+ *
+ * Note:	This routine handles any combination of source colors an target colors.
+ *		Even cases where color reduction is not possible or necessary — such as converting
+ *		from a 16-color standard palette to a 256-color standard palette — are handled
+ *		correctly. However, the routine is not optimized for these exotic cases.
+ *
+ * Parameters:	srcFile
+ *		srcBlock:    bitmap to be converted
+ *		destFile:    Destination file
+ *		destFormat:  target format: BMF_4BIT, BMF_8BIT, BMF_24BIT or BMF_MONO
+ * 			     all other BMF_bits are ignored
+ *              palette:     Target palette to be used
+ *			     Pass NULL pointer to use the GEOS standard palette
+ *              palColors    Number of valid colors in the palette
+ *                    	     often 16 or 256; other values are also allowed
+ *              progressText: Text object for displaying progress indicators
+ *                    	      Null if no progress indicator is needed
+ *    Return:	Handle of the new bitmap
+ *           	Zero on error:	out of memory
+ *---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTConvertBitmapColorsByReplace(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int palColors, optr progressText) {
+int srcFormat, srcColors, compact;
+VMBlockHandle newBmp;
+
+    /*
+     * ensure that the source bitmap is uncompacted
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBitmap, 0, 0, &compact);
+    if ( compact ) {
+	srcBitmap = GrUncompactBitmap(srcFile, srcBitmap, destFile);
+	srcFile = destFile;
+    }
+
+
+    /*
+     * handle special case: convert image to true color
+     */
+    destFormat &= BMT_FORMAT;
+    if ( destFormat == BMF_24BIT ) {
+	newBmp = FloydToolConvertTo24Bit(srcFile, srcBitmap, destFile, progressText);
+    	goto cleanUp;
+    }
+    if ( destFormat == BMF_MONO ) {
+	newBmp = ToolConvertToMono(srcFile, srcBitmap, destFile);
+    	goto cleanUp;
+    }
+
+
+
+    /*
+     * call different conversion routines depending on the source color depth
+     */
+    srcColors = srcFormat & BMT_FORMAT;
+    switch (srcColors) {
+    case BMF_MONO:
+    	newBmp = FloydToolCovertMonoToColor(srcFile, srcBitmap, destFile, destFormat, palette, palColors, progressText);
+    	break;
+    case BMF_4BIT:
+    case BMF_8BIT:
+    	newBmp = ToolConvertIndexBitmapByReplace(srcFile, srcBitmap, destFile,
+					destFormat, palette, palColors, progressText);
+    	break;
+    case BMF_24BIT:
+    	newBmp = ToolConvert24BitByReplace(srcFile, srcBitmap, destFile,
+				destFormat, palette, palColors, progressText);
+    	break;
+    EC( default: ProgError("Unsupported color depth in BTConvertBitmapColorsByReplace"); )
+    }
+
+
+cleanUp:
+    /*
+     * Clean up
+     */
+    if ( compact ) {
+    	/* destroy uncompacted copy */
+	HugeArrayDestroy(srcFile, srcBitmap);
+    }
+
+    return newBmp;
+}
+
+
+/*---------------------  ---------------------
+ * Purpose:
+ * Context:
+ * Strategy:
+ * Parameters:
+ * Return:
+ ---------------------------------------------------------------------------*/
+
+/* ----------------- end of file: replace.goc --------------------------- */
+
+

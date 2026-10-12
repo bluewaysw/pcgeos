@@ -18,9 +18,11 @@ Use `help command` for more info.
 
 ### Source window
 
-`Page Up` / `↑` — Scroll forward 1-pg/1-line  
-`Page Down` / `↓` — Scroll backward 1-pg/1-line  
-`←` / `→` — Scroll left/right  
+`Page Up` / `Page Down` — Scroll up/down half a window  
+`Ctrl+↑` / `Ctrl+↓` — Scroll up/down one line with modern prompt keys  
+`↑` / `↓` — Scroll up/down one line with legacy prompt keys  
+`Ctrl+←` / `Ctrl+→` — Scroll left/right with modern prompt keys  
+`←` / `→` — Scroll left/right with legacy prompt keys  
 
 ## Downloading & Running
 

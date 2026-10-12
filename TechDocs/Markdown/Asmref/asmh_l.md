@@ -3048,7 +3048,7 @@ expressing hexadecimal numbers.
 ax - Character to check.
 
 **Returns:**  
-ZF - Clear if character is a hexidecimal digit.
+ZF - Clear if character is a hexadecimal digit.
 
 **Library:** localize.def
 

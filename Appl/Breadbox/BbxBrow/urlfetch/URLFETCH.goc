@@ -619,14 +619,24 @@ void URLFetchExtraMemoryUnlock(optr em)
         p_child = G_fetchChildren+i ;
         while (p_child->action != FETCH_CHILD_ACTION_DEAD)
             {}
+        /* free per-child wait semaphore */
+        if (p_child->sem) {
+            ThreadFreeSem(p_child->sem);
+            p_child->sem = NullHandle;
+        }
 #if PROGRESS_DISPLAY
 	/* free semaphore */
-	ThreadFreeSem(G_fetchProgressSem[i]);
+        if (G_fetchProgressSem[i]) {
+            ThreadFreeSem(G_fetchProgressSem[i]);
+            G_fetchProgressSem[i] = NullHandle;
+        }
 	/* free VM file and data stream */
 	if (G_fetchProgressVMFile[i]) {
 	    HugeArrayDestroy(G_fetchProgressVMFile[i],
 			     G_fetchProgressDataStream[i]);
 	    VMClose(G_fetchProgressVMFile[i], FILE_NO_ERRORS);
+            G_fetchProgressVMFile[i] = NullHandle;
+            G_fetchProgressDataStream[i] = NullHandle;
 	    sprintf(workFileName, WORK_FILENAME, i);
 #ifdef GLOBAL_INTERNET_BUILD
 	    FileSetCurrentPath(vmCacheSP, vmCacheDir);
@@ -639,8 +649,19 @@ void URLFetchExtraMemoryUnlock(optr em)
         /* Each child ends its own thread */
     }
 
-    if(lastURLDriver)
-      GeodeFreeLibrary(lastURLDriver);
+    if (G_fetchSemaphore) {
+        ThreadFreeSem(G_fetchSemaphore);
+        G_fetchSemaphore = NullHandle;
+    }
+    if (G_allocBlock) {
+        MemFree(G_allocBlock);
+        G_allocBlock = NullHandle;
+    }
+
+    if (lastURLDriver) {
+        GeodeFreeLibrary(lastURLDriver);
+        lastURLDriver = NullHandle;
+    }
 
     /* Destroy the thread we are currently in */
     @send ConstructOptr(ThreadGetInfo(0, TGIT_THREAD_HANDLE), 0)::

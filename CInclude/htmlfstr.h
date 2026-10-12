@@ -24,6 +24,7 @@ typedef struct {
       #define FORM_STRING_ENCODING_MULTI        2
     word flags ;
       #define FORM_STRING_FLAG_IS_GET_METHOD    0x8000
+      #define FORM_STRING_FLAG_TRUNCATED        0x4000
     
     cb_FormStringCallback *callback;	/* vfptr to callback function  */
     MemHandle callbackData;	/* State block maintained by callback */

@@ -60,7 +60,7 @@ a retn or retf which pops all local arguments off the stack.)
 **Figure 2-1** Stack conventions for GEOS routines  
 _(a) This is the stack-s setup when HelloProc was called, but before HelloProc did anything to the stack._  
 _(b) This is the stack after HelloProc has finished setting up the stack frame._  
-_(c) This is the stack after the ret instuction is executed. The ret pops the return address and the parameters off the stack._
+_(c) This is the stack after the ret instruction is executed. The ret pops the return address and the parameters off the stack._
 
 As noted above, Esp does most of the bookkeeping for you. You need simply 
 declare your arguments and local variables, then use the .enter and 
@@ -1193,7 +1193,7 @@ the queue, then the new message will be discarded; it will not be added to the
 queue.
 
 You can modify this behavior by passing MF_REPLACE. If you pass this flag, 
-the latter message will supercede an existing message on the queue; that is, 
+the latter message will supersede an existing message on the queue; that is, 
 the pre-existing message will be discarded, and the new one will take its 
 place in the queue. (The only difference between the two messages will be in 
 the arguments passed.)

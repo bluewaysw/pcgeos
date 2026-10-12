@@ -180,6 +180,8 @@ int	__void__;
 #endif
 
 WINDOW	*initscr(), *newwin(), *subwin();
+WINDOW	*resizewin();
+int	reinitscr();
 char	*longname(), *getcap();
 
 /*

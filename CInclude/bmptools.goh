@@ -78,7 +78,7 @@
  *    BTRotateBitmap180 	-- Rotate the bitmap by 180 degrees.
  *    BTRotateBitmap90 		-- Rotate the bitmap by 90 degrees clockwise.
  *    BTRotateBitmap270 	-- Rotate the bitmap by 90 degrees counterclockwise.
- *
+ *    BTShiftImage 		-- Shift a bitmap image to left/right, up/down or both
  *
  *------ Working with the Clipboard  ------------------------------------------------
  *
@@ -140,7 +140,17 @@
  *    PictureDisplayClass	-- An object that can display images (HugeBitmaps and
  *				   GStrings) in a simple way
  *
- *---
+ *------ Dihering and Scaling  ------------------------------------------------
+ *
+ *    BTCreatePaletteByMedianCut -- Generate an optimized color palette using the Median Cut algorithm
+ *    BTDitherByFloydSteinberg 	-- Convert a bitmap to a color-reduced bitmap using Floyd-Steinberg dithering
+ *    BTConvertBitmapColorsByReplace -- Convert a bitmap to a color-reduced bitmap by replacing the pixel colors
+ *				   by the neares available color in the target colors
+ *
+ *    BTScaleBitmapSystem 	-- Use system functions to scale a bitmap (including masked bitmaps)
+ *    BTScaleBitmapBilinear 	-- Use bilinear / area sampling algorithm to scale a bitmap
+ *
+ *------ Debug helper  ------------------------------------------------
  *    BTSetDebugText 		-- Enable debugging helper routines
  *
  ###########################################################################*/
@@ -523,6 +533,22 @@ extern VMBlockHandle RS_EXPORT BTRotateBitmap90(VMFileHandle srcFile, VMBlockHan
  ---------------------------------------------------------------------------*/
 extern VMBlockHandle RS_EXPORT BTRotateBitmap270(VMFileHandle srcFile, VMBlockHandle bmpBlock, VMFileHandle destFile, optr progressText);
 
+/*--------------------- BTShiftImage ---------------------
+ *  Purpose:	Shift a bitmap image to left/right, up/down or both
+ *		The bitmap must be uncompacted or it will not shifted
+ *  Context:
+ *  Strategy:	We modify the bitmap itself
+ *  Parameters:	vmFile, bmp:	bitmap to handle
+ *		horiz:	horizontal shift amount
+ *				positive: right shift
+ *				negative: left shift
+ *		vert:	vertical shift amount
+ *				positive: shift down	(according to geos coordinate system)
+ *				negative: shift up
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT BTShiftImage(VMFileHandle vmFile, VMBlockHandle bmp, int horiz, int vert, optr progressText);
+
 
 /*
  ***************************************************************************
@@ -862,9 +888,13 @@ extern VMBlockHandle RS_EXPORT BTApplyTransparencyColor(VMFileHandle srcFile, VM
  *		green:	    geen value for pixels that were transparent before
  *		blue:	    blue value for pixels that were transparent before
  *
- *	If a 8-bit, 4-bit or monochrome bitmap has been passed
+ *	If a 8-bit, 4-bit bitmap has been passed
  *		redOrIndex: index value for pixels that were transparent before
- *			    for monochrome mitmaps this may be 0 or 1
+ *		green and blue will be ignored
+ *
+ *	If monochrome bitmap has been passed
+ *		redOrIndex: pass 0 (for white) or 1 (for black)
+ *			    this means: do NOT pass C_WHITE or C_BLACK for monochrome bitmaps
  *		green and blue will be ignored
  *
  * 	Strategy:
@@ -914,9 +944,13 @@ extern Boolean RS_EXPORT BTBitmapFillMask(VMFileHandle srcFile, VMBlockHandle bm
  *		green:	    green color value for transparent pixels
  *		blue:	    blue color value for transparent pixels
  *
- *	If a 8-bit, 4-bit or monochrome bitmap has been passed
- *		redOrIndex: index of the color for transparent pixels
- *			    for monochrome mitmaps this may be 0 or 1
+ *	If a 8-bit, 4-bit bitmap has been passed
+ *		redOrIndex: index value for pixels that were transparent before
+ *		green and blue will be ignored
+ *
+ *	If monochrome bitmap has been passed
+ *		redOrIndex: pass 0 (for white) or 1 (for black)
+ *			    this means: do NOT pass C_WHITE or C_BLACK for monochrome bitmaps
  *		green and blue will be ignored
  *
  * Return:	FALSE if everything is ok
@@ -1279,6 +1313,121 @@ extern Boolean RS_EXPORT DragGetDragBounds(DragRectStruct *dragRect, Rectangle *
 	@message void MSG_PD_GET_SIZE(int *xSize, int *ySize);
 
 @endc;
+
+/*
+ ***************************************************************************
+ *
+ *	Part 9: Dithering and Scaling
+ *
+ ***************************************************************************
+ */
+
+/*--------------------- BTCreatePaletteByMedianCut ---------------------
+ * Purpose:	Generate an optimized color palette using the Median Cut algorithm
+ * Parameters:	vmFile, bmpBlock: Bitmap to analyze
+ *		*palette: Return: optimized palette
+ *			  must be able to hold at least 'targetColors' entries
+ *		targetColors: Number of colors in the new palette
+ *			      Usually 16 or 256, but any other value <= 256 is also possible.
+ *		tempFile: VM file for storing the histogram
+ *			  NULL: Use ClipboardFile
+ *		progressTextOptr: Text object to display progress messages
+ *Return:	FALSE: Everything OK
+ *		TRUE:  Error, e.g. out of memory
+ ---------------------------------------------------------------------------*/
+extern Boolean RS_EXPORT BTCreatePaletteByMedianCut(VMFileHandle vmFile, VMBlockHandle bmpBlock,
+		PaletteEntry *palette, int targetColors, VMFileHandle tempFile, optr progressTextOptr);
+
+
+/*--------------------- BTDitherByFloydSteinberg ---------------------
+ * Purpose:	Convert a bitmap to a color-reduced bitmap
+ *		using Floyd-Steinberg dithering
+ *
+ * Note:	This routine handles any combination of source colors an target colors.
+ *		Even cases where color reduction is not possible or necessary — such as converting
+ *		from a 16-color standard palette to a 256-color standard palette — are handled
+ *		correctly. However, the routine is not optimized for these exotic cases.
+ *
+ * Parameters:	srcFile
+ *		srcBlock:    bitmap to be converted
+ *		destFile:    Destination file
+ *		destFormat:  target format: BMF_4BIT, BMF_8BIT or BMF_MONO
+ * 			     all other BMF_bits are ignored
+ *              palette:     Destination palette to be used
+ *			     Pass NULL pointer to use the GEOS standard palette
+ *              palColors    Number of valid colors in the palette
+ *                    	     often 16 or 256; other values are also allowed
+ *              progressText: Text object for displaying progress indicators
+ *                    	      Null if no progress indicator is needed
+ *    Return:	Handle of the new bitmap
+ *           	Zero on error:	- source bitmap is compacted
+ *           		      	- source bitmap is monochrome
+ *				- out of memory
+ * ---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTDitherByFloydSteinberg(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int palColors, optr progressText);
+
+/*--------------------- BTConvertBitmapColorsByReplace ---------------------
+ * Purpose:	Convert a bitmap to a color-reduced bitmap by replacing the pixel colors
+ *		by the neares available color in the target colors
+ *
+ * Note:	This routine handles any combination of source colors an target colors.
+ *		Even cases where color reduction is not possible or necessary — such as converting
+ *		from a 16-color standard palette to a 256-color standard palette — are handled
+ *		correctly. However, the routine is not optimized for these exotic cases.
+ *
+ * Parameters:	srcFile
+ *		srcBlock:    bitmap to be converted
+ *		destFile:    Destination file
+ *		destFormat:  target format: BMF_4BIT, BMF_8BIT, BMF_24BIT or BMF_MONO
+ * 			     all other BMF_bits are ignored
+ *              palette:     Target palette to be used
+ *			     Pass NULL pointer to use the GEOS standard palette
+ *              palColors    Number of valid colors in the palette
+ *                    	     often 16 or 256; other values are also allowed
+ *              progressText: Text object for displaying progress indicators
+ *                    	      Null if no progress indicator is needed
+ *    Return:	Handle of the new bitmap
+ *           	Zero on error:	out of memory
+ *---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTConvertBitmapColorsByReplace(VMFileHandle srcFile, VMBlockHandle srcBitmap, VMFileHandle destFile,
+			int destFormat, PaletteEntry *palette, int palColors, optr progressText);
+
+
+/*-------------------- BTScaleBitmapSystem ---------------------
+ *  Purpose:	Use system function to scale the bitmap.
+ *		This routine fixes a bug that causes color distortion
+ *		in bitmaps with a palette and processes transparent bitmaps correctly.
+ *  Context:
+ *
+ *  Note: 	If the bitmap to scale has a palette, we need write access to
+ *		this bitmap to fix a system bug (R.B. 09/2026)
+ *
+ *  Parameters:	srcFile, srcBmp: bitmap to scale
+ * 		destFile: file for the new bitmap
+ *		newWidth, newHeight: size of the new bitmap
+ *  Return:	VMBlock handle of the new (scaled) bitmap
+ *		The color depth and palette are identical to those of the original bitmap.
+ *		Zero in case of error
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTScaleBitmapSystem(VMFileHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile, int newWidth, int newHeight);
+
+
+/*-------------------- BTScaleBitmapBilinear ---------------------
+ *  Purpose:	Use bilinear / area sampling algorithm to scale a bitmap
+ *  Context:
+ *  Strategy:	The scaled bitmap will always be a true color bitmap
+ *		Scaling is done in two steps: 1st: x-scaling, 2nd: y-scaling
+
+ *  Parameters:	srcFile, srcBmp: Bitmap to scale
+ *		destFile: VMFile for the scaled bitmap
+ *		newWidth, newHeight: size of the scaled bitmap
+ *		progressText: text object to display "progress dots"
+ *  Return:	VMBlock handle of the new (scaled) bitmap
+ *		This will always be a true color bitmap
+ ---------------------------------------------------------------------------*/
+extern VMBlockHandle RS_EXPORT BTScaleBitmapBilinear(VMFileHandle srcFile, VMBlockHandle srcBmp, VMFileHandle destFile,
+				int newWidth, int newHeight, optr progressText);
 
 
 /*

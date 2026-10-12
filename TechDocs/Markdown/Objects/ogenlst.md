@@ -334,7 +334,7 @@ hints takes effect only on screens that are taller than they are wide.
 
     @instance word GII_identifier;
 
-*GII_identifier* sets the indentifying keyword (usually an enumerated type) 
+*GII_identifier* sets the identifying keyword (usually an enumerated type) 
 that uniquely identifies this GenItem. This identifier is used by the 
 GenItemGroup parent to indicate the current selection and otherwise 
 reference the item. Each GenItem identifier within the same GenItemGroup 

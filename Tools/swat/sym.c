@@ -2906,6 +2906,176 @@ Sym_ToAddr(Sym	    sym,
 
 
 
+
+/***********************************************************************
+ *				SymTypeIsClassStruct
+ ***********************************************************************
+ * SYNOPSIS:	    Decide whether the given symbol actually names a GEOS
+ *		    class record (a ClassStruct), as opposed to some random
+ *		    variable that happens to be spelled like a class.
+ * CALLED BY:	    (INTERNAL) SymProcessPossibleMethodPath
+ * RETURN:	    TRUE if the symbol may be used as the starting point of
+ *		    a method-table walk.
+ * SIDE EFFECTS:    None
+ *
+ * STRATEGY:
+ *	Esp records a class declared in assembly as an OSYM_CLASS (or
+ *	OSYM_MASTER_CLASS/OSYM_VARIANT_CLASS) symbol, so those are trivially
+ *	accepted.
+ *
+ *	A class defined in Goc, however, never reaches us as one of those:
+ *	Goc emits the class record as an ordinary C object (see
+ *	Tools/goc/output.c) and the C compiler's debug records -- whether
+ *	turned into symbols by codeview.c or borland.c -- know nothing about
+ *	GEOS classes, so all we get is an OSYM_VAR. For those we have to fall
+ *	back on the type of the variable, and the name under which that type
+ *	is recorded depends on who generated the module:
+ *
+ *	    Esp		"ClassStruct" is a real assembly structure
+ *			(Include/object.def), so Type_Name() hands back
+ *			"struct ClassStruct".
+ *	    C compilers	the type comes from
+ *			    typedef struct _ClassStruct {...} ClassStruct;
+ *			in CInclude/object.h, so, depending on whether the
+ *			compiler's debug records point at the struct tag or at
+ *			the typedef, Type_Name() hands back
+ *			"struct _ClassStruct" or plain "ClassStruct".
+ *			Some compilers additionally get the record declared as
+ *			a one-element array, so there may be an array wrapper
+ *			to peel off first.
+ *
+ *	We therefore normalize whatever Type_Name() produces before
+ *	comparing and, should even that fail, look for the fields we
+ *	actually care about, which are named identically in the assembly
+ *	and the C definitions of the structure. (Class_methodTable is
+ *	deliberately not among them: it is a label at the end of the
+ *	assembly structure and has no counterpart in the C one.)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *
+ ***********************************************************************/
+static Boolean
+SymTypeIsClassStruct(Type   type)
+{
+    char    *typeName;
+    char    *cp;
+    char    *end;
+    Boolean  result;
+    int	     depth;
+
+    /*
+     * Peel off any array wrapper -- for some compilers Goc declares the
+     * class record as an array of a single ClassStruct.
+     */
+    for (depth = 0;
+	 !Type_IsNull(type) && (Type_Class(type) == TYPE_ARRAY) && (depth < 8);
+	 depth++)
+    {
+	Type	base;
+
+	Type_GetArrayData(type, (int *)NULL, (int *)NULL, (Type *)NULL, &base);
+	if (Type_IsNull(base)) {
+	    break;
+	}
+	type = base;
+    }
+
+    if (Type_IsNull(type)) {
+	return(FALSE);
+    }
+
+    /*
+     * Fetch the printed form of the type and strip off the decoration that
+     * differs between the assembler and the C compilers.
+     */
+    typeName = Type_Name(type, "", FALSE);
+    cp = typeName;
+
+    if (strncmp(cp, "const ", 6) == 0) {
+	cp += 6;
+    }
+    if (strncmp(cp, "volatile ", 9) == 0) {
+	cp += 9;
+    }
+    if (strncmp(cp, "struct ", 7) == 0) {
+	cp += 7;
+    }
+    if (*cp == '_') {
+	cp += 1;
+    }
+
+    /*
+     * Ignore trailing whitespace, but nothing else: "ClassStruct *" is a
+     * pointer to a class, not a class, and must not be accepted here.
+     */
+    end = cp + strlen(cp);
+    while ((end > cp) && isspace(end[-1])) {
+	end--;
+    }
+
+    result = ((end - cp) == (sizeof("ClassStruct") - 1)) &&
+	     (strncmp(cp, "ClassStruct", sizeof("ClassStruct") - 1) == 0);
+
+    free((malloc_t)typeName);
+
+    if (result) {
+	return(TRUE);
+    }
+
+    /*
+     * The name didn't look familiar, so see if the thing at least has the
+     * fields a class record must have. Both Include/object.def and
+     * CInclude/object.h use these names, so this works no matter who
+     * generated the symbols.
+     */
+    if (Type_Class(type) == TYPE_STRUCT) {
+	return(Type_GetFieldData(type, "Class_superClass", (int *)NULL,
+				 (int *)NULL, (Type *)NULL) &&
+	       Type_GetFieldData(type, "Class_methodCount", (int *)NULL,
+				 (int *)NULL, (Type *)NULL));
+    }
+
+    return(FALSE);
+}
+
+/***********************************************************************
+ *				SymIsClassRecord
+ ***********************************************************************
+ * SYNOPSIS:	    Decide whether the given symbol may be used as the
+ *		    starting point of a method-table walk.
+ * CALLED BY:	    (INTERNAL) SymProcessPossibleMethodPath
+ * RETURN:	    TRUE if the symbol names a GEOS class record.
+ * SIDE EFFECTS:    None
+ *
+ ***********************************************************************/
+static Boolean
+SymIsClassRecord(Sym	sym)
+{
+    if (Sym_IsNull(sym)) {
+	return(FALSE);
+    }
+
+    switch (Sym_Type(sym)) {
+    case OSYM_CLASS:
+    case OSYM_MASTER_CLASS:
+    case OSYM_VARIANT_CLASS:
+	/*
+	 * Esp told us outright that this is a class.
+	 */
+	return(TRUE);
+    case OSYM_VAR:
+	/*
+	 * All a C-defined class ever looks like, so check the type.
+	 */
+	return(SymTypeIsClassStruct(SymGetType(sym)));
+    default:
+	return(FALSE);
+    }
+}
+
+
 /***********************************************************************
  *				SymProcessPossibleMethodPath
  ***********************************************************************
@@ -3054,29 +3224,12 @@ SymProcessPossibleMethodPath(const char *name,
 	classSym = Sym_LookupInScope(className, SYM_VAR, scope);
     }
 
-    if (!Sym_IsNull(classSym)) {
+    if (!Sym_IsNull(classSym) && !SymIsClassRecord(classSym)) {
 	/*
 	 * Make sure it's a class, not just a variable whose name is
 	 * the abbreviated name of the class.
 	 */
-	switch (Sym_Type(classSym)) {
-	case OSYM_VAR:
-	{
-	    char *typeName = Type_Name(SymGetType(classSym), "", FALSE);
-	    if (strcmp(typeName, "struct ClassStruct") != 0) {
-		classSym = NullSym;
-	    }
-	    free ((malloc_t)typeName);
-	    break;
-	}
-	case OSYM_CLASS:
-	case OSYM_MASTER_CLASS:
-	case OSYM_VARIANT_CLASS:
-	    break;
-	default:
-	    classSym = NullSym;
-	    break;
-	}
+	classSym = NullSym;
     }
 
     if (Sym_IsNull(classSym)) {
@@ -3090,6 +3243,15 @@ SymProcessPossibleMethodPath(const char *name,
 	    classSym = Sym_Lookup(className, SYM_VAR, scope);
 	} else {
 	    classSym = Sym_LookupInScope(className, SYM_VAR, scope);
+	}
+
+	if (!Sym_IsNull(classSym) && !SymIsClassRecord(classSym)) {
+	    /*
+	     * Something of that name exists, but it isn't a class record,
+	     * so pretend we found nothing rather than groveling through
+	     * whatever data happen to live there.
+	     */
+	    classSym = NullSym;
 	}
 
 	if (Sym_IsNull(classSym)) {

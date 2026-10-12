@@ -1695,7 +1695,7 @@ This routine gets a note's creation date.
             char *          text);      /* String to hold return value */);
 
 This routine fills the passed buffer with the note's keywords. The target 
-buffer should be of atleast length INK_DB_MAX_NOTE_KEYWORDS_SIZE +1. 
+buffer should be of at least length INK_DB_MAX_NOTE_KEYWORDS_SIZE +1. 
 The string will be null-terminated.
 
 **Include:** pen.goh
@@ -2421,7 +2421,7 @@ structure. Any fields which are not specified in the format string will be fille
 with -1.
 
 If the string parses correctly, **LocalCustomParseDateTime()** returns -1. 
-Otherwise it reutrns the offset to the start of the text which did not parse 
+Otherwise it returns the offset to the start of the text which did not parse 
 correctly.
 
 **Include:** localize.h

@@ -41,6 +41,8 @@
         [string c $modernPromptKeys 0] == 0 ||
         [string c $modernPromptKeys off] == 0} {
           echo {Legacy prompt keys (modernPromptKeys disabled):}
+          echo {  Up/Down           Scroll srcwin up/down one line}
+          echo {  Left/Right        Scroll srcwin left/right}
           if {[string c ${file-os} unix] == 0} {
             echo {  Linux mouse       Plain drag selects terminal text; no wheel support}
           }
@@ -51,10 +53,13 @@
       echo {  Delete            Delete the character under the cursor}
       echo {  Backspace         Delete the character left of the cursor}
       echo {  Up/Down           Previous/next command}
+      echo {  Ctrl+Up/Down      Scroll srcwin up/down one line}
+      echo {  Ctrl+Left/Right   Scroll srcwin left/right}
       if {[string c ${file-os} unix] == 0} {
         echo {  Linux mouse       Wheel scrolls srcwin; Shift+Left drag selects}
       }
     }
+    echo {  Page Up/Down      Scroll srcwin up/down half a window}
     echo {}
     echo {Command history:}
     echo {  Ctrl-p/Ctrl-n     Previous/next command}

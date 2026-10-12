@@ -207,7 +207,7 @@ and a duration in ticks. The sound will be played immediately, played using
 the instrument patch IP_REED_ORGAN if the sound device supports 
 simulated instruments. The note will play with medium loudness.
 
-To play a note at a lower priority (so it won't neccessarily interrupt other 
+To play a note at a lower priority (so it won't necessarily interrupt other 
 sounds), or with a different loudness, or as if by an instrument other than a 
 reed organ, you will create and play a custom note.
 

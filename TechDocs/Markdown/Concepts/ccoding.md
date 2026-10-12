@@ -2495,7 +2495,7 @@ and your **@method** declaration looks like
 @method DoSomething, MyClass, MSG_MC_DO_SOMETHING {
 /* Code Here */ }
 
-Then your protoype should look like
+Then your prototype should look like
 
 extern word _pascal DoSomething(optr oself,
             MyMessages message,
@@ -3959,4 +3959,4 @@ most part, only UI objects are saved to state files; however, you can mark
 other object blocks for saving. State saving is described in full in [section 6.1.4 
 of chapter 6](cappl.md#614-saving-and-restoring-state).
 
-[Frist Steps: Hello World](cgetsta.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Applications and Geodes](cappl.md)
+[First Steps: Hello World](cgetsta.md) <-- &nbsp;&nbsp; [table of contents](../concepts.md) &nbsp;&nbsp; --> [Applications and Geodes](cappl.md)

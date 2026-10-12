@@ -128,6 +128,8 @@ int _pascal _export pngImportProcessChunks(FileHandle file, pngIHDRData* ihdrDat
 
                 /* now that we seem to have a valid IHDR, create the memory for an array of IDATChunks */
                 *idatChunksHan = MemAlloc(PNG_MAX_IDAT_CHUNKS * sizeof(pngIDATChunkEntry), HF_SWAPABLE | HF_SHARABLE, HAF_ZERO_INIT);
+                if (*idatChunksHan == NullHandle)
+                    return 0;
 
                 /* Move file pointer forward by the remaining part of the IHDR chunk */
                 FilePos(file, chdr.length - sizeof(pngIHDRData), FILE_POS_RELATIVE);

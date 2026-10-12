@@ -76,7 +76,7 @@ set syntax and is programmable, thus allowing users to create
 more powerful commands than the built-in command set listed 
 in "Swat Reference," Chapter 4.
 
-**Library** Tcl also includes a library which can be imbedded in an 
+**Library** Tcl also includes a library which can be embedded in an 
 application, as it is in Swat. This library includes a parser for 
 the Tcl language, routines to implement the Tcl built-in 
 commands, and procedures allowing an application to extend 
