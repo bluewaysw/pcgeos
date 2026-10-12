@@ -1,6 +1,6 @@
 name impgraph.lib
 
-longname "Graphics Imp Library"
+longname "Graphics Import Library"
 
 type library, single
 
