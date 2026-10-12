@@ -37,9 +37,9 @@ CALLED BY:	MSG_FM_START_PRINT
 PASS:		*ds:si - instance handle of Folder object
 		ds:bx	- ptr to object
 
-RETURN:		
+RETURN:
 
-DESTROYED:	
+DESTROYED:
 
 PSEUDO CODE/STRATEGY:
 
@@ -59,13 +59,13 @@ FolderStartPrint	method	FolderClass, MSG_FM_START_PRINT
 	.enter
 if _FAX_CAPABILITY
 	mov	ss:[outputType], cl
-endif		
+endif
 	mov	ss:[doingMultiFileLaunch], TRUE	; init flag
 
 GM<	cmp	ds:[bx].FOI_selectList, NIL	; no selected files?	>
 GM<	je	done				; yes, do nothing	>
 ND<	call	NDCheckForNoSelection					>
-ND<	jc	done							>
+ND<	LONG	jc	done							>
 	;
 	mov	di, ds:[bx].FOI_selectList	; di = selection list head
 ND<	call	NDGetSelectionIntoDI 					>
@@ -171,7 +171,7 @@ CALLED BY:	INTERNAL
 PASS:		ds:si - folder object instance data
 		es:di - FolderRecord of file to open
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,bx,cx,dx,si,bp,ds
 
@@ -236,7 +236,7 @@ CALLED BY:	FilePrintESDI
 PASS:		es:di - FileOperationInfoEntry (or FolderRecord) of
 		file to print.
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	bx,cx,dx
 
@@ -312,7 +312,7 @@ CALLED BY:	PrintGeosFile
 PASS:		dx - AppLaunchBlock
 		cx - filename block (in case error reporting is needed)
 
-RETURN:		nothing 
+RETURN:		nothing
 
 DESTROYED:	ax,cx,dx,bp
 
@@ -339,13 +339,13 @@ LoadApplicationAndPrint	proc	far
 	;
 	; Lock down LoadAppData anf save the token away, unlocking the block
 	; so it doesn't get in the way of loading the app, if it needs loading.
-	; 
+	;
 
 	; Connect/Launch/Open the app + document combo
 	;
 	call	PrintConnect		; call IACPConnect w/correct info
 	jc	error
-	
+
 	; NOW, get the PrintControl to do dirty deeds for us...
 
 	call	PrintInitiatePrint	; Request print via IACPConnection in bp
@@ -435,7 +435,7 @@ PrintConnect	proc	near	uses	es, di
 
 	;
 	; Connect to the server, telling IACP to create it if it's not there.
-	; 
+	;
 	segmov	es, ss
 	mov	di, sp
 	mov	bx, dx
@@ -477,7 +477,7 @@ PrintInitiatePrint	proc	near	uses	si, di
 
 	call	GeodeAllocQueue
 
-	; OK, first, before trying to print, make sure the document has 
+	; OK, first, before trying to print, make sure the document has
 	; finished opening.  Send the document a bogus message, w/a completion
 	; message so we know when its done being opened/aborted somehow(?)
 	; We can't "call" the server, only send it a message, and it can
@@ -498,7 +498,7 @@ PrintInitiatePrint	proc	near	uses	si, di
 					; bx = queue (dest for completion msg)
 
 	push	bx			; save queue handle
-	mov	ax, MSG_META_NOTIFY 
+	mov	ax, MSG_META_NOTIFY
 	mov	cx, MANUFACTURER_ID_GEOWORKS
 	mov	dx, GWNT_DOCUMENT_OPEN_COMPLETE
 	mov	di, mask MF_RECORD
@@ -554,7 +554,7 @@ PrintInitiatePrint	proc	near	uses	si, di
 					; bx = queue (dest for completion msg)
 
 	push	bx			; save queue handle
-	mov	ax, MSG_META_NOTIFY 
+	mov	ax, MSG_META_NOTIFY
 	mov	cx, MANUFACTURER_ID_GEOWORKS
 	mov	dx, GWNT_SPOOL_PRINTING_COMPLETE
 	mov	di, mask MF_RECORD
