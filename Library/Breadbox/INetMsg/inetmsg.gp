@@ -14,7 +14,7 @@
 
 name inetmsg.lib
 
-longname "Internet Msg Library"
+longname "Internet Message Library"
 
 ###########################################################################
 
