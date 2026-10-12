@@ -139,6 +139,7 @@ typedef struct {
   struct {
     WordFlags   HTBHO_fileInfo;
       #define HTML_FI_BACK_COLOR 0x0001 /* set if background color specified */
+      #define HTML_FI_INLINE_SVG 0x0002 /* owns inline SVG backing files */
       #define HTML_FI_NON_JS_SCRIPT 0x4000 /* contains unknown script types */
       #define HTML_FI_EXT_SCRIPT 0x8000 /* some external scripts not loaded */
     NameToken   HTBHO_documentTitle;    /* <TITLE>...</TITLE> */
@@ -222,6 +223,9 @@ typedef struct {
     #define HTML_IDF_ISMAP      0x0002  /*  - image is a server side map */
     #define HTML_IDF_SUBMIT     0x0004  /*  - image is graphical submit btn */
     #define HTML_IDF_RESOLVING  0x0008  /*  - image has been requested */
+    #define HTML_IDF_INLINE_SVG 0x0010  /*  - source is a page-owned file */
+    #define HTML_IDF_PICTURE_FALLBACK 0x0020 /* svgFile is an image URL */
+    #define HTML_IDF_PICTURE_FALLBACK_USED 0x0040 /* runtime: tried/disabled */
     #define HTML_IDF_SIZE_DIRTY 0x4000  /*  - size has changed recently */
     #define HTML_IDF_BROKEN     0x8000  /*  - image could not be resolved */
   XYSize size;                          /* target size, or 0 if not spec'd */
@@ -229,6 +233,11 @@ typedef struct {
   word formElementIndex;                /* array member index of associated
                                            form element if IDF_SUBMIT is set */
   NameToken imageURL;                   /* name token of image URL */
+  NameToken svgFile;                    /* local pool auxiliary source:
+                                           INLINE_SVG: backing-file path;
+                                           PICTURE_FALLBACK: fallback URL.
+                                           Flags are mutually exclusive;
+                                           owned by the transfer item. */
   NameToken imageALT;                   /* alternative text of image (only if
                                            image has var graphic placeholder) */
   NameToken usemap;                     /* URL of associated map */
@@ -261,6 +270,7 @@ typedef struct {
 
 #define TOKEN_FIELDS_IMAGE_DATA \
   word_offsetof(HTMLimageData, imageURL), \
+  word_offsetof(HTMLimageData, svgFile), \
   word_offsetof(HTMLimageData, imageALT), \
   word_offsetof(HTMLimageData, usemap), 0xFFFF
 
@@ -341,9 +351,11 @@ typedef struct {
   NameToken     HFD_value;              // Initial value or text of element
                                         //  FILE: accept=...
                                         //  TEXTAREA: contents of token
+                                        //  BUTTON: submitted value
                                         //  HEADER: target= ...
   NameToken     HFD_prompt;             // Prompt for text input and choice
                                         // list dialogs
+                                        //  BUTTON: displayed caption
                                         //  HEADER: name=
 
   dword         HFD_runtimeState;       /* may be used to hold current
@@ -407,6 +419,7 @@ typedef struct {
       word        flags ;
         #define HTML_SUBMIT_PRESSED 0x0001
 	#define HTML_BUTTON_ONCLICK 0x0002
+	#define HTML_BUTTON_CONTENT 0x0004
     } submit ;
   } HFD_var;
 
@@ -788,6 +801,21 @@ int _pascal _export ParsePlainFile(ReadHTML_getc *,dword,HTMLextra *, VMBlockHan
 int _pascal _export ParseAnyFile(word fileType, word fileSource, dword data,
   HTMLextra *ext, VMBlockHandle *item, AllocWatcherHandle watcher, dword *p_memUsed);
 void _pascal _export ParseAbort(void) ;
+
+/* Optional image-source inputs. viewportWidth is zero when unknown.
+ * mimeSupported receives an ASCII MIME type and must not reenter the parser.
+ */
+typedef Boolean _pascal _export proc_HTMLImageMimeSupported(char *mimeP);
+typedef Boolean _pascal pcfm_HTMLImageMimeSupported(char *mimeP, void *callbackP);
+typedef struct {
+    word viewportWidth;
+    proc_HTMLImageMimeSupported *mimeSupported;
+} HTMLImageSourceContext;
+
+int _pascal _export ParseAnyFileWithImageSources(word fileType,
+    word fileSource, dword data, HTMLextra *ext, VMBlockHandle *item,
+    AllocWatcherHandle watcher, dword *usedMemP,
+    HTMLImageSourceContext *imageSourcesP);
 
 /***************************************************************************
  *              HTML Export

@@ -2663,6 +2663,7 @@ T_layoutLevelTable *LayoutStackTableLevelAccess(T_layoutStack *p_stack, word lev
 @extern method HTMLTextClass, MSG_HTML_TEXT_LAYOUT_STOP
 {
     T_layoutStack *p_stack ;
+    Boolean notifyEnded = FALSE;
 
     if (pself->HTI_layoutStack)  {
         if (!(pself->HTI_layoutState & HTS_RESTARTING_LAYOUT))  {
@@ -2674,9 +2675,7 @@ T_layoutLevelTable *LayoutStackTableLevelAccess(T_layoutStack *p_stack, word lev
             /* Update our boundaries */
             @call oself::MSG_HTML_TEXT_CALCULATE_BOUNDARIES() ;
 
-            /* Let the sub-class know that we are finished */
-            @call oself::MSG_HTML_TEXT_FORMATTING_ENDED() ;
-
+            notifyEnded = TRUE;
             @call oself::MSG_HTML_TEXT_INTERNAL_FLUSH_INVAL_AREA() ;
         }
         LayoutStackFree(pself->HTI_layoutStack) ;
@@ -2697,6 +2696,12 @@ T_layoutLevelTable *LayoutStackTableLevelAccess(T_layoutStack *p_stack, word lev
     }
 
     ProfPoint("MSG_HTML_TEXT_LAYOUT_STOP") ;
+    if (notifyEnded) {
+        EC_ERROR_IF(pself->HTI_layoutStack ||
+                    (pself->HTI_layoutState & HTS_CALCULATING_LAYOUT), -1);
+        /* The callback may start a new layout, so finish cleanup first. */
+        @call oself::MSG_HTML_TEXT_FORMATTING_ENDED() ;
+    }
 }
 
 void IHideCells(T_layoutStack *p_stack, word startCell, word endCell)

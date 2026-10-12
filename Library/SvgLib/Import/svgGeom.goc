@@ -1,0 +1,116 @@
+/***********************************************************************
+ * svgGeom.goc - shared fixed-point helpers (WWFixed 16.16)
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/ctype.h>
+#include <file.h>
+#include <system.h>
+#include <graphics.h>
+#include <gstring.h>
+#include "Import/svg.h"
+#include "Import/dbglog.h"
+
+/* 16.16 from int */
+WWFixedAsDWord SvgGeomMakeWWFixedFromInt(int v)
+{
+    WWFixedAsDWord f;
+    f = ((WWFixedAsDWord)((sdword)v)) << 16;
+    return f;
+}
+
+/* 16.16 -> signed 16-bit, symmetric round-to-nearest */
+sword SvgGeomWWFixedToSWordRound(WWFixedAsDWord w)
+{
+    sdword v;
+    v = (sdword)w;
+
+    /* Add +0x8000 for both signs, then arithmetic shift.
+       This yields correct rounding for negatives: -36.0 -> -36, -36.75 -> -37. */
+    v += 0x8000;
+
+    return (sword)(v >> 16);
+}
+
+WWFixedAsDWord SvgGeomWWSqrt(WWFixedAsDWord a)
+{
+    WWFixedAsDWord g;
+    WWFixedAsDWord prev;
+    int i;
+
+    if ((sdword)a <= 0) {
+        return MakeWWFixed(0);
+    }
+
+    g = a;
+    if ((sdword)g <= 0) {
+        g = MakeWWFixed(1);
+    }
+
+    prev = 0;
+    for (i = 0; i < 16; i++) {
+        WWFixedAsDWord q;
+        if (g == 0) {
+            g = MakeWWFixed(1);
+        }
+        q = GrSDivWWFixed(a, g);                          /* a/g */
+        g = GrSDivWWFixed(GrAddWWFixed(g, q), MakeWWFixed(2)); /* (g + a/g)/2 */
+        if (g == prev) {
+            break;
+        }
+        prev = g;
+    }
+    return g;
+}
+
+WWFixedAsDWord SvgGeomWWAbs(WWFixedAsDWord x)
+{
+    return ((sdword)x < 0) ? (WWFixedAsDWord)(-(sdword)x) : x;
+}
+
+WWFixedAsDWord SvgGeomWWMin(WWFixedAsDWord a, WWFixedAsDWord b)
+{
+    return ((sdword)a < (sdword)b) ? a : b;
+}
+
+WWFixedAsDWord SvgGeomWWMax(WWFixedAsDWord a, WWFixedAsDWord b)
+{
+    return ((sdword)a > (sdword)b) ? a : b;
+}
+
+/* Fast atan2 approximation in **degrees** (16.16 WWFixed) */
+WWFixedAsDWord SvgGeomWWAtan2Deg(WWFixedAsDWord y, WWFixedAsDWord x)
+{
+    WWFixedAsDWord absY, r, angle;
+    WWFixedAsDWord k45, k135;
+    WWFixedAsDWord denom;
+
+    absY = SvgGeomWWAbs(y);
+    k45  = MakeWWFixed(45);
+    k135 = MakeWWFixed(135);
+
+    if ((sdword)x >= 0) {
+        denom = GrAddWWFixed(x, absY);
+        if ((sdword)denom == 0) {
+            r = 0;
+        } else {
+            r = GrSDivWWFixed(GrSubWWFixed(x, absY), denom);
+        }
+        angle = GrSubWWFixed(k45, GrMulWWFixed(k45, r));
+    } else {
+        denom = GrSubWWFixed(absY, x);
+        if ((sdword)denom == 0) {
+            r = 0;
+        } else {
+            r = GrSDivWWFixed(GrAddWWFixed(x, absY), denom);
+        }
+        angle = GrSubWWFixed(k135, GrMulWWFixed(k45, r));
+    }
+
+    if ((sdword)y < 0) {
+        angle = (WWFixedAsDWord)(-(sdword)angle);
+    }
+    return angle;
+}
