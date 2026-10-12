@@ -8,7 +8,7 @@
 ##############################################################################
 name impdoc.lib
 
-longname "Doc Import Library"
+longname "Document Import Library"
 
 type library, single, c-api
 entry LIBRARYENTRY
