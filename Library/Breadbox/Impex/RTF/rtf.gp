@@ -1,6 +1,6 @@
 name rtf.lib
 
-longname "Breadbox RTF Translator"
+longname "RTF Translator"
 tokenchars "TLTX"
 tokenid 16431
 
@@ -24,5 +24,3 @@ export TransGetExportOptions
 export TransImport
 export TransExport
 export TransGetFormat
-
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"

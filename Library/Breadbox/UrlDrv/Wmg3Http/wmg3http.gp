@@ -8,7 +8,7 @@
 ##############################################################################
 
 name            wmg3http.lib
-longname        "Breadbox HTTP URL Driver"
+longname        "HTTP URL Driver"
 tokenchars      "URLD"
 tokenid         16431
 
@@ -39,5 +39,4 @@ export          URLDRVFLUSH
 resource HTMLResource shared lmem data
 resource StatusResource shared lmem data
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
