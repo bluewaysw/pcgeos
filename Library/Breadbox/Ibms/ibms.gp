@@ -1,5 +1,5 @@
 name ibms.lib
-longname "Index Based Mem Lib"
+longname "Index Based Memory Library"
 type    library, single, c-api
 tokenchars "None"
 tokenid 16431
