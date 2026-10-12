@@ -21,7 +21,7 @@
 name n2txt.lib
 
 #Long Name                                                                    #
-longname "Num to Text Library"
+longname "Number to Text Library"
 
 tokenchars   "bb01"
 tokenid 16431
