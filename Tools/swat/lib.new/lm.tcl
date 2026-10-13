@@ -293,8 +293,14 @@ See also:
     	    }
 	    var address [addr-parse $a]
     	}
+    	global stub-is-geos32
     	if {[null [index $address 0]]} {
-	    var seg [expr [index $address 1]>>4]
+	    # 32 bit (protected mode) Swat: segment (selector) in the high word
+	    if {${stub-is-geos32}} {
+	    	var seg [expr [index $address 1]>>16]
+	    } else {
+	    	var seg [expr [index $address 1]>>4]
+	    }
 	    var fmt_seg [format %%04xh $seg]
 	} else {
 	    var seg [handle segment [index $address 0]]

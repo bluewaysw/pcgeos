@@ -221,7 +221,11 @@ See also:
 		    # being careful of what segment we use for things in the
 		    # HMA (always 0xffff)
 		    #
-    	    	    if {[index $v 1] >= 0x100000} {
+    	    	    global stub-is-geos32
+    	    	    if {${stub-is-geos32}} {
+		    	# 32 bit (protected mode) Swat: selector in the high word
+		    	var seg [expr [index $v 1]>>16] off [expr [index $v 1]&0xffff]
+    	    	    } elif {[index $v 1] >= 0x100000} {
 		    	var seg 0xffff off [expr [index $v 1]-0xffff0]
     	    	    } else {
 		    	[var seg [expr [index $v 1]>>4]

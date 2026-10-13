@@ -3210,7 +3210,7 @@ SymProcessPossibleMethodPath(const char *name,
 		 * Fixed memory.
 		 */
 		classAddr.handle =
-		    Handle_Find((Address)((method >> 12) & 0xffff0));
+		    Handle_Find(FarPtrToAddress(method & 0xffff0000));
 	    }
 	    /*
 	     * Now lookup the method itself, as that's the goal of this whole
@@ -3243,7 +3243,7 @@ SymProcessPossibleMethodPath(const char *name,
 		 */
 
 		classAddr.handle =
-		    Handle_Find((Address)((super >> 12) & 0xffff0));
+		    Handle_Find(FarPtrToAddress(super & 0xffff0000));
 		classAddr.offset = (Address)(super & 0xffff);
 
 		if (classAddr.handle == NullHandle) {

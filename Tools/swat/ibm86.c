@@ -3833,7 +3833,7 @@ Ibm86PrintArgs(char    	    	*decode,    /* Buffer for result */
 		
 		Ibm86ReadStack(4, 0, (genptr)&a);
 
-		a = (Address)((word)a + ((((dword) a) >> 12) & 0xffff0));
+		a = FarPtrToAddress(a);
 		
 		h = Handle_Find(a);
 		
@@ -3859,7 +3859,7 @@ Ibm86PrintArgs(char    	    	*decode,    /* Buffer for result */
 		
 		Ibm86ReadStack(4, 0, (genptr)&a);
 		Ibm86ReadStack(2, 4, (genptr)&w);
-		a = (Address)((word)a + ((((dword) a) >> 12) & 0xffff0));
+		a = FarPtrToAddress(a);
 		
 		h = Handle_Find(a);
 		if (h == NullHandle) {
