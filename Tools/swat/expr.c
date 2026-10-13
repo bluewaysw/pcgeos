@@ -4516,7 +4516,7 @@ ExprIndirect(ExprState	*state,
 		 * a handle if possible.
 		 */
 		resultPtr->value.addr.offset = (Address)(d & 0xffff);
-		seg = (Address)((d >> 12) & 0xffff0);
+		seg = FarPtrToAddress(d & 0xffff0000);
 		resultPtr->value.addr.handle = Handle_Find(seg);
 
 		/*
@@ -4796,7 +4796,7 @@ ExprFetch(ExprState	*state,
 					       tokenPtr->value.addr.offset,
 					       (genptr)&val);
 			    gap->offset = (Address)
-				(((val >> 12) & 0xffff0) + (val & 0xffff));
+				FarPtrToAddress(val);
 			    gap->handle = Handle_Find(gap->offset);
 
 			    /*
@@ -4844,7 +4844,7 @@ ExprFetch(ExprState	*state,
 				}
 			    } else {
 				gap->offset = (Address)
-				    (((val >> 12) & 0xffff0) + (val & 0xffff));
+				    FarPtrToAddress(val);
 				gap->handle = Handle_Find(gap->offset);
 				/*
 				 * If points into a handle, adjust the offset

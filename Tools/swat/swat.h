@@ -47,6 +47,14 @@
 #define OffsetOf(addr)              (((dword)addr) & OFFSET_MASK)
 #define MakeSegOff(seg, off)        ((((dword)seg) << SEGMENT_SHIFT) + ((dword)off))
 #define MakeAddress(seg, off)       ((Address)MakeSegOff(seg, off))
+/*
+ * A far pointer (segment in the high word, offset in the low word, as
+ * stored in memory) as an Address. With SEGMENT_SHIFT 4 that's the real
+ * mode segment * 16 + offset; for the 32 bit (protected mode) Swat the
+ * segment is a selector and stays in the high word.
+ */
+#define FarPtrToAddress(fp)         MakeAddress((((dword)(fp)) >> 16) & 0xffff, \
+					    ((dword)(fp)) & 0xffff)
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4090)

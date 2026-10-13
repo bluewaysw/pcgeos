@@ -108,7 +108,13 @@ defvar tbrk-token [bpt-init tbrks tbrk maxtbrk
 	#
     	var t [type make array 2 [type word]]
 	if {[null [index $alist 0]]} {
-	    var ip [expr [index $alist 1]&0xf] cs [expr [index $alist 1]>>4]
+	    global stub-is-geos32
+	    if {${stub-is-geos32}} {
+	    	# 32 bit (protected mode) Swat: selector in the high word
+	    	var ip [expr [index $alist 1]&0xffff] cs [expr [index $alist 1]>>16]
+	    } else {
+	    	var ip [expr [index $alist 1]&0xf] cs [expr [index $alist 1]>>4]
+	    }
     	} else {
 	    var ip [index $alist 1] cs [handle segment [index $alist 0]]
     	}
