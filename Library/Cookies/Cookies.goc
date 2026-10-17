@@ -1430,30 +1430,25 @@ void EXPORT CookieSet(
 	cp->CS_expires.TDAT_year = SESSION_COOKIE;
     }
 
-    if (!path) {
-	/* If no path, defaults to request path */
-	/* use only containing directory, not full path and
-	   arguments */
-	q = strchr(anchorPath, '?');
-	if (q) {
-	    /* remove args temporarily */
-	    saveChar1 = *q;
-	    *q = '\0';
-	}
-	s = strrchr(anchorPath, '/');
-	if (q) *q = saveChar1;
-	if (s && s != anchorPath) {
-	    /* remove trailing filename */
-	    saveChar2 = *s;
-	    *s = '\0';
-	}
-	/* DBCS TBD: conversion of Unicode path to SBCS */
-	HLMALLOCSTRDBCS(cp->CS_path, anchorPath);
-	if (s && s != anchorPath) {
-	    *s = saveChar2;
-	}
+    if (!path || *path != '/') {
+        /* Default to the containing directory, or the root directory. */
+        q = strchr(anchorPath, '?');
+        if (q) {
+            saveChar1 = *q;
+            *q = C_NULL;
+        }
+        s = strrchr(anchorPath, '/');
+        if (!s || s == anchorPath) {
+            HLMALLOCSTR(cp->CS_path, "/");
+        } else {
+            saveChar2 = *s;
+            *s = C_NULL;
+            HLMALLOCSTRDBCS(cp->CS_path, anchorPath);
+            *s = saveChar2;
+        }
+        if (q) *q = saveChar1;
     } else {
-	HLMALLOCSTR(cp->CS_path, path);
+        HLMALLOCSTR(cp->CS_path, path);
     }
 
     if (!domain) {
@@ -1522,7 +1517,7 @@ void EXPORT CookieParse(TCHAR *anchorPath, TCHAR *anchorHost, char *cTxt)
     HTScanToken sym;
     char *p = cTxt;
     char *name = 0, *value = 0, *expires = 0, *path = 0, *domain = 0;
-    char *thisWord = 0;
+    char *thisWord = 0, *attributeValueP;
     Boolean secure = FALSE;
 
     if (cookieList == 0) return;
@@ -1540,32 +1535,47 @@ void EXPORT CookieParse(TCHAR *anchorPath, TCHAR *anchorHost, char *cTxt)
     }
     value = thisWord;
 
-    /* The rest of the headers are optional */
-    do {
-	sym = HTScanCookie(&p, &thisWord, CD_EQUAL);
-	switch (sym) {
-	case HTST_EXPIRES:
-	    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-	    expires = thisWord;
-	    break;
-	case HTST_DOMAIN:
-	    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-	    StripTrailingSpaces(thisWord);
-	    domain = thisWord;
-	    break;
-	case HTST_PATH:
-	    sym = HTScanCookie(&p, &thisWord, CD_SEMICOLON);
-	    StripTrailingSpaces(thisWord);
-	    path = thisWord;
-	    break;
-	case HTST_SECURE:
-	    secure = TRUE;
-	    break;
-	default:
-	    /* Be tolerant, ignore */
-	    break;
-	}
-    } while (sym != HTST_XXX_EOL);
+    /* Split attributes before interpreting names or values. */
+    while (*p) {
+        thisWord = p;
+        p = STRCHRSB(thisWord, ';');
+        if (p) {
+            *p++ = C_NULL;
+        } else {
+            p = thisWord + STRLENSB(thisWord);
+        }
+        while (ISWHITE(*thisWord)) thisWord++;
+        attributeValueP = STRCHRSB(thisWord, '=');
+        if (attributeValueP) {
+            *attributeValueP++ = C_NULL;
+            while (ISWHITE(*attributeValueP)) attributeValueP++;
+        }
+        StripTrailingSpaces(thisWord);
+        sym = HTScanSearchReservedWord(thisWord);
+        switch (sym) {
+        case HTST_EXPIRES:
+            if (attributeValueP) expires = attributeValueP;
+            break;
+        case HTST_DOMAIN:
+        case HTST_PATH:
+            if (attributeValueP) {
+                StripTrailingSpaces(attributeValueP);
+                if (sym == HTST_PATH) {
+                    path = attributeValueP;
+                } else {
+                    domain = attributeValueP;
+                }
+            }
+            break;
+        case HTST_SECURE:
+            secure = TRUE;
+            break;
+        default:
+            /* ATTENTION: Max-Age is ignored; add age parsing to support
+             * cookies that omit Expires and require persistence. */
+            break;
+        }
+    }
 
     CookieSet(anchorPath, anchorHost, name, value, expires, path, 
 		      domain, secure);
