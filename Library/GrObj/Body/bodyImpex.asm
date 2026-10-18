@@ -562,170 +562,220 @@ Revision History:
 	jon	May 12, 1992 	Initial version.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-; This constant is used to prevent the user from creating a bitmap which is
-; too big to store.  There is an EC check on the size of a chunk array
-; element and this should prevent the user from making that too big.  In
-; non-EC, the user may run out of memory if the bitmap is too big.  The
-; units for this constant are points, and this gives the user a 12-inch
-; wide bitmap.  Since the default bitmap is 4-bit 72dpi, this will not
-; violate the EC check.  Also, if the user were to change the resolution of
-; a 12-inch bitmap to 600dpi, the EC check will not fail because the chunk
-; array element size will still be small enough.  --JimG 6/14/94
-
-; Actually, this is 12 1/12 (12.08333) inches.  This gives the user a little
-; extra slop because the snap to grid may not exactly create an object that
-; is 12.000 inches. --JimG 6/14/94
+; ATTENTION: Keep the existing 870-point width ceiling at 72 dpi. Even
+; at 24 bits, an 871-pixel row plus mask fits in a small HugeArray element.
+; Raising this ceiling or allowing other DPI requires pixel row-size checks.
 CONVERT_TO_BITMAP_MAX_WIDTH_LOW	=	870
 
-GrObjBodyConvertSelectedGrObjsToBitmap	method dynamic	GrObjBodyClass,
+GrObjBodyConvertSelectedGrObjsToBitmap method dynamic GrObjBodyClass,
 				MSG_GB_CONVERT_SELECTED_GROBJS_TO_BITMAP
-	uses	cx, dx, bp
+	uses	bx, cx, dx, si, di
+CheckHack <(size RectDWFixed) ge (size GrObjInitializeData)>
+bodyChunk	local	lptr
+geometry	local	RectDWFixed
+gstringH	local	hptr
+bitmapOD	local	optr
+bmFormat	local	word
 	.enter
 
-	; Check width of selected objects.  If they are too wide, then warn
-	; the user with an error dialog.  --JimG 6/14/94
-	
-	sub	sp, size RectDWord
-	mov	bp, sp
-	
-	mov	ax, MSG_GB_GET_BOUNDS_OF_SELECTED_GROBJS
-	call	ObjCallInstanceNoLock			;Destroys: ax
-	movdw	axbx, ss:[bp].RD_right
-	subdw	axbx, ss:[bp].RD_left			;axbx = width
-	add	sp, size RectDWord
-	tst	ax					;High byte should be 0
-	jnz	tooWide
-	cmp	bx, CONVERT_TO_BITMAP_MAX_WIDTH_LOW	;Low byte <= limit
-	jle	beginConversion
-
-tooWide:
-	mov	bx, handle convertToBitmapTooBigErrorString
-	mov	ax, offset convertToBitmapTooBigErrorString
-	call	GrObjBodyStandardError
-	jmp	done
-	
-beginConversion:
-	call	GBMarkBusy
-
-	push	si					;save body chunk
-
-	;
-	;  Put some bogus value out there
-	;
-	clr	bp
-	rept 	size PointDWFixed / 2
+		mov	ss:[bodyChunk], si
 		push	bp
-	endm
-	mov	bp, sp
+		lea	bp, ss:[geometry]
+		mov	ax, MSG_GB_GET_BOUNDS_OF_SELECTED_GROBJS
+		call	ObjCallInstanceNoLock
+		pop	bp
+		lea	di, ss:[geometry]
+		movdw	axbx, ss:[di].RD_right
+		subdw	axbx, ss:[di].RD_left
+		tst	ax
+		jnz	tooWide
+		cmp	bx, CONVERT_TO_BITMAP_MAX_WIDTH_LOW
+		jbe	chooseFormat
+tooWide:
+		mov	bx, handle convertToBitmapTooBigErrorString
+		mov	ax, offset convertToBitmapTooBigErrorString
+		call	GrObjBodyStandardError
+		jmp	done
 
+chooseFormat:
 	;
-	;	Generate the gstring represented by the selected grobjs
+	; The modal picker changes no objects, including on Cancel.
 	;
-	call	GrObjGlobalGetVMFile
-	mov	cx, bx					;cx <- vm file
-	mov	ax, MSG_GB_CREATE_GSTRING_TRANSFER_FORMAT
-	call	ObjCallInstanceNoLock
-
-	mov_tr	di,ax					;di <- vm block handle
-
-	;    Specify the position and size of the new grobject and
-	;    have initialize itself to the default attributes
+		push	ds:[LMBH_handle]
+		mov	bx, handle GrObjBitmapFormatDialog
+		mov	si, offset GrObjBitmapFormatDialog
+		call	UserCreateDialog
+		tst	bx
+		jz	noDialog
+		call	UserDoDialog
+		cmp	ax, IC_OK
+		jne	destroyDialog
 	;
-CheckHack <(size RectDWFixed) ge (size GrObjInitializeData)>
-	sub	sp, size RectDWFixed - size PointDWFixed
-	mov	bp,sp
-	mov	ax, MSG_GB_GET_DWF_BOUNDS_OF_SELECTED_GROBJS
-	call	ObjCallInstanceNoLock
-
-if 1
-
-	mov	ax, ss:[bp].RDWF_right.DWF_frac
-	sub	ax, ss:[bp].RDWF_left.DWF_frac
-	mov	cx, ss:[bp].RDWF_right.DWF_int.low
-	sbb	cx, ss:[bp].RDWF_left.DWF_int.low
-	rndwwf	cxax
-	inc	cx
-
-	mov	ax, ss:[bp].RDWF_bottom.DWF_frac
-	sub	ax, ss:[bp].RDWF_top.DWF_frac
-	mov	dx, ss:[bp].RDWF_bottom.DWF_int.low
-	sbb	dx, ss:[bp].RDWF_top.DWF_int.low
-	rndwwf	dxax
-	inc	dx
-endif
-
-	clr	ax
-	movwwf	ss:[bp].GOID_width, cxax
-	movwwf	ss:[bp].GOID_height, dxax
-
-	push	cx,dx					;save width,height
-
+	; Controller calls may destroy BP; keep our local-variable frame.
 	;
-	;	Delete the selected grobjs now that we're done with `em
+		push	bp, si
+		mov	si, offset GrObjBitmapColorControl
+		mov	ax, MSG_VBFC_GET_FORMAT
+		mov	di, mask MF_CALL
+		call	ObjMessage
+		pop	bp, si
+		mov	ss:[bmFormat], cx
+		mov	ax, IC_OK
+destroyDialog:
+		push	ax, bp, si
+		mov	si, offset GrObjBitmapColorControl
+		mov	ax, MSG_GEN_CONTROL_DESTROY_UI
+		mov	di, mask MF_CALL
+		call	ObjMessage
+		pop	ax, bp, si
+		call	UserDestroyDialog
+		jmp	dialogDone
+noDialog:
+		mov	ax, IC_NULL
+dialogDone:
+		pop	bx
+		call	MemDerefDS
+		mov	si, ss:[bodyChunk]
+		cmp	ax, IC_OK
+		LONG jne	done
+		cmp	ss:[bmFormat], BMF_24BIT
+		LONG ja	done			; reject missing/unsupported selection
+
+		call	GBMarkBusy
 	;
-	mov	ax, MSG_META_DELETE
-	call	ObjCallInstanceNoLock
-
+	; Capture the selection before preparing its replacement.
 	;
-	;  ^lcx:dx <- new bitmap object
+		clr	ax
+		movdwf	ss:[geometry].RDWF_left, axaxax
+		movdwf	ss:[geometry].RDWF_top, axaxax
+		call	GrObjGlobalGetVMFile
+		mov	cx, bx
+		push	bp
+		lea	bp, ss:[geometry]
+		mov	ax, MSG_GB_CREATE_GSTRING_TRANSFER_FORMAT
+		call	ObjCallInstanceNoLock
+		pop	bp
+		push	si
+		mov	si, ax
+		mov	cl, GST_VMEM
+		call	GrLoadGString
+		mov	ss:[gstringH], si
+		pop	si
+
+		push	bp
+		lea	bp, ss:[geometry]
+		mov	ax, MSG_GB_GET_DWF_BOUNDS_OF_SELECTED_GROBJS
+		call	ObjCallInstanceNoLock
+		pop	bp
+		mov	ax, ss:[geometry].RDWF_right.DWF_frac
+		sub	ax, ss:[geometry].RDWF_left.DWF_frac
+		mov	cx, ss:[geometry].RDWF_right.DWF_int.low
+		sbb	cx, ss:[geometry].RDWF_left.DWF_int.low
+		rndwwf	cxax
+		inc	cx
+		mov	ax, ss:[geometry].RDWF_bottom.DWF_frac
+		sub	ax, ss:[geometry].RDWF_top.DWF_frac
+		mov	dx, ss:[geometry].RDWF_bottom.DWF_int.low
+		sbb	dx, ss:[geometry].RDWF_top.DWF_int.low
+		rndwwf	dxax
+		inc	dx
 	;
-	mov	cx, segment BitmapGuardianClass
-	mov	dx, offset BitmapGuardianClass
-	mov	ax, MSG_GB_INSTANTIATE_GROBJ
-	call	ObjCallInstanceNoLock
-
-	mov	si,di					;si <- vm block handle
-	push	cx,dx					;save new bitmap
-	mov	cl, GST_VMEM
-	call	GrLoadGString				;si <- GString
-	mov	cx, si					;cx <- gstring
-	pop	bx, si					;^lbx:si <- bitmap
-	mov	di,mask MF_FIXUP_DS
-	mov	ax,MSG_GO_INITIALIZE
-	call	ObjMessage
-
-	mov	bp, cx					;bp <- gstring
-	pop	cx,dx					;cx,dx <- width,height
-	add	sp,size RectDWFixed			;free stack frame
-
-	mov	ax, MSG_BG_CREATE_VIS_BITMAP
-	mov	di,mask MF_FIXUP_DS
-	call	ObjMessage
-
-	mov_tr	ax, si					;ax <- grobj chunk
-	mov	si, bp					;GString
-	clr	di					;no gstate
-	mov	dl,GSKT_KILL_DATA
-	call	GrDestroyGString
-
-	;    Notify object that it is complete and ready to go
+	; Reuse the bounds frame as position and size initialization data.
 	;
-	mov_tr	si, ax					;^lbx:si <- grobj
-	mov	ax,MSG_GO_NOTIFY_GROBJ_VALID
-	mov	di,mask MF_FIXUP_DS
-	call	ObjMessage
-
-	;    Add the new grobject to the body and have it drawn.
-	;    If you wish to add many grobjects and draw them all
-	;    at once use MSG_GB_ADD_GROBJ instead.
+		clr	ax
+		lea	di, ss:[geometry]
+		movwwf	ss:[di].GOID_width, cxax
+		movwwf	ss:[di].GOID_height, dxax
 	;
+	; Do not leave undo references to an object we may have to discard.
+	;
+		call	GrObjGlobalUndoIgnoreActions
+		mov	cx, segment BitmapGuardianClass
+		mov	dx, offset BitmapGuardianClass
+		mov	ax, MSG_GB_INSTANTIATE_GROBJ
+		call	ObjCallInstanceNoLock
+		movdw	ss:[bitmapOD], cxdx
+		movdw	bxsi, cxdx
+		push	bp
+		lea	bp, ss:[geometry]
+		mov	ax, MSG_GO_INITIALIZE
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		pop	bp
 
-	mov	cx,bx					;new handle
-	mov	dx,si					;new chunk
-	pop	si					;body chunk
-	mov	bp,GOBAGOR_LAST or mask GOBAGOF_DRAW_LIST_POSITION
-	mov	ax,MSG_GB_ADD_GROBJ_THEN_DRAW
-	call	ObjCallInstanceNoLock
+		mov	ax, MSG_GOVG_GET_VIS_WARD_OD
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		movdw	bxsi, cxdx
+		mov	cx, ss:[bmFormat]
+		mov	dx, 72
+		push	bp
+		mov	bp, dx
+		mov	ax, MSG_VIS_BITMAP_SET_FORMAT_AND_RESOLUTION
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		pop	bp
 
-	mov	al,HUM_NOW
-	call	GrObjBodySendBecomeSelectedToChild
-
-	call	GBMarkNotBusy
-
+		movdw	bxsi, ss:[bitmapOD]
+		lea	di, ss:[geometry]
+		mov	cx, ss:[di].GOID_width.WWF_int
+		mov	dx, ss:[di].GOID_height.WWF_int
+		mov	ax, ss:[gstringH]
+		push	bp
+		mov	bp, ax
+		mov	ax, MSG_BG_CREATE_VIS_BITMAP
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		pop	bp
+		mov	ax, MSG_GOVG_GET_VIS_WARD_OD
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		movdw	bxsi, cxdx
+		mov	ax, MSG_VIS_BITMAP_GET_MAIN_BITMAP
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		call	GrObjGlobalUndoAcceptActions
+		tst	dx
+		jz	creationFailed
+	;
+	; Only a successfully allocated bitmap may replace the originals.
+	;
+		mov	si, ss:[bodyChunk]
+		mov	ax, MSG_META_DELETE
+		call	ObjCallInstanceNoLock
+		movdw	bxsi, ss:[bitmapOD]
+		mov	ax, MSG_GO_GENERATE_UNDO_UNDO_CLEAR_CHAIN
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		mov	ax, MSG_GO_NOTIFY_GROBJ_VALID
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		movdw	cxdx, ss:[bitmapOD]
+		mov	si, ss:[bodyChunk]
+		push	bp
+		mov	bp, GOBAGOR_LAST or mask GOBAGOF_DRAW_LIST_POSITION
+		mov	ax, MSG_GB_ADD_GROBJ_THEN_DRAW
+		call	ObjCallInstanceNoLock
+		pop	bp
+		mov	al, HUM_NOW
+		call	GrObjBodySendBecomeSelectedToChild
+		jmp	freeGString
+creationFailed:
+		movdw	bxsi, ss:[bitmapOD]
+		mov	ax, MSG_META_OBJ_FREE
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+freeGString:
+		mov	si, ss:[gstringH]
+		clr	di
+		mov	dl, GSKT_KILL_DATA
+		call	GrDestroyGString
+		mov	si, ss:[bodyChunk]
+		call	GBMarkNotBusy
 done:
 	.leave
 	ret
-GrObjBodyConvertSelectedGrObjsToBitmap	endm
+GrObjBodyConvertSelectedGrObjsToBitmap endm
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
