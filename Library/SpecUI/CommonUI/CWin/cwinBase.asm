@@ -1743,138 +1743,9 @@ OLBaseWinCreateCombinationMoniker	proc	far
 combMkr		local	optr		push	bp, 0
 iconMkr		local	optr		push	bx, di
 textMkr		local	optr		push	cx, dx
-hasDocumentTitle local	word	push	0
-appChunk	local	word
 	uses	ax, bx, si, di, es
 	.enter
 
-	;
-	; A real long-term title may legitimately equal the app name.
-	;
-	mov	di, ds:[si]
-	add	di, ds:[di].Vis_offset
-CUAS <	cmp	ds:[di].OLWI_type, MOWT_PRIMARY_WINDOW		>
-OLS  <	cmp	ds:[di].OLWI_type, OLWT_BASE_WINDOW		>
-	jne	getAppText
-	mov	di, ds:[si]
-	add	di, ds:[di].Gen_offset
-	.warn	-private
-	mov	ax, ds:[di].GPI_longTermMoniker
-	.warn	@private
-	cmp	ax, ss:[textMkr].offset
-	jne	getAppText
-	mov	ax, ds:[LMBH_handle]
-	cmp	ax, ss:[textMkr].handle
-	jne	getAppText
-	inc	ss:[hasDocumentTitle]
-getAppText:
-
-	;
-	; Copy the app name into the existing temporary block before adding
-	; the optional document/window title. Never change either source.
-	;
-	push	bp
-	mov	bp, (VMS_TEXT shl offset VMSF_STYLE)
-	stc
-	call	GenFindMoniker
-	pop	bp
-	tst	cx
-	LONG jz	textReady
-	cmp	cx, ss:[textMkr].handle
-	jne	copyAppText
-	cmp	dx, ss:[textMkr].offset
-	jne	copyAppText
-	clr	ss:[textMkr].handle	; app fallback is not a document title
-copyAppText:
-	movdw	bxdi, cxdx
-	call	ObjSwapLock
-	push	bx, bp
-	mov	cx, ss:[combMkr].handle
-	mov	bp, di
-	clr	ax, bx, dx, di
-	call	UserCopyChunkOut
-	pop	bx, bp
-	mov	ss:[appChunk], ax
-	call	ObjSwapUnlock
-
-	push	ds:[LMBH_handle]
-	mov	bx, ss:[combMkr].handle
-	call	MemLock
-	mov	ds, ax
-	mov	bx, ss:[textMkr].handle
-	tst	bx
-	LONG jz	useAppText
-	call	MemLock
-	mov	es, ax
-	mov	di, ss:[textMkr].offset
-	mov	di, es:[di]
-	test	es:[di].VM_type, mask VMT_GSTRING or mask VMT_MONIKER_LIST
-	LONG jnz unlockTitle
-	add	di, VM_data+VMT_text
-	LocalIsNull	es:[di]
-	LONG jz	unlockTitle
-	;
-	; The primary can hold a copy of the app name even without a document.
-	;
-	tst	ss:[hasDocumentTitle]
-	jnz	sizeTitle
-	mov	si, ss:[appChunk]
-	mov	si, ds:[si]
-	add	si, VM_data+VMT_text
-	clr	cx
-	call	LocalCmpStrings
-	LONG je	unlockTitle
-sizeTitle:
-	;
-	; Insert room for " - " and the title before the app's terminator.
-	; Counts passed to LMemInsertAt are bytes, including in DBCS builds.
-	;
-	LocalStrLength
-DBCS <	shl	cx, 1						>
-	add	cx, 3 * size TCHAR
-	push	cx
-	segxchg	ds, es
-	mov	di, ss:[appChunk]
-	mov	di, es:[di]
-	add	di, VM_data+VMT_text
-	LocalStrLength
-DBCS <	shl	cx, 1						>
-	mov	bx, cx
-	add	bx, VM_data+VMT_text
-	segxchg	ds, es
-	pop	cx
-	mov	ax, ss:[appChunk]
-	call	LMemInsertAt
-	jc	unlockTitle
-	mov	di, ax
-	mov	di, ds:[di]
-	clr	ds:[di].VM_width		; combined text must be measured again
-	add	di, bx
-	mov	si, ss:[textMkr].offset
-	mov	si, es:[si]
-	add	si, VM_data+VMT_text
-	segxchg	ds, es
-appendTitle:
-	mov	ax, ' '
-	LocalPutChar	esdi, ax
-	mov	ax, '-'
-	LocalPutChar	esdi, ax
-	mov	ax, ' '
-	LocalPutChar	esdi, ax
-	LocalCopyString
-	segxchg	ds, es
-unlockTitle:
-	mov	bx, ss:[textMkr].handle
-	call	MemUnlock
-useAppText:
-	mov	ax, ss:[appChunk]
-	mov	ss:[textMkr].offset, ax
-	mov	bx, ss:[combMkr].handle
-	mov	ss:[textMkr].handle, bx
-	call	MemUnlock
-	pop	bx
-	call	MemDerefDS
-textReady:
 	movdw	bxdi, ss:[iconMkr]	;^lbx:di = moniker
 	tst	bx
 	jnz	copyMoniker
@@ -1925,8 +1796,6 @@ DBCS <	shl	cx, 1						>
 	mov	ax, ss:[combMkr].offset
 	call	LMemInsertAt
 	pop	cx
-	mov	bx, ss:[textMkr].handle
-	call	MemDerefES		; text may move with the combination block
 
 	mov	si, ax
 	mov	si, ds:[si]		;ds:si = icon VisMoniker
