@@ -1578,6 +1578,10 @@ endif
 					;until MSG_VIS_MOVE_RESIZE_WIN to
 					;do this.
 
+if _MOTIF or _ISUI
+	call	InvalidateMenuBarGeometryIfMenusInHeader
+endif
+
 	;See if this GenDisplay is inside a GenDisplayGroup.
 
 	push	si, es
@@ -1631,6 +1635,27 @@ updateWindow:
 done:
 	ret
 SetMaximized	endp
+
+if _MOTIF or _ISUI	;--------------------------------------------------------------
+InvalidateMenuBarGeometryIfMenusInHeader	proc	near	uses	si, es
+	.enter
+	;
+	; Maximizing with menus in the header removes the title area.  Make
+	; the menu bar recalc against the new header bounds.
+	;
+	call	OpenWinCheckMenusInHeader
+	jnc	done
+	call	WinClasses_DerefVisSpec_DI
+	mov	si, ds:[di].OLMDWI_menuBar
+	mov	cl, mask VOF_GEOMETRY_INVALID or mask VOF_IMAGE_INVALID
+	mov	dl, VUM_MANUAL
+	mov	ax, MSG_VIS_MARK_INVALID
+	call	WinClasses_ObjCallInstanceNoLock
+done:
+	.leave
+	ret
+InvalidateMenuBarGeometryIfMenusInHeader	endp
+endif		;--------------------------------------------------------------
 
 if _CUA_STYLE	;--------------------------------------------------------------
 DisableSysMenuIcon	proc	near
