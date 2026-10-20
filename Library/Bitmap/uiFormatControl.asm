@@ -62,9 +62,21 @@ REVISION HISTORY:
 VisBitmapFormatControlGetInfo	method dynamic	VisBitmapFormatControlClass,
 					MSG_GEN_CONTROL_GET_INFO
 
-	mov	si, offset VBFC_dupInfo
-	call	CopyDupInfoCommon
-	ret
+		mov	ax, ATTR_VIS_BITMAP_FORMAT_CONTROL_FORMAT_ONLY
+		call	ObjVarFindData
+		pushf
+		mov	si, offset VBFC_dupInfo
+		call	CopyDupInfoCommon
+		popf
+		jnc	done
+		sub	di, size GenControlBuildInfo
+		clr	es:[di].GCBI_gcnCount
+		clr	es:[di].GCBI_notificationCount
+		andnf	es:[di].GCBI_flags, not mask GCBF_SUSPEND_ON_APPLY
+		ornf	es:[di].GCBI_flags, mask GCBF_DO_NOT_DESTROY_CHILDREN_WHEN_CLOSED or \
+			mask GCBF_NOT_REQUIRED_TO_BE_ON_SELF_LOAD_OPTIONS_LIST
+done:
+		ret
 VisBitmapFormatControlGetInfo	endm
 
 VBFC_dupInfo	GenControlBuildInfo	<
@@ -116,7 +128,7 @@ VBFC_notifyList		NotificationType	\
 VBFC_childList		GenControlChildInfo \
 	<offset VisBitmapFormatItemGroup, mask VBFCF_MONO or \
 					  mask VBFCF_4BIT or \
-					  mask VBFCF_8BIT, 0>,
+					  mask VBFCF_8BIT or mask VBFCF_24BIT, 0>,
 	<offset VisBitmapResolutionInteraction, mask VBFCF_72_DPI or \
 					        mask VBFCF_300_DPI or \
 					        mask VBFCF_CUSTOM_DPI, 0>
@@ -128,7 +140,8 @@ VBFC_featuresList	GenControlFeaturesInfo	\
 	<offset Dpi72Item, Dpi72Name, 0>,
 	<offset Color4BitItem, Color4BitName, 0>,
 	<offset MonoItem, MonoName, 0>,
-	<offset Color8BitItem, Color8BitName, 0>
+	<offset Color8BitItem, Color8BitName, 0>,
+	<offset Color24BitItem, Color24BitName, 0>
 
 if _FXIP
 BitmapControlInfoXIP	ends
@@ -162,6 +175,11 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 VisBitmapFormatControlSetFormat	method dynamic	VisBitmapFormatControlClass,
 						MSG_VBFC_SET_FORMAT
+		mov	ax, ATTR_VIS_BITMAP_FORMAT_CONTROL_FORMAT_ONLY
+		call	ObjVarFindData
+		jnc	changeBitmap
+		ret
+changeBitmap:
 features	local	word
 resolution	local	word
 format		local	BMFormat
@@ -218,7 +236,8 @@ haveResolution:
 	; Get the format of the bitmap
 	;
 getFormat:
-		test	ss:[features], mask VBFCF_MONO or mask VBFCF_4BIT
+		test	ss:[features], mask VBFCF_MONO or mask VBFCF_4BIT or \
+				       mask VBFCF_8BIT or mask VBFCF_24BIT
 		jz	spewData
 		mov	si, offset VisBitmapFormatItemGroup
 		mov	ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
@@ -434,7 +453,7 @@ setStatus:
 		mov	dl, VUM_DELAYED_VIA_UI_QUEUE
 		mov	bx, mask VBFCF_MONO or \
 			    mask VBFCF_4BIT or \
-			    mask VBFCF_8BIT
+			    mask VBFCF_8BIT or mask VBFCF_24BIT
 		mov	di, offset VisBitmapFormatItemGroup
 		call	SendMessageToChild
 
@@ -509,7 +528,7 @@ haveResolution:
 		mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
 		clr	dx			;determinate
 		mov	bx, mask VBFCF_MONO or \
-			    mask VBFCF_4BIT
+			    mask VBFCF_4BIT or mask VBFCF_8BIT or mask VBFCF_24BIT
 		mov	di, offset VisBitmapFormatItemGroup	
 		call	SendMessageToChild
 done:
@@ -615,5 +634,47 @@ ObjMessage_near_call_save_bp	proc	near
 		pop	bp
 		ret
 ObjMessage_near_call_save_bp	endp
+
+;
+; Initialize a standalone picker without a selected target bitmap.
+;
+VisBitmapFormatControlGenerateUI method dynamic VisBitmapFormatControlClass,
+					MSG_GEN_CONTROL_GENERATE_UI
+		mov	di, offset VisBitmapFormatControlClass
+		call	ObjCallSuperNoLock
+		mov	ax, ATTR_VIS_BITMAP_FORMAT_CONTROL_FORMAT_ONLY
+		call	ObjVarFindData
+		jnc	done
+		mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+		mov	cx, BMF_24BIT
+		clr	dx
+		mov	bx, mask VBFCF_24BIT
+		mov	di, offset VisBitmapFormatItemGroup
+		call	SendMessageToChild
+done:
+		ret
+VisBitmapFormatControlGenerateUI endm
+
+;
+; Read the picker even if the user accepted its unchanged default.
+;
+VisBitmapFormatControlGetFormat method dynamic VisBitmapFormatControlClass,
+					MSG_VBFC_GET_FORMAT
+		call	GetChildBlockAndFeatures
+		test	ax, mask VBFCF_MONO or mask VBFCF_4BIT or \
+			mask VBFCF_8BIT or mask VBFCF_24BIT
+		jz	missing
+		tst	bx
+		jz	missing
+		mov	si, offset VisBitmapFormatItemGroup
+		mov	ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		mov	cx, ax
+		ret
+missing:
+		mov	cx, GIGS_NONE
+		ret
+VisBitmapFormatControlGetFormat endm
 
 VisBitmapUIControllerCode	ends
