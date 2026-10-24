@@ -1,6 +1,6 @@
 name thumbdb.lib
 
-longname "Breadbox Thumbnail Library"
+longname "Thumbnail Library"
 
 type library, single, c-api
 
@@ -20,5 +20,4 @@ export THUMBDRAWITEM
 export THUMBREMOVEITEM
 
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

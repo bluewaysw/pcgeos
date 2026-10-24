@@ -8,7 +8,7 @@
 ##############################################################################
 
 name            wmg3ext.lib
-longname        "Breadbox External URL Driver"
+longname        "External URL Driver"
 tokenchars      "URLD"
 tokenid         16431
 
@@ -26,5 +26,4 @@ export          URLDRVFLUSH
 
 resource HTMLResource shared lmem data
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

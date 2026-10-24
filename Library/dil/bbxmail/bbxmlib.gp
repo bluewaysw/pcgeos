@@ -16,7 +16,7 @@ name bbxmlib.lib
 # Long filename: this name can displayed by GeoManager, and is used to identify
 # the application for inter-application communication.
 #
-longname	"BBX Mail Library"
+longname	"Mail Library"
 tokenchars	"bbxm"
 tokenid		0
 

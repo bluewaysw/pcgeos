@@ -24,7 +24,7 @@
 ########################################################################
 
 name cdaudio.lib
-longname "Breadbox CD Audio Library"
+longname "CD Audio Library"
 tokenchars "CDAL"
 tokenid 16474
 
@@ -79,6 +79,3 @@ export CD_GET_PLAY_STATUS
 export CD_PLAY_POSITION
 export CD_PLAY_STOP
 export CD_PLAY_RESUME
-
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
-

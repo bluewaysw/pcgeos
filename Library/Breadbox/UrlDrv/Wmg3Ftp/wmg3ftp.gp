@@ -8,7 +8,7 @@
 ##############################################################################
 
 name            wmg3ftp.lib
-longname        "Breadbox FTP URL Driver"
+longname        "FTP URL Driver"
 tokenchars      "URLD"
 tokenid         16431
 
@@ -29,6 +29,5 @@ export          URLDRVFLUSH
 resource HTMLResource shared lmem data
 resource StatusResource shared lmem data
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 entry           WMG3FTPENTRY

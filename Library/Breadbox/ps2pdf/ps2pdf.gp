@@ -14,7 +14,7 @@
 name ps2pdf.lib
 
 #Long Name                                                                    #
-longname "Breadbox PS to PDF Library"
+longname "PS to PDF Library"
 
 tokenchars   "bb01"
 tokenid 16431
@@ -33,4 +33,3 @@ resource Strings data object
 
 export CONVERTTOPDF
 
-usernotes "Copyright 1994-2014  Breadbox Computer Company  All Rights Reserved"

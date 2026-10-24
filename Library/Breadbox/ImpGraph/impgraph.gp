@@ -1,6 +1,6 @@
 name impgraph.lib
 
-longname "Breadbox Graphics Imp Library"
+longname "Graphics Import Library"
 
 type library, single
 
@@ -27,5 +27,4 @@ incminor
 
 export MIMEDRVGRAPHICEX
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
