@@ -2202,7 +2202,7 @@ ToolAreaAutoHide	method dynamic ToolAreaClass,
 	segmov	ds, dgroup				; load dgroup
 	test	ds:[taskBarPrefs], mask TBF_ENABLED	; test if TBF_ENABLED is set
 	pop	ds					; restore ds
-	jz	done					; skip if no taskbar
+	LONG jz	done					; skip if no taskbar
 
 	push	ds
 	segmov	ds, dgroup
@@ -2240,6 +2240,19 @@ EC <	ERROR_NC OL_ERROR						>
 
 	test	cl, mask VA_VISIBLE
 	jnz	waitMore
+
+	; A taskbar context menu also keeps the tool area visible.
+	push	si
+	call	ToolAreaGetTaskMenu
+	jc	noTaskMenu
+	mov	ax, MSG_VIS_GET_ATTRS
+	call	ObjCallInstanceNoLock
+	test	cl, mask VA_VISIBLE
+	pop	si
+	jnz	waitMore
+	jmp	hide
+noTaskMenu:
+	pop	si
 hide:
 	mov	di, ds:[si]
 	add	di, ds:[di].Gen_offset
@@ -3272,3 +3285,330 @@ done:
 OLFieldSendToGenApplications	endm
 
 HighUncommon	ends
+
+if TOOL_AREA_IS_TASK_BAR
+HighUncommon segment resource
+
+;
+; ExpressMenuControl is inserted before the three template children.
+;
+TASK_MENU_CHILD equ 3
+
+;
+; Keep taskbar-specific mouse handling out of the shared OLItemClass.
+;
+TaskBarListGetItemClass method dynamic TaskBarListClass, \
+				MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS
+		mov	cx, segment TaskBarItemClass
+		mov	dx, offset TaskBarItemClass
+		ret
+TaskBarListGetItemClass endm
+
+;
+; Consume right presses instead of starting inherited bubble help. Open on
+; release so the native stay-up menu does not inherit a pending right release.
+;
+TaskBarItemStartMoveCopy method dynamic TaskBarItemClass, \
+				MSG_META_START_MOVE_COPY
+		mov	ax, bp
+		andnf	ax, mask BI_BUTTON
+		cmp	ax, BUTTON_2 shl offset BI_BUTTON
+		jne	callSuper
+		call	VisGrabMouse
+		mov	ax, mask MRF_PROCESSED
+		ret
+callSuper:
+		mov	ax, MSG_META_START_MOVE_COPY
+		mov	di, offset TaskBarItemClass
+		GOTO	ObjCallSuperNoLock
+TaskBarItemStartMoveCopy endm
+
+TaskBarItemEndMoveCopy method dynamic TaskBarItemClass, \
+				MSG_META_END_MOVE_COPY
+		mov	ax, bp
+		andnf	ax, mask BI_BUTTON
+		cmp	ax, BUTTON_2 shl offset BI_BUTTON
+		jne	callSuper
+		call	VisReleaseMouse
+		call	VisTestPointInBounds
+		jnc	done
+		push	cx, dx
+		clr	cx
+		call	GenCheckIfFullyEnabled
+		pop	cx, dx
+		jnc	done
+		call	TaskBarItemShowMenu
+done:
+		mov	ax, mask MRF_PROCESSED
+		ret
+callSuper:
+		mov	ax, MSG_META_END_MOVE_COPY
+		mov	di, offset TaskBarItemClass
+		GOTO	ObjCallSuperNoLock
+TaskBarItemEndMoveCopy endm
+
+;
+; Shift-F10 opens the focused taskbar item's menu without activating its app.
+;
+TaskBarItemKbdChar method dynamic TaskBarItemClass, \
+				MSG_META_KBD_CHAR, MSG_META_FUP_KBD_CHAR
+		test	dl, mask CF_FIRST_PRESS
+		jz	callSuper
+SBCS <		cmp	cx, (VC_ISCTRL shl 8) or VC_F10		>
+DBCS <		cmp	cx, C_SYS_F10				>
+		jne	callSuper
+		mov	bl, dh
+		andnf	bl, not (mask SS_LSHIFT or mask SS_RSHIFT)
+		jnz	callSuper
+		tst	dh
+		jz	callSuper
+		call	VisGetBounds
+		mov	cx, ax
+		call	TaskBarItemShowMenu
+		stc
+		ret
+callSuper:
+		mov	di, offset TaskBarItemClass
+		GOTO	ObjCallSuperNoLock
+TaskBarItemKbdChar endm
+
+;
+; Pass CX/DX in the button's window coordinates. Both mouse and keyboard
+; entry points use the native transform, including a relocated taskbar.
+;
+TaskBarItemShowMenu proc near
+		call	VisQueryWindow
+		tst	di
+		jz	done
+		mov	ax, cx
+		mov	bx, dx
+		call	WinTransform
+		mov	dx, ax
+		mov	bp, bx
+		mov	di, ds:[si]
+		add	di, ds:[di].Gen_offset
+		mov	cx, ds:[di].GII_identifier
+		mov	ax, MSG_TASK_BAR_LIST_SHOW_MENU
+		call	GenCallParent
+done:
+		ret
+TaskBarItemShowMenu endp
+
+;
+; Resolve the positional button ID immediately, without selecting its window.
+;
+TaskBarListShowMenu method dynamic TaskBarListClass, \
+				MSG_TASK_BAR_LIST_SHOW_MENU
+		push	dx, bp, si
+		mov	di, ds:[si]
+		add	di, ds:[di].Gen_offset
+		movdw	bxsi, ds:[di].GIGI_destination
+		mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		call	ObjMessage
+		mov	ax, cx
+		mov	cx, dx
+		pop	dx, bp, si
+		tst	ax
+		jz	done
+		mov	ax, MSG_TOOL_AREA_SHOW_TASK_MENU
+		GOTO	GenCallParent
+done:
+		ret
+TaskBarListShowMenu endm
+
+;
+; Reinitialization follows entry removal. Clear the saved target and dismiss
+; before identifiers can be reused by the rebuilt list.
+;
+TaskBarListInitialize method dynamic TaskBarListClass, \
+				MSG_GEN_DYNAMIC_LIST_INITIALIZE
+		push	ax, cx, dx, bp
+		mov	ax, MSG_TOOL_AREA_DISMISS_TASK_MENU
+		call	GenCallParent
+		pop	ax, cx, dx, bp
+		mov	di, offset TaskBarListClass
+		GOTO	ObjCallSuperNoLock
+TaskBarListInitialize endm
+
+;
+; Find the copied menu by position: COPY_TREE changes its chunk handle.
+; Pass *DS:SI = tool area; return *DS:SI = menu, carry set if absent.
+;
+ToolAreaGetTaskMenu proc near
+		mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+		mov	cx, TASK_MENU_CHILD
+		call	ObjCallInstanceNoLock
+		jc	done
+		mov	si, dx
+done:
+		ret
+ToolAreaGetTaskMenu endp
+
+ToolAreaDismissTaskMenu method dynamic ToolAreaClass, \
+				MSG_TOOL_AREA_DISMISS_TASK_MENU
+		call	ToolAreaGetTaskMenu
+		jc	done
+		mov	di, ds:[si]
+		add	di, ds:[di].Gen_offset
+		clr	ds:[di].TBMI_windowListEntry
+		mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+		mov	cx, IC_DISMISS
+		GOTO	ObjCallInstanceNoLock
+done:
+		ret
+ToolAreaDismissTaskMenu endm
+
+;
+; Open a disabled popup immediately, then ask the application for its state.
+; The global UI thread must never make a synchronous call into an app thread.
+;
+ToolAreaShowTaskMenu method dynamic ToolAreaClass, \
+				MSG_TOOL_AREA_SHOW_TASK_MENU
+		push	cx, dx, bp
+		call	ToolAreaGetTaskMenu
+		pop	cx, dx, bp
+		jc	done
+		mov	di, ds:[si]
+		add	di, ds:[di].Gen_offset
+		mov	ds:[di].TBMI_windowListEntry, cx
+		inc	ds:[di].TBMI_request
+		push	dx, bp
+		clr	ax
+		call	SetTaskMenuItems
+		pop	cx, dx
+		mov	ax, MSG_OL_POPUP_ACTIVATE
+		call	ObjCallInstanceNoLock
+		mov	ax, MSG_MO_MW_ENTER_STAY_UP_MODE
+		mov	cx, TRUE
+		call	ObjCallInstanceNoLock
+
+		mov	di, ds:[si]
+		add	di, ds:[di].Gen_offset
+		mov	dx, ds:[di].TBMI_windowListEntry
+		tst	dx
+		jz	done
+		mov	bp, ds:[di].TBMI_request
+		mov	cx, si
+		mov	si, dx
+		mov	ax, MSG_OL_WINDOW_LIST_ITEM_GET_TASK_MENU_STATE
+		GOTO	ObjCallInstanceNoLock
+done:
+		ret
+ToolAreaShowTaskMenu endm
+
+;
+; Ignore replies for a replaced target, a newer request, or a dismissed popup.
+;
+TaskBarMenuState method dynamic TaskBarMenuClass, MSG_TASK_BAR_MENU_STATE
+		cmp	dx, ds:[di].TBMI_windowListEntry
+		jne	done
+		cmp	bp, ds:[di].TBMI_request
+		jne	done
+		mov	bx, ds:[si]
+		add	bx, ds:[bx].Vis_offset
+		test	ds:[bx].VI_attrs, mask VA_VISIBLE
+		jz	done
+		tst	cx
+		jz	dismiss
+		mov	ax, cx
+		call	SetTaskMenuItems
+		mov	ax, MSG_GEN_NAVIGATE_TO_NEXT_FIELD
+		GOTO	ObjCallInstanceNoLock
+dismiss:
+		mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
+		mov	cx, IC_DISMISS
+		GOTO	ObjCallInstanceNoLock
+done:
+		ret
+TaskBarMenuState endm
+
+;
+; Apply the same command/permission table that the primary checks on dispatch.
+; Pass *DS:SI = menu, AL = OLWinSysIcons. Preserve SI for popup activation.
+;
+SetTaskMenuItems proc near
+menuChunk local lptr push si
+menuState local word push ax
+menuIndex local word
+	.enter
+		clr	menuIndex
+setItem:
+		mov	si, menuChunk
+		mov	cx, menuIndex
+		mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
+		push	bp
+		call	ObjCallInstanceNoLock
+		pop	bp
+		jc	done
+		mov	si, dx
+		mov	bx, menuIndex
+		shl	bx, 1
+		shl	bx, 1
+		mov	ax, menuState
+		test	al, {byte}cs:[taskMenuCommands+2][bx]
+		mov	ax, MSG_GEN_SET_NOT_ENABLED
+		jz	setEnabled
+		mov	ax, MSG_GEN_SET_ENABLED
+setEnabled:
+		mov	dl, VUM_NOW
+		push	bp
+		call	ObjCallInstanceNoLock
+		pop	bp
+		inc	menuIndex
+		cmp	menuIndex, TASK_MENU_COMMAND_COUNT
+		jb	setItem
+done:
+		mov	si, menuChunk
+	.leave
+		ret
+SetTaskMenuItems endp
+
+;
+; Entry destruction invalidates the popup before the chunk can be reused.
+;
+OLWindowListItemDestroy method dynamic OLWindowListItemClass, MSG_GEN_DESTROY
+		push	ax, dx, bp
+		mov	ax, MSG_WINDOW_LIST_LIST_DISMISS_TASK_MENU
+		call	GenCallParent
+		pop	ax, dx, bp
+		mov	di, offset OLWindowListItemClass
+		GOTO	ObjCallSuperNoLock
+OLWindowListItemDestroy endm
+
+WindowListListDismissTaskMenu method dynamic WindowListListClass, \
+				MSG_WINDOW_LIST_LIST_DISMISS_TASK_MENU
+		movdw	bxsi, ds:[di].GIGI_destination
+		mov	ax, MSG_OL_FIELD_DISMISS_TASK_MENU
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		GOTO	ObjMessage
+WindowListListDismissTaskMenu endm
+
+OLFieldDismissTaskMenu method dynamic OLFieldClass, \
+				MSG_OL_FIELD_DISMISS_TASK_MENU
+		mov	si, ds:[di].OLFI_toolArea
+		tst	si
+		jz	done
+		mov	ax, MSG_TOOL_AREA_DISMISS_TASK_MENU
+		GOTO	ObjCallInstanceNoLock
+done:
+		ret
+OLFieldDismissTaskMenu endm
+
+;
+; Normal trigger completion dismisses the popup. Keep its saved entry until
+; command delivery; list reinitialization clears it if the window disappears.
+;
+TaskBarMenuCommand method dynamic TaskBarMenuClass, \
+				MSG_TASK_BAR_MENU_COMMAND
+		mov	si, ds:[di].TBMI_windowListEntry
+		tst	si
+		jz	done
+		mov	ax, MSG_OL_WINDOW_LIST_ITEM_TASK_MENU_COMMAND
+		GOTO	ObjCallInstanceNoLock
+done:
+		ret
+TaskBarMenuCommand endm
+
+HighUncommon ends
+endif
