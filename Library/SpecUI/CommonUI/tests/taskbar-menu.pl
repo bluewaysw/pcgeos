@@ -40,7 +40,7 @@ my %label;
 for (0 .. $#code) { $label{$1} = $_ if $code[$_] =~ /^(\w+):$/ }
 sub execute {
     my ($mem) = @_;
-    my ($pc, $al, $zero) = (0, 0, 0);
+    my ($pc, $al, $zero, $carry) = (0, 0, 0, 0);
     for (1 .. 100) {
         my $op = $code[$pc++];
         next if $op =~ /:$|^\.leave$|^segmov/;
@@ -50,6 +50,13 @@ sub execute {
             $zero = !($mem->{$1} & bits($2));
         } elsif ($op =~ /^tst\s+.*?\.(VCI_window)$/) { $zero = !$mem->{$1} }
         elsif ($op =~ /^ornf\s+al,\s*mask (\w+)$/) { $al |= bits($1); $zero = !$al }
+        elsif ($op =~ /^call\s+OpenWinCheckIfMinMaxRestoreControls$/) {
+            # Native helper preserves registers and returns the UI policy in carry.
+            $carry = $mem->{minMaxRestoreControls};
+        } elsif ($op =~ /^andnf\s+al,\s*not \((.+)\)$/) {
+            $al &= ~bits($1 =~ /mask (\w+)/g);
+            $zero = !$al;
+        } elsif ($op =~ /^jc\s+(\w+)$/) { $pc = $label{$1} if $carry }
         elsif ($op =~ /^(jz|jmp)\s+(\w+)$/) { $pc = $label{$2} if $1 eq 'jmp' || $zero }
         else { die "Unsupported capability instruction: $op\n" }
     }
@@ -59,7 +66,8 @@ sub execute {
 # Check the complete state/capability matrix against window-menu semantics.
 my @attr = qw(OWA_CLOSABLE OWA_MINIMIZABLE OWA_MAXIMIZABLE OWA_MOVABLE OWA_RESIZABLE);
 my $cases = 0;
-for my $caps (0 .. 31) {
+# Include retained OWA_MAXIMIZABLE with controls off and no Restore permission.
+for my $caps (0 .. 31) { for my $controls (0, 1) {
     my $attrs = bits(@attr[grep { $caps & (1 << $_) } 0 .. $#attr]);
     for my $min (0, 1) { for my $max (0, 1) { for my $restore (0, 1) {
         for my $realized (0, 1) { for my $ext (0 .. 3) {
@@ -67,22 +75,22 @@ for my $caps (0 .. 31) {
                         ($max ? bits('OLWSS_MAXIMIZED') : 0);
             my %mem = (OLWI_attrs => $attrs, OLWI_specState => $state,
                 OLWI_fixedAttr => $restore ? bits('OWFA_RESTORABLE') : 0,
-                VCI_window => $realized,
+                VCI_window => $realized, minMaxRestoreControls => $controls,
                 olExtWinAttrs => ($ext & 1 ? bits('EWA_MOVABLE') : 0) |
                                  ($ext & 2 ? bits('EWA_RESIZABLE') : 0));
             my $want = 0;
             $want |= bits('OLWSI_CLOSABLE') if $caps & 1;
-            $want |= bits('OLWSI_MINI') if ($caps & 2) && !$min;
-            $want |= bits('OLWSI_MAXI') if ($caps & 4) && ($min ? $restore : !$max);
-            $want |= bits('OLWSI_RESTORE') if $restore && ($min || $max);
+            $want |= bits('OLWSI_MINI') if $controls && ($caps & 2) && !$min;
+            $want |= bits('OLWSI_MAXI') if $controls && ($caps & 4) && ($min ? $restore : !$max);
+            $want |= bits('OLWSI_RESTORE') if $controls && $restore && ($min || $max);
             $want |= bits('OLWSI_MOVE') if ($caps & 8) && !$min && $realized && ($ext & 1);
             $want |= bits('OLWSI_SIZE') if ($caps & 16) && !$min && $realized && ($ext & 2);
-            die "Wrong commands: caps=$caps min=$min max=$max restore=$restore realized=$realized ext=$ext\n"
+            die "Wrong commands: caps=$caps controls=$controls min=$min max=$max restore=$restore realized=$realized ext=$ext\n"
                 unless execute(\%mem) == $want;
             ++$cases;
         } }
     } } }
-}
+} }
 
 # UIC order must agree with the one permission/dispatch table used by ESP.
 my $ui = read_file("$FindBin::Bin/../CSpec/cspecCUAS.ui");

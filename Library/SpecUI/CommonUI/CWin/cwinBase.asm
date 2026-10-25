@@ -5945,6 +5945,11 @@ checkSize:
 unavailable:
 		clr	ax
 done:
+	; Primaries retain OWA_MAXIMIZABLE for startup even without user controls.
+		call	OpenWinCheckIfMinMaxRestoreControls
+		jc	stateReady
+		andnf	al, not (mask OLWSI_MINI or mask OLWSI_MAXI or mask OLWSI_RESTORE)
+stateReady:
 	.leave
 		ret
 GetTaskMenuState endp
