@@ -95,4 +95,39 @@ for (0 .. 5) {
     die "Menu/command order differs for $items[$_]\n"
         unless $ui =~ /\Q$items[$_]\E = GenTrigger \{[^}]*action = MSG_TASK_BAR_MENU_COMMAND, TaskMenu;[^}]*word \Q$messages[$_]\E\b/s;
 }
-print "Taskbar menu: $cases capability cases and menu/command alignment passed\n";
+# COPY_TREE preserves action destinations. Exercise the actual update-loop
+# instructions on two copies with different block and chunk handles.
+my $field = read_file("$FindBin::Bin/../CWin/cwinFieldUncommon.asm");
+my ($binding) = $field =~ /SetTaskMenuItems proc near.*?setItem:(.*?)mov\s+bx, menuIndex/s;
+die "Missing item update loop\n" unless defined $binding;
+$binding =~ s/;[^\n]*//g;
+my @binding = grep length, map { s/^\s+|\s+$//gr } split /\n/, $binding;
+for my $copy ([0x2e60, 0x70], [0x31a0, 0xa0]) {
+    my ($block, $menu) = @$copy;
+    my @chunks = map { $menu + 2 * ($_ + 1) } 0 .. $#items;
+    my %dest = map { $_ => 'template:TaskMenu' } @chunks;
+    for my $index (0 .. $#items) {
+        my %v = (menuChunk => $menu, menuIndex => $index,
+                 'ds:[LMBH_handle]' => $block);
+        for my $op (@binding) {
+            if ($op =~ /^mov\s+(\w+),\s*(.+)$/) {
+                my ($reg, $operand) = ($1, $2);
+                $v{$reg} = $v{$operand} // ($operand =~ /^MSG_/ ? $operand : die "Unknown operand $operand\n");
+            } elsif ($op =~ /^call\s+ObjCallInstanceNoLock$/) {
+                if ($v{ax} eq 'MSG_GEN_FIND_CHILD_AT_POSITION') {
+                    $v{dx} = $chunks[$v{cx}];
+                    $v{cx} = $block;
+                } elsif ($v{ax} eq 'MSG_GEN_TRIGGER_SET_DESTINATION') {
+                    $dest{$v{si}} = "$v{cx}:$v{dx}";
+                } else { die "Unexpected binding message $v{ax}\n" }
+            } elsif ($op !~ /^(?:push|pop)\s+bp$|^jc\s+done$/) {
+                die "Unsupported binding instruction: $op\n";
+            }
+        }
+    }
+    for my $chunk (@chunks) {
+        die "Copied trigger still targets $dest{$chunk}, expected $block:$menu\n"
+            unless $dest{$chunk} eq "$block:$menu";
+    }
+}
+print "Taskbar menu: $cases capability cases, command alignment and copied-trigger routing passed\n";

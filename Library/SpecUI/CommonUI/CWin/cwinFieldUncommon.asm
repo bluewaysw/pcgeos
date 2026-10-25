@@ -2624,9 +2624,9 @@ setPosition:
 	mov	ds:[bx].SWSP_y, dx
 
 	;
-	; set TaskBar usable
+	; set TaskBar usable; keep the relocated DS returned by object calls
 	;
-	push 	ds, si
+	push	si
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	clr	cx					; find first child = 0
 	call	ObjCallInstanceNoLock
@@ -2636,12 +2636,12 @@ setPosition:
 	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTaskBarCheck:
-	pop	ds, si
+	pop	si
 
 	;
-	; set Tray usable
+	; set Tray usable; keep the relocated DS returned by object calls
 	;
-	push 	ds, si
+	push	si
 	mov	ax, MSG_GEN_FIND_CHILD_AT_POSITION
 	mov	cx, 1					; second child = 1
 	call	ObjCallInstanceNoLock
@@ -2651,7 +2651,7 @@ afterTaskBarCheck:
 	mov	dl, VUM_DELAYED_VIA_APP_QUEUE		; dl <- VisUpdateMode
 	call	ObjCallInstanceNoLock
 afterTrayCheck:
-	pop	ds, si
+	pop	si
 
 done:
 	ret
@@ -3542,6 +3542,15 @@ setItem:
 		pop	bp
 		jc	done
 		mov	si, dx
+
+	; COPY_TREE preserves action destinations pointing at the template menu.
+		mov	cx, ds:[LMBH_handle]
+		mov	dx, menuChunk
+		mov	ax, MSG_GEN_TRIGGER_SET_DESTINATION
+		push	bp
+		call	ObjCallInstanceNoLock
+		pop	bp
+
 		mov	bx, menuIndex
 		shl	bx, 1
 		shl	bx, 1
