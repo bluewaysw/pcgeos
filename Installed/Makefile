@@ -98,7 +98,7 @@ minimalLibrary	: kernel swap sound net ui isui motif spool text mailbox \
 		  winword8 zlib dirlist minizip idialc eps impex_libs \
 		  thumbdb ftplib flllib sitelist int8087 intx87\
 		  basicdb gridlib gsol treplib hostif ascii \
-		  rsftool bmptools
+		  rsftool bmptools icmtool
 
 prefLibs	: prefvid prefts preftd \
 		  prefsnd prefos prefmous preflo preflf prefkbd \
@@ -1831,6 +1831,10 @@ Installed/Library/Breadbox/Impex/VCImpex:	ui impex ansic math meta MAKELIB
 
 vconvert: Installed/Appl/Breadbox/VConvert
 Installed/Appl/Breadbox/VConvert:		ui ansic grobj text math meta MAKEAPPL
+
+# Icon Editor support and more
+icmtool	: Installed/Library/IcmTool
+Installed/Library/IcmTool:			ansic ui MAKELIB
 
 # RabeSoft Libraries
 
