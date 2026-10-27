@@ -888,6 +888,55 @@ Boolean LOCAL DialogError(optr errorChunk, optr document)
 }
 @endif
 
+/* Use the registered image drivers, not a parser-specific format list. */
+Boolean _pascal _export FrameImageMimeSupported(char *mimeP)
+{
+    TCHAR mime[MIME_MAXBUF];
+    FileLongName driver;
+    word len;
+    unsigned char c;
+
+    while(*mimeP == ' ' || *mimeP == '\t' || *mimeP == '\r' ||
+          *mimeP == '\n' || *mimeP == '\f')
+        mimeP++;
+    len = 0;
+    while(*mimeP && *mimeP != ' ' && *mimeP != '\t' &&
+          *mimeP != '\r' && *mimeP != '\n' && *mimeP != '\f') {
+        c = (unsigned char)*mimeP++;
+        if(c >= 0x7f || c < 0x21 || len >= MIME_MAXBUF - 1)
+            return FALSE;
+        mime[len++] = (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+    }
+    while(*mimeP == ' ' || *mimeP == '\t' || *mimeP == '\r' ||
+          *mimeP == '\n' || *mimeP == '\f')
+        mimeP++;
+    if(*mimeP || len <= 6)
+        return FALSE;
+    mime[len] = 0;
+    return !LocalCmpStringsNoCase(mime, _TEXT("image/"), 6) &&
+        NameAssocFindAssociation(assocTypeDriver, mime, driver,
+                                 sizeof(driver), TRUE, (void *)0);
+}
+
+/* Snapshot the frame text's existing width before parsing. */
+int _pascal ParseFrameHTML(word fileSource, dword data, HTMLextra *extP,
+    VMBlockHandle *itemP, AllocWatcherHandle watcher, dword *usedMemP)
+{
+    HTMLImageSourceContext sources;
+    optr text;
+
+    sources.viewportWidth = 0;
+    sources.mimeSupported = FrameImageMimeSupported;
+    if(extP->HE_frame) {
+        text = @call extP->HE_frame::MSG_URL_FRAME_GET_TEXT_OBJ();
+        if(text)
+            sources.viewportWidth =
+                @call text::MSG_URL_TEXT_GET_IMAGE_SOURCE_WIDTH();
+    }
+    return ParseAnyFileWithImageSources(HFTT_ASSUME_HTML, fileSource, data,
+        extP, itemP, watcher, usedMemP, &sources);
+}
+
 VMBlockHandle HandleHTMLError(optr htmlMsg, HTMLextra *ext,
                               optr document, dword *usedMem)
 {
@@ -1019,7 +1068,7 @@ VMBlockHandle HandleHTMLError(optr htmlMsg, HTMLextra *ext,
 					   &cp, 0, &status, &backup);
 @endif
 			    MemUnlock(OptrToHandle(errorChunk));
-			    ret = ParseAnyFile(HFTT_ASSUME_HTML,
+			    ret = ParseFrameHTML(
 					       HFTT_SOURCE_OPTR,
 					       (dword)errorChunk,
 					       ext, &item,
@@ -1041,7 +1090,7 @@ VMBlockHandle HandleHTMLError(optr htmlMsg, HTMLextra *ext,
     if (!reportedErr)  /* encompasses entire following if-statement */
 @endif
     if (ret) {
-    ret = ParseAnyFile(HFTT_ASSUME_HTML, HFTT_SOURCE_OPTR, (dword)htmlMsg,
+    ret = ParseFrameHTML(HFTT_SOURCE_OPTR, (dword)htmlMsg,
       ext, &item, G_allocWatcher, usedMem);
 @ifdef DO_DBCS
     /* store parsed code page */
@@ -1049,7 +1098,7 @@ VMBlockHandle HandleHTMLError(optr htmlMsg, HTMLextra *ext,
 @endif
     }
 @else
-    ret = ParseAnyFile(HFTT_ASSUME_HTML, HFTT_SOURCE_OPTR, (dword)htmlMsg,
+    ret = ParseFrameHTML(HFTT_SOURCE_OPTR, (dword)htmlMsg,
       ext, &item, G_allocWatcher, usedMem);
 @ifdef DO_DBCS
     /* store parsed code page */
@@ -1257,7 +1306,7 @@ Boolean LOCAL testScriptCode(VMFileHandle file, VMBlockHandle code, dword offset
     @call oself::MSG_URL_FRAME_DESTROY_SCRIPT_CONTEXT(TRUE);
 
     /* ignore error, keep current page if no item returned */
-    (void)ParseAnyFile(HFTT_ASSUME_HTML, HFTT_SOURCE_SCRIPT, (dword)(&ssh),
+    (void)ParseFrameHTML(HFTT_SOURCE_SCRIPT, (dword)(&ssh),
 		       &ext, &item, G_allocWatcher, &usedMem);
 @ifdef DO_DBCS
     /* store parsed code page */
@@ -1521,7 +1570,7 @@ Boolean LOCAL testScriptCode(VMFileHandle file, VMBlockHandle code, dword offset
 @endif
           if(!strcmpi(result.mimeType,_TEXT("text/html")) && request.dir != DIR_SOURCE)
           {
-            ret = ParseAnyFile(HFTT_ASSUME_HTML,
+            ret = ParseFrameHTML(
               HFTT_SOURCE_FILENAME, (dword)(result.curHTML), &ext, &item,
               G_allocWatcher, &usedMem);
           }
@@ -1637,7 +1686,7 @@ Boolean LOCAL testScriptCode(VMFileHandle file, VMBlockHandle code, dword offset
       else                              // We are missing some files
       {
         /* The parsed item is unusable */
-        VMFreeVMChain(ext.HE_vmFile, VMCHAIN_MAKE_FROM_VM_BLOCK(item));
+        FreeHTMLTransferItem(ext.HE_vmFile, VMCHAIN_MAKE_FROM_VM_BLOCK(item));
 
         /* Store the acknowledgement, so we can resend it later */
         pself->UFI_pendingFetchMem = urlFetchMem;
