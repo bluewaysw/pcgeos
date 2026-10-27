@@ -900,9 +900,14 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Goes to a page, as directed by the nav
 		controller.  The page is either specified
 		by number or relative to the current page.
-		Note: Prev and next only work within a
-		      single file, i.e., for a single name
-		      array.
+		Prev and next normally move within a single
+		file (a single name array).  When the first or
+		last page of a content file is reached and the
+		file belongs to a book, prev/next continue on
+		the last page of the previous file or the first
+		page of the next file in the book's file list.
+		Going to a specific page only works within the
+		current file.
 
 CALLED BY:	MSG_CGV_GOTO_PAGE_FOR_NAV
 PASS:		*ds:si	= ContentGenViewClass object
@@ -984,8 +989,8 @@ EC <		ERROR_NE JM_SEE_BACKTRACE				>
 sendDisplayRequest:
 		cmp	ax, -1				; See if we're at the
 							; first or last page.
-		je	doneAbort			; Yes, so don't change
-							; context.
+		je	atFileBoundary			; Yes, try the adjacent
+							; file in the book.
 		movdw	cxdx, ss:cgvOptr
 		push	bp
 		sub	sp, (size ContentTextRequest)
@@ -1016,6 +1021,39 @@ gotoSpecificPage:
 		jc	sendDisplayRequest
 doneAbort:		
 		call	MNUnlockNameArray
+		jmp	done
+
+atFileBoundary:
+	;
+	; We're on the first or last page of this content file.  If
+	; the file is part of a book, and the book has another content
+	; file in the requested direction, continue on the last page of
+	; the previous file or the first page of the next file.
+	;
+		call	MNUnlockNameArray
+		cmp	cx, CNCGPT_SPECIFIC_PAGE	; Goto page # stays in
+		je	done				; the current file.
+
+		movdw	bxsi, ss:cgvOptr
+		call	MemDerefDS			;*ds:si <- ContentGenView
+		mov	dx, 1				;assume next file
+		cmp	cx, CNCGPT_NEXT_PAGE
+		je	haveDirection
+		mov	dx, -1				;previous file
+haveDirection:
+		push	bp
+		sub	sp, (size ContentTextRequest)
+		mov	bp, sp
+		call	MLGetAdjacentFilePage		;carry set if none
+		jc	freeRequest
+		mov	ss:[bp].CTR_flags, mask CTRF_needContext
+							;Tell nav the new
+							;context.
+		mov	ax, MSG_CGV_DISPLAY_TEXT
+		call	ObjCallInstanceNoLock
+freeRequest:
+		add	sp, (size ContentTextRequest)
+		pop	bp
 		jmp	done
 		
 ContentGenViewGotoPageForNav	endm
@@ -1352,6 +1390,375 @@ done:
 		.leave
 		ret
 MLSetFlagsForSpecialContext	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MLGetAdjacentFilePage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Find the page to display when paging past the first
+		or last page of the current content file: the last
+		page of the previous file, or the first page of the
+		next file in the book.
+
+CALLED BY:	ContentGenViewGotoPageForNav
+PASS:		*ds:si	= ContentGenView
+		ss:bp	= ContentTextRequest buffer
+		dx	= 1 for the next file, -1 for the previous file
+RETURN:		carry clear if found:
+			CTR_filename	= adjacent content file
+			CTR_context	= first page (dx = 1) or
+					  last page (dx = -1) of it
+		carry set if no book, no adjacent file, or the
+			adjacent file could not be read
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+	If the adjacent file has no numbered pages we stop rather
+	than skipping ahead to the file after it.
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MLGetAdjacentFilePage	proc	near
+		uses	ax, bx, cx, dx, si, di, ds, es
+		.enter
+EC <		call	AssertIsCGV				>
+
+		call	MLFindAdjacentBookFile		;carry set if none
+		jc	done
+		call	MLGetBoundaryPageOfFile		;carry set if none
+done:
+		.leave
+		ret
+MLGetAdjacentFilePage	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MLFindAdjacentBookFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Look up the content file that comes before or after
+		the current one in the book's file list.
+
+CALLED BY:	MLGetAdjacentFilePage, MNAdjustPrevNextForBook
+PASS:		*ds:si	= ContentGenView
+		ss:bp	= ContentTextRequest buffer
+		dx	= 1 for the next file, -1 for the previous file
+RETURN:		carry clear if there is an adjacent file:
+			CTR_filename	= name of the adjacent file
+			CTR_bookname, CTR_pathname, CTR_diskhandle
+					= the book's location
+		carry set if no book is open, the current file is not
+			in the book's list, or it is the first/last one
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MLFindAdjacentBookFile	proc	near
+		uses	ax, bx, cx, dx, si, di, ds, es
+		.enter
+EC <		call	AssertIsCGV				>
+
+		segmov	es, ss, ax
+	;
+	; No book name means we are showing a book-less content file.
+	;
+		lea	di, ss:[bp].CTR_bookname
+		mov	ax, CONTENT_BOOKNAME
+		call	ContentGetStringVardata		;carry set if found
+		jnc	noFile
+		lea	di, ss:[bp].CTR_pathname
+		mov	ax, CONTENT_BOOK_PATHNAME
+		call	ContentGetStringVardata
+		jnc	noFile
+		mov	ax, CONTENT_BOOK_DISK_HANDLE
+		call	ObjVarFindData			;ds:bx <- disk handle
+		jnc	noFile
+		mov	ax, ds:[bx]
+		mov	ss:[bp].CTR_diskhandle, ax
+		lea	di, ss:[bp].CTR_filename
+		mov	ax, CONTENT_FILENAME
+		call	ContentGetStringVardata
+		jnc	noFile
+	;
+	; Open the book and find the current file in its file list.
+	;
+		push	dx
+		call	BookOpen			;ds:0 <- BookFileHeader
+		pop	dx				;^hbx <- book file
+		jc	noFile				;^hcx <- header block
+		push	bx, cx				;save for BookClose
+
+		mov	ax, ds:[BFH_nameList]
+		mov	cx, ds:[BFH_count]		;cx <- # of files
+		tst	ax
+		jz	notInBook
+		jcxz	notInBook
+
+		push	bp
+		call	VMLock				;ax <- segment of list
+		mov	ds, ax				;bp <- its mem handle
+		mov	ax, bp
+		pop	bp
+		push	ax				;save list mem handle
+
+		mov	ax, cx				;ax <- # of files
+		segmov	es, ss, bx
+		clr	bx				;bx <- index of file
+		clr	si				;ds:si <- 1st name
+		lea	di, ss:[bp].CTR_filename	;es:di <- current file
+		clr	cx				;null-terminated
+fileLoop:
+		call	LocalCmpStrings
+		je	foundCurrent
+		add	si, size FileLongName
+		inc	bx
+		cmp	bx, ax
+		jb	fileLoop
+		jmp	notAdjacent			;not in the list
+
+foundCurrent:
+	;
+	; Step to the adjacent file.  The unsigned compare against the
+	; file count also catches an index of -1.
+	;
+		add	bx, dx
+		cmp	bx, ax
+		jae	notAdjacent
+		tst	dx
+		js	previousFile
+		add	si, size FileLongName
+		jmp	copyName
+previousFile:
+		sub	si, size FileLongName
+copyName:
+		lea	di, ss:[bp].CTR_filename	;es:di <- dest
+		LocalCopyString				;CTR_filename <- name
+		clc
+		jmp	unlockList
+
+notAdjacent:
+		stc
+unlockList:
+		pop	ax				;ax <- list mem handle
+		pushf
+		push	bp
+		mov	bp, ax
+		call	VMUnlock
+		pop	bp
+		popf
+		jmp	closeBook
+
+notInBook:
+		stc
+closeBook:
+		pop	bx, cx				;book file, header
+		pushf
+		call	BookClose
+		popf
+		jmp	done
+
+noFile:
+		stc
+done:
+		.leave
+		ret
+MLFindAdjacentBookFile	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MLGetBoundaryPageOfFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Get the name of the first or last page of a content
+		file that is not currently displayed.
+
+CALLED BY:	MLGetAdjacentFilePage
+PASS:		*ds:si	= ContentGenView
+		ss:bp	= ContentTextRequest
+			  CTR_filename - content file to look in
+		dx	= 1 for the first page, -1 for the last page
+RETURN:		carry clear if found:
+			CTR_context = name of the page
+		carry set if the file couldn't be opened or has no
+			numbered pages
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Open the file read-only, lock its name array, pick the
+	context with page number 1 or with the highest page number,
+	then close the file again.  MLDisplayText reopens it.
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MLGetBoundaryPageOfFile	proc	near
+		uses	ax, bx, cx, dx, si, di, ds, es
+		.enter
+EC <		call	AssertIsCGV				>
+
+		push	dx
+		call	MFOpenFile			;^hbx <- content file
+		pop	dx
+		jc	done
+		push	bx				;save file handle
+		push	dx				;save direction
+	;
+	; Lock the file's name array.
+	;
+		call	DBLockMap			;*es:di <- map block
+		mov	di, es:[di]
+		mov	ax, es:[di].CFMB_names		;ax <- VM handle
+		call	DBUnlock
+		push	bp
+		call	VMLock				;ax <- segment
+		pop	bp
+		mov	ds, ax
+		mov	si, VM_ELEMENT_ARRAY_CHUNK	;*ds:si <- name array
+	;
+	; Find the first or last page.  The result must be passed in
+	; dx/cx: name arrays have variable sized elements, and for those
+	; ChunkArrayEnum does not pass ax through to the callback.
+	;
+		mov	dx, -1				;dx <- token, none yet
+		clr	cx				;cx <- max page seen
+		mov	bx, SEGMENT_CS
+		mov	di, offset MLFindFirstPageCallback
+		pop	ax				;ax <- direction
+		push	ax
+		tst	ax
+		jns	haveCallback
+		mov	di, offset MLFindLastPageCallback
+haveCallback:
+		call	ChunkArrayEnum			;dx <- token of page
+		mov	ax, dx				;ax <- token of page
+		cmp	ax, -1
+		stc
+		je	unlockNames
+		segmov	es, ss, di
+		lea	di, ss:[bp].CTR_context
+		call	MNGetName			;CTR_context <- name
+		clc
+unlockNames:
+		call	MNUnlockNameArray		;flags preserved
+		pop	bx				;discard direction
+		pop	bx				;^hbx <- content file
+		pushf
+		mov	al, FILE_NO_ERRORS
+		call	VMClose
+		popf
+done:
+		.leave
+		ret
+MLGetBoundaryPageOfFile	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MLFindFirstPageCallback
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	ChunkArrayEnum callback: find the element for page 1
+
+CALLED BY:	MLGetBoundaryPageOfFile (via ChunkArrayEnum)
+PASS:		*ds:si	= PageNameArray
+		ds:di	= PageNameArrayElement
+RETURN:		carry set (stop) if found:
+			dx = element number of page 1
+DESTROYED:	ax
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MLFindFirstPageCallback	proc	far
+		call	MLIsPageElement			;carry set if not page
+		jc	continue
+		cmp	ds:[di].PNAE_pageNumber, 1
+		jne	continue
+		call	ChunkArrayPtrToElement		;ax <- element number
+		mov	dx, ax				;dx <- element number
+		stc					;stop enumerating
+		ret
+continue:
+		clc
+		ret
+MLFindFirstPageCallback	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MLFindLastPageCallback
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	ChunkArrayEnum callback: find the element with the
+		highest page number
+
+CALLED BY:	MLGetBoundaryPageOfFile (via ChunkArrayEnum)
+PASS:		*ds:si	= PageNameArray
+		ds:di	= PageNameArrayElement
+		dx	= element number of highest page so far
+		cx	= highest page number so far
+RETURN:		dx, cx	= updated
+		carry clear (continue)
+DESTROYED:	ax
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MLFindLastPageCallback	proc	far
+		call	MLIsPageElement			;carry set if not page
+		jc	continue
+		cmp	ds:[di].PNAE_pageNumber, cx
+		jbe	continue
+		mov	cx, ds:[di].PNAE_pageNumber	;cx <- new highest
+		call	ChunkArrayPtrToElement		;ax <- element number
+		mov	dx, ax				;dx <- element number
+continue:
+		clc
+		ret
+MLFindLastPageCallback	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MLIsPageElement
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check if a name array element is a numbered page in
+		this file.
+
+CALLED BY:	MLFindFirstPageCallback, MLFindLastPageCallback
+PASS:		ds:di	= PageNameArrayElement
+RETURN:		carry clear if it is a page, set if not
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Skip free elements, file names, contexts in other files,
+	and contexts that aren't applied to any page.  Bindery leaves
+	the page fields of unapplied names untouched, so their page
+	number can be stale; only names with page text are real pages.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MLIsPageElement	proc	near
+		cmp	ds:[di].REH_refCount.WAAH_high, EA_FREE_ELEMENT
+		je	notPage
+		cmp	ds:[di].PNAE_meta.VTNAE_data.VTND_type, VTNT_CONTEXT
+		jne	notPage
+		cmp	ds:[di].PNAE_meta.VTNAE_data.VTND_file,
+			VIS_TEXT_CURRENT_FILE_TOKEN
+		jne	notPage
+		cmp	ds:[di].PNAE_pageNumber, 0
+		je	notPage
+		cmp	ds:[di].PNAE_meta.VTNAE_data.VTND_helpText.DBGI_item, 0
+		je	notPage				;no text for this name
+		clc
+		ret
+notPage:
+		stc
+		ret
+MLIsPageElement	endp
 
 
 BookFileCode	ends
