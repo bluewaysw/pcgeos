@@ -210,8 +210,9 @@ JpegImport(TCHAR *file,
   struct jpeg_error_mgr jerr;
   /* More stuff */
   FILE * infile = 0;		/* source file */
-  JSAMPARRAY buffer;		/* Output row buffer */
-  int row_stride;		/* physical row width in output buffer */
+  JSAMPROW rowP = (void*)0;      /* Valid only while rowH is locked */
+  MemHandle rowH = 0;
+  dword rowSize;
 
   VMBlockHandle bmblock = 0;
   VMBlockHandle dataVMBlock;
@@ -397,6 +398,11 @@ EC(dword cbSize = 0;)
       }
 
       /* More clean up */
+      if (rowH) {
+          if (rowP)
+              MemUnlock(rowH);
+          MemFree(rowH);
+      }
 #if SCANLINE_COMPRESS
       if (scanlineCompress) {
         if (cBuf)
@@ -681,11 +687,15 @@ EC(dword cbSize = 0;)
   }
 #endif
 
-  /* JSAMPLEs per row in output buffer */
-  row_stride = cinfo->output_width * cinfo->output_components;
-  /* Make a one-row-high sample array that will go away when done with image */
-  buffer = MCALL4(alloc_sarray, cinfo->mem,
-                  (j_common_ptr) cinfo, JPOOL_IMAGE, row_stride, 1);
+  /* Check the byte count before narrowing it to a GEOS block size. */
+  rowSize = (dword)cinfo->output_width * cinfo->output_components * sizeof(JSAMPLE);
+  if (!rowSize || rowSize > 0xffffUL) {
+      flag = TRUE;
+  } else {
+      rowH = MemAlloc((word)rowSize, HF_DYNAMIC, HAF_ZERO_INIT);
+      if (!rowH)
+          flag = TRUE;
+  }
   /* Step 6: while (scan lines remain to be read) */
   /*           jpeg_read_scanlines(...); */
 
@@ -701,7 +711,12 @@ EC(dword cbSize = 0;)
      * Here the array is only one element long, but you could ask for
      * more than one scanline at a time if that's more convenient.
      */
-    (void) jpeg_read_scanlines(cinfo, buffer, 1);
+    rowP = MemLock(rowH);
+    if (!rowP) {
+        flag = TRUE;
+        break;
+    }
+    (void) jpeg_read_scanlines(cinfo, &rowP, 1);
 
 #if SCANLINE_COMPRESS
     if (scanlineCompress) {
@@ -721,15 +736,19 @@ EC(dword cbSize = 0;)
     {
 #endif
         if (displayClass == DC_GRAY_8)
-            ConvertGreyLine(lineptr, buffer[0], size) ;
+            ConvertGreyLine(lineptr, rowP, size) ;
         else if (displayClass == DC_COLOR_8)
-            ConvertLine(lineptr, buffer[0], size) ;
+            ConvertLine(lineptr, rowP, size) ;
         else if (displayClass == DC_COLOR_4)
-            ConvertLine16Color(lineptr, buffer[0], cinfo->output_width) ;
+            ConvertLine16Color(lineptr, rowP, cinfo->output_width) ;
         else if (displayClass == DC_GRAY_1)
-	        MonoDowngrade(lineptr, buffer[0], cinfo->output_width, cinfo->output_scanline-1) ;
+	        MonoDowngrade(lineptr, rowP, cinfo->output_width, cinfo->output_scanline-1) ;
         else
-            memcpy(lineptr, buffer[0], size) ;
+            memcpy(lineptr, rowP, size) ;
+
+        /* The decoder retains no caller output pointer after the call. */
+        MemUnlock(rowH);
+        rowP = (void*)0;
 
 #if SCANLINE_COMPRESS
 	if (scanlineCompress) {
@@ -809,8 +828,16 @@ EC(dword cbSize = 0;)
         break ;
 #endif
     }
-    else
+    else {
+        MemUnlock(rowH);
+        rowP = (void*)0;
         flag = TRUE;
+    }
+  }
+
+  if (rowH) {
+      MemFree(rowH);
+      rowH = 0;
   }
 
 #if SCANLINE_COMPRESS

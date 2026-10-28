@@ -59,25 +59,42 @@ WAKEUP	endp
 .ioenable
 
 	global BLOCK:far
-BLOCK	proc	far	queueP:fptr, flag:fptr
+BLOCK	proc	far	queueP:fptr, flag:fptr, bytesAvailP:fptr, preReadOffsetP:fptr, needed:word
 	.enter
 	;
-	; atomically check flag, block if FALSE
+	; atomically check fileDone and available bytes before blocking
 	;
-	INT_OFF
-	push	ds, si
-	lds	si, flag
-	mov	ax, ds:[si]
-	pop	ds, si
-	cmp	ax, 0	; also allows us to set conditional brk here
-	jne	noBlock
-	mov	ax, queueP.segment
-	mov	bx, queueP.offset
-	call	ThreadBlockOnQueue
-noBlock:
-	INT_ON
+		INT_OFF
+		push	ds, si
+		lds	si, flag
+		mov	ax, ds:[si]
+		tst	ax
+		jnz	skipBlock
+		lds	si, bytesAvailP
+		mov	ax, ds:[si]
+		mov	dx, ds:[si+2]
+		lds	si, preReadOffsetP
+	; A borrow means the pre-read cursor exceeds the available byte count.
+		sub	ax, ds:[si]
+		sbb	dx, ds:[si+2]
+		jc	doBlock
+	; Any nonzero high word, or enough low-word bytes, satisfies the wait.
+		tst	dx
+		jnz	skipBlock
+		cmp	ax, needed
+		jae	skipBlock
+doBlock:
+		mov	ax, queueP.segment
+		mov	bx, queueP.offset
+		pop	ds, si
+		call	ThreadBlockOnQueue
+		jmp	done
+skipBlock:
+		pop	ds, si
+done:
+		INT_ON
 	.leave
-	ret
+		ret
 BLOCK	endp
 endif
 

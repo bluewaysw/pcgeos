@@ -413,12 +413,11 @@ struct fjpeg_decompress_struct {
     JSAMPARRAY buffer[MAX_COMPONENTS];
     Boolean buffer_full;		/* Have we gotten an iMCU row from decoder? */
     JDIMENSION rowgroup_ctr;	/* counts row groups output to postprocessor */
-    /* Remaining fields are only used in the context case. */
+    /* These master pointers are only used in the context case. */
     /* These are the master pointers to the funny-order pointer lists. */
     JSAMPIMAGE xbuffer[2];	/* pointers to weird pointer lists */
-    int whichptr;			/* indicates which pointer set is now in use */
-    int context_state;		/* process_data state machine status */
-    JDIMENSION rowgroups_avail;	/* row groups available to postprocessor */
+    /* Uses the three word slots formerly reserved for context mode. */
+    MemHandle bufferH[MAX_COMPONENTS]; /* locked during scanline calls */
     JDIMENSION iMCU_row_ctr;	/* counts iMCU rows to detect image top/bot */
   } main;
 
