@@ -189,6 +189,10 @@ MSG_OL_FIELD_SEND_TO_GEN_APPLICATIONS	message
 ; Pass:		dx	= message
 ; Return:	nothing
 ;
+
+MSG_OL_FIELD_DISMISS_TASK_MENU message
+; Dismiss the taskbar popup before a backing window-list entry is destroyed.
+
 endif
 
 ;------------------------------------------------------------------------------
@@ -283,6 +287,12 @@ MSG_TOOL_AREA_INIT_POSITION			message
 
 ;endif ; TOOL_AREA_IS_TASK_BAR
 
+if TOOL_AREA_IS_TASK_BAR
+MSG_TOOL_AREA_SHOW_TASK_MENU message
+; Pass: CX = backing window-list item, DX/BP = screen X/Y.
+MSG_TOOL_AREA_DISMISS_TASK_MENU message
+endif
+
 ToolAreaClass	endc
 
 if TOOL_AREA_IS_TASK_BAR or WINDOW_LIST_ACTIVE
@@ -326,6 +336,9 @@ MSG_WINDOW_LIST_LIST_SELECT_ITEM			message
 ; Return:	nothing
 ; Destroyed:	ax, cx, dx, bp
 ;
+if TOOL_AREA_IS_TASK_BAR
+MSG_WINDOW_LIST_LIST_DISMISS_TASK_MENU message
+endif
 WindowListListClass	endc
 
 endif
@@ -335,7 +348,22 @@ if TOOL_AREA_IS_TASK_BAR
 ;	TaskBarListClass
 ;------------------------------------------------------------------------------
 TaskBarListClass	class	GenDynamicListClass
+MSG_TASK_BAR_LIST_SHOW_MENU message
+; Pass: CX = item identifier, DX/BP = screen X/Y.
 TaskBarListClass	endc
+
+TaskBarItemClass class GenItemClass
+TaskBarItemClass endc
+
+TaskBarMenuClass class GenInteractionClass
+	uses OLWinClass
+MSG_TASK_BAR_MENU_COMMAND message
+; Pass: CX = window command from the trigger action data.
+MSG_TASK_BAR_MENU_STATE message
+; Pass: CX = OLWinSysIcons, DX = backing entry, BP = request ID.
+    TBMI_windowListEntry lptr
+    TBMI_request word
+TaskBarMenuClass endc
 
 ;------------------------------------------------------------------------------
 ;	SysTrayTriggerClass

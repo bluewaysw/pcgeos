@@ -172,6 +172,8 @@ endif
 
 if TOOL_AREA_IS_TASK_BAR
 	TaskBarListClass	mask CLASSF_DISCARD_ON_SAVE
+	TaskBarItemClass mask CLASSF_DISCARD_ON_SAVE
+	TaskBarMenuClass mask CLASSF_DISCARD_ON_SAVE
 	SysTrayInteractionClass	mask CLASSF_DISCARD_ON_SAVE
 endif
 

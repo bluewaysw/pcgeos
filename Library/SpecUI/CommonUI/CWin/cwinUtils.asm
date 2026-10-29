@@ -1498,7 +1498,7 @@ REVISION HISTORY:
 	Doug	8/92		Initial version
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-OpenWinCheckIfMinMaxRestoreControls	proc	near	uses	ax, di, es
+OpenWinCheckIfMinMaxRestoreControls	proc	far	uses	ax, di, es
 	.enter
 	mov	ax, segment olWindowOptions
 	mov	es, ax
