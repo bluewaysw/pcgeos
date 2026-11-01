@@ -2249,9 +2249,10 @@ int num;
 
 	if(hostApiAvailable)
 		{
-		dword result = HostIfCall(
-			HIF_SSL_READ, (dword) s, (dword) buf, num);
-		return (int) (result >> 16);
+		/* Clear stale socket errors before receiving host data. */
+		ThreadSetError(SE_NORMAL);
+		return (int) (HostIfCall(
+			HIF_SSL_READ, (dword) s, (dword) buf, num) >> 16);
 		}
 
 

@@ -360,7 +360,28 @@ int SocketRecvNice(
         if (!p_conn->aborted) {
 #ifdef SSL_ENABLE
             if (p_conn->secure) {
-                ret = SSL_read(p_conn->ssl, p_conn->buffer, bufSize);
+                /* Avoid a host operation for every header/chunk byte. */
+                if (!p_conn->sslCount) {
+                    ret = SSL_read(p_conn->ssl, p_conn->sslBuffer,
+                        sizeof(p_conn->sslBuffer));
+                    if (ret > (int)sizeof(p_conn->sslBuffer)) {
+                        ThreadSetError(SE_CONNECTION_ERROR);
+                        ret = -1;
+                    }
+                    if (ret > 0) {
+                        p_conn->sslOffset = 0;
+                        p_conn->sslCount = ret;
+                    }
+                }
+                if (p_conn->sslCount) {
+                    ret = (p_conn->sslCount < bufSize) ?
+                        p_conn->sslCount : bufSize;
+                    memcpy(p_conn->buffer,
+                        p_conn->sslBuffer + p_conn->sslOffset, ret);
+                    p_conn->sslOffset += ret;
+                    p_conn->sslCount -= ret;
+                    ThreadSetError(SE_NORMAL);
+                }
                 if ((ret < 0) && (ThreadGetError() == SE_CONNECTION_CLOSED)) {
                     /* let error handling below do its work */
                     ret = 0;
@@ -547,9 +568,11 @@ void SocketMyClose(T_HTTPConnection *p_conn)
         if (p_conn->secure && p_conn->ssl) {
             SSL_shutdown(p_conn->ssl);
             SSL_free(p_conn->ssl);
+            p_conn->ssl = (void *)0;
         }
 	CloseSocket(p_conn->sock);
         p_conn->sock = NullHandle;
+        p_conn->sslOffset = p_conn->sslCount = 0;
     }
 }
 #else
@@ -1475,8 +1498,8 @@ word HTTPGet(HTTPConnectionHandle conn)
     word      size;
     Boolean   gotPassword = FALSE ;
     HTTPPassword *passwordP;
-    Boolean   retry ;
-    Boolean   doClose ;
+    Boolean   retry = FALSE;
+    Boolean   doClose = FALSE;
     FileHandle output;
     SocketError err;
     word      interError ;
@@ -1531,7 +1554,13 @@ word HTTPGet(HTTPConnectionHandle conn)
     p_conn->secure = (LocalCmpStringsNoCase(
         LMemDerefHandles(p_conn->heap, p_conn->urlChunk), _TEXT("HTTPS:"), 6) == 0);
     MemUnlock(p_conn->heap);
-    if (p_conn->secure) ThreadPSem(sslSem);
+    if (p_conn->secure) {
+        /* Let abort/find inspect this connection while another TLS
+         * request owns the semaphore. */
+        ConnectionUnlock(conn);
+        ThreadPSem(sslSem);
+        p_conn = ConnectionLock(conn);
+    }
 #endif
 
     MemLock(p_conn->heap);
@@ -1539,8 +1568,11 @@ word HTTPGet(HTTPConnectionHandle conn)
     MemUnlock(p_conn->heap);
     if (urlLen*sizeof(TCHAR) > sizeof(p_conn->pathbuf)) {
 	pathB = MemAlloc(urlLen*sizeof(TCHAR), HF_DYNAMIC, HAF_STANDARD_LOCK);
-	if (!pathB)
-	    return URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE ;
+        if (!pathB) {
+            /* Release the connection lock and TLS semaphore on failure. */
+            rcode = URLRequestMakeRet(URL_RET_NO_MEMORY) | URB_RF_NOCACHE;
+            goto error_exit;
+        }
 	p_conn->path = MemDeref(pathB);
     } else {
 	p_conn->path = p_conn->pathbuf;
@@ -1747,13 +1779,6 @@ word HTTPGet(HTTPConnectionHandle conn)
                 doClose = FALSE;
                 handle_error(URL_RET_MESSAGE);
 	    }
-            if (!SSL_set_fd(p_conn->ssl, p_conn->sock)) {
-                SocketMyClose(p_conn);  /* does SSL_free */
-                sprintf(p_conn->errBuf, _TEXT("SSL"));
-                p_conn->msg = @MsgConnectErr;
-                doClose = FALSE;
-                handle_error(URL_RET_MESSAGE);
-            }
         }
 #endif
 
@@ -1790,7 +1815,14 @@ word HTTPGet(HTTPConnectionHandle conn)
         if ((p_conn->secure) && (err == SE_NORMAL) && (p_conn->ssl)) {
 	    void *sslP = p_conn->ssl;
 
-	    SSL_set_fd(p_conn->ssl, p_conn->sock);
+            /* Host TLS needs the connection handle created by SocketConnect. */
+            if (!SSL_set_fd(p_conn->ssl, p_conn->sock)) {
+                SocketMyClose(p_conn);  /* does SSL_free */
+                sprintf(p_conn->errBuf, _TEXT("SSL"));
+                p_conn->msg = @MsgConnectErr;
+                doClose = FALSE;
+                handle_error(URL_RET_MESSAGE);
+            }
 	    SSL_set_tlsext_host_name(p_conn->ssl, (char*) hostname.UTA_ip);
 
 	    if (p_conn->useProxy) {
@@ -2118,7 +2150,13 @@ word HTTPGet(HTTPConnectionHandle conn)
 #ifdef PERSISTANT_CONNECTIONS
 	/* send pesistant connection header, if not proxy */
 	if (!p_conn->dontUsePersistant) {
+            /* HTTPS connections are never reused; ask the peer to close. */
+#ifdef SSL_ENABLE
+            interError = sock_printf(p_conn, NULL,
+                p_conn->secure ? "Connection: close\r\n" : persistHeader);
+#else
 	    interError = sock_printf(p_conn, NULL, persistHeader);
+#endif
 	    if (interError == SOCK_SEND_ABORT) {
 		handle_error(URL_RET_ABORTED);
 	    } else if (interError == SOCK_SEND_ERR) {
@@ -2638,10 +2676,17 @@ word HTTPGet(HTTPConnectionHandle conn)
             }
 #ifdef PERSISTANT_CONNECTIONS
 	} else {
-	    /* eat data for non-URL_RET_FILE or not-modifieds */
-	    do {
-	    } while ((!p_conn->aborted) &&
-		     (SocketGetBlock(conn, &p_conn, TRUE)) > 0);
+            /* Drain only sockets we might reuse. SSL_read cannot honor
+             * noWait, and HTTPS sockets are always closed below. */
+            if (p_conn->allowSocketCache && persistantConnections
+#ifdef SSL_ENABLE
+                && !p_conn->secure
+#endif
+            ) {
+                do {
+                } while ((!p_conn->aborted) &&
+                    (SocketGetBlock(conn, &p_conn, TRUE)) > 0);
+            }
 #endif
         }
 
