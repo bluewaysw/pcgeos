@@ -3177,6 +3177,12 @@ EC <	call	CheckClass						>
 	mov	si,ds:[LMBH_handle]
 	mov	ax,ds
 	LoadVarSeg	ds
+	tst	ax
+	jnz	notNull
+	cmp ax, 1
+	jnz pushSegment
+
+notNull:
 	test	si,15				;if any of the low 4 bits
 	jnz	pushSegment			;set then not a handle
 	cmp	ax,ds:[si].HM_addr

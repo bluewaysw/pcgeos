@@ -34,10 +34,12 @@ static void AdjustPointers( CharTableEntry* charTableEntries,
                             word numOfChars );
 static word RemoveCharData( FontBuf* fontBuf, word offsetCharData );
 static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size );
-static sword RenderGreyChar( TRUETYPE_VARS, TransformMatrix* transformMatrix,
+static sword RenderGreyChar( TT_Outline* outline, TT_Raster_Map* rasterMap, TT_BBox* glyphBBox,
+                             TransformMatrix* transformMatrix,
                              sword width, sword height, word phases,
                              MemHandle bitmapHandle, void** charDataPtr );
-static void RenderGreyFallback( TRUETYPE_VARS, sword width, sword height,
+static void RenderGreyFallback( TT_Outline* outline, TT_Raster_Map* rasterMap,
+                                sword width, sword height,
                                 word pad, word phases,
                                 byte* out, word greyCols, word phaseSize,
                                 byte* work, word workSize );
@@ -192,7 +194,7 @@ EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
         }
         else if( fontBuf->FB_flags & FBF_IS_GREY )
         {
-                size = RenderGreyChar( trueTypeVars, transformMatrix, width, height,
+                size = RenderGreyChar( &outline, &rasterMap, &glyphBBox, transformMatrix, width, height,
                                        ( fontBuf->FB_flags & FBF_GREY_PHASES ) ? GREY_PHASES : 1,
                                        bitmapHandle, &charData );
         }
@@ -525,7 +527,7 @@ EC(     ECCheckBounds( (void*)(charData + dataSize + bytesToMove - 1) ) );
  *                 greyCols, phaseSize  Bytes per row, per phase.
  *                 *work, workSize      Scratch space.
  *******************************************************************/
-static void RenderGreyFallback( TRUETYPE_VARS, sword width, sword height,
+static void RenderGreyFallback( TT_Outline* outline, TT_Raster_Map* rasterMap, sword width, sword height,
                                 word pad, word phases,
                                 byte* out, word greyCols, word phaseSize,
                                 byte* work, word workSize )
@@ -537,13 +539,13 @@ static void RenderGreyFallback( TRUETYPE_VARS, sword width, sword height,
 
 
         memset( work, 0, workSize );
-        TT_Transform_Outline( &OUTLINE, &unscale );
-        RASTER_MAP.rows   = height;
-        RASTER_MAP.width  = width + pad;
-        RASTER_MAP.cols   = monoCols;
-        RASTER_MAP.size   = monoCols * height;
-        RASTER_MAP.bitmap = work;
-        TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
+        TT_Transform_Outline( outline, &unscale );
+        rasterMap->rows   = height;
+        rasterMap->width  = width + pad;
+        rasterMap->cols   = monoCols;
+        rasterMap->size   = monoCols * height;
+        rasterMap->bitmap = work;
+        TT_Get_Outline_Bitmap( outline, rasterMap );
 
         for( k = 0; k < phases; k++ )
                 for( y = 0; y < height; y++ )
@@ -610,7 +612,8 @@ static byte GreyCoverage( const byte* row, word hiCols, word hiWidth, sword col 
  *                 coverage 0..GREY_LEVELS-1. The video driver picks the
  *                 phase from the fractional pen position.
  *******************************************************************/
-static sword RenderGreyChar( TRUETYPE_VARS, TransformMatrix* transformMatrix,
+static sword RenderGreyChar( TT_Outline* outline, TT_Raster_Map* rasterMap, TT_BBox* glyphBBox,
+                             TransformMatrix* transformMatrix,
                              sword width, sword height, word phases,
                              MemHandle bitmapHandle, void** charDataPtr )
 {
@@ -645,39 +648,39 @@ static sword RenderGreyChar( TRUETYPE_VARS, TransformMatrix* transformMatrix,
 EC(     ECCheckBounds( (void*)charData ) );
         hiBitmap = charData + size;
 
-        RASTER_MAP.rows   = height * GREY_OVERSAMPLING;
-        RASTER_MAP.width  = hiWidth;
-        RASTER_MAP.cols   = hiCols;
-        RASTER_MAP.size   = hiSize;
-        RASTER_MAP.bitmap = hiBitmap;
+        rasterMap->rows   = height * GREY_OVERSAMPLING;
+        rasterMap->width  = hiWidth;
+        rasterMap->cols   = hiCols;
+        rasterMap->size   = hiSize;
+        rasterMap->bitmap = hiBitmap;
 
         /* translate outline one pixel from the origin, scale it, render it */
-        TT_Translate_Outline( &OUTLINE, -GLYPH_BBOX.xMin + pad * 64, -GLYPH_BBOX.yMin );
-        TT_Transform_Outline( &OUTLINE, &scale );
-        OUTLINE.dropout_mode = 2;
+        TT_Translate_Outline( outline, -glyphBBox->xMin + pad * 64, -glyphBBox->yMin );
+        TT_Transform_Outline( outline, &scale );
+        outline->dropout_mode = 2;
         {
                 /* The rasterizer sizes its render pool (and precision) */
                 /* by y_ppem: tell it about the oversampled size, or    */
                 /* glyphs with many edges (like 'w') overflow the pool  */
                 /* and come out empty.                                  */
-                TT_UShort  ppem = OUTLINE.y_ppem;
+                TT_UShort  ppem = outline->y_ppem;
                 TT_Error   error;
 
-                OUTLINE.y_ppem = ppem * GREY_OVERSAMPLING;
-                error = TT_Get_Outline_Bitmap( &OUTLINE, &RASTER_MAP );
-                OUTLINE.y_ppem = ppem;
+                outline->y_ppem = ppem * GREY_OVERSAMPLING;
+                error = TT_Get_Outline_Bitmap( outline, rasterMap );
+                outline->y_ppem = ppem;
 
                 if( error )
                 {
                         /* fall back to the 1 bit glyph: full coverage */
-                        RenderGreyFallback( trueTypeVars, width, height, pad, phases,
+                        RenderGreyFallback( outline, rasterMap, width, height, pad, phases,
                                             charData + SIZE_GREY_CHAR_HEADER,
                                             greyCols, phaseSize, hiBitmap, hiSize );
                         goto fillHeader;
                 }
         }
 
-EC_ERROR_IF(    hiSize < RASTER_MAP.size, ERROR_BITMAP_BUFFER_OVERFLOW );
+EC_ERROR_IF(    hiSize < rasterMap->size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
         /* downsample every phase: count the subpixels of each 4x4 block */
         out = charData + SIZE_GREY_CHAR_HEADER;
@@ -712,9 +715,9 @@ fillHeader:
         ((GreyCharData*)charData)->GCD_pictureWidth = outWidth;
         ((GreyCharData*)charData)->GCD_numRows      = height;
         ((GreyCharData*)charData)->GCD_xoff         = transformMatrix->TM_scriptX +
-                                                      transformMatrix->TM_heightX + ( GLYPH_BBOX.xMin >> 6 ) - pad;
+                                                      transformMatrix->TM_heightX + ( glyphBBox->xMin >> 6 ) - pad;
         ((GreyCharData*)charData)->GCD_yoff         = transformMatrix->TM_scriptY +
-                                                      transformMatrix->TM_heightY - ( GLYPH_BBOX.yMax >> 6 );
+                                                      transformMatrix->TM_heightY - ( glyphBBox->yMax >> 6 );
 
         *charDataPtr = charData;
         return size;
@@ -731,13 +734,6 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
         allocSize = INITIAL_BITMAP_BLOCKSIZE;
     else
         allocSize = (size + 255) & 0xFF00;
-
-if(MGI_TYPE_FLAGS(MemGetInfo(bitmapHandle, MGIT_FLAGS_AND_LOCK_COUNT)) & HF_DISCARDED)
-	{
-                MemReAlloc( bitmapHandle, MAX( size, INITIAL_BITMAP_BLOCKSIZE ), HAF_NO_ERR );
-                bitmapData = MemLock( bitmapHandle );
-        } else {
-                word  bitmapBlockSize = MemGetInfo( bitmapHandle, MGIT_SIZE );
 
     bitmapData  = MemLock( bitmapHandle );
     currentSize = (bitmapData == NULL) ? 0 : MemGetInfo( bitmapHandle, MGIT_SIZE );

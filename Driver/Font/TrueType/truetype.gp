@@ -46,7 +46,7 @@ resource InitMod	code read-only shared discard-only
 resource ttcalc_TEXT fixed code read-only shared
 resource STRINGCODE fixed code read-only shared
 resource ttmemory_TEXT fixed code read-only shared
-resource MAINCODE fixed code read-only shared
+#resource MAINCODE fixed code read-only shared
 resource ttchars_TEXT fixed code read-only shared
 resource ttinit_TEXT fixed code read-only shared
 resource ttmetrics_TEXT fixed code read-only shared
@@ -54,7 +54,7 @@ resource ttcharmapper_TEXT fixed code read-only shared
 resource ttadapter_TEXT fixed code read-only shared
 resource ttwidths_TEXT fixed code read-only shared
 resource ttpath_TEXT fixed code read-only shared
-resource ttcache_TEXT fixed code read-only shared
+#resource ttcache_TEXT fixed code read-only shared
 resource ttraster_TEXT fixed code read-only shared
 resource ttgload_TEXT fixed code read-only shared
 resource ttapi_TEXT fixed code read-only shared
