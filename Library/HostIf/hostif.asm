@@ -711,6 +711,13 @@ HostIfCall	proc	far
 		push	ds
 		segmov	ds, dgroup
 
+	;
+	; Serialize the entire exchange before touching the shared port.
+	; A blocked caller must not leave a partial request there while the
+	; async caller still owns the semaphore to register its result slot.
+	;
+		PSem	ds, asyncOpSem
+
 		push	bp
 		mov	bp, dx
 
@@ -734,8 +741,6 @@ HostIfCall	proc	far
 		out	dx, ax
 		mov	ax, bp
 		out	dx, ax
-
-		PSem	ds, asyncOpSem, TRASH_AX_BX
 
 		mov	ax, di
 		out	dx, ax
