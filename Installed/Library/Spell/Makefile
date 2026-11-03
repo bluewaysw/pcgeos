@@ -4,23 +4,27 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = spell
-UI              = uiSpell.asm thesCtrl.asm uiSuggestList.asm uiManager.asm\
-                  uiEditUserDict.asm uiConstant.def uiSpell.ui thesCtrl.ui\
-                  uiManager.ui uiEditUserDict.ui
-IH              = ihCalls.asm ihManager.asm ihVariables.def ihConstants.def
-ET              = thesC.asm thes.asm etManager.asm etVariable.def\
-                  etConstant.def
-ICS             = spellStrings.asm spell.asm icsManager.asm spellC.asm\
-                  icsThread.asm icsConstant.def icsVariable.def
+ET              = thes.asm etManager.asm thesC.asm etConstant.def\
+                  etVariable.def
+UI              = uiSpell.asm uiEditUserDict.asm thesCtrl.asm uiManager.asm\
+                  uiSuggestList.asm uiConstant.def uiManager.ui thesCtrl.ui\
+                  uiEditUserDict.ui uiSpell.ui
+ICS             = icsManager.asm geos_localmem.asm spellStrings.asm\
+                  geos_asmcalls.asm spellC.asm icsThread.asm spell.asm\
+                  geos_opts.asm icsVariable.def icsConstant.def
+OPEN            = spellopen.c openlex.h geosbridge.h
+IH              = ihManager.asm ihCalls.asm ihConstants.def ihVariables.def
 UI_TO_RDFS      = uiManager.ui
-OBJS            =
-COMMON          = spellFeatures.h spellConstant.def spellFea.h
-MODULES         = UI IH ET ICS
-CMODULES        =
-SRCS            = $(UI) $(IH) $(ET) $(ICS) $(COMMON)
+OBJS            = spellopen.obj
+COMMON          = spellFeatures.h spellFea.h spellConstant.def
+MODULES         = ET UI ICS IH
+CMODULES        = Open
+SRCS            = $(ET) $(UI) $(ICS) $(OPEN) $(IH) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = spell
+
+PRODUCTS        = DBCS 
 
 SYSMAKEFILE     = geode.mk
 
@@ -35,4 +39,8 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
+#endif
+
+#if exists(DBCS/$(DEPFILE))
+#include "DBCS/$(DEPFILE)"
 #endif
