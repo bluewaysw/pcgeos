@@ -598,6 +598,43 @@ else
 GEOSnotify	endp
 endif
 
+;
+; Report detailed personal-dictionary failures with the existing GEOS strings.
+; The C caller has already released its memory locks and spell semaphore.
+;
+global	OPENUSERNOTIFY:far
+OPENUSERNOTIFY	proc	far	errorCode:word
+	uses	ax, bx, cx, dx, si, di, ds, es
+	.enter
+		mov	si, offset no_save_user_error
+		mov	di, offset no_save_user_error2
+		cmp	errorCode, 11
+		je	notify
+		mov	si, offset no_load_user_error
+		mov	di, offset no_load_user_error2
+		cmp	errorCode, 12
+		je	notify
+		mov	si, offset load_user_proto_error
+		mov	di, offset load_user_proto_error2
+		cmp	errorCode, 13
+		je	notify
+		mov	si, offset load_user_mem_error
+		mov	di, offset load_user_mem_error2
+		cmp	errorCode, 14
+		jne	exit
+notify:
+		push	si		; Pascal arguments: first string, then second.
+		push	di
+ifdef __BORLANDC__
+		call	GEOSNOTIFY
+else
+		call	GEOSnotify
+endif
+exit:
+	.leave
+		ret
+OPENUSERNOTIFY	endp
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -28,7 +28,7 @@ longname "Spell Check Library"
 tokenchars "SPLL"
 tokenid 0
 
-usernotes	"The American Heritage Electronic Dictionary \xa91989 by Houghton Mifflin Co. All rights reserved."
+usernotes	""
 #
 # Specify geode type
 #
@@ -50,6 +50,9 @@ library text
 #
 nosort
 resource FixedCode fixed code read-only
+resource OpenReadCode	code fixed read-only shared
+resource OpenLexCode	code read-only shared
+resource OpenSuggestCode	code read-only shared
 resource ThesaurusCode	code read-only shared
 resource SpellCode	code read-only shared
 resource SpellControlCommon	code read-only shared
@@ -58,15 +61,15 @@ resource SpellInit	code read-only shared
 resource SpellControlCode	code read-only shared
 resource TextControlCode	code read-only shared
 
-#resource ETCODE	code read-only shared
-#resource IPCODE	code read-only shared
+resource ETCODE	code read-only shared
+resource IPCODE	code read-only shared
 #resource ICS1	code read-only shared
-#resource INIT	code read-only shared
-#resource EXIT	code read-only shared
-#resource IPPRINT	code read-only shared
-#resource CODE	code read-only shared
-#resource IHCODE	code read-only shared
-#resource STDLIB	code read-only shared
+resource INIT	code read-only shared
+resource EXIT	code read-only shared
+resource IPPRINT	code read-only shared
+resource CODE	code read-only shared
+resource IHCODE	code read-only shared
+resource STDLIB	code read-only shared
 #resource ETINFLEC	code read-only shared
 #resource ETSEARCH	code read-only shared
 #resource ETUNFLEC	code read-only shared
