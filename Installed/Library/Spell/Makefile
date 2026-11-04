@@ -24,8 +24,6 @@ LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = spell
 
-PRODUCTS        = DBCS 
-
 SYSMAKEFILE     = geode.mk
 
 #include <geos.mk>
@@ -39,8 +37,4 @@ SYSMAKEFILE     = geode.mk
 
 #if exists($(DEPFILE))
 #include "$(DEPFILE)"
-#endif
-
-#if exists(DBCS/$(DEPFILE))
-#include "DBCS/$(DEPFILE)"
 #endif
