@@ -62,8 +62,3 @@ LINKFLAGS	+= -D__BORLANDC__
 ASMFLAGS	+= -DGPC_SPELL
 UICFLAGS	+= -DGPC_SPELL
 LINKFLAGS	+= -DGPC_SPELL
-
-# The platform default is -3. These options follow CCOMFLAGS, so the final
-# CPU switch keeps the replacement engines compatible with 8086 and 286.
-WCCNCOPTFLAGS = -ox -0
-WCCECOPTFLAGS = -0
