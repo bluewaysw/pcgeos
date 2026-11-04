@@ -1,0 +1,743 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	crop.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements cropping images.
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+extern GlobalStruct global;
+
+/*--------------------- Local Headers ---------------------
+ ---------------------------------------------------------------------------*/
+
+
+/*===========================================================================
+	CropContentClass - Common messages and routines
+ ===========================================================================*/
+
+@classdecl CropContentClass;
+
+/*--------------------- MSG_VIS_RECALC_SIZE ---------------------
+ *  Purpose:	Return the size of the Content object
+ *  Context:	Geometry management
+ *  Strategy:
+ *  Parameters:  SizeAsDWord (RecalcSizeArgs width; RecalcSizeArgs height);
+ *  Return:	SizeAsDWord
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_VIS_RECALC_SIZE {
+int w, h;
+
+    if ( !pself->CCI_bitmap ) {
+	w = 48;
+	h = 30;
+    } else {
+	BTGetMoreBitmapInfos(global.tempFile, pself->CCI_bitmap, &w, &h, 0);
+    }
+
+    w *= pself->CCI_pixelSize;
+    h *= pself->CCI_pixelSize;
+
+    return( MAKE_SIZE_DWORD(w , h) );
+}
+
+/*--------------------- CropDrawSelectionFrame ---------------------
+ *  Purpose:	Draw selection outline for CropContentClass.
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void CropDrawSelectionFrame(CropContentInstance *pself, GStateHandle gs) {
+int x0, y0, x1, y1, grid;
+
+    GrSaveState(gs);
+
+    /*
+     * Sort and scale coordinates
+     */
+    grid = pself->CCI_pixelSize;
+    x0 = grid * pself->CCI_drag.x0;
+    y0 = grid * pself->CCI_drag.y0;
+    x1 = grid * pself->CCI_drag.x1 ;
+    y1 = grid * pself->CCI_drag.y1;
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+
+    /*
+     * correct coordinates according to CCI_pixelSize. Then draw the rectangle.
+     */
+    switch (pself->CCI_pixelSize) {
+    case 1:
+    case 2:
+    	GrSetLineWidth(gs, MakeWWFixed(1));
+    	break;
+    case 3:    case 4:
+    case 5:    case 6:
+    	GrSetLineWidth(gs, MakeWWFixed(2));
+	x0 += 2;
+	y0 += 2;
+	x1 += grid - 1;
+	y1 += grid - 1;
+    	break;
+    default:
+    	GrSetLineWidth(gs, MakeWWFixed(3));
+	x0 += 2;
+	y0 += 2;
+	x1 += grid - 2;
+	y1 += grid - 2;
+    }
+
+    GrSetMixMode(gs, MM_INVERT);
+    GrSetLineStyle(gs, LS_SOLID, 0, 0, 0);
+    GrDrawRect(gs, x0, y0, x1, y1);
+
+    GrRestoreState(gs);
+}
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:	Draw method for CropContentClass.
+ *  Context:
+ *  Strategy:	- Draw bitmap scaled
+ 		- Draw grid, if appropriate
+ 		- Draw selection frame, if appropriate
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_VIS_DRAW {
+ int width, height, grid;
+
+    if ( !pself->CCI_bitmap) {
+	    GrDrawText(gstate, 1, 1, "no bitmap", 0); 	// <-- useful for debugging
+	    return;
+    }
+
+
+     /*
+      * draw bitmap scaled with CCI_pixelSize
+      */
+     BTGetMoreBitmapInfos(global.tempFile, pself->CCI_bitmap, &width, &height, 0);
+     grid = pself->CCI_pixelSize;
+     width *= grid;
+     height *= grid;
+
+     GrSaveState(gstate);
+     GrApplyScale(gstate, MakeWWFixed(grid), MakeWWFixed(grid) );
+
+     GrDrawHugeBitmap(gstate, 0, 0, global.tempFile, pself->CCI_bitmap);
+
+     GrRestoreState(gstate);
+
+     /*
+      * Draw grid. The 'tool' parameter does not matter, as long as is is
+      * not BTF_EDIT_MASK
+      */
+     FatbitsDrawGrid(gstate, BTF_SELECTION, grid, width, height);
+
+     /*
+      * If a selection frame is active, we must restore it
+      */
+     if ( pself->CCI_drag.dragState != CI_DRAG_STATE_INACTIVE ) {
+     	 CropDrawSelectionFrame(pself, gstate);
+      }
+
+}
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:	Start drawing a selection frame
+ *  Context:
+ *  Strategy:
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_META_START_SELECT {
+int xPos, yPos;
+GStateHandle	gstate;
+
+    retVal->flags = MRF_PROCESSED;
+    if ( 0 == pself->CCI_bitmap ) return;
+
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+
+    /*
+     * transform coordinates
+     */
+    xPos = xPosition / (pself->CCI_pixelSize);
+    yPos = yPosition / (pself->CCI_pixelSize);
+
+    /*
+     * remove old selection frame, if we have one
+     */
+    if (pself->CCI_drag.dragState == CI_DRAG_STATE_DONE) {
+    	CropDrawSelectionFrame(pself, gstate);
+    }
+
+    /*
+     * initialize drag structure
+     */
+    @send oself::MSG_CROP_CONTENT_SET_DRAG_STATE(CI_DRAG_STATE_DRAGGING);
+    pself->CCI_drag.x0 = xPos;
+    pself->CCI_drag.y0 = yPos;
+    pself->CCI_drag.x1 = xPos;
+    pself->CCI_drag.y1 = yPos;
+
+
+    /*
+     * draw initial drag frame
+     */
+    CropDrawSelectionFrame(pself, gstate);
+    @call CropImageSelectedSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR("1x1", 0);
+
+    GrDestroyState(gstate);
+
+}
+
+/*--------------------- MSG_META_PTR ---------------------
+ *  Purpose:	- Display mouse position
+ *		- Resize seelction frame
+ *  Context:
+ *  Strategy:
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ ---------------------------------------------------------------------------*/
+@extern method CropContentClass, MSG_META_PTR {
+char buf[15];
+int xPos, yPos;		// position in bitmap coordinates
+GStateHandle	gstate;
+
+    /*
+     * return if we have no bitmap to edit
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->CCI_bitmap == 0) return;
+
+
+    /*
+     * Transform coordinates
+     * Update mouse position text
+     */
+    xPos = xPosition / (pself->CCI_pixelSize);
+    yPos = yPosition / (pself->CCI_pixelSize);
+    sprintf(buf, "%d:%d", xPos, yPos);
+    @call CropImageMouseText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    pself = ObjDerefVis(oself);
+
+
+
+    /*
+     * Return if we have no selection frame
+     */
+    if ( pself->CCI_drag.dragState != CI_DRAG_STATE_DRAGGING ) return;
+
+
+    /*
+     * Limit the selection frame to the size of the bitmap
+     */
+    if (xPos < 0) xPos = 0;
+    if (yPos < 0) yPos = 0;
+    if (xPos >= pself->CCI_xSize) xPos = pself->CCI_xSize - 1;
+    if (yPos >= pself->CCI_ySize) yPos = pself->CCI_ySize - 1;
+
+    /*
+     * constrain coordinates if we want to select a square
+     */
+    if ( (inputState>>8) & UIFA_CONSTRAIN ) {
+    	IconConstrainSelectionCoordinates(pself->CCI_drag.x0, pself->CCI_drag.y0, pself->CCI_xSize, pself->CCI_ySize, &xPos, &yPos);
+    }
+
+    /*
+     * Return if the pixel under the mouse has not changed
+     */
+    do {
+   	if (xPos != pself->CCI_drag.x1) break;
+   	if (yPos != pself->CCI_drag.y1) break;
+   	return;
+    } while (FALSE);
+
+
+    /*
+     * Update selection frame
+     */
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    CropDrawSelectionFrame(pself, gstate);
+    pself->CCI_drag.x1 = xPos;
+    pself->CCI_drag.y1 = yPos;
+    CropDrawSelectionFrame(pself, gstate);
+    GrDestroyState(gstate);
+
+    /*
+     * Show selected size
+     */
+    @call oself::MSG_CROP_CONTENT_UPDATE_SELECTED_SIZE_TEXT();
+}
+
+/*--------------------- MSG_CROP_CONTENT_UPDATE_SELECTED_SIZE_TEXT ---------------------
+ *  Purpose:	Show selected size in CropImageSelectedSizeText object
+ *  Strategy:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method CropContentClass, MSG_CROP_CONTENT_UPDATE_SELECTED_SIZE_TEXT {
+char buf[15];
+int x0, y0, x1, y1;
+
+    /*
+     * Display selected size
+     * Sort coordinates, fix bound behavior
+     */
+    x0 = pself->CCI_drag.x0;
+    y0 = pself->CCI_drag.y0;
+    x1 = pself->CCI_drag.x1;
+    y1 = pself->CCI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+    x1++;
+    y1++;
+
+    sprintf(buf, "%dx%d", x1 - x0, y1 - y0);
+    @call CropImageSelectedSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+}
+
+/*--------------------- MSG_META_END_SELECT ---------------------
+ *  Purpose:	Finsish drawing the selection frame
+ *  Strategy:	Set dragState to CI_DRAG_STATE_DONE
+ *		This indicates that there is a selection frame and the
+ *		coordinates in CCI_drag instance data are valid
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method CropContentClass, MSG_META_END_SELECT {
+
+    /*
+     * return if we have no bitmap to edit (savety check)
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->CCI_bitmap == 0) return;
+
+    @send oself::MSG_CROP_CONTENT_SET_DRAG_STATE(CI_DRAG_STATE_DONE);
+
+}
+
+
+/*===========================================================================
+	Class specific methodes
+ *===========================================================================*/
+
+/*--------------------- MSG_CROP_CONTENT_SET_PIXEL_SIZE ---------------------
+ *  Purpose:	Set pixel size for CropImageView.
+ *  Startegy:
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_CROP_CONTENT_SET_PIXEL_SIZE {
+     pself->CCI_pixelSize = selection;
+     @call oself::MSG_CROP_CONTENT_RESIZE_AND_REDRAW();
+}
+
+
+/*--------------------- MSG_CROP_CONTENT_RESIZE_AND_REDRAW ---------------------
+ *  Purpose:	Resize and redraw CorpContnet object and view
+ *  Context:	This message is called if the size has been changed
+ *		- when the zoom (CCI_pixelSize) has been changed
+ *		- when the bitmap has been changed
+ *  Startegy:
+ 	- return if we have not bitmap
+ 	- cache bitmap's size
+ 	- update the size information CCI_xSize and CCI_ySize
+ 	- send invalidate messages to oursefand our view
+ 	- send redraw messages
+ *  Parameters: .
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_CROP_CONTENT_RESIZE_AND_REDRAW {
+optr viewObj;
+
+    /*
+     * It's allowed for CCI_bitmap to be zero
+     */
+    if ( 0 == pself->CCI_bitmap) return;	/* nothing to do */
+    viewObj = pself->VCNI_view;
+
+    /*
+     * update information about the current bitmap's size
+     */
+    BTGetMoreBitmapInfos(global.tempFile, pself->CCI_bitmap,
+    			  &pself->CCI_xSize, &pself->CCI_ySize, 0);
+
+    /*
+     * update ourself and our view
+     */
+    @call oself::MSG_VIS_SET_SIZE(pself->CCI_xSize, pself->CCI_ySize);
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+
+    @call viewObj::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+    @call viewObj::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/*--------------------- MSG_CROP_CONTENT_DUPLICATE_AND_USE_BITMAP ---------------------
+ *  Purpose:	Duplicate the passed bitmap and use it
+ *  Strategy:
+ 	- destroy currently used bitmap (if we have one)
+ 	- duplicate the passed bitmap and use it
+ 	- set dragState to CI_DRAG_STATE_INACTIVE. This indicates that there
+ 	  is no selection frame yet and the coordinates in CCI_drag instance
+ 	  data are invalid
+ 	- resize our self according to the new bitmap and redraw ouself
+ *  Parameters:	vmFile: 	VM file hoding the new bitmap
+ *		bmpHandle:	new bitmap handle
+ *				bmpHandle is allowed to be zero. This only destroys the current bitmap
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_CROP_CONTENT_DUPLICATE_AND_USE_BITMAP {
+
+
+    /*
+     * Store new bitmap. The passed bitmap handle is allowed to be zero
+     */
+    if ( pself->CCI_bitmap ) HugeArrayDestroy(global.tempFile, pself->CCI_bitmap);
+    if ( bitmap ) {
+    	pself->CCI_bitmap = BTCopyBitmap(vmFile, global.tempFile, bitmap);
+    } else {
+    	pself->CCI_bitmap = 0;
+    }
+
+    @send oself::MSG_CROP_CONTENT_SET_DRAG_STATE(CI_DRAG_STATE_INACTIVE);
+    @call CropImageSelectedSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR("--", 0);
+
+    @call oself::MSG_CROP_CONTENT_RESIZE_AND_REDRAW();
+
+}
+/*--------------------- MSG_CROP_CONTENT_SET_DRAG_STATE ---------------------
+ *  Purpose:	Update drag-state and enable/disable "Do Crop" trigger
+ *  Strategy:	In a real object oriented world, the trigger optr sould be an
+ *		instance variable. ;-)
+ *  Parameters:	state: new state
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_CROP_CONTENT_SET_DRAG_STATE {
+
+    pself->CCI_drag.dragState = state;
+
+    switch (state) {
+    case CI_DRAG_STATE_INACTIVE:
+    	@call CropImageCropTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	break;
+    case CI_DRAG_STATE_DRAGGING:
+    case CI_DRAG_STATE_DONE:
+    	@call CropImageCropTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	break;
+    EC( default: ProgError("Invalid state in CROP_~_SET_DRAG_STATE"); )
+    }
+}
+
+/*--------------------- MSG_CROP_CONTENT_GET_DRAG_DATA ---------------------
+ *  Purpose:	Return pself->CCI_drag field
+ *  Strategy:
+ *  Parameters:	data: buffer to hold CropDragStruct
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_CROP_CONTENT_GET_DRAG_DATA {
+    *data = pself->CCI_drag;
+}
+
+/*--------------------- MSG_CROP_CONTENT_SET_INITIAL_SELECTION_FRAME ---------------------
+ *  Purpose:	Set up a selection frame
+ *  Strategy:
+ *  Parameters:	frame coordiantes
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method CropContentClass, MSG_CROP_CONTENT_SET_INITIAL_SELECTION_FRAME {
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+    pself->CCI_drag.x0 = x0;
+    pself->CCI_drag.x1 = x1;
+    pself->CCI_drag.y0 = y0;
+    pself->CCI_drag.y1 = y1;
+
+    /*
+     * mark frame as finished and enable "crop image" trigger
+     */
+    @call oself::MSG_CROP_CONTENT_SET_DRAG_STATE(CI_DRAG_STATE_DONE);
+
+    /*
+     * Show selected size
+     */
+    @call oself::MSG_CROP_CONTENT_UPDATE_SELECTED_SIZE_TEXT();
+}
+
+/*===========================================================================
+	Related process- and database viewer methodes
+ *===========================================================================*/
+
+/*--------------------- MSG_ICON_CROP_CURRENT_ICON ---------------------
+ *  Purpose:	Initiate CropImageDialog with the current icon
+ *  Context:
+ *  Strategy:	- request 'save changes' of the current icon (if modified)
+ *		- get current icon bitmap
+ 		- ensure "Crop Target" group to be visible
+ *		- execute crop dialog with this bitmap
+ *		  this will crop the image, as requested by the user
+ *		- send cropped image to DBViewer object for further use.
+ *  Parameters:	dbViewer: DB Viwer object to use
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_CROP_CURRENT_ICON {
+VMBlockHandle 	bmp, croppedBmp = 0;
+VMFileHandle	vmFile;
+int	iSet, icon, cropTarget;
+Boolean closedBecauseShutdown;
+
+    if ( @call dbViewer:: MSG_DB_VIEWER_CHECK_ICON_DIRTY_AND_DEAL_WITH_IT(TRUE) ) return;
+
+    vmFile = @call dbViewer::MSG_DB_VIEWER_GET_DATABASE();
+    iSet = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    icon = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ICON();
+
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    @send CropTargetGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+    croppedBmp = @call process::MSG_ICON_DO_CROP_IMAGE_DIALOG(vmFile, bmp, vmFile, TRUE, &closedBecauseShutdown);
+
+    cropTarget = @call CropTargetGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @send dbViewer::MSG_DB_VIEWER_HANDLE_CROPPED_ICON(croppedBmp, cropTarget, closedBecauseShutdown);
+}
+
+
+/*--------------------- MSG_ICON_DO_CROP_IMAGE_DIALOG ---------------------
+ *  Purpose:	Execute CropImageDialog - let the user select an area
+ *		of the passed image and return the cropped image
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile, bmp: image to crop
+ *			The image will be copied and the copy will be freed
+ *			by the CropContent object afterwards
+ *		destFile: VM file for the croped image
+ *		testIfSelectionTool: try to get initial selection frame from selection tool
+ *		closedBecauseShutdown: return TRUE if GEOS is about to shut down
+ *  Return:	VMBlockHandle of the cropped image (stored in destFile)
+ *		NullHandle if the has choosen to cancel
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_DO_CROP_IMAGE_DIALOG {
+VMBlockHandle croppedBmp = 0;
+int cmd;
+CropDragStruct	dragData;
+
+    if (!bmp) return 0;	/* no bitmap to crop - savety check only  */
+
+    /*
+     * Initialize and run dialog box
+     */
+    @call CropImageContent::MSG_CROP_CONTENT_DUPLICATE_AND_USE_BITMAP(vmFile, bmp);
+
+
+    if (testIfSelectionTool) {
+      do {
+        Rectangle bounds;
+    	/*
+    	 * See if the fatbits selection tool is active and try to copy the selection frame
+    	 */
+    	if ( BTF_SELECTION != @call CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_GET_BITMAP_TOOL() ) break;
+	if ( @call CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_SELECTION_GET_SELECTED_BOUNDS(&bounds) ) break;
+	@send CropImageContent::MSG_CROP_CONTENT_SET_INITIAL_SELECTION_FRAME(
+			bounds.R_left, bounds.R_top, bounds.R_right, bounds.R_bottom);
+
+	} while (FALSE);
+    } else {
+    	@send CropImageContent::MSG_CROP_CONTENT_SET_DRAG_STATE(CI_DRAG_STATE_INACTIVE);
+    }
+    cmd = UserDoDialog(@CropImageDialog);
+
+    if ( closedBecauseShutdown ) {
+    	*closedBecauseShutdown = (cmd == IC_NULL) ? TRUE : FALSE;
+    }
+
+    /*
+     * crop image, if there is a clipping rectangle present
+     */
+    @call CropImageContent::MSG_CROP_CONTENT_GET_DRAG_DATA(&dragData);
+    if ( (cmd == IC_CROP_IMAGE) && (dragData.dragState != CI_DRAG_STATE_INACTIVE) ) {
+    	croppedBmp = BTClipBitmap (vmFile, bmp, destFile,
+    	    		dragData.x0, dragData.y0, dragData.x1, dragData.y1);
+    }
+
+    /*
+     * Free bitmap, used by CropImageContent object
+     */
+    @send CropImageContent::MSG_CROP_CONTENT_DUPLICATE_AND_USE_BITMAP(0, 0);
+    @send CropImageContent::MSG_CROP_CONTENT_SET_DRAG_STATE(CI_DRAG_STATE_INACTIVE);
+
+    return croppedBmp;
+}
+
+
+/*--------------------- MSG_DB_VIEWER_CROP_CURRENT_ICON ---------------------
+ *  Purpose:	Start crop image dialog for that icon
+ *  Context:
+ *  Strategy:	The dialog is opeend with UserDoDialog(). Therefore this
+ *		must be done in the process thread.
+ *  Parameters: -
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CROP_CURRENT_ICON {
+     @send, forceQueue process::MSG_ICON_CROP_CURRENT_ICON(oself);
+}
+
+/*--------------------- MSG_DB_VIEWER_HANDLE_CROPPED_ICON ---------------------
+ *  Purpose:	Use new (cropped) bitmap as specified in the cropTarget paramter
+ *  Context:	The user has choosen an area from current icon in the CropImageDialog
+ *		The area was cropped and now send to us to handle the new bitmap
+ *		properly.
+ *  Strategy:
+ *  Parameters: bmp: VMBlockHandle of the cropped icon image
+ 		     bitmap must already be stored in the database file
+ *		cropTarget: What to do with the cropped image; CROP_TARGET_~ konstant
+ *		closedBecauseShutdown: TRUE if CropImageDialog was closed because
+ 		     GEOS is about to shut down -> rememeber state
+ 		     FALSE: User has closed the dialog (normal situation)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_HANDLE_CROPPED_ICON {
+int iSet, count, curIcon;
+VisMonikerListEntryType vmlet;
+VMFileHandle	vmFile;
+int	displayClass, style, dispSize, aspect;
+char 	name[2*MAX_ICON_NAME_LENGTH];
+
+    if (closedBecauseShutdown) {
+    	pself->DBVI_flags |= DBVF_RESTORE_CROP_IMAGE;	/* Restore dialog on restart of GEOS */
+    	return;
+    }
+    if (!bmp) return;	/* no cropped image, nothings to do */
+
+    /*
+     * Get the current icon-set and related data
+     */
+    iSet = pself->DBVI_currentISet;
+    vmFile = pself->DBVI_vmFile;
+    curIcon = pself->DBVI_currentIcon;
+    count = IdGetEntryCount(vmFile, iSet);
+
+    /*
+     * Ensure that the currently edited icon has been saved,
+     * if we use the bitmap for a new icon / icon set
+     */
+    switch (cropTarget ) {
+    case CROP_TARGET_SAME_ICON: 	/* we don't change the properties or name */
+    	break;
+    default:
+    	/*
+    	 * The new icon should have the same properties as the original
+    	 */
+	vmlet = IdGetEntryType(vmFile, iSet, curIcon);
+	displayClass = (vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET;
+	style = (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET;
+	dispSize = (vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET;
+	aspect = (vmlet & VMLET_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET;
+
+	/*
+	 * Create a new name to the new icon.
+	 * Limit length to MAX_ICON_NAME_LENGTH (=32) characters
+	 */
+	MemLock(OptrToHandle(@CropMonikerPrefix));
+	strcpy(name, LMemDeref(@CropMonikerPrefix));
+	IdGetEntryName(vmFile, iSet, curIcon, strchr(name, 0));
+	name[MAX_ICON_NAME_LENGTH] = 0;
+	MemUnlock(OptrToHandle(@CropMonikerPrefix));
+    }
+
+
+    switch (cropTarget ) {
+
+    case CROP_TARGET_SAME_ICON:
+    	/*
+    	 * Set cropped bitmap as edit-bitmap for the fatbits object
+    	 * Set the flag that the icon lsit must be redrawn because
+    	 * the size of an icons has been changed.
+    	 */
+	@call CombineOselfWith(@MyFatbits)::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_CROP_IMAGE);
+	@call CombineOselfWith(@MyFatbits)::MSG_FATBITS_DUPLICATE_AND_USE_BITMAP(vmFile, bmp);
+	@call oself::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+
+	global.flags |= GF_ICON_SIZE_HAS_BEEN_CHANGED;
+	goto done;
+
+    case CROP_TARGET_NEW_ICON:
+	/*
+	 * We can have max. MAX_ICONS icons.
+	 */
+	if (count >= MAX_ICONS) {
+    	    ErrorBoxOptr(@TooManyIconsText);
+    	    goto done;
+    	}
+	/*
+	 * Remember that the number of existing icons (stored in 'count') is equal to
+	 * the index of the new icon, since the counting starts at zero.
+	 */
+    	InitializeIconFromImport(vmFile, iSet, count, bmp, displayClass, style, dispSize, aspect, name);
+
+    	/*
+    	 * Update icon list and edit the new icon
+    	 */
+    	@call oself::MSG_DB_VIEWER_ICON_ADDED(count);
+    	break;
+
+    case IMPORT_TO_NEW_ISET:
+    	/*
+    	 * Create a new set of icons, having only the cropped icon as member
+    	 */
+    	CreateNewISetFromImport(oself, bmp, style, dispSize, aspect, name);
+    	break;
+
+    EC(default: ProgError("Invalid cropTarget in _HANDLE_CROPPED_ICON"); )
+    }
+
+
+done:
+	return;
+}
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+/* *********** End of file crop.goc ********************/
+
+

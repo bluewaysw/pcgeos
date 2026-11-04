@@ -1,0 +1,976 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	undo.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 10/25/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deals with undo / redo cain
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+
+/***********************************************************************
+ *
+ * Structure of the undo chain
+ *	- For every set of icons there is exactly one undo chain in the
+ *	  undo file. The instance variable FBI_undoChain points to the
+ *	  header block of the chain.
+ *	- The undo chain is an array of UndoEntry structures. Each of them
+ *	  contains the undo-type and the data required for undo.
+ *	- The undo chain is organized as a ring buffer, where nextIndex
+ *	  points to the next empty entry.
+ *  	- For consistency, the same data structure is stored for all
+ *   	  undo-capable actions.
+ *
+ * Explainations
+ *  	- The fact that the undo buffer is implemented as a ring buffer
+ *  	  is not considered in the following explanations for the sake
+ *  	  of clarity.
+ *  	- In the following, header->... refers to a member of the structure
+ *  	  UndoChainHeader (see below)
+ *
+ *  	- header->nextIndex points to the entry in UndoArray that is to be
+ *  	  filled next – or that was last restored.
+ *  	- to the left of header->nextIndex is the entry for the next undo –
+ *  	  provided header->undoCount is not zero.
+ *  	- to the right of header->nextIndex is the entry for the next redo –
+ *  	  provided header->redoCount is not zero.
+ *
+ *  	- BEFORE every undo-capable action, the current state is saved.
+ *  	  In particular, the bitmap in its current state is copied into
+ *  	  the undo file.
+ *      - The data is saved in undoArray[nextIndex].
+ *        If any data is already stored there, it is deleted first.
+ *      - then nextIndex is shifted to the right.
+ *
+ *  	- Undo: the associated state (left of nextIndex) is restored.
+ *  	    - if this is the first undo, the current state must first be
+ *  	      loaded and stored in undArray[nextIndex], so that a redo
+ *  	      becomes possible.
+ *  	    - nextIndex is shifted to the left
+ *  	    - update of the counters undoCount, redoCount
+ *  	    - update of the UI
+ *
+ *  	- If, after an undo, another undo-capable action follows, the first
+ *  	  redo entry is overwritten. Therefore redoCount must be set to zero
+ *  	  (no redo possible anymore).
+ *
+ *  	- Redo: the associated state (right of nextIndex) is restored
+ *  	    - nextIndex is shifted to the right
+ *  	    - update of the counters undoCount, redoCount
+ *  	    - update of the UI
+ *
+ *
+ *  Examples
+ *
+ *  after 3 undo-capable actions
+ *      nextIndex = 3
+ *      undoCount = 3
+ *      redoCount = 0
+ *	                      nextIndex
+ *	                         |
+ *  +--------+--------+--------+--------+--------+--------+
+ *  |  Undo1 |  Undo2 |  Undo3 |  Empty |  Empty |  Empty |
+ *  +--------+--------+--------+--------+--------+--------+
+ *
+ *
+ *  then 2x Undo
+ *      nextIndex = 1
+ *      undoCount = 1
+ *      redoCount = 2
+ *              nextIndex          was filled with the current state
+ *                 |               during the first Undo
+ *                 |                |
+ *  +--------+--------+--------+--------+--------+--------+
+ *  |  Undo1 | (Undo2)|  Redo1 |  Redo2 |  Empty |  Empty |
+ *  +--------+--------+--------+--------+--------+--------+
+ *        |                  |
+ * left of nextIndex:       right of nextIndex:
+ * will be used for the     will be used for the next
+ * next Undo to restore     Redo to restore
+ *
+ *
+ *  then 1x Redo
+ *      nextIndex = 2
+ *      undoCount = 2
+ *      redoCount = 1
+ *                      nextIndex
+ *                         |
+ *  +--------+--------+--------+--------+--------+--------+
+ *  |  Undo1 |  Undo2 |restored|  Redo2 |  Empty |  Empty |
+ *  +--------+--------+--------+--------+--------+--------+
+ *                |        |
+ *                |    the undo type stored at nextIndex
+ *                |    always determines the moniker of
+ *                |    the redo trigger
+ *                |
+ * the undo type stored to the left of nextIndex always determines
+ * the moniker of the undo trigger
+ *
+ ***********************************************************************/
+
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+void UndoFreeItem(UndoChainHeader *header, int index);
+void UndoExtecuteRestoreIcon(optr fatbitsObj, UndoEntry *undoEntryPtr);
+
+/***********************************************************************
+ *
+ *	Tool Routines
+ *		- Open and close the undo file
+ *		- Update undo trigger moniker
+ *		- Enable/Disable undo menu triggers
+ *
+ ***********************************************************************/
+
+/*--------------------- UndoOpenUndoFile ---------------------
+ *  Purpose:	Opens the undo file in the current folder
+ *
+ *  Context:
+ *  Strategy:
+ *	- if we are restore from state, the file will be opened,
+ *	  preserving any undo data.
+ *	- if not, the file will be opened and truncated
+ *  Parameters:	attachFlags: AppAttachFlags from MSG_GEN_PROCESS_OPEN_APPLICATION
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UndoOpenUndoFile(AppAttachFlags attachFlags) {
+VMFileHandle fh;
+FileLongName fileName;
+
+    MemLock( OptrToHandle(@IconEdUndoFileName) );
+    strcpy(fileName, LMemDeref(@IconEdUndoFileName));
+    MemUnlock( OptrToHandle(@IconEdUndoFileName) );
+
+    if ( attachFlags & AAF_RESTORING_FROM_STATE ) {
+    	fh = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE, 0);
+    } else {
+        fh = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE_TRUNCATE,0);
+    }
+
+    /*
+     * If opening fails, try to delete and recreate the file.
+     * Of course, this will also crash the app if we are restoring from state.
+     */
+    if ( !fh ) {
+        FileSetAttributes(fileName, 0);
+    	FileDelete(fileName);
+	fh = VMOpen(fileName, VMAF_FORCE_READ_WRITE | VMAF_FORCE_DENY_WRITE , VMO_CREATE_TRUNCATE,0);
+    }
+
+    global.undoFile = fh;
+}
+
+/*--------------------- UndoCloseUndoFile ---------------------
+ *  Purpose:	Close the undo file
+ *		There is no need to destroy any data structures before.
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void UndoCloseUndoFile(void) {
+    if ( global.undoFile ) {
+	VMClose(global.undoFile, FALSE);
+    }
+    global.undoFile = 0;
+}
+
+/*--------------------- UndoFindUndoRedoMonikerOptr ---------------------
+ *  Purpose:	Find out the text (optr) that describes the passed undo operation
+ *  Context:	UndoUpdateTriggerMoniker
+ *  Strategy:
+ *	The texts returned here are the same for undo and for redo.
+ *  Parameters:	undoType: operation to do
+ *  Return:	optr of the describung text
+ ---------------------------------------------------------------------------*/
+optr UndoFindUndoRedoMonikerOptr(UndoType undoType) {
+optr op;
+
+
+
+
+    switch (undoType) {
+
+    case UNDO_NONE:
+    case UNDO_JUST_FOR_REDO:	op = @UndoRedoNothing;	break;
+    case UNDO_ROTATE:		op = @UndoRedoRotate;	break;
+    case UNDO_FLIP:		op = @UndoRedoFlip;	break;
+    case UNDO_RENAME_ICON: 	op = @UndoRedoRenameIcon;	break;
+    case UNDO_DRAW_BITMAP:	op = @UndoRedoDrawBitmap;	break;
+    case UNDO_CHANGE_ATTRIBUTES: op = @UndoChangeAttributes;	break;
+    case UNDO_CHANGE_HOTSPOT:	op = @UndoChangeHotspot; 	break;
+
+    case UNDO_PENCIL:		op = @UndoRedoPaint;	break;
+    case UNDO_ERASER:		op = @UndoRedoEraser;	break;
+    case UNDO_DRAW_LINE:	op = @UndoRedoDrawLine;	break;
+    case UNDO_FILL_RECTANGLE:	op = @UndoRedoFillRectangle;	break;
+    case UNDO_DRAW_RECTANGLE:	op = @UndoRedoDrawRectangle;	break;
+    case UNDO_FILL_ELLIPSE:	op = @UndoRedoFillEllipse;	break;
+    case UNDO_DRAW_ELLIPSE:	op = @UndoRedoDrawEllipse;	break;
+    case UNDO_FILL_AREA:	op = @UndoRedoFillArea;	break;
+    case UNDO_SHIFT_IMAGE:	op = @UndoRedoShiftImage;	break;
+    case UNDO_MOVE_SELECTION:	op = @UndoRedoMoveSelection;	break;
+    case UNDO_FILL_MASK:	op = @UndoRedoFillMask;	break;
+    case UNDO_EDIT_MASK:	op = @UndoRedoEditMask;	break;
+
+    case UNDO_CROP_IMAGE:	op = @UndoRedoCropImage;	break;
+
+    default:
+    	op = @UndoRedoNothing;
+    	EC( DebugInfo1("\rundoType = %d", undoType); \
+    	    ProgError("Invalid Undo Op in UndoFindUndoRedoMonikerOptr"); )
+    }
+
+    return op;
+}
+
+/*--------------------- ToolCreateUndoRedoMoniker ---------------------
+ *  Purpose:	Create a valid VisMoniker for the undo / redo menu trigger
+ *  Return:	optr of new moniker
+ ---------------------------------------------------------------------------*/
+optr ToolCreateUndoRedoMoniker(optr baseOp, optr operationOp, MemHandle mh) {
+int	size;
+char	*baseText, *operationText, *newText;
+optr	monikerOp;
+VisMonikerWithText	*moniker, *newMoniker;
+
+    /*
+     * Calculate size of new moniker:
+     * VisMonikerWithText + "Undo:" + " " + "Rotate"
+     */
+    size = sizeof(VisMonikerWithText);
+
+    moniker = (VisMonikerWithText*)LMemDeref(baseOp);
+    baseText = (void*)moniker;
+    baseText += sizeof(VisMonikerWithText);
+    size += strlen(baseText);
+
+    size += 1;		// one space char
+
+    operationText = LMemDeref(operationOp);
+    size += strlen(operationText);
+
+    size += 4;		// zero terminator + a few extra bytes
+
+    /*
+     * Allocate new moniker and copy data
+     */
+    monikerOp = ConstructOptr(mh, LMemAlloc(mh, size) );
+    newMoniker = LMemDeref(monikerOp);
+
+    memcpy(newMoniker, moniker, sizeof(VisMonikerWithGString));
+    newText = (void*)newMoniker;
+    newText += sizeof(VisMonikerWithText);
+    strcpy(newText, baseText);
+    strcat(newText, " ");
+    strcat(newText, operationText);
+
+    return monikerOp;
+}
+
+/*--------------------- UndoUpdateTriggerMonikers ---------------------
+ *  Purpose:	Changes the monikers of the undo / redo menu trigger
+ *  Context:
+ *  Strategy:
+ *	- Find out the text (optr) for undo / redo action like "Rotate"
+ *	- construct monikers like "Redo: Roatate"
+ *	- Change the monikers
+ *	  Do not enable or disable the triggers
+ *  Parameters:	void (UndoType undoType, UndoType redoType)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UndoUpdateTriggerMonikers(UndoType undoType, UndoType redoType) {
+optr undoOp, redoOp, monikerOp;
+MemHandle	mh;
+
+
+    /*
+     * lock Resource with base monikers and related texts
+     * Cretae LMem to hold the new monikers
+     */
+    MemLock(OptrToHandle(@UndoMainMoniker));
+    mh= MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    MemLock(mh);
+
+    /*
+     * Find out operation text like "Rotate" or "Flood Fill"
+     * Create moniker from base moniker and operation text
+     * assign moniker
+     */
+    undoOp = UndoFindUndoRedoMonikerOptr(undoType);
+    monikerOp = ToolCreateUndoRedoMoniker(@UndoMainMoniker, undoOp, mh);
+    @call IconUndoTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(monikerOp, VUM_NOW);
+
+    /*
+     * Do the same for redo
+     */
+    redoOp = UndoFindUndoRedoMonikerOptr(redoType);
+    monikerOp = ToolCreateUndoRedoMoniker(@RedoMainMoniker, redoOp, mh);
+    @call IconRedoTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(monikerOp, VUM_NOW);
+
+    /*
+     * Clean up
+     */
+    MemUnlock(OptrToHandle(@UndoMainMoniker));
+    MemFree(mh);
+
+}
+
+/*--------------------- MSG_FATBITS_ENABLE_UNDO_TRIGGERS ---------------------
+ *  Purpose:	Enable or disable undo and redo triggers
+ *  Context:
+ *  Strategy:
+ *	- get undo and redo count
+ *	- enable / disable menu triggers directly
+ *	- enable / disable tool triggers via ToolOnlyEditControl
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_ENABLE_UNDO_TRIGGERS {
+MemHandle mh;
+UndoChainHeader *header;
+int undoCount, redoCount;
+word	enableTriggers = 0, disableTriggers = 0;
+
+    /*
+     * get undo / redo count
+     */
+    header = VMLock(global.undoFile,  pself->FBI_undoChain, &mh);
+    undoCount = header->undoCount;
+    redoCount = header->redoCount;
+    VMUnlock(mh);
+
+    /*
+     * Update menu triggers
+     */
+    if (undoCount) {
+    	@call IconUndoTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	enableTriggers |= ETF_TRIG_UNDO;
+    } else {
+    	@call IconUndoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	disableTriggers |= ETF_TRIG_UNDO;
+    }
+
+    if (redoCount) {
+    	@call IconRedoTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	enableTriggers |= ETF_TRIG_REDO;
+    } else {
+    	@call IconRedoTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	disableTriggers |= ETF_TRIG_REDO;
+    	}
+
+    /*
+     * Update tool triggers
+     */
+    @send ToolOnlyEditControl::MSG_TOC_ENABLE_EDIT_TOOL_TRIGGERS(enableTriggers, disableTriggers);
+
+}
+
+
+/*--------------------- MSG_FATBITS_UPDATE_UNDO_TRIGGERS ---------------------
+ *  Purpose:	Set correct visMonikers for undo / redo menu triggers
+ *		Enable correct triggers.
+ *  Context:
+ *  Strategy:
+ *	- lock undo array
+ *	- find out the correct type for undo and redo operations
+ *	  + redo type can be found on the 'nextIndex' entry
+ *	    of undoArray (if redoCount is greater than zero)
+ *	  + undo type can be found on the left of 'nextIndex' entry
+ *	    of undoArray (if undoCount is greater than zero)
+ *	- unlock undo array
+ *	- set monikers
+ *	- enable / disable all triggers via MSG_FATBITS_ENABLE_UNDO_TRIGGERS
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_UPDATE_UNDO_TRIGGERS {
+MemHandle mh;
+UndoChainHeader *header;
+int idx, undoType, redoType;
+
+    header = VMLock(global.undoFile,  pself->FBI_undoChain, &mh);
+
+    /*
+     * redoType is header->undoArray[header->nextIndex].undoType or UNDO_NONE
+     */
+    idx = header->nextIndex;
+    if (header->redoCount ) {
+    	redoType = header->undoArray[idx].undoType;
+    } else {
+    	redoType = UNDO_NONE;
+    }
+
+    /*
+     * undoType is header->undoArray[header->nextIndex-1].undoType or UNDO_NONE
+     */
+    idx--;
+    if (idx < 0) idx += UNDO_BUFFER_SIZE;
+    if (header->undoCount ) {
+    	undoType = header->undoArray[idx].undoType;
+    } else {
+    	undoType = UNDO_NONE;
+    }
+
+    VMUnlock(mh);
+
+    /*
+     * Set monikers of the menu triggers
+     */
+    UndoUpdateTriggerMonikers(undoType, redoType);
+
+    /*
+     * Enable/disable correkt triggers triggers
+     */
+    @call oself::MSG_FATBITS_ENABLE_UNDO_TRIGGERS();
+}
+
+/***********************************************************************
+ *
+ *	Manage Undo-Chain
+ *
+ ***********************************************************************/
+
+/*--------------------- UndoFreeItem ---------------------
+ *  Purpose:	Free an item from the undo chain
+ *		You may pass an aready freed itme to this routine
+ *  Context:
+ *  Strategy:
+ *	- check for empty item first
+ *	- clear item data
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UndoFreeItem(UndoChainHeader *header, int index) {
+UndoEntry *item;
+
+    /*
+     * See it the undo item is empty. This allows the routine
+     * to work with any item, even if it is freed already.
+     */
+    item = &(header->undoArray[index]);
+    if ( item->undoType == UNDO_NONE ) return;
+
+    /*
+     * Clear data: destroy bitmap an mark entry as unused
+     */
+    if ( item->iconBitmap ) HugeArrayDestroy(global.undoFile, item->iconBitmap);
+    item->iconBitmap = 0;
+    item->undoType = UNDO_NONE;
+
+
+}
+
+/*--------------------- MSG_FATBITS_CREATE_UNDO_CHAIN ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_CREATE_UNDO_CHAIN {
+VMBlockHandle  chainBlock;
+MemHandle mh;
+UndoChainHeader *header;
+
+    chainBlock = VMAlloc(global.undoFile, sizeof(UndoChainHeader), 0);
+    pself->FBI_undoChain = chainBlock;
+
+    header = VMLock(global.undoFile, chainBlock, &mh);
+    memset (header, 0, sizeof(UndoChainHeader));
+EC( {
+  int n;
+  for ( n = 0; n < UNDO_BUFFER_SIZE; n++) header->undoArray[n].index = n;
+} )
+
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    UndoUpdateTriggerMonikers(UNDO_NONE, UNDO_NONE);
+    @call oself::MSG_FATBITS_ENABLE_UNDO_TRIGGERS();
+}
+
+/*--------------------- MSG_FATBITS_UNDO_FLUSH_CHAIN ---------------------
+*  Purpose:	Clear the undo chain
+
+ *  Context:
+ *  Strategy:
+ *	- reset undo header - simply clear all counter and set nextIndex to
+ *	  the start of the cain
+ *	- free all undo items, but only on request
+ *	- update undo/redo triggers
+ *  Parameters: Boolean freeItems:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_UNDO_FLUSH_CHAIN {
+int n;
+MemHandle mh;
+UndoChainHeader *header;
+
+
+    header = VMLock(global.undoFile,  pself->FBI_undoChain, &mh);
+
+    header->nextIndex = 0;
+    header->undoCount = 0;
+    header->redoCount = 0;
+
+    /*
+     * There is no need to free the UndoItems. This will be done when the
+     * space is needed in MSG_FATBITS_UNDO_SAVE_ICON_STATE or MSG_FATBITS_UNDO.
+     * But we can do this on request.
+     */
+    if ( freeItems ) {
+	for ( n = 0; n < UNDO_BUFFER_SIZE; n++) UndoFreeItem(header, n);
+    }
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    UndoUpdateTriggerMonikers(UNDO_NONE, UNDO_NONE);
+    @call oself::MSG_FATBITS_ENABLE_UNDO_TRIGGERS();
+}
+
+
+
+/***********************************************************************
+ *
+ *	Undo / Redo Operations
+ *
+ ***********************************************************************/
+
+/*--------------------- FetchIconUndoData ---------------------
+ *  Purpose:	Copy all undo-relevant data to the passed undoEntry
+ *  Context:
+ *  Strategy:
+ *	- copy current bitmap state to undo file
+ *	- read IE_name and IE_type from current icon
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void FetchIconUndoData(optr fatbitsObj, UndoEntry *undoEntry) {
+FatbitsInstance *pself;
+optr dbViewerObj;
+VMFileHandle vmFile;
+int iSet, icon;
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    /*
+     * Copy the bitmap.
+     * If the (currently unsupported) flag UNDO_DONT_STORE_IMAGE is enabled, you
+     * should test if this flag is not set like
+     * if ( 0 == (undoEntry->undoType & UNDO_DONT_STORE_IMAGE) ) { .. }
+     */
+    undoEntry->iconBitmap = BTCopyBitmap(global.tempFile, global.undoFile, pself->FBI_bitmap);
+    EC( if ( undoEntry->iconBitmap == 0 ) { ProgError("FetchIconUndoData: no bitmap found"); return; } )
+
+    /*
+     * find out the current icon
+     */
+    dbViewerObj = ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk(@DBViewerContent));
+    vmFile = @call dbViewerObj::MSG_DB_VIEWER_GET_DATABASE();
+    iSet = @call dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    icon = @call dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ICON();
+
+    EC( if ( (iSet == NO_CURRENT_ISET) || (icon == NO_CURRENT_ICON) ) \
+    	{ ProgError("FetchIconUndoData: No icon or iSet"); return; } )
+
+    /*
+     * copy name and type
+     */
+    IdGetEntryName(vmFile, iSet, icon, undoEntry->iconName);
+    undoEntry->iconType = IdGetEntryType(vmFile, iSet, icon);
+}
+
+/*--------------------- MSG_FATBITS_UNDO_SAVE_ICON_STATE ---------------------
+ *  Purpose:	Save the current editied state of an icon.
+ *  Context:	This method must be called every time bevore an undoable
+ *		operation is performed.
+ *  Strategy:
+ *	- Store current icon state in undoArray[header->nextIndex]
+ *	- move header->nextIndex to the right
+ *	- update counters. redoCount must be set to zero because moving
+ *	  nextIndex destroys the redo chain
+ *	- update undo/redo triggers
+ *  Parameters:	undoType:	undo operation
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_UNDO_SAVE_ICON_STATE {
+MemHandle mh;
+UndoChainHeader *header;
+UndoEntry *entryPtr;	// where to store data
+
+
+    /*
+     * Lock the undo chain. Then use an do-while(FALSE) loop
+     * to ensure VMUnlock() in case of error.
+     */
+    header = VMLock(global.undoFile,  pself->FBI_undoChain, &mh);
+    do {
+
+	/*
+	 * Store current icon state in undoArray[header->nextIndex]
+	 * If the item is used, free it first
+	 */
+	entryPtr = &(header->undoArray[header->nextIndex]);
+	UndoFreeItem(header, header->nextIndex);
+
+	entryPtr->undoType = undoType;
+	FetchIconUndoData(oself, entryPtr);
+
+	/*
+	 * increment nextIndex and undoCount
+	 * Note that we have a ring buffer.
+	 */
+	header->nextIndex++;
+	if (header->nextIndex >= UNDO_BUFFER_SIZE) header->nextIndex = 0;
+
+	/*
+	 * Any undoable operation destroys the redo chain. Simply set redoCount
+	 * to zero. There is no need to free the items, that will be done when
+	 * the item is re-used.
+	 */
+	header->redoCount = 0;
+	header->undoCount++;
+
+	/*
+	 * Increment the undo counter, but limit it to the available space in the undoArray
+	 */
+    	if (header->undoCount > MAX_UNDO_COUNT)  header->undoCount = MAX_UNDO_COUNT;
+
+    } while(FALSE);
+
+
+    /*
+     * Unlock undo chain.
+     * update undo / redo triggers. Note that there is nothings left to redo.
+     */
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    UndoUpdateTriggerMonikers(undoType, UNDO_NONE);
+    @call oself::MSG_FATBITS_ENABLE_UNDO_TRIGGERS();
+
+}
+
+
+/*--------------------- UndoExtecuteRestoreIcon ---------------------
+ *  Purpose:	Execute an undo or redo operation for an icon
+ *  Context:
+ *  Strategy:
+ *	- replace the bitmap (pself->FBI_bitmap) by the bitmap from the undo chain
+ *	- replace name and type from undo chain
+ *	- resize and redraw fatbits as well as live preview
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UndoExtecuteRestoreIcon(optr fatbitsObj, UndoEntry *undoEntryPtr) {
+VMBlockHandle oldBitmap;
+FatbitsInstance *pself;
+optr dbViewerObj;
+VMFileHandle vmFile;
+int iSet, icon;
+Boolean restoreImage;
+
+
+    /*
+     * Set new Bitmap. Destroy old one.
+     * undoEntryPtr->iconBitmap may be zero if the (currently unsupported) undoType-flag
+     * UNDO_DONT_STORE_IMAGE was passed to MSG_FATBITS_UNDO_SAVE_ICON_STATE
+     */
+    pself = ObjDerefVis(fatbitsObj);
+    restoreImage = undoEntryPtr->iconBitmap ? TRUE : FALSE;
+    if ( restoreImage ) {
+    	/*
+    	 * Restore image. Resizing, updating instance variables and
+    	 * FBI_maskBmp (shadow mask bitmap) will be done by
+    	 * MSG_FATBITS_RESIZE_AND_REDRAW below.
+    	 */
+	oldBitmap = pself->FBI_bitmap;
+	pself->FBI_bitmap = BTCopyBitmap(global.undoFile, global.tempFile, undoEntryPtr->iconBitmap);
+	HugeArrayDestroy(global.tempFile, oldBitmap);
+    }
+
+    /*
+     * Set icon's mane and type
+     * Must find out current icon for that
+     */
+    dbViewerObj = ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk(@DBViewerContent));
+    vmFile = @call dbViewerObj::MSG_DB_VIEWER_GET_DATABASE();
+    iSet = @call dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    icon = @call dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ICON();
+
+    EC( if ( (iSet == NO_CURRENT_ISET) || (icon == NO_CURRENT_ICON) ) \
+    	{ ProgError("UndoExtecuteRestoreIcon: No icon or iSet"); return; } )
+
+    /*
+     * copy name and type
+     */
+    IdSetEntryName(vmFile, iSet, icon, undoEntryPtr->iconName);
+    IdSetEntryType(vmFile, iSet, icon, undoEntryPtr->iconType);
+
+    /*
+     * Resize and redraw fatbits as well as live preview, if the image was restored.
+     * Update icon information in FatbitsInfoText
+     */
+    if ( restoreImage ) {
+	@call fatbitsObj::MSG_FATBITS_RESIZE_AND_REDRAW(TRUE);
+	pself = ObjDerefVis(fatbitsObj);
+	@send pself->FBI_imageObj::MSG_OTHER_CONTENT_USE_IMAGE(pself->FBI_bitmap);
+    }
+
+    @call ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk(@DBViewerContent))::MSG_DB_VIEWER_UPDATE_ICON_INFORMATION(icon);
+
+}
+
+
+/*--------------------- MSG_FATBITS_UNDO ---------------------
+ *  Purpose:	Performs an undo operation for the bitmap editied by
+ *		the fatbits object
+ *  Context:	Send by one of the undo triggers
+ *  Strategy:
+ *	The UndoEntry to restore is on the left side of the UndoEntry referred
+ *	by header->nextIndex.
+ *	- if we do the first undo, fetch the current state
+ *	- move header->nextIndex to left and restore icon
+ *	- update undo and redo counters
+ *	- get type for next undo / redo operation
+ *	- update undo/redo triggers
+ *	- update dialogs and mark icon dirty
+ *  Parameters:  -
+ *  Return:
+ ---------------------------------------------------------------------------*/
+// stop in FatbitsFATBITS_UNDO
+@extern method FatbitsClass, MSG_FATBITS_UNDO {
+MemHandle mh;
+optr dbViewerObj;
+UndoChainHeader *header;
+UndoEntry *undoEntryPtr;
+UndoType undoType, redoType;
+
+    /*
+     * Lock the undo chain. Then use an do-while(FALSE) loop
+     * to ensure VMUnlock() in case of error.
+     */
+    header = VMLock(global.undoFile,  pself->FBI_undoChain, &mh);
+
+    do {
+    	EC ( if (header->undoCount <= 0) { ProgError("Error. undoCount cannot be zero"); break; } )
+
+    	/*
+    	 * If we do the first undo operation from the chain, we must store the current
+    	 * state of the icon to allow a redo operation for that undo operation
+    	 * The typ UNDO_JUST_FOR_REDO is created for that.
+    	 */
+        if ( header->redoCount == 0) {
+        	UndoFreeItem(header, header->nextIndex);
+        	undoEntryPtr = &(header->undoArray[header->nextIndex]);
+        	undoEntryPtr->undoType = UNDO_JUST_FOR_REDO;
+        	FetchIconUndoData(oself, undoEntryPtr);
+        }
+
+
+    	/*
+    	 * Move nextIndex to the left. Then use this UndoEntry to
+    	 * retore the icon.
+    	 */
+    	header->nextIndex--;
+    	if ( header->nextIndex < 0 ) header->nextIndex = UNDO_BUFFER_SIZE - 1;
+
+	undoEntryPtr = &(header->undoArray[header->nextIndex]);
+	UndoExtecuteRestoreIcon(oself, undoEntryPtr);
+
+        /*
+         * Update counters. The EC version does some error checking here
+         */
+    	header->undoCount--;
+    	header->redoCount++;
+    	EC ( if (header->redoCount > MAX_UNDO_COUNT) { ProgError("UNDO-Error. redoCount to large"); break; } )
+    	EC ( if ( (header->redoCount + header->undoCount) > MAX_UNDO_COUNT) { ProgError("UNDO-Error. Count sum to large"); break; } )
+
+        /*
+         * Find out the type for the next redo/undo operation.
+         * The next redo type is the current undo type
+         * The next undo type is one position to the left.
+         * If there are no undoes left, undo type is UNDO_NONE
+         */
+    	redoType = undoEntryPtr->undoType;
+	if ( header->undoCount ) {
+    	    int idx;
+
+    	    idx = header->nextIndex - 1;
+    	    if (idx < 0) idx = UNDO_BUFFER_SIZE - 1;
+
+    	    undoEntryPtr = &(header->undoArray[idx]);
+    	    undoType = undoEntryPtr->undoType;
+
+        } else {
+    	    undoType = UNDO_NONE;
+        }
+
+    } while(FALSE);
+
+    /*
+     * Mark undo chain dirty, unlock it and update the undo/redo triggers.
+     * Also mark icon als dirty. This is required when the icon has been saved,
+     * but the undo chain is left intact.
+     */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    UndoUpdateTriggerMonikers(undoType, redoType);
+    @call oself::MSG_FATBITS_ENABLE_UNDO_TRIGGERS();
+
+    dbViewerObj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent));
+    @send dbViewerObj::MSG_DB_VIEWER_UPDATE_DIALOGS();
+
+    /*
+     * If the flag UNDO_CANNOT_BE_DISCARDED is set, the operation (renaming, change attributes)
+     * is already written to the database and cannot be reverted via "Discard Changes".
+     * Therefore the icon should not be set dirty.
+     * Note that redoType contains the correct value to check for this flag!
+     */
+    if ( (redoType & UNDO_CANNOT_BE_DISCARDED) == 0) {
+	@send dbViewerObj::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+    }
+
+    /*
+     * Update all non-modal dialogs, if they are open
+     */
+    @send dbViewerObj::MSG_DB_VIEWER_UPDATE_DIALOGS();
+
+}
+
+/*--------------------- MSG_FATBITS_REDO ---------------------
+ *  Purpose:	Performs an redo operation for the bitmap editied by
+ *		the fatbits object
+ *  Context:	Send by one of the redo triggers
+ *  Strategy:
+ *	The UndoEntry to restore is on the right side of the UndoEntry referred
+ *	by header->nextIndex.
+ *	- get type for next undo operation
+ *	- move header->nextIndex to right and restore icon
+ *	- update undo and redo counters
+ *	- get type for next redo operation
+ *	- update undo/redo triggers
+ *	- update dialogs and mark icon dirty
+ *  Parameters: -
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_REDO {
+MemHandle mh;
+optr dbViewerObj;
+UndoChainHeader *header;
+int undoType, redoType;
+UndoEntry *undoEntryPtr;
+
+
+    /*
+     * Lock the undo chain. Then use an do-while(FALSE) loop
+     * to ensure VMUnlock() in case of error.
+     */
+    header = VMLock(global.undoFile,  pself->FBI_undoChain, &mh);
+
+    do {
+    	EC ( if (header->redoCount == 0) { ProgError("Error. redoCount cannot be zero"); break; } )
+
+	/*
+	 * get current redo type as undo type for next undo operation
+	 */
+	undoEntryPtr = &(header->undoArray[header->nextIndex]);
+	undoType = undoEntryPtr->undoType;
+
+	/*
+	 * Move nextIndex to right (to the UndoEntry to restore).
+	 * The restore icon.
+	 */
+	header->nextIndex++;
+	if ( header->nextIndex >= UNDO_BUFFER_SIZE) header->nextIndex = 0;
+
+	undoEntryPtr = &(header->undoArray[header->nextIndex]);
+	UndoExtecuteRestoreIcon(oself, undoEntryPtr);
+
+	/*
+	 * Update counters. The EC version does some error checking here.
+	 */
+	header->redoCount--;
+	header->undoCount++;
+    	EC ( if (header->undoCount > MAX_UNDO_COUNT) { ProgError("REDO-Error. undoCount to large"); break; } )
+    	EC ( if ( (header->redoCount + header->undoCount) > MAX_UNDO_COUNT) { ProgError("REDO-Error. Count sum to large"); break; } )
+
+
+        /*
+         * If there are redoes left, take the next redo type from
+         * UndoEntry pointed by header->nextIndex.
+         * Otherwise next redo type is UNDO_NONE
+         */
+    	if ( header->redoCount ) {
+	    undoEntryPtr = &(header->undoArray[header->nextIndex]);
+	    redoType = undoEntryPtr->undoType;
+    	} else {
+	    redoType = UNDO_NONE;
+	}
+
+    } while(FALSE);
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /*
+     * Update UI and mark icon dirty (for savety only)
+     */
+    UndoUpdateTriggerMonikers(undoType, redoType);
+    @call oself::MSG_FATBITS_ENABLE_UNDO_TRIGGERS();
+
+    dbViewerObj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent));
+    @send dbViewerObj::MSG_DB_VIEWER_UPDATE_DIALOGS();
+
+    /*
+     * If the flag UNDO_CANNOT_BE_DISCARDED is set, the operation (renaming, change attributes)
+     * is already written to the database and cannot be reverted via "Discard Changes".
+     * Therefore the icon should not be set dirty.
+     * Note that undoType contains the correct value to check for this flag!
+     */
+    if ( (undoType & UNDO_CANNOT_BE_DISCARDED) == 0) {
+	@send dbViewerObj::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+    }
+
+    /*
+     * Update all non-modal dialogs, if they are open
+     */
+    @send dbViewerObj::MSG_DB_VIEWER_UPDATE_DIALOGS();
+
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file undo.goc ********************/
+
+
