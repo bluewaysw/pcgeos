@@ -35,7 +35,6 @@ library	ui
 library	impex
 library	grobj
 library bitmap
-# library color
 
 library	bmptools
 exempt	bmptools
