@@ -52,6 +52,7 @@ include spellConstant.def
 
 ;ETCODE	segment	word public 'CODE'
 ETCODE	segment	public 'CODE'
+global	OPENTHESAURUSFILENAME:far
 ifdef __BORLANDC__
 global	_et_load:far
 global	_et_close:far

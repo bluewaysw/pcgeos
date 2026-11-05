@@ -1,0 +1,719 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Host-only regression checks of the actual GEOS spelling adapter.
+ *
+ * Build from Library/Spell/Open:
+ * cc -x c -std=c89 -Wall -Wextra -Wno-unknown-pragmas -I../../../CInclude \
+ *    test_icgeos.test -o test_icgeos && ./test_icgeos
+ * ./test_icgeos /absolute/path/to/DICTS
+ *
+ * This shim deliberately moves every unlocked heap block and injects file
+ * failures. It validates adapter control flow, personal-list transactionality,
+ * exact UI strings and suggestion completion. The optional DICTS argument
+ * also tests the real adapter and reader against unchanged release files.
+ * It cannot validate GEOS registers, scheduling or DOS I/O.
+ */
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define OPEN_GEOSBRIDGE_H
+#define OPEN_SPELL_HOST_TEST
+#define _export
+#define _pascal
+#define HF_DYNAMIC 1
+#define HF_SHARABLE 2
+#define HAF_ZERO_INIT 128
+#define FALSE 0
+#define SP_USER_DATA 1
+#define ERROR_FILE_NOT_FOUND 2
+#define FILE_ACCESS_R 0
+#define FILE_ACCESS_W 1
+#define FILE_DENY_W 0x20
+#define FILE_DENY_RW 0x10
+#define FCF_NATIVE 0x8000
+#define FILE_CREATE_TRUNCATE 0
+typedef unsigned short word;
+typedef unsigned short WordFlags;
+typedef unsigned char byte;
+typedef unsigned char ByteEnum;
+typedef unsigned long dword;
+typedef word MemHandle;
+typedef word FileHandle;
+typedef word ChunkHandle;
+typedef word ThreadHandle;
+typedef word SemaphoreHandle;
+#include "openlex.h"
+/* Keep the actual case tables in every test and expose the native reader
+ * separately from the injected record/suggestion fixtures below.
+ */
+#define olFind testCoreFind
+#define olSuggest testCoreSuggest
+#include "openlex.inc"
+#undef olSuggest
+#undef olFind
+typedef struct {
+    FileHandle fileH;
+    OLContext lex;
+    FILE *streamP;
+} OpenGeoFile;
+static MemHandle MemAlloc(word, word, word);
+static MemHandle MemAllocSetOwner(word, word, word, word);
+static void *MemLock(MemHandle);
+static void MemUnlock(MemHandle);
+static void MemFree(MemHandle);
+static word GeodeGetCodeProcessHandle(void);
+static void ThreadPSem(word);
+static void ThreadVSem(word);
+static word ThreadGetError(void);
+static void FilePushDir(void);
+static void FilePopDir(void);
+static word FileSetCurrentPath(word, const char *);
+static FileHandle FileOpen(const char *, word);
+static FileHandle FileCreate(const char *, word, word);
+static word FileClose(FileHandle, word);
+static dword FileSize(FileHandle);
+static word FileRead(FileHandle, void *, word, word);
+static word FileWrite(FileHandle, const void *, word, word);
+static word FileCommit(FileHandle, word);
+static word FileDelete(const char *);
+static word FileRename(const char *, const char *);
+static word InitFileReadInteger(const char *, const char *, word *);
+static int OpenGeoOpen(OpenGeoFile *, unsigned char, const char *);
+static void OpenGeoClose(OpenGeoFile *);
+static int OpenGeoName(char *, const char *);
+static word OpenGeoLength(const unsigned char *, word);
+static void OpenGeoFold(unsigned char *, word);
+#include "icgeos.inc"
+
+SemaphoreHandle spellSem = 1;
+static void *testBlocks[16];
+static word testSizes[16];
+static word testLocks[16];
+static unsigned char testFiles[3][4096];
+static word testFileSizes[3];
+static int testFilePresent[3];
+static word testError;
+static int testSemaphore;
+static int testFailure;
+static int testDictionaryResult = 1;
+static int testAllocFail;
+static const char *testDictionaryPathP;
+static const unsigned char *testCandidatesP = (const unsigned char *)"hello";
+static word testCandidateBytes = 6;
+static const unsigned char *testSuggestionInputP;
+static word testSuggestionCalls;
+
+/* Allocate a zeroed fake GEOS block, optionally forcing memory exhaustion. */
+static MemHandle MemAlloc(word size, word heapFlags, word allocFlags)
+{
+    word index;
+    assert((heapFlags & HF_SHARABLE) && allocFlags == HAF_ZERO_INIT);
+    if (testAllocFail) {
+        return 0;
+    }
+    for (index = 1; index < 16; ++index) {
+        if (!testBlocks[index]) {
+            testBlocks[index] = calloc(1, size);
+            assert(testBlocks[index]);
+            testSizes[index] = size;
+            return index;
+        }
+    }
+    return 0;
+}
+
+/* Check that persistent blocks belong to the library rather than a client. */
+static MemHandle MemAllocSetOwner(word owner, word size, word hf, word af)
+{
+    assert(owner == 1);
+    return MemAlloc(size, hf, af);
+}
+
+/* Resolve a stable handle and maintain the kernel-like nested lock count. */
+static void *MemLock(MemHandle blockH)
+{
+    assert(blockH && blockH < 16 && testBlocks[blockH]);
+    ++testLocks[blockH];
+    return testBlocks[blockH];
+}
+
+/* Relocate on final unlock so every stale internal pointer becomes invalid. */
+static void MemUnlock(MemHandle blockH)
+{
+    void *replacementP;
+    assert(testLocks[blockH]);
+    if (!--testLocks[blockH]) {
+        replacementP = malloc(testSizes[blockH]);
+        assert(replacementP);
+        memcpy(replacementP, testBlocks[blockH], testSizes[blockH]);
+        free(testBlocks[blockH]);
+        testBlocks[blockH] = replacementP;
+    }
+}
+
+/* Reject double frees and frees of still-locked blocks. */
+static void MemFree(MemHandle blockH)
+{
+    assert(blockH && testBlocks[blockH] && !testLocks[blockH]);
+    free(testBlocks[blockH]);
+    testBlocks[blockH] = (void *)0;
+}
+
+/* Supply the fake library owner handle. */
+static word GeodeGetCodeProcessHandle(void)
+{
+    return 1;
+}
+/* Check serialized access to the one shared personal dictionary. */
+static void ThreadPSem(word sem)
+{
+    assert(sem == 1 && !testSemaphore++);
+}
+/* Check every semaphore acquisition has exactly one release. */
+static void ThreadVSem(word sem)
+{
+    assert(sem == 1 && testSemaphore-- == 1);
+}
+/* Expose the most recent fake file operation error. */
+static word ThreadGetError(void)
+{
+    return testError;
+}
+/* Directory changes are thread-local no-ops in the in-memory filesystem. */
+static void FilePushDir(void)
+{
+}
+/* Match each production directory restoration without host filesystem I/O. */
+static void FilePopDir(void)
+{
+}
+/* Permit only the prescribed linguistic-data directory. */
+static word FileSetCurrentPath(word disk, const char *pathP)
+{
+    assert(disk == SP_USER_DATA && !strcmp(pathP, "DICTS"));
+    return 1;
+}
+
+/* Map the only three authorized personal-list basenames to fake file slots. */
+static int testFileIndex(const char *nameP)
+{
+    if (!strcmp(nameP, "OPENUSER.USR")) { return 0; }
+    if (!strcmp(nameP, "OPENUSER.BAK")) { return 1; }
+    assert(!strcmp(nameP, "OPENUSER.TMP"));
+    return 2;
+}
+
+/* Open an existing fake file or report the same not-found status as GEOS. */
+static FileHandle FileOpen(const char *nameP, word flags)
+{
+    int index;
+    (void)flags;
+    index = testFileIndex(nameP);
+    testError = testFilePresent[index] ? 0 : ERROR_FILE_NOT_FOUND;
+    return testFilePresent[index] ? (word)(index + 1) : 0;
+}
+
+/* Create only the staging file; live and backup files cannot be truncated. */
+static FileHandle FileCreate(const char *nameP, word flags, word attributes)
+{
+    int index;
+    (void)flags;
+    (void)attributes;
+    index = testFileIndex(nameP);
+    assert(index == 2);
+    testFilePresent[index] = 1;
+    testFileSizes[index] = 0;
+    return (word)(index + 1);
+}
+
+/* Closing a valid virtual handle succeeds without modifying persisted data. */
+static word FileClose(FileHandle fileH, word noError)
+{
+    (void)noError;
+    assert(fileH >= 1 && fileH <= 3);
+    return 0;
+}
+
+/* Return native-file size, including the eight-byte personal-list header. */
+static dword FileSize(FileHandle fileH)
+{
+    return testFileSizes[fileH - 1];
+}
+
+/* Read exactly the requested prefix, matching production's single full read. */
+static word FileRead(FileHandle fileH, void *bufferP, word size, word noError)
+{
+    (void)noError;
+    assert(size <= testFileSizes[fileH - 1]);
+    memcpy(bufferP, testFiles[fileH - 1], size);
+    return size;
+}
+
+/* Inject a short write before any rename; the original must remain intact. */
+static word FileWrite(FileHandle fileH, const void *bufferP, word size, word noError)
+{
+    (void)noError;
+    assert(fileH == 3 && size <= 4096);
+    if (testFailure == 1) { return 0; }
+    memcpy(testFiles[2], bufferP, size);
+    testFileSizes[2] = size;
+    return size;
+}
+
+/* Inject an explicit commit error independently of successful buffered writes. */
+static word FileCommit(FileHandle fileH, word noError)
+{
+    (void)fileH;
+    (void)noError;
+    return testFailure == 2;
+}
+
+/* Report missing backup files exactly as the production cleanup expects. */
+static word FileDelete(const char *nameP)
+{
+    int index;
+    index = testFileIndex(nameP);
+    if (!testFilePresent[index]) { return ERROR_FILE_NOT_FOUND; }
+    testFilePresent[index] = 0;
+    return 0;
+}
+
+/* Fail the publish rename after USR moved to BAK, exercising rollback. */
+static word FileRename(const char *oldP, const char *newP)
+{
+    int oldIndex;
+    int newIndex;
+    oldIndex = testFileIndex(oldP);
+    newIndex = testFileIndex(newP);
+    if (testFailure == 3 && oldIndex == 2) { return 5; }
+    assert(testFilePresent[oldIndex] && !testFilePresent[newIndex]);
+    memcpy(testFiles[newIndex], testFiles[oldIndex], testFileSizes[oldIndex]);
+    testFileSizes[newIndex] = testFileSizes[oldIndex];
+    testFilePresent[newIndex] = 1;
+    testFilePresent[oldIndex] = 0;
+    return 0;
+}
+
+/* Missing preferences leave the adapter's documented English defaults. */
+static word InitFileReadInteger(const char *catP, const char *keyP, word *valueP)
+{
+    (void)catP; (void)keyP; (void)valueP;
+    return 1;
+}
+
+/* Read a real release file through the same relocating context callback. */
+static int testReadDictionary(void *userP, unsigned long offset,
+                              unsigned short count, unsigned char *outputP)
+{
+    OpenGeoFile *fileP;
+    fileP = (OpenGeoFile *)userP;
+    return fseek(fileP->streamP, (long)offset, SEEK_SET) == 0 &&
+           fread(outputP, 1, count, fileP->streamP) == count;
+}
+
+/* Bind fixture or real input so relocation checks can catch stale userP. */
+static int OpenGeoOpen(OpenGeoFile *fileP, unsigned char kind, const char *nameP)
+{
+    assert(kind == 1 && !strcmp(nameP, "EN_US.DCT"));
+    if (testDictionaryPathP) {
+        fileP->streamP = fopen(testDictionaryPathP, "rb");
+        assert(fileP->streamP);
+        return olOpen(&fileP->lex, testReadDictionary, fileP, kind);
+    }
+    fileP->fileH = 1;
+    fileP->lex.userP = fileP;
+    return testDictionaryResult;
+}
+
+/* Mark a context closed, tolerating a failed-open cleanup path. */
+static void OpenGeoClose(OpenGeoFile *fileP)
+{
+    if (fileP->streamP) {
+        assert(!fclose(fileP->streamP));
+        fileP->streamP = (void *)0;
+    }
+    fileP->fileH = 0;
+}
+/* Supply a stable selection to the spelling initializer. */
+static int OpenGeoName(char *nameP, const char *extP)
+{
+    assert(!strcmp(extP, "DCT")); strcpy(nameP, "EN_US.DCT"); return 1;
+}
+/* Measure only within the requested caller-owned buffer. */
+static word OpenGeoLength(const unsigned char *textP, word maximum)
+{
+    word length;
+    for (length = 0; length < maximum && textP[length]; ++length) { }
+    return length;
+}
+/* Apply the actual one-byte GEOS case map in place. */
+static void OpenGeoFold(unsigned char *textP, word length)
+{
+    word index;
+    for (index = 0; index < length; ++index) { textP[index] = olLower(textP[index]); }
+}
+
+/* Return exact fixture records while detecting stale context callback binding. */
+int olFind(OLContext *contextP, const unsigned char *keyP, unsigned short length,
+           unsigned char *valueP, unsigned short capacity, unsigned short *sizeP)
+{
+    OpenGeoFile *fileP;
+    fileP = (OpenGeoFile *)contextP->userP;
+    assert(&fileP->lex == contextP && length && capacity == 1);
+    if (testDictionaryPathP) {
+        return testCoreFind(contextP, keyP, length, valueP, capacity, sizeP);
+    }
+    if (!strcmp((const char *)keyP, "hello") || !strcmp((const char *)keyP, "cat") ||
+        !strcmp((const char *)keyP, "don't") || !strcmp((const char *)keyP, "this") ||
+        !strcmp((const char *)keyP, "test") || !strcmp((const char *)keyP, "\x8a" "ddi") ||
+        !strcmp((const char *)keyP, "\x8e" "cole")) {
+        valueP[0] = 1; *sizeP = 1; return 1;
+    }
+    if (!strcmp((const char *)keyP, "London") || !strcmp((const char *)keyP, "eBay") ||
+        !strcmp((const char *)keyP, "\x80" "ddi")) {
+        valueP[0] = 2; *sizeP = 1; return 1;
+    }
+    return 0;
+}
+
+/* Supply controlled canonical records or the real bounded suggestion engine. */
+int olSuggest(OLContext *contextP, const unsigned char *wordP,
+              unsigned short length, unsigned char *outputP,
+              unsigned short capacity, unsigned short *sizeP,
+              OLSuggestWorkspace *workspaceP)
+{
+    OpenGeoFile *fileP;
+    fileP = (OpenGeoFile *)contextP->userP;
+    assert(&fileP->lex == contextP && length && capacity >= testCandidateBytes);
+    ++testSuggestionCalls;
+    if (testDictionaryPathP) {
+        return testCoreSuggest(contextP, wordP, length, outputP, capacity,
+                               sizeP, workspaceP);
+    }
+    if (testSuggestionInputP) {
+        assert(!strcmp((const char *)wordP, (const char *)testSuggestionInputP));
+    }
+    memcpy(outputP, testCandidatesP, testCandidateBytes);
+    *sizeP = testCandidateBytes;
+    return 1;
+}
+
+/* Allocate an ICBuff through the same zero-init contract as the assembly. */
+static MemHandle testNewBuffer(void)
+{
+    MemHandle bufferH;
+    bufferH = MemAlloc(sizeof(ICBuff), HF_DYNAMIC | HF_SHARABLE, HAF_ZERO_INIT);
+    assert(bufferH);
+    return bufferH;
+}
+
+/* Change the current task without retaining a movable ICBuff pointer. */
+static void testTask(MemHandle bufferH, word task)
+{
+    ICBuff *bufferP;
+    bufferP = (ICBuff *)MemLock(bufferH);
+    bufferP->ICB_task = task;
+    MemUnlock(bufferH);
+}
+
+/* Assert complete projected output, uniqueness and one joint core query. */
+static void testProjected(MemHandle bufferH, const unsigned char *inputP,
+                           const unsigned char *canonicalP, word canonicalBytes,
+                           const unsigned char *expectedP, word expectedBytes)
+{
+    ICBuff *bufferP;
+    unsigned char alternate[65];
+    word index;
+    word offset;
+    word count;
+    word calls;
+    testCandidatesP = canonicalP;
+    testCandidateBytes = canonicalBytes;
+    testSuggestionInputP = inputP;
+    testTask(bufferH, OPEN_VERIFY);
+    assert(ICGEOSpl(inputP, bufferH) == OPEN_NOT_FOUND);
+    testTask(bufferH, OPEN_CORRECT);
+    calls = testSuggestionCalls;
+    assert(ICGEOSpl((const unsigned char *)"", bufferH) == OPEN_NOT_FOUND);
+    assert(testSuggestionCalls == calls + 1);
+    bufferP = (ICBuff *)MemLock(bufferH);
+    count = bufferP->ICB_numAlts;
+    assert(count && count <= 8 && !bufferP->ICB_nextAlt);
+    MemUnlock(bufferH);
+    offset = 0;
+    for (index = 0; index < count; ++index) {
+        assert(offset < expectedBytes);
+        ICGEOGetAlternate(alternate, (const unsigned char *)"", bufferH, index);
+        assert(!strcmp((const char *)alternate, (const char *)expectedP + offset));
+        offset += (word)strlen((const char *)expectedP + offset) + 1;
+    }
+    assert(offset == expectedBytes);
+    testSuggestionInputP = (void *)0;
+    testTask(bufferH, OPEN_VERIFY);
+}
+
+/* Reject every unterminated tail, including tails shorter than a word buffer. */
+static void testAlternateBounds(MemHandle bufferH)
+{
+    ICBuff *bufferP;
+    unsigned char alternate[65];
+    word offset;
+    word index;
+    for (offset = 0; offset <= ICCORMAX; ++offset) {
+        bufferP = (ICBuff *)MemLock(bufferH);
+        memset(bufferP->ICB_altList, 'x', ICCORMAX);
+        bufferP->ICB_numAlts = 1;
+        bufferP->ICB_correctPtr[0] = offset;
+        MemUnlock(bufferH);
+        memset(alternate, 0xcc, sizeof(alternate));
+        ICGEOGetAlternate(alternate, (const unsigned char *)"", bufferH, 0);
+        assert(!alternate[0]);
+        for (index = 1; index < sizeof(alternate); ++index) {
+            assert(alternate[index] == 0xcc);
+        }
+    }
+    bufferP = (ICBuff *)MemLock(bufferH);
+    bufferP->ICB_correctPtr[0] = ICCORMAX - 65;
+    bufferP->ICB_altList[ICCORMAX - 1] = 0;
+    MemUnlock(bufferH);
+    ICGEOGetAlternate(alternate, (const unsigned char *)"", bufferH, 0);
+    assert(strlen((const char *)alternate) == 64);
+}
+
+/* Cover normal initialization, user edits, rollback, casing and suggestions. */
+static void testFixtures(void)
+{
+    MemHandle firstH;
+    MemHandle secondH;
+    MemHandle listH;
+    ICBuff *bufferP;
+    unsigned char *listP;
+    unsigned char alternate[65];
+    unsigned char longWord[66];
+    unsigned char ignoredWord[8];
+    unsigned char original[4096];
+    word originalSize;
+    word index;
+    dword result;
+    firstH = testNewBuffer();
+    testAllocFail = 1;
+    assert(ICGEOSplInitICBuff(firstH) == OPEN_NOMEM);
+    testAllocFail = 0;
+    assert(ICGEOSplInitICBuff(firstH) == OPEN_OK);
+    assert(ICGEOSpl((unsigned char *)"hello", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"hello", firstH) == OPEN_FOUND);
+    bufferP = (ICBuff *)MemLock(firstH);
+    assert(bufferP->ICB_errorFlags == 0x8000 && bufferP->ICB_rside == 4);
+    bufferP->ICB_prevWord[0] = 0;
+    MemUnlock(firstH);
+    assert(ICGEOSpl((unsigned char *)"Hello", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"HELLO", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"hElLo", firstH) == OPEN_NOT_FOUND);
+    assert(ICGEOSpl((unsigned char *)"London", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"london", firstH) == OPEN_NOT_FOUND);
+    assert(ICGEOSpl((unsigned char *)"(cat).", firstH) == OPEN_FOUND);
+    bufferP = (ICBuff *)MemLock(firstH);
+    assert(bufferP->ICB_lside == 1 && bufferP->ICB_rside == 3);
+    MemUnlock(firstH);
+    assert(ICGEOSpl((unsigned char *)"\xd2" "hello" "\xd3", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"don\xd5" "t", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"cat\xd1" "cat", firstH) == OPEN_NOT_FOUND);
+    bufferP = (ICBuff *)MemLock(firstH);
+    assert(bufferP->ICB_emDashMap.WM_data[0]);
+    MemUnlock(firstH);
+    assert(ICGEOSpl((unsigned char *)"123", firstH) == OPEN_PRE_PROC);
+    assert(ICGEOSpl((unsigned char *)"helo", firstH) == OPEN_NOT_FOUND);
+    testTask(firstH, OPEN_CORRECT);
+    assert(ICGEOSpl((unsigned char *)"", firstH) == OPEN_NOT_FOUND);
+    ICGEOGetAlternate(alternate, (unsigned char *)"", firstH, 0);
+    assert(!strcmp((char *)alternate, "hello"));
+    ICGEOGetAlternate(alternate, (unsigned char *)"", firstH, 99);
+    assert(!alternate[0]);
+    testTask(firstH, OPEN_VERIFY);
+    assert(ICGEOSpl((unsigned char *)"Helo", firstH) == OPEN_NOT_FOUND);
+    testTask(firstH, OPEN_CORRECT);
+    assert(ICGEOSpl((unsigned char *)"", firstH) == OPEN_NOT_FOUND);
+    bufferP = (ICBuff *)MemLock(firstH);
+    assert(bufferP->ICB_numAlts == 1);
+    MemUnlock(firstH);
+    ICGEOGetAlternate(alternate, (unsigned char *)"", firstH, 0);
+    assert(!strcmp((char *)alternate, "Hello"));
+    testProjected(firstH, (const unsigned char *)"Tthis",
+                  (const unsigned char *)"this", 5,
+                  (const unsigned char *)"This", 5);
+    testProjected(firstH, (const unsigned char *)"Thjis",
+                  (const unsigned char *)"this\0test", 10,
+                  (const unsigned char *)"This\0Test", 10);
+    testProjected(firstH, (const unsigned char *)"teast",
+                  (const unsigned char *)"test", 5,
+                  (const unsigned char *)"test", 5);
+    testProjected(firstH, (const unsigned char *)"HELO",
+                  (const unsigned char *)"hello\0London\0eBay", 18,
+                  (const unsigned char *)"HELLO\0London\0eBay", 18);
+    testProjected(firstH, (const unsigned char *)"hElO",
+                  (const unsigned char *)"hello\0London", 13,
+                  (const unsigned char *)"hello\0London", 13);
+    testProjected(firstH, (const unsigned char *)"Addi",
+                  (const unsigned char *)"\x80" "ddi\0\x8a" "ddi", 10,
+                  (const unsigned char *)"\x80" "ddi", 5);
+    testProjected(firstH, (const unsigned char *)"\x83" "col",
+                  (const unsigned char *)"\x8e" "cole", 6,
+                  (const unsigned char *)"\x83" "cole", 6);
+    testProjected(firstH, (const unsigned char *)"\x83" "COL",
+                  (const unsigned char *)"\x8e" "cole", 6,
+                  (const unsigned char *)"\x83" "COLE", 6);
+    testProjected(firstH, (const unsigned char *)"\x83" "cOL",
+                  (const unsigned char *)"\x8e" "cole", 6,
+                  (const unsigned char *)"\x8e" "cole", 6);
+    assert(ICGEOSpl((const unsigned char *)"\x83" "COLE", firstH) == OPEN_FOUND);
+    assert(ICGEOSpl((const unsigned char *)"\x83" "cOLE", firstH) == OPEN_NOT_FOUND);
+    testAlternateBounds(firstH);
+    testTask(firstH, OPEN_VERIFY);
+    ICGEOIgnoreString((unsigned char *)"Qwerty", firstH);
+    assert(ICGEOSpl((unsigned char *)"QWERTY", firstH) == OPEN_IGNORED);
+    ICResetIgnoreUserDict(firstH);
+    assert(ICGEOSpl((unsigned char *)"qwerty", firstH) == OPEN_NOT_FOUND);
+    memset(longWord, 'a', 65);
+    longWord[65] = 0;
+    assert(ICGEOSpl(longWord, firstH) == OPEN_INVALID);
+    assert((word)IPGEOAddUser(longWord, firstH) == OPEN_INVALID);
+    assert((word)IPGEOAddUser((unsigned char *)"", firstH) == OPEN_INVALID);
+    for (index = 0; index < 200; ++index) {
+        sprintf((char *)ignoredWord, "q%04u", (unsigned int)index);
+        ICGEOIgnoreString(ignoredWord, firstH);
+    }
+    bufferP = (ICBuff *)MemLock(firstH);
+    assert(bufferP->ICB_retCode == OPEN_NOMEM);
+    MemUnlock(firstH);
+    ICResetIgnoreUserDict(firstH);
+    testAllocFail = 1;
+    assert((word)IPGEOAddUser((unsigned char *)"AllocationFailure", firstH) == OPEN_NOMEM);
+    testAllocFail = 0;
+    result = IPGEOAddUser((unsigned char *)"MyName", firstH);
+    assert((word)result == OPEN_OK && (word)(result >> 16) == 1);
+    assert(ICGEOSpl((unsigned char *)"MYNAME", firstH) == OPEN_FOUND);
+    secondH = testNewBuffer();
+    assert(ICGEOSplInitICBuff(secondH) == OPEN_OK);
+    listH = IPGEOBuildUserList(secondH);
+    listP = (unsigned char *)MemLock(listH);
+    assert(((word *)listP)[0] == 1 && !strcmp((char *)listP + 8, "MyName"));
+    MemUnlock(listH); MemFree(listH);
+    originalSize = testFileSizes[0];
+    memcpy(original, testFiles[0], originalSize);
+    for (testFailure = 1; testFailure <= 3; ++testFailure) {
+        assert((word)IPGEOAddUser((unsigned char *)"Failed", firstH) != OPEN_OK);
+        assert(testFilePresent[0] && testFileSizes[0] == originalSize);
+        assert(!memcmp(testFiles[0], original, originalSize));
+        assert(ICGEOSpl((unsigned char *)"Failed", secondH) == OPEN_NOT_FOUND);
+    }
+    testFailure = 0;
+    assert((word)IPGEOAddUser((unsigned char *)"MyName", firstH) == OPEN_ERROR);
+    assert((word)IPGEODeleteUser((unsigned char *)"MyName", firstH) == OPEN_OK);
+    assert(ICGEOSpl((unsigned char *)"MYNAME", secondH) == OPEN_NOT_FOUND);
+    ICGEOSplExitICBuff(firstH);
+    ICGEOSplExitICBuff(firstH);
+    assert(openUserReferences == 1);
+    assert(ICGEOSpl((const unsigned char *)"hello", firstH) == OPEN_ERROR);
+    assert(ICGEOSplInitICBuff(firstH) == OPEN_OK);
+    assert(ICGEOSpl((const unsigned char *)"hello", firstH) == OPEN_FOUND);
+    ICGEOSplExitICBuff(firstH); MemFree(firstH);
+    ICGEOSplExitICBuff(secondH); MemFree(secondH);
+    assert(!openUsersH && !openUserReferences);
+    /* Corrupt USR must fail without loading BAK or overwriting either file. */
+    testFiles[0][0] = '!';
+    firstH = testNewBuffer();
+    assert(ICGEOSplInitICBuff(firstH) == OPEN_ERROR);
+    assert(!openUsersH && testFiles[0][0] == '!');
+    MemFree(firstH);
+    /* Removing USR simulates a crash after its rename; BAK remains readable. */
+    testFilePresent[0] = 0;
+    firstH = testNewBuffer();
+    assert(ICGEOSplInitICBuff(firstH) == OPEN_OK);
+    assert(ICGEOSpl((unsigned char *)"MyName", firstH) == OPEN_FOUND);
+    ICGEOSplExitICBuff(firstH); MemFree(firstH);
+    ICGEOSplExit();
+    for (index = 1; index < 16; ++index) { assert(!testBlocks[index]); }
+    puts("spelling adapter checks passed");
+}
+
+/* Exercise a real misspelling through verification and the legacy empty query. */
+static void testRealCorrection(MemHandle bufferH, const unsigned char *inputP,
+                                const unsigned char *expectedP)
+{
+    ICBuff *bufferP;
+    unsigned char alternate[65];
+    word count;
+    word index;
+    word matches;
+    word calls;
+    testTask(bufferH, OPEN_VERIFY);
+    assert(ICGEOSpl(inputP, bufferH) == OPEN_NOT_FOUND);
+    testTask(bufferH, OPEN_CORRECT);
+    calls = testSuggestionCalls;
+    assert(ICGEOSpl((const unsigned char *)"", bufferH) == OPEN_NOT_FOUND);
+    assert(testSuggestionCalls == calls + 1);
+    bufferP = (ICBuff *)MemLock(bufferH);
+    count = bufferP->ICB_numAlts;
+    assert(count && count <= 8);
+    MemUnlock(bufferH);
+    matches = 0;
+    for (index = 0; index < count; ++index) {
+        ICGEOGetAlternate(alternate, (const unsigned char *)"", bufferH, index);
+        assert(alternate[0] && strlen((const char *)alternate) <= 64);
+        if (!index) {
+            assert(!strcmp((const char *)alternate, (const char *)expectedP));
+        }
+        if (!strcmp((const char *)alternate, (const char *)expectedP)) {
+            ++matches;
+        }
+    }
+    assert(matches == 1);
+}
+
+/* Verify the reported regressions using the shipped, unmodified DCT payloads. */
+static void testRealDictionaries(const char *directoryP)
+{
+    char path[1024];
+    MemHandle bufferH;
+    word index;
+    assert(strlen(directoryP) + 12 < sizeof(path));
+    memset(testFilePresent, 0, sizeof(testFilePresent));
+    sprintf(path, "%s/EN_GB.DCT", directoryP);
+    testDictionaryPathP = path;
+    bufferH = testNewBuffer();
+    assert(ICGEOSplInitICBuff(bufferH) == OPEN_OK);
+    testRealCorrection(bufferH, (const unsigned char *)"Tthis",
+                       (const unsigned char *)"This");
+    testRealCorrection(bufferH, (const unsigned char *)"Thjis",
+                       (const unsigned char *)"This");
+    testRealCorrection(bufferH, (const unsigned char *)"teast",
+                       (const unsigned char *)"test");
+    testRealCorrection(bufferH, (const unsigned char *)"TTHIS",
+                       (const unsigned char *)"THIS");
+    ICGEOSplExitICBuff(bufferH); MemFree(bufferH);
+    sprintf(path, "%s/LB_LU.DCT", directoryP);
+    bufferH = testNewBuffer();
+    assert(ICGEOSplInitICBuff(bufferH) == OPEN_OK);
+    testRealCorrection(bufferH, (const unsigned char *)"Addi",
+                       (const unsigned char *)"\x80" "ddi");
+    testRealCorrection(bufferH, (const unsigned char *)"ADDI",
+                       (const unsigned char *)"\x80" "DDI");
+    ICGEOSplExitICBuff(bufferH); MemFree(bufferH);
+    testDictionaryPathP = (void *)0;
+    for (index = 1; index < 16; ++index) {
+        assert(!testBlocks[index]);
+    }
+    puts("real dictionary adapter checks passed (six corrections)");
+}
+
+/* Always run fault fixtures; optionally add whole-path release regressions. */
+int main(int argc, char **argv)
+{
+    assert(argc <= 2);
+    testFixtures();
+    if (argc == 2) {
+        testRealDictionaries(argv[1]);
+    }
+    return 0;
+}
