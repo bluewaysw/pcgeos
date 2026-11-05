@@ -1279,6 +1279,17 @@ SBRFrame	ends
 
 BptSkipRecover	proc	far
 	;
+	; Only a pending skip is ours. GEOS (PM, HDPMI) also uses the trap
+	; flag to force context switches; such a step must go the normal
+	; way (RpcStepReply -> SysCSVec) and not be taken for the end of a
+	; skip, which would install a breakpoint and restore the PIC mask
+	; at the wrong time.
+	;
+		tst	cs:[bptSkipAddr].segment
+		jnz	BSRIsSkip
+		jmp	RpcStepReply
+BSRIsSkip:
+	;
 	; Save the three registers with which we dick. We use
 	; BP so we can reference into the stack later, though it
 	; costs us a byte in the es:[bp], below.

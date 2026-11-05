@@ -398,8 +398,43 @@ SysExitInterruptVerifyRegs endp
 endif
 
 ifdef PROTECTED_MODE
+;
+; Esp refuses protected-mode instructions, so emit LSL AX, AX
+; (0F 03 /r, modrm 11 000 000 = C0h) as raw bytes. ZF set if valid.
+;
+LSL_AX_AX	macro
+	.inst	byte 0x0f
+	.inst	byte 0x03
+	.inst	byte 0xc0
+endm
+
 idata	segment
 contextSwitching	byte	0
+;
+; Set when SysExitInterrupt had to drop a context switch because it
+; cannot reach the interrupted frame on the DPMI host's interrupt stack
+; (every host except NTVDM, e.g. HDPMI). The switch is then performed
+; at the next safe point by SysPreemptIfPending.
+;
+preemptPending		byte	0
+;
+; HDPMI: selector of the host's ring-3 interrupt stub segment (its default
+; PM interrupt vectors point there). Non-zero once HDPMI was detected; used
+; by SysHDPMISetTrap to find the interrupted context on HDPMI's LPMS.
+;
+hdpmiIntSel		word	0
+;
+; When to use the HDPMI single step trap (command line /pt0, /pt2):
+;   1 (default)	only if a thread with higher priority than the current
+;		one is waiting (input -> IM thread); round robin between
+;		equal priorities stays at the safe points
+;   2		always, including time slice round robin
+;
+hdpmiTrapMode		byte	1
+;
+; Number of deferred switches actually attempted (Swat: preemptCount)
+;
+preemptCount		word	0
 idata	ends
 endif
 
@@ -507,9 +542,9 @@ EC <	ERROR_Z	SYS_EXIT_INTERRUPT_RUN_QUEUE_IS_ZERO			>
 	mov	ax, ss
 	cmp	ax, 017fh
 	pop	ax
-	jne	SEI_done
+	jne	SEI_tryHDPMI
 	cmp	ss:[0ffch], 0c7h
-	je	SEI_done
+	je	SEI_defer
 
 SEI_switch	label near
 	ForceRef SEI_switch
@@ -521,6 +556,18 @@ SEI_done:
 				;  tickling 286 bug
 	pop	ds
 	ret
+
+SEI_tryHDPMI:
+	call	SysHDPMISetTrap		; carry clear: switch scheduled
+	jnc	SEI_done
+SEI_defer:
+	;
+	; We can't redirect the interrupted context on this DPMI host.
+	; Remember the switch so SysPreemptIfPending can do it as soon as
+	; the interrupted thread reaches a safe point.
+	;
+	mov	ds:[preemptPending], TRUE
+	jmp	SEI_done
 SysExitInterrupt	endp
 
 ExceptionFrame	STRUC
@@ -534,32 +581,6 @@ ExceptionFrame	STRUC
     except_ss		word
 ExceptionFrame	ENDS
 
-SysContextSwitchReflector	proc	far
-	;
-	; Load DS with our dgroup.
-	;
-		push	ds, ax, bx, bp, si
-	;
-	; Save CS:IP and error code of excepting process.
-	;
-		mov	bp, sp			; ss:bp+10 = ExceptionFrame
-		add	bp, 10			; ss:bp = ExceptionFrame
-		mov	ds, ss:[bp].except_ss
-		mov	ax, ss:[bp].except_cs
-		mov	ds:[TPD_SCSVector].segment, ax
-		mov	ax, ss:[bp].except_ip
-		mov	ds:[TPD_SCSVector].offset, ax
-		and	ss:[bp].except_flags, not mask CPU_TRAP
-	;
-	; Change CS:IP to SysContextSwitch.
-	;
-		.assert	segment SysContextSwitch eq @CurSeg
-		mov	ss:[bp].except_cs, cs
-		mov	ss:[bp].except_ip, offset SysContextSwitch
-
-		pop	ds, ax, bx, bp, si
-		retf
-SysContextSwitchReflector	endp
 
 SysContextSwitch	proc	far
 	pushf
@@ -569,10 +590,24 @@ SysContextSwitch	proc	far
 SCS_iretSetup	label	near
 	INT_OFF
 	push	ds, ax
+ifdef PROTECTED_MODE
+	;
+	; Swat's stub jumps here for single steps that aren't its own,
+	; with the trapped flags (TF still set) in the frame. Clear TF, or
+	; the iret below keeps single stepping every instruction.
+	; Stack: ax, ds, ip, cs, flags
+	;
+	push	bp
+	mov	bp, sp
+	andnf	{word}ss:[bp+10], not mask CPU_TRAP
+	pop	bp
+endif
 	LoadVarSeg	ds
 	tst	ds:[contextSwitching]
 	jz	done
 	dec	ds:[contextSwitching]
+	call	SysCheckContextSwitch	; carry set: not here, deferred
+	jc	done
 	
 	; a potential wake-up was aborted because interrupt code was running
 	; make sure that the highest priority thread is running
@@ -592,11 +627,391 @@ SCS_iretSetup	label	near
 	pop	di
 noPowerDriver:
 
-	call	WakeUpRunQueue
+	call	SysWakeUpRunQueueSaveAll	; this preempts arbitrary code
 done:
 	pop	ds, ax
 	iret
 SysContextSwitch	endp
+
+;
+; WakeUpRunQueue is near; IRQCode needs a far way to it.
+;
+SysWakeUpRunQueueFar	proc	far
+	call	WakeUpRunQueue
+	ret
+SysWakeUpRunQueueFar	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysPreemptIfPending
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Perform a context switch that SysExitInterrupt had to defer.
+
+CALLED BY:	SysUnlockCommon, SysVSemCommon, MemUnlock
+		(PROTECTED_MODE only)
+
+PASS:		nothing
+RETURN:		nothing
+DESTROYED:	nothing, not even flags
+
+PSEUDO CODE/STRATEGY:
+	In real mode, SysExitInterrupt switches to a higher-priority thread
+	that an interrupt made runnable (input manager, time slicing, ...).
+	In protected mode that only works on NTVDM, whose interrupt stack
+	layout is known. On other hosts the switch is deferred and done here.
+
+	This is only safe where the real-mode kernel could have been
+	preempted as well, so we require:
+	    - interrupts enabled at the call (not in a critical section)
+	    - not running interrupt code (interruptCount == 0)
+	    - a real thread (not the kernel/idle context)
+	    - running on that thread's own stack (not a DPMI host stack)
+	Otherwise the flag stays set and a later safe point handles it.
+
+	The fast path is a single byte test.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;
+; Esp refuses protected-mode instructions, so emit VERR AX
+; (0F 00 /4, modrm 11 100 000 = E0h) as raw bytes.
+; Sets ZF if the selector in AX is valid and readable.
+;
+VERR_AX	macro
+	.inst	byte 0x0f
+	.inst	byte 0x00
+	.inst	byte 0xe0
+endm
+
+SysPreemptIfPending	proc	near
+	pushf
+	push	ds, ax
+	LoadVarSeg	ds, ax
+	tst	ds:[preemptPending]
+	jz	done
+
+	;
+	; Interrupts must have been on at the call site.
+	; Stack: ax, ds, flags
+	;
+	push	bp
+	mov	bp, sp
+	test	{word}ss:[bp+6], mask CPU_INTERRUPT
+	pop	bp
+	jz	done
+
+	INT_OFF
+	tst	ds:[interruptCount]
+	jnz	done
+	mov	ax, ds:[currentThread]
+	tst	ax
+	jz	done
+	cmp	ax, ss:[TPD_threadHandle]
+	jne	done
+
+	mov	ds:[preemptPending], 0
+	inc	ds:[preemptCount]
+
+	;
+	; Same as SysContextSwitch: tell the power driver we're not idle.
+	;
+	tst	ds:defaultDrivers.DDT_power
+	jz	noPowerDriver
+	clr	ax
+	xchg	al, ds:[idleCalled]
+	tst	al
+	jz	noPowerDriver
+	push	di
+	mov	di, DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION
+	call	ds:powerStrategy
+	pop	di
+noPowerDriver:
+
+	;
+	; The thread switch only saves the 16-bit registers (plus ds/es)
+	; unless SUPPORT_32BIT_DATA_REGS is set, which it isn't for every
+	; product. Our callers (SysUnlockCommon, MemUnlock, ...) promise to
+	; destroy nothing, and PM kernel code keeps 32-bit values and fs/gs
+	; live across them, so save the full state ourselves.
+	;
+	pushad
+	push	fs, gs
+
+	call	WakeUpRunQueue		; may switch threads; we come back
+					;  here when this thread runs again
+	;
+	; fs/gs may hold selectors of blocks another thread freed while we
+	; were switched out; don't fault on reloading them.
+	;
+	pop	ax			; ax <- saved gs
+	VERR_AX
+	jz	gsOK
+	clr	ax
+gsOK:
+	mov	gs, ax
+	pop	ax			; ax <- saved fs
+	VERR_AX
+	jz	fsOK
+	clr	ax
+fsOK:
+	mov	fs, ax
+	popad
+done:
+	pop	ds, ax
+	call	SafePopf		; restore caller's flags
+	ret
+SysPreemptIfPending	endp
+
+;
+; New code outside kcode (kcode is at its 64K limit).
+;
+kcode	ends
+IRQCode	segment resource
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysHDPMISetTrap
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Schedule a context switch for the interrupted code when
+		running under HDPMI, like the NTVDM hack in SysExitInterrupt.
+
+CALLED BY:	SysExitInterrupt (outermost interrupt, on its stack)
+PASS:		ds	= kdata
+		ss	= stack the interrupt handler runs on
+RETURN:		carry clear if TF was set in the interrupted context
+		carry set if the layout isn't HDPMI's (caller defers)
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	HDPMI runs IRQ handlers for interrupted ring-3 protected mode code
+	on its 4K locked PM stack (LPMS). The top of the LPMS then holds
+	(see HDPMI.ASM, lpms_call_int and rpmstacki):
+
+		SS:0ffch	CS of interrupted code (+ hiword EFL)
+		SS:0ff8h	EIP of interrupted code
+		SS:0ff6h	Flags	\
+		SS:0ff4h	_INTSEL_ > outermost IRET frame, returns to
+		SS:0ff2h	_RTINT_	/  the host's int 30h stub
+
+	The flags the handler IRETs with become the flags of the
+	interrupted code ("TF preserved"), so setting TF at 0ff6h gives
+	the same single step trap as on NTVDM. If the IRQ came from real
+	mode or host code, the CS at 0ffch is _INTSEL_ itself.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysHDPMISetTrap	proc	far
+	tst	ds:[hdpmiIntSel]
+	jz	notHDPMI
+	push	ax
+	mov	ax, ss
+	LSL_AX_AX			; ax <- limit of SS, ZF if valid
+	jnz	notHDPMIPop
+	cmp	ax, 0fffh		; LPMS is 4K
+	jne	notHDPMIPop
+	mov	ax, ds:[hdpmiIntSel]
+	cmp	ss:[0ff4h], ax		; outermost frame returns to host?
+	jne	notHDPMIPop
+	cmp	ss:[0ffch], ax		; interrupted code is host/real mode?
+	je	notHDPMIPop
+	;
+	; Only preempt arbitrary code where it buys something: mode 1
+	; requires a waiting thread with higher priority (lower value)
+	; than the current one. Equal priorities rotate at safe points.
+	;
+	cmp	ds:[hdpmiTrapMode], 2
+	je	doTrap
+	push	bx, si
+	mov	bx, ds:[currentThread]
+	tst	bx
+	jz	noHigher
+	mov	al, ds:[bx][HT_curPriority]
+	mov	si, ds:[runQueue]
+scanRunQueue:
+	tst	si
+	jz	noHigher
+	cmp	al, ds:[si][HT_curPriority]
+	ja	higherWaiting		; waiting thread is more important
+	mov	si, ds:[si][HT_nextQThread]
+	jmp	scanRunQueue
+noHigher:
+	pop	bx, si
+	jmp	notHDPMIPop
+higherWaiting:
+	pop	bx, si
+doTrap:
+	;
+	; Don't arm the trap on a Swat breakpoint (int 3 = 0cch): Swat's
+	; stub single-steps over that same instruction itself (bpt skip,
+	; BptSkipRecover) and would take our trap for its own.
+	;
+	push	es, bx
+	mov	ax, ss:[0ffch]		; CS of interrupted code
+	VERR_AX
+	jnz	trapOK			; not readable: can't be a breakpoint
+	mov	es, ax
+	mov	bx, ss:[0ff8h]		; IP of interrupted code
+	cmp	{byte}es:[bx], 0cch
+	jne	trapOK
+	pop	es, bx
+	jmp	notHDPMIPop
+trapOK:
+	pop	es, bx
+	pop	ax
+	ornf	{word}ss:[0ff6h], mask CPU_TRAP
+	inc	ds:[contextSwitching]
+	clc
+	ret
+
+notHDPMIPop:
+	pop	ax
+notHDPMI:
+	stc
+	ret
+SysHDPMISetTrap	endp
+
+SysContextSwitchReflector	proc	far
+	;
+	; Load DS with our dgroup.
+	;
+		push	ds, ax, bx, bp, si
+	;
+	; Save CS:IP and error code of excepting process.
+	;
+		mov	bp, sp			; ss:bp+10 = ExceptionFrame
+		add	bp, 10			; ss:bp = ExceptionFrame
+	;
+	; Only redirect if this is our trap and the code runs on the
+	; current thread's stack (TPD_SCSVector lives there). Otherwise
+	; leave the switch to the next safe point.
+	;
+		LoadVarSeg	ds, ax
+		tst	ds:[contextSwitching]
+		jz	reflectNoSwitch
+		mov	bx, ds:[currentThread]
+		tst	bx
+		jz	reflectDefer
+		mov	ds, ss:[bp].except_ss
+		cmp	bx, ds:[TPD_threadHandle]
+		jne	reflectDefer
+		mov	ax, ss:[bp].except_cs
+		mov	ds:[TPD_SCSVector].segment, ax
+		mov	ax, ss:[bp].except_ip
+		mov	ds:[TPD_SCSVector].offset, ax
+		and	ss:[bp].except_flags, not mask CPU_TRAP
+	;
+	; Change CS:IP to SysContextSwitch.
+	;
+		mov	ss:[bp].except_cs, segment SysContextSwitch
+		mov	ss:[bp].except_ip, offset SysContextSwitch
+		jmp	reflectDone
+
+reflectDefer:
+		LoadVarSeg	ds, ax
+		dec	ds:[contextSwitching]
+		mov	ds:[preemptPending], TRUE
+reflectNoSwitch:
+		and	ss:[bp].except_flags, not mask CPU_TRAP
+reflectDone:
+		pop	ds, ax, bx, bp, si
+		retf
+SysContextSwitchReflector	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysCheckContextSwitch
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Decide whether the single step trap may switch threads here.
+
+CALLED BY:	SysContextSwitch (also reached from Swat's stub via
+		SCS_iretSetup)
+PASS:		ds	= kdata, interrupts off
+		stack	= ax, ds, ip, cs, flags of the trapped code
+RETURN:		carry clear if WakeUpRunQueue may be called
+		carry set if not: preemptPending is set instead
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	The trap fires one instruction after the interrupt returned, which
+	may have been a CLI, an INT into interrupt code, or code running on
+	a non-thread stack. Real mode couldn't have preempted there either.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysCheckContextSwitch	proc	far
+	push	bp
+	mov	bp, sp
+	;
+	; bp+0 bp, +2/+4 return address, +6 ax, +8 ds, +10 ip, +12 cs,
+	; +14 flags of the trapped code
+	;
+	test	{word}ss:[bp+14], mask CPU_INTERRUPT
+	pop	bp
+	jz	defer
+	tst	ds:[interruptCount]
+	jnz	defer
+	push	ax
+	mov	ax, ds:[currentThread]
+	tst	ax
+	jz	deferPop
+	cmp	ax, ss:[TPD_threadHandle]
+	pop	ax
+	jne	defer
+	clc
+	ret
+
+deferPop:
+	pop	ax
+defer:
+	mov	ds:[preemptPending], TRUE
+	stc
+	ret
+SysCheckContextSwitch	endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SysWakeUpRunQueueSaveAll
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	WakeUpRunQueue for a thread preempted at an arbitrary
+		instruction (single step trap from SysExitInterrupt).
+
+CALLED BY:	SysContextSwitch
+PASS:		ds	= kdata, interrupts off
+RETURN:		nothing
+DESTROYED:	nothing (WakeUpRunQueue destroys ax)
+
+PSEUDO CODE/STRATEGY:
+	The thread switch only saves the 16-bit registers and ds/es unless
+	SUPPORT_32BIT_DATA_REGS is set. In real mode that's enough, but
+	in protected mode drivers (e.g. VGA16) keep FS and 32-bit values
+	live, and the thread we switch to (the IM thread calling the video
+	driver to move the pointer) changes them. Save everything here.
+
+	fs/gs may hold selectors of blocks freed while we were switched
+	out; don't fault on reloading them.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SysWakeUpRunQueueSaveAll	proc	far
+	pushad
+	push	fs, gs
+	call	SysWakeUpRunQueueFar
+	pop	ax			; ax <- saved gs
+	VERR_AX
+	jz	gsOK
+	clr	ax
+gsOK:
+	mov	gs, ax
+	pop	ax			; ax <- saved fs
+	VERR_AX
+	jz	fsOK
+	clr	ax
+fsOK:
+	mov	fs, ax
+	popad
+	ret
+SysWakeUpRunQueueSaveAll	endp
+
+IRQCode	ends
+kcode	segment
+
 endif ; PROTECTED_MODE
 
 

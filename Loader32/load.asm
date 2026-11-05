@@ -69,6 +69,7 @@ REVISION HISTORY:
 
 -------------------------------------------------------------------------------@
 ifidn	HARDWARE_TYPE, <PC>
+LOADER_HANDLE_TABLE_END	equ	0f000h	; last handle + 10h may not exceed this
 OpenKernelGetDataSize	proc	near
 
 
@@ -97,6 +98,13 @@ figureLastHandle:
 	shl	ax
 	add	ax, cx
 	jc	tooManyHandles
+	;
+	; Handle values must stay below 0f000h: values with a high byte of
+	; 0f0h or more are treated as (XIP) virtual segments, e.g. by the C
+	; stub MEMUNLOCK, which would turn handle 0f020h into 0200h.
+	;
+	cmp	ax, LOADER_HANDLE_TABLE_END
+	ja	tooManyHandles
 
 	mov	ds:[loaderVars].KLV_lastHandle, ax
 
@@ -104,12 +112,12 @@ figureLastHandle:
 
 tooManyHandles:
 	;
-	; Requested number of handles would push kdata over 64K. We can't
-	; allow that. Figure the number of handles that will fit from the
-	; start of the handle table to just before 64K (can't have
-	; KLV_lastHandle be 0...)
+	; Requested number of handles would push kdata over 64K, or create
+	; handle values of 0f000h and above. We can't allow that. Figure the
+	; number of handles that will fit from the start of the handle table
+	; to LOADER_HANDLE_TABLE_END.
 	; 
-	mov	ax, 0xfff0
+	mov	ax, LOADER_HANDLE_TABLE_END
 	sub	ax, cx
 	shr	ax
 	shr	ax

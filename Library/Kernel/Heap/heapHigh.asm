@@ -1397,6 +1397,9 @@ endif
 
 	pop	ax
 	popf
+ifdef PROTECTED_MODE
+	call	SysPreemptIfPending	; do deferred context switch
+endif
 	ret
 
 MemUnlock	endp

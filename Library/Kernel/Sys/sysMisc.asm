@@ -1798,6 +1798,9 @@ SysUnlockCommon	proc	near jmp
 				on_stack	cc bx retn
 		popf
 				on_stack	bx retn
+ifdef PROTECTED_MODE
+		call	SysPreemptIfPending	; do deferred context switch
+endif
 		pop	bx
 				on_stack	retn
 		ret
@@ -1895,6 +1898,9 @@ SysVSemCommon	proc	near jmp
 				on_stack	cc bx retn
 		popf
 				on_stack	bx retn
+ifdef PROTECTED_MODE
+		call	SysPreemptIfPending	; do deferred context switch
+endif
 		pop	bx
 				on_stack	retn
 		ret
