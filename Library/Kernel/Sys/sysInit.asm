@@ -81,11 +81,6 @@ ModRMByte	record	MRMB_MOD:2, MRMB_REG:3, MRMB_RM:3
 
 underSwatArg	char	's', 0
 restartedArg	char	'r', 0
-ifdef PROTECTED_MODE
-pt0Arg		char	'pt0', 0	; no HDPMI preemption trap
-pt2Arg		char	'pt2', 0	; trap for round robin as well
-ptSwatArg	char	'ptswat', 0	; trap path under Swat too
-endif
 logFileArg	char	'log', 0
 
 InitSys		proc	near 	uses cx, es, ax, di, bx, dx
@@ -552,19 +547,9 @@ ifdef PROTECTED_MODE
 	; its LPMS. Detect it via its vendor API and remember the selector
 	; of its interrupt stubs (default vector of INT 18h, which nobody
 	; hooks).
-	; Not under Swat: there the single step goes to Swat's stub, which
-	; forwards it to SCS_iretSetup, a path that isn't trusted yet.
+	; Under Swat the single step goes to Swat's stub, which forwards
+	; steps it didn't cause to SCS_iretSetup (RpcStepReply -> RSRNotUs).
 	;
-		test	ds:[sysConfig], mask SCF_UNDER_SWAT
-		jz	hdpmiDetect
-	;
-	; Under Swat only with /ptswat: Swat's stub forwards single steps it
-	; didn't cause to SCS_iretSetup (RpcStepReply -> RSRNotUs).
-	;
-		mov	si, offset ptSwatArg
-		call	SysCheckArg
-		jnc	noHDPMI
-hdpmiDetect:
 		push	ds
 		segmov	ds, cs
 		mov	si, offset hdpmiVendorName
@@ -578,15 +563,6 @@ hdpmiDetect:
                 call    {fptr}es:[si+GPMI_CALL_GET_INTERRUPT_HANDLER]
 		jc	noHDPMI
 		mov	ds:[hdpmiIntSel], cx
-		mov	si, offset pt0Arg
-		call	SysCheckArg
-		jnc	notPt0
-		mov	ds:[hdpmiIntSel], 0
-notPt0:
-		mov	si, offset pt2Arg
-		call	SysCheckArg
-		jnc	noHDPMI
-		mov	ds:[hdpmiTrapMode], 2
 noHDPMI:
 	;
 	; Trap the debug exception, which we're temporarily using to

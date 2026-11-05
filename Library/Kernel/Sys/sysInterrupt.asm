@@ -423,18 +423,6 @@ preemptPending		byte	0
 ; by SysHDPMISetTrap to find the interrupted context on HDPMI's LPMS.
 ;
 hdpmiIntSel		word	0
-;
-; When to use the HDPMI single step trap (command line /pt0, /pt2):
-;   1 (default)	only if a thread with higher priority than the current
-;		one is waiting (input -> IM thread); round robin between
-;		equal priorities stays at the safe points
-;   2		always, including time slice round robin
-;
-hdpmiTrapMode		byte	1
-;
-; Number of deferred switches actually attempted (Swat: preemptCount)
-;
-preemptCount		word	0
 idata	ends
 endif
 
@@ -710,7 +698,6 @@ SysPreemptIfPending	proc	near
 	jne	done
 
 	mov	ds:[preemptPending], 0
-	inc	ds:[preemptCount]
 
 	;
 	; Same as SysContextSwitch: tell the power driver we're not idle.
@@ -814,12 +801,10 @@ SysHDPMISetTrap	proc	far
 	cmp	ss:[0ffch], ax		; interrupted code is host/real mode?
 	je	notHDPMIPop
 	;
-	; Only preempt arbitrary code where it buys something: mode 1
-	; requires a waiting thread with higher priority (lower value)
-	; than the current one. Equal priorities rotate at safe points.
+	; Only preempt arbitrary code where it buys something: a waiting
+	; thread with higher priority (lower value) than the current one
+	; (input -> IM thread). Equal priorities rotate at safe points.
 	;
-	cmp	ds:[hdpmiTrapMode], 2
-	je	doTrap
 	push	bx, si
 	mov	bx, ds:[currentThread]
 	tst	bx
@@ -838,7 +823,6 @@ noHigher:
 	jmp	notHDPMIPop
 higherWaiting:
 	pop	bx, si
-doTrap:
 	;
 	; Don't arm the trap on a Swat breakpoint (int 3 = 0cch): Swat's
 	; stub single-steps over that same instruction itself (bpt skip,
