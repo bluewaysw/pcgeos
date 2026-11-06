@@ -76,6 +76,7 @@ const sword fontRampNoSmall[] = {12,14,14,18,18,24,28};
 /* (These variables may eventually go into a session-specific state block.) */
 
 HTMLextra *HTMLext;
+HTMLImageSourceState imageSourceState;
 TextTransferBlockHeader *ttbh;
 HypertextTransferBlockHeader *htbh;
 MemHandle transferHeaderMem, hypertextHeaderMem;
@@ -1384,7 +1385,8 @@ word LOCAL StyleNum(char *name, SpecialTagType *spec)
     ret = 0;                            /* default: return first style */
 
     for(i=0; HTMLStyles[i].name[0]!='*'; i++)
-      if(name[0]==HTMLStyles[i].name[0] && !STRCMPSB(name,HTMLStyles[i].name))
+      if((name[0]>='a' && name[0]<='z' ? name[0]-32 : name[0])==
+         HTMLStyles[i].name[0] && !STRCMPISB(name,HTMLStyles[i].name))
       {
         *spec = HTMLStyles[i].spec;
         ret = i;                        /* return index of style found */
@@ -2101,29 +2103,295 @@ int Open_SCRIPT(optr paramArray, int c)
 }
 #endif
 
+int LOCAL HandleNamedTag(MemHandle localHeap, char *tag, Boolean closeTag,
+                        int c, Boolean tagTooLong);
+
+/* Inline SVG uses only raw input and a bounded sequential output buffer. */
+typedef struct {
+    FileHandle file;
+    Boolean good;
+    word used;
+    char buffer[1024];
+    PathName path;
+    char recoveryTag[14];
+    Boolean recoveryClosing;
+    Boolean recover;
+    word integrationDepth;
+} InlineSVG;
+
+void LOCAL SVGFlush(InlineSVG *svgP)
+{
+    if(svgP->good && svgP->used &&
+       FileWrite(svgP->file, svgP->buffer, svgP->used, FALSE)!=svgP->used)
+        svgP->good = FALSE;
+    svgP->used = 0;
+}
+
+void LOCAL SVGPut(InlineSVG *svgP, int c)
+{
+    if(c!=EOF && svgP->good) {
+        svgP->buffer[svgP->used++] = (char)c;
+        if(svgP->used==sizeof(svgP->buffer))
+            SVGFlush(svgP);
+    }
+}
+
+int LOCAL SVGGet(InlineSVG *svgP)
+{
+    int c;
+
+    if(G_abortParse || G_hitAllocLimit)
+        return EOF;
+    c = HTMLgetcLow();
+    SVGPut(svgP, c);
+    return c;
+}
+
+/* Quotes and declaration subsets can contain apparent closing tags. */
+int LOCAL SVGTagEnd(InlineSVG *svgP, int c, Boolean *selfClosingP)
+{
+    int quote = 0, previous = 0;
+    word brackets = 0;
+
+    while(c!=EOF) {
+        if(quote) {
+            if(c==quote)
+                quote = 0;
+        } else if(c=='"' || c=='\'') {
+            quote = c;
+        } else if(c=='[') {
+            if(brackets==0xffff)
+                return EOF;
+            brackets++;
+        } else if(c==']' && brackets) {
+            brackets--;
+        } else if(!brackets && (c=='>' || c=='<')) {
+            *selfClosingP = (previous=='/');
+            return c;
+        }
+        previous = c;
+        c = SVGGet(svgP);
+    }
+    return EOF;
+}
+
+int LOCAL SVGUntil(InlineSVG *svgP, char repeated, char last)
+{
+    int c;
+    word count = 0;
+
+    while((c=SVGGet(svgP))!=EOF) {
+        if(c==last && count==2)
+            return c;
+        if(c==repeated) {
+            if(count<2)
+                count++;
+        } else {
+            count = 0;
+        }
+    }
+    return EOF;
+}
+
+/* HTML tags that end foreign content outside title/desc/foreignObject.
+   The scanner hands their name and delimiter to normal HTML tag handling. */
+Boolean LOCAL SVGHTMLBoundary(char *nameP)
+{
+    static const char boundaries[] =
+        "b big blockquote body br center code dd div dl dt em embed "
+        "h1 h2 h3 h4 h5 h6 head hr i img li listing menu meta nobr ol p "
+        "pre ruby s small span strong strike sub sup table tt u ul var";
+    const char *candidateP = boundaries;
+    word length, candidateLength;
+
+    length = STRLENSB(nameP);
+    if(!length)
+        return FALSE;
+    while(*candidateP) {
+        candidateLength = 0;
+        while(candidateP[candidateLength] && candidateP[candidateLength]!=' ')
+            candidateLength++;
+        if(candidateLength==length &&
+           !STRNCMPISB(candidateP, nameP, length))
+            return TRUE;
+        while(*candidateP && *candidateP!=' ')
+            candidateP++;
+        if(*candidateP)
+            candidateP++;
+    }
+    return FALSE;
+}
+
+/* Scan one XML markup construct; never interpret SVG drawing elements. */
+int LOCAL SVGMarkup(InlineSVG *svgP, word *depthP)
+{
+    char name[14];
+    word length = 0, i;
+    Boolean tooLong = FALSE, integration;
+    int c;
+    Boolean closing = FALSE, selfClosing = FALSE;
+
+    c = SVGGet(svgP);
+    if(c=='!') {
+        c = SVGGet(svgP);
+        if(c=='-') {
+            c = SVGGet(svgP);
+            if(c=='-')
+                return SVGUntil(svgP, '-', '>');
+        } else if(c=='[') {
+            for(i=0; i<6; i++) {
+                c = SVGGet(svgP);
+                if(c!="CDATA["[i])
+                    return EOF;       /* malformed declaration */
+            }
+            return SVGUntil(svgP, ']', '>');
+        }
+        return SVGTagEnd(svgP, c, &selfClosing);
+    }
+    if(c=='?') {
+        /* PI terminates with ?>, rather than with an ordinary >. */
+        i = 0;
+        while((c=SVGGet(svgP))!=EOF) {
+            if(c=='>' && i)
+                return c;
+            i = (c=='?');
+        }
+        return EOF;
+    }
+    if(c=='/') {
+        closing = TRUE;
+        c = SVGGet(svgP);
+    }
+    while(c!=EOF && c!='>' && c!='/' && c!='<' && c!=' ' &&
+          c!='\t' && c!='\r' && c!='\n') {
+        if(length<sizeof(name)-1)
+            name[length++] = (char)c;
+        else
+            tooLong = TRUE;
+        c = SVGGet(svgP);
+    }
+    name[length] = 0;
+    if(!tooLong && !svgP->integrationDepth &&
+       ((!closing && SVGHTMLBoundary(name)) ||
+        (closing && (!STRCMPISB(name, "body") ||
+                     !STRCMPISB(name, "html") || !STRCMPISB(name, "p"))))) {
+        STRCPYSB(svgP->recoveryTag, name);
+        svgP->recoveryClosing = closing;
+        svgP->recover = TRUE;
+        return c;
+    }
+    integration = !tooLong && (!STRCMPISB(name, "foreignObject") ||
+                  !STRCMPISB(name, "title") || !STRCMPISB(name, "desc"));
+    c = SVGTagEnd(svgP, c, &selfClosing);
+    if(c=='>' && integration) {
+        if(closing && svgP->integrationDepth)
+            svgP->integrationDepth--;
+        else if(!closing && !selfClosing) {
+            if(svgP->integrationDepth==0xffff)
+                return EOF;
+            svgP->integrationDepth++;
+        }
+    }
+    if(c=='>' && length==3 && !tooLong && !STRCMPISB(name, "svg")) {
+        if(closing)
+            (*depthP)--;
+        else if(!selfClosing) {
+            if(*depthP==0xffff)
+                return EOF;
+            (*depthP)++;
+        }
+    }
+    return c;
+}
+
+int LOCAL HandleInlineSVG(MemHandle localHeap, char *tagP, int c)
+{
+    MemHandle svgH;
+    InlineSVG *svgP;
+    TCHAR *pathP;
+    NameToken fileToken = NAME_POOL_NONE;
+    word depth = 1, image = HTML_IMAGE_INDEX_NONE, i;
+    Boolean selfClosing = FALSE;
+
+    svgH = MemAlloc(sizeof(InlineSVG), HF_DYNAMIC, HAF_ZERO_INIT);
+    if(!svgH)
+        return EOF;
+    svgP = MemLock(svgH);
+
+    if(CanParseImage()) {
+        /* Reserve room for FileCreateTempFile's separator and 8.3 basename. */
+        pathP = svgP->path;
+        FileConstructFullPath(&pathP, sizeof(svgP->path)-14*sizeof(TCHAR),
+                              SP_TEMP_FILES, _TEXT(""), TRUE);
+        if(pathP>svgP->path && *pathP==0)
+            svgP->file = FileCreateTempFile(svgP->path,
+                FILE_CREATE_ONLY | FCF_NATIVE | FILE_ACCESS_RW | FILE_DENY_RW, 0);
+    }
+    svgP->good = (svgP->file!=0);
+
+    SVGPut(svgP, '<');
+    for(i=0; tagP[i]; i++)
+        SVGPut(svgP, tagP[i]);
+    SVGPut(svgP, c);
+    c = SVGTagEnd(svgP, c, &selfClosing);
+    if(c=='>' && selfClosing)
+        depth = 0;
+    while(c=='>' && depth && !svgP->recover &&
+          !G_abortParse && !G_hitAllocLimit) {
+        while((c=SVGGet(svgP))!=EOF && c!='<')
+            ;
+        if(c=='<')
+            c = SVGMarkup(svgP, &depth);
+    }
+    SVGFlush(svgP);
+    if(svgP->file && FileClose(svgP->file, FALSE))
+        svgP->good = FALSE;
+
+    if(!depth && svgP->good && !G_abortParse && !G_hitAllocLimit) {
+        fileToken = NamePoolTokenize(NamePool, svgP->path, FALSE);
+        if(fileToken)
+            image = ParseImage(NullOptr, CA_NULL_ELEMENT, FALSE, fileToken);
+    }
+    if(image==HTML_IMAGE_INDEX_NONE) {
+        if(svgP->file)
+            FileDelete(svgP->path);
+        NamePoolReleaseToken(NamePool, fileToken);
+    }
+    if(svgP->recover) {
+        lc = c;
+        if(c=='\n')
+            c = '\r';
+        c = HandleNamedTag(localHeap, svgP->recoveryTag,
+                           svgP->recoveryClosing, c, FALSE);
+        MemUnlock(svgH);
+        MemFree(svgH);
+        return c;
+    }
+    MemUnlock(svgH);
+    MemFree(svgH);
+
+    /* A malformed '<' is already consumed; let HTML handle that new tag.
+       ATTENTION: unterminated quotes/comments/CDATA consume to EOF.
+       Guessing an HTML boundary inside them would truncate valid SVG data. */
+    lc = 0;
+    if(c=='>' && !depth)
+        return HTMLgetc();
+    return c;
+}
+
 int LOCAL HandleTag(MemHandle localHeap)
 {
-    register int c,p;
-    int ce,q;
-    char *e;
-    Boolean openTag,closeTag,tagTooLong;
-    word tagStyle;
-    HTMLStylesTable tagStyleEntry;
-    optr paramArray;
-    SpecialTagType spec;
+    int c, p;
+    Boolean closeTag, tagTooLong;
     char tag[HTML_MAXTAG+1];
-    byte seenAttributes[HTML_ATTRIBUTE_SEEN_BYTES];
-    word paramBytes;
 
     c=HTMLgetc();
     if(c=='/')
     {
       c=HTMLgetc();
       closeTag=TRUE;
-      openTag=FALSE;
     } else {
       closeTag=FALSE;
-      openTag=TRUE;
     }
 
     /* get tag name */
@@ -2133,7 +2401,7 @@ int LOCAL HandleTag(MemHandle localHeap)
            c!='\r' && c!='\t' && c!=EOF )
     {
       if(p<HTML_MAXTAG)
-        tag[p++]=(char)((c>='a' && c<='z')?(c-32):c);
+        tag[p++]=(char)c;
                                         /* get tag name */
       else
         tagTooLong=TRUE;
@@ -2142,13 +2410,33 @@ int LOCAL HandleTag(MemHandle localHeap)
     }
     tag[p]=0;                           /* terminate tag */
 
+    return HandleNamedTag(localHeap, tag, closeTag, c, tagTooLong);
+}
+
+int LOCAL HandleNamedTag(MemHandle localHeap, char *tag, Boolean closeTag,
+                        int c, Boolean tagTooLong)
+{
+    int p, ce, q;
+    char *e;
+    Boolean openTag = !closeTag;
+    word tagStyle;
+    HTMLStylesTable tagStyleEntry;
+    optr paramArray;
+    SpecialTagType spec;
+    byte seenAttributes[HTML_ATTRIBUTE_SEEN_BYTES];
+    word paramBytes;
+    const char *endTagP;
+
+    if(!ignoreTags)
+        PictureBeforeTag(tag, openTag);
+
     /* Skip scripts before allocating their potentially huge attributes. */
 #if HTML_SCRIPT_SUPPORT
     if(openTag &&
-       !(HTMLext->HE_options & HTML_JAVASCRIPT) &&
-       !STRCMPSB(tag, "SCRIPT"))
+       (ignoreTags || !(HTMLext->HE_options & HTML_JAVASCRIPT)) &&
+       !STRCMPISB(tag, "SCRIPT"))
 #else
-    if(openTag && !STRCMPSB(tag, "SCRIPT"))
+    if(openTag && !STRCMPISB(tag, "SCRIPT"))
 #endif
     {
       ce=0;
@@ -2174,9 +2462,16 @@ int LOCAL HandleTag(MemHandle localHeap)
     tagStyleEntry = ((HTMLStylesTable *)LMemDeref(@HTMLStylesChunk))[tagStyle];
     MemUnlock( OptrToHandle(@HTMLStylesChunk) );
 
-    /* STYLE is raw text and must not let CSS markup affect tag parsing. */
-    if(openTag && !ignoreTags && tagStyleEntry.spec==SPEC_STYLE)
+    if(openTag && !ignoreTags && tagStyleEntry.spec==SPEC_SVG)
+        return HandleInlineSVG(localHeap, tag, lc);
+
+    /* Text-only bodies must not change ignored-container nesting. */
+    if(openTag && (tagStyleEntry.spec==SPEC_STYLE ||
+       (ignoreTags && (tagStyleEntry.spec==SPEC_TITLE ||
+                       tagStyleEntry.spec==SPEC_TEXTAREA))))
     {
+      endTagP = tagStyleEntry.spec==SPEC_STYLE ? endStyle :
+                tagStyleEntry.spec==SPEC_TITLE ? "</TITLE" : "</TEXTAREA";
       ce=0;
       while(c!=EOF && (c!='>' || ce))
       {
@@ -2187,7 +2482,7 @@ int LOCAL HandleTag(MemHandle localHeap)
         c=HTMLgetc();
       }
 
-      c=SkipRawTextContent(endStyle, c);
+      c=SkipRawTextContent(endTagP, c);
       if(c=='>')
         c=HTMLgetc();
       return c;
@@ -2224,8 +2519,7 @@ int LOCAL HandleTag(MemHandle localHeap)
       }
     }
 
-    /* get tag arguments if any (but not while ignoring, e.g. in a script) */
-    if(!(currentFlags & TAG_IGNORE_TAGS))
+    /* Scan quoted arguments even while discarding ignored tag values. */
     {
       while( c!='/' && c!='>' && c!='<' && c!=EOF)
       {                                   /* while tag has more data in it... */
@@ -2346,10 +2640,6 @@ int LOCAL HandleTag(MemHandle localHeap)
 	if (overflowBuf) MemFree(overflowBuf);
       }
     }
-    else                                /* skip over parameter-like stuff */
-    {
-      while( c!='>' && c!='<' && c!=EOF) c=HTMLgetc();
-    }
 
     if(c=='/') {
       c=HTMLgetc();
@@ -2374,6 +2664,10 @@ int LOCAL HandleTag(MemHandle localHeap)
         if ((tagStyleEntry.flags & TAG_IGNORE_TAGS) ||
             (tagStyleEntry.spec == SPEC_NOEMBED &&
                 EnclosingCount(SPEC_OBJECT, NULL))) {
+            if(ignoreTags==0xffff) {
+                G_abortParse = TRUE;
+                return EOF;
+            }
             ignoreTags++ ;
         }
 	paramArray = NullOptr;		/* params were consumed */
@@ -2460,11 +2754,23 @@ int /*LOCAL*/ getcScriptURL(dword data)
 int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
   VMBlockHandle *item)
 {
+    return ParseHTMLFileWithImageSources(p_gc, p_data, ext, item, (void *)0);
+}
+
+int _pascal ParseHTMLFileWithImageSources(ReadHTML_getc *p_gc, dword p_data,
+    HTMLextra *ext, VMBlockHandle *item, HTMLImageSourceContext *imageSourcesP)
+{
     int c;
     HTMLFILE fHTML;
     MemHandle localHeap;
     extern word G_cellCount, G_imageCount ;
     word retValue = 0 ;
+
+    memset(&imageSourceState, 0, sizeof(imageSourceState));
+    if(imageSourcesP) {
+        imageSourceState.viewportWidth = imageSourcesP->viewportWidth;
+        imageSourceState.mimeSupported = imageSourcesP->mimeSupported;
+    }
 
     G_isParsing = TRUE ;
 
@@ -2594,8 +2900,9 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
          * Transfer parsed characters into HTML text object or process
          * them as contents of special elements.
          */
-        if(!(currentFlags & TAG_FLUSH_TEXT))
+        if(!ignoreTags && !(currentFlags & TAG_FLUSH_TEXT))
         {
+          PictureText(buf);
           if(*buf || c=='\r')
           {
             AddParaCond();              /* flush pending para end */
@@ -2606,12 +2913,14 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
         {
           if(EnclosingCount(SPEC_TITLE, NULL) ||
              EnclosingCount(SPEC_TEXTAREA, NULL) ||
-             EnclosingCount(SPEC_OPTION, NULL))
+             EnclosingCount(SPEC_OPTION, NULL) ||
+             EnclosingCount(SPEC_BUTTON, NULL))
           {
-	      /* nuke trailing spaces for TITLE and OPTION (all whitespace
+	      /* nuke trailing spaces for TITLE, OPTION, and BUTTON (all whitespace
 	         is equal (i.e. ignored)) */
 	      if (EnclosingCount(SPEC_TITLE, NULL) ||
-		  EnclosingCount(SPEC_OPTION, NULL)) {
+		  EnclosingCount(SPEC_OPTION, NULL) ||
+		  EnclosingCount(SPEC_BUTTON, NULL)) {
 		  while(STRLENSB(buf) && (buf[(STRLENSB(buf)-1)] == ' ')) {
 		      buf[(STRLENSB(buf)-1)] = C_NULL;
 		  }
@@ -2648,7 +2957,7 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
         break;
 
       case '\r':                        /* pre-formatted CR? */
-        if(!(currentFlags & TAG_FLUSH_TEXT))
+        if(!ignoreTags && !(currentFlags & TAG_FLUSH_TEXT))
         {
           EndLine("");                  /* simulate line break */
           c2 = ' ';                     /* multiple line breaks permitted */
@@ -2669,11 +2978,14 @@ int EXPORT ParseHTMLFile(ReadHTML_getc *p_gc, dword p_data, HTMLextra *ext,
     if(!gc)
       CloseFileURL( &fHTML );           /* close internally opened file */
 
+    ClearPicture();                    /* pool is disposed by Finish */
     FinishTransferItem();
 
     FreeStoredContent();                /* release content intermediate token */
 
 cleanupExit:
+    ClearPicture();
+    memset(&imageSourceState, 0, sizeof(imageSourceState));
     if (localHeap)
         MemFree( localHeap );
 

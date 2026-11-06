@@ -1,0 +1,1064 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	writeSourceCode.goc
+ *
+ *		This file deal with converting and drawing bitmaps
+ *
+ *		Based on the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 1/11/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "icmtool.goh"
+@include "Code/lmacros.goh"
+@include "UI/libui.goh"
+
+
+/*--------------------- WSFindVMTypeOptr ---------------------
+ *  Purpose:	Analyse VisMonikerListEntryType and find parameters for MonikerVMTypeGOC chunk
+ *  Parameters:	vmlet:	VisMonikerListEntryType value (gotten from IdGetEntryType() )
+ *		dsOp, styleOp, dcOp, aspectOp
+ * 			return: optr with texts for displaySize, iconStlye,
+ 				displayClass and aspectRatio
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void WSFindVMTypeOptr(VisMonikerListEntryType vmlet, optr *dsOp, optr *styleOp, optr *dcOp, optr *aspectOp) {
+word val;
+    /*
+     * DisplaySize
+     */
+    val = (vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET;
+    switch ( val)  {
+    case DS_TINY:
+    	*dsOp = @WSDispSizeTiny;
+    	break;
+    case DS_STANDARD:
+    	*dsOp = @WSDispSizeStandard;
+    	break;
+    case DS_LARGE:
+    	*dsOp = @WSDispSizeLarge;
+    	break;
+    case DS_HUGE:
+    	*dsOp = @WSDispSizeHuge;
+    	break;
+    default:
+    	*dsOp = @WSDispSizeStandard;
+    EC( ProgError("invalid DisplaySize in WSFindVMTypeOptr"); MessageNumberBox(val); )
+    }
+
+    /*
+     * IconStlye (only supported styles)
+     */
+    val = (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET;
+    switch ( val ) {
+    case VMS_TEXT:
+    	*styleOp = @WSStyleText;
+    	break;
+    case VMS_ABBREV_TEXT:
+    	*styleOp = @WSStyleAbbrevText;
+    	break;
+    case VMS_ICON:
+    	*styleOp = @WSStyleIcon;
+    	break;
+    case VMS_TOOL:
+    	*styleOp = @WSStyleTool;
+    	break;
+    default:
+    	*styleOp = @WSStyleIcon;
+    EC( ProgError("invalid IconsStyle in WSFindVMTypeOptr"); MessageNumberBox(val);)
+    }
+
+    /*
+     * DisplayClass (only supported display classes)
+     */
+    val = (vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET;
+    switch ( val ) {
+    case DC_GRAY_1:
+    	*dcOp = @WSDispClassGray1;
+    	break;
+    case DC_COLOR_4:
+    	*dcOp = @WSDispClassColor4;
+    	break;
+    case DC_COLOR_8:
+    	*dcOp = @WSDispClassColor8;
+    	break;
+    case DC_CF_RGB:
+    	*dcOp = @WSDispClassColorRGB;
+    	break;
+    default: *dcOp = @WSDispClassColor4;
+    	EC( ProgError("invalid DisplayClass in WSFindVMTypeOptr"); MessageNumberBox(val); )
+    }
+
+    /*
+     * Aspect ratio
+     */
+    val = (vmlet & VMLET_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET;
+    switch ( val ) {
+    case DAR_NORMAL:
+    	*aspectOp = @WSAspectNormal;
+    	break;
+    case DAR_SQUISHED:
+    	*aspectOp = @WSAspectSquished;
+    	break;
+    case DAR_VERY_SQUISHED:
+    	*aspectOp = @WSAspectVerySqished;
+    	break;
+    default: *aspectOp = @WSAspectNormal;
+    	EC(ProgError("invalid AspectRatio in WSFindVMTypeOptr"); MessageNumberBox(val); *aspectOp = @WSInvalidValue;)
+    }
+
+}
+
+
+/*--------------------- WSFindBitmapData ---------------------
+ *  Purpose:	Analyse VisMoniker and find bitmap information
+ *		see tokenExport for VisMonikerStructure
+ *  Parameters:	dataPtr:	pointer to VisMonikerWithGString
+ *		width, height:	return: bitmap size
+ *  Return:	Bitmap type flags (BMT_PALETTE, BMF_4BIT ... )
+ ---------------------------------------------------------------------------*/
+BMType WSFindBitmapData(byte *dataPtr, int *width, int *height, int *compact) {
+Bitmap *bitmap;
+
+    dataPtr += sizeof(VisMonikerWithGString);
+    if ( *dataPtr == GR_SET_AREA_COLOR_INDEX ) {	/* present when GrFillBitmap is used */
+    	dataPtr += 2;					/* skip command and index color */
+    }
+
+    /* Bitmap header follows after bitmap draw command (1 byte)  and bitmap size (1 word)  */
+    bitmap = (Bitmap*)(dataPtr + 3);
+    *width = bitmap->B_width;
+    *height = bitmap->B_height;
+    *compact = bitmap->B_compact;
+
+    return bitmap->B_type;
+}
+
+/*--------------------- WSFindBitmapSizeFromMoniker ---------------------
+ *  Purpose:	Analyse VisMoniker and find bitmap information
+ *		see tokenExport for VisMonikerStructure
+ *  Parameters:	dataPtr:	pointer to VisMonikerWithGString
+ *		width, height:	return: bitmap size
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void WSFindBitmapSizeFromMoniker(byte *dataPtr, int *width, int *height) {
+Bitmap *bitmap;
+
+    dataPtr += sizeof(VisMonikerWithGString);
+    if ( *dataPtr == GR_SET_AREA_COLOR_INDEX ) {	/* present when GrFillBitmap is used */
+    	dataPtr += 2;					/* skip command and index color */
+    }
+
+    /* Bitmap header follows after bitmap draw command (1 byte)  and bitmap size (1 word)  */
+    bitmap = (Bitmap*)(dataPtr + 3);
+    *width = bitmap->B_width;
+    *height = bitmap->B_height;
+
+}
+
+
+/*--------------------- WSFindBitmapHeaderParamGOC ---------------------
+ *  Purpose:	Convert bitmap type value and compact value into paramter strings,
+ *		required for bitmap headers
+ *  Parameters:	bitmap:    pointer to bitmap header (simple or complex)
+ *		param1:     string for compact
+ *		param2:	    string for bitmap type
+ *  Return:	bmFormat:   bitmap type value
+ ---------------------------------------------------------------------------*/
+int WSFindBitmapHeaderParamsGOC(Bitmap *bitmap, char *param1, char *param2) {
+optr op;
+int bmFormat;
+
+
+    switch (bitmap->B_compact) {
+    case BMC_UNCOMPACTED: op = @WSCompactUncompacted; break;
+    case BMC_PACKBITS: 	  op = @WSCompactPackbits; break;
+    default: op = @WSCompactUncompacted;
+    	EC( ProgError("Invalid compact in WSFindBitmapHeaderParamsGOC"); op = @WSInvalidValue;)
+    }
+    strcpy(param1, LMemDeref(op));
+
+    bmFormat = bitmap->B_type;
+    switch (bmFormat & BMT_FORMAT) {
+    case BMF_MONO: op = @WSColorMono; break;
+    case BMF_4BIT: op = @WSColor4Bit; break;
+    case BMF_8BIT: op = @WSColor8Bit; break;
+    case BMF_24BIT: op = @WSColor24Bit; break;
+    default: op = @WSColor4Bit;
+    	EC( ProgError("Invalid bmFormat in WSFindBitmapHeaderParamsGOC !!-!!"); )
+    }
+    strcpy(param2, LMemDeref(op));
+
+    if (bmFormat & BMT_PALETTE) strcat(param2, LMemDeref(@WSTypeFlagPaletteGOC));
+    if (bmFormat & BMT_MASK) 	strcat(param2, LMemDeref(@WSTypeFlagMaskGOC));
+
+    return bmFormat;
+}
+
+
+/*--------------------- WSWriteDataBytesGOC ---------------------
+ *  Purpose:	Write a sequence of data bytes as GOC code to a file
+ *  Parameters:	fh:	 file to write to
+ *		dataPtr: pointer to data bytes
+ *		count:	 number of data bytes to write
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void WSWriteDataBytesGOC(FileHandle fh, byte *dataPtr, int count) {
+char buf[12];
+int n;
+
+    for ( n = 0; n < count;n++) {
+	if ( (n & 0x07) == 0 ) FileWrite(fh, "\x0A\x0D\t\t", 4, FALSE);
+	sprintf(buf, "0x%02X, ", *dataPtr);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+	dataPtr++;
+    }
+}
+
+
+/*--------------------- WriteMonikerVisMonHeaderGOC ---------------------
+ *  Purpose:	Write VisMoniker Header (GOC) to file
+ *  Context:
+ *  Strategy:	Write:	@visMoniker Name = { /* size * /
+ *				displaySize=, style=, displayClass=, aspect=
+ *				cachedSize = width, height
+ *				gstring {
+ *		Other routines fill in the gstring data ...
+ *  Parameters:	fh: 	file to write to
+ *		dataPtr: pointer to VisMonikerWithSGtring
+ *		monikerName: Name for the Moniker
+ *		vmlet:  VisMonikerListEntryType for the Moniker
+ *		monikerSize: byte size of the whole moniker
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void WriteMonikerVisMonHeaderGOC(VMFileHandle fh,  byte *dataPtr, char *monikerName, VisMonikerListEntryType vmlet, int monikerSize) {
+optr dsOp, styleOp, dcOp, aspectOp;
+int width, height, compact, bmFormat;
+char *buf;
+
+
+     buf = malloc(256);	/* usually lines are shorter than 128 bytes .. be safe */
+     MemLock(OptrToHandle(@MonikerHeaderGOC));
+
+
+     /*
+      * Write Header: @visMoniker name = { /* bytesize * /
+      */
+     sprintf(buf, LMemDeref(@MonikerHeaderGOC), monikerName, monikerSize);
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+     /*
+      * Write VM_type: displaySize, style, displayClass, aspect
+      */
+     WSFindVMTypeOptr(vmlet, &dsOp, &styleOp, &dcOp, &aspectOp);
+     sprintf(buf, LMemDeref(@MonikerVMTypeGOC), LMemDeref(dsOp), LMemDeref(styleOp), LMemDeref(dcOp), LMemDeref(aspectOp));
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+
+     /*
+      * Write cached size: width, height
+      */
+     bmFormat = WSFindBitmapData(dataPtr, &width, &height, &compact);
+     sprintf(buf, LMemDeref(@MonikerCachedSizeGOC), width, height);
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+     /*
+      * Write start of GString: gstring {
+      */
+     sprintf(buf, LMemDeref(@MonikerStartGStringGOC));
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+
+     MemUnlock(OptrToHandle(@MonikerHeaderGOC));
+     free(buf);
+ }
+
+
+ /*--------------------- WriteGSDrawBmpCommandGOC ---------------------
+  *  Purpose:	Write correct draw-bitmap-header for VisMoniker or GString
+  *  Context:
+  *  Strategy:
+  *  Parameters: fh: File to write to
+  *		 dataPtr: pointer to gstring
+  *  Return:	pointer to bitmap data
+ ---------------------------------------------------------------------------*/
+byte *WriteGSDrawBmpCommandGOC(VMFileHandle fh,  byte *dataPtr, int *sizePtr) {
+char *buf;
+optr cmdOp, headerOp;
+int  bitmapSize;
+
+
+     buf = malloc(256);	/* usually lines are shorter than 128 bytes .. be safe */
+     MemLock(OptrToHandle(@MonikerHeaderGOC));
+
+     /*
+      * skip GR_SET_AREA_COLOR_INDEX if we have one
+      * figure out the correct draw command and bitmap size
+      */
+    if ( *dataPtr == GR_SET_AREA_COLOR_INDEX ) dataPtr += 2;
+
+    switch (*dataPtr) {
+    case GR_DRAW_BITMAP_CP:
+    	cmdOp = @WSDrawCmdDrawBitmap;
+    	headerOp = @GStringHeaderGOC;
+    	break;
+    case GR_FILL_BITMAP_CP:
+    	cmdOp = @WSDrawCmdFillBitmap;
+    	headerOp = @GStringHeaderGOC2;
+    	break;
+    default: cmdOp = @WSDrawCmdDrawBitmap;
+    	EC(ProgError("Invalid command in WriteGSDrawBmpCommandGOC"); cmdOp = @WSInvalidValue;)
+    }
+
+
+    /*
+     * The bitmap draw command is followed by the size of the bitmap
+     * Now we can write the source code
+     */
+    dataPtr++;
+    bitmapSize = *((word*)dataPtr);
+    *sizePtr = bitmapSize;
+    dataPtr += sizeof(word);		// Points now to the bitmap data itself
+
+    sprintf(buf, LMemDeref(headerOp), LMemDeref(cmdOp), bitmapSize);
+    FileWrite(fh, buf, strlen(buf), FALSE);
+
+    /*
+     * Clean up
+     */
+    MemUnlock(OptrToHandle(@MonikerHeaderGOC));
+    free(buf);
+
+    return dataPtr;		// points to the bitmap data itself
+}
+
+/*--------------------- WriteBitmapDataGOC ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	fh: file to write to
+ *		dataPtr: pointer to Bitmap header
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WriteBitmapDataGOC(VMFileHandle fh,  byte *dataPtr, int bitmapSize) {
+char *buf, *param1, *param2;
+int width, height, bmFormat;
+int palSize, cbDataValue;
+Bitmap *bitmapPtr;
+
+
+    buf = malloc(256);	/* usually lines are shorter than 128 bytes .. be safe */
+    param1 = malloc(64);
+    param2 = malloc(64);
+    MemLock(OptrToHandle(@MonikerHeaderGOC));
+
+    bitmapPtr = (Bitmap*)dataPtr;
+    width = bitmapPtr->B_width;
+    height = bitmapPtr->B_height;
+
+    bmFormat = WSFindBitmapHeaderParamsGOC(bitmapPtr, param1, param2);
+    if ( bmFormat & BMT_COMPLEX) {
+    	/*
+    	 * calculate important things: size of palette and value for CB_data
+    	 */
+    	palSize = ((bmFormat & BMT_FORMAT) == BMF_4BIT) ? 16 : 256;
+    	palSize *= sizeof(PaletteEntry);
+    	cbDataValue = sizeof(CBitmap) + 2 + palSize;
+
+    	/*
+    	 * write complex bitmap header
+    	 *	- write CB_simple part
+    	 *	- write complex part
+    	 */
+	strcat(param2, LMemDeref(@WSTypeFlagComplexGOC));
+    	sprintf(buf, LMemDeref(@WSBitmapHeaderGOC), width, height, param1, param2);
+    	FileWrite(fh, buf, strlen(buf), FALSE);
+
+    	sprintf(buf, LMemDeref(@WSCmplxBitmapHeaderGOC), (height & 0xFF), ((height >> 8) & 0xFF), (cbDataValue & 0xFF), ((cbDataValue >> 8) & 0xFF));
+    	FileWrite(fh, buf, strlen(buf), FALSE);
+
+    	/*
+    	 * write palette
+    	 *	- update dataPtr to point behind the CBitmap header
+    	 *	- write number of palette entries
+    	 *	- write palette
+    	 */
+	dataPtr += sizeof(CBitmap);			// point to number of palette entries
+        WSWriteDataBytesGOC(fh, dataPtr, 2);		/* number of palette entries */
+        FileWrite(fh, LMemDeref(@WSPaletteCountComment), strlen(LMemDeref(@WSPaletteCountComment)), FALSE);
+        WSWriteDataBytesGOC(fh, dataPtr+2, palSize);	/* palette data */
+        FileWrite(fh, LMemDeref(@WSPaletteEndComment), strlen(LMemDeref(@WSPaletteEndComment)), FALSE);
+        FileWrite(fh, "\x0A\x0D", 2, FALSE);
+
+    	/*
+    	 * update data pointer to point to raw bitmap data
+    	 * update bitmapSize to value without header and palette
+    	 */
+	dataPtr += 2 + palSize;				// point to raw bitmap data
+	bitmapSize -= sizeof(CBitmap) + 2 + palSize;	// raw bitmap data size
+
+
+    } else {
+    	/*
+    	 * write simple bitmap header
+    	 */
+    	sprintf(buf, LMemDeref(@WSBitmapHeaderGOC), width, height, param1, param2);
+    	FileWrite(fh, buf, strlen(buf), FALSE);
+
+    	/*
+    	 * update data pointer to point to raw bitmap data
+    	 * update bitmapSize to value without header
+    	 */
+	dataPtr += sizeof(Bitmap);			// point to raw bitmap data
+	bitmapSize -= sizeof(Bitmap);			// raw bitmap data size
+    }
+
+
+    /* Bitmap data + End GString */
+    WSWriteDataBytesGOC(fh, dataPtr, bitmapSize);
+
+
+    MemUnlock(OptrToHandle(@MonikerHeaderGOC));
+    free(buf);
+    free(param1);
+    free(param2);
+}
+
+/*--------------------- WriteBitmapFindSize ---------------------
+ *  Purpose:	Calculate position of bitmap data and return size
+ *		of bitmap data
+ *  Context:
+ *  Strategy:
+ *  Parameters:	dataPtr:pointer to VisMonikerWithGString structure
+ *		*bitmapSize: return size of bitmap data including header and palette
+ *  Return:	pointer to btamp data
+ ---------------------------------------------------------------------------*/
+byte *WriteBitmapFindSize(byte *dataPtr, int *bitmapSize) {
+    /*
+     * VisMoniker structure:
+     *	5 bytes     VisMonikerWithGString
+     *	1 byte	    GR_DRAW_BITMAP_CP
+     *  or 3 byte	    GR_SET_AREA_COLOR +  GR_FILL_BITMAP_CP
+     *	2 bytes     size of bitmap including header, palette and data
+     *	N bytes	    bitmap data
+     *	1 byte      GR_END_GSTRING
+     */
+
+    // point dataPtr to gstring
+    dataPtr += sizeof(VisMonikerWithGString);
+
+    // point dataPtr to sizeof bitmap data
+    // read size
+    if ( *dataPtr == GR_SET_AREA_COLOR_INDEX ) {
+	dataPtr += 3;	//  GR_SET_AREA_COLOR + index +  GR_FILL_BITMAP_CP
+    } else {
+ 	dataPtr += 1;	//  GR_DRAW_BITMAP_CP + 1 word
+    }
+
+    *bitmapSize = * ( (word*)dataPtr );
+
+    // return pointer to bitmap data
+    return dataPtr + 2;
+}
+
+/*--------------------- ITWriteIconGOC ---------------------
+ *  Purpose:	Write Vismoniker data as GOC code to a file
+ *		The moniker must be a VisMonikerWithGString and the
+ *		GString must be a bitmap
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	destination file
+ *		dataPtr:pointer to VisMonikerWithGString structure
+ *		monikerName: name of the moniker, like AppVGAMoniker
+ *		monikerSize: byte size of the whole moniker
+ *		vmlet:	VisMonikerListEntryType record
+ *		headerFormat: pass
+ *			WSHT_VIS_MONIKER: write a @visMoniker structure
+ *			WSHT_GSTRING:	  write a @chunk with a GString
+ *			WSHT_BITMAP:	  write a @chunk with a bitmap
+ *			Do not pass WSHT_PTR_IMAGE - use ITWritePtrGOC instead
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWriteIconGOC(FileHandle fh, byte *dataPtr, char *monikerName,
+		VisMonikerListEntryType vmlet, int monikerSize, WriteSourceHeaderType headerFormat) {
+char *txt, *buf;
+int  bitmapSize;
+
+    MemLock(OptrToHandle(@MonikerHeaderGOC));
+
+    switch (headerFormat ) {
+    case WSHT_VIS_MONIKER:
+	/*
+	 * Write VisMoniker: 	- @visMoniker name = ... size, stlye etc
+	 *			- Start of GString - DrawBitmap oder FillBitmap command
+	 *			- Bitmap data
+	 *			- End of GString - GSEndGString and closed bracket for header-bracket
+	 */
+	WriteMonikerVisMonHeaderGOC(fh,  dataPtr, monikerName, vmlet, monikerSize);
+
+	dataPtr += sizeof(VisMonikerWithGString);
+	dataPtr = WriteGSDrawBmpCommandGOC(fh, dataPtr, &bitmapSize);
+
+	WriteBitmapDataGOC(fh, dataPtr, bitmapSize);
+
+	txt = LMemDeref(@MonikerEndGStringGOC);
+	FileWrite(fh, txt, strlen(txt), FALSE);
+	break;
+
+    case WSHT_GSTRING:
+	/*
+	 * Write GString: - Start of GString - DrawBitmap oder FillBitmap command
+	 *		- Bitmap data
+	 *		- End of GString
+	 */
+	dataPtr += sizeof(VisMonikerWithGString);
+	monikerSize -= sizeof(VisMonikerWithGString);
+	buf = malloc(256);
+
+	sprintf(buf, LMemDeref(@GStringStartLineGOC), monikerName, monikerSize);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+
+	dataPtr = WriteGSDrawBmpCommandGOC(fh, dataPtr, &bitmapSize);
+	WriteBitmapDataGOC(fh, dataPtr, bitmapSize);
+
+	txt = LMemDeref(@GStringEndGStringGOC);
+	FileWrite(fh, txt, strlen(txt), FALSE);
+	free(buf);
+
+	break;
+
+    case WSHT_BITMAP:
+	/*
+	 * Write Bitmap: Bitmap data only
+	 */
+	dataPtr = WriteBitmapFindSize(dataPtr, &bitmapSize);
+	buf = malloc(256);
+	sprintf(buf, LMemDeref(@BitmapStartLineGOC), monikerName, bitmapSize);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+	free(buf);
+
+	WriteBitmapDataGOC(fh, dataPtr, bitmapSize);
+
+	txt = LMemDeref(@BitmapEndLineGOC);
+	FileWrite(fh, txt, strlen(txt), FALSE);
+
+	break;
+
+    case WSHT_PTR_IMAGE:
+	    EC(MessageBox("bad: GOC Icon PointerDef passed");)
+	break;
+
+    EC (default: ProgError("INvalid headerFormat in WriteIconAsm"); )
+    }
+
+
+    MemUnlock(OptrToHandle(@MonikerHeaderGOC));
+
+}
+
+
+/*---------------------------------------------------------------------------
+	Asm related Code
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- WSWriteDataBytesASM ---------------------
+ *  Purpose:	Write a sequence of data bytes as UI asm code to a file
+ *  Parameters:	fh:	 file to write to
+ *		dataPtr: pointer to data bytes
+ *		cound:	 number of data bytes to write
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void WSWriteDataBytesASM(FileHandle fh, byte *dataPtr, int count) {
+char buf[12];
+int n;
+
+    for ( n = 0; n < count;n++) {
+	if ( (n & 0x07) == 0 ) { strcpy(buf, "\x0A\x0D\t    db\t");
+				 FileWrite(fh, buf, strlen(buf), FALSE); }
+			else   { FileWrite(fh, ", ", 2, FALSE); }
+	sprintf(buf, "0x%02X", *dataPtr);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+	dataPtr++;
+    }
+}
+
+/*--------------------- WSFindBitmapHeaderParamASM ---------------------
+ *  Purpose:	Convert bitmap type value and compact value into paramter strings,
+ *		required for bitmap headers
+ *  Parameters:	bitmap:    pointer to bitmap header (simple or complex)
+ *		param1:     string for compact
+ *		param2:	    string for bitmap type
+ *  Return:	bmFormat:   bitmap type value
+ ---------------------------------------------------------------------------*/
+int WSFindBitmapHeaderParamsASM(Bitmap *bitmap, char *param1, char *param2) {
+optr op;
+int bmFormat;
+
+
+    switch (bitmap->B_compact) {
+    case BMC_UNCOMPACTED: op = @WSCompactUncompacted; break;
+    case BMC_PACKBITS: 	  op = @WSCompactPackbits; break;
+    default: op = @WSCompactUncompacted;
+    	EC( ProgError("Invalid compact in WSFindBitmapHeaderParamsASM"); op = @WSInvalidValue;)
+    }
+    strcpy(param1, LMemDeref(op));
+
+    bmFormat = bitmap->B_type;
+    switch (bmFormat & BMT_FORMAT) {
+    case BMF_MONO: op = @WSColorMono; break;
+    case BMF_4BIT: op = @WSColor4Bit; break;
+    case BMF_8BIT: op = @WSColor8Bit; break;
+    case BMF_24BIT: op = @WSColor24Bit; break;
+    default: op = @WSColor4Bit;
+    	EC( ProgError("Invalid bmFormat in WSFindBitmapHeaderParamsASM"); op = @WSInvalidValue;)
+    }
+    strcpy(param2, LMemDeref(op));
+
+    if (bmFormat & BMT_PALETTE) strcat(param2, LMemDeref(@WSTypeFlagPaletteASM));
+    if (bmFormat & BMT_MASK) 	strcat(param2, LMemDeref(@WSTypeFlagMaskASM));
+
+    return bmFormat;
+}
+
+
+/*--------------------- WriteMonikerVisMonHeaderASM ---------------------
+ *  Purpose:	Write VisMoniker Header (ASM) to file
+ *  Context:
+ *  Strategy:	Write:	@visMoniker Name = { /* size * /
+ *				displaySize=, style=, displayClass=, aspect=
+ *				cachedSize = width, height
+ *				gstring {
+ *		Other routines fill in the gstring data ...
+ *  Parameters:	fh: 	file to write to
+ *		dataPtr: pointer to VisMonikerWithSGtring
+ *		monikerName: Name for the Moniker
+ *		vmlet:  VisMonikerListEntryType for the Moniker
+ *		monikerSize: byte size of the whole moniker
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void WriteMonikerVisMonHeaderASM(VMFileHandle fh,  byte *dataPtr, char *monikerName, VisMonikerListEntryType vmlet, int monikerSize) {
+optr dsOp, styleOp, dcOp, aspectOp;
+int width, height, compact, bmFormat;
+char *buf;
+
+
+     buf = malloc(256);	/* usually lines are shorter than 128 bytes .. be safe */
+     MemLock(OptrToHandle(@MonikerHeaderASM));
+
+
+     /*
+      * Write Header: @visMoniker name = { /* bytesize * /
+      */
+     sprintf(buf, LMemDeref(@MonikerHeaderASM), monikerName, monikerSize);
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+     /*
+      * Write VM_type: displaySize, style, displayClass, aspect
+      */
+     WSFindVMTypeOptr(vmlet, &dsOp, &styleOp, &dcOp, &aspectOp);
+     sprintf(buf, LMemDeref(@MonikerVMTypeASM), LMemDeref(dsOp), LMemDeref(styleOp), LMemDeref(dcOp), LMemDeref(aspectOp));
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+
+     /*
+      * Write cached size: width, height
+      */
+     bmFormat = WSFindBitmapData(dataPtr, &width, &height, &compact);
+     sprintf(buf, LMemDeref(@MonikerCachedSizeASM), width, height);
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+     /*
+      * Write start of GString: gstring {
+      */
+     sprintf(buf, LMemDeref(@MonikerStartGStringASM));
+     FileWrite(fh, buf, strlen(buf), FALSE);
+
+
+     MemUnlock(OptrToHandle(@MonikerHeaderASM));
+     free(buf);
+ }
+
+
+ /*--------------------- WriteGSDrawBmpCommandASM ---------------------
+  *  Purpose:	Write correct draw-bitmap-header for VisMoniker or GString
+  *  Context:
+  *  Strategy:
+  *  Parameters: fh: File to write to
+  *		 dataPtr: pointer to gstring
+  *  Return:	pointer to bitmap data
+ ---------------------------------------------------------------------------*/
+byte *WriteGSDrawBmpCommandASM(VMFileHandle fh,  byte *dataPtr, int *sizePtr) {
+char *buf;
+optr cmdOp, headerOp;
+int  bitmapSize;
+
+
+     buf = malloc(256);	/* usually lines are shorter than 128 bytes .. be safe */
+     MemLock(OptrToHandle(@MonikerHeaderASM));
+
+     /*
+      * skip GR_SET_AREA_COLOR_INDEX if we have one
+      * figure out the correct draw command and bitmap size
+      */
+    if ( *dataPtr == GR_SET_AREA_COLOR_INDEX ) dataPtr += 2;
+
+    switch (*dataPtr) {
+    case GR_DRAW_BITMAP_CP:
+    	cmdOp = @WSDrawCmdDrawBitmap;
+    	headerOp = @GStringHeaderASM;
+    	break;
+    case GR_FILL_BITMAP_CP:
+    	cmdOp = @WSDrawCmdFillBitmap;
+    	headerOp = @GStringHeaderASM2;
+    	break;
+    default: cmdOp = @WSDrawCmdDrawBitmap;
+    	EC(ProgError("Invalid command in WriteGSDrawBmpCommandASM"); cmdOp = @WSInvalidValue;)
+    }
+
+
+    /*
+     * The bitmap draw command is followed by the size of the bitmap
+     * Now we can write the source code
+     */
+    dataPtr++;
+    bitmapSize = *((word*)dataPtr);
+    *sizePtr = bitmapSize;
+    dataPtr += sizeof(word);		// Points now to the bitmap data itself
+
+    sprintf(buf, LMemDeref(headerOp), LMemDeref(cmdOp), bitmapSize);
+    FileWrite(fh, buf, strlen(buf), FALSE);
+
+    /*
+     * Clean up
+     */
+    MemUnlock(OptrToHandle(@MonikerHeaderASM));
+    free(buf);
+
+    return dataPtr;		// points to the bitmap data itself
+}
+
+/*--------------------- WriteBitmapDataASM ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	fh: file to write to
+ *		dataPtr: pointer to Bitmap header
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WriteBitmapDataASM(VMFileHandle fh,  byte *dataPtr, int bitmapSize) {
+char *buf, *param1, *param2;
+int width, height, bmFormat;
+int palSize, cbDataValue;
+Bitmap *bitmapPtr;
+
+
+    buf = malloc(256);	/* usually lines are shorter than 128 bytes .. be safe */
+    param1 = malloc(64);
+    param2 = malloc(64);
+    MemLock(OptrToHandle(@MonikerHeaderASM));
+
+    bitmapPtr = (Bitmap*)dataPtr;
+    width = bitmapPtr->B_width;
+    height = bitmapPtr->B_height;
+
+    bmFormat = WSFindBitmapHeaderParamsASM(bitmapPtr, param1, param2);
+    if ( bmFormat & BMT_COMPLEX) {
+    	/*
+    	 * calculate important things: size of palette and value for CB_data
+    	 */
+    	palSize = ((bmFormat & BMT_FORMAT) == BMF_4BIT) ? 16 : 256;
+    	palSize *= sizeof(PaletteEntry);
+    	cbDataValue = sizeof(CBitmap) + 2 + palSize;
+
+    	/*
+    	 * write complex bitmap header
+    	 *	- write CB_simple part
+    	 *	- write complex part
+    	 */
+	strcat(param2, LMemDeref(@WSTypeFlagComplexASM));
+    	sprintf(buf, LMemDeref(@WSCmplxBitmapHeaderASM), width, height, param1, param2, height, cbDataValue);
+    	FileWrite(fh, buf, strlen(buf), FALSE);
+
+    	/*
+    	 * write palette
+    	 *	- update dataPtr to point behind the CBitmap header
+    	 *	- write number of palette entries
+    	 *	- write palette
+    	 */
+	dataPtr += sizeof(CBitmap);			// point to number of palette entries
+        WSWriteDataBytesASM(fh, dataPtr, 2);		/* number of palette entries */
+        FileWrite(fh, LMemDeref(@WSPaletteCountComment), strlen(LMemDeref(@WSPaletteCountComment)), FALSE);
+        WSWriteDataBytesASM(fh, dataPtr+2, palSize);	/* palette data */
+        FileWrite(fh, LMemDeref(@WSPaletteEndComment), strlen(LMemDeref(@WSPaletteEndComment)), FALSE);
+        FileWrite(fh, "\x0A\x0D", 2, FALSE);
+
+    	/*
+    	 * update data pointer to point to raw bitmap data
+    	 * update bitmapSize to value without header and palette
+    	 */
+	dataPtr += 2 + palSize;				// point to raw bitmap data
+	bitmapSize -= sizeof(CBitmap) + 2 + palSize;	// raw bitmap data size
+
+
+    } else {
+    	/*
+    	 * write simple bitmap header
+    	 */
+    	sprintf(buf, LMemDeref(@WSBitmapHeaderASM), width, height, param1, param2);
+    	FileWrite(fh, buf, strlen(buf), FALSE);
+
+    	/*
+    	 * update data pointer to point to raw bitmap data
+    	 * update bitmapSize to value without header
+    	 */
+	dataPtr += sizeof(Bitmap);			// point to raw bitmap data
+	bitmapSize -= sizeof(Bitmap);			// raw bitmap data size
+    }
+
+
+    /* Bitmap data + End GString */
+    WSWriteDataBytesASM(fh, dataPtr, bitmapSize);
+
+
+    MemUnlock(OptrToHandle(@MonikerHeaderASM));
+    free(buf);
+    free(param1);
+    free(param2);
+}
+
+
+/*--------------------- ITWriteIconAsm ---------------------
+ *  Purpose:	Write Vismoniker data as ui-code (should be placed in a *.ui file)
+ *		The moniker must be a VisMonikerWithGString and the
+ *		GString must be a bitmap
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	destination file
+ *		dataPtr:pointer to VisMonikerWithGString structure
+ *		monikerName: name of the moniker, like AppVGAMoniker
+ *		monikerSize: byte size of the whole moniker
+ *		vmlet:	VisMonikerListEntryType record
+ *		headerFormat: pass
+ *			WSHT_VIS_MONIKER: write a @visMoniker structure
+ *			WSHT_GSTRING:	  write a @chunk with a GString
+ *			WSHT_BITMAP:	  write a @chunk with a bitmap
+ *			Do not pass WSHT_PTR_IMAGE - use ITWritePtrAsm instead
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWriteIconAsm(FileHandle fh, byte *dataPtr, char *monikerName,
+		VisMonikerListEntryType vmlet, int monikerSize, WriteSourceHeaderType headerFormat) {
+char *txt, *buf;
+int  bitmapSize; // µµ, headerFormat;
+
+// µµ    headerFormat = @call WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    MemLock(OptrToHandle(@MonikerHeaderASM));
+
+    switch (headerFormat ) {
+    case WSHT_VIS_MONIKER:
+	/*
+	 * Write VisMoniker:	- visMoniker name = ... size, stlye etc
+	 *			- Start of GString - DrawBitmap oder FillBitmap command
+	 *			- Bitmap data
+	 *			- End of GString - GSEndGString and closed bracket for header-bracket
+	 */
+	WriteMonikerVisMonHeaderASM(fh,  dataPtr, monikerName, vmlet, monikerSize);
+
+	dataPtr += sizeof(VisMonikerWithGString);
+	dataPtr = WriteGSDrawBmpCommandASM(fh, dataPtr, &bitmapSize);
+
+	WriteBitmapDataASM(fh, dataPtr, bitmapSize);
+
+	txt = LMemDeref(@MonikerEndGStringASM);
+	FileWrite(fh, txt, strlen(txt), FALSE);
+
+	break;
+
+    case WSHT_GSTRING:
+	/*
+	 * Write GString: - Start of GString - DrawBitmap oder FillBitmap command
+	 *		- Bitmap data
+	 *		- End of GString
+	 */
+	dataPtr += sizeof(VisMonikerWithGString);
+	monikerSize -= sizeof(VisMonikerWithGString);
+	buf = malloc(256);
+
+	sprintf(buf, LMemDeref(@GStringStartLineASM), monikerName, monikerSize);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+
+	dataPtr = WriteGSDrawBmpCommandASM(fh, dataPtr, &bitmapSize);
+	WriteBitmapDataASM(fh, dataPtr, bitmapSize);
+
+	txt = LMemDeref(@GStringEndGStringASM);
+	FileWrite(fh, txt, strlen(txt), FALSE);
+	free(buf);
+	break;
+
+    case WSHT_BITMAP:
+	/*
+	 * Write Bitmap: Bitmap data only
+	 */
+	dataPtr = WriteBitmapFindSize(dataPtr, &bitmapSize);
+	buf = malloc(256);
+	sprintf(buf, LMemDeref(@BitmapStartLineASM), monikerName, bitmapSize);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+	free(buf);
+
+	WriteBitmapDataASM(fh, dataPtr, bitmapSize);
+
+	txt = LMemDeref(@BitmapEndLineASM);
+	FileWrite(fh, txt, strlen(txt), FALSE);
+	break;
+
+    case WSHT_PTR_IMAGE:
+	    EC(MessageBox("bad: ASM Icon PointerDef passed");)
+	break;
+
+    EC (default: ProgError("Invalid headerFormat in WriteIconAsm"); )
+    }
+
+    MemUnlock(OptrToHandle(@MonikerHeaderASM));
+}
+
+/*---------------------------------------------------------------------------
+	PointerDef related code
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- PtrImageWriteDataBytesGOC ---------------------
+ *  Purpose:	Write a sequence of data bytes as GOC code to a file
+ *		Do not append a comma at last byte
+ *  Parameters:	fh:	 file to write to
+ *		dataPtr: pointer to data bytes
+ *		count:	 number of data bytes to write
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void PtrImageWriteDataBytesGOC(FileHandle fh, byte *dataPtr, int count) {
+char buf[12];
+int n;
+
+    for ( n = 0; n < count-1;n++) {
+	if ( (n & 0x07) == 0 ) FileWrite(fh, "\x0A\x0D\t", 3, FALSE);
+	sprintf(buf, "0x%02X, ", *dataPtr);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+	dataPtr++;
+    }
+
+    sprintf(buf, "0x%02X", *dataPtr);
+    FileWrite(fh, buf, strlen(buf), FALSE);
+}
+
+/*--------------------- PtrImageWriteDataBytesASM ---------------------
+ *  Purpose:	Write a sequence of data bytes as UI asm code to a file
+ *  Parameters:	fh:	 file to write to
+ *		dataPtr: pointer to data bytes
+ *		cound:	 number of data bytes to write
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void PtrImageWriteDataBytesASM(FileHandle fh, byte *dataPtr, int count) {
+char buf[12];
+int n;
+
+    for ( n = 0; n < count;n++) {
+	if ( (n & 0x07) == 0 ) { strcpy(buf, "\x0A\x0D    db\t");
+				 FileWrite(fh, buf, strlen(buf), FALSE); }
+			else   { FileWrite(fh, ", ", 2, FALSE); }
+	sprintf(buf, "0x%02X", *dataPtr);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+	dataPtr++;
+    }
+}
+
+/*--------------------- ITWritePtrAsm ---------------------
+ *  Purpose:	Write the .ui source code for a mouse pointer to a file
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	file to write to
+ *		dataPtr: pointer to binary data of the mouse pointer
+ *		pointerName: name for the pointer chunk
+ *		size:	size of one plane of the pointer image
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWritePtrAsm(FileHandle fh, byte *dataPtr, char *pointerName, int size) {
+byte *buf;
+
+    buf = malloc(256);
+    MemLock(OptrToHandle(@PointerDefHeaderGOC));
+
+	sprintf(buf, LMemDeref(@PointerDefHeaderASM), pointerName, dataPtr[0], dataPtr[1], dataPtr[2], dataPtr[3]);
+	FileWrite(fh, buf, strlen(buf), FALSE);
+
+	dataPtr += 4;
+	PtrImageWriteDataBytesASM(fh, dataPtr, size);
+	FileWrite(fh, LMemDeref(@PointerDefMiddleASM), strlen(LMemDeref(@PointerDefMiddleASM)), FALSE);
+
+	dataPtr += size;
+	PtrImageWriteDataBytesASM(fh, dataPtr, size);
+	FileWrite(fh, LMemDeref(@PointerDefEndASM), strlen(LMemDeref(@PointerDefEndASM)), FALSE);
+
+    MemUnlock(OptrToHandle(@PointerDefHeaderGOC));
+    free(buf);
+}
+
+/*--------------------- ITWritePtrGOC ---------------------
+ *  Purpose:	Write the GOC source code for a mouse pointer to a file
+ *  Context:	This routine is essentially a support routine for
+ *		the IconEditor. See IconEditor code for detailed
+ *		information and an example of how to use it.
+ *  Strategy:	See code
+ *  Parameters:	fh:	file to write to
+ *		dataPtr: pointer to binary data of the mouse pointer
+ *		pointerName: name for the pointer chunk
+ *		size:	size of one plane of the pointer image
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITWritePtrGOC(FileHandle fh, byte *dataPtr, char *pointerName, int size) {
+byte *buf;
+
+    buf = malloc(256);
+    MemLock(OptrToHandle(@PointerDefHeaderGOC));
+
+    sprintf(buf, LMemDeref(@PointerDefHeaderGOC), dataPtr[0], pointerName, dataPtr[0], dataPtr[1], dataPtr[2], dataPtr[3]);
+    FileWrite(fh, buf, strlen(buf), FALSE);
+
+    dataPtr += 4;
+    PtrImageWriteDataBytesGOC(fh, dataPtr, size);
+    FileWrite(fh, LMemDeref(@PointerDefMiddleGOC), strlen(LMemDeref(@PointerDefMiddleGOC)), FALSE);
+
+    dataPtr += size;
+    PtrImageWriteDataBytesGOC(fh, dataPtr, size);
+    FileWrite(fh, LMemDeref(@PointerDefEndGOC), strlen(LMemDeref(@PointerDefEndGOC)), FALSE);
+
+    MemUnlock(OptrToHandle(@PointerDefHeaderGOC));
+    free(buf);
+}
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file writeSourceCode.goc ********************/
+

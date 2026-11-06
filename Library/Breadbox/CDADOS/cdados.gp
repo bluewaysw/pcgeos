@@ -25,7 +25,7 @@ type driver, single
 #
 # Desktop-related things
 #
-longname        "Breadbox DOS CD Audio Driver"
+longname        "DOS CD Audio Driver"
 tokenchars      "CDAD"
 tokenid         16474
 
@@ -33,5 +33,4 @@ tokenid         16474
 resource ResidentCode 		fixed code
 
 
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 

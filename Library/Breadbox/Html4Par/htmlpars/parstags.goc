@@ -143,6 +143,15 @@ word EnclosingCount(SpecialTagType spec, word *top)
     return n;                           /* return count */
 }
 
+/* Without JavaScript, omit controls with no FORM ancestor so stray
+ * controls do not clutter the document. Scripts may still use them.
+ */
+Boolean _pascal KeepFormControl(void)
+{
+    return ((HTMLext->HE_options & HTML_JAVASCRIPT) ||
+            EnclosingCount(SPEC_FORM, NULL));
+}
+
 /*
  * Requires localHeap to be locked.
  */
@@ -158,8 +167,11 @@ void GetCurrentStyles(void)
     tagStack = LMemDeref(tagStackO);
     for(p=0; p<tagStackPtr; p++,tagStack++)
     {
-      if((HTMLext->HE_options & HTML_READ_FAST) && (tagStack->spec != SPEC_A))
-        continue;                       /* fast: ignore everything but links */
+      if((HTMLext->HE_options & HTML_READ_FAST) && (tagStack->spec != SPEC_A)) {
+        /* Fast Mode skips formatting, but must still suppress content. */
+        currentFlags |= tagStack->flags & TAG_CUMULATIVE_FLAGS;
+        continue;
+      }
 
       parentCS = currentCS;
       ApplyCharacterDelta( &currentCS, &(tagStack->charDelta) );
@@ -501,11 +513,67 @@ void LOCAL PopStyle(word n)
       break;
 
     /*------------------------------------------------------------------------*/
+    case SPEC_BUTTON:
+      {
+        HTMLformData fd;
+        char *p;
+        word element;
+
+        if(!KeepFormControl())
+        {
+            if(storedContent != NAME_POOL_NONE)
+                NamePoolReleaseToken(NamePool, storedContent);
+            storedContent = NAME_POOL_NONE;
+            break;
+        }
+
+        memset(&fd, 0, sizeof(fd));
+        fd.HFD_itemType = HTML_FORM_SUBMIT;
+        p = GetParamValue(paramArray, "TYPE");
+        if(p)
+        {
+            if(!STRCMPISB(p, "RESET"))
+                fd.HFD_itemType = HTML_FORM_RESET;
+            else if(!STRCMPISB(p, "BUTTON"))
+                fd.HFD_itemType = HTML_FORM_BUTTON;
+        }
+
+        p = GetParamValue(paramArray, "NAME");
+        if(p && *p)
+            fd.HFD_name = NamePoolTokenizeDOS(NamePool, p, FALSE);
+        p = GetParamValue(paramArray, "VALUE");
+        if(p && *p)
+            fd.HFD_value = NamePoolTokenizeDOS(NamePool, p, FALSE);
+        fd.HFD_prompt = storedContent;
+        storedContent = NAME_POOL_NONE;
+        fd.HFD_var.submit.flags |= HTML_BUTTON_CONTENT;
+
+        element = AddFormElement(&fd);
+        ParseEvents(paramArray, HTML_EVENT_OBJECT_ELEMENT, element);
+      }
+      break;
+
+    /*------------------------------------------------------------------------*/
     case SPEC_TEXTAREA:
       {
         HTMLformData fd;
         char *p;
 	word element;
+
+        if(!KeepFormControl())
+        {
+            /* A stray TEXTAREA adds no control; release its collected
+             * content instead of storing it in a form record.
+             */
+            /* ATTENTION: Closing-time form membership can suppress a
+             * TEXTAREA whose FORM was already closed; store opening-time
+             * membership on the tag stack if malformed markup needs support.
+             */
+            if(storedContent != NAME_POOL_NONE)
+                NamePoolReleaseToken(NamePool, storedContent);
+            storedContent = NAME_POOL_NONE;
+            break;
+        }
 
         memset(&fd, 0, sizeof(fd));     /* set form record to default */
 
@@ -553,7 +621,13 @@ void LOCAL PopStyle(word n)
         char *p;
 
         if(currentMenu==CA_NULL_ELEMENT)
-          break;                        /* ignore unconnected options */
+        {
+            /* An OPTION with no active SELECT adds no record; release its text. */
+            if(storedContent != NAME_POOL_NONE)
+                NamePoolReleaseToken(NamePool, storedContent);
+            storedContent = NAME_POOL_NONE;
+            break;                      /* ignore unconnected options */
+        }
 
         memset(&fd, 0, sizeof(fd));     /* set form record to default */
 
@@ -580,6 +654,8 @@ void LOCAL PopStyle(word n)
     /*------------------------------------------------------------------------*/
     case SPEC_SELECT:
       ForceCloseStyle(SPEC_OPTION, SPEC_DONT_MATCH);
+      /* Following OPTIONs must not attach to the closed menu. */
+      currentMenu = CA_NULL_ELEMENT;
       break;
 
     /*------------------------------------------------------------------------*/
@@ -1100,6 +1176,9 @@ void CloseTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
     word level;
 
     tagStack = LMemDeref(tagStackO);
+
+    if(spec == SPEC_PICTURE)
+        ClearPicture();
 
     if(paramArray)                      /* if there is one to be released... */
       LMemFree(paramArray);             /* ignore closing tag parameters */

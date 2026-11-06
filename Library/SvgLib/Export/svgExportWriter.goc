@@ -1,0 +1,915 @@
+/***********************************************************************
+ *
+ * PROJECT:       SvgLib SVG Exporter
+ * FILE:          svgsubcode.goc
+ *
+ * DESCRIPTION:   GEOS adapter for the shared SVG conversion core
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include "svgExport.h"
+
+static const word kSvgExportBuiltinDashCounts[] = {0, 1, 1, 2, 3, 0};
+static const word kSvgExportBuiltinDashValues[][MAX_DASH_ARRAY_PAIRS * 2] =
+{
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, /* LS_SOLID */
+    {4, 4, 0, 0, 0, 0, 0, 0, 0, 0}, /* LS_DASHED */
+    {1, 2, 0, 0, 0, 0, 0, 0, 0, 0}, /* LS_DOTTED */
+    {4, 4, 1, 4, 0, 0, 0, 0, 0, 0}, /* LS_DASHDOT */
+    {4, 4, 1, 4, 1, 4, 0, 0, 0, 0}, /* LS_DASHDDOT */
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}  /* LS_CUSTOM */
+};
+
+static const WWFixedAsDWord kSvgExportHairlineWidth = 0x00001000;
+
+typedef int _pascal SvgExportPCFMSink(void *userData,
+                                       const char *data,
+                                       SvgWriterU16 byteCount,
+                                       SvgWriterSink *sink);
+
+int _pascal
+SvgExportInvokeSink(SvgWriterSink *sink,
+                     void *userData,
+                     const char *data,
+                     SvgWriterU16 byteCount)
+{
+    return ((SvgExportPCFMSink *)ProcCallFixedOrMovable_pascal)(
+        userData, data, byteCount, sink);
+}
+
+static int _pascal
+SvgExportFileSink(void *userData,
+                   const char *data,
+                   SvgWriterU16 byteCount)
+{
+    SvgExportContext *context;
+
+    context = (SvgExportContext*)userData;
+    if ((context == (void*)0) || (context->svgFile == NullHandle))
+    {
+        return 0;
+    }
+    return (FileWrite(context->svgFile, data, byteCount, FALSE) == byteCount);
+}
+
+static int _pascal
+SvgExportCountingSink(void *userData,
+                      const char *data,
+                      SvgWriterU16 byteCount)
+{
+    SvgExportContext *context;
+
+    context = (SvgExportContext *)userData;
+    if (!SvgWriterCountTags(&context->tagCounter, data, byteCount,
+                            SVG_TEXT_MAX_SIZE - 1))
+    {
+        context->tagTooLarge = TRUE;
+        return 0;
+    }
+    return 1;
+}
+
+void _pascal
+SvgExportInitCountingWriter(SvgExportContext *context)
+{
+    memset(&context->tagCounter, 0, sizeof(context->tagCounter));
+    context->tagTooLarge = FALSE;
+    SvgWriterInit(&context->writer, SvgExportCountingSink, context);
+}
+
+static SvgWriterFixed
+SvgExportPackDWFixed(const DWFixed *value)
+{
+    SvgWriterU32 packed;
+
+    if (value == (void*)0)
+    {
+        return 0;
+    }
+    packed = ((SvgWriterU32)value->DWF_int << 16) |
+             (SvgWriterU32)value->DWF_frac;
+    return (SvgWriterFixed)packed;
+}
+
+static void
+SvgExportNormalizePoint(const PointWWFixed *source,
+                         SvgWriterPoint *target)
+{
+    target->x = (SvgWriterFixed)SvgExportPackWWFixed(&source->PF_x);
+    target->y = (SvgWriterFixed)SvgExportPackWWFixed(&source->PF_y);
+}
+
+static void
+SvgExportNormalizeMatrix(const TransMatrix *source,
+                          SvgWriterMatrix *target)
+{
+    memset(target, 0, sizeof(*target));
+    if (source == (void*)0)
+    {
+        target->a = 0x00010000L;
+        target->d = 0x00010000L;
+        return;
+    }
+
+    target->a = (SvgWriterFixed)SvgExportPackWWFixed(&source->TM_e11);
+    target->b = (SvgWriterFixed)SvgExportPackWWFixed(&source->TM_e12);
+    target->c = (SvgWriterFixed)SvgExportPackWWFixed(&source->TM_e21);
+    target->d = (SvgWriterFixed)SvgExportPackWWFixed(&source->TM_e22);
+    target->e = SvgExportPackDWFixed(&source->TM_e31);
+    target->f = SvgExportPackDWFixed(&source->TM_e32);
+}
+
+static SvgWriterFixed
+SvgExportScaleDashLength(WWFixedAsDWord lineWidth, word factor)
+{
+    dword product;
+
+    product = (dword)lineWidth * (dword)factor;
+    return (SvgWriterFixed)product;
+}
+
+static void
+SvgExportNormalizeStyle(const SvgExportContext *context,
+                         Boolean includeStroke,
+                         Boolean includeFill,
+                         Boolean filled,
+                         RegionFillRule fillRule,
+                         SvgWriterStyle *style)
+{
+    const word *dashValues;
+    WWFixedAsDWord effectiveWidth;
+    word pairCount;
+    word totalEntries;
+    word index;
+
+    memset(style, 0, sizeof(*style));
+    effectiveWidth = (context->lineWidth == 0) ?
+                     kSvgExportHairlineWidth : context->lineWidth;
+
+    style->lineWidth = (SvgWriterFixed)effectiveWidth;
+    style->miterLimit = (SvgWriterFixed)context->miterLimit;
+    style->lineRed = RGB_RED(context->lineColor);
+    style->lineGreen = RGB_GREEN(context->lineColor);
+    style->lineBlue = RGB_BLUE(context->lineColor);
+    style->fillRed = RGB_RED(context->fillColor);
+    style->fillGreen = RGB_GREEN(context->fillColor);
+    style->fillBlue = RGB_BLUE(context->fillColor);
+    style->lineCap = SVG_WRITER_CAP_BUTT;
+    if (context->lineCap == LE_ROUNDCAP)
+    {
+        style->lineCap = SVG_WRITER_CAP_ROUND;
+    }
+    else if (context->lineCap == LE_SQUARECAP)
+    {
+        style->lineCap = SVG_WRITER_CAP_SQUARE;
+    }
+    style->lineJoin = SVG_WRITER_JOIN_MITER;
+    if (context->lineJoin == LJ_ROUND)
+    {
+        style->lineJoin = SVG_WRITER_JOIN_ROUND;
+    }
+    else if (context->lineJoin == LJ_BEVELED)
+    {
+        style->lineJoin = SVG_WRITER_JOIN_BEVEL;
+    }
+
+    dashValues = (void*)0;
+    pairCount = 0;
+    if ((context->lineStyle == LS_CUSTOM) &&
+        (context->dashPairCount != 0))
+    {
+        pairCount = context->dashPairCount;
+        dashValues = context->dashPattern;
+    }
+    else if ((context->lineStyle >= LS_DASHED) &&
+             (context->lineStyle <= LS_DASHDDOT))
+    {
+        pairCount = kSvgExportBuiltinDashCounts[context->lineStyle];
+        dashValues = kSvgExportBuiltinDashValues[context->lineStyle];
+    }
+
+    totalEntries = pairCount * 2;
+    for (index = 0;
+         (index < totalEntries) &&
+         (style->dashCount < SVG_WRITER_MAX_DASH_VALUES);
+         index++)
+    {
+        if (dashValues[index] != 0)
+        {
+            style->dashValues[style->dashCount++] =
+                SvgExportScaleDashLength(effectiveWidth,
+                                          dashValues[index]);
+        }
+    }
+    if (context->dashSkipCount != 0)
+    {
+        style->dashOffset =
+            SvgExportScaleDashLength(effectiveWidth,
+                                      context->dashSkipCount);
+        style->hasDashOffset = (style->dashOffset != 0);
+    }
+
+    style->includeStroke = (includeStroke != FALSE);
+    style->includeFill = (includeFill != FALSE);
+    style->filled = (filled != FALSE);
+    style->fillRule = (fillRule == ODD_EVEN) ?
+                      SVG_WRITER_FILL_EVENODD : SVG_WRITER_FILL_NONZERO;
+}
+
+Boolean _pascal
+SvgExportInitWriter(SvgExportContext *context)
+{
+    if ((context == (void*)0) || (context->svgFile == NullHandle))
+    {
+        return FALSE;
+    }
+    SvgWriterInit(&context->writer, SvgExportFileSink, context);
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportEnsureScratch(SvgExportContext *context, word size)
+{
+    if ((context == (void*)0) || (context->bufferHeapH == NullHandle))
+    {
+        return FALSE;
+    }
+    if (size <= context->scratchCapacity)
+    {
+        return TRUE;
+    }
+
+    if (MemLock(context->bufferHeapH) == (void *)0)
+    {
+        return FALSE;
+    }
+    if (context->scratchChunkH == NullChunk)
+    {
+        context->scratchChunkH =
+            LMemAlloc(context->bufferHeapH, size);
+        if (context->scratchChunkH == NullChunk)
+        {
+            MemUnlock(context->bufferHeapH);
+            return FALSE;
+        }
+    }
+    else if (LMemReAllocHandles(context->bufferHeapH,
+                                context->scratchChunkH,
+                                size) != 0)
+    {
+        MemUnlock(context->bufferHeapH);
+        return FALSE;
+    }
+    context->scratchCapacity = size;
+    MemUnlock(context->bufferHeapH);
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportWriteHeader(SvgExportContext *context)
+{
+    dword width;
+    dword height;
+
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+
+    width = 0;
+    height = 0;
+    if (context->bounds.RD_right > context->bounds.RD_left)
+    {
+        width = context->bounds.RD_right - context->bounds.RD_left;
+    }
+    if (context->bounds.RD_bottom > context->bounds.RD_top)
+    {
+        height = context->bounds.RD_bottom - context->bounds.RD_top;
+    }
+
+    return SvgWriterEmitHeader(&context->writer,
+                            (SvgWriterI32)context->bounds.RD_left,
+                            (SvgWriterI32)context->bounds.RD_top,
+                            (SvgWriterU32)width,
+                            (SvgWriterU32)height) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWriteFooter(SvgExportContext *context)
+{
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+    return SvgWriterEmitFooter(&context->writer) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportUpdateDrawingState(GStateHandle gstate,
+                             SvgExportContext *context)
+{
+    word index;
+
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+
+    context->lineWidth = GrGetLineWidth(gstate);
+    context->lineColor = GrGetLineColor(gstate);
+    context->fillColor = GrGetAreaColor(gstate);
+    context->lineJoin = GrGetLineJoin(gstate);
+    context->lineCap = GrGetLineEnd(gstate);
+    context->miterLimit = GrGetMiterLimit(gstate);
+    context->lineStyle = GrGetLineStyle(gstate);
+    if (context->lineStyle != LS_CUSTOM)
+    {
+        context->dashPairCount = 0;
+        context->dashSkipCount = 0;
+        for (index = 0; index < (MAX_DASH_ARRAY_PAIRS * 2); index++)
+        {
+            context->dashPattern[index] = 0;
+        }
+    }
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportWriteLineElement(SvgExportContext *context,
+                           const PointWWFixed *startPoint,
+                           const PointWWFixed *endPoint,
+                           const TransMatrix *tm)
+{
+    SvgWriterPoint start;
+    SvgWriterPoint end;
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if ((context == (void*)0) || (startPoint == (void*)0) ||
+        (endPoint == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizePoint(startPoint, &start);
+    SvgExportNormalizePoint(endPoint, &end);
+    SvgExportNormalizeStyle(context, TRUE, FALSE, FALSE,
+                             context->fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitLine(&context->writer, &start, &end, &style,
+                          &matrix) ?
+           TRUE : FALSE;
+}
+
+static void
+SvgExportNormalizeRect(const PointWWFixed *corner1,
+                        const PointWWFixed *corner3,
+                        SvgWriterRect *rect)
+{
+    SvgWriterFixed left;
+    SvgWriterFixed top;
+    SvgWriterFixed right;
+    SvgWriterFixed bottom;
+
+    left = (SvgWriterFixed)SvgExportPackWWFixed(&corner1->PF_x);
+    top = (SvgWriterFixed)SvgExportPackWWFixed(&corner1->PF_y);
+    right = (SvgWriterFixed)SvgExportPackWWFixed(&corner3->PF_x);
+    bottom = (SvgWriterFixed)SvgExportPackWWFixed(&corner3->PF_y);
+    if (right < left)
+    {
+        rect->x = right;
+        rect->width = (SvgWriterU32)left - (SvgWriterU32)right;
+    }
+    else
+    {
+        rect->x = left;
+        rect->width = (SvgWriterU32)right - (SvgWriterU32)left;
+    }
+    if (bottom < top)
+    {
+        rect->y = bottom;
+        rect->height = (SvgWriterU32)top - (SvgWriterU32)bottom;
+    }
+    else
+    {
+        rect->y = top;
+        rect->height = (SvgWriterU32)bottom - (SvgWriterU32)top;
+    }
+    rect->radiusX = 0;
+    rect->radiusY = 0;
+}
+
+Boolean _pascal
+SvgExportWriteRectElement(SvgExportContext *context,
+                           const PointWWFixed *corner1,
+                           const PointWWFixed *corner3,
+                           Boolean includeStroke,
+                           Boolean includeFill,
+                           Boolean filled,
+                           const TransMatrix *tm)
+{
+    SvgWriterRect rect;
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if ((context == (void*)0) || (corner1 == (void*)0) ||
+        (corner3 == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizeRect(corner1, corner3, &rect);
+    SvgExportNormalizeStyle(context, includeStroke, includeFill, filled,
+                             context->fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitRect(&context->writer, &rect, 0, &style,
+                          &matrix) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWriteRoundRectElement(SvgExportContext *context,
+                                const PointWWFixed *corner1,
+                                const PointWWFixed *corner3,
+                                word radiusX,
+                                word radiusY,
+                                Boolean includeStroke,
+                                Boolean includeFill,
+                                Boolean filled,
+                                const TransMatrix *tm)
+{
+    SvgWriterRect rect;
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if ((context == (void*)0) || (corner1 == (void*)0) ||
+        (corner3 == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizeRect(corner1, corner3, &rect);
+    rect.radiusX = (SvgWriterU32)radiusX * 65536L;
+    rect.radiusY = (SvgWriterU32)radiusY * 65536L;
+    SvgExportNormalizeStyle(context, includeStroke, includeFill, filled,
+                             context->fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitRect(&context->writer, &rect, 1, &style,
+                          &matrix) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWriteCubicPathElement(SvgExportContext *context,
+                                const PointWWFixed *start,
+                                const PointWWFixed *control1,
+                                const PointWWFixed *control2,
+                                const PointWWFixed *end,
+                                const TransMatrix *tm)
+{
+    SvgWriterPoint normalizedStart;
+    SvgWriterPoint normalizedControl1;
+    SvgWriterPoint normalizedControl2;
+    SvgWriterPoint normalizedEnd;
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if ((context == (void*)0) || (start == (void*)0) ||
+        (control1 == (void*)0) || (control2 == (void*)0) ||
+        (end == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizePoint(start, &normalizedStart);
+    SvgExportNormalizePoint(control1, &normalizedControl1);
+    SvgExportNormalizePoint(control2, &normalizedControl2);
+    SvgExportNormalizePoint(end, &normalizedEnd);
+    SvgExportNormalizeStyle(context, TRUE, FALSE, FALSE,
+                             context->fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitCubic(&context->writer,
+                           &normalizedStart,
+                           &normalizedControl1,
+                           &normalizedControl2,
+                           &normalizedEnd,
+                           &style,
+                           &matrix) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWriteEllipseElement(SvgExportContext *context,
+                              const WWFixed *centerX,
+                              const WWFixed *centerY,
+                              const WWFixed *radiusX,
+                              const WWFixed *radiusY,
+                              Boolean includeStroke,
+                              Boolean includeFill,
+                              Boolean filled,
+                              const TransMatrix *tm)
+{
+    SvgWriterPoint center;
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if ((context == (void*)0) || (centerX == (void*)0) ||
+        (centerY == (void*)0) || (radiusX == (void*)0) ||
+        (radiusY == (void*)0))
+    {
+        return FALSE;
+    }
+    center.x = (SvgWriterFixed)SvgExportPackWWFixed(centerX);
+    center.y = (SvgWriterFixed)SvgExportPackWWFixed(centerY);
+    SvgExportNormalizeStyle(context, includeStroke, includeFill, filled,
+                             context->fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitEllipse(
+        &context->writer, &center,
+        (SvgWriterFixed)SvgExportPackWWFixed(radiusX),
+        (SvgWriterFixed)SvgExportPackWWFixed(radiusY),
+        &style, &matrix) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWriteArcElement(SvgExportContext *context,
+                          WWFixedAsDWord centerX,
+                          WWFixedAsDWord centerY,
+                          WWFixedAsDWord radiusX,
+                          WWFixedAsDWord radiusY,
+                          sword startAngleDeg,
+                          sword endAngleDeg,
+                          ArcCloseType closeType,
+                          Boolean filled,
+                          const TransMatrix *tm)
+{
+    SvgWriterArc arc;
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+    WWFixedAsDWord angle1;
+    WWFixedAsDWord angle2;
+    WWFixedAsDWord cosine1;
+    WWFixedAsDWord sine1;
+    WWFixedAsDWord cosine2;
+    WWFixedAsDWord sine2;
+    WWFixedAsDWord cosineMiddle;
+    WWFixedAsDWord sineMiddle;
+    SvgWriterU16 normalizedDifference;
+    SvgWriterU16 normalizedStart;
+    SvgWriterU16 normalizedEnd;
+    SvgWriterU16 normalizedMiddle;
+    SvgWriterU16 fullCircle;
+
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+
+    if (!SvgWriterNormalizeArcAngles(
+            (SvgWriterI16)startAngleDeg, (SvgWriterI16)endAngleDeg,
+            &normalizedStart, &normalizedEnd,
+            &normalizedDifference, &fullCircle))
+    {
+        return FALSE;
+    }
+    normalizedMiddle = (SvgWriterU16)((normalizedStart + 180) % 360);
+
+    angle1 = (WWFixedAsDWord)((sdword)normalizedStart * 65536L);
+    angle2 = (WWFixedAsDWord)((sdword)normalizedEnd * 65536L);
+    cosine1 = GrQuickCosine(angle1);
+    sine1 = GrQuickSine(angle1);
+    cosine2 = GrQuickCosine(angle2);
+    sine2 = GrQuickSine(angle2);
+    angle1 = (WWFixedAsDWord)((sdword)normalizedMiddle * 65536L);
+    cosineMiddle = GrQuickCosine(angle1);
+    sineMiddle = GrQuickSine(angle1);
+
+    arc.center.x = (SvgWriterFixed)centerX;
+    arc.center.y = (SvgWriterFixed)centerY;
+    arc.start.x = (SvgWriterFixed)(centerX +
+                  GrMulWWFixed(radiusX, cosine1));
+    arc.start.y = (SvgWriterFixed)(centerY -
+                  GrMulWWFixed(radiusY, sine1));
+    arc.end.x = (SvgWriterFixed)(centerX +
+                GrMulWWFixed(radiusX, cosine2));
+    arc.end.y = (SvgWriterFixed)(centerY -
+                GrMulWWFixed(radiusY, sine2));
+    arc.middle.x = (SvgWriterFixed)(centerX +
+                   GrMulWWFixed(radiusX, cosineMiddle));
+    arc.middle.y = (SvgWriterFixed)(centerY -
+                   GrMulWWFixed(radiusY, sineMiddle));
+    arc.radiusX = (SvgWriterFixed)radiusX;
+    arc.radiusY = (SvgWriterFixed)radiusY;
+    arc.largeArc = (normalizedDifference > 180);
+    arc.sweep = 0;
+    arc.closeType = SVG_WRITER_ARC_OPEN;
+    if (closeType == ACT_CHORD)
+    {
+        arc.closeType = SVG_WRITER_ARC_CHORD;
+    }
+    else if (closeType == ACT_PIE)
+    {
+        arc.closeType = SVG_WRITER_ARC_PIE;
+    }
+    arc.fullCircle = fullCircle;
+
+    SvgExportNormalizeStyle(context,
+                             (filled == FALSE),
+                             (filled != FALSE),
+                             filled,
+                             context->fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitArc(&context->writer, &arc, &style, &matrix) ?
+           TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePolygonBegin(SvgExportContext *context,
+                            Boolean closeShape)
+{
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+    return SvgWriterEmitPolygonBegin(&context->writer,
+                                  (closeShape != FALSE)) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePolygonPoint(SvgExportContext *context,
+                            const PointWWFixed *point)
+{
+    SvgWriterPoint normalizedPoint;
+
+    if ((context == (void*)0) || (point == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizePoint(point, &normalizedPoint);
+    return SvgWriterEmitPolygonPoint(&context->writer,
+                                  &normalizedPoint) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePolygonEnd(SvgExportContext *context,
+                          Boolean filled,
+                          RegionFillRule fillRule,
+                          const TransMatrix *tm)
+{
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+    SvgExportNormalizeStyle(context, (filled == FALSE),
+                             (filled != FALSE), filled, fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitPolygonEnd(&context->writer, &style,
+                                &matrix) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePathBegin(SvgExportContext *context)
+{
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+    return SvgWriterEmitPathBegin(&context->writer) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePathMove(SvgExportContext *context,
+                        const PointWWFixed *point)
+{
+    SvgWriterPoint normalizedPoint;
+
+    if ((context == (void*)0) || (point == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizePoint(point, &normalizedPoint);
+    return SvgWriterEmitPathMove(&context->writer,
+                              &normalizedPoint) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePathLine(SvgExportContext *context,
+                        const PointWWFixed *point)
+{
+    SvgWriterPoint normalizedPoint;
+
+    if ((context == (void*)0) || (point == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizePoint(point, &normalizedPoint);
+    return SvgWriterEmitPathLine(&context->writer,
+                              &normalizedPoint) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePathCubic(SvgExportContext *context,
+                         const PointWWFixed *control1,
+                         const PointWWFixed *control2,
+                         const PointWWFixed *end)
+{
+    SvgWriterPoint normalizedControl1;
+    SvgWriterPoint normalizedControl2;
+    SvgWriterPoint normalizedEnd;
+
+    if ((context == (void*)0) || (control1 == (void*)0) ||
+        (control2 == (void*)0) || (end == (void*)0))
+    {
+        return FALSE;
+    }
+    SvgExportNormalizePoint(control1, &normalizedControl1);
+    SvgExportNormalizePoint(control2, &normalizedControl2);
+    SvgExportNormalizePoint(end, &normalizedEnd);
+    return SvgWriterEmitPathCubic(&context->writer,
+                               &normalizedControl1,
+                               &normalizedControl2,
+                               &normalizedEnd) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePathClose(SvgExportContext *context)
+{
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+    return SvgWriterEmitPathClose(&context->writer) ? TRUE : FALSE;
+}
+
+Boolean _pascal
+SvgExportWritePathEnd(SvgExportContext *context,
+                       Boolean fillPath,
+                       Boolean strokePath,
+                       RegionFillRule fillRule,
+                       const TransMatrix *tm)
+{
+    SvgWriterStyle style;
+    SvgWriterMatrix matrix;
+
+    if (context == (void*)0)
+    {
+        return FALSE;
+    }
+    SvgExportNormalizeStyle(context, strokePath, fillPath, fillPath,
+                             fillRule, &style);
+    SvgExportNormalizeMatrix(tm, &matrix);
+    return SvgWriterEmitPathEnd(&context->writer, &style,
+                             &matrix) ? TRUE : FALSE;
+}
+
+WWFixedAsDWord _pascal
+SvgExportPackWWFixed(const WWFixed *value)
+{
+    dword packed;
+
+    if (value == (void*)0)
+    {
+        return 0;
+    }
+    packed = ((dword)(word)value->WWF_int << 16) |
+             (dword)value->WWF_frac;
+    return (WWFixedAsDWord)packed;
+}
+
+void _pascal
+SvgExportPointFromInt(const Point *sourcePoint,
+                       PointWWFixed *targetPoint)
+{
+    targetPoint->PF_x.WWF_int = sourcePoint->P_x;
+    targetPoint->PF_y.WWF_int = sourcePoint->P_y;
+    targetPoint->PF_x.WWF_frac = 0;
+    targetPoint->PF_y.WWF_frac = 0;
+}
+
+void _pascal
+SvgExportCopyPointWWFixed(PointWWFixed *destination,
+                           const PointWWFixed *source)
+{
+    destination->PF_x.WWF_int = source->PF_x.WWF_int;
+    destination->PF_x.WWF_frac = source->PF_x.WWF_frac;
+    destination->PF_y.WWF_int = source->PF_y.WWF_int;
+    destination->PF_y.WWF_frac = source->PF_y.WWF_frac;
+}
+static Boolean
+SvgExportPathPointsEqual(const PointWWFixed *a, const PointWWFixed *b)
+{
+    if ((a == NULL) || (b == NULL))
+        return FALSE;
+    if ((a->PF_x.WWF_int != b->PF_x.WWF_int) ||
+        (a->PF_x.WWF_frac != b->PF_x.WWF_frac))
+    {
+        return FALSE;
+    }
+    if ((a->PF_y.WWF_int != b->PF_y.WWF_int) ||
+        (a->PF_y.WWF_frac != b->PF_y.WWF_frac))
+    {
+        return FALSE;
+    }
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportPathBuilderMoveTo(SvgExportContext *context,
+                                    SvgExportPathBuilder *builder,
+                                    const PointWWFixed *point)
+{
+    if ((context == (void*)0) || (builder == (void*)0) ||
+        (point == (void*)0))
+    {
+        return FALSE;
+    }
+    if ((builder->hasData == FALSE) &&
+        !SvgExportWritePathBegin(context))
+    {
+        return FALSE;
+    }
+    if (!SvgExportWritePathMove(context, point))
+    {
+        return FALSE;
+    }
+    builder->subpathOpen = TRUE;
+    builder->hasData = TRUE;
+    SvgExportCopyPointWWFixed(&builder->lastPoint, point);
+    SvgExportCopyPointWWFixed(&builder->subpathStart, point);
+    return TRUE;
+}
+
+static Boolean
+SvgExportPathBuilderEnsureSubpath(SvgExportContext *context,
+                                           SvgExportPathBuilder *builder,
+                                           const PointWWFixed *point)
+{
+    if (builder->subpathOpen == FALSE)
+    {
+        return SvgExportPathBuilderMoveTo(context, builder, point);
+    }
+    if (!SvgExportPathPointsEqual(&builder->lastPoint, point))
+    {
+        return SvgExportPathBuilderMoveTo(context, builder, point);
+    }
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportPathBuilderLineTo(SvgExportContext *context,
+                                    SvgExportPathBuilder *builder,
+                                    const PointWWFixed *startPoint,
+                                    const PointWWFixed *endPoint)
+{
+    if (!SvgExportPathBuilderEnsureSubpath(context, builder,
+                                            startPoint))
+    {
+        return FALSE;
+    }
+    if (!SvgExportWritePathLine(context, endPoint))
+    {
+        return FALSE;
+    }
+    builder->hasData = TRUE;
+    SvgExportCopyPointWWFixed(&builder->lastPoint, endPoint);
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportPathBuilderCurveTo(SvgExportContext *context,
+                                     SvgExportPathBuilder *builder,
+                                     const PointWWFixed *startPoint,
+                                     const PointWWFixed *cp1,
+                                     const PointWWFixed *cp2,
+                                     const PointWWFixed *endPoint)
+{
+    if (!SvgExportPathBuilderEnsureSubpath(context, builder,
+                                            startPoint))
+    {
+        return FALSE;
+    }
+    if (!SvgExportWritePathCubic(context, cp1, cp2, endPoint))
+    {
+        return FALSE;
+    }
+    builder->hasData = TRUE;
+    SvgExportCopyPointWWFixed(&builder->lastPoint, endPoint);
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportPathBuilderClose(SvgExportContext *context,
+                                   SvgExportPathBuilder *builder)
+{
+    if ((context == (void*)0) || (builder == (void*)0) ||
+        (builder->subpathOpen == FALSE))
+    {
+        return TRUE;
+    }
+    if (!SvgExportWritePathClose(context))
+    {
+        return FALSE;
+    }
+    builder->subpathOpen = FALSE;
+    builder->hasData = TRUE;
+    SvgExportCopyPointWWFixed(&builder->lastPoint,
+                               &builder->subpathStart);
+    return TRUE;
+}

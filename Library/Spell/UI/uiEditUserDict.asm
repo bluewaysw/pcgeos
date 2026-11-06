@@ -914,6 +914,8 @@ exit:
 	.leave
 	ret
 errorDelete:
+	cmp	ax, IC_RET_ERR
+	je	exit			; OpenSpell already reported SP-11.
 	mov	bx, offset SpellUserDictDeleteGenericString
 	mov	ax, (CDT_ERROR shl offset CDBF_DIALOG_TYPE or GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE or mask CDBF_SYSTEM_MODAL)
 	call	SpellPutupBox
@@ -1156,6 +1158,8 @@ exit:
 
 
 noAddError:
+	cmp	dx, UR_SER
+	je	exit			; OpenSpell already reported SP-11.
 
 ;	IF WE COULDN'T ADD THE WORD TO THE USER DICTIONARY, JUST IGNORE IT AND
 ;	INFORM THE USER.

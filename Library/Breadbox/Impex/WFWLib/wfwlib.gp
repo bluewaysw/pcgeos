@@ -17,10 +17,9 @@
 
 name wfwlib.lib
 
-longname "Breadbox Word 8 Core Library"
+longname "Word 8 Core Library"
 tokenchars "WFWL"
 tokenid 16431
-usernotes "Copyright 1994-2002  Breadbox Computer Company LLC  All Rights Reserved"
 
 type    library, single
 

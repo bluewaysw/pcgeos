@@ -1,0 +1,57 @@
+@include <stdapp.goh>
+@include <impex.goh>
+
+#include <geos.h>
+#include <svgLib.h>
+
+Boolean _pascal
+SvgAdapterProgress(word percent)
+{
+    return !ImpexUpdateImportExportStatus((char *)0, percent);
+}
+
+dword _export _pascal
+SvgAdapterImport(ImportFrame *frameP, VMChain *resultChainP)
+{
+    TransError status;
+
+    if (resultChainP != (void *)0)
+    {
+        *resultChainP = 0;
+    }
+    if (frameP == (void *)0 || resultChainP == (void *)0 ||
+        frameP->IF_formatNumber != 0)
+    {
+        return TE_INVALID_FORMAT;
+    }
+    ImpexUpdateImportExportStatus("File is being converted", -1);
+    status = SvgImport(frameP->IF_sourceFile, frameP->IF_transferVMFile,
+                       resultChainP, (RectDWord *)0, SvgAdapterProgress,
+                       (void*)0);
+    if (status != TE_NO_ERROR)
+    {
+        return status;
+    }
+    return ((dword)CIF_GRAPHICS_STRING << 16) | TE_NO_ERROR;
+}
+
+dword _export _pascal
+SvgAdapterExport(ExportFrame *frameP)
+{
+    if (frameP == (void *)0 || frameP->EF_formatNumber != 0)
+    {
+        return TE_EXPORT_NOT_SUPPORTED;
+    }
+    if (frameP->EF_clipboardFormat != CIF_GRAPHICS_STRING)
+    {
+        return TE_EXPORT_INVALID_CLIPBOARD_FORMAT;
+    }
+    return SvgExport(frameP->EF_outputFile, frameP->EF_transferVMFile,
+                     frameP->EF_transferVMChain);
+}
+
+sword _export _pascal
+SvgAdapterGetFormat(FileHandle sourceFile)
+{
+    return SvgCheckHeader(sourceFile) ? 0 : NO_IDEA_FORMAT;
+}

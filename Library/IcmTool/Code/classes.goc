@@ -1,0 +1,964 @@
+/***********************************************************************
+ *
+ * PROJECT:	Icon Editor and more Tool Library
+ * FILE:	classes.goc
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/12/2026	Initial revision
+ *
+ *
+ * DESCRIPTION:	Implementation of:
+ *	Classes:
+ *		  WordValueClass	-- Enter word-sized value
+ *		  SeparationLineClass	-- Draw a thin colored line in the UI
+ *		  SmartTextClass	-- Intelligent text class
+ *		  PaletteColorItemGroupClass -- Able to create colored
+ *						vis-monikers for its children.
+ *
+ *	Common routines:
+ *		  ITDrawFullPalette 	-- Draw a palette as colored squares
+ *		  ITPaletteIndexFromMousePos -- Find palette index for a palette,
+ *		  				drawn with ITDrawFullPalette()
+ *
+ *		  ITGetHSV8BitFromColor -- Convert RGB values to HSV
+ *		  ITGetColorFromHSV8Bit	-- Convert HSV values to RGB
+ *
+ *	Specialized routines:
+ *		  ITWriteIconAsm 	-- Write VisMoniker data as ui-code to a file
+ *		  ITWriteIconGOC 	-- Write VisMoniker data as GOC code to a file
+ *		  ITWritePtrAsm 	-- Write the .ui source code for a mouse pointer to a file
+ *		  ITWritePtrGOC 	-- Write the GOC source code for a mouse pointer to a file
+ *
+ * CONCEPT:
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "icmtool.goh"
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	CODE for WordValueClass				            	    +
+  +	-----------------------				            	    +
+  +	Simple implementation to display word-sized values in the range	    +
+  +	from 0 to 65535. No decimal places etc. are supported.		    +
+  +	Only the lower part of the dword-sized GVLI_value instance 	    +
+  +	variable is used.						    +
+  +									    +
+  +	Use MSG_GEN_VALUE_GET_VALUE to get the word value		    +
+  +	Use MSG_GEN_VALUE_SET_VALUE to set the word value		    +
+  +	Do not use the _INTEGER_ messages for this purpose.		    +
+  +                                                                         +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl WordValueClass;
+
+
+/*      MSG_GEN_VALUE_GET_VALUE_TEXT
+ *      Converts a instance field value to a text string
+ *      Parameter:      void ( char *buffer, GenValueType   valueType)
+ */
+
+@method WordValueClass, MSG_GEN_VALUE_GET_VALUE_TEXT {
+word    val;
+@callsuper();
+
+    	/* read requested instance field*/
+	switch (valueType) {
+		case GVT_VALUE: val = (pself->GVLI_value);
+						break;
+		case GVT_MINIMUM:       val = (pself->GVLI_minimum);
+						break;
+		case GVT_MAXIMUM:       val = (pself->GVLI_maximum);
+						break;
+		case GVT_INCREMENT:     val = (pself->GVLI_increment);
+						break;
+		case GVT_LONG:          val = 65000 ;
+						break;
+		default:        val = 65001;
+		}
+	/* Convert to text */
+	sprintf(buffer,"%u",val);
+}
+
+/*      MSG_GEN_VALUE_SET_VALUE_FROM_TEXT
+ *      Sets an instance field to a textually specified value
+ *      Parameter:      void (char *text, GenValueType valueType )
+ */
+@method WordValueClass, MSG_GEN_VALUE_SET_VALUE_FROM_TEXT {
+dword   erg;
+
+    /* convert text */
+    erg =0;
+    while ( *text != 0 ) {
+	if ( *text == '-' )     {
+		@send oself::MSG_GEN_VALUE_SET_VALUE_TO_MINIMUM();
+		erg = 0;                /* Minimum */
+		break;
+	}
+
+    // erg = erg*10; <<-- forces ansic protocol 1.008 which is not supported by
+    // earlier PC/GEOS versions (4.13 e.g) --> platform statemet required
+    erg = (erg<<3) + (erg<<1);	// avoids platform statement
+    erg += (dword)(*text - '0');
+    text++;
+    }
+    if ( erg > 0xFFFF ) {
+	@send oself::MSG_GEN_VALUE_SET_VALUE_TO_MAXIMUM();
+	    erg = 0xFFFF;
+    }
+
+    /* set instance field */
+    switch (valueType) {
+	case GVT_VALUE:
+	    @call oself::MSG_GEN_VALUE_SET_VALUE((dword)erg, FALSE);
+	    break;
+
+	case GVT_MINIMUM:
+	    @call oself::MSG_GEN_VALUE_SET_MINIMUM((dword)erg);
+	    break;
+
+	case GVT_MAXIMUM:
+	    @call oself::MSG_GEN_VALUE_SET_MAXIMUM((dword)erg);
+	    break;
+
+	case GVT_INCREMENT:
+	    @call oself::MSG_GEN_VALUE_SET_INCREMENT((dword)erg);
+	    break;
+    }
+
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	CODE for SeparationLineClass				            	    +
+  +
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl SeparationLineClass;
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *	Purpose:	Draw the line
+ ---------------------------------------------------------------------------*/
+@method SeparationLineClass, MSG_VIS_DRAW {
+Rectangle bounds;
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+    GrSetAreaColor(gstate,CF_INDEX,pself->SLI_color,0,0);
+    GrFillRect(gstate, bounds.R_left, bounds.R_top, bounds.R_right, bounds.R_bottom-1);
+}
+
+/*--------------------- MSG_SL_SET_COLOR ---------------------
+ *	Purpose:	Set pself->SLI_color value
+ ---------------------------------------------------------------------------*/
+@method SeparationLineClass, MSG_SL_SET_COLOR {
+	pself->SLI_color = color;
+	@call oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}
+
+/*--------------------- MSG_SL_GET_COLOR ---------------------
+ *	Purpose:	Return pself->SLI_color value
+ ---------------------------------------------------------------------------*/
+@method SeparationLineClass, MSG_SL_GET_COLOR {
+	return pself->SLI_color;
+}
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  +                                                                         +
+  +	CODE for SmartTextClass				            	    +
+  +	- monitor empty state and enable/disable an object if text is empty or not
+  +	- handle clipboard operations
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl SmartTextClass;
+
+/*--------------------- MSG_META_TEXT_EMPTY_STATUS_CHANGED ---------------------
+ *  Purpose:	Enable an object (Trigger) if the objects text is not empty
+ *  Context:
+ *  Strategy:
+ *  Parameters: void (optr object = cx:dx, Boolean hasTextFlag = bp);
+  *	Pass:	optr - text object
+  *		hasTextFlag - TRUE if text is becoming non-empty
+  *	Return:	none
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_META_TEXT_EMPTY_STATUS_CHANGED {
+
+    if ( pself->STI_enableObj ) {
+    	if (hasTextFlag) {
+    	    @send pself->STI_enableObj::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	} else {
+    	    @send pself->STI_enableObj::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	}
+    }
+
+    @callsuper();
+
+}
+
+/*--------------------- MSG_META_KBD_CHAR ---------------------
+ *  Purpose:	The user has entered a letter or control sequence
+ *		- Handle clipboard operations
+ *		- Inform another object, specified in STI_textChangeOutput
+ *  Context:
+ *  Strategy:
+ *  Parameters: void ( word character, word flags, word state )
+ *	character:	Low byte:  ASCII code (if high byte = 0)
+ *				   Control code  (if high byte = 0xFF)
+ *	flags:		High byte: ShiftState 	SS_xxxx
+ *			Low byte: CharFlags	CF_xxxx
+ *			   e.g. CF_FIST_PRESS , CF_RELEASE
+ *	state:		High byte: Scancode
+ *			Low byte: ToggleState
+ *			   TS_CAPSLOCK | TS_NUMLOCK | TS_SCROLLLOCK
+ *	Return:	-
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_META_KBD_CHAR {
+int len;
+
+
+    len = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE();		/* remember original text len */
+    @callsuper();
+
+    /*
+     * see if Ctrl-key + C, X or V is pressed for first time
+     * if yes, record a clipboard event and send it to the
+     * focus text object
+     */
+    do {
+      if ( (flags & 0x0F) != CF_FIRST_PRESS ) break;
+      if ( ( ((flags & 0xFF00)>>8) & (SS_LCTRL | SS_RCTRL)) == 0 ) break;
+
+      switch ( character ) {
+      case 'c':
+      	@send oself::MSG_META_CLIPBOARD_COPY();
+      	break;
+      case 'v':
+      	@send oself::MSG_META_CLIPBOARD_PASTE();
+      	len = -1;					// why? see blow.
+      	break;
+      case 'x':
+      	@send oself::MSG_META_CLIPBOARD_CUT();
+      	break;
+      }
+    } while (FALSE);
+
+    /*
+     * Inform STI_textChangeOutput object that the User has entered anything
+     */
+    if (!(pself->STI_textChangeOutput) ) return;
+    if (!(pself->STI_textChangeMsg) ) return;
+
+    if ( (flags & 0x0F) != CF_FIRST_PRESS ) return;
+    if ( (flags & 0xFF00) != 0 ) {
+    	/* ignore any control character (like single Ctrl key, cursor key etc.
+    	 * with the exception of characters that have changed the len of the text,
+    	 * like Backspace or Del
+    	 * Because Ctrl-V may not change the len in some cases, we have set the len to
+    	 * (-1) for the paste operation above. This marks the len as changed in
+    	 * every case and therefore forces sending the change message.
+    	 */
+    	if ( len == @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE() ) return;
+    }
+
+    @send pself->STI_textChangeOutput::{SMART_TEXT_CHANGE_MSG} (pself->STI_textChangeMsg)();
+
+}
+
+/*--------------------- GetNumSelectedCharacters ---------------------
+ *  Purpose:	Check if text is empty. Do not copy empty text to clipboard.
+ *		This would overwrite existing clipboard data.
+ ---------------------------------------------------------------------------*/
+Boolean GetNumSelectedCharacters(optr textObj) {
+VisTextRange	vtr;
+      @call textObj::MSG_VIS_TEXT_GET_SELECTION_RANGE(&vtr);
+      return vtr.VTR_end - vtr.VTR_start;
+}
+
+/*--------------------- MSG_META_CLIPBOARD_COPY ---------------------
+ *  Purpose:	The user has pressed Ctrl-V
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_META_CLIPBOARD_COPY {
+    if ( 0 == GetNumSelectedCharacters(oself) ) return;
+    @callsuper();
+}
+
+/*--------------------- MSG_META_CLIPBOARD_CUT ---------------------
+ *  Purpose:	The user has pressed Ctrl-X
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_META_CLIPBOARD_CUT {
+    if ( 0 == GetNumSelectedCharacters(oself) ) return;
+    @callsuper();
+}
+
+/*--------------------- MSG_STXT_SET_ENABLE_OBJECT ---------------------
+ *   Purpose:	Set STI_enableObj value
+ *		The new object is enabled or disabled accordingly.
+ *        	The old object (if any) remains unaffected.
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_STXT_SET_ENABLE_OBJECT {
+int len;
+
+    pself->STI_enableObj = obj;
+
+    if ( pself->STI_enableObj ) {
+    	len = @call oself::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    	if (len) {
+    	    @send pself->STI_enableObj::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	} else {
+    	    @send pself->STI_enableObj::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	}
+    }
+
+
+}
+/*--------------------- MSG_STXT_GET_ENABLE_OBJECT ---------------------
+ *   Purpose:	Get STI_enableObj value
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_STXT_GET_ENABLE_OBJECT {
+	return pself->STI_enableObj;
+}
+
+/*--------------------- MSG_STXT_SET_TEXT_CHANGE_OUTPUT_OBJECT ---------------------
+ *   Purpose:	Set STI_textChangeOutput object
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_STXT_SET_TEXT_CHANGE_OUTPUT_OBJECT {
+	pself->STI_textChangeOutput = obj;
+}
+
+/*--------------------- MSG_STXT_GET_TEXT_CHANGE_OUTPUT_OBJECT ---------------------
+ *   Purpose:	Get STI_textChangeOutput object
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_STXT_GET_TEXT_CHANGE_OUTPUT_OBJECT {
+	return pself->STI_textChangeOutput;
+}
+
+/*--------------------- MSG_STXT_SET_TEXT_CHANGE_OUTPUT_MSG ---------------------
+ *   Purpose:	Set STI_textChangeMsg value
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_STXT_SET_TEXT_CHANGE_OUTPUT_MSG {
+	pself->STI_textChangeMsg = msg;
+}
+/*--------------------- MSG_STXT_GET_TEXT_CHANGE_OUTPUT_MSG ---------------------
+ *   Purpose:	Get STI_textChangeMsg value
+ ---------------------------------------------------------------------------*/
+@method SmartTextClass, MSG_STXT_GET_TEXT_CHANGE_OUTPUT_MSG {
+	return pself->STI_textChangeMsg;
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ +
+ +	PaletteColorItemGroupClass
+ +
+ +	This class can create colored vis-monikers for its children.
+ +
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl PaletteColorItemGroupClass;
+
+/*--------------------- MSG_PCIG_CREATE_VIS_MONIKERS ---------------------
+ *  Purpose:	Set new visMoniker for all of the children. These are
+ 	areas, lines, ellipses (or circles) or a short text whose color depends
+ 	on the current palette. The identifier of the item is used as
+ 	palette index.
+ 	The items will be resized according to the parameters w and h.
+ *  Context:
+ *  Strategy:
+ *	- find palette pointer if none is passed
+ *	- allocate an LMem block to hold a GString
+ *	- for every child
+ *	  + create a gstring to hold the moniker
+ *	  + set line/area color corresponding to the position of the child
+ *	    The identifier of the child is used as palette index
+ *	  + draw a line, an area or a text respectively
+ *	  + replace the moniker for the child
+ *	  + destroy the gstring
+ *	- free memory block
+ *  Parameters:	type: create a line or an area moniker
+ *		w, h: new width and height of the items
+ *		palPtr: pointer to the palette (a list of PaletteEntries)
+ *			pass zero to use the GEOS standard palette
+ *  Return: -
+ ---------------------------------------------------------------------------*/
+@method PaletteColorItemGroupClass, MSG_PCIG_CREATE_VIS_MONIKERS {
+int count, n, a, x, y, idx;
+optr child;
+ChunkHandle ch;
+MemHandle   mh;
+GStateHandle gstate;
+//PaletteEntry  *palette;
+Rectangle    bounds;
+
+    /*
+     * Note: it would be possible to set up valid palette here. This would avoid color
+     * setup inside of the loop (below). But this would require a call to
+     * BTLockGEOSStandardPalette() which makes our library depend on the bitmap tool lib.
+     * /
+
+    /*
+     * allocate a memory block
+     */
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+
+    /*
+     * set a as the size of the square that best fits the item
+     */
+    a = w;
+    if ( h < w ) a = h;
+
+    /*
+     * loop over all children: find optr, read identifier, create and set moniker
+     */
+    count = @call oself::MSG_GEN_COUNT_CHILDREN();
+    for ( n = 0; n < count; n++ ) {
+	/*
+	 * create a gstring and set its bounds
+	 */
+        child = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(n);
+        idx = @call child::MSG_GEN_ITEM_GET_IDENTIFIER();
+	gstate = GrCreateGString(mh, GST_CHUNK, (word*)&ch);
+	GrSetGStringBounds(gstate, 0, 0, w, h);
+
+	/*
+	 * Set up colors. To make code simple, we set up both, line color and
+	 * area color here. If palPtr is zero, use the Geos Standard colors.
+	 */
+	if (palPtr) {
+	    GrSetLineColor(gstate, CF_RGB, palPtr[idx].rt, palPtr[idx].gn, palPtr[idx].bl);
+	    GrSetAreaColor(gstate, CF_RGB, palPtr[idx].rt, palPtr[idx].gn, palPtr[idx].bl);
+	} else {
+	    GrSetLineColor(gstate, CF_INDEX, idx, 0, 0);
+	    GrSetAreaColor(gstate, CF_INDEX, idx, 0, 0);
+	}
+
+	/*
+	 * draw moniker graphic
+	 */
+	switch (type) {
+	case PCIG_MONIKER_LINE:
+		GrSetLineWidth(gstate,	MakeWWFixed(5));
+		GrDrawLine(gstate, 2, 2, w-3, h-3);
+		break;
+
+	case PCIG_MONIKER_LINE_45:
+		GrSetLineWidth(gstate,	MakeWWFixed(5));
+		x = (w-a)/2 + 2;
+		y = (h-a)/2 + 2;
+		GrDrawLine(gstate, x, y, x + a-3, y + a-3);
+		break;
+
+	case PCIG_MONIKER_AREA:
+		GrFillRect(gstate, 0, 0, w, h);
+		break;
+
+	case PCIG_MONIKER_SQUARE:
+		x = (w-a)/2;
+		y = (h-a)/2;
+		GrFillRect(gstate, x, y, x + a, y + a);
+		break;
+
+	case PCIG_MONIKER_ELLIPSE:
+		GrFillEllipse(gstate, 0, 0, w, h);
+		break;
+
+	case PCIG_MONIKER_CIRCLE:
+		x = (w-a)/2;
+		y = (h-a)/2;
+		GrFillEllipse(gstate, x, y, x + a, y + a);
+		break;
+
+	case PCIG_MONIKER_TEXT:
+		GrSetFont (gstate, FID_DTC_URW_SANS, MakeWWFixed((a-2)));
+		GrSetTextStyle (gstate, TS_BOLD, 0);
+
+		GrGetTextBounds(gstate, "Tt", 0, 0, 0, &bounds);
+		x = (w-(bounds.R_right-bounds.R_left))/2 - bounds.R_left - 1;	/* why -1? dunno, looks better */
+		y = (h-(bounds.R_bottom-bounds.R_top))/2 - bounds.R_top;
+		GrDrawText(gstate, x, y, "Tt", 0);
+	break;
+
+	default: 	/* this is usually an error. Draw some visible stuff. */
+		GrDrawRect(gstate, 0, 0, w-1, h-1);
+
+	}
+	GrEndGString(gstate);
+
+	/*
+	 * replace moniker and free gstring
+	 * to ensure that the item is resized if the new size is smaller than
+	 * the old one, we have to set a fixed-size hint.
+	 */
+	@call child::MSG_GEN_REPLACE_VIS_MONIKER( VUM_DELAYED_VIA_APP_QUEUE,
+					h, w, 0,	/* height, width, length */
+					VMDT_GSTRING,	/* VisMonikerDataType	dataType, */
+					VMST_OPTR,	/* VisMonikerSourceType	sourceType, */
+					ConstructOptr(mh, ch) );	/* source */
+
+        @call child::MSG_GEN_SET_FIXED_SIZE(VUM_NOW, 1, h, w);
+	GrDestroyGString(gstate, 0, GSKT_KILL_DATA);
+
+    }
+
+    /*
+     * clean up
+     */
+    MemFree(mh);
+
+}
+
+
+/*===========================================================================
+	Drawing routines to display a 256 color palette
+ ===========================================================================*/
+
+
+/*--------------------- DrawPaletteItemFrame ---------------------
+ *  Purpose:	Draw a inverted frame around a color item
+ ---------------------------------------------------------------------------*/
+void DrawPaletteItemFrame(GStateHandle gstate, int x0, int y0, int x1, int y1) {
+    GrSaveState(gstate);
+    GrSetMixMode(gstate, MM_INVERT);
+    //GrDrawRect(gstate, x0, y0, x1, y1);
+    GrDrawLine(gstate, x0, y0, x1, y0);
+    GrDrawLine(gstate, x0, y0, x0, y1);
+    GrRestoreState(gstate);
+}
+
+/*--------------------- DrawPaletteItemHighlight ---------------------
+ *  Purpose:	Highlight a color item
+ *  Strategy: 	Draw white and a black rectangle inside
+ ---------------------------------------------------------------------------*/
+void DrawPaletteItemHighlight(GStateHandle gstate, int x0, int y0, int x1, int y1) {
+    GrSaveState(gstate);
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawRect(gstate, x0+2, y0+2, x1-2, y1-2);
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrDrawRect(gstate, x0+3, y0+3, x1-3, y1-3);
+    GrRestoreState(gstate);
+}
+
+/*--------------------- ITDrawFullPalette ---------------------
+ *	Purpose:	Draw the colors of a palette with (up to) 256 colors.
+ *	Concept:	The colors are drawn as two blocks of squares:
+ *			First 16 colors are drawn centered on top, the next 240 colors
+ *			are drawn as a 24x10 block below.
+ *			Between the blocks is a space of bottomBlockSize/2 height.
+ *
+ *	Parameters:	gstate:	 GState to draw to
+ *			palette: Palette (pointer to an list of PaletteEntry values)
+ *			numColors: number of valid entries in the palette, usually 16
+ *				   or 256, but other values are allowed too.
+ *				   colors with a greater index were drawn in gray.
+ *		        highlightIndex: highlight this palette index
+ *			topBlockSize:   size of the squares for the first 16 colors
+ *			bottomBlockSize:size of the squares for the other 240 colors
+ *			marginSize:     space around all blocks
+ *
+ *	Drawing positions:
+ *			The left upper corner of the top block is drawn at
+ *			  x0 = (bottomBlockWidth - 16*topBlockSize)/2;
+ *			       where bottomBlockWidth = 24*bottomBlockSize + 2*marginSize;
+ *			  y0 = marginSize;
+ *			The right bottom corner is at
+ *			  x1 = x0 + 16*topBlockSize
+ *			  y1 = y0 + topBlockSize
+ *
+ *			The left upper corner of the bottom block is drawn at
+ *			  x0 = marginSize;
+ *			  y0 = topBlockSize + bottomBlockSize/2 + marginSize;
+ *			The right bottom corner is at
+ *			  x1 = x0 + 24*bottomBlockSize
+ *			  y1 = y0 + 10*bottomBlockSize
+ *
+ *	Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITDrawFullPalette(GStateHandle gstate, PaletteEntry *palette, int numColors, int highlightIndex,
+				int topBlockSize, int bottomBlockSize, int marginSize) {
+int x, y, x0, y0, b, i;
+int bottomBlockWidth;
+
+
+    GrSaveState(gstate);
+
+    bottomBlockWidth = 24*bottomBlockSize + 2*marginSize;
+
+    /*
+     * On top there are the first 16 colors.
+     * The whole area is 24 block with.
+     */
+    b = topBlockSize;
+    x0 = (bottomBlockWidth - 16*topBlockSize)/2;
+    y0 = marginSize;
+    i = 0;
+    for ( x = 0; x < 16; x++ ) {
+    	if ( i < numColors ) {
+	    GrSetAreaColor (gstate, CF_RGB, palette[i].rt,
+			   palette[i].gn, palette[i].bl);
+	} else { GrSetAreaColor(gstate, CF_RGB, 0x80, 0x80, 0x80); }
+	GrFillRect(gstate, x0, y0, x0+b, y0+b);
+	DrawPaletteItemFrame(gstate, x0, y0, x0+b, y0+b);
+
+	if (i == highlightIndex) {
+	    DrawPaletteItemHighlight(gstate, x0, y0, x0+b, y0+b);
+	}
+
+	i++;
+	x0 += b;
+    }
+
+    /*
+     * The main block contains 24x10 colors
+     */
+
+    x0 = marginSize;
+    y0 = topBlockSize + bottomBlockSize/2 + marginSize;
+    b = bottomBlockSize;
+    for ( y = 0; y < 10; y++ ) {
+    	for ( x = 0; x < 24; x++ ) {
+    	    if ( i < numColors ) {
+	    	GrSetAreaColor (gstate, CF_RGB, palette[i].rt,
+			   palette[i].gn, palette[i].bl);
+	    } else { GrSetAreaColor(gstate, CF_RGB, 0x80, 0x80, 0x80); }
+    	    GrFillRect(gstate, x0, y0, x0+b, y0+b);
+    	    DrawPaletteItemFrame(gstate, x0, y0, x0+b, y0+b);
+
+	    if (i == highlightIndex) {
+		DrawPaletteItemHighlight(gstate, x0, y0, x0+b, y0+b);
+	    }
+
+	    i++;
+    	    x0 += b;
+      	}
+    	x0 = marginSize;
+    	y0 += b;
+    }
+
+
+    /*
+     * Interesting hack: because DrawPaletteItemFrame() only draws the left and the
+     * upper lines (to avoid flickering) we must draw the upper and right
+     * border color of both groups now. We use the color black for that.
+     */
+    GrSetLineColor (gstate, CF_INDEX, C_BLACK, 0, 0);
+
+    x0 = (bottomBlockWidth - 16*topBlockSize)/2;
+    y0 = marginSize;
+    GrDrawHLine(gstate,x0, y0 + topBlockSize, x0 + 16*topBlockSize);
+    GrDrawVLine(gstate,x0 + 16*topBlockSize, y0, y0 + topBlockSize);
+
+    x0 = marginSize;
+    y0 = topBlockSize + bottomBlockSize/2 + marginSize;
+    GrDrawHLine(gstate,x0, y0 + 10*bottomBlockSize, x0 + 24*bottomBlockSize);
+    GrDrawVLine(gstate,x0 + 24*bottomBlockSize, y0, y0 + 10*bottomBlockSize);
+
+    /*
+     * clean up
+     */
+    GrRestoreState(gstate);
+
+}
+
+/*--------------------- ITPaletteIndexFromMousePos ---------------------
+ *  Purpose:	This routine works together with ITDrawFullPalette():
+ *		It translate the mouse coordinates to an index for the case
+ *		that the palette has been drawn with ITDrawFullPalette()
+ *  Context:
+ *  Strategy:
+ *	- There are two blocks width colored squares
+ *	  On top there are the first 16 colors.
+ *	  The main block contains 24x10 colors
+ * 	  The whole area is 24 block with.
+ *	- Check if the mouse is in the upper or the bottom block
+ *	- Check if the mouse is outside of the borders of the block
+ *	- calucate index
+ *  Parameters:	xPosition, yPosition: mouse position
+ *	The next parameters must fit to the same parameters, given to ITDrawFullPalette:
+ *		topBlockSize:   size of the squares for the first 16 colors
+ *		bottomBlockSize:size of the squares for the other 240 colors
+ *		marginSize:     space around all blocks
+ *  Return:	index of the color at the mouse coordinates
+ *		(-1) if there was no colored square at the mouse coordinates
+ ---------------------------------------------------------------------------*/
+extern int RS_EXPORT ITPaletteIndexFromMousePos(int xPosition, int yPosition, int topBlockSize,
+					int bottomBlockSize, int marginSize) {
+int index;
+int x0, y0, x1, y1;
+
+
+    index = -1;	/* user may click outside of the color squares */
+    do { 	/* break if index found */
+
+   // y0: border between top and bottom block
+	y0 = topBlockSize + marginSize;
+	if ( yPosition <= y0 ) {
+
+   // we are in the upper block (16 colors)
+	    x0 = (24*bottomBlockSize + 2*marginSize - 16*topBlockSize)/2;
+	    y0 = marginSize;
+	    x1 = x0 + 16*topBlockSize;
+	    y1 = y0 + topBlockSize;
+
+    // check borders
+	    if ( xPosition < x0 ) break;
+	    if ( xPosition >= x1 ) break;
+	    if ( yPosition < y0 ) break;
+	    if ( yPosition >= y1 ) break;
+
+    // calculate index
+	    index = (xPosition - x0)/topBlockSize;
+	} else {
+
+   // we are in the bootom block (10x24 colors)
+	    x0 = marginSize;
+	    y0 = marginSize + topBlockSize + bottomBlockSize/2;
+	    x1 = x0 + 24*bottomBlockSize;
+	    y1 = y0 + 10*bottomBlockSize;
+
+    // check borders
+	    if ( xPosition < x0 ) break;
+	    if ( xPosition >= x1 ) break;
+	    if ( yPosition < y0 ) break;
+	    if ( yPosition >= y1 ) break;
+
+    // calculate index
+	    xPosition -= x0;
+	    yPosition -= y0;
+
+	    index = 16 + 24*(yPosition/bottomBlockSize) + xPosition/bottomBlockSize;
+	}
+
+    } while(FALSE);
+
+    return index;
+}
+
+
+/*===========================================================================
+	Conversion RGB <-> HSV
+ ===========================================================================*/
+
+/*--------------------- ITGetHSV8BitFromColor ------------------------------------------------------
+ *  Purpose:	Convert RGB values to HSV - HSV as 8-bit integer value
+ *  Context:	Algorithm from: Introduction to Computer Graphics by James Foley
+ *		German: "Grundlagen der Computergraphik", S. 467ff
+ *		It can also be found all over the web.
+ *  Strategy:
+ *	Typically, the value for h ranges from 0° to 360°, where 0° and 360° are identical.
+ *	However, our value range is 0 to 256, where 256 corresponds to zero. Similarly,
+ *	s and v typically range from 0 to 1, but in our case they range from zero to 255.
+ *	The algorithm has been adjusted accordingly and implemented completely using integer arithmetic.
+ *	The routine has been runtime optimized.
+ *  Note:
+ *	Repeatedly converting back and forth between RGB and HSV may result in different values
+ *	because the precision of the input and output values is limited to 8 bits, which leads to
+ *	rounding errors.
+ *  Parameters:	h_ptr:	return: hue value		(0 ... 255)
+ *		s_ptr:	return: saturation value	(0 ... 255)
+ *		v_ptr:	return: brightness value	(0 ... 255)
+ *		color:	Color to convert		(PaletteEntry)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITGetHSV8BitFromColor(word *h_ptr, word *s_ptr, word *v_ptr, PaletteEntry color ) {
+word	min_v, max_v, delta;
+int	r, g, b, h, s, v, x;
+sdword 	a;
+
+   r = color.rt;
+   g = color.gn;
+   b = color.bl;
+
+   /*
+    * - find min. and max. values. Note that the macros min() and max() are slower.
+    * - calculate delta value
+    */
+   if (r > g) max_v = r;
+	 else max_v = g;
+   if (b > max_v ) max_v = b;
+
+   if (r < g ) min_v = r;
+	  else min_v = g;
+   if ( b < min_v ) min_v = b;
+
+   delta = max_v - min_v;
+
+   /*
+    * Brightness v is equal to max value
+    */
+   v = max_v;
+
+   /*
+    * calculate saturation s
+    */
+   if ( max_v == 0 ) {
+   	s = 0;
+   } else {
+   	/*
+   	 * s = delta/max_v * 255
+   	 * delta can be up to 255  -> 255*delta cannot break the word limit.
+   	 * We add max_v/2 to round the value s (this is safe too)
+   	 */
+   	s = ( delta * 255 + (max_v>>1)) / max_v;
+   }
+
+   /*
+    * calculate hue h.
+    */
+   if ( s == 0 ) {
+   	h = 0;
+   	}
+   else
+	{
+	/*
+	 * Usually, the h value is given as an angel from 0° to 360° and calculated as
+	 * three segments of 120° each.
+	 * But we want 0 .. 256 instead, where 256 is equal to Zero.
+	 * So we don't use the factor 360°/6, we use 256/6.
+	 *
+	 * For example, if max_v == g, h is calculated as
+	 *	h = 256/6 * ( (b-r)/delta + 2)
+	 * Because this requires floating point operations
+	 * we apply some mathematics and we get
+	 *	X = b - r + 2*delta
+	 * and  h = (256*X)/(6*delta)
+	 * This can be calculated using integer operations.
+	 * For rounding we will add 3*delta to 256*x
+	 *
+	 * First, calculate x
+	 */
+	if ( r == max_v ) {
+	    x = g - b;			// h = 256/6 * (g-b)/delta
+	}
+	if ( g == max_v ) {
+	    x = b - r + (delta << 1);	// h = 256/6 * ( (b-r)/delta + 2)
+	}
+	if ( b == max_v ) {
+	    x = r - g + (delta << 2);	// h = 256/6 * ( (r-g)/delta + 4)
+	}
+
+	/*
+	 * Now we do the division. x can be up to 5*255 - so we need dword operations here
+	 */
+	a = ( (sdword)x ) << 8;	// a = 256*( (sdword)x );
+	if ( x < 0 ) {
+	    h = (a - 3*delta)/ (6*delta);
+
+	} else {
+	    h = (a +3*delta)/ (6*delta);
+	}
+
+	/*
+	 * It's expected that h could become negative, but it must be positive.
+	 * Therefore, we need to correct that by adding 360° (or 256 in our case)
+	 * s and v are already valid
+	 */
+	while ( h < 0 ) h += 256;
+	}
+
+    *h_ptr = h;
+    *s_ptr = s;
+    *v_ptr = v;
+
+}
+
+/*--------------------- ITGetColorFromHSV8Bit ---------------------
+ *  Purpose:	Convert HSV value (integer, 0..255) to RGB (0..255)
+ *  Context:	Algorithm from: Introduction to Computer Graphics by James Foley
+ *		German: "Grundlagen der Computergraphik", S. 467ff
+ *		It can also be found all over the web.
+ *  Strategy:
+ *	Typically, the value for h ranges from 0° to 360°, where 0° and 360° are identical.
+ *	However, our value range is 0 to 256, where 256 corresponds to zero. Similarly,
+ *	s and v typically range from 0 to 1, but in our case they range from zero to 255.
+ *	The algorithm has been adjusted accordingly and implemented completely using integer arithmetic.
+ *	The routine has been runtime optimized.
+ *  Note:
+ *	Repeatedly converting back and forth between RGB and HSV may result in different values
+ *	because the precision of the input and output values is limited to 8 bits, which leads to
+ *	rounding errors.
+ *  Parameters:	h:	hue value		(0 ... 255)
+ *		s:	saturation value	(0 ... 255)
+ *		v:	brightness value	(0 ... 255)
+ *		color:	return: RGB color	(PaletteEntry)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+extern void RS_EXPORT ITGetColorFromHSV8Bit(PaletteEntry *color, word h, word s, word v) {
+word h6, i, f;
+dword p, q, t;
+
+    /*
+     * Handle special case: Gray
+     */
+    if (s == 0) {
+        color->rt = v;
+        color->gn = v;
+        color->bl = v;
+        return;
+    }
+
+    /*
+     * Find out color segment (integer part) i: 0 .. 5
+     * and fraction part f ( 0...255, 256 is equal to 1.0 )
+     * When h runs from 0° to 360°, segment i is equal to int(h/60°)
+     * Our h runs from 0 to 256. We do some mathematics, use 256/6 instead of
+     * 60° (==360°/6) and find i = int(6*h/256).
+     */
+    h6 = h*6;
+    i =  h6 >> 8;	/* seg = int(6*h/256) */
+    f = h6 & 0xFF;	/* f = (h6 - 256*i);  */
+
+    /*
+     * Calculate help values. Our ranges are:
+     *	v: 0 ... 255	s: 0 ... 255	255 <== 1.0
+     *  f: 0 ... 256			256 <== 1.0 but this never occurs
+     * After doing some mathematics we get:
+     *	   p = v*(1-s)		--> p = ( v*(255-s) ) / 256
+     *     q = v*(1-s*f)	--> q = ( v*(256*255 - s*f) ) / 256*255
+     *     t = v*(1 -s*(1-f))	--> t = v*(256*255 - (s*(256-f))) / 256*255
+     *	256*255 = 65280 = 0xFF00
+     *  For rounding we add 255/2 (for p) or 0xFF00/2 == 0x7F80 (for q and t)
+     *  It is important to use dword operations for most of the multiplication
+     *  and division operations.
+     */
+    p = (v*(255 - s) + 128)/255;
+    q = ( ((dword)v) * ( (dword)(0xFF00 - s*f) ) + 0x7f80 ) / (dword)0xFF00 ;
+    t = ( ( ((dword)v) * (dword)( 0xFF00 - s*(256-f)) )   + 0x7f80 ) / (dword)0xFF00;
+
+    /*
+     * Depending on the color segment, r, g and b are one of (p, q, t, v)
+     */
+    switch (i) {
+        case 0:
+            color->rt = v; color->gn = t; color->bl = p;
+            break;
+        case 1:
+            color->rt = q; color->gn = v; color->bl = p;
+            break;
+        case 2:
+            color->rt = p; color->gn = v; color->bl = t;
+            break;
+        case 3:
+            color->rt = p; color->gn = q; color->bl = v;
+            break;
+        case 4:
+            color->rt = t; color->gn = p; color->bl = v;
+            break;
+        case 5:
+        default:
+            color->rt = v; color->gn = p; color->bl = q;
+            break;
+    }
+}
+
+
+/*---------------------  ---------------------
+ *	Purpose:
+ *	Parameters:
+ *	Return:
+ ---------------------------------------------------------------------------*/
+

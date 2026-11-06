@@ -1,0 +1,1652 @@
+/***********************************************************************
+ *
+ * PROJECT:       SvgLib SVG Exporter
+ * FILE:          svgExport.goc
+ *
+ * DESCRIPTION:   Implements the export procedure for SVG output
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+
+#include "svgExport.h"
+
+#define SVG_EXPORT_GSTRING_FLAGS   (GSC_ONE)
+#define SVG_EXPORT_ADD_WWFIXED(a, b) \
+    ((WWFixedAsDWord)((sdword)(a) + (sdword)(b)))
+#define SVG_EXPORT_SUB_WWFIXED(a, b) \
+    ((WWFixedAsDWord)((sdword)(a) - (sdword)(b)))
+
+word _pascal SvgExportGString(GStateHandle sourceGState, SvgExportContext *context);
+word _pascal SvgExportValidateGString(GStateHandle sourceGState,
+                                       SvgExportContext *context);
+
+void _pascal SvgExportResetDashPattern(SvgExportContext *context);
+Boolean _pascal
+SvgExportEnsureDashStack(SvgExportContext *context, word capacity);
+Boolean _pascal
+SvgExportPushDashState(SvgExportContext *context);
+Boolean _pascal
+SvgExportPopDashState(SvgExportContext *context);
+
+word _pascal SvgExportHandleLineOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word _pascal SvgExportHandleRectangleOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word _pascal SvgExportHandleRoundRectOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word _pascal SvgExportHandleEllipseOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word _pascal SvgExportHandleCurveOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word _pascal SvgExportHandleArcOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word _pascal SvgExportHandlePolygonOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm);
+word SvgExportEmitPath(GStateHandle playbackGState,
+                        SvgExportContext *context,
+                        Boolean fillPath,
+                        Boolean strokePath,
+                        RegionFillRule fillRule,
+                        const TransMatrix *tm);
+static word SvgExportAppendPointArrayToPath(
+    SvgExportContext *context, SvgExportPathBuilder *builder,
+    const byte *elementData, Boolean closeShape);
+static word SvgExportAppendEllipseToPath(
+    SvgExportContext *context, SvgExportPathBuilder *builder,
+    const byte *elementData);
+void _pascal SvgExportResetDashPattern(SvgExportContext *context)
+{
+    if (context == NULL)
+        return;
+
+    context->dashPairCount = 0;
+    context->dashSkipCount = 0;
+    memset(context->dashPattern, 0, sizeof(context->dashPattern));
+}
+
+static void
+SvgExportResetState(SvgExportContext *context)
+{
+    context->lineWidth = 0;
+    context->lineColor = 0;
+    context->fillColor = 0;
+    context->lineJoin = LJ_MITERED;
+    context->lineCap = LE_BUTTCAP;
+    context->miterLimit = 0;
+    context->lineStyle = LS_SOLID;
+    context->fillRule = WINDING;
+    context->dashStackDepth = 0;
+    SvgExportResetDashPattern(context);
+}
+
+Boolean _pascal
+SvgExportEnsureDashStack(SvgExportContext *context, word capacity)
+{
+    word size;
+
+    if ((context == (void *)0) ||
+        (context->bufferHeapH == NullHandle))
+    {
+        return FALSE;
+    }
+    if (capacity <= context->dashStackCapacity)
+    {
+        return TRUE;
+    }
+    if (capacity > (0xffffU / (word)sizeof(SvgExportDashState)))
+    {
+        return FALSE;
+    }
+
+    size = (word)(capacity * (word)sizeof(SvgExportDashState));
+    if (MemLock(context->bufferHeapH) == (void *)0)
+    {
+        return FALSE;
+    }
+    if (context->dashStackChunkH == NullChunk)
+    {
+        context->dashStackChunkH =
+            LMemAlloc(context->bufferHeapH, size);
+        if (context->dashStackChunkH == NullChunk)
+        {
+            MemUnlock(context->bufferHeapH);
+            return FALSE;
+        }
+    }
+    else if (LMemReAllocHandles(context->bufferHeapH,
+                                context->dashStackChunkH,
+                                size) != 0)
+    {
+        MemUnlock(context->bufferHeapH);
+        return FALSE;
+    }
+    context->dashStackCapacity = capacity;
+    MemUnlock(context->bufferHeapH);
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportPushDashState(SvgExportContext *context)
+{
+    SvgExportDashState *stackP;
+    SvgExportDashState *stateP;
+
+    if ((context == (void *)0) ||
+        (context->dashStackDepth >= context->dashStackCapacity))
+    {
+        return FALSE;
+    }
+    if (MemLock(context->bufferHeapH) == (void *)0)
+    {
+        return FALSE;
+    }
+    stackP = LMemDerefHandles(context->bufferHeapH,
+                              context->dashStackChunkH);
+    if (stackP == (void *)0)
+    {
+        MemUnlock(context->bufferHeapH);
+        return FALSE;
+    }
+
+    stateP = &stackP[context->dashStackDepth++];
+    stateP->pairCount = context->dashPairCount;
+    stateP->skipCount = context->dashSkipCount;
+    memcpy(stateP->pattern, context->dashPattern,
+           sizeof(stateP->pattern));
+    MemUnlock(context->bufferHeapH);
+    return TRUE;
+}
+
+Boolean _pascal
+SvgExportPopDashState(SvgExportContext *context)
+{
+    SvgExportDashState *stackP;
+    SvgExportDashState *stateP;
+
+    if ((context == (void *)0) || (context->dashStackDepth == 0))
+    {
+        return FALSE;
+    }
+    if (MemLock(context->bufferHeapH) == (void *)0)
+    {
+        return FALSE;
+    }
+    stackP = LMemDerefHandles(context->bufferHeapH,
+                              context->dashStackChunkH);
+    if (stackP == (void *)0)
+    {
+        MemUnlock(context->bufferHeapH);
+        return FALSE;
+    }
+
+    stateP = &stackP[--context->dashStackDepth];
+    context->dashPairCount = stateP->pairCount;
+    context->dashSkipCount = stateP->skipCount;
+    memcpy(context->dashPattern, stateP->pattern,
+           sizeof(context->dashPattern));
+    MemUnlock(context->bufferHeapH);
+    return TRUE;
+}
+
+Boolean _pascal SvgExportHandleStyleStateOpcode(word elementType,
+                                                 SvgExportContext *context,
+                                                 word elementSize)
+{
+    const byte *elementData;
+    word pairCount;
+    word entryCount;
+    word index;
+
+    if (context == NULL)
+        return FALSE;
+
+    elementData = context->elementDataP;
+
+    switch (elementType)
+    {
+        case GR_SET_LINE_STYLE:
+        {
+            const OpSetLineStyle *styleOp;
+            word skipCount;
+
+            if (SvgExportAs(elementData, GR_SET_LINE_STYLE) == (void*)0)
+            {
+                return FALSE;
+            }
+
+            styleOp = (const OpSetLineStyle *)elementData;
+            skipCount = (word)styleOp->OSLS_index;
+            if (styleOp->OSLS_style != LS_CUSTOM)
+            {
+                SvgExportResetDashPattern(context);
+            }
+            context->dashSkipCount = skipCount;
+            return TRUE;
+        }
+
+        case GR_SET_CUSTOM_LINE_STYLE:
+        {
+            const OpSetCustomLineStyle *customOp;
+            const byte *patternData;
+            word skipCount;
+
+            if (SvgExportAs(elementData, GR_SET_CUSTOM_LINE_STYLE) == (void*)0)
+            {
+                return FALSE;
+            }
+
+            customOp = (const OpSetCustomLineStyle *)elementData;
+            pairCount = customOp->OSCLS_count;
+            if (pairCount > MAX_DASH_ARRAY_PAIRS)
+            {
+                return FALSE;
+            }
+
+            entryCount = pairCount * 2;
+            if ((SVG_EXPORT_CUSTOM_LINE_STYLE_HEADER_SIZE +
+                 (pairCount * SVG_EXPORT_WORD_SIZE)) != elementSize)
+            {
+                return FALSE;
+            }
+
+            SvgExportResetDashPattern(context);
+            skipCount = customOp->OSCLS_index;
+            context->dashSkipCount = skipCount;
+            context->dashPairCount = pairCount;
+            patternData = elementData +
+                          SVG_EXPORT_CUSTOM_LINE_STYLE_HEADER_SIZE;
+            for (index = 0; index < (MAX_DASH_ARRAY_PAIRS * 2); index++)
+            {
+                if (index < entryCount)
+                {
+                    context->dashPattern[index] = (word)patternData[index];
+                }
+                else
+                {
+                    context->dashPattern[index] = 0;
+                }
+            }
+            return TRUE;
+        }
+
+        default:
+            return TRUE;
+    }
+}
+
+/****************************************************************************
+ * SvgLib SVG Export public entry point
+ ****************************************************************************/
+
+TransError _export _pascal
+SvgExport(FileHandle outputFile, VMFileHandle sourceFile,
+          VMChain sourceChain)
+{
+    GStateHandle sourceGState;
+    SvgExportContext context;
+    word error;
+
+
+    if ((outputFile == NullHandle) ||
+        (sourceFile == NullHandle) ||
+        (sourceChain == 0))
+    {
+        return TE_EXPORT_ERROR;
+    }
+
+    memset(&context, 0, sizeof(context));
+    sourceGState = GrLoadGString(sourceFile, GST_VMEM,
+                                 VMCHAIN_GET_VM_BLOCK(sourceChain));
+    if (sourceGState == 0)
+        return TE_METAFILE_CREATION_ERROR;
+
+    context.bufferHeapH = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    if (context.bufferHeapH == NullHandle)
+    {
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return TE_OUT_OF_MEMORY;
+    }
+
+    error = SvgExportValidateGString(sourceGState, &context);
+    if (error != TE_NO_ERROR)
+    {
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return error;
+    }
+    if (!SvgExportEnsureDashStack(
+            &context, context.requiredDashStackDepth))
+    {
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return TE_OUT_OF_MEMORY;
+    }
+
+    GrSetGStringPos(sourceGState, GSSPT_BEGINNING, 0);
+    GrGetGStringBoundsDWord(sourceGState, 0, 0, &context.bounds);
+    GrSetGStringPos(sourceGState, GSSPT_BEGINNING, 0);
+    if ((context.bounds.RD_right < context.bounds.RD_left) ||
+        (context.bounds.RD_bottom < context.bounds.RD_top))
+    {
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return TE_EXPORT_ERROR;
+    }
+
+    context.svgFile = outputFile;
+    SvgExportResetState(&context);
+    SvgExportInitCountingWriter(&context);
+    error = SvgExportGString(sourceGState, &context);
+    if (error != TE_NO_ERROR)
+    {
+        if (context.tagTooLarge)
+        {
+            error = TE_FILE_TOO_LARGE;
+        }
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return error;
+    }
+
+    GrSetGStringPos(sourceGState, GSSPT_BEGINNING, 0);
+    SvgExportResetState(&context);
+
+    if (FileTruncate(context.svgFile, 0, FALSE) != 0)
+    {
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return TE_FILE_WRITE;
+    }
+
+    if (FilePos(context.svgFile, 0, FILE_POS_START) != 0)
+    {
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return TE_FILE_WRITE;
+    }
+
+    error = SvgExportInitWriter(&context);
+    if (!error)
+    {
+        MemFree(context.bufferHeapH);
+        GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+        return TE_FILE_WRITE;
+    }
+
+    error = SvgExportGString(sourceGState, &context);
+
+    if (context.bufferHeapH != NullHandle)
+    {
+        MemFree(context.bufferHeapH);
+        context.bufferHeapH = NullHandle;
+    }
+
+    GrDestroyGString(sourceGState, 0, GSKT_LEAVE_DATA);
+
+    return error;
+}
+
+/****************************************************************************
+ * Validation pass
+ ****************************************************************************/
+
+word _pascal
+SvgExportValidateGString(GStateHandle sourceGState,
+                          SvgExportContext *context)
+{
+    GStringElement readType;
+    SvgExportOpcodeClass opcodeClass;
+    word elementType;
+    word elementSize;
+    word error;
+    word pathDepth;
+    word stateDepth;
+    word maximumStateDepth;
+    Boolean foundEnd;
+
+    if ((sourceGState == 0) || (context == (void*)0))
+        return TE_EXPORT_ERROR;
+
+    error = TE_NO_ERROR;
+    pathDepth = 0;
+    stateDepth = 0;
+    maximumStateDepth = 0;
+    foundEnd = FALSE;
+    GrSetGStringPos(sourceGState, GSSPT_BEGINNING, 0);
+    while (foundEnd == FALSE)
+    {
+        readType = GrGetGStringElement(0, sourceGState, 0,
+                                       (void*)0, &elementSize);
+        if ((readType == SVG_EXPORT_INVALID_OPCODE) ||
+            (elementSize < SVG_EXPORT_OPCODE_SIZE))
+        {
+            error = TE_EXPORT_ERROR;
+            break;
+        }
+        elementType = (word)readType;
+
+        error = SvgExportReadElement(context, 0,
+                                      sourceGState, elementType);
+        if (error != TE_NO_ERROR)
+        {
+            break;
+        }
+
+        error = SvgExportValidateElement(context->elementDataP,
+                                          elementType,
+                                          context->elementSize);
+        SvgExportReleaseElement(context);
+        if (error != TE_NO_ERROR)
+            break;
+
+        opcodeClass = SvgExportClassifyOpcode(elementType);
+        if (opcodeClass == SVG_OPCODE_UNSUPPORTED_RENDERING)
+        {
+            error = TE_EXPORT_NOT_SUPPORTED;
+            break;
+        }
+
+        if (elementType == GR_END_GSTRING)
+        {
+            foundEnd = TRUE;
+        }
+        else if (elementType == GR_BEGIN_PATH)
+        {
+            if (pathDepth == 0xffff)
+            {
+                error = TE_EXPORT_ERROR;
+                break;
+            }
+            pathDepth++;
+        }
+        else if (elementType == GR_END_PATH)
+        {
+            if (pathDepth == 0)
+            {
+                error = TE_EXPORT_ERROR;
+                break;
+            }
+            pathDepth--;
+        }
+        else if (elementType == GR_SAVE_STATE)
+        {
+            if (stateDepth == 0xffff)
+            {
+                error = TE_EXPORT_ERROR;
+                break;
+            }
+            stateDepth++;
+            if (stateDepth > maximumStateDepth)
+            {
+                maximumStateDepth = stateDepth;
+            }
+        }
+        else if (elementType == GR_RESTORE_STATE)
+        {
+            if (stateDepth == 0)
+            {
+                error = TE_EXPORT_ERROR;
+                break;
+            }
+            stateDepth--;
+        }
+
+        if (foundEnd == FALSE)
+        {
+            GrSetGStringPos(sourceGState, GSSPT_SKIP_1, 0);
+        }
+    }
+
+    SvgExportReleaseElement(context);
+    if ((error == TE_NO_ERROR) &&
+        ((foundEnd == FALSE) || (pathDepth != 0)))
+    {
+        error = TE_EXPORT_ERROR;
+    }
+    if (error == TE_NO_ERROR)
+    {
+        context->requiredDashStackDepth = maximumStateDepth;
+    }
+
+    GrSetGStringPos(sourceGState, GSSPT_BEGINNING, 0);
+    return error;
+}
+
+/****************************************************************************
+ * Core gstring traversal
+ ****************************************************************************/
+
+word _pascal SvgExportGString(GStateHandle sourceGState, SvgExportContext *context)
+{
+    MemHandle playbackBlockH;
+    ChunkHandle playbackChunk;
+    GStateHandle playbackGState;
+    word elementType;
+    PointWWFixed currentPosition;
+    word error;
+    GSRetType gsr;
+    word handlerResult;
+    word pathDepth = 0;
+    SvgExportOpcodeClass opcodeClass;
+    RegionFillRule pathFillRule;
+    TransMatrix tm;
+
+
+    playbackBlockH = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+    if (playbackBlockH == NullHandle)
+    {
+        return TE_OUT_OF_MEMORY;
+    }
+
+    playbackGState = GrCreateGString(playbackBlockH, GST_CHUNK, (word*) &playbackChunk);
+    if (playbackGState == 0)
+    {
+        MemFree(playbackBlockH);
+        return TE_OUT_OF_MEMORY;
+    }
+
+    handlerResult = SvgExportWriteHeader(context);
+    if (!handlerResult)
+    {
+        GrDestroyGString(playbackGState, 0, GSKT_KILL_DATA);
+        return TE_FILE_WRITE;
+    }
+
+    error = TE_NO_ERROR;
+
+    /* the main loop */
+    for(gsr = GrDrawGString(playbackGState, sourceGState, 0, 0, GSC_ONE, &elementType);
+        gsr == GSRT_ONE;
+        gsr = GrDrawGString(playbackGState, sourceGState, 0, 0, GSC_ONE, &elementType))
+    {
+        error = SvgExportReadElement(context, playbackGState,
+                                      sourceGState, elementType);
+        if (error != TE_NO_ERROR)
+        {
+            break;
+        }
+
+        error = SvgExportValidateElement(context->elementDataP,
+                                          elementType,
+                                          context->elementSize);
+        if (error != TE_NO_ERROR)
+        {
+            SvgExportReleaseElement(context);
+            break;
+        }
+
+        opcodeClass = SvgExportClassifyOpcode(elementType);
+        if (opcodeClass == SVG_OPCODE_UNSUPPORTED_RENDERING)
+        {
+            error = TE_EXPORT_NOT_SUPPORTED;
+            SvgExportReleaseElement(context);
+            break;
+        }
+
+        SvgExportUpdateDrawingState(playbackGState, context);
+
+        if (SvgExportIsStyleStateOpcode(elementType))
+        {
+            if (!SvgExportHandleStyleStateOpcode(elementType, context,
+                                                   context->elementSize))
+            {
+                error = TE_EXPORT_ERROR;
+                SvgExportReleaseElement(context);
+                break;
+            }
+            SvgExportReleaseElement(context);
+            continue;
+        }
+
+        if (elementType == GR_SAVE_STATE)
+        {
+            SvgExportReleaseElement(context);
+            if (!SvgExportPushDashState(context))
+            {
+                error = TE_OUT_OF_MEMORY;
+                break;
+            }
+            continue;
+        }
+        if (elementType == GR_RESTORE_STATE)
+        {
+            SvgExportReleaseElement(context);
+            if (!SvgExportPopDashState(context))
+            {
+                error = TE_EXPORT_ERROR;
+                break;
+            }
+            continue;
+        }
+
+        /* Skip transform/state ops */
+        if ((elementType >= GR_APPLY_ROTATION && elementType <= GR_XFORM_1F) ||
+            (elementType >= GR_SAVE_STATE && elementType <= GR_ATTR_9F))
+        {
+            SvgExportReleaseElement(context);
+            continue;
+        }
+
+        switch (elementType)
+        {
+            case GR_BEGIN_PATH:
+                if (pathDepth == 0xffff)
+                {
+                    error = TE_EXPORT_ERROR;
+                    break;
+                }
+                pathDepth++;
+                SvgExportReleaseElement(context);
+                continue;
+
+            case GR_END_PATH:
+                if (pathDepth == 0)
+                {
+                    error = TE_EXPORT_ERROR;
+                    break;
+                }
+                pathDepth--;
+                SvgExportReleaseElement(context);
+                continue;
+
+#ifdef GR_SET_NULL_PATH
+            case GR_SET_NULL_PATH:
+                pathDepth = 0;
+                SvgExportReleaseElement(context);
+                continue;
+#endif
+
+            case GR_CLOSE_SUB_PATH:
+                /* nothing to emit directly for subpath closures */
+                SvgExportReleaseElement(context);
+                continue;
+
+            default:
+                break;
+        }
+
+        if (error != TE_NO_ERROR)
+        {
+            SvgExportReleaseElement(context);
+            break;
+        }
+
+        if (pathDepth != 0)
+        {
+            /* suppress geometry opcodes recorded during an open path */
+            SvgExportReleaseElement(context);
+            continue;
+        }
+
+        handlerResult = TE_NO_ERROR;
+        GrGetCurPosWWFixed(playbackGState, &currentPosition);
+        GrGetTransform(playbackGState, &tm);
+        if (SvgExportIsLineOpcode(elementType))
+        {
+            handlerResult = SvgExportHandleLineOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsRectangleOpcode(elementType))
+        {
+            handlerResult = SvgExportHandleRectangleOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsRoundRectOpcode(elementType))
+        {
+            handlerResult = SvgExportHandleRoundRectOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsEllipseOpcode(elementType))
+        {
+            handlerResult = SvgExportHandleEllipseOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsCurveOpcode(elementType))
+        {
+            handlerResult = SvgExportHandleCurveOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsArcOpcode(elementType))
+        {
+            handlerResult = SvgExportHandleArcOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsPolygonOpcode(elementType))
+        {
+            handlerResult = SvgExportHandlePolygonOpcode(elementType, context, &currentPosition, &tm);
+        }
+        else if (SvgExportIsPathOpcode(elementType))
+        {
+            pathFillRule = context->fillRule;
+            if (elementType == GR_FILL_PATH)
+            {
+                pathFillRule = (RegionFillRule)
+                    context->elementDataP[SVG_EXPORT_OPCODE_SIZE];
+            }
+            SvgExportReleaseElement(context);
+            handlerResult = SvgExportEmitPath(
+                playbackGState, context,
+                (elementType == GR_FILL_PATH),
+                (elementType == GR_DRAW_PATH),
+                pathFillRule, &tm);
+        }
+
+        SvgExportReleaseElement(context);
+        if (handlerResult != TE_NO_ERROR)
+        {
+            error = handlerResult;
+            break;
+        }
+    }
+
+    SvgExportReleaseElement(context);
+    if ((error == TE_NO_ERROR) &&
+        ((gsr != GSRT_COMPLETE) || (pathDepth != 0)))
+    {
+        error = TE_EXPORT_ERROR;
+    }
+
+    if (error == TE_NO_ERROR)
+    {
+        if (!SvgExportWriteFooter(context))
+        {
+            error = TE_FILE_WRITE;
+        }
+    }
+
+    GrDestroyGString(playbackGState, 0, GSKT_KILL_DATA);
+
+    return error;
+}
+
+/****************************************************************************
+ * Opcode handlers
+ ****************************************************************************/
+
+word _pascal
+SvgExportHandleLineOpcode(word elementType,
+                           SvgExportContext *context,
+                           PointWWFixed *currentPosition,
+                           const TransMatrix *tm)
+{
+    PointWWFixed startPoint;
+    PointWWFixed control1;
+    PointWWFixed control2;
+    PointWWFixed endPoint;
+    SvgExportGeometryType geometryType;
+    word result;
+
+    result = SvgExportDecodeGeometry(
+        elementType, currentPosition,
+        context->elementDataP, context->elementSize,
+        &geometryType, &startPoint, &control1, &control2,
+        &endPoint);
+    if (result != TE_NO_ERROR)
+    {
+        return result;
+    }
+    if ((geometryType == SVG_GEOMETRY_LINE) &&
+        !SvgExportWriteLineElement(context, &startPoint, &endPoint, tm))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+word _pascal SvgExportHandleRectangleOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm)
+{
+    PointWWFixed corner1;
+    PointWWFixed corner3;
+    Point intCorner1;
+    Point intCorner3;
+    Boolean filled;
+    const byte *elementData;
+    word offset;
+    word wordValue1;
+    word wordValue2;
+
+    elementData = context->elementDataP;
+
+    switch (elementType)
+    {
+        case GR_DRAW_RECT:
+        case GR_FILL_RECT:
+            if (SvgExportAs(elementData, elementType) == (void*)0)
+            {
+                return TE_EXPORT_ERROR;
+            }
+            offset = sizeof(GStringElement);
+            intCorner1.P_x = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner1.P_y = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner3.P_x = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner3.P_y = (sword)SvgExportReadWord(elementData, offset);
+            SvgExportPointFromInt(&intCorner1, &corner1);
+            SvgExportPointFromInt(&intCorner3, &corner3);
+            filled = (elementType == GR_FILL_RECT);
+            break;
+
+        case GR_DRAW_RECT_TO:
+        case GR_FILL_RECT_TO:
+            SvgExportCopyPointWWFixed(&corner1, currentPosition);
+            if (SvgExportAs(elementData, elementType) == (void*)0)
+            {
+                return TE_EXPORT_ERROR;
+            }
+            offset = sizeof(GStringElement);
+            wordValue1 = SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            wordValue2 = SvgExportReadWord(elementData, offset);
+            intCorner3.P_x = (sword)wordValue1;
+            intCorner3.P_y = (sword)wordValue2;
+            SvgExportPointFromInt(&intCorner3, &corner3);
+            filled = (elementType == GR_FILL_RECT_TO);
+            break;
+
+        default:
+            return TE_NO_ERROR;
+    }
+
+    if (!SvgExportWriteRectElement(context,
+                                     &corner1,
+                                     &corner3,
+                                     (filled == FALSE),
+                                     (filled != FALSE),
+                                     filled,
+                                     tm))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+word _pascal SvgExportHandleEllipseOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm)
+{
+    WWFixed cx = {0};
+    WWFixed cy = {0};
+    WWFixed rx = {0};
+    WWFixed ry = {0};
+    sword x1, y1, x2, y2;
+    sdword sum;
+    sdword difference;
+    Boolean filled = FALSE;
+    const byte *elementData;
+    word offset;
+
+    (void)currentPosition;
+
+    elementData = context->elementDataP;
+
+    switch (elementType)
+    {
+        case GR_DRAW_ELLIPSE:
+        case GR_FILL_ELLIPSE:
+            if (SvgExportAs(elementData, elementType) == (void*)0)
+            {
+                return TE_EXPORT_ERROR;
+            }
+            offset = sizeof(GStringElement);
+            x1 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            y1 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            x2 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            y2 = (sword)SvgExportReadWord(elementData, offset);
+
+            sum = (sdword)x1 + (sdword)x2;
+            SvgExportSetWWFixedComponent(&cx,
+                                          sum * 32768L);
+            sum = (sdword)y1 + (sdword)y2;
+            SvgExportSetWWFixedComponent(&cy,
+                                          sum * 32768L);
+
+            difference = (sdword)x2 - (sdword)x1;
+            if (difference < 0)
+            {
+                difference = -difference;
+            }
+            SvgExportSetWWFixedComponent(&rx,
+                                          difference * 32768L);
+            difference = (sdword)y2 - (sdword)y1;
+            if (difference < 0)
+            {
+                difference = -difference;
+            }
+            SvgExportSetWWFixedComponent(&ry,
+                                          difference * 32768L);
+
+            filled = (elementType == GR_FILL_ELLIPSE);
+
+            break;
+
+        default:
+            return TE_NO_ERROR;
+    }
+
+    if (!SvgExportWriteEllipseElement(context,
+                                       &cx,
+                                       &cy,
+                                       &rx,
+                                       &ry,
+                                       (filled == FALSE),
+                                       (filled != FALSE),
+                                       filled,
+                                       tm))
+    {
+        return TE_FILE_WRITE;
+    }
+
+    return TE_NO_ERROR;
+}
+
+word _pascal
+SvgExportHandlePolygonOpcode(word elementType,
+                              SvgExportContext *context,
+                              PointWWFixed *currentPosition,
+                              const TransMatrix *tm)
+{
+    word pointCount;
+    word index;
+    Boolean closeShape;
+    Boolean filledShape;
+    const byte *elementData;
+    word offset;
+    Point intPoint;
+    PointWWFixed point;
+    RegionFillRule fillRule;
+
+    (void)currentPosition;
+    elementData = context->elementDataP;
+    fillRule = context->fillRule;
+    offset = sizeof(GStringElement);
+
+    switch (elementType)
+    {
+        case GR_DRAW_POLYGON:
+        case GR_DRAW_POLYLINE:
+            pointCount = SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            closeShape = (elementType == GR_DRAW_POLYGON);
+            filledShape = FALSE;
+            break;
+
+        case GR_FILL_POLYGON:
+            pointCount = SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            fillRule = (RegionFillRule)elementData[offset++];
+            closeShape = TRUE;
+            filledShape = TRUE;
+            break;
+
+        default:
+            return TE_NO_ERROR;
+    }
+
+    if (pointCount == 0)
+    {
+        return TE_NO_ERROR;
+    }
+    if (!SvgExportWritePolygonBegin(context, closeShape))
+    {
+        return TE_FILE_WRITE;
+    }
+
+    for (index = 0; index < pointCount; index++)
+    {
+        if ((offset > context->elementSize) ||
+            ((context->elementSize - offset) <
+             SVG_EXPORT_POINT_SIZE))
+        {
+            return TE_EXPORT_ERROR;
+        }
+        intPoint.P_x = SvgExportReadSword(elementData, offset);
+        offset += sizeof(sword);
+        intPoint.P_y = SvgExportReadSword(elementData, offset);
+        offset += sizeof(sword);
+        SvgExportPointFromInt(&intPoint, &point);
+        if (!SvgExportWritePolygonPoint(context, &point))
+        {
+            return TE_FILE_WRITE;
+        }
+    }
+
+    if (!SvgExportWritePolygonEnd(context, filledShape, fillRule, tm))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+static word
+SvgExportAppendPointArrayToPath(SvgExportContext *context,
+                                SvgExportPathBuilder *builder,
+                                const byte *elementData,
+                                Boolean closeShape)
+{
+    Point intPoint;
+    PointWWFixed point;
+    PointWWFixed previousPoint;
+    word pointCount;
+    word pointIndex;
+    word offset;
+
+    if ((context == (void*)0) || (builder == (void*)0) ||
+        (elementData == (void*)0))
+    {
+        return TE_EXPORT_ERROR;
+    }
+
+    pointCount = SvgExportReadWord(elementData, SVG_EXPORT_OPCODE_SIZE);
+    offset = SVG_EXPORT_POLY_HEADER_SIZE;
+    for (pointIndex = 0; pointIndex < pointCount; pointIndex++)
+    {
+        intPoint.P_x = SvgExportReadSword(elementData, offset);
+        offset += sizeof(sword);
+        intPoint.P_y = SvgExportReadSword(elementData, offset);
+        offset += sizeof(sword);
+        SvgExportPointFromInt(&intPoint, &point);
+
+        if (pointIndex == 0)
+        {
+            if (!SvgExportPathBuilderMoveTo(context, builder, &point))
+            {
+                return TE_FILE_WRITE;
+            }
+        }
+        else if (!SvgExportPathBuilderLineTo(context, builder,
+                                              &previousPoint, &point))
+        {
+            return TE_FILE_WRITE;
+        }
+        SvgExportCopyPointWWFixed(&previousPoint, &point);
+    }
+
+    if ((closeShape != FALSE) && (pointCount != 0) &&
+        !SvgExportPathBuilderClose(context, builder))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+static void
+SvgExportSetPathPoint(PointWWFixed *pointP,
+                      WWFixedAsDWord x, WWFixedAsDWord y)
+{
+    SvgExportSetWWFixedComponent(&pointP->PF_x, x);
+    SvgExportSetWWFixedComponent(&pointP->PF_y, y);
+}
+
+static word
+SvgExportAppendEllipseToPath(SvgExportContext *context,
+                             SvgExportPathBuilder *builder,
+                             const byte *elementData)
+{
+    const WWFixedAsDWord kappa = 0x00008d62L;
+    sword x1;
+    sword y1;
+    sword x2;
+    sword y2;
+    sdword delta;
+    WWFixedAsDWord centerX;
+    WWFixedAsDWord centerY;
+    WWFixedAsDWord radiusX;
+    WWFixedAsDWord radiusY;
+    WWFixedAsDWord controlX;
+    WWFixedAsDWord controlY;
+    PointWWFixed start;
+    PointWWFixed control1;
+    PointWWFixed control2;
+    PointWWFixed end;
+
+    if ((context == (void*)0) || (builder == (void*)0) ||
+        (elementData == (void*)0))
+    {
+        return TE_EXPORT_ERROR;
+    }
+
+    x1 = SvgExportReadSword(elementData, SVG_EXPORT_OPCODE_SIZE);
+    y1 = SvgExportReadSword(elementData, SVG_EXPORT_OPCODE_SIZE + 2);
+    x2 = SvgExportReadSword(elementData, SVG_EXPORT_OPCODE_SIZE + 4);
+    y2 = SvgExportReadSword(elementData, SVG_EXPORT_OPCODE_SIZE + 6);
+    centerX = (WWFixedAsDWord)(((sdword)x1 + (sdword)x2) * 32768L);
+    centerY = (WWFixedAsDWord)(((sdword)y1 + (sdword)y2) * 32768L);
+    delta = (sdword)x2 - (sdword)x1;
+    if (delta < 0) delta = -delta;
+    radiusX = (WWFixedAsDWord)(delta * 32768L);
+    delta = (sdword)y2 - (sdword)y1;
+    if (delta < 0) delta = -delta;
+    radiusY = (WWFixedAsDWord)(delta * 32768L);
+    controlX = GrMulWWFixed(radiusX, kappa);
+    controlY = GrMulWWFixed(radiusY, kappa);
+
+    SvgExportSetPathPoint(&start,
+        SVG_EXPORT_ADD_WWFIXED(centerX, radiusX), centerY);
+    if (!SvgExportPathBuilderMoveTo(context, builder, &start))
+    {
+        return TE_FILE_WRITE;
+    }
+
+    SvgExportSetPathPoint(&control1,
+        SVG_EXPORT_ADD_WWFIXED(centerX, radiusX),
+        SVG_EXPORT_ADD_WWFIXED(centerY, controlY));
+    SvgExportSetPathPoint(&control2,
+        SVG_EXPORT_ADD_WWFIXED(centerX, controlX),
+        SVG_EXPORT_ADD_WWFIXED(centerY, radiusY));
+    SvgExportSetPathPoint(&end, centerX,
+        SVG_EXPORT_ADD_WWFIXED(centerY, radiusY));
+    if (!SvgExportPathBuilderCurveTo(context, builder, &start,
+                                      &control1, &control2, &end))
+    {
+        return TE_FILE_WRITE;
+    }
+    SvgExportCopyPointWWFixed(&start, &end);
+
+    SvgExportSetPathPoint(&control1,
+        SVG_EXPORT_SUB_WWFIXED(centerX, controlX),
+        SVG_EXPORT_ADD_WWFIXED(centerY, radiusY));
+    SvgExportSetPathPoint(&control2,
+        SVG_EXPORT_SUB_WWFIXED(centerX, radiusX),
+        SVG_EXPORT_ADD_WWFIXED(centerY, controlY));
+    SvgExportSetPathPoint(&end,
+        SVG_EXPORT_SUB_WWFIXED(centerX, radiusX), centerY);
+    if (!SvgExportPathBuilderCurveTo(context, builder, &start,
+                                      &control1, &control2, &end))
+    {
+        return TE_FILE_WRITE;
+    }
+    SvgExportCopyPointWWFixed(&start, &end);
+
+    SvgExportSetPathPoint(&control1,
+        SVG_EXPORT_SUB_WWFIXED(centerX, radiusX),
+        SVG_EXPORT_SUB_WWFIXED(centerY, controlY));
+    SvgExportSetPathPoint(&control2,
+        SVG_EXPORT_SUB_WWFIXED(centerX, controlX),
+        SVG_EXPORT_SUB_WWFIXED(centerY, radiusY));
+    SvgExportSetPathPoint(&end, centerX,
+        SVG_EXPORT_SUB_WWFIXED(centerY, radiusY));
+    if (!SvgExportPathBuilderCurveTo(context, builder, &start,
+                                      &control1, &control2, &end))
+    {
+        return TE_FILE_WRITE;
+    }
+    SvgExportCopyPointWWFixed(&start, &end);
+
+    SvgExportSetPathPoint(&control1,
+        SVG_EXPORT_ADD_WWFIXED(centerX, controlX),
+        SVG_EXPORT_SUB_WWFIXED(centerY, radiusY));
+    SvgExportSetPathPoint(&control2,
+        SVG_EXPORT_ADD_WWFIXED(centerX, radiusX),
+        SVG_EXPORT_SUB_WWFIXED(centerY, controlY));
+    SvgExportSetPathPoint(&end,
+        SVG_EXPORT_ADD_WWFIXED(centerX, radiusX), centerY);
+    if (!SvgExportPathBuilderCurveTo(context, builder, &start,
+                                      &control1, &control2, &end) ||
+        !SvgExportPathBuilderClose(context, builder))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+word SvgExportEmitPath(GStateHandle playbackGState,
+                        SvgExportContext *context,
+                        Boolean fillPath,
+                        Boolean strokePath,
+                        RegionFillRule fillRule,
+                        const TransMatrix *tm)
+{
+    MemHandle pathMem;
+    void *pathPtr;
+    GStateHandle pathSource;
+    MemHandle pathPlaybackBlock;
+    GStateHandle pathPlayback;
+    ChunkHandle pathPlaybackChunk;
+    SvgExportPathBuilder builder;
+    GSRetType gsr;
+    word elementType;
+    PointWWFixed currentPosition;
+    PointWWFixed startPoint;
+    PointWWFixed control1;
+    PointWWFixed control2;
+    PointWWFixed endPoint;
+    SvgExportGeometryType geometryType;
+    word result;
+    SvgExportOpcodeClass opcodeClass;
+
+    pathMem = NullHandle;
+    pathPtr = (void*)0;
+    pathSource = 0;
+    pathPlaybackBlock = NullHandle;
+    pathPlayback = 0;
+    memset(&builder, 0, sizeof(builder));
+    result = TE_NO_ERROR;
+
+    if ((context == (void*)0) || (playbackGState == 0))
+    {
+        return TE_EXPORT_ERROR;
+    }
+
+    pathMem = GrGetPath(playbackGState, GPT_CURRENT);
+    if (pathMem == NullHandle)
+    {
+        return TE_NO_ERROR;
+    }
+
+    pathPtr = MemLock(pathMem);
+    if (pathPtr == (void*)0)
+    {
+        result = TE_OUT_OF_MEMORY;
+        goto cleanup;
+    }
+
+    pathSource = GrLoadGString(PtrToSegment(pathPtr), GST_PTR,
+                               PtrToOffset(pathPtr));
+    if (pathSource == 0)
+    {
+        result = TE_OUT_OF_MEMORY;
+        goto cleanup;
+    }
+
+    pathPlaybackBlock =
+        MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+    if (pathPlaybackBlock == NullHandle)
+    {
+        result = TE_OUT_OF_MEMORY;
+        goto cleanup;
+    }
+
+    pathPlayback = GrCreateGString(pathPlaybackBlock, GST_CHUNK,
+                                   (word*)&pathPlaybackChunk);
+    if (pathPlayback == 0)
+    {
+        result = TE_OUT_OF_MEMORY;
+        goto cleanup;
+    }
+    pathPlaybackBlock = NullHandle;
+
+    for (gsr = GrDrawGString(pathPlayback, pathSource, 0, 0,
+                             SVG_EXPORT_GSTRING_FLAGS, &elementType);
+         gsr == GSRT_ONE;
+         gsr = GrDrawGString(pathPlayback, pathSource, 0, 0,
+                             SVG_EXPORT_GSTRING_FLAGS, &elementType))
+    {
+        result = SvgExportReadElement(context, pathPlayback,
+                                       pathSource, elementType);
+        if (result != TE_NO_ERROR)
+        {
+            break;
+        }
+
+        result = SvgExportValidateElement(context->elementDataP,
+                                           elementType,
+                                           context->elementSize);
+        if (result != TE_NO_ERROR)
+        {
+            SvgExportReleaseElement(context);
+            break;
+        }
+
+        opcodeClass = SvgExportClassifyOpcode(elementType);
+        if (opcodeClass == SVG_OPCODE_UNSUPPORTED_RENDERING)
+        {
+            result = TE_EXPORT_NOT_SUPPORTED;
+            SvgExportReleaseElement(context);
+            break;
+        }
+
+        if ((elementType == GR_DRAW_POLYLINE) ||
+            (elementType == GR_DRAW_POLYGON))
+        {
+            result = SvgExportAppendPointArrayToPath(
+                context, &builder, context->elementDataP,
+                (elementType == GR_DRAW_POLYGON));
+            SvgExportReleaseElement(context);
+            if (result != TE_NO_ERROR)
+            {
+                break;
+            }
+            continue;
+        }
+        if (elementType == GR_DRAW_ELLIPSE)
+        {
+            result = SvgExportAppendEllipseToPath(
+                context, &builder, context->elementDataP);
+            SvgExportReleaseElement(context);
+            if (result != TE_NO_ERROR)
+            {
+                break;
+            }
+            continue;
+        }
+
+        GrGetCurPosWWFixed(pathPlayback, &currentPosition);
+        result = SvgExportDecodeGeometry(
+            elementType, &currentPosition,
+            context->elementDataP, context->elementSize,
+            &geometryType, &startPoint, &control1, &control2,
+            &endPoint);
+        SvgExportReleaseElement(context);
+        if (result != TE_NO_ERROR)
+        {
+            break;
+        }
+
+        switch (geometryType)
+        {
+            case SVG_GEOMETRY_MOVE:
+                if (!SvgExportPathBuilderMoveTo(context, &builder,
+                                                 &endPoint))
+                {
+                    result = TE_FILE_WRITE;
+                }
+                break;
+
+            case SVG_GEOMETRY_LINE:
+                if (!SvgExportPathBuilderLineTo(context, &builder,
+                                                 &startPoint, &endPoint))
+                {
+                    result = TE_FILE_WRITE;
+                }
+                break;
+
+            case SVG_GEOMETRY_CURVE:
+                if (!SvgExportPathBuilderCurveTo(
+                        context, &builder, &startPoint,
+                        &control1, &control2, &endPoint))
+                {
+                    result = TE_FILE_WRITE;
+                }
+                break;
+
+            case SVG_GEOMETRY_CLOSE:
+                if (!SvgExportPathBuilderClose(context, &builder))
+                {
+                    result = TE_FILE_WRITE;
+                }
+                break;
+
+            default:
+                if (opcodeClass == SVG_OPCODE_SUPPORTED_RENDERING)
+                {
+                    result = TE_EXPORT_NOT_SUPPORTED;
+                }
+                break;
+        }
+
+        if (result != TE_NO_ERROR)
+        {
+            break;
+        }
+    }
+
+    SvgExportReleaseElement(context);
+    if ((result == TE_NO_ERROR) && (gsr != GSRT_COMPLETE))
+    {
+        result = TE_EXPORT_ERROR;
+    }
+    if ((result == TE_NO_ERROR) && (builder.hasData != FALSE) &&
+        !SvgExportWritePathEnd(context, fillPath, strokePath, fillRule,
+                               tm))
+    {
+        result = TE_FILE_WRITE;
+    }
+
+cleanup:
+    SvgExportReleaseElement(context);
+    if (pathPlayback != 0)
+    {
+        GrDestroyGString(pathPlayback, 0, GSKT_KILL_DATA);
+    }
+    if (pathPlaybackBlock != NullHandle)
+    {
+        MemFree(pathPlaybackBlock);
+    }
+    if (pathSource != 0)
+    {
+        GrDestroyGString(pathSource, 0, GSKT_LEAVE_DATA);
+    }
+    if (pathPtr != (void*)0)
+    {
+        MemUnlock(pathMem);
+    }
+    if (pathMem != NullHandle)
+    {
+        MemFree(pathMem);
+    }
+
+    return result;
+}
+
+word _pascal SvgExportHandleRoundRectOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm)
+{
+    PointWWFixed corner1;
+    PointWWFixed corner3;
+    Boolean filled = FALSE;
+    Point intCorner1;
+    Point intCorner3;
+    word radiusValue;
+    const byte *elementData;
+    word offset;
+    word wordValue1;
+    word wordValue2;
+
+    elementData = context->elementDataP;
+
+    switch (elementType)
+    {
+        case GR_DRAW_ROUND_RECT:
+        case GR_FILL_ROUND_RECT:
+            if (SvgExportAs(elementData, elementType) == (void*)0)
+            {
+                return TE_EXPORT_ERROR;
+            }
+            offset = sizeof(GStringElement);
+            radiusValue = SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner1.P_x = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner1.P_y = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner3.P_x = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            intCorner3.P_y = (sword)SvgExportReadWord(elementData, offset);
+            SvgExportPointFromInt(&intCorner1, &corner1);
+            SvgExportPointFromInt(&intCorner3, &corner3);
+            filled = (elementType == GR_FILL_ROUND_RECT);
+            break;
+
+        case GR_DRAW_ROUND_RECT_TO:
+        case GR_FILL_ROUND_RECT_TO:
+            SvgExportCopyPointWWFixed(&corner1, currentPosition);
+            if (SvgExportAs(elementData, elementType) == (void*)0)
+            {
+                return TE_EXPORT_ERROR;
+            }
+            offset = sizeof(GStringElement);
+            radiusValue = SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            wordValue1 = SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            wordValue2 = SvgExportReadWord(elementData, offset);
+            intCorner3.P_x = (sword)wordValue1;
+            intCorner3.P_y = (sword)wordValue2;
+            SvgExportPointFromInt(&intCorner3, &corner3);
+            filled = (elementType == GR_FILL_ROUND_RECT_TO);
+            break;
+
+        default:
+            return TE_NO_ERROR;
+    }
+
+    if (!SvgExportWriteRoundRectElement(context,
+                                         &corner1,
+                                         &corner3,
+                                         radiusValue,
+                                         radiusValue,
+                                         (filled == FALSE),
+                                         (filled != FALSE),
+                                         filled,
+                                         tm))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+word _pascal
+SvgExportHandleCurveOpcode(word elementType,
+                            SvgExportContext *context,
+                            PointWWFixed *currentPosition,
+                            const TransMatrix *tm)
+{
+    PointWWFixed startPoint;
+    PointWWFixed control1;
+    PointWWFixed control2;
+    PointWWFixed endPoint;
+    SvgExportGeometryType geometryType;
+    word result;
+
+    result = SvgExportDecodeGeometry(
+        elementType, currentPosition,
+        context->elementDataP, context->elementSize,
+        &geometryType, &startPoint, &control1, &control2,
+        &endPoint);
+    if (result != TE_NO_ERROR)
+    {
+        return result;
+    }
+    if ((geometryType == SVG_GEOMETRY_CURVE) &&
+        !SvgExportWriteCubicPathElement(context, &startPoint,
+                                         &control1, &control2,
+                                         &endPoint, tm))
+    {
+        return TE_FILE_WRITE;
+    }
+    return TE_NO_ERROR;
+}
+
+word _pascal SvgExportHandleArcOpcode(word elementType, SvgExportContext *context, PointWWFixed *currentPosition, const TransMatrix *tm)
+{
+    Boolean fill = FALSE;
+    WWFixed cx;
+    WWFixed cy;
+    WWFixed rx;
+    WWFixed ry;
+    sword startAngle;
+    sword endAngle;
+    sword x1;
+    sword y1;
+    sword x2;
+    sword y2;
+    ArcCloseType closeType;
+    WWFixedAsDWord cxFixed;
+    WWFixedAsDWord cyFixed;
+    WWFixedAsDWord rxFixed;
+    WWFixedAsDWord ryFixed;
+    const byte *elementData;
+    word offset;
+    word wordValue;
+    sdword sum;
+    sdword difference;
+
+    (void)currentPosition;
+
+    elementData = context->elementDataP;
+
+    switch (elementType)
+    {
+        case GR_DRAW_ARC:
+        case GR_FILL_ARC:
+        {
+            if (SvgExportAs(elementData, elementType) == (void*)0)
+            {
+                return TE_EXPORT_ERROR;
+            }
+            offset = sizeof(GStringElement);
+            wordValue = SvgExportReadWord(elementData, offset);
+            closeType = (ArcCloseType)wordValue;
+            offset += sizeof(word);
+            x1 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            y1 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            x2 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            y2 = (sword)SvgExportReadWord(elementData, offset);
+            offset += sizeof(word);
+            startAngle = SvgExportReadSword(elementData, offset);
+            offset += sizeof(word);
+            endAngle = SvgExportReadSword(elementData, offset);
+
+            sum = (sdword)x1 + (sdword)x2;
+            SvgExportSetWWFixedComponent(&cx, sum * 32768L);
+            sum = (sdword)y1 + (sdword)y2;
+            SvgExportSetWWFixedComponent(&cy, sum * 32768L);
+            difference = (sdword)x2 - (sdword)x1;
+            if (difference < 0)
+            {
+                difference = -difference;
+            }
+            SvgExportSetWWFixedComponent(&rx,
+                                          difference * 32768L);
+            difference = (sdword)y2 - (sdword)y1;
+            if (difference < 0)
+            {
+                difference = -difference;
+            }
+            SvgExportSetWWFixedComponent(&ry,
+                                          difference * 32768L);
+
+            cxFixed = SvgExportPackWWFixed(&cx);
+            cyFixed = SvgExportPackWWFixed(&cy);
+            rxFixed = SvgExportPackWWFixed(&rx);
+            ryFixed = SvgExportPackWWFixed(&ry);
+
+            fill = (elementType == GR_FILL_ARC) ? TRUE : FALSE;
+            if (!SvgExportWriteArcElement(
+                    context, cxFixed, cyFixed, rxFixed, ryFixed,
+                    startAngle, endAngle, closeType, fill, tm))
+            {
+                return TE_FILE_WRITE;
+            }
+            return TE_NO_ERROR;
+        }
+
+        default:
+            break;
+    }
+    return TE_NO_ERROR;
+}
+
+word _pascal SvgExportReadWord(const byte *data, word offset)
+{
+    word value;
+
+    if (data == NULL)
+    {
+        return 0;
+    }
+
+    memcpy(&value, data + offset, sizeof(word));
+    return value;
+}
+
+sword _pascal SvgExportReadSword(const byte *data, word offset)
+{
+    sword value;
+
+    if (data == NULL)
+    {
+        return 0;
+    }
+
+    memcpy(&value, data + offset, sizeof(sword));
+    return value;
+}
+
+void _pascal SvgExportReadWWFixed(const byte *data, word offset, WWFixed *value)
+{
+    if ((data == NULL) || (value == NULL))
+    {
+        return;
+    }
+
+    memcpy(value, data + offset, sizeof(WWFixed));
+}
+
+void _pascal SvgExportSetWWFixedComponent(WWFixed *component, WWFixedAsDWord value)
+{
+    component->WWF_int = (word)((((sdword)value) >> 16) & 0xffff);
+    component->WWF_frac = (word)(value & 0xffff);
+}

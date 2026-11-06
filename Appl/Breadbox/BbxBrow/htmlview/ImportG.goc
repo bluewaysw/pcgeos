@@ -29,6 +29,7 @@
 @include <stdapp.goh>
 @include <Ansi/string.h>
 #include <library.h>
+#include <initfile.h>
 
 @include "htmlview.goh"
 @include "importg.goh"
@@ -43,7 +44,6 @@
 @extern object HTMLVApp;
 
 #if PROGRESS_DISPLAY
-/* must be MAX_FETCH_ENGINE_CHILDREN + 1 */
 #define MAX_IMPORT_THREADS 3
 #define IMPORT_WORK_FILENAME _TEXT("IMPORTWK.%03d")
 
@@ -66,9 +66,11 @@ extern Boolean G_fetchWhileImport;
 typedef struct {
     optr textObj ;
     NameToken name ;
+    dword imageGeneration;
     TCHAR mimeType[MIME_MAXBUF] ;
     PathName curHTML;
     Boolean temporary;
+    ObjCacheToken pageOwner;            /* source survives page detachment */
     Boolean objCache;
 #if PROGRESS_DISPLAY
     ImportProgressData importProgressData;
@@ -101,8 +103,9 @@ static Boolean G_importThreadStarted = FALSE ;
 #if PROGRESS_DISPLAY
 
 /* array of import threads */
-/* we have one import thread per fetch thread, plus one for import
-   operations without progress feedback */
+/* Requests rotate through the configured import threads. */
+static int G_numImportThreads;
+static int G_nextImportThread;
 static MemHandle G_importThreadMemory[MAX_IMPORT_THREADS];
 static optr G_importThreadObj[MAX_IMPORT_THREADS];
 static VMFileHandle G_importWorkFile[MAX_IMPORT_THREADS];
@@ -114,8 +117,8 @@ static MemHandle G_importProgressDataQueue[IMPORT_PROGRESS_DATA_QUEUE_SIZE];
 static SemaphoreHandle G_importProgressDataQueueSem = 0;
 
 #ifdef ALLOW_FETCH_WHILE_IMPORTING
-/* if import thread is actively importing */
-Boolean G_importActive[MAX_IMPORT_THREADS-1];
+/* Each fetch worker may have one outstanding streamed import. */
+Boolean G_importActive[MAX_FETCH_ENGINE_CHILDREN];
 #endif
 
 #else
@@ -162,15 +165,23 @@ Boolean ImportThreadEngineStart(void)
 #if PROGRESS_DISPLAY
     int i;
     FileLongName workFileName;
+    word numImportThreads = 1;
 #endif
 
     EC_ERROR_IF(G_importThreadStarted, -1) ;
     if (!G_importThreadStarted)  {
 
 #if PROGRESS_DISPLAY
+        InitFileReadInteger(HTMLVIEW_CATEGORY, "numImportThreads",
+            &numImportThreads);
+        if (numImportThreads < 1 || numImportThreads > MAX_IMPORT_THREADS)
+            numImportThreads = 1;
+        G_numImportThreads = numImportThreads;
+        G_nextImportThread = 0;
+
  #ifdef ALLOW_FETCH_WHILE_IMPORTING
 	/* init import state */
-	for (i = 0; i < MAX_IMPORT_THREADS-1; i++) {
+	for (i = 0; i < MAX_FETCH_ENGINE_CHILDREN; i++) {
 	    G_importActive[i] = FALSE;
 	}
  #endif
@@ -180,7 +191,7 @@ Boolean ImportThreadEngineStart(void)
 	    G_importProgressDataQueue[i] = 0;
 	}
 
-	for (i = 0; i < G_numFetchChildren+1; i++) {
+	for (i = 0; i < G_numImportThreads; i++) {
 #endif
         /* First create a thread that has an event queue */
         @call process::MSG_PROCESS_CREATE_EVENT_THREAD(
@@ -271,7 +282,7 @@ void ImportThreadEngineStop(void)
 	/* free progress data queue semaphore */
 	ThreadFreeSem(G_importProgressDataQueueSem);
 
-	for (i = 0; i < G_numFetchChildren+1; i++) {
+	for (i = 0; i < G_numImportThreads; i++) {
 	    @send ,insertAtFront ,forceQueue
 		 (G_importThreadObj[i])::MSG_IMPORT_THREAD_ENGINE_KILL() ;
 	    G_importThreadObj[i] = NullHandle ;
@@ -459,6 +470,7 @@ Boolean ImportThreadRequestImportGraphic(
             TCHAR *mimeType,
             TCHAR *curHTML,
             Boolean temporary,
+            ObjCacheToken pageOwner,
 	    _LoadProgressParams_)
 #else
 Boolean ImportThreadRequestImportGraphic(
@@ -466,7 +478,8 @@ Boolean ImportThreadRequestImportGraphic(
             NameToken name,
             TCHAR *mimeType,
             TCHAR *curHTML,
-            Boolean temporary)
+            Boolean temporary,
+            ObjCacheToken pageOwner)
 #endif
 {
     T_importGraphicRequest *p_request ;
@@ -476,22 +489,26 @@ Boolean ImportThreadRequestImportGraphic(
 #if PROGRESS_DISPLAY
     /* creates vfptr to callback routine */
     static proc_ImportProgressCallback *importProgressCallback = ImportGraphicProgressCallback;
-    int importThread = 0;  /* default to non-loading progress import thread */
+    int importThread;
 
-    /* G_importThreadObj[0] is non-blocking one for non-progress requests */
-    if (loadProgressDataP) {
-	importThread = loadProgressDataP->LPD_loadThread+1;
-    }
+    /* Reuse the progress queue lock to protect round-robin assignment. */
+    ThreadPSem(G_importProgressDataQueueSem);
+    importThread = G_nextImportThread;
+    if (++G_nextImportThread == G_numImportThreads)
+        G_nextImportThread = 0;
+    ThreadVSem(G_importProgressDataQueueSem);
 #endif
 
     /* All we need to do is create a block and copy all the requested */
     /* info.  The request is then sent to the thread for processing. */
-    mem = MemAlloc(sizeof(*p_request), HF_DYNAMIC, 0) ;
+    mem = MemAlloc(sizeof(*p_request), HF_DYNAMIC, HAF_ZERO_INIT) ;
     if (mem)  {
         p_request = MemLock(mem) ;
         if (p_request)  {
             p_request->textObj = textObj;
             p_request->name = name;
+            p_request->imageGeneration =
+                ((URLTextInstance *)ObjDerefVis(textObj))->UTI_imageGeneration;
 
             /* Validate the name we are using */
 EC(         NamePoolIsTokenValid(namePool, name, TRUE) ; )
@@ -499,11 +516,15 @@ EC(         NamePoolIsTokenValid(namePool, name, TRUE) ; )
             strncpy(p_request->mimeType, mimeType, (sizeof(p_request->mimeType)/sizeof(TCHAR))-1) ;
             strncpy(p_request->curHTML, curHTML, (sizeof(p_request->curHTML)/sizeof(TCHAR))-1) ;
             p_request->temporary = temporary;
+            p_request->pageOwner = pageOwner;
+            if(pageOwner)
+                ObjCacheLockItem(pageOwner, NULL, NULL, NULL, 0);
 
-            /* Is the object cache turned on? */
+            /* Inline source filenames can be reused after page eviction;
+               keep their graphics only while the text holds a reference. */
             p_request->objCache = (@call SettingsBoolGroup::
               MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() &
-                HTMLV_OBJECT_CACHE);
+                HTMLV_OBJECT_CACHE) && !pageOwner;
 
 #if PROGRESS_DISPLAY
 	    /* set up import progress data */
@@ -575,7 +596,7 @@ void ImportThreadAbortAll(void)
         /* the end of the queue (thus straddling all the events */
         /* to be ignore/removed). */
 #if PROGRESS_DISPLAY
-	for (i = 0; i < G_numFetchChildren+1; i++) {
+	for (i = 0; i < G_numImportThreads; i++) {
         /* Mark the thread for abort */
         G_importMimeStatus[i].MS_mimeFlags |= MIME_STATUS_ABORT ;
 	    @send ,forceQueue ,insertAtFront G_importThreadObj[i]::MSG_IMPORT_THREAD_ENGINE_START_ABORT() ;
@@ -787,9 +808,15 @@ void ImportThreadAbortAll(void)
           @send (request.textObj)::
             MSG_URL_TEXT_INTERNAL_CANCEL_LIKE_GRAPHICS(request.name);
       }
-      else
-          @send (request.textObj)::MSG_URL_TEXT_INTERNAL_REPLACE_LIKE_GRAPHICS(
-            OCT_NULL, request.name, 0, 0xFFFF);
+      else {
+#if PROGRESS_DISPLAY
+          if(request.importProgressData.IPD_cacheItem != OCT_NULL)
+              ObjCacheUnlockItem((ObjCacheToken)
+                request.importProgressData.IPD_cacheItem);
+#endif
+          @send (request.textObj)::MSG_URL_TEXT_INTERNAL_GRAPHIC_FAILED(
+            request.name, request.imageGeneration);
+      }
 
       /* Done with this graphic */
       @SendStatusUpdateOptr(
@@ -816,6 +843,9 @@ void ImportThreadAbortAll(void)
 
     if(request.temporary)               /* destroy file if requested */
       FileDelete(request.curHTML);
+
+    if(request.pageOwner)
+        ObjCacheUnlockItem(request.pageOwner);
 
     /* We have completed this operation on the text object.  Mark */
     /* it one less. */
