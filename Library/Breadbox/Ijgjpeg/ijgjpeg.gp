@@ -20,6 +20,10 @@ library	geos
 library ui
 library ansic
 
+ifdef PROTECTED_MODE
+resource JpegErrorCode code read-only shared fixed
+endif
+
 export JPEG_STD_ERROR
 export JPEG_CREATECOMPRESS   
 export JPEG_CREATEDECOMPRESS

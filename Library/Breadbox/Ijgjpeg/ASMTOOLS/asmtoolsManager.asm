@@ -59,7 +59,14 @@ FOMFrame	struct
     FOMF_spAdj	word
 FOMFrame	ends
 
+ifdef PROTECTED_MODE
+	;
+	; Keep the unwinder executable and fixed while it removes resource frames.
+	;
+JpegErrorCode segment resource
+else
 idata segment
+endif
 
 	SetDefaultConvention
 
@@ -155,4 +162,8 @@ endif
 
 	SetGeosConvention
 
+ifdef PROTECTED_MODE
+JpegErrorCode ends
+else
 idata ends
+endif
