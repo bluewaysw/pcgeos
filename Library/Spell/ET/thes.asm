@@ -65,9 +65,6 @@ ThesaurusOpen	proc	far
 	mov	dx, offset thesPathName
 	call	FileSetCurrentPath	
 
-	mov     ax, ET_FILE_OPEN_ERROR
-	jmp	markFlagDisabled
-
 
 	;
 	; Set up the initial et_ctrl structure:
@@ -80,7 +77,10 @@ ThesaurusOpen	proc	far
 			or mask HF_SWAPABLE or mask HF_SHARABLE
 	mov	bx, handle 0
 	call	MemAllocSetOwner	; bx=block,ax=seg,cx destroyed	
-	jc	markFlagDisabled	; exit on error
+	jnc	allocationSucceeded
+	mov	ax, ET_MEMALLOC_ERROR
+	jmp	markFlagDisabled
+allocationSucceeded:
 	mov	cx, segment udata
 	mov	ds, cx
 	mov	ds:[anEtCtrlBlock], bx	; save the block handle
@@ -108,9 +108,9 @@ ThesaurusOpen	proc	far
 	push	ax	
 
 ifdef __BORLANDC__
-	;call	_et_load
+	call	_et_load
 else
-	;call	et_load			; ax = 1 for success
+	call	et_load			; ax = 1 for success
 endif
 
 	;
@@ -125,7 +125,15 @@ endif
 	mov	ds, cx
 	mov	bx, ds:[anEtCtrlBlock]
 	call	MemUnlock
+	cmp	ax, ET_SUCCESS
+	je	openSucceeded
+	push	ax
+	call	MemFree
+	pop	ax
+	clr	ds:[anEtCtrlBlock]
+	jmp	markFlagDisabled
 
+openSucceeded:
 	;
 	; Mark that we've opened the thesaurus
 	;
@@ -207,6 +215,11 @@ ThesaurusGetMeanings		proc	far
 ;DBCS <	sbcsWordBuf		local MAX_ENTRY_LENGTH dup (char)	>
 DBCS <	sbcsWordBuf		local 26 dup (char)	>
 	.enter
+
+	; Early failure must return null handles, never uninitialized locals.
+	mov	returnBlock, 0
+	mov	chunkArrayOffset, 0
+	mov	grammarArrayHandle, 0
 
 	push	cx, dx
 
@@ -387,9 +400,9 @@ else
 endif
 
 ifdef __BORLANDC__
-	;call	_et
+	call	_et
 else
-	;call	et		; H-M's electronic thesaurus "get meanings"
+	call	et		; H-M's electronic thesaurus "get meanings"
 				; returns # of meanings found in ax (?)
 endif
 
@@ -470,6 +483,8 @@ exit:
 
 	mov	ax, indicator
 	mov	bx, returnBlock
+	mov	si, chunkArrayOffset
+	mov	dx, grammarArrayHandle
 
 	.leave
 	ret
@@ -543,6 +558,28 @@ foundEnd:
 	mov	dx, di			; dx = offset start of substring
 	dec	cx			; don't copy the period
 
+	; OpenSpellGEOS uses this prefix only to frame parser boundaries.
+	; Strip it before storing text used by both definition displays.
+	cmp	cx, 7
+	jb	storeMeaning
+	mov	bx, dx
+	cmp	{byte}es:[bx+0], 'S'
+	jne	storeMeaning
+	cmp	{byte}es:[bx+1], 'e'
+	jne	storeMeaning
+	cmp	{byte}es:[bx+2], 'n'
+	jne	storeMeaning
+	cmp	{byte}es:[bx+3], 's'
+	jne	storeMeaning
+	cmp	{byte}es:[bx+4], 'e'
+	jne	storeMeaning
+	cmp	{byte}es:[bx+5], ':'
+	jne	storeMeaning
+	cmp	{byte}es:[bx+6], ' '
+	jne	storeMeaning
+	add	dx, 7
+	sub	cx, 7
+storeMeaning:
 	mov	ax, cx			; size = cx
 	inc	ax			; plus null terminator 
 DBCS <	shl	ax, 1			; # chars -> # bytes		>
@@ -747,6 +784,10 @@ ThesaurusGetSynonyms		proc	far
 DBCS <	sbcsWordBuf		local 26 dup (char)	>
 	.enter
 
+	; The API returns a null result on failures before array allocation.
+	mov	returnBlock, 0
+	mov	chunkArrayOffset, 0
+
 	call	ThesPSem		; set the thesaurus semaphore
 
 if DBCS_PCGEOS
@@ -839,7 +880,10 @@ popDSSICX_exit:
 
 	mov	ax, THES_MEMALLOC_ERROR
 	pop	ds, si, cx
-	jmp 	freeBufferExit
+	; anEtCtrl has not been locked yet, so release only the text buffer.
+	mov	bx, textBufferBlock
+	call	MemFree
+	jmp	exit
 
 5$:	
 	mov	returnBlock, bx
@@ -921,9 +965,9 @@ else
 endif
 	
 ifdef __BORLANDC__
-	;call	_et
+	call	_et
 else
-	;call	et				; ax = number of meanings found
+	call	et				; ax = number of meanings found
 endif
 
 	add	sp, 18		; take parameters off stack (9words = 18 bytes)
@@ -970,9 +1014,9 @@ else
 endif
 	
 ifdef __BORLANDC__
-	;call	_et
+	call	_et
 else
-	;call	et		; H-M's electronic thesaurus "get meanings"
+	call	et		; H-M's electronic thesaurus "get meanings"
 				; returns # of synonyms found in ax (?)
 endif
 
@@ -1023,6 +1067,8 @@ exit:
 	call	ThesVSem			; unset the thesaurus semaphore
 
 	mov	bx, returnBlock
+	mov	dx, returnBlock
+	mov	si, chunkArrayOffset
 
 	.leave
 	ret
@@ -1085,6 +1131,7 @@ ThesaurusGetSynonymsListAsString		proc	far
 
 	.enter
 
+	mov	textBufferSegment, 0
 	mov	textBufferBlock, 0	;indicate that we have not yet
 					;allocated the text block.
 
@@ -1145,7 +1192,7 @@ allocBuffer:
 
 	mov	ax, THES_MEMALLOC_ERROR
 	pop	ds, si, cx
-	jmp 	unlockECtrl
+	jmp	exit		; anEtCtrl was not locked on this failure path
 5$:	
 	mov	returnBlock, bx
 
@@ -1214,9 +1261,9 @@ allocBuffer:
 	push	si
 	
 ifdef __BORLANDC__
-	;call	_et
+	call	_et
 else
-	;call	et				; ax = number of meanings found
+	call	et				; ax = number of meanings found
 endif
 
 	add	sp, 18		; take parameters off stack (9words = 18 bytes)
@@ -1259,9 +1306,9 @@ endif
 	push	si
 	
 ifdef __BORLANDC__
-	;call	_et
+	call	_et
 else
-	;call	et		; H-M's electronic thesaurus "get meanings"
+	call	et		; H-M's electronic thesaurus "get meanings"
 				; returns # of synonyms found in ax (?)
 endif
 
@@ -1499,9 +1546,9 @@ ThesaurusClose	proc	far
 	push	ax
 	
 ifdef __BORLANDC__
-	;call	_et_close
+	call	_et_close
 else
-	;call	et_close			; ax = success/failure
+	call	et_close			; ax = success/failure
 endif
 
 	add 	sp, 4				; 2 words = 4 bytes off stack 
@@ -1676,31 +1723,17 @@ REVISION HISTORY:
 	TJ	12/ 8/92    	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
-	thesTextCategory	char	"text",0
-	thesKey			char	"thesaurus",0
-SBCS <	thesName		char	"COM_THES.DIS",0		>
-DBCS <	thesName		wchar	"COM_THES.DIS",0		>
 ThesaurusGetFilename	proc	far
-	uses	bp, bx, cx, ds, dx, si
+	uses	ax, bp, bx, cx, ds, dx, si, es, di
 	.enter
 
-	mov	bp, WORDLEN or INITFILE_INTACT_CHARS
-	mov	cx, cs
-	mov	ds, cx
-	mov	dx, offset thesKey
-	mov	si, offset thesTextCategory
-	call	InitFileReadString
-	jnc	10$
+	;
+	; Follow the same [text] dictionary stem as the new spell and hyphen
+	; engines. Preserve AX: ThesaurusOpen still needs its block segment.
+	;
+	push	es, di
+	call	OPENTHESAURUSFILENAME
 
-	;
-	; Filename not found in initfile, copy over default database name.
-	;
-SBCS <	mov	cx, size thesName					>
-DBCS <	mov	cx, length thesName					>
-	mov	si, offset thesName
-SBCS <	rep	movsb							>
-DBCS <	rep	movsw							>
-10$:
 	.leave
 	ret
 ThesaurusGetFilename	endp
