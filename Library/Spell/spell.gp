@@ -49,7 +49,6 @@ library text
 # Define resources other than standard discardable code
 #
 nosort
-resource FixedCode fixed code read-only
 resource OpenReadCode	code fixed read-only shared
 resource OpenLexCode	code read-only shared
 resource OpenSuggestCode	code read-only shared

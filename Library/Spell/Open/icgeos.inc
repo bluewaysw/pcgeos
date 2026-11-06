@@ -334,12 +334,6 @@ word _pascal OpenPersonalWord(const unsigned char *sourceP,
 
 #pragma code_seg("INIT")
 
-/* Compatibility hook: initialization belongs to each ICBuff, not this call. */
-word _pascal _export ICGEOSplInit(void)
-{
-    return OPEN_OK;
-}
-
 /* Bind a dictionary and shared users; unwind every allocation on failure. */
 word _pascal _export ICGEOSplInitICBuff(MemHandle bufferH)
 {
@@ -858,24 +852,6 @@ dword _pascal _export IPGEODeleteUser(const unsigned char *wordP, MemHandle buff
 {
     bufferH = bufferH;
     return OpenUserEdit(wordP, 1);
-}
-
-/* Legacy user-lookup entry retained for source compatibility with old code. */
-word _pascal _export IPGEOUsr(const unsigned char *wordP, MemHandle bufferH)
-{
-    unsigned char personalWord[65];
-    OpenUserDictionary *usersP;
-    int found;
-    bufferH = bufferH;
-    if (!OpenPersonalWord(wordP, personalWord)) {
-        return OPEN_INVALID;
-    }
-    ThreadPSem(spellSem);
-    usersP = (OpenUserDictionary *)MemLock(openUsersH);
-    found = OpenUserContains(usersP, personalWord);
-    MemUnlock(openUsersH);
-    ThreadVSem(spellSem);
-    return found ? OPEN_FOUND : OPEN_NOT_FOUND;
 }
 
 /* Add an exact folded word to this session only, with a 1024-byte ceiling. */

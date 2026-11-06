@@ -68,12 +68,9 @@ include spellConstant.def		;includes product features
 
 INIT	segment 
 ifdef __BORLANDC__
-global ICGEOSPLINIT:far
 global ICGEOSPLINITICBUFF:far
-ICGEOSplInit equ ICGEOSPLINIT
 ICGEOSplInitICBuff equ ICGEOSPLINITICBUFF
 else
-global ICGEOSplInit:far
 global ICGEOSplInitICBuff:far
 endif
 INIT	ends
@@ -116,18 +113,15 @@ CODE	ends
 
 IPCODE	segment
 ifdef __BORLANDC__
-global IPGEOUSR:far
 global IPGEOADDUSER:far
 global IPGEODELETEUSER:far
 global ICGEOIGNORESTRING:far
 global ICRESETIGNOREUSERDICT:far
-IPGEOUsr equ IPGEOUSR
 IPGEOAddUser equ IPGEOADDUSER
 IPGEODeleteUser equ IPGEODELETEUSER
 ICGEOIgnoreString equ ICGEOIGNORESTRING
 ICResetIgnoreUserDict equ ICRESETIGNOREUSERDICT
 else
-global IPGEOUsr:far
 global IPGEOAddUser:far
 global IPGEODeleteUser:far
 global ICGEOIgnoreString:far
@@ -150,6 +144,5 @@ include spell.asm
 include	spellC.asm
 include spellStrings.asm
 include geos_asmcalls.asm
-include geos_opts.asm
 
 include icsThread.asm

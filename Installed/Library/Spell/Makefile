@@ -4,22 +4,22 @@
 # If you edit it, you will lose your changes, should it be regenerated.
 #
 GEODE           = spell
-ET              = thes.asm etManager.asm thesC.asm etConstant.def\
+ET              = etManager.asm thes.asm thesC.asm etConstant.def\
                   etVariable.def
-UI              = uiSpell.asm uiEditUserDict.asm thesCtrl.asm uiManager.asm\
-                  uiSuggestList.asm uiConstant.def uiManager.ui thesCtrl.ui\
-                  uiEditUserDict.ui uiSpell.ui
-ICS             = icsManager.asm geos_localmem.asm spellStrings.asm\
-                  geos_asmcalls.asm spellC.asm icsThread.asm spell.asm\
-                  geos_opts.asm icsVariable.def icsConstant.def
-OPEN            = spellopen.c openlex.h geosbridge.h
-IH              = ihManager.asm ihCalls.asm ihConstants.def ihVariables.def
+ICS             = geos_asmcalls.asm geos_localmem.asm icsManager.asm\
+                  icsThread.asm spell.asm spellC.asm spellStrings.asm\
+                  icsConstant.def icsVariable.def
+IH              = ihCalls.asm ihManager.asm ihConstants.def ihVariables.def
+OPEN            = spellopen.c geosbridge.h openlex.h
+UI              = thesCtrl.asm uiEditUserDict.asm uiManager.asm uiSpell.asm\
+                  uiSuggestList.asm uiConstant.def thesCtrl.ui\
+                  uiEditUserDict.ui uiManager.ui uiSpell.ui
 UI_TO_RDFS      = uiManager.ui
 OBJS            = spellopen.obj
-COMMON          = spellFeatures.h spellFea.h spellConstant.def
-MODULES         = ET UI ICS IH
+COMMON          = spellConstant.def spellFea.h spellFeatures.h
+MODULES         = ET ICS IH UI
 CMODULES        = Open
-SRCS            = $(ET) $(UI) $(ICS) $(OPEN) $(IH) $(COMMON)
+SRCS            = $(ET) $(ICS) $(IH) $(OPEN) $(UI) $(COMMON)
 LOBJS           =
 LIBOBJ          = $(DEVEL_DIR)/Include/$(GEODE).ldf
 LIBNAME         = spell
