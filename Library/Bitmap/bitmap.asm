@@ -1745,6 +1745,15 @@ VisBitmapCheckBitmapSize	proc	near
 	add	bx, ds:[bx].VisBitmap_offset
 	mov	cl, ds:[bx].VBI_bmFormat
 
+		cmp	cl, BMF_24BIT
+		jne	check8Bit
+		movdw	cxbx, dxax		; 24-bit pixels occupy three bytes
+		shldw	dxax
+		jc	tooLarge
+		adddw	dxax, cxbx
+		jc	tooLarge
+		jmp	gotSize
+check8Bit:
 	cmp	cl, BMF_8BIT		; 8bit = 1 byte/pixel
 	je	gotSize
 
@@ -1761,6 +1770,8 @@ VisBitmapCheckBitmapSize	proc	near
 	cmp	cl, BMF_MONO		; mono = 1/8 byte/pixel
 	jne	tooLarge		; other formats are considered too big
 gotSize:
+		cmp	dx, 0400h		; do not wrap the 16-bit KB count
+		jae	tooLarge
 	shldw	dxax
 	shldw	dxax
 	shldw	dxax
