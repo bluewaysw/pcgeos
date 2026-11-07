@@ -1,0 +1,638 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	newIcons.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	stevey	9/11/92		Initial revision (documentAddISet.asm)
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file contains routines for creating new icons and sets of icons.
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+@include "bmptools.goh"
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+
+
+/*############################################################################
+ * Create and destroy icons or icon sets
+ *############################################################################*/
+
+/*--------------------- CreateNewFileISet ---------------------
+ *  Purpose:	Create a new icon set with some icons
+ *  Context:	Initialize document file or Create an new file icon
+ *  Strategy:
+ 	- iconFormats is a bit field. This means that each bit represents a
+ 	  specific icon (size, colors...), described by a IP_xx constant.
+ 	  If a specific bit is set, this icon must be created, otherwise not.
+	- We count the set bits and create an empty icon set
+	- Then we initialize each icon, again using the bits that are set
+	- Example: IP_STANDARD_VGA_FILE has the value 0x20. If this bit is
+	  set, we create a standard VGA icon (48x30).
+ *  Parameters:	vmFile:	Database file
+ *		iconFormats: 	icons to create (IconParameters bit flags)
+ *  Return:	Index of the new icon set
+ ---------------------------------------------------------------------------*/
+int CreateNewFileISet(VMFileHandle vmFile, word iconFormats, optr prefixTextObj) {
+int 	iSet, numIcons, n, icon;
+word	mask;
+
+	/*
+	 * Check if there is at least one icon passed. If not, bail.
+	 */
+    if ( iconFormats == 0) {
+    	MessageBoxOptr(@AtLeastOneIcon);
+    	iSet = IdGetISetCount(vmFile);
+    	return iSet - 1;	// note that NOC_CURRENT_ISET is defined as -1
+    }
+
+	/*
+	 * Count the icons to create - that is: count the set bits
+	 */
+    mask = 1;
+    numIcons = 0;
+    for ( n = 0; n < 16; n++ ) {
+	if ( iconFormats & mask ) numIcons++;
+	mask <<= 1;
+    }
+
+	/*
+	 * Create the new icon set with numIcons icons
+	 */
+    iSet = IdAddISet(vmFile, numIcons);
+    IdSetEntryCount(vmFile, iSet , numIcons);
+
+	/*
+	 * Initialize the icons. Every bit which is set in iconFormats
+	 * represents a icon to create.
+	 * iconFormats & mask is always equal to one of the IP_xx constants
+	 */
+    mask = 1;
+    icon = 0;
+    for ( n = 0; n < 16; n++ ) {
+	if ( iconFormats & mask ) {
+	    InitializeIcon(vmFile, iSet, icon, iconFormats & mask/*,  colorScheme*/);
+	    AssignInitialIconName(vmFile, iSet, icon, iconFormats & mask, prefixTextObj);
+	    icon++;
+	}
+	mask <<= 1;
+    }
+
+
+    return iSet;
+}
+
+
+/*--------------------- InitializeIcon ---------------------
+ *  Purpose:	Setup an icon to default values
+ *  Context:	Create new icon set
+ *  Strategy:
+ *  Parameters:	vmFile,
+ *		iSet	which icon set
+ *		icon	which icon for that icon set
+ *		params	icon description value
+ *		colorScheme	Color depth, if the icon is colored
+ *				pass BMF_4BIT, BMF_8BIT or BMF_24BIT
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void InitializeIcon(VMFileHandle vmFile, int iSet, int icon, IconParameters params) {
+VMBlockHandle 	bmp;
+int	width, height;
+BMFormat	bmfmt;
+
+
+    /*
+     * Set up icon parameters and bitmap
+     * IdGetIconExtraBlock ensures that an initialized extra block (IE_extraBlock) exists
+     */
+    ToolFindBitmapAndScreenParameters(params, &width, &height, &bmfmt, NULL, NULL);
+    bmfmt |= BMT_MASK;
+
+    bmp = IconToolCreateBitmap(vmFile, bmfmt, width, height, NULL, TRUE);
+    IdSetEntryBitmapNoCopy(vmFile, iSet, icon, bmp);
+    IdSetEntryParameters(vmFile, iSet, icon, params);
+
+    IdGetIconExtraBlock(vmFile, iSet, icon);
+}
+
+/*--------------------- AssignInitialIconName ---------------------
+ *  Purpose:	Set the default Name for a new icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile,
+ *		iSet	which icon set
+ *		icon	which icon for that icon set
+ *		params	icon description value
+ *		useFileIconPrefix: Write the text in FileIconPrefixText in front of the icon name.
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void AssignInitialIconName(VMFileHandle vmFile, int iSet, int icon, IconParameters params, optr prefixTextObj) {
+optr defaultNameOp;
+char iconName[MAX_ICON_NAME_LENGTH + 10]; // be save
+
+    /*
+     * Get the Prefix for the icon name
+     */
+    if ( prefixTextObj ) {
+    	@call prefixTextObj::MSG_VIS_TEXT_GET_ALL_PTR(iconName);
+    } else {
+    	iconName[0] = 0;
+    }
+
+    /*
+     * Add the default name body to the iconName
+     */
+    defaultNameOp = GetEntryDefaultNameOptr(params);
+    MemLock(OptrToHandle(defaultNameOp));
+    strcat(iconName, LMemDeref(defaultNameOp));
+    MemUnlock(OptrToHandle(defaultNameOp));
+
+    /*
+     * Finally set the initial name for the icon
+     */
+    IdSetEntryName(vmFile, iSet, icon, iconName);
+
+}
+
+/*--------------------- AssignInitialCustomIconName ---------------------
+ *  Purpose:	Set the default Name for a custom icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile,
+ *		iSet	which icon set
+ *		icon	which icon for that icon set
+ *		style	icon style: VMS_TOOL | VMS_ICON
+ *		BMFormat bitmapformat
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void AssignInitialCustomIconName(VMFileHandle vmFile, int iSet, int icon, int style, int BMFormat) {
+optr defaultNameOp = 0;
+
+    if ( style ==  VMS_TOOL ) 	defaultNameOp = (BMFormat == BMF_MONO) ? @DefaultNameCustomToolMono  : @DefaultNameCustomTool;
+        		else 	defaultNameOp = (BMFormat == BMF_MONO) ? @DefaultNameCustomIconMono : @DefaultNameCustomIcon;
+    MemLock(OptrToHandle(defaultNameOp));
+    IdSetEntryName(vmFile, iSet, icon, LMemDeref(defaultNameOp));
+    MemUnlock(OptrToHandle(defaultNameOp));
+}
+
+
+
+/*--------------------- ToolFindBitmapAndScreenParameters ---------------------
+ *  Purpose:	Transform IconParameters (IP_xxx) constant into the
+ 		corresponding width, height and bitmap colors values
+ 		as well as the corresponding display values
+ *  Context:
+ *  Strategy:
+ *  Parameters:	params	an IP_xxx constant
+ 			describes - size of the icon
+ 				  - number of colors
+ 				  - display size
+ 				  - aspect ratio
+ 		*widthPtr,
+ 		*heightPtr,
+ 		*bmFormatPtr,
+ 		*displaySizePtr,
+ 		*aspectPtr:	pointers to return values
+ 				Note that BMT_MASK is not set in *bmFormatPtr
+ 				NULL pointers are allowed
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolFindBitmapAndScreenParameters(IconParameters params,
+			int *widthPtr, int *heightPtr, BMFormat *bmFormatPtr,
+			int *displaySizePtr, int *aspectPtr) {
+BMFormat bmfmt;
+int width, height;
+int aspect = DAR_NORMAL;
+int displaySize = DS_STANDARD;
+
+    switch (params) {
+    case IP_STANDARD_SVGA_FILE_256:
+    	width = 64;	height = 40;
+    	bmfmt = BMF_8BIT;
+    	displaySize = DS_LARGE;
+    	break;
+    case IP_STANDARD_SVGA_FILE:
+    	width = 64;	height = 40;
+    	bmfmt = BMF_4BIT;
+    	displaySize = DS_LARGE;
+    	break;
+    case IP_STANDARD_SVGA_FILE_MONO:
+    	width = 64;	height = 40;
+    	bmfmt = BMF_MONO;
+    	displaySize = DS_LARGE;
+    	break;
+
+    case IP_CGA_PREF_MODULE:
+    	width = 64;	height = 18;
+    	bmfmt = BMF_MONO;
+    	displaySize = DS_STANDARD;
+    	aspect = DAR_VERY_SQUISHED;
+    	break;
+
+
+    case IP_STANDARD_VGA_FILE_256:
+    	width = 48;	height = 30;
+    	bmfmt = BMF_8BIT;
+    	break;
+    case IP_STANDARD_VGA_FILE:
+    	width = 48;	height = 30;
+    	bmfmt = BMF_4BIT;
+    	break;
+    case IP_STANDARD_MCGA_FILE:
+    	width = 48;	height = 30;
+    	bmfmt = BMF_MONO;
+    	break;
+    case IP_STANDARD_CGA_FILE:
+    	width = 48;	height = 14;
+    	bmfmt = BMF_MONO;
+    	aspect = DAR_VERY_SQUISHED;
+    	break;
+
+    case IP_TINY_COLOR_FILE_256:
+    	width = 32;	height = 20;
+    	bmfmt = BMF_8BIT;
+    	displaySize = DS_TINY;
+    	break;
+    case IP_TINY_COLOR_FILE:
+    	width = 32;	height = 20;
+    	bmfmt = BMF_4BIT;
+    	displaySize = DS_TINY;
+    	break;
+    case IP_TINY_MONO_FILE:
+    	width = 32;	height = 20;
+    	bmfmt = BMF_MONO;
+    	displaySize = DS_TINY;
+    	break;
+
+
+    case IP_STANDARD_CGA_TOOL:
+    	width = 15;	height = 10;
+    	bmfmt = BMF_MONO;
+    	aspect = DAR_VERY_SQUISHED;
+    	break;
+
+    case IP_TINY_COLOR_TOOL_256:
+    	bmfmt = BMF_8BIT;
+    	width = 15;	height = 15;
+    	displaySize = DS_TINY;
+    	break;
+    case IP_TINY_COLOR_TOOL:
+    	bmfmt = BMF_4BIT;
+    	width = 15;	height = 15;
+    	displaySize = DS_TINY;
+    	break;
+    case IP_TINY_MONO_TOOL:
+    	width = 15;	height = 15;
+    	bmfmt = BMF_MONO;
+    	displaySize = DS_TINY;
+    	break;
+
+    default:
+    	width = 30;	height = 30;
+    	bmfmt = BMF_4BIT;
+    EC ( ProgError("ToolFindBitmapAndScreenParameters: invalid params"); )
+    }
+
+    if (widthPtr) *widthPtr	= width;
+    if (heightPtr) *heightPtr	= height;
+    if (bmFormatPtr) *bmFormatPtr = bmfmt;
+    if (aspectPtr) *aspectPtr	= aspect;
+    if (displaySizePtr) *displaySizePtr = displaySize;
+
+}
+
+/*--------------------- InternalInitializeIconEntryType ---------------------
+ *  Purpose:	Setup up the IE_type value for an icon with custom settings
+ *  Context:	Tool for create a new icon for a set
+ *  Strategy:
+ *  Parameters:	vmFile:	database file
+ *		iSet:	which icon set
+ *		icon:	which icon for that icon set
+ 		stlye:	pass VMS_TOOL | VMS_ICON
+ *		displayClass:	pass DC_TEXT, DC_GRAY_1, DC_COLOR_4, DC_COLOR_8, DC_CF_RGB
+ 		displaySize:	pass DS_TINY, DS_STANDARD, DS_LARGE ( or DS_HUGE )
+ 		aspect:		pass DAR_NORMAL or DAR_VERY_SQUISHED
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void InternalInitializeIconEntryType(VMFileHandle vmFile, int iSet, int icon, int style,
+				int displayClass, int displaySize, int aspect) {
+word	vmlet;		/* typedef WordFlags VisMonikerListEntryType; */
+IconEntry *iconEntry;
+optr	iEntryList;
+word	size;
+
+    if ( IdGetFlags(vmFile, iSet) & IF_PTR_IMAGE) {
+	/*
+	 * Special handling fpr "pointer-image" sets:
+	 * iconEntry->IE_type contians the hotspot coordiantes.
+	 * Set it to (0:0).
+	 */
+	vmlet = 0;
+    } else {
+	/*
+	 * Assign VisMonikerListEntryType
+	 */
+	vmlet = 0x40;	/* Set GSting Bit */
+	vmlet |= displaySize   	<< VMLET_GS_SIZE_OFFSET;
+	vmlet |= style  	<< VMLET_STYLE_OFFSET;
+	vmlet |= aspect 	<< VMLET_GS_ASPECT_RATIO_OFFSET;
+	vmlet |= displayClass  	<< VMLET_GS_COLOR_OFFSET;
+    }
+
+    /*
+     * Assign IE_type value
+     *
+     */
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+    iconEntry->IE_type = vmlet;
+    IdUnlockEntryList(iEntryList, TRUE);
+
+}
+
+/*--------------------- InitializeCustomIcon ---------------------
+ *  Purpose:	Setup up icon with custom settings
+ *  Context:	Create a new icon for a set
+ *  Strategy:
+ *  Parameters:	vmFile:	database file
+ *		iSet:	which icon set
+ *		icon:	which icon for that icon set
+ 		stlye:	pass VMS_TOOL | VMS_ICON
+ 		width, height: 	dimensions of the icon bitmap
+ *		bitmapColor:	Color depth of the bitmap
+ *				pass BMF_MONO, BMF_4BIT, BMF_8BIT or BMF_24BIT
+ 		displaySize:	pass DS_TINY, DS_STANDARD, DS_LARGE ( or DS_HUGE )
+ 		aspect:		pass DAR_NORMAL or DAR_VERY_SQUISHED
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void InitializeCustomIcon(VMFileHandle vmFile, int iSet, int icon, int style,
+				int width, int height, int bitmapColor,
+				int displaySize, int aspect) {
+VMBlockHandle	bmp;
+DisplayClass	colorDC;
+
+    /*
+     * Map bitmapColor to DisplayClass value
+     */
+    switch (bitmapColor & BMT_FORMAT) {
+    case BMF_24BIT:
+    	colorDC = DC_CF_RGB;
+    	break;
+    case BMF_8BIT:
+    	colorDC = DC_COLOR_8;
+    	break;
+    case BMF_4BIT:
+    	colorDC = DC_COLOR_4;
+    	break;
+    case BMF_MONO:
+    	colorDC = DC_GRAY_1;
+    	break;
+    default:
+    	colorDC = DC_COLOR_4;
+    }
+
+    /*
+     * set up IE_type value ( a VisMonikerListEntryType record)
+     */
+    InternalInitializeIconEntryType(vmFile, iSet, icon, style, colorDC, displaySize, aspect);
+
+ 	/*
+	 * Set up bitmap
+	 *
+	 */
+    bmp = IconToolCreateBitmap(vmFile, bitmapColor | BMT_MASK, width, height, NULL, TRUE);
+    IdSetEntryBitmapNoCopy(vmFile, iSet, icon, bmp);
+
+}
+
+
+/*--------------------- FinishInitializingISet ---------------------
+ *  Purpose:	Set Name and default PreviewObject and PreviewColors
+ *  Context:
+ *  Strategy:	In core, setting PreviewObject and PreviewColors in the
+ *		ISetHeader is for downward compatibility only. We have
+ *		added some new preview objects which the old icon editor
+ *		can't handle and will crash if he found the new values.
+ *		We no longer store the preview settings in the database file.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void	FinishInitializingISet(VMFileHandle vmFile, int iSet, char *name) {
+
+
+    IdSetISetName(vmFile, iSet, name);
+
+    IdSetPreviewObject(vmFile, iSet, DEFAULT_PREVIEW_OBJECT);
+    IdSetPreviewColors(vmFile, iSet, DEFAULT_ON_COLOR_1, DEFAULT_ON_COLOR_2, DEFAULT_OFF_COLOR_1, DEFAULT_OFF_COLOR_2);
+
+
+}
+
+/*--------------------- CreateNewToolIcon ---------------------
+ *  Purpose:	Create a new tool icon set with some icons
+ *  Context:	Create a new icon set
+ *  Strategy:
+ 	- iconFormats is a bit field. This means that each bit represents a
+ 	  specific icon, described by a IP_xx constant.
+ 	  If a specific bit is set, this icon must be created, otherwise not.
+	- We count the set bits and create an empty icon set
+	- Then we initialize each icon, again using the bits that are set
+	  For standard icon formats, we use InitializeIcon(), for custom
+	  icon formats we use InitializeCustomIcon().
+ *  Parameters:	vmFile:	Database file
+ *  Return:	number(Index) of the new icon set
+ ---------------------------------------------------------------------------*/
+int CreateNewToolISet(VMFileHandle vmFile) {
+int 	iSet, numIcons, n, icon;
+word	mask, iconFormats;
+int 	bmpColors, displaySize, aspect, width, height;
+
+	/*
+	 * Ask UI for information
+	 */
+    iconFormats = @call ToolIconFormatChooser1::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    iconFormats |= @call ToolIconFormatChooser2::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+	/*
+	 * Check if there is at least one icon selected. If not, bail.
+	 */
+    if ( iconFormats == 0) {
+    	MessageBoxOptr(@AtLeastOneIcon);
+    	iSet = IdGetISetCount(vmFile);
+    	return iSet - 1;	// note that NO_CURRENT_ISET is defined as -1
+    }
+
+	/*
+	 * Count the icons to create - that is: count the set bits
+	 */
+    mask = 1;
+    numIcons = 0;
+    for ( n = 0; n < 16; n++ ) {
+	if ( iconFormats & mask ) numIcons++;
+	mask <<= 1;
+    }
+
+	/*
+	 * Create the new icon set with numIcons icons
+	 */
+    iSet = IdAddISet(vmFile, numIcons);
+    IdSetEntryCount(vmFile, iSet , numIcons);
+
+	/*
+	 * Initialize the icons. There are up to four "standard" icons and
+	 * up to two custom icons. Every bit in iconFormats represents one of
+	 * the IP_xx constants and therefore an icon to create.
+	 */
+    icon = 0;
+    if ( iconFormats & IP_TINY_COLOR_TOOL_256 ) {
+    	InitializeIcon(vmFile, iSet, icon, IP_TINY_COLOR_TOOL_256);
+    	AssignInitialIconName(vmFile, iSet, icon, IP_TINY_COLOR_TOOL_256, 0);
+    	icon++;
+    }
+    if ( iconFormats & IP_TINY_COLOR_TOOL ) {
+	InitializeIcon(vmFile, iSet, icon, IP_TINY_COLOR_TOOL);
+    	AssignInitialIconName(vmFile, iSet, icon, IP_TINY_COLOR_TOOL, 0);
+    	icon++;
+    }
+    if ( iconFormats & IP_TINY_MONO_TOOL ) {
+    	InitializeIcon(vmFile, iSet, icon, IP_TINY_MONO_TOOL);
+    	AssignInitialIconName(vmFile, iSet, icon, IP_TINY_MONO_TOOL, 0);
+    	icon++;
+    }
+    if ( iconFormats & IP_STANDARD_CGA_TOOL ) {
+    	InitializeIcon(vmFile, iSet, icon, IP_STANDARD_CGA_TOOL);
+    	AssignInitialIconName(vmFile, iSet, icon, IP_STANDARD_CGA_TOOL, 0);
+    	icon++;
+    }
+
+    /*
+     * See if there is an custom tool selected.
+     * If not, return
+     */
+    if ( 0 == (iconFormats & (IP_CUSTOM_COLOR_TOOL | IP_CUSTOM_MONO_TOOL)) ) return iSet;
+
+    /*
+     * There is an custom tool selected.
+     * Get information from UI.
+     */
+    displaySize = @call ToolIconDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    aspect = @call ToolIconAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    width = @call CustomToolWidthValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    height = @call CustomToolHeightValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    /*
+     * Check icon memory size. If to large, return
+     */
+    bmpColors = @call CustomToolColorChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (CheckIconTooLargeAndDealWithIt(width, height, bmpColors | BMT_MASK) ) {
+	return iSet;
+    	}
+
+    /*
+     * Initialize icon(s)
+     */
+    if ( iconFormats & IP_CUSTOM_COLOR_TOOL ) {
+    	InitializeCustomIcon(vmFile, iSet, icon, VMS_TOOL, width, height, bmpColors, displaySize, aspect);
+    	AssignInitialCustomIconName(vmFile, iSet, icon, VMS_TOOL, bmpColors);
+    	icon++;
+    }
+
+    if ( iconFormats & IP_CUSTOM_MONO_TOOL ) {
+    	InitializeCustomIcon(vmFile, iSet, icon, VMS_TOOL, width, height, BMF_MONO, displaySize, aspect);
+    	AssignInitialCustomIconName(vmFile, iSet, icon, VMS_TOOL, BMF_MONO);
+    	icon++;
+    }
+
+
+    return iSet;
+}
+
+/*--------------------- CreateNewCustomISet ---------------------
+ *  Purpose:	Create a new custom icon set with up to two icons
+ *  Context:	Create a new icon set
+ *  Strategy:
+	- Get all relevant information from UI
+	- Create a new, empty icon set.
+	- Initialize the icon(s), using InitializeCustomIcon().
+ *  Parameters:	vmFile:	Database file
+ *  Return:	number(Index) of the new icon set
+ ---------------------------------------------------------------------------*/
+int CreateNewCustomISet(VMFileHandle vmFile) {
+int 	iSet, numIcons, style;
+int 	bmpColors, displaySize, aspect, width, height;
+Boolean addMonoIcon;
+
+    /*
+     * Ask UI for information about the icon
+     */
+    width = @call CustomWidthValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    height = @call CustomHeightValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bmpColors = @call CustomISetBitmapColorsChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    displaySize = @call CustomIconDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    aspect = @call CustomIconAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    style = @call CustomIconStyleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    addMonoIcon = @call CustomIconAddExtraMonoIcon::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ? TRUE : FALSE;
+
+    /*
+     * Check icon memory size. If to large, return the current icon set (first icon set has number zero)
+     */
+    if (CheckIconTooLargeAndDealWithIt(width, height, bmpColors | BMT_MASK) ) {
+    	iSet = IdGetISetCount(vmFile);
+    	return iSet - 1;
+    	}
+
+    /*
+     * Create the new icon set with one or two icons
+     */
+    numIcons = addMonoIcon ? 2 : 1;
+    iSet = IdAddISet(vmFile, numIcons);
+    IdSetEntryCount(vmFile, iSet , numIcons);
+
+
+    /*
+     * Initialize the icon(s) using InitializeCustomIcon();
+     */
+
+    InitializeCustomIcon(vmFile, iSet, 0, style, width, height, bmpColors, displaySize, aspect);
+    AssignInitialCustomIconName(vmFile, iSet, 0, style, bmpColors);
+    if ( addMonoIcon ) {
+    	InitializeCustomIcon(vmFile, iSet, 1, style, width, height, BMF_MONO, displaySize, aspect);
+    	AssignInitialCustomIconName(vmFile, iSet, 1, style, BMF_MONO);
+    }
+
+    return iSet;
+}
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file newIcons.goc ********************/
+
+

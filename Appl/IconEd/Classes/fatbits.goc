@@ -1,0 +1,1518 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	fatbits.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	stevey	8/18/92		Initial revision (documentVisBitmap.asm)
+ *	RainerB 8/02/2025	Ported to goc
+ *
+ *
+ * DESCRIPTION:	- Implementation of FatbitsClass (main code)
+ *		  The FatbitsClass implements the pixel-view of the current icon.
+ *		  It also implements all editing of the bitmap. Most parts of the
+ *		  editing code are implementes in other code files.
+ *		- Implementation of MousePtrViewClass
+ *		  This class implements a view that supports different mouse pointers
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+@classdecl FatbitsClass;
+
+/*
+ * Undo handling - see undo.goc
+ */
+@extern method FatbitsClass, MSG_FATBITS_CREATE_UNDO_CHAIN;
+@extern method FatbitsClass, MSG_FATBITS_UNDO_FLUSH_CHAIN;
+@extern method FatbitsClass, MSG_FATBITS_UNDO_SAVE_ICON_STATE;
+@extern method FatbitsClass, MSG_FATBITS_UNDO;
+@extern method FatbitsClass, MSG_FATBITS_REDO;
+@extern method FatbitsClass, MSG_FATBITS_ENABLE_UNDO_TRIGGERS;
+@extern method FatbitsClass, MSG_FATBITS_UPDATE_UNDO_TRIGGERS;
+
+/*
+ * Edit the bitmap - see edit.goc
+ */
+@extern method FatbitsClass, MSG_META_START_SELECT;
+@extern method FatbitsClass, MSG_META_PTR;
+@extern method FatbitsClass, MSG_META_END_SELECT;
+@extern method FatbitsClass, MSG_META_START_MOVE_COPY;
+@extern method FatbitsClass, MSG_META_END_MOVE_COPY;
+@extern method FatbitsClass, MSG_FATBITS_SET_BITMAP_TOOL;
+@extern method FatbitsClass, MSG_FATBITS_GET_BITMAP_TOOL;
+@extern method FatbitsClass, MSG_FATBITS_TEST_IF_PTR_IMAGE;
+@extern method FatbitsClass, MSG_FATBITS_TEST_AND_HANDLE_PTR_IMAGE_START_SELECT;
+
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_END_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT;
+@extern method FatbitsClass, MSG_FATBITS_START_ANTS;
+@extern method FatbitsClass, MSG_FATBITS_NEXT_ANTS;
+@extern method FatbitsClass, MSG_FATBITS_KILL_ANTS;
+@extern method FatbitsClass, MSG_FATBITS_DRAW_ANTS_OR_OUTLINE;
+@extern method FatbitsClass, MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL;
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_PTR_MOVE_COPY;
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_MOVE_SELECTED_AREA;
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_GET_SELECTED_BOUNDS;
+
+@extern method FatbitsClass, MSG_FATBITS_PENCIL_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_PENCIL_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_ERASR_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_ERASR_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_LINE_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_LINE_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_LINE_END_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_FILL_RECT_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_FILL_RECT_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_FILL_RECT_END_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_RECTANGLE_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_RECTANGLE_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_RECTANGLE_END_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_FILL_ELLIPSE_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_FILL_ELLIPSE_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_FILL_ELLIPSE_END_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_ELLIPSE_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_ELLIPSE_META_PTR;
+@extern method FatbitsClass, MSG_FATBITS_ELLIPSE_END_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_FLOOD_FILL_START_SELECT;
+
+@extern method FatbitsClass, MSG_FATBITS_FILL_MASK_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_EDIT_MASK_START_SELECT;
+@extern method FatbitsClass, MSG_FATBITS_EDIT_MASK_META_PTR;
+
+
+@extern method FatbitsClass, MSG_FATBITS_REDRAW_AFTER_DRAG;
+@extern method FatbitsClass, MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED;
+
+/*
+ * Import - draw bitmap into current bitmap - see impex.goc
+ */
+@extern method FatbitsClass, MSG_FATBITS_DRAW_BITMAP_INTO_CURRENT;
+@extern method FatbitsClass, MSG_FATBITS_DRAW_BITMAP_AT_XY;
+
+/*--------------------- Local Headers ---------------------
+ ---------------------------------------------------------------------------*/
+
+
+
+/*--------------------- MSG_META_INITIALIZE ---------------------
+ *  Purpose:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_META_INITIALIZE {
+    @callsuper();
+
+    ToolInitializeDrawAttrs(&(pself->FBI_lineAttrs), &(pself->FBI_areaAttrs));
+
+    pself->FBI_currentTool = 	BTF_INITIAL_TOOL;
+    pself->FBI_startSelectMsg = INITIAL_START_SELECT_MSG;
+    pself->FBI_metaPtrMsg = 	INITIAL_META_PTR_MSG;
+    pself->FBI_endSelectMsg = 	INITIAL_END_SELECT_MSG;
+}
+
+
+/*--------------------- MSG_VIS_RECALC_SIZE ---------------------
+ *  Purpose:	Return the size of the Content object
+ *  Context:	Geometry management
+ *  Strategy:
+ 	- if no bitmap existes, return default values
+ 	- if there is an bitmap, return bitmap size mutplied with FBI_pixelSize
+ *  Parameters:  SizeAsDWord (RecalcSizeArgs width; RecalcSizeArgs height9;
+ *  Return:	SizeAsDWord
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_VIS_RECALC_SIZE {
+int w, h;
+
+    if ( !pself->FBI_bitmap ) {
+    	w = 48;
+    	h = 30;
+    } else {
+    	BTGetMoreBitmapInfos(global.tempFile, pself->FBI_bitmap, &w, &h, 0);
+    }
+
+    w *= pself->FBI_pixelSize;
+    h *= pself->FBI_pixelSize;
+    return( MAKE_SIZE_DWORD(w , h) );
+}
+
+
+/*--------------------- MSG_META_CLIPBOARD_COPY ---------------------
+ * Purpose:     Copy current bitmap to clipboard
+ * Startegy:
+ *	- if there is a part of the image selected (ants are running), copy selection
+ *	- if not, copy whole image;
+ * Parameters:	void(void)
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_META_CLIPBOARD_COPY {
+VMBlockHandle bmp;
+
+    if ( pself->FBI_ants.antState != ANT_STATE_NO_ANTS ) {
+    	bmp = BTClipBitmap(global.tempFile, pself->FBI_bitmap, global.tempFile,
+    		pself->FBI_drag.x0, pself->FBI_drag.y0, pself->FBI_drag.x1, pself->FBI_drag.y1);
+    	BTCopyBitmapToClipboard(global.tempFile, bmp, BT_CLIP_COPY_ADD_GSTRING);
+    	HugeArrayDestroy(global.tempFile, bmp);
+    } else {
+	BTCopyBitmapToClipboard(global.tempFile, pself->FBI_bitmap, BT_CLIP_COPY_ADD_GSTRING);
+    }
+}
+
+
+/*--------------------- MSG_FATBITS_SET_FLAGS ---------------------
+ *  Purpose:	Set or clear common flags
+ *  Startegy:
+ *  Parameters:	flagsToSet
+ *		flagsToClear
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SET_FLAGS {
+
+     pself->FBI_flags |= flagsToSet;
+     pself->FBI_flags &= ~flagsToClear;
+}
+
+/*--------------------- MSG_FATBITS_GET_FLAGS ---------------------
+ *  Purpose:	Retrive common flags
+ *  Startegy:
+ *  Parameters:	-
+ *  Return:	FBI_flags value
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_GET_FLAGS {
+     return pself->FBI_flags;
+}
+
+
+/*--------------------- MSG_FATBITS_SET_PIXEL_SIZE ---------------------
+ *  Purpose:	Set pixel size for FatbitsView.
+ *		Update Zoom-Trigger
+ *  Startegy:
+ *  Parameters:	size: New pixel size
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SET_PIXEL_SIZE {
+
+     if ( size < 2 ) { @send FatbitsZoomOutTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW); }
+     		else { @send FatbitsZoomOutTrigger::MSG_GEN_SET_ENABLED(VUM_NOW); }
+     if ( size > 14 ) { @send FatbitsZoomInTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW); }
+     		else { @send FatbitsZoomInTrigger::MSG_GEN_SET_ENABLED(VUM_NOW); }
+
+     pself->FBI_pixelSize = size;
+     @call oself::MSG_FATBITS_RESIZE_AND_REDRAW(FALSE);
+}
+
+/*--------------------- MSG_FATBITS_GET_PIXEL_SIZE ---------------------
+ *  Purpose:	Return the Fatbits pixel size
+ *  Parameters:
+ *  Return:	object
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_GET_PIXEL_SIZE {
+     return pself->FBI_pixelSize;
+}
+
+/*--------------------- MSG_FATBITS_RESIZE_AND_REDRAW ---------------------
+ *  Purpose:	Resize Fatbits object and view
+ *  Context:	This message is called for a simple redraw as well as
+ *	        for a redraw after the size has been changed, e.g. after
+ *		a rotate operation.
+ *  Startegy:
+ 	- kill running ants - this is the simplest and saved way to handle ants
+ 	- get bitmap's size
+ 	- update FBI_bmFormat (bitmap colors and more informations)
+ 	  as well as the size information.
+ 	- if necessary:
+ 	  re-build shadow bitmaps (copy of the mask and working bmp for drag tools)
+ 	- send invalidate messages to Fatbits object and it's view
+ 	- send redraw message
+ *  Parameters:	forceRebuild: force to re-build the shadow bitmaps
+ *			      pass FALSE only if you are sure that the
+ *			      image has not been modified
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_RESIZE_AND_REDRAW {
+optr viewObj;
+int w, h;
+
+    if ( 0 == pself->FBI_bitmap) return;	/* may occur during start-up */
+    viewObj = pself->VCNI_view;
+
+    @call oself::MSG_FATBITS_KILL_ANTS();
+
+    /*
+     * update information about the current bitmap
+     */
+    w = pself->FBI_xSize;
+    h = pself->FBI_ySize;
+    pself->FBI_bmFormat = BTGetMoreBitmapInfos(global.tempFile, pself->FBI_bitmap,
+    			  &pself->FBI_xSize, &pself->FBI_ySize, 0);
+
+    /*
+     * if the size has been changed or on request: update shadow bitmaps
+     */
+    if ( w != pself->FBI_xSize ) forceRebuild = TRUE;
+    if ( h != pself->FBI_ySize ) forceRebuild = TRUE;
+
+    if ( forceRebuild ) {
+	if ( pself->FBI_maskBmp ) {
+	    HugeArrayDestroy(global.tempFile, pself->FBI_maskBmp);
+	    pself->FBI_maskBmp = 0;
+	}
+	if ( pself->FBI_drag.bmp ) {
+	    HugeArrayDestroy(global.tempFile, pself->FBI_drag.bmp);
+	    pself->FBI_drag.bmp = 0;
+	}
+	pself->FBI_maskBmp = BTExtractTransparencyMask(global.tempFile, pself->FBI_bitmap, global.tempFile, 0);
+	pself->FBI_drag.bmp = BTCreateOffscreenBitmap(global.tempFile, BMF_24BIT, pself->FBI_xSize, pself->FBI_ySize, NULL);
+    }
+
+
+    /*
+     * update ourself
+     */
+    @call oself::MSG_VIS_SET_SIZE(pself->FBI_xSize, pself->FBI_ySize);
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+
+    @call viewObj::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+    @call viewObj::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/*--------------------- MSG_FATBITS_DUPLICATE_AND_USE_BITMAP ---------------------
+ *  Purpose:	Duplicate the passed bitmap and use it
+ *  Parameters:	void (VMFileHandle vmFile, VMBlockHandle bmpHandle);
+ *  Strategy:
+ 	- destroy currently used bitmap
+ 	- duplicate the passed bitmap and use it
+ 	- resize and redraw the fatbist object
+ 	  this also updates the shadow bitmaps
+ 	- inform 'imageObject' that the bitmap has been changed
+ *  Return:	object
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_DUPLICATE_AND_USE_BITMAP {
+
+    EC( if ( !bmpHandle ) { ProgError("FATBITS_DUPLICATE_BITMAP: invalid bitmap"); return; } )
+    EC( if ( !vmFile ) { ProgError("FATBITS_DUPLICATE_BITMAP: invalid vmFile"); return; } )
+
+    if ( !global.tempFile ) return;	/* we are about to shut down - do nothing */
+
+    /*
+     * Store new bitmap. MSG_FATBITS_RESIZE_AND_REDRAW does the rest of the job,
+     * e.g. update size informatiion, store the mask as monochrome imgae separately
+     * or create a 24 bit bitmap for buffering, used by some tools.
+     */
+    if ( pself->FBI_bitmap ) HugeArrayDestroy(global.tempFile, pself->FBI_bitmap);
+    pself->FBI_bitmap = BTCopyBitmap(vmFile, global.tempFile, bmpHandle);
+
+    @call oself::MSG_FATBITS_RESIZE_AND_REDRAW(TRUE);
+    pself = ObjDerefVis(oself);
+
+    /*
+     * Update live preview
+     */
+    EC( if ( !pself->FBI_imageObj) { ProgError("Fatbits has no image object (use bitmap)"); return; } )
+    @send pself->FBI_imageObj::MSG_OTHER_CONTENT_USE_IMAGE(pself->FBI_bitmap);
+}
+
+/*--------------------- MSG_FATBITS_UPDATE_MASK_BMP ---------------------
+ *  Purpose:	After some operations (like shifting the image) the
+ *		copy of the bitmap's mask needs an update
+ *  Parameters:	void ();
+ *  Strategy:
+ 	- destroy currently used copy of the mask
+ 	- extract the current mask
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_UPDATE_MASK_BMP {
+
+    if ( pself->FBI_maskBmp ) HugeArrayDestroy(global.tempFile, pself->FBI_maskBmp);
+    pself->FBI_maskBmp = BTExtractTransparencyMask(global.tempFile, pself->FBI_bitmap, global.tempFile, 0);
+
+}
+
+/*--------------------- MSG_FATBITS_FREE_BITMAP ---------------------
+ *  Purpose:	Free the current bitmap so that the fatbits object will show nothings
+ *  Parameters:	void ();
+ *  Strategy:
+ 	- destroy currently used bitmap
+ 	  we don't destroy the sahdow bitmaps (FBI_maskBmp, FBI_drag.bmp). This is
+ 	  done when they are re-used.
+ 	- redraw itself
+ 	- inform 'imageObject' (live preview) that the bitmap has been changed
+ 	- clear out FatBitsInfoText
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_FREE_BITMAP {
+optr obj;
+
+    if ( pself->FBI_bitmap ) {
+     	HugeArrayDestroy(global.tempFile, pself->FBI_bitmap);
+     	pself->FBI_bitmap = 0;
+     	}
+
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+
+    EC( if ( !pself->FBI_imageObj) { ProgError("Fatbits has no image object (free bitmap)"); return; } )
+    @send pself->FBI_imageObj::MSG_OTHER_CONTENT_USE_IMAGE(0);
+
+    obj = ConstructOptr(OptrToHandle(oself),OptrToChunk(@FatBitsInfoText));
+    @send obj::MSG_VIS_TEXT_DELETE_ALL();
+
+}
+/*--------------------- MSG_FATBITS_GET_BITMAP ---------------------
+ *  Purpose:	Return the current bitmap handle
+ *  Parameters:	-
+ *  Strategy:
+ *  Return:	VMBlockHandle of the bitmap (whic is stored on global.tempFile)
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_GET_BITMAP {
+    return pself->FBI_bitmap;
+}
+
+/*--------------------- MSG_FATBITS_USE_ICON ---------------------
+ *  Purpose:	Load all required data from an icon to edit it
+ *  Parameters:	void (VMFileHandle vmFile, int iSet, int icon);
+ *  Strategy:
+ 	- find out icon's bitmap and use it
+ 	- update drawing attributes according to the icon to use
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_USE_ICON {
+VMBlockHandle bmp;
+
+
+    if (iSet == NO_CURRENT_ISET) { return; /* may occur if the database is empty */ }
+    if (icon == NO_CURRENT_ICON) { EC( ProgError("MSG_FATBITS_USE_ICON no icon");) return; }
+
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    EC( if (!bmp) { ProgError("MSG_FATBITS_USE_ICON no icon bitmp"); return; } )
+    @call oself::MSG_FATBITS_DUPLICATE_AND_USE_BITMAP(vmFile, bmp);
+
+    /*
+     * Update colors and draw attributes from icon
+     * Verify colors for savety
+     */
+    IdGetLineOrAreaAttrs(vmFile, iSet, icon, &(pself->FBI_lineAttrs), &(pself->FBI_areaAttrs));
+    @call oself::MSG_FATBITS_VERIFY_COLORS();
+
+}
+
+/*--------------------- MSG_FATBITS_SAVE_ICON ---------------------
+ *  Purpose:	Copy the changes in the currently editied icon back to the database
+ *  Parameters:	void (VMFileHandle vmFile, int iSet, int icon);
+ *  Strategy:
+ *	- replace the bitmap
+ *	- redraw the cuirrent icon
+ *	- redraw icon set in dbViewer if required
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SAVE_ICON {
+VMBlockHandle bmp;
+optr visISet, dbViewer, visIcon, viewObj;
+
+    /*
+     * Replace Bitmap
+     * Ensure that all transparent pixels are set to white. This is required
+     * for compatibility with the older version of the icon editor.
+     */
+    bmp =  BTCopyBitmap(global.tempFile, vmFile, pself->FBI_bitmap);
+    IconSetHiddenPixelsToWhite(vmFile, bmp);
+    IdClearAndSetEntryBitmap(vmFile, iSet, icon, bmp);
+
+    /*
+     * There is no need to copy the draw attributes (colors etc.) back
+     * to the icon, because they are updated every time when they
+     * changes (see MSG_GO_-xxx)
+     *     IdSetLineAttrs(vmFile, iSet, icon, &(pself->FBI_lineAttrs));
+     *	   IdSetAreaAttrs(vmFile, iSet, icon, &(pself->FBI_areaAttrs));
+     */
+
+    /*
+     * The VisIcon needs new bounds to draw the bitmap, because there
+     * is a new bitmap.
+     * Query for the optr of the visIcon and let MSG_VIS_ICON_INITIALIZE do the job.
+     */
+    visIcon = @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@IconListContent))::MSG_VIS_FIND_CHILD_AT_POSITION(icon);
+    @send visIcon::MSG_VIS_ICON_INITIALIZE(icon);
+
+    if ( global.flags & GF_ICON_SIZE_HAS_BEEN_CHANGED) {
+
+	/*
+	 * Update icon list to remove artifacts
+	 */
+	viewObj = CombineOselfWith(@IconListView);
+    	@send viewObj::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+    	@send viewObj::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+	global.flags &= ~GF_ICON_SIZE_HAS_BEEN_CHANGED;
+    }
+
+    /*
+     *  If the saved icon was the first one, the current VisISet also needs
+     *  new bounds that fits to the new bitmap.
+     */
+    dbViewer = ConstructOptr(OptrToHandle(oself), ChunkOf(@DBViewerContent));
+    if (icon == 0) {
+        /*
+         * Query the database viewer for the optr of the icon set. And let
+         * MSG_VIS_ISET_INITIALIZE do the job. Then redraw the database viewer.
+         */
+    	visISet = @call dbViewer::MSG_VIS_FIND_CHILD_AT_POSITION(iSet);
+    	@send visISet::MSG_VIS_ISET_INITIALIZE(iSet);
+    	@send dbViewer::MSG_VIS_INVALIDATE();
+    }
+
+
+    /*
+     * Update all non-modal dialogs, if they are open
+     */
+    @send dbViewer::MSG_DB_VIEWER_UPDATE_DIALOGS();
+}
+
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:
+ *	Draw method for FatbitsClass.
+ *  Context:
+ *  Strategy:
+ 	- set scale factor to pixelSize
+ 	- Draw bitmap scaled
+ 	- Draw grid, if appropriate
+ 	- Draw selection frame, if appropriate
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+// stop in FatbitsVIS_DRAW
+@method FatbitsClass, MSG_VIS_DRAW {
+int width, height, grid;
+
+    if ( !pself->FBI_bitmap) return;
+    /*
+     * draw bitmap scaled with FBI_pixelSize
+     * if global.useBackgroundPattern is set, draw background pattern
+     */
+    BTGetMoreBitmapInfos(global.tempFile, pself->FBI_bitmap, &width, &height, 0);
+    grid = pself->FBI_pixelSize;
+    width *= grid;
+    height *= grid;
+
+@if @ENABLE_BACKGROUND_PATTERN
+    if (global.useBackgroundPattern) {
+	GrSaveState(gstate);
+	GrSetAreaMaskSys(gstate, 17);
+	GrSetAreaColor(gstate, CF_INDEX, 23, 0, 0 );
+	GrFillRect(gstate, 0, 0, width, height);
+	GrRestoreState(gstate);
+    }
+@endif
+
+
+    GrSaveState(gstate);
+    GrApplyScale(gstate, MakeWWFixed(grid), MakeWWFixed(grid) );
+    if (pself->FBI_currentTool == BTF_EDIT_MASK) {
+    	GrDrawHugeBitmap(gstate, 0, 0, global.tempFile, pself->FBI_maskBmp);
+    } else {
+    	GrDrawHugeBitmap(gstate, 0, 0, global.tempFile, pself->FBI_bitmap);
+    }
+    GrRestoreState(gstate);
+
+    FatbitsDrawGrid(gstate, pself->FBI_currentTool, grid, width, height);
+
+    /*
+     * If a selection frame is active, we must restore it
+     */
+    if ( pself->FBI_ants.antState != ANT_STATE_NO_ANTS ) {
+        GrSaveState(gstate);
+        @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL(pself->FBI_ants.antState, FALSE, gstate);
+        @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL(LS_SOLID, TRUE, gstate);
+        GrRestoreState(gstate);
+    }
+
+    /*
+     * if we are in "edit-pointer-image" mode, we must draw the hotspot
+     */
+    if ( @call oself::MSG_FATBITS_TEST_IF_PTR_IMAGE() ) {
+    	int xHot, yHot, iSet, icon, opt;
+    	optr dbViewer;
+    	VMFileHandle	vmFile;
+
+	opt = @call PointerImageShowHotspotChooser::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if ( opt & PIO_SHOW_HOTSPOT ) {
+	    dbViewer = CombineOselfWith(@DBViewerContent);
+	    vmFile = @call dbViewer::MSG_DB_VIEWER_GET_DATABASE();
+	    iSet = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ISET();
+	    icon = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ICON();
+    	    IdGetHotspot(vmFile, iSet, icon, &xHot, &yHot);
+
+    	    GrSaveState(gstate);
+	    GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_RED, 0, 0 );
+	    GrFillRect(gstate, xHot*grid, yHot*grid, (xHot+1)*grid, (yHot+1)*grid);
+    	    GrRestoreState(gstate);
+    	}
+    }
+}
+
+/*--------------------- FatbitsDrawGrid ---------------------
+ *  Purpose:	Draw the grid for fatbits object
+ *  Strategy:
+ *	- see code
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void FatbitsDrawGrid(GStateHandle gstate, int curTool, int grid, int width, int height) {
+int x, y;
+
+    /*
+     * draw grid only if the FBI_pixelSize is not too small
+     */
+    if ( grid < 3 ) return;
+
+    GrSaveState(gstate);
+    /*
+     * If the mask bitmap is shown, draw all grid lines inverse (or light gray) and then return.
+     */
+    if (curTool == BTF_EDIT_MASK) {
+    	GrSaveState(gstate);
+	GrSetLineColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+
+	for (x = grid; x < width; x += grid) GrDrawVLine(gstate, x, 0, height);
+	for (y = grid; y < height; y += grid) GrDrawHLine(gstate, 0, y, width);
+
+	GrRestoreState(gstate);
+	return;
+   }
+
+    GrSetLineColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+    for (x = grid; x < width; x += grid) GrDrawVLine(gstate, x, 0, height);
+    for (y = grid; y < height; y += grid) GrDrawHLine(gstate, 0, y, width);
+
+    /*
+     * draw every 5th grid line in black or mark it with an extra dotted black line
+     */
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    grid *= 5;
+    if ( grid < 7*5 ) {
+    	// too small for an extra dotted line, draw grid lines in black
+	for (x = grid; x < width; x += grid) GrDrawVLine(gstate, x, 0, height);
+	for (y = grid; y < height; y += grid) GrDrawHLine(gstate, 0, y, width);
+
+    } else {
+    	// mark grid lines with an extra dotted line
+    	// Strange, LineMaskSys does not seem to be saved by GrSaveState.
+	GrSetLineMaskSys(gstate, SDM_50);
+	for (x = grid+1; x < width; x += grid) GrDrawVLine(gstate, x, 0, height);
+	for (y = grid+1; y < height; y += grid) GrDrawHLine(gstate, 0, y, width);
+	GrSetLineMaskSys(gstate, SDM_100);
+    }
+
+    GrRestoreState(gstate);
+}
+
+/*--------------------- FatbitsSendNotificationLow ---------------------
+ *  Purpose:	Send a pre-allocated data block to the controllers via GCN list
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void FatbitsSendNotificationLow(int listType, int notificationType, MemHandle dataBlock) {
+EventHandle	notifyEvent;
+
+    /* Record the event with notificationType to send it to:
+     * MANUFACTURER_ID_GEOWORKS::listType
+     * Then send it
+     */
+    notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+		   MANUFACTURER_ID_GEOWORKS, notificationType, dataBlock);
+
+    @call application::MSG_META_GCN_LIST_SEND(
+		GCNLSF_SET_STATUS, notifyEvent, dataBlock,
+		listType,  MANUFACTURER_ID_GEOWORKS);
+}
+
+/*--------------------- FatbitsCreateLineAttrNotifyBlock ---------------------
+ *  Purpose:	As the name says
+ *  Startegy
+ *	- Allocate a memory block with HAF_ZERO_INIT
+ *	- Only set really needed members of the big structure
+ *	- initializte reference count
+ *  Return:	Handle of the initialized and unlocked data block
+ ---------------------------------------------------------------------------*/
+MemHandle FatbitsCreateLineAttrNotifyBlock(IconLineAttrs lineAttrs) {
+GrObjNotifyLineAttrChange *nlacPtr;
+MemHandle	dataBlock;
+
+    dataBlock = MemAlloc(sizeof(GrObjNotifyLineAttrChange),
+		    HF_DYNAMIC | HF_SHARABLE, HAF_STANDARD_NO_ERR | HAF_ZERO_INIT);
+    nlacPtr = (GrObjNotifyLineAttrChange *)MemLock(dataBlock);
+
+    nlacPtr->GNLAC_lineAttr.GOBLAE_style = lineAttrs.lineStyle;
+    nlacPtr->GNLAC_lineAttr.GOBLAE_width = lineAttrs.lineWidth;
+    nlacPtr->GNLAC_lineAttr.GOBLAE_mask = lineAttrs.lineDrawMask;
+    nlacPtr->GNLAC_lineAttr.GOBLAE_drawMode = lineAttrs.lineMixMode;	/* changing lineMixMode not yet implemented */
+    nlacPtr->GNLAC_lineAttr.GOBLAE_r = lineAttrs.lineColor.rt;
+    nlacPtr->GNLAC_lineAttr.GOBLAE_g = lineAttrs.lineColor.gn;
+    nlacPtr->GNLAC_lineAttr.GOBLAE_b = lineAttrs.lineColor.bl;
+
+    /* In order to use the block as a data block for a notification,
+     * it must be unlocked and its reference count must be 1.
+     * For details on why, see the Clipsamp example.
+     */
+    MemUnlock(dataBlock);
+    MemInitRefCount(dataBlock, 1);
+
+    return dataBlock;
+}
+
+/*--------------------- FatbitsCreateAreaAttrNotifyBlock ---------------------
+ *  Purpose:	As the name says
+ *  Startegy
+ *	- Allocate a memory block with HAF_ZERO_INIT
+ *	- Only set really needed members of the big structure
+ *	- initializte reference count
+ *  Return:	Handle of the initialized and unlocked data block
+ ---------------------------------------------------------------------------*/
+MemHandle FatbitsCreateAreaAttrNotifyBlock(IconAreaAttrs areaAttrs) {
+GrObjNotifyAreaAttrChange *naacPtr;
+MemHandle	dataBlock;
+
+    dataBlock = MemAlloc(sizeof(GrObjNotifyAreaAttrChange),
+		    HF_DYNAMIC | HF_SHARABLE, HAF_STANDARD_NO_ERR | HAF_ZERO_INIT);
+    naacPtr = (GrObjNotifyAreaAttrChange *)MemLock(dataBlock);
+
+    naacPtr->GNAAC_areaAttr.GOBAAE_mask = areaAttrs.areaDrawMask;
+    naacPtr->GNAAC_areaAttr.GOBAAE_drawMode = areaAttrs.areaMixMode;
+    naacPtr->GNAAC_areaAttr.GOBAEE_pattern = areaAttrs.areaPattern;
+    naacPtr->GNAAC_areaAttr.GOBAAE_r = areaAttrs.areaColor.rt;
+    naacPtr->GNAAC_areaAttr.GOBAAE_g = areaAttrs.areaColor.gn;
+    naacPtr->GNAAC_areaAttr.GOBAAE_b = areaAttrs.areaColor.bl;
+
+
+    /* In order to use the block as a data block for a notification,
+     * it must be unlocked and its reference count must be 1.
+     * For details on why, see the Clipsamp example.
+     */
+    MemUnlock(dataBlock);
+    MemInitRefCount(dataBlock, 1);
+
+    return dataBlock;
+}
+
+/*--------------------- MSG_FATBITS_SEND_NOTIFICATIONS ---------------------
+ *  Purpose:	Send out all controller notifications to hold them up to date
+ *  Context:
+ *  Strategy:
+ *  Parameters:	word sendFlags	which notifiocatins to send
+ *				required to handle CustomColorsDialog correctly
+ *				and speed up things
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SEND_NOTIFICATIONS {
+MemHandle	dataBlock;
+int listType, notificationType;
+int index;
+
+    /*
+     * Area Attributes
+     */
+    if ( sendFlags & SEND_AREA_NOTIFICATIONS ) {
+	listType = GAGCNLT_APP_TARGET_NOTIFY_GROBJ_AREA_ATTR_CHANGE;
+	notificationType = GWNT_GROBJ_AREA_ATTR_CHANGE;
+
+	dataBlock = FatbitsCreateAreaAttrNotifyBlock(pself->FBI_areaAttrs);
+	FatbitsSendNotificationLow(listType, notificationType, dataBlock);
+
+	/*
+	* AreaColor Index (dialog and tool) as well as the CustomColorDialog requires
+	* extra handling because they are not part of the controller
+	*/
+	index = PaletteFindIndex(pself->FBI_areaAttrs.areaColor.rt,
+				pself->FBI_areaAttrs.areaColor.gn,
+				pself->FBI_areaAttrs.areaColor.bl,
+				((pself->FBI_bmFormat & BMT_FORMAT) == BMF_8BIT ) ? 256 : 16 );
+	@send AreaColorIndexGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE);
+	@send AreaColorToolIndexGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE);
+
+	UpdateCustomColorDialogColor(pself->FBI_areaAttrs.areaColor.rt,
+				pself->FBI_areaAttrs.areaColor.gn,
+				pself->FBI_areaAttrs.areaColor.bl, TRUE);
+    }
+
+    /*
+     * Line Attributes
+     */
+    if ( sendFlags & SEND_LINE_NOTIFICATIONS ) {
+	listType = GAGCNLT_APP_TARGET_NOTIFY_GROBJ_LINE_ATTR_CHANGE;
+	notificationType = GWNT_GROBJ_LINE_ATTR_CHANGE;
+
+	dataBlock = FatbitsCreateLineAttrNotifyBlock(pself->FBI_lineAttrs);
+	FatbitsSendNotificationLow(listType, notificationType, dataBlock);
+
+	/*
+	* Line Color Index (dialog and tool) as well as the CustomColorDialog requires
+	*  extra handling because they are not part of the controller
+	*/
+	index = PaletteFindIndex(pself->FBI_lineAttrs.lineColor.rt,
+				pself->FBI_lineAttrs.lineColor.gn,
+				pself->FBI_lineAttrs.lineColor.bl,
+				((pself->FBI_bmFormat & BMT_FORMAT) == BMF_8BIT ) ? 256 : 16 );
+	@send LineColorIndexGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE);
+	@send LineColorToolIndexGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE);
+
+	UpdateCustomColorDialogColor(pself->FBI_lineAttrs.lineColor.rt,
+				pself->FBI_lineAttrs.lineColor.gn,
+				pself->FBI_lineAttrs.lineColor.bl, FALSE);
+    }
+
+    /*
+     * Update bitmap Tools (dialog box and too bar)
+     */
+    if ( sendFlags & SEND_BMPTOOLS_NOTIFICATIONS ) {
+	@send IconBitmapToolControl::MSG_TOC_SELECT_BITMAP_TOOL(pself->FBI_currentTool, 0, 0);
+    }
+}
+
+/*--------------------- MSG_GO_SET_LINE_WIDTH ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *	- no callsuper() required
+ *  Parameters:	void (WWFixed width = dx.cx);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_LINE_WIDTH {
+
+    pself->FBI_lineAttrs.lineWidth = width;
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_LINE_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+/*--------------------- MSG_GO_SET_LINE_STYLE ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *	- no callsuper() required
+ *  Parameters:	void (LineStyle style = cl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_LINE_STYLE {
+
+    pself->FBI_lineAttrs.lineStyle = style;
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_LINE_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+/*--------------------- MSG_GO_SET_LINE_COLOR ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- store passed data
+ *	- check, if new color is compatible. If not, replace it
+ *	- send notifications to update all controllers
+ *	- update working gstate
+ *  Parameters:	void (byte red = cl, byte green = ch, byte blue = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_LINE_COLOR {
+Boolean ok;
+PaletteEntry newColor;
+
+    pself->FBI_lineAttrs.lineColor.rt = red;
+    pself->FBI_lineAttrs.lineColor.gn = green;
+    pself->FBI_lineAttrs.lineColor.bl = blue;
+
+    ok = FatbitsVerifyColor(pself->FBI_bmFormat, pself->FBI_lineAttrs.lineColor, &newColor);
+    if ( !ok ) {
+    	@send ReplacedOldColorContent::MSG_OTHER_CONTENT_SET_COLOR(red, green, blue);
+    	@send ReplacedNewColorContent::MSG_OTHER_CONTENT_SET_COLOR(newColor.rt, newColor.gn, newColor.bl);
+	UserDoDialog(@ReplacedColorDialog);
+	pself->FBI_lineAttrs.lineColor = newColor;
+    }
+
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_LINE_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+/*--------------------- MSG_GO_SET_LINE_MASK  ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *	- no callsuper() required
+ *  Parameters: void (SystemDrawMask drawMask = cl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_LINE_MASK {
+
+    pself->FBI_lineAttrs.lineDrawMask = drawMask;
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_LINE_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+
+/*--------------------- MSG_GO_SET_AREA_COLOR ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- store passed data
+ *	- check, if new color is compatible. If not, replace it
+ *	- send notifications to update all controllers
+ *	- update working gstate
+ *  Parameters:	void (byte red = cl, byte green = ch, byte blue = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_AREA_COLOR {
+Boolean ok;
+PaletteEntry newColor;
+
+    pself->FBI_areaAttrs.areaColor.rt = red;
+    pself->FBI_areaAttrs.areaColor.gn = green;
+    pself->FBI_areaAttrs.areaColor.bl = blue;
+
+    ok = FatbitsVerifyColor(pself->FBI_bmFormat, pself->FBI_areaAttrs.areaColor, &newColor);
+    if ( !ok ) {
+    	@send ReplacedOldColorContent::MSG_OTHER_CONTENT_SET_COLOR(red, green, blue);
+    	@send ReplacedNewColorContent::MSG_OTHER_CONTENT_SET_COLOR(newColor.rt, newColor.gn, newColor.bl);
+	UserDoDialog(@ReplacedColorDialog);
+	pself->FBI_areaAttrs.areaColor = newColor;
+    }
+
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_AREA_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+/*--------------------- MSG_GO_SET_AREA_MASK ---------------------
+ *  Purpose:	Sets the
+ *  Strategy:
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *	- no callsuper() required
+ *  Parameters:	void (SystemDrawMask mask = cl)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_AREA_MASK {
+
+    pself->FBI_areaAttrs.areaDrawMask = mask;
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_AREA_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+/*--------------------- MSG_GO_SET_AREA_PATTERN ---------------------
+ *  Purpose:	Sets the line draw mask
+ *  Strategy:
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *	- no callsuper() required
+ *  Parameters:	void (GraphicPattern pattern = cx);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_GO_SET_AREA_PATTERN {
+
+    pself->FBI_areaAttrs.areaPattern = pattern;
+    @send oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_AREA_NOTIFICATIONS);
+    @send oself::MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON();
+}
+
+/*--------------------- MSG_FATBITS_SET_AREA_COLOR_FROM_INDEX ---------------------
+ *  Purpose:	Set the area color according to the passed index
+ *		using the current palette (or system palette in no
+ *		current palette is available).
+ *  Strategy:
+ *	- Get the color
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SET_AREA_COLOR_FROM_INDEX {
+PaletteEntry color;
+
+    color = PaletteGetColorFromIndex(selection);
+    @call oself::MSG_GO_SET_AREA_COLOR(color.rt, color.gn, color.bl);
+}
+
+/*--------------------- MSG_FATBITS_SET_LINE_COLOR_FROM_INDEX ---------------------
+ *  Purpose:	Set the line color according to the passed index
+ *		using the current palette (or system palette in no
+ *		current palette is available).
+ *  Strategy:
+ *	- Get the color
+ *	- store passed data
+ *	- update working gstate
+ *	- send notifications to update all controllers
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SET_LINE_COLOR_FROM_INDEX {
+PaletteEntry color;
+
+    color = PaletteGetColorFromIndex(selection);
+    @call oself::MSG_GO_SET_LINE_COLOR(color.rt, color.gn, color.bl);
+}
+
+/*--------------------- MSG_FATBITS_GET_COLORS ---------------------
+ *  Purpose:	Retrives current colors from Fatbits object
+ *  Strategy:
+ *  Parameters:	void (PaletteEntry *lineColor, PaletteEntry *areaColor);
+ *		Pass a NULL pointer if you are not interested in a particular color
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_GET_COLORS {
+
+    if (lineColor) {
+    	*lineColor = pself->FBI_lineAttrs.lineColor;
+    }
+
+    if (areaColor) {
+    	*areaColor = pself->FBI_areaAttrs.areaColor;
+    }
+}
+
+
+/*--------------------- MSG_FATBITS_SET_ATTRS ---------------------
+ *  Purpose:	Set all line and area attributes for the object
+ *		Do not send out the notification message
+ *  Strategy:
+ *  Parameters:	IconLineAttrs lineAttrs
+ *	 	IconAreaAttrs areaAttrs);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_SET_ATTRS {
+
+    pself->FBI_lineAttrs = lineAttrs;
+    pself->FBI_areaAttrs = areaAttrs;
+ }
+
+/*--------------------- MSG_FATBITS_GET_ATTRS ---------------------
+ *  Purpose:	Retrives current line and/or area attributes from Fatbits object
+ *  Strategy:
+ *  Parameters:	IconLineAttrs *lineAttrs
+ *		IconAreaAttrs *areaAttrs
+ *		Pass a NULL pointer if you are not interested in a particular attribute
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_GET_ATTRS {
+
+    if (lineAttrs) {
+    	*lineAttrs = pself->FBI_lineAttrs;
+    }
+
+    if (areaAttrs) {
+    	*areaAttrs = pself->FBI_areaAttrs;
+    }
+}
+
+
+/*--------------------- MSG_FATBITS_VERIFY_COLORS ---------------------
+ *  Purpose:	Verify that the currently selected line color and area color
+ *		are compatible with the image we are currently editing.
+ *  Strategy:
+ *	- check line color and area color separately
+ *	  * if not compatibele replace it by a comaptible color
+ *	  * do not display any message to the user
+ *  Parameters:	(none)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_VERIFY_COLORS {
+Boolean ok;
+PaletteEntry newColor;
+
+    /*
+     * We have to check line color as well as area color separately
+     */
+    ok = FatbitsVerifyColor(pself->FBI_bmFormat, pself->FBI_lineAttrs.lineColor, &newColor);
+    if (!ok) {
+    	pself->FBI_lineAttrs.lineColor = newColor;
+    }
+    ok = FatbitsVerifyColor(pself->FBI_bmFormat, pself->FBI_areaAttrs.areaColor, &newColor);
+    if (!ok) {
+    	pself->FBI_areaAttrs.areaColor = newColor;
+    }
+
+}
+
+/*--------------------- FatbitsVerifyColor ---------------------
+ *  Purpose:	Check if the passed color is compatible with the
+ *		image we are currently editing.
+ *  Strategy:
+ *	- true color images accept any color
+ *	- monochrome images only accept black and white
+ *	- for 4 bit or 8 bit images, : check the palette (this may be the standard palette)
+ *	  - if color was found in the palette: OK
+ *	  - if not: find out the "nearest" color from the palette
+ *  Parameters:	format: color depth. BMType value (with BMT_PALETTE set, e.g.) is ok.
+ *		color   color to check
+ *		newColor: the most similar color if not comaptible
+ *  Return:	TRUE  	if color is comaptible
+ *		FALSE 	if not
+ ---------------------------------------------------------------------------*/
+Boolean FatbitsVerifyColor(int format, PaletteEntry color, PaletteEntry *newColor) {
+WWFixedAsDWord	gray;
+int val, idx;
+PaletteEntry	* palette;
+
+
+    format &= BMT_FORMAT;	/* mask color depth */
+    *newColor = color;		/* always return a valid color */
+
+    switch (format) {
+
+    case BMF_24BIT: return TRUE;	/* If we have a true color image, we are always ok */
+
+    case BMF_MONO:
+    	if ( (color.rt == 0) && (color.gn == 0) && (color.bl == 0) ) return TRUE;
+    	if ( (color.rt == 0xFF) && (color.gn == 0xFF) && (color.bl == 0xFF) ) return TRUE;
+
+    	/* calculate gray value */
+     	gray = GrMulWWFixed( MakeWWFixed(0.299), MakeWWFixed(color.rt) )
+		+ GrMulWWFixed( MakeWWFixed(0.587), MakeWWFixed(color.gn)  )
+		+ GrMulWWFixed( MakeWWFixed(0.114), MakeWWFixed(color.bl)  );
+
+	/* compare with middle gray and set newColor to black or white */
+	if ( ((gray+0x8000) >> 16) > 128 ) { val = 0xFF; } else { val = 0; }
+	memset(newColor, val, sizeof(PaletteEntry));
+	return FALSE;
+
+
+    case BMF_4BIT: val = 16; break;	/* number of colors */
+    default: val = 256; break;
+    }
+
+    /*
+     * Search for color in the current palette (this may be the standard palette).
+     */
+    idx = PaletteFindIndex(color.rt, color.gn, color.bl, val);
+    if ( idx >= 0 ) return TRUE;
+
+
+    /*
+     * The color is not in the palette. Find a similar color.
+     * IconLockGlobalPalette() locks the bitmaps individual palette, if
+     * we have one, or the GEOSStandardPalette, if not
+     */
+    palette = IconLockGlobalPalette();
+    idx = BTApproxRGBPaletteLinear(palette, color, val);
+    IconUnlockGlobalPalette();
+
+    *newColor = PaletteGetColorFromIndex(idx);
+
+    return FALSE;
+}
+
+
+
+
+/*--------------------- MSG_FATBITS_LINE_EXTRA_APP_UI_STATUS_MSG ---------------------
+ *  Purpose:	Update controller UI and CustomColorsDialog UI when a new
+ *		colors has been selected in LineColorIndexGroup´
+ *		LineColorIndexGroup is added to the IconLineColorSelector
+ *		with ATTR_GEN_CONTROL_APP_UI
+ *  Strategy:
+ *	- read current line attrs from fatbits object and replace line color
+ *	- create a GCN message to update the controller.
+ *	  This holds tool UI and dialog UI of the controller consistent
+ *	- The CustomColorsDialog is not part of the controller, so it
+ *	  must be informed separately
+ *  Parameters:	(GEN_ITEM_GROUP_STATUS_MSG)
+    	    	    	    	    word selection = cx,
+				    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_LINE_EXTRA_APP_UI_STATUS_MSG {
+IconLineAttrs lineAttrs;
+PaletteEntry color;
+MemHandle mh;
+
+    @call oself::MSG_FATBITS_GET_ATTRS(&lineAttrs, NULL);
+    color = PaletteGetColorFromIndex(selection);
+    lineAttrs.lineColor = color;
+
+    mh = FatbitsCreateLineAttrNotifyBlock(lineAttrs);
+    @send IconLineColorSelector::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+		   MANUFACTURER_ID_GEOWORKS, GWNT_GROBJ_LINE_ATTR_CHANGE, mh);
+
+    UpdateCustomColorDialogColor(color.rt, color.gn, color.bl, FALSE); // FALSE == line color changed)
+
+}
+
+/*--------------------- MSG_FATBITS_AREA_EXTRA_APP_UI_STATUS_MSG ---------------------
+ *  Purpose:	Update controller UI and CustomColorsDialog UI when a new
+ *		colors has been selected in AreaColorIndexGroup´
+ *		AreaColorIndexGroup is added to the IconAreaColorSelector
+ *		with ATTR_GEN_CONTROL_APP_UI
+ *  Strategy:
+ *	- read current area attrs from fatbits object and replace area color
+ *	- create a GCN message to update the controller.
+ *	  This holds tool UI and dialog UI of the controller consistent
+ *	- The CustomColorsDialog is not part of the controller, so it
+ *	  must be informed separately
+ *  Parameters:	(GEN_ITEM_GROUP_STATUS_MSG)
+    	    	    	    	    word selection = cx,
+				    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_AREA_EXTRA_APP_UI_STATUS_MSG {
+IconAreaAttrs areaAttrs;
+PaletteEntry color;
+MemHandle mh;
+
+    @call oself::MSG_FATBITS_GET_ATTRS(NULL, &areaAttrs);
+    color = PaletteGetColorFromIndex(selection);
+    areaAttrs.areaColor = color;
+
+    mh = FatbitsCreateAreaAttrNotifyBlock(areaAttrs);
+    @send IconAreaColorSelector::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+		   MANUFACTURER_ID_GEOWORKS, GWNT_GROBJ_AREA_ATTR_CHANGE, mh);
+
+    UpdateCustomColorDialogColor(color.rt, color.gn, color.bl, TRUE); // TRUE == area color changed
+
+}
+
+
+/*--------------------- MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON ---------------------
+ *  Purpose:	Write line~ and area attributes to current icon
+ *  Strategy:
+ *	- get database object
+ *	- fetch current iSet and icon
+ *	- copy draw attrs to the icon
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_WRITE_DRAW_ATTRS_TO_ICON {
+optr dbViewerObj;
+VMFileHandle vmFile;
+int iSet, icon;
+
+    dbViewerObj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent));
+    vmFile = @call dbViewerObj::MSG_DB_VIEWER_GET_DATABASE();
+
+    iSet = @call dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    if (iSet == NO_CURRENT_ISET) return;
+
+    icon = @call dbViewerObj::MSG_DB_VIEWER_GET_CURRENT_ICON();
+    if (icon == NO_CURRENT_ICON) return;
+
+    IdSetLineAttrs(vmFile, iSet, icon, &(pself->FBI_lineAttrs));
+    IdSetAreaAttrs(vmFile, iSet, icon, &(pself->FBI_areaAttrs));
+}
+
+
+
+
+/*--------------------- MSG_FATBITS_TRANSFORM_ICON ---------------------
+ *  Purpose:	Do some simple transformation operations with the edited bitmap
+ *  Context:
+ *  Strategy:
+ *  Parameters:	void  (int operation);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_TRANSFORM_ICON {
+VMBlockHandle bmpBlock, newBmp = 0;
+VMFileHandle  vmFile;
+optr dbViewerObj;
+
+
+    bmpBlock = pself->FBI_bitmap;
+    if (!bmpBlock) return;
+
+    vmFile = global.tempFile;
+    if (!vmFile) return;
+
+    /*
+     * Perform operation. Save current state first (for undo)
+     */
+    AppMarkBusy();
+
+    switch (operation) {
+    case ITT_FLIP_HORIZONTALLY:
+    	@call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_FLIP);
+	newBmp = BTFlipBitmapH(vmFile, bmpBlock, vmFile, 0);
+    	break;
+    case ITT_FLIP_VERTICALLY:
+    	@call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_FLIP);
+	newBmp = BTFlipBitmapV(vmFile, bmpBlock, vmFile, 0);
+    	break;
+    case ITT_ROTATE_90:
+    	@call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_ROTATE);
+    	newBmp = BTRotateBitmap90(vmFile, bmpBlock, vmFile, 0);
+    	break;
+    case ITT_ROTATE_180:
+    	@call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_ROTATE);
+    	newBmp = BTRotateBitmap180(vmFile, bmpBlock, vmFile, 0);
+    	break;
+    case ITT_ROTATE_270:
+    	@call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_ROTATE);
+    	newBmp = BTRotateBitmap270(vmFile, bmpBlock, vmFile, 0);
+        break;
+    }
+
+    if ( newBmp ) {
+	/*
+	 * Set new Bitmap. Mark icon as dirty
+	 */
+	pself->FBI_bitmap = newBmp;
+        dbViewerObj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent) );
+    	@call dbViewerObj::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+
+	/*
+	 * Resize and redraw fatbits as well as live preview.
+	 * Then free old bitmap
+	 */
+	@call oself::MSG_FATBITS_RESIZE_AND_REDRAW(TRUE);
+	pself = ObjDerefVis(oself);
+	@send pself->FBI_imageObj::MSG_OTHER_CONTENT_USE_IMAGE(pself->FBI_bitmap);
+	HugeArrayDestroy(vmFile, bmpBlock);
+    }
+
+    AppMarkNotBusy();
+
+}
+
+/*--------------------- MSG_FATBITS_GET_PIXEL_COLOR ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	x, y:	Coordinates
+ *		index:	return: color index for index color bitmaps
+ *			if no index available, return -1 here
+ *  Return:	Color of the pixel as PaletteEntry
+ *		In case of error : black
+ ---------------------------------------------------------------------------*/
+@method FatbitsClass, MSG_FATBITS_GET_PIXEL_COLOR {
+VMBlockHandle bmpBlock;
+VMFileHandle  vmFile;
+int format, width, height, size, b, idx;
+PaletteEntry color = { 0, 0, 0 };
+PaletteEntry white = { 0xFF, 0xFF, 0xFF };
+PaletteEntry *palette, *rgbPtr;
+byte *linePtr, *dataPtr;
+
+    /*
+     * buffer data and do error checks
+     */
+    bmpBlock = pself->FBI_bitmap;
+    if (!bmpBlock) return color;
+    vmFile = global.tempFile;
+    if (!vmFile) return color;
+
+    /*
+     * lock palette and correct pixel line
+     * Skip mask bytes, itf we have it
+     * to keep things simple, the palette is lockend even if the bitmap has no palette
+     */
+    format = BTGetMoreBitmapInfos(vmFile, bmpBlock, &width, &height, 0);
+    if ( (x >= width) || (y>=height) ) return color;
+    palette = IconLockGlobalPalette();
+    HugeArrayLock(vmFile, bmpBlock, y, (void**)&linePtr, (word*)&size);
+    if (format & BMT_MASK) { dataPtr = linePtr + (width+7)/8; }
+    		      else { dataPtr = linePtr; }
+
+    /*
+     * Read pixel. return default index '-1' - no index available
+     */
+    if ( index ) *index = -1;
+
+    switch (format & BMT_FORMAT) {
+    case BMF_MONO:
+	dataPtr += x/8;
+	b = *dataPtr;
+	if ( ( b & (0x80 >> (x & 0x07)) ) == 0 ) color = white;
+	/* default is black */
+    	break;
+    case BMF_4BIT:
+    	b = dataPtr[x/2];
+    	if ( x & 1 ) { idx = b & 0x0F; }
+    		else { idx = (b & 0xF0) >> 4; }
+        color = palette[idx];
+    	if ( index ) *index = idx;
+    	break;
+    case BMF_8BIT:
+    	idx = dataPtr[x];
+    	color = palette[idx];
+    	if ( index ) *index = idx;
+    	break;
+    case BMF_24BIT:
+    	rgbPtr = (PaletteEntry*)dataPtr;
+    	color = rgbPtr[x];
+    	break;
+    }
+
+    /*
+     * unlock things and return
+     */
+    IconUnlockGlobalPalette();
+    HugeArrayUnlock(linePtr);
+
+    return color;
+}
+
+
+/* ###############################################  */
+
+
+/*-----------------------------------------------------------------------------
+ *
+ *  MousePtrViewClass
+ *
+ ---------------------------------------------------------------------------*/
+@classdecl MousePtrViewClass;
+
+
+
+/*--------------------- MSG_MOUSE_PTR_VIEW_ENTER ---------------------
+ *  Purpose:	The mouse pointer enters the view area
+ *  Context:
+ *  Strategy:
+ 	- set proper pointer image
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method MousePtrViewClass, MSG_MOUSE_PTR_VIEW_ENTER {
+int tool, size;
+optr fatbitsObj;
+
+    @callsuper();
+    switch (pself->MPVI_contentType) {
+    case MPV_CONTENT_FATBITS:
+    	/*
+    	 * The pointer image depends on the current tool
+	 */
+	fatbitsObj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits));
+	tool = @call fatbitsObj::MSG_FATBITS_GET_BITMAP_TOOL();
+
+	switch (tool) {
+	case BTF_SELECTION:
+	    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@SelectionPointer, PIL_WINDOW);
+	    break;
+	case BTF_ERASER:
+	    size = @call FatbitImageSizeGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	    if ( size < 5 ) {
+	        @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@EraserSmallPointer, PIL_WINDOW);
+	    } else {
+	        @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@EraserPointer, PIL_WINDOW);
+	    }
+	    break;
+	case BTF_FILL_MASK:
+	    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@FillMaskPointer, PIL_WINDOW);
+	break;
+	case BTF_FLOOD_FILL:
+	    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@FloodFillPointer, PIL_WINDOW);
+	    break;
+	case BTF_PICK_COLOR:
+	    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@PipettePointer, PIL_WINDOW);
+	    break;
+	default:
+@if @DEFAULT_EDIT_MOUSE_POINTER_IS_STANDARD_POINTER
+	    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(0, PIL_WINDOW);
+@elseif
+	    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@StandardPointer, PIL_WINDOW);
+@endif
+	}
+    break;
+
+    case MPV_CONTENT_CROP_IMAGE:
+    	@call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(@SelectionPointer, PIL_WINDOW);
+    break;
+
+    case MPV_CONTENT_POINTER_PREVIEW:
+    	@call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(pself->MPVI_ptrOp, PIL_WINDOW);
+    break;
+
+    }
+}
+
+/*--------------------- MSG_MOUSE_PTR_VIEW_LEAVE ---------------------
+ *  Purpose:	The mouse pointer is leaving the view area
+ *  Context:
+ *  Strategy:
+ 	- clear mouse pointer position text
+ 	- reset pointer image
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method MousePtrViewClass, MSG_MOUSE_PTR_VIEW_LEAVE {
+optr obj;
+
+    @callsuper();
+    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(0, PIL_WINDOW);
+
+    switch (pself->MPVI_contentType) {
+
+    case MPV_CONTENT_FATBITS:
+    	obj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@FatBitsMouseText));
+    	@call obj::MSG_VIS_TEXT_DELETE_ALL();
+    	break;
+
+    case MPV_CONTENT_CROP_IMAGE:
+        @call CropImageMouseText::MSG_VIS_TEXT_DELETE_ALL();
+    	break;
+
+    case MPV_CONTENT_POINTER_PREVIEW:
+    	break;
+   }
+
+}
+
+/*--------------------- MSG_MPV_UPDATE_POINTER_IMAGE ---------------------
+ *  Purpose:	Update pointer image for MPV_CONTENT_POINTER_PREVIEW mode
+ *  Context:
+ *  Strategy:	- free old pointer memory (if we have one)
+ *		- assing new pointer
+ *  Parameters:	ptrImg	new pointer image
+ *			may be zero to clear pointer image
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method MousePtrViewClass,  MSG_MPV_UPDATE_POINTER_IMAGE {
+
+    if (pself->MPVI_ptrOp) {
+    	@call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(0, PIL_WINDOW);
+    	MemFree(OptrToHandle(pself->MPVI_ptrOp));
+    }
+    pself->MPVI_ptrOp = ptrImg;
+    @call oself::MSG_GEN_VIEW_SET_PTR_IMAGE(ptrImg, PIL_WINDOW);
+
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file fatbits.goc ********************/
+
+

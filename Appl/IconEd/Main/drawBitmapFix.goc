@@ -1,0 +1,826 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	drawBitmapFix.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 1/11/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deal with converting and drawing bitmaps
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "bmptools.goh"
+@include "lmacros.goh"
+
+
+/*--------------------- IconToolCreateBitmap ---------------------
+ *  Purpose:	This is the central routine to create an empty bitmap.
+ *  Context:
+ *  Strategy:	We use BTCreateOffscreenBitmap from bmptools library,
+ *		therefore we have to use HugeArrayDestroy() to free a bitmap
+ *  Parameters:	vmFile,
+ 		bmfmt  bitmap format for the new bitmap
+ 		width, height: size of the bitmap
+ 		clear:	Clear bitmap data
+ *  Return:	Handle of the bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle IconToolCreateBitmap(VMFileHandle vmFile, BMFormat bmfmt, int width, int height, PaletteEntry *palette, Boolean clear) {
+VMBlockHandle bmp;
+BitmapAccessRecord	bar;
+byte	*data;
+int  line, numBytes, maskBytes;
+
+
+    bmp = BTCreateOffscreenBitmap(vmFile, bmfmt, width, height, palette);
+
+    if (clear) {
+
+    	// The byte-size of a bitmap line depends on the bitmap format
+        switch (bmfmt & BMT_FORMAT) {
+	case BMF_MONO:
+	    numBytes = (width+7)/8;
+	    break;
+    	case BMF_4BIT:
+	    numBytes = (width+1)/2;
+	    break;
+        case BMF_8BIT:
+	    numBytes = width;
+	    break;
+    	default: 	// 24 Bit
+	    numBytes = 3*width;
+	}
+
+        if ( bmfmt & BMT_MASK) { maskBytes = (width+7)/8; } else { maskBytes = 0; }
+
+	/*
+	 * To be comaptible with the old IconEditor, we have
+	 * to set the mask to zero and the data bits to “white”.
+	 * A different color would also be cool, but could confuse the user.
+	 */
+	data = BTBitmapLock(vmFile, bmp, &bar, 0);	// lock first line
+    	for (line = 0; line < height; line++ ) {
+    	    if ( maskBytes ) {
+    	    	memset(data, 0, maskBytes);
+    	    	data += maskBytes;
+    	    	}
+    	    if ( (bmfmt & BMT_FORMAT) == BMF_MONO) {memset(data, 0x00, numBytes);}
+	  	else { memset(data, 0xFF, numBytes); }
+	    data = BTBitmapNext(&bar, TRUE);		// fast lock next line
+	    if (!data) break;
+	    }
+	BTBitmapUnlock(&bar, TRUE);			// unlock all
+    }
+
+    return bmp;
+}
+
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+
+
+/*********************************************************************************
+ *
+ *	Draw a bitmap into another
+ *	Negative coordinates, working with masks and palettes are not handled properly
+ *	by the system in some cases. Therefore we need a huge workaround.
+ *
+ *********************************************************************************/
+
+/*--------------------- LocalClipBitmap ---------------------
+ *  Purpose:	Clip bitmap do avoid negative drawing coordinates
+ *		This routine maskes a copy, stored in destFile
+ *  Strategy:
+ *	- see, if the coordiantes are negative
+ *	  if yes, calculate clipped width / height and update the drawing coordinates to zero
+ *	- clip the bitmap
+ *  Parameters:	srcFile, bmp:	Bitmap to clip
+ *		*x0, *y0:	Coordinates where the bitmap should be drawn
+ *		srcWidth,
+ *		srcHeigth:	Dimensions of the target bitmap
+ *		destFile:	VMFile for new bitmap
+ *  Return:	handle of the clipped bitmap
+*		*x0, *y0:	New coordinates to draw the clipped bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle LocalClipBitmap(VMFileHandle srcFile, VMBlockHandle srcBmp, int *x0, int *y0, int srcWidth, int srcHeight, VMFileHandle destFile) {
+int w, h;
+VMBlockHandle bmpToDraw;
+
+    w = srcWidth;
+    if (*x0 < 0) { w += *x0; *x0 = 0;}
+    h = srcHeight;
+    if ( *y0 < 0 ) { h += *y0; *y0 = 0; }
+
+    /* BTClipBitmap() also checks for invaild sizes and returns zero in this case */
+    bmpToDraw = BTClipBitmap(srcFile, srcBmp, destFile, srcWidth - w, srcHeight - h, srcWidth-1, srcHeight-1);
+    return bmpToDraw;;
+}
+
+
+/*--------------------- LocalCheckDrawCompatible ---------------------
+ *  Purpose:	See if a bitmap of the given srcFormat can be drawn properly
+ *		to a bitmap with the destFormat by the system.
+ *		If not, a work around is required.
+ *  Context:	Drawing routines of the system are buggy (01/2026) if a palette
+ *		is involed. Please do not touch this routine, if the probem is
+ *		fixed in the system, or the program will be incompatibe
+ *		with older system versions.
+ *  Paramters:	srcFormat,
+ *		destFormat:	BMFormat values
+ *  Return:	TRUE, if the system can draw it properly, FALSE if not
+ ---------------------------------------------------------------------------*/
+Boolean LocalCheckDrawCompatible(int srcFormat, int destFormat) {
+
+    /*
+     * We always accept monochrome bitmap as destination format, even if the
+     * system may diter the source using wrong colors, if the source has a palette
+     * True color bitmaps as destination format also works fine.
+     */
+    if ( (destFormat & BMT_FORMAT) == BMF_MONO ) return TRUE;
+    if ( (destFormat & BMT_FORMAT) == BMF_24BIT ) return TRUE;
+
+    /*
+     * In all other cases: The system cannot handle palettes properly
+     */
+    if ( srcFormat & BMT_PALETTE ) return FALSE;
+    if ( destFormat & BMT_PALETTE ) return FALSE;
+
+    return TRUE;
+}
+
+/*--------------------- CreatePaletteMapTableLow ---------------------
+ *  Purpose:	Actually create a palette mapping table
+ ---------------------------------------------------------------------------*/
+byte * CreatePaletteMapTableLow(PaletteEntry *srcPal, int srcCount, PaletteEntry *destPal, int destCount) {
+byte *mapTable;
+int n;
+
+    /*
+     * We want to map an index form the source to destination:
+     * destIndex = mapTable[srcIndex] --> mapTable must have the size scrCount
+     */
+    mapTable = malloc(srcCount + 4);	// a few bytes more for savety
+
+    for ( n = 0; n < srcCount; n++ ) {
+    	mapTable[n] = BTApproxRGBPaletteLinear(destPal, srcPal[n], destCount);
+    }
+
+    return mapTable;
+}
+
+/*--------------------- LocalCreatePaletteMapTable ---------------------
+ *  Purpose:	Create a palette index mapping table
+ *  Context:	We have already extracted the palette of the target bitmap
+ *  Strategy:
+ *	- Find a valid pointer to the source bitmap palette as well as the target bitmap palette.
+ *	- Create the mapping table
+ *	- Don't forget to free/unlock the palette pointers
+ *  Parameters:	vmFile, bmp:	Bitmap to handle
+ *		width, height:	Dimensions of this bitmap
+ *		bmFormat:	BMFormat value for this bitmap
+ *		destPalPtr:	Pointer to the palette of the target bitmap
+ *				NULL if the target has no palette (uses the standard palette)
+ *		destPalCount:	Color depth of the target bitmap
+ *  Return:
+ ---------------------------------------------------------------------------*/
+byte *LocalCreatePaletteMapTable(VMFileHandle vmFile, VMBlockHandle bmp, BMFormat bmFormat,
+				PaletteEntry *destPalPtr, int destPalCount) {
+byte *mapTable;
+PaletteEntry *srcPal, *destPal;
+
+    if ( (bmFormat & BMT_FORMAT ) == BMF_24BIT ) return 0;
+
+    /*
+     * If the target bitmap has no palette (destPalPtr is equal to zero)
+     * we have to use the GEOS standard palette.
+     */
+    if (destPalPtr)  { destPal = destPalPtr; }
+       	  	else { destPal = BTLockGEOSStandardPalette(); }
+
+    /*
+     * If the source bitmap has a palette, use it.
+     * If not, also use the GEOS standard palette.
+     */
+    if ( bmFormat & BMT_PALETTE ) {
+    	srcPal = malloc(256*sizeof(PaletteEntry));
+    	BTGetBitmapPalette(vmFile, bmp, srcPal, ((bmFormat & BMT_FORMAT) == BMF_4BIT) ? 16 : 256);
+    } else {
+	srcPal = BTLockGEOSStandardPalette();
+    }
+
+    /*
+     * Now create the map table for use like destIndex = mapTable[srcIndex]
+     */
+    if ( (bmFormat & BMT_FORMAT ) == BMF_4BIT ) {
+    	mapTable = CreatePaletteMapTableLow(srcPal, 16, destPal, destPalCount);
+    } else {
+    	mapTable = CreatePaletteMapTableLow(srcPal, 256, destPal, destPalCount);
+    }
+
+    /*
+     * Free or unlock palettes
+     */
+    if ( !destPalPtr) BTUnlockGEOSStandardPalette();
+    if ( bmFormat & BMT_PALETTE ) {
+    	free(srcPal);
+    } else {
+    	BTUnlockGEOSStandardPalette();
+    }
+
+    return mapTable;
+}
+
+/*--------------------- ConvertImageTo4Bit ---------------------
+ *  Purpose:	Convert a passed bitmap to a 4 bit bitmap.
+ *		Use "replace pixel by next color" strategy
+ *  Context:
+ *  Strategy:
+ *	- Create the target bitmap. We always have a transparency mask.
+ *	- Create palette index mapping table.
+ *	- Copy (convert) data line by line
+ *	  - copy mask data
+ *	  - convert pixel data, depending on the source format
+ *	- unlock/free used stuff
+ *  Parameters:	vmFile, bmp:	Bitmap to handle
+ *		width, height:	Dimensions of this bitmap
+ *		bmFormat:	BMFormat value for this bitmap
+ *		destFormat:	BMFormat value for the target bitmap
+ *		palette:	Pointer to the palette of the target bitmap
+ *				NULL if the target has no palette (uses the standard palette)
+ *		destFile:	VMFile for new bitmap
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ConvertImageTo4Bit(VMFileHandle vmFile, VMBlockHandle bmp,
+				int width, int height, BMFormat bmFormat, PaletteEntry *destPalPtr, VMFileHandle destFile) {
+VMBlockHandle newBmp = 0;
+PaletteEntry *destPal, *colorPtr;
+byte *mapTable = 0;
+
+BitmapAccessRecord srcBar, destBar;
+byte *srcPtr, *destPtr;
+int n, x, destFormat, maskLen;
+int b, tp;
+
+    EC( if ( (bmFormat & BMT_FORMAT ) == BMF_MONO ) {
+	ProgError("Error: ConvertImageTo4Bit: MONO source bitmap passed");
+	return 0; }
+    )
+
+    /*
+     * Create a 4 bit bitmap with mask.
+     * If destPalPtr is not zero, use this palette too.
+     */
+    destFormat = BMF_4BIT | BMT_MASK;
+    if (destPalPtr) destFormat |= BMT_PALETTE;
+    newBmp = BTCreateOffscreenBitmap(destFile, destFormat, width, height, destPalPtr);
+
+    /*
+     * Create a mapping table for index colors. The system handling is wrong.
+     * LocalCreatePaletteMapTable() returns NULL if we have a 24 bit bitmap.
+     */
+    mapTable = LocalCreatePaletteMapTable(vmFile, bmp, bmFormat, destPalPtr, 16);
+
+
+    /*
+     * Prepare for copy.
+     * If the source bitmap is a 24-bit bitmap, we need access to the
+     * target palette. Otherwise, the mapping table is sufficient.
+     */
+    if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) {
+    	/* Find the proper palette pointer */
+        if (destPalPtr)  { destPal = destPalPtr; }
+       	  	    else { destPal = BTLockGEOSStandardPalette(); }
+    }
+
+    maskLen = (width+7)/8;
+
+    /*
+     * Copy data line by line.
+     */
+    srcPtr = BTBitmapLock(vmFile, bmp, &srcBar, 0);
+    destPtr = BTBitmapLock(destFile, newBmp, &destBar, 0);
+
+    for ( n = 0; n < height; n++ ) {
+
+        /*
+         * Always copy the mask data and update the pointers so that they point to the pixel data.
+         */
+        memcpy(destPtr, srcPtr, maskLen);
+        srcPtr += maskLen;
+        destPtr += maskLen;
+
+	/*
+	 * Handling  depends on the format of our source bitmap.
+ 	 */
+	switch (bmFormat & BMT_FORMAT ) {
+
+	case BMF_4BIT:
+	    for ( x = 0; x < width/2; x++)  {
+
+		tp = *srcPtr;				// two pixels
+		b = mapTable[(tp & 0xF0) >> 4] << 4;	// even pixel
+		b |= mapTable[tp & 0x0F] & 0x0F;	// odd pixel
+
+		destPtr[x] = b;		// store two pixels
+		srcPtr++;
+	    	}
+	    if ( width & 1 ) {
+		tp = *srcPtr;			// two pixels
+		destPtr[x] = mapTable[(tp & 0xF0) >> 4] << 4;// last (even) pixel
+	    	}
+	    break;
+
+	case BMF_8BIT:
+	    for ( x = 0; x < width/2; x++)  {
+
+		b = mapTable[*srcPtr] << 4;	// even pixel
+		srcPtr++;
+		b |= mapTable[*srcPtr] & 0x0F; 	// odd pixel
+		srcPtr++;
+
+		destPtr[x] = b;			// store two pixels
+	    	}
+	    if ( width & 1 ) {
+		b = mapTable[*srcPtr] << 4;	// last (even) pixel
+	    	destPtr[x] = b;
+	    	}
+	    break;
+
+	case BMF_24BIT:
+	    colorPtr = (PaletteEntry*)srcPtr;
+	    for ( x = 0; x < width/2; x++)  {
+		b = BTApproxRGBPaletteLinear(destPal, *colorPtr, 16) << 4;	// even pixel
+		colorPtr++;
+
+		b |= BTApproxRGBPaletteLinear(destPal, *colorPtr, 16) & 0x0F;	// odd pixel
+		colorPtr++;
+
+		destPtr[x] = b;			// store two pixels
+	    	}
+	    if ( width & 1 ) {
+		b =BTApproxRGBPaletteLinear(destPal, *colorPtr, 16) << 4;	// last (even) pixel
+	    	destPtr[x] = b;
+	    	}
+	    break;
+	}
+
+	/*
+	 * enter next line
+	 */
+	srcPtr =  BTBitmapNext(&srcBar, FALSE);
+	destPtr = BTBitmapNext(&destBar, TRUE);
+
+    }
+
+    /*
+     * Unlock an free all the suff we have used
+     */
+    BTBitmapUnlock(&srcBar, FALSE);
+    BTBitmapUnlock(&destBar, TRUE);
+
+
+    if (mapTable) free(mapTable);
+    if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) {	// <- source bitmap
+	if ( !destPalPtr) BTUnlockGEOSStandardPalette();
+    }
+
+    return newBmp;
+
+}
+
+/*--------------------- ConvertImageTo8Bit ---------------------
+ *  Purpose:	Convert a passed bitmap to a 8 bit bitmap.
+ *		Use "replace pixel by next color" strategy
+ *  Context:
+ *  Strategy:
+ *	- Create the target bitmap. We always have a transparency mask.
+ *	- Create palette index mapping table.
+ *	- Copy (convert) data line by line
+ *	  - copy mask data
+ *	  - convert pixel data, depending on the source format
+ *	- unlock/free used stuff
+ *  Parameters:	vmFile, bmp:	Bitmap to handle
+ *		width, height:	Dimensions of this bitmap
+ *		bmFormat:	BMFormat value for this bitmap
+ *		destFormat:	BMFormat value for the target bitmap
+ *		palette:	Pointer to the palette of the target bitmap
+ *				NULL if the target has no palette (uses the standard palette)
+ *		destFile:	VMFile for new bitmap
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ConvertImageTo8Bit(VMFileHandle vmFile, VMBlockHandle bmp,
+				int width, int height, BMFormat bmFormat, PaletteEntry *destPalPtr, VMFileHandle destFile) {
+VMBlockHandle newBmp = 0;
+PaletteEntry *destPal;
+byte *mapTable = 0;
+
+BitmapAccessRecord srcBar, destBar;
+byte *srcPtr, *destPtr;
+int n, x, destFormat, maskLen;
+
+    EC( if ( (bmFormat & BMT_FORMAT ) == BMF_MONO ) {
+	ProgError("Error: ConvertImageTo8Bit: MONO source bitmap passed");
+	return 0; }
+    )
+
+    /*
+     * Create 8 bit bitmap with mask.
+     * If destPalPtr is not zero, use this palette too.
+     */
+    destFormat = BMF_8BIT | BMT_MASK;
+    if (destPalPtr) destFormat |= BMT_PALETTE;
+    newBmp = BTCreateOffscreenBitmap(destFile, destFormat, width, height, destPalPtr);
+
+    /*
+     * Create a mapping table for index colors. The system handling is wrong.
+     * LocalCreatePaletteMapTable() returns NULL if we have a 24 bit bitmap.
+     */
+    mapTable = LocalCreatePaletteMapTable(vmFile, bmp, bmFormat, destPalPtr, 256);
+
+
+    /*
+     * Prepare for copy.
+     * If the source bitmap is a 24-bit bitmap, we need access to the
+     * target palette. Otherwise, the mapping table is sufficient.
+     */
+    if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) {
+    	/* Find the proper palette pointer */
+        if (destPalPtr)  { destPal = destPalPtr; }
+       	  	    else { destPal = BTLockGEOSStandardPalette(); }
+    }
+
+    maskLen = (width+7)/8;
+
+    /*
+     * Copy data line by line.
+     */
+    srcPtr = BTBitmapLock(vmFile, bmp, &srcBar, 0);
+    destPtr = BTBitmapLock(destFile, newBmp, &destBar, 0);
+
+    for ( n = 0; n < height; n++ ) {
+
+        /*
+         * Always copy the mask data and update the pointers so that they point to the pixel data.
+         */
+        memcpy(destPtr, srcPtr, maskLen);
+        srcPtr += maskLen;
+        destPtr += maskLen;
+
+	/*
+	 * Handling  depends on the format of our source bitmap.
+ 	 */
+	switch (bmFormat & BMT_FORMAT ) {
+
+	case BMF_4BIT:
+	    for ( x = 0; x < width; x++)  {
+	        if ( x & 1 ) { destPtr[x] = mapTable[ srcPtr[x/2] & 0x0F ]; }
+	        	else { destPtr[x] = mapTable[ srcPtr[x/2] >> 4   ]; }
+	    }
+	    break;
+
+	case BMF_8BIT:
+	    for ( x = 0; x < width; x++)  {
+	    	destPtr[x] = mapTable[srcPtr[x]];
+	    	}
+	    break;
+
+	case BMF_24BIT:
+	    for ( x = 0; x < width; x++)  {
+	    	destPtr[x] = BTApproxRGBPaletteLinear(destPal, ((PaletteEntry*)srcPtr)[x], 256);
+	    	}
+	    break;
+	}
+
+	/*
+	 * enter next line
+	 */
+	srcPtr =  BTBitmapNext(&srcBar, FALSE);
+	destPtr = BTBitmapNext(&destBar, TRUE);
+
+    }
+
+    /*
+     * Unlock an free all the suff we have used
+     */
+    BTBitmapUnlock(&srcBar, FALSE);
+    BTBitmapUnlock(&destBar, TRUE);
+
+
+    if (mapTable) free(mapTable);
+    if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) {	// <- source bitmap
+	if ( !destPalPtr) BTUnlockGEOSStandardPalette();
+    }
+
+    return newBmp;
+}
+
+
+
+/*-------------------- CreateDrawCompatibleBitmap ---------------------
+ *  Purpose:	Convert the passed bitmap to a fromat that can be drawn
+ *		by the system to another bitmap without messing up colors
+ *  Context:
+ *  Strategy:
+ *	- call the proper conversion routine
+ *  Parameters:	vmFile, bmp:	Bitmap to handle
+ *		width, height:	Dimensions of this bitmap
+ *		srcFormat:	BMFormat value for this bitmap
+ *		destFormat:	BMFormat value for the target bitmap
+ *		palette:	Pointer to the palette of the target bitmap
+ *				NULL if the target has no palette (uses the standard palette)
+ *		destFile:	VMFile for new bitmap
+ *  Return:
+ ---------------------------------------------------------------------------*/
+VMBlockHandle CreateDrawCompatibleBitmap(VMFileHandle vmFile, VMBlockHandle bmp, int width, int height,
+					int srcFormat, int destFormat, PaletteEntry *palette, VMFileHandle destFile) {
+VMBlockHandle newBmp = 0;
+
+    /*
+     * Call the proper conversion routine.
+     * Remember  that srcFormat == BMF_MONO and destFormat == BMF_MONO
+     * as well as destFormat == BMF_24BIT
+     * cannot occur at this point in the Icon Editor
+     */
+    EC( if ( (destFormat & BMT_FORMAT) == BMF_MONO) { ProgError("Error: CreateComatibleBmp dest==MONO"); return 0; } )
+    EC( if ( (destFormat & BMT_FORMAT) == BMF_24BIT) { ProgError("Error: CreateComatibleBmp dest==24 bit"); return 0; } )
+    EC( if ( ( srcFormat & BMT_FORMAT) == BMF_MONO) { ProgError("Error: CreateComatibleBmp src==MONO"); return 0; } )
+
+    switch ( destFormat & BMT_FORMAT) {
+    case BMF_4BIT:
+    	newBmp = ConvertImageTo4Bit(vmFile, bmp, width, height, srcFormat, palette, destFile);
+    	break;
+
+    case BMF_8BIT:
+    	newBmp = ConvertImageTo8Bit(vmFile, bmp, width, height, srcFormat, palette, destFile);
+    	break;
+    }
+
+   /*
+    * To avoid crashes in case of error: copy bitmap if newBmp is zero
+    */
+   if (!newBmp) {
+   	EC(ProgError("Error: CreateDrawCompatibleBitmap newBmp is zero."); )
+   	newBmp = BTCopyBitmap(vmFile, destFile, bmp);
+   }
+
+    return newBmp;
+}
+
+
+/*-------------------- ToolChangePaletteBit ---------------------
+ *  Purpose:	Change the bit BMT_PALETTE for a bitmap
+ *  Context:	System bugfix. The system handles palette indizes wrong
+ *		in some cases when drawing a bitmap if there is a palette.
+ *  Strategy:
+ *	- lock the bitmap header and modify CB_simple.B_type value
+ *  Parameters:	vmFile, bmp:	affected bitmap
+ *		newState:	set (TRUE) or clear (FALSE) the bit
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolChangePaletteBit(VMFileHandle vmFile, VMBlockHandle bmp, int newState) {
+MemHandle  mh;
+CBitmap    *cBmp;
+   cBmp = BTBitmapToolLockHeader(vmFile, bmp, &mh);
+   if (newState) {
+   	cBmp->CB_simple.B_type |= BMT_PALETTE;
+   } else {
+   	cBmp->CB_simple.B_type &= ~BMT_PALETTE;
+   }
+   VMDirty(mh);
+   VMUnlock(mh);
+}
+
+/*--------------------- DrawOneBitmapToAnother ---------------------
+ *  Purpose:	Draw a bitmap into another with fixing system bugs
+ *  Context:	The system has problems drawing one bitmap into another if they
+ *		are not standard bitmaps (without a palette). There are also
+ *		problems if a mask and/or palette is involved or if the drawing
+ *		coordinates are negative.
+ *
+ *		Note: Please do not simplify this routine if the issues have been
+ *		resolved at the system level, or the program will no longer be
+ *		compatible with older versions of GEOS.
+ *
+ *  Strategy:
+ *	IMPORTANT: We assume that both bitmaps are masked!
+ *		I'm not sure if a work around is required if both bitmaps are not masked
+ *		or in which case the fix is required and in which not.
+ *		The Icon Editor has masked bitmals only, so I implement this fix only
+ *		for two masked bitmaps. R.B.
+ *
+ *	Note: 	This routine is also used by the icon preview to simulate different
+ *		display classes. Therefore, it must not perform any color mapping.
+ *
+ * 	There a a lot of cases to handle. I know that there are some cases where the
+ *	following fixes are not necessary, but that would make the routine even more
+ *	complex. That's why I have only excluded the ‘simple’ cases from special processing.
+ *
+ *	Oh, what a painful task!
+ *
+ *	- 1. Clip bitmap if drawing coordinates are neagtive. I know that there are some
+ *	     cases where this is not necessary, but that would make the routine even more
+ *	     complex.
+ *	- 2. extract masks from both bitmaps
+ *	- 3. If bmpToDraw is monochrome, a special handling is required
+ *	     The bitmap must be converted to a 16 color bitmap
+ *	- 4. Check if we have a 'simple' case as stated above.
+ * 	     If not, create a compatible source bitmap.
+ *	- 5. Draw bitmap. If the bitmaps are not "draw-compatible" another fix is required.
+ *	     To avoid misrepresenting index colors we have to make the system think that
+ *	     the bitmaps do not have a palette.
+ *	- 6. Combine the mask using the MM_OR mix mode. This prevents non-transparent (black)
+ *	     pixels in the destination bitmap to become transparent.
+ *	- 7. Re-assign the combined mask information
+ *	- 8. Free stuff we have used
+ *
+ *  Parameters:	srcFile, srcBmp:	bitmap to draw into the other bitmap
+ *		destFile, destBmp:	bitmap in which to draw
+ *		x0, y0:			coordinates for drawing
+ *		progressText: optr of an text object to show progress
+ *			  if given, routine append dots  ('.') from time to time
+ *			  pass zero for no progress report
+ *		tempFile: VMFile for temporary bitmaps
+ *  Return: -
+ ---------------------------------------------------------------------------*/
+void IconToolDrawOneBitmapToAnother(VMFileHandle srcFile, VMBlockHandle srcBmp,
+		VMFileHandle destFile, VMBlockHandle destBmp,
+		int x0, int y0, optr progressText, VMFileHandle tempFile) {
+VMBlockHandle srcMask, destMask;
+VMBlockHandle bmpToDraw;
+GStateHandle  bmpGS;
+int srcWidth, srcHeight;
+Boolean	freeBmpToDraw = FALSE;
+Boolean isCompatible = TRUE;
+BMFormat srcFormat, destFormat;
+VMBlockHandle newBmp;
+PaletteEntry *palette;
+
+
+    /*
+     * Step 1: Clip bitmap if there are negative drawing coordinates
+     */
+    srcFormat = BTGetMoreBitmapInfos(srcFile, srcBmp, &srcWidth, &srcHeight, 0);
+
+    if ( (x0<0) || (y0<0) ) {
+    	/*
+    	 * Clip bitmap to have no negative coordinates.
+    	 * LocalClipBitmap() also checks for invaild sizes and returns zero in this case
+	 * the new bitmap is stored in tempFile and must be freed later
+    	 */
+    	bmpToDraw = LocalClipBitmap(srcFile, srcBmp, &x0, &y0, srcWidth, srcHeight, tempFile);
+    	if ( !bmpToDraw ) return;
+	srcFile = tempFile;
+	freeBmpToDraw = TRUE;
+
+
+    } else {
+    	bmpToDraw = srcBmp;
+    }
+
+
+    /*
+     * Step 2: extract both maskes. Use tempFile
+     */
+    srcMask = BTExtractTransparencyMask(srcFile, bmpToDraw, tempFile, progressText);
+    destMask = BTExtractTransparencyMask(destFile, destBmp, tempFile, progressText);
+    if (!srcMask) goto done;
+    if (!destMask) goto done;
+
+    /*
+     * Step 3: draw (combine) maskes.
+     * The MM_OR mix mode prevents non-transparent (black) pixels in the destination
+     * (destMask) from being overwritten by white pixels from the source.
+     */
+    bmpGS = GrEditBitmap(tempFile, destMask, NULL);
+    GrSetMixMode(bmpGS, MM_OR);
+    GrDrawHugeBitmap(bmpGS, x0, y0, tempFile, srcMask);
+    GrDestroyBitmap(bmpGS, BMD_LEAVE_DATA);
+
+    /*
+     * Step 4: If bmpToDraw is monochrome, a special handling is required
+     */
+    if ( (srcFormat & BMT_FORMAT) == BMF_MONO) {
+    	VMBlockHandle tmpBlk;
+	/*
+	 * Create a 4-bit bitmap of the same size (color plane is set to white by
+	 * IconToolCreateBitmap). Draw the bmpToDraw and transfer the mask.
+	 */
+    	tmpBlk = IconToolCreateBitmap(tempFile, BMF_4BIT | BMT_MASK, srcWidth, srcHeight, NULL, TRUE);
+    	bmpGS = GrEditBitmap(tempFile, tmpBlk, NULL);
+    	GrDrawHugeBitmap(bmpGS, 0, 0, srcFile, bmpToDraw);
+    	GrDestroyBitmap(bmpGS, BMD_LEAVE_DATA);
+    	BTApplyTransparencyMask(tempFile, tmpBlk, 0, tempFile, srcMask, progressText);
+
+
+    	/*
+    	 * Use the 4-bit-bitmap as bmpToDraw.
+	 * update srcFormat
+    	 * Mark bmpToDraw as to be freed later
+    	 */
+    	if (freeBmpToDraw) HugeArrayDestroy(srcFile, bmpToDraw);
+    	bmpToDraw = tmpBlk;
+    	srcFormat = BMF_4BIT | BMT_MASK;
+
+	srcFile = tempFile;
+	freeBmpToDraw = TRUE;
+    }
+
+    /*
+     * Step 5: Check if srcFormat and destFormat are draw-compatible
+     * If not, craete a compatible source bitmap (newBmp in tempFile)
+     */
+    destFormat = BTGetMoreBitmapInfos(destFile, destBmp, NULL, NULL, NULL);
+    newBmp = 0;
+    palette = NULL;
+
+    if ( !LocalCheckDrawCompatible(srcFormat, destFormat) ) {
+    	/*
+    	 * The system cannot handle drawing propely. Make a work around.
+    	 */
+    	isCompatible = FALSE;
+    	if (destFormat & BMT_PALETTE) {
+    	    palette = malloc(256 * sizeof(PaletteEntry));
+    	    BTGetBitmapPalette(destFile, destBmp, palette, ((destFormat & BMT_FORMAT) == BMF_4BIT) ? 16 : 256);
+    	    }
+    	newBmp = CreateDrawCompatibleBitmap(srcFile, bmpToDraw, srcWidth, srcHeight, srcFormat, destFormat, palette, tempFile);
+    	EC( if (newBmp == 0) { ProgError("Error. CreateDrawCompatibleBitmap returns zero!"); } );
+    	if (newBmp == 0) return;	// emergency exit
+
+    	/*
+    	 * Use the  compatibe bitmap as bmpToDraw.
+    	 * Mark bmpToDraw as to be freed later
+    	 * update format information
+    	 */
+    	if (freeBmpToDraw) HugeArrayDestroy(srcFile, bmpToDraw);
+    	bmpToDraw = newBmp;
+	srcFile = tempFile;
+	freeBmpToDraw = TRUE;
+	if (palette) free(palette);
+
+	srcFormat = BTGetMoreBitmapInfos(srcFile, bmpToDraw, NULL, NULL, NULL);
+
+    }
+
+    /*
+     * Step 6: Draw bitmap
+     * If the bitmaps are not "draw-compatible" another fix is required.
+     * GrDrawHugeBitmap misrepresents colors when a palette is used. Since we
+     * have already adjusted the palettes in CreateDrawCompatibleBitmap(),
+     * we can make the system think that the bitmaps do not have a palette,
+     * and everything is fine.
+     */
+    if ( isCompatible ) {
+	bmpGS = GrEditBitmap(destFile, destBmp, NULL);
+	GrDrawHugeBitmap(bmpGS, x0, y0, srcFile, bmpToDraw);
+	GrDestroyBitmap(bmpGS, BMD_LEAVE_DATA);
+    } else {
+	if ( destFormat & BMT_PALETTE ) ToolChangePaletteBit(destFile, destBmp, 0);
+	if ( srcFormat & BMT_PALETTE ) ToolChangePaletteBit(srcFile, bmpToDraw, 0);
+
+	bmpGS = GrEditBitmap(destFile, destBmp, NULL);
+	GrDrawHugeBitmap(bmpGS, x0, y0, srcFile, bmpToDraw);
+	GrDestroyBitmap(bmpGS, BMD_LEAVE_DATA);
+
+	if ( destFormat & BMT_PALETTE ) ToolChangePaletteBit(destFile, destBmp, 1);
+	if ( srcFormat & BMT_PALETTE ) ToolChangePaletteBit(srcFile, bmpToDraw, 1);
+    }
+
+
+    /*
+     * Step 7: Re-Assign mask and destroy copies
+     * We pass zero for the 'destFile' (3rd) parameter to modifiy the original bitmap
+     * instead to make a copy.
+     */
+    BTApplyTransparencyMask(destFile, destBmp, 0, tempFile, destMask, progressText);
+
+done:
+    if (srcMask) HugeArrayDestroy(tempFile, srcMask);
+    if (destMask) HugeArrayDestroy(tempFile, destMask);
+    if (freeBmpToDraw) HugeArrayDestroy(srcFile, bmpToDraw);
+
+}
+
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file drawBitmapFix.goc ********************/
+

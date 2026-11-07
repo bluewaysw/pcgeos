@@ -1,0 +1,2055 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	document.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements the IconDBViewerClass, the content of IconDBView
+ *		Objects of this class displays all icon sets, available in the icon database
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+
+void SwitchISet(int iSet, optr oself);
+void ViewerDrawRubberBand(optr oself);
+
+
+
+/*###########################################################################
+	CODE for IconDBViewerClass
+/*###########################################################################*/
+
+@classdecl IconDBViewerClass;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_EDIT_MENU;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DEAL_WITH_IMPORTED_BITMAP;
+@extern method IconDBViewerClass, MSG_META_CLIPBOARD_PASTE;
+//extern method IconDBViewerClass, MSG_META_SELECT_ALL;
+//extern method IconDBViewerClass, MSG_META_DELETE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREPARE_FOR_IMPORT;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREPARE_FOR_EXPORT;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_INITIALIZE_WRITE_TO_VM_FILE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EXPORT_ICON_TO_VM_FILE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EXPORT_ICON_TO_GRAPHIC_FILE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMPORT_GRAPHIC_FILE;
+
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SET_DOC_FILE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ATTACH_UI;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_HANDLE_RESTORE_FROM_STATE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DETACH_UI;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_CACHED_DATA_TO_FILE;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DESTROY_LIST;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESCAN_DATABASE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ISET_ADDED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EDIT_ISET;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_STATUS_TEXT;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_ISET_COUNT;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SET_SINGLE_SELECTION;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_FIRST_SELECTION;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ISET_TOGGLED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_DATABASE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_CURRENT_ISET;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DELETE_CURRENT_ISET;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ADD_ISET_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DUPLICATE_ISET;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RENAME_ISET;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_MARK_ICON_DIRTY;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_PALETTE_VM_BLOCK;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMPORT_TOKEN_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_APPLY_RANGE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_DO_IMPORT;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_NOTIFY_TOKEN_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_QUERY_TOKEN;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_NOTIFY_ICON_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_QUERY_ICON;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_INITIALIZE_EXPORT_TOKEN_DB_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EXPORT_TO_TOKEN_DB;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_UPDATE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_OPTION_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_STORE_OPTIONS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_GET_OPTIONS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_STORE_SETTINGS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_TEST_OPTIONS_CHANGED;
+
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_SOURCE_CODE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_SOURCE_STORE_SETTINGS;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_OPEN_MOVE_ICON_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CLOSE_MOVE_ICON_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_QUERY_ISET_FOR_MOVE_ICON_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_APPLY_ISET_FOR_MOVE_ICON_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEST_ICON_VS_PTR;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_SHIFT_ICON;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_NOTIFY_ICON_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_QUERY_BITMAP;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_SHIFT_SET;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_NOTIFY_ISET_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_QUERY_ISET;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_UPDATE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_APPLY_OPTIONS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_APPLY_COLOR;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_APPLY_OBJECT_SELECTOR;
+@extern method IconDBViewerClass,  MSG_DB_VIEWER_PREVIEW_ICON_APPLY_DISPLAY_CLASS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_OBJECT;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_MONIKER;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_APPLY_RANGE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_DELETE_TOKEN;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_NOTIFY_TOKEN_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_QUERY_TOKEN;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_HANDLE_CROPPED_ICON;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CROP_CURRENT_ICON;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_SPEED_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_COLOR_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_SCALE_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_START_TIMER;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_STOP_TIMER;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_TIMER_NEXT_FRAME;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_SINGLE_STEP;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_UPDATE_BUFFER_BITMAP;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ANIMATION_ENTER_FRAME;
+
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SELECT_ALL;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_MULTIPLE_SELECTIONS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_COPY_ISETS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PASTE_ISETS;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CREATE_ISET_VMCHAIN;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CREATE_ISET_TRANSFER_TREE;
+@if @COPY_ISET_CREATES_A_GSTRING
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CREATE_TRANSFER_GSTRING;
+@endif
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PASTE_ISET_TREE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PASTE_SINGLE_ISET;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_ENTER_PTR_MODE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_LEAVE_PTR_MODE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_OPTIONS_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_HOTSPOT_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_NEW_EDIT_MODE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_ADD_IMAGE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_POINTER_IMAGE_MAKE_PTR_FROM_CURRENT_ICON;
+
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_OPEN_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_APPLY_OR_CLOSE_DIALOG;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_IMAGE_POSITION;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_OPTIONS_CHANGED;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SCALE_OR_COLOR;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SIZE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_INITIAL_SIZE;
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_PREVIEW_OBJ_SELECTED;
+
+/*#########################################################################
+ *
+ * 	Geometry Management
+ *
+ *#########################################################################*/
+
+/*--------------------- MSG_VIS_COMP_GET_CHILD_SPACING ---------------------
+ *  Purpose:	Returns the spacing for the children.
+ *  	This message returns the child spacing used by the composite. The high word
+ *  	of the return value is the spacing between lines of wrapped children; the low
+ *  	word is the horizontal spacing between children.
+ *  Parameters:
+ *  Return:	SpacingAsDWord
+ *		high-word->y-direction, low-word->x-direction
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_VIS_COMP_GET_CHILD_SPACING {
+dword spacing;
+	spacing = VIEWER_VERTICAL_CHILD_SPACING;
+	spacing <<= 16; 				// Line Space
+	spacing += VIEWER_HORIZONTAL_CHILD_SPACING;	// horizontal
+	return spacing;
+}
+
+/*--------------------- MSG_VIS_COMP_GET_MARGINS ---------------------
+ * Purpose:	Returns the distance of the children from the edges.
+ *		This message returns the margins the composite should use when
+ *		recalculating its child spacing. If you want a special left, top, right, or bottom
+ *		margin around the composite's children, intercept this message and return
+ *		the margin(s) in the appropriate field(s) of the Rectangle structure.
+ * Parameters:	void (Rectangle *retValue);
+ * Return:		-
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_VIS_COMP_GET_MARGINS {
+	retValue->R_left = VIEWER_MARGIN;
+	retValue->R_right = VIEWER_MARGIN;
+	retValue->R_top = VIEWER_MARGIN;
+	retValue->R_bottom = VIEWER_MARGIN;
+	}
+
+
+
+/*###########################################################################
+ #
+ #	Mouse message handlers
+ #
+ #	The IconDBViewerClass has a simple MSG_META_START_SELECT
+ #	handler. MSG_META_START_SELECT is handled by the VisISetClass object.
+ #	They calls the IconDBViewerClass back to select/edit the appropriate
+ #	icon or icon set(s).
+ #
+ #	Only the rubberband's start coordinates are stored, the rubberband
+ #	itself is initiated in the MSG_META_DRAG_SELECT handler and
+ #	finished in MSG_META_END_SELECT.
+ #
+ ###########################################################################
+
+
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:	Handle left click into the view.
+
+ *  Strategy:
+	- let the VisISet objects do the main job ( using @callsuper() )
+	- store the top-left coordinates for the rubberband so that the
+	  rubberband starts at the point where the user clicked the mouse
+
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_META_START_SELECT {
+
+    @callsuper();
+
+    pself->DBVI_rubberBand.R_left = xPosition;
+    pself->DBVI_rubberBand.R_top = yPosition;
+
+    retVal->flags = MRF_PROCESSED;
+
+}
+
+/*--------------------- MSG_META_DRAG_SELECT ---------------------
+ *  Purpose:	initialize rubberband
+
+ *  Strategy:
+	- draw the rubberband for the first time
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_META_DRAG_SELECT {
+
+
+    /*
+     *  Initalize the rubberband points and draw it for the first time.
+     *  Top-left coordinates are already set in META_START_SELECT
+     *
+     */
+    pself->DBVI_buttonDown = TRUE;
+    pself->DBVI_rubberBand.R_right = xPosition;
+    pself->DBVI_rubberBand.R_bottom = yPosition;
+
+    ViewerDrawRubberBand(oself);
+
+    retVal->flags = MRF_PROCESSED;
+}
+
+/*--------------------- ViewerDrawRubberBand ---------------------
+ *  Purpose:	Draws an inverted rectangle
+ *  Context:
+ *  Strategy:
+	- create a gstate for drawing
+	- draw an inverted rectangle using the stored
+	  coordinates
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ViewerDrawRubberBand(optr oself) {
+IconDBViewerInstance *pself;
+GStateHandle gstate;
+
+    pself = ObjDerefVis(oself);
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    GrSetMixMode(gstate, MM_INVERT);
+    GrSetLineStyle(gstate, LS_DOTTED, 0, 0, 0);
+    GrDrawRect(gstate, pself->DBVI_rubberBand.R_left,
+    		pself->DBVI_rubberBand.R_top,
+    		pself->DBVI_rubberBand.R_right,
+    		pself->DBVI_rubberBand.R_bottom);
+    GrDestroyState(gstate);
+
+}
+
+
+
+/*--------------------- MSG_META_END_SELECT ---------------------
+ *  Purpose:	Stops drawing rubberband, and selects icon sets.
+
+ *  Strategy:
+	- if we're rubberbanding, draw the final rubberband.
+	- clear the "buttonDown" flag
+	- record a MSG_VIS_ISET_CHECK_IN_RECTANGLE classed event
+	  and sent it to the children to select/deselect them
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_META_END_SELECT {
+
+    /*
+     *  If the buttonDown flag isn't set, skip the rubberbanding,
+     *  else clear the rubberband.
+     */
+    if ( ! (pself->DBVI_buttonDown) ) goto done;
+    ViewerDrawRubberBand(oself);
+
+     /*
+     *  Send a check-in-rectangle message to the children.
+     */
+    @send @visChildren::MSG_VIS_ISET_CHECK_IN_RECTANGLE(pself->DBVI_rubberBand);
+
+done:
+    pself->DBVI_buttonDown = FALSE;
+    retVal->flags = MRF_PROCESSED;
+
+}
+
+
+/*--------------------- MSG_META_PTR ---------------------
+ *  Purpose:	 Draws a rubberband if buttonDown.
+ *  Context:
+ *  Strategy:
+	- handle quick-copy stuff
+	- if mouse button's not down, bail
+	- clear the old rubberband
+	- store the new coordinates
+	- draw the new rubberband
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_META_PTR {
+
+    /*
+     *  Do the rubberbanding stuff. DBVI_buttonDown is false if quick transfer
+     */
+    if( pself->DBVI_buttonDown ) {
+    	ViewerDrawRubberBand(oself);
+	pself->DBVI_rubberBand.R_right = xPosition;
+	pself->DBVI_rubberBand.R_bottom = yPosition;
+
+    	ViewerDrawRubberBand(oself);
+    }
+
+    retVal->flags = MRF_PROCESSED;
+    }
+
+
+
+/***********************************************************************
+ *	Other IconDBViewerClass messages
+ ***********************************************************************/
+
+
+/*--------------------- MSG_DB_VIEWER_GET_CURRENT_ICON ---------------------
+ *  Purpose:	returns currently-edited icon
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	icon number
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_GET_CURRENT_ICON {
+    return pself->DBVI_currentIcon;
+}
+
+/*--------------------- IconUpdatePalette ---------------------
+ *  Purpose:	Update cached palette for the icon
+ *  Context:
+ *  Strategy:	If the icon image has a palette, we cache the palette data
+ *		in a vm block.
+ *		If there is no palette, free the vm block
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconUpdatePalette(VMFileHandle vmFile, int iSet, int icon, VMBlockHandle *paletteBlockPtr) {
+int format;
+VMBlockHandle bmp, palBlock;
+PaletteEntry *palette;
+MemHandle	mh;
+
+
+
+    /*
+     * check parameters fist
+     */
+    if ( !vmFile ) return;
+    if ( iSet == NO_CURRENT_ISET) return;
+    if ( icon == NO_CURRENT_ICON) return;
+
+    /*
+     * Get bitmap, see if there is a palette and load the palette
+     */
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    EC( if (!bmp) { ProgError("IconUpdateGlobalPalette no icon bitmp"); return; } )
+
+    format = BTGetMoreBitmapInfos(vmFile, bmp, NULL, NULL, NULL);
+
+
+    palBlock = *paletteBlockPtr;
+    if (format & BMT_PALETTE ) {
+
+    	/*
+    	 * Ensure that there is a vm block to hold the palette. The block may
+    	 * always hold 256 palette entires even if we have as 16 color bitmap.
+    	 * This avoids unnecessary re-allocs.
+    	 * For a 16 bit bitmap, the palette contains a lot of (unused) garbage then.
+    	 */
+    	if (!palBlock) {
+	    palBlock = VMAlloc(global.tempFile, 256*sizeof(PaletteEntry), 0);
+	}
+
+	/*
+	 * Copy palette to the vm block in the global.tempFile
+	 * Set unused palette enties to gray.
+	 */
+	palette = VMLock(global.tempFile, palBlock, &mh);
+	memset(palette, 0x80, 256*sizeof(PaletteEntry));
+	BTGetBitmapPalette(vmFile, bmp, palette, ((format & BMT_FORMAT) == BMF_4BIT) ? 16 : 256);
+	VMDirty(mh);
+	VMUnlock(mh);
+    } else {
+	/*
+	 * there is no palette, so free the palette block
+	 */
+    	if (palBlock) VMFree(global.tempFile, palBlock);
+    	palBlock = 0;
+
+    	/*
+    	 * If we have a 16-color image or a monochrome image, we want to present
+    	 * only 16 colors to the user when he selects a color in IconCustomColorDialog.
+    	 * In this cases we create a "fake" custom palette that contains only the
+    	 * 16 standard colors from the GEOS standard palette.
+    	 * DrawFullPalette(), the draw routine for IconCustomColorDialog, then uses this palette.
+    	 */
+    	if ( ((format & BMT_FORMAT) == BMF_4BIT) || ((format & BMT_FORMAT) == BMF_MONO) ) {
+    	    PaletteEntry *geosPalette;
+
+    	    palBlock = VMAlloc(global.tempFile, 256*sizeof(PaletteEntry), 0);
+	    palette = VMLock(global.tempFile, palBlock, &mh);
+	    memset(palette, 0x80, 256*sizeof(PaletteEntry));
+
+	    geosPalette = BTLockGEOSStandardPalette();
+	    memcpy(palette, geosPalette, 16*sizeof(PaletteEntry));
+	    BTUnlockGEOSStandardPalette();
+
+	    VMDirty(mh);
+	    VMUnlock(mh);
+    	}
+    }
+
+    *paletteBlockPtr = palBlock;
+
+}
+
+
+/*--------------------- CheckIconAttributes ---------------------
+ *  Purpose:	Check if all icon attributes are supported by the icon editor
+ *
+ *  Context:
+ *  Strategy:	check:	display class
+ *			icon stlye
+ *			display size (DS_HUGE is accepted, even if UI is hidden)
+ *			aspect ratio
+ *  Parameters:	vmFile: database file
+ *		iSet:	icon set to check
+ *		icon:	icon to check
+ *  Return:	TRUE, if there is an unsupported attr was found
+ *		FALSE: anything is fine
+ ---------------------------------------------------------------------------*/
+Boolean CheckIconAttributes(VMFileHandle vmFile, int iSet, int icon) {
+VisMonikerListEntryType vmlet;
+word	flags;
+
+    /*
+     * Pointer images have set the hotspot instead of a vmlet value
+     * in IE_type value. So we don't check type here.
+     */
+    flags = IdGetFlags(vmFile, iSet);
+    if (flags & IF_PTR_IMAGE) return FALSE;
+
+    vmlet = IdGetEntryType(vmFile, iSet, icon);
+
+    /* display size */
+    switch ((vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET) {
+    case DS_HUGE:
+    case DS_LARGE:
+    case DS_STANDARD:
+    case DS_TINY:
+    	// no unsupported values
+	break;
+    default: return TRUE;
+    }
+
+    /* icon stlye */
+    switch ((vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET) {
+    case VMS_ICON:
+    case VMS_TOOL:
+    	// not supported: VMS_TEXT, VMS_ABBREV_TEXT, VMS_GRAPHIC_TEXT
+	break;
+    default: return TRUE;
+    }
+
+    /* display class */
+    switch ((vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET) {
+    case DC_GRAY_1:
+    case DC_COLOR_4:
+    case DC_COLOR_8:
+    case DC_CF_RGB:	/* aka DC_COLOR_RGB */
+    	// not supported:     DC_TEXT, DC_GRAY_2, DC_GRAY_4, DC_GRAY_8, DC_COLOR_2
+	break;
+    default: return TRUE;
+    }
+
+    /* aspect ratio */
+    switch ((vmlet & VMT_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET) {
+    case DAR_VERY_SQUISHED:
+    case DAR_NORMAL:
+    	// not supported: DAR_SQUISHED
+	break;
+    default: return TRUE;
+    }
+
+    /*
+     * no problem found
+     */
+    return FALSE;
+
+}
+
+/*--------------------- MSG_DB_VIEWER_SWITCH_ICON ---------------------
+ *  Purpose:	Switches editing to a different (existing) icon
+ *  Context:
+ *  Strategy:
+ *	- save current icon set into database (prompt for save)
+ *	- Redraw icons to highlight the newly selected icon
+ *	- upate global palette information
+ *	- inform the fatbit object obout the icon to edit
+ *	- update the conrollers and the rest of the world
+ *  Parameters: icon:	new icon number
+ *  Return:
+ ---------------------------------------------------------------------------*/
+// stop in IconDBViewerDB_VIEWER_SWITCH_ICON
+@method IconDBViewerClass, MSG_DB_VIEWER_SWITCH_ICON {
+optr	fatbitsObj;
+int lastIcon;
+PaletteEntry *palette;
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * Update instance variables for selected icon.
+     * Redraw the affected icons.
+     */
+    lastIcon = pself->DBVI_currentIcon;
+    pself->DBVI_currentIcon = icon;
+    @call @GetDocUIOptr(@IconListContent)::MSG_ICON_VIEWER_REDRAW_ICON(lastIcon);
+    @call @GetDocUIOptr(@IconListContent)::MSG_ICON_VIEWER_REDRAW_ICON(pself->DBVI_currentIcon);
+
+    /*
+     * Update palette information
+     */
+    IconUpdatePalette(pself->DBVI_vmFile, pself->DBVI_currentISet, icon, &pself->DBVI_iconImagePalette);
+    global.paletteVMBlock = pself->DBVI_iconImagePalette;
+
+    /*
+     * Send the current icon to the fatbits object.
+     * The fatbits object loads all data that is needs.
+     */
+    fatbitsObj = @GetDocUIOptr(@MyFatbits);
+    @call fatbitsObj::MSG_FATBITS_USE_ICON(pself->DBVI_vmFile,
+    				pself->DBVI_currentISet,
+    				pself->DBVI_currentIcon);
+    @call fatbitsObj::MSG_FATBITS_UNDO_FLUSH_CHAIN(FALSE);
+
+    /*
+     * Update all controllers and the rest of the world
+     */
+    @send fatbitsObj::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_ALL_NOTIFICATIONS);
+    @call oself::MSG_DB_VIEWER_UPDATE_ICON_INFORMATION(icon);
+
+    /*
+     * Create colored monikers for our specal controller UI. This is done
+     * here, and not in MSG_FATBITS_SEND_NOTIFICATIONS, because it is only
+     * needed once, whereas MSG_FATBITS_SEND_NOTIFICATIONS is sent frequently.
+     * Note that this requires an up-to-date global.paletteVMBlock
+     */
+    palette = IconLockGlobalPalette();
+    @send LineColorToolIndexGroup::MSG_PCIG_CREATE_VIS_MONIKERS(PCIG_MONIKER_LINE, 15, 15, palette);
+    @send LineColorIndexGroup::MSG_PCIG_CREATE_VIS_MONIKERS(PCIG_MONIKER_AREA, 15, 15, palette);
+    @send AreaColorToolIndexGroup::MSG_PCIG_CREATE_VIS_MONIKERS(PCIG_MONIKER_AREA, 15, 15, palette);
+    @send AreaColorIndexGroup::MSG_PCIG_CREATE_VIS_MONIKERS(PCIG_MONIKER_AREA, 15, 15, palette);
+    IconUnlockGlobalPalette();
+
+    /*
+     * 	See if the current iSet is an pointer-image-set or not and set up UI
+     */
+    if ( IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) == IF_PTR_IMAGE ) {
+    	@call oself::MSG_DB_VIEWER_POINTER_IMAGE_ENTER_PTR_MODE();
+    } else {
+    	@call oself::MSG_DB_VIEWER_POINTER_IMAGE_LEAVE_PTR_MODE();
+    }
+
+
+    /*
+     * 	Update all non-modal dialogs to reflect the new icon
+     */
+    @send oself::MSG_DB_VIEWER_UPDATE_DIALOGS();
+
+
+    /*
+     * 	In a few cases an icon may have attributes, tht are not supported by the icon editor,
+     *  e.g. a display class of GRAY_4. This may cause invaild settings in the "Icon Attributes"
+     *  dialog or other unexpected behavior (but no crash :-).
+     *  We check the attribute and ask the user for changig it, if anything is unusual.
+     */
+    if ( CheckIconAttributes(pself->DBVI_vmFile, pself->DBVI_currentISet, icon) ) {
+    	MessageBoxOptr(@InvalidAttrsFound);
+    	@send oself::MSG_DB_VIEWER_INITIALIZE_ICON_ATTRIBUTES_DIALOG(TRUE);
+    }
+
+
+}
+
+/*--------------------- MSG_DB_VIEWER_UPDATE_DIALOGS ---------------------
+ *  Purpose:	Update all non-modal dialogs to reflect the new icon
+ *  Context:
+ *  Strategy:	This is the central point to update all dialogs. We can call
+ *		this method at any point where we think one or more of the
+ *		dialogs needs to be updated.
+ *		Only update dialogs that are currently on screen (VA_VISIBLE is set)
+ *  Parameters: -
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+// stop in IconDBViewerDB_VIEWER_UPDATE_DIALOGS
+@method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_DIALOGS {
+int attrs;
+
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return;
+    if (pself->DBVI_currentIcon == NO_CURRENT_ICON) return;
+    if (pself->DBVI_vmFile == 0) return;	/* <- may happen if App is about to close */
+
+
+    attrs = @call ChangeIconAttributesDialog::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send oself::MSG_DB_VIEWER_INITIALIZE_ICON_ATTRIBUTES_DIALOG(FALSE);
+    }
+
+    attrs = @call IconPreviewDialog::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+        /* in this special case we have to hide/show some UI */
+ 	@send oself::MSG_DB_VIEWER_PREVIEW_ICON_OPEN_DIALOG();
+    }
+
+    attrs = @call TextMonikerDialog::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send oself::MSG_DB_VIEWER_TEXT_MONIKER_UPDATE_DIALOG();
+    }
+
+    attrs = @call IconPickColorControlBox::MSG_VIS_GET_ATTRS();
+    if (attrs & VA_VISIBLE) {
+ 	@send process::MSG_ICON_OPEN_PICK_COLOR_DIALOG();
+    }
+
+
+    /* if you add more dialogs here, please update EnableEditing() and DisableEditing() too */
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_UPDATE_ICON_INFORMATION_PART_ONE ---------------------
+ *  Purpose:	Display informations about the current icon in a text object
+ *  Context:	This part is used multiple times
+ *  Parameters: textObj: ouput obj;
+ *		icon:	icon number to use (icon set to use is always DBVI_currentISet)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_ICON_INFORMATION_PART_ONE {
+char name[ICON_NAME_BUFFER_SIZE];
+int width, height, bmpFormat;
+VMBlockHandle	bmp;
+Boolean err, isPtrImage;
+
+    /*
+     * Find out the name of the current icon and display it
+     * err != 0 may occur during start-up
+     */
+    err = IdGetEntryName(pself->DBVI_vmFile, pself->DBVI_currentISet, icon, name);
+    if (err) return;
+
+    @call textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(", ", 0);
+
+    /*
+     * Find out the color scheme and dimension of the current icon and display it
+     * bmp == 0 may occur during start-up
+     * Note: VIS_TEXT messages may move the block on the global heap. So we have to deref pself
+     */
+    pself = ObjDerefVis(oself);
+    bmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, icon);
+    if (!bmp) return;
+    bmpFormat = BTGetMoreBitmapInfos(pself->DBVI_vmFile, bmp, &width, &height, 0);
+    sprintf(name, "%ux%u, ", width, height);
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+    pself = ObjDerefVis(oself);
+
+    MemLock(OptrToHandle(@IconInfoMonoText));
+    switch ( bmpFormat & BMT_FORMAT) {
+	case BMF_MONO:
+	    strcpy(name, LMemDeref(@IconInfoMonoText));
+	    break;
+    	case BMF_4BIT:
+	    strcpy(name, LMemDeref(@IconInfo16ColorsText));
+	    break;
+        case BMF_8BIT:
+	    strcpy(name, LMemDeref(@IconInfo256ColorsText));
+	    break;
+    	default: 	// 24 Bit
+	    strcpy(name, LMemDeref(@IconInfoTCText));
+	}
+    if ( bmpFormat & BMT_PALETTE ) {
+        @call textObj::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+        @call textObj::MSG_VIS_TEXT_APPEND_PTR(", ", 0);
+    	strcpy(name, LMemDeref(@IconInfoPaletteText));
+    }
+    MemUnlock(OptrToHandle(@IconInfoMonoText));
+
+    /*
+     * If we are a poiner image, overwrite color information and ignore style, display-size and so on
+     */
+    pself = ObjDerefVis(oself);
+    isPtrImage = (IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) & IF_PTR_IMAGE) ? TRUE : FALSE;
+    if ( isPtrImage ) {
+    	MemLock(OptrToHandle(@IconInfoPointerImageText));
+    	strcpy(name, LMemDeref(@IconInfoPointerImageText));
+    	MemUnlock(OptrToHandle(@IconInfoPointerImageText));
+    	}
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_UPDATE_ICON_INFORMATION ---------------------
+ *  Purpose:	Display informations about the current icon in FatBitsInfoText
+ *  Context:
+ *  Parameters: icon:	icon number to use (icon set to use is always DBVI_currentISet)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_ICON_INFORMATION {
+char name[ICON_NAME_BUFFER_SIZE];
+optr textObj, dcText;
+int val;
+word 	vmlet;	/* VisMonikerListEntryType */
+Boolean isPtrImage;
+
+    pself = ObjDerefVis(oself);
+    textObj = @GetDocUIOptr(@FatBitsInfoText);
+
+    @call oself::MSG_DB_VIEWER_UPDATE_ICON_INFORMATION_PART_ONE(textObj, icon);
+
+    isPtrImage = (IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) & IF_PTR_IMAGE) ? TRUE : FALSE;
+    if ( isPtrImage ) return;
+
+    /*
+     * Find out the style (icon, tool) of the current icon and display it
+     * Start a new line for that.
+     */
+    vmlet = IdGetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, icon);
+
+    /*
+     * Find out the display size of the current icon and display it
+     * e.g. "Icon image for large screens"
+     * Huge screens are not supported yet, but code is still available
+     */
+    strcpy(name, "\r");
+    val = (vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET;
+
+    MemLock(OptrToHandle(@IconInfoTinyScreenText2));
+    switch (val) {
+     case     DS_TINY:  strcat(name, 	LMemDeref(@IconInfoTinyScreenText2)); break;
+     case     DS_STANDARD:  strcat(name, LMemDeref(@IconInfoStandardScreenText2)); break;
+     case     DS_LARGE:  strcat(name, 	LMemDeref(@IconInfoLargeScreenText2)); break;
+     case     DS_HUGE:  strcat(name, 	LMemDeref(@IconInfoHugeScreenText2)); break;
+     default:  strcat(name, "(invalid screen),"); break;
+    }
+    MemUnlock(OptrToHandle(@IconInfoTinyScreenText2));
+
+    strcat(name, " ");
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+    pself = ObjDerefVis(oself);
+
+    val = (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET;
+    MemLock(OptrToHandle(@IconInfoIconStyleText2));
+    switch (val) {
+     case     VMS_ICON:  strcpy(name, LMemDeref(@IconInfoIconStyleText2)); break;
+     case     VMS_TOOL:  strcpy(name, LMemDeref(@IconInfoToolStyleText2)); break;
+     default:  EC(DebugInfo("undefiend type");) break;
+    }
+    MemUnlock(OptrToHandle(@IconInfoIconStyleText2));
+
+    strcat(name, " ");
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+    pself = ObjDerefVis(oself);
+
+    /*
+     * Display display class, because this may differ from bitmaps color depth
+     * We display the actual display class, not the suggested one.
+     */
+    val = (vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET;
+    switch (val) {
+    case DC_GRAY_1:	dcText = @IconInfoMonoText;	break;
+    case DC_COLOR_4:	dcText = @IconInfo16ColorsText;	break;
+    case DC_COLOR_8:	dcText = @IconInfo256ColorsText; break;
+    case DC_CF_RGB:	dcText = @IconInfoTCText;	break;
+    default:		dcText = @IconInfo16ColorsText;
+    }
+
+    @call textObj::MSG_VIS_TEXT_APPEND_OPTR(@IconInfoForText, 0);
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(" ", 0);
+    @call textObj::MSG_VIS_TEXT_APPEND_OPTR(dcText, 0);
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(" ", 0);
+    @call textObj::MSG_VIS_TEXT_APPEND_OPTR(@IconInfoScreensText, 0);
+
+    /*
+     * Find out the aspect ratio of the current icon and display it
+     * DAR_SQUISHED is designed for EGA screens and currently not used
+     */
+    name[0] = 0;
+    val = (vmlet & VMLET_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET;
+
+    MemLock(OptrToHandle(@IconInfoSquishedText));
+    switch (val) {
+     case     DAR_NORMAL:  name[0] = 0; break;
+     case     DAR_SQUISHED:
+     			strcat(name, " ");
+     			strcat(name, LMemDeref(@IconInfoSquishedText));
+     			break;
+     case     DAR_VERY_SQUISHED:
+     			strcat(name, " ");
+     			strcat(name, LMemDeref(@IconInfoVerySquishedText));
+     			break;
+     default:  EC(DebugInfo("(invalid aspect ratio)");) break;
+    }
+    MemUnlock(OptrToHandle(@IconInfoSquishedText));
+
+    if (strlen(name)) {
+    	@call textObj::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+        pself = ObjDerefVis(oself);
+    }
+
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_GET_VIEW ---------------------
+ *  Purpose:	Returns the GenView of this object
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	optr of GenView
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_GET_VIEW {
+    return pself->VCNI_view;
+}
+
+/*--------------------- MSG_DB_VIEWER_ADD_ICON_OPEN_DIALOG ---------------------
+ *  Purpose:	Add an new icon to the current icon set
+ *  Context:
+ *  Strategy:
+    Because UserDoDialog should be executed in process thread, we have two parts
+    Initally we had a single message including call to UserDoDialog, but this block
+    the UI thread and therfore UI updating while the dialog is open.
+    Part 1:
+ 	- check if the number of icons is too large
+ 	- see if icon is dirty an dealt with it
+ 	- execute AddIconDialog - in the process thread
+    Part 2 (MSG_DB_VIEWER_ADD_ICON_DIALOG_CLOSED)
+	- see if the requested size is too large
+	- check the number of icon again, because we can add two icons
+	- set up the database entry for the new icon(s)
+	- switch editing to the first new icon
+	- make the edited icon visble in the IconListView
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_ADD_ICON_OPEN_DIALOG {
+int 	iSet;
+int 	icon;
+VMFileHandle vmFile;
+
+    iSet = pself->DBVI_currentISet;
+    vmFile = pself->DBVI_vmFile;
+
+	/*
+	* Get the number of current icons.
+	* We can have max. MAX_ICONS icons. If the check is ok,
+	* 'icon' varibable contains the index of the first new icon, since the counting starts at zero.
+	*/
+	icon = IdGetEntryCount(vmFile, iSet);
+	if (icon >= MAX_ICONS) {
+	ErrorBoxOptr(@TooManyIconsText);
+	return;
+	}
+
+	if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+	/*
+	* If we have a "pointer-image" iSet, let a specialized message
+	* do the job.
+	*/
+	if ( IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) == IF_PTR_IMAGE ) {
+	@call oself::MSG_DB_VIEWER_POINTER_IMAGE_ADD_IMAGE();
+	return;
+	}
+
+    /*
+     *  Execute AddIconDialog in process thread
+     */
+    @call AddIconNameTextField::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@DefaultNameCustomCommon, 0);
+    @send process::MSG_ICON_EXECUTE_ADD_ICON_DIALOG(@AddIconDialog, oself);
+
+}
+
+/*--------------------- MSG_ICON_EXECUTE_ADD_ICON_DIALOG ---------------------
+ *  Purpose:	Execute the dialog via UserDoDialog
+ *		This should be done in the process thread
+ *  Context:
+ *  Strategy:
+ *  	- call UserDoDialog
+ *	- informdbViewer, if Iocon should be created (not canceled)
+ *  Parameters: optr dialog, optr dbViewer
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_EXECUTE_ADD_ICON_DIALOG {
+int cmd;
+    cmd = UserDoDialog(dialog);
+    if ( cmd != IC_OK ) return;
+
+    @send dbViewer::MSG_DB_VIEWER_ADD_ICON_DIALOG_CLOSED();
+}
+
+/*--------------------- MSG_DB_VIEWER_ADD_ICON_DIALOG_CLOSED ---------------------
+ *  Purpose:	Add an new icon to the current icon set - Part 2
+ *  Context:
+ *  Strategy:
+ *  Details see MSG_DB_VIEWER_ADD_ICON_OPEN_DIALOG
+	- see if the requested size is too large
+	- check the number of icon again, because we can add two icons
+	- set up the database entry for the new icon(s)
+	- switch editing to the first new icon
+	- make the edited icon visble in the IconListView
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_ADD_ICON_DIALOG_CLOSED {
+int 	iSet, numIcons, style;
+int 	bitmapColors, displaySize, aspect, width, height;
+Boolean addMonoIcon;
+char	iconName[ICON_NAME_BUFFER_SIZE + 20];	// enough space for MonoMonikerPrefix, USually Mono or Monochrome SchwarzWeiss
+int 	icon;
+VMFileHandle vmFile;
+
+
+
+    iSet = pself->DBVI_currentISet;
+    vmFile = pself->DBVI_vmFile;
+
+    AppMarkBusy();
+
+    /*
+     * Ask UI for information about the icon
+     */
+    @call AddIconNameTextField::MSG_VIS_TEXT_GET_ALL_PTR(iconName);
+
+    width = @call CustomIconWidthValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    height = @call CustomIconHeightValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bitmapColors = @call AddIconBitmapColorsChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    displaySize = @call AddIconDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    aspect = @call AddIconAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    style = @call AddIconStyleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    addMonoIcon = @call AddIconAddExtraMonoIcon::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() ? TRUE : FALSE;
+
+    /*
+     * Check Icon memory size. If to large, return
+     */
+    if (CheckIconTooLargeAndDealWithIt(width, height, bitmapColors | BMT_MASK) ) {
+    	goto done;
+    	}
+
+    /*
+     * Check icon count and ignore additional mono icon, if there are too many icons
+     */
+    icon = IdGetEntryCount(vmFile, iSet);
+    if ( addMonoIcon && ((icon+1) >= MAX_ICONS)) {
+    	ErrorBoxOptr(@TooManyIconsText);
+	addMonoIcon = FALSE;
+    }
+
+    /*
+     * Create the new icon(s)
+     */
+    numIcons = addMonoIcon ? 2 : 1;
+
+    IdCreateEntries(vmFile, iSet, numIcons);
+    IdSetEntryCount(vmFile, iSet, icon + numIcons);
+
+    /*
+     * Initialize the icons using InitializeCustomIcon() and IdSetEntryName()
+     */
+    InitializeCustomIcon(vmFile, iSet, icon, style, width, height, bitmapColors, displaySize, aspect);
+    IdSetEntryName(vmFile, iSet, icon, iconName);
+    if ( addMonoIcon ) {
+    	InitializeCustomIcon(vmFile, iSet, icon+1, style, width, height, BMF_MONO, displaySize, aspect);
+    	/*
+    	 * Add a "monochrome" specifier in front of the given name
+    	 * Buffer (iconName) size is large enough, but the resulting lenght may be too large
+    	 * So, truncate it for savety
+    	 */
+    	MemLock(OptrToHandle(@MonoMonikerPrefix));
+    	strcpy(iconName, LMemDeref(@MonoMonikerPrefix) );
+    	@call AddIconNameTextField::MSG_VIS_TEXT_GET_ALL_PTR(strchr(iconName,0));
+    	MemUnlock(OptrToHandle(@MonoMonikerPrefix));
+
+    	iconName[MAX_ICON_NAME_LENGTH] = 0;
+        IdSetEntryName(vmFile, iSet, icon+1, iconName);
+    }
+
+    /*
+     * Edit the newly created icon and mark document dirty
+     * Update status bar too
+     */
+    @call oself::MSG_DB_VIEWER_ICON_ADDED(icon);
+    @send oself::MSG_DB_VIEWER_UPDATE_STATUS_TEXT();
+
+done:
+    AppMarkNotBusy();
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_ICON_ADDED ---------------------
+ *  Purpose:	An new Icon has been added
+ *  Context:
+ *  Strategy:
+ *	- rescan list to show the new icon
+ *	- switch editing to passed icon
+ *	- make document dirty
+ *	- update edit menu to be save
+ *	- scroll list to show the icon
+ *
+ *  Parameters:	iconToEdit:	edit and show this icon
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_ICON_ADDED {
+optr	iconObj;
+Rectangle bounds;
+
+    /*
+     * rescan list, edit icon and mark document dirty
+     */
+    @call @GetDocUIOptr(@IconListContent)::MSG_ICON_VIEWER_RESCAN_LIST();
+    pself = ObjDerefVis(oself);
+    pself->DBVI_currentIcon = iconToEdit;
+    @call oself::MSG_DB_VIEWER_SWITCH_ICON(iconToEdit);
+
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+
+    /*
+     * Make the DBVI_currentIcon visible in the IconListView
+     */
+    iconObj = @call @GetDocUIOptr(@IconListContent)::MSG_VIS_FIND_CHILD_AT_POSITION(iconToEdit);
+    @call iconObj::MSG_VIS_GET_BOUNDS(&bounds);
+    @call @GetDocUIOptr(@IconListView)::MSG_GEN_VIEW_SET_ORIGIN(bounds.R_top - ICON_LIST_MARGIN, 0);
+
+    /*
+     * Update edit menu (for savety only)
+     */
+    @call oself::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_DELETE_ICON ---------------------
+ *  Purpose:	Deletes the current icon.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_DELETE_ICON {
+int count, cmd, deletedIcon;
+optr visISet;
+
+
+    if ( pself->DBVI_currentISet == NO_CURRENT_ISET ) return;
+
+    /*
+     *  See if this is the last icon left to the icon set.
+     */
+    count = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    if ( count <= 1 ) {
+    	/*
+    	 *  Put up a dialog asking if they want to delete the icon set
+    	 *  (which is what we do if they delete the last icon).
+    	 */
+	cmd = QuestionBoxOptr(@CantDeleteLastIconText);
+	if ( cmd != IC_YES ) return;
+	@call oself::MSG_DB_VIEWER_DELETE_CURRENT_ISET(FALSE);
+	return;
+	}
+
+    /*
+     *  Put up the dialog asking if they're sure,
+     *  but only if confirm-on-delete is set
+     */
+    cmd = ConfirmOnDeleteBox(@PromptForDeleteIconText);
+    if ( cmd != IC_YES ) return;
+    IdDeleteEntry(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+    SetIconDirtyState(pself, FALSE);
+    deletedIcon = pself->DBVI_currentIcon;
+
+
+    /*
+     *  Since the icon we just deleted wasn't the last one, we'll
+     *  just switch-icon to another icon. If possible switch to the
+     *  icon behind the deleted one, if not possible switch to icon 0
+     */
+    if ( deletedIcon >= (count-1) ) {
+    	// there is no icon behind the deleted one
+    	@call oself::MSG_DB_VIEWER_SWITCH_ICON(0);
+    } else {
+    	@call oself::MSG_DB_VIEWER_SWITCH_ICON(deletedIcon);
+    }
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@IconListContent))::MSG_ICON_VIEWER_RESCAN_LIST();
+
+    /*
+     *  If the deleted icon was the first one, the VisISet needs new bounds to draw
+     *  the bitmap, because there is a new bitmap.
+     *  MSG_VIS_ISET_INITIALIZE does the job. Then redraw the database viewer.
+     */
+    pself = ObjDerefVis(oself);
+    if (deletedIcon == 0) {
+    	visISet = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(pself->DBVI_currentISet);
+    	@send visISet::MSG_VIS_ISET_INITIALIZE(pself->DBVI_currentISet);
+    	@send oself::MSG_VIS_INVALIDATE();
+    }
+
+    /* Update status text */
+    @send oself::MSG_DB_VIEWER_UPDATE_STATUS_TEXT();
+
+
+}
+
+/*--------------------- MSG_DB_VIEWER_DUPLICATE_ICON ---------------------
+ *  Purpose:	Make a 1:1 copy of the currently edited icon
+ *  Context:
+ *  Strategy:
+ 	- Copy the IconEntry data
+ 	- Copy the bitmap
+ 	- Update name, e.g. AppVGAMoniker -> AppVGAMoniker1
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_DUPLICATE_ICON {
+int iSet, numIcons;
+word size;
+IconEntry *curEntryPtr, *newEntryPtr;
+optr iEntryList;
+VMFileHandle vmFile;
+char iconName[ICON_NAME_BUFFER_SIZE + 5]; // savety for working with sprintf
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * Add a new, empty icon
+     */
+    iSet = pself->DBVI_currentISet;
+    if (iSet == NO_CURRENT_ISET ) return;	// for savety only
+    vmFile = pself->DBVI_vmFile;
+
+    numIcons = IdGetEntryCount(vmFile, iSet);
+    IdCreateEntries(vmFile, iSet, 1);
+    IdSetEntryCount(vmFile, iSet, numIcons + 1);
+
+    /*
+     * Lock iEntryList and copy icon-related information
+     * Because icon counting starts with zero, numIcons is the index of the new icon
+     * Unlock entryList afterwards
+     */
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    EC ( if ( ChunkArrayGetCount(iEntryList) < (numIcons+1))  { \
+    	DebugInfo2("\rChunkArray: %u, numIcons+1=%u", ChunkArrayGetCount(iEntryList), (numIcons+1)); \
+    	ProgError("duplicate_icon: numIconsError"); return; \
+    	} )
+
+    curEntryPtr = ChunkArrayElementToPtr(iEntryList, pself->DBVI_currentIcon, &size);
+    newEntryPtr = ChunkArrayElementToPtr(iEntryList, numIcons, &size);
+
+    *newEntryPtr = *curEntryPtr;
+    newEntryPtr->IE_bitmap = BTCopyBitmap(vmFile, vmFile, curEntryPtr->IE_bitmap);
+    newEntryPtr->IE_extraBlock = VMCopyVMBlock(vmFile, curEntryPtr->IE_extraBlock, vmFile);
+
+    IdUnlockEntryList(iEntryList, FALSE);
+
+
+    /*
+     * Change the name to avoid duplicted visMoniker identifiers when writing the icon set to file
+     * If there is no current name, generate one.
+     * Remember that numIcons is the index of the new icon
+     */
+    IdGetEntryName(vmFile, iSet, numIcons, iconName);
+    if ( strlen(iconName) == 0 ) strcpy(iconName, "Moniker");	// no need to localize this
+    iconName[MAX_ICON_NAME_LENGTH-2] = 0;				// get space for the number
+    sprintf( strchr(iconName,0), "%u", numIcons);
+    IdSetEntryName(vmFile, iSet, numIcons, iconName);
+
+
+    /*
+     * Rescan icon list. Keep editing the current icon.
+     * MSG_ICON_VIEWER_RESCAN_LIST creates new objetcs so it may invalidate pself
+     * on older systems. In BBX4 and later, pself is dereferenced automatically
+     * if the caller is a method, but not if the caller is a routine.
+     * MSG_ICON_VIEWER_RESCAN_LIST also forces the IconListContent to redraw.
+     */
+
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@IconListContent))::MSG_ICON_VIEWER_RESCAN_LIST();
+    //pself = ObjDerefVis(oself);
+}
+
+
+/*--------------------- MSG_DB_VIEWER_RENAME_ICON ---------------------
+ *  Purpose:	Rename the currently edited icon
+ *  Context:
+        if openFlag
+	   - get the current name from icon
+	   - update and execute rename dialog
+	else
+	   - store undo information
+	   - get the name from the Rename dialog box
+	   - set the name of the icon in the database
+	   - update FatbitsInfoText
+	   - mark document file as dirty
+ *  Strategy:
+ *  Parameters:	openFlag	TRUE: called to open the dialog
+ *				FALSE: called to apply rename
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_RENAME_ICON {
+char  name[ISET_NAME_BUFFER_SIZE];
+
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return;
+
+    if (openFlag) {
+	/*
+	* Execte Rename-Dialog
+	*/
+	IdGetEntryName(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, name);
+	@call RenameIconTextField::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+	@send RenameIconDialog::MSG_GEN_INTERACTION_INITIATE();
+	return;
+    }
+
+    /*
+     * Store undo information
+     */
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_RENAME_ICON);
+
+    /*
+     * Rename the icon and update FatbitsInfoText
+     */
+    @call RenameIconTextField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+    IdSetEntryName(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, name);
+    @call oself::MSG_DB_VIEWER_UPDATE_ICON_INFORMATION(pself->DBVI_currentIcon);
+
+
+    /*
+     * Finally mark the database dirty. Use @send because IconDocumentGroup runs in process thread.
+     */
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_INITIALIZE_ICON_ATTRIBUTES_DIALOG ---------------------
+ *  Purpose:	Initialize dialog for modifying icon attributes (display size, style etc.)
+ *		Open dialog if requested
+ *  Context:
+ *  Strategy:
+ *  Parameters:	Boolean openDialog : open dialog or not
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_INITIALIZE_ICON_ATTRIBUTES_DIALOG {
+VMBlockHandle iconBmp;
+int 	width, height, bmFormat;
+word	val, vmlet;	/* VisMonikerListEntryType */
+char	buf[25];
+optr	textOp;
+DisplayClass	displayClass;
+dword	sizeUncompressed, sizeCompressed;
+
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return;
+    if (pself->DBVI_currentIcon == NO_CURRENT_ICON) return;
+    if (pself->DBVI_vmFile == 0) return;	/* <- may happen if App is about to close */
+
+    /*
+     * Send current icon attributes to UI
+     * Ensure that DS_HUGE is shown even if HIDE_HUGE_SCREEN_UI is active
+     */
+    vmlet = IdGetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+
+    val = (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET;
+    @send IconAttributesStyleChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    val = (vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET;
+
+@if @HIDE_HUGE_SCREEN_UI
+    if ( val == DS_HUGE) {
+    	@send IconAttributesHugeSizeItem::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+    	@send IconAttributesHugeSizeItem::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+@endif
+    @send IconAttributesDisplaySizeChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    val = (vmlet & VMLET_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET;
+    @send IconAttributesAspectChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    val = (vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET;
+    @send IconAttributesDisplayClassChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    /*
+     * Get bitmap information and send it to the UI
+     */
+    iconBmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+    bmFormat = BTGetMoreBitmapInfos(pself->DBVI_vmFile, iconBmp, &width, &height, 0);
+
+    sprintf(buf, "%ux%u,  ", width, height);
+    @call IABitmapInfoText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    switch (bmFormat & BMT_FORMAT) {
+	case BMF_MONO:	textOp = @IconInfoMonoText;	break;
+    	case BMF_4BIT:	textOp = @IconInfo16ColorsText;	break;
+        case BMF_8BIT:	textOp = @IconInfo256ColorsText; break;
+    	default: 	textOp = @IconInfoTCText;	break;
+	}
+    @call IABitmapInfoText::MSG_VIS_TEXT_APPEND_OPTR(textOp, 0);
+    if ( bmFormat & BMT_PALETTE ) {
+    	@call IABitmapInfoText::MSG_VIS_TEXT_APPEND_PTR(", ", 0);
+    	@call IABitmapInfoText::MSG_VIS_TEXT_APPEND_OPTR(@TokenInfoPalette, 0);
+    }
+
+    /*
+     * Get suggested display class and send it to the UI
+     */
+    displayClass = FindSuggestedDisplayClass(pself->DBVI_vmFile, iconBmp);
+    switch ( displayClass ) {
+    case DC_CF_RGB: 	textOp = @TokenInfoRGBScreen;	break;
+    case DC_COLOR_8: 	textOp = @TokenInfo256Screen;	break;
+    case DC_GRAY_1:	textOp = @TokenInfoMonoScreen;	break;
+    default: 		textOp = @TokenInfo16Screen;
+    }
+    @call IASuggestesDisplayClassText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(textOp, 0);
+
+    /*
+     * Display uncompressed and compressed size
+     */
+    ExpTokenFindBitmapSizes(pself->DBVI_vmFile, iconBmp, &sizeUncompressed, &sizeCompressed);
+    MemLock(OptrToHandle(@TokenInfoSizeBytes));
+
+    sprintf(buf, LMemDeref(@TokenInfoSizeBytes), sizeUncompressed);
+    @call IAUncompressedSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    if (sizeUncompressed > MAX_SAFE_MONIKER_SIZE)
+    	@call IAUncompressedSizeText::MSG_VIS_TEXT_APPEND_OPTR(@TokenInfoTooLarge, 0);
+
+    sprintf(buf, LMemDeref(@TokenInfoSizeBytes), sizeCompressed);
+    @call IACompressedSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    if (sizeCompressed > MAX_SAFE_MONIKER_SIZE)
+    	@call IACompressedSizeText::MSG_VIS_TEXT_APPEND_OPTR(@TokenInfoTooLarge, 0);
+
+    MemUnlock(OptrToHandle(@TokenInfoSizeBytes));
+
+    /*
+     * Set all attribute chooser to not modified. That causes them to send its
+     * apply msg (enable "change attributes" buttons) if they are changed
+     * Also set "change attributes" buttons initially not enabled
+     */
+    @send IconAttributesDisplayClassChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+    @send IconAttributesAspectChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+    @send IconAttributesStyleChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+    @send IconAttributesDisplaySizeChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+
+    @send ChangeIconDoChangeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ChangeIconDoChangeAndCloseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /*
+     * Ready
+     */
+    if ( openDialog ) {
+    	@send ChangeIconAttributesDialog::MSG_GEN_INTERACTION_INITIATE();
+    }
+}
+
+/*--------------------- MSG_DB_VIEWER_ATTRIBUTE_CHANGED ---------------------
+ *  Purpose:	Enable "ChangeAttributes" Triggers when one of the
+ *		attributes has been changed by the user.
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_ATTRIBUTE_CHANGED {
+    @send ChangeIconDoChangeTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ChangeIconDoChangeAndCloseTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    pself->DBVI_iconDirty = TRUE;
+}
+
+
+/*--------------------- MSG_DB_VIEWER_TEST_ATTRIBUTE_CHANGED ---------------------
+ *  Purpose:	Compare current icon attributes with the settings in ChangeIconAttributesDialog
+ *  Parameters: Boolean (word *vmletPtr)
+ *  Return:	TRUE if the attrbutes differs *vmletPtr is set to the new attributes
+ *		FALSE if the does not differ or if the dialog is not on screen
+ *			*vmletPtr is perhaps not valid
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_TEST_ATTRIBUTE_CHANGED {
+VisMonikerListEntryType vmlet0, vmlet;
+word val;
+
+    // Emergency error checking
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return FALSE;
+    if (pself->DBVI_currentIcon == NO_CURRENT_ICON) return FALSE;
+
+    vmlet0 = IdGetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+
+    /*
+     * read icon style, display size, aspect ratio and disply class
+     * from dialog UI objects and update icon entry
+     */
+    vmlet = 0x40;	/* Set GSting Bit */
+    val = @call IconAttributesStyleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    vmlet |= val << VMLET_STYLE_OFFSET;
+
+    val = @call IconAttributesDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    vmlet |= val << VMLET_GS_SIZE_OFFSET;
+
+    val = @call IconAttributesAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    vmlet |= val << VMLET_GS_ASPECT_RATIO_OFFSET;
+
+    val = @call IconAttributesDisplayClassChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    vmlet |= val << VMLET_GS_COLOR_OFFSET;
+
+    *vmletPtr = vmlet;
+
+    if ( vmlet == vmlet0 ) return FALSE; /* no changes detected */
+    return TRUE;
+
+}
+
+/*--------------------- MSG_DB_VIEWER_CLOSE_ICON_ATTRIBUTES_DIALOG ---------------------
+ *  Purpose:	Icon attributes dialog has been finished
+ *  Context:
+ *  Strategy:	- if doChange is FALSE, do nothing
+ *		- read properties from UI and write it to the icon
+ *		- update program UI
+ *  Parameters:	int operation
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_CLOSE_ICON_ATTRIBUTES_DIALOG {
+word vmlet;	/* VisMonikerListEntryType */
+
+
+    if ( operation == CAD_CLOSE_ONLY ) {
+    	@send ChangeIconAttributesDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    	return;
+    }
+
+    /*
+     * read icon style, display size, aspect ratio and disply class
+     * from dialog UI objects and update icon entry
+     */
+    if ( @call oself::MSG_DB_VIEWER_TEST_ATTRIBUTE_CHANGED(&vmlet) ) {
+	/*
+	 * Remember current icons state for undo
+	 * Save and display new properties
+	 * Mark Icon dirty
+	 */
+	@call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_CHANGE_ATTRIBUTES);
+	IdSetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, vmlet);
+
+	@call oself::MSG_DB_VIEWER_UPDATE_ICON_INFORMATION(pself->DBVI_currentIcon);
+
+	/*
+	 * Reset all attribute chooser to not modified. That causes them to send its
+	 * apply msg (enable "change attributes" buttons) if they are changed
+	 * Also reset "change attributes" buttons to not enabled
+	 */
+	@send IconAttributesDisplayClassChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+	@send IconAttributesAspectChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+	@send IconAttributesStyleChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+	@send IconAttributesDisplaySizeChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(FALSE);
+
+	@send ChangeIconDoChangeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ChangeIconDoChangeAndCloseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+
+	/*
+	 * Finally mark the database dirty. Use @send because IconDocumentGroup runs in process thread.
+	 */
+	@send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+    }
+
+    if ( operation == CAD_SAVE_AND_CLOSE ) {
+    	@send ChangeIconAttributesDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    	return;
+    }
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_UPDATE_SAVE_ICON_TRIGGERS ---------------------
+ *  Purpose:	Enable / Disable SaveIconTrigger and DiscardIconTrigger
+ *  Context:
+ *  Strategy:
+ *	- if the icon is dirty, enable both triggers,
+ *	  otherwise disable them.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_SAVE_ICON_TRIGGERS {
+
+    if ( pself->DBVI_iconDirty ) {
+    	@send SaveIconTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send DiscardIconTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@send SaveIconTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send DiscardIconTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+/*--------------------- MSG_DB_VIEWER_CHECK_ICON_DIRTY_AND_DEAL_WITH_IT ---------------------
+ *  Purpose:	Call CheckIconDirtyAndDealWithIt() from outside of the
+ *		DatabaseViewer object
+ *  Context:
+ *  Strategy:
+ *  Parameters: hasCancelTrigger: add a "Cancel" trigger to the diealog box
+ *  Return:	FALSE:	icon is not dirty OR saved OR changes are discarded
+ 		TRUE:	The user has choosen to cancel.
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_CHECK_ICON_DIRTY_AND_DEAL_WITH_IT {
+    return CheckIconDirtyAndDealWithIt(oself, hasCancelTrigger);
+}
+
+/*--------------------- CheckIconDirtyAndDealWithIt ---------------------
+ *  Purpose:	See if current icon is dirty, and prompt for save.
+ *		Undo cain will be flushed if changes are discarded.
+  *  Context:
+  *  Strategy:
+ 	- if icon is dirty, prompt the user for save
+ 	- if user wants to save changes, save it,
+ 	  otherwise, discard changes and flush undo chain
+ 	- return TRUE if they cancel.
+     Additional feature:
+     	The user may working with the "Text Moniker" dialog. The content of
+     	this dialog is updated every time when the current icon or iSet changes.
+     	Therefore we have also to test here, if these settings need to be saved.
+ *  Parameters:	dbViewerObj: DatabaseViewer object (must be locked!)
+ 		hasCancelTrigger: add a "Cancel" trigger to the diealog box
+ *  Return:	FALSE:	icon is not dirty OR saved OR changes are discarded
+ 		TRUE:	The user has choosen to cancel.
+ ---------------------------------------------------------------------------*/
+Boolean CheckIconDirtyAndDealWithIt(optr dbViewerObj, Boolean hasCancelTrigger) {
+IconDBViewerInstance *pself;
+int cmd;
+EC(word info;)
+
+StandardDialog3ResponseTriggerTable YesNoCancelResponseTable[] =
+	{ 3,
+	{@ConfirmYesMoniker, IC_YES},
+	{@ConfirmNoMoniker, IC_NO},
+	{@ConfirmCancelMoniker, IC_DISMISS} };
+
+StandardDialog2ResponseTriggerTable YesNoResponseTable[] =
+	{ 2,
+	{@ConfirmYesMoniker, IC_YES},
+	{@ConfirmNoMoniker, IC_NO} };
+
+
+EC( info = MemGetInfo(OptrToHandle(dbViewerObj), MGIT_FLAGS_AND_LOCK_COUNT); 	\
+    if ( MGI_LOCK_COUNT(info) == 0 ) {						\
+    ProgError("dbViewerObj not locked in CheckIconDirtyAndDealWithIt"); } )
+
+    pself = ObjDerefVis(dbViewerObj);
+
+    /*
+     * If there is no current icon set do nothing
+     * If the icon is not dirty only check the "Text Moniker" dialog
+     */
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return FALSE;
+    if (!pself->DBVI_iconDirty) goto testMonikerDialog;
+
+    /*
+     * The icon image or icon attributes has been changend.
+     * Prompt for save .
+     */
+    if (hasCancelTrigger) {
+    	cmd = UserStandardDialogOptr((char*)0, &YesNoCancelResponseTable,
+		0, 0, @PromptForSaveIconText,
+		( (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)));
+    } else {
+    	cmd = UserStandardDialogOptr((char*)0, &YesNoResponseTable,
+		0, 0, @PromptForSaveIconText,
+		( (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		  (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)));
+    }
+    /*
+     * If the user has chosen to cancel or the system is shutting down (IC_NULL), return TRUE
+     */
+    if ( cmd == IC_NULL ) return TRUE;
+    if ( cmd == IC_DISMISS ) return TRUE;
+
+    if (cmd == IC_YES) {
+        int visAttrs;
+        Boolean changed;
+        VisMonikerListEntryType vmlet;
+    	/*
+    	 * ok, save the icon. This includes changed icon attributes
+    	 */
+	visAttrs = @call ChangeIconAttributesDialog::MSG_VIS_GET_ATTRS();
+	if (visAttrs & VA_VISIBLE) {
+ 	    changed = @call dbViewerObj::MSG_DB_VIEWER_TEST_ATTRIBUTE_CHANGED(&vmlet);
+ 	    pself = ObjDerefVis(dbViewerObj);
+ 	    if (changed) IdSetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, vmlet);
+	}
+
+        @call dbViewerObj::MSG_DB_VIEWER_SAVE_CURRENT_ICON();
+    } else {
+        @call dbViewerObj::MSG_DB_VIEWER_DISCARD_CURRENT_ICON();
+    }
+
+testMonikerDialog:
+    /*
+     * Test if the settings in the "Text Monikers" dialog have been changed.
+     */
+    if ( @call dbViewerObj::MSG_DB_VIEWER_TEXT_MONIKER_TEST_OPTIONS_CHANGED() ) {
+    	/*
+    	 * We do not provide a way to cancel the operaion here, because the icon
+    	 * may already be saved. An option to cancel at this point may confuse the user.
+    	 */
+    	 cmd = QuestionBoxOptr(@PromptForSaveTextMonikersText);
+    	 if (cmd == IC_YES) {
+    	     /*
+    	      *Save options from Text-Monikers dialog
+    	      */
+    	     @call dbViewerObj::MSG_DB_VIEWER_TEXT_MONIKER_STORE_SETTINGS();
+    	 }
+    }
+
+    return FALSE;
+}
+
+
+/*--------------------- MSG_DB_VIEWER_SAVE_CURRENT_ICON ---------------------
+ *  Purpose:	Save changes to current icon
+ *		Do not prompt for save
+ *		Do not deal with the undo cain.
+ *  Context:
+ *  Strategy
+ *	- let's make the fatbits object the job
+ *	- mark icon as not dirty
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_SAVE_CURRENT_ICON {
+
+    @call CombineOselfWith(@MyFatbits)::MSG_FATBITS_SAVE_ICON( pself->DBVI_vmFile,
+    					pself->DBVI_currentISet,
+    					pself->DBVI_currentIcon);
+    SetIconDirtyState(pself, FALSE);
+}
+
+
+/*--------------------- MSG_DB_VIEWER_DISCARD_CURRENT_ICON ---------------------
+ * Purpose:	Dicard changes of current icon and flush undo chain
+ *		Do not prompt
+ *  Context:
+ *  Strategy:
+ *	- tell the fatbits object to re-use the current icon.
+ *	  this discards all changes
+ *	- flush undo chain
+ *	- mark icon as not dirty
+ *	- update dialog boxes that displays any icon properties
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_DISCARD_CURRENT_ICON {
+
+    @call CombineOselfWith(@MyFatbits)::MSG_FATBITS_USE_ICON( pself->DBVI_vmFile,
+    					pself->DBVI_currentISet,
+    					pself->DBVI_currentIcon);
+    @call CombineOselfWith(@MyFatbits)::MSG_FATBITS_UNDO_FLUSH_CHAIN(FALSE);
+    SetIconDirtyState(pself, FALSE);
+    @send, forceQueue oself::MSG_DB_VIEWER_UPDATE_DIALOGS();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_GET_FLAGS ---------------------
+ * Purpose:	return DBVI_flags value
+ - currently unused, but code left intact and commented out
+ ---------------------------------------------------------------------------* /
+@method IconDBViewerClass, MSG_DB_VIEWER_GET_FLAGS {
+    return pself->DBVI_flags;
+}
+/**/
+
+/*--------------------- MSG_DB_VIEWER_TEST_IF_PTR_IMAGE ---------------------
+ * Purpose:	Test, if the current iSet is a "pointer-image" set or not
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	TRUE: The current iSet is a "pointer-image" set
+ *		FALSE: The current iSet is a normal icon set
+ ---------------------------------------------------------------------------*/
+@method IconDBViewerClass, MSG_DB_VIEWER_TEST_IF_PTR_IMAGE {
+int flags;
+
+    if ( ! pself->DBVI_vmFile ) return FALSE;	/* about to close */
+
+    flags = IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    if (flags & IF_PTR_IMAGE) return TRUE;
+    return FALSE;
+
+}
+
+
+/*--------------------- ToolCalcBitmapSize ---------------------
+ *  Purpose:	Calculate the number of bytes that are required to hold
+ *		the bitmap data, including the bitmap header.
+ *  Strategy:	See code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+dword ToolCalcBitmapSize(int width, int height, BMFormat bmpFormat) {
+int 	numBytes, paletteSize;
+dword 	bitmapSize;
+
+
+    /*
+     * Calculate the number of bytes in a pixel line and the palette Size
+     * Add the right number of bytes if we have a masked bitmap or a palette
+     * Note that the palette is preceded by a word (number of palette entries).
+     */
+    switch (bmpFormat & BMT_FORMAT) {
+    case BMF_MONO:
+	  numBytes = (width+7)/8;
+	  paletteSize = 0;
+	  break;
+    case BMF_4BIT:
+	  numBytes = (width+1)/2;
+	  paletteSize = 16*sizeof(PaletteEntry) +  2;
+	  break;
+    case BMF_8BIT:
+	  numBytes = width;
+	  paletteSize = 256*sizeof(PaletteEntry) +  2;
+	  break;
+    default: 	// 24 Bit
+	  numBytes = 3*width;
+	  paletteSize = 0;
+    }
+
+    if ( bmpFormat & BMT_MASK) numBytes += (width+7)/8;
+
+    /*
+     * Calculate the number of bytes in the bitmap. This may be a dword value.
+     * Add header size
+     */
+    bitmapSize = numBytes;
+    bitmapSize *= height;
+    if ( bmpFormat & BMT_PALETTE) bitmapSize += paletteSize;
+
+    if ( bmpFormat & BMT_COMPLEX) {
+    	bitmapSize += sizeof(CBitmap);		/* Complex bitmap header */
+    } else {
+    	bitmapSize += sizeof(Bitmap);		/* Simple bitmap header */
+    }
+
+    return bitmapSize;
+}
+
+/*--------------------- CheckIconTooLargeAndDealWithIt ---------------------
+ *  Purpose:	See if the bitmap data size extend the save size of 8 kB.
+ *  Context:
+ *  Strategy:
+	- Return TRUE if either dimension is larger than
+	  the max allowable size.  (We have this check for when we
+	  are importing graphics).
+	- Figure out the total space that will be required by the
+	  bitmap (including the mask), and disallow the bitmap's
+	  creation if it's >8k.
+	- But the user may explicitely override this behavior.
+	  For example he wants to reduce the color deepth of a true color
+	  image later. For example, he may want to reduce the color depth
+	  of a true color image later on. Or the image should not be
+	  written to the token database or as source code, but exported to
+	  an image file or only to the clipboard.
+ *  Parameters:
+ *  Return:	FALSE: Anything is OK
+ 		TRUE:
+ ---------------------------------------------------------------------------*/
+Boolean CheckIconTooLargeAndDealWithIt(int width, int height, BMFormat bmpFormat) {
+dword 	bitmapSize;
+
+
+    /*
+     * Quick check to see if either dimension is too large.
+     */
+    if ( (width > MAX_ICON_WIDTH) || (height > MAX_ICON_HEIGHT) ) {
+    	ErrorBoxOptr(@IconTooWideOrTallText);
+    	return TRUE;
+    }
+
+    /*
+     * Calculate the number of bytes in the bitmap. This may be a dword value.
+     * Then check if it extends the save moniker size.
+     */
+    bitmapSize = ToolCalcBitmapSize(width, height, bmpFormat);
+
+    if ( bitmapSize > (dword)MAX_SAFE_MONIKER_SIZE) {
+    	/*
+    	 * Depending on the user settings, we reject this icon (return TRUE)
+    	 * or we display a warning and accept the image (return FALSE);
+    	 */
+    	int options = @call OptionsBooleanGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    	if (options & IO_ALLOW_OVERSIZED_ICONS) {
+    	    UserDoDialog(@IconVeryLargeWarningBox);
+    	} else {
+    	    int cmd;
+    	    cmd = UserDoDialog(@IconTooLargeErrorBox);
+    	    if ( cmd == IC_STILL_USE_IMAGE) return FALSE;	/* nevertheless accept this icon */
+    	    return TRUE;
+    	}
+    }
+
+    /*
+     * Great, all checks are passed.
+     */
+    return FALSE;
+
+}
+
+
+/*--------------------- DisableEditing ---------------------
+ *  Purpose:	Disables UI gadgetry for editing an icon.
+ *  Context:	This routine is called if there is no icon set in the current
+ 		database file. In this case we have to disable some UI
+ 		or the app will crash, if the user uses one of these options.
+ *  Strategy:	See code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void DisableEditing(void) {
+EventHandle ev;
+
+    /*
+     * Disabling the complete icon menu sometimes does not work, because
+     * the document control may enable the objects, listed in it's enableDisable
+     * (which is true for the icon menu) after DisableEditing() has been
+     * called. Therefore, we have a sub group to disable here.
+     */
+    @send ISetMenuSubGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /*
+     * All parts of the ISetMenu must be disabled,
+     * except for the AddISet trigger.
+     * As long as we have no non-modal dialogs as child, we don't need
+     * the menu-hack described below.
+     */
+    @send ISetMenuSubGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+
+    /*
+     * There are some features from the extras menu that are not available
+     * if there is no iSet in the database file. Disable them.
+     */
+    @send SortISetsTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send AnimationTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /*
+     * Disable some complete Menus.
+     * Unfortunately there is a nasty issue when GEOS restores from state.
+     * We call DisableEditing() when a document closes, even for shut down.
+     * We want to disable some menus here. If a dialog that is a child
+     * of a menu is still open, it is automatically disabled. But when
+     * GEOS restarts, the dialog is not enabled when the menu itself is
+     * enabled in EnableEditing(). That is why we do not disable the menu itself,
+     * but all its children. In EnableEditing(), we revert this in the same way.
+     */
+
+    ev = @record GenInteractionClass::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconMenu::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+    ev = @record GenInteractionClass::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconOptionsMenu::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+    ev = @record GenInteractionClass::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconGraphicsMenu::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+
+    /*
+     * Disable some objects in the import/export groups of the file menu
+     */
+    @send ExportToTokenDBTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ExportIconSubmenu::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send ImportGraphicTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+
+    /*
+     * Disable all non-maodal dialogs as well as the Custom color dilog
+     */
+    @send ChangeIconAttributesDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconPreviewDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send TextMonikerDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconCustomColorDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send IconPickColorControlBox::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+/*--------------------- EnableEditing ---------------------
+ *  Purpose:	Enables UI gadgetry for editing an icon.
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EnableEditing(void) {
+EventHandle ev;
+
+    /*
+     * As pointed out in the comment for DisableEditing(),
+     * we have to enable a sub group of the IconMenu here.
+     */
+    @send ISetMenuSubGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    /*
+     * All parts of the ISetMenu must be enabled,
+     * The AddISet trigger is enabled in any case.
+     * As long as we have no non-modal dialogs as child, we don't need
+     * the menu-hack described in DisableEditing().
+     */
+    @send ISetMenuSubGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    /*
+     * Enable features from the extras menu that are only available
+     * if there is at least on iSet in the database file.
+     */
+    @send SortISetsTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send AnimationTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    /*
+     * Enable some complete Menus. As stated in DisableEditing(), there is a
+     * nasty issue when GEOS restores from state. That's why we don't enable
+     * the menus here, but we have to enable its children.
+     */
+    ev = @record GenInteractionClass::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconMenu::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+    ev = @record GenInteractionClass::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconOptionsMenu::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+    ev = @record GenInteractionClass::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconGraphicsMenu::MSG_GEN_SEND_TO_CHILDREN(ev);
+
+
+    /*
+     * Enable some objects in the import/export groups of the file menu
+     */
+    @send ExportToTokenDBTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ExportIconSubmenu::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ImportGraphicTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+
+    /*
+     * Enable all non-maodal dialogs as well as the Custom color dilog
+     */
+    @send ChangeIconAttributesDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconPreviewDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send TextMonikerDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconCustomColorDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send IconPickColorControlBox::MSG_GEN_SET_ENABLED(VUM_NOW);
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+
+
+/* *********** End of file DOCUMENT.GOC ********************/
+
+

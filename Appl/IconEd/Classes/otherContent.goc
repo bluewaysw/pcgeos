@@ -1,0 +1,738 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	otherContent.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 8/03/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	Implementation of OtherContentClass
+ *		OtherContentClass is used for different purposes to display
+ *		more or less simple things. The Idea is to avoid a lot of
+ *		VisContent subclasses.
+ *		The content to be displayed is determined by the OCI_type
+ *		instance variable.
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+/*--------------------- OtherContentClass ---------------------
+ ---------------------------------------------------------------------------*/
+
+@classdecl OtherContentClass;
+
+@extern method OtherContentClass, MSG_OC_CREATE_CHILD;
+@extern method OtherContentClass, MSG_OC_DESTROY_LIST;
+@extern method OtherContentClass, MSG_VIS_COMP_GET_CHILD_SPACING;
+@extern method OtherContentClass, MSG_VIS_COMP_GET_MARGINS;
+@extern method OtherContentClass, MSG_OC_CHILD_SELECTED;
+@extern method OtherContentClass, MSG_OC_GET_SELECTED_CHILD;
+
+
+/*--------------------- Local Headers ---------------------
+ ---------------------------------------------------------------------------*/
+
+void OCDrawPoinerPreviewImage(GStateHandle gstate, int hotX, int hotY);
+
+
+
+/*===========================================================================
+	OtherContentClass is used for different purposes
+	Common messages and routines
+ ===========================================================================*/
+
+/*--------------------- MSG_VIS_RECALC_SIZE ---------------------
+ *  Purpose:	Return the size of the Content object
+ *  Context:	Geometry management
+ *  Strategy:
+ 	- depending on pself->OCI_type return appropirate size
+ 	- for bitmaps: respect OCI_margin
+ *  Parameters:  SizeAsDWord (RecalcSizeArgs width; RecalcSizeArgs height9;
+ *  Return:	SizeAsDWord
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_VIS_RECALC_SIZE {
+int w, h;
+
+    switch (pself->OCI_type) {
+    case OC_TYPE_BITMAP_PREVIEW:
+    case OC_TYPE_BITMAP:
+	if ( !pself->OCI_bitmap ) {
+	    w = 48;
+	    h = 30;
+	} else {
+	    BTGetMoreBitmapInfos(global.tempFile, pself->OCI_bitmap, &w, &h, 0);
+	}
+	w += 2*pself->OCI_margin;
+	h += 2*pself->OCI_margin;
+	break;
+
+    case OC_TYPE_PALETTE:
+	w = MORE_COLORS_WIDTH;
+	h = MORE_COLORS_HEIGHT;
+	break;
+
+    case OC_TYPE_SINGLE_COLOR:
+	w = SINGLE_COLOR_VIEW_WIDTH;
+	h = SINGLE_COLOR_VIEW_HEIGHT;
+    	break;
+
+    case OC_TYPE_COLOR_BAR:
+	w = HSV_BAR_VIEW_WIDTH;
+	h = HSV_BAR_VIEW_HEIGHT;
+    	break;
+
+    default:
+    	return @callsuper();
+    }
+
+    return( MAKE_SIZE_DWORD(w , h) );
+}
+
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:
+ *	Draw method for OtherContentClass.
+ *  Context:
+ *  Strategy:
+ * 	Depending on the pself->OCI_type value
+ * 	    - simply draw the bitmap with respect to OCI_margin
+ * 	or  - Draw the 256 color palette
+ * 	or  - Draw a single colored area
+ * 	or  - Draw a color bar
+ * 	      Instead to draw a lot if lines, we draw rectangles for speed
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_VIS_DRAW {
+
+
+    switch ( pself->OCI_type) {
+    case OC_TYPE_BITMAP_PREVIEW:
+	if ( !pself->OCI_bitmap) {
+	    //GrDrawText(gstate, 1, 1, "no bitmap", 0); 	// <-- useful for debugging
+	    return;
+	}
+	GrDrawHugeBitmap(gstate, pself->OCI_margin, pself->OCI_margin, global.tempFile, pself->OCI_bitmap);
+	break;
+
+    case OC_TYPE_PALETTE:
+    	DrawFullPalette(gstate);
+    	break;
+
+    case OC_TYPE_SINGLE_COLOR:
+    	GrSetAreaColor (gstate, CF_RGB, pself->OCI_color.rt, pself->OCI_color.gn, pself->OCI_color.bl);
+    	GrFillRect(gstate, 0, 0, SINGLE_COLOR_VIEW_WIDTH, SINGLE_COLOR_VIEW_HEIGHT);
+    	break;
+
+    case OC_TYPE_COLOR_BAR:
+	{
+	int n;
+	int w = COLOR_BAR_RECTANGLE_WIDTH;	// <- rectangle width for one color in the color bar
+	PaletteEntry *colorData;
+
+
+	/*
+	 * Drawing two-pixel-wide rectangles instead of individual lines speeds
+	 * things up significantly without any visible compromises.
+	 * if ENABLE_MORE_SPEED_HSV_OPTION is set to non zero (but by default it is
+	 * zero) the user may decide to use 6 pixel-wide rectangles with more speed
+	 * lower quality (visible rectangles in the bar)
+	 */
+@if @ENABLE_MORE_SPEED_HSV_OPTION
+	if ( @call HsvSpeedOrQualitySelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & 1 ) w = MORE_SPEED_W;
+@endif
+
+	colorData = MemLock(pself->OCI_colorBarBlock);
+	for ( n = 0; n < 256; n+=w ) {
+	    GrSetAreaColor (gstate, CF_RGB, colorData[n].rt, colorData[n].gn, colorData[n].bl);
+	    GrFillRect(gstate, pself->VI_bounds.R_left + n, pself->VI_bounds.R_top, pself->VI_bounds.R_left + n+w, pself->VI_bounds.R_bottom);
+	    }
+	MemUnlock(pself->OCI_colorBarBlock);
+
+        }
+    	break;
+
+    case OC_TYPE_TOKEN:
+        @call oself::MSG_OC_DRAW_TOKEN(gstate);
+        break;
+
+    case OC_TYPE_BITMAP:
+        @call oself::MSG_OC_DRAW_BITMAP(gstate);
+        break;
+
+    case OC_TYPE_POINTER_PREVIEW:
+    	OCDrawPoinerPreviewImage(gstate, pself->OCI_hotX, pself->OCI_hotY);
+    	break;
+
+    case OC_TYPE_RESIZE_PREVIEW:
+    	@callsuper();			/* nothing special, only draw the children */
+    	break;
+
+
+EC(  default: 	\
+{ char *txt;	\
+  txt = malloc(100);	\
+  sprintf(txt, "Invalild type %u in OtherContentVIS_DRAW", pself->OCI_type); \
+  ProgError(txt);	\
+  } \
+)
+
+
+    }
+}
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:
+
+ *  Context:
+ *  Strategy:
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_META_START_SELECT {
+
+    switch ( pself->OCI_type) {
+    //case OC_TYPE_BITMAP_PREVIEW:
+    case OC_TYPE_PALETTE:
+  	OtherContentPaletteStartSelectHandler(xPosition, yPosition);
+    	break;
+
+    case OC_TYPE_POINTER_PREVIEW:
+    	@call oself::MSG_OC_SET_HOTSPOT(xPosition, yPosition);
+    	break;
+
+    //case OC_TYPE_SINGLE_COLOR:
+    // case OC_TYPE_COLOR_BAR:
+    // case OC_TYPE_RESIZE_PREVIEW
+    default: @callsuper();
+
+    }
+
+    retVal->flags = MRF_PROCESSED;
+}
+
+/*===========================================================================
+	Support OCI_type = OC_TYPE_SINGLE_COLOR
+	The object draws a colored area
+ *===========================================================================*/
+
+/*--------------------- MSG_OTHER_CONTENT_SET_COLOR ---------------------
+ *  Purpose:	Set color for OC_TYPE_SINGLE_COLOR objects
+ *  Context:
+ *  Strategy:
+ *	- store color
+ *	- redraw itself
+ *  Parameters:	void (int r, int g, int b) <-- color values
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OTHER_CONTENT_SET_COLOR {
+
+    pself->OCI_color.rt = r;
+    pself->OCI_color.gn = g;
+    pself->OCI_color.bl = b;
+
+    @call oself::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+
+}
+
+/*--------------------- MSG_OTHER_CONTENT_GET_COLOR ---------------------
+ *  Purpose:	Get color for OC_TYPE_SINGLE_COLOR objects
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	OCI_color value
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OTHER_CONTENT_GET_COLOR {
+    return pself->OCI_color;
+}
+
+/*===========================================================================
+	Support OCI_type = OC_TYPE_COLOR_BAR
+	The object draws a bar with different colors
+ ===========================================================================*/
+
+/*--------------------- MSG_OC_CREATE_COLOR_BAR ---------------------
+ *  Purpose:	Create color bar values for an OC_TYPE_COLOR_BAR object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	int h, s, v:	HSV values of the current color
+ *		int type:	which color bar to create
+ *		Boolean redraw:	redraw bar
+ *  Return:
+ ---------------------------------------------------------------------------*/
+// stop in OtherContentOC_CREATE_COLOR_BAR
+@method OtherContentClass, MSG_OC_CREATE_COLOR_BAR {
+PaletteEntry *colorData;
+
+    if ( !(pself->OCI_colorBarBlock) ) {
+    	pself->OCI_colorBarBlock = MemAlloc(256*sizeof(PaletteEntry), HF_SHARABLE | HF_SWAPABLE, HAF_ZERO_INIT);
+	}
+
+    colorData = MemLock(pself->OCI_colorBarBlock);
+
+    switch (type) {
+    case CREATE_H_BAR:
+    	/* this bar does not depend on the current color value */
+    	CreateHueColorBar(colorData);
+    	break;
+    case CREATE_S_BAR:
+    	/* Saturation bar depends on current h and v values */
+    	CreateSaturationColorBar(colorData, h, v);
+    	break;
+
+    case CREATE_V_BAR:
+    	/* value (i.e. brightness) bar depends on current h and s values */
+    	CreateBrightnessColorBar(colorData, h, s);
+    	break;
+    }
+
+    if ( redraw) {
+    	@call oself::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+    }
+
+    MemUnlock(pself->OCI_colorBarBlock);
+}
+
+/*--------------------- CreateHueColorBar ---------------------
+ *  Purpose:	Create color bar of all possible colors
+ *		hue runs from 0 to 255, s and v are 255
+ *  Strategy:
+ *	- the associated sliders deals with the HSV color model, but
+ *	  the color bar arry must contain RBG values
+ *	- this bar is created only one at program startup
+ *	- simply store the RGB values for every hue value
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void CreateHueColorBar(PaletteEntry *colorBarData) {
+int x;
+
+    for ( x = 0; x < 256; x++ ) {
+	ITGetColorFromHSV8Bit(&(colorBarData[x]), x, 255, 255);
+    }
+
+}
+/*--------------------- CreateSaturationColorBar ---------------------
+ *  Purpose:	Create color bar of all possible colors for the
+ *		passed h and v values
+ *		s (saturation) runs from 0 to 255
+ *  Context:
+ *  Strategy:
+ *	- the associated sliders deals with the HSV color model, but
+ *	  the color bar arry must contain RBG values
+ *	- because we draw rectangles (default width is 2) instead of
+ *	  lines, we need to calculate only every 2nd value
+ *	  in the color bar
+ *	- If the UI is enabled (ENABLE_MORE_SPEED_HSV_OPTION), the user
+ *	  may decide to use wider rectangles (width of MORE_SPEED_W)
+ *	  this speeds up calculating, but causes visible recangles in the bar
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void CreateSaturationColorBar(PaletteEntry *colorBarData, int h, int v) {
+int x;
+int w = COLOR_BAR_RECTANGLE_WIDTH;	// default = 2
+
+@if @ENABLE_MORE_SPEED_HSV_OPTION
+    if ( @call HsvSpeedOrQualitySelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & 1 ) w = MORE_SPEED_W;
+@endif
+    for ( x = 0; x < 256; x+=w ) {
+	ITGetColorFromHSV8Bit(&(colorBarData[x]), h, x, v);
+     }
+}
+
+/*--------------------- CreateBrightnessColorBar ---------------------
+ *  Purpose:	Create color bar of all possible colors for the
+ *		passed h and s values
+ *		v (brightness) runs from 0 to 255,
+ *  Context:
+ *  Strategy:
+ *	- the associated sliders deals with the HSV color model, but
+ *	  the color bar arry must contain RBG values
+ *	- because we draw rectangles (default width is 2) instead of
+ *	  lines, we need to calculate only every 2nd value
+ *	  in the color bar
+ *	- If the UI is enabled (ENABLE_MORE_SPEED_HSV_OPTION), the user
+ *	  may decide to use wider rectangles (width of MORE_SPEED_W)
+ *	  this speeds up calculating, but causes visible recangles in the bar
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void CreateBrightnessColorBar(PaletteEntry *colorBarData, int h, int s) {
+int x;
+int w = COLOR_BAR_RECTANGLE_WIDTH;	// default = 2
+
+@if @ENABLE_MORE_SPEED_HSV_OPTION
+    if ( @call HsvSpeedOrQualitySelector::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & 1 ) w = MORE_SPEED_W;
+@endif
+    for ( x = 0; x < 256; x+=w ) {
+	ITGetColorFromHSV8Bit(&(colorBarData[x]), h, s, x);
+     }
+}
+
+/*--------------------- MSG_OC_DESTROY_COLOR_BAR ---------------------
+ *  Purpose:	Free colorBarBlock for OC_TYPE_COLOR_BAR objects
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_DESTROY_COLOR_BAR {
+
+    if ( pself->OCI_colorBarBlock ) MemFree(pself->OCI_colorBarBlock);
+    pself->OCI_colorBarBlock = 0;
+}
+
+/*===========================================================================
+	Support OCI_type = OC_TYPE_BITMAP_PREVIEW
+	The object draws a bitmap
+ ===========================================================================*/
+
+/*--------------------- ResizeAndReadrawImageObj ---------------------
+ *  Purpose:	Resize ImageClass object object and view
+ *  Startegy:
+ 	- get size of the bitmap
+ 	- send resize messages to image object (oself) and it's view
+ 	- send redraw message
+ *  Parameters:	optr of Fatbits object
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ResizeAndReadrawImageObj(optr oself) {
+OtherContentInstance *pself;
+int w, h;
+optr viewObj;
+
+    pself = ObjDerefVis(oself);
+    viewObj = pself->VCNI_view;			/* the following messages may invalidate pself */
+    if ( 0 == pself->OCI_bitmap) goto redraw;	/* may occur if no current icon exists */
+
+    BTGetMoreBitmapInfos(global.tempFile, pself->OCI_bitmap, &w, &h, 0);
+    w += 2*pself->OCI_margin;
+    h += 2*pself->OCI_margin;
+    @call oself::MSG_VIS_SET_SIZE(w, h);
+
+redraw:
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+    @call viewObj::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+    @call viewObj::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+/*--------------------- MSG_OTHER_CONTENT_USE_IMAGE ---------------------
+ *  Purpose:	Set the bitmap (stored in global.tempFile) for this object
+ *  Context:	The bitmap is only used, not managed -> do not destroy old
+ *		used bitmap here!
+ *  Strategy:
+ *  Parameters:	void (VMBlockHandle bmp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OTHER_CONTENT_USE_IMAGE {
+
+    pself->OCI_bitmap = bmp;
+    ResizeAndReadrawImageObj(oself);
+
+}
+
+/*--------------------- MSG_OTHER_CONTENT_REDRAW_IMAGE ---------------------
+ *  Purpose:
+ 	Forces the object to redraw itself
+ *  Context:
+ *  Strategy:
+ *	- Calling this method prevents flickering because the
+ *	  background will not be drawn.
+ *  Parameters:	void (void)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OTHER_CONTENT_REDRAW_IMAGE {
+GStateHandle gstate;
+
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    @call oself::MSG_VIS_DRAW(0, gstate);
+    GrDestroyState(gstate);
+
+}
+
+/*===========================================================================
+	Support OCI_type = OC_TYPE_TOKEN
+	The object draws a token from token database file
+ ===========================================================================*/
+
+/*--------------------- MSG_OC_SET_TOKEN ---------------------
+ *  Purpose:	Set token to show
+ *  Context:
+ *  Strategy:
+ *  Parameters:	tok: GeodeToken to show
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_SET_TOKEN {
+
+    memcpy( &(pself->OCI_token), &tok, sizeof(GeodeToken));
+    @call oself::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+}
+
+
+/*--------------------- MSG_OC_DRAW_TOKEN ---------------------
+ *  Purpose:	Draw token image, centered with a frame
+ *  Context:
+ *  Strategy:
+ *  Parameters:	gstate: GState handle to to draw to
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+@method OtherContentClass, MSG_OC_DRAW_TOKEN {
+int color;
+word size;
+VisMonikerWithGString	*monikerPtr;
+MemHandle	mh;
+
+    /*
+     * Fill background
+     */
+    color = COLOR_DARK_SILVER;
+    GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+    GrFillRect(gstate, 0, 0, EXPORT_TOKEN_PREVIEW_WIDTH, EXPORT_TOKEN_PREVIEW_HEIGHT);
+
+    mh = IconGetTokenMonikerBlock(pself->OCI_token, DS_STANDARD, VMS_ICON, &size);
+    if ( mh ) {
+
+	/* Get a pointer to the moniker and draw it */
+	monikerPtr = MemLock(mh);
+	IconDrawMonikerCentered(gstate, monikerPtr, EXPORT_TOKEN_PREVIEW_WIDTH, EXPORT_TOKEN_PREVIEW_HEIGHT);
+	MemFree(mh);
+
+    }
+@if @DEBUG_FLAG
+    else {
+    	GrDrawText(gstate, 5, 5, "Not found", 0);
+    }
+@endif
+
+
+}
+
+/*===========================================================================
+	Support OCI_type = OC_TYPE_BITMAP
+	The object draws a icon image (bitmap)
+ ===========================================================================*/
+
+/*--------------------- MSG_OC_REPLACE_BITMAP ---------------------
+ *  Purpose:	Replace the bitmap, stored in OCI_bitmap, by another
+ *  Context:
+ *  Strategy:
+ *	- free old bitmap
+ *	- set and redraw new bitmap
+ *  Parameters: bmp	Bitmap handle
+ *			the bitmap must already be stored in global.tempFile
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_REPLACE_BITMAP {
+int width, height;
+
+    if ( pself->OCI_bitmap ) HugeArrayDestroy(global.tempFile, pself->OCI_bitmap);
+    pself->OCI_bitmap = bmp;
+    if (!bmp) return;
+
+
+    /*
+     * update ourself
+     */
+    BTGetMoreBitmapInfos(global.tempFile, pself->OCI_bitmap, &width, &height, 0);
+    @call oself::MSG_VIS_SET_SIZE(width, height);
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+
+    @call pself->VCNI_view::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+    @call pself->VCNI_view::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+
+
+    @call oself::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+}
+
+/*--------------------- MSG_OC_GET_BITMAP ---------------------
+ *  Purpose:	Return current bitmap handle
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	bitmap handle
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_GET_BITMAP {
+    return pself->OCI_bitmap;
+}
+
+/*--------------------- MSG_OC_SET_HOTSPOT ---------------------
+ *  Purpose:	Update hotspot and redaw ourself
+ *  Context:
+ *  Strategy:
+ *  Parameters:	x, y: new coordiantes
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_SET_HOTSPOT {
+
+    pself->OCI_hotX = x;
+    pself->OCI_hotY = y;
+    @call pself->VCNI_view::MSG_GEN_VIEW_REDRAW_CONTENT();	/* also draws background! */
+
+}
+
+/*--------------------- MSG_OC_BITMAP_UPDATED ---------------------
+ *  Purpose:	The content of the bitmap has been changed. Redraw it.
+ *		- do no geometry calculation
+ *		- do not drawing a backround or redrawing the view
+ *  Context:	This is much faster than MSG_OC_REPLACE_BITMAP
+ *		This method is designed to speed up animations
+ *  Strategy:
+ *	- free old bitmap if a new bitmap has been passed
+ *	- redraw bitmap
+ *  Parameters: bmp	New bitmap handle
+ *			Pass zero to continue using the old bitmap.
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_BITMAP_UPDATED {
+GStateHandle gstate;
+
+    if (bmp) {
+    	HugeArrayDestroy(global.tempFile, pself->OCI_bitmap);
+    	pself->OCI_bitmap = bmp;
+    }
+
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    @call oself::MSG_OC_DRAW_BITMAP(gstate);
+    GrDestroyState(gstate);
+
+}
+
+
+/*--------------------- MSG_OC_DRAW_BITMAP ---------------------
+ *  Purpose:	draw the bitmap, centered, with a frame
+ *  Context:
+ *  Strategy:
+ 	- Draw the bitmap centered, but no more to the left/top than position (1, 1)
+ *  Parameters:	gstate: GState handle to to draw to
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method OtherContentClass, MSG_OC_DRAW_BITMAP {
+int 	x, y, width, height;
+int 	viewW, viewH;
+
+    viewW = pself->VCNI_viewWidth;
+    viewH = pself->VCNI_viewHeight;
+
+    if ( pself->OCI_bitmap ) {
+	/*
+	 * Draw Bitmap centered
+	 */
+	BTGetMoreBitmapInfos(global.tempFile, pself->OCI_bitmap, &width, &height, 0);
+
+	x = (viewW - width)/2;
+	if ( x < 1 ) x = 1;
+	y = (viewH - height)/2;
+	if ( y < 1 ) y = 1;
+	GrDrawHugeBitmap(gstate, x, y, global.tempFile, pself->OCI_bitmap);
+
+    }
+
+}
+
+
+/*--------------------- OCDrawPoinerPreviewImage ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ POINTER_PREVIEW_VIEW_WIDTH		(320)
+ #define POINTER_PREVIEW_VIEW_HEIGHT		(160)
+
+ ---------------------------------------------------------------------------*/
+
+@extern chunk AppVGAMoniker;
+@extern chunk AppVGAMonoMoniker;
+@extern chunk DocVGAMoniker;
+@extern chunk DocVGAMonoMoniker;
+
+void OCDrawPoinerPreviewImage(GStateHandle gstate, int hotX, int hotY) {
+int x, y, dx, dy, idx;
+
+    GrSaveState(gstate);
+
+    /*
+     * Draw a color bar
+     */
+    dx = POINTER_PREVIEW_VIEW_WIDTH / 8;
+    dy = POINTER_PREVIEW_VIEW_HEIGHT/4;
+    idx = 0;
+    for ( y = POINTER_PREVIEW_VIEW_HEIGHT/2; y < POINTER_PREVIEW_VIEW_HEIGHT; y += dy) {
+      for ( x = 0; x < POINTER_PREVIEW_VIEW_WIDTH; x += dx ) {
+      	GrSetAreaColor(gstate, CF_INDEX, idx, 0, 0);
+      	GrFillRect(gstate, x, y, x+dx, y+dy);
+      	idx++;
+      }
+    }
+
+
+    /*
+     * Draw example pictures - the AppMonikers
+     * Because IconDrawMonikerCentered assumes the left border is located at x=0
+     * we calculate 'with' parameter somewhat tricky.
+     */
+    dx = POINTER_PREVIEW_VIEW_WIDTH/4;
+    dy = POINTER_PREVIEW_VIEW_HEIGHT/2;
+
+    MemLock(OptrToHandle(@AppVGAMoniker));
+    IconDrawMonikerCentered(gstate, LMemDeref(@AppVGAMoniker), dx, dy);
+    GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    IconDrawMonikerCentered(gstate, LMemDeref(@AppVGAMonoMoniker), 5*dx, dy);
+    MemUnlock(OptrToHandle(@AppVGAMoniker));
+
+    MemLock(OptrToHandle(@DocVGAMoniker));
+    IconDrawMonikerCentered(gstate, LMemDeref(@DocVGAMoniker), 3*dx, dy);
+    GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    IconDrawMonikerCentered(gstate, LMemDeref(@DocVGAMonoMoniker), 7*dx, dy);
+    MemUnlock(OptrToHandle(@DocVGAMoniker));
+
+    /*
+     * Draw hotspot
+     */
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0,0);
+    GrSetMixMode(gstate, MM_INVERT);
+    GrDrawLine(gstate, hotX-20, hotY, hotX+20, hotY);
+    GrDrawLine(gstate, hotX, hotY-20, hotX, hotY+20);
+
+    GrRestoreState(gstate);
+
+}
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file otherContent.goc ********************/
+
+

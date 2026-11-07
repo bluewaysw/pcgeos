@@ -1,0 +1,1128 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	dbViewerISet.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements the icon-set related part of the IconDBViewerClass
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+void SwitchISet(int iSet, optr oself);
+void ViewerDrawRubberBand(optr oself);
+
+/*--------------------- SecureCopyVMBlock ---------------------
+ *  Purpose:	Test if the vmBlock is valid an copy a valid block.
+ *  Context:	Due to a bug in the first beta release, the same VMBlock
+ *		(IE_extraBlock, ISH_extraBlock) may be used by multiple
+ *		icons or icon sets respectively. This my cause
+ *		the application to crash when these blocks are copied.
+ *		The safety check using VMInfo() prevents this.
+ *  Strategy:
+ *  Parameters:
+ *  Return:	The handle of the copied block or zero if block was invalid
+ *		IE_extraBlock and ISH_extraBlock are allowed to be zero
+ ---------------------------------------------------------------------------*/
+VMBlockHandle SecureCopyVMBlock(VMFileHandle srcFile, VMBlockHandle vmBlock, VMFileHandle destFile) {
+VMInfoStruct info;
+VMBlockHandle 	newBlock = 0;
+
+    // VMInfo checks if the block is valid
+    // returns TRUE, if valid (checked with swat)
+    if ( VMInfo (srcFile, vmBlock, &info) ) {
+    	newBlock = VMCopyVMBlock(srcFile, vmBlock, destFile);
+    }
+    EC( else { DebugInfo("\r  *** Skip copying invalid VMBlock"); } )
+
+    return newBlock;
+}
+
+
+/***********************************************************************
+ *	Icon set related DBViewer messages
+ ***********************************************************************/
+
+/*--------------------- MSG_DB_VIEWER_DESTROY_LIST ---------------------
+ *  Purpose:	Removes all the VisISet object children.
+ *  Context:
+ *  Strategy:
+	- record a MSG_VIS_DESTROY classed event and send it to
+	  each child
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DESTROY_LIST {
+EventHandle ev;
+
+    /*
+     *  Send a destroy event to each child.
+     */
+    ev = @record VisISetClass::MSG_VIS_DESTROY(VUM_NOW);
+    @call oself::MSG_VIS_SEND_TO_CHILDREN(ev);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_RESCAN_DATABASE ---------------------
+ *  Purpose:	Removes all children and rescans database.
+ *  Context:
+ *  Strategy:
+	- remove any existing children
+	- get the count of icon sets in the database
+	- add that many children
+	- redraw the window
+ *  Warning: 	This method creates new objects and can therefore move the
+ 		block on the global heap, which invalidates all pointers to
+ 		the block (e.g. pself of the calling method)!
+*  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESCAN_DATABASE {
+int n, iSetCount;
+
+    /*
+     *  Remove any existing VisISet objects.
+     */
+    @call oself::MSG_DB_VIEWER_DESTROY_LIST();
+
+
+    /*
+     *  For each icon set in the database, add a child
+     */
+    pself->DBVI_numSelected = 0;
+    iSetCount = IdGetISetCount(pself->DBVI_vmFile);
+    if ( !iSetCount) {
+    	return;
+    	}
+
+    for ( n = 0; n < iSetCount; n++) {
+	AddVisISet(pself->DBVI_vmFile, @GetDocUIOptr(@DBViewerContent), n);
+    }
+
+    @call oself::MSG_VIS_VUP_UPDATE_WIN_GROUP(VUM_NOW);
+}
+
+/*--------------------- MSG_DB_VIEWER_ISET_ADDED ---------------------
+ *  Purpose:	A new set of icons has been created.
+ *  Context:
+ *  Strategy:
+	- Rescan data base to create an VisISet object
+	- Select passed icon-set for edit
+	- Mark document dirty
+	- Update the edit menu
+
+ *  Parameters:	iSetToSelect: make this icon-set to the current set
+ *			      and edit the first icon.
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ISET_ADDED {
+
+    /*
+     *  Create a VisISet object in the viewer.
+     *  Rescan database (this may move our block),
+     *  edit the new icon set and mark document dirty
+     */
+    @call oself::MSG_DB_VIEWER_RESCAN_DATABASE();
+    pself = ObjDerefVis(oself);
+
+    pself->DBVI_currentISet = NO_CURRENT_ISET;
+    @call oself::MSG_DB_VIEWER_SET_SINGLE_SELECTION(iSetToSelect);
+    @call oself::MSG_DB_VIEWER_EDIT_ISET(FALSE);
+
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+
+    /*
+     * Update edit menu
+     */
+    @call oself::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+}
+
+/*--------------------- MSG_DB_VIEWER_EDIT_ISET ---------------------
+ *  Purpose:	Switches to a new icon set (the first selected one) in the database.
+ *  Context:
+ *  Strategy:
+ *	- get currently edited icon set and check, if anything is to do
+ *	- save the icon set if dirty (prompt for save)
+ *	- switch to new icon set (SwitchISet does the job)
+ *	- redraw sets, if requested
+ *	- enable UI for editing
+ *	- mark icon set as dirty
+ *	- update status text
+ *  Parameters:	redrawSets - TRUE to force old and new icon set to redraw
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EDIT_ISET {
+int curISet, oldISet;
+
+    /*
+     *  Get the current selection in the database viewer.
+     *  If the new icon set is qual to the current icon set or to NO_CURRENT_ISET, do nothing
+     *  If the current icon set is dirty, prompt for save and save it or discatd it.
+     */
+    oldISet = pself->DBVI_currentISet;
+    curISet = @call oself::MSG_DB_VIEWER_GET_FIRST_SELECTION();
+    if ( curISet == NO_CURRENT_ISET ) return;
+    if ( curISet == oldISet ) return;
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     *  Switch edit to new icon set.
+     *  DBVI_currentISet gets set in SwitchISet
+     */
+
+     SwitchISet(curISet, oself);
+
+
+    /*
+     *  Redraw icon sets, if requested
+     */
+    if ( redrawSets ) {
+    	GStateHandle gstate;
+    	optr visIcon;
+
+    	gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    	if (oldISet != NO_CURRENT_ISET) {
+    	    visIcon = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(oldISet);
+    	    @call visIcon::MSG_VIS_DRAW(0, gstate);
+    	}
+    	if ( oldISet != curISet ) if (curISet != NO_CURRENT_ISET) {
+    	    visIcon = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(curISet);
+    	    @call visIcon::MSG_VIS_DRAW(0, gstate);
+    	}
+    	GrDestroyState(gstate);
+    }
+
+    /*
+     *  Enable editing if we're editing an icon set.
+     */
+    if ( pself->DBVI_currentISet != NO_CURRENT_ISET) EnableEditing();
+
+    SetIconDirtyState(pself, FALSE);
+    @send oself::MSG_DB_VIEWER_UPDATE_STATUS_TEXT();
+}
+
+/*--------------------- MSG_DB_VIEWER_UPDATE_STATUS_TEXT ---------------------
+ *  Purpose:	Update status text at the bottom of the Documents Dippaly object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_UPDATE_STATUS_TEXT {
+optr text;
+char *buf, *name;
+
+
+    /*
+     *  Fist status text contains the total numer of sets in the icon-database
+     */
+    MemLock(OptrToHandle(@StatusNumberOfISets));
+    buf = malloc(128);
+    name = buf + 128 - (MAX_ISET_NAME_LENGTH+8);
+
+    sprintf(buf, LMemDeref(@StatusNumberOfISets), IdGetISetCount(pself->DBVI_vmFile));
+    text = CombineOselfWith(@IconDBStatusText1);
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    /*
+     *  Second text contains the infos about the current set
+     */
+    IdGetISetName(pself->DBVI_vmFile, pself->DBVI_currentISet, name);
+    sprintf(buf, LMemDeref(@StatusCurrentISet), name, IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet));
+    text = CombineOselfWith(@IconDBStatusText2);
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    MemUnlock(OptrToHandle(@StatusNumberOfISets));
+    free(buf);
+}
+
+/*--------------------- SwitchISet ---------------------
+ *  Purpose:	Switch editing to a given icon set.
+ *  Context:
+ *  Strategy:
+ 	- select new set (iSet)
+ 	- rescan database to show nes iSet as selected
+	- edit the first icon
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void SwitchISet(int iSet, optr oself) {
+IconDBViewerInstance *pself;
+
+    pself = ObjDerefVis(oself);
+
+    /*
+     *  Store passed iSet as current icon set and rescan list
+     *	MSG_ICON_VIEWER_RESCAN_LIST may invalidate pself, so we must deref it
+     */
+    pself->DBVI_currentISet = iSet;
+    @call @GetDocUIOptr(@IconListContent)::MSG_ICON_VIEWER_RESCAN_LIST();
+    pself = ObjDerefVis(oself);
+
+    /*
+     *  Update "Text Monikers" dialog to prevent meaningless questions about
+     *  saving text-moniker settings (if the dialog is open).
+     */
+    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_UPDATE_DIALOG();
+
+    /*
+     *  Edit the first icon of the new iSet.
+     */
+    @call oself::MSG_DB_VIEWER_SWITCH_ICON(0);
+    pself = ObjDerefVis(oself);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_GET_ISET_COUNT ---------------------
+ *  Purpose:	Returns the number of icon-sets in the database
+ *  Context:
+ *  Strategy:
+*   Parameters:  int(void)
+ *  Return:	number
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_ISET_COUNT {
+    return IdGetISetCount(pself->DBVI_vmFile);
+}
+
+/*--------------------- MSG_DB_VIEWER_SET_SINGLE_SELECTION ---------------------
+ *  Purpose:	Selects a VisISet and deselects all the rest.
+ *  Context:
+ *	Note: the selected icon set may differ from currently edited icon set.
+ *	The selection state is stored in the VisISet object itself, the
+ *	currently edited icon set is stored in DBVI_currentISet
+ *  Strategy:
+ *	- select one VisISet object and deselect the others
+ *  Parameters: iSet	icon set number to select
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SET_SINGLE_SELECTION {
+
+    /*
+     *  Have the VisISets select or deselect itself
+     */
+    @send @visChildren::MSG_VIS_ISET_SET_SELECTED_STATE(iSet, 0);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_GET_FIRST_SELECTION ---------------------
+ *  Purpose:	Returns the number of the first (or only) selected VisISet object.
+ *  Context:
+ *  Strategy:
+	- count the selected children
+	- if none are selected, return carry set
+	- if one is selected, return its position in cx
+	- if more than one is selected, return the first
+ *  Parameters:  int(void)
+ *  Return:	selected icon set or NO_CURRENT_ISET if none selected
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_FIRST_SELECTION {
+int numChildren, n;
+optr visIcon;
+Boolean selected;
+
+    /*
+     *  Count the children & quit if there aren't any.
+     *  Loop until a selected child is found
+     */
+    numChildren = @call oself::MSG_VIS_COUNT_CHILDREN();
+    if (!numChildren) return NO_CURRENT_ISET;
+
+    for ( n = 0; n < numChildren; n++ ) {
+    	visIcon = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(n);
+    	selected = @call visIcon::MSG_VIS_ISET_GET_SELECTION();
+    	if (selected) return n;
+    }
+
+    /*
+     *  None was selected, apparently.
+     */
+    return NO_CURRENT_ISET;
+
+}
+
+
+/*--------------------- AddVisISet ---------------------
+ *  Purpose:	Adds a VisISet object to the database viewer
+ *  Context:
+ *  Strategy:
+	- instantiate a new VisISet
+	- add it to the vis tree
+	- tell the child its number
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void AddVisISet(VMFileHandle vmFile, optr contentObj, int iSet) {
+optr iconObj;
+MemHandle objBlock;
+
+    objBlock = OptrToHandle(contentObj);
+    iconObj = ObjInstantiate(objBlock, &VisISetClass);
+    @call contentObj::MSG_VIS_ADD_CHILD(iconObj, CCO_LAST);
+    @call iconObj::MSG_VIS_ISET_INITIALIZE(iSet);
+
+}
+
+
+
+/*--------------------- MSG_DB_VIEWER_ISET_TOGGLED ---------------------
+ *  Purpose:	A VisISet child changed state (selected or deselected)
+ *  Context:
+ *  Strategy:
+	- just update the numSelected instance datum to reflect the change
+	- update edit menu
+ *  Parameters: selected   nonzero if child is being selected
+			  zero if child is being deselected
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ISET_TOGGLED {
+
+    if ( selected ) {
+    	pself->DBVI_numSelected++;
+    } else {
+    	pself->DBVI_numSelected--;
+    }
+
+    @call oself::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+}
+
+/*--------------------- MSG_DB_VIEWER_GET_DATABASE ---------------------
+ *  Purpose:	Returns the handle of the viewer's database file.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	database file handle
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_DATABASE {
+    return pself->DBVI_vmFile;
+}
+
+/*--------------------- MSG_DB_VIEWER_GET_CURRENT_ISET ---------------------
+ *  Purpose:	Returns the currently-edited icon set.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	current icon set
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_CURRENT_ISET {
+    return pself->DBVI_currentISet;
+}
+
+
+/*--------------------- MSG_DB_VIEWER_DELETE_CURRENT_ISET ---------------------
+ *  Purpose:	Deletes the currently-edited icon set only (no prompt).
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters: confirmDelete:	Pass TRUE to confirm using ConfirmOnDeleteBox().
+ *				Confirmation will be skipped if the "confirm on delete"
+ 				option is disabled.
+				Pass FALSE to skip confirmation always.
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DELETE_CURRENT_ISET {
+optr obj;
+int  oldISet, count;
+
+
+    if (confirmDelete) {
+    	int cmd;
+    	cmd = ConfirmOnDeleteBox(@PromptForDeleteCurrentSetText);
+	if ( cmd != IC_YES ) return;
+    }
+
+    /*
+     *  Get the current icon set and delete from database.
+     *  Update the database viewer & stuff.
+     */
+    oldISet = pself->DBVI_currentISet;
+    DeleteISetByNumber(oself, pself->DBVI_currentISet);
+    @call oself::MSG_DB_VIEWER_RESCAN_DATABASE();
+    pself = ObjDerefVis(oself);
+
+    /*
+     *  DeleteISetByNumber() has set DBVI_currentISet to NO_CURRENT_ISET
+     *  --> clear fatbits and live preview
+     */
+    obj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits));
+    @send obj::MSG_FATBITS_FREE_BITMAP();
+
+    /*
+     *  If there a icon sets left, select one, preferably this
+     *  at the place where the deleted one was
+     */
+    count = IdGetISetCount(pself->DBVI_vmFile);
+    if ( count ) {
+    	if ( oldISet >= count) oldISet--;
+	@call oself::MSG_DB_VIEWER_SET_SINGLE_SELECTION(oldISet);
+	@call oself::MSG_DB_VIEWER_EDIT_ISET(FALSE);
+    } else {
+    	pself->DBVI_currentIcon = NO_CURRENT_ICON;
+    }
+
+    /*
+     * Update edit menu
+     */
+    @call oself::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+
+}
+
+
+
+/*--------------------- MSG_DB_VIEWER_ADD_ISET_OPEN_DIALOG ---------------------
+ *  Purpose:	Create a new set of icons - Part 1
+ *  Context:
+ *  Strategy:	We have three messages
+ 	* MSG_DB_VIEWER_ADD_ISET_OPEN_DIALOG -initialize the dialog
+ 	* MSG_ICON_EXECUTE_ADD_ISET_DIALOG - execute dialog in process thread
+ 	* MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED - create new iSet (called if not canceled)
+     Part 1 (this message):
+	- see if the current icon set is dirty and prompt for save
+	- Select pointer image tab, if appropriate
+     Do in process thread
+	- execute AddISetDialog to let the user select the properties
+	  and initial icons of the icon set to create
+     Part 2 (MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED)
+	- depending on selected iconType value create the new set
+	- let MSG_DB_VIEWER_ISET_ADDED do the rest of the job like
+	  update database viewer and menus
+ *  Parameters:	openPtrImage:	TRUE: open "Add Pointer Image" tab
+ *				FALSE: open last / default tab
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ADD_ISET_OPEN_DIALOG {
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    if (openPtrImage) {
+	@call AddTypeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(NEW_PTR_ISET, FALSE);
+	@call AddTypeGroup::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@call AddTypeGroup::MSG_GEN_APPLY();
+    }
+
+    /*
+     *  Execute AddISetDialog and find out which icon type should be created
+     *  Also get the name of the new icon set and the icons to create
+     */
+    @call AddNameField::MSG_VIS_TEXT_SELECT_ALL();
+    if ( @call AddISetHelpText::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0 ) {
+    	@send AddISetHelpText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@NewISetIconHelpText,0);
+    }
+
+    @send process::MSG_ICON_EXECUTE_ADD_ISET_DIALOG(@AddISetDialog, oself);
+}
+
+/*--------------------- MSG_ICON_EXECUTE_ADD_ISET_DIALOG ---------------------
+ *  Purpose:	Execute AddISetDialog in process thread
+ *  Context:
+ *  Strategy:
+ 	- extecute dialog
+ 	- inform dbViewer to create the set (if the user has not canceled the process)
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_EXECUTE_ADD_ISET_DIALOG {
+int cmd;
+
+    cmd = UserDoDialog(dialog);
+    if ( cmd != IC_OK ) return;
+
+    @send dbViewer::MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED();
+}
+
+
+
+/*--------------------- MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED ---------------------
+ *  Purpose:	Create a new set of icons - Part 2
+ *  Context:
+ *  Strategy:	We have three messages
+ 	* MSG_DB_VIEWER_ADD_ISET_OPEN_DIALOG -initialize the dialog
+ 	* MSG_ICON_EXECUTE_ADD_ISET_DIALOG - execute dialog in process thread
+ 	* MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED - create new iSet (called if not canceled)
+     Part 1 (MSG_DB_VIEWER_ADD_ISET_OPEN_DIALOG):
+	- see if the current icon set is dirty and prompt for save
+	- Select pointer image tab, if appropriate
+     Do in process thread
+	- execute AddISetDialog to let the user select the properties
+	  and initial icons of the icon set to create
+     Part 2 (this)
+	- depending on selected iconType value create the new set
+	- let MSG_DB_VIEWER_ISET_ADDED do the rest of the job like
+	  update database viewer and menus
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ADD_ISET_DIALOG_CLOSED {
+int iconType, iSet;
+char	iconName[ISET_NAME_BUFFER_SIZE];
+word	iconFormats;
+
+    AppMarkBusy();
+
+    iconType = @call AddTypeGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @call AddNameField::MSG_VIS_TEXT_GET_ALL_PTR(iconName);
+
+    /*
+     *  Use the iconType value to run the appropriate handler.
+     */
+    switch (iconType) {
+    case NEW_FILE_ISET:
+     	iconFormats = @call FileIconFormatChooser1::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+     	iconFormats |= @call FileIconFormatChooser2::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+   	iSet = CreateNewFileISet(pself->DBVI_vmFile, iconFormats, @FileIconPrefixText);
+  	FinishInitializingISet(pself->DBVI_vmFile, iSet, iconName);
+    	break;
+    case NEW_TOOL_ISET:
+   	iSet = CreateNewToolISet(pself->DBVI_vmFile);
+  	FinishInitializingISet(pself->DBVI_vmFile, iSet, iconName);
+    	break;
+    case NEW_PTR_ISET:
+   	iSet = CreateNewMousePointer(pself->DBVI_vmFile);
+  	FinishInitializingISet(pself->DBVI_vmFile, iSet, iconName);
+    	break;
+    case NEW_CUSTOM_ISET:
+   	iSet = CreateNewCustomISet(pself->DBVI_vmFile);
+  	FinishInitializingISet(pself->DBVI_vmFile, iSet, iconName);
+    	break;
+    case NEW_PREF_MODULE_ISET:
+	iconFormats = @call PrefModuleFormatChooser::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+   	iSet = CreateNewFileISet(pself->DBVI_vmFile, iconFormats, @PrefModulePrefixText);
+  	FinishInitializingISet(pself->DBVI_vmFile, iSet, iconName);
+    	break;
+    }
+
+
+    /*
+     * Tell ourself that we have an new icon set
+     * Create a VisISet object for it and make it to the current set
+     */
+    @call oself::MSG_DB_VIEWER_ISET_ADDED(iSet);
+
+    AppMarkNotBusy();
+}
+
+/*--------------------- MSG_DB_VIEWER_DUPLICATE_ISET ---------------------
+ *  Purpose:	Duplicate the current icon set
+ *  Context:
+ *  Strategy:
+ 	- Save current icon set if necessary
+ 	- Create a new empty icon set with the correct number of icons
+ 	- Copy ISetHeader structure
+ 	- Copy each icon
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DUPLICATE_ISET {
+int curIcn, newIcn, numIcons, n;
+word size;
+ISetHeader header;
+IconEntry *curEntryPtr, *newEntryPtr;
+optr curEntryList, newEntryList;
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * Add a new, empty icon set. IDAddISet() does not initialize the icon's data
+     * and does not create an ISH_extraBlock
+     */
+    curIcn = pself->DBVI_currentISet;
+    if (curIcn == NO_CURRENT_ISET ) return;	// for savety only
+    numIcons = IdGetEntryCount(pself->DBVI_vmFile, curIcn);
+    EC( if (!numIcons) { ProgError("Duplicate_ISET: no icons found"); return; } )
+    newIcn = IdAddISet(pself->DBVI_vmFile, numIcons);
+
+    /*
+     * Copy the ISetHeader structure to new icon set
+     * IdSetISetHeader() preserves the iEntryList of the new icon set
+     * It is intentional that the name is not changed.
+     * Note that the ISH_extraBlock must be duplicated.
+     * - Because the block is allocated on first access, it may not exist yet.
+     * - Due to a bug in the first beat reales, it also may be invalid.
+     * So we use SecureCopyVMBlock() which uses VMInfo to check if the block is valid.
+     */
+    IdGetISetHeader(pself->DBVI_vmFile, curIcn, &header);
+    header.ISH_extraBlock = SecureCopyVMBlock(pself->DBVI_vmFile, header.ISH_extraBlock, pself->DBVI_vmFile);
+    IdSetISetHeader(pself->DBVI_vmFile, newIcn, &header);
+
+
+    /*
+     * for every icon: Copy the IconEntry structure and the icon bitmap
+     */
+    curEntryList = IdLockEntryList(pself->DBVI_vmFile, curIcn);
+    newEntryList = IdLockEntryList(pself->DBVI_vmFile, newIcn);
+
+    EC ( if ( ChunkArrayGetCount(curEntryList) != numIcons)  { ProgError("duplicate_icon: numF_omartsError1"); return; } )
+    EC ( if ( ChunkArrayGetCount(newEntryList) != numIcons)  { ProgError("duplicate_icon: numF_omartsError2"); return; } )
+
+    for ( n = 0; n < numIcons; n++ ) {
+    	curEntryPtr = ChunkArrayElementToPtr(curEntryList, n, &size);
+    	newEntryPtr = ChunkArrayElementToPtr(newEntryList, n, &size);
+
+    	*newEntryPtr = *curEntryPtr;
+    	newEntryPtr->IE_bitmap = BTCopyBitmap(pself->DBVI_vmFile, pself->DBVI_vmFile, curEntryPtr->IE_bitmap);
+    	newEntryPtr->IE_extraBlock = SecureCopyVMBlock(pself->DBVI_vmFile, curEntryPtr->IE_extraBlock, pself->DBVI_vmFile);
+    }
+
+    IdUnlockEntryList(curEntryList, FALSE);
+
+    /*
+     * Rescan database. Keep editing the current icon set.
+     */
+    @call oself::MSG_DB_VIEWER_RESCAN_DATABASE();
+    pself = ObjDerefVis(oself);
+
+    pself->DBVI_currentISet = NO_CURRENT_ISET;
+    @call oself::MSG_DB_VIEWER_SET_SINGLE_SELECTION(curIcn);
+    @call oself::MSG_DB_VIEWER_EDIT_ISET(FALSE);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_RENAME_ISET ---------------------
+ *  Purpose:	Rename the currently edited icon set
+ *  Context:
+ *  Strategy:
+ 	if openFlag
+	  - get the name from icon set
+	  - update and execute rename dialog and return
+	else
+	- get the name from the Rename dialog box
+	- set the name of the icon set in the database
+	- update the VisISet object and the database viewer
+ *  Parameters:	openFlag	TRUE: called to open the dialog
+ *				FALSE: called to apply rename
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RENAME_ISET {
+char  name[ISET_NAME_BUFFER_SIZE];
+optr visISet;
+
+    if (pself->DBVI_currentISet == NO_CURRENT_ISET) return;
+
+    if ( openFlag ) {
+	/*
+	* Execte Rename-Dialog
+	*/
+	IdGetISetName(pself->DBVI_vmFile, pself->DBVI_currentISet, name);
+	@call RenameISetTextField::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+	@send RenameISetDialog::MSG_GEN_INTERACTION_INITIATE();
+	return;
+    }
+
+    /*
+     * Rename the icon set.
+     * The VisISet object caches the name, so it must be updated too.
+     * MSG_VIS_ISET_INITIALIZE() does this job for us.
+     * Then redraw all.
+     */
+    @call RenameISetTextField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+    IdSetISetName(pself->DBVI_vmFile, pself->DBVI_currentISet, name);
+
+    visISet = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(pself->DBVI_currentISet);
+    @send visISet::MSG_VIS_ISET_INITIALIZE(pself->DBVI_currentISet);
+    @send oself::MSG_VIS_INVALIDATE();
+
+
+    /*
+     * Finally mark the database dirty. Use @send because IconDocumentGroup runs in process thread.
+     * Update staus bar too
+     */
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+    @send oself::MSG_DB_VIEWER_UPDATE_STATUS_TEXT();
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_SELECT_ALL ---------------------
+ *  Purpose:	Select all iSets
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SELECT_ALL {
+    @send @visChildren::MSG_VIS_ISET_SET_SELECTION(TRUE);
+}
+
+
+/*--------------------- DeleteISetByNumber ---------------------
+ *  Purpose:	Deletes a single icon set from the current database.
+ *  Context:
+ *  Strategy:
+	- find out if the icon set is being edited
+	- if so, disable editing 'n' stuff
+	- if the icon set being deleted is BEFORE (i.e., less than)
+	  the current icon set, then the current icon set's number must
+	  be decremented (because it gets one closer to the
+	  first icon set in the database).
+	- delete the icon set from the database
+	- delete the VisISet object from the database viewer
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void DeleteISetByNumber(optr oself, int iSet) {
+IconDBViewerInstance *pself;
+optr	obj;
+
+    pself = ObjDerefVis(oself);
+
+    do {
+    	if ( iSet == pself->DBVI_currentISet ) {
+	    /*
+	     *  We're deleting the current icon set.  Disable editing.
+	     *  (No need to prompt for saving it since it's being deleted).
+	     */
+    	    DisableEditing();
+	    pself->DBVI_currentISet = NO_CURRENT_ISET;
+	    SetIconDirtyState(pself, FALSE);
+
+    	    obj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@IconListContent));
+    	    @call obj::MSG_ICON_VIEWER_DESTROY_LIST();
+    	    break;
+	}
+
+    	if (  iSet < pself->DBVI_currentISet) {
+	    /*
+	     *  the icon set being deleted is BEFORE the current icon set,
+	     *  so it's number must be decremented
+	     */
+	    pself->DBVI_currentISet -= 1;
+    	    break;
+	}
+
+    } while (FALSE);
+
+    /*
+     *  Now we can safely delete the icon set.
+     *  MSG_ICON_VIEWER_DESTROY_LIST may have invalidated pself.
+     */
+    pself = ObjDerefVis(oself);
+    IdFreeEntries(pself->DBVI_vmFile, iSet);
+    IdDeleteISet(pself->DBVI_vmFile, iSet);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_MARK_ICON_DIRTY ---------------------
+ *  Purpose:	Mark icon set dirty (for Check~DirtyAndDealWithIt)
+ *  Context:
+ *  Strategy:
+ 	- Sets DBVI_iconDirty
+ 	- update SaveIcon / DiscardIcon Trigger
+ 	-> SetIconDirtyState does the job
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_MARK_ICON_DIRTY {
+    SetIconDirtyState(pself, TRUE);
+}
+
+
+/*--------------------- SetIconDirtyState ---------------------
+ *  Purpose:	Mark icon set dirty (for Check~DirtyAndDealWithIt)
+ *  Context:
+ *  Strategy:
+ 	- Sets DBVI_iconDirty state
+ 	- update SaveIcon / DiscardIcon Trigger
+ 	  These triggers are global.
+ 	- Mark Document (database file) as dirty, if appropriate
+ *  Parameters:	pself:	DBViewerObject instance
+ *			We pass pself instead of oslef to avoid calling this
+ 			Routine from wrong object class
+ *		state:	TRUE if dirty, FALSE if clean
+ *  Note:   this routine must be consistent to MSG_DB_VIEWER_UPDATE_SAVE_ICON_TRIGGERS
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void SetIconDirtyState(IconDBViewerInstance *pself, Boolean state) {
+    pself->DBVI_iconDirty = state;
+
+    if ( state ) {
+    	@send SaveIconTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send DiscardIconTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+    } else {
+    	@send SaveIconTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send DiscardIconTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+}
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ +
+ +	Move Icons to another iSet
+ +
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*--------------------- MSG_DB_VIEWER_OPEN_MOVE_ICON_DIALOG ---------------------
+ *  Purpose:	Initialize and open dialog to move an icon to another set
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_OPEN_MOVE_ICON_DIALOG {
+int count;
+VMBlockHandle iconBmp, bmp;
+
+
+    /*
+     * handle modified icons
+     */
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * Intialize iSet list. Cancel if there is only one iSet.
+     */
+    @send MoveIconISetList::MSG_GEN_ITEM_GROUP_SET_DESTINATION(oself);
+    count = IdGetISetCount(pself->DBVI_vmFile);
+    if (count < 2) {
+    	ErrorBoxOptr(@ErrorTooFewSets);
+    	return;
+    }
+    @send MoveIconISetList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+
+    /*
+     * Update "Move Icon" button
+     */
+    @send MoveIconISetList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    @send MoveIconISetList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send MoveIconISetList::MSG_GEN_APPLY();
+
+    /*
+     * Display current icon's bitmap
+     */
+    iconBmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon);
+    bmp = BTCopyBitmap(pself->DBVI_vmFile, global.tempFile, iconBmp);
+    @call MoveIconContent::MSG_OC_REPLACE_BITMAP(bmp);
+
+    /*
+     * Open dialog box
+     */
+    @send MoveIconDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- MSG_DB_VIEWER_CLOSE_MOVE_ICON_DIALOG ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	Boolean moveIcon
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_CLOSE_MOVE_ICON_DIALOG {
+int 	numIcons, cmd, curIconsInSet;
+int	curISet, curIcon, targetISet, newIcon;
+IconEntry	iEntry;
+VMFileHandle 	vmFile;
+
+    /*
+     * Free bitmap, displayed in the dialog
+     * Exit if the user has choosen "Cancel"
+     */
+    @call MoveIconContent::MSG_OC_REPLACE_BITMAP(0);
+    if (!moveIcon) return;
+
+    /*
+     * make code more readable
+     */
+    vmFile = pself->DBVI_vmFile;
+    curISet = pself->DBVI_currentISet;
+    curIcon = pself->DBVI_currentIcon;
+    targetISet = @call MoveIconISetList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /*
+     * Warn if the last icon is about to move. This will delete the iSet!
+     * Block moving if the new iSet becomes to large
+     */
+    numIcons = IdGetEntryCount(vmFile, curISet);
+    if ( numIcons < 2 ) {
+    	cmd = QuestionBoxOptr(@WarningMoveLastIcon);
+    	if ( cmd != IC_YES ) return;
+    }
+    curIconsInSet = IdGetEntryCount(vmFile, targetISet);
+    if (curIconsInSet >= MAX_ICONS) {
+    	ErrorBoxOptr(@TooManyIconsText);
+    	return;
+    }
+
+    /*
+     * Get IconEntry from source icon.
+     * Copy bitmap and extra block and replace the handles.
+     * This is required because IdDeleteEntry frees these data.
+     */
+    IdGetEntry(vmFile, curISet, curIcon, &iEntry);
+    iEntry.IE_bitmap = BTCopyBitmap(vmFile, vmFile, iEntry.IE_bitmap);
+    iEntry.IE_extraBlock = SecureCopyVMBlock(vmFile, iEntry.IE_extraBlock, vmFile);
+
+    /*
+     * Create new IconEntry in the target set.
+     * Then fill it in with our copy of the icon.
+     */
+    IdCreateEntries(vmFile, targetISet, 1);
+    IdIncEntryCount(vmFile, targetISet);
+
+    newIcon = IdGetEntryCount(vmFile, targetISet) - 1;	/* index is zero based */
+    IdSetEntry(vmFile, targetISet, newIcon, iEntry);
+
+    /*
+     * Delete moved Icon. IdDeleteEntry() already decrements the entry count
+     * Mark document as modified
+     */
+    if ( numIcons < 2 ) {
+    	/*
+    	 * This was the last icon. Ddelete current set.
+    	 */
+    	@call oself::MSG_DB_VIEWER_DELETE_CURRENT_ISET(FALSE);
+    } else {
+        IdDeleteEntry(vmFile, curISet, curIcon);
+	/*
+     	 *  If the deleted icon was the first one, the VisISet needs new bounds to draw
+    	 *  the bitmap, because there is a new bitmap.
+    	 *  MSG_VIS_ISET_INITIALIZE does the job. Then redraw the database viewer.
+    	 */
+    	if (curIcon == 0) {
+    	    optr visISet;
+    	    visISet = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(curISet);
+    	    @send visISet::MSG_VIS_ISET_INITIALIZE(curISet);
+    	    @send oself::MSG_VIS_INVALIDATE();
+    	}
+    }
+
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+
+    /*
+     * Switch to edit the moved icon
+MSG_DB_VIEWER_ICON_ADDED also marks the databsa sa dirty and updates edit menu
+     */
+    pself->DBVI_currentISet = NO_CURRENT_ISET;
+    @call oself::MSG_DB_VIEWER_SET_SINGLE_SELECTION(targetISet);
+    @call oself::MSG_DB_VIEWER_EDIT_ISET(FALSE);
+    @call oself::MSG_DB_VIEWER_ICON_ADDED(newIcon);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_QUERY_ISET_FOR_MOVE_ICON_DIALOG ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_QUERY_ISET_FOR_MOVE_ICON_DIALOG {
+char buf[ISET_NAME_BUFFER_SIZE + 8], *bufPtr;
+Boolean cannotMove;
+EC(int count;)
+
+    EC(count = IdGetISetCount(pself->DBVI_vmFile);)
+    EC( if ( item >= count ) { \
+    	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT (item, "INVALID"); \
+    	return; } )
+
+    /*
+     * Construct and replace list moniker
+     */
+    bufPtr = buf;
+    if ( pself->DBVI_currentISet == item) {
+    	cannotMove = TRUE;
+    } else {
+    	cannotMove = @call oself::MSG_DB_VIEWER_TEST_ICON_VS_PTR(item);
+    }
+
+    if ( cannotMove ) { strcpy(buf, "( "); bufPtr = strchr(buf, 0); }
+    IdGetISetName(pself->DBVI_vmFile, item, bufPtr);
+    if ( cannotMove ) { strcat(buf, " )"); }
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT (item, buf);
+}
+
+/*--------------------- MSG_DB_VIEWER_APPLY_ISET_FOR_MOVE_ICON_DIALOG; ---------------------
+ *  Purpose:	An iSet was selected in the move-icon-target list
+ *  Context:
+ *  Strategy:	Update "move icon" trigger
+ *  Parameters:	 GEN_ITEM_GROUP_APPLY_MSG (
+ *			word selection = cx,
+ *			word numSelections = bp,
+ *			GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_APPLY_ISET_FOR_MOVE_ICON_DIALOG {
+Boolean cannotMove;
+word  cmpVal;
+
+    /*
+     * Disable all "cannot move..." texts
+     */
+    @send MoveIconWrongSourceText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send MoveIconWrongIconTargetText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send MoveIconWrongPtrTargetText::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+    cannotMove = TRUE;		/* this default makes things easier */
+
+    if ( pself->DBVI_currentISet == selection) {
+    	@send MoveIconWrongSourceText::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+    	/*
+    	 * See if selected iSet's images are comaptible with the current
+    	 * iSet's images (both are pointer images or both are 'normal' icons)
+    	 */
+    	cmpVal = @call oself::MSG_DB_VIEWER_TEST_ICON_VS_PTR(selection);
+    	switch (cmpVal) {
+    	case IVP_COMAPTIBLE:	cannotMove = FALSE;
+    		break;
+    	case IVP_POINTER_IMG:	@send MoveIconWrongPtrTargetText::MSG_GEN_SET_USABLE(VUM_NOW);
+     		break;
+   	case IVP_ICON:		@send MoveIconWrongIconTargetText::MSG_GEN_SET_USABLE(VUM_NOW);
+    		break;
+    	}
+    }
+
+    if (cannotMove) {
+    	@send MoveIconDoMoveTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+    	@send MoveIconDoMoveTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+}
+
+/*--------------------- MSG_DB_VIEWER_TEST_ICON_VS_PTR ---------------------
+ *  Purpose:	Compare ISH_flags values for two iSets if they are compatible
+ *  Context:
+ *  Strategy:	Get ISH_flags:IF_PTR_IMAGE value for both sets
+ *		Them compare them
+ *  Parameters:	iSet: iSet to comp.are with current iSet
+ *  Return:	IVP_COMAPTIBLE	  both sets have IF_PTR_IMAGE set or both have it clear
+     		IVP_POINTER_IMG   passed iSet is a pointer image iSet (IF_PTR_IMAGE is set)
+     				  but current iSet is a normal icon iSet (IF_PTR_IMAGE is clear)
+     		IVP_ICON	  passed iSet is a normal icon iSet (IF_PTR_IMAGE is clear)
+     				  but current iSet is a pointer image iSet (IF_PTR_IMAGE is set)
+
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEST_ICON_VS_PTR  {
+word	curVal, otherVal;
+
+    curVal = IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) & IF_PTR_IMAGE;
+    otherVal = IdGetFlags(pself->DBVI_vmFile, iSet) & IF_PTR_IMAGE;
+
+    if ( curVal == otherVal ) return IVP_COMAPTIBLE;
+    if ( otherVal == IF_PTR_IMAGE) return IVP_POINTER_IMG;
+    return IVP_ICON;
+}
+
+/* *********** End of file dbViewerISet.goc ********************/
