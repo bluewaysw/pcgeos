@@ -5312,6 +5312,11 @@ endif
 	jnc	5$				;CHECK BW FOR CUA LOOK
 	dec	cx				;needed for correct menu bar
 5$:						; position now (cbh 2/15/92)
+	;
+	; Combined headers expose an old ISUI mismatch: system-menu placement
+	; adds this extra width, so the returned title bounds must reserve it.
+	;
+ISU <	add	cx, ISUI_SYS_MENU_RESERVED_WIDTH_EXTRA		>
 	mov	ax, cx				;ax = left icon width
 						; (system menu icon only,
 						;  OLBaseWin adds in express
@@ -5366,6 +5371,45 @@ afterAdjustments:
 	jz	15$
 	dec	bp				; Else make adjustment to right
 15$:						;   icon width, who knows why
+
+if _ISUI					; ISUI has a separate right close button
+	;
+	; Combined headers use MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS to fit the
+	; menu bar between the controls.  ISUI already removed its separate
+	; close button from OLWI_titleBarBounds.R_right, but omitted it from
+	; the returned right width (bp), which was harmless without menus here.
+	;
+	call	WinCommon_DerefVisSpec_DI	; ds:di = window instance
+	test	ds:[di].OLWI_attrs, mask OWA_CLOSABLE
+	; does this window have close UI?
+	jz	afterCloseWidth			; no, reserve no close width
+
+	push	ax				; preserve returned left width
+	call	OpenWinCheckIfMinMaxRestoreControls
+	; are min/max controls allowed?
+	jnc	addCloseWidth			; no minimize button can act as close
+	call	WinCommon_DerefVisSpec_DI	; restore window instance
+	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
+	; can this window have minimize UI?
+	jz	addCloseWidth			; no, close must be separate
+	mov	ax, TEMP_OL_WIN_HIDE_MINIMIZE	; check for hidden minimize UI
+	call	ObjVarFindData			; carry set if minimize is hidden
+	jc	addCloseWidth			; hidden minimize cannot act as close
+	mov	ax, TEMP_OL_WIN_MINIMIZE_IS_CLOSE
+	; check for minimize-as-close mode
+	call	ObjVarFindData			; carry set if mode is active
+	jnc	addCloseWidth			; absent mode needs separate close
+	call	UserGetDefaultUILevel		; ax = current UI level
+	cmp	ax, UIIL_INTRODUCTORY		; introductory UI uses separate close
+	je	addCloseWidth			; reserve its close-button width
+	pop	ax				; restore returned left width
+	jmp	short afterCloseWidth		; minimize supplies the close action
+addCloseWidth:
+	pop	ax				; restore returned left width
+	add	bp, ISUI_CLOSE_BUTTON_RESERVED_WIDTH
+						; reserve separate close button
+afterCloseWidth:
+endif						; _ISUI
 
 haveRightWidth:
 
@@ -5422,15 +5466,25 @@ OLWinGetTitleBarHeight	method dynamic	OLWinClass, \
 	mov	bp, di				; ds:bp - instance data
 	call	OpenWinGetHeaderBounds		; (ax, bx, cx, dx) = bounds
 	sub	dx, bx				; dx = height
+	;
+	; Convert outer header bounds to the usable title-control height.
+	;
 if _ISUI
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done
-	sub	dx, 4				; margins = 2 above / 2 below
+	sub	dx, ISUI_TITLE_BUTTON_VERTICAL_INSET
+						; margins = 2 above / 2 below
 else
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done
 	dec	dx				; small adjustment for color
 	dec	dx
+if _MOTIF
+	call	OpenWinCheckMenusInHeader
+	jnc	done
+	add	dx, MO_COMBINED_HEADER_BOTTOM_EDGE
+						; include combined header bottom edge
+endif
 endif
 done:
 	ret

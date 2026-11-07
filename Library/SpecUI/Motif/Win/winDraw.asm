@@ -53,7 +53,7 @@ PASS:		ax, bx, cx, - bounds of the rectangle
 RETURN:		ax, bx, cx, dx, di	- preserved
 
 DESTROYED:	nothing
-		
+
 	Chris	4/91		Updated for new graphics, bounds conventions
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
@@ -92,7 +92,7 @@ PASS:		ax, bx, cx, - bounds of the rectangle
 RETURN:		ax, bx, cx, dx, di	- preserved
 
 DESTROYED:	nothing
-		
+
 	Chris	3/93		Initial revision
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
@@ -125,7 +125,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Draws a frame at the bounds passed.  If the display type is
 		B&W, then it will just draw a frame.  If it's a color display,
-		then it will draw a "shadowed" frame in 2 colors. 
+		then it will draw a "shadowed" frame in 2 colors.
 
 PASS:		ax, bx, cx, dx	- GrFillRect-style bounds of the rectangle
 		di	- GState to use
@@ -200,7 +200,7 @@ OpenWinGetBounds	proc	near
 
 if	DRAW_SHADOWS_ON_BW_GADGETS
 	push	bp
-	mov	bp, ds:[si]			
+	mov	bp, ds:[si]
 	add	bp, ds:[bp].Vis_offset
 	test	ds:[bp].OLWI_moreFixedAttr, mask OWMFA_CUSTOM_WINDOW
 	jnz	exit
@@ -225,7 +225,7 @@ OpenWinGetInsideResizeBorderBounds	proc	near
 	;If (RESIZABLE) AND NOT (MAXIMIZABLE and MAXIMIZED),
 	;add in width of two resize borders
 
-	mov	bp, ds:[si]			
+	mov	bp, ds:[si]
 	add	bp, ds:[bp].Vis_offset
 
 if _MOTIF
@@ -277,7 +277,7 @@ CALLED BY:	utility
 PASS:		ds:*si	- handle of instance data
 		ds:bp	- pointer to instance data
 
-RETURN:		(ax, bx, cx, dx) = bounds		
+RETURN:		(ax, bx, cx, dx) = bounds
 
 DESTROYED:	nothing
 
@@ -317,7 +317,7 @@ CALLED BY:	utility
 PASS:		ds:*si	- handle of instance data
 		ds:bp	- pointer to instance data
 
-RETURN:		(ax, bx, cx, dx) = bounds		
+RETURN:		(ax, bx, cx, dx) = bounds
 
 DESTROYED:	nothing
 
@@ -328,7 +328,7 @@ REVISION HISTORY:
 	----	----		-----------
 	Eric	9/89		split from OpenLook code.
 	Chris	4/91		Updated for new graphics, bounds conventions
-	
+
 ------------------------------------------------------------------------------@
 
 OpenWinGetHeaderBounds	proc	near
@@ -487,7 +487,7 @@ if not NORMAL_HEADERS_ON_DISABLED_WINDOWS	; only 50% if disabling headers
 	mov	al, SDM_50			; else draw everything 50%
 	call	GrSetTextMask
 	call	GrSetLineMask
-	
+
 OWD_drawHeader:
 endif
 	call	OpenWinDrawHeaderTitleBackground
@@ -495,7 +495,7 @@ endif
 	mov	al, SDM_100			; else draw everything 100%
 	call	GrSetTextMask
 	call	GrSetLineMask
-	
+
 OWD_noHeader:
 	mov	bp, di			;bp = GState
 					;Then call parent class, to do children
@@ -589,7 +589,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -685,7 +685,7 @@ if 0
 endif
 
 if	_MOTIF
-	mov	bp, ds:[si]			
+	mov	bp, ds:[si]
 	add	bp, ds:[bp].Vis_offset
 	test	ds:[bp].OLWI_attrs, mask OWA_RESIZABLE
 	LONG	jz	exit
@@ -726,7 +726,7 @@ endif
 	call	WinDrawWhiteVLineIfColor		; & etch mark
 
 	mov	ax, cx
-	sub	ax, CUAS_WIN_ICON_WIDTH-1 	;right 
+	sub	ax, CUAS_WIN_ICON_WIDTH-1 	;right
 
 	push	ds
 	push	ax
@@ -769,12 +769,12 @@ endif
 16$:
 
 	mov	bp, MO_ETCH_COLOR
-	call	WinDrawVLine				;bottom left vert 
+	call	WinDrawVLine				;bottom left vert
 	inc	ax
 	call	WinDrawWhiteVLineIfColor		; & etch mark
 
 	mov	ax, cx
-	sub	ax, CUAS_WIN_ICON_WIDTH-1 	;right 
+	sub	ax, CUAS_WIN_ICON_WIDTH-1 	;right
 
 	push	ds
 	push	ax
@@ -807,11 +807,11 @@ endif
 	push	cx
 	mov	cx, ax
 	add	cx, bp				;left segment
-	
+
 	;
 	; Upper left and right marks are now drawn even with the bottom
 	; of the window header, although the button handling code still thinks
-	; the resize borders are fixed sizes.  
+	; the resize borders are fixed sizes.
 	;
 	mov	bx, ds:[si]			;point to instance
 	add	bx, ds:[bx].Vis_offset		;ds:[di] -- SpecInstance
@@ -829,7 +829,7 @@ endif
 	call	WinDrawWhiteHLineIfColor		; & etch mark
 
 	mov	bx, dx
-	sub	bx, CUAS_WIN_RESIZE_BORDER_SIZE+CUAS_WIN_ICON_HEIGHT+2 ;bottom 
+	sub	bx, CUAS_WIN_RESIZE_BORDER_SIZE+CUAS_WIN_ICON_HEIGHT+2 ;bottom
 	call	WinDrawWhiteHLineIfColor		;bottom left horizontal
 	dec	bx
 	mov	bp, MO_ETCH_COLOR
@@ -849,7 +849,7 @@ endif
 	call	WinDrawWhiteHLineIfColor		; & etch mark
 
 	mov	bx, dx
-	sub	bx, CUAS_WIN_RESIZE_BORDER_SIZE+CUAS_WIN_ICON_HEIGHT+2 ;bottom 
+	sub	bx, CUAS_WIN_RESIZE_BORDER_SIZE+CUAS_WIN_ICON_HEIGHT+2 ;bottom
 	call	WinDrawWhiteHLineIfColor		;bottom right horizontal
 	dec	bx
 	mov	bp, MO_ETCH_COLOR
@@ -877,7 +877,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -888,10 +888,10 @@ REVISION HISTORY:
 	----	----		-----------
 	Eric	10/89		initial version
 	Chris	5/90		COMMENTED OUT!! Not necessary.
-	
+
 ------------------------------------------------------------------------------@
-if	0		
-	
+if	0
+
 OpenWinDrawInsideResizeBorderBackground	proc	near
 	push	ax, cx			;reserve color scheme, draw flags
 
@@ -944,7 +944,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -1074,7 +1074,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -1094,7 +1094,9 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	class	OLWinClass
 	;
 	; Code added 2/ 6/92 to get rid of title on maximized windows.
-	; 
+	; 06/2026: We now better support menus in header bars,
+	; but still want no backgrounds in menubar-turned-title-bars
+	;
 	call	OpenWinCheckMenusInHeader
 	LONG	jc	exit		;menus in header, don't draw title
 
@@ -1103,7 +1105,7 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	push	si
 
 	;reset some invalid flags for this window, to indicate that draw
-	;has occurred.  
+	;has occurred.
 
 	mov	cl, mask OLWHS_HEADER_AREA_INVALID or \
 		    mask OLWHS_FOCUS_AREA_INVALID or \
@@ -1116,7 +1118,7 @@ OpenWinDrawHeaderTitleBackground	proc	near
 	LONG	jz done			;skip if not...
 
 	mov	al, ColorScheme <MO_ETCH_COLOR, C_WHITE>
-	push	ax			;Save display type (AH), 
+	push	ax			;Save display type (AH),
 					;and background color scheme (AL=C_WHITE)
 
 	;see if this is a pinned menu
@@ -1178,7 +1180,7 @@ if	_MOTIF					;new code 12/ 1/92 cbh
 	call	OpenCheckIfBW
 	jc	dontScootUp
 	dec	dx				;move bottom line up a pixel
-dontScootUp:	
+dontScootUp:
 endif
 
 	;Draw the horizontal line below the header
@@ -1190,7 +1192,7 @@ if	_MOTIF
 ;	mov	di, ds:[si]			;point to instance
 ;	add	di, ds:[di].Vis_offset		;ds:[di] -- VisInstance
 ;	test	ds:[di].OLWI_attrs, mask OWA_RESIZABLE
-;	pop	di		 		;  
+;	pop	di		 		;
 	call	OpenCheckIfBW			;color, skip line drawing
 	jnc	dontDrawIntoBorders
 endif
@@ -1202,7 +1204,7 @@ endif
 ;	mov	di, ds:[si]			;point to instance
 ;	add	di, ds:[di].Vis_offset		;ds:[di] -- VisInstance
 ;	mov	cx, ds:[di].VI_bounds.R_right	;  resize borders anymore.
-;	sub	cx, ds:[di].VI_bounds.R_left	;  
+;	sub	cx, ds:[di].VI_bounds.R_left	;
 ;	pop	di
 
 	push	bx			;draw bottom C_BLACK line
@@ -1216,7 +1218,7 @@ endif
 	pop	bx
 	pop	ax, cx			;restore header left and right
 dontDrawIntoBorders:
-	
+
 	inc	bx			;colored portion is inside
 ;	dec	dx			;top and bottom lines
 	;
@@ -1265,13 +1267,13 @@ drawHighlight:
 
 	;color display: draw inside the etch area
 
-	add	si, MO_WIN_HIGHLIGHT_INSET_X				
-	sub	cx, MO_WIN_HIGHLIGHT_INSET_X				
+	add	si, MO_WIN_HIGHLIGHT_INSET_X
+	sub	cx, MO_WIN_HIGHLIGHT_INSET_X
 
 drawHighlight2:
 	mov	ax, si			;ax = left coord
-	add	bx, MO_WIN_HIGHLIGHT_INSET_Y				
-	sub	dx, MO_WIN_HIGHLIGHT_INSET_Y				
+	add	bx, MO_WIN_HIGHLIGHT_INSET_Y
+	sub	dx, MO_WIN_HIGHLIGHT_INSET_Y
 	push	ax, ds
 	mov	ax, segment idata
 	mov	ds, ax
@@ -1354,7 +1356,7 @@ PASS:		ds:*si	- instance data
 		dx	- ?
 		di	- handle of GState
 
-RETURN:		nothing	
+RETURN:		nothing
 
 DESTROYED:	bx, dx
 
@@ -1370,7 +1372,7 @@ REVISION HISTORY:
 
 CGA_TITLE_TEXT_Y_OFFSET	=	-1
 GCM_CGA_TITLE_TEXT_Y_OFFSET = 	-1
-			    
+
 TITLE_TEXT_Y_OFFSET	=	2
 GCM_TITLE_TEXT_Y_OFFSET	=	6	;for non CGA only
 
@@ -1379,13 +1381,13 @@ OpenWinDrawHeaderTitle	proc	near
 
 	;
 	; Code added 2/ 6/92 to get rid of title on maximized windows.
-	; 
+	;
 	call	OpenWinCheckMenusInHeader
 	LONG	jc	exit		;menus in header, don't draw title
 
 if	 _ALLOW_MINIMIZED_TITLE_BARS
 	; If minimizing title bar, then don't draw the title - won't fit.
-	
+
 	test	ds:[bp].OLWI_moreFixedAttr, mask OMWFA_MINIMIZE_TITLE_BAR
 	LONG	jnz	exit
 endif	;_ALLOW_MINIMIZED_TITLE_BARS
@@ -1400,7 +1402,7 @@ EC <	call	GenCheckGenAssumption	;Make sure gen data exists 	>
 
 	mov	cl, mask OLWHS_TITLE_IMAGE_INVALID or mask OLWHS_FOCUS_AREA_INVALID
 	call	OpenWinHeaderResetInvalid
-   
+
 	test	ds:[bp].OLWI_attrs, mask OWA_TITLED
 	LONG	jz done			;skip if not titled...
 
@@ -1429,8 +1431,8 @@ MO <10$:								>
 
 	;(ax, bx), (cx, dx) = coordinates for title area.
 	;Calculate size of text moniker.
-	
-	sub	cx, ax			;save width of title area 
+
+	sub	cx, ax			;save width of title area
 	push	cx			;
 
 ;HACK
@@ -1460,7 +1462,7 @@ endif
 	call	OpenWinGetMonikerSize	;get size of moniker (cx, dx)
 					;does not trash ax, bp
 
-	pop	bx			;bx = width of title area		
+	pop	bx			;bx = width of title area
 	push	bx			;save again...
 	sub	bx, cx			;find amount of space around text
 
@@ -1468,7 +1470,7 @@ endif
 					;see +2 note below...
 					;account for margins around text,
 
-	tst	bx			;did it go negative? 
+	tst	bx			;did it go negative?
 	jns	20$			;skip if not...
 	clr	bx			;use offset of 0
 20$:
@@ -1487,7 +1489,7 @@ endif
 
 ;HACK
 	popf
-	jz	30$			;If not GCM, branch	
+	jz	30$			;If not GCM, branch
 	mov	bx,GCM_TITLE_TEXT_Y_OFFSET-TITLE_TEXT_Y_OFFSET
 	call	OpenWinCheckIfSquished		;see if on CGA
 	jnc	30$			;not CGA, branch
@@ -1505,13 +1507,13 @@ endif
 	mov	cx, di			;else keep to title width
 40$:
 	add	cx, ax			;cx = left bound + offset + text width
-	
+
 	mov	di, bp			;pass di = gstate
 
 	add	ax, CUAS_TITLE_TEXT_MARGIN
 					;move inside margin area
 	mov	dx, ax			;dl = X offset from OLWinClass bounds
-	
+
 	add	bx, TITLE_TEXT_Y_OFFSET	;push text down a bit
 	;
 	; If it's a CGA display, compensate for a smaller header height
@@ -1534,12 +1536,12 @@ notCGA:
 45$:
 	mov	ss:[bp].DMA_xMaximum, cx		;title area is max width
 	mov	ss:[bp].DMA_yMaximum, MAX_COORD		;don't clip Y
-	
+
 	mov	cl, (J_LEFT shl offset DMF_X_JUST) or \
 		    (J_LEFT shl offset DMF_Y_JUST) or \
 		    mask DMF_CLIP_TO_MAX_WIDTH or \
 		    mask DMF_TEXT_ONLY
-		    
+
 	call	OpenWinDrawMoniker			;draw it
 	pop	di					;restore gstate
 	add	sp, size DrawMonikerArgs		;dump args
