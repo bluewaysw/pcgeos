@@ -890,6 +890,14 @@ REVISION HISTORY:
 ------------------------------------------------------------------------------@
 
 OpenWinUpdateGeometry	method dynamic	OLWinClass, MSG_VIS_UPDATE_GEOMETRY
+	;
+	; Closing may leave ratios in VI_bounds. Geometry needs pixel bounds,
+	; including when a minimized parent reopens its document windows.
+	;
+	push	ax, bp
+	call	ConvertSpecWinSizePairsToPixels
+	pop	ax, bp
+
 	;first see if this is the first UPDATE_GEOMETRY:
 
 if 0
