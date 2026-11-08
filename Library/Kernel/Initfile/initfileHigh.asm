@@ -1135,6 +1135,13 @@ sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 
 		call	InitFileHaveLowerIniFile
 		LONG	jnc	readOne
+	;
+	; A primary @deleted marker blocks the complete list. Test it before
+	; reading factory items. The normal read then returns the missing-key
+	; result without allocating a merged list.
+	;
+		call	InitFilePrimaryIsDeleted
+		LONG	jc	readOne
 
 		push	ds, si, cx, dx
 		segmov	es, ss
@@ -1330,7 +1337,12 @@ endif
 	call	FindCategory
 	jc	notFound
 	call	FindKey
+	jc	notFound
+	call	InitFileIsDeletedValue
 	jnc	doneGood
+	mov	bx, es:[bx]
+	call	MemUnlock
+	jmp	error
 notFound:
 	push	bx
 	mov	bx, es:[bx]
@@ -2201,6 +2213,7 @@ if DBCS_PCGEOS
 	shl	cx, 1				; cx = # bytes
 	mov	bp, cx				; bp = # bytes
 	pop	cx
+	mov	bx, IFOT_DATA		; DBCS strings use encoded data
 else
 	mov	bx, IFOT_STRING
 endif
@@ -2473,6 +2486,11 @@ sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 		.enter
 
+	;
+	; Restore the whole key before matching items. A match with a factory item can
+	; skip the local write, but it must not leave the whole list deleted.
+	;
+	call	InitFileClearEntryTombstone
 	call	InitFileHaveLowerIniFile
 	jc	haveLowerIni
 	call	InitFileFreeRewriteSnapshot
@@ -2589,14 +2607,14 @@ checkSnapshotKey:
 
 		clr	es:[rewriteStringSection]
 	;
-	; The primary key was deleted before the rewrite was marked, so the
-	; normal read path now resolves to the lower factory entry.
+	; A normal read stops at the primary marker. Read the lower files
+	; directly to save factory entries for the existing list rewrite.
 		;
 			push	bp
 			clr	bp
 			lds	si, ss:[catString]
 			movdw	cxdx, ss:[keyString]
-			call	InitFileReadString
+			call	InitFileReadLowerString
 			pop	bp
 			jnc	gotLower
 		jmp	done
@@ -2864,12 +2882,12 @@ isLowerBlob:
 		mov	cx, ds
 		mov	dx, offset dgroup:[rewriteKey]
 	;
-	; The primary key was deleted before the rewrite was marked, so the
-	; normal read path now resolves to the lower factory entry.
+	; A normal read stops at the primary marker. Read the lower files
+	; directly to save factory entries for the existing list rewrite.
 	;
 		push	bp
 		clr	bp
-		call	InitFileReadString
+		call	InitFileReadLowerString
 		pop	bp
 		jnc	gotLower
 		jmp	clearState
@@ -3087,7 +3105,7 @@ scanLoop:
 	mov	cx, ss:[blobSize]
 	mov	dx, ss:[entryIndex]
 	call	GetStringSectionByIndex
-	jc	freeNotRemoved
+	LONG	jc	freeNotRemoved
 	mov	ss:[entryStart], si
 	mov	ss:[entryLength], cx
 	mov	ss:[entryRemaining], ax
@@ -3712,14 +3730,43 @@ InitFileWrite	proc	near
 	push	bx
 	call	EnterInitfile		;es, bp <- dgroup, destroys ax, bx
 	pop	bx
+	call	InitFileWriteLow
+	call	ExitInitfile
+	.leave
+	ret
+InitFileWrite	endp
 
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileWriteLow
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Construct and insert a primary entry without releasing the lock.
+		The private deleted mode writes the raw marker. The string mode
+		protects a literal marker as data. The deletion caller uses this
+		routine under the same lock as its check of the lower files.
+PASS:		es,bp - dgroup; EnterInitfile has stored the write parameters
+		bx - InitFileOperationType, including private IFOT_DELETED
+RETURN:		carry clear; INI lock and primary buffer lock still held
+DESTROYED:	ax,bx,cx,di,si,ds
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	Codex/MeyerK	11/08/26	Split entered write from lock handling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileWriteLow proc near
 	mov	es:[buildBufHan], 0
 
+	cmp	bx, IFOT_DELETED
+	je	writeDeleted
 	cmp	bx, IFOT_STRING
 	mov	bx, offset BuildEntryFromString	; Assume string operation
 	je	doWrite
 	mov	bx, offset BuildEntryFromData	; Nope. data.
+	jmp	doWrite
 
+writeDeleted:
+	mov	bx, offset BuildEntryFromDeleted
 
 doWrite:
 	call	bx			;destroys ax, bx
@@ -3805,12 +3852,9 @@ endif
 if HASH_INIFILE
 	call	HashUpdateHashTable
 endif
-	call	ExitInitfile
 	clc				;return no errors
-
-	.leave
 	ret
-InitFileWrite	endp
+InitFileWriteLow endp
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3960,7 +4004,7 @@ COMMENT @-----------------------------------------------------------------------
 
 FUNCTION:	InitFileDeleteEntry
 
-DESCRIPTION:	Deletes a key entry from a category
+DESCRIPTION:	Delete a key without exposing a value from a lower file.
 
 CALLED BY:	GLOBAL
 
@@ -3974,8 +4018,18 @@ DESTROYED:	none
 REGISTER/STACK USAGE:
 
 PSEUDO CODE/STRATEGY:
+		Keep an existing whole-key marker. Otherwise, search lower
+		files while the primary buffer and INI lock remain held.
+		If a lower value is available, write the deletion marker in
+		the primary file. If not, physically remove the primary entry.
+		Keep the existing string-section rewrite hooks.
 
 KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+		Reads report a marked key as missing. The application can use
+		its own default. This does not request false, zero or a factory
+		reset. A normal write replaces the marker. An existing marker
+		stays in place when a factory update removes the lower key.
+		Internal raw deletion and category deletion stay physical.
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -3999,7 +4053,21 @@ endif
 if INI_STRING_SECTION_TOMBSTONES
 		call	InitFileMarkStringSectionRewrite
 endif
+		call	FindCategory
+		jc	checkLower
+		call	FindKey
+		jc	checkLower
+		call	InitFileIsDeletedValue
+		jc	exitDelete		; keep an existing tombstone
+checkLower:
+		call	InitFileFindLowerKey
+		jc	deleteLocal
+		mov	bx, IFOT_DELETED
+		call	InitFileWriteLow
+		jmp	exitDelete
+deleteLocal:
 		call	InitFileDeleteEntryLow
+exitDelete:
 		call	ExitInitfile
 if INI_STRING_SECTION_TOMBSTONES
 		call	InitFileStartPendingRewrite
@@ -4017,7 +4085,9 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFileDeleteEntryRaw
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Delete a key entry without string-section sidecar hooks.
+SYNOPSIS:	Physically remove a primary entry without list rewrite hooks.
+		Do not write a marker, even if a lower value is available.
+		Use this path for internal cleanup of key.disabled entries.
 
 PASS:		ds:si - category ASCIIZ string
 		cx:dx - key ASCIIZ string
@@ -4036,6 +4106,28 @@ InitFileDeleteEntryRaw	proc	near
 
 	ret
 InitFileDeleteEntryRaw	endp
+
+	;
+	; A list append restores the key even if a match with a factory item skips
+	; its local write. Remove only the whole-key marker here. Keep the
+	; existing key.disabled entries and rewrite snapshot for item handling.
+	;
+InitFileClearEntryTombstone proc near
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
+		call	EnterInitfile
+		call	FindCategory
+		jc	done
+		call	FindKey
+		jc	done
+		call	InitFileIsDeletedValue
+		jnc	done
+		call	InitFileDeleteEntryLow
+done:
+		call	ExitInitfile
+	.leave
+		ret
+InitFileClearEntryTombstone endp
 
 endif
 
@@ -4186,7 +4278,9 @@ COMMENT @-----------------------------------------------------------------------
 
 FUNCTION:	InitFileDeleteCategory
 
-DESCRIPTION:	Deletes an entire category of data from the initfile
+DESCRIPTION:	Remove the primary category and its keys.
+		Do not write key deletion markers. Lower values can become
+		available again after this operation.
 
 CALLED BY:	GLOBAL
 

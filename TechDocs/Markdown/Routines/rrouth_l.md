@@ -764,7 +764,68 @@ case-insensitive.
             const char      *category,
             const char      *key);
 
-This routine deletes an entry in the GEOS.INI file. Pass it the following:
+This routine deletes the specified key from the primary INI file. The primary
+file is the first file in the search order. Lower files are the other loaded
+INI files, in search order. The routine searches this active chain. It does not
+require a file named net.ini.
+
+The routine uses these rules:
+
+- If the primary entry is already a deletion marker, keep it.
+- If a lower value is available, write key = @deleted in the primary file.
+  The key does not need to have a primary entry before the call.
+- If no lower value is available, remove the primary entry without a marker.
+
+A lower value is available if the search finds a normal entry before it finds
+a marker. Zero, false, and an empty string all count as values. A lower marker
+blocks all files below it. If a future factory update adds a previously absent
+key, its value becomes available after a deletion without a marker. An existing
+marker remains if an update removes the lower key. Repeated deletion keeps it.
+
+The marker is the exact, case-sensitive, bare value @deleted. "Bare" means
+outside a blob. Spaces and tabs can surround the marker. A semicolon can start
+a comment after it. After the token, only spaces, tabs, and an optional comment
+are allowed. @Deleted and @deletedLater are not markers. Blob contents are
+ordinary data. The grammar is the same in the kernel and the loader.
+
+All logical reads treat a marker as a missing key. They do not parse it as a
+string, number, Boolean, or data block. They return the normal missing-key
+result, with the same output rules as for an absent key. The application
+can use its own default. The marker does not mean false, zero, or an empty
+string. IFRF_FIRST_ONLY also treats a primary marker as missing. Routines that
+read all files stop at a marker and keep results from higher files.
+
+A normal write replaces the primary marker. InitFileWriteString protects a
+literal "@deleted" automatically. It uses a blob in SBCS builds and the normal
+encoded data form in DBCS builds. Empty strings keep their normal representation.
+The internal raw lookup and deletion routines still find and remove physical
+entries. They do not change their rules for this marker.
+
+String-section lists keep their existing key.disabled entries and item rules.
+A marker for the whole key blocks the complete list. A later list write clears
+that marker before the kernel applies the item rules. It must clear the marker
+even if a match with a factory item avoids a local write. The kernel reads factory
+rewrite snapshots directly from lower files, below the primary marker.
+Whole-key marker support does not depend on INI_STRING_SECTION_TOMBSTONES.
+
+To restore a lower value for a scalar key by hand, remove its primary entry.
+For a full factory-list reset, also remove the local list and its key.disabled
+entry. InitFileDeleteEntry does not request a factory reset. Existing callers
+keep using this API. For example, video recovery deletes keys to request
+autodetection, and mouse preferences delete a port key that no longer applies.
+OpenWith and ConfigUI delete keys before list writes. PreflvlResetAppFeatures
+also uses this API and receives the same missing-key result. The API uses
+the same deletion rule for all callers.
+
+InitFileDeleteCategory is unchanged. It removes only the primary category and
+can expose lower keys. With only one file loaded, InitFileDeleteEntry does not
+create new markers, but it retains any existing marker. Older kernels do not
+support the marker. Public entry points and parameters are unchanged.
+
+See [Deleted Keys in Layered INI Files](../Tools/tini.md#911-deleted-keys-in-layered-ini-files)
+for INI examples.
+
+Pass the following:
 
 *category* - A pointer to the null-terminated string representing the 
 category in which the entry resides. This string ignores white 
