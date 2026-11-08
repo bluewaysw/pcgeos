@@ -1,0 +1,182 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) blueway.Softworks 2026 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		File System Drivers
+FILE:		hostfsConstant.def
+
+DESCRIPTION:
+	Constants and structures of the host file system driver.
+
+	The host interface protocol must match src/geos/geoshost_hostfs.h
+	in pcgeos-basebox.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;			Host interface
+;------------------------------------------------------------------------------
+;
+; We talk to the host through the HostIf library (HostIfDetect, HostIfCall)
+; with the commands HIF_HOSTFS_INIT, HIF_HOSTFS_MOUNT and HIF_HOSTFS_CALL
+; of HIF_API_HOSTFS (hostif.def):
+;
+;	HIF_HOSTFS_INIT		-> ax = HIF_OK, si = HOSTFS_MAGIC
+;				   (unmounts everything)
+;	HIF_HOSTFS_MOUNT	bx:cx = "NAME=HOST PATH",
+;				 dx:di = name buffer, si = its size
+;				-> ax = HIF_OK, si = volume number,
+;				   cx:dx = root directory ID
+;	HIF_HOSTFS_CALL		bx:cx = HostFsFrame, dx = size
+;				-> ax = HIF_OK, results in the frame
+;
+HOSTFS_API_VERSION	equ	1
+
+HOSTFS_MAGIC		equ	4648h	; 'HF'
+
+;------------------------------------------------------------------------------
+;			Request frame
+;------------------------------------------------------------------------------
+HostFsFunction	etype	word
+    ; Paths. In: ds:dx = path, HFF_dirId = base for relative paths.
+    HFF_CUR_PATH_SET	enum	HostFsFunction, 1	; -> cx:dx = dir ID
+    HFF_OPEN		enum	HostFsFunction		; al = access
+							; -> ax = handle,
+							;    cx:dx = file ID
+    HFF_CREATE		enum	HostFsFunction		; al = access,
+							;  cl = FileAttrs,
+							;  ch = FileCreateFlags
+    HFF_CREATE_DIR	enum	HostFsFunction
+    HFF_DELETE_DIR	enum	HostFsFunction
+    HFF_DELETE_FILE	enum	HostFsFunction
+    HFF_RENAME		enum	HostFsFunction		; bx:cx = new name
+    HFF_MOVE		enum	HostFsFunction		; HFF_aux = dest path,
+							; HFF_auxId = dest base
+    HFF_GET_ATTRS	enum	HostFsFunction		; -> cx = FileAttrs
+    HFF_SET_ATTRS	enum	HostFsFunction		; cx = FileAttrs
+    HFF_PATH_GET_EXT	enum	HostFsFunction		; ax = attr,
+							;  es:di = buffer,
+							;  cx = size or count
+    HFF_PATH_SET_EXT	enum	HostFsFunction		; (same)
+    HFF_PATH_GET_ALL_SIZE enum	HostFsFunction		; -> ax = bytes,
+							;    cx = count
+    HFF_PATH_GET_ALL_FILL enum	HostFsFunction		; es = block
+
+    ; Open files. In: HFF_handle.
+    HFF_READ		enum	HostFsFunction, 32	; ds:dx, cx -> ax
+    HFF_WRITE		enum	HostFsFunction		; ds:dx, cx -> ax
+    HFF_POSITION	enum	HostFsFunction		; al, cx:dx -> dx:ax
+    HFF_TRUNCATE	enum	HostFsFunction		; cx:dx
+    HFF_COMMIT		enum	HostFsFunction
+    HFF_GET_DATE_TIME	enum	HostFsFunction		; -> cx, dx
+    HFF_SET_DATE_TIME	enum	HostFsFunction		; cx, dx
+    HFF_FILE_SIZE	enum	HostFsFunction		; -> dx:ax
+    HFF_ADD_REFERENCE	enum	HostFsFunction
+    HFF_CHECK_DIRTY	enum	HostFsFunction		; -> ax
+    HFF_CLOSE		enum	HostFsFunction		; -> ax = closed,
+							;    cx:dx = file ID
+    HFF_GET_FILE_ID	enum	HostFsFunction		; -> cx:dx
+    HFF_CHECK_NATIVE	enum	HostFsFunction		; ch -> ax
+    HFF_HANDLE_GET_EXT	enum	HostFsFunction
+    HFF_HANDLE_SET_EXT	enum	HostFsFunction
+    HFF_HANDLE_GET_ALL_SIZE enum HostFsFunction
+    HFF_HANDLE_GET_ALL_FILL enum HostFsFunction
+
+    ; Enumeration of HFF_dirId.
+    HFF_ENUM_BEGIN	enum	HostFsFunction, 64	; -> ax = enum handle
+    HFF_ENUM_NEXT	enum	HostFsFunction		; ax, ds = FECD
+    HFF_ENUM_END	enum	HostFsFunction		; ax
+
+    ; Volume.
+    HFF_DISK_INFO	enum	HostFsFunction, 80	; -> dx:ax = free,
+							;    cx:bx = total
+    HFF_POLL_CHANGES	enum	HostFsFunction		; -> next change made
+							;  on the host, as a
+							;  notification;
+							;  ERROR_NO_MORE_FILES
+							;  if none
+
+;
+; One request to the host. The register image is both input and output;
+; which registers matter depends on the function (see HostFsFunction).
+;
+HostFsFrame	struct
+    HFF_func		HostFsFunction	; what to do
+    HFF_result		word		; out: FileError, 0 if successful
+    HFF_ax		word
+    HFF_bx		word
+    HFF_cx		word
+    HFF_dx		word
+    HFF_si		word
+    HFF_di		word
+    HFF_ds		word
+    HFF_es		word
+    HFF_dirId		dword		; directory relative paths start in
+					;  (0 = root)
+    HFF_handle		word		; host file handle (handle ops)
+    HFF_disk		word		; disk handle, for FEA_DISK
+    HFF_pathInfo	word		; DirPathInfo, for FEA_PATH_INFO
+    HFF_driveStatus	word		; DriveExtendedStatus, for
+					;  FEA_DRIVE_STATUS
+    HFF_aux		dword		; function specific
+    HFF_auxId		dword		; function specific
+    HFF_notifyType	word		; out: FileChangeNotificationType+1,
+					;  0 if none
+    HFF_notifyId	dword		; out: ID to notify with
+    HFF_notifyName	char	FILE_LONGNAME_BUFFER_SIZE dup(?)
+					; out: name for FCNT_CREATE/RENAME
+    HFF_notify2Type	word		; out: second notification, no name
+    HFF_notify2Id	dword
+    HFF_volume		word		; host volume of the drive (not used
+					;  for handle operations)
+HostFsFrame	ends
+
+;------------------------------------------------------------------------------
+;			Private data
+;------------------------------------------------------------------------------
+;
+; Stored at FP_private in the path blocks of threads whose current
+; directory is on our drive.
+;
+HostFsPathPrivate	struct
+    HFPP_dirId		dword		; host ID of the directory
+HostFsPathPrivate	ends
+
+;
+; The FSDFlags that describe this driver's capabilities.
+;
+FSD_FLAGS	equ	FSDFlags	<
+		0,	; FSDF_NETWORK
+		0,	; FSDF_PRIMARY
+		0,	; FSDF_SKELETON
+		0,	; FSDF_CAN_FORMAT
+		0	; FSDF_CAN_COPY
+	>
+
+HOSTFS_DRIVE_STATUS	equ	mask DES_LOCAL_ONLY or mask DS_PRESENT or \
+				(DRIVE_FIXED shl offset DS_TYPE)
+
+;
+; One entry per drive we manage, as configured in GEOS.INI:
+;	[hostfs]
+;	drives = {
+;	HOST=C:\Users\me\GeosData
+;	WORK=/home/me/work
+;	}
+;
+HOSTFS_MAX_DRIVES	equ	8		; must match the host
+
+HostFsDrive	struct
+    HFD_dse		word		; DriveStatusEntry, 0 if unused
+    HFD_disk		word		; disk handle, once GEOS used the drive
+					;  (needed for notifications)
+    HFD_volume		word		; host volume number
+    HFD_rootId		dword		; root directory ID, also disk ID
+    HFD_name		char	DRIVE_NAME_MAX_LENGTH dup(?)
+HostFsDrive	ends
+
+;
+; Fatal errors
+;
+INVALID_FS_FUNCTION			enum FatalErrors

@@ -627,6 +627,9 @@ Installed/Driver/IFS/DOS/MS4:		kernel MAKEDRV
 os2	: Installed/Driver/IFS/DOS/OS2
 Installed/Driver/IFS/DOS/OS2:		kernel MAKEDRV
 
+hostfs	: Installed/Driver/IFS/HostFS
+Installed/Driver/IFS/HostFS:		kernel MAKEDRV
+
 ntfat	: Installed/Driver/IFS/DOS/NTFat
 Installed/Driver/IFS/DOS/NTFat:		kernel MAKEDRV
 

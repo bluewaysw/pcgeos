@@ -1797,6 +1797,18 @@ endif
 		mov	ds:[dosLastCritical], 0
 		pop	ds
 
+if HOST_FS_FASTPATH
+	;
+	; Under pcgeos-basebox, let the host execute the call directly (no
+	; INT 21h dispatch, no DPMI reflection or transfer buffer). ZF set
+	; means it did: CF and registers are as DOS returns them, and on
+	; error ax already holds the extended error code. SysUnlockBIOS at
+	; "done" preserves the carry.
+	;
+		call	DOSHostFsInt21
+		jz	done
+endif
+
 	;
 	; See if the call returns the carry flag + error
 	; 

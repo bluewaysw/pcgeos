@@ -29,10 +29,14 @@ DESCRIPTION:
 
 _OS2		equ	TRUE	; define the version of DOS driven by this
 				;  driver.
+HOST_FS_FASTPATH equ	TRUE	; use the BASEBOX host FS fast path when
+				;  running under pcgeos-basebox
 
 include	dosGeode.def
 
 include os2Interface.def
+include hostif.def		; HostIf library: talking to BASEBOX
+include Internal/hostDosFs.def	; its DOS fast path sub-API
 ;include os2Macro.def
 ;include	os2Constant.def
 
@@ -71,6 +75,7 @@ include os2InitExit.asm		; Initialization/exit routines.
 include dosCritical.asm		; Critical-error handler
 include dosUtils.asm		; Random utility things.
 include os2Utils.asm		; more random utility things
+include os2HostFs.asm		; BASEBOX host file system fast path
 include dosVirtual.asm		; Virtual namespace support
 
 include	dosSuspend.asm		; DR_SUSPEND/DR_UNSUSPEND

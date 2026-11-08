@@ -64,15 +64,49 @@ global 	HOSTIFCALL:far
 ;
 global	HostIfShutdown:far
 
+global	HostIfRegisterNotify:far
+;
+; Have a routine called when the host sends a notification of the given
+; type. The routine is called on the HostIf process thread, so it may
+; block and send messages, but should finish quickly.
+;
+;	Pass:	ax	- HostIfNotification
+;		cx:dx	- routine, in fixed memory (it must stay loaded until
+;			  HostIfUnregisterNotify)
+;	Return:	carry set if no more routines can be registered
+;
+;	The routine is called with:
+;		ax	- HostIfNotification
+;	and may destroy ax, bx, cx, dx, si, di, bp, es.
+;
+
+global	HostIfUnregisterNotify:far
+;
+; Stop calling a routine registered with HostIfRegisterNotify.
+;
+;	Pass:	ax	- HostIfNotification
+;		cx:dx	- routine
+;	Return:	nothing
+;
+
 HostIfAPI etype	word
 	HIF_API_HOST			enum	HostIfAPI, 0
 	HIF_API_VIDEO			enum	HostIfAPI, 1
 	HIF_API_SSL			enum	HostIfAPI, 2
 	HIF_API_SOCKET			enum	HostIfAPI, 3
+	HIF_API_FS			enum	HostIfAPI, 4	; DOS IFS driver fast path
+	HIF_API_HOSTFS			enum	HostIfAPI, 5	; host file system
 
 HostIfNotification etype	word
 	HIF_NOTIFY_DISPLAY_SIZE_CHANGE	enum	HostIfNotification, 1
 	HIF_NOTIFY_SOCKET_STATE_CHANGE	enum	HostIfNotification, 2
+	HIF_NOTIFY_DRIVE_CHANGE		enum	HostIfNotification, 3
+	HIF_NOTIFY_FS_CHANGES		enum	HostIfNotification, 4
+		; host file changes on DOSBox drives are pending; collect them
+		; with HIF_FS_POLL_CHANGES (registered handler only, no GCN)
+	HIF_NOTIFY_HOSTFS_CHANGES	enum	HostIfNotification, 5
+		; host file changes on host file system drives are pending
+		; (registered handler only, no GCN)
 
 HostIfFunctions	etype	word
 	HIF_SET_VIDEO_PARAMS		enum	HostIfFunctions, 4
@@ -113,6 +147,24 @@ HostIfFunctions	etype	word
 	HIF_SSL_SET_TLSEXT_HOST_NAME	enum	HostIfFunctions, HIF_SSL_BASE+15
 	HIF_SSL_SET_SSL_METHOD		enum	HostIfFunctions, HIF_SSL_BASE+16
 	HIF_SSL_END			enum	HostIfFunctions, 1299
+
+	; File system fast path. Used directly over the port by the DOS
+	; IFS driver (see Internal/hostDosFs.def for the protocol).
+	HIF_FS_BASE			enum	HostIfFunctions, 1300
+	HIF_FS_ENABLE			enum	HostIfFunctions, HIF_FS_BASE
+	HIF_FS_INT21			enum	HostIfFunctions, HIF_FS_BASE+1
+	HIF_FS_GET_DRIVE_INFO		enum	HostIfFunctions, HIF_FS_BASE+2
+	HIF_FS_GET_DRIVE_GENERATION	enum	HostIfFunctions, HIF_FS_BASE+3
+	HIF_FS_POLL_CHANGES		enum	HostIfFunctions, HIF_FS_BASE+4
+	HIF_FS_END			enum	HostIfFunctions, 1399
+
+	; Host file system (HIF_API_HOSTFS). The frame layout and its
+	; functions are private to the HostFS driver (hostfsConstant.def).
+	HIF_HOSTFS_BASE			enum	HostIfFunctions, 1400
+	HIF_HOSTFS_INIT			enum	HostIfFunctions, HIF_HOSTFS_BASE
+	HIF_HOSTFS_MOUNT		enum	HostIfFunctions, HIF_HOSTFS_BASE+1
+	HIF_HOSTFS_CALL			enum	HostIfFunctions, HIF_HOSTFS_BASE+2
+	HIF_HOSTFS_END			enum	HostIfFunctions, 1499
 
 HostIfResults	etype	word
 	HIF_OK				enum	HostIfResults, 0

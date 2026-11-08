@@ -1,0 +1,75 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) blueway.Softworks 2026 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel/IFS
+FILE:		hostDosFs.def
+
+DESCRIPTION:
+	Constants of the BASEBOX host interface sub-API used by the DOS IFS
+	driver's fast path (HIF_API_FS, commands HIF_FS_* in hostif.def).
+	The driver talks to the host through the HostIf library
+	(HostIfDetect, HostIfCall); this file only holds what is specific
+	to this sub-API. Must match src/geos/geoshost_fs.h in pcgeos-basebox.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__HOSTDOSFS
+
+HOSTFS_API_VERSION		equ	1
+
+HOSTFS_MAGIC			equ	5346h	; 'FS', returned in si
+
+;
+; HIF_FS_INT21 outcome, in bx (ax only carries the HostIf status)
+;
+HOSTFS_NOT_EXECUTED		equ	0	; use a real INT 21h
+HOSTFS_EXECUTED			equ	1	; done, results in the frame
+
+HOSTFS_FUNC_MAP_SIZE		equ	32	; 256 bits, one per AH value
+
+;
+; HIF_FS_ENABLE options (passed in di)
+;
+HOSTFS_OPT_DRIVE_NOTIFY		equ	0001h	; deliver HIF_NOTIFY_DRIVE_CHANGE
+HOSTFS_OPT_FILE_NOTIFY		equ	0002h	; watch for host file changes
+
+;
+; Drive kinds returned by HIF_FS_GET_DRIVE_INFO (DOSBox DosDriveType)
+;
+HOSTFS_DRIVE_UNKNOWN		equ	0
+HOSTFS_DRIVE_LOCAL		equ	1	; host directory mount
+HOSTFS_DRIVE_CDROM		equ	2	; host directory as CD-ROM
+HOSTFS_DRIVE_FAT		equ	3	; FAT disk image
+HOSTFS_DRIVE_ISO		equ	4	; ISO/CUE image
+HOSTFS_DRIVE_VIRTUAL		equ	5	; DOSBox Z: drive
+
+HostFsDriveFlags	record
+    :11
+    HFDF_DEFAULT:1		; current DOS default drive
+    HFDF_REMOTE:1		; reported as remote by DOSBox
+    HFDF_REMOVABLE:1		; removable media
+    HFDF_READ_ONLY:1		; read-only medium
+    HFDF_PRESENT:1		; drive exists
+HostFsDriveFlags	end
+
+;
+; DOS-compatible register frame for HIF_FS_INT21. The host executes the
+; call described by the register image and writes the results back. The
+; frame is only modified when the host reports the call as executed.
+;
+HostFsFrame	struct
+    HFF_ax	word
+    HFF_bx	word
+    HFF_cx	word
+    HFF_dx	word
+    HFF_si	word
+    HFF_di	word
+    HFF_ds	word		; segment (real mode) or selector (PM)
+    HFF_es	word
+    HFF_flags	word		; out: bit 0 = carry
+    HFF_extErr	word		; out: extended DOS error if carry set
+HostFsFrame	ends
+
+HOSTFS_FRAME_CARRY		equ	0001h

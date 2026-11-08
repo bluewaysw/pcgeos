@@ -1328,6 +1328,16 @@ VMCheckDSHeader	proc	far	uses ax, cx, si, es, di, dx
 	call	VMCheckBlkHanOffset
 20$:
 	LoadVarSeg	es
+	;
+	; The walk below visits every block handle in the file, and this
+	; routine runs on almost every VM operation. For VM files with many
+	; blocks (huge bitmaps, HugeArrays) that makes all VM work O(n) per
+	; call, i.e. seconds of pure checking. Only do it when VM file
+	; structure checking was asked for ("ec +vm" in Swat), like the
+	; other expensive VM checks in this file.
+	;
+	test	es:[sysECLevel], mask ECF_VMEM
+	jz	ok
 	mov	di, ds:[VMH_lastHandle]
 	clr	cx, dx
 30$:

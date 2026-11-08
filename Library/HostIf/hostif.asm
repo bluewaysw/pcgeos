@@ -58,6 +58,15 @@ DefLib hostif.def
 ;------------------------------------------------------------------------------
 HOST_API_INTERRUPT 	equ 	0xA0
 MAX_ASYNC_OP_SLOTS	equ	16
+MAX_NOTIFY_ROUTINES	equ	8
+
+;
+; A routine registered with HostIfRegisterNotify.
+;
+HostIfNotifyEntry	struct
+HINE_type		word		; HostIfNotification, 0 if free
+HINE_routine		fptr.far	; routine to call (fixed memory)
+HostIfNotifyEntry	ends
 
 ;
 ; The host (basebox) raises HOST_API_INTERRUPT whenever it queues an event,
@@ -101,6 +110,7 @@ idata   segment
 	asyncOpTable	fptr MAX_ASYNC_OP_SLOTS dup (0)
 
 	oldIntVec	fptr 0
+	notifyTable	HostIfNotifyEntry MAX_NOTIFY_ROUTINES dup (<>)
 
 idata   ends
 
@@ -173,9 +183,15 @@ EC <	call	ECCheckStack						>
 	jnz	done
 	mov	bx, ds:hostIfGeode
 
-	;mov_trash	ax, bx
+	;
+	; One queued MSG_HOSTIF_PROCESS_EVENTS is enough: it drains every
+	; queued host event. A duplicate is the same message with the same
+	; cx, dx and bp, so clear them (they hold whatever the interrupted
+	; code had).
+	;
 	mov	ax, MSG_HOSTIF_PROCESS_EVENTS
-	mov	di, mask MF_FORCE_QUEUE
+	clr	cx, dx, bp
+	mov	di, mask MF_FORCE_QUEUE or mask MF_CHECK_DUPLICATE
 	call	ObjMessage
 done:
 	pop	ax, bx, cx, dx, si, di, bp, ds, es
@@ -275,13 +291,24 @@ EC <	WARNING	HOSTIF_ASYNC_RESULT_WITHOUT_WAITER			>
 	jmp	eventLoop
 
 doEvent:
-	; Record the message
+	; Routines registered for this notification type come first
+	call	HostIfDispatchNotify
+
+	; Broadcast the types interested objects listen for on the GCN list;
+	; others (e.g. the file system "changes pending" notifications) only
+	; go to registered routines.
 	mov	ax, MSG_META_NOTIFY
 	mov	cx, MANUFACTURER_ID_GEOWORKS
 	mov	dx, GWNT_HOST_DISPLAY_SIZE_CHANGE
 	cmp	si, HIF_NOTIFY_DISPLAY_SIZE_CHANGE
 	je	useType
+	mov	dx, GWNT_HOST_DRIVE_CHANGE
+	cmp	si, HIF_NOTIFY_DRIVE_CHANGE
+	je	useType
 	mov	dx, GWNT_HOST_SOCKET_STATE_CHANGE
+	cmp	si, HIF_NOTIFY_SOCKET_STATE_CHANGE
+	je	useType
+	jmp	eventLoop
 useType:
 	mov	di, mask MF_RECORD
 	call	ObjMessage
@@ -498,6 +525,142 @@ done:
 		.leave
 		ret
 HostIfShutdown	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfRegisterNotify
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Have a routine called for a host notification type.
+CALLED BY:	GLOBAL (e.g. file system drivers)
+PASS:		ax	= HostIfNotification
+		cx:dx	= routine, in fixed memory
+RETURN:		carry set if the table is full
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfRegisterNotify	proc	far
+		uses	bx, ds
+		.enter
+		segmov	ds, dgroup, bx
+		mov	bx, offset notifyTable
+		push	cx
+		mov	cx, MAX_NOTIFY_ROUTINES
+findFree:
+		tst	ds:[bx].HINE_type
+		jz	found
+		add	bx, size HostIfNotifyEntry
+		loop	findFree
+		pop	cx
+		stc
+		jmp	done
+found:
+		pop	cx
+	;
+	; Routine first, type last: the dispatcher only looks at entries
+	; whose type matches, and the type is written in one (atomic) word
+	; access, so it never sees a half-written entry.
+	;
+		mov	ds:[bx].HINE_routine.segment, cx
+		mov	ds:[bx].HINE_routine.offset, dx
+		mov	ds:[bx].HINE_type, ax
+		clc
+done:
+		.leave
+		ret
+HostIfRegisterNotify	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfUnregisterNotify
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Stop calling a routine registered with HostIfRegisterNotify.
+CALLED BY:	GLOBAL
+PASS:		ax	= HostIfNotification
+		cx:dx	= routine
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfUnregisterNotify	proc	far
+		uses	bx, si, ds
+		.enter
+		segmov	ds, dgroup, bx
+		mov	bx, offset notifyTable
+		mov	si, MAX_NOTIFY_ROUTINES
+entryLoop:
+		cmp	ds:[bx].HINE_type, ax
+		jne	next
+		cmp	ds:[bx].HINE_routine.segment, cx
+		jne	next
+		cmp	ds:[bx].HINE_routine.offset, dx
+		jne	next
+		mov	ds:[bx].HINE_type, 0
+next:
+		add	bx, size HostIfNotifyEntry
+		dec	si
+		jnz	entryLoop
+		.leave
+		ret
+HostIfUnregisterNotify	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HostIfDispatchNotify
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Call the routines registered for a notification type.
+CALLED BY:	HostIfProcEventProcess (on the HostIf process thread)
+PASS:		si	= HostIfNotification
+RETURN:		nothing
+DESTROYED:	nothing
+
+PSEUDO CODE/STRATEGY:
+	Each routine is called with ax = notification type through
+	ProcCallFixedOrMovable (ax and bx are passed in TPD_dataAX/BX).
+	The loop state lives on the stack, as the routines may destroy
+	most registers.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (#665)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HostIfDispatchNotify	proc	far
+		uses	ax, bx, cx, dx, si, di, bp, ds, es
+		.enter
+		segmov	ds, dgroup, ax
+		mov	bx, offset notifyTable
+		mov	cx, MAX_NOTIFY_ROUTINES
+entryLoop:
+		cmp	ds:[bx].HINE_type, si
+		jne	next
+		push	bx, cx, si, ds
+		mov	ax, ds:[bx].HINE_routine.offset
+		mov	bx, ds:[bx].HINE_routine.segment
+		mov	ss:[TPD_dataAX], si	; routine gets ax = type
+		mov	ss:[TPD_dataBX], 0
+		call	ProcCallFixedOrMovable
+		pop	bx, cx, si, ds
+next:
+		add	bx, size HostIfNotifyEntry
+		loop	entryLoop
+		.leave
+		ret
+HostIfDispatchNotify	endp
+
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

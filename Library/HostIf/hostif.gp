@@ -54,3 +54,5 @@ export HOSTIFDETECT
 export HostIfCall
 export HOSTIFCALL
 export HostIfShutdown
+export HostIfRegisterNotify
+export HostIfUnregisterNotify
