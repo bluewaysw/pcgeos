@@ -104,8 +104,19 @@ the existing list rules. To restore a full factory list by hand, remove the
 primary list key (which holds the list or its marker). Also remove the primary
 key.disabled entry in the same category.
 
-Category deletion is unchanged. It removes the primary category and can expose
-keys from lower files. Older kernels do not support the @deleted marker.
+List writes update the local key.disabled exclusions before they return. Reads
+therefore see the current list before commit. The kernel keeps a snapshot for
+further items in the same rewrite. Save and commit finish that rewrite. Entry,
+item, and category deletion also finish pending list work first.
+
+InitFileSave copies the primary buffer to ini.bak, including current exclusions.
+InitFileRevert reads and checks the backup before replacing the active buffer.
+A failed restore keeps the active settings and pending rewrite. Lower INI files
+are not part of the backup and stay loaded.
+
+Category deletion removes the primary category and can expose lower keys.
+Pending work is finished first, so a later commit cannot recreate the removed
+category from an old snapshot. Older kernels do not support the @deleted marker.
 For the API rules, see [InitFileDeleteEntry](../Routines/rrouth_l.md#initfiledeleteentry).
 
 ## 9.2 Categories in the INI File

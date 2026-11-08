@@ -2363,13 +2363,29 @@ InitFileWriteStringSection	proc	far
 		call	PushAllFar
 
 if INI_STRING_SECTION_TOMBSTONES
+	;
+	; Keep the INI lock until the list and its exclusions agree. Readers
+	; must not see the cleared whole-key marker with old exclusions.
+	; The INI module lock allows nested calls from the same thread.
+	;
+		push	ds
+		call	LoadVarSegDS_PInitFile
+		pop	ds
 		call	InitFilePrepareStringSectionWrite
-		jnc	writeLocalNow
-		call	PopAllFar
-		ret
-	writeLocalNow:
+		jc	publishExclusions
 endif
 		call	InitFileWriteStringSectionRaw
+if INI_STRING_SECTION_TOMBSTONES
+publishExclusions:
+	;
+	; The snapshot holds factory items that the caller has not written
+	; back. Store them before returning, including when a factory match
+	; skipped the local write. Keep the snapshot for later rewrite items.
+	;
+		call	InitFileRewriteDisabledSidecarFromSnapshot
+		LoadVarSeg	ds
+		call	VInitFileWrite
+endif
 		call	PopAllFar
 
 		ret
@@ -2912,7 +2928,10 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFileFlushPendingRewrite
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Commit pending rewrite snapshot to the disabled sidecar.
+SYNOPSIS:	Store pending exclusions and end the current rewrite.
+
+PASS:		Caller holds the INI module lock through this call and its
+		following operation. Internal reads and writes nest the lock.
 
 DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
@@ -2933,11 +2952,14 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SYNOPSIS:	Replace the disabled sidecar with the current snapshot.
+		Keep the snapshot so further items can be written back.
 
-DESTROYED:	ax,bx,cx,dx,si,bp,ds,es
+PASS:		Caller holds the INI module lock.
+
+DESTROYED:	nothing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 InitFileRewriteDisabledSidecarFromSnapshot	proc	near
-	uses	ax, bx, cx, dx, si, bp, ds, es
+	uses	ax, bx, cx, dx, di, si, bp, ds, es
 	.enter
 
 		LoadVarSeg	ds, ax
@@ -3895,7 +3917,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 InitFileDeleteStringSection	proc	far
-		uses	ax, bx, di, bp, es
+		uses	ax, bx, cx, dx, di, si, bp, ds, es
 if INI_STRING_SECTION_TOMBSTONES
 sidecarCategory	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
 sidecarKey	local	MAX_INITFILE_CATEGORY_LENGTH dup (char)
@@ -3903,6 +3925,14 @@ endif
 		.enter
 
 if INI_STRING_SECTION_TOMBSTONES
+	;
+	; Finish the previous rewrite before resolving the item index. A
+	; later snapshot flush must not replace this deletion's exclusion.
+	;
+		push	ds
+		call	LoadVarSegDS_PInitFile
+		pop	ds
+		call	InitFileFlushPendingRewrite
 		push	ax, ds, si, cx, dx
 		call	InitFileHaveLowerIniFile
 		jnc	legacyDelete
@@ -3990,6 +4020,10 @@ free:
 		call	MemFree				; free buffer used earlier
 		popf					; restore carry flag
 exit:
+if INI_STRING_SECTION_TOMBSTONES
+		LoadVarSeg	ds
+		call	VInitFileWrite
+endif
 		.leave
 		ret
 
@@ -4030,6 +4064,8 @@ KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
 		reset. A normal write replaces the marker. An existing marker
 		stays in place when a factory update removes the lower key.
 		Internal raw deletion and category deletion stay physical.
+		The INI module lock covers the pending flush, primary change
+		and capture of the next rewrite snapshot.
 
 REVISION HISTORY:
 	Name	Date		Description
@@ -4043,6 +4079,13 @@ InitFileDeleteEntry	proc	far
 	.enter
 
 if INI_STRING_SECTION_TOMBSTONES
+	;
+	; Keep pending state, primary deletion and the new snapshot under
+	; one INI lock. Nested lookup and write calls keep their own locks.
+	;
+		push	ds
+		call	LoadVarSegDS_PInitFile
+		pop	ds
 		push	ds, si, cx, dx
 		push	bp
 		call	InitFileFlushPendingRewrite
@@ -4071,6 +4114,8 @@ exitDelete:
 		call	ExitInitfile
 if INI_STRING_SECTION_TOMBSTONES
 		call	InitFileStartPendingRewrite
+		LoadVarSeg	ds
+		call	VInitFileWrite
 endif
 
 	.leave
@@ -4088,6 +4133,7 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 SYNOPSIS:	Physically remove a primary entry without list rewrite hooks.
 		Do not write a marker, even if a lower value is available.
 		Use this path for internal cleanup of key.disabled entries.
+		Public deletion can start another list rewrite.
 
 PASS:		ds:si - category ASCIIZ string
 		cx:dx - key ASCIIZ string
@@ -4279,6 +4325,8 @@ COMMENT @-----------------------------------------------------------------------
 FUNCTION:	InitFileDeleteCategory
 
 DESCRIPTION:	Remove the primary category and its keys.
+		Finish pending list work before physical deletion, so commit
+		cannot recreate the category from an old snapshot.
 		Do not write key deletion markers. Lower values can become
 		available again after this operation.
 
@@ -4306,6 +4354,18 @@ REVISION HISTORY:
 InitFileDeleteCategory	proc	far
 	uses	ax, bx, cx, dx, di, si, bp, ds, es
    	.enter
+
+if INI_STRING_SECTION_TOMBSTONES
+	;
+	; Store pending exclusions before removing the category. Otherwise,
+	; a later commit can write the sidecar and create the category again.
+	; Keep the outer lock through the physical category removal.
+	;
+		push	ds
+		call	LoadVarSegDS_PInitFile
+		pop	ds
+		call	InitFileFlushPendingRewrite
+endif
 
 	; There *must* be a valid pointer in CX:DX, as EnterInitfile
 	; always expects a key to be passed. So, put something valid in CX:DX
@@ -4381,6 +4441,10 @@ endif
 
 exit:
 	call	ExitInitfile
+if INI_STRING_SECTION_TOMBSTONES
+	LoadVarSeg	ds
+	call	VInitFileWrite
+endif
 
 	.leave
 	ret
@@ -4391,7 +4455,8 @@ COMMENT @-----------------------------------------------------------------------
 
 FUNCTION:	InitFileSave
 
-DESCRIPTION:	Saves the initfile
+DESCRIPTION:	Finish pending list work and copy the primary buffer to its
+		backup. Keep the INI lock through both operations.
 
 CALLED BY:	GLOBAL
 
@@ -4428,6 +4493,14 @@ InitFileSave	proc	far
 	; lock buffer after grabbing semaphore
 	;
 	call	LoadVarSegDS_PInitFile
+if INI_STRING_SECTION_TOMBSTONES
+	;
+	; Store all pending exclusions before copying the primary buffer.
+	; Save ends the rewrite, as commit does. Keep the lock through both
+	; the flush and the backup so another writer cannot split them.
+	;
+	call	InitFileFlushPendingRewrite
+endif
 	mov	bx, ds:[loaderVars].KLV_initFileBufHan
 	push	bx
 	call	MemLock
@@ -4468,7 +4541,9 @@ COMMENT @-----------------------------------------------------------------------
 
 FUNCTION:	InitFileRevert
 
-DESCRIPTION:	Restores the backed-up initfile
+DESCRIPTION:	Restore the primary buffer from its backup. On failure, keep
+		the current buffer and pending rewrite. On success, discard
+		old pending state and refresh cached positions and hashing.
 
 CALLED BY:	GLOBAL
 
@@ -4493,65 +4568,113 @@ REVISION HISTORY:
 -------------------------------------------------------------------------------@
 
 InitFileRevert	proc	far
-	uses	ax, bx, cx, dx, ds
+	uses	ax, bx, cx, dx, si, ds
 	.enter
 
-	; Change to the correct directory
-	;
 		call	FilePushDir
 		mov	ax, SP_PRIVATE_DATA
 		call	FileSetStandardPath
-
-	; Lock buffer after grabbing semaphore
-	;
 		call	LoadVarSegDS_PInitFile
-if INI_STRING_SECTION_TOMBSTONES
-		call	InitFileFreeRewriteSnapshot
-endif
-		mov	bx, ds:[loaderVars].KLV_initFileBufHan
+	;
+	; Read the backup into a separate block. A failed restore must leave
+	; the active buffer and pending rewrite unchanged. Save includes the
+	; DOS EOF byte, so read the exact backup without adding another one.
+	; Keep file and memory handles separate so each failure closes the
+	; backup and frees only the new block.
+	;
 		mov	al, FILE_ACCESS_R or FILE_DENY_RW
 		mov	dx, offset initfileBackupName
 		call	FileOpen
-		jc	done
-		push	bx
-		mov	bx, ax				;bx <- file handle
-
-		call	FileSize			;AX = file size
-
-	; realloc initfile buffer
-	;
-		push	bx				;save file handle
-;		mov	ax, ds:[initFileBackupSize]
-		push	ax				;save size
-		mov	bx, ds:[loaderVars].KLV_initFileBufHan
-		mov	ch, mask HAF_ZERO_INIT or mask HAF_LOCK or mask HAF_NO_ERR
-		call	MemReAlloc
-		mov	ds:[initFileBufSegAddr], ax	;update seg addr
-		pop	cx
-		mov	ds:[loaderVars].KLV_initFileSize, cx		;change size
-		pop	bx				;retrieve file handle
-
-	; read file in
-	; ax = seg addr of buffer
-	; cx = size
-	;
-		push	ds
+		LONG jc	done
+		mov_tr	bx, ax
+		call	FileSize
+		tst	dx			; the buffer must fit in one segment
+		LONG jnz	closeError
+		tst	ax			; Save always includes at least EOF
+		LONG jz	closeError
+		mov	cx, ax
+		push	bx, cx			; backup file handle and size
+		mov	cx, ALLOC_DYNAMIC_LOCK or (mask HAF_ZERO_INIT shl 8)
+		call	MemAllocFar
+		pop	dx, cx			; backup file handle and size
+		LONG jc	allocationError
+		push	ds			; dgroup
+		push	bx			; new memory handle
 		mov	ds, ax
-		clr	dx				;ds:dx <- initfile buffer
-		mov	al, FILE_NO_ERRORS
-		call	FileReadFar			;cx <- # bytes
+		mov	bx, dx			; backup file handle
+		clr	ax, dx			; return read errors, buffer offset 0
+		call	FileReadFar
+		pushf
 		mov	al, FILE_NO_ERRORS
 		call	FileCloseFar
-		pop	ds
-		clc					;indicate success
-		pop	bx				;retrieve mem handle
-		call	MemUnlock			;release buffer
+		popf
+		pop	bx			; new memory handle, still locked
+		jc	invalidBackup		; includes a short read
+		mov	si, cx
+		dec	si
+		cmp	{byte}ds:[si], MSDOS_TEXT_FILE_EOF
+		jne	invalidBackup
+EC <		call	ValidateIniFileFar				>
+NEC <		call	ValidateIniFile					>
+		jc	invalidBackup
+		pop	ds			; dgroup
+	;
+	; The replacement must outlive the calling application. The buffer
+	; is shared, like the primary buffer loaded at startup.
+	;
+		mov	ax, handle 0
+		call	HandleModifyOwner
+		mov	ax, mask HF_SHARABLE
+		call	MemModifyFlags
+		call	MemUnlock
+		xchg	bx, ds:[loaderVars].KLV_initFileBufHan
+		mov	ds:[loaderVars].KLV_initFileSize, cx
+		call	MemFree			; replaced primary buffer
+	;
+	; The backup is now active. Discard the pending rewrite from the
+	; replaced buffer. Keep the primary file handle and lower buffers.
+	;
+if INI_STRING_SECTION_TOMBSTONES
+		call	InitFileFreeRewriteSnapshot
+endif
+	;
+	; Cached positions refer to the old contents. Rebuild the optional
+	; hash table from all active buffers, then clear parser positions.
+	;
+if HASH_INIFILE
+		call	InitFileInitHashTable
+endif
+		clr	ax
+		mov	ds:[curCatOffset], ax
+		mov	ds:[curKeyOffset], ax
+		mov	ds:[initFileBufPos], ax
+		mov	ds:[initFileBufSegAddr], ax
+		mov	ds:[initFileHanLocked], ax
+if HASH_INIFILE
+		mov	ds:[currentIniOffset], ax
+endif
+		clc
+		jmp	done
+
+invalidBackup:
+		pop	ds			; dgroup
+		call	MemFree			; discard locked temporary buffer
+		stc
+		jmp	done
+
+allocationError:
+		mov	bx, dx			; allocation did not return a buffer
+closeError:
+		mov	al, FILE_NO_ERRORS
+		call	FileCloseFar
+		stc
+
 done:
-		call	VInitFileWrite			;release semaphore
+		pushf
+		call	VInitFileWrite
 		call	FilePopDir
-
+		popf
 		.leave
-
 		ret
 InitFileRevert	endp
 
@@ -4587,16 +4710,17 @@ INITFILECOMMIT	proc	far
 	uses	ax, bx, cx, dx, di, ds, es
 	.enter
 
-	; Some set-up work first
 	;
-if INI_STRING_SECTION_TOMBSTONES
-		call	InitFileFlushPendingRewrite
-		call	InitFileFreeRewriteSnapshot
-endif
+	; Keep the INI lock from the pending flush through the disk write.
+	; The buffer and its exclusions must be one committed state.
+	;
 		call	LoadVarSegDS_PInitFile
 		LoadVarSeg	es
-		tst	es:[trashedIniBuffer]	;If the .ini buffer is trashed, just
-		jnz	exit			; exit.
+		tst	es:[trashedIniBuffer]
+		LONG jnz	releaseSemaphore
+if INI_STRING_SECTION_TOMBSTONES
+		call	InitFileFlushPendingRewrite
+endif
 		mov	bx, es:[loaderVars].KLV_initFileBufHan	;lock the buffer
 		push	bx
 		call	MemLock
@@ -4648,7 +4772,7 @@ hack10:
 	; .ini file was opened read-only
 		pop	bx
 		call	MemUnlock
-		jmp	exit
+		jmp	releaseSemaphore
 
 fileWriteOK:
 		mov	al, FILE_NO_ERRORS	;reset the FILE_NO_ERRORS_FLAG
@@ -4664,9 +4788,12 @@ fileWriteOK:
 done:
 		pop	bx
 		call	MemUnlock		; unlock the buffer
+	;
+	; A skipped or read-only commit must also release the INI lock.
+	;
+releaseSemaphore:
 		segmov	ds, es			; dgroup -> ds
 		call	VInitFileWrite
-exit:
 		.leave
 
 		ret
