@@ -1515,6 +1515,19 @@ A marker for the whole key blocks the complete list. A later list write clears
 that marker before the kernel applies the existing item rules. A full factory-list reset may also
 require removal of the local list and its key.disabled entry.
 
+After each list write, the kernel stores the current exclusions in key.disabled.
+Reads see that list before commit. The pending snapshot remains available for
+further factory-item matches. Item deletion finishes the pending rewrite before
+resolving the item index. Save, commit, entry deletion, and category deletion
+also finish pending list work. A category is physically removed after that work,
+so a later commit cannot recreate it from an old snapshot.
+
+InitFileSave backs up the primary buffer, including its current list exclusions.
+InitFileRevert first reads and checks that backup in a separate block. A failed
+restore keeps the active buffer and pending rewrite. A successful restore
+replaces the primary buffer, discards old pending state, and refreshes cached
+positions and the optional hash table. Lower files stay in place.
+
 InitFileDeleteCategory still removes only the primary category and its keys.
 It does not write markers for the keys in that category. Lower values can
 therefore become available again. Callers and public APIs are unchanged.

@@ -69,9 +69,13 @@ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		InitFileInitHashTable
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-SYNOPSIS:	Create the hash table used to speed up ini reads and writes.
+SYNOPSIS:	Create or rebuild the table used for INI category lookup.
 
-CALLED BY:	InitGeos
+CALLED BY:	InitGeos, InitFileRevert
+
+STRATEGY:	The INI module lock protects all active buffers. A restore
+		changes category positions, so rebuild the complete table.
+		The caller can already hold the recursive module lock.
 
 PASS:		nothing
 RETURN:		nothing
@@ -93,9 +97,21 @@ InitFileInitHashTable	proc	far
 		call	LoadVarSegDS_PInitFile
 		segmov	es, ds			; es <- dgroup
 	;
-	; Allocate a block for the table.
+	; Release the old table before rebuilding it. No lookup can use its
+	; old positions while this thread holds the INI module lock.
 	;
+		mov	bx, es:[hashTableBlkHandle]
+		tst	bx
+		jz	createTable
+		call	MemFree
+createTable:
 		call	HashCreateTable		;bx <- blk, *ds:si <- array
+	;
+	; A restore can be called by an application. Keep the new table
+	; owned by the kernel so it survives that application's exit.
+	;
+		mov	ax, handle 0
+		call	HandleModifyOwner
 		mov	es:[hashTableBlkHandle], bx
 		mov	es:[hashTableChunkHandle], si
 	;

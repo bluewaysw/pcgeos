@@ -738,9 +738,10 @@ TE_CUSTOM.
 ### InitFileCommit()
     void    InitFileCommit(void);
 
-This routine commits any changes to the GEOS.INI file, removing and 
-replacing its stored backup. It ensures that no other threads are working on 
-the file during the commit operation.
+This routine writes the primary INI buffer to its active file. It finishes any
+pending list rewrite before writing. The INI lock covers both operations, so
+the stored list and its key.disabled exclusions agree. Commit does not update
+ini.bak; use InitFileSave() to update that backup.
 
 **Include:** initfile.h
 
@@ -755,6 +756,11 @@ GEOS.INI file. Pass it the following:
 *category* - A pointer to the null-terminated string representing the 
 category to be deleted. This string ignores white space and is 
 case-insensitive.
+
+Before removing the category, this routine finishes any pending list rewrite.
+This prevents a later commit from recreating the category through key.disabled.
+It physically removes only the primary category. Lower keys can become visible
+again. It does not create category or key deletion markers.
 
 **Include:** initfile.h
 
@@ -817,8 +823,8 @@ OpenWith and ConfigUI delete keys before list writes. PreflvlResetAppFeatures
 also uses this API and receives the same missing-key result. The API uses
 the same deletion rule for all callers.
 
-InitFileDeleteCategory is unchanged. It removes only the primary category and
-can expose lower keys. With only one file loaded, InitFileDeleteEntry does not
+InitFileDeleteCategory removes only the primary category and can expose lower
+keys. It finishes pending list work before physical removal. With only one file loaded, InitFileDeleteEntry does not
 create new markers, but it retains any existing marker. Older kernels do not
 support the marker. Public entry points and parameters are unchanged.
 
@@ -862,6 +868,10 @@ deleted, the kernel stores the exact original factory entry in a sidecar string
 section named `key.disabled` in the same category. Kernels built with
 `INI_STRING_SECTION_TOMBSTONES=FALSE`, and runtimes with only one INI file, use
 the legacy local-only string-section delete behavior.
+
+Item deletion finishes any pending list rewrite before resolving stringNum.
+The index therefore refers to the current visible list. A later commit cannot
+replace the new deletion with an older snapshot.
 
 **Include:** initfile.h
 
@@ -1257,10 +1267,17 @@ not be found; it will be *false* otherwise.
 ### InitFileRevert()
     Boolean InitFileRevert(void);
 
-This routine restores the GEOS.INI file from its saved backup version. It 
-ensures that no other thread is operating on the file while it is being restored. 
-This function returns an error flag: *true* represents an error in restoring the 
-file; *false* indicates success.
+This routine restores the primary INI buffer from ini.bak. It reads and checks
+the backup in a separate memory block while holding the INI lock. If opening,
+allocation, reading, or validation fails, it returns true and keeps the active
+buffer, pending list rewrite, and cached positions unchanged. The backup must
+contain the final DOS EOF byte written by InitFileSave().
+
+On success, it returns false, replaces the primary buffer, and discards the
+pending rewrite from the old buffer. It clears cached positions and rebuilds
+the optional hash table for the active INI chain. The new buffer and hash table
+belong to the kernel. Lower INI buffers and the active primary file handle stay
+in place. InitFileCommit() writes the restored buffer to the primary file.
 
 **Include:** initfile.h
 
@@ -1268,11 +1285,14 @@ file; *false* indicates success.
 ### InitFileSave()
     Boolean InitFileSave(void);
 
-This routine saves the GEOS.INI file synchronously by updating the backup 
-file to be the current version. (**InitFileCommit()** actually overwrites the 
-GEOS.INI file itself.) It ensures that no other thread is operating on the file 
-while it is being written out. This function returns an error flag: *true* 
-represents an error in trying to save the file; *false* indicates success.
+This routine finishes any pending list rewrite and copies the primary buffer
+to ini.bak. The INI lock covers both operations. The backup includes the current
+key.disabled exclusions, so restoring it preserves the list that was saved.
+Save ends the pending rewrite, as commit does.
+
+Only the primary buffer is backed up. Lower INI files stay separate.
+InitFileCommit() writes the primary buffer to its active file. This function
+returns true on a reported save error and false on success.
 
 **Include:** initfile.h
 
@@ -1413,6 +1433,16 @@ The sidecar stores exact factory string-section entries. This preserves user
 deletions and modifications while still allowing new lower-priority INI entries
 to appear later. Disabled kernels and single-file runtimes append string
 sections with the legacy local-only behavior.
+
+After each list write, key.disabled contains the current exclusions. This also
+applies when a factory-item match skips the local write. Reads see the current
+list before commit. The kernel keeps the pending snapshot so more items can
+still match during the rewrite. The list change and its exclusions use one INI
+lock.
+
+Save, commit, entry deletion, item deletion, and category deletion finish a
+pending rewrite. A successful restore discards the old pending state. A failed
+restore keeps it. The list order and matching rules are unchanged.
 
 **Include:** initfile.h
 
