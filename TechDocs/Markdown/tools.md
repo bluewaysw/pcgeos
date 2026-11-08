@@ -88,6 +88,7 @@ nav_order: 3
 
 **[9 The INI File](Tools/tini.md)**  
 [9.1 How to Use the INI File](Tools/tini.md#91-how-to-use-the-ini-file)  
+[9.1.1 Deleted Keys in Layered INI Files](Tools/tini.md#911-deleted-keys-in-layered-ini-files)\
 [9.2 Categories in the INI File](Tools/tini.md#92-categories-in-the-ini-file)  
 [9.2.1 cards](Tools/tini.md#921-cards)  
 [9.2.2 configure](Tools/tini.md#922-configure)  

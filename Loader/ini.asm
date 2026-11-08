@@ -25,6 +25,8 @@ DESCRIPTION:
 
 MAX_INI_KEY_SIZE	=	40
 
+deletedValue	char	"@deleted", 0
+
 ifidn	HARDWARE_TYPE, <PC>
   NEED_INITFILE_READ_INTEGER	equ	1
 else
@@ -690,7 +692,14 @@ searchLoop:
 	jc	notFound
 
 	call	FindKey
-	jnc	done
+	jc	notFound
+	;
+	; Startup reads use the same missing-key result as kernel reads.
+	; A deletion marker must not expose a value from a lower file.
+	;
+	call	IsDeletedValue
+	jc	error			; do not search below the marker
+	jmp	done
 
 notFound:
 	;category or key not found in .ini file, progress down the path
@@ -935,6 +944,67 @@ exit:
 	pop	ax,cx,si,ds
 	ret
 FindKey		endp
+
+	;
+	; Match the exact lowercase @deleted value outside a blob. Allow spaces
+	; and tabs around it, plus an optional trailing semicolon comment.
+	; A longer token or blob content is data, not a marker. Check the raw
+	; text before string or numeric conversion. Keep this rule in sync with
+	; Library/Kernel/Initfile/initfileLow.asm:InitFileIsDeletedString.
+	; Carry set means a marker. Keep all registers and the parser position.
+	;
+IsDeletedValue proc near
+	uses	ax, si, di, ds
+	.enter
+		lds	si, cs:[initFileBufPos]
+		mov	di, offset deletedValue
+skipLeading:
+		mov	al, ds:[si]
+		cmp	al, ' '
+		je	nextLeading
+		cmp	al, C_TAB
+		jne	matchToken
+nextLeading:
+		inc	si
+		jmp	skipLeading
+matchToken:
+		mov	al, cs:[di]
+		inc	di
+		tst	al
+		jz	checkEnd
+		cmp	al, ds:[si]
+		jne	notDeleted
+		inc	si
+		jmp	matchToken
+checkEnd:
+		mov	al, ds:[si]
+		cmp	al, ' '
+		je	nextTrailing
+		cmp	al, C_TAB
+		je	nextTrailing
+		tst	al
+		jz	deleted
+		cmp	al, C_CR
+		je	deleted
+		cmp	al, C_LF
+		je	deleted
+		cmp	al, MSDOS_TEXT_FILE_EOF
+		je	deleted
+		cmp	al, ';'
+		je	deleted
+notDeleted:
+		clc
+		jmp	done
+nextTrailing:
+		inc	si
+		jmp	checkEnd
+deleted:
+		stc
+done:
+	.leave
+		ret
+IsDeletedValue endp
+
 
 
 COMMENT @-----------------------------------------------------------------------

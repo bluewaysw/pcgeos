@@ -499,7 +499,7 @@ PASS:
 	bp - InitFileReadFlags
 
 RETURN:
-	carry - set if error (category or key not found)
+	carry - set if the category or key is absent, or a marker is found
 	all parameters stored away in variables
 	initFileSem grabbed
 	es, bp - dgroup
@@ -534,7 +534,18 @@ searchLoop:
 	call	FindCategory
 	jc	notFound
 	call	FindKey
+	jc	notFound
+	;
+	; A raw marker makes the key missing. Do not search a lower file.
+	; Check before type conversion so missing-key outputs stay unchanged.
+	;
+	call	InitFileIsDeletedValue
 	jnc	doneGood
+	push	bx
+	mov	bx, es:[bx]
+	call	MemUnlock
+	pop	bx
+	jmp	error			; stop at the tombstone
 notFound:
 	;
 	; category or key not found in .ini file, progress down the
@@ -667,6 +678,15 @@ endif ;
 
 		call	FindKey
 		jc	nextInitFile
+	;
+	; Stop at a marker. The caller keeps values from higher files.
+	; Clear the handle because this buffer is no longer locked.
+	;
+		call	InitFileIsDeletedValue
+		jnc	done
+		call	MemUnlock
+		mov	es:[initFileHanLocked], 0
+		jmp	notFound		; retain earlier read-all contributions
 done:
 		.leave
 		ret
@@ -859,6 +879,11 @@ REVISION HISTORY:
 
 ----------------------------------------------------------------------------@
 
+	;
+	; This is physical lookup. Return markers as entries so a normal write
+	; can replace them and internal cleanup can remove them. Logical read
+	; paths call InitFileIsDeletedValue after this routine succeeds.
+	;
 FindKey		proc	far
 EC<	call	IFCheckDgroupRegs					>
 
@@ -941,6 +966,191 @@ exit:
 	pop	ax,bx,cx,si,ds
 	ret
 FindKey		endp
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileIsDeletedString
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check the raw value for the whole-key deletion marker.
+PASS:		ds:si - ASCII text, terminated by NUL, CR, LF or DOS EOF
+RETURN:		carry set if the value is a marker; all registers unchanged
+
+STRATEGY:	Compare the complete token without case conversion. Allow only
+		spaces or tabs before and after it. A semicolon starts a trailing
+		comment. A blob or a longer token is data, not a marker.
+		Do not move the caller's pointer or the INI parser position.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileIsDeletedString proc far
+	uses	ax, si, di, es
+	.enter
+
+	;
+	; Match only @deleted outside a blob. Keep Loader/ini.asm in sync.
+	;
+		LoadVarSeg	es, ax
+		mov	di, offset initfileDeletedValue
+skipLeading:
+		mov	al, ds:[si]
+		cmp	al, ' '
+		je	nextLeading
+		cmp	al, C_TAB
+		jne	matchToken
+nextLeading:
+		inc	si
+		jmp	skipLeading
+
+matchToken:
+		mov	al, es:[di]
+		inc	di
+		tst	al
+		jz	checkEnd
+		cmp	al, ds:[si]
+		jne	notDeleted
+		inc	si
+		jmp	matchToken
+
+checkEnd:
+		mov	al, ds:[si]
+		cmp	al, ' '
+		je	nextTrailing
+		cmp	al, C_TAB
+		je	nextTrailing
+		tst	al
+		jz	deleted
+		cmp	al, C_CR
+		je	deleted
+		cmp	al, C_LF
+		je	deleted
+		cmp	al, MSDOS_TEXT_FILE_EOF
+		je	deleted
+		cmp	al, INIT_FILE_COMMENT
+		je	deleted
+notDeleted:
+		clc
+		jmp	done
+nextTrailing:
+		inc	si
+		jmp	checkEnd
+
+deleted:
+		stc
+done:
+	.leave
+		ret
+InitFileIsDeletedString endp
+
+	;
+	; Check the current raw body without changing the parser position.
+	;
+InitFileIsDeletedValue proc far
+	uses	ds, si
+	.enter
+		lds	si, es:[initFileBufPos]
+		call	InitFileIsDeletedString
+	.leave
+		ret
+InitFileIsDeletedValue endp
+
+if INI_STRING_SECTION_TOMBSTONES
+
+	;
+	; Check the primary key before a list merge. Carry set means a marker.
+	; A missing primary entry allows lower items; a marker blocks the list.
+	;
+InitFilePrimaryIsDeleted proc far
+	uses	ax, bx, cx, di, si, bp, ds, es
+	.enter
+		call	EnterInitfile
+		call	FindCategory
+		jc	notDeleted
+		call	FindKey
+		jc	notDeleted
+		call	InitFileIsDeletedValue
+		jmp	done
+notDeleted:
+		clc
+done:
+		call	ExitInitfile
+	.leave
+		ret
+InitFilePrimaryIsDeleted endp
+
+endif	; INI_STRING_SECTION_TOMBSTONES
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFileFindLowerKey
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Check for a lower value while the primary file stays locked.
+PASS:		es,bp - dgroup; EnterInitfile has stored category and key
+RETURN:		carry clear if a lower value is available
+		carry set if no value is available, or a lower marker blocks it
+		Primary parser state and all registers unchanged.
+
+STRATEGY:	Search lower files in order. Zero, false and an empty string
+		count as values. Stop at the first value or deletion marker.
+		Release each lower buffer. Restore the primary parser offsets
+		and hash index before return. The caller keeps the INI lock
+		from this check through the primary write or physical deletion.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitFileFindLowerKey proc far
+	uses	ax, bx
+	.enter
+
+		push	es:[initFileBufSegAddr], es:[initFileBufPos]
+		push	es:[curCatOffset], es:[curKeyOffset]
+if HASH_INIFILE
+		push	es:[currentIniOffset]
+endif
+		mov	bx, offset loaderVars.KLV_initFileBufHan + size hptr
+searchLoop:
+		cmp	bx, offset loaderVars.KLV_initFileBufHan + \
+				MAX_INI_FILES * size hptr
+		jae	notFound
+		tst	{hptr}es:[bx]
+		jz	notFound
+
+		push	bx
+		mov	bx, es:[bx]
+		call	MemLock
+		pop	bx
+		mov	es:[initFileBufSegAddr], ax
+		mov	es:[curCatOffset], CATEGORY_NOT_CACHED
+if HASH_INIFILE
+		mov	ax, bx
+		sub	ax, offset loaderVars.KLV_initFileBufHan
+		mov	es:[currentIniOffset], ax
+endif
+		call	FindCategory
+		jc	nextFile
+		call	FindKey
+		jc	nextFile
+		call	InitFileIsDeletedValue
+		pushf			; keep the result while unlocking the buffer
+		mov	bx, es:[bx]
+		call	MemUnlock
+		popf
+		jmp	done
+
+nextFile:
+		push	bx
+		mov	bx, es:[bx]
+		call	MemUnlock
+		pop	bx
+		add	bx, size hptr
+		jmp	searchLoop
+notFound:
+		stc
+done:
+if HASH_INIFILE
+		pop	es:[currentIniOffset]
+endif
+		pop	es:[curCatOffset], es:[curKeyOffset]
+		pop	es:[initFileBufSegAddr], es:[initFileBufPos]
+	.leave
+		ret
+InitFileFindLowerKey endp
+
 
 
 COMMENT @--------------------------------------------------------------------

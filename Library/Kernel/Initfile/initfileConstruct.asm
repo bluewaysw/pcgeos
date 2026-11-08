@@ -321,6 +321,16 @@ DBCS <	mov	al, C_LINEFEED						>
 	mov	al, INIT_FILE_COMMENT
 	repne	scasb			;scan for semi
 	jz	initEntry		;semicolon found, so use a blob
+	;
+	; A string value equal to @deleted is data, not a deletion request.
+	; Force a blob so the reader does not treat it as a raw marker.
+	; Normal DBCS string writes use the existing encoded data path.
+	;
+	push	ds
+	segmov	ds, es
+	call	InitFileIsDeletedString
+	pop	ds
+	jc	initEntry
 	clr	bx			;no special chars, so no blob
 
 initEntry:
@@ -447,6 +457,31 @@ nullString:
 	stosw
 	jmp	terminate
 BuildEntryFromString	endp
+
+	;
+	; Build key = @deleted for the private deletion write mode.
+	; Do not use the string builder: it must protect a literal marker in
+	; a blob. The raw marker is ASCII in both SBCS and DBCS INI files.
+	;
+BuildEntryFromDeleted proc near
+	uses	cx, di, si, ds
+	.enter
+		mov	cx, INITFILE_DELETED_VALUE_LENGTH + 2
+		call	InitEntry
+		LoadVarSeg	ds, ax
+		mov	si, offset initfileDeletedValue
+		mov	cx, INITFILE_DELETED_VALUE_LENGTH
+		rep	movsb
+		mov	ax, C_CR or (C_LF shl 8)
+		stosw
+		clr	al
+		stosb
+		dec	di			; entry size excludes the NUL
+		mov	es, bp
+		mov	es:[entrySize], di
+	.leave
+		ret
+BuildEntryFromDeleted endp
 
 
 COMMENT @-----------------------------------------------------------------------

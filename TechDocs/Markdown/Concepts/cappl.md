@@ -1484,26 +1484,44 @@ the legacy string-section read behavior.
 InitFileDeleteEntry(), InitFileDeleteCategory(), 
 InitFileDeleteStringSection()
 
-Besides reading and writing data, you can delete categories and keys that 
-were previously entered. **InitFileDeleteEntry()** takes pointers to both the 
-null-terminated category name and the null-terminated key name and 
-deletes the entry. **InitFileDeleteCategory()** takes only a pointer to the 
-null-terminated category name and deletes the entire category, including all 
-the keys stored under it.
+InitFileDeleteEntry deletes a key from the primary INI file. The primary file
+is the first file in the search order. A lower INI file is a file that GEOS
+searches after it, such as net.ini in a split setup.
 
-In addition, you can delete a single string section from a specified blob.
-**InitFileDeleteStringSection()** takes the category and key names of the
-blob as well as the index of the string section, and it deletes the string section.
-If the string section does not exist or if either the key or category can not be
-found, the routine will return an error flag.
+If a lower file supplies a value for the key, the kernel writes key = @deleted
+in the primary file. This marker is called a tombstone. Reads report the key
+as missing and stop the search. The application can use its normal default.
+A missing key does not mean false, zero, or an empty string.
 
-When tombstone support is compiled in and a lower INI file is present, deleting
-or rewriting string sections records affected factory entries in a `key.disabled`
-sidecar list in the same category. User-deleted or user-modified factory entries
-do not reappear when lower-priority INI files are updated. Full-list rewrites
-compare entries lexically, so formatting-only changes do not create local
-duplicates or leave factory entries disabled. Disabled kernels and single-file
-runtimes keep the legacy local-only delete behavior.
+If no lower value is available, the kernel removes the primary entry. It does
+not create a marker for a key that a future factory update might add. An
+existing marker stays in place, even if an update removes the lower key.
+A normal write replaces the marker. To use a lower value again, remove the
+primary entry by hand. This operation differs from deleting the key through
+the API.
+
+The exact lowercase value @deleted outside a blob is reserved. Spaces and tabs
+can surround it. A semicolon can start a comment after it. Empty strings and
+blob contents remain data. String writes protect a literal "@deleted"
+automatically. Both kernel reads and loader reads apply the marker rule.
+The rule does not depend on INI_STRING_SECTION_TOMBSTONES.
+
+InitFileDeleteStringSection deletes one indexed item from a string-section
+list. With INI_STRING_SECTION_TOMBSTONES enabled and a lower file loaded, the
+kernel stores a deleted factory item in key.disabled in the same category.
+This item list keeps its existing format and rules. With the feature disabled
+or only one file loaded, item deletion changes only the primary file.
+A marker for the whole key blocks the complete list. A later list write clears
+that marker before the kernel applies the existing item rules. A full factory-list reset may also
+require removal of the local list and its key.disabled entry.
+
+InitFileDeleteCategory still removes only the primary category and its keys.
+It does not write markers for the keys in that category. Lower values can
+therefore become available again. Callers and public APIs are unchanged.
+
+See [Deleted Keys in Layered INI Files](../Tools/tini.md#911-deleted-keys-in-layered-ini-files)
+for INI examples. See [InitFileDeleteEntry](../Routines/rrouth_l.md#initfiledeleteentry)
+for the read flags, marker syntax, and API limits.
 
 ## 6.4 General System Utilities
 

@@ -31,6 +31,83 @@ combinations are described in the special add-on documents that describe
 developing for each system. For more information, contact Geoworks 
 Developer Support.
 
+### 9.1.1 Deleted Keys in Layered INI Files
+
+The primary INI file is the first file in the search order. It is usually
+geos.ini. An EC system can use geosec.ini. A lower INI file is a file that GEOS
+searches after the primary file. In a split setup, net.ini supplies factory
+settings. Put user changes in the primary file.
+
+When you edit an INI file outside GEOS, close GEOS first. GEOS reads the files
+into memory at startup.
+
+When a read selects one value, GEOS uses these rules:
+
+- If the primary file has a normal value, GEOS uses that value.
+- If the primary file does not have the key, GEOS searches the lower files.
+- If GEOS finds the deletion marker, it reports a missing key and stops the
+  search. It does not use a value from a lower file.
+
+The deletion marker is the complete value @deleted outside a blob. This marker
+is also called a tombstone. The spelling must be lowercase. Spaces and tabs are
+allowed before and after the marker. A semicolon can start a comment after it.
+The loader uses the same rules when it reads settings at startup.
+
+For example, net.ini can contain this factory setting:
+
+    [sound]
+    enabled = true
+
+To make this key missing, put this entry in geos.ini:
+
+    [sound]
+    enabled = @deleted ; Use the application default.
+
+A missing key does not mean false or zero. The application can use its own
+default. To set this Boolean value to false, use enabled = false.
+
+To use the net.ini value again, remove the complete enabled entry from geos.ini.
+Do not replace the marker with a blank value. An empty string is a value, not a
+deletion request. In an SBCS INI file, an empty string is written as follows:
+
+    label = {}
+
+Only the exact marker has deletion meaning. For example, @Deleted and
+@deletedLater are ordinary text. They are not valid values for every key type.
+Text inside a blob is also ordinary data. In an SBCS INI file, use this form for
+the literal string "@deleted":
+
+    label = {@deleted}
+
+InitFileWriteString protects the literal string automatically. It uses a blob
+in SBCS builds and the normal encoded data form in DBCS builds. A normal write
+to a deleted key replaces the marker with the new value.
+
+InitFileDeleteEntry writes a marker only if a value for that key is available
+from a lower file. Otherwise, it removes the primary entry. With only one INI
+file loaded, it does not create a marker. If a future factory update adds a
+previously absent key, that new value becomes available.
+
+An existing marker stays in place when the key is deleted again. It also stays
+in place if a factory update removes the lower key. A later factory update
+cannot restore that key while the marker remains.
+
+A marker works in any file in the INI chain. A read stops at the first marker
+that it reaches. A read-all operation keeps values that it has already read
+from higher files, then stops. A primary-file-only read reports a primary
+marker as a missing key.
+
+Lists can also use key.disabled entries to record deleted factory items. This list
+of items is separate from a marker for the whole key. A marker for the whole
+key blocks the complete list. A later list write clears that marker and uses
+the existing list rules. To restore a full factory list by hand, remove the
+primary list key (which holds the list or its marker). Also remove the primary
+key.disabled entry in the same category.
+
+Category deletion is unchanged. It removes the primary category and can expose
+keys from lower files. Older kernels do not support the @deleted marker.
+For the API rules, see [InitFileDeleteEntry](../Routines/rrouth_l.md#initfiledeleteentry).
+
 ## 9.2 Categories in the INI File
 
 Code Display 9-1 shows a short list, without description, of all the categories 
