@@ -271,7 +271,7 @@ The following code snippets from the Icon Editor code demonstrate how to do this
 
 @end AppMonikerResource;
 ```
-In your .gp file, this resource should have the attributes “lmem, read-only, shared.”
+In your .gp file, this resource should have the attributes "lmem, read-only, shared."
 
 ```
 resource	AppMonikerResource	lmem read-only shared
@@ -283,7 +283,7 @@ resource	AppMonikerResource	lmem read-only shared
 
 + The token (Token-Chars and Token-ID) is declared in the .gp file.
 ```
-tokenchars  “ICON”
+tokenchars  "ICON"
 tokenid     0
 ```
 + The application object must have a list of all program icons as VisMonikers.
@@ -300,7 +300,7 @@ tokenid     0
 + Overwrite the MSG_GEN_PROCESS_INSTALL_TOKEN method in your process class. Since the document moniker list is located in the same resource as the monikers, relocation is not required.
 ```
 @method IconProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN {
-GeodeToken docToken = { “IDOC”, 0 };
+GeodeToken docToken = { "IDOC", 0 };
 dword    tokenDW;
 
     @callsuper();        /* installs the app token */
