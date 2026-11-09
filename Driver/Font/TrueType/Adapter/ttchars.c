@@ -84,7 +84,7 @@ void _pascal TrueType_Gen_Chars(
         TransformMatrix*       transformMatrix;
         TT_Raster_Map          rasterMap;
         TT_BBox                glyphBBox;
-        TT_Outline             outline;
+        TT_Outline*            outline;
         void*                  charData;
         sword                  width, height, size;
 
@@ -120,12 +120,12 @@ EC(     ECCheckBounds( (void*)transformMatrix ) );
 
         /* load glyph and load glyphs outline */
         TT_Load_Glyph( INSTANCE, GLYPH, charIndex, TTLOAD_DEFAULT );
-        TT_Get_Glyph_Outline( GLYPH, &outline );
+        outline = TT_Get_Glyph_Outline( GLYPH );
 
-        TT_Transform_Outline( &outline, &transformMatrix->TM_matrix );
+        TT_Transform_Outline( outline, &transformMatrix->TM_matrix );
 
         /* get glyphs boundig box */
-        TT_Get_Outline_BBox( &outline, &glyphBBox );
+        TT_Get_Outline_BBox( outline, &glyphBBox );
 
         /* Grid-fit it */
         glyphBBox.xMin &= -64;
@@ -156,16 +156,20 @@ EC(             ECCheckBounds( (void*)charData ) );
                 rasterMap.bitmap = ((byte*)charData) + SIZE_REGION_HEADER;
 
                 /* translate outline and render it */
-                TT_Transform_Outline( &outline, &flipmatrix );
-                TT_Translate_Outline( &outline, -glyphBBox.xMin, glyphBBox.yMax );
-                TT_Get_Outline_Region( &outline, &rasterMap );
+                TT_Transform_Outline( outline, &flipmatrix );
+                TT_Translate_Outline( outline, -glyphBBox.xMin, glyphBBox.yMax );
+                TT_Get_Outline_Region( outline, &rasterMap );
 
+EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
                 /* fill header of charData */
                 ((RegionCharData*)charData)->RCD_xoff = transformMatrix->TM_scriptX + 
                                                         transformMatrix->TM_heightX + ( glyphBBox.xMin >> 6 );
+                                                        transformMatrix->TM_heightX + ( glyphBBox.xMin >> 6 );
                 ((RegionCharData*)charData)->RCD_yoff = transformMatrix->TM_scriptY + 
+                                                        transformMatrix->TM_heightY - ( glyphBBox.yMax >> 6 ); 
+                ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                                                         transformMatrix->TM_heightY - ( glyphBBox.yMax >> 6 ); 
                 ((RegionCharData*)charData)->RCD_size = rasterMap.size;
                 ((RegionCharData*)charData)->RCD_bounds.R_left   = 0;
@@ -173,6 +177,7 @@ EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
                 ((RegionCharData*)charData)->RCD_bounds.R_top    = 0;
                 ((RegionCharData*)charData)->RCD_bounds.R_bottom = height;
 
+                size = rasterMap.size + SIZE_REGION_HEADER;
                 size = rasterMap.size + SIZE_REGION_HEADER;
         }
         else
@@ -187,6 +192,9 @@ EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
                 charData = EnsureBitmapBlock( bitmapHandle, size );
 EC(             ECCheckBounds( (void*)charData ) );
 
+                /* rasterizer ORs pixels into the bitmap, so it must be cleared */
+                memset( charData, 0, size );
+
                 /* init rasterMap */
                 rasterMap.rows   = height;
                 rasterMap.width  = width;
@@ -195,8 +203,8 @@ EC(             ECCheckBounds( (void*)charData ) );
                 rasterMap.bitmap = ((byte*)charData) + SIZE_CHAR_HEADER;
 
                 /* translate outline and render it */
-                TT_Translate_Outline( &outline, -glyphBBox.xMin, -glyphBBox.yMin );
-                TT_Get_Outline_Bitmap( &outline, &rasterMap );
+                TT_Translate_Outline( outline, -glyphBBox.xMin, -glyphBBox.yMin );
+                TT_Get_Outline_Bitmap( outline, &rasterMap );
 
 EC_ERROR_IF(    size < rasterMap.size, ERROR_BITMAP_BUFFER_OVERFLOW );
 
@@ -557,5 +565,5 @@ static void* EnsureBitmapBlock( MemHandle bitmapHandle, word size )
         bitmapData = MemDeref( bitmapHandle );
     }
         
-    return memset( bitmapData, 0, size );
+    return bitmapData;
 }
