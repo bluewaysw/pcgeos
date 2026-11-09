@@ -16,8 +16,8 @@ control.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -51,8 +51,8 @@ fatbits.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -85,8 +85,8 @@ iconSet.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -119,8 +119,8 @@ otherContent.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -153,8 +153,8 @@ visIcon.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -187,8 +187,8 @@ visListItem.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -221,8 +221,8 @@ database.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -255,8 +255,8 @@ dbViewer.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -289,8 +289,8 @@ dbViewerISet.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -323,8 +323,8 @@ document.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -357,8 +357,8 @@ newIcons.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -391,8 +391,8 @@ undo.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -425,8 +425,8 @@ crop.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -459,8 +459,8 @@ edit.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -493,8 +493,8 @@ edit2.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -527,8 +527,8 @@ floodfill.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -561,8 +561,8 @@ pointerImage.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -595,8 +595,8 @@ resize.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h graphics.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h graphics.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -629,8 +629,8 @@ animation.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -663,8 +663,8 @@ debug.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h sysstats.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h sysstats.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -697,8 +697,8 @@ drawBitmapFix.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h bmptools.goh lmacros.goh
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h bmptools.goh lmacros.goh
 drawBitmapFix.obj \
 drawBitmapFix.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -726,8 +726,8 @@ impex.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -761,8 +761,8 @@ impexISet.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -796,8 +796,8 @@ palette.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -830,8 +830,8 @@ preview.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -864,8 +864,8 @@ process.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -899,8 +899,8 @@ tokenExport.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h win.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h win.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -934,8 +934,8 @@ tokenImport.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h win.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h win.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -969,8 +969,8 @@ tokenSource.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h win.h iconed.goh impex.goh grobj.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h win.h iconed.goh impex.goh grobj.goh \
                 Objects/colorC.goh Objects/styles.goh Objects/bitmapC.goh \
                 Objects/splineC.goh bmptools.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
@@ -1004,8 +1004,8 @@ appui.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh objects/gViewCC.goh bmptools.goh \
-                iconed.goh ansi/stdlib.h ansi/stdio.h ansi/string.h \
+                Objects/helpCC.goh Objects/gViewCC.goh bmptools.goh \
+                iconed.goh Ansi/stdlib.h Ansi/stdio.h Ansi/string.h \
                 impex.goh grobj.goh Objects/colorC.goh Objects/styles.goh \
                 Objects/bitmapC.goh Objects/splineC.goh lmacros.goh \
                 Main/config.goh Main/iconConstants.h \
