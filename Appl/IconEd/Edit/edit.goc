@@ -1,0 +1,1536 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	edit.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 12/13/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deals with editing the bitmap
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+
+/*---------------------------------------------------------------
+ *
+ *  Strategy Notes:
+ *
+ * Undo
+ *	- MSG_FATBITS_UNDO_SAVE_ICON_STATE() is called at the start of the
+ *	  tool-specific START_SELECT handler. Here we can pass the correct undo type.
+ *
+ * Fix system bug
+ *	- Since GrSetBitmapMode() fails when we try to edit the mask of a
+ *	  true color image (12/2025 - R.B.), we have a separate monochrome
+ *	  bitmap that contains a copy of the mask. After we have modified
+ *	  this mask bitmap, we copy it back into the original bitmap.
+ * 	  In some modes (like pencil), this must be done after each individual
+ *	  pixel so that the live preview object is always up to date.
+ *	  In other modes this can be done once at the end of the
+ *	  META_END_SELECT handler.
+ *
+ * Fat bits look
+ *	- To create the "fatbits" look when drawing a pixel, a rubber line
+ *	  or other shapes, we draw the changes directly to a shadow bitmap
+ *	  using the mixmode MM_INVERT and draw this bitmap upscaled to the
+ *	  screen afterwards. We use a screen-gstate (FBI_screenGState) for drawing.
+ *
+ * Flickering while dragging
+ *	- To reduce flickering, we set a clipping path as follows. This is somewaht
+ *	  tricky about saving and restoring the screen-gstate.
+ *	- Let's assume we have already a shape drawn on the screen.
+ *	  Because MSG_META_PTR calls the drawing routine twice (first to remove the
+ *	  old shape, then to draw the new shape) the screen-gstate is not changes at all.
+ *	  - First step: the shape is about to remove:
+ *	    1. Draw the shape to the shadow bitmap. This removes the shape
+ * 	       from shadow bitmap, not from screen.
+ * 	    2. Save the screen-gstate
+ * 	    3. Set a new clipping path for screen-gstate, that encloses the shape.
+ * 	       Then return.
+ * 	  - Second step: the new shape is about drawn:
+ * 	    1. Draw the shape to the shadow bitmap (not to screen).
+ * 	    2. Add a clipping path to the screen-gstate, that encloses the new shape.
+ * 	    3. Save screen-gstate and upscale it.
+ * 	    4. Draw the shadow bitmap to the screen. This replaces the old shape
+ * 	       by the new shape in the "fat pixel" look.
+ * 	    5. Restore screen-gstate (this downscales the screen-gstate)
+ * 	    6. Draw grid (this must be done in not-upscaled screen-gstate)
+ * 	    7. Restore screen-gstate. This removes the clipping path.
+ *
+ *	  On the other hand, MSG_META_START_START calls the drawing routine only one
+ *	  time, for drawing the first shape. Therefore we have to call the routine
+ *	  EditSetInitialPath() as first step in MSG_META_PTR. This routine saves the
+ *	  screen-gsstate and creates a dummy clipping path, just as if we had removed
+ *	  an old shape.
+ *	  As a consequence, we must not call the drawing routine in the
+ *	  MSG_META_END_SELCT handler. This would put the screen-gstate on the stack
+ *	  and we had to pop it back.
+ *
+ * Flickering when drag tool has been finished
+ *	- At first, we must redraw the background to safely remove artifacts from dragging.
+ *	  If the artifacts are on a transparent areas, they aren not overwritten when drawing
+ *	  the icon bitmap.
+ *	- Then we must draw the new icon image and the grid to the screen.
+ *	- To minimize flickering, we set a clipping rectangle for both drawings.
+ *	  If we have drawn a line (or an unfilled ellipse or rectangle) the clipping area
+ *	  must be larger than the rectangle enclosd by the dragging coordiantes. This is
+ *	  why we pass the line width to MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED.
+ *	- The remaining flickering is acceptable in my opinion and does not justify the
+ *	  considerable effort that would be required to eliminate it.
+ *
+ ---------------------------------------------------------------------------*/
+
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+void EditUpdateGSLineAttributes(GStateHandle gs, BMType bmFormat, IconLineAttrs *attrs);
+void EditUpdateGSAreaAttributes(GStateHandle gs, BMType bmFormat, IconAreaAttrs *attrs);
+void ToolTransferMask(VMBlockHandle srcBmp, VMBlockHandle destBmp, int width, int height);
+
+/***********************************************************************
+ *
+ *	Fatbits mouse messages does only common jobs and the it calls
+ *	the tool-specifc message - if any
+ *
+ ***********************************************************************/
+
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- check if data are valid
+ *	- Create and initialize gstates for: bitmap, screen, mask-copy bitmap
+ *	- Transform coordinates
+ *	- initialize tool specific things
+ *	- call the tool-specific method (if we have any)
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_META_START_SELECT {
+int xPos, yPos;
+int colorIdx;
+PaletteEntry	color;
+
+    /*
+     * return if we have no bitmap to edit
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->FBI_bitmap == 0) return;
+    EC(if (pself->FBI_maskBmp == 0) { ProgError("No mask bitmap"); return; } )
+    EC(if (pself->FBI_drag.bmp == 0) { ProgError("No drag bitmap"); return; } )
+
+
+    /*
+     * If the user switches to another document by clicking directly in the Fatbits-View,
+     * the document does not yet have the model. Mouse handling does not yet work in this
+     * case; specifically, MSG_META_END_SELECT is not sent to the Fatbits object. This
+     * leads to incorrect behavior during drawing. That is why we check for this here and
+     * abort the process if necessary.
+     */
+    if ( global.curDisplay != (oself>>16) ) return; 	/* we don't have the model yet */
+
+
+    /*
+     * Transform coordinates
+     */
+    xPos = xPosition / (pself->FBI_pixelSize);
+    yPos = yPosition / (pself->FBI_pixelSize);
+
+    /*
+     * If we are in "pick color" mode, update "Selected Color" UI
+     * We don't need to create any gstate or do the other stuff below.
+     */
+    if (pself->FBI_flags & FB_PICK_COLOR_IS_ACTIVE) {
+	color = @call oself::MSG_FATBITS_GET_PIXEL_COLOR(xPos, yPos, NULL);
+	@call PickColorSelectedColorContent::MSG_OTHER_CONTENT_SET_COLOR(color.rt, color.gn, color.bl);
+    	return;
+    }
+
+    /*
+     * If we are in "edit-pointer-image" mode and "select hotspot" is active,
+     * we also need as special handling.
+     */
+    if ( @call oself::MSG_FATBITS_TEST_AND_HANDLE_PTR_IMAGE_START_SELECT(xPos, yPos, TRUE) ) return;
+
+
+    /*
+     * Create and initialize the required GStates. FBI_drag.gstate is unsed only
+     * by some tools and therefore initialized later.
+     * Unfortunately, the last pixel of a line is not drawn by default in some cases.
+     * We fix this by setting another line end value. Dunno why this is required.
+     */
+    pself->FBI_screenGState = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    GrSetLineEnd(pself->FBI_screenGState, LE_SQUARECAP);
+
+    pself->FBI_bitmapGState = GrEditBitmap(global.tempFile, pself->FBI_bitmap, 0);
+    GrSetLineEnd(pself->FBI_bitmapGState, LE_SQUARECAP);
+
+    pself->FBI_maskGState = GrEditBitmap(global.tempFile, pself->FBI_maskBmp, 0);
+    GrSetLineEnd(pself->FBI_maskGState, LE_SQUARECAP);
+
+
+    /*
+     * initialize drag struct - except for the selection tool
+     * tools are allowed to overwrite this initial settings
+     */
+    if (pself->FBI_currentTool != BTF_SELECTION) {
+	pself->FBI_drag.x0 = xPos;
+	pself->FBI_drag.y0 = yPos;
+	pself->FBI_drag.x1 = xPos;
+	pself->FBI_drag.y1 = yPos;
+	pself->FBI_drag.nextClear = FALSE;
+    }
+
+    /*
+     * Depending on the tool, there are different other things to set up.
+     * No special setup is required for
+     * 		BTF_PENCIL, BTF_ERASER, BTF_SHIFT_IMG, BTF_EDIT_MASK
+     * 		BTF_FLOOD_FILL, BTF_FILL_MASK, BTF_SELECTION,
+     *		BTF_PICK_COLOR
+     */
+
+
+    switch (pself->FBI_currentTool) {
+    case BTF_LINE:
+    case BTF_FILL_RECT:
+    case BTF_RECTANGLE:
+    case BTF_FILL_ELLIPSE:
+    case BTF_ELLIPSE:
+
+	/*
+	 * These tools uses FBI_drag.bmp and need a gstate for this.
+	 */
+    	pself->FBI_drag.gstate = GrEditBitmap(global.tempFile, pself->FBI_drag.bmp, NULL);
+	GrSetLineEnd(pself->FBI_drag.gstate, LE_SQUARECAP);
+
+	/*
+	 * Copy the bitmap to FBI_drag.bmp.
+	 * But if FBI_bitmap is monochrome, drawing to FBI_drag.gstate
+	 * does not work properly and we need a work around.
+	 */
+	colorIdx = @call ViewColorGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	GrSetAreaColor(pself->FBI_drag.gstate, CF_INDEX, colorIdx, 0, 0);
+	GrFillRect(pself->FBI_drag.gstate, 0, 0, pself->FBI_xSize, pself->FBI_ySize);
+
+	if ( (pself->FBI_bmFormat & BMT_FORMAT) == BMF_MONO ) {
+		GStateHandle gs;
+		VMBlockHandle bm;
+		/*
+		 * After a lot of trial and error, the following procedure
+		 * has been found to work.
+		 */
+		bm = GrCreateBitmap(BMF_4BIT | BMT_MASK, pself->FBI_xSize, pself->FBI_ySize, global.tempFile, 0, &gs);
+
+		ToolTransferMask(pself->FBI_bitmap, bm, pself->FBI_xSize, pself->FBI_ySize);
+		GrSetAreaColor(gs, CF_INDEX, C_WHITE, 0, 0);
+		GrFillRect(gs, 0, 0, pself->FBI_xSize, pself->FBI_ySize);
+
+		GrDrawHugeBitmap(gs, 0, 0, global.tempFile, pself->FBI_bitmap);
+		GrDrawHugeBitmap(pself->FBI_drag.gstate, 0, 0, global.tempFile, bm);
+
+		GrDestroyBitmap(gs, BMD_KILL_DATA);
+
+	} else {
+		GrDrawHugeBitmap(pself->FBI_drag.gstate, 0, 0, global.tempFile, pself->FBI_bitmap);
+	}
+
+	/*
+	 * Now set mixmode MM_INVERT.
+	 */
+	GrSetMixMode(pself->FBI_drag.gstate, MM_INVERT);
+
+    	break;
+
+    }
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag initialized to (-1) in fatbits::META_START_SELECT"); } )
+
+    /*
+     * call the tool-specific method (if we have any)
+     */
+    if ( pself->FBI_startSelectMsg ) {
+    	@call oself::{FATBITS_MOUSE_MSG}(pself->FBI_startSelectMsg)(xPos, yPos);
+    }
+
+}
+
+
+
+/*--------------------- MSG_META_PTR ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ 	- check if data are valid
+	- transform bitmap coordinates
+	- show coordinates
+ 	- set flag if shift key is down or not
+ *	- call the tool-specific method (if we have any)
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_META_PTR {
+char buf[15];
+int xPos, yPos;		// position in bitmap coordinates
+optr obj;
+
+
+    /*
+     * return if we have no bitmap to edit
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->FBI_bitmap == 0) return;
+
+
+    /*
+     * Transform coordinates
+     * Update mouse position text
+     */
+    xPos = xPosition / (pself->FBI_pixelSize);
+    yPos = yPosition / (pself->FBI_pixelSize);
+    sprintf(buf, "%d:%d", xPos, yPos);
+    obj = ConstructOptr(OptrToHandle(oself), OptrToChunk(@FatBitsMouseText));
+    @call obj::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    pself = ObjDerefVis(oself);
+
+
+    /*
+     * For savety: cancel here if we don't have the model yet.
+     * See MSG_META_START_SELECT for a description why.
+     */
+    if ( global.curDisplay != (oself>>16) ) return;
+
+    /*
+     * If we are in "pick color" mode, a special handling is required
+     * We don't have any gstates or special mouse handlers.
+     */
+    if (pself->FBI_flags & FB_PICK_COLOR_IS_ACTIVE) {
+	@send process::MSG_ICON_PICK_COLOR_DIALOG_UPDATE_COLOR(xPos, yPos, oself);
+	return;
+    }
+
+    /*
+     * Return if we have no screen-gstate (META_START_SELECT was not called)
+     * Otherwise call the tool-specific method (if we have any)
+     */
+    if ( !pself->FBI_screenGState ) return;
+
+
+    if ( pself->FBI_metaPtrMsg ) {
+
+	/*
+	 * at first set flag if shift key is down or not
+	 * then call current handler
+	 */
+	if ( (inputState>>8) & UIFA_CONSTRAIN ) {
+	    @send oself::MSG_FATBITS_SET_FLAGS(FB_SHIFT_KEY_IS_DOWN, 0);
+	} else {
+	    @send oself::MSG_FATBITS_SET_FLAGS(0, FB_SHIFT_KEY_IS_DOWN);
+	}
+    	@call oself::{FATBITS_MOUSE_MSG}(pself->FBI_metaPtrMsg)(xPos, yPos);
+    }
+
+}
+
+
+/*--------------------- MSG_META_END_SELECT ---------------------
+ *  Purpose:
+ *  Strategy:
+ * 	- check if data are valid
+ *	- transform bitmap coordinates
+ *	  and call the tool-specific method (if we have any)
+ *	- copy mask-bitmap back to the icon bitmap
+ *	- redraw the bitmap image
+ *	- update live preview object
+ * 	- Destroy the GStates.
+ *	- Mark Icon dirty
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_META_END_SELECT {
+int xPos, yPos;
+
+    /*
+     * return if we have no bitmap to edit or
+     * no screen gstate (META_START_SELECT was aborted or we ar in a special mode)
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->FBI_bitmap == 0) return;
+    if ( !pself->FBI_screenGState ) return;
+
+
+    @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /*
+     * Call the tool-specific method (if we have any)
+     * Transform coordinates first
+     */
+    if ( pself->FBI_endSelectMsg ) {
+     	xPos = xPosition / (pself->FBI_pixelSize);
+    	yPos = yPosition / (pself->FBI_pixelSize);
+   	@call oself::{FATBITS_MOUSE_MSG}(pself->FBI_endSelectMsg)(xPosition, yPosition);
+    }
+
+    /*
+     * Destroy the GStates. FBI_drag.gstate is not initialized in some cases.
+     * Mark Icon dirty (not for selection and pick color tool).
+     */
+    GrDestroyState(pself->FBI_screenGState);
+    pself->FBI_screenGState = 0;
+
+    GrDestroyBitmap(pself->FBI_bitmapGState, BMD_LEAVE_DATA);
+    pself->FBI_bitmapGState = 0;
+
+    GrDestroyBitmap(pself->FBI_maskGState, BMD_LEAVE_DATA);
+    pself->FBI_maskGState = 0;
+
+    if ( pself->FBI_drag.gstate ) {
+	GrDestroyBitmap(pself->FBI_drag.gstate, BMD_LEAVE_DATA);
+	pself->FBI_drag.gstate = 0;
+    }
+
+    switch ( pself->FBI_currentTool) {
+    case BTF_SELECTION:	// make not dirty by default
+    case BTF_PICK_COLOR:
+    	break;
+    default:
+    	@call ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent))::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+    }
+
+    @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+}
+
+
+
+/***********************************************************************
+ *
+ *	Common Tools and Routines
+ *
+ ***********************************************************************/
+
+
+
+/*--------------------- TestIfToolWorksWithTheMask ---------------------
+ *  Purpose:	As the name says.
+ *  Context:	We need this when we are in "edit-pointer-image" mode
+ *  Strategy:	List all tools here to get an message when a new tool has been added
+ *  Parameters:
+ *  Return:	TRUE: the tool works mainly with the mask plane of the bitmap
+ *		FALSE: the tool affect mainly the color plane, even if the
+ *		       mask is set to opaque wegn a pixel is set to a color.
+ ---------------------------------------------------------------------------*/
+Boolean TestIfToolWorksWithTheMask(int tool) {
+
+    switch (tool) {
+    case BTF_ERASER:
+    case BTF_FILL_MASK:
+    case BTF_EDIT_MASK:
+    	return TRUE;
+
+    case BTF_SELECTION:
+    case BTF_PENCIL:
+    case BTF_LINE:
+    case BTF_FILL_RECT:
+    case BTF_RECTANGLE:
+    case BTF_FILL_ELLIPSE:
+    case BTF_ELLIPSE:
+    case BTF_FLOOD_FILL:
+    case BTF_SHIFT_IMG:
+    case BTF_PICK_COLOR:
+        return FALSE;
+
+    default:
+        EC( ProgError("Unknown tool in TestIfToolWorksWithTheMask"); )
+    	return FALSE;
+    }
+}
+
+/*--------------------- UpdatePtrImageControlBox ---------------------
+ *  Purpose:	Update PointerImageContromDialog UI according to the
+ *		selected tool.
+ *  Context:	When the user selects a bitmap tool from the tool bar, the
+ *		PointerImageModeChooser object sould be updated to relect
+ *		the selected tool. This is a difficult task because the user
+ *		can switch from "draw a color" mode to "make pixels transparent"
+ *		and back as often as he whish.
+ *  Strategy:	See code
+ *  Parameters: newTool: selected tool
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UpdatePtrImageControlBox(int newTool) {
+int curTool;
+Boolean curToolIsColored, newToolIsMaskTool;
+IconAreaAttrs	areaAttrs;
+word oldTool;
+
+    /*
+     * Do some preparings ...
+     *
+     * Get current selection from ImageModeChosser in the PointerImageContromDialog
+     * and rembember if this is a "draw-a-color" mode or not.
+     * If "select hotspot" is selected simply return (do not change anything)
+     */
+    curTool = @call PointerImageModeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (curTool == PIM_HOTSPOT) return;
+    curToolIsColored = ( curTool < PIM_TRANSPARENT ) ? TRUE : FALSE;
+
+    /*
+     * Remember if the new tool requires the dialog UI to set to
+     * "make-pixel-transparent" mode or not.
+     */
+    newToolIsMaskTool = TestIfToolWorksWithTheMask(newTool);
+
+
+    if ( curToolIsColored ) {
+    	if ( newToolIsMaskTool) {
+    	    /*
+    	     * We are switching form "draw-a-color" mode to "make-pixel-transparent" mode.
+    	     * Simpy set UI to "transparent" mode.
+    	     */
+    	    @send PointerImageModeChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(PIM_TRANSPARENT, FALSE);
+    	    UpdatePointerImageModeText(PIM_TRANSPARENT);
+    	}
+    } else {
+    	if ( !newToolIsMaskTool) {
+    	    /*
+    	     * We are switching form "make-pixel-transparent" mode to "draw-a-color"mode.
+    	     * To find out the correct item to select, ask fatbits object for the
+    	     * current color. The possible RGB values are black (0xFF, 0xFF, 0xFF), white
+    	     * (0, 0, 0) oder light gray (0xAA, 0xAA, 0xAA). This makes the things simple.
+    	     */
+	    @call CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_GET_ATTRS(NULL, &areaAttrs);
+	    switch (areaAttrs.areaColor.rt) {
+	    	case 0: oldTool = PIM_BLACK; break;
+	    	case 0xFF: oldTool = PIM_WHITE; break;
+	    	default: oldTool = PIM_INVERT;
+	    }
+    	    @send PointerImageModeChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(oldTool, FALSE);
+    	    UpdatePointerImageModeText(oldTool);
+    	}
+    }
+
+}
+
+/*--------------------- MSG_FATBITS_SET_BITMAP_TOOL ---------------------
+ *  Purpose:	Activates the editing tool selected by the user.
+ *  Strategy:
+ *	- each tool has it's own set of mouse handlers
+ *	- For the edit-mask tool open or close the EditMaskControlBox dialog
+ *	  and redraw fatbits to show the correct image (mask or icon image)
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SET_BITMAP_TOOL {
+int oldTool;
+
+    /*
+     * Do nothing if the tool does not change. This may happen in Edit-pointer-image-mode
+     * Remember current tool and update value
+     */
+    if (pself->FBI_currentTool == selection) return;
+    oldTool = pself->FBI_currentTool;
+    pself->FBI_currentTool = selection;
+
+    switch (oldTool ) {
+    case BTF_EDIT_MASK:
+    	@call ConstructOptr(OptrToHandle(oself), OptrToChunk (@FatbitsView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+    	@send EditMaskControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    	break;
+@if @SHIFT_IMAGE_IS_A_BITMAP_TOOL
+    case BTF_SHIFT_IMG:
+    	@send ShiftImageControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    	break;
+@endif
+    case BTF_PICK_COLOR:
+    	@send process::MSG_ICON_CLOSE_PICK_COLOR_DIALOG();
+    	break;
+    }
+
+    /*
+     * Do some preparings
+     */
+    @call oself::MSG_FATBITS_KILL_ANTS();
+    @send SelectionToolControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    if ( @call oself::MSG_FATBITS_TEST_IF_PTR_IMAGE() ) {
+	UpdatePtrImageControlBox(selection);
+    }
+
+    /*
+     * Each tool has it's own method for the mouse handlers. Set it.
+     */
+    switch (selection) {
+    case BTF_SELECTION:
+        @call oself::MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT();
+        @send SelectionToolControlBox::MSG_GEN_INTERACTION_INITIATE();
+
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_SELECTION_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_SELECTION_META_PTR;
+    	pself->FBI_endSelectMsg = 	MSG_FATBITS_SELECTION_END_SELECT;
+    	break;
+
+    case BTF_PENCIL:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_PENCIL_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_PENCIL_META_PTR;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    case BTF_ERASER:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_ERASR_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_ERASR_META_PTR;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    case BTF_LINE:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_LINE_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_LINE_META_PTR;
+    	pself->FBI_endSelectMsg = 	MSG_FATBITS_LINE_END_SELECT;
+    	break;
+
+    case BTF_FILL_RECT:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_FILL_RECT_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_FILL_RECT_META_PTR;
+    	pself->FBI_endSelectMsg = 	MSG_FATBITS_FILL_RECT_END_SELECT;
+    	break;
+
+    case BTF_RECTANGLE:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_RECTANGLE_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_RECTANGLE_META_PTR;
+    	pself->FBI_endSelectMsg = 	MSG_FATBITS_RECTANGLE_END_SELECT;
+    	break;
+
+    case BTF_FILL_ELLIPSE:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_FILL_ELLIPSE_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_FILL_ELLIPSE_META_PTR;
+    	pself->FBI_endSelectMsg = 	MSG_FATBITS_FILL_ELLIPSE_END_SELECT;
+    	break;
+
+    case BTF_ELLIPSE:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_ELLIPSE_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_ELLIPSE_META_PTR;
+    	pself->FBI_endSelectMsg = 	MSG_FATBITS_ELLIPSE_END_SELECT;
+    	break;
+
+    case BTF_FLOOD_FILL:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_FLOOD_FILL_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	0;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    case BTF_SHIFT_IMG:
+@if @SHIFT_IMAGE_IS_A_BITMAP_TOOL
+    	@send ShiftImageControlBox::MSG_GEN_INTERACTION_INITIATE();
+@endif
+    	pself->FBI_startSelectMsg = 	0;
+    	pself->FBI_metaPtrMsg = 	0;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    case BTF_FILL_MASK:
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_FILL_MASK_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	0;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    case BTF_EDIT_MASK:
+
+    	@call ConstructOptr(OptrToHandle(oself), OptrToChunk (@FatbitsView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+    	@send EditMaskControlBox::MSG_GEN_INTERACTION_INITIATE();
+
+    	pself->FBI_startSelectMsg = 	MSG_FATBITS_EDIT_MASK_START_SELECT;
+    	pself->FBI_metaPtrMsg = 	MSG_FATBITS_EDIT_MASK_META_PTR;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    case BTF_PICK_COLOR:
+	@send process::MSG_ICON_OPEN_PICK_COLOR_DIALOG();
+
+     	pself->FBI_startSelectMsg = 	0;	/* we have no special mouse handlers */
+    	pself->FBI_metaPtrMsg = 	0;
+    	pself->FBI_endSelectMsg = 	0;
+    	break;
+
+    EC( default: ProgError("FATBITS_SET_BITMAP_TOOL: invalid tool value"); )
+    }
+
+
+    @call oself::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_BMPTOOLS_NOTIFICATIONS);
+}
+
+/*--------------------- MSG_FATBITS_GET_BITMAP_TOOL ---------------------
+ *  Purpose:	Retrive current tool
+ *  Return:	tool
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_GET_BITMAP_TOOL {
+    return pself->FBI_currentTool;
+}
+
+/***********************************************************************
+ *
+ *	Fatbits tool messages - they do the real job
+ *
+ ***********************************************************************/
+
+/*######################################################################
+  #
+  #	Selection Tool
+  #
+  ######################################################################*/
+
+
+
+/*--------------------- MSG_META_START_MOVE_COPY ---------------------
+ *  Purpose:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_META_START_MOVE_COPY {
+
+    /*
+     * return if we have no bitmap to edit or it we have no selecte area yet
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->FBI_bitmap == 0) return;
+
+    if ( pself->FBI_currentTool != BTF_SELECTION ) return;
+    if ( pself->FBI_ants.antState == ANT_STATE_NO_ANTS ) return;
+
+    /*
+     * Reset target offsets. Initiate move-copy mode
+     */
+    pself->FBI_drag.selDX = 0;
+    pself->FBI_drag.selDY = 0;
+
+    pself->FBI_drag.mcX0 = xPosition / (pself->FBI_pixelSize);
+    pself->FBI_drag.mcY0 = yPosition / (pself->FBI_pixelSize);
+
+    pself->FBI_drag.originX = pself->FBI_drag.mcX0;
+    pself->FBI_drag.originY = pself->FBI_drag.mcY0;
+
+    pself->FBI_flags |= FB_MOVE_COPY_IS_ACTIVE;
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@FatbitsView))::MSG_GEN_VIEW_SET_PTR_IMAGE(@MoveImgPointer, PIL_WINDOW);
+
+    /*
+     * Create and initialize the required GState.
+     */
+    pself->FBI_screenGState = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+}
+
+/*--------------------- MSG_META_END_MOVE_COPY ---------------------
+ *  Purpose:
+ *  Strategy:
+ *	- do some savety checks
+ *	- remove target frame and leave move-copy mode
+ *	- move selected area to new position
+ *  Parameters:
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_META_END_MOVE_COPY {
+
+    retVal->flags = MRF_PROCESSED;
+
+    if (pself->FBI_bitmap == 0) return;
+    if ( !pself->FBI_screenGState ) return;
+    if ( pself->FBI_currentTool != BTF_SELECTION ) return;
+    if ( (pself->FBI_flags & FB_MOVE_COPY_IS_ACTIVE) == 0 ) return;
+
+
+    pself->FBI_flags &= ~FB_MOVE_COPY_IS_ACTIVE;
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, TRUE);
+
+    GrDestroyState(pself->FBI_screenGState);
+    pself->FBI_screenGState = 0;
+
+    @call oself::MSG_FATBITS_KILL_ANTS();
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@FatbitsView))::MSG_GEN_VIEW_SET_PTR_IMAGE(@SelectionPointer, PIL_WINDOW);
+
+    @call oself::MSG_FATBITS_SELECTION_MOVE_SELECTED_AREA();
+
+}
+
+/*--------------------- MSG_FATBITS_SELECTION_PTR_MOVE_COPY ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:int xPos, int yPos
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_PTR_MOVE_COPY {
+int dx, dy, x0, y0;
+
+
+    if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) {
+    	/*
+    	 * limit movement to horizontal or vertical
+    	 * - calculate distances (x, y) to the origin
+    	 * - update coordinates so that shorter distance is zero
+    	 */
+    	x0 = pself->FBI_drag.originX;
+	y0 = pself->FBI_drag.originY;
+
+    	dx = xPos - x0; 	if (dx < 0) dx = -dx;
+    	dy = yPos - y0; 	if (dy < 0) dy = -dy;
+
+    	if ( dx < dy ) { xPos = x0; }
+    	      	  else { yPos = y0; }
+    }
+
+
+    /*
+     * Return if the pixel under the mouse has not changed
+     */
+    do {
+   	if (xPos != pself->FBI_drag.mcX0) break;
+   	if (yPos != pself->FBI_drag.mcY0) break;
+   	return;
+    } while (FALSE);
+
+
+    /*
+     * Update target frame
+     */
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, TRUE);
+
+    pself->FBI_drag.selDX -= pself->FBI_drag.mcX0 - xPos;
+    pself->FBI_drag.selDY -= pself->FBI_drag.mcY0 - yPos;
+
+    pself->FBI_drag.mcX0 = xPos;
+    pself->FBI_drag.mcY0 = yPos;
+
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, TRUE);
+
+}
+
+
+/*--------------------- MSG_FATBITS_SELECTION_MOVE_SELECTED_AREA ---------------------
+ *  Purpose:	Move the selected Area one pixel down
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_MOVE_SELECTED_AREA {
+VMBlockHandle	bmpToMove, maskBmp;
+GStateHandle	gstate;
+int	grid, x0, y0, x1, y1, dx, dy;
+optr obj;
+int color;
+    /*
+     * do nothing if target offsets are zero. Otherwise store undo information.
+     */
+    if ( (pself->FBI_drag.selDX == 0) && (pself->FBI_drag.selDY == 0) ) return;
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_MOVE_SELECTION);
+
+    /*
+     * Move selected area to new position
+     * 	- buffer an sort coordinates
+     *	- clip bitmap
+     *	- clear clipped area
+     *	- draw clipped bitmap to new position
+     *	- update shadow maks bitmap
+     *	- Redraw fatbits
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+    dx = pself->FBI_drag.selDX;
+    dy = pself->FBI_drag.selDY;
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+    bmpToMove = BTClipBitmap(global.tempFile, pself->FBI_bitmap, global.tempFile, x0, y0, x1, y1);
+
+    /*
+    * Clear out source area if "move" is selected
+    */
+    if ( @call SelectionToolCopyOption::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 2 ) {
+	maskBmp = BTExtractTransparencyMask(global.tempFile, pself->FBI_bitmap, global.tempFile, 0);
+
+	gstate = GrEditBitmap(global.tempFile, maskBmp, NULL);
+	GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+	GrFillRect(gstate, x0, y0, x1+1, y1+1);
+	GrDestroyState(gstate);
+
+	BTApplyTransparencyMask(global.tempFile, pself->FBI_bitmap, 0, global.tempFile, maskBmp, 0);
+	HugeArrayDestroy(global.tempFile, maskBmp);
+    }
+
+
+    /*
+     * Draw Bitmap. Destroy clipped bitmap.
+     */
+    IconToolDrawOneBitmapToAnother(global.tempFile, bmpToMove, global.tempFile, pself->FBI_bitmap, x0 + dx, y0 + dy, 0, global.tempFile);
+
+    HugeArrayDestroy(global.tempFile, bmpToMove);
+
+
+    /*
+     * Update modified areas and live preview
+     *	- create a screen gstate
+     *	- Set up clipping path
+     *	- clear backround. MSG_GEN_VIEW_GET_COLOR returns a dword,
+     *	  where the least significant byte contains the color index.
+     *	- Redraw fatbits and destroy state
+     *	- redraw live preview
+     */
+    gstate = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+
+    grid = pself->FBI_pixelSize;
+    GrSetClipRect(gstate, PCT_REPLACE, grid*x0, grid*y0, grid*(x1+1), grid*(y1+1));
+    GrSetClipRect(gstate, PCT_UNION, grid*(x0+dx), grid*(y0+dy), grid*(x1+dx+1), grid*(y1+dy+1));
+
+    obj = ConstructOptr(OptrToHandle(oself), ChunkOf(@FatbitsView));
+    color = @call obj::MSG_GEN_VIEW_GET_COLOR();
+    GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+    GrFillRect(gstate, 0, 0, grid*(pself->FBI_xSize+1), grid*(pself->FBI_ySize+1));
+
+    @call oself::MSG_VIS_DRAW(0, gstate);
+    GrDestroyState(gstate);
+
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    /*
+     * We have a new mask now. Replace it.
+     * Mark Icon as dirty.
+     */
+    @call oself::MSG_FATBITS_UPDATE_MASK_BMP();
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent))::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+
+//UserStandardSound(SST_ERROR);
+}
+
+/*--------------------- MSG_FATBITS_SELECTION_MOVE_SELECTED_AREA ---------------------
+ *  Purpose:	Return selecttion frame
+ *  Context:
+ *  Strategy:
+ *  Parameters:	bounds: return: selection bounds (invalid if we have no selection frame)
+ *  Return:	TRUE:	returned bounds are invalid, because
+ *			- selection tool is not active
+ *			- thre si no selection frame (no running ants)
+ *		FALSE	returned bounds are valid
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_GET_SELECTED_BOUNDS {
+
+    memset(bounds, 0, sizeof(Rectangle));
+    if ( pself->FBI_ants.antState == ANT_STATE_NO_ANTS ) return TRUE;
+    if ( pself->FBI_currentTool != BTF_SELECTION) return TRUE;
+
+    bounds->R_top = 	pself->FBI_drag.y0;
+    bounds->R_left = 	pself->FBI_drag.x0;
+    bounds->R_bottom = 	pself->FBI_drag.y1;
+    bounds->R_right = 	pself->FBI_drag.x1;
+
+    return FALSE;
+}
+
+
+/*--------------------- MSG_FATBITS_DRAW_ANTS_OR_OUTLINE ---------------------
+ *  Purpose:	Draw selection-ants to the screen
+ *		Fatbitsobj must be locked
+ *  Context:
+ *  Strategy:
+ *	| rectangle size is stored in FBI_drag structure
+ *	| default linewidth is three. for smaller grids it is two or one
+ *	| MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL does the job
+ *  Parameters:	linestyle: LS_solid for outline
+ *			   LS_xx for ants
+ *		respectDXY: take FBI_drag.selDX / selDY into account
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_DRAW_ANTS_OR_OUTLINE {
+GStateHandle gs;
+
+    /*
+     * Create gstate to draw to, draw outline an destroy gstate
+     */
+    gs = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+    EC( if(!gs) { ProgError("ToolDrawAnts - no gstate"); return; } )
+
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL(lineStyle, respectDXY, gs);
+
+    GrDestroyState(gs);
+}
+
+/*--------------------- MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL ---------------------
+ *  Purpose:	Do the draw-job for MSG_FATBITS_DRAW_ANTS_OR_OUTLINE
+ *  Context:	will also be used in fatbits VIS_DRAW
+ *  paramters (int lineStyle, Boolean respectDXY, GStateHandle gs);
+ *  Strategy:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_DRAW_ANTS_OR_OUTLINE_INTERNAL {
+int x0, y0, x1, y1, grid;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in DRAW_ANTS_OR_OUTLINE"); } )
+
+    /*
+     * Draw nothing if respectDXY and selDX == 0 and selDY == 0
+     */
+    if ( respectDXY ) {
+    	if ( (pself->FBI_drag.selDX == 0) && (pself->FBI_drag.selDY == 0) ) return;
+    }
+
+
+    GrSetMixMode(gs, MM_INVERT);
+    GrSetLineWidth(gs, MakeWWFixed(3));
+    /* map line style if we are about to create a selection frame */
+    if ( lineStyle == ANT_STATE_DRAGGING ) lineStyle = LS_SOLID;
+    GrSetLineStyle(gs, lineStyle, 0, 0, 0);
+
+    /*
+     * Sort and scale coordinates
+     */
+    grid = pself->FBI_pixelSize;
+    x0 = grid * pself->FBI_drag.x0;
+    y0 = grid * pself->FBI_drag.y0;
+    x1 = grid * pself->FBI_drag.x1 ;
+    y1 = grid * pself->FBI_drag.y1;
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+    /*
+     * Update coordinates if target frame should be drawn
+     */
+    if ( respectDXY ) {
+    	x0 += grid * pself->FBI_drag.selDX;
+    	x1 += grid * pself->FBI_drag.selDX;
+    	y0 += grid * pself->FBI_drag.selDY;
+    	y1 += grid * pself->FBI_drag.selDY;
+    }
+
+    /*
+     * correct coordinates according to FBI_pixelSize. Then draw the rectangle.
+     */
+    switch (pself->FBI_pixelSize) {
+    case 1:
+    case 2:
+    	GrSetLineWidth(gs, MakeWWFixed(1));
+    	break;
+    case 3:    case 4:
+    case 5:    case 6:
+    	GrSetLineWidth(gs, MakeWWFixed(2));
+	x0 += 2;
+	y0 += 2;
+	x1 += grid - 1;
+	y1 += grid - 1;
+    	break;
+    default:
+	x0 += 2;
+	y0 += 2;
+	x1 += grid - 2;
+	y1 += grid - 2;
+    }
+
+    GrDrawRect(gs, x0, y0, x1, y1);
+
+}
+
+
+/*--------------------- IconConstrainSelectionCoordinates ---------------------
+ *  Purpose:	Limit mouse coordinates
+ *  Context:	Called by selection tools or crop image if we want to select a squares
+ *		instead of a rectangle.
+ *		We also must limit the size of the square to fit inside of the image
+ *  Strategy:	- calculate width (dx) and height (dx) of the bounding rectange
+ *		- calculate the size of the bounding square (w)
+ *		- limit this size to fit inside of the image
+ *		- update *xPos and *yPos, based on their positions relative
+ *		  to x0 and y0
+ ---------------------------------------------------------------------------*/
+void IconConstrainSelectionCoordinates(int x0, int y0, int xSize, int ySize, int *xPos, int *yPos) {
+int dx, dy, w;
+
+    dx = *xPos - x0; 	if (dx < 0) dx = -dx;
+    dy = *yPos - y0; 	if (dy < 0) dy = -dy;
+
+    if ( dx < dy ) { w = dy; }
+    	      else { w = dx; }
+
+    /*
+     * limit square size to fit inside of the image
+     */
+    if ( *xPos < x0 ) {
+    	if ( (x0 - w) < 0 ) w = x0;
+    } else {
+    	if ( (x0 + w) >= xSize ) w = xSize - x0 -1;
+    }
+    if ( *yPos < y0 ) {
+    	if ( (y0 - w) < 0 ) w = y0;
+    } else {
+    	if ( (y0 + w) >= ySize ) w = ySize - y0 -1;
+    }
+
+
+    /*
+     * update mouse coordinates
+     */
+    if ( *xPos < x0 ) { *xPos = x0 - w; }
+    		else  { *xPos = x0 + w; }
+    if ( *yPos < y0 ) { *yPos = y0 - w; }
+    		else  { *yPos = y0 + w; }
+}
+
+/*--------------------- MSG_FATBITS_SELECTION_START_SELECT ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	xPos, yPos: mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_START_SELECT{
+
+    /*
+     * First kill ants, if they are are running,
+     * then initialize drag struct with new coordinates
+     */
+    @call oself::MSG_FATBITS_KILL_ANTS();
+
+    pself->FBI_drag.x0 = xPos;
+    pself->FBI_drag.y0 = yPos;
+    pself->FBI_drag.x1 = xPos;
+    pself->FBI_drag.y1 = yPos;
+
+    pself->FBI_drag.selDX = 0;
+    pself->FBI_drag.selDY = 0;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag initialized to -1 in SELECTION_START_SELECT"); } )
+
+    /*
+     * Draw first selection frame. This selects a 1x1 pixel area.
+     */
+    pself->FBI_ants.antState = ANT_STATE_DRAGGING;
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, FALSE);
+
+    @call oself::MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT();
+}
+
+/*--------------------- MSG_FATBITS_SELECTION_META_PTR ---------------------
+ *  Purpose:	Change the size or position of the selection area
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:	xPos, yPos: mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_META_PTR{
+
+    /*
+     * if FB_MOVE_COPY_IS_ACTIVE is set, use another method
+     * that moves the selection area without changing its size
+     */
+    if ( pself->FBI_flags & FB_MOVE_COPY_IS_ACTIVE ) {
+   	@call oself::MSG_FATBITS_SELECTION_PTR_MOVE_COPY(xPos, yPos);
+   	return;
+    }
+
+    /*
+     * Limit the selection frame to the size of the bitmap
+     */
+    if (xPos < 0) xPos = 0;
+    if (yPos < 0) yPos = 0;
+    if (xPos >= pself->FBI_xSize) xPos = pself->FBI_xSize - 1;
+    if (yPos >= pself->FBI_ySize) yPos = pself->FBI_ySize - 1;
+
+    /*
+     * constrain coordinates if we want to select a square
+     */
+    if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) {
+    	IconConstrainSelectionCoordinates(pself->FBI_drag.x0, pself->FBI_drag.y0, pself->FBI_xSize, pself->FBI_ySize, &xPos, &yPos);
+    }
+
+    /*
+     * Return if the pixel under the mouse has not changed
+     */
+    do {
+   	if (xPos != pself->FBI_drag.x1) break;
+   	if (yPos != pself->FBI_drag.y1) break;
+   	return;
+    } while (FALSE);
+
+
+    /*
+     * Update selection frame
+     */
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, FALSE);
+    pself->FBI_drag.x1 = xPos;
+    pself->FBI_drag.y1 = yPos;
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, FALSE);
+
+    /*
+     * Update 'selected size' text
+     */
+    @call oself::MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT();
+}
+
+
+/*--------------------- MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT ---------------------
+ *  Purpose:	Change the size or position of the selection area
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:	xPos, yPos: mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT{
+char buf[15];
+int x0, y0, x1, y1;
+
+    /*
+     * If there is no selection frame, display '--'
+     */
+    if ( pself->FBI_ants.antState == ANT_STATE_NO_ANTS ) {
+    	@call SelectionToolSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR("--", 0);
+    	return;
+    }
+
+    /*
+     * Display selected size
+     * Sort coordinates, fix bound behavior
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+    x1++;
+    y1++;
+
+    sprintf(buf, "%dx%d", x1 - x0, y1 - y0);
+    @call SelectionToolSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    // pself = ObjDerefVis(oself);
+
+}
+
+/*--------------------- MSG_FATBITS_SELECTION_END_SELECT ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *	- remove solid selection frame
+ *	- reset ant state. We are no longer dragging, but we have
+ *	  no ants yet. This also simplifies the START_ANT handler.
+ *	- start ant selection frame
+ *  Parameters:	xPos, yPos: mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_SELECTION_END_SELECT{
+
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(LS_SOLID, FALSE);
+    pself->FBI_ants.antState = ANT_STATE_NO_ANTS;
+    @call oself::MSG_FATBITS_START_ANTS();
+}
+
+
+/*--------------------- MSG_FATBITS_START_ANTS ---------------------
+ *  Purpose:	Start ant-timer and draw first ants
+ *  Context:
+ *  Strategy:	- Start ants timer
+ *		- draw first ant frame
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_START_ANTS {
+
+    if (pself->FBI_ants.antState) return;	/* timer is already running */
+
+    pself->FBI_ants.antState = ANT_STATE_1;
+
+    pself->FBI_ants.th = TimerStart(TIMER_EVENT_CONTINUAL, oself, 10 /* tics */,
+    		MSG_FATBITS_NEXT_ANTS,  10 /* tics */, &pself->FBI_ants.tID);
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(pself->FBI_ants.antState, FALSE);
+
+    /*
+     * Update UI that wants to know that there is an area selected
+     */
+    @call ImportSelectionOptions::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/*--------------------- MSG_FATBITS_NEXT_ANTS ---------------------
+ *  Purpose:	ANT-Timer handler. Draw next ant state
+ *  Context:
+ *  Strategy:	- remove current ants
+ *		- set next ant state
+ *		- drawnext ants
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_NEXT_ANTS {
+
+    if (!pself->FBI_ants.antState) return;	/* no timer running (or killed) */
+
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(pself->FBI_ants.antState, FALSE);
+
+    switch (pself->FBI_ants.antState) {
+    case ANT_STATE_1:	pself->FBI_ants.antState = ANT_STATE_2; break;
+    case ANT_STATE_2:	pself->FBI_ants.antState = ANT_STATE_3; break;
+    case ANT_STATE_3:	pself->FBI_ants.antState = ANT_STATE_1; break;
+    default:	pself->FBI_ants.antState = ANT_STATE_1;
+    }
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(pself->FBI_ants.antState, FALSE);
+
+}
+
+/*--------------------- MSG_FATBITS_KILL_ANTS ---------------------
+ *  Purpose:	Stop ant-timer (if it is running)
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_KILL_ANTS {
+
+    if (!pself->FBI_ants.antState) return;	/* no timer running (or already killed) */
+
+    TimerStop(pself->FBI_ants.th, pself->FBI_ants.tID);
+    pself->FBI_ants.th = 0;
+    pself->FBI_ants.tID = 0;
+
+    @call oself::MSG_FATBITS_DRAW_ANTS_OR_OUTLINE(pself->FBI_ants.antState, FALSE);
+    pself->FBI_ants.antState = ANT_STATE_NO_ANTS;
+
+    /*
+     * Update UI that wants to know that there is no area selected
+     */
+    @call oself::MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT();
+    @call ImportSelectionOptions::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+
+/*######################################################################
+  #
+  #	Pencil Tool
+  #
+  ######################################################################*/
+
+/*--------------------- PencilDrawPixel ---------------------
+ *  Purpose:	Draw a single pixel in pencil-mode
+ *  Context:
+ *  Strategy:
+ *	- draw the pixel to the bitmap and to the mask
+ *	  Since GrSetBitmapMode() fails when we try to edit the mask of a
+ *	  true color image, we have a separate monochrome bitmap that
+ *	  contains a copy of the mask. After we have modified this mask
+ *	  bitmap, we copy it back into the original bitmap.
+ * 	  In Pencil mode, this must be done after each individual pixel
+ *	  so that the live preview object is always up to date.
+ *
+ *	- Set a one-pixel cliprect to avoid flickering
+ *	- redraw the image
+ *	- update live preview object
+ *  Parameters: oself:	The fatbits object
+ *		x, y:	Pixel coordinates
+ *		redrawPreview:  redraw the live preview object (don't calling
+ *				the view object to avoid flickering)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void PencilDrawPixel(optr fatbitsObj, int x, int y, Boolean redrawPreview) {
+FatbitsInstance *pself;
+int grid;
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    GrDrawPoint(pself->FBI_bitmapGState, x,y);
+    GrDrawPoint(pself->FBI_maskGState, x,y);
+
+    /*
+     * Redraw fatbits and live preview.
+     * 	- Copy mask back to the image
+     *	- Set a one-pixel cliprect to avoid flickering
+     *	- redraw the image and the live preview object
+     */
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+    grid = pself->FBI_pixelSize;
+
+    GrSaveState(pself->FBI_screenGState);
+    GrSetClipRect(pself->FBI_screenGState, PCT_REPLACE, grid*x, grid*y, grid*(x+1), grid*(y+1));
+    @call fatbitsObj::MSG_VIS_DRAW(0, pself->FBI_screenGState);
+    GrRestoreState(pself->FBI_screenGState);
+
+    if ( redrawPreview ) {
+    	if (pself->FBI_imageObj) @send pself->FBI_imageObj::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+    }
+}
+
+/*--------------------- MSG_FATBITS_PENCIL_START_SELECT ---------------------
+ *  Purpose:	Start select handler for pencil tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- pixels are drawn as areas - so we set the line color as area color
+ *	- draw the first pixel
+ *  Parameters:	xPos, yPos: Mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_PENCIL_START_SELECT{
+PaletteEntry color;
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_PENCIL);
+
+    color = pself->FBI_lineAttrs.lineColor;
+
+    ToolSetLineColor(pself->FBI_bitmapGState, pself->FBI_bmFormat, color);
+    ToolSetAreaColor(pself->FBI_bitmapGState, pself->FBI_bmFormat, color);
+
+    PencilDrawPixel(oself, xPos, yPos, TRUE);
+}
+
+/*--------------------- MSG_FATBITS_PENCIL_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for pencil tool
+ *  Context:
+ *  Strategy:
+ *	- return if the pixel under the mouse already has been set
+ *	- store new position
+ *	- draw the pixel
+ *  Parameters:	xPos, yPos: Mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_PENCIL_META_PTR{
+
+   do {
+   	if (xPos != pself->FBI_drag.x0) break;
+   	if (yPos != pself->FBI_drag.y0) break;
+   	return;
+   } while (FALSE);
+
+   pself->FBI_drag.x0 = xPos;
+   pself->FBI_drag.y0 = yPos;
+   PencilDrawPixel(oself, pself->FBI_drag.x0, pself->FBI_drag.y0, TRUE);
+
+}
+
+
+/*######################################################################
+  #
+  #	Eraser Tool
+  #
+  ######################################################################*/
+
+/*--------------------- EraserClearPixel ---------------------
+ *  Purpose:	Clear out a single pixel in eraser-mode
+ *  Context:
+ *  Strategy:
+ *	- give the user a visual feedback that a pixel has been erased.
+ *	  Because the pixel is now transparent, redrawing the image
+ *	  will not change the color of the pixel on the screen.
+ *	  Therefore we draw a rectangle in the views background color.
+ *	- Let PencilDrawPixel do the pixel-clear-job because clearing out a
+ *	  pixel is the same as setting its colors to white.
+ *	- Redraw the live preview object. This must be done by calling the
+ *	  View to ensure that the background is drawn when a pixel has
+ *	  become transparent.
+ *  Parameters: oself:	The fatbits object
+ *		x, y:	Pixel coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EraserClearPixel(optr fatbitsObj, int x, int y) {
+FatbitsInstance *pself;
+int grid;
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    grid = pself->FBI_pixelSize;
+    GrFillRect(pself->FBI_screenGState, grid*x, grid*y, grid*(x+1), grid*(y+1));
+
+    PencilDrawPixel(fatbitsObj, x, y, FALSE);
+
+    @call ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+/*--------------------- MSG_FATBITS_ERASER_START_SELECT ---------------------
+ *  Purpose:	Start select handler for eraser tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Points are drawn as areas. Set bitmap and mask area color to white.
+ *	  For downward compatibility, a transparent pixel should be
+ *	  white in the invisible background.
+ *	  If the bitmap has a palette (meaning that the C_WHITE index isn't
+ *	  actually white), this is automatically corrected when the icon is saved.
+ *	  That's why I'm not going to bother with any further steps here.
+ *	- Set screen gstate's area color to the view background color to
+ *	  give the user a visual feedback when he erases a pixel.
+ *	- clear the first pixel
+ *  Parameters:	xPos, yPos: Mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_ERASR_START_SELECT {
+int colorIdx;
+
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_ERASER);
+
+    GrSetAreaColor(pself->FBI_bitmapGState, CF_INDEX, C_WHITE, 0, 0);
+    GrSetAreaColor(pself->FBI_maskGState, CF_INDEX, C_WHITE, 0, 0);
+
+    colorIdx = @call ViewColorGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    GrSetAreaColor(pself->FBI_screenGState, CF_INDEX, colorIdx, 0, 0);
+
+    EraserClearPixel(oself, xPos, yPos);
+}
+
+
+/*--------------------- MSG_FATBITS_ERASR_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for pencil tool
+ *  Context:
+ *  Strategy:
+ *	- return if the pixel under the mouse already has been cleared
+ *	- store new position
+ *	- clear the pixel
+ *  Parameters:	xPos, yPos: Mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_ERASR_META_PTR{
+
+   do {
+   	if (xPos != pself->FBI_drag.x0) break;
+   	if (yPos != pself->FBI_drag.y0) break;
+   	return;
+   } while (FALSE);
+
+   pself->FBI_drag.x0 = xPos;
+   pself->FBI_drag.y0 = yPos;
+   EraserClearPixel(oself, pself->FBI_drag.x0, pself->FBI_drag.y0);
+
+}
+
+
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file edit.goc ********************/
+
+

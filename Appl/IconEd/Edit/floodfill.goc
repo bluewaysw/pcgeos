@@ -1,0 +1,589 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	floodfill.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 12/13/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deals with editing the bitmap (flood fill tools)
+ *
+ **************************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files  &  Constants
+ ***************************************************************************
+ */
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+extern GlobalStruct global;
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ * Concept notes
+ *
+ *	We use the flood fill algorithm for filling an colored area or a transparent
+ *	area with a color as well as for make a colred area transparent.
+ *	Therefore we need not only the color af a pixel, we also need the information
+ *	if the pixel is transparent or not.
+ *
+ *	The color information is therefore stored in a single dword value.
+ *	The high signifikant byte contains the mask information, If the bit
+ *	FLOOD_MASK_IS_SET (M) is set, the pixel is not transparent.
+ *					+-----+-----+-----+-----+
+ *	Monochrome or index images:	|  M  |  0  |  0  | idx |
+ *					+-----+-----+-----+-----+
+ *
+ *					+-----+-----+-----+-----+
+ *	True color images:		|  M  |  R  |  G  |  B  |
+ *					+-----+-----+-----+-----+
+ *
+ *	All routines are spcialized for the icon editor. We expect that the
+ *	images are stored in the global.tempFile an that all images have
+ *	a transparency mask.
+ *
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+#define	FLOOD_MASK_IS_SET	(dword)0x80000000
+
+dword FloodGetPixelXY(VMBlockHandle bmp, int width, int format, int x, int y);
+dword FloodGetPixel(byte *linePtr, int width, int format, int x);
+Boolean FloodFillImage(VMFileHandle vmFile, VMBlockHandle bitmapBlock, int xStart, int yStart, dword newColorInfo);
+void ToolTransferMask(VMBlockHandle srcBmp, VMBlockHandle destBmp, int width, int height);
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	Methods and tool routines
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+/*--------------------- MSG_FATBITS_FLOOD_FILL_START_SELECT ---------------------
+ *  Purpose:	Fill or clear an area
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- set up a colorInfo value with the bit FLOOD_MASK_IS_SET is set
+ *	- fill area and update mask bitmap
+ *	- redraw fatbits and preview
+ *  Parameters: xPos, yPos: mouse coordinates
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FLOOD_FILL_START_SELECT{ /* int  */
+dword newColorInfo;
+int idx, count;
+PaletteEntry color;
+
+
+    @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_FILL_AREA);
+    	/* We do not call AppMarkBusy() here because this calls MSG_GEN_APPLICATION_IGNORE_INPUT();
+    	 * which prevents MSG_MET_END_SELECT() from being sended. But we need that to happen.
+    	 */
+
+    /*
+     * Set up the proper colorInfo value for FloodFillImage()
+     */
+    color = pself->FBI_areaAttrs.areaColor;
+    count = 256;
+
+    switch (pself->FBI_bmFormat & BMT_FORMAT) {
+    case BMF_MONO:
+    	idx = 1;		// default: black
+	if (color.rt) idx = 0;	// white
+	newColorInfo = idx;
+    	break;
+
+    case BMF_4BIT:
+    	count = 16;
+    case BMF_8BIT:		/* set low signinficant byte to index */
+	idx = PaletteFindIndex(color.rt, color.gn, color.bl, count);
+	newColorInfo = idx;
+    	break;
+
+    case BMF_24BIT:		/* set RGB value */
+	newColorInfo = color.rt;
+	newColorInfo <<= 8;
+	newColorInfo += color.gn;
+	newColorInfo <<= 8;
+	newColorInfo += color.bl;
+    	break;
+    }
+    newColorInfo |= FLOOD_MASK_IS_SET;
+
+    /*
+     * Fill area and update mask bitmap
+     */
+    FloodFillImage(global.tempFile, pself->FBI_bitmap, xPos, yPos, newColorInfo);
+    ToolTransferMask(pself->FBI_bitmap, pself->FBI_maskBmp, pself->FBI_xSize, pself->FBI_ySize);
+
+    /*
+     * Redraw fatbits and live preview completely.
+     */
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@FatbitsView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+
+/*--------------------- MSG_FATBITS_FILL_MASK_START_SELECT ---------------------
+ *  Purpose:	Clear the mask in the area where mouse was clicked.
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Call FloodFillImage() with a special colorInfo value
+ 	  - passed color is set to white for downward compatibility
+ 	  - the bit FLOOD_MASK_IS_SET of passed color value is clear.
+ 	    This causes FloodFillImage() to make the area transparent.
+ *	- update mask bitmap
+ *	- redraw fatbits and preview
+ *  Parameters: xPos, yPos: mouse coordinates
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_MASK_START_SELECT{
+
+    @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+    	/* We do not call AppMarkBusy() here because this calls MSG_GEN_APPLICATION_IGNORE_INPUT();
+    	 * which prevents MSG_MET_END_SELECT() from being sended. But we need that to happen.
+    	 */
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_FILL_MASK);
+
+    /*
+     * Fill area and update mask bitmap
+     */
+    FloodFillImage(global.tempFile, pself->FBI_bitmap, xPos, yPos, 0x00FFffFF);
+    ToolTransferMask(pself->FBI_bitmap, pself->FBI_maskBmp, pself->FBI_xSize, pself->FBI_ySize);
+
+    /*
+     * Redraw fatbits and live preview completely.
+     */
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@FatbitsView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	Flood-Fill-Routines and definitions
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+#define	MONITOR_FLOOD_STACK_DEEPTH	0
+
+	/*
+	 * The FloodStack is a HugeArray
+	 */
+typedef struct {
+	word	x, y;
+	} FloodStackItem;
+
+typedef struct {
+	VMFileHandle	stackFile;
+	VMBlockHandle	stackBlock;
+	dword		numItemsOnStack;
+#if MONITOR_FLOOD_STACK_DEEPTH
+	dword		maxItemsOnStack;
+#endif
+	} FloodStack;
+
+
+/*------------- FloodStackCreate -----------------------------------------
+ * Purpose:     Nomes es omen
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+void FloodStackCreate(FloodStack *stack, VMFileHandle vmFile) {
+	memset(stack, 0, sizeof(FloodStack));
+	stack->stackFile = vmFile;
+	stack->stackBlock = HugeArrayCreate(vmFile, sizeof(FloodStackItem), 0);
+}
+
+
+/*------------- FloodStackDestroy -----------------------------------------
+ * Purpose: 	Nomen est omen
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+void FloodStackDestroy(FloodStack *stack) {
+	HugeArrayDestroy(stack->stackFile, stack->stackBlock);
+	memset(stack, 0, sizeof(FloodStack));
+	}
+
+/*------------- FloodStackPush -----------------------------------------
+ * Purpose:	Push a pixel position to the stack.
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+void FloodStackPush(FloodStack *stack, int x, int y) {
+FloodStackItem item;
+
+	item.x = x;
+	item.y = y;
+	HugeArrayAppend(stack->stackFile, stack->stackBlock, 1, &item);
+	stack->numItemsOnStack++;
+
+#if MONITOR_FLOOD_STACK_DEEPTH
+	if ( stack->numItemsOnStack > stack->maxItemsOnStack )
+		stack->maxItemsOnStack = stack->numItemsOnStack;
+#endif
+}
+
+/*------------- FloodStackPop -----------------------------------------
+ * Purpose:	Pop a pixel position from stack.
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+void FloodStackPop(FloodStack *stack, int *x, int *y) {
+FloodStackItem	*itemPtr;
+word		size;
+
+	EC( if ( !stack->numItemsOnStack) {
+		ProgError("FloodStackPop: empty stack");
+		}
+	)
+
+	/*
+	 * Set numItemsOnStack to the index of the last element,
+	 * this is equal to the new item cont.
+	 */
+	stack->numItemsOnStack--;
+
+	// Copy entry
+	HugeArrayLock(stack->stackFile, stack->stackBlock,
+			stack->numItemsOnStack, (void**)&itemPtr, &size);
+	*x = itemPtr->x;
+	*y = itemPtr->y;
+	HugeArrayUnlock(itemPtr);
+
+	// delete popped entry
+	HugeArrayDelete(stack->stackFile, stack->stackBlock, 1, stack->numItemsOnStack);
+
+}
+
+/*------------- FloodGetPixelXY -----------------------------------------
+ * Purpose:     Return color information for a given pixel
+ *		Pass valid coordinates
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+dword FloodGetPixelXY(VMBlockHandle bmp, int width, int format, int x, int y) {
+dword	colorInfo;
+BitmapAccessRecord bar;
+byte 	*linePtr;
+
+    linePtr = BTBitmapLock(global.tempFile, bmp, &bar, y);
+    colorInfo = FloodGetPixel(linePtr, width, format, x);
+    BTBitmapUnlock(&bar, FALSE);
+
+    return colorInfo;
+}
+
+/*------------- FloodGetPixel -----------------------------------------
+ * Purpose:     Return color information for a given pixel
+ *		Pass a pointer to locked pixel line
+ * Startegy:
+ *	- Get color information depending on the color depth of the bitmap
+ *	- Add mask information
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+dword FloodGetPixel(byte *linePtr, int width, int format, int x) {
+int 	maskLen;
+byte 	*pixelPtr, b;
+dword	colorInfo;
+
+    maskLen = (width+7)/8;
+    pixelPtr = linePtr + maskLen;
+    colorInfo = 0;
+
+    /*
+     * 1st step: get color information
+     * see concept notes above for information about colorInfo structure
+     */
+    switch (format & BMT_FORMAT) {
+    case BMF_MONO:		/* set low signinficant byte to 0 or 1 */
+	pixelPtr += x/8;
+	b = *pixelPtr;
+	if ( b & (0x80 >> (x & 0x07)) ) colorInfo = 1;
+    	break;
+
+    case BMF_4BIT:		/* set low signinficant byte to index */
+    	b = pixelPtr[x/2];
+    	if ( x & 1 ) { colorInfo = b & 0x0F; }
+    		else { colorInfo = (b & 0xF0) >> 4; }
+    	break;
+
+    case BMF_8BIT:		/* set low signinficant byte to index */
+	colorInfo = pixelPtr[x];
+    	break;
+
+    case BMF_24BIT:		/* set RGB value */
+    	pixelPtr += 3*x;
+    	colorInfo = *pixelPtr;	/* R value */
+    	colorInfo <<= 8;
+    	pixelPtr++;
+    	colorInfo += *pixelPtr;	/* G value */
+    	colorInfo <<= 8;
+    	pixelPtr++;
+    	colorInfo += *pixelPtr;	/* B value */
+    	break;
+    }
+
+    /*
+     * 2nd step: mix in mask bit information
+     */
+    linePtr += x/8;
+    b = *linePtr;
+    if ( b & (0x80 >> (x & 0x07)) ) colorInfo |= FLOOD_MASK_IS_SET;
+
+    return colorInfo;
+}
+
+/*------------- FloodWritePixel -----------------------------------------
+ * Purpose:	Set the color and mask information for a single pixel
+ * Parameters:
+ *	- Write color information depending on the color depth of the bitmap
+ *	- Write mask information
+ * Comment: If we use FloodFillPixel to fill an area transparent, colorInfo is
+ *	  set to white. But if the bitmap has a palette (meaning that the passed index
+ *	  isn't actually white), this is automatically corrected when the icon
+ *	  is saved. That's why I'm not going to bother with any further steps here.
+ * Return:
+ -----------------------------------------------------------------------*/
+void FloodWritePixel(byte *linePtr, int width, int format, int x, dword newColorInfo) {
+int 	maskLen;
+byte 	*pixelPtr, b;
+
+    maskLen = (width+7)/8;
+    pixelPtr = linePtr + maskLen;
+
+    /*
+     * set new color information
+     * see concept notes above for information about colorInfo structure
+     */
+    switch (format & BMT_FORMAT) {
+
+    case BMF_MONO:		/* low signinficant byte is 0 or 1 */
+	pixelPtr += x/8;
+	b = *pixelPtr;
+	if ( newColorInfo & 0x0F) {
+	    b |= 0x80 >> (x & 0x07);		/* set image bit */
+	} else {
+	    b &= ~(0x80 >> (x & 0x07));		/* clear image bit */
+	}
+	*pixelPtr = b;
+    	break;
+
+    case BMF_4BIT:		/* low signinficant byte is index */
+    	b = pixelPtr[x/2];
+    	if ( x & 1 ) {
+    	    b &= 0xF0; 		// preserve higher half byte
+    	    b |= newColorInfo & 0x0F;
+    	} else {
+    	    b &= 0x0F; 		// preserve lower half byte
+    	    b |= (newColorInfo & 0x0F) << 4;
+    	}
+	pixelPtr[x/2] = b;
+    	break;
+
+    case BMF_8BIT:		/* low signinficant byte is index */
+	pixelPtr[x] = newColorInfo & 0xFF;
+    	break;
+
+    case BMF_24BIT:			/* three bytes RGB value */
+    	pixelPtr += 3*x;
+    	*pixelPtr = (newColorInfo >> 16) & 0xFF;	/* R */
+    	pixelPtr++;
+    	*pixelPtr = (newColorInfo >> 8) & 0xFF;		/* G */
+    	pixelPtr++;
+    	*pixelPtr = newColorInfo & 0xFF;		/* B */
+    	break;
+    }
+
+    /*
+     * set mask bit information
+     */
+    linePtr += x/8;
+    b = *linePtr;
+    if ( newColorInfo & FLOOD_MASK_IS_SET) {
+	b |= 0x80 >> (x & 0x07);	/* set mask bit */
+    } else {
+	b &= ~(0x80 >> (x & 0x07));	/* clear mask bit */
+    }
+    *linePtr = b;
+
+
+}
+
+
+/*------------- FloodCompareColors -----------------------------------------
+ * Purpose:	Check, if a pixels should be drawn in the new color
+ *		Take into account what we also want to fill in transparent areas
+ * Startegy:
+ 	- if curColor == oldColor return TRUE (replace pixel color)
+ 	- otherwise check mask information
+ 	  If the color to be replaced (oldColorInfo) refers to a
+ 	  transparent pixel, every transparent pixel should be replaced,
+ 	  no matter, what the (invisible) color is.
+ * Parameters:  oldColorInfo: the color to be replaced
+ 		curColorInfo: the color of the current pixel
+ * Return:	TRUE, if pixel color should be replaced
+ *		FALSE, if not
+ -----------------------------------------------------------------------*/
+Boolean FloodCompareColors(dword curColorInfo, dword oldColorInfo) {
+
+    if ( curColorInfo == oldColorInfo) return TRUE;
+    if ( oldColorInfo & FLOOD_MASK_IS_SET ) return FALSE;
+    /*
+     * We are about to fill a masked-out area.
+     * Replace every masked pixel.
+     */
+    if ( curColorInfo & FLOOD_MASK_IS_SET ) return FALSE;	// not masked pixel
+    return TRUE;
+}
+
+
+/*------------- FloodFillImage -----------------------------------------
+ * Purpose:    	Replace the color in an area by another color
+ *		using the flood-fill algorithm
+ * Startegy:
+ 	- oldColorInfo:	color at starting point - color to be replaced by newColorInfo
+ 	- curColorInfo:	color of the current pixel
+ 	- for algorithm: see code
+ * Parameters:	vmFile, bitmapBlock: bitmap to fill
+ *		xStart, yStart:	bitmap coordinates
+ *		newColorInfo:	color to use
+ *				- FLOOD_MASK_IS_SET should usually be set
+ *				- pass FLOOD_MASK_IS_SET clear to make a
+ *				  non-transparent area transparent
+ * Return:	TRUE, if there is nothing to do
+ ----------------------------------------------------------------------*/
+Boolean FloodFillImage(VMFileHandle vmFile, VMBlockHandle bitmapBlock,
+		int xStart, int yStart, dword newColorInfo) {
+FloodStack	stack;
+BitmapAccessRecord	bar;
+byte	*linePtr;
+int	x, y, width, xMax, yMax, bmFormat;
+dword 	oldColorInfo, curColorInfo;
+
+#define FF_DO_TIME_CHECK	0
+#if FF_DO_TIME_CHECK
+dword 	time;
+#endif
+
+	/*
+	 * Get information about the  bitmap
+	 */
+	bmFormat = BTGetMoreBitmapInfos(vmFile, bitmapBlock, &xMax, &yMax, 0);
+	width = xMax;
+	xMax--;		// max. coordinate = width - 1
+	yMax--;
+
+
+	/*
+	 * Create flood fill stack
+	 * Get color to replace
+	 */
+	FloodStackCreate(&stack, vmFile);
+
+	linePtr = BTBitmapLock(vmFile, bitmapBlock, &bar, yStart);
+	oldColorInfo = FloodGetPixel(linePtr, width, bmFormat, xStart);
+	BTBitmapUnlock(&bar, TRUE);
+
+        /*
+         * see if there is nothing to do
+         * - replace a color by the same color
+         * - make an area transparent, that is already transparent
+         */
+	if ( oldColorInfo == newColorInfo ) {
+		FloodStackDestroy(&stack);
+		return TRUE;
+		}
+	if ( ((oldColorInfo & FLOOD_MASK_IS_SET) == 0) && ((newColorInfo & FLOOD_MASK_IS_SET) == 0)) {
+		FloodStackDestroy(&stack);
+		return TRUE;
+		}
+
+#if FF_DO_TIME_CHECK
+	time = TimerGetCount();
+#endif
+
+	FloodStackPush(&stack, xStart, yStart);
+
+	while ( stack.numItemsOnStack ) {
+	    FloodStackPop(&stack, &x, &y);
+
+	    /*
+	     * If the current color is equal to the color to be replaced,
+	     * replace it.
+	     * Then push the neighboring pixels onto the stack, if they have the
+	     * color we a searching for. They all will be handled later.
+	     */
+	    linePtr = BTBitmapRelock(&bar, y);
+	    curColorInfo = FloodGetPixel(linePtr, width, bmFormat, x);
+	    if ( FloodCompareColors(curColorInfo, oldColorInfo) ) {
+
+	    	FloodWritePixel(linePtr, width, bmFormat, x, newColorInfo);
+
+		if ( y < yMax) {
+			linePtr = BTBitmapNext(&bar, TRUE);
+			curColorInfo = FloodGetPixel(linePtr, width, bmFormat, x);
+			if (  FloodCompareColors(curColorInfo, oldColorInfo) ) FloodStackPush(&stack, x, y + 1);
+			linePtr = BTBitmapPrev(&bar, TRUE);
+			}
+		if ( y >  0  ) {
+			linePtr = BTBitmapPrev(&bar, TRUE);
+			curColorInfo = FloodGetPixel(linePtr, width, bmFormat, x);
+			if ( FloodCompareColors(curColorInfo, oldColorInfo) ) FloodStackPush(&stack, x, y - 1);
+			linePtr = BTBitmapNext(&bar, TRUE);
+			}
+		if ( x < xMax) {
+			curColorInfo = FloodGetPixel(linePtr, width, bmFormat, x + 1);
+			if ( FloodCompareColors(curColorInfo, oldColorInfo) ) FloodStackPush(&stack, x + 1, y);
+			}
+		if ( x >  0  ) {
+			curColorInfo = FloodGetPixel(linePtr, width, bmFormat, x - 1);
+			if ( FloodCompareColors(curColorInfo, oldColorInfo) ) FloodStackPush(&stack, x - 1, y);
+			}
+		}
+	    BTBitmapUnlock(&bar, TRUE);
+
+	    }	// end of while
+
+
+#if FF_DO_TIME_CHECK
+	time = TimerGetCount() - time;
+	MessageDWordBox(time);
+#endif
+
+
+#if MONITOR_FLOOD_STACK_DEEPTH
+	MessageDWordBox(stack.maxItemsOnStack);
+#endif
+
+	FloodStackDestroy(&stack);
+
+	return FALSE;
+}
+
+/*-------------  -----------------------------------------
+ * Purpose:
+ * Parameters:
+ * Return:
+ -----------------------------------------------------------------------*/
+
+/* end of file floodfill.goc */
+
