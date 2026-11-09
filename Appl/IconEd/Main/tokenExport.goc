@@ -1,0 +1,1801 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	token.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 1/10/2025	Initial revision
+ *
+ * DESCRIPTION:	This file deals with export to token database
+ *
+ *+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	Structure of VisMonikers for export to token database
+ *	or for write to file
+ *+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ *
+ * If the icon bitmap has no palette
+ * ---------------------------------
+ *
+ *	+------------------------------------------+
+ *	| 5 bytes     VisMonikerWithGString        |
+ *	+------------------------------------------+
+ *	| 3/5 bytes   1 byte GR_DRAW_BITMAP_CP     |
+ *	|          or 3 - GR_SET_AREA_COLOR_INDEX  | see below!
+ 	|		- Index Color: C_BLACK 	   |
+ 	|		- GR_FILL_BITMAP_CP    	   |
+ *	|             2 byte size of bitmap        |
+ *      |               including header           |
+ *	+------------------------------------------+
+ *	| 6 bytes     Bitmap header                |
+ *	| N bytes     bitmap image data, may  be   |
+ *	|             compacted or not             |
+ *	+------------------------------------------+
+ *	| 1 byte      GR_END_GSTRING               |
+ *	+------------------------------------------+
+ *
+ *
+ * If the icon bitmap has a palette
+ * --------------------------------
+ *
+ *	+------------------------------------------+
+ *	| 5 bytes     VisMonikerWithGString        |
+ *	+------------------------------------------+
+ *	| 3/5 bytes   1 byte GR_DRAW_BITMAP_CP     |
+ *	|          or 3 - GR_SET_AREA_COLOR_INDEX  |
+ 	|		- Index Color: C_BLACK 	   |
+ 	|		- GR_FILL_BITMAP_CP    	   |
+ *	|             2 byte size of bitmap        |
+ *      |               including header and       |
+ *      |               palette                    |
+ *	+------------------------------------------+
+ *	| 20 bytes    CBitmap header               |
+ *	|  2 bytes    number of palette entries    |
+ *	| 48 bytes or 768 bytes:                   |
+ *	|             palette data                 |
+ *	| N  bytes    bitmap image data, may  be   |
+ *	|             compacted or not             |
+ *	+------------------------------------------+
+ *	| 1 byte      GR_END_GSTRING               |
+ *	+------------------------------------------+
+ *
+ * Set up complex bitmap header values as
+ * --------------------------------------
+ *      CB_startScan = 0
+ *      CB_numScans  = height of the bitmap
+ *      CB_devInfo   = 0
+ *      CB_data	     = sizeof(CBitmap) + 2 + sizeof(PaletteEntry)* number of palette entries
+ *                   => 70 (0x46)   for a 16 color palette
+ *                   => 790 (0x316) for a 256 color palette
+ *      CB_palette   = 20 (size of CBitmap structure)
+ *      CB_xres      = 72
+ *      CB_yres      = 72
+ *
+ * Using GR_FILL_BITMAP_CP (for monochrome icons only)
+ * ---------------------------------------------------
+ *	GR_FILL_BITMAP_CP reduces the data size for a monochrome bitmap
+ *	because there is no mask required. Instead, the bitmap will be
+ *	drawn transparent using the current area color. Due to a system
+ *	issue (the area color is sometimes not reset to black), we have
+ *	to set the area color manually to black.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+@include <win.h>
+
+@include "iconed.goh"
+@include "rsftool.goh"
+
+@include "UI/appui.goh"
+@include "token.h"
+@include "initfile.h"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+/*--------------------- ToolGetCurrentISetData ---------------------
+ *  Purpose:	Find out important information about the current icon set
+ *  Context:
+ *  Strategy:
+ *  Parameters:	*vmFile: 	return: database file
+ *		*currentIcon:	return: currently edited icon
+ *  Return:	current icon set
+ ---------------------------------------------------------------------------*/
+int ToolGetCurrentISetData(VMFileHandle *vmFile, int *curIcon) {
+optr 	dbViewer;
+int	iSet;
+
+    if ( !global.curDisplay ) return NO_CURRENT_ISET;
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+
+    iSet = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    if (iSet == NO_CURRENT_ISET ) return NO_CURRENT_ISET;
+
+    if ( *vmFile ) {
+    	*vmFile = @call dbViewer::MSG_DB_VIEWER_GET_DATABASE();
+    }
+
+    if ( *curIcon ) {
+    	*curIcon = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ICON();
+    }
+
+    return iSet;
+}
+
+/*--------------------- ToolSetTextWashColor ---------------------
+ *  Purpose:	Chang the background color of a GenText object
+ *  Context:
+ *  Strategy:	The object must be not usable to change the color
+ *  Parameters:	obj:	Text object
+ *		color: 	index color
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolSetTextWashColor(optr obj, int color) {
+int isUsable;
+ColorQuad cq = { CF_INDEX, 0, 0, 0 };
+
+    isUsable = @call obj::MSG_GEN_GET_USABLE();
+    if ( isUsable ) @call obj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+    cq.CQ_redOrIndex = color;
+    @call obj::MSG_META_ADD_VAR_DATA(HINT_TEXT_WASH_COLOR, sizeof(ColorQuad), &cq);
+
+    if ( isUsable ) @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+
+/***********************************************************************
+ *
+ *	Export token to token database
+ *	--------------------------------
+ *
+ ***********************************************************************/
+
+GeodeToken ToolExpTokenGetTokenFromUI(void);
+void 	ToolExpTokenUpdateUIFromToken(GeodeToken token);
+int	ToolExpTokenCheckReady(VMFileHandle vmFile, int iSet);
+int 	ExpTokenCountTextMonikersToExport(optr dbViewerObj, int iSet);
+
+void 	ExpTokenSelectDuplicatedPropertyItems(VMFileHandle vmFile, int iSet);
+void 	ExpTokenSelectTooLargeItems(VMFileHandle vmFile, int iSet);
+void 	ExpTokenSelectEmptyOrTCItems(VMFileHandle vmFile, int iSet);
+Boolean ExpTokenTestIfInvisible(VMFileHandle vmFile, VMBlockHandle bmp, int *bmFormatPtr);
+
+optr 	MakeMonikerFromBitmap(VMFileHandle vmFile, VMBlockHandle bmp, MemHandle mh, int vmType, word compressMode);
+void 	StoreMonikerInList(optr monikerList, optr monikerOp, int index, word type);
+dword 	FindChunkSizeForMoniker(VMFileHandle vmFile, VMBlockHandle bmp, word compressMode, int *compact);
+word 	MonikerWriteSimpleBitmapHeader(byte *bPtr, int bmFormat, int width, int height, int compact);
+word 	MonikerWriteComplexBitmapHeader(byte *bPtr, int bmFormat, int width, int height, int compact);
+word 	MonikerCopyBitmapPalette(byte *bPtr, VMFileHandle vmFile, VMBlockHandle bmp);
+word 	MonikerCopyBitmapData(VMFileHandle vmFile, VMBlockHandle bmp, int width, int height, byte *data);
+
+/*--------------------- MSG_DB_VIEWER_INITIALIZE_EXPORT_TOKEN_DB_DIALOG ---------------------
+ *  Purpose:	Set up all data required to work with the ExportTokenDialog
+ *  Context:
+ *  Strategy:
+ 	- reset dialog size (minimizes ExpTokenInfoText)
+ 	- initialize list of icon moniker names
+ 	- display token ID and token chars
+ 	- find  standard size icon for the token and display it
+ 	- check if we are ready for export
+ 		- icon bitmap sizes must be smaller than 8 kb
+ 		  perhaps we must compress it
+ 		- we cannot have twice the same combination of display size,
+ 		  display class, icon style and aspect ratio.
+ 		- warn, if one of the images is a (possibly large) true color image
+	- enable "Export" trigger if all checks has been passe
+ *  Parameters:
+ *  Return:	TRUE, if canceled by user or no icon set available
+ *		FALSE if dialog box can opned (even if not ready for export)
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_INITIALIZE_EXPORT_TOKEN_DB_DIALOG {
+int count, n, idx;
+GeodeToken  initialToken = { "Tokn", 0};
+VMBlockHandle iconBmp, bmp;
+word	vmlet;		/* VisMonikerListEntryType, word flags */
+int ready, warn;
+
+    @send ExportTokenDialog::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_NOW);
+
+    @send ExpTokenMonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    if ( pself->DBVI_currentISet == NO_CURRENT_ISET ) return TRUE;
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return TRUE;
+
+
+    count = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    count += ExpTokenCountTextMonikersToExport(oself, pself->DBVI_currentISet);
+    @send ExpTokenMonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+
+    /*
+     * Fetch token from current IconSet
+     * Send Token to dialog UI
+     */
+    initialToken = IdGetToken(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    ToolExpTokenUpdateUIFromToken(initialToken);
+
+
+    /*
+     * Display an icon for the token to be exported. Prefer colored icons
+     * in standard size. If not found, use first icon image.
+     */
+    idx = 0;
+    for ( n = 0 ; n < count; n++ ) {
+    	/*
+    	 * Get EntryType and check it
+    	 */
+    	vmlet = IdGetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, n);
+    	if ( ((vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET) != DS_STANDARD ) continue;
+    	if ( ((vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET) != VMS_ICON ) continue;
+    	if ( ((vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET) < DC_COLOR_4 ) continue;
+
+    	/*
+    	 * The icon is colored, for standard sized screens and not a tool icon.
+    	 * Use this icon.
+    	 */
+    	idx = n;
+    	break;
+    }
+
+    /*
+     * Now display the icon ..
+     */
+    iconBmp = IdGetEntryBitmap(pself->DBVI_vmFile, pself->DBVI_currentISet, idx);
+    bmp = BTCopyBitmap(pself->DBVI_vmFile, global.tempFile, iconBmp);
+    @call RightTokenImageContent::MSG_OC_REPLACE_BITMAP(bmp);
+
+
+    /*
+     * Check if ready for export. If not, display the reason.
+     * At first, setup initial state for UI (not ready, all compress options allowed)
+     */
+    @send ExpTokenDoExportTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    ToolSetTextWashColor(@ExpTokenInfoText, C_LIGHT_RED);
+
+    @send ETCompressAlways::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send ETCompressNever::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    ready = ToolExpTokenCheckReady(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    warn = ready & TOKEN_WARNING_BITS;
+    ready &= TOKEN_STATUS_BITS;
+
+    /*
+     * depending on ready state, update UI or return
+     */
+    switch ( ready ) {
+
+    case TOKEN_READY_IF_MINIMZE:
+    	/*
+    	 * We can only use 'minimize size' option
+    	 */
+	@send ETCompressAlways::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ETCompressNever::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ExpTokenCompressOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(COMPRESS_ICON_AUTO, FALSE);
+	goto weAreReady;
+
+    case TOKEN_READY_IF_COMPRESS:
+    	/*
+    	 * We can use 'minimize size' or 'compress always' option
+    	 */
+    	if ( COMPRESS_ICON_NEVER == @call ExpTokenCompressOptions::MSG_GEN_ITEM_GROUP_GET_SELECTION() ) {
+    	    @send ExpTokenCompressOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(COMPRESS_ICON_AUTO, FALSE);
+    	}
+	@send ETCompressNever::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	goto weAreReady;
+
+
+    case TOKEN_NOT_READY_BECAUSE_SIZE:
+    	/*
+    	 * We have at least on icon that is larger than MAX_SAFE_MONIKER_SIZE
+    	 * We cannot export this set of icons to token database.
+    	 */
+        ExpTokenSelectTooLargeItems(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	@send ExpTokenInfoText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@ExpTokenTooLargeIcons, 0);
+    	return FALSE;
+
+    case TOKEN_NOT_READY_BECAUSE_PROPERTIES:
+    	/*
+    	 * We have two icons with the same combination of display size, display class, icon style
+    	 * and aspect ratio. This combination should be unique for the icons in the same token.
+    	 */
+        ExpTokenSelectDuplicatedPropertyItems(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	@send ExpTokenInfoText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@ExpTokenDoubleProperties, 0);
+    	return FALSE;
+    }
+
+
+
+weAreReady:
+    /*
+     * Display warnings, if we have any
+     */
+    @send ExpTokenInfoText::MSG_VIS_TEXT_DELETE_ALL();
+    if (warn) {
+    	ExpTokenSelectEmptyOrTCItems(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	ToolSetTextWashColor(@ExpTokenInfoText, WARNING_COLOR);	/* Warning color */
+
+        if (warn & TOKEN_RGB_WARNING) {
+    	    @send ExpTokenInfoText::MSG_VIS_TEXT_APPEND_OPTR(@ExpTokenRGBWarning, 0);
+    	    }
+        if (warn & TOKEN_EMPTY_WARNING) {
+    	    @send ExpTokenInfoText::MSG_VIS_TEXT_APPEND_OPTR(@ExpTokenEmptyWarning, 0);
+    	    }
+
+    } else {
+    	ToolSetTextWashColor(@ExpTokenInfoText, COLOR_DARK_SILVER);
+    }
+
+    @send ExpTokenInfoText::MSG_VIS_TEXT_APPEND_OPTR(@ExpTokenReadyText, 0);
+    @send ExpTokenDoExportTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    return FALSE;
+}
+
+
+/*--------------------- MSG_ICON_DO_EXPORT_TOKEN_DB_DIALOG ---------------------
+ *  Purpose:	Open ExportTokenDialog, handle 'select geode' and initiate
+ *		real export to token database
+ *  Context:	This must be done in the process thread or file selectors will not work
+ *  Strategy:
+ 	- open ExportTokenDialog
+ 	- if cmd == IC_SELECT_GEODE: request geode and update UI
+ 	  restart ExportTokenDialog
+	- if cmd == IC_OK: export token to token DB (MSG_DB_VIEWER_EXPORT_TO_TOKEN_DB)
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_DO_EXPORT_TOKEN_DB_DIALOG {
+int 	cmd, cmd2;
+Boolean err;
+GeodeToken	token;
+GenFilePath *gfp = 0;
+int found;
+
+    AppMarkBusy();
+    err = @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_INITIALIZE_EXPORT_TOKEN_DB_DIALOG();
+    AppMarkNotBusy();
+    if (err) return;
+
+doDialog:
+
+    cmd = UserDoDialog(@ExportTokenDialog);
+    @send ExportTokenDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /*
+     * if cmd == IC_SELECT_GEODE: request geode and update UI
+     */
+    if (cmd == IC_SELECT_GEODE) {
+        FileLongName	geodeName;
+
+	/*
+	 * Set path. Last used path is stored in ATTR_GEN_PATH_DATA of
+	 * the dialog object (see below)
+	 */
+        FilePushDir();
+        FileSetStandardPath(SP_APPLICATION);
+
+	if (!gfp) gfp = malloc(sizeof(GenFilePath));
+	found = @call ExportTokenDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+
+	if (found != (-1)) {
+	    FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path);
+	}
+
+
+        /*
+         * Request Geode.
+         */
+        MemLock(OptrToHandle(@ExpTokenGeodeTitle));
+    	cmd2 = FileToolExtendedRequestSelectFile(geodeName,
+			@ExpTokenGeodeInfoText, LMemDeref(@ExpTokenGeodeTitle),
+			NULL, TRUE, 0, 0, FSFC_DIRS | FSFC_GEOS_EXECUTABLES,
+			NULL, NULL, NULL);
+	MemUnlock(OptrToHandle(@ExpTokenGeodeTitle));
+
+    	if ( cmd2 == IC_OK) {
+    	    /*
+    	     * get token
+    	     */
+    	    err = FileGetPathExtAttributes(geodeName, FEA_TOKEN, &token, sizeof(GeodeToken));
+    	    if (err) {
+    	    	ErrorBoxOptr(@ExpTokenErrorReadToken);
+    	    } else {
+    	        ToolExpTokenUpdateUIFromToken(token);
+	    }
+
+	    /*
+	     * Store current path in ATTR_GEN_PATH_DATA of the dialog object
+	     */
+	    gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+	    @call ExportTokenDialog::MSG_META_ADD_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+
+
+	    /* Restart dialog */
+	    FilePopDir();
+    	}
+        goto doDialog;
+    }		// end of select geode
+
+    /*
+     * free path buffer
+     * Destroy bitmap for RightTokenImageContent object (clean up tempFile)
+     */
+    if(gfp) free(gfp);
+    @call RightTokenImageContent::MSG_OC_REPLACE_BITMAP(0);
+
+    /*
+     * if cmd == IC_OK: export token to token DB
+     */
+    if (cmd == IC_OK) {
+    	@send CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_EXPORT_TO_TOKEN_DB();
+    }
+
+}
+
+/*--------------------- MSG_ICON_APP_EXPORT_TOKEN_QUERY_ICON ---------------------
+ *  Purpose:	Replace icon moniker in ExpTokenMonikerList
+ *  Context:
+ *  Strategy:	construct string like "48x30, file icon, 16 color screen"
+ *  Parameters:	GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_EXPORT_TOKEN_QUERY_ICON {
+char 	buf[50];	// space to print things like "48x30, file icon, monochrome screen" + reserve
+int	iSet, width, height;
+VMFileHandle vmFile;
+word 	vmlet;		/* VisMonikerListEntryType - word flags */
+word	count;
+
+    iSet = ToolGetCurrentISetData(&vmFile, NULL);
+    count = IdGetEntryCount(vmFile, iSet);
+
+    /*
+     * See if we have a text moniker. This needs another string
+     */
+    if ( item >= count) {
+    	int type;
+    	optr dbViewer;
+    	dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    	type = (item == count) ? VMS_TEXT : VMS_ABBREV_TEXT;
+    	sprintf(buf, "Text Moniker: ");
+    	@call dbViewer::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, strchr(buf, 0), type);
+    	goto replaceMoniker;
+    }
+
+
+    /*
+     * We have a (graphical) icons
+     * Get icon size an print it
+     */
+    IdGetEntryDimensions(vmFile, iSet, item, &width, &height);
+    sprintf(buf,"%ux%u, ", width, height);
+    while (strlen(buf) < 7) strcat(buf, " ");
+
+    /*
+     * Get and print icon properties:
+     *		- file or tool
+     *		- display class (this may differ from color depth of the bitmap!)
+     */
+    vmlet = IdGetEntryType(vmFile, iSet, item);
+
+    MemLock(OptrToHandle(@ExpTokenFileIcon));
+
+    switch ( (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET ) {
+    case  VMS_TOOL:	strcat(buf, LMemDeref(@ExpTokenToolIcon));	break;
+    default:		strcat(buf, LMemDeref(@ExpTokenFileIcon));
+    }
+
+    strcat(buf, ", ");
+    switch ( (vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET ) {
+    case DC_CF_RGB: 	strcat(buf, LMemDeref(@ExpTokenRGBScreen));	break;
+    case DC_COLOR_8: 	strcat(buf, LMemDeref(@ExpToken256Screen));	break;
+    case DC_GRAY_1:
+    	if ( ((vmlet & VMT_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET) == DAR_VERY_SQUISHED ) {
+    	    strcat(buf, LMemDeref(@ExpTokenCGAScreen));
+    	} else {
+    	    strcat(buf, LMemDeref(@ExpTokenMonoScreen));
+    	}
+       	break;
+    default: 	strcat(buf, LMemDeref(@ExpToken16Screen));
+    }
+
+    /*
+     * Replace icon moniker
+     */
+replaceMoniker:
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT (item, buf);
+
+}
+
+
+/*--------------------- MSG_ICON_APP_EXPORT_TOKEN_SOURCE_CHANGED ---------------------
+ *  Purpose:	Toggle between "Enter ID Manually" and "Use Geode"
+ *  Context:	Export token to token database dialog
+ *  Strategy:
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG
+			word selection = cx,
+			word numSelections = bp,
+			GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_EXPORT_TOKEN_SOURCE_CHANGED {
+
+    if (selection == GET_TOKEN_FROM_GEODE) {
+	@call ExpTokenIDGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call ExpTokenSelectGeodeTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+	@call ExpTokenIDGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call ExpTokenSelectGeodeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+}
+
+/*--------------------- MSG_ICON_APP_EXP_TOKEN_CHARS_CHANGED ---------------------
+ *  Purpose:	Update 'current' icon display in ExportTokenDialog
+ *  Context:	The user has entered a character into ExpTokenTokenChars text object
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_EXP_TOKEN_CHARS_CHANGED {
+GeodeToken tok;
+
+    tok = ToolExpTokenGetTokenFromUI();
+    @call LeftTokenImageContent::MSG_OC_SET_TOKEN(tok);
+}
+
+/*--------------------- MSG_ICON_APP_EXP_TOKEN_ID_CHANGED ---------------------
+ *  Purpose:	Update 'current' icon display in ExportTokenDialog
+ *  Context:	The token ID (ExpTokenIDValue object) has been changed
+ *  Strategy:
+ *  Parameters:(GEN_VALUE_APPLY_MSG)
+ 	WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_EXP_TOKEN_ID_CHANGED {
+GeodeToken tok;
+
+    tok = ToolExpTokenGetTokenFromUI();
+    @call LeftTokenImageContent::MSG_OC_SET_TOKEN(tok);
+}
+
+/*--------------------- ToolExpTokenGetTokenFromUI ---------------------
+ *  Purpose:	Read cuurent token from ExportTokenDialog UI
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	token
+ ---------------------------------------------------------------------------*/
+GeodeToken ToolExpTokenGetTokenFromUI(void) {
+GeodeToken tok;
+char tchars[6];		// 4 chars + 00 + savety
+word manufID;
+
+    @call ExpTokenTokenChars::MSG_VIS_TEXT_GET_ALL_PTR(tchars);
+    manufID = @call ExpTokenIDValue::MSG_GEN_VALUE_GET_VALUE();
+    memcpy(&(tok.GT_chars[0]), tchars, 4);
+    tok.GT_manufID = manufID;
+
+    return tok;
+}
+
+/*--------------------- ToolExpTokenUpdateUIFromToken ---------------------
+ *  Purpose:	Set the UI in ExportTokenDialog to reflect the given token
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolExpTokenUpdateUIFromToken(GeodeToken token) {
+char buf[8];
+
+    /*
+     * Pass token information to object in ExportTokenDialog
+     */
+    sprintf(buf, "%c%c%c%c", token.GT_chars[0], token.GT_chars[1], token.GT_chars[2], token.GT_chars[3]);
+    @call ExpTokenTokenChars::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    @call ExpTokenIDValue::MSG_GEN_VALUE_SET_VALUE(token.GT_manufID, FALSE);
+
+    @call LeftTokenImageContent::MSG_OC_SET_TOKEN(token);
+}
+
+
+/*--------------------- ToolCheckIconsProperties ---------------------
+ *  Purpose:	Check all icons if they are icons with the same combination of
+     	  	display size, icon style, display class and aspect ratio
+ *  Context:
+     * Usually only one icon should exists for every combination of
+     * display size, icon style, display class aspect ratio.
+ *  Strategy:
+ 	- IdGetEntryType returns all information we need
+ 	- make a double-loop over all icons for this set
+ 	- if a duplicates has been found, select icon and try next one
+ *  Parameters:
+ 	vmFile:	database file
+ 	iSet:	icon set to examinate
+ *  Return:	TRUE: 	we have duplicates
+ *		FALSE:	no duplicates
+ ---------------------------------------------------------------------------*/
+Boolean ToolCheckIconsProperties(VMFileHandle vmFile, int iSet) {
+int n, count, k;
+VisMonikerListEntryType	vmlet1, vmlet2;
+
+    count = IdGetEntryCount(vmFile, iSet);
+    if ( count < 2 ) return FALSE;
+
+    for ( n = 0; n < (count-1); n++ ) {
+
+    	vmlet1 = IdGetEntryType(vmFile, iSet, n);
+    	vmlet1 &= (VMLET_GS_COLOR | VMLET_STYLE | VMLET_GS_SIZE | VMLET_GS_ASPECT_RATIO);
+
+    	for ( k = n+1; k < count; k++ ) {
+
+    	    vmlet2 = IdGetEntryType(vmFile, iSet, k);
+    	    vmlet2 &= (VMLET_GS_COLOR | VMLET_STYLE | VMLET_GS_SIZE | VMLET_GS_ASPECT_RATIO);
+
+    	    if ( vmlet1 == vmlet2 ) {
+    	    	/* same properties found */
+    	    	return TRUE;
+    	    }
+    	}	// for(k)
+    }		// for(n)
+
+    return FALSE;
+}
+
+
+/*--------------------- ToolExpTokenCheckReady ---------------------
+ *  Purpose:	Check all icons for the set to see, if there is a problem
+ *  Context:
+ *  Strategy:
+ *	Possible problems are:
+ 	- two or more icons have the same combination of
+     	  display size, icon style, display class and aspect ratio
+     	- both, compressed and uncompressed size are larger than
+     	  MAX_SAFE_MONIKER_SIZE. If only one of the sizees is
+     	  too large, return TOKEN_READY_IF_MINIMZE or TOKEN_READY_IF_COMPRESS
+     	- request to print out a warning if
+     	  ... one or more icons are true color icons
+     	  ... one or more icons are invisble (mask is completely clear)
+
+ *  Parameters:	vmFile:	database file
+ *		iSet:	Icon set to check
+ *  Return:
+	TOKEN_READY_FOR_EXPORT			0	<- no problem
+	TOKEN_READY_IF_MINIMZE			1	<- compressed size is too large
+	TOKEN_READY_IF_COMPRESS			2	<- uncompressed size is too large
+	TOKEN_NOT_READY_BECAUSE_SIZE		0x10
+	TOKEN_NOT_READY_BECAUSE_PROPERTIES	0x11
+    Additional flag bits:
+	TOKEN_RGB_WARNING			0x100	<- there are RGB icons
+	TOKEN_EMPTY_WARNING			0x200	<- there are empty icons
+
+ ---------------------------------------------------------------------------*/
+int ToolExpTokenCheckReady(VMFileHandle vmFile, int iSet) {
+int 	count, icon;
+int 	bmFormat;
+VMBlockHandle 	bmp;
+int retVal = TOKEN_READY_FOR_EXPORT;
+
+    count = IdGetEntryCount(vmFile, iSet);
+    EC( if (!count) { ProgError("Strange. no icon in ToolExpTokenCheckReady"); return TOKEN_NOT_READY_BECAUSE_PROPERTIES; } )
+
+    /*
+     * check combination of display size, icon style, display class and aspect ratio
+     */
+    if ( ToolCheckIconsProperties(vmFile, iSet) ) {
+    	return TOKEN_NOT_READY_BECAUSE_PROPERTIES;
+    }
+
+    /*
+     * Examinate every icon
+     */
+    for ( icon = 0; icon < count; icon++) {
+
+        /*
+         * Get bitmap handle and bitmap format
+         */
+        bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+        bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+
+
+        /*
+         * Check size - compressed and uncompressed
+         * If this fails report the error and skip other cheks
+         */
+        retVal = ToolCheckIconSizes(vmFile, bmp);
+        if ( retVal >= TOKEN_FIRST_NOT_READY_VALUE ) {
+	    return retVal;
+    	}
+
+        /*
+         * Check icon for warning messags
+         */
+	if ( ExpTokenTestIfInvisible(vmFile, bmp, NULL) )  retVal |= TOKEN_EMPTY_WARNING;
+	if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) retVal |= TOKEN_RGB_WARNING;
+
+    }		// for (icon)
+
+
+    return retVal;
+}
+
+
+/*--------------------- ToolCheckIconSizes ---------------------
+ *  Purpose:	Check size - compressed and uncompressed
+ *  Context:
+ *  Strategy:
+ 	- loop over the icons
+ 	- mask out all unneeded bits
+ 	- compare relevant bits
+ 	- select the items if the bits are the same
+ *  Parameters:
+ *  Return:
+ 	TOKEN_READY_FOR_EXPORT	-- no problems
+        TOKEN_READY_IF_MINIMZE	-- we MUST use minimze icon size
+        TOKEN_READY_IF_COMPRESS	-- we can use 'compress always' or 'minimze size'
+        TOKEN_NOT_READY_BECAUSE_SIZE -- both sizes are too big
+ ---------------------------------------------------------------------------*/
+int ToolCheckIconSizes(VMFileHandle vmFile, VMBlockHandle bmp) {
+Boolean err;
+dword	uncompressedSize, compressedSize;
+int invalid = 0;
+
+    err = ExpTokenFindBitmapSizes(vmFile, bmp, &uncompressedSize, &compressedSize);
+    if ( !err ) return TOKEN_READY_FOR_EXPORT;
+
+    /*
+     * At lease one of the sizes are too large. Check details
+     */
+    if (uncompressedSize > MAX_SAFE_MONIKER_SIZE) invalid |= 1;
+    if (compressedSize > MAX_SAFE_MONIKER_SIZE) invalid |= 2;
+    switch (invalid) {
+    case 1:	// only uncompressed size is too big
+		// we can use 'compress always' or 'minimze size'
+	return TOKEN_READY_IF_COMPRESS;
+    case 2:	// only compressed size is too big - a very rare case
+      		// we MUST use minimze icon size
+	return TOKEN_READY_IF_MINIMZE;
+    case 3:	// both sizes are too big
+		// We have to cancel the export / write code
+         return TOKEN_NOT_READY_BECAUSE_SIZE;
+    EC( default: ProgError("Icon size check failure"); )
+    }
+
+    return TOKEN_NOT_READY_BECAUSE_SIZE;	// emergency value - be save
+}
+
+
+/*--------------------- ExpTokenSelectDuplicatedPropertyItems ---------------------
+ *  Purpose:	Check all icons for duplicate properties and select the affected
+ *		icons in the ExpTokenMonikerList
+ *  Context:
+ *  Strategy:
+ 	- loop over the icons
+ 	- mask out all unneeded bits
+ 	- compare relevant bits
+ 	- select the items if the bits are the same
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ExpTokenSelectDuplicatedPropertyItems(VMFileHandle vmFile, int iSet) {
+int n, k, count;
+word vmlet, bits1, bits2;
+
+    @call ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+    count = IdGetEntryCount(vmFile, iSet);
+    if ( count < 2 ) return;
+
+    for ( n = 0; n < (count-1); n++ ) {
+
+      vmlet = IdGetEntryType(vmFile, iSet, n);
+      bits1 = vmlet & (VMLET_GS_SIZE | VMLET_STYLE | VMLET_GS_ASPECT_RATIO | VMLET_GS_COLOR);
+
+      for (k = n+1; k < count; k++) {
+
+	vmlet = IdGetEntryType(vmFile, iSet, k);
+	bits2 = vmlet & (VMLET_GS_SIZE | VMLET_STYLE | VMLET_GS_ASPECT_RATIO | VMLET_GS_COLOR);
+	if ( bits1 == bits2) {
+ 	    @send ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+	    @send ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (k, TRUE);
+ 	}
+
+      }		// for (k)
+    }		// for (n)
+
+}
+
+
+/*--------------------- ExpTokenFindBitmapSizes ---------------------
+ *  Purpose:	Calculate bitmap size for compressed and uncompressed variant
+ *		The bitmap header is not taken into account.
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters: vmFile, bmp:	bitmap to analyse
+ *		uncompressedSize: return size for uncompressed bitmap
+ *				NULL pointer allowed
+ *		compressedSize: return size for uncompressed bitmap
+ *				NULL pointer allowed
+ *  Return:	TRUE if one of the sizes is larger than MAX_SAFE_MONIKER_SIZE
+ ---------------------------------------------------------------------------*/
+Boolean ExpTokenFindBitmapSizes(VMFileHandle vmFile, VMBlockHandle bmp, dword *uncompressedSize, dword *compressedSize) {
+dword size;
+Boolean retVal = FALSE;
+int width, height, bmFormat;
+VMBlockHandle compressedBmp;
+word line, lineSize;
+void *linePtr;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+
+    /* calculate uncompressed size */
+    if (uncompressedSize) {
+    	size = ToolCalcBitmapSize(width, height, bmFormat);
+    	*uncompressedSize = size;
+    	if ( size > MAX_SAFE_MONIKER_SIZE) retVal = TRUE;
+    }
+
+    /*
+     * Calculate compressed size.
+     * - compress bitmap
+     * - add sizes for every line
+     *	 Use save HugeArrayLock/HugeArrayUnlock, even this may be slower
+     * - free bitmap
+     * - add palette size, if appropriate
+     */
+    if (compressedSize) {
+	compressedBmp = GrCompactBitmap(vmFile, bmp, global.tempFile);
+	size = 0;
+
+	for ( line = 0; line < height; line++) {
+    	    HugeArrayLock(global.tempFile, compressedBmp, line, &linePtr, &lineSize);
+    	    size += lineSize;
+	    HugeArrayUnlock(linePtr);
+     	}
+     	HugeArrayDestroy(global.tempFile, compressedBmp);
+
+	if ( bmFormat & BMT_PALETTE) {
+	    /*
+	     * calculate palette size
+	     * Note that the palette is preceded by a word (number of palette entries).
+	     */
+	    switch (bmFormat & BMT_FORMAT) {
+	    case BMF_MONO: size += 2*sizeof(PaletteEntry) +  2;	/* not yet supported, but probalely later */
+		  break;
+	    case BMF_4BIT:
+		  size += 16*sizeof(PaletteEntry) +  2;
+		  break;
+	    case BMF_8BIT:
+		  size += 256*sizeof(PaletteEntry) +  2;
+		  break;
+	    }
+	}
+
+	/*
+	 * Add header size
+	 */
+	if ( bmFormat & BMT_COMPLEX) {
+    	    size += sizeof(CBitmap);		/* Complex bitmap header */
+    	} else {
+    	    size += sizeof(Bitmap);		/* Simple bitmap header */
+    	}
+
+	*compressedSize = size;
+    	if ( size > MAX_SAFE_MONIKER_SIZE) retVal = TRUE;
+    }
+
+    return retVal;
+}
+
+/*--------------------- ExpTokenSelectTooLargeItems ---------------------
+ *  Purpose:	Check all icons if they are too big and select the affected
+ *		icons in the ExpTokenMonikerList
+ *  Context:
+ *  Strategy:
+ 	- both, uncompressed and compressed size must exceed MAX_SAFE_MONIKER_SIZE
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ExpTokenSelectTooLargeItems(VMFileHandle vmFile, int iSet) {
+int n, count;
+VMBlockHandle  bmp;
+dword size1, size2;
+
+    @call ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+    count = IdGetEntryCount(vmFile, iSet);
+
+
+    for ( n = 0; n < count; n++ ) {
+    	bmp = IdGetEntryBitmap(vmFile, iSet, n);
+	ExpTokenFindBitmapSizes(vmFile, bmp, &size1, &size2);
+	if ( (size1 > MAX_SAFE_MONIKER_SIZE) && (size2 > MAX_SAFE_MONIKER_SIZE) )
+		@send ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+    }
+
+}
+
+/*--------------------- ExpTokenSelectEmptyOrTCItems ---------------------
+ *  Purpose:	Check all icons if they are empty or true color and select
+ *		the affected icons in the ExpTokenMonikerList
+ *  Context:	Display export to tokenDB warning
+ *  Strategy:
+ 	- loop over all icons in the set
+ 	- select item if the icon is invisible
+ 	  ExpTokenTestIfInvisible returns the bmFormat value as a service
+ 	- select item if it is a true color item
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ExpTokenSelectEmptyOrTCItems(VMFileHandle vmFile, int iSet) {
+int n, count, bmFormat;
+VMBlockHandle  bmp;
+
+    @call ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+    count = IdGetEntryCount(vmFile, iSet);
+
+    for ( n = 0; n < count; n++ ) {
+    	bmp = IdGetEntryBitmap(vmFile, iSet, n);
+	if ( ExpTokenTestIfInvisible(vmFile, bmp, &bmFormat) )
+		@send ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+	if ( (bmFormat & BMT_FORMAT) == BMF_24BIT)
+		@send ExpTokenMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+    }
+
+}
+
+/*--------------------- ExpTokenTestIfInvisible ---------------------
+ *  Purpose:	Check if the icon is invisible bacause its mask is
+ *		completely clear
+ *  Context:
+ *  Strategy:
+ 	- return FALSE if there is no mask
+ 	- calculate number of mask bytes with all 8 bits used
+ 	- calculate the number of used bits in the right most byte
+ 	- compare every byte in the mask with zero.
+ *  Parameters: vmFile, bmp:	bitmap to check
+ *		bmFormat: return: bitmap type value as a service for ExpTokenSelectEmptyOrTCItems
+ 			  Null pointer allowed
+ *  Return:	TRUE  if the image is invisible (completely masked out)
+ *		FALSE if there are visble pixels
+ ---------------------------------------------------------------------------*/
+Boolean ExpTokenTestIfInvisible(VMFileHandle vmFile, VMBlockHandle bmp, int *bmFormatPtr) {
+BitmapAccessRecord bar;
+int maskLen, unusedBits, fullBytes, bmFormat, x, y, width, height;
+byte tailMask;
+byte *maskData;
+Boolean invisible;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    if ( bmFormatPtr ) *bmFormatPtr = bmFormat;
+    if ( (bmFormat & BMT_MASK) == 0 ) return FALSE;
+
+    /*
+     * Calculate mask len and more
+     *	maskLen:   number of bytes for the mask
+     *	fullBytes: number of bytes with all 8 bits used
+     *  tailMask:  bit mask for the right most byte
+     *		   zero if there are no unused bits in the right most byte
+     */
+    maskLen = (width+7)/8;
+    unusedBits = (8*maskLen) - width;
+    if ( unusedBits ) {
+    	fullBytes = maskLen - 1;
+    	tailMask = 0xFF << unusedBits;
+    } else {
+    	fullBytes = maskLen;
+    	tailMask = 0;
+    }
+
+    /*
+     * Lock lines from top to bottom.
+     * Set invisible to FALSE and return if we find any non-masked bit.
+     */
+    invisible = TRUE;
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+
+    for ( y = 0; y < height; y++ ) {
+
+	/* compare fullBytes values with zero */
+	if ( fullBytes ) {
+	  for ( x = 0; x < fullBytes; x++) {
+	    if ( maskData[x] ) {
+		invisible = FALSE;	// non-zero value found
+		break;
+	    }
+	  }
+	}
+
+	/* compare tailByte value with zero */
+	if ( tailMask ) {
+	    if ( maskData[fullBytes] & tailMask ) {
+		invisible = FALSE;
+		break;
+	    }
+
+	}
+
+	maskData = BTBitmapNext(&bar, FALSE);
+    }
+
+    BTBitmapUnlock(&bar, FALSE);
+
+    return invisible;
+}
+
+/*--------------------- ExpTokenCountTextMonikersToExport ---------------------
+ *  Purpose:	Return the number of text monikers that soulb be exported to token DB
+ *  Context:
+ *  Strategy:
+ 	- check options (export allowed?)
+ 	- check text moniker size (no export if empty)
+ *  Parameters:
+ *  Return:	number of text monikers to export
+ ---------------------------------------------------------------------------*/
+int ExpTokenCountTextMonikersToExport(optr dbViewerObj, int iSet) {
+word options;
+FileLongName	monikerText;
+int 	retVal = 0;
+
+    do {
+    	/*
+    	 * no export if OPT_ENABLE_TEXT_MONIKER_EXPORT is not set
+    	 */
+    	options = @call dbViewerObj::MSG_DB_VIEWER_TEXT_MONIKER_GET_OPTIONS(iSet);
+    	if ( (options & OPT_ENABLE_TEXT_MONIKER_EXPORT) == 0 ) break;
+
+    	/*
+    	 * export moniker only if string len is not zero
+    	 */
+    	@call dbViewerObj::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, monikerText, VMS_TEXT);
+    	if ( strlen(monikerText) ) retVal++;
+    	@call dbViewerObj::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, monikerText, VMS_ABBREV_TEXT);
+    	if ( strlen(monikerText) ) retVal++;
+
+    } while(FALSE);
+
+    return retVal;
+}
+
+/*--------------------- MakeMonikerFromText ---------------------
+ *  Purpose:	Create a VisMonikerWithText structure from text moniker,
+ *		stored in the iSet extra block
+ *
+ *  Context:
+ *  Strategy:
+ *  Parameters:	dbViewer: DBViewer object
+ *		iSet:	icon set to use
+ *		nr:	number of the text moniker
+ *			0: firts tet moniker, 1: 2nd text moniker
+ *		mh: 	Memory block to use or zero to create a new memory block
+ *  Return:	optr holding the new moniker
+ *		zero in case of any error
+ ---------------------------------------------------------------------------*/
+optr MakeMonikerFromText(optr dbViewer, int iSet, int nr, MemHandle mh) {
+FileLongName	monikerText;
+int 	textLen, size, chunkSize;
+VisMonikerWithText	*monikerPtr;
+byte 		*bPtr;
+optr		monikerOp;
+word		vmType = DC_GRAY_1 | (DAR_NORMAL << VMT_GS_ASPECT_RATIO_OFFSET);
+
+    /*
+     * Get moniker text. Ensure that it is not empty, even if this may not occur here.
+     */
+    if ( nr == 0) {
+	@call dbViewer::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, monikerText, VMS_TEXT);
+    } else {
+	@call dbViewer::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, monikerText, VMS_ABBREV_TEXT);
+    }
+    if ( strlen(monikerText) == 0 ) strcpy(monikerText, "?");
+
+    /*
+     * Calculate chunk size
+     */
+    textLen = strlen(monikerText);
+    chunkSize = sizeof(VisMonikerWithText) + textLen + 1; // count zero terminator
+
+    /*
+     * Usually all monikers fits in the passed memory block (mh).
+     * If not, or if mh == 0, allocate a new block for every moniker.
+     */
+    if ( mh ) {
+    	size = MemGetInfo(mh, MGIT_SIZE);
+    	if ( (size+chunkSize) > MAX_SAFE_MONIKER_SIZE ) mh = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    } else {
+    	mh = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    }
+
+    /*
+     * Alloc  a chunk to hold the moniker and get a pointer to the chunk.
+     *
+     */
+    MemLock(mh);
+    monikerOp = ConstructOptr(mh, LMemAlloc(mh, chunkSize + 4) );	// a few extra bytes
+    bPtr = LMemDeref(monikerOp);
+    memset(bPtr, 0, chunkSize + 4);
+    monikerPtr = (void*)bPtr;
+
+    /*
+     * Fill in visMoniker structure.
+     */
+    monikerPtr->VMWT_common.VM_type = vmType & 0xFF;
+    monikerPtr->VMWT_common.VM_width = textLen;
+    monikerPtr->VMWT_mnemonicOffset = (-1);
+    bPtr += sizeof(VisMonikerWithText);
+
+    strcpy((char*)bPtr, monikerText);
+
+    return monikerOp;
+}
+
+
+/*--------------------- MSG_DB_VIEWER_EXPORT_TO_TOKEN_DB ---------------------
+ *  Purpose:	Export current icon set to token database file
+ *  Context:
+ *  Strategy:
+ 	- get token from UI
+ 	- alloc a LMem block and a chunk for the moniker list (needed for TokenDefineToken)
+ 	- get compress mode (never, always, minimize size) from dialog UI
+ 	- For every icon: - buid a moniker from icon
+ 			  - store moniker (and list entry type) in moniker list
+ 	- call TokenDefineToken()
+ 	- free memory
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_EXPORT_TO_TOKEN_DB {
+GeodeToken 	token;
+dword		tokenDW;
+MemHandle	listBlock;
+optr		monikerList, monikerOp;
+int		icon,
+		numIcons,		// number of icons (non-text)
+		listSize;	// size of moniker list (in bytes)
+int		numTextMonikers;
+word 		type, compressMode;
+VisMonikerListEntry	*vmlePtr;
+MemHandle	monMH;
+
+    /*
+     * Get token and store it for further use
+     */
+    token = ToolExpTokenGetTokenFromUI();
+    IdSetToken(pself->DBVI_vmFile, pself->DBVI_currentISet, token);
+
+    /*
+     * Alloc LMemChunk for moniker list
+     *	- find out size of the chunk (listSize)
+     *  - alloc block and chunk
+     * Nice to know: TokenDefineToken fetches the number of icons for the token from
+     * the size of the passed monikerList chunk.
+     * Therefore: never make this chunk larger than required to hold the list!
+     */
+    numIcons = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    numTextMonikers = ExpTokenCountTextMonikersToExport(oself, pself->DBVI_currentISet);
+    listSize = (numIcons + numTextMonikers) * sizeof(VisMonikerListEntry);
+
+    listBlock = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    MemLock(listBlock);
+    monikerList = ConstructOptr(listBlock, LMemAlloc(listBlock, listSize));
+    MemUnlock(listBlock);
+
+    /*
+     * Create a moniker for each icon
+     *	- get compress mode from UI
+     *  - loop over all (graphical) icons
+     *  - handle text monikers separately
+     */
+    compressMode = @call ExpTokenCompressOptions::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    compressMode |= @call ExpTokenMonoOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+
+    for (icon = 0; icon < numIcons; icon++) {
+    	monikerOp = MakeMonikerFromIcon(pself->DBVI_vmFile, pself->DBVI_currentISet, icon, compressMode, listBlock);
+    	if ( !monikerOp ) continue;	// Emergency handling, should not occur
+    	type = IdGetEntryType(pself->DBVI_vmFile, pself->DBVI_currentISet, icon);
+    	StoreMonikerInList(monikerList, monikerOp, icon, type);
+    }
+
+    if ( numTextMonikers ) {
+    	/*
+    	 * We have (up to two) text monikers. They must be handled separately
+    	 * 'numIcons' holds the number of (graphical) icons. Therefore the first
+    	 * text moniker must be store in the moniker list at postion 'numIcons + n'
+    	 * where n runs from 0 to 1.
+    	 */
+    	int n;
+    	int numIcons = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	type =  (DS_STANDARD << VMLET_GS_SIZE_OFFSET) |
+    		(VMS_TEXT << VMLET_STYLE_OFFSET) |
+    		(DAR_NORMAL << VMLET_GS_ASPECT_RATIO_OFFSET) |
+    		(DC_GRAY_1 << VMLET_GS_COLOR_OFFSET) ;
+
+    	for ( n = 0; n < numTextMonikers; n++) {
+    	    monikerOp = MakeMonikerFromText(oself, pself->DBVI_currentISet, n, listBlock);
+    	    if ( !monikerOp ) continue;	// Emergency handling, sould not occur
+    	    StoreMonikerInList(monikerList, monikerOp, numIcons + n, type);
+
+    	    type =  (DS_STANDARD << VMLET_GS_SIZE_OFFSET) |
+    		(VMS_ABBREV_TEXT << VMLET_STYLE_OFFSET) |	/* for 2nd turn (if we have one) */
+    		(DAR_NORMAL << VMLET_GS_ASPECT_RATIO_OFFSET) |
+    		(DC_GRAY_1 << VMLET_GS_COLOR_OFFSET) ;
+    	}
+    }
+
+    /*
+     * Define token
+     */
+    memcpy(&tokenDW, &token.GT_chars[0], 4);
+    TokenDefineToken(tokenDW, token.GT_manufID, monikerList, 0*TF_NEED_RELOCATION );
+
+
+    /*
+     * Done. Clean up memory.
+     *	- lock icon list block
+     *	- loop over all list entries
+     *	- free the moniker block if it is not the same as the list block
+     *	- free list block
+     */
+    MemLock(listBlock);
+    vmlePtr = LMemDeref(monikerList);
+    for (icon = 0; icon < (numIcons + numTextMonikers); icon++) {
+ 	monikerOp = vmlePtr[icon].VMLE_moniker;
+ 	monMH = OptrToHandle(monikerOp);
+ 	if ( monMH != listBlock) MemFree(monMH);
+    }
+
+    MemFree(listBlock);
+}
+
+
+/*--------------------- MakeMonikerFromIcon ---------------------
+ *  Purpose:	Convert an icon bitmap to a VisMoniker structure
+ *  Context:
+ *  Strategy:
+ 	- get icon's bitmap handles
+ 	- call MakeMonikerFromBitmap
+ *  Parameters:	vmFile:	database file
+ *		iSet, icon: icon to convert
+ *		compressMode:	flagbits how to compress data
+ 		mh: Memory block to hold the moniker
+ 		    pass zero to allocate a new block
+ *  Return:	optr holding the new moniker
+ *		zero in case of any error
+ ---------------------------------------------------------------------------*/
+optr MakeMonikerFromIcon(VMFileHandle vmFile, int iSet, int icon, word compressMode, MemHandle mh) {
+optr	monikerOp;
+VMBlockHandle	bmp;
+word	type;
+
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    type = IdGetEntryType(vmFile, iSet, icon);
+    EC( if ( (type & VMLET_GSTRING)==0 ) { ProgError("No GString in MakeMonikerFromIcon"); return 0; } )
+
+    /*
+     * Do the real create moniker job
+     * Value for VM_type (vmType parameter) is the same as the low
+     * byte of VisMonikerListEntryType (gotten with IdGetEntryType() )
+     */
+    monikerOp = MakeMonikerFromBitmap(vmFile, bmp, mh, type & 0xFF, compressMode);
+
+    return monikerOp;
+}
+
+/*--------------------- IconTestBWT ---------------------
+ *  Purpose:	See id we have a monochrome bitmap that has white pixels
+ *		that are not transparent
+ *  Context:	We cannot use GrFillBitmap to draw such bitmap
+ *  Strategy:
+ 	- only test monochrome bitmaps
+ 	- lock line by line
+ 	- test pixels
+
+ 	White, non transparent pixel have the mask bit set, but the
+ 	pixel data bit not. All other combinations alre allowed.
+ 	Mask	Pixel	OR	Color	Allowed
+ 	 0	 0	0	transp.	yes
+ 	 0	 1	1	transp.	yes
+ 	 1	 0	1	white	NO
+ 	 1	 1	1	black	yes
+ 	As we can see, only in the not allowed case the
+ 	mask OR pixel value is not equal to the pixel value itself.
+
+ *  Parameters:	vmFile:	bitmap file
+ *		bm:	bitmap handle
+ *  Return:	TRUE if we have white, non-transparent pixels
+ *		FALSE if all non transparant pixels are black
+ ---------------------------------------------------------------------------*/
+Boolean IconTestBWT(VMFileHandle vmFile, VMBlockHandle bmp) {
+
+BitmapAccessRecord bar;
+int maskLen, unusedBits, fullBytes, bmFormat, y, width, height, n;
+byte tailMask;
+byte *maskData, *pixData;
+Boolean whitePixels;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    if ( (bmFormat & BMT_FORMAT) != BMF_MONO) return FALSE;
+
+    /*
+     * Calculate mask len and more
+     *	maskLen:   number of bytes for the mask
+     *	fullBytes: number of bytes with all 8 bits used
+     *  tailMask:  bit mask for the right most byte
+     *		   zero if there are no unused bits in the right most byte
+     */
+    maskLen = (width+7)/8;
+    unusedBits = (8*maskLen) - width;
+    if ( unusedBits ) {
+    	fullBytes = maskLen - 1;
+    	tailMask = 0xFF << unusedBits;
+    } else {
+    	fullBytes = maskLen;
+    	tailMask = 0;
+    }
+
+    /*
+     * Lock lines from top to bottom.
+     * Set whitePixels to TRUE and return if we find any difference between mask and data.
+     */
+    whitePixels = FALSE;
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+    pixData = maskData + maskLen;
+
+    for ( y = 0; y < height; y++ ) {
+
+	/* compare fullBytes values */
+	if ( fullBytes ) {
+	    for ( n = 0; n < fullBytes; n++) {
+		if ( (maskData[n] | pixData[n] ) != pixData[n] ) {
+		     whitePixels = TRUE;
+		     break;
+		}
+	    }
+	}
+
+	/* compare tailByte values */
+	if ( tailMask ) {
+	    int m, p;
+	    m = maskData[fullBytes] & tailMask;
+	    p =  pixData[fullBytes] & tailMask;
+	    if ( (m | p) != p ) {
+	  	whitePixels = TRUE;
+	  	break;
+	  }
+	}
+
+	maskData = BTBitmapNext(&bar, FALSE);
+	pixData = maskData + maskLen;
+    }
+
+    BTBitmapUnlock(&bar, FALSE);
+
+    return whitePixels;
+
+}
+
+/*--------------------- MakeMonikerFromBitmap ---------------------
+ *  Purpose:	Convert an icon bitmap to a VisMoniker structure
+ *  Context:
+ *  Strategy:
+ 	- If requested: remove the mask from monochrome bitmap
+ 	- Calculate the moniker size. uses compressMode
+ 	  returns if the moniker should be compacted
+ 	- If the bitmap should be compacted, compact it
+ 	- Check the size of the memory block plus moniker size
+ 	  alloc a new block for the moniker if the size will bee too large
+	- Alloc  a chunk to hold the moniker
+	- Fill in VisMoniker data.
+	    ... VisMonikerWithGString structure
+	    ... Draw bitmap command
+	    ... Bitmap header
+	    ... Palette, if we have one
+	    ... Bitmap data
+	    ... GrEndGstring
+	- Free memory
+ *  Parameters: vmFile, bmp:	Bitmap to convert
+ 		mh:	memory block to store the VisMoniker
+ 			pass zero to allocate a new block
+ 		vmType:	VisMoniker type (will be stored in VM_type field)
+ 		compressMode: how to compress the bitmap
+ *  Return:	optr of the chunk that holds the moniker
+ *		zero in case of any error (moniker is too big)
+ ---------------------------------------------------------------------------*/
+optr MakeMonikerFromBitmap(VMFileHandle vmFile, VMBlockHandle bmp, MemHandle mh, int vmType, word compressMode) {
+optr	monikerOp;
+VMFileHandle	bmpFile;
+int	bmFormat, width, height, compact;
+dword	chunkSize;	/* dword: avoid overflow */
+
+byte 	*bPtr;
+word 	*sizePtr;
+VisMonikerWithGString 	*monikerPtr;
+int	numBytes, bitmapSize;
+word	size;
+Boolean	useFillBitmap, freeCopy, removeMask;
+
+
+    /*
+     * Monochrome bitmaps may have white pixels, that are not transparent.
+     * We cannot use GrFillBitmap to draw the bitmap in this case
+     */
+    if (IconTestBWT(vmFile, bmp) ) {
+    	compressMode &= ~USE_FILL_BITMAP_FOR_MONO;
+    }
+
+    /*
+     * - See if the mask should be removed. There are two cases:
+     *	 -> the bit WRITE_TRANSPARENCY_MASK in compressMode variable is clear
+     *   -> the bitmap is monochrome and the bit USE_FILL_BITMAP_FOR_MONO is set
+     * - Remove mask (if appropriate)
+     * - Set up bmpFile to the file that holds the bitmap to use
+     */
+    removeMask = FALSE;
+    useFillBitmap = FALSE;
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    if ( (compressMode & WRITE_TRANSPARENCY_MASK) == 0 ) {
+    	removeMask = TRUE;
+    } else {
+        if ( ( (bmFormat & BMT_FORMAT) == BMF_MONO ) && ( compressMode & USE_FILL_BITMAP_FOR_MONO ) ) {
+    	removeMask = TRUE;
+    	useFillBitmap = TRUE;
+        }
+    }
+
+    if ( removeMask ) {
+    	int r, g, b;
+        /*
+         * We want to make the previously transparent areas white
+         */
+        IconGetWhiteColor(vmFile, bmp,  &r, &g, &b);
+	bmp = BTCopyBitmapAndRemoveMask(vmFile, bmp, global.tempFile, r, g, b, 0);
+    	bmFormat &= ~BMT_MASK;
+	bmpFile = global.tempFile;
+	freeCopy = TRUE;
+    } else {
+    	bmpFile = vmFile;
+	freeCopy = FALSE;
+    }
+
+
+    /*
+     * Find size, required for the moniker, and find out if it should be compacted
+     */
+    chunkSize = FindChunkSizeForMoniker(bmpFile, bmp, compressMode, &compact);
+    if ( chunkSize > (dword)MAX_SAFE_MONIKER_SIZE ) return 0;
+
+
+    /*
+     * If the bitmap should be compacted, compact it
+     * if the mask has been removed, old bmp holds a copy -> free it
+     */
+    if ( compact == BMC_PACKBITS ) {
+    	VMBlockHandle oldBmp;
+    	oldBmp = bmp;
+	bmp = GrCompactBitmap(bmpFile, bmp, global.tempFile);
+	if (freeCopy) HugeArrayDestroy(bmpFile, oldBmp);
+	bmpFile = global.tempFile;
+	freeCopy = TRUE;
+    }
+
+    /*
+     * Usually all monikers fits in the passed memory block (mh).
+     * If not, or if mh == 0, allocate a new block for every moniker.
+     */
+    if ( mh ) {
+    	size = MemGetInfo(mh, MGIT_SIZE);
+    	if ( (size+chunkSize) > MAX_SAFE_MONIKER_SIZE ) mh = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    } else {
+    	mh = MemAllocLMem(LMEM_TYPE_GENERAL,0);
+    }
+
+    /*
+     * Alloc  a chunk to hold the moniker and get a pointer to the chunk.
+     *
+     */
+    MemLock(mh);
+    monikerOp = ConstructOptr(mh, LMemAlloc(mh, chunkSize + 4) );	// a few extra bytes
+    bPtr = LMemDeref(monikerOp);
+    memset(bPtr, 0, chunkSize + 4);
+    monikerPtr = (void*)bPtr;
+
+    /*
+     * Fill in visMoniker structure.
+     */
+    monikerPtr->VMWGS_common.VM_type = vmType & 0xFF;
+    monikerPtr->VMWGS_common.VM_width = width;
+    monikerPtr->VMWGS_height = height;
+    bPtr += sizeof(VisMonikerWithGString);
+
+    /*
+     * store 'draw bitmap' gstring command:
+     * GR_FILL_BITMAP_CP + size for unmasked monochrome bitmaps
+     * GR_DRAW_BITMAP_CP + size for every other case
+     * The size parameter will be written later. Therefore set up
+     * a pointer (sizePtr) to this position.
+     */
+    if (useFillBitmap ) {
+    	*bPtr = GR_SET_AREA_COLOR_INDEX;	bPtr++;
+    	*bPtr = C_BLACK;			bPtr++;
+    	*bPtr = GR_FILL_BITMAP_CP;
+    } else {
+    	*bPtr = GR_DRAW_BITMAP_CP;
+    }
+    bPtr++;
+    sizePtr = (word*) bPtr;
+    bPtr += 2;				/* point to start of bitmap header */
+
+    /*
+     * Write bitmap header and palette (if we have one)
+     * bitmapSize counts the number of bytes written to the gstring
+     * starting from bitmap header.
+     * This value is used as size parameter for GR_DRAW_BITMAP_CP.
+     */
+    bmFormat &= ~BMT_HUGE;	/* the icon bitmap is huge, the moniker bitmap is not huge */
+    bitmapSize = 0;
+
+    if ( bmFormat & BMT_PALETTE ) {
+    	/*
+    	 * A palette requires a complex bitmap (BMT_COMPLEX is set by default)
+    	 */
+    	numBytes = MonikerWriteComplexBitmapHeader(bPtr, bmFormat, width, height, compact);
+    	bitmapSize += numBytes;
+    	bPtr += numBytes;
+
+    	numBytes = MonikerCopyBitmapPalette(bPtr, bmpFile, bmp);
+    	bitmapSize += numBytes;
+    	bPtr += numBytes;
+    } else {
+    	/*
+    	 * No palette. We can use a simple bitmap, but we have to reset
+    	 * the bit BMT_COMPLEX.
+    	 */
+    	bmFormat &= ~BMT_COMPLEX;
+    	numBytes = MonikerWriteSimpleBitmapHeader(bPtr, bmFormat, width, height, compact);
+    	bitmapSize += numBytes;
+    	bPtr += numBytes;
+    }
+
+    /*
+     * Copy bitmap data to the moniker
+     */
+    numBytes = MonikerCopyBitmapData(bmpFile, bmp, width, height, bPtr);
+    bitmapSize += numBytes;
+    bPtr += numBytes;
+
+
+    /*
+     * Set size paramter for GR_DRAW_BITMAP_CP
+     * Mark gstring as finshed
+     */
+    *sizePtr = bitmapSize;
+    *bPtr = GR_END_GSTRING;
+
+    /*
+     * Done.
+     */
+    if ( freeCopy ) HugeArrayDestroy(bmpFile, bmp);
+    MemUnlock(mh);
+    return monikerOp;
+}
+
+/*--------------------- StoreMonikerInList ---------------------
+ *  Purpose:	Update moniker list for export to token DB
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void StoreMonikerInList(optr monikerList, optr monikerOp, int index, word type) {
+VisMonikerListEntry	*vmlePtr;
+
+    /*
+     * Lock List and get a pointer to requested entry
+     */
+    MemLock(OptrToHandle(monikerList));
+    vmlePtr = LMemDeref(monikerList);
+    vmlePtr += index;
+
+    /*
+     * Store data and set VMLET_MONIKER_LIST bit
+     */
+    vmlePtr->VMLE_type = type | VMLET_MONIKER_LIST;
+    vmlePtr->VMLE_moniker = monikerOp;
+
+
+    MemUnlock(OptrToHandle(monikerList));
+}
+
+/*--------------------- FindChunkSizeForMoniker ---------------------
+ *  Purpose:	Calculate the memory size to hold the moniker
+ *  Context:
+ *  Strategy:
+ 	- find out compressed and / or uncmpressed bitmap size
+ 	  Even this should not happen here, bitmap sizes may be larger
+ 	  than 64 kB. Therefore we use dword values for sizes.
+ 	- add space for VisMonikerWithGstring,  draw command, bitmap header
+ 	  and GS_END_GSTRING command
+ *  Parameters:	vmFile, bmp:	bitmap from which the VisMoniker is to be generated
+ *		*compact:	return: BMC_UNCOMPACTED | BMC_PACKBITS
+ *  Return:	size required to hold the moniker
+ ---------------------------------------------------------------------------*/
+dword FindChunkSizeForMoniker(VMFileHandle vmFile, VMBlockHandle bmp, word compressMode, int *compact) {
+dword size, compressedSize;
+word bmFormat;
+
+    /*
+     * Find out relevant bitmap size.
+     * This includes palette (if any) and bitmap data, but not yet the header
+     */
+    switch (compressMode & ICON_COMPRESS_BITS) {
+    case COMPRESS_ICON_ALWAYS:
+    	ExpTokenFindBitmapSizes(vmFile, bmp, 0, &size);
+    	*compact = BMC_PACKBITS;
+    	break;
+
+    case COMPRESS_ICON_NEVER:
+    	ExpTokenFindBitmapSizes(vmFile, bmp, &size, 0);
+    	*compact = BMC_UNCOMPACTED;
+    	break;
+
+    case COMPRESS_ICON_AUTO:
+    	ExpTokenFindBitmapSizes(vmFile, bmp, &size, &compressedSize);
+    	if ( compressedSize < size ) {
+    		size = compressedSize;
+    		*compact = BMC_PACKBITS;
+    	} else {
+    		*compact = BMC_UNCOMPACTED;
+    	}
+    	break;
+    }
+
+    /*
+     * Get size of bitmap header and add space for VisMonikerWithGstring,
+     * draw command, and GS_END_GSTRING command
+     */
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+    if ( bmFormat & BMT_PALETTE ) {
+    	/*
+    	 * To store a palette we need a complex bitmap
+    	 */
+    	size += sizeof(CBitmap);		/* Complex bitmap header */
+    } else {
+    	size += sizeof(Bitmap);			/* Simple bitmap header */
+    }
+
+    size += sizeof(VisMonikerWithGString)	/* GString header */
+    		+ 3				/* GR_DRAW_BITMAP_CP + size parameter */
+    		+ 1;				/* GR_END_GSTRING */
+    return size;
+}
+
+/*--------------------- MonikerWriteSimpleBitmapHeader ---------------------
+ *  Purpose:	Fill  in a simple bitmap header structure
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	number of bytes written
+ ---------------------------------------------------------------------------*/
+word MonikerWriteSimpleBitmapHeader(byte *bPtr, int bmFormat, int width, int height, int compact) {
+Bitmap *bmpHeader;
+    /*
+     * fill in bitmap data
+     */
+
+    bmpHeader = (Bitmap*)bPtr;
+    bmpHeader->B_width = width;
+    bmpHeader->B_height = height;
+    bmpHeader->B_compact = compact;	/* BMC_UNCOMPACTED, BMC_PACKBITS, BMC_USER_DEFINED */
+
+    bmpHeader->B_type = bmFormat;
+
+    return sizeof(Bitmap);
+}
+
+/*--------------------- MonikerWriteComplexBitmapHeader ---------------------
+ *  Purpose:	Fill  in a complex bitmap header structure
+ *		This structure will always be followed by a palette
+ *  Context:
+ *  Strategy:
+ 	- fill in simple bitmap header
+ 	- fill in data that relates to a complex bitmap
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+word MonikerWriteComplexBitmapHeader(byte *bPtr, int bmFormat, int width, int height, int compact) {
+CBitmap	*cBitmap;
+word dataOffset;
+
+    MonikerWriteSimpleBitmapHeader(bPtr, bmFormat, width, height, compact);
+
+    /*
+     * Calculate offset to bitmap image data. This depends on the palette size.
+     * We can have a 16 color or a 256 color palette.
+     */
+    dataOffset = sizeof(CBitmap) + 2;	/* palette starts with a word (number of entries) */
+    if ( (bmFormat & BMT_FORMAT) == BMF_8BIT ) { dataOffset += 256 * sizeof(PaletteEntry); }
+    					else   { dataOffset += 16 * sizeof(PaletteEntry); }
+    cBitmap = (void*)bPtr;
+    /* cBitmap ->CB_simple; is already filled */
+    cBitmap ->CB_startScan = 0;		/* first line */
+    cBitmap ->CB_numScans  = height;	/* number of lines in the bitmap */
+    cBitmap ->CB_devInfo   = 0;
+    cBitmap ->CB_data	   = dataOffset; /* start of bitmap image data */
+    cBitmap ->CB_palette   = sizeof(CBitmap);	/* start of palette data */
+    cBitmap ->CB_xres	   = 72;
+    cBitmap ->CB_yres	   = 72;	/* resolution is always 72x72 dpi */
+
+    return sizeof(CBitmap);
+}
+
+/*--------------------- MonikerCopyBitmapPalette ---------------------
+ *  Purpose:	Write bitmap palette to VisMoniker data structure
+ *  Context:
+ *  Strategy:
+ *	- palette data starts with the number of the palette enties (a word)
+ *	  this can be 16 or 256
+ *	- then the palette data follows
+ *  Parameters:
+ *  Return:	number of bytes written
+ ---------------------------------------------------------------------------*/
+word MonikerCopyBitmapPalette(byte *bPtr, VMFileHandle vmFile, VMBlockHandle bmp) {
+word	bmFormat, palSize;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+    if ( (bmFormat & BMT_FORMAT) == BMF_8BIT ) { palSize = 256; }
+    					else   { palSize = 16; }
+
+    *((word*)bPtr) = palSize;
+
+    bPtr+= 2;
+    BTGetBitmapPalette(vmFile, bmp, (PaletteEntry*)bPtr, palSize);
+
+    return  (palSize * sizeof(PaletteEntry)) + 2;
+}
+
+/*--------------------- MonikerCopyBitmapData ---------------------
+ *  Purpose:	Copy bitmap image to moniker
+ *  Context:
+ *  Strategy:	lock line by line and copy data
+ *		this works both, compresses and uncompresses bitmaps
+ *  Parameters:
+ *  Return:	number of bytes copied
+ ---------------------------------------------------------------------------*/
+word MonikerCopyBitmapData(VMFileHandle vmFile, VMBlockHandle bmp, int width, int height, byte *data) {
+word line, lineSize;
+void *linePtr;
+word size;
+
+    size = 0;
+    for ( line = 0; line < height; line++) {
+    	HugeArrayLock(vmFile, bmp, line, &linePtr, &lineSize);
+    	memcpy(data, linePtr, lineSize);
+    	size += lineSize;
+    	data += lineSize;
+	HugeArrayUnlock(linePtr);
+    }
+
+    return size;
+}
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file tokenExport.goc ********************/
+

@@ -1,0 +1,477 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	control.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements my own controller class: ToolOnlyControlClass
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+@include "token.h"
+@include "initfile.h"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+
+/*---------------------------------------------------------------------------
+	ToolOnlyToolNameString - one resource for the names of all tool UI
+ ---------------------------------------------------------------------------*/
+
+@start ToolOnlyToolNameString, data;
+
+@chunk char    CopyToolTriggerName[] = "Copy";
+@chunk char    PasteToolTriggerName[] = "Paste";
+@chunk char    UndoToolTriggerName[] = "Undo";
+@chunk char    RedoToolTriggerName[] = "Redo";
+
+@chunk char 	BtSelectionItemName[] = "Selection";
+@chunk char 	BtPencilItemName[] = "Pencil";
+@chunk char 	BtEraserItemName[] = "Eraser";
+@chunk char 	BtLineItemName[] = "Line";
+@chunk char 	BtFillRectItemName[] = "Filled Rectangle";
+@chunk char 	BtRectangleItemName[] = "Rectangle";
+@chunk char 	BtFillEllipseItemName[] = "Filled Ellipse";
+@chunk char 	BtEllipseItemName[] = "Ellipse";
+@chunk char 	BtFloodFillItemName[] = "Flood Fill";
+@chunk char 	BtShiftItemName[] = "Shift Image";	/* We do not include this in
+        	* @if @SHIFT_IMAGE_IS_A_BITMAP_TOOL .. @endif to make the translation
+        	* file independent of whether this flag is set or not.*/
+@chunk char 	BtFillTransparentItemName[] = "Fill Transparent";
+@chunk char 	BtEditMaskItemName[] = "Edit Mask";
+@chunk char 	BtPickColorItemName[] = "Pick Color";
+
+
+/*
+ * Monikers for tool buttons and items
+ */
+@include "Art/edittools.goh"
+
+
+@end ToolOnlyToolNameString;
+
+
+/*---------------------------------------------------------------------------
+	Edit controller tool UI and related data
+ ---------------------------------------------------------------------------*/
+
+@start IconEditControlToolUI, notDetachable;
+
+@object GenTriggerClass EditCopyToolTrigger = {
+    GI_visMoniker = list { @CopyToolMoniker, @CopyToolMonoMoniker };
+    GI_states = @default & ~(GS_USABLE | GS_ENABLED);
+    @SetTriggerDestination_TO_BITMAP;
+    GTI_actionMsg = MSG_META_CLIPBOARD_COPY;
+    }
+@object GenTriggerClass EditPasteToolTrigger = {
+    GI_visMoniker = list { @PasteToolMoniker, @PasteToolMonoMoniker };
+    GI_states = @default & ~(GS_USABLE | GS_ENABLED);
+    @SetTriggerDestination_TO_DB_VIEWER;
+    GTI_actionMsg = MSG_META_CLIPBOARD_PASTE;
+    }
+@object GenTriggerClass EditUndoToolTrigger = {
+    GI_visMoniker = list { @UndoToolMoniker, @UndoToolMonoMoniker };
+    GI_states = @default & ~(GS_USABLE | GS_ENABLED);
+    @SetTriggerDestination_TO_BITMAP;
+    GTI_actionMsg = MSG_FATBITS_UNDO;
+    }
+@object GenTriggerClass EditRedoToolTrigger = {
+    GI_visMoniker = list { @RedoToolMoniker, @RedoToolMonoMoniker };
+    GI_states = @default & ~(GS_USABLE | GS_ENABLED);
+    @SetTriggerDestination_TO_BITMAP;
+    GTI_actionMsg = MSG_FATBITS_REDO;
+    }
+
+@end IconEditControlToolUI;
+
+/* Edit tool toolbox features (ETF_xxx) are defined in iconed.goh */
+
+/* Toolbox Child list
+typedef struct {
+    ChunkHandle			GCCI_object;
+    WordFlags			GCCI_featureMask;
+    GenControlChildFlags	GCCI_flags;
+} GenControlChildInfo;
+*/
+static const GenControlChildInfo EditToolChildInfo[] = {
+    /* The order of the children must match the specified flags, i.e., the first child
+     * must have bit 0 set (0x01), the second child bit 1 (0x02), and so on.
+     * The order of the children here must correspond to the order in the EditToolFeaturesInfo table.
+     */
+    { OptrToChunk(@EditCopyToolTrigger), 	ETF_TRIG_COPY,  GCCF_IS_DIRECTLY_A_FEATURE },
+    { OptrToChunk(@EditPasteToolTrigger),	ETF_TRIG_PASTE, GCCF_IS_DIRECTLY_A_FEATURE },
+    { OptrToChunk(@EditUndoToolTrigger), 	ETF_TRIG_UNDO,  GCCF_IS_DIRECTLY_A_FEATURE },
+    { OptrToChunk(@EditRedoToolTrigger), 	ETF_TRIG_REDO,  GCCF_IS_DIRECTLY_A_FEATURE }
+
+
+};
+
+/* FeaturesInfo list
+typedef struct {
+    ChunkHandle			GCFI_object;
+    optr			GCFI_name;
+    GenControlFeatureFlags    	GCFI_flags;
+} GenControlFeaturesInfo;
+*/
+static const GenControlFeaturesInfo EditToolFeaturesInfo[] = {
+    /* The order of the features determines the order in which they are
+     * displayed in the toolbar. Unfortunately, they are displayed in
+     * reverse order in the Show/Hide Tools dialog box.
+     * The order of the children here must correspond to the order in
+     * the ~ToolChildInfo (GenControlChildInfo) table.
+     */
+    { (ChunkHandle)@EditCopyToolTrigger, 	@CopyToolTriggerName,  0 },
+    { (ChunkHandle)@EditPasteToolTrigger,	@PasteToolTriggerName, 0 },
+    { (ChunkHandle)@EditUndoToolTrigger, 	@UndoToolTriggerName,  0 },
+    { (ChunkHandle)@EditRedoToolTrigger, 	@RedoToolTriggerName,  0 }
+
+};
+
+static const char IconEditControlInitKey[] = "EditTools";
+
+#define		ETF_TOOL_COUNT		 (sizeof(EditToolChildInfo) / sizeof(GenControlChildInfo) )
+#define		ETF_TOOL_FEATURES_COUNT  (sizeof(EditToolFeaturesInfo) / sizeof(GenControlFeaturesInfo) )
+
+/*---------------------------------------------------------------------------
+	Bitmap controller tool UI related data
+	Note: The template block iteself (IconBitmapControlToolUI) is declared in
+	      appui.goc because the monikers and both objets, that uses the
+ 	      monikers (toolbar UI and bitmap dialog box UI), must be in the same
+ 	      code file (!) or the Resource Editor messes up (02/2026 - R.B.)
+	For informations and restrictions see Edit controller section
+ ---------------------------------------------------------------------------*/
+
+
+
+
+/* Toolbox Child list */
+static const GenControlChildInfo BitmapToolChildInfo[] = {
+    { OptrToChunk(@BitmapToolChooser),	BTF_ALL_FEATURES, 0}
+
+};
+
+/* FeaturesInfo list */
+    /* The order of the features determines the order in which they are
+     * displayed in the toolbar. Unfortunately, they are displayed in
+     * reverse order in the Show/Hide Tools dialog box.
+     * The order of the children here must correspond to the order in
+     * the ~ToolChildInfo (GenControlChildInfo) table.
+     */
+static const GenControlFeaturesInfo BitmapToolFeaturesInfo[] = {
+    { (ChunkHandle)@BitmapSelectionToolItem,	@BtSelectionItemName, 0 },
+    { (ChunkHandle)@BitmapPencilToolItem, 	@BtPencilItemName, 0 },
+    { (ChunkHandle)@BitmapEraserToolItem, 	@BtEraserItemName, 0 },
+    { (ChunkHandle)@BitmapLineToolItem, 	@BtLineItemName, 0 },
+    { (ChunkHandle)@BitmapFillRectToolItem, 	@BtFillRectItemName, 0 },
+    { (ChunkHandle)@BitmapRectangleToolItem,	@BtRectangleItemName, 0 },
+    { (ChunkHandle)@BitmapFillEllipseToolItem, 	@BtFillEllipseItemName, 0 },
+    { (ChunkHandle)@BitmapEllipseToolItem, 	@BtEllipseItemName, 0 },
+    { (ChunkHandle)@BitmapFloodFillToolItem,	@BtFloodFillItemName, 0 },
+    { (ChunkHandle)@BitmapFillMaskToolItem, 	@BtFillTransparentItemName, 0 },
+    { (ChunkHandle)@BitmapEditMaskToolItem, 	@BtEditMaskItemName, 0 },
+    { (ChunkHandle)@BitmapPickColorToolItem, 	@BtPickColorItemName, 0 }
+@if @SHIFT_IMAGE_IS_A_BITMAP_TOOL
+   , { (ChunkHandle)@BitmapShiftToolItem, 	@BtShiftItemName, 0 }
+@endif
+};
+
+
+static const char BitmapControlInitKey[] = "BitmapToolsV2";
+#define		BTF_TOOL_COUNT		(sizeof(BitmapToolChildInfo) / sizeof(GenControlChildInfo) )
+#define		BTF_TOOL_FEATURES_COUNT (sizeof(BitmapToolFeaturesInfo) / sizeof(GenControlFeaturesInfo) )
+
+
+
+/*---------------------------------------------------------------------------
+	ToolOnlyControlClass
+ ---------------------------------------------------------------------------*/
+@classdecl ToolOnlyControlClass;
+
+/*--------------------- MSG_GEN_CONTROL_GET_INFO ---------------------
+ *  Purpose:	Return all important infomation to build the controller
+ *  Context:
+ *  Strategy:
+ 	- clear GenControlBuildInfo structure
+ 	- set controller name
+ 	- Depending on what the controller is operating as, call the
+ 	  corresponding initialization message.
+	  Since we do not have any standard UI, we only need to
+	  initialize the tool part of the GenControlBuildInfo structure;
+	  the rest remains null.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+// stop in ToolOnlyControlGEN_CONTROL_GET_INFO
+@method ToolOnlyControlClass, MSG_GEN_CONTROL_GET_INFO {
+Message msg;
+
+    memset(info, 0, sizeof(GenControlBuildInfo));
+    @callsuper();
+    info->GCBI_controllerName = ConstructOptr(OptrToHandle(oself), pself->TOCI_controllerName);
+
+    if ( pself->TOCI_SetupToolMsg == 0) return;
+
+    msg = pself->TOCI_SetupToolMsg;
+    @call oself::{TOC_SETUP_TOOL_MSG}msg(info);
+}
+
+/*--------------------- MSG_TOC_SETUP_EDIT_CONTROL_TOOLS ---------------------
+ *  Purpose:	Fill in the tool part of the GenControlBuildInfo structure
+ *  Context:	The controller works as tool-only Edit Controller
+ *  Strategy:
+ *  Parameters:	void (GenControlBuildInfo *info);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method ToolOnlyControlClass, MSG_TOC_SETUP_EDIT_CONTROL_TOOLS {
+
+    info->GCBI_initFileKey = IconEditControlInitKey;
+
+    info->GCBI_toolBlock 	= OptrToHandle(@EditCopyToolTrigger);	/* MemHandle */
+    info->GCBI_toolList  	= &EditToolChildInfo;		/* GenControlChildInfo	*/
+    info->GCBI_toolCount 	= ETF_TOOL_COUNT; 		/* word */
+    info->GCBI_toolFeaturesList = &EditToolFeaturesInfo;	/* GenControlFeaturesInfo */
+    info->GCBI_toolFeaturesCount = ETF_TOOL_FEATURES_COUNT;	/* word */
+    info->GCBI_toolFeatures 	= ETF_DEFAULT_FEATURES;		/* WordFlags */
+}
+
+
+/*--------------------- MSG_TOC_SETUP_BITMAP_CONTROL_TOOLS ---------------------
+ *  Purpose:	Fill in the tool part of the GenControlBuildInfo structure
+ *  Context:	The controller works as tool-only Bitmap-Tools-Controller
+ *  Strategy:
+ *  Parameters:	void (GenControlBuildInfo *info);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method ToolOnlyControlClass, MSG_TOC_SETUP_BITMAP_CONTROL_TOOLS {
+
+    info->GCBI_initFileKey = BitmapControlInitKey;
+
+    info->GCBI_toolBlock 	= OptrToHandle(@BitmapToolChooser);	/* MemHandle */
+    info->GCBI_toolList  	= &BitmapToolChildInfo;		/* GenControlChildInfo	*/
+    info->GCBI_toolCount 	= BTF_TOOL_COUNT; 		/* word */
+    info->GCBI_toolFeaturesList = &BitmapToolFeaturesInfo;	/* GenControlFeaturesInfo */
+    info->GCBI_toolFeaturesCount = BTF_TOOL_FEATURES_COUNT;	/* word */
+    info->GCBI_toolFeatures 	= BTF_DEFAULT_FEATURES;		/* WordFlags */
+
+}
+
+
+/*--------------------- MSG_TOC_ENABLE_EDIT_TOOL_TRIGGERS ---------------------
+ *  Purpose:	Enable/disable the copy, paste, undo and redo tool triggers
+ *		if the controller works as tool only Edit Controller
+ *  Strategy:
+ 	- fetch tool block
+ 	- for every trigger: enable or disable it
+ 	  take into account that a triggger my be hidden
+ *  Parameters:	enableTriggers:  triggers to enable
+ 		disableTriggers. triggers to disable
+ 		pass ETF_~ constants for enableTriggers and disableTriggers
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method ToolOnlyControlClass, MSG_TOC_ENABLE_EDIT_TOOL_TRIGGERS {
+TempGenControlInstance *instanceData;
+MemHandle toolBlock;
+
+
+@if @DEBUG_FLAG
+    /*
+     * Do some debug checkings
+     */
+    if ( pself->TOCI_SetupToolMsg != MSG_TOC_SETUP_EDIT_CONTROL_TOOLS ) {
+	ProgError("Error: ENABLE_EDIT_TOOL_TRIGGERS on a not edit controller");
+	return;
+    }
+    if ( !ObjVarFindData(oself, TEMP_GEN_CONTROL_INSTANCE) ) {
+    	ProgError("Error: ENABLE_EDIT_TOOL_TRIGGERS no TEMP_GEN_CONTROL_INSTANCE");
+	return;
+    }
+    instanceData = ObjVarDerefData(oself, TEMP_GEN_CONTROL_INSTANCE);
+    if ( instanceData == 0 ) {
+    	ProgError("Error: ENABLE_EDIT_TOOL_TRIGGERS deref TEMP_GEN_CONTROL_INSTANCE failed");
+	return;
+    }
+@endif
+
+    /*
+     * Find out the tool block. If the user has hidden all tools, there is no tool block.
+     */
+    instanceData = ObjVarDerefData(oself, TEMP_GEN_CONTROL_INSTANCE);
+    if ( instanceData == 0 ) return;
+    toolBlock = instanceData->TGCI_toolBlock;
+    if ( toolBlock == 0 ) return;
+
+    /*
+     * The user may have hidden one or more of the available features (triggers).
+     * In this case, sendig a message to an (no existing) trigger causes the system
+     * to crash.
+     * Fortunately, TGCI_toolboxFeatures contains the currently active tools,
+     * so we can mask out hidden tools.
+     */
+    enableTriggers &= instanceData->TGCI_toolboxFeatures;
+    disableTriggers &= instanceData->TGCI_toolboxFeatures;
+
+
+    /*
+     * Enable triggers that are to enable
+     */
+    if (enableTriggers & ETF_TRIG_COPY) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditCopyToolTrigger))::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    if (enableTriggers & ETF_TRIG_PASTE) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditPasteToolTrigger))::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    if (enableTriggers & ETF_TRIG_UNDO) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditUndoToolTrigger))::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    if (enableTriggers & ETF_TRIG_REDO) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditRedoToolTrigger))::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    /*
+     * Disable triggers that are to disable
+     */
+    if (disableTriggers & ETF_TRIG_COPY) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditCopyToolTrigger))::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+    if (disableTriggers & ETF_TRIG_PASTE) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditPasteToolTrigger))::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+    if (disableTriggers & ETF_TRIG_UNDO) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditUndoToolTrigger))::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+    if (disableTriggers & ETF_TRIG_REDO) {
+    	@send ConstructOptr(toolBlock, ChunkOf(@EditRedoToolTrigger))::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+ }
+
+
+/*--------------------- MSG_TOC_SELECT_BITMAP_TOOL ---------------------
+ *  Purpose:	Select a bitmap tool in the tool bar and bitmap tools dialog
+ *		if the controller works as tool only Bitmap Tool Controller
+ *  Strategy:
+ *	- send bitmap-tool to BitmapToolbox dialog
+ *	- update the tool name in the BitmapToolbox dialog
+ 	- fetch tool block (tool bar)
+ 	- select the specified bitmap-tool
+ *  Parameters:	(GEN_ITEM_GROUP_APPLY_MSG)
+ *	word selection:		pass BTF_~ constants
+ *	word numSelections:	(unused)
+ *	GenItemGroupStateFlags stateFlags: (unused)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method ToolOnlyControlClass, MSG_TOC_SELECT_BITMAP_TOOL {
+TempGenControlInstance *instanceData;
+MemHandle toolBlock;
+optr itemGroup;
+char *namePtr;
+
+
+@if @DEBUG_FLAG
+    /*
+     * Do some debug checkings
+     */
+    if ( pself->TOCI_SetupToolMsg != MSG_TOC_SETUP_BITMAP_CONTROL_TOOLS ) {
+	ProgError("Error: TOC_SELECT_BITMAP_TOOL on a not bitmap tool controller");
+	return;
+    }
+    if ( !ObjVarFindData(oself, TEMP_GEN_CONTROL_INSTANCE) ) {
+    	ProgError("Error: TOC_SELECT_BITMAP_TOOL no TEMP_GEN_CONTROL_INSTANCE");
+	return;
+    }
+    instanceData = ObjVarDerefData(oself, TEMP_GEN_CONTROL_INSTANCE);
+    if ( instanceData == 0 ) {
+    	ProgError("Error:  deref TEMP_GEN_CONTROL_INSTANCE failed");
+	return;
+    }
+@endif
+
+
+    /*
+     * Update ItemGroup in BitmapToolbox dialog
+     */
+    @send BitmapDialogToolChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+
+    /*
+     * Update bitmap-tool name in BitmapToolbox
+     */
+    MemLock(OptrToHandle(@BtPencilItemName));
+    switch (selection) {
+    case BTF_SELECTION:
+    	namePtr = LMemDeref(@BtSelectionItemName);	break;
+    case BTF_PENCIL:
+    	namePtr = LMemDeref(@BtPencilItemName);	break;
+    case BTF_ERASER:
+    	namePtr = LMemDeref(@BtEraserItemName);	break;
+    case BTF_LINE:
+    	namePtr = LMemDeref(@BtLineItemName);	break;
+    case BTF_FILL_RECT:
+    	namePtr = LMemDeref(@BtFillRectItemName);	break;
+    case BTF_RECTANGLE:
+    	namePtr = LMemDeref(@BtRectangleItemName);	break;
+    case BTF_FILL_ELLIPSE:
+    	namePtr = LMemDeref(@BtFillEllipseItemName);	break;
+    case BTF_ELLIPSE:
+    	namePtr = LMemDeref(@BtEllipseItemName);	break;
+    case BTF_FLOOD_FILL:
+    	namePtr = LMemDeref(@BtFloodFillItemName);	break;
+    case BTF_SHIFT_IMG:
+    	namePtr = LMemDeref(@BtShiftItemName);	break;
+    case BTF_FILL_MASK:
+    	namePtr = LMemDeref(@BtFillTransparentItemName);	break;
+    case BTF_EDIT_MASK:
+    	namePtr = LMemDeref(@BtEditMaskItemName);	break;
+    case BTF_PICK_COLOR:
+    	namePtr = LMemDeref(@BtPickColorItemName);	break;
+    }
+    @call BitmapDialogToolInfoText::MSG_VIS_TEXT_REPLACE_ALL_PTR(namePtr, 0);
+    pself = ObjDerefGen(oself);
+
+    MemUnlock(OptrToHandle(@BtPencilItemName));
+
+    /*
+     * Find out the tool block. If the user has hidden all tools, there is no tool block.
+     */
+    instanceData = ObjVarDerefData(oself, TEMP_GEN_CONTROL_INSTANCE);
+    if ( instanceData == 0 ) return;
+    toolBlock = instanceData->TGCI_toolBlock;
+    if ( toolBlock == 0 ) return;
+
+    /*
+     * Send bitmap-tool identifier to our own item group. There is no problem if the
+     * tool is invisble.
+     */
+    itemGroup = ConstructOptr(toolBlock, ChunkOf(@BitmapToolChooser));
+    @send itemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+
+}
+
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file control.goc ********************/

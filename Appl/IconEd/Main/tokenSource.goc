@@ -1,0 +1,1209 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	token.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 3/22/2025	Initial revision
+ *
+ * DESCRIPTION:	This file deals with writing icons as source code
+ *
+ *+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	For structure of VisMonikers for export to token database
+ *	or for write to file see tokenExport.goc
+ *+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+@include <win.h>
+
+@include "iconed.goh"
+@include "rsftool.goh"
+
+@include "UI/appui.goh"
+@include "token.h"
+@include "initfile.h"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+void IconFindValidIconName(VMFileHandle vmFile, int iSet, int icon, char *name);
+
+
+/***********************************************************************
+ *
+ *	Write token as source code - Part 1: handling UI
+ *	------------------------------------------------
+ *
+ ***********************************************************************/
+int	ToolWriteSourceCheckReady(VMFileHandle vmFile, int iSet, int curIcon);
+void 	WriteSourceSelectTooLargeItems(VMFileHandle vmFile, int iSet);
+void 	WriteSourceSelectEmptyOrTCItems(VMFileHandle vmFile, int iSet);
+void 	WriteSourceSelectDoublePropertyItems(VMFileHandle vmFile, int iSet);
+Boolean WriteSourceCheckDuplicatedNames(VMFileHandle vmFile, int iSet, Boolean selectItems);
+
+/*--------------------- WriteSourceWTFEnterDefaultPath ---------------------
+ *  Purpose:	If there is no path in ATTR_GEN_PATH_DATA of the WriteSourceDialog,
+ 		dialog object, read path from ini or enter SP_DOCUMENT
+ 		Also used for writing icons to a vm file (WTF~).
+ ---------------------------------------------------------------------------*/
+void WriteSourceWTFEnterDefaultPath(optr iniKey) {
+Boolean err;
+word	size, disk;
+char *fullPath;
+const char *spp;
+
+    fullPath = malloc(IE_FULL_PATH_BUFFER_SIZE);
+    spp = fullPath;
+
+    MemLock(OptrToHandle(iniKey));
+    err = InitFileReadStringBuffer(IE_INI_CATEGORY, LMemDeref(iniKey), fullPath, IE_FULL_PATH_BUFFER_SIZE, &size);
+    MemUnlock(OptrToHandle(iniKey));
+
+    if ( err ) goto enterDocument;
+
+    disk = FileParseStandardPath(0, &spp);
+    FileSetCurrentPath(disk, spp);
+
+    free(fullPath);
+    return;
+
+enterDocument:
+    FileSetStandardPath(SP_DOCUMENT);
+    free(fullPath);
+}
+
+/*--------------------- ToolUpdateWriteSourcePath ---------------------
+ *  Purpose:	Update WriteSourcePathText to reflect the actual path
+ *  Context:
+ *  Strategy:
+ 	- Read path from WriteSourceDialog object
+ 	- if not found, use SP_DOCUMENT
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolUpdateWriteSourcePath(void) {
+GenFilePath *gfp = 0;
+char *fpp, *fullPath = 0;
+Boolean found;
+
+    /*
+     * Last used path is stored in ATTR_GEN_PATH_DATA of the dialog object
+     */
+    gfp = malloc(sizeof(GenFilePath));
+    fullPath = malloc(IE_FULL_PATH_BUFFER_SIZE);
+
+    found = @call WriteSourceDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+    if (found == (-1)) {
+        FilePushDir();
+    	WriteSourceWTFEnterDefaultPath(@IniPathKey);
+        gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+        FilePopDir();
+    }
+
+    fpp = fullPath;
+    FileConstructFullPath (&fpp, IE_FULL_PATH_BUFFER_SIZE, gfp->GFP_disk, gfp->GFP_path, TRUE);
+    @call WriteSourcePathText::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath, 0);
+
+    free(gfp);
+    free(fullPath);
+}
+
+/*--------------------- MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG ---------------------
+ *  Purpose:	Set up all data required to work with the WriteSourceDialog
+ *  Context:
+ *  Strategy:
+ 	- Set initial UI values for options
+ 	- initialize list of icon moniker names
+ 	- display token ID and token chars
+ 	- find  standard size icon for the token and display it
+ 	- check if we are ready for export
+ 		- icon bitmap sizes must be smaller than 8 kb
+ 		  perhaps we must compress it
+ 		- we cannot have twice the same combination of display size,
+ 		  display class, icon style and aspect ratio.
+ 		- warn, if one of the images is a (possibly large) true color image
+	- enable "Export" trigger if all checks has been passe
+ *  Parameters:
+ *  Return:	TRUE, if canceled by user or no icon set available
+ *		FALSE if dialog box can opened (even if not ready for export)
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG {
+int count, iconsToWrite;
+int ready, warn, sel;
+int compressOptions, maskOptions, language, header;
+
+    /*
+     * Check initial settings. Reset all related flags
+     */
+    @send WriteSourceMonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    if ( pself->DBVI_currentISet == NO_CURRENT_ISET ) return TRUE;
+    if ( pself->DBVI_currentIcon == NO_CURRENT_ICON ) return TRUE;
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return TRUE;
+
+    global.flags &= ~(GF_WRITE_CODE_DOUBLE_NAMES | GF_WRITE_CODE_CURRENT_ICON_ONLY);
+
+    /*
+     * Initialize UI
+     */
+    IdGetWriteSourceData(pself->DBVI_vmFile, pself->DBVI_currentISet,
+    			&compressOptions, &maskOptions, &language, &header);
+    @send WriteSourceCompressOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(compressOptions, FALSE);
+    @send WriteSourceMaskOptions::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(maskOptions, FALSE);
+    @send WriteSourceLanguageList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(language, FALSE);
+    @send WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(header, FALSE);
+
+    /*
+     * If we are in "edit-pointer-image" mode, some UI needs a special setup
+     */
+    if ( IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) & IF_PTR_IMAGE ) {
+
+        @send WriteVisMonikerItem::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @send WriteGStringChunkItem::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @send WriteBitmapChunkItem::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        @send WritePtrImageItem::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+	@send WriteSourceLeftOptionsGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(WSHT_PTR_IMAGE, FALSE);
+
+    } else {
+        @send WriteVisMonikerItem::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @send WriteGStringChunkItem::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @send WriteBitmapChunkItem::MSG_GEN_SET_ENABLED(VUM_NOW);
+        @send WritePtrImageItem::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+        @send WriteSourceLeftOptionsGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+        if (header==WSHT_PTR_IMAGE) @send WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(WSHT_VIS_MONIKER, FALSE);
+    }
+
+
+    /*
+     * Initialize moniker list.
+     *	iconsToWrite == WSIT_CURRENT_ICON: only currently editied icon
+     *	else: all icons
+     */
+    iconsToWrite = @call WriteSourceIconChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( iconsToWrite == WSIT_CURRENT_ICON) {
+    	global.flags |= GF_WRITE_CODE_CURRENT_ICON_ONLY;
+    	@send WriteSourceMonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
+    } else {
+    	count = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	@send WriteSourceMonikerList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+    }
+
+
+    /*
+     * Display path to store the file
+     */
+    ToolUpdateWriteSourcePath();
+
+    /*
+     * Setup initial state for UI (not ready, all compress options allowed)
+     *
+     * If we are writing a bitmap chunk, "optimize mono bitmaps" is meaningless
+     * because we don't write GrDrawBitmap or GrFillBitmap.
+     * We handle this here even if the UI is currently not visible (see
+     * ENABLE_FILL_BITMAP_OPTION flag for details).
+     */
+    @send WriteSourceOKTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    ToolSetTextWashColor(@WriteSourceInfoText, C_LIGHT_RED);
+
+    @send WSCompressAlways::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @send WSCompressNever::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    sel = @call WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( sel == WSHT_BITMAP ) {
+    	@call WSMonoUsesFillBitmapOption::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@call WriteSourceMaskOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(USE_FILL_BITMAP_FOR_MONO, FALSE);
+    } else {
+    	@call WSMonoUsesFillBitmapOption::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@call WriteSourceMaskOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(USE_FILL_BITMAP_FOR_MONO, TRUE);
+    }
+
+    /*
+     * Check if ready for export. If not, display the reason.
+     */
+    ready = ToolWriteSourceCheckReady(pself->DBVI_vmFile, pself->DBVI_currentISet , pself->DBVI_currentIcon);
+    warn = ready & TOKEN_WARNING_BITS;
+    ready &= TOKEN_STATUS_BITS;
+
+    /*
+     * depending on ready state, update UI or return
+     */
+    switch ( ready ) {
+
+    case TOKEN_READY_IF_MINIMZE:
+    	/*
+    	 * We can only use 'minimize size' option
+    	 */
+	@send WSCompressAlways::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send WSCompressNever::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send WriteSourceCompressOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(COMPRESS_ICON_AUTO, FALSE);
+	goto weAreReady;
+
+    case TOKEN_READY_IF_COMPRESS:
+    	/*
+    	 * We can use 'minimize size' or 'compress always' option
+    	 */
+    	if ( COMPRESS_ICON_NEVER == @call WriteSourceCompressOptions::MSG_GEN_ITEM_GROUP_GET_SELECTION() ) {
+    	    @send WriteSourceCompressOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(COMPRESS_ICON_AUTO, FALSE);
+    	}
+	@send WSCompressNever::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	goto weAreReady;
+
+
+    case TOKEN_NOT_READY_BECAUSE_SIZE:
+    	/*
+    	 * We have at least on icon that is larger than MAX_SAFE_MONIKER_SIZE
+    	 * We cannot write this set of icons as source code.
+    	 */
+        WriteSourceSelectTooLargeItems(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	@send WriteSourceInfoText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@WriteSourceTooLargeIcons, 0);
+    	return FALSE;
+
+EC(    case TOKEN_NOT_READY_BECAUSE_PROPERTIES: \
+	ProgError("TOKEN_NOT_READY_BECAUSE_PROPERTIES in WriteSourceCodeCheck"); \
+    	return FALSE; )
+    }
+
+weAreReady:
+    /*
+     * Display warnings, if we have any
+     */
+    @send WriteSourceInfoText::MSG_VIS_TEXT_DELETE_ALL();
+    if (warn) {
+    	WriteSourceSelectEmptyOrTCItems(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	ToolSetTextWashColor(@WriteSourceInfoText, WARNING_COLOR);	/* dark yellow */
+
+        if (warn & TOKEN_RGB_WARNING) {
+    	    @send WriteSourceInfoText::MSG_VIS_TEXT_APPEND_OPTR(@WriteSourceRGBWarning, 0);
+    	    }
+        if (warn & TOKEN_EMPTY_WARNING) {
+    	    @send WriteSourceInfoText::MSG_VIS_TEXT_APPEND_OPTR(@WriteSourceEmptyWarning, 0);
+    	    }
+        if (warn & TOKEN_PROPERTIES_WARNING) {
+            WriteSourceSelectDoublePropertyItems(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    	    @send WriteSourceInfoText::MSG_VIS_TEXT_APPEND_OPTR(@WriteSourceDoublePropertiesWarning, 0);
+    	    }
+
+        if (warn & TOKEN_ICON_NAMES_WARNING) {
+            WriteSourceCheckDuplicatedNames(pself->DBVI_vmFile, pself->DBVI_currentISet, TRUE);
+    	    @send WriteSourceInfoText::MSG_VIS_TEXT_APPEND_OPTR(@WriteSourceDoubleNameWarning, 0);
+    	    }
+
+
+    } else {
+    	ToolSetTextWashColor(@WriteSourceInfoText, COLOR_DARK_SILVER);
+    }
+
+    @send WriteSourceInfoText::MSG_VIS_TEXT_APPEND_OPTR(@WriteSourceReadyText, 0);
+    @send WriteSourceOKTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    return FALSE;
+}
+
+
+/*--------------------- MSG_ICON_DO_WRITE_SOURCE_DIALOG ---------------------
+ *  Purpose:	Open WriteSourceDialog, handle 'select geode' and initiate
+ *		real export to source code file
+ *  Context:	This must be done in the process thread or file selectors will not work
+ *  Strategy:
+ 	- open WriteSourceDialog
+ 	- if cmd == IC_SELECT_PATH: request ne path and update UI
+ 	  restart WriteSourceDialog
+	- if cmd == IC_OK: write icons as source code (MSG_DB_VIEWER_WRITE_SOURCE_CODE)
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_DO_WRITE_SOURCE_DIALOG {
+int 	cmd, cmd2;
+Boolean err;
+GenFilePath *gfp = 0;
+int found;
+optr dbViewer;
+
+    AppMarkBusy();
+    err = @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG();
+    AppMarkNotBusy();
+    if (err) return;
+
+doDialog:
+    @call WriteSourceDialog::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_NOW);
+    cmd = UserDoDialog(@WriteSourceDialog);
+
+
+    @send WriteSourceDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /*
+     * if cmd == IC_SELECT_PATH: select path to the moniker file
+     */
+    if (cmd == IC_SELECT_PATH) {
+
+	/*
+	 * Set path. Last used path is stored in ATTR_GEN_PATH_DATA of
+	 * the dialog object (see below)
+	 */
+        FilePushDir();
+	if (!gfp) gfp = malloc(sizeof(GenFilePath));
+	found = @call WriteSourceDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+
+	if (found != (-1)) {
+	    FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path);
+	} else {
+	    WriteSourceWTFEnterDefaultPath(@IniPathKey);
+	}
+
+        /*
+         * Request Path.
+         */
+        MemLock(OptrToHandle(@WriteSourcePathTitle));
+	cmd2 = FileToolRequestChangeDir(@WriteSourcePathInfoText, LMemDeref(@WriteSourcePathTitle), NULL, TRUE);
+        MemUnlock(OptrToHandle(@WriteSourcePathTitle));
+
+    	if ( cmd2 == IC_OK) {
+	    /*
+	     * Store current path in ATTR_GEN_PATH_DATA of the dialog object
+	     * Update UI
+	     */
+	    gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+	    @call WriteSourceDialog::MSG_META_ADD_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+	    ToolUpdateWriteSourcePath();
+    	}
+
+	/* Restart dialog */
+	FilePopDir();
+        goto doDialog;
+    }		// end of select geode
+
+
+    /*
+     * free path buffer
+     */
+    if(gfp) free(gfp);
+
+
+    /*
+     * Store settings
+     */
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    @call dbViewer::MSG_DB_VIEWER_WRITE_SOURCE_STORE_SETTINGS();
+
+    /*
+     * if cmd == IC_OK: write icons as source code
+     */
+    if (cmd == IC_OK) {
+    	err = @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_WRITE_SOURCE_CODE();
+    	if (err) goto doDialog;
+    }
+
+}
+
+/*--------------------- IconFindValidIconName ---------------------
+ *  Purpose:	Find an unique name for the icon.
+ *  Context:	If an icon's name occurs twice in the code, compiling fails
+ *  Strategy:
+ 	- get name. if there are no duplicated anme, we are done
+ 	- see if the current name occurs twice or more
+ 	  if yes, create an unique name
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconFindValidIconName(VMFileHandle vmFile, int iSet, int icon, char *name) {
+int count, n, anz;
+char name2[ICON_NAME_BUFFER_SIZE];
+
+    /*
+     * Get actual name. If there are no duplicates, return.
+     */
+    IdGetEntryName(vmFile, iSet, icon, name);
+    if ( (global.flags & GF_WRITE_CODE_DOUBLE_NAMES) == 0 ) return;
+
+    /*
+     *	See if our name occurs twice or more
+     */
+    count = IdGetEntryCount(vmFile, iSet);
+    if ( count < 2 ) return;
+
+    anz = 0;
+    for ( n = 0; n < count; n++ ) {
+        IdGetEntryName(vmFile, iSet, n, name2);
+	if ( strcmp(name, name2 )==0 ) anz++;
+    	}
+
+    if ( anz < 2 ) return;
+
+    /*
+     *	Fix the name by adding the icon number. I know that there is a very special
+     *	case in which the name is still not unique:
+     *		moniker 0: unnamed	--> will be renamed to unnamed00
+     *		moniker 1: unnamed
+     *		moniker 2: unnamed00	<-- Who does such a thing?
+     *  But the effort required to check this is disproportionately high.
+     */
+    name[MAX_ICON_NAME_LENGTH - 2] = 0;
+    sprintf(name2,"%02u", icon);
+    strcat(name, name2);
+
+}
+
+/*--------------------- MSG_ICON_APP_WRITE_SOURCE_QUERY_ICON ---------------------
+ *  Purpose:	Replace icon moniker in WriteSourceMonikerList
+ *  Context:
+ *  Strategy:	construct string like "48x30, file icon, 16 color screen"
+ *  Parameters:	GEN_DYNAMIC_LIST_QUERY_MSG (optr list, word item);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_QUERY_ICON {
+char 	buf[MAX_ICON_NAME_LENGTH + 20];
+char *name;
+int	iSet, width, height, icon, currentIcon;
+VMFileHandle vmFile;
+
+    /*
+     * Get current iSet, vmFile and current icon
+     * if "current icon" is selected, ignore passed list item and use current icon
+     */
+    iSet = ToolGetCurrentISetData(&vmFile, &currentIcon);
+    icon = item;
+
+    if (global.flags & GF_WRITE_CODE_CURRENT_ICON_ONLY) icon = currentIcon;
+
+    /*
+     * Get icon size and icon name
+     */
+    IdGetEntryDimensions(vmFile, iSet, icon, &width, &height);
+    sprintf(buf,"%ux%u, ", width, height);
+    name = strchr(buf,0);
+    IconFindValidIconName(vmFile, iSet, icon, name);
+
+    /*
+     * Replace icon moniker
+     */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT (item, buf);
+}
+
+/*--------------------- MSG_ICON_APP_WRITE_SOURCE_ICON_CHANGED ---------------------
+ *  Purpose:	Choose "All Icons" or "Current Icon"
+ *  Context:	Message from WriteSourceDialog
+ *  Strategy:	Re-initialize dialog box
+ *		We must save the settings first, because MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG
+ *		reads thesetting from iSet's extra data block
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_ICON_CHANGED {
+    AppMarkBusy();
+    @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_WRITE_SOURCE_STORE_SETTINGS();
+    @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG();
+    AppMarkNotBusy();
+}
+
+
+/*--------------------- MSG_ICON_APP_WRITE_SOURCE_HEADER_CHANGED ---------------------
+ *  Purpose:	Choose "VisMoniker", "Bitmap CHunk" or "PoinerDef"
+ *  Context:	Message from WriteSourceDialog
+ *  Strategy:	Re-initialize dialog box
+ *		We must save the settings first, because MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG
+ *		reads thesetting from iSet's extra data block
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_HEADER_CHANGED {
+
+    AppMarkBusy();
+    @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_WRITE_SOURCE_STORE_SETTINGS();
+    @call CombineGCurDisplayWith(@DBViewerContent)::MSG_DB_VIEWER_WRITE_SOURCE_INITIALIZE_DIALOG();
+    AppMarkNotBusy();
+}
+
+
+/*--------------------- MSG_ICON_APP_WRITE_SOURCE_LANGUAGE_CHANGED ---------------------
+ *  Purpose:	Choose "GOC" or "UIC"  (Asm)
+ *  Context:	Message from WriteSourceDialog
+ *  Strategy:	Replace the extension of the current source code file name
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_WRITE_SOURCE_LANGUAGE_CHANGED {
+FileLongName	fName;
+char *p;
+
+    @call WriteSourceFileName::MSG_VIS_TEXT_GET_ALL_PTR(fName);
+    p = strchr(fName, '.');
+    if (p) {
+    	*p = 0;
+    } else {
+    	fName[DOS_FILE_NAME_CORE_LENGTH] = 0;
+    }
+
+    if (selection == WSLT_GOC) {
+    	strcat(fName, ".GOH");
+    } else {
+    	strcat(fName, ".UI");
+    }
+
+    @call WriteSourceFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(fName, 0);
+
+}
+
+
+
+
+
+/*--------------------- ToolWriteSourceCheckReady ---------------------
+ *  Purpose:	Check all icons for the set to see, if there is a problem
+ *  Context:
+ *  Strategy:
+ *	Possible problems are:
+     	- both, compressed and uncompressed size are larger than
+     	  MAX_SAFE_MONIKER_SIZE. If only one of the sizees is
+     	  too large, return TOKEN_READY_IF_MINIMZE or TOKEN_READY_IF_COMPRESS
+     	- request to print out a warning if
+     	  ... one or more icons are true color icons
+     	  ... one or more icons are invisble (mask is completely clear)
+     	  ... two or more icons have the same combination of
+     	      display size, icon style, display class and aspect ratio
+     	      	Note: This is a real problem for export to tokenDB, but in case
+     	      	of writing source code, the programmer may use this icons in
+     	      	different contexts, which may be ok.
+     	      	Therefore we print a warning only.
+     	  ... two or more icons have the same name
+     	  	Usually, compiling a program fails if there are two or more
+     	  	chunks with the same name.
+     	  	Therefore, the code generates unique names, but does not store
+     	  	them in the icons data. Therefore, a warning is generated.
+
+     	  Depending on the settings in the WriteSourceDialog, all or only
+     	  some checks must performed.
+
+ *  Parameters:	vmFile:	database file
+ *		iSet:	Icon set to check
+ 		curIcon: currently edited icon
+ *  Return:
+	TOKEN_READY_FOR_EXPORT			0	<- no problem
+	TOKEN_READY_IF_MINIMZE			1	<- compressed size is too large
+	TOKEN_READY_IF_COMPRESS			2	<- uncompressed size is too large
+	TOKEN_NOT_READY_BECAUSE_SIZE		0x10
+    Additional flag bits:
+	TOKEN_RGB_WARNING			0x100	<- there are RGB icons
+	TOKEN_EMPTY_WARNING			0x200	<- there are empty icons
+	TOKEN_PROPERTIES_WARNING		0x400	<- duplicted set of properties
+	TOKEN_ICON_NAMES_WARNING		0x800	<- duplicted icon names
+
+ ---------------------------------------------------------------------------*/
+int ToolWriteSourceCheckReady(VMFileHandle vmFile, int iSet, int curIcon) {
+int retVal = TOKEN_READY_FOR_EXPORT;
+int 	count, icon, iconsToWrite;
+int 	bmFormat, headerToWrite;
+VMBlockHandle 	bmp;
+
+    count = IdGetEntryCount(vmFile, iSet);
+    EC( if (!count) { ProgError("Strange. no icon in ToolWriteSourceCheckReady"); return TOKEN_NOT_READY_BECAUSE_PROPERTIES; } )
+
+    iconsToWrite = @call WriteSourceIconChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (iconsToWrite) {
+    case WSIT_CURRENT_ICON:
+    	/*
+    	 * Only check the current icon
+    	 *	- get bitmap and check size
+    	 *	- check for warnings
+    	 *	- return
+    	 */
+        bmp = IdGetEntryBitmap(vmFile, iSet, curIcon);
+        bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+        retVal = ToolCheckIconSizes(vmFile, bmp);
+        if ( retVal >= TOKEN_FIRST_NOT_READY_VALUE ) return retVal;
+
+	if ( ExpTokenTestIfInvisible(vmFile, bmp, NULL) )  retVal |= TOKEN_EMPTY_WARNING;
+	if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) 	   retVal |= TOKEN_RGB_WARNING;
+	return retVal;
+
+    case WSIT_ALL_ICONS: break;
+
+    EC(default: ProgError("ToolWriteSourceCheckReady: WSIT_SELECTED_ICONS passed"); return TOKEN_NOT_READY_BECAUSE_SIZE; )
+    }
+
+    /*
+     * Examinate every icon
+     */
+    for ( icon = 0; icon < count; icon++) {
+
+        /*
+         * Get bitmap handle and bitmap format
+         */
+        bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+        bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+
+
+        /*
+         * Check size - compressed and uncompressed
+         * If this fails report the error and skip other cheks
+         */
+        retVal = ToolCheckIconSizes(vmFile, bmp);
+        if ( retVal >= TOKEN_FIRST_NOT_READY_VALUE ) {
+    	return retVal;
+    	}
+
+
+        /*
+         * Check icon for warning messags
+         */
+	if ( ExpTokenTestIfInvisible(vmFile, bmp, NULL) )  retVal |= TOKEN_EMPTY_WARNING;
+	if ( (bmFormat & BMT_FORMAT) == BMF_24BIT ) 	   retVal |= TOKEN_RGB_WARNING;
+    }		// for (icon)
+
+
+    /*
+     * For VisMonikers: check combination of display size, icon style, display class
+     *			and aspect ratio
+     * 			as well as duplicated names
+     * BitmapChunk and PointerDef: only check duplicated names
+     */
+    headerToWrite = @call WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (headerToWrite == WSHT_VIS_MONIKER) {
+    	if ( ToolCheckIconsProperties(vmFile, iSet) ) retVal |= TOKEN_PROPERTIES_WARNING;
+    }
+    if ( WriteSourceCheckDuplicatedNames(vmFile, iSet, FALSE) )  retVal |= TOKEN_ICON_NAMES_WARNING;
+
+    return retVal;
+}
+
+
+/*--------------------- WriteSourceSelectTooLargeItems ---------------------
+ *  Purpose:	Check all icons if they are too big and select the affected
+ *		icons in the WriteSourceMonikerList
+ *  Context:
+ *  Strategy:
+ 	- see if both, uncompressed and compressed exceeds MAX_SAFE_MONIKER_SIZE
+ 	  if so, select the icon
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WriteSourceSelectTooLargeItems(VMFileHandle vmFile, int iSet) {
+int n, count;
+VMBlockHandle  bmp;
+dword size1, size2;
+
+    @call WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+    count = IdGetEntryCount(vmFile, iSet);
+
+    for ( n = 0; n < count; n++ ) {
+    	bmp = IdGetEntryBitmap(vmFile, iSet, n);
+	ExpTokenFindBitmapSizes(vmFile, bmp, &size1, &size2);
+	if ( (size1 > MAX_SAFE_MONIKER_SIZE) && (size2 > MAX_SAFE_MONIKER_SIZE) )
+		@send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+    }
+}
+
+/*--------------------- WriteSourceSelectEmptyOrTCItems ---------------------
+ *  Purpose:	Check all icons if they are empty or true color and select
+ *		the affected icons in the WriteSourceMonikerList
+ *  Context:	Display export to tokenDB warning
+ *  Strategy:
+ 	- loop over all icons in the set
+ 	- select item if the icon is invisible
+ 	  ExpTokenTestIfInvisible returns the bmFormat value as a service
+ 	- select item if it is a true color item
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WriteSourceSelectEmptyOrTCItems(VMFileHandle vmFile, int iSet) {
+int n, count, bmFormat;
+VMBlockHandle  bmp;
+
+    @call WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED (FALSE);
+
+    count = IdGetEntryCount(vmFile, iSet);
+
+    for ( n = 0; n < count; n++ ) {
+    	bmp = IdGetEntryBitmap(vmFile, iSet, n);
+	if ( ExpTokenTestIfInvisible(vmFile, bmp, &bmFormat) )
+		@send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+	if ( (bmFormat & BMT_FORMAT) == BMF_24BIT)
+		@send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+    }
+}
+
+/*--------------------- WriteSourceSelectDoublePropertyItems ---------------------
+ *  Purpose:	Check all icons if they are icon with the same combination of
+     	  	display size, icon style, display class and aspect ratio
+     	  	If yes, select thems
+ *  Context:
+ *  Strategy:
+ 	- IdGetEntryType returns all information we need
+ 	- make a double-loop over all icons for this set
+ 	- if a duplicates has been found, select icon and try next one
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WriteSourceSelectDoublePropertyItems(VMFileHandle vmFile, int iSet) {
+int n, count, k;
+VisMonikerListEntryType	vmlet1, vmlet2;
+
+    count = IdGetEntryCount(vmFile, iSet);
+    if ( count < 2 ) return;
+    for ( n = 0; n < (count-1); n++ ) {
+
+    	vmlet1 = IdGetEntryType(vmFile, iSet, n);
+    	vmlet1 &= (VMLET_GS_COLOR | VMLET_STYLE | VMLET_GS_SIZE | VMLET_GS_ASPECT_RATIO);
+
+    	for ( k = n+1; k < count; k++ ) {
+
+    	    vmlet2 = IdGetEntryType(vmFile, iSet, k);
+    	    vmlet2 &= (VMLET_GS_COLOR | VMLET_STYLE | VMLET_GS_SIZE | VMLET_GS_ASPECT_RATIO);
+
+    	    if ( vmlet1 == vmlet2 ) {
+    	    	/* same properties found */
+    	    	@send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+    	    	@send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (k, TRUE);
+    	    	break;
+    	    }
+    	}	// for(k)
+    }		// for(n)
+}
+
+/*--------------------- WriteSourceCheckDuplicatedNames ---------------------
+ *  Purpose:	Check all icons if they are icons with the same name
+ *  Context:
+     * Any VisMoniker must have different names or compilation fails
+ *  Strategy:
+ 	- reset global flag
+ 	- IdGetEntryName returns the name
+ 	- make a double-loop over all icons for this set
+ 	- if a duplicates has been found, set global flag and return
+ 	  seletc items, if selectItems is TRUE
+ *  Parameters:
+ 	vmFile:	database file
+ 	iSet:	icon set to examinate
+ 	selectItems: TRUE to select te affected items in the WriteSourceMonikerList
+ *  Return:	TRUE: 	we have duplicates
+ *		FALSE:	no duplicates
+ ---------------------------------------------------------------------------*/
+Boolean WriteSourceCheckDuplicatedNames(VMFileHandle vmFile, int iSet, Boolean selectItems) {
+int n, count, k;
+char name1[ICON_NAME_BUFFER_SIZE], name2[ICON_NAME_BUFFER_SIZE];
+Boolean	retVal = FALSE;
+
+    global.flags &= ~GF_WRITE_CODE_DOUBLE_NAMES;
+    count = IdGetEntryCount(vmFile, iSet);
+    if ( count < 2 ) return FALSE;
+
+    for ( n = 0; n < (count-1); n++ ) {
+        IdGetEntryName(vmFile, iSet, n, name1);
+    	for ( k = n+1; k < count; k++ ) {
+	    IdGetEntryName(vmFile, iSet, k, name2);
+    	    if ( strcmp(name1, name2 )==0 ) {
+    	    	global.flags |= GF_WRITE_CODE_DOUBLE_NAMES;
+    	    	if ( selectItems ) {
+    	    	    @send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (n, TRUE);
+    	    	    @send WriteSourceMonikerList::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE (k, TRUE);
+    	    	}
+    	    	retVal = TRUE;
+    	    }
+    	}	// for(k)
+    }		// for(n)
+
+    return retVal;
+}
+
+/***********************************************************************
+ *
+ *	Write token as source code - Part 2: Write code to file
+ *	-------------------------------------------------------
+ *
+ *	WriteSourceEnterPath	-- enter path to source file
+ *	WriteSourceOpenFile	-- open file to write to
+ *
+ *	WriteIconToFile		-- Main code for writing an icon as VisMoniker to file
+ *	WritePtrImageToFile	-- Main code for writing an icon as PointerDef to file
+ *	WriteIconGOC		-- Write an icon as GOC code to file
+ *
+ ***********************************************************************/
+
+void WriteIconToFile(FileHandle destFile, VMFileHandle vmFile, int iSet, int icon);
+void WritePtrImageToFile(FileHandle destFile, VMFileHandle vmFile, int iSet, int icon);
+void WriteIconGOC(FileHandle fh, byte *dataPtr, char *monikerName, VisMonikerListEntryType vmlet, int monikerSize);
+
+
+/*--------------------- WriteSourceEnterPath ---------------------
+ *  Purpose:	Set path for write. Last used path is stored in ATTR_GEN_PATH_DATA of
+	 	the WriteSourceDialog dialog object
+ ---------------------------------------------------------------------------*/
+void WriteSourceEnterPath(void) {
+GenFilePath *gfp;
+Boolean found;
+
+    gfp = malloc(sizeof(GenFilePath));
+    found = @call WriteSourceDialog::MSG_META_GET_VAR_DATA(ATTR_GEN_PATH_DATA, sizeof(GenFilePath), gfp);
+
+    if (found != (-1)) {
+	FileSetCurrentPath(gfp->GFP_disk, gfp->GFP_path);
+    } else {
+	WriteSourceWTFEnterDefaultPath(@IniPathKey);
+    }
+
+    free(gfp);
+}
+
+/*--------------------- WriteSourceOpenFile ---------------------
+ *  Purpose:	Open destination file
+ *  Context:
+ *  Strategy:
+ *  Parameters:	nameBuffer:	return: file name
+ *  Return:	File handle of the file
+ *		Zero, if the file could not be opened
+ ---------------------------------------------------------------------------*/
+FileHandle WriteSourceOpenFile(char *nameBuffer) {
+FileHandle fh = 0;
+char	fileName[DOS_DOT_FILE_NAME_LENGTH + 2];
+int	cmd, err;
+
+    /*
+     * Read file name from UI
+     */
+    @call WriteSourceFileName::MSG_VIS_TEXT_GET_ALL_PTR(fileName);
+    if ( !strlen(fileName) ) {
+	ErrorBoxOptr(@WSErrorEmptyFilename);
+	return 0;
+    }
+    if (nameBuffer) strcpy(nameBuffer, fileName);
+
+    /*
+     * Check file exists and ask for overwrite
+     */
+    if (FileToolExistFile(fileName) ) {
+    	MemLock(OptrToHandle(@WSQuestionOverwriteFile));
+    	cmd = UserStandardDialog ( (char *)0,(char *)0,(char *)0,
+    		fileName,LMemDeref(@WSQuestionOverwriteFile), \
+		(( CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) | \
+		 ( GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)) );
+    	MemUnlock(OptrToHandle(@WSQuestionOverwriteFile));
+
+	if (cmd != IC_YES) return 0;
+    }
+
+    /*
+     *	Open file. Handle errors
+     */
+    fh = FileCreate(fileName, (FILE_CREATE_TRUNCATE | FCF_NATIVE) | (FILE_ACCESS_RW | FILE_DENY_RW), 0);
+    err = ThreadGetError();
+    if ( err ) {
+      switch (err) {
+     	case ERROR_ACCESS_DENIED:
+	case ERROR_WRITE_PROTECTED:
+	case ERROR_FILE_IN_USE:
+	case ERROR_SHARING_VIOLATION:
+	case ERROR_FILE_FORMAT_MISMATCH:
+	    ErrorBoxOptrString(@WSErrorAccessDenied, fileName);
+	    break;
+	case ERROR_INVALID_LONGNAME:
+	    ErrorBoxOptrString(@WSErrorInvalidName, fileName);
+	    break;
+	default:
+	    ErrorBoxOptrString(@WSErrorCommon, fileName);
+	}
+      return 0;
+    }
+
+    return fh;
+}
+
+/*--------------------- MSG_DB_VIEWER_WRITE_SOURCE_STORE_SETTINGS ---------------------
+ *  Purpose:	Res user setting from dialog UI and store it in  the iSte's extra data block
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_SOURCE_STORE_SETTINGS {
+int compressOptions, maskOptions, language, header;
+
+    compressOptions = @call  WriteSourceCompressOptions::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    maskOptions = @call  WriteSourceMaskOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    language = @call  WriteSourceLanguageList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    header = @call  WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    IdSetWriteSourceData(pself->DBVI_vmFile, pself->DBVI_currentISet,
+    			compressOptions, maskOptions, language, header);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_WRITE_SOURCE_CODE ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ 	- open/create destination file
+	- remember path for later use
+	- depending on settings in the dialog UI
+	   + write sindgle icon to fiel
+	   + or loop over all icons
+ *  Parameters:
+ *  Return:	TRUE if error
+ *		FALSE if code was successful written
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_SOURCE_CODE {
+FileHandle	fh;
+int	iconsToWrite;
+int	iSet, icon, count;
+VMFileHandle vmFile;
+char	fileName[DOS_DOT_FILE_NAME_LENGTH + 2];
+GenFilePath *gfp;
+char *fpp, *fullPath = 0;
+Boolean	isPtrImage;
+
+
+    /*
+     * Enter path and open destination file
+     */
+    FilePushDir();
+    WriteSourceEnterPath();
+    fh = WriteSourceOpenFile(fileName);
+    if ( !fh ) {
+    	FilePopDir();
+    	return TRUE;	/* could not open file */
+    }
+
+    /*
+     * store path in the geos.ini for later use
+     */
+    gfp = malloc(sizeof(GenFilePath));
+    fullPath = malloc(IE_FULL_PATH_BUFFER_SIZE);
+
+    gfp->GFP_disk = FileGetCurrentPath (gfp->GFP_path, sizeof(PathName));
+    fpp = fullPath;
+    FileConstructFullPath (&fpp, IE_FULL_PATH_BUFFER_SIZE, gfp->GFP_disk, gfp->GFP_path, TRUE);
+    MemLock(OptrToHandle(@IniPathKey));
+    InitFileWriteString(IE_INI_CATEGORY, LMemDeref(@IniPathKey), fullPath);
+    MemUnlock(OptrToHandle(@IniPathKey));
+
+    free(fullPath);
+    free(gfp);
+
+
+    /*
+     * Get info if we want to write all icons or only the current icon
+     * as well as the format to write.
+     */
+    AppMarkBusy();
+    iconsToWrite = @call WriteSourceIconChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+
+    /*
+     * Write the current icon to file or loop over all icons
+     */
+    iSet =  pself->DBVI_currentISet;
+    vmFile = pself->DBVI_vmFile;
+    isPtrImage = ( IdGetFlags(vmFile, iSet) & IF_PTR_IMAGE ) ? TRUE : FALSE;
+
+    if ( iconsToWrite == WSIT_CURRENT_ICON) {
+	/*
+	 * Write only the current icon to file
+	 */
+	 if (isPtrImage)  WritePtrImageToFile(fh, vmFile, iSet, pself->DBVI_currentIcon);
+	 	     else WriteIconToFile(fh, vmFile, iSet, pself->DBVI_currentIcon);
+    } else {
+	/*
+	 * loop over all icons
+	 */
+	count = IdGetEntryCount(vmFile, iSet);
+	for ( icon = 0; icon < count; icon++ ) {
+	    if (isPtrImage)  WritePtrImageToFile(fh, vmFile, iSet, icon);
+	    		else WriteIconToFile(fh, vmFile, iSet, icon);
+	}
+    }
+
+    /*
+     * Clean up
+     */
+    FileClose(fh, FALSE);
+    FilePopDir();
+    AppMarkNotBusy();
+
+    MessageBoxOptrString(@WSSuccessMessage, fileName);
+    return FALSE;
+
+}
+
+
+/*--------------------- WriteIconToFile ---------------------
+ *  Purpose:	Core routine to write an icon as source code to file
+ *  Context:
+ *  Strategy:
+ 	- Create a VisMoniker for that icon in an LMem chunk
+ 	  This handles all cases ad creates a valid moniker.
+ 	- Because we want to write the data size to the file, we must
+ 	  calculate this value her. OK, that is a self-made problem.
+ 	- Find a valid name for the moniker / data chunk
+ 	- Write data as text to the source code file.
+ 	  The routines WriteIconGOC and WriteIconAsm analyse the
+ 	  passed moniker and creates the corresponding source code.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WriteIconToFile(FileHandle destFile, VMFileHandle vmFile, int iSet, int icon) {
+optr	monikerOp;
+word compressMode, lang, monikerSize, headerFormat;
+byte *dataPtr, *monikerPtr;
+char monikerName[MAX_ICON_NAME_LENGTH + 2];
+VisMonikerListEntryType vmlet;
+
+
+    /*
+     * Create the VisMonker data in an LMem chunk
+     *	- get compress mode from UI
+     *  - Call MakeMonikerFromIcon() to do the job
+     *	  pass zero as mem handle to allocate new LMem block
+     *	  MakeMonikerFromIcon() returns zero in case of any error
+     *	- get VisMonikerListEntryType value for further use
+     */
+    compressMode = @call WriteSourceCompressOptions::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    compressMode |= @call WriteSourceMaskOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    monikerOp = MakeMonikerFromIcon(vmFile, iSet, icon, compressMode, 0);
+    if (!monikerOp) return;		// Emergency handling, should not occur
+
+    vmlet = IdGetEntryType(vmFile, iSet, icon);
+
+    /*
+     * Find out the data size of the whole moniker.
+     * The structure of a VisMonikerWithGString is (see also tokenExport.goc):
+     *		5 bytes     VisMonikerWithGString
+     *		1 byte	    GR_DRAW_BITMAP_CP
+     *	     or 3 byte	    GR_SET_AREA_COLOR +  GR_FILL_BITMAP_CP
+     *		2 bytes     size of bitmap including header, palette and data
+     *		N bytes	    bitmap data
+     *		1 byte      GR_END_GSTRING
+     * -> get a pointer to bitmap size location
+     * -> calculate moniker size
+     */
+    MemLock(OptrToHandle(monikerOp));
+    monikerPtr = (byte*)LMemDeref(monikerOp);
+
+    dataPtr = monikerPtr + sizeof(VisMonikerWithGString);
+    if ( *dataPtr == GR_SET_AREA_COLOR_INDEX ) {
+        monikerSize = sizeof(VisMonikerWithGString) + 2; // 7 bytes. including
+    							// GR_SET_AREA_COLOR + index
+    	dataPtr += 3;					// point to 'size of bitmap'
+    } else {
+    	monikerSize = sizeof(VisMonikerWithGString);	// 5 bytes
+    	dataPtr += 1;					// point to 'size of bitmap'
+    }
+
+
+    monikerSize += 3;					// Draw/FillBitmapCP command
+    							// + 1 word 'size-of-bitmap-data'
+    monikerSize += *((word*)dataPtr);			// read size-of-bitmap-data
+    monikerSize++;					// GR_END_GSTRING
+
+    /*
+     * Find an unique name for the moniker to write. Duplicated names causes
+     * compiling to fail.
+     */
+    IconFindValidIconName(vmFile, iSet, icon, monikerName);
+
+    /*
+     * Convert moniker moniker-data into text, depending on the destination language
+     */
+    lang = @call WriteSourceLanguageList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    headerFormat = @call WriteSourceHeaderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    switch (lang) {
+    case WSLT_GOC:
+    	ITWriteIconGOC(destFile, monikerPtr, monikerName, vmlet, monikerSize, headerFormat);
+    	break;
+    case WSLT_ASM:
+    	ITWriteIconAsm(destFile, monikerPtr, monikerName, vmlet, monikerSize, headerFormat);
+    	break;
+    EC( default: ProgError("WriteIconToFile: unknown languge"); )
+    }
+
+    /*
+     * Clean up
+     */
+    MemFree(OptrToHandle(monikerOp));
+}
+
+
+
+/*--------------------- WritePtrImageToFile ---------------------
+ *  Purpose:	Core routine to write an icon as PointerDef to file
+ *  Context:
+ *  Strategy:
+ 	- Create a PointerDef for that icon in an LMem chunk
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void WritePtrImageToFile(FileHandle destFile, VMFileHandle vmFile, int iSet, int icon) {
+char pointerName[MAX_ICON_NAME_LENGTH + 2];
+optr ptrImageOp;
+VMBlockHandle bmp;
+int size, lang;
+int hotX, hotY;
+byte *bPtr;
+
+    /*
+     * Create a PointerDef for that icon in an LMem chunk
+     * MakePointerFromImage() return zero in case of error
+     */
+    bmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    IdGetHotspot(vmFile, iSet, icon, &hotX, &hotY);
+    ptrImageOp = MakePointerFromImage(vmFile, bmp, &size, hotX, hotY);
+    if (!ptrImageOp) return;
+
+    /*
+     * Find an unique name for the pointer image to write. Duplicated names causes
+     * compiling to fail.
+     */
+    IconFindValidIconName(vmFile, iSet, icon, pointerName);
+
+    /*
+     * Convert pointer image data into text, depending on the destination language
+     * A PointerDef structure has a header of 4 bytes, folowed by two mono-bitmap planes
+     * Therefore size of a bitmap plane is (chunkSize - 4)/2
+     */
+    size = (size - 4)/2;
+    MemLock(OptrToHandle(ptrImageOp));
+    bPtr = LMemDeref(ptrImageOp);
+    lang = @call WriteSourceLanguageList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    switch (lang) {
+    case WSLT_GOC:
+        ITWritePtrGOC(destFile, bPtr, pointerName, size);
+    	break;
+
+    case WSLT_ASM:
+        ITWritePtrAsm(destFile, bPtr, pointerName, size);
+    	break;
+    EC( default: ProgError("WritePtrImageToFile: unknown languge"); )
+    }
+
+    /*
+     * Clean up
+     */
+    MemFree(OptrToHandle(ptrImageOp));
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file tokenSource.goc ********************/
+
