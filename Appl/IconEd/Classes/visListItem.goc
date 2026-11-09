@@ -1,0 +1,1793 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	visImage.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 4/10/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	Implementation of VisListItemClass and VisListContentClass
+ * 		as well as related operations
+ *		The combination VisListItemClass/VisListContentClass is designed to
+ * 		replace a DynamicList for the special case, that the VisMonikers for
+ * 		the children of the DynamicList may potentially large. Because a
+ *		DynamicList creates all its children in its own resource, all
+ *		VisMonikers for the children are also stored in this resource.
+ *		This may cause the resoure to become very large, potentially more than 64 kB.
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "lmacros.goh"
+@include "UI/appui.goh"
+
+@include "token.h"
+
+/*---------------------------------------------------------------------------
+  ---------------------------------------------------------------------------*/
+
+extern GlobalStruct global;
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  + 	VisListItemClass
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl VisListItemClass;
+
+/*--------------------- MSG_VIS_LIST_ITEM_SET_BITMAP ---------------------
+ *  Purpose:	Assign a bitmap to the object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile, bmp: bitmap to draw
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_SET_BITMAP {
+
+    pself->VLI_vmFile = vmFile;
+    pself->VLI_graphicBlock = bmp;
+    pself->VLI_imageType = VLIT_BITMAP;
+    @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+
+}
+
+
+/*--------------------- MSG_VIS_LIST_ITEM_GET_BITMAP ---------------------
+ *  Purpose:	Return bitmap handle and vmFile for object that displays a bitmap
+ *  Context.	(works fine, but currently no longer used)
+ *  Strategy:
+ *  Parameters:	*vmFilePtr: pointer to vmFile handle of the bitmap
+ *			    Nullpointer is allowed
+ *  Return:	VMBlockHandle of the bitmap
+ *		Zero if pself->VLI_imageType is not equal to VLIT_BITMAP
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_GET_BITMAP {
+
+    if ( pself->VLI_imageType != VLIT_BITMAP ) {
+    	if ( vmFilePtr ) *vmFilePtr = 0;
+    	return 0;
+    }
+
+    if ( vmFilePtr ) *vmFilePtr = pself->VLI_vmFile;
+    return pself->VLI_graphicBlock;
+}
+
+/*--------------------- MSG_VIS_LIST_ITEM_SET_TOKEN ---------------------
+ *  Purpose:	Assign a token to display in this object
+ *  Context:
+ *  Strategy:	Create a gstring in a memory block that holds the image to display
+ *		IconDrawTokenToGString() finds out a representaive icon
+ *  Parameters:	tok: Geodetoken
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_SET_TOKEN {
+MemHandle	gsBlock;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
+
+    /*
+     * Free current image data (no redraw at this point)
+     */
+    @call oself::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(FALSE);
+
+    /*
+     * Create GString to hold Image
+     */
+    gsBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    gsState = GrCreateGString( gsBlock, GST_CHUNK, &gsChunk);
+    gsOptr = ConstructOptr(gsBlock, gsChunk);
+
+    IconDrawTokenToGString(gsState, tok, TOKEN_LIST_ITEM_WIDTH, TOKEN_LIST_MONIKER_HEIGHT, TOKEN_LIST_TEXT_SIZE);
+    GrEndGString(gsState);
+    GrDestroyGString(gsState,0,GSKT_LEAVE_DATA);
+
+    pself->VLI_gstring = gsOptr;
+    pself->VLI_imageType = VLIT_GSTRING;
+    @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+}
+
+/*--------------------- MSG_VIS_LIST_ITEM_SET_VIS_MONIKER ---------------------
+ *  Purpose:	Assign a vismoniker to display in this object
+ *  Context:
+ *  Strategy:	Create a gstring in a memory block that holds the image to display
+ *
+ *  Parameters:	VisMonikerWithGString *monikerPtr
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_SET_VIS_MONIKER {
+int width, height;
+MemHandle	gsBlock;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
+
+    /*
+     * Free current image data (no redraw at this point)
+     */
+    @call oself::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(FALSE);
+
+    /*
+     * calculate size
+     */
+    width =  pself->VI_bounds.R_right - pself->VI_bounds.R_left;
+    height = pself->VI_bounds.R_bottom - pself->VI_bounds.R_top;
+
+
+    /*
+     * Create GString to hold Image
+     */
+    gsBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    gsState = GrCreateGString( gsBlock, GST_CHUNK, &gsChunk);
+    gsOptr = ConstructOptr(gsBlock, gsChunk);
+
+    IconDrawMonikerCentered(gsState, monikerPtr, width, height);
+    GrEndGString(gsState);
+    GrDestroyGString(gsState,0,GSKT_LEAVE_DATA);
+
+    pself->VLI_gstring = gsOptr;
+    pself->VLI_imageType = VLIT_GSTRING;
+    @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+
+}
+
+/*--------------------- MSG_VIS_LIST_ITEM_SET_TEXT ---------------------
+ *  Purpose:	Assign a simple text to display in this object
+ *  Context:
+ *  Strategy:	Create a gstring in a memory block that holds the image to display
+ *		We draw the passed text vertically centered
+ *  Parameters:	char *text: text to draw
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_SET_TEXT {
+int width, height;
+MemHandle	gsBlock;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
+
+    /*
+     * Free current image data (no redraw at this point)
+     */
+    @call oself::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(FALSE);
+
+    /*
+     * calculate size
+     */
+    width =  pself->VI_bounds.R_right - pself->VI_bounds.R_left;
+    height = pself->VI_bounds.R_bottom - pself->VI_bounds.R_top;
+
+
+    /*
+     * Create GString to hold the text vertically centered
+     * For simplicity we assume a text font héight of 12
+     */
+    gsBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    gsState = GrCreateGString( gsBlock, GST_CHUNK, &gsChunk);
+    gsOptr = ConstructOptr(gsBlock, gsChunk);
+
+    GrDrawText(gsState, 3, (height - 12)/2, text, 0);
+
+    GrEndGString(gsState);
+    GrDestroyGString(gsState,0,GSKT_LEAVE_DATA);
+
+    pself->VLI_gstring = gsOptr;
+    pself->VLI_imageType = VLIT_GSTRING;
+    @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+
+}
+
+
+/*--------------------- MSG_VIS_LIST_ITEM_SET_GSTRING ---------------------
+ *  Purpose:	Assign a prre-defined to display in this object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	gsOptr: GString, stored in a memory chunk
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_SET_GSTRING {
+
+    /*
+     * Free current image data (no redraw at this point)
+     */
+    @call oself::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(FALSE);
+
+    pself->VLI_gstring = gsOptr;
+    pself->VLI_imageType = VLIT_GSTRING;
+    @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+}
+
+/*--------------------- MSG_VIS_LIST_ITEM_CLEAR_IMAGE ---------------------
+ *  Purpose:	Set the object to "invisible"- no drawing, no mouse handling
+ *  Context:
+ *  Strategy:
+ *  Parameters:	redraw: updat object visual immediately
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_CLEAR_IMAGE {
+
+    /*
+     * free memory, if we have allocated any
+     */
+    switch (pself->VLI_imageType) {
+    case VLIT_NO_IMAGE: break;
+
+    case VLIT_BITMAP:
+	pself->VLI_vmFile = 0;
+	pself->VLI_graphicBlock = 0;
+    	break;
+
+    case VLIT_GSTRING:
+    	MemFree(OptrToHandle(pself->VLI_gstring));
+    	pself->VLI_gstring = 0;
+	break;
+
+    EC( default: ProgError("Type-Error in CLEAR_IMAGE"); )
+    }
+
+    pself->VLI_imageType = VLIT_NO_IMAGE;
+    pself->VLI_isSelected = FALSE;
+    if (redraw) @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+
+}
+
+/*--------------------- MSG_VIS_LIST_ITEM_SET_SELECTED_STATE ---------------------
+ *  Purpose:	Set selected state and redraw object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	state:	TRUE set selected
+ *			FALSE: set not selected
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_LIST_ITEM_SET_SELECTED_STATE {
+    if (pself->VLI_isSelected == state) return;
+    pself->VLI_isSelected = state;
+    @call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+}
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:	Select itself and deselect all other items
+ *  Context:
+ *  Strategy:	- see if anything is to do
+ *		- select our self
+ *		- force parent to deselect all other items
+ *  Parameters:void (MouseReturnParams *retVal,
+ *		sword xPosition, sword yPosition,
+ *		word inputState)
+ *      	inputState: lowByte: ButtonInfo
+ *			    highByte: UIFunctionsActive
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_META_START_SELECT {
+
+    /*
+     * do nothing if we have no image or we are selected already
+     */
+    retVal->flags = MRF_PROCESSED;
+    if (pself->VLI_imageType == VLIT_NO_IMAGE) return;
+    if (pself->VLI_isSelected) return;
+
+    @call oself::MSG_VIS_LIST_ITEM_SET_SELECTED_STATE(TRUE);
+    @call @visParent::MSG_VIS_LIST_CONTENT_NOTIFY_CHILD_SELECTED(oself);
+
+}
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:	Drw ourself, if we have an image to draw
+ *  Context:
+ *  Strategy:
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListItemClass, MSG_VIS_DRAW {
+int x0, y0, x1, y1;
+
+    if (pself->VLI_imageType == VLIT_NO_IMAGE ) return;
+
+
+    /*
+     * cache bounds
+     */
+    x0 = pself->VI_bounds.R_left;	y0 = pself->VI_bounds.R_top;
+    x1 = pself->VI_bounds.R_right;	y1 = pself->VI_bounds.R_bottom;
+
+    /*
+     * Set a clip rect to handle oversized bitmaps. Because all VisListItem objects draws
+     * to the same gstate, we have to save the gstate first and restore it afterwards.
+     */
+    GrSaveState(gstate);
+    GrSetClipRect(gstate, PCT_REPLACE, x0, y0, x1-1, y1-1);
+
+    /* drawing a dotted (or dashed) border does not look nice for me :~{ * /
+    GrSetLineStyle(gstate, LS_DOTTED, 0, 0, 0);
+    GrDrawRect(gstate, x0-3, y0-3, x1-2, y1-2);	/* left top corner is outside of clip rect */
+
+    /*
+     * draw background
+     */
+    if ( pself->VLI_isSelected ) {
+    	GrSetAreaColor(gstate, CF_INDEX, VC_BLUE_BACKGROUND, 0, 0);
+    	GrFillRect(gstate, x0 , y0, x1, y1);
+    	    /*
+    	     * We have to reset the area color to black or monochrome VisMoniker images
+    	     * that are draw with GrFillBitmap (mostly all of them) will be invisible
+    	     * (drawn blue on blue).
+    	     */
+    	GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    }
+
+    switch (pself->VLI_imageType) {
+    case VLIT_BITMAP: {
+    	int x, y, width, height;
+	/*
+	 * Draw the bitmap centered.
+	 */
+	BTGetMoreBitmapInfos(pself->VLI_vmFile, pself->VLI_graphicBlock, &width, &height, 0);
+
+	x = ((x1-x0) - width)/2;
+	if ( x < 1 ) x = 1;
+	y = ((y1-y0) - height)/2;
+	if ( y < 1 ) y = 1;
+
+    	GrDrawHugeBitmap(gstate, x+x0, y+y0, pself->VLI_vmFile, pself->VLI_graphicBlock);
+    	break;
+    	}
+
+    case VLIT_GSTRING: {
+    	word lElem;	// GStringElement
+    	byte *bPtr;
+    	Handle	gsHandle;
+
+    	MemLock(OptrToHandle(pself->VLI_gstring));
+	bPtr = LMemDeref(pself->VLI_gstring);
+	gsHandle = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+	GrDrawGString(gstate, gsHandle, x0, y0, 0, &lElem);
+	GrDestroyGString(gsHandle, NULL, GSKT_LEAVE_DATA);
+    	MemUnlock(OptrToHandle(pself->VLI_gstring));
+	break;
+    	}
+    EC( default: GrDrawText(gstate, x0 +2 , y0 + 2, "Type-Error", 0); )
+
+    }
+
+    GrRestoreState(gstate);
+
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  + 	VisListContentClass
+  +
+  +	Note: This class uses global a variable: global.tokenListMH
+  +
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+@classdecl VisListContentClass;
+
+/*--------------------- MSG_VIS_LIST_CONTENT_SET_OUTPUT ---------------------
+ *  Purpose:	Set a new output object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	optr outputObj
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_SET_OUTPUT {
+    pself->VLCI_output = outputObj;
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS ---------------------
+ *  Purpose:	Update VLCI_numItems field. Do not redraw objects
+ *  Context:
+ *  Strategy:
+ *  Parameters:	number: new number
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS {
+    pself->VLCI_numItems = number;
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_CLEAR_ITEMS ---------------------
+ *  Purpose:	Reset all items to have no imgae.
+ *		Free any associated memory, if any exists.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	redraw: force items to redraw itself
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_CLEAR_ITEMS {
+    @send @visChildren::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(redraw);
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM ---------------------
+ *  Purpose:	Make an item visible an select it. Update scroller object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	itemToSelect: id number of the item to display and to select
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM {
+int numChildren, firstItem, row, maxRow;
+
+    numChildren = @call oself::MSG_VIS_COUNT_CHILDREN();
+    firstItem = 0;
+    if ( itemToSelect >= numChildren) {
+    	/*
+    	 * if we have a single row display, calculating firstItem is simple
+    	 */
+    	if ( pself->VLCI_numItemsY == 1) {
+    	    firstItem = itemToSelect - (numChildren - 1);
+    	} else {
+    	    /*
+    	     * on a multiple row display firstItem must be a
+    	     * multiple of VLCI_numItemsX
+    	     */
+    	    row = itemToSelect / (pself->VLCI_numItemsX);
+    	    maxRow = (pself->VLCI_numItems + pself->VLCI_numItemsX - 1) / (pself->VLCI_numItemsX);
+    	    maxRow--;	/* rows are zero based */
+    	    if ( (row >= maxRow) && (row > 0) ) row--;
+    	    firstItem = row * pself->VLCI_numItemsX;
+    	}
+    }
+
+    /*
+     * Remember first item identifier and selected item identifier for later use
+     * Then update and redraw all out children
+     */
+    pself->VLCI_firstItemID = firstItem;
+    pself->VLCI_selectedItem = itemToSelect;
+
+    @call oself::MSG_VIS_LIST_CONTENT_UPDATE_ITEM_IMAGES();
+    @send oself::MSG_VIS_LIST_CONTENT_SELECT_ITEM(itemToSelect);
+    @send oself::MSG_VIS_LIST_CONTENT_UPDATE_SCROLLER();
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_UPDATE_ITEM_IMAGES ---------------------
+ *  Purpose:	Send out the query message for all VisListItem objects to
+ *		make the image up to date.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_UPDATE_ITEM_IMAGES {
+int numChildren, n, item;
+optr	obj;
+
+    /*
+     * enumerate all VisListItem objects and initialize them
+     */
+    numChildren = @call oself::MSG_VIS_COUNT_CHILDREN();
+    item = pself->VLCI_firstItemID;
+    for ( n = 0; n < numChildren; n++, item++) {
+
+    	obj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(n);
+    	EC( if (obj == 0) {ProgError("invalid object number in update_item_imgaes"); } )
+    	if ( item < pself->VLCI_numItems ) {
+    	    /*
+    	     * An item with that number exists. Send query-image-message
+    	     */
+	    if ( (pself->VLCI_output) && (pself->VLCI_queryMsg) ) {
+	        @send pself->VLCI_output::
+        		{VIS_LIST_CONTENT_QUERY_MSG}(pself->VLCI_queryMsg)(obj, item);
+            }
+    	} else {
+    	    /*
+    	     * there is no image for the object. clear object
+    	     */
+    	    @send obj::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(TRUE);
+    	}
+
+    }	    /* end of for() */
+
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_UPDATE_SINGLE_ITEM_IMAGE ---------------------
+ *  Purpose:	Send out the query message for a given VisListItem object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	itemToUpdate: id number of the item to update
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_UPDATE_SINGLE_ITEM_IMAGE {
+optr obj;
+int  child;
+
+    child = itemToUpdate - pself->VLCI_firstItemID;
+    obj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(child);
+    if (!obj) return;
+
+    if ( itemToUpdate < pself->VLCI_numItems ) {
+	if ( (pself->VLCI_output) && (pself->VLCI_queryMsg) ) {
+	@send pself->VLCI_output::
+		{VIS_LIST_CONTENT_QUERY_MSG}(pself->VLCI_queryMsg)(obj, itemToUpdate);
+	}
+    } else {
+    	@send obj::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(TRUE);
+    }
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_NOTIFY_CHILD_SELECTED ---------------------
+ *  Purpose:	Inform the object that the user has selected an VisListItemClass item
+ *  Context:	Send from one of our children
+ *  Strategy:	- deselect all other childen
+ *		- update VLCI_selectedItem value
+ *		- send notify msg to VLCI_output
+ *  Parameters:	optr itemOp
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_NOTIFY_CHILD_SELECTED {
+optr obj;
+int  numObj, n;
+
+    /*
+     * enumerate all children
+     * if the child is the sender, store its (item-)number, if not, set it not selected
+     */
+    numObj = @call oself::MSG_VIS_COUNT_CHILDREN();
+    for ( n = 0; n < numObj; n++ ) {
+    	obj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(n);
+	if (obj == 0 ) continue;
+	if (obj == itemOp ) {
+    	    pself->VLCI_selectedItem = n + pself->VLCI_firstItemID;
+    	} else {
+    	    @send obj::MSG_VIS_LIST_ITEM_SET_SELECTED_STATE(FALSE);
+    	}
+    }
+
+    /*
+     * send out notification message
+     */
+    if ( (pself->VLCI_output) && (pself->VLCI_notifySelectionMsg) ) {
+        @send pself->VLCI_output::
+        	{VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG}
+        	(pself->VLCI_notifySelectionMsg)(pself->VLCI_selectedItem);
+    }
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_SELECT_ITEM ---------------------
+ *  Purpose:	Select a given list item. This item may be actually visible or not.
+ *  Context:
+ *  Strategy:	- calculate child number
+ *		- loop over all children
+ *		   * select child that correspondends to passed itemNr
+ *		   * deselect all other childen
+ *		- notify output object that a new item has been selected
+ *  Parameters:	itemNr to select
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_SELECT_ITEM {
+optr obj;
+int  numObj, n;
+int childNr;
+
+    childNr = itemNr - pself->VLCI_firstItemID;
+    pself->VLCI_selectedItem = itemNr;
+
+    numObj = @call oself::MSG_VIS_COUNT_CHILDREN();
+    for ( n = 0; n < numObj; n++ ) {
+    	obj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(n);
+    	@send obj::MSG_VIS_LIST_ITEM_SET_SELECTED_STATE( (childNr == n) ? TRUE : FALSE );
+    }
+
+
+    /*
+     * send out notification message
+     */
+    if ( (pself->VLCI_output) && (pself->VLCI_notifySelectionMsg) ) {
+        @send pself->VLCI_output::
+        	{VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG}
+        	(pself->VLCI_notifySelectionMsg)(pself->VLCI_selectedItem);
+    }
+
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM ---------------------
+ *  Purpose:	Return the id of the selected item, even if the item is not visble in the list.
+ *  Return:	VLCI_selectedItem value
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM {
+    return (pself->VLCI_selectedItem);
+}
+
+
+
+/*--------------------- MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID ---------------------
+ *  Purpose:	Set first item to show in the list. Update list visual
+ *  Context:
+ *  Strategy:
+ *  Parameters:	int id
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID {
+    pself->VLCI_firstItemID = id;
+    @call oself::MSG_VIS_LIST_CONTENT_UPDATE_ITEM_IMAGES();
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_GET_FIRST_ITEM_ID ---------------------
+ *  Purpose:	Return the VLCI_firstItemID field
+ *  Return:	VLCI_firstItemID
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_GET_FIRST_ITEM_ID {
+    return pself->VLCI_firstItemID;
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_SET_TOKEN_RANGE ---------------------
+ *  Purpose:	For the case that our children display a token we can set up a range of
+ *		token-ID's to display.
+ *  Context:
+ *  Strategy:	-
+ *  Parameters:
+ *  Return:	number of tokens to show in the list
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_SET_TOKEN_RANGE {
+TokenListStruct	*list;
+word n, numTokens;
+Boolean found;
+int	curIdx;
+
+    /*
+     * Lock token list
+     */
+    list = MemLock(global.tokenListMH);
+
+    /*
+     * Find out current selected token. curIdx holds is set to the
+     * absolute value no matter what range is displayed
+     */
+     curIdx = @call oself::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+     curIdx += list->firstIndex;
+
+
+    /*
+     * update TokenListStruct values
+     */
+
+    do {
+	found = FALSE;
+	list->firstIndex = 0;
+	list->tokensToShow = 0;
+
+	// find first index to display
+	for (n = 0; n < list->tokenCount; n++ ) {
+	    if (list->token[n].GT_manufID >= minID ) {
+		list->firstIndex = n;
+		found = TRUE;
+		break;
+		}
+	}
+ 	if ( !found ) break;		// minID too large - no tokens to show
+
+ 	// find number of tokens to display
+ 	list->tokensToShow = 0;
+ 	for (n = list->firstIndex; n < list->tokenCount; n++) {
+ 	    if (list->token[n].GT_manufID > maxID ) break;
+ 	    list->tokensToShow++;
+ 	    }
+
+ 	} while(FALSE);
+
+    // if there are no token to display, list->tokensToShow will be zero
+    numTokens = list->tokensToShow;
+    @send oself::MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS(list->tokensToShow);
+
+    /*
+     *	try to restore previously selected token
+     */
+    if (numTokens == 0) {
+    	@call oself::MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM(VLC_NONE_SELECTED);
+    } else {
+    	do {
+    	    /*
+    	     * If the manfID of the previously selected token (curIdx)
+    	     * out of bounds, set a new value
+    	     */
+    	    curIdx -= list->firstIndex;
+    	    if (curIdx <= 0 ) {
+    	    	curIdx = 0; break;
+    	    }
+    	    if (curIdx >= list->tokensToShow ) {
+    	    	curIdx = list->tokensToShow - 1;
+    	    	break;
+    	    }
+    	} while(FALSE);
+
+    	@call oself::MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM(curIdx);
+
+    }
+
+    MemUnlock(global.tokenListMH);
+    return numTokens;
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER ---------------------
+ *  Purpose:	Set up scroller object to work with us
+ *  Context:	Calling this message replaces the proper static UI setup
+ *  Strategy:	- set HINT_VALUE_DISPLAYS_RANGE
+ *		- set GVLI_applyMsg
+ *	        - set GVLI_destination
+ *  Parameters: -
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER {
+
+    EC( if ( (pself->VLCI_scrollerObj) == 0 ) { \
+    	ProgError("VisListContent::Initialize has non scrollbar object set"); \
+    	return; \
+    	} )
+
+    if ( pself->VLCI_numItemsY == 1) {
+    	/* We have an _X_SCROLLER */
+    	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_RANGE_LENGTH(MakeWWFixed(pself->VLCI_numItemsX));
+    } else {
+    	/* We have an _Y_SCROLLER */
+    	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_RANGE_LENGTH(MakeWWFixed(pself->VLCI_numItemsY));
+    }
+
+    @send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_DESTINATION(oself);
+    @send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_APPLY_MSG(MSG_VIS_LIST_CONTENT_SCROLLER_APPLY);
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_SCROLLER_APPLY ---------------------
+ *  Purpose:	This method handles the 7 messages from SortIconsScrollbar.
+ *  Context:	See declaration of VisListContentClass for details.
+ *  Strategy:	When GenValue acts as a scroller, visual update does not happen
+ *		automatically. Instead we have zu send the value back to the object
+ *		for an visual update.
+ *		- Round the value to the next integer value
+ *		- send value back to the scroller object
+ *		- Calculate first item to show. This depends on the values of
+ *		  VLCI_numItemsY and VLCI_numItemsX
+ *		- update item list (ourself)
+ *  Parameters: GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_SCROLLER_APPLY,
+				MSG_VIS_LIST_CONTENT_SCROLLER_APPLY_1,
+				MSG_VIS_LIST_CONTENT_SCROLLER_APPLY_2,
+				MSG_VIS_LIST_CONTENT_SCROLLER_APPLY_3,
+				MSG_VIS_LIST_CONTENT_SCROLLER_APPLY_4,
+				MSG_VIS_LIST_CONTENT_SCROLLER_APPLY_5,
+				MSG_VIS_LIST_CONTENT_SCROLLER_APPLY_6  {
+int firstItem, selectedItem;
+
+    EC( if ( (pself->VLCI_scrollerObj) == 0 ) { \
+    	ProgError("VisListContent::Apply has non scrollbar object set"); \
+    	return; \
+    	} )
+
+    /*
+     * visual update: in scrollbar mode the bar is not updated automatically visually
+     * we ensure here that the scroller only holds integer values
+     */
+    value += 0x8000;
+    value &= 0xFFFF0000;
+    @send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_VALUE(value, FALSE);
+
+    /*
+     * Calculate first item number
+     */
+    if ( pself->VLCI_numItemsY == 1 ) {
+    	/*
+    	 * For a single-row-display the left most icon is always
+    	 * equal to the scrollers 'value' (as integer)
+    	 */
+        firstItem = value>>16;
+    } else {
+    	/*
+    	 * For a multi-row-display the top-left icon must be
+    	 * a mutiple of VLCI_numItemsX
+    	 */
+    	firstItem = value>>16;
+    	firstItem *= pself->VLCI_numItemsX;
+    }
+
+    /*
+     * Get currently seletced item, then redraw list and restore selection
+     */
+    selectedItem = @call oself::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    @send oself::MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID(firstItem);
+    @send oself::MSG_VIS_LIST_CONTENT_SELECT_ITEM(selectedItem);
+
+}
+
+/*--------------------- MSG_VIS_LIST_CONTENT_UPDATE_SCROLLER ---------------------
+ *  Purpose:	Update the GenValue scroller object to reflect the number of currently
+ *		displayed items as well as the currently selected item
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:	number of tokens to show in the list
+ ---------------------------------------------------------------------------*/
+@method VisListContentClass, MSG_VIS_LIST_CONTENT_UPDATE_SCROLLER {
+int  rows, curRow;
+
+    EC ( if (pself->VLCI_scrollerObj == 0) {ProgError("VLC_UPDATE_SCROLLER: no scroller obj"); } )
+    if (pself->VLCI_scrollerObj == 0) return;
+
+    /*
+     * If the list is empty, set scroller to full range
+     */
+    if ( pself->VLCI_numItems == 0 ) {
+	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_MAXIMUM (MakeWWFixed(pself->VLCI_numItemsY));
+	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, FALSE);
+	return;
+    }
+
+    /*
+     * A single row display is assumed to have an _X_SCROLLER to handle with.
+     * This differs from handling an _Y_SCROLLER
+     */
+    if ( pself->VLCI_numItemsY == 1 ) {
+    	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_MAXIMUM (MakeWWFixed(pself->VLCI_numItems));
+	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_INTEGER_VALUE(pself->VLCI_firstItemID, FALSE);
+    	return;
+    }
+
+    /*
+     * Now we have an _Y_SCROLLER
+     * Calculate number of rows required to display all items
+     * Set scroller maximum value to these number
+     * Then display the line that holds the currently selected item
+     */
+    rows = (pself->VLCI_numItems + pself->VLCI_numItemsX - 1) / (pself->VLCI_numItemsX);
+    @send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_MAXIMUM (MakeWWFixed(rows));
+
+    if (pself->VLCI_selectedItem >= 0 ) {
+    	curRow = (pself->VLCI_selectedItem)/(pself->VLCI_numItemsX);
+    	@send pself->VLCI_scrollerObj::MSG_GEN_VALUE_SET_INTEGER_VALUE(curRow, FALSE);
+    }
+
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ + 	Handling SortIconsDialog
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*--------------------- MSG_DB_VIEWER_SORT_ICONS_OPEN_DIALOG ---------------------
+ *  Purpose:	Initialize and open the "Sort Icons" dialog box
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_OPEN_DIALOG {
+int iSet, numIcons;
+VMFileHandle vmFile;
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * get basic informations and do savety checks
+     */
+    iSet = pself->DBVI_currentISet;
+    if (iSet == NO_CURRENT_ISET ) return;
+    vmFile = pself->DBVI_vmFile;
+    if (vmFile == 0) return;
+
+    numIcons = IdGetEntryCount(vmFile, iSet);
+    if ( numIcons < 2 ) {
+	ErrorBoxOptr(@ErrorTooFewIcons);
+	return;
+    }
+
+    /*
+     * Initalize VisListContent and implicitly VisListItem objects and scrollbar
+     * We want the currently edited icon to be selected in the list.
+     * This also initalizes the scrollbar.
+     */
+    @send SortIconContent::MSG_VIS_LIST_CONTENT_SET_OUTPUT(oself);
+    @send SortIconContent::MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER();
+    @send SortIconContent::MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS(numIcons);
+    @call SortIconContent::MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM(pself->DBVI_currentIcon);
+
+    /*
+     * Open dialog box. Remember state for a GEOS restart
+     */
+    pself->DBVI_flags |= DBVF_RESTORE_SORT_ICONS;
+    @send SortIconsDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_SORT_ICONS_CLOSE_DIALOG ---------------------
+ *  Purpose:	Sort icons dialog has been closed. Update IconListContent to
+ *		reflect the new order of the icons
+ *  Context:	The handler of the "Shift" buttons of this dialog box modify
+ *		the database directly. Therefore this "close" handler must
+ *		be called in every case.
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_CLOSE_DIALOG {
+int selectedIcon;
+optr visISet;
+
+    /*
+     * rescan icon list to reflect the new order of the icons
+     */
+    @send ConstructOptr(OptrToHandle(oself), OptrToChunk(@IconListContent))::MSG_ICON_VIEWER_RESCAN_LIST();
+
+    /*
+     * It's possible that the first icon has been changed (I cannot detect this at this point)
+     * For this case, the 'representative' icon for the iSet may have another size.
+     * Therefore we update the 'representative' icon and the iSet list.
+     */
+    visISet = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(pself->DBVI_currentISet);
+    @send visISet::MSG_VIS_ISET_INITIALIZE(pself->DBVI_currentISet);
+    @send oself::MSG_VIS_INVALIDATE();
+
+    /*
+     * edit the icon that is selected in the SortIcon list
+     */
+    selectedIcon = @call SortIconContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    @send oself::MSG_DB_VIEWER_SWITCH_ICON(selectedIcon);
+
+    /*
+     * reset all item imgaes in our current dialog box
+     */
+    @send SortIconContent::MSG_VIS_LIST_CONTENT_CLEAR_ITEMS(FALSE);
+    pself->DBVI_flags &= ~DBVF_RESTORE_SORT_ICONS;
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_SORT_ICONS_QUERY_BITMAP ---------------------
+ *  Purpose:	Replace the image, shown by the VisListItem object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	VIS_LIST_CONTENT_QUERY_MSG(optr itemObj, int itemNr)
+ *		itemNr is the icon to show
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_QUERY_BITMAP {
+int iSet;
+VMFileHandle 	vmFile;
+VMBlockHandle	bmp;
+
+    /*
+     * do savety checks and get basic informations
+     */
+    if ( !itemObj ) return;
+    if ( itemNr == NO_CURRENT_ICON ) return;
+    iSet = pself->DBVI_currentISet;
+    vmFile = pself->DBVI_vmFile;
+
+    /*
+     * replace objects bitmap (the bitmap will be used, not copied)
+     */
+    bmp = IdGetEntryBitmap(vmFile, iSet, itemNr);
+    @send itemObj::MSG_VIS_LIST_ITEM_SET_BITMAP(vmFile, bmp);
+
+}
+
+
+/*--------------------- ToolUpdateSortIconsShiftTriggers ---------------------
+ *  Purpose:	Enable/disable "Shift Icon" triggers
+ *  Context:	Sort icons
+ *  Strategy:
+ *  Parameters:	selectedIcon: selected icon in the list
+ *		numIcons:     number of icons in the iSet
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolUpdateSortIconsShiftTriggers(int selectedIcon, int numIcons) {
+
+    if (selectedIcon == 0 ) {
+    	@send SortIconsShiftLeftTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+    	@send SortIconsShiftLeftTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    if (selectedIcon >= (numIcons-1) ) {
+    	@send SortIconsShiftRightTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+    	@send SortIconsShiftRightTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+}
+
+/*--------------------- MSG_DB_VIEWER_SORT_ICONS_NOTIFY_ICON_CHANGED ---------------------
+ *  Purpose:	A new icon was selected in SortIconDialog
+ *  Context:	This message comes from SortIconContent (VLCI_notifySelectionMsg)
+ *  Strategy:	Update information in SortIconsIconText
+ *		enable disable "shift-icon" triggers
+ *  Parameters:	VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG(int selectedItemNr)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_NOTIFY_ICON_CHANGED {
+int numIcons;
+
+    // selectedIcon == selectedItemNr;
+    @call oself::MSG_DB_VIEWER_UPDATE_ICON_INFORMATION_PART_ONE(@SortIconsIconText, selectedItemNr);
+
+    numIcons = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    ToolUpdateSortIconsShiftTriggers(selectedItemNr, numIcons);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_SORT_ICONS_SHIFT_ICON ---------------------
+ *  Purpose:	Shift icon up or down and update list
+ *  Context:	Sort icons
+ *  Strategy:
+ *  Parameters:	steps:	+1 Shift up (to right)
+ *			-1 Shift down (to left)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_ICONS_SHIFT_ICON {
+int firstId, selectedIcon, numIcons;
+Boolean err;
+
+    /*
+     * Modify database file
+     */
+    selectedIcon = @call SortIconContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    err = IdShiftIcon(pself->DBVI_vmFile, pself->DBVI_currentISet, selectedIcon, steps);
+    if (err) return;
+
+
+    /*
+     * swap bitmaps of the affected VisListItemClass objects
+     */
+    @call SortIconContent::MSG_VIS_LIST_CONTENT_UPDATE_SINGLE_ITEM_IMAGE(selectedIcon);
+    @call SortIconContent::MSG_VIS_LIST_CONTENT_UPDATE_SINGLE_ITEM_IMAGE(selectedIcon+steps);
+
+
+    /*
+     * if we have shifted the icon out of the list, reinitialize list
+     */
+    firstId = @call SortIconContent::MSG_VIS_LIST_CONTENT_GET_FIRST_ITEM_ID();
+    if ( (selectedIcon+steps) < firstId ) {
+    	@send SortIconContent::MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID(selectedIcon+steps);
+    }
+
+    if ( (selectedIcon+steps) >= firstId + SORT_ICONS_NUM_ITEMS_IN_LIST ) {
+        firstId = selectedIcon + steps - SORT_ICONS_NUM_ITEMS_IN_LIST + 1;
+    	@send SortIconContent::MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID(firstId);
+    }
+
+    /*
+     * Select moved icon
+     */
+    selectedIcon += steps;
+    @call SortIconContent::MSG_VIS_LIST_CONTENT_SELECT_ITEM(selectedIcon);
+
+    /*
+     * Update "Shift" triggers
+     */
+    numIcons = IdGetEntryCount(pself->DBVI_vmFile, pself->DBVI_currentISet);
+    ToolUpdateSortIconsShiftTriggers(selectedIcon, numIcons);
+
+    /*
+     * Update Scroller - the 'value' of the scroller is equal to the
+     * number of the left icon.
+     */
+    firstId = @call SortIconContent::MSG_VIS_LIST_CONTENT_GET_FIRST_ITEM_ID();
+    @send SortIconsScrollbar::MSG_GEN_VALUE_SET_INTEGER_VALUE(firstId, FALSE);
+
+}
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ + 	Handling TokenDeleterDialog
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*--------------------- MSG_DB_VIEWER_TOKEN_DELETER_OPEN_DIALOG ---------------------
+ *  Purpose:	Initialize and open the "Token Deleter" dialog box
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_OPEN_DIALOG {
+
+    /*
+     * Read tokens form tokenDB and build global token list (tokenListMH)
+     */
+    ImpTokenListTokens(TRUE);
+
+
+    /*
+     * Initalize VisListContent and implicitly VisListItem objects and scrollbar
+     * MSG_DB_VIEWER_TOKEN_DELETER_APPLY_RANGE reads manufacturerID range from
+     * UI and updates the content object and the scrollbar
+     */
+    @send TokenDeleterContent::MSG_VIS_LIST_CONTENT_SET_OUTPUT(oself);
+    @send TokenDeleterContent::MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER();
+    @call oself::MSG_DB_VIEWER_TOKEN_DELETER_APPLY_RANGE();
+
+    /*
+     * Open dialog box
+     */
+    @send TokenDeleterDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_TOKEN_DELETER_CLOSE_DIALOG ---------------------
+ *  Purpose:	Token Deleter dialog has been closed.
+ *		Free any associated memory.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_CLOSE_DIALOG {
+     @send TokenDeleterContent::MSG_VIS_LIST_CONTENT_CLEAR_ITEMS(FALSE);
+}
+
+/*--------------------- MSG_DB_VIEWER_TOKEN_DELETER_APPLY_RANGE ---------------------
+ *  Purpose:	Set a new manufacturer ID range for the tokens to display
+ *  Context:
+ *  Strategy:	- Read range from UI
+ *		- let VisListContent object (TokenDeleterContent)
+ *		  do the main job.
+ *		- enable / disable "Delete Token" trigger
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_APPLY_RANGE {
+word minID, maxID, numTokens;
+    /*
+     * Read ID range from  UI
+     */
+    minID = @call TokenDeleterManufIDMinimumValue::MSG_GEN_VALUE_GET_VALUE();
+    maxID = @call TokenDeleterManufIDMaximumValue::MSG_GEN_VALUE_GET_VALUE();
+    if ( minID > maxID ) {
+    	word tmp = minID;
+    	minID=maxID;
+    	maxID=tmp;
+	@call TokenDeleterManufIDMinimumValue::MSG_GEN_VALUE_SET_VALUE(minID, FALSE);
+	@call TokenDeleterManufIDMaximumValue::MSG_GEN_VALUE_SET_VALUE(maxID, FALSE);
+	}
+
+    /*
+     * Update list according to the ID range. This updates the scroller too
+     */
+    numTokens = @call TokenDeleterContent::MSG_VIS_LIST_CONTENT_SET_TOKEN_RANGE(minID, maxID);
+
+    /*
+     * if the list is empty, disable "Delete Token" button
+     */
+    if (0==numTokens) {
+	@call TokenDeleterDeleteTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	}
+    else {
+    	@call TokenDeleterDeleteTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	}
+
+}
+
+/*--------------------- MSG_DB_VIEWER_TOKEN_DELETER_QUERY_TOKEN ---------------------
+ *  Purpose:	Replace the image, shown by the VisListItem object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	VIS_LIST_CONTENT_QUERY_MSG(optr itemObj, int itemNr)
+ *		itemNr is the token number
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_QUERY_TOKEN {
+TokenListStruct	*list;
+
+    list = MemLock(global.tokenListMH);
+    @send itemObj::MSG_VIS_LIST_ITEM_SET_TOKEN(list->token[itemNr + list->firstIndex]);
+    MemUnlock(global.tokenListMH);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_TOKEN_DELETER_NOTIFY_TOKEN_CHANGED ---------------------
+ *  Purpose:	A new icon was selected in TokenDeleterDialog
+ *  Context:	This message comes from TokenDeleterContent (VLCI_notifySelectionMsg)
+ *  Strategy:	Update information in TokenDeleterIconText
+ *		enable disable "shift-icon" triggers
+ *  Parameters:	VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG(int selectedItemNr)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_NOTIFY_TOKEN_CHANGED {
+char buffer[20];
+GeodeToken tok;
+TokenListStruct	*list;
+int itemNr;
+
+
+    /*
+     * Get selected token. if the list is empty, selected item is equal
+     * to VLC_NONE_SELECTED (-1)
+     */
+    itemNr = @call TokenDeleterContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    if ( itemNr == VLC_NONE_SELECTED ) {
+    	@call TokenDeleterTokenText::MSG_VIS_TEXT_REPLACE_ALL_PTR("-", 0);
+    	return;
+    }
+
+    list = MemLock(global.tokenListMH);
+    tok = list->token[itemNr + list->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+    /*
+     * Update dialog UI
+     */
+    ImpTokenTokenCharsToText(tok, buffer);
+    sprintf(strchr(buffer,0), "%u", tok.GT_manufID);
+    @call TokenDeleterTokenText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_TOKEN_DELETER_DELETE_TOKEN ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TOKEN_DELETER_DELETE_TOKEN {
+GeodeToken tok;
+TokenListStruct	*list;
+dword tokenDW;
+int itemNr;
+
+
+    /*
+     * Get selected token. If the list is empty, selected item is equal
+     * to VLC_NONE_SELECTED (-1)
+     */
+    itemNr = @call TokenDeleterContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    if ( itemNr == VLC_NONE_SELECTED ) return;	// emergency, should never happen
+
+    list = MemLock(global.tokenListMH);
+    tok = list->token[itemNr + list->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+    /*
+     * Delete token and update List
+     */
+    memcpy(&tokenDW, &tok.GT_chars[0], 4);
+    TokenRemoveToken(tokenDW, tok.GT_manufID);
+    ImpTokenListTokens(TRUE);
+    @call oself::MSG_DB_VIEWER_TOKEN_DELETER_APPLY_RANGE();
+
+    MessageBoxOptr(@TokenDeleterSuccessful);
+}
+
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ + 	Handling Import Token from TokenDB
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+
+/*--------------------- MSG_DB_VIEWER_IMPORT_TOKEN_OPEN_DIALOG ---------------------
+ *  Purpose:	Initiate and open ImportTokenDialog
+ *  Context:
+ *  Strategy:
+ 	- see if current icon is modified
+ 	- initialize the import token dialog box
+ 	- Open the dialog
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMPORT_TOKEN_OPEN_DIALOG {
+word numTokens;
+
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    numTokens = ImpTokenListTokens(TRUE);
+    @call ImpTokenTokenInfoCount::MSG_GEN_VALUE_SET_INTEGER_VALUE(numTokens, FALSE);
+
+    /*
+     * First initialize ImpTokenIconContent (of VisListContentClass). This
+     * implicitely initializes implicitly VisListItem objects and scrollbar.
+     * The selection will be set by the apply message of ImpTokenContent.
+     */
+    @call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_SET_OUTPUT(oself);
+    @call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER();
+
+    /*
+     * Initalize ImpTokenContent in the same way.
+     * MSG_DB_VIEWER_IMP_TOKEN_APPLY_RANGE reads manufacturerID range from
+     * UI and updates the content object and the scrollbar
+     */
+    @call ImpTokenContent::MSG_VIS_LIST_CONTENT_SET_OUTPUT(oself);
+    @call ImpTokenContent::MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER();
+    @call oself::MSG_DB_VIEWER_IMP_TOKEN_APPLY_RANGE();
+
+
+    /*
+     * Open dialog box
+     */
+    @send ImportTokenDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- ImpTokenListTokens ---------------------
+ *  Purpose:	Create a sorted list of all tokens in the tokenDB
+ *  Context:
+ *  Strategy:
+ *  Parameters:	listTextOnlyTokens:
+ *			TRUE: List all tokens, including tokens that have no graphc icons
+ *			FALSE: list only token taht have graphic icons
+ *  Return:	Number of tokens in TokenDB
+ ---------------------------------------------------------------------------*/
+word ImpTokenListTokens(Boolean listTextOnlyTokens) {
+TokenListStruct	*list;
+dword	retVal;
+word count, minIdx, topIdx, n;
+word flags;
+
+    if (global.tokenListMH) MemFree(global.tokenListMH);	// Destroy old list
+
+	/*
+	 * Create list with 6 byte header to use TokenListStruct for access
+	 */
+    flags = listTextOnlyTokens ? 0 : TRF_ONLY_GSTRING;
+    retVal = TokenListTokens(flags, 6, 0);
+    global.tokenListMH = TokenListTokensHandleFromDWord(retVal);
+    if( !global.tokenListMH ) return 0;			// BAD
+    count = TokenListTokensCountFromDWord(retVal);
+
+    list = MemLock(global.tokenListMH);
+    list->tokenCount = count;
+    list->firstIndex = 0;
+    list->tokensToShow = count;
+
+	/*
+	* Sort list by Manufacturer ID
+	* topIdx: 	start of the unsorted list part
+	* minIdx:	index of smallest token ID in unsorted list part
+	*/
+    for (topIdx = 0; topIdx<(count-1); topIdx++) {
+
+	minIdx = topIdx;	// assume: smallest ID is on top
+
+	// check all following tokens to see if the ID is smaller
+	// find the index of the smallest token ID
+	for ( n = topIdx+1; n < count; n++) {
+	    if (list->token[n].GT_manufID < list->token[minIdx].GT_manufID) minIdx = n;
+	    }
+
+    	if (minIdx != topIdx) {
+    	    // smaller ID found. swap tokens
+    	    GeodeToken tmpToken = list->token[topIdx];
+    	    list->token[topIdx] = list->token[minIdx];
+    	    list->token[minIdx] = tmpToken;
+    	    }
+    }
+
+    MemUnlock(global.tokenListMH);
+
+    return count;
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_CLOSE_DIALOG ---------------------
+ *  Purpose:	Close Import Token dialog and initiate import
+ *  Context:
+ *  Strategy:
+ *	- find out token to import
+ *	- pass the token to our DBViewer object
+ *  Parameters:	doImport:	TRUE to do the import
+ *				FALSE to cancel and free used memory
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_CLOSE_DIALOG {
+
+GeodeToken tok;
+int selection;
+TokenListStruct	*tokenList;
+
+    if ( !doImport) {
+	@send ImportTokenDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	if(global.iconListPtr) free(global.iconListPtr);
+	global.iconListPtr = 0;
+	return;
+    }
+
+
+    /*
+     * Find out token to import
+     */
+    selection = @call ImpTokenContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    tokenList = MemLock(global.tokenListMH);
+    tok = tokenList->token[selection + tokenList->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+    @send ImportTokenDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    @call oself::MSG_DB_VIEWER_IMP_TOKEN_DO_IMPORT(tok);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_APPLY_RANGE ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_APPLY_RANGE {
+word minID, maxID;
+int numTokens;
+
+    /*
+     * Read ID range from  UI
+     */
+    minID = @call ImpTokenManufIDMinimumValue::MSG_GEN_VALUE_GET_VALUE();
+    maxID = @call ImpTokenManufIDMaximumValue::MSG_GEN_VALUE_GET_VALUE();
+    if ( minID > maxID ) {
+    	word tmp = minID;
+    	minID=maxID;
+    	maxID=tmp;
+	@call ImpTokenManufIDMinimumValue::MSG_GEN_VALUE_SET_VALUE(minID, FALSE);
+	@call ImpTokenManufIDMaximumValue::MSG_GEN_VALUE_SET_VALUE(maxID, FALSE);
+	}
+
+    /*
+     * Update list according to the ID range. This updates the scroller too
+     */
+    numTokens = @call ImpTokenContent::MSG_VIS_LIST_CONTENT_SET_TOKEN_RANGE(minID, maxID);
+
+    /*
+     * Update dialog UI:
+     *	- Number of currently visible tokens
+     *	- disable or enable  "Import Token" button
+     */
+    @call ImpTokenTokenInfoDisplayed::MSG_GEN_VALUE_SET_INTEGER_VALUE(numTokens, FALSE);
+    if (0==numTokens) {
+	@call ImpTokenDoImportTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	}
+    else {
+    	@call ImpTokenDoImportTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	}
+
+}
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ + 	Handling SortISetsDialog
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+/*--------------------- MSG_DB_VIEWER_SORT_I_SETS_OPEN_DIALOG ---------------------
+ *  Purpose:	Initialize and open the "Sort Icon Sets" dialog box
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_OPEN_DIALOG {
+int iSet, numSets;
+VMFileHandle vmFile;
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * get basic informations and do savety checks
+     */
+    iSet = pself->DBVI_currentISet;
+    if (iSet == NO_CURRENT_ISET ) return;
+    vmFile = pself->DBVI_vmFile;
+    if (vmFile == 0) return;
+
+    numSets = IdGetISetCount(vmFile);
+    if ( numSets < 2 ) {
+	ErrorBoxOptr(@ErrorTooFewISets);
+	return;
+    }
+
+    /*
+     * Initalize VisListContent and implicitly VisListItem objects and scrollbar
+     * We want the currently edited iSet to be selected in the list.
+     * This also initalizes the scrollbar.
+     */
+    @send SortISetContent::MSG_VIS_LIST_CONTENT_SET_OUTPUT(oself);
+    @send SortISetContent::MSG_VIS_LIST_CONTENT_INITIALIZE_SCROLLER();
+    @send SortISetContent::MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS(numSets);
+    @call SortISetContent::MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM(pself->DBVI_currentISet);
+
+    /*
+     * Open dialog box
+     */
+    @send SortISetsDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_SORT_I_SETS_CLOSE_DIALOG ---------------------
+ *  Purpose:	Sort iSets dialog has been closed. Update DBViewerContent to
+ *		reflect the new order of the icons
+ *  Context:	The handler of the "Shift" buttons of this dialog box modify
+ *		the database directly. Therefore this "close" handler must
+ *		be called in every case.
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_CLOSE_DIALOG {
+int selectedISet;
+
+    /*
+     * rescan db viewer list to reflect the new order of the iSets
+     */
+    @send ConstructOptr(OptrToHandle(oself), OptrToChunk(@DBViewerContent))::MSG_DB_VIEWER_RESCAN_DATABASE();
+
+    /*
+     * edit the iSet that is selected in the SortISet list
+     */
+    selectedISet = @call SortISetContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+
+    pself->DBVI_currentISet = NO_CURRENT_ISET;
+    @call oself::MSG_DB_VIEWER_SET_SINGLE_SELECTION(selectedISet);
+    @call oself::MSG_DB_VIEWER_EDIT_ISET(FALSE);
+
+    @send IconDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE (pself->DBVI_vmFile);
+
+    /*
+     * reset all item imgaes in our current dialog box
+     */
+    @send SortISetContent::MSG_VIS_LIST_CONTENT_CLEAR_ITEMS(FALSE);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_SORT_I_SETS_QUERY_ISET ---------------------
+ *  Purpose:	Replace the image, shown by the VisListItem object
+ *  Context:
+ *  Strategy:
+ *  Parameters:	VIS_LIST_CONTENT_QUERY_MSG(optr itemObj, int itemNr)
+ *		itemNr is the iSet to show
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_QUERY_ISET {
+int iSet;
+VMFileHandle 	vmFile;
+VMBlockHandle	bmp;
+MemHandle	gsBlock;
+GStateHandle	gsState;
+word 		gsChunk; // ChunkHandle 	gsChunk;
+optr		gsOptr;
+int 		width, height, x, y, bmFormat;
+dword 		bmSize;
+Rectangle 	bounds;
+char 	name[ISET_NAME_BUFFER_SIZE];
+
+    /*
+     * do savety checks and get basic informations
+     */
+    if ( !itemObj ) return;
+    if ( itemNr == NO_CURRENT_ICON ) return;
+    iSet = itemNr;
+    vmFile = pself->DBVI_vmFile;
+
+    /*
+     * Create GString to hold Image
+     *	- the representative bitmap on top
+     *	- iSet name below
+     */
+    gsBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    gsState = GrCreateGString( gsBlock, GST_CHUNK, &gsChunk);
+    gsOptr = ConstructOptr(gsBlock, gsChunk);
+
+
+    /*
+     * Draw bitmap centered, if possible ...
+     */
+    bmp = IdGetEntryBitmap(vmFile, itemNr, 0);
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+
+    /*
+     * ... Calculate coordinates
+     */
+    x = (SIS_LIST_ITEM_OBJ_WIDTH - width)/2;
+    if (x < 0) x = 0;
+    y = (SIS_LIST_ITEM_IMAGE_HEIGHT - height)/2;
+    if (y < 0) y = 0;
+
+    /*
+     * ... Draw bitmap - clip it, if it is to large
+     */
+    bmSize = ToolCalcBitmapSize(width, height, bmFormat);
+    if ( bmSize <= MAX_SAFE_MONIKER_SIZE) {
+	/*
+	 * No special handling required
+	 */
+	GrSaveState(gsState);
+	GrSetClipRect(gsState, PCT_REPLACE, 0, 0, SIS_LIST_ITEM_OBJ_WIDTH, SIS_LIST_ITEM_IMAGE_HEIGHT);
+	GrDrawHugeBitmap(gsState, x, y, vmFile, bmp);
+    } else {
+    	/*
+    	 * We have to clip very large images first
+    	 */
+    	VMBlockHandle tempBmp;
+	GrSaveState(gsState);
+    	tempBmp = BTClipBitmap (vmFile, bmp, global.tempFile, 0, 0, SIS_LIST_ITEM_OBJ_WIDTH, SIS_LIST_ITEM_IMAGE_HEIGHT);
+	GrDrawHugeBitmap(gsState, x, y, global.tempFile, tempBmp);
+	HugeArrayDestroy(global.tempFile, tempBmp);
+    }
+
+    /*
+     * Draw name - clip it, if it is to large
+     */
+    IdGetISetName(vmFile, iSet, name);
+    GrSetFont(gsState, SIS_LIST_FONT_ID, MakeWWFixed(SIS_LIST_FONT_SIZE) );
+    GrGetTextBounds(gsState, name, 0, 0, 0, &bounds);
+    x = SIS_LIST_ITEM_OBJ_WIDTH - (bounds.R_right - bounds.R_left);
+    x = x/2;
+    if (x < 1) x = 1;	/* looks better */
+
+    GrSetClipRect(gsState, PCT_REPLACE, 0, SIS_LIST_ITEM_IMAGE_HEIGHT, SIS_LIST_ITEM_OBJ_HEIGHT, SIS_LIST_ITEM_OBJ_WIDTH);
+    GrDrawText(gsState, x, SIS_LIST_ITEM_IMAGE_HEIGHT, name, 0);
+    GrRestoreState(gsState);
+
+    /*
+     * replace item image by our gstring
+     */
+    GrEndGString(gsState);
+    GrDestroyGString(gsState,0,GSKT_LEAVE_DATA);
+
+    @send itemObj::MSG_VIS_LIST_ITEM_SET_GSTRING(gsOptr);
+
+
+}
+
+
+
+/*--------------------- ToolUpdateSortISetsShiftTriggers ---------------------
+ *  Purpose:	Enable/disable "Shift Icon Set" triggers
+ *  Context:	Sort iSets
+ *  Strategy:
+ *  Parameters:	selectedISet: selected iSet in the list
+ *		numISets:     number of iSets in the iSet
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolUpdateSortISetsShiftTriggers(int selectedISet, int numISets) {
+
+    if (selectedISet == 0 ) {
+    	@send SortISetsShiftLeftTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+    	@send SortISetsShiftLeftTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    if (selectedISet >= (numISets-1) ) {
+    	@send SortISetsShiftRightTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+    	@send SortISetsShiftRightTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+}
+
+/*--------------------- MSG_DB_VIEWER_SORT_I_SETS_NOTIFY_ISET_CHANGED ---------------------
+ *  Purpose:	A new iSet was selected in SortISetDialog
+ *  Context:	This message comes from SortISetContent (VLCI_notifySelectionMsg)
+ *  Strategy:	Update information in SortISetsCurSetText
+ *		enable disable "shift-icon-sets" triggers
+ *  Parameters:	VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG(int selectedItemNr)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_NOTIFY_ISET_CHANGED {
+int numISets, iSet, numIcons;
+char name[ISET_NAME_BUFFER_SIZE];
+
+    /*
+     * update triggers
+     */
+    numISets = IdGetISetCount(pself->DBVI_vmFile);
+    ToolUpdateSortISetsShiftTriggers(selectedItemNr, numISets);
+
+    /*
+     * display iSet's name in SortISetsCurSetText
+     */
+    iSet = selectedItemNr;
+    numIcons = IdGetEntryCount(pself->DBVI_vmFile, iSet);
+
+    IdGetISetName(pself->DBVI_vmFile, iSet, name);
+    @call SortISetsCurSetText::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, 0);
+
+    /*
+     * Append number if icons for that set to text in SortISetsCurSetText
+     */
+    MemLock(OptrToHandle(@InfoSortISetsNumIcons));
+    sprintf(name, LMemDeref(@InfoSortISetsNumIcons), numIcons);
+    MemUnlock(OptrToHandle(@InfoSortISetsNumIcons));
+    @call SortISetsCurSetText::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_SORT_I_SETS_SHIFT_SET ---------------------
+ *  Purpose:	Shift iSet up or down and update list
+ *  Context:	Sort iSets
+ *  Strategy:
+ *  Parameters:	steps:	+1 Shift up (to right)
+ *			-1 Shift down (to left)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SORT_I_SETS_SHIFT_SET {
+int firstId, selectedSet, numSets;
+Boolean err;
+
+    /*
+     * Modify database file
+     */
+    selectedSet = @call SortISetContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    err = IdShiftISet(pself->DBVI_vmFile, selectedSet, steps);
+    if (err) return;
+
+
+    /*
+     * swap images of the affected VisListItemClass objects
+     */
+    @call SortISetContent::MSG_VIS_LIST_CONTENT_UPDATE_SINGLE_ITEM_IMAGE(selectedSet);
+    @call SortISetContent::MSG_VIS_LIST_CONTENT_UPDATE_SINGLE_ITEM_IMAGE(selectedSet+steps);
+
+
+    /*
+     * if we have shifted the iSet out of the list, reinitialize list
+     */
+    firstId = @call SortISetContent::MSG_VIS_LIST_CONTENT_GET_FIRST_ITEM_ID();
+    if ( (selectedSet+steps) < firstId ) {
+    	@send SortISetContent::MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID(selectedSet+steps);
+    }
+
+    if ( (selectedSet+steps) >= firstId + SORT_ISETS_NUM_ITEMS_IN_LIST ) {
+        firstId = selectedSet + steps - SORT_ISETS_NUM_ITEMS_IN_LIST + 1;
+    	@send SortISetContent::MSG_VIS_LIST_CONTENT_SET_FIRST_ITEM_ID(firstId);
+    }
+
+    /*
+     * Select moved iSet
+     */
+    selectedSet += steps;
+    @call SortISetContent::MSG_VIS_LIST_CONTENT_SELECT_ITEM(selectedSet);
+
+    /*
+     * Update "Shift" triggers
+     */
+    numSets = IdGetISetCount(pself->DBVI_vmFile);
+    ToolUpdateSortISetsShiftTriggers(selectedSet, numSets);
+
+    /*
+     * Update Scroller - the 'value' of the scroller is equal to the
+     * number of the left iSet.
+     */
+    firstId = @call SortISetContent::MSG_VIS_LIST_CONTENT_GET_FIRST_ITEM_ID();
+    @send SortISetsScrollbar::MSG_GEN_VALUE_SET_INTEGER_VALUE(firstId, FALSE);
+}
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file visImage.goc ********************/

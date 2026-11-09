@@ -1,0 +1,721 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	palette.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 10/31/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deal with color palettes and selecting colors
+ *
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+
+/*===========================================================================
+	Drawing routines to display a 256 color palette
+ ===========================================================================*/
+
+/*--------------------- DrawFullPalette ---------------------
+ *  Purpose:	Draw 256 color palette for icon editors special color selectors
+ *  Context:
+ *  Strategy:	IconLockGlobalPalette() locks the bitmaps custom palette, if
+ *		we have one, or the GEOSStandardPalette, if not
+ *		Then draw this palette and highlight the
+ *		global.currentPaletteIndex color
+ *  Parameters:
+ *  Return:	-
+
+ ---------------------------------------------------------------------------*/
+void DrawFullPalette(GStateHandle gstate) {
+PaletteEntry	* palette;
+
+    /*
+     * Find a valid palette pointer, then draw palette
+     */
+    palette = IconLockGlobalPalette();
+    ITDrawFullPalette(gstate, palette, 256, global.currentPaletteIndex,
+			MORE_COLORS_TOP_BLOCK_SIZE, MORE_COLORS_BOTTOM_BLOCK_SIZE, MORE_COLORS_MARGIN );
+    IconUnlockGlobalPalette();
+
+}
+
+
+
+/*--------------------- OtherContentPaletteStartSelectHandler ---------------------
+ *  Purpose:	React on a mouse click on a indexed color
+ *  Context:
+ *  Strategy:
+ *	  As we have drawn the palette with ITDrawFullPalette() we can use
+ * 	  ITPaletteIndexFromMousePos() to translate the mouse coordinates to an index.
+ *	  It returns (-1) if the mouse is outside of any color square.
+ *  Parameters:	xPosition, yPosition: mouse position
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void	OtherContentPaletteStartSelectHandler(int xPosition, int yPosition) {
+int index;
+PaletteEntry	color;
+
+    index = ITPaletteIndexFromMousePos(xPosition, yPosition, MORE_COLORS_TOP_BLOCK_SIZE,
+					MORE_COLORS_BOTTOM_BLOCK_SIZE, MORE_COLORS_MARGIN);
+
+    if ( index < 0 ) return;
+
+    color = PaletteGetColorFromIndex(index);
+    SetNewColorForCustomColorDialog(color.rt, color.gn, color.bl, TRUE);
+}
+
+/*===========================================================================
+	Working with a palette
+ ===========================================================================*/
+
+
+/*--------------------- PaletteFindIndex ---------------------
+ *  Purpose:	Find the Index to a given color value
+ *		using the current palette (or system palette in no
+ *		current palette is available).
+ *  Context:
+ *  Strategy:	we search for an exact match
+ *  Parameters:	r, g, b: color values
+ *		count: palette size (usually 16 or 256)
+ *  Return:	palette index if found
+ *		-1 if not found (color matches no index)
+ ---------------------------------------------------------------------------*/
+int PaletteFindIndex(int r, int g, int b, int count) {
+int n, index;
+PaletteEntry	*palette;
+
+    /*
+     * Find a valid palette pointer
+     */
+    palette = IconLockGlobalPalette();
+
+    /*
+     * search in palette for color
+     */
+    index = -1;		/* default: not found */
+    for ( n = 0; n < count; n++) {
+    	if (palette[n].rt != r) continue;
+    	if (palette[n].gn != g) continue;
+    	if (palette[n].bl != b) continue;
+    	/*
+    	 * found it!
+    	 */
+    	index = n;
+    	break;
+    }
+
+    IconUnlockGlobalPalette();
+    return index;
+
+}
+
+/*--------------------- PaletteGetColorFromIndex ---------------------
+ *  Purpose:	Translate an index to a PaletteEntry value
+ *		using the current palette (or system palette in no
+ *		current palette is available).
+ *  Context:
+ *  Strategy:	we search for an exact match
+ *  Parameters:	r, g, b: color values
+ *		count: palette size (usually 16 or 256)
+ *  Return:	palette index if found
+ *		-1 if not found;
+ ---------------------------------------------------------------------------*/
+PaletteEntry PaletteGetColorFromIndex(int index) {
+PaletteEntry color, *palette;
+
+    /*
+     * Find a valid palette pointer
+     */
+    palette = IconLockGlobalPalette();
+
+    color = palette[index];
+
+    IconUnlockGlobalPalette();
+    return color;
+
+}
+
+/*===========================================================================
+	Support CustomColorDialog - select a color from
+	palette index or using HSV values
+ ===========================================================================*/
+
+/*--------------------- SetNewColorForCustomColorDialog ---------------------
+ *  Purpose:	Update the displayed color in CustomColorDialog
+ *  Context:	This is th core routine to do the job
+ *  Strategy:
+ *  Parameters:	r, g, b:  new color values
+ *		forceUpdateHSVSlider:
+ *			Usually the sliders are not updated if they are visible,
+ *			i.e. uiMode is equal to CCM_HSV in the code.
+ *			Pass TRUE to overide this behavior. This is required
+ *			if the editied icon has be changed, e.g.
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void SetNewColorForCustomColorDialog(int r, int g, int b, Boolean forceUpdateHSVSlider) {
+PaletteEntry  color;
+word h, s, v;
+int	index;
+int uiMode;
+
+
+
+    /*
+     * Find out if the color matches to an index of the current palette and display it
+     * PaletteFindIndex returns (-1) if the color does not match an index value
+     */
+    index = PaletteFindIndex(r, g, b, 256);
+    global.currentPaletteIndex = index;
+
+    if ( index >= 0 ) {
+    	@send CCCurrentIndex::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send CCCurrentIndex::MSG_GEN_VALUE_SET_INTEGER_VALUE(index, FALSE);
+    } else {
+    	@send CCCurrentIndex::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send CCCurrentIndex::MSG_GEN_VALUE_SET_INTEGER_VALUE(-1, TRUE);
+    }
+
+    /*
+     * Udate rgb values and current-color area
+     */
+    @send CCRValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(r, FALSE);
+    @send CCGValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(g, FALSE);
+    @send CCBValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(b, FALSE);
+
+    @send, forceQueue CCCurrentColorContent::MSG_OTHER_CONTENT_SET_COLOR(r, g, b);
+
+    /*
+     * Depending on whether the palette is displayed or the HSV sliders,
+     * different things need to be done.
+     */
+    uiMode = @call CCPaletteModeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (uiMode) {
+
+    case CCM_PALETTE_INDEX:
+	/*
+	 * Readraw palette index view.
+	 * This is very time consuming and should only be done if the UI is visible
+	 */
+    	@call CustomColorsIndexContent::MSG_OTHER_CONTENT_REDRAW_IMAGE();
+
+	/*
+	 * Update HSV sliders. The sliders are not visibe yet but should be up to date
+	 * when the user switches to HSV mode.
+	 */
+	forceUpdateHSVSlider = TRUE;
+    	break;
+
+
+    case CCM_HSV:
+    	/*
+    	 * Nothing more to do yet. In particular do not update HSV sliders by default
+ 	 * to avoid feedback loops due to rounding errors.
+	 */
+	break;
+
+    }
+
+    if ( forceUpdateHSVSlider) {
+
+    	/*
+    	 * Convert the rgb values to HSV values and update the sliders.
+    	 * Then re-create the color bars for saturation and brightness.
+    	 * The hue bar does not need to be re-created, since it never changes.
+     	 */
+    	color.rt = r;
+    	color.gn = g;
+    	color.bl = b;
+	ITGetHSV8BitFromColor(&h, &s, &v, color);
+
+	@send HsvHueSlider::MSG_GEN_VALUE_SET_INTEGER_VALUE(h, FALSE);
+	@send HsvSaturationSlider::MSG_GEN_VALUE_SET_INTEGER_VALUE(s, FALSE);
+	@send HsvBrightnessSlider::MSG_GEN_VALUE_SET_INTEGER_VALUE(v, FALSE);
+
+	@send, forceQueue HsvSContent::MSG_OC_CREATE_COLOR_BAR(h, s, v, CREATE_S_BAR, TRUE);
+	@send, forceQueue HsvVContent::MSG_OC_CREATE_COLOR_BAR(h, s, v, CREATE_V_BAR, TRUE);
+
+    }
+
+}
+
+
+/*--------------------- UpdateCustomColorDialogColor ---------------------
+ *  Purpose:	Set new Color for CustomColorDialog depending on some conditions
+ *  Context:
+ *	This routine is called when the color has been changed for some reasons,
+ *	e.g. if the user chooses a new line color ar a new area color
+ *  Strategy:
+ *	The color of the dialogbox will only be changed is the corresponding
+ *	"Set as .. color" button is enabled. These buttons are enabled when the
+ *	box is opened by a controller.
+ *	E.g. if the area controller opens the box, the "Save as area color"
+ *	button will be enabled.
+ *  Parameters:	areaColorChanged: TRUE: Area color has been changed
+ *				  FALSE: Line color has been changed
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void UpdateCustomColorDialogColor(int red, int green, int blue, Boolean areaColorChanged) {
+
+    if (areaColorChanged) {
+	if ( @call CustomColorsSetAreaColorTrigger::MSG_GEN_CHECK_IF_FULLY_ENABLED() ) {
+    			SetNewColorForCustomColorDialog(red, green, blue, TRUE);
+    			}
+    } else {
+    	if ( @call CustomColorsSetLineColorTrigger::MSG_GEN_CHECK_IF_FULLY_ENABLED() ) {
+    			SetNewColorForCustomColorDialog(red, green, blue, TRUE);
+    			}
+    }
+
+}
+
+/*--------------------- MSG_ICON_OPEN_CUSTOM_COLORS_DIALOG ---------------------
+ *  Purpose:	Open the CustomColorDialog dialog box
+ *  Context:
+ *  Strategy:
+ *	Depending on which controller sent the message, different buttons are
+ *	activated and different colors are displayed.
+ *  Parameters: forAreaColor: TRUE:  Message comes from AreaAttributes controller
+ 				     enable "Set as area color" button
+ *			      FALSE: Message comes from LineAttributes controller
+ *				     enable "Set as line color" button
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_OPEN_CUSTOM_COLORS_DIALOG {
+PaletteEntry color;
+
+    if ( forAreaColor ) {
+    	@send CustomColorsSetAreaColorTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@call CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_GET_COLORS(NULL, &color);
+    } else  {
+    	@send CustomColorsSetLineColorTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@call CombineGCurDisplayWith(@MyFatbits)::MSG_FATBITS_GET_COLORS(&color, NULL);
+    }
+
+    SetNewColorForCustomColorDialog(color.rt, color.gn, color.bl, TRUE);
+    @send IconCustomColorDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+/*--------------------- MSG_ICON_CLOSE_CUSTOM_COLORS_DIALOG ---------------------
+ *  Purpose:	Open the CustomColorDialog dialog box
+ *  Context:
+ *  Strategy:
+ *		"Set as area color" and "Set as line color" bittons becomes disabled
+ *		to prepare the diaolog for next open.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_CLOSE_CUSTOM_COLORS_DIALOG {
+
+   @send IconCustomColorDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+   @send CustomColorsSetAreaColorTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+   @send CustomColorsSetLineColorTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+/*--------------------- MSG_ICON_SET_CUSTOM_COLOR ---------------------
+ *  Purpose:	Handle "set as .. color" message from dialog
+ *  Context:
+ *  Strategy:
+ *	- fetch current color from dialg
+ *	- let the fatbits object do the rest of the job
+ *  Parameters: void (Boolean isAreaColor)
+ *			TRUE if Button "Set as Area Color" has been pressed
+ *			FALSE if Button "Set as Line Color" has been pressed
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_SET_CUSTOM_COLOR {
+int r, g, b;
+
+    /*
+     * Fetch rgb values
+     */
+    r = @call CCRValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    g = @call CCGValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    b = @call CCBValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    /*
+     * Send color to the fatbits object
+     * This automatically updates all controllers
+     */
+    if (isAreaColor) @send CombineGCurDisplayWith(@MyFatbits)::MSG_GO_SET_AREA_COLOR(r, g, b);
+    	else  @send CombineGCurDisplayWith(@MyFatbits)::MSG_GO_SET_LINE_COLOR(r, g, b);
+}
+
+/*--------------------- MSG_ICON_CUSTOM_COLOR_MODE_CHOOSER_CHANGED ---------------------
+ *  Purpose:	Swicth between "Seltce from palette" and "Selct a HSV value" mode
+ *  Context:
+ *  Strategy:
+ *	- disable all related UI
+ *	- enable appropriate UI
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_CUSTOM_COLOR_MODE_CHOOSER_CHANGED {
+    @send CustomColorsIndexView::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send CustomColorsHSVGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+    if (selection == CCM_HSV) @send CustomColorsHSVGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+    		else	@send CustomColorsIndexView::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+/*--------------------- MSG_ICON_APP_HSV_H_SLIDER_APPLY ---------------------
+ *  Purpose:	Respond to movement of the hue slider
+ *  Context:
+ *  Strategy:
+ *	- fetch hsv values
+ *	- update both, brightness color bar and saturation color bar
+ *	- update RGB values in CustomColorDialog
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_HSV_H_SLIDER_APPLY {
+int h, s, v;
+PaletteEntry color;
+
+    h = value >> 16;
+    s = @call HsvSaturationSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    v = @call HsvBrightnessSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    @send, forceQueue HsvSContent::MSG_OC_CREATE_COLOR_BAR(h, s, v, CREATE_S_BAR, TRUE);
+    @send, forceQueue HsvVContent::MSG_OC_CREATE_COLOR_BAR(h, s, v, CREATE_V_BAR, TRUE);
+
+    /*
+     * Update Color in CustomColorDialog, but don't update the HSV sliders
+     */
+    ITGetColorFromHSV8Bit(&color, h, s, v);
+    SetNewColorForCustomColorDialog(color.rt, color.gn, color.bl, FALSE);
+}
+/*--------------------- MSG_ICON_APP_HSV_S_SLIDER_APPLY ---------------------
+ *  Purpose:	Respond to movement of the saturation slider
+ *  Context:
+ *  Strategy:
+ *	- fetch hsv values
+ *	- update brightness (v) color bar
+ *	- update RGB values in CustomColorDialog
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_HSV_S_SLIDER_APPLY {
+int h, s, v;
+PaletteEntry color;
+
+    h = @call HsvHueSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    s = value >> 16;
+    v = @call HsvBrightnessSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    /*
+     * Update Color in CustomColorDialog, but don't update all HSV sliders,
+     * onyl the V (brighness) slieder needs to be updated.
+     */
+    @send, forceQueue HsvVContent::MSG_OC_CREATE_COLOR_BAR(h, s, v, CREATE_V_BAR, TRUE);
+    ITGetColorFromHSV8Bit(&color, h, s, v);
+    SetNewColorForCustomColorDialog(color.rt, color.gn, color.bl, FALSE);
+}
+
+/*--------------------- MSG_ICON_APP_HSV_V_SLIDER_APPLY ---------------------
+ *  Purpose:	Respond to movement of the brightness slider
+ *  Context:
+ *  Strategy:
+ *	- fetch hsv values
+ *	- update saturation (s) color bar
+ *	- update RGB values in CustomColorDialog
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconApplicationClass, MSG_ICON_APP_HSV_V_SLIDER_APPLY {
+int h, s, v;
+PaletteEntry color;
+
+    h = @call HsvHueSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    s = @call HsvSaturationSlider::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    v = value >> 16;
+
+
+    /*
+     * Update Color in CustomColorDialog, but don't update all HSV sliders,
+     * onyl the S (saturation) slieder needs to be updated.
+     */
+    @send, forceQueue HsvSContent::MSG_OC_CREATE_COLOR_BAR(h, s, v, CREATE_S_BAR, TRUE);
+    ITGetColorFromHSV8Bit(&color, h, s, v);
+    SetNewColorForCustomColorDialog(color.rt, color.gn, color.bl, FALSE);
+}
+
+
+
+/*--------------------- IconLockGlobalPalette ---------------------
+ *  Purpose:	Lock the palette of the currently edited bitmap
+ *  Context:
+ *  Strategy:
+ *	- If there is a custom palette for the bitmap, lock it
+ *	- if not, lock the GEOS standard palette
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+PaletteEntry *IconLockGlobalPalette(void) {
+PaletteEntry	* palette;
+
+    EC( if (global.paletteMH ) { ProgError("Cannot call to IconLockGlobalPalette when palette is locked"); return NULL; } )
+
+    if ( global.paletteVMBlock ) {
+    	palette = VMLock(global.tempFile, global.paletteVMBlock, &global.paletteMH);
+    } else {
+    	palette = BTLockGEOSStandardPalette();
+    }
+
+    return palette;
+
+}
+
+/*--------------------- IconUnlockGlobalPalette ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *	- If there is a custom palette for the bitmap, unlock it
+ *	- if not, unlock the GEOS standard palette
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconUnlockGlobalPalette(void) {
+
+    if ( global.paletteVMBlock ) {
+    	EC( if (!global.paletteMH ) { ProgError("call to IconUnlockGlobalPalette while paletteMH is zero"); return; } )
+    	VMUnlock(global.paletteMH);
+    	global.paletteMH = 0;
+    } else {
+    	BTUnlockGEOSStandardPalette();
+    }
+}
+
+
+/*--------------------- FindSuggestedDisplayClass ---------------------
+ *  Purpose:	Find the display class required to correctly draw the bitmap.
+ *  Context:	If we don't know the real display class, we can try to
+ *		calculate the value
+ *  Strategy:
+ 	- if the bitmap has no palette, the display class is equal to
+ 	  the bitmaps color depth
+ 	- if not:
+ 	  + all colors are in the 16 color standard palette -> DC_COLOR_4
+ 	  + all colors are in the 256 color standard palette -> DC_COLOR_8
+ 	  + in any other case: DC_CF_RGB
+ *  Parameters:	bitmap to analyse
+ *  Return:  	DisplayClass value
+ ---------------------------------------------------------------------------*/
+DisplayClass FindSuggestedDisplayClass(VMFileHandle vmFile, VMBlockHandle bmp) {
+int bmFormat, numColors;
+PaletteEntry *palette;
+DisplayClass displayClass;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+
+    if ( (bmFormat & BMT_PALETTE) == 0 ) {
+    	switch ( bmFormat & BMT_FORMAT ) {
+	case BMF_MONO:	return DC_GRAY_1;
+	case BMF_4BIT:	return DC_COLOR_4;
+	case BMF_8BIT:	return DC_COLOR_8;
+	case BMF_24BIT: return DC_CF_RGB;
+	default: return DC_COLOR_4;		// emergency value
+	}
+    }
+
+    /*
+     * get palette and compare it with the geos standard palette
+     */
+    switch ( bmFormat & BMT_FORMAT ) {
+	case BMF_MONO:	return DC_GRAY_1;
+	case BMF_4BIT:	numColors = 16;	break;
+	case BMF_8BIT:	numColors = 16;	break;
+	default: 	return DC_COLOR_4;	// emergency value
+	}
+
+    palette = malloc(256*sizeof(PaletteEntry));
+    BTGetBitmapPalette(vmFile, bmp, palette, numColors);
+
+    do {
+	/*
+	 * check for 16-color standard palette
+	 */
+	if ( IsColorListInStdPalette(palette, numColors, 16)) {
+	    displayClass = DC_COLOR_4;
+	    break;
+	}
+	/*
+	 * check for 256-color standard palette
+	 */
+	if ( IsColorListInStdPalette(palette, numColors, 256)) {
+	    displayClass = DC_COLOR_8;
+	    break;
+        }
+        displayClass = DC_CF_RGB;
+
+    } while (FALSE);
+
+    free(palette);
+    return displayClass;
+
+}
+
+/* ------------------- IsColorListInStdPalette ---------------------
+ *  Purpose:	Compare colorList and standard palette
+ *  Context:
+ *  Strategy:
+ *  Parameters: colorList: a list of PaletteEntry values
+ *		listCount: number of colors in the list
+ *		count:	   number of colors to search in the standard palette
+ *			   usually 16 ord 256
+ *  Return:	TRUE:	any color in the list is in the standard palette
+ *		FALSE:  at least one of the colors in the list was not
+ *			found in the standard palette
+ ---------------------------------------------------------------------------*/
+Boolean IsColorListInStdPalette(PaletteEntry *colorList, int listCount, int count) {
+int i, k;
+Boolean found;
+PaletteEntry	*palette, color;
+
+    /*
+     * Lock GEOS standard palette
+     */
+    palette = BTLockGEOSStandardPalette();
+
+    /*
+     * Search every color in the standard palette
+     */
+    for ( i = 0; i < listCount; i++) {
+
+    	color = colorList[i];
+    	found = FALSE;
+
+    	for ( k = 0; k < count; k++ ) {
+
+    	    if (memcmp(&color, &palette[k], sizeof(PaletteEntry)) == 0 ) {
+    	    	found = TRUE;
+    	    	break;
+    	    }
+    	}
+    	if ( !found) break;	// color could not be found in the list
+    }
+
+    BTUnlockGEOSStandardPalette();
+
+    return found;
+
+}
+
+/*--------------------- IconGetWhiteColor ---------------------
+ *  Purpose:	Find out the index that is the best-fit to "white"
+ *  Context:
+ *  Strategy:
+ *  Parameters:	vmFile, bmp:	handles of the bitmap image
+ *		*redOrIndex, *green, *blue: will be filled in with proper values
+ *			for use with BTSetColorForMaskedPixels() or
+ *			BTCopyBitmapAndRemoveMask()
+ *  Return:	index for "white" if we have an index-color image
+ 			*redOrIndex = index, *blue = *green = 0;
+ *		(-1) if we have an True Color image
+ 			*redOrIndex = *blue = *green = 0xFF;
+ ---------------------------------------------------------------------------*/
+int IconGetWhiteColor(VMFileHandle vmFile, VMBlockHandle bmp,  int *redOrIndex, int *green, int *blue) {
+word	bmFormat;
+int idx, count;
+PaletteEntry *palPtr, whiteColor = { 255, 255, 255 };
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, 0, 0, 0);
+
+    /*
+     * True color images are simple
+     */
+    if ( (bmFormat & BMT_FORMAT) ==  BMF_24BIT) {
+    	*redOrIndex = 0xFF; *green = 0xFF; *blue = 0xFF;
+    	return (-1);
+    }
+
+    /*
+     * Monochrome images must return zero for white, because
+     * BTCopyBitmapAndRemoveMask and BTSetColorForMaskedPixels
+     * expect this.
+     */
+    if ( (bmFormat & BMT_FORMAT) ==  BMF_MONO) {
+    	*redOrIndex = 0; *green = 0; *blue = 0;
+    	return 0;
+    }
+
+    /*
+     * Colored bitmaps without a palette are simple too
+     */
+    if ( (bmFormat & BMT_PALETTE) ==  0) {
+    	*redOrIndex = C_WHITE; *green = 0; *blue = 0;
+    	return C_WHITE;
+    }
+
+
+    /*
+     * Ok, we have a palette. Find out the best index for "white"
+     * BTApproxRGBPaletteLinear() does a good job, even it does
+     * not prefer gray values over slightly colored values.
+     */
+    count = ((bmFormat & BMT_FORMAT) == BMF_8BIT) ? 256 : 16;
+    palPtr = malloc(count*sizeof(PaletteEntry));
+    BTGetBitmapPalette(vmFile, bmp, palPtr, count);
+    idx = BTApproxRGBPaletteLinear(palPtr, whiteColor, count);
+    free(palPtr);
+
+    *redOrIndex = idx; *green = 0; *blue = 0;
+    return idx;
+
+}
+
+/*--------------------- IconSetHiddenPixelsToWhite ---------------------
+ *  Purpose:	Fill all transparent pixels with "white" color, but do not
+ *		remove transparency. That is, the "hidden" color behind the
+ *		transparent pixels are set to "white"
+ *  Context:	The older Icon Editor expects this
+ *  Strategy:	If we have a palette, a real "whithe" may not part of the palette.
+ *		Use IconGetWhiteColor() to find the "best-fit-white" index
+ *  Parameters: vmFile, bmp:	handles of the bitmap image
+ *  Return:	IconGetWhiteColor(VMFileHandle vmFile, VMBlockHandle bmp,
+ ---------------------------------------------------------------------------*/
+void IconSetHiddenPixelsToWhite(VMFileHandle vmFile, VMBlockHandle bmp) {
+int redOrIndex, green, blue;
+
+    IconGetWhiteColor(vmFile, bmp, &redOrIndex, &green, &blue);
+    BTSetColorForMaskedPixels(vmFile, bmp, redOrIndex, green, blue, NULL);
+
+}
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file palette.goc ********************/
+
+
+
+

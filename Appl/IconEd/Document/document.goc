@@ -1,0 +1,847 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	document.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements the IconDBDocumentClass, the document
+ *		of the Icon Editor
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+@include "token.h"
+
+extern GlobalStruct global;
+
+
+/*###########################################################################
+
+	CODE for IconDBDocumentClass
+
+	Handling system document messages
+
+ ###########################################################################*/
+
+@classdecl IconDBDocumentClass;
+
+/*--------------------- MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE --------
+ * Purpose:		Initialize a newly created document
+ * PARAMETERS:	    	Boolean (void)
+ * Strategy:
+ *	- Create and initialize MapBlock
+ *	- Create one set of icons
+ *	  DEFAULT_NEW_ISET_ICONS specifies the icons in this set
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+VMBlockHandle  mBlock, mainArray;
+MemHandle mh;
+IconMapBlockStruct *mapPtr;
+int	iSet;
+char	savedPrefixText[MAX_ICON_PREFIX_LENGTH + 5];
+
+    /*
+     * Create and initialize MapBlock
+     */
+    mainArray = HugeArrayCreate(pself->GDI_fileHandle, sizeof(ISetHeader), 0);
+
+    mBlock = VMAlloc(pself->GDI_fileHandle, sizeof(IconMapBlockStruct), 0);
+    VMSetMapBlock(pself->GDI_fileHandle, mBlock);
+    mapPtr = VMLock(pself->GDI_fileHandle, mBlock, &mh);
+
+    memset (mapPtr, 0, sizeof(IconMapBlockStruct));	// be save
+    mapPtr->IMBS_mainArray = mainArray;
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    /*
+     * Create one set of file icons
+     *
+     * We use a nasty hack at this point. CreateNewFileIcon asks FileIconPrefixText for
+     * a prefix for the newly created icons. This value may be modified by the user
+     * some times ago an he is wondering why the prefix is set to a 'strange' value.
+     * Therefore, we save the actual text an set a default value instead. Then we
+     * restore the text afterwards.
+     */
+    @call FileIconPrefixText::MSG_VIS_TEXT_GET_ALL_PTR(savedPrefixText);
+    @call FileIconPrefixText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(@DefaultNewFileIconPrefix, 0);
+
+    iSet = CreateNewFileISet(pself->GDI_fileHandle, DEFAULT_NEW_ISET_ICONS, @FileIconPrefixText);
+    MemLock(OptrToHandle(@UntitledISetString));
+    FinishInitializingISet(pself->GDI_fileHandle, iSet, LMemDeref(@UntitledISetString));
+    MemUnlock(OptrToHandle(@UntitledISetString));
+
+    @call FileIconPrefixText::MSG_VIS_TEXT_REPLACE_ALL_PTR(savedPrefixText, 0);
+
+    return(FALSE);		/* Return no error */
+}
+
+/*------------------ MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED ---------------------
+ * Purpose:	    Store the new file handle of the document
+ * PARAMETERS:	    void (void)
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED
+{
+optr dbViewer;
+
+    @callsuper();
+
+    dbViewer = ConstructOptr(pself->GDI_display, ChunkOf(@DBViewerContent));
+    @send dbViewer::MSG_DB_VIEWER_SET_DOC_FILE(pself->GDI_fileHandle);
+}
+
+
+/*--------------------- MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT ----------
+ * Purpose:	Disconnect document from UI
+ *		We let the DB viewer object do the job.
+ * PARAMETERS:	void (void)
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
+optr dbViewer;
+GenDocumentOperation op;
+
+    @callsuper();
+
+    op = @call oself::MSG_GEN_DOCUMENT_GET_OPERATION();
+    dbViewer = ConstructOptr(pself->GDI_display, ChunkOf(@DBViewerContent));
+    @send dbViewer::MSG_DB_VIEWER_ATTACH_UI(pself->GDI_fileHandle, op);
+
+}
+
+
+/*----------------- MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT ----------------
+ * Purpose:	    Connect a newly opened document to the UI
+ *		    We let the DB viewer object do the job.
+ * PARAMETERS:	    void (void)
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+optr dbViewer;
+GenDocumentOperation	op;
+
+    @callsuper();
+
+    op = @call oself::MSG_GEN_DOCUMENT_GET_OPERATION();
+    dbViewer = ConstructOptr(pself->GDI_display, ChunkOf(@DBViewerContent));
+    @call dbViewer::MSG_DB_VIEWER_DETACH_UI(op);
+
+}
+
+
+/*--------------- MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE ---------------------
+ * Purpose:	Write not yet saved data to the file.
+ * Note: 	This method is called in different contextes. Therefore,
+ *		We have to take into account the current document operation.
+ * PARAMETERS: void (void)
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE {
+optr 	dbViewer;
+GenDocumentOperation	op;
+
+    /*
+     * If we are about to save or close the file, we should see, if the current icon set is dirty
+     * and save it, if appropriate.
+     * In any other case (auto save, switch document .. ) we should not do this check.
+     */
+
+    op = @call oself::MSG_GEN_DOCUMENT_GET_OPERATION();
+    switch (op) {
+    case GDO_SAVE_AS:		// = 1
+    case GDO_SAVE:		// = 8
+    case GDO_CLOSE:		// = 9
+	dbViewer = ConstructOptr(pself->GDI_display, ChunkOf(@DBViewerContent));
+	@call dbViewer::MSG_DB_VIEWER_WRITE_CACHED_DATA_TO_FILE();
+   	break;
+    EC(default: if ( op != GDO_AUTO_SAVE ) { op=op; DebugInfo1("\rWriteCachedData Operation = %u", op); } )
+    }
+
+    /* other possibe GenDocumentOperation values
+	    GDO_NORMAL = 0   ,
+	    GDO_REVERT  = 2  ,
+	    GDO_REVERT_QUICK = 3   ,
+	    GDO_ATTACH  = 4  ,
+	    GDO_DETACH  = 5  ,
+	    GDO_NEW = 6   ,
+	    GDO_OPEN = 7    ,
+	    GDO_AUTO_SAVE = 10   ,
+	    GDO_REVERT_TO_AUTO_SAVE = 11   ,
+    */
+
+    @callsuper();
+    }
+
+/*--------------- MSG_META_GAINED_MODEL_EXCL ---------------------
+ *  Purpose:	We have become the "active" document. Update the App-UI.
+ *  Context:
+ *  Strategy:
+ 	- Update pixel size and view color in options menu.
+ 	  Do not touch the OptionsBooleanGroup, they holds global settings.
+ 	- Update global.curDisplay to our DisplayClass object. All our
+ 	  document-related objects are children of the display object.
+ 	  This allows us to access an object by combining it's chunk handle
+ 	  and the global. curDisplay handle using CombineGCurDisplayWith(obj).
+ 	- Call DisabelEditing() or EnableEditng(), depending on the number
+ 	  of icon sets we have in our document (database file).
+ *  Parameters: void (void)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_META_GAINED_MODEL_EXCL {
+optr view, fatbitsObj, dbViewer;
+word value;
+int  iSet, tool;
+
+    @callsuper();
+
+    /*
+     * Update fatbits pixel size in options menu
+     */
+    fatbitsObj = ConstructOptr(pself->GDI_display, ChunkOf(@MyFatbits));
+    value = @call fatbitsObj::MSG_FATBITS_GET_PIXEL_SIZE();
+    @call FatbitImageSizeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(value, FALSE);
+
+
+    /*
+     * Update view color in options menu
+     * MSG_GEN_VIEW_GET_COLOR returns a dword, where the least
+     * significant byte contains the color index (we only use indexed colors).
+     */
+    view = ConstructOptr(pself->GDI_display, ChunkOf(@IconDBView));
+    value = @call view::MSG_GEN_VIEW_GET_COLOR();
+    @call ViewColorGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(value & 0xFF, FALSE);
+
+    /*
+     * Tell the rest of the world what our current display handle is
+     */
+    global.curDisplay = pself->GDI_display;
+
+
+    /*
+     * Update Controllers including the CustomColorDialog and bitmap tools
+     * If CustomColorDialog is open for area color and line color, line color has priority
+     */
+    @call fatbitsObj::MSG_FATBITS_SEND_NOTIFICATIONS(SEND_ALL_NOTIFICATIONS);
+
+    /*
+     * Show or hide Selection-Tool Dialog, depending on the current tool
+     */
+    tool = @call fatbitsObj::MSG_FATBITS_GET_BITMAP_TOOL();
+    if ( BTF_SELECTION == tool ) {
+    	@send SelectionToolControlBox::MSG_GEN_INTERACTION_INITIATE();
+    	@send fatbitsObj::MSG_FATBITS_SELECTION_UPDATE_SELECTED_SIZE_TEXT();
+    } else {
+    	@send SelectionToolControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    }
+    if ( BTF_EDIT_MASK == tool ) {
+    	@send EditMaskControlBox::MSG_GEN_INTERACTION_INITIATE();
+    } else {
+    	@send EditMaskControlBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+    }
+    if ( BTF_PICK_COLOR == tool ) {
+    	@send process::MSG_ICON_OPEN_PICK_COLOR_DIALOG();
+    } else {
+    	@send process::MSG_ICON_CLOSE_PICK_COLOR_DIALOG();
+    }
+
+    /*
+     * Enable or disable editing, if appropriate
+     */
+    if ( IdGetISetCount(pself->GDI_fileHandle) ) {
+    	EnableEditing();
+    } else {
+    	DisableEditing();
+    }
+
+
+    /*
+     * Enable or disable SaveISet / SaveIcon triggers and other UI
+     */
+    dbViewer = ConstructOptr(pself->GDI_display, ChunkOf(@DBViewerContent));
+    @send dbViewer::MSG_DB_VIEWER_UPDATE_SAVE_ICON_TRIGGERS();
+
+    @send dbViewer::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+    @send fatbitsObj::MSG_FATBITS_UPDATE_UNDO_TRIGGERS();
+
+    /*
+     * Store the vm block (in global.tempFile) that holds the palette of the
+     * currently edited bitmap for global access by various routines.
+     * If there is no custom palette for the bitmap, the vm block is zero.
+     */
+    global.paletteVMBlock = @call dbViewer::MSG_DB_VIEWER_GET_PALETTE_VM_BLOCK();
+
+    /*
+     * 	See if the current iSet is an pointer-image-set or not and set up UI
+     */
+    iSet = @call dbViewer::MSG_DB_VIEWER_GET_CURRENT_ISET();
+    if ( IdGetFlags(pself->GDI_fileHandle, iSet) == IF_PTR_IMAGE ) {
+    	@call dbViewer::MSG_DB_VIEWER_POINTER_IMAGE_ENTER_PTR_MODE();
+    } else {
+    	@call dbViewer::MSG_DB_VIEWER_POINTER_IMAGE_LEAVE_PTR_MODE();
+    }
+
+    /*
+     * Update all non-modal dialogs, if they are open
+     */
+    @send dbViewer::MSG_DB_VIEWER_UPDATE_DIALOGS();
+
+}
+
+/*--------------- MSG_META_LOST_MODEL_EXCL ---------------------
+ *  Purpose:	We have lost to be the "active" document.
+ *  Context:	When the model changes, the order of messages send is
+ *		1. LOST_MODEL_EXCL to the old model object
+ *		2. GAINED_MODEL_EXCL to the new model object (if there is any)
+ *  Strategy:
+ 	- clear global.curDisplay handle to mark that there is no document open
+ 	- Disable editing for savety
+ *  Parameters: void (void)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_META_LOST_MODEL_EXCL {
+optr obj;
+
+    @callsuper();
+    global.curDisplay = 0;
+    DisableEditing();
+
+    global.paletteVMBlock = 0;
+    /*
+     * Update edit menu
+     */
+    obj = ConstructOptr(pself->GDI_display, ChunkOf(@DBViewerContent));
+    @send obj::MSG_DB_VIEWER_UPDATE_EDIT_MENU();
+}
+
+/*--------------------- MSG_DB_DOC_SET_FATBIT_SIZE ---------------------
+ *  Purpose:	Pass this message to the MyFatbits
+ *  Context:
+ *  Strategy:
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	    	    	    word selection = cx,
+			    	    word numSelections = bp,
+				    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_DB_DOC_SET_FATBIT_SIZE {
+optr obj;
+
+    obj = ConstructOptr(pself->GDI_display, ChunkOf(@MyFatbits));
+    @send obj::MSG_FATBITS_SET_PIXEL_SIZE(selection);
+}
+
+
+/*--------------------- MSG_DB_DOC_FATBIT_ZOOM ---------------------
+ *  Purpose:	Zoom MyFatbits view
+ *  Context:
+ *  Strategy:
+ *  Parameters: void (int inOrOut)
+ *		inOrOut: -1: zoom out
+ *			 +1: zoom in
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_DB_DOC_FATBIT_ZOOM {
+int value;
+optr obj;
+
+    value = @call FatbitImageSizeGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /*
+     * We expect that the size has a step ow two. Therefore map one to zero and back.
+     */
+    if (value == 1) value = 0;
+    value += 2*inOrOut;
+    if (value < 1) value = 1;
+    if (value > 16) value = 16;
+    @call FatbitImageSizeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(value, FALSE);
+
+    obj = ConstructOptr(pself->GDI_display, ChunkOf(@MyFatbits));
+    @send obj::MSG_FATBITS_SET_PIXEL_SIZE(value);
+}
+
+
+
+
+/*--------------------- MSG_DB_DOC_SET_VIEW_COLOR ---------------------
+ *  Purpose:	Update the background color of all GenView objects we have
+ *  Context:
+ *  Strategy:
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (
+    	    	       	    word selection = cx,
+			    word numSelections = bp,
+			    GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_DB_DOC_SET_VIEW_COLOR {
+    IconDBSetViewColors(pself->GDI_display, selection);
+}
+
+/*--------------------- MSG_DB_DOC_SET_OPTIONS ---------------------
+ *  Purpose:	Switch on/off UI groups in our display object
+ *  Context:
+ *  Strategy:
+ *  Parameters: GEN_BOOLEAN_GROUP_APPLY_MSG
+ 		(word selectedBooleans = cx,
+	          word indeterminateBooleans = dx,
+	          word modifiedBooleans = bp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method IconDBDocumentClass, MSG_DB_DOC_SET_OPTIONS {
+optr obj;
+VisUpdateModeAsWord  vumdw = { VUM_MANUAL, 0 };
+
+    IconDBSetOptions(pself->GDI_display, selectedBooleans);
+
+    /*
+     *  If IO_COLORED_ICON_LIST has been changed, update IconListContent color
+     */
+    if (modifiedBooleans & IO_COLORED_ICON_LIST ) {
+
+    	/*
+    	 * If IO_COLORED_ICON_LIST is selected, mark ViewColorGroup as modified
+    	 * and force it to send its apply message. This will cause the IconListContent
+    	 * to use the appropriate color.
+    	 * If it is not selected, send GVA_SAME_COLOR_AS_PARENT_WIN to the
+    	 * IconListView. This only takes effekt if the view is not usable.
+	 */
+	if (selectedBooleans & IO_COLORED_ICON_LIST ) {
+	    @send ViewColorGroup::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	    @send ViewColorGroup::MSG_GEN_APPLY();
+	} else {
+    	   obj = ConstructOptr(pself->GDI_display, ChunkOf(@IconListView));
+	   @send obj::MSG_GEN_SET_NOT_USABLE(VUM_MANUAL);
+	   @send obj::MSG_GEN_VIEW_SET_ATTRS(GVA_SAME_COLOR_AS_PARENT_WIN, 0, vumdw);
+	   @send obj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	}
+
+    }
+
+@if @ENABLE_BACKGROUND_PATTERN
+    /*
+     *  If IO_BACKGROUND_PATTERN has been changed, redraw Fatbits
+     */
+    if (modifiedBooleans & IO_BACKGROUND_PATTERN ) {
+	obj = ConstructOptr(pself->GDI_display, ChunkOf(@MyFatbits));
+	@send obj::MSG_FATBITS_RESIZE_AND_REDRAW(FALSE);
+	// pself = ObjDerefVis(obj);
+    }
+@endif
+
+}
+
+
+/*#########################################################################
+ *
+ * 	IconDBViewerClass document related messages
+ *
+ *#########################################################################*/
+
+/*--------------------- MSG_DB_VIEWER_SET_DOC_FILE ---------------------
+ *  Purpose:	Cache the database file handle
+ *  Context:
+ *  Strategy:	Must be cached because a call to the document can cause a nasty deadlock
+ *  Parameters:	void (VMFileHandle fh);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_SET_DOC_FILE {
+    pself->DBVI_vmFile = fh;
+}
+
+/*--------------------- MSG_DB_VIEWER_ATTACH_UI ---------------------
+ *  Purpose:	Attach UI to document.
+ *  Context:
+ *  Strategy:	This is us usually done by the GenDocument object but
+ *		the object has commissioned us to do it.
+ *  Parameters:	fh	Handle of the document file
+ *		op	current GenDocumentOperation
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_ATTACH_UI {
+int count;
+word options, pixelSize, viewColor;
+
+    /*
+     * Store important things
+     */
+    pself->DBVI_vmFile = fh;
+
+
+    /*
+     * Initialize some UI. Depending on the current document operation state,
+     * we have to do different things.
+     * In paticular, we must not read the view colors etc. from
+     * the init file in some cases.
+     */
+    switch ( op ) {
+    case GDO_NEW: 	// = 6
+    case GDO_OPEN: 	// = 7
+	/*
+	 * This are the standard situations to handle
+	 */
+    	break;
+
+    case GDO_REVERT: 		//  = 2
+    case GDO_REVERT_QUICK: 	// = 3
+    case GDO_NORMAL: 		// = 0
+    	/*
+    	 * We are about to discard all changes or to revert from
+    	 * quick backup. GDO_NORMAL occurs after "Move docuement to.."
+    	 * In these cases, some steps must left out.
+    	 */
+	goto revertOnly;
+
+    case GDO_DETACH: 	//  = 5
+    	/*
+    	 * We are about to restore from state. I don't know why
+    	 * operation is set to GDO_DETACH in this case.
+	 * When we are about to restore from state we are not allowed
+     	 * to jump to the first icon of the first set.
+      	 * So, let another method do the restore-from-state job.
+    	 */
+    	@call oself::MSG_DB_VIEWER_HANDLE_RESTORE_FROM_STATE();
+    	return;
+
+    case GDO_ATTACH: 	//  = 4
+	/*
+	 * I'm not sure if this can occur - I think no.
+	 * But to be sure, put up a notification if so.
+	 */
+	EC( ProgError("GDO_ATTACH in ATTACH_UI - check it."); )
+    	break;
+
+    case GDO_SAVE_AS:
+    case GDO_SAVE:		// = 8
+    case GDO_CLOSE:		// = 9
+    case GDO_AUTO_SAVE:		// = 10
+    case GDO_REVERT_TO_AUTO_SAVE: // = 11
+    default:
+    	/*
+    	 * That should never happen. Do nothing (return) in this case.
+    	 * But put up an error message in the EC version.
+    	 */
+    	EC( ProgError("Invaild DocOperation in ATTACH_UI"); )
+	return;
+    }
+
+    /*
+     * We are about to open a document or to create a new one.
+     * Initialize all the stuff we need.
+     */
+
+    LoadOptionsFromINI(&options, &pixelSize, &viewColor);
+    IconDBSetViewColors(OptrToHandle(oself), viewColor);
+    IconDBSetOptions(OptrToHandle(oself), options);
+		/* I don't know why MSG_META_INITIALIZE must be called explicitely ... */
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_META_INITIALIZE();
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_FATBITS_SET_PIXEL_SIZE(pixelSize);
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_FATBITS_CREATE_UNDO_CHAIN();
+
+    @call @GetDocUIOptr(@IconListContent)::MSG_ICON_VIEWER_SET_VIEWER_OBJECT(oself);
+
+revertOnly:
+
+	/*
+	 *  Force editing of an icon set...we do this because countless
+	 *  people demo'ing the software bitched that they couldn't
+	 *  start using the editor until they'd created an icon set.
+	 *  If there's no icon set, it means the user deliberately
+	 *  opened a previously-created database with no icon set in
+	 *  it, so we'll assume they know what they're doing. (SteveY)
+	 */
+    count = IdGetISetCount(pself->DBVI_vmFile);
+
+	/*
+	 *  Switch editing to first icon set. First we have to add a
+	 *  child for each icon set in the database (RESCAN_DATABASE),
+	 *  and then set the selection to the first icon set.
+	 *  Note: MSG_DB_VIEWER_RESCAN_DATABASE may invalidate pself.
+	 */
+    if ( count ) {
+    	@call oself::MSG_DB_VIEWER_RESCAN_DATABASE();
+    	pself = ObjDerefVis(oself);
+
+	/*
+	 * Be sure to set DBVI_currentISet to NO_CURRENT_ISET
+	 * first because we have no current set yet.
+	 */
+	pself->DBVI_currentISet = NO_CURRENT_ISET;
+	@call oself::MSG_DB_VIEWER_SET_SINGLE_SELECTION(0);
+	@call oself::MSG_DB_VIEWER_EDIT_ISET(FALSE);
+	}
+    else {
+	/*
+	 * the database is empty
+	 */
+	DisableEditing();
+	}
+
+}
+
+/*--------------------- MSG_DB_VIEWER_HANDLE_RESTORE_FROM_STATE ---------------------
+ *  Purpose:	When we are restoring from state, most of the actions that
+ *		MSG_DB_VIEWER_ATTACH_UI has to perform when creating a new
+ *		document are superfluous or even disruptive.
+ *		That is why we use two separate methods.
+ *  Context:
+ *  Strategy:
+ *	- all instance variables are up to date at this point
+ *	- for an unknown reason, we must redraw ourself and the icon list
+ *	- restore closed dialog boxes, if possible
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+// stop in  IconDBViewerDB_VIEWER_HANDLE_RESTORE_FROM_STATE
+@extern method IconDBViewerClass, MSG_DB_VIEWER_HANDLE_RESTORE_FROM_STATE {
+optr iconList;
+
+    @call @GetDocUIOptr(@IconListContent)::MSG_ICON_VIEWER_SET_VIEWER_OBJECT(oself);
+
+    @send oself::MSG_VIS_INVALIDATE();
+
+    iconList = ConstructOptr(OptrToHandle(oself), OptrToChunk(@IconListContent));
+    @send iconList::MSG_VIS_INVALIDATE();
+
+    /*
+     * Some dialogboxes are opened with UserDoDialog() and therefore automatically
+     * closed, when GEOS shuts down. A few of them can be restored when GEOS
+     * restores from state. We set a flag on shut down in these cases and
+     * call the proper restore message here.
+     */
+
+    if ( pself->DBVI_flags & DBVF_RESTORE_SORT_ICONS) {
+	@send oself::MSG_DB_VIEWER_SORT_ICONS_OPEN_DIALOG();
+	pself->DBVI_flags &= ~DBVF_RESTORE_SORT_ICONS;
+    }
+
+    if ( pself->DBVI_flags & DBVF_RESTORE_ANIMATION) {
+	@send oself::MSG_DB_VIEWER_ANIMATION_OPEN_DIALOG();
+	pself->DBVI_flags &= ~DBVF_RESTORE_ANIMATION;
+    }
+
+    if ( pself->DBVI_flags & DBVF_RESTORE_CROP_IMAGE) {
+      	@send, forceQueue process::MSG_ICON_CROP_CURRENT_ICON(oself);
+	pself->DBVI_flags &= ~DBVF_RESTORE_CROP_IMAGE;
+    }
+
+}
+
+/*--------------------- MSG_DB_VIEWER_DETACH_UI ---------------------
+ *  Purpose:	Detach UI from document.
+ *  Context:
+ *  Strategy:	This is us usually done by the GenDocument object but
+ *		the object has commissioned us to do it.
+ *  Parameters: op	current GenDocumenteOperation
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_DETACH_UI {
+
+    /*
+     * stop ant timer and animation timer, if any
+     */
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk(@MyFatbits))::MSG_FATBITS_KILL_ANTS();
+    @call oself::MSG_DB_VIEWER_ANIMATION_STOP_TIMER();
+
+    /*
+     * If we are about to move the document to another place, current
+     * GenDocumenteOperation is equal to GDO_NORMAL. Only in this case
+     * we have to check, if the icon is dirty. In any other cases,
+     * discard changes.
+     */
+    if ( op == GDO_NORMAL ) {
+	CheckIconDirtyAndDealWithIt(oself, FALSE);
+    } else {
+        if ( global.tempFile ) {	/* may be zero if we are about to shut down */
+	@call oself::MSG_DB_VIEWER_DISCARD_CURRENT_ICON();
+	}
+    }
+
+
+    pself->DBVI_vmFile = 0;
+    DisableEditing();
+}
+
+/*--------------------- MSG_DB_VIEWER_WRITE_CACHED_DATA_TO_FILE ---------------------
+ *  Purpose:	See if the current icon set is dirty and save it on request
+ *  Context:
+ *  Strategy:	This is us usually done by the GenDocument object but
+ *		the object has commissioned us to do it.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_WRITE_CACHED_DATA_TO_FILE {
+    CheckIconDirtyAndDealWithIt(oself, FALSE);
+}
+
+/*--------------------- MSG_DB_VIEWER_GET_PALETTE_VM_BLOCK ---------------------
+ *  Purpose:	Return the vm block that holds the palette of the currently
+ *		edited bitmap. This may be a null handle.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_GET_PALETTE_VM_BLOCK {
+    return pself->DBVI_iconImagePalette;
+}
+
+/*#########################################################################
+ *
+ * 	document related routines
+ *
+ *#########################################################################*/
+
+/*--------------------- IconDBSetEntryListColor ---------------------
+ *  Purpose:	Update the background color of IconListContent
+ *  Context:	Routine is used twice
+ *  Strategy:
+ *  Parameters:	color: color index to use
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconDBSetEntryListColor(MemHandle display, int color) {
+optr obj;
+VisUpdateModeAsWord  vumdw = { VUM_NOW, 0 };
+
+    obj = ConstructOptr(display, ChunkOf(@IconListView));
+    if ( global.coloredIconListView ) {
+    	@send obj::MSG_GEN_VIEW_SET_ATTRS(0, GVA_SAME_COLOR_AS_PARENT_WIN, vumdw);
+    	@send obj::MSG_GEN_VIEW_SET_COLOR(color, CF_INDEX, 0);
+    } else {
+    	@send obj::MSG_GEN_VIEW_SET_ATTRS(GVA_SAME_COLOR_AS_PARENT_WIN, 0, vumdw);
+    }
+
+}
+/*--------------------- IconDBSetViewColors ---------------------
+ *  Purpose:	Update the background color of all GenView objects we have
+ *		in our display object
+ *  Context:	Routine is used twice
+ *  Strategy:
+ *  Parameters:	color: color index to use
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconDBSetViewColors(MemHandle display, int color) {
+optr obj;
+
+    obj = ConstructOptr(display, ChunkOf(@IconDBView));
+    @send obj::MSG_GEN_VIEW_SET_COLOR(color, CF_INDEX, 0);
+
+    obj = ConstructOptr(display, ChunkOf(@FatbitsView));
+    @send obj::MSG_GEN_VIEW_SET_COLOR(color, CF_INDEX, 0);
+
+    obj = ConstructOptr(display, ChunkOf(@LivePreviewView));
+    @send obj::MSG_GEN_VIEW_SET_COLOR(color, CF_INDEX, 0);
+
+/* That doesn't look good at the moment
+    obj = ConstructOptr(display, ChunkOf(@IconColorbar));
+    @send obj::MSG_GEN_VIEW_SET_COLOR(color, CF_INDEX, 0);
+*/
+    IconDBSetEntryListColor(display, color);
+}
+
+
+/*--------------------- IconDBSetOptions ---------------------
+ *  Purpose:	Switch on/off UI groups (database viewer, icon list,
+ *		fatbits object) in our display object
+ *  Context:	Routine is used twice
+ *  Strategy:
+ *  Parameters:	dispaly: MemHandle of our display object
+ *		options: selected Booleans from IconOptionsMenu/OptionsBooleanGroup
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconDBSetOptions(MemHandle display, int options) {
+optr 	obj;
+
+    /*
+     * Set the UI usable / not usable
+     */
+    obj = ConstructOptr(display, ChunkOf(@IconDBView));
+    if ( options & IO_SHOW_DATABASE) {
+	@send BigDatabase::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send obj::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+	@send BigDatabase::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send obj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    }
+
+    obj = ConstructOptr(display, ChunkOf(@IconOptionsGroup));
+    if ( options & IO_SHOW_ICON)
+    	 @send obj::MSG_GEN_SET_USABLE(VUM_NOW);
+    else @send obj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+    obj = ConstructOptr(display, ChunkOf(@IconFatbitsGroup));
+    if ( options & IO_SHOW_FATBITS)
+    	 @send obj::MSG_GEN_SET_USABLE(VUM_NOW);
+    else @send obj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+
+    /*
+     * Resize database viewer (even if not visible)
+     */
+    obj = ConstructOptr(display, ChunkOf(@IconDBView));
+    @call obj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    if ( options & IO_BIG_DATABASE) {
+	@call obj::MSG_GEN_SET_MINIMUM_SIZE(VUM_DELAYED_VIA_APP_QUEUE,
+			1, SST_PIXELS | VIEWER_VIEW_MIN_HEIGHT, SST_PIXELS | VIEWER_VIEW_FIXED_BIG_WIDTH);
+	@call obj::MSG_GEN_SET_MAXIMUM_SIZE(VUM_DELAYED_VIA_APP_QUEUE,
+			1, SST_LINES_OF_TEXT | VIEWER_VIEW_MAX_HEIGHT, SST_PIXELS | VIEWER_VIEW_FIXED_WIDTH);
+    } else {
+	@call obj::MSG_GEN_SET_MINIMUM_SIZE(VUM_DELAYED_VIA_APP_QUEUE,
+			1, SST_PIXELS | VIEWER_VIEW_MIN_HEIGHT, SST_PIXELS | VIEWER_VIEW_FIXED_WIDTH);
+	@call obj::MSG_GEN_SET_MAXIMUM_SIZE(VUM_DELAYED_VIA_APP_QUEUE,
+			1, SST_LINES_OF_TEXT | VIEWER_VIEW_MAX_HEIGHT, SST_PIXELS | VIEWER_VIEW_FIXED_WIDTH);
+    }
+    if ( options & IO_SHOW_DATABASE) @call obj::MSG_GEN_SET_USABLE(VUM_NOW);
+
+
+    /*
+     * Resize icon list (even if not visible)
+     */
+    obj = ConstructOptr(display, ChunkOf(@IconListView));
+    @call ConstructOptr(display, ChunkOf(@IconRightGroup))::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @call obj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    if ( options & IO_BIG_ICONLIST) {
+	@call obj::MSG_GEN_SET_MINIMUM_SIZE(VUM_DELAYED_VIA_APP_QUEUE,
+			1, SST_PIXELS | 2*ICON_LIST_HEIGHT, SST_PIXELS | ICON_LIST_WIDTH);
+	@call obj::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_APP_QUEUE);
+    } else {
+	@call obj::MSG_GEN_SET_MINIMUM_SIZE(VUM_DELAYED_VIA_APP_QUEUE,
+			1, SST_PIXELS | ICON_LIST_HEIGHT, SST_PIXELS | ICON_LIST_WIDTH);
+	@call obj::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    @call obj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @call ConstructOptr(display, ChunkOf(@IconRightGroup))::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+
+}
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+
+
+/* *********** End of file DOCUMENT.GOC ********************/
+

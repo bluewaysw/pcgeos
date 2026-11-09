@@ -1,0 +1,1507 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	resize.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/7/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file deal width scaling and color reduction
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+@include <graphics.h>
+
+@include "iconed.goh"
+@include "bmptools.goh"
+
+@include "UI/appui.goh"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+void ToolUpdateResizeSourceSizeText(VMFileHandle vmFile, VMBlockHandle bmp);
+VMBlockHandle ResizeCreateTargetImage(int width, int height, PaletteEntry *palette);
+int ResizeTestColorCompatibility(int srcFormat, int destFormat);
+
+
+/*---------------------------------------------------------------------------
+	VisResizePreviewClass methods
+ 	- display a color reduced and/or scaled bitmap
+ 	- holds information (flags) how that bitmap has been created
+ ---------------------------------------------------------------------------*/
+@classdecl VisResizePreviewClass;
+
+/*-------------------- MSG_VRP_SET_BITMAP ---------------------
+ *  Purpose:	Set a new bitmap and redraw the object
+ *  Context:	The bitmap is stored in global.tempFile and owned by the
+ *		VisResizePreview object from now.
+ *		In particular, you should not modify or destroy the bitmap
+ *		from outside.
+ *		Destroying the bitmap is done by VisResizePreview::MSG_VIS_DESTROY
+ *  Strategy:
+ *  Parameters: VMBlockHandle bmp to set
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_SET_BITMAP {
+int width, height;
+
+    pself->VRPI_bitmap = bmp;
+    if (!bmp) return;
+
+    BTGetMoreBitmapInfos(global.tempFile, bmp, &width, &height, 0);
+    @send oself::MSG_VIS_SET_SIZE(width + RESIZE_PV_BITAMP_BORDER, height + RESIZE_PV_BITAMP_BORDER);
+    	/* some pixels more for space and drawing the border */
+    @call oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID, VUM_NOW);
+}
+
+/*-------------------- MSG_VRP_GET_BITMAP ---------------------
+ *  Purpose:	Return handle of our bitmap
+ *  Context:	The bitmap is stored in global.tempFile and managed from outside
+ *  Parameters:
+ *  Return:	the handle
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_GET_BITMAP {
+    return pself->VRPI_bitmap;
+}
+
+/*-------------------- MSG_VRP_SET_FLAGS ---------------------
+ *  Purpose:	Set a new flags value
+ *  Context:	The flags are only stored, but not used by the object itself
+ *  Strategy:
+ *  Parameters: int flags: flags value to set
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_SET_FLAGS {
+    pself->VRPI_flags = flags;
+}
+
+/*-------------------- MSG_VRP_GET_FLAGS ---------------------
+ *  Purpose:	Retrive the flags value
+ *  Context:	The flags are only stored, but not used by the object itself
+ *  Parameters: -
+ *  Return:	flags value
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_GET_FLAGS {
+    return pself->VRPI_flags;
+}
+
+
+/*-------------------- MSG_VRP_SET_CHILD_NUMBER ---------------------
+ *  Purpose:	Every object must know it's own number.
+ *  Context:
+ *  Parameters: int nr
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_SET_CHILD_NUMBER {
+    pself->VRPI_childNr = nr;
+}
+
+/*-------------------- MSG_VRP_GET_FLAGS ---------------------
+ *  Purpose:	Select child that has the passed number, deselect
+ *		all other childs.
+ *  Strategy:	- set VRPI_selected field
+ *		- redraw object if selection has been changed
+ *  Parameters: child: number of the child to select.
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_SELECT_CHILD_NUMBER {
+int oldSel;
+
+    oldSel = pself->VRPI_selected;
+    if (pself->VRPI_childNr == child ) {
+    	pself->VRPI_selected = TRUE;
+    } else {
+    	pself->VRPI_selected = FALSE;
+    }
+
+    if ( pself->VRPI_selected != oldSel) {
+    	@call oself::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+    }
+}
+
+
+/*-------------------- MSG_VRP_GET_SELECTED ---------------------
+ *  Purpose:	Return  VRPI_selected value
+ *  Parameters: -
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VRP_GET_SELECTED {
+    return pself->VRPI_selected;
+}
+
+
+/*--------------------- MSG_VIS_DRAW ---------------------
+ *  Purpose:
+ *	Draw method for VisResizePreviewClass.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	void (DrawFlags drawFlags, GStateHandle gstate);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VIS_DRAW	{
+int color, col1, col2;
+int x0, x1, y0, y1;
+
+    if ( !(pself->VRPI_bitmap) ) {
+        GrDrawText(gstate, 0, 0, "No bmp", 0);
+    	return;
+    }
+
+    /*
+     * Draw background and border
+     *  - Initialize the bounds for the outer rectangle
+     *  - Get view color. MSG_GEN_VIEW_GET_COLOR returns a dword,
+     *    where the least significant byte contains the color index.
+     *	  Then draw the background
+     *  - Draw border.
+     */
+    x0 = pself->VI_bounds.R_left;
+    y0 = pself->VI_bounds.R_top;
+    x1 = pself->VI_bounds.R_right - 1;
+    y1 = pself->VI_bounds.R_bottom - 1;	/*  why? Dunno. I just had to. (Steve) */
+
+    color = @call ResizeTargetView::MSG_GEN_VIEW_GET_COLOR();
+    GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+    GrFillRect(gstate, x0, y0, x1, y1);
+
+    col1 = C_WHITE;
+    col2 = C_DARK_GRAY;
+      if (pself->VRPI_selected) {
+     	IconDrawRectangle(gstate, x0, y0, x1, y1, col2, col1, 0);
+     	IconDrawRectangle(gstate, x0+1, y0+1, x1-1, y1-1, col2, col1, 0);
+     } else {
+     	IconDrawRectangle(gstate, x0, y0, x1, y1, col1, col2, 0);
+     }
+
+
+    /*
+     *  Draw the bitmap into the icon area.  We draw it indented
+     *  some pixels from the top and left sides, to make room for the
+     *  1- or 2-pixel border (snd some space) that gets drawn around the perimeter.
+     */
+    x0 = pself->VI_bounds.R_left + RESIZE_PV_BITAMP_BORDER/2;
+    y0 = pself->VI_bounds.R_top + RESIZE_PV_BITAMP_BORDER/2;
+    GrDrawHugeBitmap(gstate, x0, y0, global.tempFile, pself->VRPI_bitmap);
+
+}
+
+/*--------------------- MSG_META_START_SELECT ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:	Send our number to the parent. The parent (OtherContentClass)
+ *		does the rest of the job.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_META_START_SELECT	{
+
+    retVal->flags = MRF_PROCESSED;
+    @call @visParent::MSG_OC_CHILD_SELECTED(pself->VRPI_childNr);
+}
+
+/*--------------------- MSG_VIS_DESTROY ---------------------
+ *  Purpose:	The object is about to destroy itself
+ *  Context:
+ *  Strategy:	Free bitmap, if we have one
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@method VisResizePreviewClass, MSG_VIS_DESTROY {
+
+    if ( pself->VRPI_bitmap ) {
+    	HugeArrayDestroy(global.tempFile, pself->VRPI_bitmap);
+    	pself->VRPI_bitmap = 0;
+    }
+    @callsuper();
+}
+/*---------------------------------------------------------------------------
+	Related OtherContentClass methods
+ ---------------------------------------------------------------------------*/
+
+/*-------------------- MSG_OC_CREATE_CHILD ---------------------
+ *  Purpose:	Create a child of VisResizePreviewClass and initialize it
+ *  Context:
+ *  Strategy:
+ *  Parameters: bmp:	bitmap for the new child
+ *		flags:	flags for the new child
+ *  Return:	optr of the new child
+ ---------------------------------------------------------------------------*/
+@extern method OtherContentClass, MSG_OC_CREATE_CHILD {
+optr visObj;
+MemHandle objBlock;
+int childNr;
+
+    childNr = @call oself::MSG_VIS_COUNT_CHILDREN();	/* <-- id number of new child */
+
+    objBlock = OptrToHandle(oself);
+    visObj = ObjInstantiate(objBlock, &VisResizePreviewClass);
+    @call oself::MSG_VIS_ADD_CHILD(visObj, CCO_LAST);
+
+    @call visObj::MSG_VRP_SET_BITMAP(bmp);
+    @call visObj::MSG_VRP_SET_FLAGS(flags);
+    @call visObj::MSG_VRP_SET_CHILD_NUMBER(childNr);
+
+    return visObj;
+}
+
+/*-------------------- MSG_OC_DESTROY_LIST ---------------------
+ *  Purpose:	Remove all children and destroy it's bitmaps
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method OtherContentClass, MSG_OC_DESTROY_LIST {
+EventHandle ev;
+
+    /*
+     *  Send a destroy event to each child.
+     *  Note: this also destroys the childrens bitmap!
+     */
+    ev = @record VisResizePreviewClass::MSG_VIS_DESTROY(VUM_NOW);
+    @call oself::MSG_VIS_SEND_TO_CHILDREN(ev);
+
+    /*
+     * clear UI
+     */
+    @send ResizeTargetScalingGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@RTCommonEmptyMoniker), VUM_NOW);
+    @send ResizeTargetMaskGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@RTCommonEmptyMoniker), VUM_NOW);
+    @send ResizeTargetColorReductionGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@RTCommonEmptyMoniker), VUM_NOW);
+    @call ResizeTargetSizeText::MSG_VIS_TEXT_DELETE_ALL();
+
+
+}
+
+/*-------------------- MSG_OC_CHILD_SELECTED ---------------------
+ *  Purpose:	Inform the object that one of it's child becomes selected
+ *  Context:	Send from one of it's child or from outside
+ *  Strategy:	- have our childeren to selecte /deselect itself
+ *		- inform dbViewer about selectes child number so it can update the UI
+ *  Parameters:	child: child number to select
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method OtherContentClass, MSG_OC_CHILD_SELECTED {
+EventHandle ev;
+optr	visObj, dbViewer;
+
+    ev = @record VisResizePreviewClass::MSG_VRP_SELECT_CHILD_NUMBER(child);
+    @call oself::MSG_VIS_SEND_TO_CHILDREN(ev);
+
+    @send ResizeResizeTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    visObj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(child);
+    dbViewer = CombineGCurDisplayWith(@DBViewerContent);
+    @send dbViewer::MSG_DB_VIEWER_RESIZE_IMAGE_PREVIEW_OBJ_SELECTED(visObj);
+}
+
+/*-------------------- MSG_OC_GET_SELECTED_CHILD ---------------------
+ *  Purpose:	Ask our children which is selected
+ *  Context:
+ *  Strategy:
+ *  Parameters:	-
+ *  Return:	optr of the selected child
+ *		zero if no child is selected (usually this is an error)
+ ---------------------------------------------------------------------------*/
+@extern method OtherContentClass, MSG_OC_GET_SELECTED_CHILD {
+int count, n, sel;
+optr child, selChild;
+
+    selChild = 0;
+    count = @call oself::MSG_VIS_COUNT_CHILDREN();
+    if (!count) return selChild;
+
+    for (n = 0; n < count; n++ ) {
+    	child = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(n);
+    	sel = @call child::MSG_VRP_GET_SELECTED();
+    	if ( sel ) {
+    	    selChild = child;
+    	    break;
+    	}
+    }
+
+    return selChild;
+}
+
+/*--------------------- MSG_VIS_COMP_GET_CHILD_SPACING ---------------------
+ *  Purpose:	Returns the spacing for the children.
+ *  	This message returns the child spacing used by the composite. The high word
+ *  	of the return value is the spacing between lines of wrapped children; the low
+ *  	word is the horizontal spacing between children.
+ *  Parameters:
+ *  Return:	SpacingAsDWord
+ *		high-word->y-direction, low-word->x-direction
+ ---------------------------------------------------------------------------*/
+@extern method OtherContentClass, MSG_VIS_COMP_GET_CHILD_SPACING {
+dword spacing;
+
+    /*
+     * we only need this if we have children
+     */
+    if ( pself->OCI_type != OC_TYPE_RESIZE_PREVIEW) return @callsuper();
+
+    /*
+     * we use the same spacing as the icon list does
+     */
+    spacing = RESIZE_TARGET_VERTICAL_CHILD_SPACING;
+    spacing <<= 16; 					// Line Space
+    spacing += RESIZE_TARGET_HORIZONTAL_CHILD_SPACING;	// horizontal
+    return spacing;
+}
+
+/*--------------------- MSG_VIS_COMP_GET_MARGINS ---------------------
+ * Purpose: Returns the distance of the children from the edges.
+ *		This message returns the margins the composite should use when
+ *		recalculating its child spacing. If you want a special left, top, right, or bottom
+ *		margin around the composite's children, intercept this message and return
+ *		the margin(s) in the appropriate field(s) of the Rectangle structure.
+ * Parameters:	void (Rectangle *retValue);
+ * Return:		-
+ ---------------------------------------------------------------------------*/
+@extern method OtherContentClass, MSG_VIS_COMP_GET_MARGINS {
+
+    /*
+     * we only need this if we have children
+     */
+    if ( pself->OCI_type != OC_TYPE_RESIZE_PREVIEW) {
+    	 @callsuper();
+    	return;
+    }
+
+    /*
+     * we use the same spacing as the icon list does
+     */
+    retValue->R_left = RESIZE_TARGET_MARGIN;
+    retValue->R_right = RESIZE_TARGET_MARGIN;
+    retValue->R_top = RESIZE_TARGET_MARGIN;
+    retValue->R_bottom = RESIZE_TARGET_MARGIN;
+}
+
+
+/*---------------------------------------------------------------------------
+	Related IconDBViewerClass methods
+ ---------------------------------------------------------------------------*/
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_OPEN_DIALOG ---------------------
+ *  Purpose:	Initialize and open the ResizeDialog box
+ *		This dialog box let the user create a new icon from current one,
+ *		having another size and / or color depth
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_OPEN_DIALOG {
+VMBlockHandle iconBmp, bmpCopy;
+VMFileHandle  vmFile;
+int iSet, icon, width, height, vmlet, val;
+char nameBuffer[MAX_ICON_NAME_LENGTH + 10];
+
+    if ( CheckIconDirtyAndDealWithIt(oself, TRUE) ) return;
+
+    /*
+     * Get information about current icon
+     */
+    vmFile = pself->DBVI_vmFile;
+    iSet = pself->DBVI_currentISet;
+    icon = pself->DBVI_currentIcon;
+
+    iconBmp = IdGetEntryBitmap(vmFile, iSet, icon);
+    BTGetMoreBitmapInfos(vmFile, iconBmp, &width, &height, 0);
+    vmlet = IdGetEntryType(vmFile, iSet, icon);
+    IdGetEntryName(vmFile, iSet, icon, nameBuffer);
+
+
+    /*
+     * Update UI: size GenValues, SourceContent (copy bitmap first),
+     * ResizeSourceSizeText, ResizeNewNameText,
+     * ResizeDisplaySizeChooser, ResizeStyleChooser, ResizeAspectChooser,
+     * ResizeDisplayClassChooser
+     */
+    @send ResizeNewXSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(width, FALSE);
+    @send ResizeNewYSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(height, FALSE);
+
+    bmpCopy = BTCopyBitmap(vmFile, global.tempFile, iconBmp);
+    @call ResizeSourceContent::MSG_OC_REPLACE_BITMAP(bmpCopy);
+
+    ToolUpdateResizeSourceSizeText(global.tempFile, bmpCopy);
+
+    @call ResizeNewNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(nameBuffer, 0);
+
+    val = (vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET;
+    @send ResizeDisplaySizeChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    val = (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET;
+    @send ResizeStyleChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    val = (vmlet & VMLET_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET;
+    @send ResizeAspectChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    val = (vmlet & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET;
+    @send ResizeDisplayClassChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(val, FALSE);
+
+    @send ResizeScaleChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send ResizeScaleChooser::MSG_GEN_APPLY();
+
+
+    /*
+     * Open dialog box
+     */
+    @send ResizeDialog::MSG_GEN_INTERACTION_INITIATE();
+    @send process::MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS(FALSE);
+
+}
+
+
+/*--------------------- ToolUpdateResizeSourceSizeText ---------------------
+ *  Purpose:	Pass size and color depth of the bitmap to our
+ *		ResizeSourceSizeText text object
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolUpdateResizeSourceSizeText(VMFileHandle vmFile, VMBlockHandle bmp) {
+int format, width, height;
+dword bitmapSize;
+char buf[30];
+
+    format = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, NULL);
+    sprintf(buf, "%ux%u, ", width, height);
+    MemLock(OptrToHandle(@IconInfoMonoText));
+
+    switch (format & BMT_FORMAT) {
+	case BMF_MONO:
+	    strcat(buf, LMemDeref(@IconInfoMonoText));
+	    break;
+    	case BMF_4BIT:
+	    strcat(buf, LMemDeref(@IconInfo16ColorsText));
+	    break;
+        case BMF_8BIT:
+	    strcat(buf, LMemDeref(@IconInfo256ColorsText));
+	    break;
+    	default: 	// 24 Bit
+	    strcat(buf, LMemDeref(@IconInfoTCText));
+	}
+    @call ResizeSourceSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    if (format & BMT_PALETTE) {
+    	sprintf(buf, ",\r%s", LMemDeref(@IconInfoPaletteText));
+    	@call ResizeSourceSizeText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+    }
+
+    MemUnlock(OptrToHandle(@IconInfoMonoText));
+
+    bitmapSize = ToolCalcBitmapSize(width, height, format);
+    MemLock(HandleOf(@ImageSizeText));
+    strcpy(buf, "\r");
+    sprintf(&buf[1], LMemDeref(@ImageSizeText), bitmapSize);
+    MemUnlock(HandleOf(@ImageSizeText));
+    @call ResizeSourceSizeText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+}
+
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_APPLY_OR_CLOSE_DIALOG ---------------------
+ *  Purpose:	Create a new icon for the current set or simply quit the dialog box
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:	doApply	TRUE: Apply settings and create a new icon
+ *			FALSE: do not create a new icon
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_APPLY_OR_CLOSE_DIALOG {
+int 	icon, iSet;
+VMFileHandle vmFile;
+VMBlockHandle bmp, iconBmp;
+DisplayClass	colorDC;
+int  style, dispSize, aspect;
+optr imgObj;
+char iconName[MAX_ICON_NAME_LENGTH + 10];
+	int width, height, format;
+
+    if ( !doApply ) {
+	@call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+	@call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ResizeDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	@call ResizeSourceContent::MSG_OC_REPLACE_BITMAP(0);
+    	return;
+    }
+
+
+    iSet = pself->DBVI_currentISet;
+    vmFile = pself->DBVI_vmFile;
+
+    /*
+     * Do error checking
+     */
+    icon = IdGetEntryCount(vmFile, iSet);
+    if (icon >= MAX_ICONS) {
+    	ErrorBoxOptr(@TooManyIconsText);
+    	return;
+    }
+
+    /*
+     * Get bitmap from selected preview object and check size
+     */
+    imgObj = @call ResizeTargetContent::MSG_OC_GET_SELECTED_CHILD();
+    bmp = @call imgObj::MSG_VRP_GET_BITMAP();
+
+    format = BTGetMoreBitmapInfos(global.tempFile, bmp, &width, &height, 0);
+    if (CheckIconTooLargeAndDealWithIt(width, height, format) ) {
+    	return;
+    	}
+
+    /* ok, use the bitmap for a new icon */
+    iconBmp = BTCopyBitmap(global.tempFile, vmFile, bmp);
+
+    /*
+     * Create a new icon.
+     * The attributes are read from UI
+     */
+    IdCreateEntries(vmFile, iSet, 1);
+    IdSetEntryCount(vmFile, iSet, icon + 1);
+
+    style = @call ResizeStyleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    colorDC = @call ResizeDisplayClassChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    dispSize = @call ResizeDisplaySizeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    aspect = @call ResizeAspectChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    InternalInitializeIconEntryType(vmFile, iSet, icon, style, colorDC, dispSize, aspect);
+    IdSetEntryBitmapNoCopy(vmFile, iSet, icon, iconBmp);
+
+    @call ResizeNewNameText::MSG_VIS_TEXT_GET_ALL_PTR(iconName);
+    IdSetEntryName(vmFile, iSet, icon, iconName);
+
+    @call oself::MSG_DB_VIEWER_ICON_ADDED(icon);
+}
+
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_NEW_IMAGE_POSITION ---------------------
+ *  Purpose:	The use has entered a new target image position.
+ *		Update information glyph and see,
+ *		if we need to re-create the preview images
+ *  Context:
+ *  Strategy:
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_IMAGE_POSITION {
+optr moniker;
+
+    switch (selection) {
+    case RPI_TOP_LEFT:
+    	moniker = @RITopLeftMoniker;
+    	break;
+    case RPI_TOP_RIGHT:
+    	moniker = @RITopRightMoniker;
+    	break;
+    case RPI_BOTTOM_LEFT:
+    	moniker = @RIBottomLeftMoniker;
+    	break;
+    case RPI_BOTTOM_RIGHT:
+    	moniker = @RIBottomRightMoniker;
+    	break;
+
+    EC(default: ProgError(""); return; )
+    }
+    @send ResizePlaceImageGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(moniker), VUM_NOW);
+
+    @call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+    @call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send process::MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS(FALSE);
+}
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_OPTIONS_CHANGED ---------------------
+ *  Purpose:	Switch "auto create preview images" on or off
+ *  Context:
+ *  Strategy:	- creatate new preview images, if apropriate.
+ *		- if not: clear list, if "build opaque images" has been changed
+ *  Parameters: GEN_BOOLEAN_GROUP_APPLY_MSG (word selectedBooleans = cx,
+ *	          word indeterminateBooleans = dx, word modifiedBooleans = bp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_OPTIONS_CHANGED {
+
+    if ( selectedBooleans & ROPT_AUTO_CREATE_PREVIEW ) {
+        @send process::MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS(TRUE);
+    }
+    else if ( modifiedBooleans & ROPT_CREATE_OPAQUE_PREVIEW ) {
+        @call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+        @call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+}
+
+/*-------------------- ResizeToolCreateTargetPalette ---------------------
+ *  Purpose:	Find out the correct palette for the target image
+ *  Strategy:	depending on the passed flag values:
+ *		- return standard palette
+ *		- return copy of the source bitmap's palette
+ *		- build a custom palette using median cut algorithm
+ *  Parameters:	vmFile, bmp: source bitmap to be analyzed
+ *		commonFlags: information if colors should be replaced or not
+ *			RPF_NO_COLOR_REPLACEMENT is set: do not build a custom palette
+ *						 is not set: build a custom palette
+ *		colorCompatibility: only valid if RPF_NO_COLOR_REPLACEMENT is set
+ *			info on whether to copy the original palette or use the default palette
+ *		palette: poitner to a palette with 256 entries
+ *		targetColors: only valid if RPF_NO_COLOR_REPLACEMENT is not set
+ *			Number of colors the new palette needs to have (usually 16 or 256)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ResizeToolCreateTargetPalette(VMFileHandle vmFile, VMBlockHandle bmp, word commonFlags, int colorCompatibility,
+		PaletteEntry *palette, int targetColors, optr progressText) {
+VMBlockHandle 	origBmp;
+PaletteEntry	*stdPalette;
+
+    /*
+     * Initialize palette with standard palette
+     */
+    stdPalette = BTLockGEOSStandardPalette();
+    memcpy(palette, stdPalette, 256*sizeof(PaletteEntry));
+    BTUnlockGEOSStandardPalette();
+
+    /*
+     * If no color replacement is required, we use either the original
+     * bitmap's palette or the system palette (as already initialized).
+     */
+    if ( commonFlags & RPF_NO_COLOR_REPLACEMENT ) {
+	switch (colorCompatibility) {
+	case COLORS_COMPATIBLE_PAL4:
+	case COLORS_COMPATIBLE_PAL8:
+	    /*
+	     * copy palette over from source bitmap as required.
+	     */
+	    origBmp = @call ResizeSourceContent::MSG_OC_GET_BITMAP();
+	    BTGetBitmapPalette(global.tempFile, origBmp, palette, (colorCompatibility == COLORS_COMPATIBLE_PAL4) ? 16 : 256 );
+	    break;
+	}
+    } else {
+    	/*
+    	 * We need color replacement and build a custom palette from original bitmap's color
+    	 */
+	BTCreatePaletteByMedianCut(global.tempFile, bmp,
+			palette, targetColors, global.tempFile, progressText);
+
+    }
+
+}
+
+
+/*-------------------- ResizeToolDrawWithReplace ---------------------
+ *  Purpose:	Draw scaled bitmap to destination using "replace colors" strategy
+ *  Strategy:	IconToolDrawOneBitmapToAnother() does the job perfectly
+ *		We encapsulate this call in a macro
+ ---------------------------------------------------------------------------*/
+#define ResizeToolDrawWithReplace(srcBmp, destBmp, progressText) \
+	IconToolDrawOneBitmapToAnother(global.tempFile, srcBmp, \
+			global.tempFile, destBmp, 0, 0, progressText,  global.tempFile)
+
+
+/*--------------------- ResizeMakeMaskOpaque ---------------------
+ *  Purpose:	Set the mask of the passed bitmap to fully non-transparent
+ *  Context:
+ *  Strategy:
+ *  Parameters: vmFile, bmp:	bitmap to handle
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ResizeMakeMaskOpaque(VMFileHandle vmFile, VMBlockHandle bmp) {
+BitmapAccessRecord bar;
+int maskLen, bmFormat, width, height, y;
+byte *maskData;
+
+    if ( !vmFile || !bmp ) return;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    if ( (bmFormat & BMT_MASK) == 0 ) return;
+
+    /*
+     * ensure that the uncovered pixels becomes white
+     */
+    IconSetHiddenPixelsToWhite(vmFile, bmp);
+
+    /*
+     * Lock lines from top to bottom.
+     * Fill all bits with '1' (non-transparent)
+     */
+    maskLen = (width+7)/8;
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+
+    for ( y = 0; y < height; y++ ) {
+    	memset(maskData, 0xFF, maskLen);
+	maskData = BTBitmapNext(&bar, TRUE);
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+}
+
+
+
+/*--------------------- ResizeKillNTWPixels ---------------------
+ *  Purpose:	Ensure that there are no white, non-transparent pixels
+ *		in a monochrome, masked bitmap.
+ *  Context:
+ *  Strategy:	Copying data bytes to mask does the job
+ *  Parameters: vmFile, bmp:	bitmap to handle
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ResizeKillNTWPixels(VMFileHandle vmFile, VMBlockHandle bmp) {
+BitmapAccessRecord bar;
+int maskLen, bmFormat, width, height, y;
+byte *maskData, *pixelData;
+
+    if ( !vmFile || !bmp ) return;
+
+    bmFormat = BTGetMoreBitmapInfos(vmFile, bmp, &width, &height, 0);
+    if ( (bmFormat & BMT_MASK) == 0 ) return;
+    if ( (bmFormat & BMT_FORMAT) != BMF_MONO ) return;
+
+    /*
+     * Lock lines from top to bottom.
+     * Copy pixel dta to mask to mak every white pixel transparent
+     */
+    maskLen = (width+7)/8;
+    maskData = BTBitmapLock(vmFile, bmp, &bar, 0);
+
+    for ( y = 0; y < height; y++ ) {
+    	pixelData = maskData + maskLen;
+    	memcpy(maskData, pixelData, maskLen);
+	maskData = BTBitmapNext(&bar, TRUE);
+    }
+
+    BTBitmapUnlock(&bar, TRUE);
+}
+
+
+
+/*--------------------- ResizeCreatePreviewObject ---------------------
+ *  Purpose:	Create and set up a preview object
+ *  Context:
+ *  Strategy:
+ *  Parameters: bmp:	bitmap to use (stored in global.tempFile)
+ *			passing zero is is allowed and intended.
+ *		flags:	RPF_~ flag bits - informations about the preview properties
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ResizeCreatePreviewObject(VMBlockHandle bmp, word flags) {
+
+    if (!bmp) return;
+    @call ResizeTargetContent::MSG_OC_CREATE_CHILD(bmp, flags);
+}
+
+/*--------------------- ResizeCreatePreviewImage ---------------------
+ *  Purpose:	Create final preview image from scaled bitmap
+ *  Context:
+ *  Strategy:	- do color reduction	(use size of scaled bitmap)
+ *		- create final target image
+ *		- draw color reduced image to target image
+ *  Parameters: scaledBmp: bitmap to use (stored in global.tempFile)
+ *			this is always a true color bitmap
+ *			passing zero is is allowed and intended.
+ *		colorCompatibility: info how to handle dithering and palette
+ *		flags: Color reduction information:
+ *			RPF_COLOR_REPLACED is set: Replaces colors by nearest color
+ *					   is not se: dither imgae
+ *		progressText: text object for progess report
+ *			pass zero for no progress report
+ *  Return:	Handle of the final preview image
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ResizeCreatePreviewImage(VMBlockHandle scaledBmp, int colorCompatibility, word flags, PaletteEntry *palette, optr progressText) {
+int scaledWidth, scaledHeight;	/* size of scaled bitmap */
+int width, height, drawPos, x, y, format;
+VMBlockHandle	tempBmp, previewBmp;
+
+    if ( !scaledBmp ) return 0;	/* This is intentional */
+    ProgressDisplaySpace();
+
+    /*
+     * do color reduction
+     * still uses scaled bitmap's size
+     */
+    BTGetMoreBitmapInfos(global.tempFile, scaledBmp, &scaledWidth, &scaledHeight, 0);
+
+    if ( flags & RPF_COLOR_REPLACED) {
+        /*
+         * Create target bitmap and draw scaled bitmap into this bitmap
+         */
+	tempBmp = ResizeCreateTargetImage(scaledWidth, scaledHeight, palette);
+	if (!tempBmp) return 0;	/* emergency exit */
+    	ResizeToolDrawWithReplace(scaledBmp, tempBmp, progressText);
+    } else {
+        /*
+         * Dithering routine creates its own target image
+         */
+    	int destFormat, palColors;
+    	Boolean useStdPalette = FALSE;
+
+        destFormat = @call ResizeNewColorChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        palColors = (destFormat & BMT_FORMAT) == BMF_8BIT ? 256 : 16;
+
+EC(					\
+switch (destFormat & BMT_FORMAT) {	\
+case BMF_MONO:				\
+case BMF_4BIT:				\
+case BMF_8BIT:	break;			\
+default: MessageBox("Dither Ziel nicht 16 oder 256"); \
+} \
+)
+
+
+	if ( !palette) {
+	    palette = BTLockGEOSStandardPalette();
+	    useStdPalette = TRUE;
+	}
+
+	tempBmp = BTDitherByFloydSteinberg(global.tempFile, scaledBmp, global.tempFile,
+			destFormat & BMT_FORMAT, palette, palColors, progressText);
+	if (useStdPalette) BTUnlockGEOSStandardPalette();
+
+    }
+
+
+    /*
+     * Create a final preview image and calculate drawing position
+     * ResizeCreateTargetImage(0, 0, palette) reads size and other required information from UI
+     */
+    previewBmp = ResizeCreateTargetImage(0, 0, palette);
+    BTGetMoreBitmapInfos(global.tempFile, previewBmp, &width, &height, 0);
+
+    /*
+     *	Draw the color-reduced image into the preview image
+     */
+    drawPos = @call ResizePlaceImageChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (drawPos) {
+    case RPI_TOP_LEFT:
+    	x = 0;	y = 0;
+    	break;
+    case RPI_TOP_RIGHT:
+    	x = width - scaledWidth;
+    	y = 0;
+    	break;
+    case RPI_BOTTOM_LEFT:
+    	x = 0;
+    	y = height - scaledHeight;
+    	break;
+    case RPI_BOTTOM_RIGHT:
+    	x = width - scaledWidth;
+    	y = height - scaledHeight;
+    	break;
+    }
+
+    IconToolDrawOneBitmapToAnother(global.tempFile, tempBmp, \
+			global.tempFile, previewBmp, x, y, progressText,  global.tempFile);
+
+    /*
+     * Ensure that monochrome bitmaps have no white, non-transparent pixels
+     */
+    format = @call ResizeNewColorChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if ( (format & BMT_FORMAT) == BMF_MONO ) {
+    	ResizeKillNTWPixels(global.tempFile, previewBmp);
+    }
+
+
+    /*
+     * clean up
+     */
+    HugeArrayDestroy(global.tempFile, tempBmp);
+
+    return previewBmp;
+}
+
+
+/*-------------------- ResizeCreateTargetImage ---------------------
+ *  Purpose:	Read information about new bitmap from UI and create the bitmap
+ *  Context:
+ *  Strategy:	read bitmap format and size from UI
+ *  Parameters:	width, height:	dimension for the new bitmap
+ *				pass zero to read the values from UI
+ *		palette: pointer to palette to use for the bitmap
+ *  Return:	Handle to new bitmap, stored in global.tempFile
+ ---------------------------------------------------------------------------*/
+VMBlockHandle ResizeCreateTargetImage(int width, int height, PaletteEntry *palette) {
+int format;
+VMBlockHandle bmp;
+
+    format = @call ResizeNewColorChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (!width) width = @call ResizeNewXSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    if (!height) height = @call ResizeNewYSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    /*
+     * We don't check the image size here because this may happen up to eight times
+     * if the new size is too large - we check this on creating the icon.
+     */
+
+    /*
+     * Create target bitmap and clean up palette pointer
+     */
+    bmp = IconToolCreateBitmap(global.tempFile, format | BMT_MASK, width, height, palette, TRUE);
+
+
+    return bmp;
+}
+
+/*-------------------- ResizeTestColorCompatibility ---------------------
+ *  Purpose:	Test, if the colors of the source bitmap (srcFormat) are supported
+ *		by the target bitmap (destFormat).
+ *  Context:
+ *  Strategy:	do a lot of switch statements
+ *  Parameters:	srcFormat:	bitmap type value for source bitmap
+ *		destFormat:	bitmap type value for target bitmap
+ *  Return:	COLORS_NOT_COMPATIBLE	we need color reduction
+ *		COLORS_COMPATIBLE	all colors are supported by the target bitmap
+ *					target bitmap is true color or has no palette
+ *		COLORS_COMPATIBLE_PAL4	all colors are supported if we copy the
+ *					16 palette colors from source bitmap
+ *		COLORS_COMPATIBLE_SYS4	all colors are supported if we use the
+ *					16 colors system palette
+ *		COLORS_COMPATIBLE_PAL8	all colors are supported if we copy the
+ *					256 color palette from source bitmap
+ *		COLORS_COMPATIBLE_SYS8	all colors are supported if we use the
+ *					256 colors system palette
+ ---------------------------------------------------------------------------*/
+int ResizeTestColorCompatibility(int srcFormat, int destFormat) {
+
+    /*
+     * - Mask out unused  bits for savety
+     * - True color destination is always COMPATIBLE
+     * - Monochrome source too.
+     */
+    srcFormat &= BMT_FORMAT | BMT_PALETTE;
+    destFormat &= BMT_FORMAT | BMT_PALETTE;
+    if ( destFormat == BMF_24BIT) return COLORS_COMPATIBLE;
+    if ( srcFormat == BMF_MONO) return COLORS_COMPATIBLE;
+
+    /*
+     * For each other source format: check all possible traget formats
+     */
+    switch (srcFormat) {
+
+    case BMF_4BIT:
+    	switch (destFormat) {
+    	case BMF_MONO:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT:			return COLORS_COMPATIBLE;
+    	case BMF_4BIT | BMT_PALETTE:	return COLORS_COMPATIBLE_SYS4;
+    	case BMF_8BIT:			return COLORS_COMPATIBLE;
+    	case BMF_8BIT | BMT_PALETTE:	return COLORS_COMPATIBLE_SYS4;
+    	default: break;			/* should never happen */
+    	}
+
+    case BMF_4BIT | BMT_PALETTE:
+    	switch (destFormat) {
+    	case BMF_MONO:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT | BMT_PALETTE:	return COLORS_COMPATIBLE_PAL4;
+    	case BMF_8BIT:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_8BIT | BMT_PALETTE:	return COLORS_COMPATIBLE_PAL4;
+    	default: break;			/* should never happen */
+    	}
+
+    case BMF_8BIT:
+    	switch (destFormat) {
+    	case BMF_MONO:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT | BMT_PALETTE:	return COLORS_NOT_COMPATIBLE;
+    	case BMF_8BIT:			return COLORS_COMPATIBLE;
+    	case BMF_8BIT | BMT_PALETTE:	return COLORS_COMPATIBLE_SYS8;
+    	default: break;			/* should never happen */
+    	}
+
+    case BMF_8BIT | BMT_PALETTE:
+    	switch (destFormat) {
+    	case BMF_MONO:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_4BIT | BMT_PALETTE:	return COLORS_NOT_COMPATIBLE;
+    	case BMF_8BIT:			return COLORS_NOT_COMPATIBLE;
+    	case BMF_8BIT | BMT_PALETTE:	return COLORS_COMPATIBLE_PAL8;
+    	default: break;			/* should never happen */
+    	}
+
+    case BMF_24BIT:			return COLORS_NOT_COMPATIBLE;
+
+    default: EC(ProgError("ResizeTestColorCompatibility invalid source format"); )
+    	return COLORS_NOT_COMPATIBLE;
+    }
+
+    /* we should never reach this point */
+    EC(ProgError("ResizeTestColorCompatibility invalid destination format"); )
+    return COLORS_NOT_COMPATIBLE;
+
+}
+
+
+/*-------------------- MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS ---------------------
+ *  Purpose:	Rebuild the list with the preview images
+ *  Context:
+ *  Strategy:	- destroy old list (this includes the objets and the bitmaps they display)
+ *		- scale bitmap if adequate - if not, copy it
+ *		  after this step the bitmaps are true color bitmaps
+ 		  scaled bitmaps handles are: sysScaledBmp and bilinScaledBmp respectively
+ *		- set up target palette, if we need one
+ *		- create up to eight preview images and the corresponding preview objects
+ *		  We use the handles previewBmp and opaqueBmp to hold these bitmaps.
+ *		  Because we send these bitmaps to VisResizePreviewClass objects we must
+ *		  NOT free it here! This will be done by the VisResizePreviewClass objects
+ *
+ *
+ *		We have two scaling methods (system, bilinear) and two color reduction
+ *		methods (dithering, replace).
+ *		In addition, we can generate another preview image in which the
+ *		mask is completely opaque. So we can have up to eight preview images.
+ *		Unscaled images counts as scaled by system.
+ *		Using the same colors counts as replaced.
+ *
+ *  Parameters: forceCreate:
+ *			TRUE: Create previews in any case
+ *			FALSE: Create previews only if "Auto Create Previews" is on
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS {
+int  scaleMode, width, height, newW, newH;
+int scaledWidth, scaledHeight;
+int srcFormat, destFormat, colorCompatibility;
+
+VMBlockHandle  origBmp, sysScaledBmp, bilinScaledBmp;
+VMBlockHandle  previewBmp, opaqueBmp;
+word	flags, commonFlags, sel;
+Boolean addOpaqueImages;
+PaletteEntry	*palette = 0;
+
+optr progressText = @IconProgressText;
+
+    if ( !forceCreate) {
+	int sel = @call ResizeMoreOptionsChooser::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if ( (sel & ROPT_AUTO_CREATE_PREVIEW) == 0) return;	/* Auto create is off */
+    }
+
+    ProgressOpenProgressBox(TRUE);
+    ProgressDisplayTextOptr(@ScaleImages, FALSE);
+    ProgressDisplaySpace();
+
+    /*
+     * Destroy current preview objects
+     */
+    @call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+    @call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /*
+     * Collect required information. Use the Bitmap used by the ResizeSourceContent
+     * object (stored in global.tempFile) as source. The current icon may differ from that!
+     */
+    origBmp = @call ResizeSourceContent::MSG_OC_GET_BITMAP();
+    srcFormat = BTGetMoreBitmapInfos(global.tempFile, origBmp, &width, &height, 0);
+    scaleMode = @call ResizeScaleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    newW = @call ResizeNewXSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    newH = @call ResizeNewYSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    destFormat = @call ResizeNewColorChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    sel = @call ResizeMoreOptionsChooser::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    addOpaqueImages = sel & ROPT_CREATE_OPAQUE_PREVIEW ? TRUE : FALSE;
+
+
+    /*
+     * Scale bitmap (if required)
+     * 		There are two scaling mechanisms
+     *		- uses system routines --> creates sysScaledBmp
+     *		- uses use bilinear scaling --> creates bilinScaledBmp
+     * 		Both bitmap are stored in global.tempFile and both bitmaps
+     *		are true color bitmaps
+     *
+     * If no scaling required, sysScaledBmp holds the new (true color) bitmap
+     * and bilinScaledBmp is zero.
+     */
+    if ( (width == newW) && (height == newH) ) scaleMode = RSI_DONT_SCALE;
+    if ( scaleMode == RSI_DONT_SCALE ) {
+	sysScaledBmp = IconToolCreateBitmap(global.tempFile, BMF_24BIT | BMT_MASK, width, height, NULL, TRUE);
+	IconToolDrawOneBitmapToAnother(global.tempFile, origBmp,
+			global.tempFile, sysScaledBmp, 0, 0, progressText,  global.tempFile);
+	bilinScaledBmp = 0;
+	scaledWidth = width;
+	scaledHeight = height;
+	commonFlags = RPF_SCALE_UNSCALED;
+    } else {
+    	/*
+    	 * Calculate new size based on scale mode.
+    	 */
+    	WWFixedAsDWord	fak;
+	scaledWidth = newW;
+	scaledHeight = newH;	// defaults for RSI_SCALE_BOTH
+    	switch (scaleMode) {
+    	case RSI_SCALE_ON_X:	fak = GrUDivWWFixed(MakeWWFixed(newW),MakeWWFixed(width));
+    				scaledHeight= (GrMulWWFixed( fak, MakeWWFixed(height)) + 0x8000) >> 16;
+    				break;
+	case RSI_SCALE_ON_Y:	fak = GrUDivWWFixed(MakeWWFixed(newH),MakeWWFixed(height));
+    				scaledWidth = (GrMulWWFixed( fak, MakeWWFixed(width)) + 0x8000) >> 16;
+    				break;
+	}
+	sysScaledBmp = BTScaleBitmapSystem(global.tempFile, origBmp, global.tempFile, scaledWidth, scaledHeight);
+	bilinScaledBmp = BTScaleBitmapBilinear(global.tempFile, origBmp, global.tempFile, scaledWidth, scaledHeight, progressText);
+	commonFlags = 0;
+    }
+
+
+    /*
+     * Find out if we need color reduction or not.
+     * If the source image has been scaled, we usually need a color "reduction", because the
+     * scaled image may contain “average” colors that do not occur in the target image.
+     * The only exception is if the target image is a true color image.
+     * The 2nd case in which no color reduction is needed is when the image is unscaled and
+     * colorCompatibility is not equal to COLORS_NOT_COMPATIBLE. All other values for colorCompatibility
+     * indicate that all colors of the source bitmap are supported by the target bitmap.
+     */
+    colorCompatibility = ResizeTestColorCompatibility(srcFormat, destFormat);
+    if ( (destFormat & BMT_FORMAT) == BMF_24BIT ) commonFlags |= RPF_NO_COLOR_REPLACEMENT;
+    if ( commonFlags & RPF_SCALE_UNSCALED ) {
+	if ( colorCompatibility != COLORS_NOT_COMPATIBLE ) commonFlags |= RPF_NO_COLOR_REPLACEMENT;
+    }
+
+    /*
+     * Find out if the target bitmap needs a palette and set up palette properly
+     */
+    if ( destFormat & BMT_PALETTE ) {
+    	int targetColors;
+	ProgressDisplayTextOptr(@BuildPalette, FALSE);	ProgressDisplaySpace();
+    	palette = malloc(256*sizeof(PaletteEntry));
+    	memset(palette, 0x80, 256*sizeof(PaletteEntry));
+    	targetColors = ( (destFormat & BMT_FORMAT) == BMF_4BIT ) ? 16 : 256;
+	ResizeToolCreateTargetPalette(global.tempFile, origBmp, commonFlags, colorCompatibility,
+			palette, targetColors, progressText);
+    }
+
+    /*
+     * Create up to eight preview images and the corresponding objcets
+     * All of the routines can handle a null handle for the bitmaps,
+     * therefore we don't need to check the handles for zero.
+     * Note that previewBmp and opaqueBmp are passed to a
+     * VisResizePreviewClass and must NOT be destroyed here!
+     * But it is save to re-use the variable for next preview objects
+     */
+
+/* System scaled: replaced & dithered */
+
+    ProgressDisplayTextOptr(@CreatePreviewImages, FALSE);
+    ProgressDisplaySpace();
+
+    flags = RPF_SCALE_SYSTEM | RPF_COLOR_REPLACED | commonFlags;
+    previewBmp = ResizeCreatePreviewImage(sysScaledBmp, colorCompatibility, flags, palette, progressText);
+    ResizeCreatePreviewObject(previewBmp, flags);
+
+    if (addOpaqueImages) if (previewBmp) {
+	ProgressDisplaySpace();
+    	opaqueBmp = BTCopyBitmap(global.tempFile, global.tempFile, previewBmp);
+    	ResizeMakeMaskOpaque(global.tempFile, opaqueBmp);
+    	ResizeCreatePreviewObject(opaqueBmp, flags | RPF_MASK_OPAQUE);
+    }
+
+    /*
+     * If the flags RPF_NO_COLOR_REPLACEMENT has been set, no dithered variant of the
+     * image is needed
+     */
+    if ( (flags & RPF_NO_COLOR_REPLACEMENT) == 0 ) {
+    	ProgressDisplayCR();
+	flags = RPF_SCALE_SYSTEM | RPF_COLOR_DITERED | commonFlags;
+	previewBmp = ResizeCreatePreviewImage(sysScaledBmp, colorCompatibility, flags, palette, progressText);
+	ResizeCreatePreviewObject(previewBmp, flags);
+
+    	if (addOpaqueImages) if (previewBmp) {
+    	    ProgressDisplaySpace();
+    	    opaqueBmp = BTCopyBitmap(global.tempFile, global.tempFile, previewBmp);
+    	    ResizeMakeMaskOpaque(global.tempFile, opaqueBmp);
+    	    ResizeCreatePreviewObject(opaqueBmp, flags | RPF_MASK_OPAQUE);
+    	}
+    }
+
+
+/* Bilinear scaled: replaced & dithered */
+
+    flags = RPF_SCALE_BILINEAR | RPF_COLOR_REPLACED | commonFlags;
+    ProgressDisplaySpace();
+    previewBmp = ResizeCreatePreviewImage(bilinScaledBmp, colorCompatibility, flags, palette, progressText);
+    ResizeCreatePreviewObject(previewBmp, flags);
+
+    if (addOpaqueImages) if (previewBmp) {
+	ProgressDisplaySpace();
+    	opaqueBmp = BTCopyBitmap(global.tempFile, global.tempFile, previewBmp);
+    	ResizeMakeMaskOpaque(global.tempFile, opaqueBmp);
+    	ResizeCreatePreviewObject(opaqueBmp, flags | RPF_MASK_OPAQUE);
+    }
+
+    if ( (flags & RPF_NO_COLOR_REPLACEMENT) == 0 ) {
+    	ProgressDisplayCR();
+	flags = RPF_SCALE_BILINEAR | RPF_COLOR_DITERED | commonFlags;
+	previewBmp = ResizeCreatePreviewImage(bilinScaledBmp, colorCompatibility, flags, palette, progressText);
+	ResizeCreatePreviewObject(previewBmp, flags);
+
+    	if (addOpaqueImages) if (previewBmp) {
+	    ProgressDisplaySpace();
+    	    opaqueBmp = BTCopyBitmap(global.tempFile, global.tempFile, previewBmp);
+    	    ResizeMakeMaskOpaque(global.tempFile, opaqueBmp);
+    	    ResizeCreatePreviewObject(opaqueBmp, flags | RPF_MASK_OPAQUE);
+    	 }
+
+    }
+
+    /*
+     * select first preview image
+     */
+    @call ResizeTargetContent::MSG_OC_CHILD_SELECTED(0);
+
+    /*
+     * clean up - but do NOT free previewBmp and opaqueBmp !
+     */
+    if (palette) free(palette);
+    if (sysScaledBmp) HugeArrayDestroy(global.tempFile, sysScaledBmp);
+    if (bilinScaledBmp) HugeArrayDestroy(global.tempFile, bilinScaledBmp);
+
+    ProgressCloseProgressBox(0);
+
+}
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_PREVIEW_OBJ_SELECTED ---------------------
+ *  Purpose:	Update UI to display properties of the selected preview image
+ *  Context:
+ *  Strategy:
+ *  Parameters: obj: selected preview object of VisResizePreviewClass
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_PREVIEW_OBJ_SELECTED {
+word flags;
+optr visMoniker;
+VMBlockHandle	bmp;
+int width, height, bmFormat;
+dword size;
+char buf[30];
+
+    if (!obj) return;	/* emergency handling */
+    flags = @call obj::MSG_VRP_GET_FLAGS();
+
+    /*
+     * Uncopmpressed size - does not depend on any flags
+     */
+    bmp = @call obj::MSG_VRP_GET_BITMAP();
+    bmFormat = BTGetMoreBitmapInfos(global.tempFile, bmp, &width, &height, 0);
+    size = ToolCalcBitmapSize(width, height, bmFormat);
+
+    MemLock(HandleOf(@ImageSizeText));
+    sprintf(buf, LMemDeref(@ImageSizeText), size);
+    MemUnlock(HandleOf(@ImageSizeText));
+    @call ResizeTargetSizeText::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    if (size > MAX_SAFE_MONIKER_SIZE)
+    	@call ResizeTargetSizeText::MSG_VIS_TEXT_APPEND_OPTR(@TokenInfoTooLarge, 0);
+
+    /*
+     * Source scale mode
+     * RPF_SCALE_SYSTEM and RPF_SCALE_BILINEAR are only valid if RPF_SCALE_UNSCALED is not set
+     */
+    if ( flags & RPF_SCALE_UNSCALED ) {
+    	visMoniker = @RTScalingNotRequired;
+    } else {
+    	if ( flags & RPF_SCALE_SYSTEM ) visMoniker = @RTScalingSystem;
+    	if ( flags & RPF_SCALE_BILINEAR ) visMoniker = @RTScalingBilinear;
+    }
+    @send ResizeTargetScalingGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(visMoniker), VUM_NOW);
+
+    /*
+     * Color reduction mode
+     * RPF_COLOR_REPLACED and RPF_COLOR_DITERED are only valid if RPF_NO_COLOR_REPLACEMENT is not set
+     */
+    if ( flags & RPF_NO_COLOR_REPLACEMENT ) {
+    	visMoniker = @RTColorReductionNotRequired;
+    } else {
+	if ( flags & RPF_COLOR_REPLACED ) visMoniker = @RTColorReductionNearestColor;
+	if ( flags & RPF_COLOR_DITERED ) visMoniker = @RTColorReductionDithering;
+    }
+    @send ResizeTargetColorReductionGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(visMoniker), VUM_NOW);
+
+    /*
+     * Mask
+     * There are four cases: unscaled, scaled (system or bilinear), opaque
+     */
+    if ( flags & RPF_MASK_OPAQUE ) {
+    	visMoniker = @RTMaskOpaque;
+    } else {
+	if ( flags & RPF_SCALE_UNSCALED ) {
+    	    visMoniker = @RTMaskScalingNotRequired;
+	} else {
+    	    if ( flags & RPF_SCALE_SYSTEM ) visMoniker = @RTMaskSystemScaled;
+    	    if ( flags & RPF_SCALE_BILINEAR ) visMoniker = @RTMaskBilinearScaled;
+	}
+    }
+    @send ResizeTargetMaskGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(visMoniker), VUM_NOW);
+
+}
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SCALE_OR_COLOR ---------------------
+ *  Purpose:	The user has entered a new scale value or color depth
+ *		See if we need to re-create the preview images
+ *  Context:
+ *  Strategy:	MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS checks if "auto create
+ *		preview images" is active and reads all required values from the UI
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SCALE_OR_COLOR {
+int scaleSel;
+
+    scaleSel = @call ResizeScaleChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (scaleSel) {
+    case RSI_SCALE_ON_X:
+	@send ResizePlaceImageTopRight::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomLeft::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomRight::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	break;
+    case RSI_SCALE_ON_Y:
+	@send ResizePlaceImageTopRight::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomLeft::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomRight::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	break;
+    case RSI_SCALE_BOTH:
+	@send ResizePlaceImageTopRight::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomLeft::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomRight::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	break;
+    case RSI_DONT_SCALE:
+	@send ResizePlaceImageTopRight::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomLeft::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send ResizePlaceImageBottomRight::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	break;
+    }
+    if ( scaleSel == RSI_SCALE_BOTH ) {
+    	@send KeepAspectInfoGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@MayChangeAspectMoniker), VUM_NOW);
+    } else {
+    	@send KeepAspectInfoGlyph::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@KeepAspectMoniker), VUM_NOW);
+    }
+
+
+    @call ResizePlaceImageChooser::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(RPI_TOP_LEFT, FALSE);
+    @send ResizePlaceImageChooser::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+    @send ResizePlaceImageChooser::MSG_GEN_APPLY();
+
+    @call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+    @call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @send process::MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS(FALSE);
+
+}
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_NEW_INITIAL_SIZE ---------------------
+ *  Purpose:	The user has selected a new initial value for icon size
+ *  Context:
+ *  Strategy:	- send new size to GenValue objects ResizeNewXSize and ResizeNewYSize;
+ *		- call MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SIZE which does the job.
+ *  Parameters:	GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ 		word numSelections, GenItemGroupStateFlags stateFlags = dl);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_INITIAL_SIZE {
+int x, y;
+GenValueStateFlagsAsWord gvsf = { 0, 0 };
+
+    switch (selection) {
+    case 15:	x = 15; y = 15;
+    	break;
+    case 10:	x = 15; y = 10;
+    	break;
+    case 20:	x = 32; y = 20;
+    	break;
+    case 30:	x = 48; y = 30;
+    	break;
+    case 14:	x = 48; y = 14;
+    	break;
+    case 40:	x = 64; y = 40;
+    	break;
+    case 18:	x = 64; y = 18;
+    	break;
+    default:	x = 48; y = 30;
+    	break;
+    }
+
+    @send ResizeNewXSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(x, FALSE);
+    @send ResizeNewYSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(y, FALSE);
+
+    @send oself::MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SIZE((WWFixedAsDWord)0, gvsf);	/* parameters does not matter */
+
+}
+
+/*-------------------- MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SIZE ---------------------
+ *  Purpose:	The user has entered a new target size.
+ *		See if we need to re-create the preview images
+ *  Context:
+ *  Strategy:	- Handle an unexpected behavior
+ *		- MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS checks if "auto create
+ *		  preview images" is active and reads all required values from the UI
+ *  Parameters:	GEN_VALUE_APPLY_MSG
+ *		void (WWFixedAsDWord value, GenValueStateFlagsAsWord stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_RESIZE_IMAGE_NEW_SIZE {
+VMBlockHandle  bmp;
+int width, height, w, h;
+optr childObj;
+
+    /*
+     * Our concept is to remove all preview objects if the user changes one of the
+     * properties so that the images always match the displayed values.
+     *
+     * For the special case, that the user has changed the value (size) in the GenValue object,
+     * but has not applyed it, the apply message may send after the new preview images
+     * have been created.
+     * This happens, if the value has been changed and while the cursor is still inside of
+     * the GenValue object the "Create Preview Images" trigger is pressed with the mouse.
+     * Calling MSG_OC_DESTROY_LIST() will then destroy the just created images and
+     * we see nothing.
+     *
+     * We fix the by comparing the size of the preview image and the values in the new-size
+     * GenValue objects. We call MSG_OC_DESTROY_LIST() only if the size differs.
+     *
+     * As a side effect this handlung allows MSG_DB_VIEWER_RESIZE_IMAGE_NEW_INITIAL_SIZE to call
+     * this message with invalid (all zero) parameters bacaus we don't use the parameters.
+     */
+
+    childObj = @call ResizeTargetContent::MSG_VIS_FIND_CHILD_AT_POSITION(0);
+    do {
+    	if (!childObj) break;	/* there are no preview objects (this is ok) */
+
+    	bmp = @call childObj::MSG_VRP_GET_BITMAP();
+	if (!bmp) return;	// emergency exit
+
+	BTGetMoreBitmapInfos(global.tempFile, bmp, &width, &height, 0);
+	w = @call ResizeNewXSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	h = @call ResizeNewYSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	if ( (width != w) || (height != h) ) {
+	    @call ResizeTargetContent::MSG_OC_DESTROY_LIST();
+	    @call ResizeResizeTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	}
+
+    } while (FALSE);
+
+    /*
+     * Re-create preview objects if the option "auto create previews" is on.
+     */
+    @send process::MSG_ICON_RESIZE_IMAGE_CREATE_PREVIEWS(FALSE);
+}
+
+
+/*--------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file resize.goc ********************/
+

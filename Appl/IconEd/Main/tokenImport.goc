@@ -1,0 +1,2161 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	tokenImport.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 1/10/2025	Initial revision
+ *
+ * DESCRIPTION:	This file deals with import from token database
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+@include <win.h>
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+@include "token.h"
+@include "initfile.h"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+void AnalyseIconMoniker(GeodeToken tok, int item, MonikerAnalyseResult *mars, char *textMonikerIfAny);
+
+
+@if @DEBUG_TOKEN_IMPORT
+void DebugAnalyseStruct(MonikerAnalyseResult *mars);
+@endif
+
+
+/***********************************************************************
+ *
+ *	Common tools
+ *
+ ***********************************************************************/
+
+/*--------------------- DrawTextCentered ---------------------
+ *  Purpose:	Draw a text centered to a gstate
+ *  Parameters:	gstate	to draw to
+ *		y:	y position
+ *		text:	text to draw
+ *		width: 	available space, left position is equal to zero
+ ---------------------------------------------------------------------------*/
+void DrawTextCentered(GStateHandle gstate, int y, char *text, int width) {
+Rectangle bounds;
+int x;
+
+     GrGetTextBounds(gstate, text, 0, 0, 0, &bounds);
+     x = width - (bounds.R_right - bounds.R_left);
+     x = x/2;
+     GrDrawText(gstate, x, y, text, 0);
+
+}
+
+/*--------------------- IconDrawMonikerCentered ---------------------
+ *  Purpose:	Draw a VisMoniker centered to the given rectangle
+ *		to left bounds are (0:0)
+ *  Parameters:	gstate: where to draw
+ *		monikerPtr: Pointer to VisMoniker structure (gstring)
+ *		width, height: available space
+ ---------------------------------------------------------------------------*/
+void IconDrawMonikerCentered(GStateHandle gsState, VisMonikerWithGString *monikerPtr, int width, int height) {
+byte 	*bPtr;
+int x, y;
+Handle	monikerGString;
+word		lElem;
+
+    if ( (monikerPtr->VMWGS_common.VM_type & VMT_GSTRING) == 0 ) {
+    	/*
+    	 * Ups - we have a text moniker. This may occur if an application has no
+    	 * graphical moniker, but only a text moniker written to tokenDB
+    	 * To make things simple in this rare case, assume text size of 12 and draw
+    	 * text left justified with a small offset
+    	 */
+    	bPtr = (byte*)monikerPtr;
+    	bPtr += sizeof(VisMonikerWithText);
+    	y = (height - 12)/2;
+	GrDrawText(gsState, 3, y, (char*)bPtr, 0);
+	return;
+	}
+
+
+    /* setup pointer to gstring */
+    bPtr = (byte*)monikerPtr;
+    bPtr += sizeof(VisMonikerWithGString);
+
+    /* Center moniker */
+    x = (width - (int)monikerPtr->VMWGS_common.VM_width)/2;
+    if (x < 0) x = 0;
+    y = (height - (int)monikerPtr->VMWGS_height)/2;
+    if (y < 0) y = 0;
+    monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+    GrDrawGString(gsState, monikerGString, x, y, 0, &lElem);
+    GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+}
+
+
+/*--------------------- ImpTokenTokenCharsToText ---------------------
+ *  Purpose:	Convert token chars to text like "GDAT,"
+ *		Convert zero chars to '-'
+ *  Parameters:	tok: 	GeodeToken
+ *		retBuffer: buffer to draw text
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ImpTokenTokenCharsToText(GeodeToken tok, char *retBuf) {
+GeodeToken tok2;
+int  n;
+
+    /* setup token string */
+    for ( n = 0; n< 4; n++ ) {
+    	if (tok.GT_chars[n]==0) {tok2.GT_chars[n] ='-'; }
+    			   else {tok2.GT_chars[n] = tok.GT_chars[n]; }
+    }
+    sprintf(retBuf, "%c%c%c%c,", tok2.GT_chars[0], tok2.GT_chars[1],
+    			tok2.GT_chars[2], tok2.GT_chars[3]);
+}
+
+/*--------------------- IconDrawTokenToGString ---------------------
+ *  Purpose:	Find out a representaive moniker for a token and
+ *		draw it to a gstring.
+ *		Does NOT apply GrEndGString();
+ *  Context:
+ *  Strategy:
+ *  Parameters:	gstate:	GState to draw to
+ *		tok:	GeodeToken to draw
+ 		width, height: 	Available space
+ 		textHeight: 	text font size for TokenID below image
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void IconDrawTokenToGString(GStateHandle gstate, GeodeToken tok, int width, int height, int textHeight) {
+MemHandle 	mh, mh2;
+word 		monikerSize, size2;
+byte 		*bPtr;
+VisMonikerWithGString	*monikerPtr;
+char buf[20];
+
+    /*
+     * Load main moniker an draw it to the gstring
+     * Prefer large icon monikers, but it the size of the large moniker
+     * is smaller than the size of the standard moniker, then it is
+     * perhaps empty. Use the standard moniker then.
+     */
+    mh = IconGetTokenMonikerBlock(tok, DS_LARGE, VMS_ICON, &monikerSize);
+
+    mh2 = IconGetTokenMonikerBlock(tok, DS_STANDARD, VMS_ICON, &size2);
+    if ( size2 > monikerSize) {
+    	monikerSize = size2;
+    	MemFree(mh);
+    	mh = mh2;
+    } else { MemFree(mh2); }
+
+    if ( mh ) {
+
+	/* Get a pointer to the moniker and draw it */
+	bPtr = MemLock(mh);
+	monikerPtr = (VisMonikerWithGString*)bPtr;
+
+	IconDrawMonikerCentered(gstate, monikerPtr, width, height);
+
+	/* Draw Token ID text below moniker */
+	GrSetFont(gstate, FID_UNIVERSITY, MakeWWFixed(textHeight));
+	ImpTokenTokenCharsToText(tok, buf);
+        DrawTextCentered(gstate, height-2, buf, width);
+	sprintf(buf, "%u", tok.GT_manufID);
+        DrawTextCentered(gstate, height-2 + textHeight, buf, width);
+
+	MemFree(mh);
+    } else {
+    	/* IMHO this sould not happen */
+    	GrDrawText(gstate, 10, 10, "No Token", 0);
+    }
+
+}
+
+
+/***********************************************************************
+ *
+ *	Handle Import Token dialog messages - Part 2
+ *	Topics:
+ *	- query moniker for token list
+ *	- apply token list (notify_token_changed)
+ *	- query moniker for icon list
+ *	- apply icon list (notify_icon_changed)
+ *	For part 1 (open and close dialog, apply token range) see visListItem.goc
+ ***********************************************************************/
+
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_QUERY_TOKEN ---------------------
+ *  Purpose:	Update item image with a token from tokenDB file
+ *  Context:	Send form ImpTokenContent (VLCI_queryMsg)
+ *  Strategy:	MSG_VIS_LIST_ITEM_SET_TOKEN does the job for us
+ *  Parameters:	VIS_LIST_CONTENT_QUERY_MSG(optr itemObj, int itemNr)
+ *		itemNr is the token number
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_QUERY_TOKEN {
+TokenListStruct	*list;
+
+    list = MemLock(global.tokenListMH);
+    @send itemObj::MSG_VIS_LIST_ITEM_SET_TOKEN(list->token[itemNr + list->firstIndex]);
+    MemUnlock(global.tokenListMH);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_NOTIFY_TOKEN_CHANGED ---------------------
+ *  Purpose:	A new token was selected in Import Token Dialog
+ *  Context:	This message comes from ImpTokenContent (VLCI_notifySelectionMsg)
+ *  Strategy:
+ *  Parameters:	VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG(int selectedItemNr)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_NOTIFY_TOKEN_CHANGED {
+GeodeToken	tok;
+TokenListStruct	*list;
+char buffer[20];
+int numIcons, numTextIcons;
+dword tokChars, searchCount;
+
+    EC( if (!global.tokenListMH) { ProgError("Error: Apply token, bu no token list"); return; } )
+
+
+    /*
+     * If there are not tokens to display: clear UI
+     */
+    if ( selectedItemNr == VLC_NONE_SELECTED ) {
+    	/*
+    	 * Clear Dialog UI
+    	 */
+    	@call ImpTokenTokenID::MSG_VIS_TEXT_DELETE_ALL();
+ 	@call ImpTokenTokenNumIcons::MSG_VIS_TEXT_DELETE_ALL();
+    	@call ImpTokenIconSize::MSG_VIS_TEXT_DELETE_ALL();
+    	@call ImpTokenIconBitmapColors::MSG_VIS_TEXT_DELETE_ALL();
+    	@call ImpTokenIconDisplayClass::MSG_VIS_TEXT_DELETE_ALL();
+
+    	/*
+    	 * Reset Icon List
+    	 */
+	@call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS(0);
+	@call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_CLEAR_ITEMS(TRUE);
+	@call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_UPDATE_SCROLLER();
+    	return;
+    }
+
+    /*
+     * Get selected token
+     */
+    list = MemLock(global.tokenListMH);
+    tok = list->token[selectedItemNr + list->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+    /*
+     * Count icons for this token
+     */
+    memcpy(&tokChars, &tok.GT_chars[0], 4);
+    if (!global.iconListPtr) global.iconListPtr = malloc(MAX_SEARCH_RESULT_ICONS*sizeof(MonikerFoundStruct));
+    searchCount = IconTokenListIcons(tokChars, tok.GT_manufID, global.iconListPtr);
+
+    numTextIcons = searchCount >> 16;
+    numIcons = (searchCount & 0xFFF) + numTextIcons;
+
+    /*
+     *The there are no graphical icons, disable "import token" button
+     */
+    if ( numIcons == numTextIcons ) {
+    	@send ImpTokenDoImportTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    } else {
+    	@send ImpTokenDoImportTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    global.numIconsInList = numIcons;
+
+    /*
+     * Update dialog UI
+     */
+    ImpTokenTokenCharsToText(tok, buffer);
+    sprintf(strchr(buffer,0), "%u", tok.GT_manufID);
+    @call ImpTokenTokenID::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0);
+
+    @call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_SET_NUM_ITEMS(numIcons);
+    sprintf(buffer, "%u", numIcons);
+    @call ImpTokenTokenNumIcons::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0);
+
+    /*
+     * select first icon in the icon list
+     */
+    if (numIcons) {
+    	@call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM(0);
+    } else {
+    	@call ImpTokenIconContent::MSG_VIS_LIST_CONTENT_DISPLAY_AND_SELECT_ITEM(VLC_NONE_SELECTED);
+    }
+
+}
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_QUERY_ICON ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:	VIS_LIST_CONTENT_QUERY_MSG(optr itemObj, int itemNr)
+ *		itemNr is the number of the currently selected token in our case
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_QUERY_ICON {
+dword 	tokenDW;
+Boolean	found;
+word 	monikerSize;
+int 	selection;
+char 	*buf;
+TokenListStruct	*tokenList;
+GeodeToken 	tok = { "    ", 0 };
+VisMoniker	*monikerPtr;
+MemHandle 	mh;
+
+
+    /*
+     * find out currently selected token
+     */
+    selection = @call ImpTokenContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    tokenList = MemLock(global.tokenListMH);
+    if ( selection >= 0) tok = tokenList->token[selection + tokenList->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+    /*
+     * Savety checks
+     */
+    if ( selection == VLC_NONE_SELECTED ) {
+    	/*
+    	 * This means that there is currently no token shown in the list.
+    	 * But if anything works fine this should never happen.
+    	 */
+    	@send itemObj::MSG_VIS_LIST_ITEM_CLEAR_IMAGE(TRUE);
+    	EC( DebugInfo1("\rQUERY_ICON %u witout token selected", itemNr); )
+    	return;
+    }
+    if ( (!global.iconListPtr) || (!global.numIconsInList) ) {
+    	EC( ProgError("IMP_TOKEN_QUERY_ICON: no icon list!") );
+    	goto emergencyMoniker;
+    }
+    if (itemNr >= global.numIconsInList) {
+    	EC( ProgError("IMP_TOKEN_QUERY_ICON: itemNr out of range") );
+    	goto emergencyMoniker;
+    }
+
+
+
+    /*
+     * Lock Icon moniker and send it to the itemObj (which has send out the query msg)
+     * Usually this is a gstring moniker, but it may be a text moniker too.
+     */
+    mh = 0;
+    memcpy(&tokenDW, &tok.GT_chars[0], 4);
+    found = TokenLoadMonikerBlock( tokenDW, tok.GT_manufID, global.iconListPtr[itemNr].displayType,
+			global.iconListPtr[itemNr].searchFlags, &monikerSize, &mh );
+
+    EC( if ( !found ) { ProgError("Moniker not found in IMP_TOKEN_QUERY_ICON"); goto emergencyMoniker; } )
+    EC( if ( !mh ) { ProgError("No mem block in IMP_TOKEN_QUERY_ICON"); goto emergencyMoniker; } )
+
+    monikerPtr = MemLock(mh);
+
+    if (monikerPtr->VM_type & VMT_GSTRING ) {
+        @send itemObj::MSG_VIS_LIST_ITEM_SET_VIS_MONIKER((VisMonikerWithGString*)monikerPtr);
+    } else {
+        byte *bPtr;
+        bPtr = (byte*)monikerPtr;
+        bPtr += sizeof(VisMonikerWithText);
+        @send itemObj::MSG_VIS_LIST_ITEM_SET_TEXT((char*)bPtr);
+    }
+
+    MemFree(mh);
+    return;
+
+emergencyMoniker:
+    buf = malloc(20);
+    sprintf(buf, "(Item %u)", itemNr);
+    @send itemObj::MSG_VIS_LIST_ITEM_SET_TEXT(buf);
+    free(buf);
+}
+
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_NOTIFY_ICON_CHANGED ---------------------
+ *  Purpose:	A new Icon was selected in Import Token Dialog
+ *  Context:	This message comes from ImpTokenIconContent (VLCI_notifySelectionMsg)
+ *  Strategy:
+ *  Parameters:	VIS_LIST_CONTENT_NOTIFY_SELECTION_MSG(int selectedItemNr)
+ *		selectedItemNr is the selected icon (number) in our case
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_NOTIFY_ICON_CHANGED {
+TokenListStruct	*tokenList;
+GeodeToken tok;
+int selectedToken;
+char *buf;
+optr dcOptr, asOptr;
+MonikerAnalyseResult mars;
+
+    if ( selectedItemNr == VLC_NONE_SELECTED)  {
+    	/*
+    	 * clear UI
+    	 */
+    	@call ImpTokenTokenID::MSG_VIS_TEXT_DELETE_ALL();
+ 	@call ImpTokenTokenNumIcons::MSG_VIS_TEXT_DELETE_ALL();
+    	@call ImpTokenIconSize::MSG_VIS_TEXT_DELETE_ALL();
+    	@call ImpTokenIconBitmapColors::MSG_VIS_TEXT_DELETE_ALL();
+    	@call ImpTokenIconDisplayClass::MSG_VIS_TEXT_DELETE_ALL();
+        return;
+    }
+
+    /*
+     * Find out selected token
+     */
+    selectedToken = @call ImpTokenContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    tokenList = MemLock(global.tokenListMH);
+    tok = tokenList->token[selectedToken + tokenList->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+    /*
+     * Analyse moniker for current icon
+     */
+    AnalyseIconMoniker(tok, selectedItemNr, &mars, NULL);
+@if @DEBUG_TOKEN_IMPORT
+    DebugAnalyseStruct(&mars);
+@endif
+
+    /*
+     * Display class
+     */
+    switch (mars.displayClass) {
+    case DC_GRAY_1:
+   	dcOptr = @IconInfoMonoText;
+   	break;
+    case DC_COLOR_4:
+   	dcOptr = @IconInfo16ColorsText;
+   	break;
+    case DC_COLOR_8:
+   	dcOptr = @IconInfo256ColorsText;
+   	break;
+    case DC_CF_RGB:
+   	dcOptr = @IconInfoTCText;
+   	break;
+    case DC_TEXT:
+   	dcOptr = @IconInfoTextText;
+   	break;
+    default:	/*
+     		 * not supported displayClass:
+     		 * DC_GRAY_2, DC_GRAY_4, DC_GRAY_8, DC_COLOR_2
+     		 */
+   	dcOptr = @IconInfoOtherColorsText;
+   	break;
+    }
+
+    switch (mars.aspect) {
+    case DAR_NORMAL:
+   	asOptr = 0;
+   	break;
+    case DAR_SQUISHED:
+   	asOptr = @IconInfoEGAText;
+   	break;
+    case DAR_VERY_SQUISHED:
+   	asOptr = @IconInfoCGAText;
+   	break;
+    default:
+   	asOptr = 0;
+   	break;
+    }
+
+    buf = malloc(100);
+
+    /*
+     * Display Icon size
+     */
+    if ( mars.isGString ) {
+	sprintf(buf, "%ux%u", mars.width, mars.height);
+    } else {
+    	sprintf(buf, "%u ", mars.width);
+    	MemLock(OptrToHandle(@IconCharactersText));
+        strcat(buf, LMemDeref(@IconCharactersText));
+        MemUnlock(OptrToHandle(@IconCharactersText));
+    }
+    @call ImpTokenIconSize::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    MemLock(OptrToHandle(dcOptr));
+    strcpy(buf, LMemDeref(dcOptr));
+    if (asOptr) {strcat(buf, ", "); strcat(buf, LMemDeref(asOptr)); }
+    MemUnlock(OptrToHandle(dcOptr));
+
+    @call ImpTokenIconDisplayClass::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+
+    /*
+     * Display bitmap colors
+     */
+    if ( !mars.bitmapFound) {
+    	@call ImpTokenIconBitmapColors::MSG_VIS_TEXT_REPLACE_ALL_PTR("-", 0);
+    } else {
+      MemLock(OptrToHandle(@IconInfoMonoText));
+      switch ( mars.bmFormat & BMT_FORMAT) {
+	case BMF_MONO:
+	    strcpy(buf, LMemDeref(@IconInfoMonoText));
+	    break;
+    	case BMF_4BIT:
+	    strcpy(buf, LMemDeref(@IconInfo16ColorsText));
+	    break;
+        case BMF_8BIT:
+	    strcpy(buf, LMemDeref(@IconInfo256ColorsText));
+	    break;
+    	default: 	// 24 Bit
+	    strcpy(buf, LMemDeref(@IconInfoTCText));
+	}
+      if ( mars.bmFormat & BMT_PALETTE ) {
+        strcat(buf, ", ");
+    	strcat(buf, LMemDeref(@IconInfoPaletteText));
+      }
+      MemUnlock(OptrToHandle(@IconInfoMonoText));
+      @call ImpTokenIconBitmapColors::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+    }
+
+    free(buf);
+}
+
+
+
+/*--------------------- IconGetTokenMonikerBlock ---------------------
+ * Purpose:	Get the moniker for an icon of a token in a memory block
+ *		Allways try to fetch true color gstring moniker
+ * Pass		dispSize DS_TINY  0
+ *			DS_STANDARD  1
+ *			DS_LARGE  2
+ *			DS_HUGE  3
+ *		style	VMS_TEXT  0
+ *			VMS_ABBREV_TEXT  1
+ *			VMS_GRAPHIC_TEXT  2
+ *			VMS_ICON  3
+ *			VMS_TOOL  4
+ * 		*monikerSize: return: byte size of the moniker
+ * Return:	Handle of memory block containing the moniker image
+ ---------------------------------------------------------------------------*/
+MemHandle IconGetTokenMonikerBlock(GeodeToken token,
+				word dispSize, word style,
+				word *monikerSize) {
+dword tokenDW;
+MemHandle mh;
+Boolean	found;
+
+    mh = 0;
+    memcpy(&tokenDW, &token.GT_chars[0], 4);
+
+	/*
+	 * TokenLoadMonikerBlock returns an 'alternative' moniker if the
+	 * passed displaySize/style combination was not found
+	 * e.g it retuns the 16 color moniker if no true color and
+	 * no 8 bit color moniker was found
+	 */
+    found = TokenLoadMonikerBlock( tokenDW, token.GT_manufID,
+	(dispSize << DT_DISP_SIZE_OFFSET)|
+	(DAR_NORMAL << DT_DISP_ASPECT_RATIO_OFFSET)|
+	DC_CF_RGB,
+	//DC_COLOR_4,
+	(style << VMSF_STYLE_OFFSET) | VMSF_GSTRING,
+	monikerSize, &mh );
+
+    if ( !found ) {
+    	*monikerSize = 0;
+    	return 0;
+    	}
+    return mh;
+
+}
+
+
+
+
+/***********************************************************************
+ *
+ *	Import token from token database
+ *	--------------------------------
+ *	To my great surprise, this was a complex task. We intend to import
+ *	all icons for a token with the intention of retaining the colors,
+ *	including the palette.
+ *
+ *	Unfortunately we have no direct access to the properties of the
+ *	icon's image bitmap. Therefore we use the routine AnalyseIconMoniker()
+ *	to scan the VisMoniker's gstring to fiddle out the properties.
+ *
+ *	In best case we find a bitmap in the gstring. Then we can use the
+ *	information stored in the bitmap header to find out the bitmap type
+ *	(color depth e.g.) and the palette to use (if there is any). This
+ *	is done in the routine FindFormatAndPaletteFromMoniker(),
+ *
+ *	In the other case we must assume that the moniker is a gstring without
+ *	bitmap or the bitmap-draw-command is not the first commant.Then we
+ *	make a list of used colors (after drawing the gstirng to a true color
+ *	bitmap) and try to find out the correct type and palette from this
+ *	list. This is done in FindFormatAndPaletteFromColorList().
+ *
+ *	Another problem is that the system currently (01/2026) cannot draw
+ *	bitmaps with a palette correctly in some cases.
+ *	This is also true if the bitmap is part of a gstring.
+ *	Therefore - and to make the program compatible with older GEOS
+ *	versions - we draw the moniker gstring to a true color bitmap
+ *	frist, using the routine CreateTrueColorBitmapFromIconMoniker().
+ *	Then we fiddle out the bitmap type and palette information and draw
+ *	the true color bitmap to the final bitmap. This works fine and
+ *	prevents the colors.
+ *
+ *	There is on exeption from this: Monochrome bitmap (displayClass
+ *	DC_GRAY_1) are handled separately in CreateMonoBitmapFromIconMoniker().
+ *
+ ***********************************************************************/
+
+VMBlockHandle CreateMonoBitmapFromIconMoniker(VMFileHandle vmFile, Handle monikerGString, MonikerAnalyseResult *mars);
+VMBlockHandle CreateTrueColorBitmapFromIconMoniker(VMFileHandle vmFile, Handle monikerGString, MonikerAnalyseResult *mars);
+void CreateNameForImportedIcon(VMFileHandle vmFile, int iSet, int icon, MonikerAnalyseResult *mars);
+
+VMBlockHandle TrueColorsToMinimumColors(VMFileHandle tcFile, VMBlockHandle tcBmp, VMFileHandle destFile, int icon, MonikerAnalyseResult *mars);
+void 	ToolDrawGStringToMask(GStateHandle maskGS, Handle gsToDraw);
+int 	CountColors(VMFileHandle tcFile, VMBlockHandle tcBmp, PaletteEntry *colorList, Boolean ignoreMaskedPixels);
+Boolean FindColorInList(PaletteEntry color, PaletteEntry *colorList, int listSize);
+int FindFormatAndPaletteFromMoniker(PaletteEntry *palette, int icon, MonikerAnalyseResult *mars);
+int 	FindFormatAndPaletteFromColorList(PaletteEntry *colorList, int numColors, PaletteEntry *palette/*, int icon, MonikerAnalyseResult *mars*/);
+Boolean IsColorListInStdPalette(PaletteEntry *colorList, int listCount, int count);
+
+
+
+
+/*--------------------- MSG_DB_VIEWER_IMP_TOKEN_DO_IMPORT ---------------------
+ *  Purpose:	Do the job to import all icons for a token
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters:	tok: GeodeToken to import
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_IMP_TOKEN_DO_IMPORT {
+int numIcons, numTextIcons, icon;
+dword tokenChars, searchCount;
+int iSet = 0;
+char name[15];
+MonikerAnalyseResult mars;
+VMBlockHandle	bmp;
+FileLongName	textMoniker;
+
+    AppMarkBusy();
+
+    /*
+     * Count icons for the token
+     */
+    memcpy(&tokenChars, &tok.GT_chars[0], 4);
+    if (!global.iconListPtr) global.iconListPtr = malloc(MAX_SEARCH_RESULT_ICONS*sizeof(MonikerFoundStruct));
+    searchCount = IconTokenListIcons(tokenChars, tok.GT_manufID, global.iconListPtr);
+
+    numTextIcons = searchCount >> 16;	// text (no-gstring) icons
+    numIcons = searchCount & 0xFFF;	// gstring icons only (no text icons)
+
+    if ( !numIcons ) {	// emergency exit
+    	/*
+    	 * We cannot import tokens without graphical icons, even if
+    	 * there are text monikers present.
+    	 * The reason is that delting the last (graphical) icon forces deleting the iSet.
+    	 * Therefore we somtimes assume that there is at least one graphical icon.
+    	 */
+    	ErrorBoxOptr(@ErrorNoIcons);
+    	goto done;
+    }
+
+    /*
+     * Create an empty icon set
+     * Use token ID as initial name for the set
+     * Store the token ID for re-export
+     */
+    iSet = IdAddISet(pself->DBVI_vmFile, numIcons);
+    IdSetEntryCount(pself->DBVI_vmFile, iSet , numIcons);
+
+    ImpTokenTokenCharsToText(tok, name);
+    sprintf(strchr(name,0), "%u", tok.GT_manufID);
+    FinishInitializingISet(pself->DBVI_vmFile, iSet, name);
+
+    IdSetToken(pself->DBVI_vmFile, iSet, tok);
+
+    /*
+     * Initialize all icons
+     */
+    for ( icon = 0; icon < numIcons; icon++ ) {
+    	/*
+    	 * Anylyse moniker
+    	 * Create bitmap (copy moniker image)
+    	 * Set up icon
+    	 */
+	AnalyseIconMoniker(tok, icon, &mars, NULL);
+	bmp = CreateBitmapFromIconMoniker(tok, pself->DBVI_vmFile, icon, &mars);
+	InitializeIconFromImport(pself->DBVI_vmFile, iSet, icon, bmp,
+				mars.displayClass, mars.iconStyle, mars.displaySize, mars.aspect, NULL);
+	CreateNameForImportedIcon(pself->DBVI_vmFile, iSet, icon, &mars);
+    }
+
+    /*
+     * Import up to two text monikers, if we have some
+     *	- enable text moniker import by default (ensure re-export text monikers)
+     *	- store text monikers: The id of the first text moniker is equal to numIcons
+     */
+    if ( numTextIcons ) {
+    	@call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_OPTIONS(iSet, OPT_ENABLE_TEXT_MONIKER_EXPORT);
+
+    	/* first text moniker is marked as VMS_TEXT */
+    	AnalyseIconMoniker(tok, numIcons, &mars, textMoniker);
+    	@call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER(iSet, textMoniker, VMS_TEXT);
+
+    	if ( numTextIcons > 1 ) {
+    	    /* 2nd text moniker is marked as VMS_ABBREV_TEXT */
+    	    AnalyseIconMoniker(tok, numIcons+1, &mars, textMoniker);
+    	    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER(iSet, textMoniker, VMS_ABBREV_TEXT);
+    	}
+    }
+
+    /*
+     * free used memory
+     */
+done:
+    free(global.iconListPtr);
+    global.iconListPtr = 0;
+
+    /*
+     * Tell ourself that we have an new icon set.
+     * Create a VisISet object for it and make it to the current set
+     */
+    @call oself::MSG_DB_VIEWER_ISET_ADDED(iSet);
+
+    AppMarkNotBusy();
+}
+
+
+/*--------------------- CreateNameForImportedIcon ---------------------
+ *  Purpose:	Set up an initial name for the imported icon
+ *  Strategy:	Combine displaySize, iconStyle and displayClass
+ *		to an meaningful moniker.
+ *  Parameters:	tok: GeodeToken o import
+ *		vmFile: database file
+ *		icon:	icon (number) to import
+ *		mars:	all required informations
+ *  Return:	vmblock containing the bitmap
+ ---------------------------------------------------------------------------*/
+void CreateNameForImportedIcon(VMFileHandle vmFile, int iSet, int icon, MonikerAnalyseResult *mars) {
+char iconName[MAX_ICON_NAME_LENGTH + 10]; // be save
+Boolean	isCGA;
+
+    isCGA = mars->aspect == DAR_VERY_SQUISHED ? TRUE : FALSE;
+
+    MemLock(OptrToHandle(@ImportIconNameCGA));
+    switch (mars->displaySize) {
+    case DS_TINY:	if ( isCGA ) { strcpy(iconName, LMemDeref(@ImportIconNameCGA)); }
+    				else { strcpy(iconName, LMemDeref(@ImportIconNameTiny));  }
+    			break;
+    case DS_STANDARD:	strcpy(iconName, LMemDeref(@ImportIconNameVGA));	break;
+    default:		strcpy(iconName, LMemDeref(@ImportIconNameLarge));	break;
+    }
+
+    switch (mars->iconStyle) {
+    case VMS_TOOL:	strcat(iconName, LMemDeref(@ImportIconNameTool));	break;
+    default:		strcat(iconName, LMemDeref(@ImportIconNameFile));	break;
+    }
+
+    switch (mars->displayClass) {
+    case DC_GRAY_1:	if ( !isCGA ) strcat(iconName, LMemDeref(@ImportIconNameMono));
+    			break;
+    default:		break;
+    }
+
+    strcat(iconName, LMemDeref(@ImportIconNameMoniker));
+    MemUnlock(OptrToHandle(@ImportIconNameCGA));
+
+    IdSetEntryName(vmFile, iSet, icon, iconName);
+}
+
+
+/*--------------------- CreateBitmapFromIconMoniker ---------------------
+ *  Purpose:	Copy the icons VisMoniker image to a new bitmap
+ *  Context:	global.iconListPtr must be set up properly
+ *  Strategy:	See code
+ *  Parameters:	tok: GeodeToken o import
+ *		vmFile: database file
+ *		icon:	icon (number) to import
+ *		mars:	all required informations
+ *  Return:	vmblock containing the bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle CreateBitmapFromIconMoniker(GeodeToken tok, VMFileHandle vmFile, int icon, MonikerAnalyseResult *mars) {
+VMBlockHandle bmp = 0, tcBmp = 0;
+MemHandle	mh = 0;
+dword		tokenDW;
+byte 	*bPtr;
+Handle	monikerGString = 0;
+word	monikerSize;
+Boolean found;
+VisMoniker *monikerPtr;
+
+    if ( !mars->isGString ) {
+        // textual moniker -> emergenycy exit
+    	EC( ProgError("CreateBitmapFromIconMoniker - no gstring"); )
+    	return IconToolCreateBitmap(vmFile, BMF_4BIT | BMT_MASK, 48, 30, 0, TRUE);
+    }
+
+    /*
+     * Load moniker gstring for drawing
+     */
+    mh = 0;
+    monikerGString = 0;
+
+    memcpy(&tokenDW, &tok.GT_chars[0], 4);
+    found = TokenLoadMonikerBlock( tokenDW, tok.GT_manufID, global.iconListPtr[icon].displayType,
+			global.iconListPtr[icon].searchFlags, &monikerSize, &mh );
+
+    EC(if (!found) goto doneCreate; )
+    EC(if (!mh) goto doneCreate; )
+
+    monikerPtr = MemLock(mh);
+
+
+
+    bPtr = (byte*)monikerPtr;
+    bPtr += sizeof(VisMonikerWithGString);
+
+    monikerGString = GrLoadGString(PtrToSegment(bPtr), GST_PTR, PtrToOffset(bPtr));
+    EC( if (!monikerGString) goto doneCreate; )
+
+
+    /*
+     * Convert moniker gstring to bitmap
+     * mars->bmFormat is equal BMF_MONO only if there was a bitmap found
+     */
+     if ( (mars->bmFormat & BMT_FORMAT) == BMF_MONO ) {
+	/*
+	 * Since drawing a monochrome bitmap to a true color bitmap does not work
+	 * (perhaps only on olders systems) we use our own routine for monochrome
+	 * displays
+	 */
+	bmp = CreateMonoBitmapFromIconMoniker(vmFile, monikerGString, mars);
+
+     } else {
+
+	/*
+	 * All colored monikers are handled in the same way:
+	 * - Draw then to a true color bitmap
+	 * - scan this bitmap to find out the really used number of colors
+	 *   and replace bitmap if necessary
+     	 */
+     	tcBmp = CreateTrueColorBitmapFromIconMoniker(global.tempFile, monikerGString, mars);
+    	bmp = TrueColorsToMinimumColors(global.tempFile, tcBmp, vmFile, icon, mars);
+     	HugeArrayDestroy(global.tempFile, tcBmp);
+
+    }
+
+
+
+EC(doneCreate:)
+    /*
+     * free memory
+     */
+    if (monikerGString) GrDestroyGString(monikerGString, NULL, GSKT_LEAVE_DATA);
+    if (mh) MemFree(mh);
+
+    EC( if (!bmp) { ProgError("Error in CreateBitmapFromIconMoniker");
+    		    bmp = IconToolCreateBitmap(vmFile, BMF_4BIT | BMT_MASK, 48, 30, 0, TRUE); } )
+
+    return bmp;
+}
+
+/*--------------------- CreateMonoBitmapFromIconMoniker ---------------------
+ *  Purpose:	Convert monochrome gstring to bitmap
+ *  Context:
+ *  Strategy:	A work around is used because monochrome images
+ *		are not drawn as expected
+ *  Parameters:	vmFile: database file
+ *		monikerPtr: pointer to locked visMoniker
+ *		mars:	all required informations
+ *  Return:	vmblock containing the bitmap
+ *
+ *  Comment:	There is still a rare bug. If the moniker gstring contains a
+ *		monochrome, masked bitmap that also has white, non-transparent
+ *		pixels, then the white pixels also become transparent. This
+ *		seems to be a system problem.
+ *		GrDrawGString(gs, monikerGString, 0, 0, 0, &lElem); ignores
+ *		the white pixels as if they were transparent.
+ ---------------------------------------------------------------------------*/
+VMBlockHandle CreateMonoBitmapFromIconMoniker(VMFileHandle vmFile, Handle monikerGString, MonikerAnalyseResult *mars) {
+VMBlockHandle bm16;
+Handle gs;
+VMBlockHandle bmp = 0;//, maskBmp = 0;
+GStateHandle bmpGS = 0; //,maskGS = 0;
+word	lElem;
+
+    /*
+     * Create target bitmap. Unfortunately, drawing the moniker gstring to the monochrome
+     * target does not work properly (perhaps only on older systems).
+     */
+    bmp = IconToolCreateBitmap(vmFile, BMF_MONO | BMT_MASK , mars->width, mars->height, 0, TRUE);
+
+    /*
+     * Workaround: Create a 16 color bitmap as temporary target
+     */
+    bm16 = GrCreateBitmap(BMF_4BIT | BMT_COMPLEX, mars->width, mars->height, global.tempFile, 0, &gs);
+
+    GrDrawGString(gs, monikerGString, 0, 0, 0, &lElem);
+    GrEndGString(gs);
+
+
+    /*
+     * draw the 16 bit bitmap to the "color" and mask plane of our final target
+     */
+    bmpGS = GrEditBitmap(vmFile, bmp, NULL);
+
+    GrDrawHugeBitmap(bmpGS, 0, 0, global.tempFile, bm16);
+    GrSetBitmapMode(bmpGS, BM_EDIT_MASK, 0);
+    GrDrawHugeBitmap(bmpGS, 0, 0, global.tempFile, bm16);
+    GrSetBitmapMode(bmpGS, BM_CLUSTERED_DITHER, 0);	/* <- important, otherwise EDIT_MASK
+                                 			 * becomes permanent and the pixel layer
+                                 			 * is not edited with a simple GrEditBitmap,
+                                 			 * but rather the mask.
+                                 			 */
+
+    GrDestroyState(bmpGS);			// blocks 2 .. 4 handles if the process
+    						// thread is blocked (e.g. because of
+    						// UserDoDialog) until the process thread
+    						// is running again
+
+    /*
+     * done
+     */
+    GrDestroyState(gs);
+    HugeArrayDestroy(global.tempFile, bm16);	// also blocks some handles ... see above
+    return bmp;
+}
+
+/*--------------------- CreateTrueColorBitmapFromIconMoniker ---------------------
+ *  Purpose:	Convert gstring to a true color bitmap
+ *  Context:	We draw any colored moniker to a true color bitmap first
+ *		This true-color-bitmap is the starting point to find out the real
+ *		number of colors used in the icon image
+ *  Strategy:
+ *  Parameters:	vmFile: database file
+ *		monikerPtr: pointer to locked visMoniker
+ *		mars:	all required informations
+ *  Return:	vmblock containing the bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle CreateTrueColorBitmapFromIconMoniker(VMFileHandle vmFile, Handle monikerGString, MonikerAnalyseResult *mars) {
+VMBlockHandle bmp = 0, maskBmp = 0;
+GStateHandle bmpGS = 0, maskGS = 0;
+word	lElem;
+
+    /*
+     * Create a masked true color bitmap and draw the moniker
+     */
+    bmp = BTCreateOffscreenBitmap(vmFile, BMF_24BIT | BMT_MASK , mars->width, mars->height, 0);
+
+    bmpGS = GrEditBitmap(vmFile, bmp, NULL);
+    GrDrawGString(bmpGS, monikerGString, 0, 0, 0, &lElem);
+    GrDestroyState(bmpGS);
+
+
+    /*
+     * Older GEOS versions (BBX 4) cannot edit the mask of true color bitmaps,
+     * therefore we need a separate mask bitmap and apply them using
+     * BTApplyTransparencyMask()
+     */
+
+    maskBmp = BTCreateOffscreenBitmap(global.tempFile, BMF_MONO , mars->width, mars->height, 0);
+    maskGS = GrEditBitmap(global.tempFile, maskBmp, NULL);
+
+    GrSetAreaColor(maskGS, CF_INDEX, C_WHITE, 0, 0);
+    GrFillRect(maskGS, 0, 0, mars->width, mars->height);
+    ToolDrawGStringToMask(maskGS, monikerGString);
+
+    bmp = BTApplyTransparencyMask(vmFile, bmp, 0 /* <- replace mask */, global.tempFile, maskBmp, 0);
+
+    GrDestroyState(maskGS);
+    HugeArrayDestroy(global.tempFile, maskBmp);
+
+    return bmp;
+
+}
+
+/*--------------------- ToolDrawGStringToMask ---------------------
+ *  Purpose:	Put some code in a single routine that draws a
+ *		gstring to a moncrome (mask~) bitmap and avoid
+ *		dithering colors
+ *  Context:
+ *  Strategy:
+ *  Parameters:	maskGS: GSstate refering to the mask bitmap
+ *		gsToDraw: gstring which will be drawn
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void ToolDrawGStringToMask(GStateHandle maskGS, Handle gsToDraw) {
+word elem;
+
+    /*
+     * In order to avoid dithering the mask, we have to set the MixMode to MM_SET.
+     * A GString may contain commands to modify the MixMode.
+     * Therefore, we have to filter it out while drawing to the mask.
+     */
+    GrSetMixMode(maskGS,MM_SET);
+    do {
+	int retVal;
+	retVal = GrDrawGString(maskGS, gsToDraw, 0, 0, GSC_ATTR,&elem);
+	if ( retVal == GSRT_COMPLETE) break;
+	if ( elem == GR_SET_MIX_MODE ) {
+	    GrSetGStringPos(gsToDraw, GSSPT_SKIP_1, 0);
+	    }
+	} while ( elem != GR_END_GSTRING );
+
+}
+
+/* ------------------- TrueColorsToMinimumColors ---------------------
+ *  Purpose:	Convert the original true color bitmap into a bitmap
+ *		with as few colors as possible, without replacing any
+ *		of the colors.
+ *  Context:
+ *  Strategy:
+ 	There ar two cases:
+ 	1. We have found a bitmap as a part of the moniker gstring
+ 	   - read bitmap format and palette information from moniker
+ 	2. We have no bitmap found, so we don't know the color depth
+ 	   of the gstirng image
+ 	   - count existing colors and create a list of these colors
+ 	   - use this list to find out the proper bitmap format and
+ 	     create a palette, if appropriate
+ 	In both cases
+ 	- create the new bitmap
+ 	- draw true color bitmap to the new bitmap
+ *  Parameters:	tcFile, tcBmp:  true color bitmap
+ 		destFile:	file for the new bitmap
+ 		icon:		icon to import
+ 		mars:		moniker analyse result
+ *  Return:	vmblock containing the new bitmap
+ ---------------------------------------------------------------------------*/
+VMBlockHandle TrueColorsToMinimumColors(VMFileHandle tcFile, VMBlockHandle tcBmp, VMFileHandle destFile, int icon, MonikerAnalyseResult *mars) {
+VMBlockHandle newBmp;
+int numColors, bmFormat, width, height;
+PaletteEntry *colorList, *palette;
+
+    BTGetMoreBitmapInfos(tcFile, tcBmp, &width, &height, 0);
+
+    palette = malloc(260*sizeof(PaletteEntry));
+    memset(palette, 0, 260*sizeof(PaletteEntry));
+    colorList = 0;
+
+    if ( mars->bitmapFound ) {
+    	bmFormat = FindFormatAndPaletteFromMoniker(palette, icon, mars);
+    } else {
+    	colorList = malloc(260*sizeof(PaletteEntry));
+	numColors = CountColors(tcFile, tcBmp, colorList, FALSE);
+	bmFormat = FindFormatAndPaletteFromColorList(colorList, numColors, palette/*, icon, mars*/);
+    }
+
+    if ( bmFormat & BMT_PALETTE ) {
+     	newBmp = BTCreateOffscreenBitmap(destFile, bmFormat | BMT_MASK, width, height, palette);
+    } else {
+     	newBmp = BTCreateOffscreenBitmap(destFile, bmFormat | BMT_MASK, width, height, NULL);
+    }
+
+    IconToolDrawOneBitmapToAnother(tcFile, tcBmp, destFile, newBmp, 0, 0, 0, global.tempFile);
+
+    if ( colorList) free(colorList);
+    free(palette);
+
+    return newBmp;
+
+}
+
+/* ------------------- CountColors ---------------------
+ *  Purpose:	Count the number of colors in a true color masked bitmap
+ *		and build a list of these colors
+ *  Context:	We are intereresd if the bitmap has up to 16, up to 256
+ *		or more colors. Therefore we break if we have found more than
+ *		256 colors and retrun 257 in this case
+ *  Strategy:
+ *  Parameters:	tcFile, tcBmp:  true color bitmap
+ 		colorList: 	return list of colors (up to 256 values)
+ 		ignoreMaskedPixels: If TRUE, the 'background' color of pixels that
+ 				are transparent is not counted
+ *  Return:	Number of colors in the bitmap
+ *		Value 257 if there are more than 256 colors
+ ---------------------------------------------------------------------------*/
+int CountColors(VMFileHandle tcFile, VMBlockHandle tcBmp, PaletteEntry *colorList, Boolean ignoreMaskedPixels) {
+int numColors;
+int width, height, maskWidth, line, x;
+byte *maskPtr, mBits, pBit;
+PaletteEntry 	*pixelPtr, color;
+BitmapAccessRecord bar;
+
+    /*
+     * get bitmpap size
+     */
+    BTGetMoreBitmapInfos(tcFile, tcBmp, &width, &height, 0);
+    numColors = 0;
+    maskWidth = (width+7)/8;
+
+    /*
+     * Lock bitmap line by line and count colors
+     * mBits (mask data bits) and pBit (current pixel mask
+     * bit) are initialized even if ignoreMaskedPixels is TRUE
+     */
+    maskPtr = BTBitmapLock(tcFile, tcBmp, &bar, 0);
+    mBits = *maskPtr;
+    pBit = 0x080;
+    pixelPtr = (PaletteEntry*) ( maskPtr + maskWidth);
+    for ( line = 0; line < height; line++ ) {
+
+    	for ( x = 0; x < width; x++ ) {
+
+    	    if ( ignoreMaskedPixels) {
+		/*
+		* at first see, if there are pixels left in the mask byte
+		* then see, if the pixel is masked out
+		*/
+		if ( pBit == 0 ) {
+		    mBits = *maskPtr;
+		    pBit = 0x080;
+		    maskPtr++;
+		}
+
+		if ( (mBits & pBit) == 0) {		// don't count transparent pixels
+    	    	    pBit >>= 1;
+    	    	    continue;
+    	    	}
+    	    	pBit >>= 1;
+    	    }
+
+	    /*
+	     * Ckeck if the color already in the list.
+	     * if not, append it
+	     */
+    	    color = pixelPtr[x];
+    	    if ( FindColorInList(color, colorList, numColors) ) {
+    	    	/*
+    	    	 * Append color to list. Return '257' if the
+    	    	 * list already has 256 color entires
+    	    	 */
+    	    	if ( numColors >= 256) {
+    	    	    BTBitmapUnlock(&bar, FALSE);
+    	    	    return 257;
+    	    	    }
+    	    	colorList[numColors] = color;
+    	    	numColors++;
+    	    }
+    	}
+
+	/*
+	 * Enter nextt line
+         */
+	maskPtr = BTBitmapNext(&bar, FALSE);
+	mBits = *maskPtr;
+	pBit = 0x080;
+	pixelPtr = (PaletteEntry*) (maskPtr + maskWidth);
+
+    }
+
+    BTBitmapUnlock(&bar, FALSE);
+
+    return numColors;
+}
+
+/* ------------------- FindColorInList ---------------------
+ *  Purpose:	Scan color list for a given color
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	TRUE: color not found - must be added
+ *		FALSE: color found
+ ---------------------------------------------------------------------------*/
+Boolean FindColorInList(PaletteEntry color, PaletteEntry *colorList, int listSize) {
+int n;
+    if ( !listSize ) return TRUE;
+    for ( n = 0;  n < listSize; n++ ) {
+	if ( memcmp(&(colorList[n]), &color, sizeof(PaletteEntry)) == 0 ) return FALSE;
+    }
+    return TRUE;
+}
+
+/* ------------------- FindFormatAndPaletteFromMoniker ---------------------
+ *  Purpose:	Find out the right bitmap format and (if reasonable) the
+ *		right palette from the bitmap that we have found in the moniker
+ *  Context:
+ *  Strategy:
+ 	- find out selected token and load the moniker for the passed icon
+ 	- get a pointer to the bitmap header
+ 	- read bitmap type
+ 	- if there is a palete, copy the palette
+ *  Parameters: palette:	return palette here, if required
+ 		icon:		icon to import
+ 		mars:		analyse data
+ *  Return:	bitmap format
+ ---------------------------------------------------------------------------*/
+int FindFormatAndPaletteFromMoniker(PaletteEntry *palette, int icon, MonikerAnalyseResult *mars) {
+MemHandle	mh;
+dword		tokenDW;
+CBitmap		*cBitmap;
+BMType 		bmFormat;
+byte 		*bPtr;
+TokenListStruct	*tokenList;
+
+int	selection;
+GeodeToken tok;
+Boolean found;
+word monikerSize;
+PaletteEntry *palPtr;
+int	numEntries;
+
+    /*
+     * find out currently selected token
+     */
+    selection = @call ImpTokenContent::MSG_VIS_LIST_CONTENT_GET_SELECTED_ITEM();
+    tokenList = MemLock(global.tokenListMH);
+    tok = tokenList->token[selection + tokenList->firstIndex];
+    MemUnlock(global.tokenListMH);
+
+
+    /*
+     * Lock icon moniker
+     */
+    mh = 0;
+    memcpy(&tokenDW, &tok.GT_chars[0], 4);
+    found = TokenLoadMonikerBlock( tokenDW, tok.GT_manufID, global.iconListPtr[icon].displayType,
+			global.iconListPtr[icon].searchFlags, &monikerSize, &mh );
+    EC( if(!found) return BMF_4BIT | BMT_MASK; )
+    EC( if(!mh) return BMF_4BIT | BMT_MASK; )
+
+
+    /*
+     * Find bitmap type and palette
+     */
+    bPtr = MemLock(mh);
+    bPtr += mars->bitmapOffset;
+    cBitmap = (CBitmap*)bPtr;
+
+    bmFormat = cBitmap->CB_simple.B_type;
+    if ( bmFormat & BMT_PALETTE ) {
+    	palPtr = (PaletteEntry*)(bPtr + cBitmap->CB_palette + 2);
+    	switch (bmFormat & BMT_FORMAT) {
+	case BMF_MONO: numEntries = 2; break;	// may be supported later
+	case BMF_4BIT: numEntries = 16; break;
+	case BMF_8BIT: numEntries = 256; break;
+	default:	    // Invalid
+		numEntries = 16;
+		EC( ProgError("Invalid bitmap format in FindFormatAndPaletteFromMoniker");)
+	}
+
+	memcpy(palette, palPtr, sizeof(PaletteEntry) * numEntries);
+    }
+
+    MemUnlock(mh);
+
+    return bmFormat;
+
+}
+
+/* ------------------- FindFormatAndPaletteFromColorList ---------------------
+ *  Purpose:	Find out the right bitmap format for the passed colorList
+ *		If reasonable create the right palette
+ *  Context:
+ *  Strategy:
+ 	- if numColors is greater than 256, we need a 24 bit bitmap in any case
+ 	- if not, we need a custom palette if at least one color is not part
+ 	  of the GEOS standard palette. IsColorListInStdPalette() checks this
+ *  Parameters: colorList:	list of colors
+ 		numColors:  	number of colors in the list
+ 		palette:	return palett here, if required
+ *  Return:	bitmap format
+ ---------------------------------------------------------------------------*/
+int FindFormatAndPaletteFromColorList(PaletteEntry *colorList, int numColors, PaletteEntry *palette/*, int icon, MonikerAnalyseResult *mars*/) {
+int  bmFormat;
+
+    if ( numColors > 256 ) return BMF_24BIT | BMT_MASK;
+
+    if ( numColors <= 16 ) {
+    	bmFormat = BMF_4BIT | BMT_MASK;
+    	if (!IsColorListInStdPalette(colorList, numColors, 16)) {
+    	    bmFormat |= BMT_PALETTE;
+    	    memcpy(palette, colorList, numColors*sizeof(PaletteEntry));
+    	}
+    } else {
+    	bmFormat = BMF_8BIT | BMT_MASK;
+    	if (!IsColorListInStdPalette(colorList, numColors, 256)) {
+    	    bmFormat |= BMT_PALETTE;
+    	    memcpy(palette, colorList, numColors*sizeof(PaletteEntry));
+    	}
+    }
+
+    return bmFormat;
+}
+
+/***********************************************************************
+ *
+ *	Handle Text Monikers
+ *
+ ***********************************************************************/
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_OPEN_DIALOG ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_OPEN_DIALOG {
+
+    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_UPDATE_DIALOG();
+    @send TextMonikerDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_UPDATE_DIALOG ---------------------
+ *  Purpose:	Read options and text monikers from  current iSet extra block and
+ *		update TextMonikerDialog UI
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_UPDATE_DIALOG {
+word options;
+FileLongName	monikerText;
+
+    options = @call oself::MSG_DB_VIEWER_TEXT_MONIKER_GET_OPTIONS(pself->DBVI_currentISet);
+    @call TextMonikerEnableGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(options, FALSE);
+
+    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(pself->DBVI_currentISet, monikerText, VMS_TEXT);
+    @call TextMonikerTextInput::MSG_VIS_TEXT_REPLACE_ALL_PTR(monikerText, 0);
+
+    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(pself->DBVI_currentISet, monikerText, VMS_ABBREV_TEXT);
+    @call TextMonikerAbbrevTextInput::MSG_VIS_TEXT_REPLACE_ALL_PTR(monikerText, 0);
+
+    /*
+     * update (enable/disable) UI according to the selected options
+     */
+    @send TextMonikerEnableGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(0xFFFF, 0);
+    @send TextMonikerEnableGroup::MSG_GEN_APPLY();
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_CLOSE_DIALOG ---------------------
+ *  Purpose:	Handle Close /Save trigger from TextMonikerDialog
+ *  Context:
+ *  Strategy:
+ *  Parameters:	doStore: TRUE: store dialog data for the current iSet
+ 			       but do not close dialog
+ *			 FALSE: discard dialog data and close dialog
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_CLOSE_DIALOG {
+
+     if ( ! doStore ) {
+         @send TextMonikerDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+         return;
+     }
+
+     /*
+      * store options and textual monikers, even it options says "Don't export
+      * text monikers" and/or the monikers are empty
+      */
+     @call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_SETTINGS();
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_STORE_SETTINGS ---------------------
+ *  Purpose:	Store settings from TextMonikerDialog
+ *  Context:
+ *  Strategy:	- store UI values, even if they are not changed or empty
+ *		- ensure that TextMoniker is not empty if AbbrevTextMoniker has text
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_STORE_SETTINGS {
+FileLongName	moniker;
+word	options, len1, len2;
+
+     /*
+      * store options and textual monikers; get moniker lenght's
+      */
+     options = @call TextMonikerEnableGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+     @call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_OPTIONS(pself->DBVI_currentISet, options);
+
+     @call TextMonikerTextInput::MSG_VIS_TEXT_GET_ALL_PTR(moniker);
+     len1 = strlen(moniker);
+     @call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER(pself->DBVI_currentISet, moniker, VMS_TEXT);
+
+     @call TextMonikerAbbrevTextInput::MSG_VIS_TEXT_GET_ALL_PTR(moniker);
+     len2 = strlen(moniker);
+     @call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER(pself->DBVI_currentISet, moniker, VMS_ABBREV_TEXT);
+
+     /*
+      * Ensure that ISED_textMoniker is not empty if ISED_abbrevTextMoniker has text
+      * This is required to simply export text monikers to token DB file
+      */
+     if ( (len1 == 0) && (len2 > 0) ) {
+     	/*
+     	 * set ISED_textMoniker (VMS_TEXT) to the text that is entered for ISED_abbrevTextMoniker
+     	 * and clear ISED_abbrevTextMoniker (VMS_ABBREV_TEXT)
+     	 */
+	@call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER(pself->DBVI_currentISet, moniker, VMS_TEXT);
+	@call TextMonikerTextInput::MSG_VIS_TEXT_REPLACE_ALL_PTR(moniker, 0);
+
+	@call oself::MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER(pself->DBVI_currentISet, "", VMS_ABBREV_TEXT);
+	@call TextMonikerAbbrevTextInput::MSG_VIS_TEXT_REPLACE_ALL_PTR("", 0);
+     }
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER ---------------------
+ *  Purpose:	Store a text moniker for an icon set in iSet extra block
+ *  Context:
+ *  Strategy:
+ *  Parameters:	iSet
+ 		moniker: moniker string, may be an empty string
+ 		type	VMS_TEXT or VMS_ABBREV_TEXT
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_STORE_MONIKER {
+VMBlockHandle	extraBlock;
+MemHandle	mh;
+ISetExtraData	*data;
+byte	chr = 0;
+VMFileHandle vmFile = pself->DBVI_vmFile;
+
+    /*
+     * get extra block and lock it
+     * IdGetISetExtraBlock ensures the existence of the block
+     */
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+    data = VMLock(vmFile, extraBlock, &mh);
+
+    /*
+     * ensure that the moniker string is not longer than MAX_TEXT_MONIKER_LENGTH
+     * ! this modifies the source string (temporarily, see below)
+     * ! and is an emergency handling only, because the size should be checked beforehand
+     */
+    if (strlen(moniker) > MAX_TEXT_MONIKER_LENGTH) {
+    	chr = moniker[MAX_TEXT_MONIKER_LENGTH];
+    	moniker[MAX_TEXT_MONIKER_LENGTH] = 0;
+    }
+
+    /*
+     * store moniker
+     */
+    if (type == VMS_ABBREV_TEXT) {
+    	strcpy(data->ISED_abbrevTextMoniker, moniker);
+    } else {
+    	strcpy(data->ISED_textMoniker, moniker);
+    }
+
+    /*
+     * restore source string if it has been changed
+     */
+    if (chr) moniker[MAX_TEXT_MONIKER_LENGTH] = chr;
+
+    /*
+     * mark extra block as dirty and unlock it
+     */
+    VMDirty(mh);
+    VMUnlock(mh);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_STORE_OPTIONS ---------------------
+ *  Purpose:	Set ISED_textMonikerOptions in iSet extraBlock
+ *  Context:
+ *  Strategy:
+ *  Parameters:	iSet: 	icon set to use
+ *		options: options value, e.g. OPT_ENABLE_TEXT_MONIKER_EXPORT
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_STORE_OPTIONS {
+VMBlockHandle	extraBlock;
+MemHandle	mh;
+ISetExtraData	*data;
+VMFileHandle vmFile = pself->DBVI_vmFile;
+
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+    data = VMLock(vmFile, extraBlock, &mh);
+
+    data->ISED_textMonikerOptions = options;
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER ---------------------
+ *  Purpose:	Get a text moniker for the iSet
+ *  Context:
+ *  Strategy:
+ *  Parameters:	iSet:	icon set to use
+ *		moniker: return: text of the moniker (may be empty if there is no moniker)
+ *		type:	VisMoniker Style (VMS_ABBREV_TEXT or VMS_TEXT)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER {
+VMBlockHandle	extraBlock;
+MemHandle	mh;
+ISetExtraData	*data;
+VMFileHandle vmFile = pself->DBVI_vmFile;
+
+    /*
+     * get extra block and lock it
+     * IdGetISetExtraBlock ensures the existence of the block
+     */
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+    data = VMLock(vmFile, extraBlock, &mh);
+
+    /*
+     * read and copy moniker. The text string may be empty
+     */
+    if (type == VMS_ABBREV_TEXT) {
+    	strcpy(moniker, data->ISED_abbrevTextMoniker);
+    } else {
+    	strcpy(moniker, data->ISED_textMoniker);
+    }
+
+    /*
+     * unlock extra block
+     */
+    VMUnlock(mh);
+
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_GET_OPTIONS ---------------------
+ *  Purpose:	Get options for handling text monikers in the passed iSet
+ *  Context:
+ *  Strategy:
+ *  Parameters:	iSet:	icon set to use
+ *  Return:	options ( extraBlock::ISED_textMonikerOptions)
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_GET_OPTIONS {
+VMBlockHandle	extraBlock;
+MemHandle	mh;
+ISetExtraData	*data;
+VMFileHandle vmFile = pself->DBVI_vmFile;
+word 	retVal;
+
+    extraBlock = IdGetISetExtraBlock(vmFile, iSet);
+    data = VMLock(vmFile, extraBlock, &mh);
+
+    retVal = data->ISED_textMonikerOptions;
+
+    VMUnlock(mh);
+
+    return retVal;
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_OPTION_CHANGED ---------------------
+ *  Purpose:	Enable / Disable text objects to enter text monikers
+ *  Context:
+ *  Strategy:
+ *  Parameters: GEN_BOOLEAN_GROUP_APPLY_MSG (word selectedBooleans = cx,
+ *	          word indeterminateBooleans = dx, word modifiedBooleans = bp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_OPTION_CHANGED {
+
+    if (selectedBooleans & OPT_ENABLE_TEXT_MONIKER_EXPORT) {
+    	@send TextMonikerAbbrevTextInput::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send TextMonikerTextInput::MSG_GEN_SET_ENABLED(VUM_NOW);
+    	@send TextMonikerInfoText2::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+    	@send TextMonikerAbbrevTextInput::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send TextMonikerTextInput::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	@send TextMonikerInfoText2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+}
+
+/*--------------------- MSG_DB_VIEWER_TEXT_MONIKER_TEST_OPTIONS_CHANGED ---------------------
+ *  Purpose:	Test,if the curent settings in the "Text Moniker" dialog differs
+ *		from values, stored in the current icon set data block.
+ *		If yes,the user has changed the values since last UI update
+ *  Context:
+ *  Strategy:	Only compare values if the dialog box is visible on screen
+ *  Parameters:
+ *  Return:	TRUE if the user has changed the value
+ *		FALSE:values are unchangend or the dialog box is not open
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_TEXT_MONIKER_TEST_OPTIONS_CHANGED {
+word attrs, options1, options2, iSet;
+FileLongName 	moniker1, moniker2;
+
+    attrs = @call TextMonikerDialog::MSG_VIS_GET_ATTRS();
+    if ( (attrs & VA_VISIBLE) == 0 ) return FALSE;
+
+    iSet = pself->DBVI_currentISet;
+    options1 = @call oself::MSG_DB_VIEWER_TEXT_MONIKER_GET_OPTIONS(iSet);
+    options2 = @call TextMonikerEnableGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if ( options1 != options2 ) return TRUE;
+
+    @call TextMonikerTextInput::MSG_VIS_TEXT_GET_ALL_PTR(moniker1);
+    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, moniker2, VMS_TEXT);
+    if (strcmp(moniker1, moniker2)) return TRUE;
+
+    @call TextMonikerAbbrevTextInput::MSG_VIS_TEXT_GET_ALL_PTR(moniker1);
+    @call oself::MSG_DB_VIEWER_TEXT_MONIKER_GET_MONIKER(iSet, moniker2, VMS_ABBREV_TEXT);
+    if (strcmp(moniker1, moniker2)) return TRUE;
+
+    return FALSE;
+}
+
+
+
+/*---------------------------------------------------------------------------
+ *
+ *	Search the icons assigned with a particular token
+ *	+++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ *	This part of code deals with scanning the token database file for icons
+ *	In a perfect world this should be done by the system API.
+ *
+ *	Currently (01/2026) there is no API to find out how may icons are assigned
+ *	with a token and for what (display size, display class, icon or tool ..)
+ *	it is intendend for.
+ *	That's why we use a brute force method to scan the database.  We are going
+ * 	through  all conceivable meaningful combinations for DisplayType and
+ *	VisMonikerSearchFlags with TokenLookupMoniker and remember every combination
+ *	that returns a new DBGroupAndItem entry.
+ *
+ *	If the API is available, we probely can update (simplifiy) the routines
+ *		IconTokenListIcons()
+ *		AnalyseIconMoniker()
+ *	But this will make the App incopmatible to earlier GEOS versions.
+ *	I would not do that.
+ *
+ ---------------------------------------------------------------------------*/
+
+word InternalScanTokenDBBruteForce(dword tokenChars, word manufID,
+	Boolean gstringsOnly, MonikerSearchResult *resultList, int listSize);
+Boolean IconScanMonikerForBitmap(VisMoniker *monikerPtr, CBitmap *cBitmap, int *bmpPos, word *opCode, word *size);
+
+
+/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * 	IconTokenListIcons
+ *
+ * Strategy:
+ *	- go through all conceivable meaningful combinations for DisplayType and
+ *	  VisMonikerSearchFlags with TokenLookupMoniker.
+ *	- store every combination that returns a new DBGroupAndItem entry.
+
+ * Return: foundIcons list is filed in
+ *	   retValue: low word: 	number of monikers found when searching for GStrings
+ *	   	     high word: additional number of monikers found for gstring search = FALSE
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+dword IconTokenListIcons(dword tokenChars, word manufID, MonikerFoundStruct *foundIcons) {
+int count;
+int i, n, x;
+MonikerSearchResult  *resultList;
+dword retVal;
+
+
+    /*
+     * No token should have more than 265 different monikers associated ..
+     */
+    resultList = malloc(MAX_SEARCH_RESULT_ICONS*sizeof(MonikerSearchResult));
+
+    /*
+     * At fist, we scan for "gstring only" monikers. This should never
+     * return a text moniker - but it does if there is no graphical moniker :-(
+     * Then we scan for "non gstring" monikers and pass the existing list.
+     * This appends only new monikers, not yet found.
+     * Hopefully this are text monikers only.
+     */
+    n = InternalScanTokenDBBruteForce(tokenChars, manufID, TRUE, resultList, 0);
+    x = InternalScanTokenDBBruteForce(tokenChars, manufID, FALSE, resultList, n);
+
+    /*
+     * Check the special case, that there is a text moniker, but no graphical moniker.
+     * In this case, n will ne one, but the moniker is a text moniker (x may be 0 or or 1).
+     * Therefore: lock the standard moniker in this case and correct n and x, if required.
+     */
+    if (n == 1) {
+    	MemHandle mh;
+    	GeodeToken tok;
+    	word size;
+    	VisMoniker *monikerPtr;
+
+    	tok.GT_manufID = manufID;
+    	memcpy(&tok.GT_chars[0], &tokenChars, 4);
+    	mh = IconGetTokenMonikerBlock(tok, DS_STANDARD, VMS_ICON, &size);
+    	if (mh) {
+    	    monikerPtr = MemLock(mh);
+    	    if ( (monikerPtr->VM_type & VMT_GSTRING) == 0 ) {
+    	    	/*
+    	    	 * Ok, we have NO Gstring standard icon, it is a text moniker.
+    	    	 * Fix values for x and n.
+    	    	 */
+    	    	n--;	x++;
+    	    	if ( x > 2 ) x = 2;	// we can not hanndle more than 2 text monikers
+    	    }
+  	    MemFree(mh);
+ 	}
+    }
+
+    /*
+     * copy all found monikers
+     */
+    count = n + x;
+    for ( i = 0; i < count; i++ ) {
+	foundIcons[i] = resultList[i].foundInfo;
+    }
+
+    free(resultList);
+
+    retVal = x;
+    retVal = (retVal << 16) + n;
+    return retVal;
+
+}
+
+
+/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	InternalLookupMoniker
+ *	Find a moniker for the passed icon attributes. Note that TokenLookupMoniker returns the "best fit"
+ *	moniker, if no exact matching moniker is found.
+ *  Parameters: tokenChars, manufID: token to scan
+ 		dispSize, aspect, dispClass, iconStyle: icon atttributes
+ *		searchGString: search for GString monikers (only)
+ *		monikerSearchResult: return moniker information
+ *			in particular monikerSearchResult->monikerInfo holds an
+ *			unique TokenDBItem for each moniker
+ * Return TRUE on error
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+Boolean InternalLookupMoniker(dword tokenChars, word manufID,
+		word dispSize, word aspect, word dispClass, word iconStyle, Boolean searchGString,
+		MonikerSearchResult *monikerSearchResult) {
+Boolean ok;
+DisplayType 	displayType;
+VisMonikerSearchFlags searchFlags;
+
+    displayType = dispSize	<< DT_DISP_SIZE_OFFSET |
+    		aspect		<< DT_DISP_ASPECT_RATIO_OFFSET |
+    		dispClass	<< DT_DISP_CLASS_OFFSET;
+    searchFlags = iconStyle	<< VMSF_STYLE_OFFSET |
+    		( searchGString ? VMSF_GSTRING : 0) ;
+		/* VMSF_COPY_CHUNK and VMSF_REPLACE_LIST are left zero */
+
+    ok = TokenLookupMoniker(tokenChars, manufID,
+		       displayType, searchFlags,
+		       &(monikerSearchResult->monikerInfo));
+    monikerSearchResult->foundInfo.displayType = displayType;
+    monikerSearchResult->foundInfo.searchFlags = searchFlags;
+
+    return !ok;
+}
+
+/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	ToolCompareSearchResult
+ *	See, if the passed TokenMonikerInfo is already in the passed
+ *	MonikerSearchresult List
+ *	Return TRUE if not --> should be added
+ *	       FALSE if found
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+Boolean ToolCompareSearchResult(MonikerSearchResult *list, int listSize, TokenMonikerInfo info) {
+int n;
+
+    if (!listSize) return TRUE;
+    for ( n = 0; n < listSize; n++) {
+    	if ( memcmp(&(list[n].monikerInfo), &info, sizeof(TokenMonikerInfo)) == 0 ) return FALSE;
+    }
+    return TRUE;
+}
+
+/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *	InternalScanTokenDBBruteForce
+ *	Builds a list of all possible monikers for an token
+ *	Because we have no access to this internal information, we scan for
+ *	every possible combination of moniker attributes.
+ * Strategy:
+ *	- go through all conceivable meaningful combinations for DisplayType and
+ *	  VisMonikerSearchFlags with TokenLookupMoniker.
+ *	- store (add to list) every combination that returns a new DBGroupAndItem entry.
+ * Parameters:	tokenChars, manufID: 	token to scan
+		gstringsOnly: 	if TRUE, scan for gstrings only
+			I'm not sure if only text monikers are found, if this parameter
+			is set to FALSE, but the algorithm still workd fine, if not.
+		resultList: return: list of found monikers
+ *		listSize: initial list size (new monikers will be appended)
+ * Return: Number of newly appended entries
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+word InternalScanTokenDBBruteForce(dword tokenChars, word manufID,
+	Boolean gstringsOnly, MonikerSearchResult *resultList, int listSize) {
+int i, s, a, c, n;
+MonikerSearchResult monikerSearchResult;
+Boolean err;
+
+word iconStyles     [5] = { VMS_ICON, VMS_TOOL, VMS_GRAPHIC_TEXT ,VMS_TEXT, VMS_ABBREV_TEXT };
+word dispSizeList   [4] = { DS_HUGE, DS_LARGE, DS_STANDARD, DS_TINY };
+word aspectList	    [2] = { DAR_NORMAL, DAR_VERY_SQUISHED};
+word dispClassList  [4] = { DC_CF_RGB, DC_COLOR_8, DC_COLOR_4, DC_GRAY_1 };
+
+word *iconStyleList, islCount;
+
+    /*
+     * Searching for icon styles depends on parameter gstringsOnly
+     */
+    if ( gstringsOnly ) {
+    	iconStyleList = iconStyles;
+    	islCount = 3;	/* icons, tools, graphic text */
+    } else {
+    	iconStyleList = &iconStyles[3];
+    	islCount = 3;	/* text, abbrev text */
+    }
+
+    n = 0;	// newly added items
+
+    /*
+     * The order of the loops determines the order in which the
+     * icons are displayed after import.
+     */
+    for ( i = 0; i < islCount; i++) {	// icon style
+     for ( a = 0; a < 2; a++) {		// aspect
+       for ( c = 0; c < 4; c++) {	// display Class
+         for ( s = 0; s < 4; s++) {	// display size
+
+        /*
+         * Find a moniker. This may be an "best fit moniker"
+         */
+	err = InternalLookupMoniker(tokenChars, manufID,
+		dispSizeList[s], aspectList[a], dispClassList[c], iconStyleList[i], gstringsOnly,
+		&monikerSearchResult);
+	if (err) { EC(ProgError("Error in Brute Force Scan");) continue; }
+
+	/*
+	 * See if moniker is already in the list. If not, add them.
+	 */
+	if ( ToolCompareSearchResult(resultList, listSize, monikerSearchResult.monikerInfo) ) {
+	    // Needs to be added
+	    if ( listSize >= MAX_SEARCH_RESULT_ICONS ) {
+	    	ErrorBoxOptr(@TooManyIconsInToken);
+	    	return n;
+	    }
+	    resultList[listSize] = monikerSearchResult;
+	    listSize++;
+	    n++;
+	}
+
+       }
+      }
+     }
+    }
+
+    return n;
+}
+
+
+
+/*-------------------------------------------------------------
+ * ToolCalculateDisplaySize
+ *-------------------------------------------------------------
+ *	Calculate the most probable screen size from icons size
+ *	Note! This can never be exact!
+ *
+ *	Expects that mars->height, mars->width, mars->isGString,
+ *   	mars->displayClass and mars->aspect are already set.
+ *
+ *	large screen	64x40, icon,
+ *			64x18, CGA icon
+ *	standard screen	48x30, icon,
+ *			15x15  tool
+ *	tiny screen 	32x20, icon,
+ *			15x15  tool
+ *			15x10  CGA tool
+ *
+ *	Note that some monikers are a few pixels oversized
+ *	--> CGA (very squished) is always a standard screen
+ *	--> We use as minimum size for standars screen:	40x25
+ *	    --> all tools are for tiny screen
+ *	--> We use as minimum size for large screen:	55x35
+ *
+ *	Return DS_-value for this icon
+ *-------------------------------------------------------------*/
+DisplaySize ToolCalculateDisplaySize(MonikerAnalyseResult *mars) {
+
+    if ( !mars->isGString ) return DS_STANDARD;	// text monikers
+
+    if (mars->aspect != DAR_NORMAL)  return DS_STANDARD;
+    if ( (mars->width < 40) && (mars->height < 25) )  return DS_TINY;
+
+    if ( (mars->width < 55) || (mars->height < 35) ) return DS_STANDARD;
+
+    // DS_HUGE is not supported yet
+    return DS_LARGE;
+
+}
+
+
+/*-------------------------------------------------------------
+ * ToolCalculateIconStlye
+ *-------------------------------------------------------------
+ *	Expects that mars->height, mars->width, mars->isGString,
+ *   	mars->displayClass and mars->aspect are already set
+ *
+ *	Return VMS_-value for this icon
+ *-------------------------------------------------------------*/
+VMStyle ToolCalculateIconStyle(int item, MonikerAnalyseResult *mars) {
+VMStyle style;
+
+    style = global.iconListPtr[item].searchFlags & VMSF_STYLE;
+    style >>= VMSF_STYLE_OFFSET;
+
+    if ( !mars->isGString ) {
+    	// text monikers - style is VMS_TEXT or VMS_ABBREV_TEXT
+        return style;
+    }
+
+    /*
+     * See if the size is too small for an VMS_ICON. Then it may be a tool.
+     * Usually tools are 15x15 pixels, but some may oversized a little
+     */
+    if ( (mars->width <= 18) && (mars->height <= 18) ) return VMS_TOOL;
+    return VMS_ICON;
+
+}
+
+/*--------------------- AnalyseIconMoniker ---------------------
+ *  Purpose:	Load moniker 'item' for token 'tok' and analyse it
+ *  Context:	There is no API to find out the iconStyle and displaySize
+ *		direct from token database.
+ *		If there the API is added later, please don't use it,
+ *		or the icon editor will not be downward compatible with
+ *		older GEOS versions!
+ *  Strategy:
+ *  Parameters:	tok:	Token to use
+ *		item:	Icon number to analyse
+ *		mars:	return: Analysis result
+ *		textMonikerIfAny: if the icon is not a GString, it is a text moniker.
+ *			textMonikerIfAny points to a buffer to hold the
+ *			moniker's text.
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+void AnalyseIconMoniker(GeodeToken tok, int item, MonikerAnalyseResult *mars, char *textMonikerIfAny) {
+MemHandle	mh;
+word	monikerSize;
+dword 	tokenDW;
+Boolean	found;
+VisMoniker *monikerPtr;
+CBitmap	cBitmap;
+
+    if ( textMonikerIfAny ) *textMonikerIfAny = 0;
+
+    mh = 0;
+    memset(mars, 0, sizeof(MonikerAnalyseResult));
+    memcpy(&tokenDW, &tok.GT_chars[0], 4);
+    found = TokenLoadMonikerBlock( tokenDW, tok.GT_manufID, global.iconListPtr[item].displayType,
+			global.iconListPtr[item].searchFlags, &monikerSize, &mh );
+
+    EC( if ( !found ) { ProgError("Moniker not found in AnalyseIconMoniker"); return; } )
+    EC( if ( !mh ) { ProgError("No mem block in AnalyseIconMoniker"); return; } )
+
+    monikerPtr = MemLock(mh);
+
+    /*
+     * Get information from VisMoniker structure (size, displayClass, aspect ratio)
+     */
+    if (monikerPtr->VM_type & VMT_GSTRING ) {
+	mars->width = monikerPtr->VM_width;
+	mars->height =  ((VisMonikerWithGString*)monikerPtr)->VMWGS_height;
+    	mars->isGString 	= TRUE;
+    } else {
+    	// find out the text len
+    	byte *bPtr;
+	bPtr = (byte*) monikerPtr;
+	bPtr += sizeof(VisMonikerWithText);
+	mars->width = strlen((char*)bPtr);
+	mars->height =  (-1);
+    	mars->isGString 	= FALSE;
+    	if ( textMonikerIfAny ) {
+    	   /*
+    	    * Return the moniker text - maximum allowed len is MAX_TEXT_MONIKER_LENGTH (==32)
+    	    * If the string is too long, we can simply set an terminator, the memory block
+    	    * holding the visMoniker will be freed below.
+    	    */
+    	   if ( (mars->width) > MAX_TEXT_MONIKER_LENGTH) bPtr[MAX_TEXT_MONIKER_LENGTH] = 0;
+    	   strcpy(textMonikerIfAny, bPtr);
+    	}
+
+    }
+
+    mars->displayClass = monikerPtr->VM_type & VMT_GS_COLOR;
+    mars->aspect = (monikerPtr->VM_type & VMLET_GS_ASPECT_RATIO) >> VMT_GS_ASPECT_RATIO_OFFSET;
+
+    /*
+     * calculate displaySize and iconStyle
+     */
+    mars->displaySize = 	ToolCalculateDisplaySize(mars);
+    mars->iconStyle = 	ToolCalculateIconStyle(item, mars);
+
+
+    /*
+     * Scan for bitmap information and store them
+     */
+    if ( mars->isGString ) {
+    	int bmpOffs;
+    	word bmpSize, opCode;
+
+	if (IconScanMonikerForBitmap(monikerPtr, &cBitmap, &bmpOffs, &opCode, &bmpSize) ) {
+		mars->bitmapFound = TRUE;
+
+		mars->bitmapOffset = bmpOffs;
+		mars->bmFormat = cBitmap.CB_simple.B_type;
+		mars->compact = cBitmap.CB_simple.B_compact;
+@if @DEBUG_TOKEN_IMPORT
+		mars->opCode	= opCode;
+		mars->bitmapDataSize = bmpSize;
+@endif
+		/*
+		 * In a few cases the cached size differs from bitmap size.
+		 * So we must set width and height here again.
+		 */
+		mars->width = cBitmap.CB_simple.B_width;
+		mars->height = cBitmap.CB_simple.B_height;
+
+    	} else {
+		mars->bitmapFound = FALSE;
+    		mars->bmFormat = BMT_MASK | BMF_24BIT;	// simplify creating target bitmap
+    	}
+
+    } /* end of isGString */
+
+
+
+    MemFree(mh);
+}
+
+
+/*--------------------- IconScanMonikerForBitmap ---------------------
+ *  Purpose:	Try to find the bitmap in a VisMonikerWithGString
+ *		We assume that the first command in the GString is a draw-bitmap command
+ *		But maybe there are a few simple commands that come before that.
+ *  Context:
+ *  Strategy:
+ *  Parameters:	monikerPtr: pointer to VisMonikerWithGString
+ *		cBitmap:    return bitmap information
+ *		bmpOffs:    position of the draw-bitmap op code,
+ *			    realtive to the start of the VisMoniker
+ *		opCode:	    draw-bitmap operation code
+ *		size:	    sizeof bitmap data, including the header
+ *  Comment:	The parametes bmpOffs, opCode an size are for debugging purpose and
+ *		only used if the compiler flag DEBUG_TOKEN_IMPORT is not equal to zero.
+ *		To keep the code from becoming too confusing, they remain in the
+ *		code even if the compiler flag is not activated.
+ *  Return:	TRUE: bitmap found
+ *		      cBitmap, bmpOffs and opCode are filled in
+ *		      if there is no complex bitmap, complex part of cBitmap is left clear
+ *		FALSE: no bitmap found
+ ---------------------------------------------------------------------------*/
+Boolean IconScanMonikerForBitmap(VisMoniker *monikerPtr, CBitmap *cBitmap, int *bmpOffs, word *opCode, word *size) {
+byte *bPtr;
+Bitmap *bitmapPtr;
+Boolean found;
+
+
+    memset(cBitmap, 0, sizeof(CBitmap));
+    found = FALSE;
+
+    /*
+     * get a pointer to the GString
+     */
+    bPtr =(byte*)monikerPtr;
+    bPtr += sizeof(VisMonikerWithGString);
+
+    /*
+     * Scan the gstring for a draw-bitmap-command
+     * Skip some known simple commands
+     */
+    do {
+      switch (*bPtr) {
+
+      /* Set color commands */
+      case GR_SET_LINE_COLOR:			// Paramter 3 byte
+      case GR_SET_AREA_COLOR:
+      case GR_SET_TEXT_COLOR:
+    	bPtr += 1 + 3;
+    	break;
+
+      case GR_SET_LINE_COLOR_INDEX:		// Parameter: 1 byte
+      case GR_SET_AREA_COLOR_INDEX:		// <-- I USE THIS!
+      case GR_SET_TEXT_COLOR_INDEX:
+    	bPtr += 1 + 1;
+    	break;
+
+      /* additional simple commands */
+      case GR_SET_GSTRING_BOUNDS:			// Parameter 4 integer
+    	bPtr += 1 + 4*2;
+    	break;
+      case GR_APPLY_TRANSLATION:			// Parameter 2 WWFixed
+      	EC( MessageBox("GR_APPLY_TRANSLATION found in visMoniker"); )
+    	bPtr += 1 + 2*4;
+    	break;
+
+      /* Draw-bitmap comnds */
+      case GR_FILL_BITMAP:			// Parameter x, y, size (3 word)
+      	*opCode = GR_FILL_BITMAP;
+    	bPtr += 1 + 2*2;			// point to size!
+    	found = TRUE;
+    	break;
+
+      case GR_FILL_BITMAP_CP:			// Parameter size (word)
+      	*opCode = GR_FILL_BITMAP_CP;
+    	bPtr += 1;				// point to size!
+    	found = TRUE;
+    	break;
+
+      case GR_DRAW_BITMAP:			// Parameter x, y, size (3 word)
+      	*opCode = GR_DRAW_BITMAP;
+    	bPtr += 1 + 2*2;			// point to size!
+    	found = TRUE;
+    	break;
+
+      case GR_DRAW_BITMAP_CP:			// Parameter size (word)
+      	*opCode = GR_DRAW_BITMAP_CP;
+    	bPtr += 1;				// point to size!
+    	found = TRUE;
+    	break;
+
+      default:
+      	return FALSE;
+      }
+
+      if (found) break;
+
+    } while (TRUE);
+
+    /*
+     * find out if we have a complex bitmap or not
+     * then fill in the relevant cBitmap part
+     */
+
+    *size = * ((word*)bPtr);
+
+    bPtr += 2;			// skip size parameter
+    *bmpOffs = bPtr - (byte*)monikerPtr;
+    bitmapPtr = (Bitmap*)bPtr;
+    if (bitmapPtr->B_type & BMT_COMPLEX) {
+    	cBitmap->CB_simple = *bitmapPtr;
+    } else {
+    	*cBitmap = *( (CBitmap*)bPtr );
+    }
+
+    return TRUE;
+
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file tokenImport.goc ********************/
+
+
+

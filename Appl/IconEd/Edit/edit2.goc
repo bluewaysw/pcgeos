@@ -1,0 +1,1498 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	edit2.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 12/27/2025	initial revision
+ *
+ *
+ * DESCRIPTION:	This file deals with editing the bitmap (shift image tool)
+ * 		See edit.goc for strategy notes.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+
+@include "iconed.goh"
+
+@include "UI/appui.goh"
+
+/*---------------------------------------------------------------------------
+	Global Variables and local headers
+ ---------------------------------------------------------------------------*/
+GlobalStruct global;
+
+void EditUpdateGSLineAttributes(GStateHandle gs, BMType bmFormat, IconLineAttrs *attrs);
+void EditUpdateGSAreaAttributes(GStateHandle gs, BMType bmFormat, IconAreaAttrs *attrs);
+void ToolTransferMask(VMBlockHandle srcBmp, VMBlockHandle destBmp, int width, int height);
+void FatbitsConstrainCoordinates(FBDragStruct *dragPtr, int *xPos, int *yPos);
+
+/***********************************************************************
+ *
+ *	Common Tools and Routines
+ *
+ ***********************************************************************/
+
+/*--------------------- MSG_FATBITS_REDRAW_AFTER_DRAG ---------------------
+ *  Purpose:	Do some common jobs for the drawing routine of the
+ *		drag tools (line, ellipse, fillrect ..)
+ *  Context:
+ *  Strategy:
+ *	The method expects a valid clipping path to be set
+ *	- Draw the shadow bitmap (FBI_drag.bmp) upscaled to the screen
+ *	- draw the grid
+ *	- redraw the live preview
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_REDRAW_AFTER_DRAG {
+WindowHandle win;
+GStateHandle gs;
+int grid;
+
+    grid = pself->FBI_pixelSize;
+
+    /*
+     * Draw the shadow bitmap. This must be done with up-scaled screen-gstate
+     */
+    GrSaveState(pself->FBI_screenGState);
+    GrApplyScale(pself->FBI_screenGState, MakeWWFixed(grid), MakeWWFixed(grid) );
+    GrDrawHugeBitmap(pself->FBI_screenGState, 0,0, global.tempFile, pself->FBI_drag.bmp);
+    GrRestoreState(pself->FBI_screenGState);
+
+    /*
+     * Draw the grid into the unscaled screen-gstate
+     */
+    FatbitsDrawGrid(pself->FBI_screenGState, pself->FBI_currentTool, grid, grid*pself->FBI_xSize, grid*pself->FBI_ySize);
+
+    /*
+     * Draw the unscaled shadow bitmap to the live preview
+     */
+    win = @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_GET_WINDOW();
+    gs = GrCreateState(win);
+    GrDrawHugeBitmap(gs, LIVE_PREVIEW_MARGIN, LIVE_PREVIEW_MARGIN, global.tempFile, pself->FBI_drag.bmp);
+    GrDestroyState(gs);
+
+}
+
+/*---------------------  MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED ---------------------
+ *  Purpose:	Redraw fatbits and live preview after a drag tool (line,
+ *		ellipse fillrect .. has been finished
+ *  Context:	This method is called at the end of the tool-specific
+ *		_END_SELECT handler. FBI_bitmap is up to date.
+ *  Strategy:
+ *	- set up an clipping rectangle for the fatbits object to minimize filckering
+ *	  We need to know the line with for that, to make the recktangle large enough.
+ *	- draw background color
+ *	- draw FBI_bitmap via MSG_VIS_DRAW; this automatically draws the grid
+ *	- redraw whole LivePreviewView
+ *	  We don't make much effort here because the flickering is usually invisible.
+ *  Parameters: lineWidth: width of the drawn line
+ *			   pass zero for areas (they don't have a line width)
+ *  Return:	-
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass,  MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED {
+int x0, y0, x1, y1, grid, colorIdx;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in REDRAW_AFTER_DRAG_TOOL"); } )
+
+    /*
+     * fetch some information
+     */
+    grid = pself->FBI_pixelSize;
+    colorIdx = @call ViewColorGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /*
+     * sort coordinates
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+    /*
+     * Expand coordinates to enclose thicker lines
+     * lineWith is zero for areas - then fix the bounds behavior
+     */
+    if (lineWidth) {
+    	x0 -= lineWidth/2 + 1;
+    	y0 -= lineWidth/2 + 1;
+    	x1 += lineWidth/2 + 1;
+    	y1 += lineWidth/2 + 1;
+    } else {
+    	x1++;
+    	y1++;
+    }
+
+    /*
+     * Upscale coordinates and set clipping rectangle
+     */
+    x0 = grid*x0;
+    y0 = grid*y0;
+    x1 = grid*x1;
+    y1 = grid*y1;
+    GrSetClipRect(pself->FBI_screenGState, WINDING, x0, y0, x1, y1);
+
+    /*
+     * Draw background, image and grid (this still flickers a little)
+     */
+    GrSetAreaColor(pself->FBI_screenGState, CF_INDEX, colorIdx, 0, 0);
+    GrFillRect(pself->FBI_screenGState, 0, 0, grid*pself->FBI_xSize, grid*pself->FBI_ySize);
+    @call oself::MSG_VIS_DRAW(0, pself->FBI_screenGState);
+
+    /*
+     * Redraw live preview.
+     * This redraws the background, that's why it flickers a little, but mostly not visible.
+     */
+    @call ConstructOptr(OptrToHandle(oself), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/*--------------------- ToolSetLineOrAreaColor ---------------------
+ *  Purpose:	Set the line or area color for an GState
+ *  Context:	GrSetLine/AreaColor(gs, CF_RGB, ..) does not work for an index color
+ *		bitmap, in particular, if we have a custom palette.
+ *  Strategy:
+ * 	- check the color depth
+ *	- fetch palette index, if required
+ *	- set color as index color
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void ToolSetLineOrAreaColor(GStateHandle gs, BMType bmFormat, PaletteEntry color, Boolean setLineColor) {
+int count, idx;
+
+    /*
+     * Setting line color as RGB value does not work if the bitmap
+     * is not an 24 bit bitmap. In particular, if we have a custom palette.
+     * So we must fetch the correct index color.
+     * monochrome bitmap also needs a special handling
+     */
+    switch (bmFormat & BMT_FORMAT) {
+	case BMF_MONO:
+    	    idx = C_BLACK;
+	    if ( (color.rt+color.gn+color.bl) > 384) idx = C_WHITE;
+	    if ( setLineColor ) { GrSetLineColor(gs, CF_INDEX, idx, 0, 0); }
+		     	   else { GrSetAreaColor(gs, CF_INDEX, idx, 0, 0); }
+	    return;
+
+	case BMF_4BIT: count = 16; break;
+	case BMF_8BIT: count = 256; break;
+	default:
+	    // True color bitmap
+	    if ( setLineColor ) { GrSetLineColor(gs, CF_RGB, color.rt, color.gn, color.bl); }
+		     	   else { GrSetAreaColor(gs, CF_RGB, color.rt, color.gn, color.bl); }
+	    return;
+	}
+
+    /*
+     * We have a non-24-bit bitmap. Fetch palette index and set line color.
+     */
+    idx = PaletteFindIndex(color.rt, color.gn, color.bl, count);
+    if ( idx < 0 ) idx = 0;
+    if ( setLineColor ) { GrSetLineColor(gs, CF_INDEX, idx, 0, 0); }
+		   else { GrSetAreaColor(gs, CF_INDEX, idx, 0, 0); }
+
+}
+
+/*--------------------- EditUpdateGSAreaAttributes ---------------------
+ *  Purpose:	Set the area drawing attributes for an GState
+ *  Context:
+ *  Strategy:
+ 	- simpy set attributes for the gstate
+ 	- AreaColor requires more effort - see ToolSetLineOrAreaColor
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditUpdateGSAreaAttributes(GStateHandle gs, BMType bmFormat, IconAreaAttrs *attrs) {
+
+    GrSetAreaMaskSys(gs, attrs->areaDrawMask);
+    GrSetAreaPattern(gs, attrs->areaPattern);
+    GrSetMixMode(gs, attrs->areaMixMode); 		/* changing areaMixMode not yet implemented */
+
+    //GrSetAreaColor(gs, CF_RGB, attrs->areaColor.rt, attrs->areaColor.gn, attrs->areaColor.bl);
+    // works not properly for bitmaps with custom palette
+    ToolSetAreaColor(gs, bmFormat, attrs->areaColor);
+}
+
+/*--------------------- EditUpdateGSLineAttributes ---------------------
+ *  Purpose:	Set the line drawing attributes for an GState
+ *  Context:
+ *  Strategy:
+ 	- simply copy most attributes
+ 	- LineColor requires more effort - see ToolSetLineOrAreaColor
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditUpdateGSLineAttributes(GStateHandle gs, BMType bmFormat, IconLineAttrs *attrs) {
+
+    GrSetLineWidth(gs, MakeWWFixed(attrs->lineWidth.WWF_int));
+    GrSetLineStyle(gs, attrs->lineStyle, 0, 0, 0);
+    GrSetLineMaskSys(gs, attrs->lineDrawMask);
+    //GrSetLineMixMode(gs, attrs->lineMixMode); 	/* changing lineMixMode not yet implemented */
+
+    GrSetLineEnd(gs, LE_SQUARECAP);
+
+    // GrSetLineColor(gs, CF_RGB, ..) does not properly work for some cases ...
+    ToolSetLineColor(gs, bmFormat, attrs->lineColor);
+
+}
+
+
+/*--------------------- EditSetInitialPath ---------------------
+ *  Purpose:	Set an initial path for first drawing a rubber shape
+ *  Context:	See strategy notes on top of this file
+ *  Strategy:
+ *	- Save screen gstate
+ *	- set a small clipping path
+ *	  this path will be expanded later
+ *	- set FBI_drag.nextClear to "Next MM_INVERT darwing draws a new shape"
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditSetInitialPath(FatbitsInstance *pself) {
+GStateHandle gstate;
+int x, y;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in EditSetInitialPath"); } )
+
+    gstate = pself->FBI_screenGState;
+    x = pself->FBI_drag.x0;
+    y = pself->FBI_drag.y0;
+
+    GrSaveState(gstate);
+
+    GrBeginPath(gstate, PCT_REPLACE);	/* new path */
+    GrFillRect(gstate, x, y, x+2, y+2);
+    GrEndPath(gstate);
+    GrSetClipPath(gstate, PCT_INTERSECTION, WINDING);
+
+    pself->FBI_drag.nextClear = FALSE;
+}
+
+/*--------------------- ToolTransferMask ---------------------
+ *  Purpose:	Copy mask data form one bitmap to another
+ *		The bitmaps also may be unmasked monochrome bitmaps.
+ *  Context: This tool routine is somewhat faster than
+ *	BTApplyTransparencyMask() from the bmptools library because it
+ *	can skip a some steps required for BTApplyTransparencyMask()
+ *  Paramters:	srcBmp:	Bitmap that contains the new mask data
+ *		destBmp:Bitmap to write to
+ *		with, height: bitmap diemensions
+ *  Strategy:
+ *	- both bitmaps must be stored in the global.tempfile
+ *	- both bitmaps must have exactly the same size (dimensions)
+ ---------------------------------------------------------------------------*/
+void ToolTransferMask(VMBlockHandle srcBmp, VMBlockHandle destBmp, int width, int height) {
+int n, maskLen;
+BitmapAccessRecord srcBar, destBar;
+byte *srcPtr, *destPtr;
+
+    /*
+     * Simply copy the data line by line.
+     */
+    maskLen = (width+7)/8;
+
+    srcPtr = BTBitmapLock(global.tempFile, srcBmp, &srcBar, 0);
+    destPtr = BTBitmapLock(global.tempFile, destBmp, &destBar, 0);
+    for ( n = 0; n < height; n++ ) {
+
+	memcpy(destPtr, srcPtr, maskLen);
+	srcPtr =  BTBitmapNext(&srcBar, FALSE);
+	destPtr = BTBitmapNext(&destBar, TRUE);
+
+    }
+
+    BTBitmapUnlock(&srcBar, FALSE);
+    BTBitmapUnlock(&destBar, TRUE);
+
+}
+
+
+/*--------------------- FatbitsConstrainCoordinates ---------------------
+ *  Purpose:	Limit mouse coordinates
+ *  Context:	Called by tools that want to draw circles or squares
+ *		instead of ellipses or rectangles
+ *  Strategy:	- calculate width (dx) and height (dx) of the bounding rectange
+ *		- calculate the size of the bounding square (w)
+ *		- update *xPos and *yPos, based on their positions relative
+ *		  to x0 and y0
+ ---------------------------------------------------------------------------*/
+void FatbitsConstrainCoordinates(FBDragStruct *dragPtr, int *xPos, int *yPos) {
+int x0, y0, dx, dy, w;
+
+    x0 = dragPtr->x0;
+    y0 = dragPtr->y0;
+
+    dx = *xPos - x0; 	if (dx < 0) dx = -dx;
+    dy = *yPos - y0; 	if (dy < 0) dy = -dy;
+
+    if ( dx < dy ) { w = dy; }
+    	      else { w = dx; }
+
+    if ( *xPos < x0 ) { *xPos = x0 - w; }
+    		else  { *xPos = x0 + w; }
+    if ( *yPos < y0 ) { *yPos = y0 - w; }
+    		else  { *yPos = y0 + w; }
+}
+
+/***********************************************************************
+ *
+ *	Fatbits tool messages - they do the real job
+ *
+ ***********************************************************************/
+
+
+/*######################################################################
+  #
+  #	Line Tool
+  #
+  ######################################################################*/
+
+
+/*--------------------- EditDrawLine ---------------------
+ *  Purpose:	Draw a rubber line to the screen
+ *  Context:	Draw or erase a line
+ *  Strategy:
+ *	- use FBI_drag.bmp to draw to
+ *	- construct a polygon that encloses the line
+ *	- if we about to erase a line:
+ *		set this polygon as clipping path (this actually
+ *		does not remove the line from screen)
+ *		return
+ *	- if we are about to draw a line
+ *		Add the polygon to the current path
+ *	- draw FBI_drag.bmp to screen
+ *		this actually removes the old line and shows the new one
+ *	- draw grid to screen
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditDrawLine(optr fatbitsObj) {
+FatbitsInstance *pself;
+int x0, y0, x1, y1, grid, i, dx, dy;
+Point	shape[4];
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in DrawLine"); } )
+
+    /*
+     * Draw line in MM_INVERT mode to shadow bitmap.
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+    GrDrawLine(pself->FBI_drag.gstate, x0, y0, x1, y1);
+
+
+    /*
+     * construct a polygon that encloses the line
+     */
+
+    grid = pself->FBI_pixelSize;
+    x0 = grid*x0;
+    y0 = grid*y0;
+    x1 = grid*x1;
+    y1 = grid*y1;
+
+
+    /*
+     * ensure that the line goes from left to right
+     */
+    if (x1 < x0) {
+	int tmp = x1; x1 = x0; x0 = tmp;
+	tmp = y1; y1 = y0; y0 = tmp;
+	}
+
+    /*
+     * There are four cases, depending on whether the line
+     * goes up or down and whether it is flat or steep.
+     */
+    dx = x1 - x0;
+    dy = y1 - y0;
+
+    if ( dy < 0 ) {
+    	// line goes up
+    	if ( dx > (-dy) ) i = 3; else i = 4;
+    } else {
+    	// line goes down
+    	if ( dx > dy) i = 1; else i = 2;
+    }
+
+    /*
+     * For every case, we need another polygon
+     */
+    switch (i) {
+    case 3:
+	shape[0].P_x = x0-grid;		shape[0].P_y = y0;
+	shape[1].P_x = x1+grid;		shape[1].P_y = y1-grid;
+	shape[2].P_x = x1+2*grid;	shape[2].P_y = y1+grid;
+	shape[3].P_x = x0;		shape[3].P_y = y0+2*grid;
+	break;
+    case 1:
+	shape[0].P_x = x0;		shape[0].P_y = y0-grid;
+	shape[1].P_x = x1+2*grid;	shape[1].P_y = y1;
+	shape[2].P_x = x1+grid;		shape[2].P_y = y1+2*grid;
+	shape[3].P_x = x0-grid;		shape[3].P_y = y0+grid;
+	break;
+    case 4:
+	shape[0].P_x = x0-grid;		shape[0].P_y = y0;
+	shape[1].P_x = x1;		shape[1].P_y = y1-grid;
+	shape[2].P_x = x1+2*grid;	shape[2].P_y = y1+2;
+	shape[3].P_x = x0+grid;		shape[3].P_y = y0+2*grid;
+	break;
+    case 2:
+	shape[0].P_x = x0+grid;		shape[0].P_y = y0-grid;
+	shape[1].P_x = x1+2*grid;	shape[1].P_y = y1;
+	shape[2].P_x = x1;		shape[2].P_y = y1+2*grid;
+	shape[3].P_x = x0-grid;		shape[3].P_y = y0+grid;
+    }
+
+
+
+    if (pself->FBI_drag.nextClear == TRUE) {
+
+	/*
+	 * Set the polygon as clipping path
+	 * Ensure that the pself->FBI_screenGState is not changed at all.
+	 */
+    	GrSaveState(pself->FBI_screenGState);
+
+	GrBeginPath(pself->FBI_screenGState, PCT_REPLACE);	/* new path */
+	GrFillPolygon(pself->FBI_screenGState, WINDING, &shape[0], 4);
+	GrEndPath(pself->FBI_screenGState);
+	GrSetClipPath(pself->FBI_screenGState, PCT_INTERSECTION, WINDING);
+
+	pself->FBI_drag.nextClear = FALSE;
+        return;
+    }
+
+    /*
+     * Add the polygon to the current clipping path
+     */
+    GrBeginPath(pself->FBI_screenGState, PCT_UNION);	/* add path */
+    GrFillPolygon(pself->FBI_screenGState, WINDING, &shape[0], 4);
+    GrEndPath(pself->FBI_screenGState);
+    GrSetClipPath(pself->FBI_screenGState, PCT_UNION, WINDING);
+
+    /*
+     * Redrww fatbits and live preview. Finish drawing cycle.
+     */
+    @call fatbitsObj::MSG_FATBITS_REDRAW_AFTER_DRAG();
+
+    GrRestoreState(pself->FBI_screenGState);
+    pself->FBI_drag.nextClear = TRUE;
+}
+
+
+
+/*--------------------- MSG_FATBITS_LINE_START_SELECT ---------------------
+ *  Purpose:	Start select handler for line tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Draw line for first time
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_LINE_START_SELECT{ /* int xPos, int yPos */
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_DRAW_LINE);
+    EditSetInitialPath(pself);
+    EditDrawLine(oself);
+}
+
+/*--------------------- MSG_FATBITS_LINE_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for line tool
+ *  Context:
+ *  Strategy:
+ *	- constrain coordinates if we want to draw only horizontal,
+ *	  vertical or diagonal lines
+ *	- check if the end position has been changed
+ *	- erase old line
+ *	- draw new line
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_LINE_META_PTR{
+int dx, dy;
+
+   if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) {
+   	/*
+   	 * allow horizontal and vertical lines too
+   	 * FatbitsConstrainCoordinates restricts coordinates to diagonal lines
+   	 */
+   	do {
+   	    /*
+   	     * If the angle between the line and the horizontal or vertical
+   	     * is less than 30° (tan(30°) = 0.5), draw a horizontal or
+   	     * vertical line.
+   	     */
+   	    dx = xPos - pself->FBI_drag.x0; 	if (dx < 0) dx = -dx;
+	    dy = yPos - pself->FBI_drag.y0; 	if (dy < 0) dy = -dy;
+	    if ( dx < dy/2) xPos = pself->FBI_drag.x0;
+	    if ( dy < dx/2) yPos = pself->FBI_drag.y0;
+
+   	    if (xPos == pself->FBI_drag.x0) break;
+   	    if (yPos == pself->FBI_drag.y0) break;
+   	    FatbitsConstrainCoordinates(&(pself->FBI_drag), &xPos, &yPos);
+   	} while(FALSE);
+   }
+
+   do {
+   	if (xPos != pself->FBI_drag.x1) break;
+   	if (yPos != pself->FBI_drag.y1) break;
+   	return;
+   } while (FALSE);
+
+   EditDrawLine(oself);
+   EC( if ( pself != ObjDerefVis(oself) ) { ProgError("EditDrawLine pself-error"); } )
+
+   pself->FBI_drag.x1 = xPos;
+   pself->FBI_drag.y1 = yPos;
+   EditDrawLine(oself);
+
+}
+
+
+/*--------------------- MSG_FATBITS_LINE_END_SELECT ---------------------
+ *  Purpose:	End select handler for line tool
+ *  Context:
+ *  Strategy:
+ *	- Ignore shadow bitmap FBI_drag.bmp/drag.gstate. The image is no longer
+ *	  used and will be overwritten later.
+ *	- set line attributes
+ *	- draw colored line as well as mask and combine them
+ *	- Redraw fatbits and live preview
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_LINE_END_SELECT {
+int x0, y0, x1, y1;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in LINE_END_SELECT"); } )
+
+    EditUpdateGSLineAttributes(pself->FBI_bitmapGState, pself->FBI_bmFormat, &(pself->FBI_lineAttrs));
+    GrSetMixMode(pself->FBI_bitmapGState, MM_COPY);
+
+    EditUpdateGSLineAttributes(pself->FBI_maskGState, BMF_MONO, &(pself->FBI_lineAttrs));
+    GrSetLineColor(pself->FBI_maskGState, CF_INDEX, C_BLACK , 0, 0);
+
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    GrDrawLine(pself->FBI_bitmapGState, x0, y0, x1, y1);
+    GrDrawLine(pself->FBI_maskGState, x0, y0, x1, y1);
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+
+    /*
+     * Redraw fatbits and live preview. We need two pixels more for the clipping rect for diaginal lines
+     */
+    @call oself:: MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED(pself->FBI_lineAttrs.lineWidth.WWF_int + 2);
+
+}
+
+/*######################################################################
+  #
+  #	FillRect Tool
+  #
+  ######################################################################*/
+
+/*--------------------- EditDrawRectangle ---------------------
+ *  Purpose:	Draw or clear an rectangle outline
+ *  Context:	rectangle tool and fill rect tool
+ *  Strategy:
+ *	- use FBI_drag.bmp to draw to
+ *	- see if the rechtangel is large enough to be empty inside
+ *	  if not: draw a filled rectcangle
+ *	  if yes: draw four lines to avoid invisible corners.
+ *	- construct polygons that describes the outline
+ *	- if we about to erase a rectangle:
+ *		+ set this polygons as clipping path (this actually
+ *		  does not remove the line from screen)
+ *		+ return
+ *	- if we are about to draw a rectangle
+ *		+ Add the polygons to the current path
+ *		+ draw FBI_drag.bmp to screen
+ *		  this actually removes the old line and shows the new one
+ *		+ draw grid to screen
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditDrawRectangle(optr fatbitsObj) {
+FatbitsInstance *pself;
+int x0, y0, x1, y1, grid, i, dx, dy;
+Point	shape[4], innerShape[4];
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in DerawRectangle"); } )
+
+    /*
+     * Draw rectangle in MM_INVERT mode to shadow bitmap.
+     * - sort coordinates
+     * - if the outine is not empty inside, draw a filled area
+     * - if not, draw four lines, because GrDrawRect clears
+     *	 the corners in mixmode MM_INVERT
+     * - remember the empty state in varibale i
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+    dx = x1-x0;
+    dy = y1-y0;
+    if ( (dx < 2) || (dy<2) ) {
+    	/*
+    	 * The outline is filled inside. Draw a filled rectangle.
+    	 */
+    	GrFillRect(pself->FBI_drag.gstate, x0, y0, x1+1, y1+1);
+    	i = FALSE;
+    } else {
+    	/*
+    	 * The outline is empty inside. Draw four lines.
+    	 */
+    	GrFillRect(pself->FBI_drag.gstate, x0, y0, x1, y0+1);
+    	GrFillRect(pself->FBI_drag.gstate, x1, y0, x1+1, y1);
+    	GrFillRect(pself->FBI_drag.gstate, x0+1, y1, x1+1, y1+1);
+    	GrFillRect(pself->FBI_drag.gstate, x0, y0+1, x0, y1+1);
+    	i = TRUE;
+    }
+
+    /*
+     * Construct two polygons that describes the outline.
+     * Define shape clockwise and innerShape counter clockwise.
+     * See Concepts "24.2.11 Paths" for details
+     */
+
+    grid = pself->FBI_pixelSize;
+    x0 = grid*x0;
+    y0 = grid*y0;
+    x1 = grid*x1;
+    y1 = grid*y1;
+
+    shape[0].P_x = x0;		shape[0].P_y = y0;
+    shape[1].P_x = x1+grid;		shape[1].P_y = y0;
+    shape[2].P_x = x1+grid;		shape[2].P_y = y1+grid;
+    shape[3].P_x = x0;		shape[3].P_y = y1+grid;
+
+    if ( i ) {
+	innerShape[0].P_x = x0+grid;	innerShape[0].P_y = y0+grid;
+	innerShape[1].P_x = x0+grid;	innerShape[1].P_y = y1;
+	innerShape[2].P_x = x1;		innerShape[2].P_y = y1;
+	innerShape[3].P_x = x1;		innerShape[3].P_y = y0+grid;
+    }
+
+
+    if (pself->FBI_drag.nextClear == TRUE) {
+
+	/*
+	 * Set the polygons as clipping path. InnerShape is only drawn
+	 * if the rectangle is empty inside.
+	 * Ensure that the pself->FBI_screenGState is not changed at all.
+	 */
+    	GrSaveState(pself->FBI_screenGState);
+
+	GrBeginPath(pself->FBI_screenGState, PCT_REPLACE);	/* new path */
+	GrFillPolygon(pself->FBI_screenGState, WINDING, &shape[0], 4);
+	if ( i ) GrFillPolygon(pself->FBI_screenGState, WINDING, &innerShape[0], 4);
+	GrEndPath(pself->FBI_screenGState);
+	GrSetClipPath(pself->FBI_screenGState, PCT_INTERSECTION, WINDING);
+
+	pself->FBI_drag.nextClear = FALSE;
+        return;
+    }
+
+    /*
+     * Add the polygons as 2nd shape to the current clipping path
+     */
+    GrBeginPath(pself->FBI_screenGState, PCT_UNION);	/* add path */
+    GrFillPolygon(pself->FBI_screenGState, WINDING, &shape[0], 4);
+    if ( i ) GrFillPolygon(pself->FBI_screenGState, WINDING, &innerShape[0], 4);
+    GrEndPath(pself->FBI_screenGState);
+    GrSetClipPath(pself->FBI_screenGState, PCT_UNION, WINDING);
+
+    /*
+     * Redrww fatbits and live preview. Finish drawing cycle.
+     */
+    @call fatbitsObj::MSG_FATBITS_REDRAW_AFTER_DRAG();
+
+    GrRestoreState(pself->FBI_screenGState);
+    pself->FBI_drag.nextClear = TRUE;
+
+}
+
+
+
+/*--------------------- MSG_FATBITS_FILL_RECT_START_SELECT ---------------------
+ *  Purpose:	Start select handler for fill rect tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Draw recangle outline for first time
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_RECT_START_SELECT{
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_FILL_RECTANGLE);
+    EditSetInitialPath(pself);
+    EditDrawRectangle(oself);
+}
+
+/*--------------------- MSG_FATBITS_FILL_RECT_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for fill rect tool
+ *  Context:
+ *  Strategy:
+ *	- constrain coordinates if we want to draw a square
+ *	- check if the end position has been changed
+ *	- erase old rectangle outline
+ *	- draw new outline
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_RECT_META_PTR{
+
+    /*
+     *  Limit coordinates to a sqare
+     */
+   if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) FatbitsConstrainCoordinates(&(pself->FBI_drag), &xPos, &yPos);
+
+   do {
+   	if (xPos != pself->FBI_drag.x1) break;
+   	if (yPos != pself->FBI_drag.y1) break;
+   	return;
+   } while (FALSE);
+
+   EditDrawRectangle(oself);
+   EC( if ( pself != ObjDerefVis(oself) ) { ProgError("EditDrawRectangle pself-error"); } )
+
+   pself->FBI_drag.x1 = xPos;
+   pself->FBI_drag.y1 = yPos;
+   EditDrawRectangle(oself);
+
+}
+
+
+/*--------------------- MSG_FATBITS_FILL_RECT_END_SELECT ---------------------
+ *  Purpose:	End select handler for fill rect tool
+ *  Context:
+ *  Strategy:
+ *	- Ignore shadow bitmap FBI_drag.bmp/drag.gstate. The image is no longer
+ *	  used and will be overwritten later.
+ *	- set area attributes
+ *	- draw colored filled rectangle as well as mask and combine them
+ *	- Redraw fatbits and live preview
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_RECT_END_SELECT{
+int x0, y0, x1, y1;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in FILLRECT_END_SELECT"); } )
+
+    /*
+     * Update gstates
+     */
+    EditUpdateGSAreaAttributes(pself->FBI_bitmapGState, pself->FBI_bmFormat, &(pself->FBI_areaAttrs));
+    GrSetMixMode(pself->FBI_bitmapGState, MM_COPY);
+
+    EditUpdateGSAreaAttributes(pself->FBI_maskGState, pself->FBI_bmFormat, &(pself->FBI_areaAttrs));
+    GrSetAreaColor(pself->FBI_maskGState, CF_INDEX, C_BLACK , 0, 0);
+
+    /*
+     * Sort coordinates and fix bounds behavior
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+    x1++;
+    y1++;
+
+    /*
+     * Draw rectangle and combine mask and image
+     */
+    GrFillRect(pself->FBI_bitmapGState, x0, y0, x1, y1);
+    GrFillRect(pself->FBI_maskGState, x0, y0, x1, y1);
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+
+    /*
+     * Redraw fatbits and live preview.
+     */
+    @call oself:: MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED(0);
+
+
+}
+
+
+/*######################################################################
+  #
+  #	Rectangle Tool
+  #
+  ######################################################################*/
+
+/*--------------------- MSG_FATBITS_RECTANGLE_START_SELECT ---------------------
+ *  Purpose:	Start select handler for rectangle tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Draw rectangle for first time
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_RECTANGLE_START_SELECT{ /* int xPos, int yPos */
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_DRAW_RECTANGLE);
+    EditSetInitialPath(pself);
+    EditDrawRectangle(oself);
+}
+
+/*--------------------- MSG_FATBITS_RECTANGLE_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for rectangle tool
+ *  Context:
+ *  Strategy:
+ *	- constrain coordinates if we want to draw a square
+ *	- check if the end position has been changed
+ *	- erase old rectangle
+ *	- draw new rectangle
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_RECTANGLE_META_PTR{
+
+
+    /*
+     *  Limit coordinates to a sqare
+     */
+   if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) FatbitsConstrainCoordinates(&(pself->FBI_drag), &xPos, &yPos);
+
+   do {
+   	if (xPos != pself->FBI_drag.x1) break;
+   	if (yPos != pself->FBI_drag.y1) break;
+   	return;
+   } while (FALSE);
+
+   EditDrawRectangle(oself);
+   EC( if ( pself != ObjDerefVis(oself) ) { ProgError("EditDrawRectangle pself-error"); } )
+
+   pself->FBI_drag.x1 = xPos;
+   pself->FBI_drag.y1 = yPos;
+   EditDrawRectangle(oself);
+
+}
+
+
+/*--------------------- MSG_FATBITS_RECTANGLE_END_SELECT ---------------------
+ *  Purpose:	End select handler for rectangle tool
+ *  Context:
+ *  Strategy:
+ *	- Ignore shadow bitmap FBI_drag.bmp/drag.gstate. The image is no longer
+ *	  used and will be overwritten later.
+ *	- set line attributes
+ *	- draw colored rectangle as well as mask and combine them
+ *	- Redraw fatbits and live preview
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_RECTANGLE_END_SELECT{
+int x0, y0, x1, y1;
+
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in RECT_END_SELECT"); } )
+
+    /*
+     * Update gstates
+     */
+    EditUpdateGSLineAttributes(pself->FBI_bitmapGState, pself->FBI_bmFormat, &(pself->FBI_lineAttrs));
+    GrSetMixMode(pself->FBI_bitmapGState, MM_COPY);
+
+    EditUpdateGSLineAttributes(pself->FBI_maskGState, BMF_MONO, &(pself->FBI_lineAttrs));
+    GrSetLineColor(pself->FBI_maskGState, CF_INDEX, C_BLACK , 0, 0);
+
+    /*
+     * draw rectangle and combine mask and image
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    GrDrawRect(pself->FBI_bitmapGState, x0, y0, x1, y1);
+    GrDrawRect(pself->FBI_maskGState, x0, y0, x1, y1);
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+
+    /*
+     * Redraw fatbits and live preview.
+     */
+    @call oself:: MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED(pself->FBI_lineAttrs.lineWidth.WWF_int);
+
+}
+
+
+/*######################################################################
+  #
+  #	FillEllipse Tool
+  #
+  ######################################################################*/
+
+
+/*--------------------- EditDrawEllipse ---------------------
+ *  Purpose:	Draw or clear an ellipse outline
+ *  Context:	ellipse tool and fill ellipse tool
+ *  Strategy:
+ *	- use FBI_drag.bmp to draw to
+ *	- see if the ellipse is large enough to be empty inside
+ *	  remember this information in variable i
+ *	- if we about to erase a rectangle:
+ *		+ set a somewhat larger ellipse as clipping path
+ *		+ if  variable i is true, set a somewhat smaller
+ *		  ellipse as inner part of the clipping path
+ *		+ return
+ *	- if we are about to draw a rectangle
+ *		+ Add appropirate ellipses to the current path
+ *		+ draw FBI_drag.bmp to screen
+ *		  this actually removes the old shape and shows the new one
+ *		+ draw grid to screen
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditDrawEllipse(optr fatbitsObj) {
+FatbitsInstance *pself;
+int x0, y0, x1, y1, grid, i;
+
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in DrawEllipse"); } )
+
+    /*
+     * Draw ellipse in MM_INVERT mode to shadow bitmap:
+     * Sort coordinates and draw ellipse
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+    GrDrawEllipse(pself->FBI_drag.gstate, x0, y0, x1, y1);
+
+    /*
+     * check the size to see, if the ellipse can be drawn empty inside, or not
+     * remember the empty state in varibale i
+     * then scale coordinates
+     */
+    if ( ((x1-x0) < 4) || ((y1-y0) < 4) ) {
+    	i = FALSE;
+    } else {
+    	i = TRUE;
+    }
+
+    grid = pself->FBI_pixelSize;
+    x0 = grid*x0;
+    y0 = grid*y0;
+    x1 = grid*x1;
+    y1 = grid*y1;
+
+    if (pself->FBI_drag.nextClear == TRUE) {
+
+	/*
+	 * Set the ellipse as clipping path. Inner ellipse is only used
+	 * if the ellipse is large enough.
+	 * Ensure that the pself->FBI_screenGState is not changed at all.
+	 */
+    	GrSaveState(pself->FBI_screenGState);
+
+	GrBeginPath(pself->FBI_screenGState, PCT_REPLACE);	/* new path */
+	GrFillEllipse(pself->FBI_screenGState, x0-1*grid, y0-1*grid, x1+2*grid, y1+2*grid);
+	if (i) GrFillEllipse(pself->FBI_screenGState, x1-grid, y1-grid, x0+2*grid, y0+2*grid);
+	GrEndPath(pself->FBI_screenGState);
+	GrSetClipPath(pself->FBI_screenGState, PCT_INTERSECTION, ODD_EVEN);
+
+	pself->FBI_drag.nextClear = FALSE;
+        return;
+    }
+
+    /*
+     * Add the ellipse as 2nd shape to the current clipping path
+     */
+    GrBeginPath(pself->FBI_screenGState, PCT_UNION);	/* add path */
+    GrFillEllipse(pself->FBI_screenGState, x0-1*grid, y0-1*grid, x1+2*grid, y1+2*grid);
+    if (i) GrFillEllipse(pself->FBI_screenGState, x1-grid, y1-grid, x0+2*grid, y0+2*grid);
+    GrEndPath(pself->FBI_screenGState);
+    GrSetClipPath(pself->FBI_screenGState, PCT_UNION, ODD_EVEN);
+
+
+    /*
+     * Redrww fatbits and live preview. Finish drawing cycle.
+     */
+    @call fatbitsObj::MSG_FATBITS_REDRAW_AFTER_DRAG();
+
+    GrRestoreState(pself->FBI_screenGState);
+    pself->FBI_drag.nextClear = TRUE;
+}
+
+
+/*--------------------- MSG_FATBITS_FILL_ELLIPSE_START_SELECT ---------------------
+ *  Purpose:	Start select handler for fill ellipse tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Draw fill ellipse for first time
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_ELLIPSE_START_SELECT{
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_FILL_ELLIPSE);
+    EditSetInitialPath(pself);
+    EditDrawEllipse(oself);
+
+}
+
+/*--------------------- MSG_FATBITS_FILL_ELLIPSE_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for fill ellipse tool
+ *  Context:
+ *  Strategy:
+ *	- constrain coordinates if we want to draw a circle
+ *	- check if the end position has been changed
+ *	- erase old fill ellipse
+ *	- draw new fill ellipse
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_ELLIPSE_META_PTR{
+
+    /*
+     *  Limit coordinates to a circle
+     */
+   if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) FatbitsConstrainCoordinates(&(pself->FBI_drag), &xPos, &yPos);
+
+   do {
+   	if (xPos != pself->FBI_drag.x1) break;
+   	if (yPos != pself->FBI_drag.y1) break;
+   	return;
+   } while (FALSE);
+
+   EditDrawEllipse(oself);
+   EC( if ( pself != ObjDerefVis(oself) ) { ProgError("EditDrawEllipse(oself); pself-error"); } )
+
+   pself->FBI_drag.x1 = xPos;
+   pself->FBI_drag.y1 = yPos;
+   EditDrawEllipse(oself);
+
+}
+
+
+/*--------------------- MSG_FATBITS_FILL_ELLIPSE_END_SELECT ---------------------
+ *  Purpose:	End select handler for fill ellipse tool
+ *  Context:
+ *  Strategy:
+ *	- Ignore shadow bitmap FBI_drag.bmp/drag.gstate. The image is no longer
+ *	  used and will be overwritten later.
+ *	- set area attributes
+ *	- draw colored filled ellipse as well as mask and combine them
+ *	- Redraw fatbits and live preview
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_FILL_ELLIPSE_END_SELECT{
+int x0, y0, x1, y1;
+
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in ELLIPSE_END_SELECT"); } )
+
+    EditUpdateGSAreaAttributes(pself->FBI_bitmapGState, pself->FBI_bmFormat, &(pself->FBI_areaAttrs));
+    GrSetMixMode(pself->FBI_bitmapGState, MM_COPY);
+
+    EditUpdateGSAreaAttributes(pself->FBI_maskGState, pself->FBI_bmFormat, &(pself->FBI_areaAttrs));
+    GrSetAreaColor(pself->FBI_maskGState, CF_INDEX, C_BLACK , 0, 0);
+
+    /*
+     * Sort coordinates, fix bound behavior
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+    x1++;
+    y1++;
+
+
+    /*
+     * GrFillEllipse() sometimes creates asymmetrical figures.
+     * That's why we use an path and fill it in with
+     * the current area atrributes.
+     * It's not perfect either, but it's noticeably better.
+     * - Set clipping path and fill it (color plane and mask)
+     * - combine both bitmaps
+     *
+     * Note 1: 	The GrFillEllipse() problem should be fixed on system level.
+     * Note 2:  The combination GrDrawEllipse() + GrFillEllipse() makes
+     *		really good (but not perfect) filled ellipses.
+     *		But we cannot use this becaus some of the area attributes are
+     *		not 1:1 supported by lines (e.g. area patterns). Therefore
+     *		the result may then confuse the user in some cases.
+     *		R.B. 12/2025
+     */
+
+@if 1
+
+    GrBeginPath(pself->FBI_bitmapGState, PCT_REPLACE);
+    GrDrawEllipse(pself->FBI_bitmapGState, x0, y0, x1, y1);
+    GrEndPath(pself->FBI_bitmapGState);
+    GrSetClipPath(pself->FBI_bitmapGState, PCT_INTERSECTION, WINDING);
+    GrFillRect(pself->FBI_bitmapGState, x0, y0, x1, y1);
+
+    GrBeginPath(pself->FBI_maskGState, PCT_REPLACE);
+    GrDrawEllipse(pself->FBI_maskGState, x0, y0, x1, y1);
+    GrEndPath(pself->FBI_maskGState);
+    GrSetClipPath(pself->FBI_maskGState, PCT_INTERSECTION, WINDING);
+    GrFillRect(pself->FBI_maskGState, x0, y0, x1, y1);
+
+@elseif
+
+    GrFillEllipse(pself->FBI_bitmapGState, x0, y0, x1, y1);
+    GrFillEllipse(pself->FBI_maskGState, x0, y0, x1, y1);
+
+@endif
+
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+
+    /*
+     * Redraw fatbits and live preview.
+     */
+    @call oself:: MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED(0);
+
+}
+
+
+/*######################################################################
+  #
+  #	Ellipse Tool
+  #
+  ######################################################################*/
+
+
+
+/*--------------------- MSG_FATBITS_ELLIPSE_START_SELECT ---------------------
+ *  Purpose:	Start select handler for ellipse tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- Draw ellipse for first time
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_ELLIPSE_START_SELECT{
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_DRAW_ELLIPSE);
+    EditSetInitialPath(pself);
+    EditDrawEllipse(oself);
+}
+
+/*--------------------- MSG_FATBITS_ELLIPSE_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for ellipse tool
+ *  Context:
+ *  Strategy:
+ *	- constrain coordinates if we want to draw a circle
+ *	- check if the end position has been changed
+ *	- erase old ellipse
+ *	- draw new ellipse
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_ELLIPSE_META_PTR{
+
+    /*
+     *  Limit coordinates to a circle
+     */
+   if ( pself->FBI_flags & FB_SHIFT_KEY_IS_DOWN ) FatbitsConstrainCoordinates(&(pself->FBI_drag), &xPos, &yPos);
+
+   do {
+   	if (xPos != pself->FBI_drag.x1) break;
+   	if (yPos != pself->FBI_drag.y1) break;
+   	return;
+   } while (FALSE);
+
+
+   EditDrawEllipse(oself);
+   EC( if ( pself != ObjDerefVis(oself) ) { ProgError("EditDrawEllipse(oself); pself-error"); } )
+
+   pself->FBI_drag.x1 = xPos;
+   pself->FBI_drag.y1 = yPos;
+   EditDrawEllipse(oself);
+
+}
+
+
+/*--------------------- MSG_FATBITS_ELLIPSE_END_SELECT ---------------------
+ *  Purpose:	End select handler for ellipse tool
+ *  Context:
+ *  Strategy:
+ *	- Ignore shadow bitmap FBI_drag.bmp/drag.gstate. The image is no longer
+ *	  used and will be overwritten later.
+ *	- set line attributes
+ *	- draw colored ellipse as well as mask and combine them
+ *	- Redraw fatbits and live preview
+ *  Parameters:	xPos, yPos:	Mouse position
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_ELLIPSE_END_SELECT{
+int x0, y0, x1, y1;
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in ELLIPSE_END_SELECT"); } )
+
+
+    EditUpdateGSLineAttributes(pself->FBI_bitmapGState, pself->FBI_bmFormat, &(pself->FBI_lineAttrs));
+    GrSetMixMode(pself->FBI_bitmapGState, MM_COPY);
+
+    EditUpdateGSLineAttributes(pself->FBI_maskGState, BMF_MONO, &(pself->FBI_lineAttrs));
+    GrSetLineColor(pself->FBI_maskGState, CF_INDEX, C_BLACK , 0, 0);
+
+    /*
+     * Sort coordinates
+     */
+    x0 = pself->FBI_drag.x0;
+    y0 = pself->FBI_drag.y0;
+    x1 = pself->FBI_drag.x1;
+    y1 = pself->FBI_drag.y1;
+    if (x1 < x0) { int tmp = x1; x1 = x0; x0 = tmp; }
+    if (y1 < y0) { int tmp = y1; y1 = y0; y0 = tmp; }
+
+    GrDrawEllipse(pself->FBI_bitmapGState, x0, y0, x1, y1);
+    GrDrawEllipse(pself->FBI_maskGState, x0, y0, x1, y1);
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+
+    /*
+     * Redraw fatbits and live preview.
+     */
+    @call oself:: MSG_FATBITS_REDRAW_AFTER_DRAG_TOOL_FINISHED(pself->FBI_lineAttrs.lineWidth.WWF_int);
+
+}
+
+
+
+/*######################################################################
+  #
+  #	Edit Mask Tool
+  #
+  ######################################################################*/
+
+/*--------------------- EditMaskDrawPixel ---------------------
+ *  Purpose:	Draw a single pixel in edit-mask-mode
+ *  Context:
+ *  Strategy:
+ *	- Get color (black or white) from EditMaskModeChooser
+ *	- Set pixel (black is opaque, white is transparent)
+ *	  Do not touch the color layer.
+ *	- Set a one-pixel cliprect to avoid flickering
+ *	- redraw the image
+ *	- update live preview object
+ *  Parameters: oself:	The fatbits object
+ *		x, y:	Pixel coordinates
+ *		redrawPreview:  redraw the live preview object (don't calling
+ *				the view object to avoid flickering)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void EditMaskDrawPixel(optr fatbitsObj, int x, int y) {
+FatbitsInstance *pself;
+int grid, color;
+
+    pself = ObjDerefVis(fatbitsObj);
+
+    /*
+     */
+    color = @call EditMaskModeChooser::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    GrSetAreaColor(pself->FBI_maskGState, CF_INDEX, color, 0, 0);
+    GrDrawPoint(pself->FBI_maskGState, x,y);
+
+    /*
+     * Redraw fatbits and live preview.
+     * 	- Copy mask back to the image
+     *	- Set a one-pixel cliprect to avoid flickering
+     *	- redraw the image
+     *  - force the LivePreviewView to redraw itself. This ensures that
+     *	  the background is drawn when a pixel has become transparent.
+     */
+    ToolTransferMask(pself->FBI_maskBmp,  pself->FBI_bitmap,  pself->FBI_xSize,  pself->FBI_ySize);
+
+    grid = pself->FBI_pixelSize;
+
+    GrSaveState(pself->FBI_screenGState);
+    GrSetClipRect(pself->FBI_screenGState, PCT_REPLACE, grid*x, grid*y, grid*(x+1), grid*(y+1));
+    @call fatbitsObj::MSG_VIS_DRAW(0, pself->FBI_screenGState);
+    GrRestoreState(pself->FBI_screenGState);
+
+    @call ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+}
+
+/*--------------------- MSG_FATBITS_EDIT_MASK_START_SELECT ---------------------
+ *  Purpose:	Start select handler for edit-mask tool
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- draw the first pixel
+ *  Parameters:	xPos, yPos: Mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_EDIT_MASK_START_SELECT{ /* int xPos, int yPos */
+
+    EC( if ( pself->FBI_drag.x0 == (-1) ) { ProgError("FBI_drag not initialized in MASK_START_SELECT"); } )
+
+    @call oself::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_EDIT_MASK);
+    EditMaskDrawPixel(oself, pself->FBI_drag.x0, pself->FBI_drag.y0);
+}
+
+/*--------------------- MSG_FATBITS_EDIT_MASK_META_PTR ---------------------
+ *  Purpose:	Mouse move handler for edit-mask tool
+ *  Context:
+ *  Strategy:
+ *	- return if the pixel under the mouse already has been edited
+ *	- store new position
+ *	- draw the pixel
+ *  Parameters:	xPos, yPos: Mouse coordinates
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method FatbitsClass, MSG_FATBITS_EDIT_MASK_META_PTR{
+
+   do {
+   	if (xPos != pself->FBI_drag.x0) break;
+   	if (yPos != pself->FBI_drag.y0) break;
+   	return;
+   } while (FALSE);
+
+   pself->FBI_drag.x0 = xPos;
+   pself->FBI_drag.y0 = yPos;
+   EditMaskDrawPixel(oself, pself->FBI_drag.x0, pself->FBI_drag.y0);
+}
+
+/*######################################################################
+  #
+  #	Shift Image Tool
+  #
+  ######################################################################*/
+
+/*--------------------- MSG_ICON_SHIFT_IMAGE_TO ---------------------
+ *  Purpose:	Execute shift image operation
+ *  Context:
+ *  Strategy:
+ *	- Save current icon state for undo
+ *	- fetch shift amount
+ *	- loop: depending on shiftDirection: shift image
+ *	        one pixel in each loop turn
+ *	- update local copy of the mask data
+ *	- mark icon dirty
+ *	- redraw fatbits and live preview
+ *  Parameters: void (ShiftDirection shiftDirection)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconProcessClass, MSG_ICON_SHIFT_IMAGE_TO {
+optr fatbitsObj;
+int count;
+VMBlockHandle	bmp;
+
+    fatbitsObj = CombineGCurDisplayWith(@MyFatbits);
+    if (!fatbitsObj) return;
+
+    AppMarkBusy();
+    @call fatbitsObj::MSG_FATBITS_UNDO_SAVE_ICON_STATE(UNDO_SHIFT_IMAGE);
+
+
+    count = @call ShiftImageAmountValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    bmp = @call fatbitsObj::MSG_FATBITS_GET_BITMAP();
+
+    switch (shiftDirection) {
+        case SHIFT_TO_TOP_LEFT:
+            BTShiftImage(global.tempFile, bmp, -count, -count, 0);
+	    break;
+        case SHIFT_TO_TOP:
+            BTShiftImage(global.tempFile, bmp, 0, -count, 0);
+	    break;
+        case SHIFT_TO_TOP_RIGHT:
+            BTShiftImage(global.tempFile, bmp, count, -count, 0);
+	    break;
+        case SHIFT_TO_LEFT:
+            BTShiftImage(global.tempFile, bmp, -count, 0, 0);
+	    break;
+        case SHIFT_TO_RIGHT:
+            BTShiftImage(global.tempFile, bmp, count, 0, 0);
+	    break;
+        case SHIFT_TO_BOTTOM_LEFT:
+            BTShiftImage(global.tempFile, bmp, -count, count, 0);
+	    break;
+        case SHIFT_TO_BOTTOM:
+            BTShiftImage(global.tempFile, bmp, 0, count, 0);
+	    break;
+        case SHIFT_TO_BOTTOM_RIGHT:
+            BTShiftImage(global.tempFile, bmp, count, count, 0);
+	    break;
+	}
+
+
+    /*
+     * We have a new (shifted) mask now. Replace it.
+     * Mark Icon as dirty.
+     */
+    @call fatbitsObj::MSG_FATBITS_UPDATE_MASK_BMP();
+    @call ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk(@DBViewerContent))::MSG_DB_VIEWER_MARK_ICON_DIRTY();
+
+    /*
+     * Redraw Fatbits and Preview
+     */
+    @call ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk (@FatbitsView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+    @call ConstructOptr(OptrToHandle(fatbitsObj), OptrToChunk (@LivePreviewView))::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    AppMarkNotBusy();
+
+}
+
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file edit2.goc ********************/
+
+
