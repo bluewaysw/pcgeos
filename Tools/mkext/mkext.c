@@ -1,6 +1,8 @@
 /*
 	Make Extern - Create @extern - statements for objects and chunks
 	Process .goc file and create corresponding .goh file
+	Author:	Rainer Bettsteller, 2022-2026
+	Idea:	Edward Di Geronimo Jr., 1996 (16 Bit DOS-Tool EXTERN.EXE)
 */
 #include <stdio.h>
 #include <string.h>
