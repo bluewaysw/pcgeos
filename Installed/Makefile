@@ -131,7 +131,7 @@ minimalAppl	: minimalGame minimalUtils minimalTools minimalSavers \
 		  bbxchat bbxmail \
 		  newsread geozip sclock trayapps\
  	  	  hmbase pdfvu bnkr30 ftpc \
- 	  	  instc instf grafcalc
+ 	  	  instc instf grafcalc iconed
 
 minimalUtils	: prefmgr
 
@@ -989,6 +989,9 @@ Installed/Library/FMTools/CvtTool:	ui convert MAKELIB
 
 grafcalc: Installed/Appl/GrafCalc
 Installed/Appl/GrafCalc:	ui ansic cell parse color math MAKEAPPL
+
+iconed: Installed/Appl/IconEd
+Installed/Appl/IconEd:		ui ansic impex grobj bitmap bmptools rsftool icmtool MAKEAPPL
 
 homebase:
 #	No need to do this because this is sync'ed by morning make script.

@@ -57,13 +57,21 @@ nav_order: 3
 [6.1 Changing Platforms](Tools/tdebug.md#61-changing-platforms)  
 [6.2 Switching Kernels](Tools/tdebug.md#62-switching-kernels)
 
-**[7 Icon Editor](Tools/ticoned.md)**  
+**[7 Icon Editor](Tools/ticoned.md#7-icon-editor)**  
 [7.1 Creating Icons](Tools/ticoned.md#71-creating-icons)  
-[7.2 Importing Icons](Tools/ticoned.md#72-importing-icons)  
-[7.3 Editing Icons](Tools/ticoned.md#73-editing-icons)  
-[7.4 Writing Source Code](Tools/ticoned.md#74writing-source-code)  
-[7.5 Icon Databases](Tools/ticoned.md#75-icon-databases)  
-[7.6 Exporting to Database](Tools/ticoned.md#76-exporting-to-database)
+[7.1.1 Basic](Tools/ticoned.md#711-basics)  
+[7.1.2 Creating a New Icon Set](Tools/ticoned.md#712-creating-a-new-icon-set)  
+[7.1.3 Creating a New Icon](Tools/ticoned.md#713-creating-a-new-icon)  
+[7.1.4 Importing Icons](Tools/ticoned.md#714-importing-icons)  
+[7.2 Editing Icons](Tools/ticoned.md#72-editing-icons)  
+[7.2.1 Basic Functions](Tools/ticoned.md#721-basic-functions)  
+[7.2.2 Changing Colors and Size](Tools/ticoned.md#722-changing-colors-and-size)  
+[7.2.3 Icon Preview](Tools/ticoned.md#723-icon-preview)  
+[7.3 Write Source Code](Tools/ticoned.md#73-write-source-code)  
+[7.3.1 Writing the Code](Tools/ticoned.md#731-writing-the-code)  
+[7.3.2 Using VisMonikers, Bitmaps and GStrings in your Program](Tools/ticoned.md#732-using-vismonikers-bitmaps-and-gstrings-in-your-program)  
+[7.4 Exporting to the Token Database](Tools/ticoned.md#74-exporting-to-the-token-database)  
+[7.5 Additional Features](Tools/ticoned.md#75-additional-features)  
 
 **[8 Resource Editor](Tools/tresed.md)**  
 [8.1 Glossary](Tools/tresed.md#81-glossary)  

@@ -1,0 +1,1079 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	debug.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file contains debugging stuff.
+ *
+ **************************************************************************/
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+@include <sysstats.h>
+
+@include "iconed.goh"
+@include "bmptools.goh"
+
+@include "UI/appui.goh"
+@include "token.h"
+
+
+/*---------------------------------------------------------------------------
+	Definitons
+ ---------------------------------------------------------------------------*/
+extern GlobalStruct global;
+
+
+@if @DEBUG_FLAG
+
+
+/*---------------------------------------------------------------------------
+	Hilfsroutinen
+ ---------------------------------------------------------------------------*/
+
+int stopswat(void) { int x = 12; return x; }	// debug feature to stop swat in the middle of a routine
+
+
+/*---------------------	CheckVMBlockValidOrZero -------------------------------*
+ * 	Purpose:	Check if VMHandle is valid or zero
+ 	Return:		TRUE in case of error
+ *----------------------------------------------------------------------*/
+Boolean CheckVMBlockValidOrZero(VMFileHandle vmFile, VMBlockHandle block)
+{
+VMInfoStruct info;
+Boolean err;
+
+	if (block == 0 ) return FALSE;		// allowed here
+
+	// VMInfo checks if the block is valid
+	// returns TRUE, if valid (checked with swat)
+	err = ! ( VMInfo (vmFile, block, &info) );
+	return err;
+
+}
+
+/*---------------------	CheckVMBlockValid -------------------------------*
+ * 	Purpose:	Check if VMHandle is valid
+ 	Return:		TRUE in case of error
+ *----------------------------------------------------------------------*/
+Boolean CheckVMBlockValid(VMFileHandle vmFile, VMBlockHandle block)
+{
+VMInfoStruct info;
+Boolean err;
+
+	// Zero is invalid here
+	if (!block) return TRUE;
+
+	// VMInfo checks if the block is valid
+	// returns TRUE, if valid (checked with swat)
+	err = ! ( VMInfo (vmFile, block, &info) );
+	return err;
+
+}
+
+/*---------------------	DebugDisplayVMListEntry -------------------------------*
+ * 	Purpose:	Show VisMonikerListEntryType briefly
+ *----------------------------------------------------------------------*/
+void DebugDisplayVMListEntry(VisMonikerListEntryType vmlet) {
+@if 0
+typedef WordFlags VisMonikerListEntryType;	!<---
+
+#define VMLET_GS_SIZE 		0x3000	/* DisplaySize */
+#define VMLET_STYLE		0x0f00  /* VMStyle */
+#define VMLET_MONIKER_LIST	0x0080
+#define VMLET_GSTRING		0x0040
+#define VMLET_GS_ASPECT_RATIO	0x0030	/* DisplayAspectRatio */
+#define VMLET_GS_COLOR		0x000f	/* DisplayClass */
+
+#define VMLET_GS_SIZE_OFFSET 12
+#define VMLET_STYLE_OFFSET 8
+#define VMLET_GS_ASPECT_RATIO_OFFSET 4
+#define VMLET_GS_COLOR_OFFSET 0
+@endif
+word	val;
+
+     DebugInfo1("\rVMLE=%04X", vmlet);
+
+     if (vmlet & VMLET_GSTRING) { DebugInfo(", gs"); }
+     	else { DebugInfo(", GS NOT SET"); }
+
+     if (vmlet & VMLET_MONIKER_LIST) { DebugInfo(", LIST IS SET"); }
+
+     val = (vmlet & VMLET_GS_SIZE) >> VMLET_GS_SIZE_OFFSET;
+     switch (val) {
+     case     DS_TINY:  DebugInfo(", tiny"); break;
+     case     DS_STANDARD:  DebugInfo(", std"); break;
+     case     DS_LARGE:  DebugInfo(", large"); break;
+     case     DS_HUGE:  DebugInfo(", huge"); break;
+     default:  DebugInfo(", SIZE?"); break;
+     }
+
+     val = (vmlet & VMLET_STYLE) >> VMLET_STYLE_OFFSET;
+     switch (val) {
+     case     VMS_ICON:  DebugInfo(", icon"); break;
+     case     VMS_TOOL:  DebugInfo(", tool"); break;
+     default:  DebugInfo(", STYLE?"); break;
+     }
+
+     val = vmlet & VMLET_GS_COLOR;	// Shift offset is zero
+     switch (val) {
+     case     DC_GRAY_1:  DebugInfo(", mono"); break;
+     case     DC_COLOR_4:  DebugInfo(", col4"); break;
+     case     DC_COLOR_8:  DebugInfo(", col8"); break;
+     case     DC_CF_RGB:  DebugInfo(", RGB"); break;
+     default:  DebugInfo(", COLOR?"); break;
+     }
+
+     val = (vmlet & VMT_GS_ASPECT_RATIO) >> VMLET_GS_ASPECT_RATIO_OFFSET;
+     switch (val) {
+     case     DAR_NORMAL:  DebugInfo(", norm"); break;
+     case     DAR_SQUISHED:  DebugInfo(", sqish"); break;
+     case     DAR_VERY_SQUISHED:  DebugInfo(", vSquish"); break;
+     default:  DebugInfo(", ASPECT?"); break;
+     }
+
+}
+
+/*---------------------	DebugDumpMoniker -------------------------------*
+ * 	Purpose:
+ *----------------------------------------------------------------------*/
+void DebugDumpMoniker(VisMonikerWithGString *monikerPtr, int idNr) {
+int type;
+int color, aspect, cmd, bmpSize;
+byte *bPtr;
+
+    DebugInfo1("\r+++ Debug Moniker %u ++++", idNr);
+
+// -- VisMoniker Part
+    type = monikerPtr->VMWGS_common.VM_type;
+    if ( type & VMT_MONIKER_LIST ) DebugInfo("\r - is MONIKER_LIST -");
+    if ( (type & VMT_GSTRING) == 0 ) {
+    	DebugInfo1("\r - NO GSTRING - width=%u", monikerPtr->VMWGS_common.VM_width);
+    	return;
+    }
+    color = type & VMT_GS_COLOR;
+    aspect = (type & VMT_GS_ASPECT_RATIO) >> 4;
+    DebugInfo2("\rColor=%u, aspect=%u", color, aspect);
+
+    DebugInfo2("\rSize =%ux%u", monikerPtr->VMWGS_common.VM_width, monikerPtr->VMWGS_height);
+
+// -- GString part
+    bPtr = (void*)monikerPtr;
+    bPtr += sizeof(VisMonikerWithGString);
+
+    cmd = *bPtr;
+    bPtr++;
+    bmpSize = *((word*)bPtr);
+    bPtr += 2;
+    DebugInfo2("\rcmd = %u, %u bytes", cmd, bmpSize);
+
+// Bitmap header
+   DebugDisplayBitmapHeaderPtr((CBitmap*) bPtr);
+
+// End GString - bPtr muss noch auf Bitmap header zeigen
+   DebugInfo1("\rGS-End-Cmd = %02X", bPtr[bmpSize]);
+   if (bPtr[bmpSize] != GR_END_GSTRING) DebugInfo("  BAD!");
+
+}
+
+/*---------------------	DebugDisplayBitmapHeader -------------------------------*
+ * 	Purpose:
+ *----------------------------------------------------------------------*/
+void DebugDisplayBitmapHeader(VMFileHandle vmFile, VMBlockHandle bmpHandle) {
+CBitmap* header;
+MemHandle mh;
+int  n;
+word	size;
+byte *data;
+
+
+    header = BTBitmapToolLockHeader(vmFile, bmpHandle, &mh);
+    DebugDisplayBitmapHeaderPtr(header);
+    VMUnlock(mh);
+
+    // Erste Zeile
+    DebugInfo("\rFirst Line Content:");
+    HugeArrayLock(vmFile, bmpHandle, 0, (void**)&data, &size);
+    for (n = 0; n < 8; n++) DebugInfo1(" %02X",data[n]);
+    HugeArrayUnlock(data);
+}
+
+
+/*---------------------	DebugDisplayBitmapHeaderPtr -------------------------------*
+ * 	Purpose:
+ *----------------------------------------------------------------------*/
+void DebugDisplayBitmapHeaderPtr(CBitmap* header) {
+word	width, height, compact, type;
+
+@if 0
+/* Simple Bitmap Structure */
+
+typedef struct {
+    word	B_width;
+    word	B_height;
+    byte	B_compact;
+    byte	B_type;
+} Bitmap;
+
+/* Complex Bitmap Structure */
+
+typedef struct {
+    Bitmap	CB_simple;
+    word	CB_startScan;
+    word	CB_numScans;
+    word	CB_devInfo;
+    word	CB_data;
+    word	CB_palette;
+    word	CB_xres;
+    word	CB_yres;
+} CBitmap;
+@endif
+
+    // Simple Bitmap Data
+    width = header->CB_simple.B_width;
+    height = header->CB_simple.B_height;
+    compact = header->CB_simple.B_compact;
+    type = header->CB_simple.B_type;
+
+    DebugInfo("\r**Bitmap Header **");
+    DebugInfo2("\r  %ux%u", width, height);
+    if (compact) DebugInfo1(", comp=%u", compact);
+
+    switch (type & BMT_FORMAT) {
+	case BMF_MONO: DebugInfo(", mono"); break;
+	case BMF_4BIT: DebugInfo(", 4Bit"); break;
+	case BMF_8BIT: DebugInfo(", 8Bit"); break;
+	case BMF_24BIT: DebugInfo(", RGB"); break;
+	default: DebugInfo(", COLOR?");
+	}
+
+    if (type & BMT_HUGE) DebugInfo(", HUGE");
+    if ( (type & BMT_MASK) == 0) DebugInfo(", no Mask");
+    if (type & BMT_PALETTE) DebugInfo(", Palette");
+    if ( (type & BMT_COMPLEX) ==0 ) {
+    	DebugInfo(", simple");
+    	return;
+    }
+
+    // Complex data
+    DebugInfo2("\rScan start=%u num=%u",header->CB_startScan, header->CB_numScans);
+    DebugInfo1("\rCB_devInfo = %u", header->CB_devInfo);
+    DebugInfo1("\rCB_data =%u", header->CB_data);
+    DebugInfo1("\rCB_palette =%u", header->CB_palette);
+    DebugInfo2("\rResolution %ux%u", header->CB_xres, header->CB_yres);
+
+}
+
+/*---------------------------------------------------------------------------
+	Routines - Test for different purposes
+ ---------------------------------------------------------------------------*/
+
+/*--------------------- TestPrintIconList ---------------------
+ *  Purpose:	Print whole Mapblock's mainArray
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void TestPrinMainArray(VMFileHandle vmFile, VMBlockHandle mainArray) {
+int count, n;
+    count = HugeArrayGetCount(vmFile, mainArray);
+DebugInfo1("\rNumber of Icon sets = %u", count );
+
+    if ( count ) for ( n = 0; n < count; n++ ) {
+    TestPrintIconData(vmFile, n);
+    }
+}
+
+/*--------------------- TestPrintIconData ---------------------
+ *  Purpose:	Print Mapblock's mainArray element
+ *  Context:
+ *  Strategy:
+ *  Parameters:	iSet: icon set (number)
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void TestPrintIconData(VMFileHandle vmFile, int iSet) {
+/*
+typedef struct {
+	char 	ISH_name[MAX_ISET_NAME_LENGTH];
+	PreviewSettingsType ISH_preview_unused;	/* current preview object * /
+	IconFlags 	ISH_flags;		/* various (ptr image, etc) * /
+	word 	ISH_rsrvd;		/* reserved for future use * /
+	word 	ISH_entryCount;		/* number of valid entries
+					   in the iconEntry list * /
+	optr 	ISH_entryList;		/* block & chunk for chunkarray * /
+} ISetHeader;
+
+
+typedef struct {
+	char 	IE_name[MAX_ICON_NAME_LENGTH];	/* name * /
+	VisMonikerListEntryType IE_type;
+	word 	IE_bitmap;			/* chunk array block & chunk * /
+	word 	IE_extraBlock;			/* for later additions * /
+} IconEntry;
+*/
+
+ISetHeader	*iHeader;
+IconEntry	*iconEntry;
+word 	size;
+int	width, height, compr, count, n, iconCount;
+char 	buf[MAX_ISET_NAME_LENGTH + 2];
+VMBlockHandle	arrayBlock;
+ChunkHandle 	arrayChunk;
+//MemHandle	mh;
+
+optr	iEntryList;
+	/*
+	 * Test Id.. routines
+	 */
+
+	DebugInfo1("\r---------- Print IconData iSet %u", iSet);
+
+	DebugInfo("\rIcon-Name: ");
+	IdGetISetName(vmFile, iSet, buf);
+	DebugInfo(buf);
+
+	iHeader = IdLockIconHeader(vmFile, iSet);
+
+	DebugInfo1("\rISH_flags = %04X", iHeader->ISH_flags);
+	iconCount = iHeader->ISH_entryCount;
+
+	arrayBlock = iHeader->ISH_iEntryListBlock;
+	arrayChunk = iHeader->ISH_iEntryListArray;
+
+	IdUnlockIconHeader(iHeader, FALSE);
+
+
+	DebugInfo1("\rISH_entryCount = %u", iconCount);
+
+	iEntryList = IdLockEntryList(vmFile, iSet);
+
+	count = ChunkArrayGetCount(iEntryList);
+	for ( n = 0; n < count; n++ ) {
+		iconEntry = ChunkArrayElementToPtr(iEntryList, n, &size);
+
+		DebugInfo2("\r  - icon %u: bmp=%04X", n, iconEntry->IE_bitmap);
+
+		if (iconEntry->IE_bitmap) {
+			BTGetMoreBitmapInfos(vmFile, iconEntry->IE_bitmap, &width, &height, &compr);
+			DebugInfo2("\r\t%ux%u", width, height);
+			DebugInfo1(", compr=%d", compr);
+		}
+	}
+
+
+	IdUnlockEntryList(iEntryList, FALSE);
+
+	for ( n = 0; n < count; n++ ) {
+		DebugInfo1("\r %u ID-Name:", n);
+		IdGetEntryName(vmFile, iSet, n, buf);
+		DebugInfo(buf);
+		DebugInfo("<");
+	}
+}
+
+/*---------------------------------------------------------------------------
+	complete Full-Chek of a file (icon database)
+
+	Boolean FullCheckDatabase(VMFileHandle vmFile)
+
+ ---------------------------------------------------------------------------*/
+Boolean FullCheckDatabaseInternal(VMFileHandle vmFile);
+
+/* return TRUE  in case of error */
+Boolean FullCheckDatabase(VMFileHandle vmFile) {
+Boolean err;
+	err = FullCheckDatabaseInternal(vmFile);
+	if (err) MessageBox("FullCheckDatabase Failed");
+	return err;
+}
+
+/* -- FullCheckDatabaseInternal --*/
+Boolean FullCheckDatabaseInternal(VMFileHandle vmFile) {
+VMBlockHandle iconArray;
+int NumSets, iSet, count1, count2, len, entryCount, icon;
+word size;
+ISetHeader	*iHeader;
+IconEntry *iconEntry;
+char buffer[60];
+MemHandle	mh;
+ChunkHandle	arrayChunk;
+VMBlockHandle	arrayBlock;
+optr	iEntryList;
+
+
+    DebugInfo("\r--- FullCheckDatabase ---");
+
+    iconArray = IdGetHugeArray(vmFile);
+    if (CheckVMBlockValid(vmFile, iconArray)) {
+    	DebugInfo1("\rInvalid IconArray %X", iconArray);
+    	return TRUE;
+    	}
+
+    NumSets = HugeArrayGetCount(vmFile, iconArray);
+    DebugInfo1("\rNumSets = %u", NumSets);
+
+    /* Alle icon sets full checken */
+    iSet = 0;
+checkNextIcon:
+    DebugInfo1("\r+++ Icon-Set Nr. %u", iSet);
+
+    iHeader = IdLockIconHeader(vmFile, iSet);
+    if (!iHeader) {
+    	DebugInfo("\rIcon-Set does not exist");
+    	return TRUE;
+    	}
+
+    /*
+     * Print ISetHeader
+     */
+
+    // Name (special case 32 characters not implemented!)
+    len = strlen(iHeader->ISH_name);
+    DebugInfo1("\rIconName len = %u \r>", len);
+    DebugInfo(iHeader->ISH_name);
+    DebugInfo("<\r>");
+    IdGetISetName(vmFile, iSet, buffer);
+    DebugInfo(buffer);
+    DebugInfo("<");
+    if (strcmp(buffer, iHeader->ISH_name)) {
+    	DebugInfo("\rError in IdGetISetName");
+    	IdUnlockIconHeader(iHeader, FALSE);
+    	return TRUE;
+    	}
+
+    // Rest
+    DebugInfo1("\rISH_entryCount = %u", iHeader->ISH_entryCount);
+    DebugInfo1("\rISH_iEntryListArray = %u", (word)iHeader->ISH_iEntryListArray);
+    DebugInfo1("\rISH_iEntryListBlock = %u", iHeader->ISH_iEntryListBlock);
+
+    arrayBlock = iHeader->ISH_iEntryListBlock;
+    arrayChunk = iHeader->ISH_iEntryListArray;
+    entryCount = iHeader->ISH_entryCount;
+
+    IdUnlockIconHeader(iHeader, FALSE);
+
+    // Check EntryListBlock
+    if (CheckVMBlockValid(vmFile, arrayBlock)) {
+    	DebugInfo1("\rInvalid ISH_iEntryListBlock %X", iconArray);
+    	return TRUE;
+    	}
+
+    DebugInfo("\r---Check entryListBlock");
+    VMLock(vmFile,  arrayBlock, &mh);
+    DebugInfo1("\rMan. Lock: mh=%u, ", mh);
+    count1 = ChunkArrayGetCountHandles(mh, arrayChunk);
+    DebugInfo1(" count =%u", count1);
+    ECCheckChunkArrayHandles(mh, arrayChunk);
+    VMUnlock(mh);
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    count2 = ChunkArrayGetCount(iEntryList);
+    DebugInfo2("\rId-Lock: mh=%u, count = %u", OptrToHandle(iEntryList), count2);
+    ECCheckChunkArray(iEntryList);
+    IdUnlockEntryList(iEntryList, FALSE);
+
+    if (count1 != count2) {
+    	DebugInfo2("\rChunkArray Count differs %u vs %u", count1, count2);
+    	return TRUE;
+    	}
+    if (count1 != entryCount) {
+    	DebugInfo2("\rentryCount %u differs vs ChunkArray Count %u", count1, entryCount);
+    	return TRUE;
+    	}
+
+    /*
+     * Print IconEntry
+     */
+
+    iEntryList = IdLockEntryList(vmFile, iSet);
+    for (icon = 0; icon < entryCount; icon++ ) {
+    	DebugInfo1("\r+++ Icon Nr. %u", icon);
+    	iconEntry = ChunkArrayElementToPtr(iEntryList, icon, &size);
+
+	// Name (special case 32 characters not implemented!)
+	// no check for IdGetEntryName double locked
+    	len = strlen(iconEntry->IE_name);
+    	DebugInfo1("\rIconName len = %u >", len);
+    	DebugInfo(iconEntry->IE_name);
+    	DebugInfo("<");
+
+	DebugDisplayVMListEntry(iconEntry->IE_type);
+
+        DebugInfo2("\rBitmap=%u, extrablock=%u", iconEntry->IE_bitmap, iconEntry->IE_extraBlock);
+    	if (CheckVMBlockValid(vmFile, iconEntry->IE_bitmap)) {
+    	    DebugInfo1("\rInvalid Bitmap Block %X", iconEntry->IE_bitmap);
+    	    return TRUE;
+    	    }
+
+	DebugDisplayBitmapHeader(vmFile, iconEntry->IE_bitmap);
+
+    	}
+    IdUnlockEntryList(iEntryList, FALSE);
+
+    // Icon-Set done
+    iSet++;
+    if (iSet < NumSets) goto  checkNextIcon;
+    DebugInfo("\r------- DONE --------");
+    return FALSE;
+
+}
+
+
+/*---------------------------------------------------------------------------
+	Undo - Debugging
+ ---------------------------------------------------------------------------*/
+void DebugUndoHeader(char *info, UndoChainHeader *header) {
+// info : nullpointer erlaubt
+int start, end;
+
+    if (info) if (strlen(info)) DebugInfo(info);
+
+    DebugInfo1("\rNext-Index=%u", header->nextIndex);
+
+    DebugInfo1("\r  %uxUndo", header->undoCount);
+    if (header->undoCount) {
+
+    	start = header->nextIndex - header->undoCount;
+    	if (start < 0) start += UNDO_BUFFER_SIZE;
+
+    	end = start + header->undoCount - 1;
+    	if ( end >= UNDO_BUFFER_SIZE ) end -= UNDO_BUFFER_SIZE;
+	DebugInfo2(": %u (%u)", start, header->undoArray[start].iconBitmap);
+	DebugInfo2("-%u (%u)", end, header->undoArray[end].iconBitmap);
+    }
+
+    DebugInfo1("\r  %uxRedo", header->redoCount);
+    if (header->redoCount) {
+
+    	start = header->nextIndex + 1;
+    	if (start >= UNDO_BUFFER_SIZE ) start -= UNDO_BUFFER_SIZE;
+
+    	end = start + header->redoCount - 1;
+    	if ( end >= UNDO_BUFFER_SIZE ) end -= UNDO_BUFFER_SIZE;
+	DebugInfo2(": %u (%u)", start, header->undoArray[start].iconBitmap);
+	DebugInfo2("-%u (%u)", end, header->undoArray[end].iconBitmap);
+    }
+}
+
+
+/*---------------------------------------------------------------------------
+	Routines - Debug~
+ ---------------------------------------------------------------------------*/
+void DebugInfo(char* text) {
+    @call IconDebugText::MSG_VIS_TEXT_APPEND_PTR(text, 0);
+}
+
+void DebugInfo1(char *text, word val) {
+char buffer[100];
+    sprintf(buffer, text, val);
+    @call IconDebugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+void DebugInfo2(char *text, word val, word val2) {
+char buffer[100];
+    sprintf(buffer, text, val, val2);
+    @call IconDebugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+
+void DebugInfo1DW(char *text, dword val) {
+char buffer[100];
+    sprintf(buffer, text, val);
+    @call IconDebugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+void DebugInfo2DW(char *text, dword val, dword val2) {
+char buffer[100];
+    sprintf(buffer, text, val, val2);
+    @call IconDebugText::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+}
+
+void DebugBuffer(byte *bPtr, int count) {
+char buffer[20];
+int n;
+dword dw;
+
+     dw = (dword)bPtr;
+     DebugInfo2("\rbytes at %04X:%04X\r", (dw>>16) & 0xFFFF, dw & 0xFFFF);
+     n = 0;
+     while (n < count) {
+     	sprintf(buffer, " %02X", bPtr[n]);
+     	DebugInfo(buffer);
+     	n++;
+     	if ( (n & 0x07) == 0) DebugInfo("\r");
+     }
+}
+
+
+void DebugClearText(void) {
+    @call IconDebugText::MSG_VIS_TEXT_DELETE_ALL();
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ ---------------------------------------------------------------------------*/
+void WWFToASCII(char *buffer, WWFixedAsDWord wwf, Boolean addHex) {
+char *p;
+word	i, f;
+WWFixedAsDWord  sik;
+
+     p = buffer;
+     *p =0;
+     sik = wwf;
+     i = (wwf>>16) & 0xFFFF;
+     f = wwf & 0xFFFF;
+
+
+
+     // Negative Zahl?
+     if ( i & 0x8000 ) {
+     	wwf = 0-wwf;
+	i = (wwf>>16) & 0xFFFF;
+	f = wwf & 0xFFFF;
+     	*p = '-';
+     	p++;
+     	}
+
+
+     // Ganzzahligen Teil
+     UtilHex32ToAscii(p, i, UHTAF_NULL_TERMINATE);
+     strcat(p, ".");
+     p = strchr(p, 0);
+
+     // Gebrochener Teil: Q'Dirty - 3 Nachkommastellen ohne Runden
+     i = 0;
+     if (f & 0x8000) i  = 5000;	/* 1/2	*/
+     if (f & 0x4000) i += 2500;	/* 1/4	*/
+     if (f & 0x2000) i += 1250;	/* 1/8	*/
+     if (f & 0x1000) i +=  625;	/* 1/16	*/
+     if (f & 0x0800) i +=  313;	/* 1/32	*/
+     if (f & 0x0400) i +=  156;	/* 1/64	*/
+     if (f & 0x0200) i +=   78;	/* 1/128	*/
+     if (f & 0x0100) i +=   39;	/* 1/256	*/
+     if (f & 0x0080) i +=   20;	/* 1/512	*/
+     if (f & 0x0040) i +=   10;	/* 1/1024	*/
+     if (f & 0x0020) i +=    5;	/* 1/2048	*/
+     if (f & 0x0010) i +=    2;	/* 1/4096	*/
+     if (f & 0x0008) i +=    1;
+
+     i = i/10;
+     sprintf(p, "%03u", i);
+
+     if ( addHex) {
+     	i = (sik>>16) & 0xFFFF;
+     	f = sik & 0xFFFF;
+     	p = strchr(p, 0);
+     	sprintf(p, " (%04X:%04X)", i,f);
+	}
+
+}
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ ---------------------------------------------------------------------------*/
+void DebugWWF(char *txt, WWFixedAsDWord wwf) {
+char buf[30];
+
+    DebugInfo(txt);
+    WWFToASCII(buf, wwf, TRUE);
+    DebugInfo(buf);
+}
+
+/*---------------------  ---------------------
+ *  Purpose:	Debug MSG_GEN_DOCUMENT_ ... messages
+ ---------------------------------------------------------------------------*/
+void DebugDocMsg(optr docObj, char *txt) {
+	// important! pass IconDBDocument as docObj
+int	op;
+char 	opText[20];
+
+    op = @call docObj::MSG_GEN_DOCUMENT_GET_OPERATION();
+
+    switch (op) {
+    case GDO_SAVE_AS:
+    	strcpy(opText, "");
+	break;
+    case GDO_SAVE:		// = 8
+    	strcpy(opText, " (save)");
+	break;
+    case GDO_CLOSE:		// = 9
+    	strcpy(opText, " (close)");
+	break;
+    case GDO_REVERT: //  = 2  ,
+    	strcpy(opText, " (revert)");
+	break;
+    case GDO_REVERT_QUICK: // = 3   ,
+    	strcpy(opText, "(quick)");
+	break;
+    case GDO_ATTACH: //  = 4  ,
+    	strcpy(opText, " (attach)");
+	break;
+    case GDO_DETACH: //  = 5  ,
+    	strcpy(opText, " (detach)");
+	break;
+    case GDO_NORMAL: // = 0   ,
+    	strcpy(opText, " (normal)");
+	break;
+    case GDO_NEW: // = 6   ,
+    	strcpy(opText, " (new)");
+	break;
+    case GDO_OPEN: // = 7    ,
+    	strcpy(opText, " (open)");
+	break;
+    default:
+    	strcpy(opText, "");
+    /* other possibe GenDocumentOperation values
+	    GDO_AUTO_SAVE = 10   ,
+	    GDO_REVERT_TO_AUTO_SAVE = 11   ,
+    */
+    }
+
+    DebugInfo("\r");
+    DebugInfo(txt);
+    DebugInfo1(", op=%u", op);
+    DebugInfo(opText);
+}
+
+
+/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+void DumpTokenMonikers2(dword tokenChars, word manufID)
+{
+TokenEntry      *tokenEntryP;
+MemHandle    tokenEntryMH;
+word 	teMHSize;
+Boolean         ok;
+DBGroupAndItem  monList;
+
+
+    DebugInfo("\r---DumpTokenMonikers2--");
+    ok = TokenLoadTokenBlock(tokenChars, manufID, &teMHSize, &tokenEntryMH);
+    DebugInfo2("\rsize tokenEntry=%u, locked =%u", sizeof(TokenEntry), teMHSize);
+
+    if (!ok)
+    {
+    	DebugInfo("--NOT OK - return");
+        return;
+    }
+
+    tokenEntryP = MemLock(tokenEntryMH);
+    monList = tokenEntryP->TE_monikerList;
+    MemUnlock(tokenEntryMH);
+
+DebugInfo1DW("\MonikerList = %lu", monList);
+
+{
+Boolean err;
+DisplayType displayType;
+/*
+typedef ByteFlags DisplayType;
+#define DT_DISP_SIZE		0xc0	<-- DS_STANDARD
+#define DT_DISP_ASPECT_RATIO	0x30	<-- DAR_NORMAL
+#define DT_DISP_CLASS		0x0f	<-- DC_COLOR_4 ..,
+
+#define DT_DISP_SIZE_OFFSET 6
+#define DT_DISP_ASPECT_RATIO_OFFSET 4
+#define DT_DISP_CLASS_OFFSET 0
+*/
+
+
+VisMonikerSearchFlags searchFlags;
+/*
+#define VMSF_STYLE 		0xf000		<<-- VMS_ICON/TOOL
+#define VMSF_COPY_CHUNK 		0x0400
+#define VMSF_REPLACE_LIST 	0x0200
+#define VMSF_GSTRING 		0x0100
+
+#define VMSF_STYLE_OFFSET 	12
+*/
+
+TokenMonikerInfo tokenMonikerInfo;
+/*
+typedef struct {
+    TokenDBItem         TMI_moniker;
+    word                TMI_fileFlag;           / * 0 if token is in shared
+						   token DB file
+						   Non-0 if it's in local file * /
+} TokenMonikerInfo;
+*/
+    displayType = DS_STANDARD	<< DT_DISP_SIZE_OFFSET |
+    		DAR_NORMAL	<< DT_DISP_ASPECT_RATIO_OFFSET |
+    		DC_COLOR_4	<< DT_DISP_CLASS_OFFSET;
+
+    searchFlags = VMS_ICON	<< VMSF_STYLE_OFFSET |
+    		VMSF_GSTRING;
+
+    err = TokenLookupMoniker(tokenChars, manufID,
+		       displayType, searchFlags,
+		       &tokenMonikerInfo);
+DebugInfo1("\rNr 1: err = %d", err);
+DebugInfo1DW("\r\t%lX,", (dword)tokenMonikerInfo.TMI_moniker);
+
+    displayType = DS_STANDARD	<< DT_DISP_SIZE_OFFSET |
+    		DAR_NORMAL	<< DT_DISP_ASPECT_RATIO_OFFSET |
+    		DC_CF_RGB	<< DT_DISP_CLASS_OFFSET;
+
+    searchFlags = VMS_TOOL	<< VMSF_STYLE_OFFSET |
+    		VMSF_GSTRING;
+
+    err = TokenLookupMoniker(tokenChars, manufID,
+		       displayType, searchFlags,
+		       &tokenMonikerInfo);
+DebugInfo1("\rNr 2: err = %d", err);
+DebugInfo1DW("\r\t%lX,", (dword)tokenMonikerInfo.TMI_moniker);
+}
+
+}
+
+/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+word ImpTokenListTokens(Boolean listTextOnlyTokens);
+dword IconTokenListIcons(dword tokenChars, word manufID, MonikerFoundStruct *foundIcons);
+
+void AnalyseIconMoniker(GeodeToken tok, int item, MonikerAnalyseResult *mars, char *textMonikerIfAny);
+
+void PrintToken(GeodeToken tok) {
+char buf[20];
+sprintf(buf, "\r%c%c%c%c, %u",
+	tok.GT_chars[0], tok.GT_chars[1], tok.GT_chars[2], tok.GT_chars[3],
+	tok.GT_manufID);
+DebugInfo(buf);
+}
+
+#define DrawToken if (!tokenDrawn ) { tokenDrawn = TRUE; PrintToken(tok); }
+
+/* -------------------- FullCheckIconsInTokenDB ---------------------------------------
+ * Komplettcheck der Icons in der TokenDB
+ * --------------------------------------------------------------------------- */
+void FullCheckIconsInTokenDB(void) {
+int numTokens, numIcons;
+TokenListStruct	*tokenList;
+GeodeToken tok;
+int n, i;
+dword tokenChars, countVal;
+MonikerAnalyseResult	mars;
+Boolean tokenDrawn;
+
+
+
+    // TokenList erzeugen
+    numTokens = ImpTokenListTokens(TRUE);
+
+    // Alle Tokens druchgehen
+    for ( n = 0; n < numTokens; n++) {
+	tokenList = MemLock(global.tokenListMH);
+	tok = tokenList->token[n];
+	MemUnlock(global.tokenListMH);
+
+
+	if ( n & 0x0F) { DebugInfo("."); }
+	        else   { DebugInfo("+"); }
+
+	// Alle Icons im Token druchgehen
+	memcpy(&tokenChars, &tok.GT_chars[0], 4);
+	if (!global.iconListPtr) global.iconListPtr = malloc(MAX_SEARCH_RESULT_ICONS*sizeof(MonikerFoundStruct));
+	countVal = IconTokenListIcons(tokenChars, tok.GT_manufID, global.iconListPtr);
+	numIcons = (countVal & 0xFFFF);
+	numIcons +=  countVal >> 16;
+
+	tokenDrawn = FALSE;
+
+	for ( i = 0; i < numIcons; i++ ) {
+
+
+	    AnalyseIconMoniker(tok, i, &mars, NULL);
+
+	    if (mars.isGString) {
+
+/*
+DisplayClass : OK*/
+		//- Check DisplayClass invaild (DC_TEXT, DC_GRAY_2, DC_GRAY_4, DC_GRAY_8, DC_COLOR_2)
+		switch (mars.displayClass) {
+		case DC_TEXT:
+		case DC_GRAY_2:
+		case DC_GRAY_4:
+		case DC_GRAY_8:
+		case DC_COLOR_2:
+			DrawToken
+			DebugInfo(" displayClass");
+			break;
+		}
+
+
+@if 1
+		//- no bitmap
+		if ( !mars.bitmapFound ) {
+			DrawToken
+			DebugInfo(" no-bitmap");
+		}
+
+		else {
+
+			//- chekc ob palette oder Complex dabei ist
+			if ( mars.bmFormat & BMT_PALETTE ) {
+				DrawToken
+				DebugInfo(" palette");
+			}
+			if ( mars.bmFormat & BMT_COMPLEX ) {
+				DrawToken
+				DebugInfo(" complex");
+			}
+
+
+
+		}
+@endif
+	    }	/* end of isGString */
+
+	}
+	if (tokenDrawn) DebugInfo("\r");
+
+    }
+
+    // do not free global.iconListPtr - depending on the calling routine,
+    // the buffer may be used later --> it will be freed later automatiucally
+
+    DebugInfo("\r * FULL CHECK DONE *");
+}
+
+/*--------------------- PrintFreeHandles ---------------------
+ *  Purpose:	Track free handles
+ *  Context:
+ *  Strategy:	Initialize global.testVal as follows:
+		 global.testVal = 0;
+		 global.testVal = PrintFreeHandles("\rStart:");
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+int PrintFreeHandles(char *text) {
+int numHan;
+numHan = SysGetInfo(SGIT_NUMBER_OF_FREE_HANDLES);
+DebugInfo(text);
+DebugInfo2(" %u (%d)", numHan, numHan - global.testVal);
+return numHan;
+}
+
+@endif
+
+@if @DEBUG_TOKEN_IMPORT
+/*--------------------- DebugAnalyseStruct ---------------------
+ *  Purpose:	Display Important icon attributes
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+void DebugAnalyseStruct(MonikerAnalyseResult *mars) {
+char buf[25];
+
+    @call ImpTokenDebugText::MSG_VIS_TEXT_DELETE_ALL();
+
+//--
+    switch (mars->displayClass) {
+    case DC_TEXT: strcpy(buf, "DC_TEXT"); break;
+    case DC_GRAY_1: strcpy(buf, "DC_GRAY_1"); break;
+    case DC_GRAY_2: strcpy(buf, "! DC_GRAY_2"); break;
+    case DC_GRAY_4: strcpy(buf, "! DC_GRAY_4"); break;
+    case DC_GRAY_8: strcpy(buf, "! DC_GRAY_8"); break;
+    case DC_COLOR_2: strcpy(buf, "! DC_COLOR_2"); break;
+    case DC_COLOR_4: strcpy(buf, "DC_COLOR_4"); break;
+    case DC_COLOR_8: strcpy(buf, "DC_COLOR_8"); break;
+    case DC_CF_RGB: strcpy(buf, "DC_CF_RGB"); break;
+    default:	 strcpy(buf, "! DC_unknown");
+    }
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+//--
+    strcpy(buf, " - ");
+    switch (mars->displaySize) {
+    case DS_TINY: 	strcat(buf, "DS_TINY"); break;
+    case DS_STANDARD: 	strcat(buf, "DS_STANDARD"); break;
+    case DS_LARGE: 	strcat(buf, "DS_LARGE"); break;
+    case DS_HUGE: 	strcat(buf, "DS_HUGE"); break;
+    default: strcat(buf, "DS_unknown");
+    }
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+//--
+    strcpy(buf, " - ");
+    switch (mars->aspect) {
+    case DAR_NORMAL: 	strcat(buf, ""); break;
+    case DAR_SQUISHED: 	strcat(buf, "! DAR_SQUISHED"); break;
+    case DAR_VERY_SQUISHED: strcat(buf, "DAR_VERY_SQUISHED"); break;
+    default: strcat(buf, "DAR_unknown");
+    }
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+//--
+    strcpy(buf, " - ");
+    switch (mars->iconStyle) {
+    case VMS_TEXT: 	strcat(buf, "VMS_TEXT"); break;
+    case VMS_ABBREV_TEXT: 	strcat(buf, "VMS_ABBREV_TEXT"); break;
+    case VMS_GRAPHIC_TEXT: 	strcat(buf, "VMS_GRAPHIC_TEXT"); break;
+    case VMS_ICON: 	strcat(buf, "VMS_ICON"); break;
+    case VMS_TOOL: 	strcat(buf, "VMS_TOOL"); break;
+    default: strcat(buf, "VMS_unknown");
+    }
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+//--
+    if ( !mars->isGString ) return;
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR("\r", 0);
+
+    if (!mars->bitmapFound) {
+    	@call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR("GString - bitmap not found" , 0);
+    	return;
+    }
+
+//--
+    sprintf(buf, "bitmap offset=%u ", mars->bitmapOffset);
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+    sprintf(buf, "(%u bytes), ", mars->bitmapDataSize);
+    switch (mars->bmFormat & BMT_FORMAT) {
+    case BMF_MONO:	strcat(buf, "BMF_MONO"); break;
+    case BMF_4BIT:	strcat(buf, "BMF_4BIT"); break;
+    case BMF_8BIT:	strcat(buf, "BMF_8BIT"); break;
+    case BMF_24BIT:	strcat(buf, "BMF_24BIT"); break;
+    default: 	strcat(buf, "BMF_unknown");
+    }
+    @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+
+    if ((mars->bmFormat & BMT_MASK) == 0) @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(" (NO MASK)", 0);
+    if (mars->bmFormat & BMT_PALETTE) @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(", palette", 0);
+    if (mars->compact != BMC_PACKBITS) @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(" [-UNCOMPACTED-]", 0);
+    if ( mars->bmFormat & BMT_COMPLEX ) @call ImpTokenDebugText::MSG_VIS_TEXT_APPEND_PTR(", COMPLEX", 0);
+
+}
+
+
+@endif
+
+
+/*---------------------  ---------------------
+ *  Purpose:
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+
+/* *********** End of file debug.goc ********************/
+
+
