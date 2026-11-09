@@ -1,0 +1,515 @@
+/**************************************************************************
+ *
+ * PROJECT:	Icon Editor	(GOC Version)
+ * FILE:	preview.goc
+ *
+ *		This project is inspired by the Icon Editor by Steve Yegge, 1992 - 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	RainerB 7/18/2025	Initial revision
+ *
+ *
+ * DESCRIPTION:	This file implements the icon preview dialog handling.
+ *
+ *
+ **************************************************************************/
+
+
+/*  Standard include files */
+@include <stdapp.goh>
+@include <ansi/stdlib.h>
+@include <ansi/stdio.h>
+@include <ansi/string.h>
+
+@include "iconed.goh"
+@include "UI/appui.goh"
+
+
+extern GlobalStruct global;
+
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_OPEN_DIALOG ---------------------
+ *  Purpose:	Initialize IconPreviewDialog and run it
+ *  Context:
+ *  Strategy:	- There are two cases that require different UI:
+ *		  "Normal-icon-mode" and "Pointer-image-mode"
+ *		- MSG_DB_VIEWER_PREVIEW_ICON_UPDATE_DIALOG creates moinker or pointer
+ *		  image and assigns it to the proper objects
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_OPEN_DIALOG {
+Boolean err;
+    if ( pself->DBVI_currentIcon == NO_CURRENT_ICON) return;
+    if ( pself->DBVI_currentISet == NO_CURRENT_ISET) return;
+
+    if ( IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) & IF_PTR_IMAGE ) {
+    	/*
+    	 * Initialize UI for pointer image preview
+    	 */
+    	@send PreviewStuffGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @send PreviewGI::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+        @send PreviewPointerViewGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+
+	@send IconPreviewDialog::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@PointerPreviewMoniker), VUM_NOW);
+	@send PointerPreviewContent::MSG_OC_SET_HOTSPOT(-1, -1);
+
+    } else {
+    	/*
+    	 * Initialize UI for standard icon preview
+    	 */
+    	@send PreviewStuffGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+        @send PreviewGI::MSG_GEN_SET_USABLE(VUM_NOW);
+        @send PreviewPointerViewGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+	@send IconPreviewDialog::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@IconPreviewMoniker), VUM_NOW);
+
+    }
+
+    /*
+     * Update Moniker / Pointer image
+     */
+    err = @call oself::MSG_DB_VIEWER_PREVIEW_ICON_UPDATE_DIALOG();
+    if (err) return;
+
+    @send IconPreviewDialog:: MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_NOW);
+    @send IconPreviewDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_UPDATE_DIALOG ---------------------
+ *  Purpose:	Bring the dialog UI up to date.
+ *		Close the dialog if the current icon image cannot be shown.
+ *  Context:
+ *  Strategy:
+ *  Parameters:
+ *  Return:	TRUE in case of errors
+ *		FALSE: anything is ok
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_UPDATE_DIALOG {
+Boolean err;
+VMBlockHandle	bmp;
+int hotX, hotY;
+optr ptrImageOp;
+
+    if ( IdGetFlags(pself->DBVI_vmFile, pself->DBVI_currentISet) & IF_PTR_IMAGE ) {
+	/*
+	 * Update pointer image
+	 * - Get the bitmap from fatbits object to be up to date with the current editied state.
+	 * - Find out hotspot
+	 * - create pointer
+	 * - assign pointer to PreviewPointerView
+    	 */
+        bmp = @call CombineOselfWith(@MyFatbits)::MSG_FATBITS_GET_BITMAP();
+	IdGetHotspot(pself->DBVI_vmFile, pself->DBVI_currentISet, pself->DBVI_currentIcon, &hotX, &hotY);
+
+	ptrImageOp = MakePointerFromImage(global.tempFile, bmp, NULL, hotX, hotY);
+	@call PreviewPointerView::MSG_MPV_UPDATE_POINTER_IMAGE(ptrImageOp);
+	return FALSE;
+    }
+
+    /*
+     * Update 'normal' icon
+     * - update colors
+     * - create moniker from icon image
+     * - show adequate preview object
+     */
+    @call oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR();
+    err = @call oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_MONIKER();
+    if (err) {
+    	/*
+    	 * the moniker is too big - exit dialog
+    	 */
+    	@send ClosePreviewTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+    	return TRUE;
+    }
+    @call oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_OBJECT();
+
+    return FALSE;
+}
+
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_CLOSE_DIALOG ---------------------
+ *  Purpose:	Close the dialog box.
+ *  Context:
+ *  Strategy:	- The currently shown moniker is not destroyed,
+ *		  this happens automatically if the dialog is re-opened.
+ *		- Destroy the previewd pointer image (to free the associated handle)
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CLOSE_DIALOG {
+
+    @call PreviewPointerView::MSG_MPV_UPDATE_POINTER_IMAGE(0);
+
+    @send IconPreviewDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_APPLY_OPTIONS ---------------------
+ *  Purpose:	The options  in the Preview Icon dialog has been changed
+ *  Context:	Currently there is only the "Enable Mixed Colors" option
+ *  Strategy:
+ *  Parameters: GEN_BOOLEAN_GROUP_APPLY_MSG (word selectedBooleans = cx,
+ *	          word indeterminateBooleans = dx, word modifiedBooleans = bp);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_APPLY_OPTIONS {
+int options, color;
+
+    /*
+     * Read options from UI for the case that we add more options later
+     */
+    options = @call PreviewColorOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if ( options & PBO_ENABLE_COLOR_MIX ) {
+	@call OnColorSelector2::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call OffColorSelector2::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+        color = @call OnColorSelector1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        @call OnColorSelector2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(color, FALSE);
+        @call OnColorSelector2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+        color = @call OffColorSelector1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        @call OffColorSelector2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(color, FALSE);
+        @call OffColorSelector2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    @call oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR();
+
+}
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_APPLY_COLOR ---------------------
+ *  Purpose:	Apply handler for any of the four color selectors in the
+ *		IconPreview dialog box.
+ *  Context:
+ *  Strategy:	- if "Enable color mix" is off, update the "2nd color" selectors
+ *		  to displey the same color as the first color selctors
+ *		- call MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR to update
+ *		  preview objects.
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_APPLY_COLOR {
+int options, color;
+
+    options = @call PreviewColorOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if ( (options & PBO_ENABLE_COLOR_MIX) == 0 ) {
+    	/*
+    	 * Update 2nd color selectors, even if they are not enbaled
+    	 */
+        color = @call OnColorSelector1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        @call OnColorSelector2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(color, FALSE);
+        @call OnColorSelector2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+        color = @call OffColorSelector1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        @call OffColorSelector2::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(color, FALSE);
+        @call OffColorSelector2::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+    @call oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR();
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_APPLY_OBJECT_SELECTOR ---------------------
+ *  Purpose:	Handle to set a new preview object
+ *  Context:
+ *  Strategy:	see code
+ *  Parameters: GEN_ITEM_GROUP_APPLY_MSG (word selection,
+ *			word numSelections, GenItemGroupStateFlags stateFlags);
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_APPLY_OBJECT_SELECTOR {
+
+    /*
+     * Disable color selctors if color cannot be changed
+     */
+    switch (selection) {
+    case PIO_FLAT:
+    case PIO_FRAMED:
+    case PIO_BULLET_ITEM:
+    	@call ColorSelectorGroups::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    	break;
+    default:
+    	@call ColorSelectorGroups::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+
+    /*
+     * Change preview object
+     */
+    @call oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_OBJECT();
+}
+
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_APPLY_DISPLAY_CLASS ---------------------
+ *  Purpose:	Handler to emulate another display class
+ *  Context:
+ *  Strategy:	simply call "change moniker" message to do the job
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass,  MSG_DB_VIEWER_PREVIEW_ICON_APPLY_DISPLAY_CLASS {
+    @send oself::MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_MONIKER();
+}
+
+
+
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR ---------------------
+ *  Purpose:	Set new gadget background color for preview object
+ *  Context:	Send by any oft the ColorSelector - ItemGroups in the Preview Icon dialog
+ *  Strategy:	- read colors from UI
+ *		- set gadget background colors
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_COLOR {
+optr pvObjects[] = { @PreviewTrigger1, @PreviewTrigger2, @PreviewToolTrigger1, @PreviewToolTrigger2,
+		     @PreviewTool1, @PreviewTool2, @PreviewTool3,
+		     @PreviewScrollableListItem1, @PreviewScrollableListItem2, @PreviewScrollableListItem3,
+		     @PreviewBulletedListItem1, @PreviewBulletedListItem2, @PreviewBulletedListItem3,
+		     @PreviewFlat1, @PreviewFlat2, @PreviewFramed1, @PreviewFramed2,
+		     @PreviewSingleTool, 0 };
+optr obj;
+int n;
+BackgroundColors   bgColors;
+Boolean	usable;
+
+    bgColors.BC_unselectedColor1     = @call OffColorSelector1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    bgColors.BC_unselectedColor2     = @call OffColorSelector2::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    bgColors.BC_selectedColor1       = @call OnColorSelector1::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    bgColors.BC_selectedColor2       = @call OnColorSelector2::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /*
+     * Set background colors for all objects
+     */
+    n = 0;
+    obj = pvObjects[n];
+    while (obj) {
+        usable = @call obj::MSG_GEN_GET_USABLE();
+    	if (usable) @call obj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    	@call obj:: MSG_META_ADD_VAR_DATA(HINT_GADGET_BACKGROUND_COLORS, sizeof(BackgroundColors), &bgColors);
+    	if (usable) @call obj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+    	n++;
+    	obj = pvObjects[n];
+    }
+
+}
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_OBJECT ---------------------
+ *  Purpose:	Display another preview object
+ *  Context:
+ *  Strategy:	- hide all preview objects
+ *		- show ony the requested preview object
+ *  Parameters:
+ *  Return:
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_OBJECT {
+optr pvObjects[] = { @PreviewTriggerGroup, @PreviewToolTriggerGroup, @PreviewToolGroup,
+              	     @PreviewScrollableListGroup, @PreviewBulletedListGroup, @PreviewFlatGroup,
+              	     @PreviewFramedGroup, @PreviewSingleToolGroup, 0 };
+optr obj;
+int n, pvItem;
+
+    /*
+     * hide all objects
+     */
+    n = 0;
+    obj = pvObjects[n];
+    while (obj) {
+    	@send obj::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    	n++;
+    	obj = pvObjects[n];
+    }
+
+    /*
+     * show selected object
+     */
+    pvItem = @call PreviewObjectsGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    @send pvObjects[pvItem]::MSG_GEN_SET_USABLE(VUM_NOW);
+
+}
+
+
+/*--------------------- MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_MONIKER ---------------------
+ *  Purpose:	Update the monikers of the preview objects according to the currently
+ *		edited icon and to the settings in the PreviewDialog.
+ *  Context:
+ *  Strategy:	See code for more details
+ *		- Get the bitmap from fatbits object to be up to date with the
+ *		  current editied state.
+ *		- Retrieve the desired display class and copy the bitmap, if necessary.
+ *		  This is used to emulate different display classes
+ *		- Call MakeMonikerFromBitmap().
+ *		- We have a lot of preview objects and monikers may be up to 8 kB.
+ *		  This may crash if we replace all the monikers. Therefore:
+ *		    + Replace the moniker of the PreviewMonikerHolder object by
+ *		      the newly created moniker (only for one object)
+ *		    + Send MSG_GEN_USE_VIS_MONIKER(moniker_from_preview_monker_holder)
+ *		      to all preview objects. This does not copy the moniker, but
+ *		      it will be shared by all the objects.
+ *		  Because there is a short time between freeing the old moniker
+ *		  (REPLACE_VIS_MONIKER) and use the new moniker, we let the preview
+ *		  objetcs use a "save moniker" first.
+ *		- Give the PreviewScrollableListGroup a new size becaus the happens not
+ *		  automaticaly if the size of the item changes.
+ *  Parameters:
+ *  Return:	TRUE if moniker is too large
+ *		FALSE if anything is ok
+ ---------------------------------------------------------------------------*/
+@extern method IconDBViewerClass, MSG_DB_VIEWER_PREVIEW_ICON_CHANGE_MONIKER {
+optr pvObjects[] = { @PreviewTrigger1, @PreviewTrigger2, @PreviewToolTrigger1, @PreviewToolTrigger2,
+		     @PreviewTool1, @PreviewTool2, @PreviewTool3,
+		     @PreviewScrollableListItem1, @PreviewScrollableListItem2, @PreviewScrollableListItem3,
+		     @PreviewBulletedListItem1, @PreviewBulletedListItem2, @PreviewBulletedListItem3,
+		     @PreviewFlat1, @PreviewFlat2, @PreviewFramed1, @PreviewFramed2,
+		     @PreviewSingleTool, 0 };
+optr monikerOp, obj, dcOptr;
+int	w, h, n;
+ChunkHandle mon;
+VMFileHandle vmFile;
+int	iSet, icon;
+VMBlockHandle	bmp, bmp2;
+word	type, compressMode;
+word	dispClass, iconDC, fmt;
+
+    /*
+     * Cache data and reject textual monikers
+     * At current stage of development, a texttual moniker cannot occur here.
+     * Therefore the rejection is just a precaution.
+     */
+    vmFile = pself->DBVI_vmFile;
+    iSet = pself->DBVI_currentISet;
+    icon = pself->DBVI_currentIcon;
+    type = IdGetEntryType(vmFile, iSet, icon);
+    if ( (type & VMLET_GSTRING)==0 ) {
+    	ErrorBoxOptr(@PreviewNoTextMoniker);
+    	return TRUE;
+    }
+
+
+    /*
+     * Get the bitmap from fatbits object to be up to date with the current editied state.
+     */
+    bmp = @call CombineOselfWith(@MyFatbits)::MSG_FATBITS_GET_BITMAP();
+    BTGetMoreBitmapInfos(global.tempFile, bmp, &w, &h, 0);
+
+
+    /*
+     * Find out display class from icon's type value
+     * Update dialog UI
+     */
+    iconDC = (type & VMLET_GS_COLOR) >> VMLET_GS_COLOR_OFFSET;
+    switch ( iconDC ) {
+    case DC_CF_RGB: 	dcOptr = @TokenInfoRGBScreen;	fmt = BMF_24BIT;break;
+    case DC_COLOR_8: 	dcOptr = @TokenInfo256Screen;	fmt = BMF_24BIT;break;
+    case DC_GRAY_1:	dcOptr = @TokenInfoMonoScreen;	fmt = BMF_MONO;	break;
+    default: 		dcOptr = @TokenInfo16Screen;	fmt = BMF_4BIT;
+    }
+    @call PreviewIconDisplayClassText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(dcOptr, 0);
+
+    /*
+     * Retrieve the desired display class and copy the bitmap, if necessary.
+     * To simplify things, we don't check whether the bitmap already matches
+     * the required display class; instead, we always copy it if it's a limited
+     * display class. In this cases, the new bitmap must have no palette.
+     */
+    bmp2 = 0;
+    dispClass = @call PreviewDisplayClassGroup::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    switch (dispClass) {
+    case PIDC_RGB:		/* no special display class */
+    	break;
+
+    case PIDC_USE_ICON_VALUE: /* Use value, specified in the icon's attributes */
+	if ( fmt == BMF_24BIT ) break;
+ 	bmp2 = IconToolCreateBitmap(global.tempFile, fmt | BMT_MASK, w, h, 0, TRUE);
+    	break;
+
+    case PIDC_MONO:
+    	bmp2 = IconToolCreateBitmap(global.tempFile, BMF_MONO | BMT_MASK, w, h, 0, TRUE);
+    	break;
+
+    case PIDC_COLOR16:
+    	bmp2 = IconToolCreateBitmap(global.tempFile, BMF_4BIT | BMT_MASK, w, h, 0, TRUE);
+    	break;
+
+    case PIDC_COLOR256:
+    	bmp2 = IconToolCreateBitmap(global.tempFile, BMF_8BIT | BMT_MASK, w, h, 0, TRUE);
+    	break;
+
+    EC( default: ProgError("Invalid display class in PREVIEW_ICON_CHANGE_MONIKER"); )
+    }
+    if ( bmp2 ) {
+    	/*
+    	 * Copy the icon bitmap into the new (color-limited) bitmap
+    	 */
+    	IconToolDrawOneBitmapToAnother(global.tempFile, bmp, global.tempFile, bmp2, 0, 0, 0, global.tempFile);
+    	bmp = bmp2;
+    }
+
+    /*
+     * Do the real create moniker job:
+     * Value for VM_type (vmType parameter of MakeMonikerFromBitmap) is the same
+     * as the low byte of von VisMonikerListEntryType (gotten with IdGetEntryType())
+     */
+    compressMode = COMPRESS_ICON_AUTO | WRITE_TRANSPARENCY_MASK | USE_FILL_BITMAP_FOR_MONO;
+    monikerOp = MakeMonikerFromBitmap(global.tempFile, bmp, 0, type & 0xFF, compressMode);
+    if (bmp2) HugeArrayDestroy(global.tempFile, bmp2);
+
+    if (!monikerOp) {
+    	ErrorBoxOptr(@PreviewMonikerTooLarge);
+    	return TRUE;
+    }
+
+    /*
+     * To be save, force all preview objetcs to use a "save" moniker first
+     * This is reqired because replacing the moniker for PreviewMonikerHolder
+     * will destroy the currently used moniker of these objects.
+     */
+    n = 0;
+    obj = pvObjects[n];
+    while (obj) {
+    	@send obj::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@SavePreviewMonker), VUM_DELAYED_VIA_UI_QUEUE);
+    	n++;
+    	obj = pvObjects[n];
+    }
+
+    /*
+     * Send visMoniker to PreviewMonikerHolder object
+     * This copies the moniker so we can free it.
+     */
+    @call PreviewMonikerHolder::MSG_GEN_REPLACE_VIS_MONIKER( VUM_DELAYED_VIA_APP_QUEUE,
+					w, h, 0,	/* width, height, length */
+					VMDT_VIS_MONIKER,	/* VisMonikerDataType	dataType, */
+					VMST_OPTR,	/* VisMonikerSourceType	sourceType, */
+					monikerOp );	/* source */
+    MemFree(OptrToHandle(monikerOp));
+
+    /*
+     * Share the visMoniker with all other objects
+     */
+    mon = @call PreviewMonikerHolder::MSG_GEN_GET_VIS_MONIKER();
+    n = 0;
+    obj = pvObjects[n];
+    while (obj) {
+    	@send obj::MSG_GEN_USE_VIS_MONIKER(mon, VUM_NOW);
+    	n++;
+    	obj = pvObjects[n];
+    }
+
+    /*
+     * set a fixed Size for the Scrollable list
+     */
+    @call PreviewScrollableListGroup::MSG_GEN_SET_FIXED_SIZE(VUM_NOW, 3, h, 3*w);
+
+    return FALSE;
+}
+
+
+
+
+
+
+/* *********** End of file preview.goc ********************/
+
+
