@@ -60,11 +60,9 @@ static word getNameFromNameTable(
 
 void InitConvertHeader(         TRUETYPE_VARS, FontHeader* fontHeader );
 
-word GetKernCount(       TRUETYPE_VARS );
+word GetKernCount( TRUETYPE_VARS );
 
 static word toHash( const char* str );
-
-static word strlen( const char* str );
 
 static void strcpoy( char* dest, const char* source );
 
@@ -338,6 +336,7 @@ static void ProcessFont( TRUETYPE_VARS, const char* fileName, MemHandle fontInfo
         sword                   availIndex;
         char                    styleName[STYLE_NAME_LENGTH];
         char                    familyName[FID_NAME_LEN];
+        TextStyle               style;
 
 
 EC(     ECCheckBounds( (void*)fileName ) );
@@ -364,6 +363,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
         if ( getNameFromNameTable( trueTypeVars, &styleName, STYLE_NAME_ID ) == 0 )
                 goto Fail;
 
+        style      = mapTextStyle( &styleName );  
         mappedFont = getFontID( trueTypeVars, familyName, &fontID );
 	availIndex = getFontIDAvailIndex( fontID, fontInfoBlock );
 
@@ -434,7 +434,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
     
                 /* fill OutlineDataEntry */
                 outlineDataEntry = (OutlineDataEntry*) (fontInfo + 1);
-                outlineDataEntry->ODE_style  = mapTextStyle( &styleName );
+                outlineDataEntry->ODE_style  = style;
                 outlineDataEntry->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineDataEntry->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineDataEntry->ODE_first.OE_handle = fontHeaderChunk;
@@ -452,18 +452,20 @@ EC(     ECCheckFileHandle( truetypeFile ) );
 	}
         else
         {
-                FontsAvailEntry*      availEntries = LMemDeref( ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)) );
-                OutlineDataEntry*     outlineData;
-                OutlineDataEntry*     outlineDataEnd;
+                FontsAvailEntry*  availEntries;
+                OutlineDataEntry* outlineData;
+                OutlineDataEntry* outlineDataEnd;
+
+                availEntries = LMemDeref(ConstructOptr(fontInfoBlock, sizeof(LMemBlockHeader)));
 
                 fontInfoChunk = availEntries[availIndex].FAE_infoHandle;
-                fontInfo = LMemDerefHandles( fontInfoBlock, fontInfoChunk );
-	            outlineData = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineTab);
-                outlineDataEnd = (OutlineDataEntry*) (((byte*)fontInfo) + fontInfo->FI_outlineEnd);
+                fontInfo = LMemDerefHandles(fontInfoBlock, fontInfoChunk);
 
-        while( outlineData < outlineDataEnd)
+                outlineData = (OutlineDataEntry*)(((byte*)fontInfo) + fontInfo->FI_outlineTab);
+                outlineDataEnd = (OutlineDataEntry*)(((byte*)fontInfo) + fontInfo->FI_outlineEnd);
+		while( outlineData < outlineDataEnd)
 		{
-                        if( ( mapTextStyle( &styleName ) == outlineData->ODE_style ) &&
+                        if( ( style == outlineData->ODE_style ) &&
 	                    ( mapFontWeight( FACE_PROPERTIES.os2->usWeightClass ) == outlineData->ODE_weight ) )
 			{
 				goto Fail;
@@ -502,7 +504,7 @@ EC(     ECCheckFileHandle( truetypeFile ) );
                 /* fill OutlineDataEntry */
                 fontInfo = LMemDeref( ConstructOptr(fontInfoBlock, fontInfoChunk) );
                 outlineData = (OutlineDataEntry*) (fontInfo + 1);
-                outlineData->ODE_style  = mapTextStyle( &styleName );
+                outlineData->ODE_style  = style;
                 outlineData->ODE_weight = mapFontWeight( FACE_PROPERTIES.os2->usWeightClass );
                 outlineData->ODE_header.OE_handle = trueTypeOutlineChunk;
                 outlineData->ODE_first.OE_handle = fontHeaderChunk;
@@ -595,11 +597,14 @@ static Boolean isFontUnacceptable( TRUETYPE_VARS )
 
 static word toHash( const char* str )
 {
-        word   i;
-        word   hash = strlen( str );
+        const char* p = str;
+        word        hash = 0;
 
-        for ( i = 0; i < strlen( str ); ++i )
-		hash = hash * 7 + str[i];
+        while( *p++ )
+                ++hash;
+
+        while( *str )
+                hash = hash * 7 + *str++;
 
         /* The generated FontID has the following structure:      */
         /* 0bMMMMGGGHHHHHHHHH        MMMM      Fontmaker (4 bit)  */
@@ -1124,15 +1129,6 @@ EC(             ECCheckBounds( pairs ) );
 /* We cannot use functions from the Ansic library, which causes a  */
 /* cycle. Therefore, the required functions are reimplemented here.*/
 /*******************************************************************/
-
-static word strlen( const char* str )
-{
-        const char  *s;
-
-        for ( s = str; *s; ++s )
-                ;
-        return( s - str );  
-}
 
 
 static void strcopy( char* dest, const char* source )
