@@ -16,8 +16,8 @@ classes.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h icmtool.goh bmptools.goh
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h icmtool.goh bmptools.goh
 classes.obj \
 classes.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \
                 graphics.h fontID.h font.h color.h gstring.h timer.h vm.h \
@@ -45,8 +45,8 @@ writeSourceCode.eobj: stdapp.goh object.goh ui.goh Objects/metaC.goh \
                 Objects/gItemC.goh Objects/gBoolC.goh \
                 Objects/gGadgetC.goh Objects/gToolCC.goh \
                 Objects/gValueC.goh Objects/gToolGC.goh \
-                Objects/helpCC.goh ansi/stdlib.h ansi/stdio.h \
-                ansi/string.h icmtool.goh bmptools.goh Code/lmacros.goh \
+                Objects/helpCC.goh Ansi/stdlib.h Ansi/stdio.h \
+                Ansi/string.h icmtool.goh bmptools.goh Code/lmacros.goh \
                 UI/libui.goh
 writeSourceCode.obj \
 writeSourceCode.eobj: geos.h heap.h geode.h resource.h ec.h object.h lmem.h \

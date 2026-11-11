@@ -1127,7 +1127,7 @@ you create such a VM chain and pass it to a chain utility, the results are
 undefined. It is your responsibility to make sure no loops occur.
 
 A VM chain block is the same as any other VM block, with one exception: The 
-block must begin with a **VMChain** structure. This structure contains a 
+block must begin with a **VMChainLink** structure. This structure contains a 
 single data field, VMC_next, which is the handle of the next block in the chain. 
 If the block is in a chain but has no next link, VMC_next is a null handle. This 
 means, for example, that LMem heaps cannot belong to a VM chain (since 
@@ -1139,7 +1139,7 @@ Figure 18-6. A tree block begins with a **VMChainTree** structure. This
 structure has three fields:
 
 VMCT_meta  
-This is a **VMChain** structure. Every block in a VM chain, 
+This is a **VMChainLink** structure. Every block in a VM chain, 
 including a tree block, must begin with such a structure. 
 However, to indicate that this is a tree block, the VMC_next field 
 must be set to the special value VM_CHAIN_TREE.

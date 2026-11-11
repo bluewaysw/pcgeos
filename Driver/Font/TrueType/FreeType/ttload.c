@@ -179,13 +179,16 @@
 #endif
 
     maxProfile->numGlyphs             = GET_UShort();
-
     maxProfile->maxPoints             = GET_UShort();
     maxProfile->maxContours           = GET_UShort();
     maxProfile->maxCompositePoints    = GET_UShort();
     maxProfile->maxCompositeContours  = GET_UShort();
 
-    maxProfile->maxZones              = GET_UShort();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    maxProfile->maxZones = GET_UShort();
+#else
+    SKIP( 2 );
+#endif
     maxProfile->maxTwilightPoints     = GET_UShort();
 
     maxProfile->maxStorage            = GET_UShort();
@@ -523,11 +526,6 @@
 
     header->number_Of_HMetrics = GET_UShort();
 
-    FORGET_Frame();
-
-    header->long_metrics_block  = NullHandle;
-    header->short_metrics_block = NullHandle;
-
     /* Now try to load the corresponding metrics */
 
 #ifdef TT_CONFIG_OPTION_PROCESS_VMTX
@@ -656,7 +654,12 @@
     names = &face->nameTable;
 
     /* Load the initial names data. */
-    names->format         = GET_UShort();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
+    names->format = GET_UShort();
+#else
+    SKIP( 2 );
+#endif
+
     names->numNameRecords = GET_UShort();
     names->storageOffset  = GET_UShort();
 
@@ -756,7 +759,9 @@
     FREE( names->storage );
 
     names->numNameRecords = 0;
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     names->format         = 0;
+#endif
     names->storageOffset  = 0;
   }
 
@@ -782,11 +787,7 @@
 
 
     if ( ( n = TT_LookUp_Table( face, TTAG_cvt ) ) < 0 )
-    {
-      face->cvtSize = 0;
-      face->cvt     = NULL;
       return TT_Err_Ok;
-    }
 
     face->cvtSize = face->dirTables[n].Length >> 1;
 
@@ -918,34 +919,22 @@
 
 
     /* The font program is optional */
-    if ( ( n = TT_LookUp_Table( face, TTAG_fpgm ) ) < 0 )
-    {
-      face->fontProgram = NULL;
-      face->fontPgmSize = 0;
-    }
-    else
+    if ( ( n = TT_LookUp_Table( face, TTAG_fpgm ) ) >= 0 )
     {
       face->fontPgmSize = face->dirTables[n].Length;
 
-      if ( ALLOC( face->fontProgram,
-                  face->fontPgmSize )              ||
+      if ( ALLOC( face->fontProgram, face->fontPgmSize ) ||
            FILE_Read_At( face->dirTables[n].Offset,
                          (void*)face->fontProgram,
                          face->fontPgmSize )       )
         return error;
     }
 
-    if ( ( n = TT_LookUp_Table( face, TTAG_prep ) ) < 0 )
-    {
-      face->cvtProgram = NULL;
-      face->cvtPgmSize = 0;
-    }
-    else
+    if ( ( n = TT_LookUp_Table( face, TTAG_prep ) ) >= 0 )
     {
       face->cvtPgmSize = face->dirTables[n].Length;
 
-      if ( ALLOC( face->cvtProgram,
-                  face->cvtPgmSize )               ||
+      if ( ALLOC( face->cvtProgram, face->cvtPgmSize ) ||
            FILE_Read_At( face->dirTables[n].Offset,
                          (void*)face->cvtProgram,
                          face->cvtPgmSize )        )
@@ -1039,8 +1028,12 @@
 #endif
 
     os2->sTypoAscender       = GET_Short();
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     os2->sTypoDescender      = GET_Short();
     os2->sTypoLineGap        = GET_Short();
+#else
+    SKIP( 4 );
+#endif
     os2->usWinAscent         = GET_UShort();
     os2->usWinDescent        = GET_UShort();
 
@@ -1096,9 +1089,16 @@
     if ( ( i = TT_LookUp_Table( face, TTAG_post ) ) < 0 )
       return TT_Err_Post_Table_Missing;
 
+#ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     if ( FILE_Seek( face->dirTables[i].Offset ) ||
          ACCESS_Frame( 32 ) )
       return error;
+#else
+    if ( FILE_Seek( face->dirTables[i].Offset + 12 ) ||
+         ACCESS_Frame( 4 ) )
+      return error;
+#endif
+
 
     /* read frame data into face table */
 
@@ -1107,11 +1107,9 @@
     post->italicAngle        = GET_ULong();
     post->underlinePosition  = GET_Short();
     post->underlineThickness = GET_Short();
-#else
-    SKIP( 12 );
 #endif
 
-    post->isFixedPitch       = GET_ULong();
+    post->isFixedPitch       = GET_ULong() != 0;
 
 #ifdef TT_CONFIG_OPTION_SUPPORT_OPTIONAL_FIELDS
     post->minMemType42       = GET_ULong();
