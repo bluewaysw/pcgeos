@@ -54,8 +54,8 @@ describe their intended use:
 - The **Style** describes the basic use. The available styles are **Icon** (for general use) and
 **Tool** (typically in toolbars).
 - The **Display Size** describes the screen size. Available values are **Tiny**, **Standard**, and
-**Large**. Although another size is defined in the header file ```win.h``` (Huge), it is not
-currently used by the system and is therefore not offered by the Icon Editor.
+**Large**. Although another size is defined in the header file ```win.h``` (Huge), it is not currently
+used by the system and is therefore not offered by the Icon Editor.
 - There are two values for the **Aspect Ratio**: **Normal** (VGA) and **Very Squished** (CGA).
 - The **DispayClass** describes the color depth required by a screen to display the icon correctly.
 If the bitmap uses a palette, even a 16-color bitmap may require 256 colors or more. Available
@@ -96,16 +96,16 @@ the closest matching icon. In particular, an 16 color icon with custom
 no other colored 256-color-DisplayClass icon is available.
 
 - DisplayClass: Monochrome
-- Monochrome icons only
+  - Monochrome icons only
 - DisplayClass: 16 colors (standard palette)
-- 16 color icons without palette (uses standard palette)
-- All monochrome icons
+  - 16 color icons without palette (uses standard palette)
+  - All monochrome icons
 - DisplayClass: 256 colors (standard palette)
-- 16 color icons width a subset of the 256 color standard palette
-- 256 color icons without palette (uses standard palette)
-- All icons suitable for 16-color DispayClass
+  - 16 color icons width a subset of the 256 color standard palette
+  - 256 color icons without palette (uses standard palette)
+  - All icons suitable for 16-color DispayClass
 - DisplayClass: true color
-- All icons, in particular  16 color icons with a custom (non-standard) palette and 256
+  - All icons, in particular  16 color icons with a custom (non-standard) palette and 256
  color icons with a custom (non-standard) palette
 
 ### 7.1.2 Creating a New Icon Set
@@ -125,8 +125,7 @@ a new icon set.
 When you create a new, empty icon set using the "Icon Set" menu, do the following
 
 - Select one of the available templates, such as "Tool Icons." The different templates differ only
-in the icons they provide, which are initially added to the set. You can add more icons, change
-their properties, or delete icons later.
+in the icons they provide, which are initially added to the set. You can add more icons, change their properties, or delete icons later.
 - Select the icons you want your set to contain initially. For custom icons, you can also specify
 the size, attributes, and bitmap colors.
 - If the set can contain multiple icons initially, you must specify a prefix for the icon names.
@@ -387,20 +386,20 @@ You have the following options:
 
 - Write only the current icon or all icons from the set
 - The **Header** determines the data format to be used.
-- **VisMoniker**: A visMoniker structure is written. VisMonikers are used as file icons or
+  - **VisMoniker**: A visMoniker structure is written. VisMonikers are used as file icons or
  as graphical labels for UI objects. This is the main function of the Icon Editor.
   - **GString Chunk**: GStrings are graphics that can be drawn using the GEOS routine
     GrDrawGString(). The icon-specific attributes (such as style, DispayClass, etc.) are not used.
   - **Bitmap Chunk**: Only the raw bitmap data is written to a chunk. Here, too, the icon
     attributes are not used. To draw the image, the GrDrawBitmap() routine is used.
-- **PointerDef**: This is the special format in which mouse pointer chunks are written.
+  - **PointerDef**: This is the special format in which mouse pointer chunks are written.
 - Note for non-programmers: A **chunk** is a small area of memory within a memory block.
  GEOS store various things in it; for example, each icon is stored in a single chunk. Chunks
  are addressed in the program by their name. The Icon Editor uses the icon's name as the
  name for the chunk.
 
 - **Language** refers to the programming language
-- **GOC Source**: The GOC code must be written to a .goc or .goh file.
+  - **GOC Source**: The GOC code must be written to a .goc or .goh file.
   - **UI Source**: Assembler code is written, which must be saved in a .ui file.
 - **Compress Icons**: Icons are normally stored in a compressed format. In very rare cases, an
 uncompressed icon may require less memory than a compressed one. Therefore, "Minimize Size" is
@@ -626,7 +625,7 @@ as dialog boxes.
 - Start a timer whose handler does the following:
   - Check whether the animation is still running, e.g., whether the gstate still exists
   - Draw the current frame to the screen, i.e., into the gstate created above.
-- Select the next frame.
+  - Select the next frame.
 - To stop the animation:
   - Stop the timer
   - Destroy the gstate and set it to zero. The timer handler can then detect that the animation
@@ -647,13 +646,13 @@ artifacts may occur if the animation object is briefly obscured by other objects
 boxes.
 - Start a timer whose handler does the following:
   - Check whether the animation is still running, e.g., whether the screen gstate still exists
-- Draw the *shadow bitmap* to the screen, i.e., into the screen gstate.
+  - Draw the *shadow bitmap* to the screen, i.e., into the screen gstate.
   - Select the next frame.
   - Clear the shadow bitmap using the desired background color.
   - Draw the new frame into the shadow bitmap.
 - To stop the animation
   - Stop the timer.
-- Destroy the screen gstate and set it to zero. The timer handler can then detect that the
+  - Destroy the screen gstate and set it to zero. The timer handler can then detect that the
  animation is no longer running.
   - Destroy the shadow bitmap and its associated gstate.
 - Ensure that the animation is stopped in your MSG_GEN_PROCESS_CLOSE_APPLICATION handler if it is
