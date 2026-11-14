@@ -26,6 +26,8 @@ for my $target ('fg', 'ntbbx') {
 
         my $path = "$dest/localpc/ENSEMBLE";
         $path .= '/FREEGEOS/BLD1614/SETUP/ACTIVATE' if $target eq 'fg';
+        !-e "$path/GFS.INI" or die "GFS.INI is still staged for activation\n"
+            if $target eq 'fg';
         open my $file, '<:raw', "$path/VERSION.TXT" or die "$path: $!\n";
         my $version = do { local $/; <$file> };
         close $file;

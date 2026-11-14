@@ -1454,6 +1454,7 @@ sub GenerateFreeGEOSSetupCopyScripts {
 # PASS:         arg1 = source payload directory
 #               arg2 = output batch file
 #               arg3 = DOS source directory relative to FreeGEOS version dir
+#               Activation uses %2 as the original distribution directory.
 # CALLED BY:    GenerateFreeGEOSSetupCopyScripts
 # RETURN:       nothing
 #
@@ -1461,7 +1462,7 @@ sub GenerateFreeGEOSSetupCopyScripts {
 sub GenerateFreeGEOSSetupCopyScript {
     local( $sourceDir, $outputFile, $dosSourceRoot ) = @_;
     local( @dirs, @files );
-    local( $path );
+    local( $path, $ec );
 
     if ( ! -d $sourceDir ) {
 	die "\nERROR: Cannot find FreeGEOS setup payload directory: $sourceDir\n";
@@ -1499,7 +1500,20 @@ sub GenerateFreeGEOSSetupCopyScript {
     }
 
     foreach $path ( @files ) {
+        # Ignore a GFS.INI left in a reused build tree. Setup generates it.
+        next if ( $dosSourceRoot eq "SETUP\\ACTIVATE" &&
+                  uc( $path ) eq "GFS.INI" );
 	print SETUP_COPY_SCRIPT "copy %1\\$dosSourceRoot\\$path $path\r\n";
+    }
+
+    if ( $dosSourceRoot eq "SETUP\\ACTIVATE" ) {
+        # Keep this last so CALL returns the writer's exit code.
+        $ec = ( $RealInfo{ec} eq "y" );
+        foreach $path ( @ARGV ) {
+            $ec = ( $1 eq "true" ) if ( $path =~ /^ec=(true|false)$/ );
+        }
+        $path = $ec ? "NETEC.INI" : "NET.INI";
+        print SETUP_COPY_SCRIPT "%2\\GSETUP.EXE /WRITEGFS $path\r\n";
     }
 
     close( SETUP_COPY_SCRIPT );

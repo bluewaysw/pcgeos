@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <direct.h>
+#include <dos.h>
 #include <i86.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 
 #define MAX_PATH_CHARS 127
 #define CMD_TAIL_MAX 127
+#define GFS_IMAGE_PATH_MAX 66
 
 static char ownPath[MAX_PATH_CHARS + 1];
 static char launcherDir[MAX_PATH_CHARS + 1];
@@ -14,6 +16,8 @@ static char batchPath[MAX_PATH_CHARS + 1];
 static char comspecPath[MAX_PATH_CHARS + 1];
 static char cmdTail[CMD_TAIL_MAX + 2];
 static char cwdPath[MAX_PATH_CHARS + 1];
+static char bootPath[MAX_PATH_CHARS + 1];
+static char gfsText[512];
 
 static const char batchName[] = "gsetup.bat";
 static const char slashC[] = "/C ";
@@ -30,6 +34,9 @@ static void normalizeSeparators(char *path);
 static void writeError(void);
 static int _pascal CheckDrive(unsigned drive);
 static char _pascal FindFreeDrive(void);
+static int _pascal UpperDosPath(char *pathP);
+static int _pascal CreateTempFile(char *pathP, int *fileHP);
+static int _pascal WriteGfsIni(const char *iniNameP);
 
 int main(int argc, char *argv[])
 {
@@ -53,6 +60,15 @@ int main(int argc, char *argv[])
     if (!buildBatchPath()) {
         writeError();
         return 1;
+    }
+
+    if (argc > 1 && strcmp(argv[1], "/WRITEGFS") == 0) {
+        if (argc != 3 || (strcmp(argv[2], "NET.INI") != 0 &&
+                         strcmp(argv[2], "NETEC.INI") != 0)) {
+            fputs("ERROR: /WRITEGFS needs NET.INI or NETEC.INI.\r\n", stderr);
+            return 1;
+        }
+        return WriteGfsIni(argv[2]);
     }
 
     if (!buildCommandTail(argc, argv)) {
@@ -108,6 +124,182 @@ static char _pascal FindFreeDrive(void)
         }
     }
     return '-';
+}
+
+/* Use DOS case conversion, including its national character rules. */
+static int _pascal UpperDosPath(char *pathP)
+{
+    union REGS regs;
+    struct SREGS sregs;
+
+    memset(&regs, 0, sizeof(regs));
+    segread(&sregs);
+    regs.x.ax = 0x6522;
+    regs.x.dx = FP_OFF(pathP);
+    sregs.ds = FP_SEG(pathP);
+    (void)int86x(0x21, &regs, &regs, &sregs);
+    return !regs.x.cflag;
+}
+
+/* DOS creates a unique file in the local root without replacing a file. */
+static int _pascal CreateTempFile(char *pathP, int *fileHP)
+{
+    union REGS regs;
+    struct SREGS sregs;
+
+    strcpy(pathP, ".\\");
+    memset(&regs, 0, sizeof(regs));
+    segread(&sregs);
+    regs.x.ax = 0x5a00;
+    regs.x.dx = FP_OFF(pathP);
+    sregs.ds = FP_SEG(pathP);
+    (void)int86x(0x21, &regs, &regs, &sregs);
+    if (regs.x.cflag) {
+        return 0;
+    }
+    *fileHP = regs.x.ax;
+    return 1;
+}
+
+/***********************************************************************
+ *
+ * ROUTINE:     WriteGfsIni
+ *
+ * DESCRIPTION: Write paths for the selected image into the local root.
+ *              Keep paths relative when both parts can be moved together.
+ *
+ * PARAMETERS:  iniNameP - NET.INI or NETEC.INI, selected by the build.
+ *
+ * RETURN:      Zero on success, one on failure.
+ *
+ * STRATEGY:    Validate the paths, write and close a local temporary file,
+ *              then replace GFS.INI with a backup for rollback.
+ *
+ * REVISION HISTORY:
+ *      Name          Date        Description
+ *      ----          ----        -----------
+ *      Codex/MeyerK  11/14/26    Initial version
+ *
+ ***********************************************************************/
+static int _pascal WriteGfsIni(const char *iniNameP)
+{
+    char *pathP;
+    unsigned rootLength;
+    unsigned attributes;
+    unsigned error;
+    unsigned length;
+    unsigned written;
+    unsigned writeError;
+    unsigned closeError;
+    int fileH;
+    int haveOld;
+
+    if (_fullpath(bootPath, launcherDir, sizeof(bootPath)) == (void*)0 ||
+        _fullpath(cwdPath, ".", sizeof(cwdPath)) == (void*)0 ||
+        !appendText(bootPath, sizeof(bootPath), "\\BOOT") ||
+        !UpperDosPath(bootPath) || !UpperDosPath(cwdPath)) {
+        goto badPath;
+    }
+
+    /* MegaFile expands relative names into the same 67-byte buffer. */
+    if (strlen(bootPath) + strlen("\\GFS.IMG") > GFS_IMAGE_PATH_MAX) {
+        fputs("ERROR: Full GFS image path exceeds 66 characters.\r\n", stderr);
+        return 1;
+    }
+
+    ownPath[0] = '\0';
+    if (!appendText(ownPath, sizeof(ownPath), bootPath) ||
+        !appendText(ownPath, sizeof(ownPath), "\\GFS.IMG") ||
+        _dos_getfileattr(ownPath, &attributes) != 0 ||
+        (attributes & _A_SUBDIR)) {
+        goto badPath;
+    }
+    ownPath[0] = '\0';
+    if (!appendText(ownPath, sizeof(ownPath), bootPath) ||
+        !appendText(ownPath, sizeof(ownPath), "\\") ||
+        !appendText(ownPath, sizeof(ownPath), iniNameP) ||
+        _dos_getfileattr(ownPath, &attributes) != 0 ||
+        (attributes & _A_SUBDIR)) {
+        goto badPath;
+    }
+
+    rootLength = strlen(cwdPath);
+    pathP = bootPath;
+    if (strncmp(bootPath, cwdPath, rootLength) == 0 &&
+        (cwdPath[rootLength - 1] == '\\' ||
+         bootPath[rootLength] == '\\' || bootPath[rootLength] == '\0')) {
+        pathP += rootLength;
+        if (*pathP == '\\') {
+            pathP++;
+        }
+        if (*pathP == '\0') {
+            pathP = ".";
+        }
+    }
+
+    /* A BOOT path of at most 58 characters keeps this below 512 bytes. */
+    sprintf(gfsText,
+        "[system]\r\nfs = MEGAFILE.GEO\r\n\r\n"
+        "[paths]\r\ntop = %s GFS:\\FG\r\nini = %s\\%s\r\n\r\n"
+        "[gfs]\r\nfile = %s\\GFS.IMG\r\ndrive = GFS\r\n"
+        "bootstrapPath = %s\r\ncacheFile = none\r\n",
+        pathP, pathP, iniNameP, pathP, pathP);
+    length = strlen(gfsText);
+
+    error = _dos_getfileattr("GFS.INI", &attributes);
+    haveOld = error == 0;
+    if ((error != 0 && error != 2) ||
+        (haveOld && (attributes & (_A_RDONLY | _A_SUBDIR)))) {
+        goto fileError;
+    }
+
+    /* The path buffers are no longer needed. Reuse them for local names. */
+    if (!CreateTempFile(cwdPath, &fileH)) {
+        goto fileError;
+    }
+    writeError = _dos_write(fileH, gfsText, length, &written);
+    closeError = _dos_close(fileH);
+    if (writeError != 0 || written != length || closeError != 0) {
+        goto removeTemp;
+    }
+
+    if (haveOld) {
+        if (!CreateTempFile(comspecPath, &fileH)) {
+            goto removeTemp;
+        }
+        closeError = _dos_close(fileH);
+        if (remove(comspecPath) != 0 || closeError != 0) {
+            goto removeTemp;
+        }
+        if (rename("GFS.INI", comspecPath) != 0) {
+            goto removeTemp;
+        }
+    }
+
+    if (rename(cwdPath, "GFS.INI") != 0) {
+        if (haveOld && rename(comspecPath, "GFS.INI") != 0) {
+            fprintf(stderr, "ERROR: Previous GFS.INI is saved as %s.\r\n",
+                    comspecPath);
+        }
+        goto removeTemp;
+    }
+    if (haveOld && remove(comspecPath) != 0) {
+        fprintf(stderr, "ERROR: Cannot remove GFS.INI backup %s.\r\n",
+                comspecPath);
+        return 1;
+    }
+    return 0;
+
+badPath:
+    fputs("ERROR: Cannot use the selected BOOT directory or INI file.\r\n",
+          stderr);
+    return 1;
+
+removeTemp:
+    (void)remove(cwdPath);
+fileError:
+    fputs("ERROR: Cannot write or replace GFS.INI.\r\n", stderr);
+    return 1;
 }
 
 static int resolveOwnPath(char *argv[])

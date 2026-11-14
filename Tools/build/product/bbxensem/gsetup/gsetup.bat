@@ -13,8 +13,8 @@ rem     if an UPDATE.TXT is present, run "activate" only (UPDATE.TXT deleted aft
 rem     if a GEOS.INI/GEOSEC.INI exists, along with a GFS.INI, does nothing.
 rem - INSTALL: always runs "install" plus "activate" after warning and confirmation.
 rem - ACTIVATE: "activate"s the version for which it is called; UPDATE.TXT is ignored.
-rem - GFS.INI uses paths relative to the Ensemble root, so moving or
-rem   renaming the Ensemble folder does not require rerunning setup.
+rem - GFS.INI uses relative paths for an image inside the local root.
+rem   An external image uses full paths. Moving it requires activation.
 
 
 if "%1"=="" goto NOENTRY
@@ -37,9 +37,9 @@ if not "%4"=="" goto USAGE
 if exist %1\ginst.bat goto CHECKINSTALL2
 goto BADDIR
 
-rem Verify activate payload directory exists for INSTALL flow.
+rem Verify activation script exists for INSTALL flow.
 :CHECKINSTALL2
-if exist %1\setup\activate\gfs.ini goto INSTALLCONFIRM
+if exist %1\gact.bat goto INSTALLCONFIRM
 goto BADDIR
 
 rem Confirm explicit forced INSTALL before continuing.
@@ -57,9 +57,9 @@ if not "%4"=="" goto USAGE
 if exist %1\ginst.bat goto CHECKDEFAULT2
 goto BADDIR
 
-rem Verify activate payload directory exists.
+rem Verify activation script exists.
 :CHECKDEFAULT2
-if exist %1\setup\activate\gfs.ini goto CHECKDEFAULTINI
+if exist %1\gact.bat goto CHECKDEFAULTINI
 goto BADDIR
 
 rem Detect GEOS configuration in target root.
@@ -87,7 +87,7 @@ goto END
 rem Parse ACTIVATE arguments.
 :PARSEACTIVATE
 if not "%4"=="" goto USAGE
-if exist %1\setup\activate\gfs.ini goto DOACTIVATE
+if exist %1\gact.bat goto DOACTIVATE
 goto BADDIR
 
 rem Update marker forces activate-only and is then cleared.
@@ -132,7 +132,7 @@ swsubst %2 %1\
 rem Test real source files. Mapper exit codes differ between DOS versions.
 :VERIFY
 if not exist %2\gact.bat goto BADMAP
-if not exist %2\setup\activate\gfs.ini goto BADMAP
+if not exist %2\gsetup.exe goto BADMAP
 if not "%GI%"=="1" goto MAPPED
 if not exist %2\ginst.bat goto BADMAP
 
@@ -147,7 +147,8 @@ echo.
 
 :COPYACT
 echo Activating from %1\setup\activate to current target directory ...
-call %2\gact.bat %2
+call %2\gact.bat %2 %1
+if errorlevel 1 set GS=2
 goto UNMAP
 
 rem Remove a failed mapping before trying another command.
@@ -164,6 +165,7 @@ if "%GM%"=="W" swsubst %2 /D
 if errorlevel 1 goto CLEANERR
 
 :NEXTMAP
+if "%GS%"=="2" goto GFSINIFAIL
 if "%GS%"=="1" goto FINISH
 if "%GM%"=="E" goto TRYSUB
 if "%GM%"=="S" goto TRYSW
@@ -189,7 +191,7 @@ echo Install complete.
 goto END
 
 :GFSINIFAIL
-echo ERROR: Activate payload did not provide GFS.INI.
+echo ERROR: Cannot generate GFS.INI.
 goto END
 
 :BUSY
