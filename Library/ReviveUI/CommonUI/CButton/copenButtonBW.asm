@@ -1373,7 +1373,7 @@ NOT_MO< call	DrawBWButtonCheckMark	;if setting in menu, draw checkmark >
 	mov	si, ax			;set si = VI_attrs
 
 OLS <	mov	ax, C_BW_GREY		;pass color to use if disabled	>
-CUA <	mov	ax, C_BLACK		;pass color to use if disabled	>
+NOT_MO <	mov	ax, C_BLACK		;pass color to use if disabled	>
 MO <	mov	ax, C_BW_GREY		;pass color to use if disabled	>
 PMAN <	mov	ax, C_BW_GREY		;pass color to use if disabled	>
 if USE_COLOR_FOR_DISABLED_GADGETS

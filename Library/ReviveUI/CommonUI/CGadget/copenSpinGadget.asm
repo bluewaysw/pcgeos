@@ -3094,7 +3094,8 @@ if	0
 	mov 	di, bp				;restore gstate
 	jz	exit				;not doing text, done
 endif
-
+	mov	di, bp				;restore gstate (was only done in
+					;  the disabled code above)
 	mov	bx, dx				;get bottom of this thing
 	sub	ax, SPIN_CONTENT_MARGIN		;get past edges of the content
 	add	cx, SPIN_CONTENT_MARGIN
@@ -3168,6 +3169,10 @@ maybeClear:
 	call	GrFillRect			;else clear area
 	
 drawFrame:
+	push	di				;save gstate (CUA/MAC: unlike Motif
+					;  there is no push of it left from the
+					;  start; without this the pop below took
+					;  a word of the caller: ILLEGAL_HANDLE)
 	call	CF_DerefVisSpecDI
 	test	ds:[di].OLSGI_states, mask OLSGS_DRAW_FRAME
  	pop	di				;restore gstate

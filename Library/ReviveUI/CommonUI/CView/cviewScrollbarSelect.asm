@@ -262,7 +262,9 @@ PMAN <	cmp	ds:[di].OLSBI_elevOffset, NO_THUMB_ELEV_OFFSET		>
 	je	skipCheck
 
 	push	cx
-CUAS <	mov	cx, ds:[di].OLSBI_elevLen					>
+MO   <	mov	cx, ds:[di].OLSBI_elevLen					>
+PMAN <	mov	cx, ds:[di].OLSBI_elevLen					>
+NOT_MO  <	mov	cx, MO_THUMB_HEIGHT		;CUA thumb has a fixed size	>
 OLS  <	mov	cx, ds:[di].OLSBI_propIndLen	;indicator fills the area?	>
 	cmp	cx, ds:[di].OLSBI_scrArea
 	pop	cx
@@ -903,12 +905,35 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
-if _CUA
+if _CUA or _MAC
 
 DoScrollCriteria	proc	near
 	class	OLScrollbarClass
 	
 	push	bx, bp, cx, si			;save these
+if _MAC
+	;
+	; MAC: twisted (GenValue) scrollbars are the little arrows, on top
+	; of each other: the upper half is the up arrow, the lower half the
+	; down arrow.  (dx is the offset from MO_SCR_AREA_MARGIN, see
+	; OLScrollbarSelect.)
+	;
+	test	ds:[di].OLSBI_attrs, mask OLSA_TWISTED
+	jz	notLittleArrows
+	clr	al
+	sub	cx, MAC_LITTLE_ARROWS_GAP	;(the space to the field)
+	cmp	cx, -SCROLLBAR_LATITUDE
+	jl	exit
+	cmp	cx, MAC_LITTLE_ARROWS_WIDTH+SCROLLBAR_LATITUDE
+	jg	exit
+	add	dx, MO_SCR_AREA_MARGIN		;y in the arrows
+	mov	al, OLSS_INC_UP
+	cmp	dx, MAC_LITTLE_ARROWS_HALF
+	jl	exit
+	mov	al, OLSS_INC_DOWN
+	jmp	exit
+notLittleArrows:
+endif
 	;
 	; Have bx hold the height of the arrow (as viewed vertically) and bx
 	; holds the width.  Twisted scrollbars have these rotated.
@@ -2006,7 +2031,7 @@ DoDragArea	proc	near
 	
 	mov	bx, ds:[di].OLSBI_scrArea    ;get length of scroll area
 	
-CUA <	sub 	bx, MO_THUMB_HEIGHT					   >
+NOT_MO <	sub 	bx, MO_THUMB_HEIGHT					   >
 MO <	sub	bx, ds:[di].OLSBI_elevLen    				   >
 PMAN <	sub	bx, ds:[di].OLSBI_elevLen    				   >
 OLS  <	sub	bx, ELEV_HEIGHT		     ;elevator length		   >

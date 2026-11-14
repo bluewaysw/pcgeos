@@ -273,6 +273,9 @@ OpenWinVisUnbuild	method dynamic	OLWinClass,
 
 	call	WinCommon_DerefVisSpec_DI
 CUAS <	push	ds:[di].OLWI_sysMenu		;get system menu >
+OLS <	clr	ax				;no system menu block: the >
+OLS <	push	ax				;  window menu (OLWI_menu) is in >
+						;  this block (pop bx below)
 
 if	(0)	; are now freed along w/block
 if	_CUA_STYLE
@@ -1697,7 +1700,11 @@ endif
 
 if _CUA_STYLE	;---------------------------------------------------------------
 	inc	ax				;move inside frame border
+if not (_CUA or _MAC)
 	dec	cx				;on left and right
+endif
+NOT_MO <	; (not on the right: the icons there overlap the frame line, >
+NOT_MO <	;  as the system menu button does on the left)		>
 
 endif		;---------------------------------------------------------------
 

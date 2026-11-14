@@ -469,9 +469,140 @@ if not _NO_FIELD_BACKGROUND
 	CallMod	OLFieldDrawBG			; draw the background
 exit:
 endif
+if _MAC
+	;
+	; MAC: the rounded bottom corners of the screen
+	;
+	mov	di, bp
+	mov	ax, C_BLACK
+	call	GrSetLineColor
+	call	VisGetSize			; cx, dx = size
+	mov	bx, dx
+	dec	bx				; bottom row
+	push	cx
+	clr	ax				; bottom left: to the right, up
+	mov	cx, 1
+	mov	dx, -1
+	call	MacDrawCornerField
+	pop	ax
+	dec	ax				; bottom right: to the left, up
+	clr	cx
+	mov	dx, -1
+	call	MacDrawCornerField
+endif
 	stc
 	ret
 OLFieldDraw	endm
+
+if _MAC
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacDrawCornerField
+
+DESCRIPTION:	MAC: draws one rounded screen corner, a quarter circle with
+		a radius in proportion to the system font size (drawn in black).
+
+PASS:		di	- gstate
+		(ax, bx) - the corner pixel
+		cx	- nonzero: rows extend to the right, zero: to the left
+		dx	- step to the next row (1 down, -1 up)
+
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacDrawCornerField	proc	near	uses ax, bx, cx, dx, si, di
+radius		local	word
+toRight		local	word
+rowStep		local	word
+cornerX		local	word
+cornerY		local	word
+	.enter
+	mov	cornerX, ax
+	mov	cornerY, bx
+	mov	toRight, cx
+	mov	rowStep, dx
+	push	ax
+	mov	ax, C_BLACK
+	call	GrSetAreaColor
+	pop	ax
+	;
+	; Radius from the system font size (5/12 of it, at least 3): 5 pixels
+	; with a 12 point font, as on the Macintosh, and in proportion with
+	; larger fonts.
+	;
+	push	ds
+	mov	ax, segment dgroup
+	mov	ds, ax
+	mov	ax, ds:[specDisplayScheme].DS_pointSize
+	pop	ds
+	mov	cx, 5
+	mul	cx			; dx:ax = size * 5
+	add	ax, 6
+	mov	cx, 12
+	div	cx			; ax = size * 5 / 12, rounded
+	cmp	ax, 3
+	jge	gotRadius
+	mov	ax, 3
+gotRadius:
+	mov	radius, ax
+	;
+	; Row i (0 at the corner) is black for R - sqrt(R^2 - (R-i)^2) pixels.
+	;
+	clr	si			; si = row
+rowLoop:
+	cmp	si, radius
+	jge	done
+	mov	ax, radius
+	sub	ax, si
+	imul	ax			; ax = (R-i)^2
+	mov	cx, ax
+	mov	ax, radius
+	imul	ax			; ax = R^2
+	sub	ax, cx
+	mov	cx, ax			; cx = R^2 - (R-i)^2
+	mov	bx, radius		; bx = integer square root of cx
+sqrtLoop:
+	mov	ax, bx
+	imul	ax
+	cmp	ax, cx
+	jle	sqrtDone
+	dec	bx
+	jmp	sqrtLoop
+sqrtDone:
+	mov	cx, radius
+	sub	cx, bx			; cx = black length (>= 1)
+	mov	ax, si
+	imul	rowStep
+	add	ax, cornerY
+	mov	bx, ax			; bx = y of the row
+	mov	ax, cornerX
+	dec	cx
+	tst	toRight
+	jz	rowLeft
+	add	cx, ax			; (ax .. ax + length - 1)
+	jmp	rowDraw
+rowLeft:
+	neg	cx
+	add	cx, ax			; (ax - length + 1 .. ax)
+	xchg	ax, cx
+rowDraw:
+	inc	cx			; GrFillRect: right and bottom
+	mov	dx, bx			;  exclusive
+	inc	dx
+	call	GrFillRect
+	inc	si
+	jmp	rowLoop
+done:
+	.leave
+	ret
+MacDrawCornerField	endp
+endif
 endif
 
 

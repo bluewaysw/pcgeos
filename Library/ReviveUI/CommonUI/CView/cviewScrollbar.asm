@@ -187,6 +187,7 @@ REVISION HISTORY:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 
 OLScrollbarSpecBuild	method dynamic OLScrollbarClass, MSG_SPEC_BUILD
+MAC <	ORNF	ds:[di].VI_geoAttrs, mask VGA_NOTIFY_GEOMETRY_VALID ; (grow box)>
 	.enter
 
 	mov	di, offset OLScrollbarClass
@@ -723,6 +724,9 @@ RUDY  <	add	dx, 2				;add a total of 6	>
 	; PM has up/down buttons arranged vertically.
 PMAN  <	mov	cx, MO_SCROLLBAR_WIDTH+1	;set width		>
 PMAN  <	mov	dx, PM_SPIN_ARROW_HEIGHT*2+3	;set height		>
+	; MAC: the little arrows of System 7, on top of each other.
+MAC   <	mov	cx, MAC_LITTLE_ARROWS_GAP+MAC_LITTLE_ARROWS_WIDTH ;width	>
+MAC   <	mov	dx, MAC_LITTLE_ARROWS_HEIGHT	;set height		>
 
 if _MOTIF
 	jmp	exit
@@ -920,6 +924,110 @@ exit:
 
 OLScrollbarRecalcSize	endm
 
+if _MAC
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLScrollbarGeometryValid
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	MAC: a scrollbar that reaches into the grow box corner of a
+		resizable window (at its right and bottom edge) ends at the
+		grow box, as on the Macintosh: a vertical one at its top line,
+		a horizontal one at its left line.
+
+CALLED BY:	MSG_VIS_NOTIFY_GEOMETRY_VALID (VGA_NOTIFY_GEOMETRY_VALID is
+		set for MAC in OLScrollbarSpecBuild)
+PASS:		*ds:si	= OLScrollbar object
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLScrollbarGeometryValid	method dynamic	OLScrollbarClass, \
+				MSG_VIS_NOTIFY_GEOMETRY_VALID
+	mov	di, offset OLScrollbarClass
+	call	ObjCallSuperNoLock
+	call	MacAvoidGrowBox
+	ret
+OLScrollbarGeometryValid	endm
+
+MacAvoidGrowBox	proc	far		;(also called before drawing: on
+					;  the first geometry update the
+					;  window is not open yet)
+	class	OLScrollbarClass
+	uses	ax, bx, cx, dx, si, di, bp, es
+winWidth	local	word
+winHeight	local	word
+	.enter
+	push	si
+	call	VisQueryWindow			;di = our window
+	tst	di
+	jz	noWinPop
+	push	si
+	mov	si, WIT_INPUT_OBJ
+	call	WinGetInfo			;^lcx:dx = its object
+	pop	si
+	jcxz	noWinPop
+	movdw	bxsi, cxdx
+	call	ObjSwapLock
+	mov	di, segment OLWinClass
+	mov	es, di
+	mov	di, offset OLWinClass
+	call	ObjIsObjectInClass
+	jnc	unlockNo
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLWI_attrs, mask OWA_RESIZABLE
+	jz	unlockNo
+	test	ds:[di].OLWI_specState, mask OLWSS_MAXIMIZED
+	jnz	unlockNo			;(no grow box when zoomed)
+	mov	ax, ds:[di].VI_bounds.R_right
+	sub	ax, ds:[di].VI_bounds.R_left
+	mov	winWidth, ax
+	mov	ax, ds:[di].VI_bounds.R_bottom
+	sub	ax, ds:[di].VI_bounds.R_top
+	mov	winHeight, ax
+	call	ObjSwapUnlock
+	pop	si
+	;
+	; The grow box: from (width - 3 - (MAC_GROW_BOX_SIZE-1)) on, and the
+	; same from the bottom (see DrawMacGrowBox).
+	;
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	cx, winWidth
+	sub	cx, 3+(MAC_GROW_BOX_SIZE-1)	;cx = grow box left line
+	mov	dx, winHeight
+	sub	dx, 3+(MAC_GROW_BOX_SIZE-1)	;dx = grow box top line
+	cmp	ds:[di].VI_bounds.R_right, cx
+	jle	done				;left of the grow box
+	cmp	ds:[di].VI_bounds.R_bottom, dx
+	jle	done				;above it
+	test	ds:[di].OLSBI_attrs, mask OLSA_VERTICAL
+	jz	horizontal
+	inc	dx				;end at its top line (shared)
+	cmp	ds:[di].VI_bounds.R_top, dx
+	jge	done
+	mov	ds:[di].VI_bounds.R_bottom, dx
+	jmp	done
+horizontal:
+	inc	cx				;end at its left line (shared)
+	cmp	ds:[di].VI_bounds.R_left, cx
+	jge	done
+	mov	ds:[di].VI_bounds.R_right, cx
+	jmp	done
+unlockNo:
+	call	ObjSwapUnlock
+noWinPop:
+	pop	si
+done:
+	.leave
+	ret
+MacAvoidGrowBox	endp
+endif
+
+
 if SPINNER_GEN_VALUE
 ;
 ; pass:
@@ -1113,7 +1221,7 @@ OLS  <	add	di, ds:[di].Vis_offset				>
 validOffsets2:
 	pop	di, cx
 
-CUA <	CallMod	DrawBWScrollbar						>
+NOT_MO <	CallMod	DrawBWScrollbar						>
 MO <   	call	DrawScrollbar						>
 PMAN <	call	DrawScrollbar						>
 OLS <	call	DrawOLScrollbar						>

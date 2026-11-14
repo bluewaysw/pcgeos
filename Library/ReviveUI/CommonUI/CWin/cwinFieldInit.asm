@@ -320,6 +320,7 @@ HaveVisParent:
 					; Store new bounds data
 	mov	ds:[di].VI_bounds.R_right, cx
 	mov	ds:[di].VI_bounds.R_bottom, dx
+MAC <	mov	ds:[di].VI_bounds.R_top, MAC_MENU_BAR_HEIGHT ; below menu bar>
 
 
 if FAKE_SIZE_OPTIONS
@@ -2270,6 +2271,18 @@ EC <	ERROR_NZ	OPEN_WIN_ON_OPEN_WINDOW				>
 
 	push	bp			; push parent window to use
 
+if _MAC
+	;
+	; MAC: the field starts below the menu bar (VI_bounds.R_top), so open
+	; a plain rectangle at its bounds; the windows on the field then start
+	; below the menu bar too.  (The MAC fieldRegion was never finished.)
+	;
+	clr	ax
+	push	ax			; no region: rectangle
+	push	ax
+	call	OpenGetLineBounds	; (ax, bx) - (cx, dx), last pixel
+	push	dx, cx, bx, ax
+else
 NOFXIP<	push	cs						>
 
 FXIP <	push	bx						>
@@ -2286,6 +2299,7 @@ FXIP <	push	ax						>
 	push	cx			; right
 	push	ax			; last two params aren't used, so 
 	push	cx			;	just push whatever
+endif
 
 	mov	bx, ds:[si]
 if not _NO_FIELD_BACKGROUND
@@ -2348,12 +2362,14 @@ OFOW_noBG:
 OFOW_gotColor:
 endif
 endif
+MAC <	andnf	ah, not mask WCF_PLAIN	; MAC: draw (the screen corners) >
 	mov	bp, si			; set up chunk of this object in bp
 					; pass handle of video driver
 	mov	di, ds:[LMBH_handle]	; pass obj descriptor of this object
 	mov	cx, di
 	mov	dx, bp
 
+MAC <	andnf	ah, not mask WCF_PLAIN	; MAC: draw the screen corners >
 				; Open window BEHIND all others at this level
 	mov	si, mask WPF_PLACE_BEHIND
 	call	WinOpen

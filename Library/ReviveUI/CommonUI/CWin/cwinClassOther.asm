@@ -1180,7 +1180,7 @@ downRight:
 endif
 	mov	ax, ds:[bp].VI_bounds.R_left		;menu left
 	sub	ax, cx					;menu button left
-CUA <	inc	ax			;deal with CUA/PM one-pixel overlap >
+NOT_MO <	inc	ax			;deal with CUA/PM one-pixel overlap >
 PMAN <	inc	ax			;deal with CUA/PM one-pixel overlap >
 MO <	inc	ax			;allow one-pixel overlap now 2/3/93 >
 JEDI <	inc	ax			;2 pixels			>
@@ -1316,7 +1316,7 @@ moveMenuToLeftSide:
 if _JEDIMOTIF
 	dec	ax			;only 1-pixel to show non-optimal pos.
 else
-CUA <	sub	ax, 2			;encourage one-pixel overlap        >
+NOT_MO <	sub	ax, 2			;encourage one-pixel overlap        >
 PMAN <	dec	ax						    	    >
 endif
 

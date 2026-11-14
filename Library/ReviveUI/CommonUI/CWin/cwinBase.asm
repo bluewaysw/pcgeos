@@ -1020,7 +1020,11 @@ endif
 	;
 	; Add a hint to put the trigger in the title bar
 	;
+if _MAC
+	mov	ax, HINT_SEEK_MENU_BAR		;MAC: at the right end of the
+else					;  menu bar, as in System 7
 	mov	ax, HINT_SEEK_TITLE_BAR_RIGHT
+endif
 	clr	cx				;cx <- no extra data
 	call	ObjVarAddData
 
@@ -3815,6 +3819,55 @@ WinIconCode	ends
 WinClasses	segment resource
 
 
+if _MAC
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLBaseWinSetMacMenuBarVisible
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Show or hide the menu bar of this window on the field: as on
+		the Macintosh, only the active application's menu bar is
+		shown (the window with the system target).
+
+CALLED BY:	OLBaseWinGainedSystemTargetExcl, OLBaseWinLostSystemTargetExcl
+PASS:		*ds:si	= OLBaseWin object
+		cl	= VA_VISIBLE to show, ch = VA_VISIBLE to hide
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLBaseWinSetMacMenuBarVisible	proc	far
+	uses	ax, bx, cx, dx, si, di, bp
+	.enter
+	push	cx
+	mov	cx, mask VOF_IMAGE_INVALID	; redraw: the close and zoom box
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE	;  only show on the active window
+	call	VisMarkInvalid			;  (see OLButtonDraw)
+	pop	cx
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	si, ds:[di].OLMDWI_menuBar	; (in our block)
+	tst	si
+	jz	done
+	mov	di, ds:[si]
+	tst	ds:[di].Vis_offset		; not built yet?
+	jz	done
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+	jz	done
+	mov	dl, VUM_DELAYED_VIA_UI_QUEUE
+	mov	ax, MSG_VIS_SET_ATTRS
+	call	ObjCallInstanceNoLock
+done:
+	.leave
+	ret
+OLBaseWinSetMacMenuBarVisible	endp
+endif
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLBaseWinGainedSystemTargetExcl
@@ -3842,6 +3895,10 @@ OLBaseWinGainedSystemTargetExcl	method dynamic	OLBaseWinClass,
 					MSG_META_GAINED_SYS_TARGET_EXCL
 
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
+if _MAC
+	mov	cx, mask VA_VISIBLE		; active: show our menu bar
+	call	OLBaseWinSetMacMenuBarVisible
+endif
 	push	es
 	segmov	es, dgroup, ax
 	mov	ax, es:[olExpressOptions]
@@ -3963,6 +4020,7 @@ REVISION HISTORY:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
 OLBaseWinHideExpressToolArea	proc	near
+MAC <	ret				; MAC: the express menu stays in the menu bar>
 
 	push	si
 	mov	bx, segment OLFieldClass
@@ -4020,6 +4078,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 OLBaseWinAdjustTitleBoundsForExpressToolArea	proc	far
+MAC <	ret				; MAC: express menu is in the menu bar >
 
 	; If doesn't have Express tool area, then nothing to adjust.
 	;
@@ -4043,6 +4102,7 @@ if _OPEN_LOOK
 	add bp, OLS_WIN_HEADER_FIELD_ICON_RIGHT_MARGIN
 	sub	ds:[di].OLWI_titleBarBounds.R_right, bp
 else
+NOT_MO <	dec	bp			; CUA: tool area overlaps (-1 spacing)>
 	add	ds:[di].OLWI_titleBarBounds.R_left, bp
 endif
 endif
@@ -4078,6 +4138,10 @@ OLBaseWinLostSystemTargetExcl	method dynamic	OLBaseWinClass,
 					MSG_META_LOST_SYS_TARGET_EXCL
 
 	call	WinClasses_ObjCallSuperNoLock_OLBaseWinClass
+if _MAC
+	mov	cx, (mask VA_VISIBLE) shl 8	; no longer active: hide it
+	call	OLBaseWinSetMacMenuBarVisible
+endif
 
 ;
 ; we cannot use olExpressOptions as MSG_META_LOST_SYS_TARGET_EXCL could
@@ -4128,7 +4192,21 @@ if EVENT_MENU
 	add	ds:[di].OLWI_titleBarBounds.R_right, bp
 endif
 else
+if _OPEN_LOOK
+	; undo OLBaseWinAdjustTitleBoundsForExpressToolArea (OpenLook puts
+	; the tool area on the right): without this the title area shrank,
+	; and the tool area moved left, each time the window got the target
+	; again
+	add	bp, OLS_WIN_HEADER_FIELD_ICON_RIGHT_MARGIN
+	add	ds:[di].OLWI_titleBarBounds.R_right, bp
+else
+	; undo OLBaseWinAdjustTitleBoundsForExpressToolArea: the same -1 for
+	; the overlap (CUA), and nothing for MAC, which reserves no room
+if not _MAC
+NOT_MO <	dec	bp			; CUA: tool area overlaps (-1 spacing)>
 	sub	ds:[di].OLWI_titleBarBounds.R_left, bp
+endif
+endif
 endif
 
 	; If we're putting the menu bar in the title area, we need to
@@ -5132,9 +5210,12 @@ endif							; tool area
 	; If -1 spacing is being used (best test I know of is for B&W display),
 	; then pull tool area up & to the left one pixel, to overlap with the
 	; one-pixel line at the edge of the title area
+	; (CUA always uses -1 spacing, CUA_BASE_WIN_CHILD_SPACING, color too)
 	;
+if not (_CUA or _MAC)
 	call	OpenCheckIfBW
 	jnc	gotIt
+endif
 	dec	ax
 	dec	bx
 if EVENT_MENU
@@ -5156,6 +5237,7 @@ endif
 	call	WinTransform
 	mov	cx, ax
 	mov	dx, bx
+MAC <	clr	cx, dx			; MAC: left end of the menu bar >
 	mov	bx, ds:[LMBH_handle]
 	call	MemOwner		; bx = geode
 	push	si
@@ -5560,6 +5642,7 @@ endif	; if _GCM -------------------------------------------------------------
 						;ax, bp = widths
 
 	call	WinClasses_DerefVisSpec_DI		; ds:di = instance data
+MAC <	jmp	done				; MAC: express menu in the menu bar>
 	test	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 	jz	done				; nope
 	push	bp				;save right side width

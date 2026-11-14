@@ -175,6 +175,7 @@ isSystemMenuButton:
 	;set bordered, not in menu bar, etc.
 
 	ANDNF	ds:[di].OLBI_specState, not (mask OLBSS_IN_MENU_BAR)
+OLS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_MENU_DOWN_MARK	>
 
 if _PM
 	;
@@ -691,6 +692,7 @@ if	 _BW_MENU_ITEM_SELECTION_IS_DEPRESSED and (not _ASSUME_BW_ONLY)
 endif	;_BW_MENU_ITEM_SELECTION_IS_DEPRESSED and (not _ASSUME_BW_ONLY)
 
 if	 (not _BW_MENU_ITEM_SELECTION_IS_DEPRESSED) or (not _ASSUME_BW_ONLY)
+OLS <	mov	bx, mask OLBSS_BORDERED or mask OLBSS_DEPRESSED		>
 PMAN <	mov	bx, mask OLBSS_BORDERED or mask OLBSS_DEPRESSED		>
 NOT_MO<	mov	bx, mask OLBSS_DEPRESSED				>
 
@@ -737,9 +739,13 @@ OLMenuButtonStartSelect	method	OLMenuButtonClass, MSG_META_START_SELECT
 
 if _CUA_STYLE	;--------------------------------------------------------------
 	;CUA/Motif: if system menu button, check for double-click
+	;(MAC: the system menu button is the close box: a single click
+	; closes the window, and no menu comes up)
 
+if not _MAC
 	test	bp, mask BI_DOUBLE_PRESS
 	jz	OLMBSS_90			;skip if not...
+endif
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
@@ -780,6 +786,10 @@ if _CUA_STYLE	;--------------------------------------------------------------
 	call	ObjMessage
 
 	pop	ax, bx, cx, dx, si, bp
+if _MAC
+	mov	ax, mask MRF_PROCESSED		;closed: no system menu
+	ret
+endif
 
 OLMBSS_90:
 endif 		;--------------------------------------------------------------
@@ -860,9 +870,48 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Eric	2/90		initial version
-	sean	6/96		Got rid of Open Look version
 
 ------------------------------------------------------------------------------@
+
+if _OL_STYLE	;--------------------------------------------------------------
+
+OLMenuButtonTranslateMenuFunctions	proc	near
+	;OpenLook: check our "FeaturesExecutesDefault" environment flag,
+	;to see if we are reversing the OpenLook specification.
+
+	call	FlowGetUIButtonFlags	;get active mouse functions in AX
+	test	al, mask UIBF_SELECT_DISPLAYS_MENU
+	jnz	bswOpenLookSpec		;skip if should swap...
+
+	;Standard OpenLook spec: must swap SELECT and FEATURES
+	;to become MENU and DEFAULT flags.
+
+	mov	ax, bp			;get UIFA_SELECT and UIFA_FEATURES
+	ANDNF	bp, (mask OLMBFA_IN_BOUNDS shl 8) or 0ffh
+					;keep UIFA_IN bit as is
+
+	test	ah, mask UIFA_SELECT
+	jz	10$
+	ORNF	bp, (mask OLMBFA_DEFAULT shl 8)
+10$:
+	test	ah, mask UIFA_FEATURES
+	jz	20$
+	ORNF	bp, (mask OLMBFA_MENU shl 8)
+20$:
+	ret
+
+bswOpenLookSpec:
+	;BSW OpenLook spec: SELECT and FEATURES are OK as is.
+
+	ANDNF	bp, ((mask OLMBFA_MENU or mask OLMBFA_DEFAULT or \
+			mask OLMBFA_IN_BOUNDS) shl 8) or 0ffh
+	ret
+OLMenuButtonTranslateMenuFunctions	endp
+
+endif 		;--------------------------------------------------------------
+
+
+if _CUA_STYLE	;--------------------------------------------------------------
 
 OLMenuButtonTranslateMenuFunctions	proc	near
 	;CUA style: only keep MENU and IN_BOUNDS info. Ignore default action.
@@ -870,6 +919,8 @@ OLMenuButtonTranslateMenuFunctions	proc	near
 	ANDNF	bp, ((mask OLMBFA_MENU or mask OLMBFA_IN_BOUNDS) shl 8) or 0ffh
 	ret
 OLMenuButtonTranslateMenuFunctions	endp
+
+endif 		;--------------------------------------------------------------
 
 
 COMMENT @----------------------------------------------------------------------
@@ -910,13 +961,15 @@ REVISION HISTORY:
 	Name	Date		Description
 	----	----		-----------
 	Eric	8/89		Initial version
-	sean	6/96		Support for Selection Boxes (Odie)
 
 ------------------------------------------------------------------------------@
 
 
-OLMenuButtonHandleEvent	method	OLMenuButtonClass, \
-				MSG_META_END_SELECT, MSG_META_PTR 
+OLS < OLMenuButtonHandleEvent	method	OLMenuButtonClass, \
+				MSG_META_START_FEATURES, MSG_META_END_SELECT, \
+				MSG_META_PTR, MSG_META_END_FEATURES >
+CUAS < OLMenuButtonHandleEvent	method	OLMenuButtonClass, \
+				MSG_META_END_SELECT, MSG_META_PTR >
 if _JEDIMOTIF
 	;
 	; On MSG_META_PTR, ignore if Jotter drag in progress
@@ -1932,6 +1985,15 @@ inBoundsIsPressed:
 	test	ds:[di].OLBI_specState, mask OLBSS_HAS_MOUSE_GRAB
 	jnz	alreadyHadMouseGrab	;skip if already have mouse grab...
 
+if _OL_STYLE	;--------------------------------------------------------------
+	;Save time of menu start select
+
+	call	TimerGetCount		;get current system time
+					;& store away for later use
+	mov	ds:[di].OLMBI_menuTimer.segment, bx
+	mov	ds:[di].OLMBI_menuTimer.offset, ax
+endif		;--------------------------------------------------------------
+
 	;important: set this flag before we grab the GADGET exclusive,
 	;because grabbing the gadget may cause our menu to try to close;
 	;it will look at the OLBSS_HAS_MOUSE_GRAB flag in this object to
@@ -2136,6 +2198,7 @@ endif	;_CASCADING_MENUS
 inBoundsNotPressedEnterStayUpMode2:
 	;Menu is open --> enter stay-up mode (Motif: no redraw required)
 
+OLS <	call	OLButtonRestoreBorderedAndDepressedStatusAndDrawNOW	>
 NOT_MO<	call	OLMenuButtonEnsureIsDrawnHollow				>
 
 	;place menu in stay-up-mode, passing CX = TRUE so that the
@@ -2180,6 +2243,7 @@ endif	;_CASCADING_MENUS
 30$:
 	;reset the button visually
 
+OLS <	call	OLButtonRestoreBorderedAndDepressedStatusAndDrawNOW	>
 NOT_MO<	call	OLMenuButtonEnsureIsDrawnHollow				>
 
 	mov	ax, mask MRF_REPLAY	;replay this event, since we had the
@@ -2453,7 +2517,7 @@ REVISION HISTORY:
 
 if _CUA_STYLE and (not _MOTIF) and (not _PM)	;-------------------------------
 
-OLMenuButtonEnsureIsDrawnHollow	proc	near
+OLMenuButtonEnsureIsDrawnHollow	proc	far	;CUA calls it from KbdNavigation too
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
 	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU
@@ -2463,6 +2527,19 @@ OLMenuButtonEnsureIsDrawnHollow	proc	near
 					;whatever we want. Skip to end...
 
 inMenuBar:
+if _MAC
+	;
+	; MAC: the title of an open menu in the menu bar is drawn inverted
+	; (depressed, no border), as on the Macintosh.
+	;
+	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR
+	jz	cuaHollow
+	ANDNF	ds:[di].OLBI_specState, not (mask OLBSS_BORDERED)
+	ORNF	ds:[di].OLBI_specState, mask OLBSS_DEPRESSED
+	call	OLButtonDrawNOWIfNewState
+	jmp	done
+cuaHollow:
+endif
 	;menu button is in menu bar or is system menu: turn off depressed,
 	;turn on bordered.
 
@@ -2552,20 +2629,13 @@ endif
 	test	ds:[di].VI_attrs, mask VA_REALIZED
 	jz	done			;not realized, done
 
-	; For Odie, selection boxes don't open menus, so we ignore
-	; the activate.
-	;
-if	SELECTION_BOX
-	test	ds:[di].OLMBI_odieFlags, mask OLMBOF_IS_SELECTION_BOX
-	jnz	done
-endif
-
 	;start a menu function, placing menu in stay-up-mode
 
 	ORNF	ds:[di].OLMBI_specState, mask OLMBSS_MENU_FUNCTION_PENDING
 
 	;now save state and redraw button according to the specific UI
 
+OLS   <	call	OLMenuButtonEnsureIsDrawnDepressedNOW			>
 MO    <	call	OLMenuButtonEnsureIsDrawnDepressedNOW			>
 PMAN  <	call	OLMenuButtonEnsureIsDrawnDepressedNOW			>
 NOT_MO<	call	OLMenuButtonEnsureIsDrawnHollow				>
@@ -2746,7 +2816,7 @@ afterCloseSiblings::			;conditional: _CASCADING_MENUS
 	;Check some specific UI requirements on where the mouse pointer
 	;should be.
 
-if (_CUA or _MOTIF) and (not _JEDIMOTIF) and (not _ODIE)
+if (_CUA or _MOTIF or _OL_STYLE) and (not _JEDIMOTIF) and (not _ODIE)
 	;
 	; OpenLook, Motif: only activate menu if mouse pointer is over 
 	; right side of menu button.
@@ -2892,7 +2962,8 @@ if _JEDIMOTIF	;=============================================================
 	;
 	mov	ax, ds:[di].VI_bounds.R_left	; main menu and popup lists
 	mov	bx, ds:[di].VI_bounds.R_top
-	cmp	cl, MOWT_SUBMENU
+OLS <	cmp	cl, OLWT_SUBMENU					>
+CUAS <	cmp	cl, MOWT_SUBMENU					>
 	jne	notSubmenu
 	inc	ax				; overlap at left
 	inc	ax
@@ -2939,7 +3010,7 @@ if	DRAW_SHADOWS_ON_BW_GADGETS
 12$:
 endif
 
-CUA <	dec	bx			;overlap menu button		>
+NOT_MO <	dec	bx			;overlap menu button		>
 
 OLS <	cmp	cl, OLWT_SUBMENU					>
 CUAS <	cmp	cl, MOWT_SUBMENU					>
@@ -3036,6 +3107,22 @@ havePosition:
 	mov_tr	di, ax
 	pop	ax, si
 	call	WinUntransform	; and make parent-relative
+if _MAC
+	;
+	; MAC: a menu bar moved to the field is a window on the screen window,
+	; but its menus open on the field window (their vis parent, the
+	; application, is there), which starts below the menu bar: make the
+	; position relative to the field.
+	;
+	push	ax, si
+	mov	si, WIT_PARENT_WIN
+	call	WinGetInfo		; parent of that: none for the screen
+	tst	ax
+	pop	ax, si
+	jnz	notOnScreen
+	sub	bx, MAC_MENU_BAR_HEIGHT
+notOnScreen:
+endif
 
 	mov	cx, ax
 	mov	dx, bx
@@ -3287,6 +3374,14 @@ endif	;_CASCADING_MENUS
 	;the primary has intercepted a button release, even though an other
 	;button is still pressed, and we have the mouse grab.
 	;If so, ignore this loss. ONLY IMPORTANT FOR >1 BUTTON UIs.
+
+if _OL_STYLE
+PrintMessage <OLMenuButton: MAY NOT RELEASE MOUSE GRAB ON LOST_GADGET!>
+endif
+
+OLS <	test	ds:[di].OLBI_specState, mask OLBSS_HAS_MOUSE_GRAB	   >
+OLS <	jnz	done			;if default pending and have grab, >
+					;ignore this loss...
 
 	;fool OLButtonLostGadgetExcl into thinking that this
 	;is a regular button...
@@ -3913,7 +4008,8 @@ else	; (not _ODIE)
 
 	mov	di, ds:[si]
 	add	di, ds:[di].Vis_offset
-	cmp	ds:[di].OLMBI_popupType, MOWT_SUBMENU
+OLS <	cmp	ds:[di].OLMBI_popupType, OLWT_SUBMENU			>
+CUAS <	cmp	ds:[di].OLMBI_popupType, MOWT_SUBMENU			>
 	jne	callSuper		;skip if not sub-menu...
 
 if _JEDIMOTIF
@@ -4582,6 +4678,7 @@ if	 _BW_MENU_ITEM_SELECTION_IS_DEPRESSED and (not _ASSUME_BW_ONLY)
 endif	;_BW_MENU_ITEM_SELECTION_IS_DEPRESSED and (not _ASSUME_BW_ONLY)
 
 if	 (not _BW_MENU_ITEM_SELECTION_IS_DEPRESSED) or (not _ASSUME_BW_ONLY)
+OLS   <	mov	bx, mask OLBSS_BORDERED or mask OLBSS_DEPRESSED		>
 PMAN  <	mov	bx, mask OLBSS_BORDERED or mask OLBSS_DEPRESSED		>
 NOT_MO<	mov	bx, mask OLBSS_DEPRESSED				>
 

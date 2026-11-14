@@ -3323,7 +3323,7 @@ if _CUA_STYLE	;START of CUA_STYLE specific code -----------------------------
 	;is not menu or icon: is fixed color
 	;(changed 2/15/91 cbh to use real light color)
 	
-CUA <	mov	al, C_WHITE		;assume is not a menu		>
+NOT_MO <	mov	al, C_WHITE		;assume is not a menu		>
 MO <	mov	al, C_WHITE		;assume B&W display		>
 MO <	test	ds:[moCS_flags], mask CSF_BW ; is this a B&W display?	>
 MO <	jnz	OWOW_haveColor		;   skip if so...		>
@@ -5451,6 +5451,14 @@ EC <	pop	di							>
 	jz	exit			;skip if not...
 
 	xchg	di, si			;menu in *ds:di, button in *ds:si
+if _MAC
+	push	di			;MAC: menus from the menu bar drop below
+	mov	di, ds:[si]		;  it and can't cover their button (the
+	add	di, ds:[di].Vis_offset	;  check here mixes up the field and
+	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR ; the screen)
+	pop	di
+	jnz	exit
+endif
 
 	;
 	; Odie: we only constrain menus that are not under the menubar
@@ -5708,11 +5716,13 @@ if _JEDIMOTIF
 	dec	dx
 	dec	dx
 else
+if not (_CUA or _MAC)				; (CUA: -1 spacing, full height as for BW)
 	call	OpenCheckIfBW			; that's all for BW
 	jc	done
 	dec	dx				; small adjustment for color
 if (not _PM)
 	dec	dx				; PM needs only 1 pixel adjust.
+endif
 endif
 done:
 endif	; if _JEDIMOTIF else

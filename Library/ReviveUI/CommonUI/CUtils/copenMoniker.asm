@@ -599,6 +599,9 @@ DrawMnemonicUnderline	proc	near	uses ax, bx, dx, di, bp, si, es
 	.enter
 
 if DRAW_MNEMONIC_UNDERLINES
+if _MAC
+	jmp	reallyExit			;MAC: no mnemonic underlines
+endif
 	call	OpenCheckIfKeyboardNavigation	;if not providing kbd nav,
 	LONG jnc	reallyExit		;	don't draw mnemonic
 						;	underline
@@ -1459,9 +1462,27 @@ EC <	ERROR_NC OL_ERROR						>
 	add	si, ds:[si].Vis_offset
 	mov	cx, ds:[si].VI_bounds.R_right
 	sub	cx, ds:[si].VI_bounds.R_left
+if not _MAC
 	sub	cx, ds:[si].OLMWI_accelSpace
+endif
 	call	ObjSwapUnlock
 	pop	bx, si			;bx = draw Y position
+if _MAC
+	;
+	; MAC: the shortcut ends at the right edge of the menu (menu width
+	; minus its own width and a margin), as on the Macintosh.
+	;
+	push	dx, si, ds
+	segmov	ds, ss
+	mov	si, bp			;ds:si = the shortcut string
+	push	cx
+	clr	cx			;(null terminated)
+	call	GrTextWidth		;dx = its width
+	pop	cx
+	sub	cx, dx
+	sub	cx, MAC_MENU_SHORTCUT_MARGIN
+	pop	dx, si, ds
+endif
 
 noCentering:
 	segmov	ds, ss

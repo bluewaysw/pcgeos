@@ -364,6 +364,14 @@ OpenWinDrawHeaderBackground	proc	near
 	call	GrSetAreaColor
 
 	call	OpenWinGetHeaderBounds	;(ax, bx) - (cx, dx) = header bounds
+	;
+	;The header bounds are inclusive (1.x GrFillRect filled the right and
+	;bottom edge too); GrFillRect doesn't fill the right and bottom edge
+	;since GEOS 2.0, which left a one pixel gap on the right (where the
+	;header line, drawn with GrDrawLine, still ends) and above the line.
+	;
+	inc	cx
+	inc	dx
 
 	;if this window is resizable, then draw the top line of the header
 	;area separately, since the resize mark overlaps the top line of the
@@ -377,6 +385,7 @@ OpenWinDrawHeaderBackground	proc	near
 
 	dec	bx			;prepare to draw top line (only)
 	mov	dx, bx
+	inc	dx			;(one line high, see above)
 	add	ax, OLS_WIN_RESIZE_SEGMENT_LENGTH - OLS_WIN_LINE_BORDER_X_MARGIN
 	sub	cx, OLS_WIN_RESIZE_SEGMENT_LENGTH - OLS_WIN_LINE_BORDER_X_MARGIN
 

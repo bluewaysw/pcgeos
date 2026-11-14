@@ -2166,6 +2166,188 @@ REVISION HISTORY:
 	brianc	2/5/93  	Initial version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+if _MAC
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ToolAreaOpenWin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	MAC: the express menu sits at the left end of the menu bar,
+		above the field (which starts below the menu bar), so open
+		the tool area on the screen window, the field window's parent.
+
+CALLED BY:	MSG_VIS_OPEN_WIN
+PASS:		*ds:si	= ToolAreaClass object
+		bp	= parent window (the field window)
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ToolAreaOpenWin	method dynamic	ToolAreaClass, MSG_VIS_OPEN_WIN
+	push	si
+	mov	di, bp
+	mov	si, WIT_PARENT_WIN
+	call	WinGetInfo		; ax = screen window
+	pop	si
+	mov	bp, ax
+	mov	ax, MSG_VIS_OPEN_WIN
+	mov	di, offset ToolAreaClass
+	GOTO	ObjCallSuperNoLock
+ToolAreaOpenWin	endm
+endif
+
+if _MAC
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ToolAreaMacDraw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	MAC: the express menu is part of the menu bar: after its
+		button, draw the closing line of the menu bar under it.
+
+CALLED BY:	MSG_VIS_DRAW
+PASS:		*ds:si	= ToolAreaClass object
+		bp	= gstate
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ToolAreaMacDraw	method dynamic	ToolAreaClass, MSG_VIS_DRAW
+	push	bp
+	mov	di, offset ToolAreaClass
+	call	ObjCallSuperNoLock
+	pop	di			; di = gstate
+	call	VisGetBounds		; right/bottom exclusive
+	dec	cx
+	dec	dx
+	mov	bx, dx			; bottom row
+	push	ax
+	mov	ax, C_BLACK
+	call	GrSetLineColor
+	pop	ax
+	call	GrDrawHLine
+	call	VisGetBounds		; top left corner of the screen
+	mov	cx, 1			; to the right
+	mov	dx, 1			; rows going down
+	call	MacDrawCornerToolArea
+	ret
+ToolAreaMacDraw	endm
+
+if _MAC
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacDrawCornerToolArea
+
+DESCRIPTION:	MAC: draws one rounded screen corner, a quarter circle with
+		a radius in proportion to the system font size (drawn in black).
+
+PASS:		di	- gstate
+		(ax, bx) - the corner pixel
+		cx	- nonzero: rows extend to the right, zero: to the left
+		dx	- step to the next row (1 down, -1 up)
+
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacDrawCornerToolArea	proc	near	uses ax, bx, cx, dx, si, di
+radius		local	word
+toRight		local	word
+rowStep		local	word
+cornerX		local	word
+cornerY		local	word
+	.enter
+	mov	cornerX, ax
+	mov	cornerY, bx
+	mov	toRight, cx
+	mov	rowStep, dx
+	push	ax
+	mov	ax, C_BLACK
+	call	GrSetAreaColor
+	pop	ax
+	;
+	; Radius from the system font size (5/12 of it, at least 3): 5 pixels
+	; with a 12 point font, as on the Macintosh, and in proportion with
+	; larger fonts.
+	;
+	push	ds
+	mov	ax, segment dgroup
+	mov	ds, ax
+	mov	ax, ds:[specDisplayScheme].DS_pointSize
+	pop	ds
+	mov	cx, 5
+	mul	cx			; dx:ax = size * 5
+	add	ax, 6
+	mov	cx, 12
+	div	cx			; ax = size * 5 / 12, rounded
+	cmp	ax, 3
+	jge	gotRadius
+	mov	ax, 3
+gotRadius:
+	mov	radius, ax
+	;
+	; Row i (0 at the corner) is black for R - sqrt(R^2 - (R-i)^2) pixels.
+	;
+	clr	si			; si = row
+rowLoop:
+	cmp	si, radius
+	jge	done
+	mov	ax, radius
+	sub	ax, si
+	imul	ax			; ax = (R-i)^2
+	mov	cx, ax
+	mov	ax, radius
+	imul	ax			; ax = R^2
+	sub	ax, cx
+	mov	cx, ax			; cx = R^2 - (R-i)^2
+	mov	bx, radius		; bx = integer square root of cx
+sqrtLoop:
+	mov	ax, bx
+	imul	ax
+	cmp	ax, cx
+	jle	sqrtDone
+	dec	bx
+	jmp	sqrtLoop
+sqrtDone:
+	mov	cx, radius
+	sub	cx, bx			; cx = black length (>= 1)
+	mov	ax, si
+	imul	rowStep
+	add	ax, cornerY
+	mov	bx, ax			; bx = y of the row
+	mov	ax, cornerX
+	dec	cx
+	tst	toRight
+	jz	rowLeft
+	add	cx, ax			; (ax .. ax + length - 1)
+	jmp	rowDraw
+rowLeft:
+	neg	cx
+	add	cx, ax			; (ax - length + 1 .. ax)
+	xchg	ax, cx
+rowDraw:
+	inc	cx			; GrFillRect: right and bottom
+	mov	dx, bx			;  exclusive
+	inc	dx
+	call	GrFillRect
+	inc	si
+	jmp	rowLoop
+done:
+	.leave
+	ret
+MacDrawCornerToolArea	endp
+endif
+endif
+
 ToolAreaGupQueryVisParent	method	dynamic	ToolAreaClass,
 					MSG_SPEC_GUP_QUERY_VIS_PARENT
 	cmp	cx, SQT_VIS_PARENT_FOR_POPUP

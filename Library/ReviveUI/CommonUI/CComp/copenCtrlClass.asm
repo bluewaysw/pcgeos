@@ -1338,8 +1338,8 @@ else
 	call	CtrlCenterVertically
 
 OLS <	call	CtrlCenterHorizontally					>
-CUA <	call	CtrlFullJustifyHorizontally				>
-CUA <	call	CtrlIncludeEndsInSpacing				>
+NOT_MO <	call	CtrlFullJustifyHorizontally				>
+NOT_MO <	call	CtrlIncludeEndsInSpacing				>
 MO <	call	CtrlFullJustifyHorizontally				>
 MO <	call	CtrlIncludeEndsInSpacing				>
 PMAN <	call	CtrlFullJustifyHorizontally				>

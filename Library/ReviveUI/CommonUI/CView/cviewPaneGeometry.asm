@@ -265,6 +265,8 @@ GetPaneMargins	proc	near
 	clr	cx, dx				;assume no margins
 
 if	_CUA or _MAC
+	clr	ax, bp				;no left/right margins either:
+						;  the jz below returns them
 	mov	di, ds:[si]			;point to instance
 	add	di, ds:[di].Vis_offset		;ds:[di] -- SpecInstance
 	test	ds:[di].OLCI_optFlags, mask OLCOF_DISPLAY_MONIKER

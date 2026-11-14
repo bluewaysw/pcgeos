@@ -148,6 +148,8 @@ OpenWinRefresh	method	OLWinClass, MSG_OL_WINDOW_REFRESH
 	clr	bx
 	mov	cx, 4000h-1	; to the end of graphics space
 	mov	dx, 4000h-1
+	clr	bp		; bp:si = 0: rectangular region (GEOS 2.x
+	clr	si		;   interface; 1.x had no region parameter)
 	call	WinInvalTree	; Does all sub windows, too
 OWR_90:
 	ret
@@ -202,6 +204,7 @@ OpenWinBack	method	OLWinClass, MSG_OL_WINDOW_BACK
 
 				; Send this sucker to the back.
 	mov	ax, mask WPF_PLACE_BEHIND
+	clr	dx		; leave LayerID unchanged (GEOS 2.x interface)
 	call	WinChangePriority
 OWB_90:
 	ret

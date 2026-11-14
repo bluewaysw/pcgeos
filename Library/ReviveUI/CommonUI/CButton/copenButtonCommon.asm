@@ -676,6 +676,23 @@ inBoundsAndPressed:
 
 	call	OpenButtonCheckIfFullyEnabled
 	jnc	returnProcessed		;skip if not enabled...
+if _MAC
+	;
+	; MAC: a button in the menu bar (the help button) acts on the press,
+	; as the menus there do; the menu bar on the field is no window
+	; (OLWin) that would route the release to it.
+	;
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR
+	jz	notMacMenuBar
+	push	cx, dx, bp
+	clr	cx			;not a double press
+	call	OLButtonActivate
+	pop	cx, dx, bp
+	jmp	returnProcessed
+notMacMenuBar:
+endif
 
 	; Set double-click flag if appropriate
 	
@@ -2634,6 +2651,222 @@ endif	; BUBBLE_HELP
 
 
 
+if _MAC
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacIsSysIconWindowActive
+
+DESCRIPTION:	MAC: is the window of this title bar button (close or zoom box)
+		the active one?  Only active windows show their boxes.  (The
+		express menu in its tool area is always shown.)
+
+PASS:		*ds:si	- OLButton (OLBSS_SYS_ICON)
+
+RETURN:		carry set if active (or not in a window), clear if not
+
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacIsSysIconWindowActive	proc	near
+	uses	ax, bx, cx, dx, si, di, bp, es
+	.enter
+	call	VisFindParent		; ^lbx:si = vis parent
+	tst	bx
+	jz	active
+	call	ObjSwapLock
+	mov	di, segment OLWinClass
+	mov	es, di
+	mov	di, offset OLWinClass
+	call	ObjIsObjectInClass
+	mov	ax, mask HGF_SYS_EXCL	; assume active
+	jnc	unlock			; not a window: draw the button
+	mov	di, segment ToolAreaClass
+	mov	es, di
+	mov	di, offset ToolAreaClass
+	call	ObjIsObjectInClass	; the express menu (tool area) is
+	mov	ax, mask HGF_SYS_EXCL	;  no window with an active state:
+	jc	unlock			;  always draw it
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	mov	ax, ds:[di].OLWI_focusExcl.FTVMC_flags
+	ornf	ax, ds:[di].OLWI_targetExcl.FTVMC_flags
+unlock:
+	call	ObjSwapUnlock
+	test	ax, mask HGF_SYS_EXCL
+	jz	inactive
+active:
+	stc
+	jmp	done
+inactive:
+	clc
+done:
+	.leave
+	ret
+MacIsSysIconWindowActive	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacDrawSysIconBox
+
+DESCRIPTION:	MAC: draws the close box (the system menu button) or the zoom
+		box (maximize/restore) of an active window: an 11 x 11 box with
+		a 1 pixel white margin, centered in the button, on the title
+		bar stripes drawn by the window (no background of its own).
+		The zoom box has a 7 x 7 box in its top left corner.
+
+PASS:		*ds:si	- OLButton (OLBSS_SYS_ICON), bp - gstate
+
+RETURN:		carry set if drawn, clear if not ours (the express menu in
+		its tool area: draw it as usual)
+
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacDrawSysIconBox	proc	near
+	uses	ax, bx, cx, dx, si, di, es
+	.enter
+	push	si
+	call	VisFindParent		; ^lbx:si = vis parent
+	tst	bx
+	jz	notOursPop
+	call	ObjSwapLock
+	mov	di, segment ToolAreaClass
+	mov	es, di
+	mov	di, offset ToolAreaClass
+	call	ObjIsObjectInClass
+	call	ObjSwapUnlock
+	pop	si
+	jc	notOurs			; the express menu
+	mov	di, bp			; di = gstate
+	call	VisGetBounds		; right/bottom exclusive
+	add	ax, cx
+	shr	ax, 1
+	sub	ax, 6			; (ax, bx) = top left of the box
+	add	bx, dx
+	shr	bx, 1
+	sub	bx, 4			; (centered on the stripes)
+	push	ax, ds
+	mov	ax, segment idata
+	mov	ds, ax
+	mov	ax, C_WHITE
+	test	ds:[moCS_flags], mask CSF_BW
+	jnz	bwBox
+	mov	ax, C_LIGHT_GREY		; System 7 on colour screens
+bwBox:
+	pop	ds
+	call	GrSetAreaColor
+	mov	ax, C_BLACK
+	call	GrSetLineColor
+	pop	ax
+	push	ax, bx
+	dec	ax			; margin, 13 x 13
+	dec	bx
+	mov	cx, ax
+	add	cx, 13
+	mov	dx, bx
+	add	dx, 13
+	call	GrFillRect
+	pop	ax, bx
+	mov	cx, ax
+	add	cx, 10
+	mov	dx, bx
+	add	dx, 10
+	call	GrDrawRect		; the box, 11 x 11
+	call	MacBoxBevel		; (System 7: raised, in grey)
+	mov	di, segment OLMenuButtonClass
+	mov	es, di
+	mov	di, offset OLMenuButtonClass
+	call	ObjIsObjectInClass	; the close box?
+	mov	di, bp
+	jc	drawn
+	mov	cx, ax
+	add	cx, 6
+	mov	dx, bx
+	add	dx, 6
+	call	GrDrawRect		; zoom box: the inner box
+drawn:
+	stc
+	jmp	done
+notOursPop:
+	pop	si
+notOurs:
+	clc
+done:
+	.leave
+	ret
+MacDrawSysIconBox	endp
+
+
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacBoxBevel
+
+DESCRIPTION:	System 7 on colour screens: the close and zoom box look raised,
+		white inside on the top and left, dark grey inside on the
+		bottom and right.  Nothing on monochrome screens.
+
+PASS:		di	- gstate
+		(ax, bx) - (cx, dx) - the box (inclusive)
+
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacBoxBevel	proc	near
+	uses	ax, bx, cx, dx, ds
+	.enter
+	push	ax
+	mov	ax, segment idata
+	mov	ds, ax
+	pop	ax
+	test	ds:[moCS_flags], mask CSF_BW
+	jnz	done
+	inc	ax			; inside the black outline
+	inc	bx
+	dec	cx
+	dec	dx
+	push	ax
+	mov	ax, C_WHITE
+	call	GrSetLineColor
+	pop	ax
+	call	GrDrawHLine		; top: (ax, bx) - (cx, bx)
+	call	GrDrawVLine		; left: (ax, bx) - (ax, dx)
+	push	ax
+	mov	ax, C_DARK_GREY
+	call	GrSetLineColor
+	pop	ax
+	push	ax, bx
+	inc	ax
+	mov	bx, dx
+	call	GrDrawHLine		; bottom: (ax+1, dx) - (cx, dx)
+	pop	ax, bx
+	inc	bx
+	mov	ax, cx
+	call	GrDrawVLine		; right: (cx, bx+1) - (cx, dx)
+	mov	ax, C_BLACK
+	call	GrSetLineColor
+done:
+	.leave
+	ret
+MacBoxBevel	endp
+endif
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLButtonDraw -- MSG_VIS_DRAW for OLButtonClass
@@ -2678,6 +2911,17 @@ OLButtonDraw	method	dynamic OLButtonClass, MSG_VIS_DRAW
 					; make sure object is drawable
 	test	ds:[di].VI_attrs, mask VA_DRAWABLE
 	jz	common			; if not, skip drawing it
+if _MAC
+	test	ds:[di].OLBI_specState, mask OLBSS_SYS_ICON
+	jz	macDraw
+	call	MacIsSysIconWindowActive
+	jnc	common			; MAC: no close and zoom box on
+	call	MacDrawSysIconBox	;  inactive windows; the Mac draws
+	jc	common			;  them itself (not the express menu)
+macDraw:
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+endif
 					; make sure object is realized
 if _RUDY
 	;

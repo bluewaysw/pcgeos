@@ -1050,6 +1050,12 @@ DrawBWMenuItemGroup	proc	far
 	mov	ax, C_BLACK
 	call	GrSetLineColor
 	pop	ax				;get color scheme
+if _MAC
+	push	ax
+	mov	al, SDM_50			;MAC: dotted grey separators
+	call	GrSetLineMask
+	pop	ax
+endif
 
 EC<	call	VisCheckVisAssumption		;Make sure vis data exists >
 
@@ -1129,6 +1135,12 @@ else
 endif
 
 DBWMIG_30:
+if _MAC
+	push	ax
+	mov	al, SDM_100			;(back to solid lines)
+	call	GrSetLineMask
+	pop	ax
+endif
 	pop	ds, si
 	ret
 DrawBWMenuItemGroup	endp

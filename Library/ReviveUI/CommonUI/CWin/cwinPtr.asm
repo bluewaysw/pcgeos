@@ -939,7 +939,7 @@ if _OL_STYLE
 ;	je	OWUPI_30		;skip if so...
 endif
 
-if _CUA_STYLE or _MAC
+if _MOTIF or _PM	;-------------------------------------------------------
 	mov	cl, OLPI_RESIZE_UPL_DIAG
 	cmp	bl, mask OLWMRS_RESIZING_UP or mask OLWMRS_RESIZING_LEFT
 	je	OWUPI_30		;skip if so...
@@ -967,6 +967,31 @@ if _CUA_STYLE or _MAC
 	mov	cl, OLPI_RESIZE_DOWN
 ;saving bytes...
 ;	test	bl, mask OLWMRS_RESIZING_DOWN
+;	jnz	OWUPI_30		;skip if so...
+else		;---------------------------------------------------------------
+	;
+	; CUA has bidirectional resize pointers only; choose them as the
+	; original does in the normal update below (RCS 2.102-2.129).
+	;
+	mov	cl, OLPI_RESIZE_UP_DIAG
+	cmp	bl, mask OLWMRS_RESIZING_UP or mask OLWMRS_RESIZING_RIGHT
+	je	OWUPI_30		;skip if so...
+	cmp	bl, mask OLWMRS_RESIZING_DOWN or mask OLWMRS_RESIZING_LEFT
+	je	OWUPI_30		;skip if so...
+
+	mov	cl, OLPI_RESIZE_DOWN_DIAG
+	cmp	bl, mask OLWMRS_RESIZING_DOWN or mask OLWMRS_RESIZING_RIGHT
+	je	OWUPI_30		;skip if so...
+	cmp	bl, mask OLWMRS_RESIZING_UP or mask OLWMRS_RESIZING_LEFT
+	je	OWUPI_30		;skip if so...
+
+	mov	cl, OLPI_RESIZE_HORIZ
+	test	bl, mask OLWMRS_RESIZING_LEFT or mask OLWMRS_RESIZING_RIGHT
+	jnz	OWUPI_30		;skip if so...
+
+	mov	cl, OLPI_RESIZE_VERT
+;saving bytes...
+;	test	bl, mask OLWMRS_RESIZING_UP or mask OLWMRS_RESIZING_DOWN
 ;	jnz	OWUPI_30		;skip if so...
 endif
 	jmp	short OWUPI_30
@@ -1118,6 +1143,23 @@ REVISION HISTORY:
 
 OpenWinStartSelect	method dynamic	OLWinClass, MSG_META_START_SELECT, \
 						    MSG_META_START_MOVE_COPY
+if _MAC
+	;
+	; MAC: the grow box comes before the window contents (a scrollbar
+	; may be under it): a press in it starts resizing the window.
+	;
+	cmp	ax, MSG_META_START_SELECT
+	jne	macNotGrowBox
+	call	WinCommon_DerefVisSpec_DI
+	push	ax
+	call	TestForResizeControl	;MAC: only in the grow box
+	jnc	macNotGrowBoxPop
+	pop	bp			;(discard saved ax)
+	jmp	isMoveResize
+macNotGrowBoxPop:
+	pop	ax
+macNotGrowBox:
+endif
 	;First: update the mouse pointer image, in case we have not received
 	;a MSG_META_PTR event recently.
 
@@ -1217,7 +1259,24 @@ endif
 	jc	isMoveResize		;skip if is resizing window...
 
 	call	TestForMoveControl	;pass ds:di = specific instance
+if	_OL_STYLE
+	jc	isMoveResize		;moving window...
+	;
+	; A press on the pushpin or the window menu button (mark): grab the
+	; mouse, so that the release comes back here (OpenWinEndSimpleButton
+	; unpins or runs the window menu's default). Otherwise it only came
+	; back while moving, i.e. never for windows that can't be moved
+	; (maximized windows, most displays).
+	;
+	push	cx, dx, di
+	call	CheckIfInMarkBounds	;carry set if on a mark
+	pop	cx, dx, di
+	jnc	OWSS_80
+	call	VisGrabMouse
+	jmp	OWSS_80
+else
 	jnc	OWSS_80			;skip if not moving window...
+endif
 
 isMoveResize:
 	;we might be starting to move or resize this window: save state flags
@@ -1781,6 +1840,34 @@ if _CUA_STYLE	;--------------------------------------------------------------
 
 TestForResizeControl	proc	near
 	class	OLWinClass
+if _MAC
+	;
+	; MAC: a window is only resized with its grow box, at the bottom
+	; right, and only towards the bottom right.
+	;
+	push	cx, dx
+	test	ds:[di].OLWI_attrs, mask OWA_RESIZABLE
+	jz	macNoResize
+	mov	ax, cx			;(ax, bx) = mouse position
+	mov	bx, dx
+	call	VisGetSize		;(cx, dx) = size of window
+	sub	cx, MAC_GROW_BOX_SIZE
+	sub	dx, MAC_GROW_BOX_SIZE
+	cmp	ax, cx
+	jl	macNoResize
+	cmp	bx, dx
+	jl	macNoResize
+	mov	al, mask OLWMRS_RESIZING_DOWN or mask OLWMRS_RESIZING_RIGHT or \
+		    mask OLWMRS_MOVE_RESIZE_PENDING
+	mov	bx, mask XF_RESIZE_RIGHT or mask XF_RESIZE_BOTTOM
+	pop	cx, dx
+	stc
+	ret
+macNoResize:
+	pop	cx, dx
+	clc
+	ret
+endif
 
 	push	cx, dx			;save position of mouse,
 					;since caller must check for move start
@@ -2091,73 +2178,84 @@ OpenWinEnsureMenu	endp
 ;
 ; ret ds:*si - menu created
 OpenWinCreateChildObject	proc near
-
-	; ATTENTION!! (TODO) Concurrency between different application might
-	; cause problem with this solution
-	mov	di, si
-	push	si
-	push 	cx
+	;
+	; PASS:	*ds:si	- OLWinClass object
+	;	ax	- offset of the lptr field in the vis instance that
+	;		  receives the new object (OLWI_menu)
+	;	^lbx:dx	- template (head of branch in a UI resource)
+	; RETURN: *ds:si	- same (ds fixed up)
+	;	^lcx:dx	- new object, in the window's block
+	;
+	; The original CommonUI calls this routine but no version of it
+	; survived. Modelled on OpenWinDuplicateBlock (CUA system menu):
+	; the copy only gets an upward generic link to the window, so that
+	; it isn't a real generic child (that would confuse applications
+	; and put a "Window" button into the menu bar), and it is built
+	; right away, so that it can be activated as a popup.
+	;
+	uses	ax, bx, bp, di
+	.enter
+	push	si				;window chunk
+	push	ax				;field offset
+	push	dx				;template chunk
+	;
+	; Duplicate the template resource, owned like the window and run by
+	; this thread, so that it can be called (the template itself is
+	; not run by any thread).
+	;
 	push	bx
-	mov	bx, 0
-	mov ax, TGIT_THREAD_HANDLE
-	call	ThreadGetInfo
-	pop	bx
-	call	MemModifyOtherInfo
-
-	mov	si, dx
-
-	clr	dx			;do not attempt to add new
-	mov	dx, di
-	mov	bp, mask CCF_MARK_DIRTY
-
-	; bx:si - gen tree to copy
-	; bp    - CompChildFlags
+	mov	bx, ds:[LMBH_handle]
+	call	MemOwner			;bx <- owner of the window
+	mov	ax, bx
+	pop	bx				;bx <- template resource
+	clr	cx				;run by current thread
+	call	ObjDuplicateResource		;bx <- duplicate
+	pop	si				;si <- template chunk
+	;
+	; Copy the branch into the window's block, with no generic parent.
+	;
+	push	bx
+	mov	cx, ds:[LMBH_handle]		;cx <- block to copy into
+	clr	dx				;don't add it as a child
+	clr	bp				;CompChildFlags
 	mov	ax, MSG_GEN_COPY_TREE
 	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-					;returns ^lcx:dx = handle of icon object
-	pop		bx
-	call	MemDerefDS		;Fixup LMem segment
-	pop	si
-
-	; add menu oject via one-way link
-	; Now set generic parent link for child to be OLWinClass obj.
-	; We don't want this to be a legitimate generic child of the OLWinClass
-	; object, because that might confuse applications.
-	;	*ds:si = OLWinClass (parent)
-	;	cx:dx = new child
+	call	ObjMessage			;^lcx:dx <- copy
+	pop	bx
+	push	dx
+	call	ObjFreeDuplicate		;duplicate no longer needed
+	pop	dx
+	pop	ax				;field offset
+	pop	si				;*ds:si <- window
 	;
-	;call	GenAddChildUpwardLinkOnly
-
-	; remember new menu chunk
-	call	WinOther_DerefVisSpec_DI
-	mov	ds:[di].OLWI_menu, dx
-
-	; Replace all "OLTPT_WINDOW" params in menu with the menu OD,
-	; rather than using the template ExpressMenu as the OD which had been 
-	; done previously.  5/25/94 cbh
+	; Remember it, and link it upward only.
 	;
-	push	cx, dx, bp, si, ds
-
-	; bx:si - copy if the menu
-	; cx:dx - need to be the windows
-	mov bp, bx
-	mov bx, cx
-	mov cx, si
-	mov si, dx
-	mov dx, bp
-	xchg dx, cx
-	mov	bp, OLTPT_WINDOW	; replace this constant
-
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	add	di, ax
+	mov	ds:[di], dx			;save chunk of new object
+	mov	cx, ds:[LMBH_handle]
+	call	GenAddChildUpwardLinkOnly
+	;
+	; Replace all "OLTPT_WINDOW" outputs in the branch with the window
+	; (5/25/94 cbh: rather than using the template as the OD).
+	;
+	push	si
+	mov	cx, ds:[LMBH_handle]		;^lcx:dx <- window
+	xchg	dx, si				;*ds:si <- new object
+	mov	bp, OLTPT_WINDOW
 	mov	ax, MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT
-	mov	di, mask MF_CALL or mask MF_FIXUP_DS
-	call	ObjMessage
-	pop	cx, dx, bp, si, ds
-
-
-	; ensure *ds:si
-	;mov	si, dx	
-
+	call	ObjCallInstanceNoLock
+	;
+	; Build it, so that it is a popup that can be activated.
+	;
+	mov	bp, mask SBF_TREE_BUILD or mask SBF_VIS_PARENT_FULLY_ENABLED
+	mov	ax, MSG_SPEC_BUILD_BRANCH
+	call	ObjCallInstanceNoLock
+	mov	dx, si				;^lcx:dx <- new object
+	mov	cx, ds:[LMBH_handle]
+	pop	si				;*ds:si <- window
+	.leave
 	ret
 OpenWinCreateChildObject	endp
 
@@ -2208,16 +2306,20 @@ OpenWinEndSimpleButton	method dynamic	OLWinClass, MSG_META_END_SELECT, \
 						MSG_META_END_MOVE_COPY,
 						MSG_META_END_FEATURES
 
+OLS <	push	ax			;save message (window mark)    >
 CUAS <	call	OpenWinUpdatePtrImage	;restore pointer image to normal >
 					;does not trash cx, dx
 
 	call	OpenWinHandleEndMoveResize
 if 	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
+	pop	bx			; bx <- message (flags kept)
 	jc	OWES_90			; was move/resize, done
 
 ;WAS NOT MOVING OR RESIZING
 
+	push	bx
 	call	CheckIfInMarkBounds	; see if pin or window mark hit
+	pop	bx
 	jnc	OWES_90			; skip if miss
 
 	call	WinOther_DerefVisSpec_DI
@@ -2234,7 +2336,22 @@ if 	_OL_STYLE	;START of OPEN LOOK specific code ---------------------
 	jmp	short OWES_90
 
 OWES_80: ;CLOSE has been clicked
-;NOTE: CLAYTON: see OpenWinEndSimple to handle select in OpenLook window mark
+	;
+	; OPEN LOOK: SELECT on the window menu button runs the window menu's
+	; default item, Close, which iconifies a base window (OPEN LOOK
+	; Functional Specification). The 2.x original left this empty. The
+	; MENU button on it opens the window menu (OpenWinStartMenu).
+	; Windows that can't be iconified don't do anything here.
+	;
+	cmp	bx, MSG_META_END_SELECT
+	jne	OWES_90			;only SELECT
+	call	WinOther_DerefVisSpec_DI
+	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
+	jz	OWES_90			;can't iconify: nothing to do
+	mov	ax, MSG_OL_WIN_MINIMIZE
+	mov	bx, ds:[LMBH_handle]
+	mov	di, mask MF_FORCE_QUEUE	;not in the middle of the button
+	call	ObjMessage		;  handling
 
 OWES_90:
 endif		;END of OPEN LOOK specific code -------------------------------
@@ -3098,7 +3215,9 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if _KBD_NAVIGATION	;------------------------------------------------------
+if _KBD_NAVIGATION or _MAC	;(MAC has no keyboard navigation, but the
+				; system menu Size item starts a resize
+				; with the mouse through OLWMRStartResize)
 
 OpenWinKbdChar	method dynamic	OLWinClass, MSG_META_KBD_CHAR
 

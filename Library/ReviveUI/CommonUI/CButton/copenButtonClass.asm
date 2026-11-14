@@ -632,7 +632,6 @@ dontSetBold:
 endif
 
 CUAS <	push	ax			;save returned min height  >
-MAC <	push	ax			;save returned min height  >
 	call	OpenGetMonikerSize	;get size of moniker (cx, dx)
 if _PCV
 	; all this code just tweaks the width for various looks so
@@ -825,10 +824,8 @@ if _PM		;--------------------------------------------------------------
 endif		;--------------------------------------------------------------
 
 CUAS <	pop	bp			;restore returned min height  >
-MAC <	pop	bp			;restore returned min height  >
 	pop	cx, dx			;get passed width and height
 CUAS <	push	bp			;save returned min height  >
-MAC <	push	bp			;save returned min height  >
 
 	xchgdw	cxdx, axbx		;cx, dx <- moniker imposed size
 					;ax, bx <- passed size
@@ -866,7 +863,6 @@ endif
 	;Make sure button is big enough to keep drawn regions working.
 
 CUAS  <	pop	ax			;restore returned min height	>
-MAC   <	pop	ax			;restore returned min height	>
 
 OLS   <	cmp	cx, BUTTON_MIN_WIDTH	;compare against smallest legal button>
 NOT_MO<	cmp	cx, CUA_BUTTON_MIN_WIDTH				>

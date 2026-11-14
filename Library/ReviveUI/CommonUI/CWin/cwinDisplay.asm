@@ -1594,9 +1594,17 @@ OLDisplayWinTogglePushpin	method dynamic	OLDisplayWinClass, \
 					; user wishes to CLOSE this display,
 					; a behavior which the application may
 					; wish to intercept & change.
-	mov	cx, IC_DISMISS
-	mov	ax, MSG_GEN_GUP_INTERACTION_COMMAND
-	GOTO	ObjCallInstanceNoLock
+	;
+	; Close the display the way the CUA close button does (MSG_OL_WIN_CLOSE
+	; -> MSG_GEN_DISPLAY_CLOSE): a GenDisplay doesn't act on IC_DISMISS.
+	;
+	; Queued: this comes from the button release handling of this window
+	; (OpenWinEndSimpleButton), which still uses the object afterwards.
+	;
+	mov	ax, MSG_OL_WIN_CLOSE
+	mov	bx, ds:[LMBH_handle]
+	mov	di, mask MF_FORCE_QUEUE
+	GOTO	ObjMessage
 OLDisplayWinTogglePushpin	endp
 
 endif		;END of OPEN LOOK specific code -------------------------------

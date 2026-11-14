@@ -854,6 +854,7 @@ afterMaximizeTest:
 	or	bh, bl				;set MAXI or RESTORE bit
 
 OWCWHG_50: ;see if window is minimizable
+MAC <	jmp	OWCWHG_60			;MAC: no minimize, zoom box only>
 	test	ds:[di].OLWI_attrs, mask OWA_MINIMIZABLE
 	jz	OWCWHG_60			;skip if not...
 
@@ -1191,8 +1192,10 @@ OpenWinGetTitleBarGroupSize	proc	far
 ;	mov	ax, MSG_VIS_RECALC_SIZE_AND_INVAL_IF_NEEDED
 	call	WinCommon_ObjCallInstanceNoLock	; cx = width, dx = height
 if not _JEDIMOTIF				; no overlap for JEDI
+if not (_CUA or _MAC)					; (CUA: -1 spacing in color too)
 	call	OpenCheckIfBW
 	jnc	unlockDone
+endif
 	jcxz	unlockDone			; keep non-negative
 	dec	cx				; so we overlap adjacent button
 endif
@@ -1254,11 +1257,13 @@ if _JEDIMOTIF
 	;
 	dec	ax
 else
+if not (_CUA or _MAC)				; (CUA: -1 spacing, full height as for BW)
 	call	OpenCheckIfBW			; that's all for BW
 	jc	gotHeight
 	dec	ax				; small adjustment for color
 if (not _PM)
 	dec	ax				; PM needs only 1 pixel adjust.
+endif
 endif
 gotHeight:
 endif

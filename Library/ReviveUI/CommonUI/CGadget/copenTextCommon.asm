@@ -456,10 +456,10 @@ MAC <	mov	ax, C_WHITE or (C_BLACK shl 8)	; al has fill color, ah frame >
 	
 	mov	di, ds:[si]			; point to instance
 	add	di, ds:[di].Vis_offset		; ds:[di] -- VisInstance
-	test	ds:[di].VTI_washColor.SCP_index.SCPI_info, mask VTCMM_COLOR_FLAG
-	jnz	20$				; some RGB color, forget it
+	cmp	ds:[di].VTI_washColor.CQ_info, CF_INDEX
+	jne	20$				; some RGB color, forget it
 						; else use as wash color here
-	mov	al, ds:[di].VTI_washColor.SCP_index.SCPI_index
+	mov	al, ds:[di].VTI_washColor.CQ_redOrIndex
 	cmp	al, C_BLACK			; is the wash color black?
 	jne	20$				; no, branch
 	mov	ah, C_WHITE			; else we'll use a white frame

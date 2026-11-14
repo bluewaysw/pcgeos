@@ -239,9 +239,17 @@ if _MAC		; START MAC specific code -------------------------------------
 	test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
 	jz	willBeBuiltLater
 
-	mov	cx, mask VOF_IMAGE_INVALID or mask VOF_GEOMETRY_INVALID
-	mov	dl, VUM_NOW
+	;
+	; 2.x: the menu bar on the field is a win group of its own in the
+	; visible world (no generic object), so it is brought up as the
+	; visual world does it, with VA_VISIBLE (see visSpec.asm).
+	;
+	mov	cx, mask VOF_IMAGE_INVALID or mask VOF_GEOMETRY_INVALID or \
+		    mask VOF_WINDOW_INVALID
+	mov	dl, VUM_MANUAL
 	call	VisMarkInvalid
+	; (it is made VA_VISIBLE when its primary becomes the active
+	; window, see OLBaseWinSetMacMenuBarVisible)
 	jmp	invalidateComplete
 
 willBeBuiltLater:
@@ -464,26 +472,175 @@ OLMenuBarSetVisParent	method	OLMenuBarClass, MSG_OL_CTRL_SET_VIS_PARENT
 		jnc	callSuper
 		call	MBBuild_DerefVisSpecDI
 		ornf	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+		movdw	ds:[di].OLMBAR_primary, cxdx	; for VUP queries
 
 	;
 	; Passed Vis parent is a primary, so locate the field under which it
 	; is sitting and use that as our Vis parent instead.
 	;
+	;
+	; 2.x: the field is run by the UI thread, and a vis tree can't span
+	; threads.  The application object sits on the field through an
+	; upward-only link, and the primaries are its vis children; so use the
+	; primary's vis parent, the application (SQT_VIS_PARENT_FOR_PRIMARY):
+	; the menu bar, a window of its own (see OLMenuBarSpecBuild), then
+	; opens on the field window like the primary.
+	;
 		push	ax, si, bp
-		mov	ax, MSG_SPEC_GUP_QUERY
+		mov	ax, MSG_SPEC_GUP_QUERY_VIS_PARENT
 		mov	bx, cx			; ^lbx:si <- primary
 		mov	si, dx
-		mov	cx, GUQT_FIELD
+		mov	cx, SQT_VIS_PARENT_FOR_PRIMARY
 		mov	di, mask MF_CALL or mask MF_FIXUP_DS
-		call	ObjMessage
+		call	ObjMessage		; ^lcx:dx <- application
 		pop	ax, si, bp
-		
+	;
+	; 2.x: OLMenuBarClass is an OLPopoutClass now (it was an OLCtrlClass
+	; when this was written), whose handler evaluates the popout hints of
+	; the vis parent, a GenDisplay, locking it -- the field is run by
+	; another thread.  A menu bar on the field isn't a popout (MAC doesn't
+	; set OLPOF_ALLOWED), so skip OLPopoutClass and go to OLCtrlClass.
+	;
+		mov	di, offset OLPopoutClass
+		CallSuper	MSG_OL_CTRL_SET_VIS_PARENT
+		jmp	done
 callSuper:
 		mov	di, offset OLMenuBarClass
 		CallSuper	MSG_OL_CTRL_SET_VIS_PARENT
+done:
 		.leave
 		ret
 OLMenuBarSetVisParent	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuBarOpenWin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Open the window of a menu bar that has been moved to the
+		field (a win group of its own, see OLMenuBarSpecBuild).
+
+CALLED BY:	MSG_VIS_OPEN_WIN
+PASS:		*ds:si	= OLMenuBar object
+		bp	= parent window (the field window)
+RETURN:		VCI_window set
+DESTROYED:	ax, bx, cx, dx, di, bp
+
+PSEUDO CODE/STRATEGY:
+		A plain rectangular window, owned by and in the layer of the
+		application like its other windows, above them (WIN_PRIO_ON_TOP;
+		menus still come up above, WIN_PRIO_POPUP).  Closing is done by
+		VisCompCloseWin.  (2.x: OLMenuBarClass has no window of its own;
+		the 1.x code relied on VisCompClass for it.)
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLMenuBarOpenWin	method	dynamic OLMenuBarClass, MSG_VIS_OPEN_WIN
+		test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+		jnz	ownWindow
+		mov	di, offset OLMenuBarClass
+		GOTO	ObjCallSuperNoLock
+
+ownWindow:
+		push	si
+		mov	di, bp			; di = field window
+		push	si
+		mov	si, WIT_PARENT_WIN	; the field starts below us,
+		call	WinGetInfo		;  so use its parent, the screen
+		pop	si
+		mov_tr	di, ax			; di = parent window
+		call	GeodeGetProcessHandle	; bx = application process
+		push	bx			; layer ID
+		push	bx			; owner
+		push	di			; parent window
+		clr	ax
+		push	ax			; rectangular: no region
+		push	ax
+		call	VisGetBounds		; right/bottom exclusive
+		add	ax, MAC_EXPRESS_WIDTH	; right of the express menu
+		add	cx, MAC_EXPRESS_WIDTH
+		dec	cx			; WinOpen wants the last pixel
+		dec	dx
+		push	dx, cx, bx, ax
+		mov	ax, C_WHITE		; al = color index, ah = WinColorFlags
+		clr	bx
+		mov	cx, ds:[LMBH_handle]	; input OD = ourself
+		mov	dx, si
+		mov	di, cx			; exposure OD = ourself
+		mov	bp, dx
+		mov	si, WIN_PRIO_ON_TOP	; WinPassFlags
+		call	WinOpen			; bx = window
+		pop	si
+		mov	di, ds:[si]
+		add	di, ds:[di].Vis_offset
+		mov	ds:[di].VCI_window, bx
+		ret
+OLMenuBarOpenWin	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuBarVupQuery
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	A menu bar moved to the field still belongs to its primary:
+		visual upward queries (focus, target...) go to the primary,
+		as when the menu bar sat in it, not to the application.
+
+CALLED BY:	MSG_VIS_VUP_QUERY
+PASS:		*ds:si	= OLMenuBar object
+		cx	= query type, dx, bp = data
+RETURN:		carry set if answered, cx, dx, bp = answer
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLMenuBarVupQuery	method	dynamic OLMenuBarClass, MSG_VIS_VUP_QUERY
+		test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+		jnz	toPrimary
+		mov	di, offset OLMenuBarClass
+		GOTO	ObjCallSuperNoLock
+toPrimary:
+		movdw	bxsi, ds:[di].OLMBAR_primary
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		GOTO	ObjMessage
+OLMenuBarVupQuery	endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		OLMenuBarBringUpHelp
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	The help button in a menu bar moved to the field sends
+		MSG_META_BRING_UP_HELP to itself, and it goes up the vis tree;
+		like the VUP queries, pass it to the primary the menu bar
+		belongs to (it has the help context), not to the application.
+
+CALLED BY:	MSG_META_BRING_UP_HELP
+PASS:		*ds:si	= OLMenuBar object
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+OLMenuBarBringUpHelp	method	dynamic OLMenuBarClass, MSG_META_BRING_UP_HELP
+		test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+		jnz	toPrimary
+		mov	di, offset OLMenuBarClass
+		GOTO	ObjCallSuperNoLock
+toPrimary:
+		movdw	bxsi, ds:[di].OLMBAR_primary
+		mov	di, mask MF_CALL or mask MF_FIXUP_DS
+		GOTO	ObjMessage
+OLMenuBarBringUpHelp	endm
 
 endif		; END MAC specific code ----------------------------------------
 
@@ -993,8 +1150,15 @@ endif	;----------------------------------------------------------------------
 	;
 	;  Let the superclass do its little thing.
 	;
+if _MAC
+	push	bp				; gstate, for the corner
+endif
 	mov	di, offset OLMenuBarClass
 	CallSuper	MSG_VIS_DRAW	;send MSG_VIS_DRAW to OLCtrlClass
+if _MAC
+	pop	di
+	call	MacMenuBarCorner		; after the children (help)
+endif
 					;so will send to kids
 if HIGHLIGHT_MNEMONICS	;------------------------------------------------------
 	pop	di				; restore gstate
@@ -1067,6 +1231,155 @@ endif	; _HIGHLIGHT_MNEMONICS ------------------------------------------------
 
 	ret
 OLMenuBarDraw	endp
+
+if _MAC
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacMenuBarCorner
+
+DESCRIPTION:	MAC: the rounded top right corner of the screen, at the right
+		end of the menu bar on the field.
+
+PASS:		*ds:si	- OLMenuBar, di - gstate
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacMenuBarCorner	proc	near
+	uses	ax, bx, cx, dx, bp
+	.enter
+	mov	bp, ds:[si]
+	add	bp, ds:[bp].Vis_offset
+	test	ds:[bp].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+	jz	done
+	mov	ax, C_BLACK
+	call	GrSetLineColor
+	call	VisGetBounds			; right exclusive
+	mov	ax, cx
+	dec	ax				; last column
+	clr	cx				; to the left
+	mov	dx, 1				; rows going down
+	call	MacDrawCornerMenuBar
+done:
+	.leave
+	ret
+MacMenuBarCorner	endp
+endif
+
+if _MAC
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacDrawCornerMenuBar
+
+DESCRIPTION:	MAC: draws one rounded screen corner, a quarter circle with
+		a radius in proportion to the system font size (drawn in black).
+
+PASS:		di	- gstate
+		(ax, bx) - the corner pixel
+		cx	- nonzero: rows extend to the right, zero: to the left
+		dx	- step to the next row (1 down, -1 up)
+
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacDrawCornerMenuBar	proc	near	uses ax, bx, cx, dx, si, di
+radius		local	word
+toRight		local	word
+rowStep		local	word
+cornerX		local	word
+cornerY		local	word
+	.enter
+	mov	cornerX, ax
+	mov	cornerY, bx
+	mov	toRight, cx
+	mov	rowStep, dx
+	push	ax
+	mov	ax, C_BLACK
+	call	GrSetAreaColor
+	pop	ax
+	;
+	; Radius from the system font size (5/12 of it, at least 3): 5 pixels
+	; with a 12 point font, as on the Macintosh, and in proportion with
+	; larger fonts.
+	;
+	push	ds
+	mov	ax, segment dgroup
+	mov	ds, ax
+	mov	ax, ds:[specDisplayScheme].DS_pointSize
+	pop	ds
+	mov	cx, 5
+	mul	cx			; dx:ax = size * 5
+	add	ax, 6
+	mov	cx, 12
+	div	cx			; ax = size * 5 / 12, rounded
+	cmp	ax, 3
+	jge	gotRadius
+	mov	ax, 3
+gotRadius:
+	mov	radius, ax
+	;
+	; Row i (0 at the corner) is black for R - sqrt(R^2 - (R-i)^2) pixels.
+	;
+	clr	si			; si = row
+rowLoop:
+	cmp	si, radius
+	jge	done
+	mov	ax, radius
+	sub	ax, si
+	imul	ax			; ax = (R-i)^2
+	mov	cx, ax
+	mov	ax, radius
+	imul	ax			; ax = R^2
+	sub	ax, cx
+	mov	cx, ax			; cx = R^2 - (R-i)^2
+	mov	bx, radius		; bx = integer square root of cx
+sqrtLoop:
+	mov	ax, bx
+	imul	ax
+	cmp	ax, cx
+	jle	sqrtDone
+	dec	bx
+	jmp	sqrtLoop
+sqrtDone:
+	mov	cx, radius
+	sub	cx, bx			; cx = black length (>= 1)
+	mov	ax, si
+	imul	rowStep
+	add	ax, cornerY
+	mov	bx, ax			; bx = y of the row
+	mov	ax, cornerX
+	dec	cx
+	tst	toRight
+	jz	rowLeft
+	add	cx, ax			; (ax .. ax + length - 1)
+	jmp	rowDraw
+rowLeft:
+	neg	cx
+	add	cx, ax			; (ax - length + 1 .. ax)
+	xchg	ax, cx
+rowDraw:
+	inc	cx			; GrFillRect: right and bottom
+	mov	dx, bx			;  exclusive
+	inc	dx
+	call	GrFillRect
+	inc	si
+	jmp	rowLoop
+done:
+	.leave
+	ret
+MacDrawCornerMenuBar	endp
+endif
 
 
 COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1279,7 +1592,8 @@ REVISION HISTORY:
 
 if _CUA or _MAC ;-------------------------------------------------
    
-.assert (@CurSeg eq CommonFunctional)	;used for both B&W and color!!!
+;(was CommonFunctional until the 2.x resource split, RCS 2.75)
+.assert (@CurSeg eq MenuBarCommon)	;used for both B&W and color!!!
 
 DrawColorOrBWMenuBar	proc	far
 	class	OLMenuBarClass
@@ -1329,9 +1643,20 @@ PMAN <	pushf								>
 	; left side, in case the button has just erased this area.
 	;
 if _CUA_STYLE and (not _MOTIF) and (not _PM)	;-------------------------------
+if _MAC
+	push	di			;MAC: the menu bar on the field starts
+	mov	di, ds:[si]		;  right of the express menu, which has
+	add	di, ds:[di].Vis_offset	;  no border: no line on the left
+	test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+	pop	di
+	jnz	noLeftLine
+endif
 	call	GrDrawVLine		;draw vertical line on left side
 	inc	ax			;assume window has LINE_BORDER,
 	dec	cx			;move in on sides
+if _MAC
+noLeftLine:				;(no window frame to move in from)
+endif
 endif		;--------------------------------------------------------------
 
 	push	bx			;can assume top line drawn,
@@ -1660,6 +1985,26 @@ REVISION HISTORY:
 
 OLMenuBarRecalcSize	method dynamic	OLMenuBarClass, \
 				MSG_VIS_RECALC_SIZE
+if _MAC
+	;
+	; A menu bar moved to the field runs across the whole screen, as on
+	; the Macintosh: take the width of our vis parent, the application,
+	; which has the size of the field.
+	;
+	test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+	jz	notOnField
+	push	dx
+	mov	ax, MSG_VIS_GET_SIZE
+	call	VisCallParent			;cx = width of the field
+	pop	dx
+	push	cx
+	call	MenuBarPassMarginInfo
+	call	OpenRecalcCtrlSize		;dx = height to use
+	pop	cx				;full width,
+	sub	cx, MAC_EXPRESS_WIDTH		;  but right of the express menu
+	ret
+notOnField:
+endif
 	;
 	; Code added 2/ 6/92 to put in header when in maximized mode.  We
 	; will force the menu bar to be the width of the header title area.
@@ -1786,8 +2131,62 @@ if _JEDIMOTIF
 
 	call	PositionChildren
 endif
+if _MAC
+	call	MacMoveHelpToRight
+endif
 	ret
 OLMenuBarPositionBranch	endm
+
+if _MAC
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MacMoveHelpToRight
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Put the help button of the primary (HINT_SEEK_MENU_BAR, see
+		AddPrimaryHelp) at the right end of the menu bar on the field,
+		as the help menu of System 7.
+
+CALLED BY:	OLMenuBarPositionBranch
+PASS:		*ds:si	= OLMenuBar object (positioned)
+RETURN:		nothing
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MacMoveHelpToRight	proc	near
+	uses	ax, bx, cx, dx, si, di, bp
+	.enter
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].OLMBAR_state, mask OLMBARS_UNDER_PRIMARY
+	jz	done
+	mov	bp, ds:[di].VI_bounds.R_top
+	push	ds:[di].VI_bounds.R_right
+	mov	si, ds:[di].OLMBAR_primary.chunk	;the primary, in our block
+	mov	ax, TEMP_OL_BASE_WIN_HELP_TRIGGER
+	call	ObjVarFindData			;ds:bx = lptr of help trigger
+	pop	ax				;ax = right end of menu bar
+	jnc	done
+	mov	si, ds:[bx]			;*ds:si = help trigger
+	mov	di, ds:[si]
+	tst	ds:[di].Vis_offset		;not built yet?
+	jz	done
+	push	ax
+	call	VisGetSize			;cx = width
+	pop	ax
+	sub	ax, cx
+	mov	cx, ax				;left = right end - width
+	mov	dx, bp
+	call	VisSetPosition
+done:
+	.leave
+	ret
+MacMoveHelpToRight	endp
+endif
 
 
 COMMENT @----------------------------------------------------------------------

@@ -2447,7 +2447,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if	_MOTIF or _PM		;currently only used by motif and pm
+if	_MOTIF or _PM or _CUA or _MAC	;used by motif, pm and the CUA pane frame
 	
 OpenSetInsetRectColors	proc	far		uses ax, es
 	.enter
@@ -2506,7 +2506,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if	_MOTIF or _PM
+if	_MOTIF or _PM or _CUA or _MAC	;CUA: OLPaneDraw (cviewPaneWindow.asm)
 	
 OpenDrawRect	proc	far		uses	si
 	.enter
@@ -2735,7 +2735,7 @@ REVISION HISTORY:
 
 ------------------------------------------------------------------------------@
 
-if	_MOTIF or _PM
+if	_MOTIF or _PM or _CUA or _MAC
 	
 SetupDraw	proc	near
 	mov	si, ds:[si]
@@ -2878,7 +2878,7 @@ DrawFrame	endp
 
 endif		; if _MOTIF ----------------------------------------------------
 	
-if _PM		;---------------------------------------------------------------
+if _PM or _CUA or _MAC	;plain frame (CUA too) ---------------------------------------------------------------
 
 DrawFrame	proc	near
 	dec	cx				; adjust for line drawing

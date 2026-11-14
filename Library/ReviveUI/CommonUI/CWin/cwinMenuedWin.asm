@@ -3021,6 +3021,10 @@ REVISION HISTORY:
 MaybeInTitleBar	proc	near
 		uses	ax,bx,si,di
 		.enter
+if _MAC
+		clc				; MAC: no extra buttons in title
+		jmp	done			;  bars, they go into the window
+endif
 	;
 	; Search the child object for titlebar hints
 	;

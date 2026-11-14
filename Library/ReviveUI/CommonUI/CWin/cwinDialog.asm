@@ -2506,6 +2506,12 @@ EC <	ERROR_AE	OL_ERROR_ILLEGAL_INTERACTION_COMMAND		>
 	mov	bx, cx				; bx = InteractionCommand
 	shl	bx, 1				; convert to word table offset
 	mov	bx, cs:[addFlagsTable][bx]
+if _MAC
+	cmp	cx, IC_HELP
+	jne	notMacHelp
+	andnf	bx, not mask ASTF_LAST		; MAC: help at the bottom left
+notMacHelp:
+endif
 	push	bx				; save add flags
 	call	EnsureReplyBar			; cx:dx = trigger bar (created
 						;	if needed)

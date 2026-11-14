@@ -294,7 +294,6 @@ OLButtonIsMDIListEntry	proc	far
 	mov	di, ds:[si]			
 	add	di, ds:[di].Vis_offset
 CUAS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU		>
-MAC <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU		>
 	ANDNF	ds:[di].OLBI_specState, not mask OLBSS_BORDERED
 
 	; NEXT, fetch the generic object in this same block whose enabled
@@ -894,7 +893,6 @@ OLS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR \
 					or mask OLBSS_BORDERED		>
 
 CUAS <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR		>
-MAC <	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR		>
 OLS < 	ORNF	ds:[di].OLBI_specState, mask OLBSS_IN_MENU_BAR or \
 					mask OLBSS_MENU_DOWN_MARK						>
 

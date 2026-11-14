@@ -459,6 +459,64 @@ GadgetAreaPassMarginInfo	endp
 		
 
 
+if _MAC
+COMMENT @----------------------------------------------------------------------
+
+FUNCTION:	MacGadgetAreaIsDocument
+
+DESCRIPTION:	MAC: is the only content of this gadget area a view (GenView)
+		or a scrolling list?  Then it has no margins and touches the
+		window frame, as in a Macintosh document window; other
+		contents keep their margins.
+
+PASS:		*ds:si	- OLGadgetArea
+
+RETURN:		carry set if so
+
+DESTROYED:	nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+		2026		Initial version (revived MAC)
+
+------------------------------------------------------------------------------@
+MacGadgetAreaIsDocument	proc	near
+	uses	ax, bx, cx, dx, si, di, bp, es
+	.enter
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	movdw	bxsi, ds:[di].VCI_comp.CP_firstChild
+	tst	si
+	jz	no
+	call	ObjSwapLock			;*ds:si = first child
+	mov	di, ds:[si]
+	add	di, ds:[di].Vis_offset
+	test	ds:[di].VI_link.LP_next.chunk, LP_IS_PARENT
+	jz	notOnly				;more than one child
+	mov	di, segment OLPaneClass
+	mov	es, di
+	mov	di, offset OLPaneClass
+	call	ObjIsObjectInClass
+	jc	unlock				;a view
+	mov	di, segment OLScrollListClass
+	mov	es, di
+	mov	di, offset OLScrollListClass
+	call	ObjIsObjectInClass		;a scrolling list?
+	jmp	unlock
+notOnly:
+	clc
+unlock:
+	call	ObjSwapUnlock			;(flags intact)
+	jmp	done
+no:
+	clc
+done:
+	.leave
+	ret
+MacGadgetAreaIsDocument	endp
+endif
+
 COMMENT @----------------------------------------------------------------------
 
 METHOD:		OLGadgetAreaGetMargins -- 
@@ -518,6 +576,14 @@ everythingCool:
 	mov	bp, ax
 	mov	cx, ax
 	mov	dx, ax
+if _MAC
+	call	MacGadgetAreaIsDocument	;only a view or a scrolling list?
+	jnc	checkCGA
+	clr	ax				;MAC: then it touches the frame,
+	mov	bp, ax				;  as in a Macintosh document
+	mov	cx, ax				;  window
+	mov	dx, ax
+endif
 
 checkCGA:	
 if (not _JEDIMOTIF)		; none of this for JEDI
@@ -717,6 +783,8 @@ PMAN <	mov	cx, MO_WIN_CHILD_SPACING	;		            >
 CUA <	mov	dx, CUA_WIN_CHILD_WRAP_SPACING				    >
 MO <	mov	dx, MO_WIN_CHILD_WRAP_SPACING				    >
 PMAN <	mov	dx, MO_WIN_CHILD_WRAP_SPACING				    >
+OLS <	mov	cx, OLS_WIN_CHILD_SPACING	;same as OpenWinGetSpacing  >
+OLS <	mov	dx, OLS_WIN_CHILD_SPACING	;(wrap spacing: same value) >
 
 	push	si
 	call	VisFindParent

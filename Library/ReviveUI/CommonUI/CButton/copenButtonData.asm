@@ -70,7 +70,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 MO <	byte	MO_BUTTON_MIN_HEIGHT					>
 PMAN <	byte	MO_BUTTON_MIN_HEIGHT					>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT					>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT					>
 if _ROUND_NORMAL_BW_BUTTONS
 	byte	ST_NORMAL_BUTTON_INSET_Y_CGA
    	byte	ST_NORMAL_BUTTON_INSET_X_NARROW
@@ -97,7 +96,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 MO <	byte	MO_BUTTON_MIN_HEIGHT					>
 PMAN <	byte	MO_BUTTON_MIN_HEIGHT					>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT					>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT					>
 	byte	ST_THICK_DROP_MENU_BUTTON_INSET_Y_CGA
    	byte	ST_THICK_DROP_MENU_BUTTON_INSET_X_NARROW
 
@@ -116,7 +114,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 MO <	byte	MO_BUTTON_MIN_HEIGHT					>
 PMAN <	byte	MO_BUTTON_MIN_HEIGHT					>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT					>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT					>
 	byte	MO_BUTTON_INSET_Y_CGA
 	byte	MO_BUTTON_INSET_X_NARROW
 
@@ -137,7 +134,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 	byte	MO_BUTTON_INSET_Y
 MO <	byte	MO_BUTTON_MIN_HEIGHT+MO_REPLY_BUTTON_INSET_Y	>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT				>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT				>
 	byte	MO_BUTTON_INSET_Y_CGA
 	byte	MO_BUTTON_INSET_X_NARROW
 
@@ -153,7 +149,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 	byte	MO_REPLY_BUTTON_INSET_Y
 MO <	byte	MO_BUTTON_MIN_HEIGHT+MO_REPLY_BUTTON_INSET_Y	>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT				>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT				>
 	byte	MO_BUTTON_INSET_Y_CGA
 	byte	MO_BUTTON_INSET_X_NARROW
 
@@ -169,7 +164,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 	byte	MO_BUTTON_INSET_Y_CGA
 MO <	byte	MO_BUTTON_MIN_HEIGHT+MO_REPLY_BUTTON_INSET_Y	>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT				>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT				>
 	byte	MO_BUTTON_INSET_Y_CGA
 	byte	MO_BUTTON_INSET_X_NARROW
 
@@ -185,7 +179,6 @@ endif ;_ROUND_NORMAL_BW_BUTTONS
 	byte	MO_BUTTON_INSET_Y_CGA
 MO <	byte	MO_BUTTON_MIN_HEIGHT+MO_REPLY_BUTTON_INSET_Y	>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT				>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT				>
 	byte	MO_BUTTON_INSET_Y_CGA
 	byte	MO_BUTTON_INSET_X_NARROW
 
@@ -419,7 +412,6 @@ endif
 MO <	byte	MO_BUTTON_MIN_HEIGHT					>
 PMAN <	byte	MO_BUTTON_MIN_HEIGHT					>
 NOT_MO<	byte	CUA_BUTTON_MIN_HEIGHT					>
-MAC<	byte	CUA_BUTTON_MIN_HEIGHT					>
 	byte	0
 	byte	0
 
@@ -429,7 +421,6 @@ MAC<	byte	CUA_BUTTON_MIN_HEIGHT					>
 
 MOBWButtonRegionSet_menuItem	label	BWButtonRegionSetStruct
 NOT_MO<	word	NULL							>
-MAC<	word	NULL							>
 MO <	word	MOBWButton_outlineBoxButtonBorder			>
 PMAN <	word	MOBWButton_outlineBoxButtonBorder			>
 	word	MOBWButton_menuItemInterior
@@ -1416,15 +1407,21 @@ MOBWButton_outlineBoxButtonBorder	label	Region
 
 if not _REDMOTIF ;----------------------- Not needed for Redwood project
 	word	-1,						EOREGREC
+if not _MAC			;MAC: no lines around close and zoom box
 	word	0
 	word		0, PARAM_2-1,				EOREGREC
+if not (_CUA or _MAC)
 	word	PARAM_3-2
+endif
+NOT_MO <	word	PARAM_3-1	;CUA: sides to the bottom, the header	>
+NOT_MO <				;  line below the button closes it	>
 	word		0, 0
 	word		PARAM_2-1, PARAM_2-1,			EOREGREC
 MO <	word	PARAM_3-1						>
 MO <	word		0, PARAM_2-1,				EOREGREC>
 PMAN <	word	PARAM_3-1						>
 PMAN <	word		0, PARAM_2-1,				EOREGREC>
+endif
 	word	EOREGREC
 endif ;not _REDMOTIF ;------------------- Not needed for Redwood project
 
@@ -1451,8 +1448,15 @@ if _CUA_STYLE and (not _MOTIF) and (not _PM) 	;------------------------------
 ;mSettingCheckBM label	word
 CUASMenuSettingCheckmarkBM	label	word
 	word	16
+if _MAC
+	word	13			;MAC: 2 rows lower, on the text
+	byte	0, BMF_MONO
+	byte	00000000b, 00000000b
+	byte	00000000b, 00000000b
+else
 	word	11
 	byte	0, BMF_MONO
+endif
 	byte	00000000b, 00000000b
 	byte	00000000b, 00000000b
 	byte	00000000b, 00110000b

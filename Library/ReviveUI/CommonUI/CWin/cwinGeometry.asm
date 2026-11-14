@@ -235,8 +235,8 @@ OpenWinGetSpacing	method OLWinClass, MSG_VIS_COMP_GET_CHILD_SPACING
 	
 	;top and bottom of other window types.
 	
-CUA <	mov	cx, CUA_BASE_WIN_CHILD_SPACING			
-CUA <	mov	dx, CUA_WIN_CHILD_WRAP_SPACING
+NOT_MO <	mov	cx, CUA_BASE_WIN_CHILD_SPACING			
+NOT_MO <	mov	dx, CUA_WIN_CHILD_WRAP_SPACING
     
 MO <	mov	cx, MO_BASE_WIN_CHILD_SPACING			
 MO <	mov	dx, MO_WIN_CHILD_WRAP_SPACING
@@ -255,7 +255,7 @@ if	(not _MOTIF)   	;spacing provided other ways now -12/ 4/92 cbh
 	test	ds:[di].OLWI_fixedAttr, mask OWFA_IS_MENU
 	jnz	OWGS_doneWithSpacing		;skip if is menu or submenu...
 
-CUA <	mov	cx, CUA_WIN_CHILD_SPACING	;else set regular spacing   >
+NOT_MO <	mov	cx, CUA_WIN_CHILD_SPACING	;else set regular spacing   >
 MO  <	mov	cx, MO_WIN_CHILD_SPACING	;		            >
 PMAN <	mov	cx, MO_WIN_CHILD_SPACING	;		            >
 	

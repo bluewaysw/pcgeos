@@ -14,6 +14,7 @@
  */
 
 #include "generic.uih"
+#include "Objects/eMenuC.uih"	/* for Express Menu */
 
 #include "../CommonUI/cGeode.uih"	/* defines compiler constants */
 
@@ -274,6 +275,12 @@ WindowMenu = GenInteraction {
 	children = WindowClose, WindowFullSize, WindowRestore,
 			WindowProperties, WindowBack, WindowRefresh, WindowQuit;
 	visibility = popup;
+	hints = {
+		HINT_SYS_MENU		/* as PopupMenu: the window is its
+					 * visible parent, and it becomes an
+					 * OLMenuWinClass object without going
+					 * into the menu bar */
+	}
 }
 
 WindowClose = GenTrigger {
@@ -319,8 +326,10 @@ WindowRefresh = GenTrigger {
 
 WindowQuit = GenTrigger {
 	moniker = "Quit";
-	action = MSG_GEN_GUP_INTERACTION_COMMAND, "OLTPT_WINDOW";
-					/* permanently close window */
+	action = MSG_OL_WIN_CLOSE, "OLTPT_WINDOW";
+					/* permanently close window: as the
+					 * CUA system menu's Close; the
+					 * original sent MSG_GEN_CLOSE_INTERACTION */
 }
 
 end WindowMenuResource;
@@ -482,16 +491,18 @@ start ExpressMenuResource;
 
 
 
-ExpressMenu = GenInteraction {
-/*	moniker = list {
-		WorkspaceTextMoniker,
-		WorkspaceIconMoniker
-	} */
+ExpressMenu = ExpressMenuControl {
+	/*
+	 * As for Motif/PM (2.x): the Express menu is the UI's
+	 * ExpressMenuControl, which builds the application lists, control
+	 * panel and Exit to DOS itself; OLFieldCreateExpressMenu sets its
+	 * features from the .ini express options and expects this class.
+	 * (The 1.x-style AppMenu_GenList/Options children below are unused.)
+	 */
 	moniker = list {
 		/*WorkspcMenuColorMoniker,*/
 		WorkspcMenuBWMoniker
 	}
-	children = AppMenu_GenList, Options;
 	visibility = popup;
 	hints = {
 		ATTR_GEN_WINDOW_CUSTOM_LAYER_ID {
@@ -500,25 +511,16 @@ ExpressMenu = GenInteraction {
 		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
 			word LAYER_PRIO_ON_TOP-1
 		},
-		/*HINT_IS_EXPRESS_MENU,*/		/* ensure is 1nd visible child
-						 * below GenPrimary. */
 		HINT_INFREQUENTLY_USED,		/* not pinnable */
-		/*HINT_AVOID_MENU_BAR,*/
-		/*HINT_EXPAND_HEIGHT_TO_FIT_PARENT,*/
-		/*HINT_SHOW_ENTIRE_MONIKER,*/
+		HINT_AVOID_MENU_BAR,
+		HINT_CAN_CLIP_MONIKER_HEIGHT,
 		HINT_KEEP_INITIALLY_ONSCREEN,
 		HINT_EXPRESS_MENU,
 		/* These will be filled in, depending on user level and
 		   .ini file settings */
 		ATTR_GEN_CONTROL_REQUIRE_UI { word 0 },
 		ATTR_GEN_CONTROL_PROHIBIT_UI { word 0 },
-		ATTR_EMC_SET_NOT_USABLE_ON_DETACH,
-		HINT_DONT_KEEP_INITIALLY_ONSCREEN,
-		HINT_NO_BORDERS_ON_MONIKERS,
-		HINT_MAXIMUM_SIZE {
-			SpecWidth <>
-			SpecHeight <SST_PIXELS, 15>
-		}
+		ATTR_EMC_SET_NOT_USABLE_ON_DETACH
 	}
 }
 
@@ -700,7 +702,9 @@ AppMenuListEntry = GenItem {
 
 Options = GenInteraction {
 	children = Programs, Utilities, WorkspaceProperties, Exit;
-	visibility = popup;
+	visibility = subGroup;		/* original: HINT_MENUABLE, HINT_SUB_GROUP:
+					 * inline in the Express menu (it has no
+					 * moniker), not a submenu */
 }
 
 Programs = GenInteraction {
