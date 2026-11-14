@@ -5069,17 +5069,33 @@ if TOOL_AREA_IS_TASK_BAR
 	jnz	done					; skip if taskbar
 endif
 	call	WinClasses_DerefVisSpec_DI
+if _MOTIF
+	;
+	; Size the express tool area from the same canonical height as the
+	; adjacent title-bar controls.
+	;
+	mov	ax, MSG_OL_WIN_GET_TITLE_BAR_HEIGHT
+	call	WinClasses_ObjCallInstanceNoLock
+	mov	cx, dx				; cx = canonical title height
+	call	OpenCheckIfBW
+	jc	5$
+	add	cx, MO_TITLE_BUTTON_COLOR_INSET
+						; canceled by color inset below
+else
 	mov	cx, ds:[di].OLWI_titleBarBounds.R_bottom
 	sub	cx, ds:[di].OLWI_titleBarBounds.R_top
 
-	;Fairly bad hacks to match menu bar height.  -cbh 6/29/92
-	;Must match similar code in EnableDisableAndPosSysIcon.
+	; ISUI calculates the menu bar independently from the title bounds.
+	; In a combined header its outer height is three pixels greater, so
+	; include that difference when sizing the express tool area.
 
 	call	OpenWinCheckIfSquished		; running CGA?
 	jc	5$				; yes, skip this
 	call	OpenWinCheckMenusInHeader	; are we in the header?
 	jnc	5$				; nope, done
-	add	cx, 3				; else expand to match menu bar
+	add	cx, ISUI_COMBINED_MENU_BAR_HEIGHT_EXTRA
+						; match combined menu-bar height
+endif
 5$:
 MO <	push	ds							>
 MO <	mov	ax, segment dgroup					>
@@ -5087,7 +5103,7 @@ MO <	mov	ds, ax							>
 MO <	test	ds:[moCS_flags], mask CSF_BW	; Is this a B&W display?>
 MO <	pop	ds							>
 MO <	jnz	20$				;   skip if so...	>
-MO <	sub	cx, 2				; Nest icon inside resize  >
+MO <	sub	cx, MO_TITLE_BUTTON_COLOR_INSET	; Nest icon inside resize  >
 MO <20$:					;   display		   >
 
 ISU <	push	ds							>
@@ -5432,6 +5448,15 @@ endif	; if _GCM -------------------------------------------------------------
 	call	WinClasses_DerefVisSpec_DI		; ds:di = instance data
 	test	ds:[di].OLBWI_flags, mask OLBWF_HAS_EXPRESS_TOOL_AREA
 	jz	done				; nope
+if TOOL_AREA_IS_TASK_BAR
+	; if the taskbar is enabled, the width of the express menu
+	; must not be reserved inside the window header.
+	push	ds
+	segmov	ds, dgroup
+	test	ds:[taskBarPrefs], mask TBF_ENABLED
+	pop	ds
+	jnz	done				; taskbar is not in the header
+endif
 	push	bp				;save right side width
 	call	OLBaseWinGetExpressMenuButtonWidth	; bp = width
 	dec	bp				;overlap express menu button

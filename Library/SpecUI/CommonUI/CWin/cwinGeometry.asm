@@ -1247,7 +1247,7 @@ endif
 ;deal with sys menu button with kdb accelerator shown
 	mov_tr	ax, cx
 	call	OpenWinGetSysMenuButtonWidth	;cx = width of sys menu button
-ISU <	add	cx, 6				;match other adjustments >
+ISU <	add	cx, ISUI_SYS_MENU_OVERLAPPED_WIDTH_EXTRA		>
 	add	ax, cx
 	mov_tr	cx, ax
 afterSysMenuButton::
