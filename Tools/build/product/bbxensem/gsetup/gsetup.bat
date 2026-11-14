@@ -1,6 +1,6 @@
 @echo off
 rem GSETUP.BAT
-rem called by gsetup.exe
+rem called by gsetup.exe: distribution directory, free drive, user mode
 rem Install/activate a (new) GEOS version from the target directory.
 rem So it is usually something like this, standing in C:\ENSEMBLE:
 rem    freegeos\60\gsetup
@@ -20,25 +20,26 @@ rem   renaming the Ensemble folder does not require rerunning setup.
 if "%1"=="" goto NOENTRY
 
 rem Keep variable footprint small for COMMAND.COM environment space limits.
-set PINST=setup\install
-set PACT=setup\activate
+set GI=
+set GM=
+set GS=
 
-if "%2"=="" goto PARSEDEFAULT
-if "%2"=="install" goto PARSEINSTALL
-if "%2"=="INSTALL" goto PARSEINSTALL
-if "%2"=="activate" goto PARSEACTIVATE
-if "%2"=="ACTIVATE" goto PARSEACTIVATE
+if "%3"=="" goto PARSEDEFAULT
+if "%3"=="install" goto PARSEINSTALL
+if "%3"=="INSTALL" goto PARSEINSTALL
+if "%3"=="activate" goto PARSEACTIVATE
+if "%3"=="ACTIVATE" goto PARSEACTIVATE
 goto USAGE
 
 rem Parse INSTALL arguments.
 :PARSEINSTALL
-if not "%3"=="" goto USAGE
-if exist %1\%PINST%\NUL goto CHECKINSTALL2
+if not "%4"=="" goto USAGE
+if exist %1\ginst.bat goto CHECKINSTALL2
 goto BADDIR
 
 rem Verify activate payload directory exists for INSTALL flow.
 :CHECKINSTALL2
-if exist %1\%PACT%\NUL goto INSTALLCONFIRM
+if exist %1\setup\activate\gfs.ini goto INSTALLCONFIRM
 goto BADDIR
 
 rem Confirm explicit forced INSTALL before continuing.
@@ -52,13 +53,13 @@ goto DOINSTALL
 
 rem Parse default mode.
 :PARSEDEFAULT
-if not "%3"=="" goto USAGE
-if exist %1\%PINST%\NUL goto CHECKDEFAULT2
+if not "%4"=="" goto USAGE
+if exist %1\ginst.bat goto CHECKDEFAULT2
 goto BADDIR
 
 rem Verify activate payload directory exists.
 :CHECKDEFAULT2
-if exist %1\%PACT%\NUL goto CHECKDEFAULTINI
+if exist %1\setup\activate\gfs.ini goto CHECKDEFAULTINI
 goto BADDIR
 
 rem Detect GEOS configuration in target root.
@@ -85,63 +86,127 @@ goto END
 
 rem Parse ACTIVATE arguments.
 :PARSEACTIVATE
-if not "%3"=="" goto USAGE
-if exist %1\%PACT%\NUL goto DOACTIVATE
+if not "%4"=="" goto USAGE
+if exist %1\setup\activate\gfs.ini goto DOACTIVATE
 goto BADDIR
 
 rem Update marker forces activate-only and is then cleared.
 :UPDATEMARKER
 echo NOTICE: Update marker found (UPDATE.TXT). Running activate phase only.
-if exist update.txt del update.txt
 goto DOACTIVATE
 
-rem Copy setup\\install payload into current target root.
+rem Select the shared copy flow after argument and payload checks.
 :DOINSTALL
-echo Installing from %1\%PINST% to current target directory ...
-subst k: %1\
-call k:\ginst.bat k:
-subst k: /D
+set GI=1
+if not "%GI%"=="1" goto ENVFAIL
 
-echo.
-echo Running activate phase ...
-goto DOACTIVATEINSTALL
-
-rem Copy setup\\activate payload. The payload provides GFS.INI.
 :DOACTIVATE
-echo Activating from %1\%PACT% to current target directory ...
-subst k: %1\
-call k:\gact.bat k:
-subst k: /D
+if "%2"=="-" goto MAPFAIL
+if "%2"=="" goto NOENTRY
+if not exist %1\gsetup.exe goto BADDIR
+if not exist %1\gact.bat goto BADDIR
+
+rem Reserve these small variables before creating a mapping.
+set GS=0
+set GM=E
+if not "%GS%"=="0" goto ENVFAIL
+if not "%GM%"=="E" goto ENVFAIL
+
+rem A file check cannot detect an empty drive or a drive without media.
+%1\gsetup.exe /CHECKDRIVE %2
+if errorlevel 1 goto BUSY
+emudrv %2 %1\
+goto VERIFY
+
+:TRYSUB
+set GM=S
+if not "%GM%"=="S" goto ENVFAIL
+subst %2 %1\
+goto VERIFY
+
+:TRYSW
+set GM=W
+if not "%GM%"=="W" goto ENVFAIL
+swsubst %2 %1\
+
+rem Test real source files. Mapper exit codes differ between DOS versions.
+:VERIFY
+if not exist %2\gact.bat goto BADMAP
+if not exist %2\setup\activate\gfs.ini goto BADMAP
+if not "%GI%"=="1" goto MAPPED
+if not exist %2\ginst.bat goto BADMAP
+
+:MAPPED
+set GS=1
+if not "%GS%"=="1" goto BADMAP
+if not "%GI%"=="1" goto COPYACT
+
+echo Installing from %1\setup\install to current target directory ...
+call %2\ginst.bat %2
 echo.
 
-if exist gfs.ini goto ACTIVATEDONE
-goto GFSINIFAIL
+:COPYACT
+echo Activating from %1\setup\activate to current target directory ...
+call %2\gact.bat %2
+goto UNMAP
 
-rem Run activate phase after INSTALL and clear update marker if present.
-:DOACTIVATEINSTALL
-echo Activating from %1\%PACT% to current target directory ...
-subst k: %1\
-call k:\gact.bat k:
-subst k: /D
+rem Remove a failed mapping before trying another command.
+:BADMAP
+%1\gsetup.exe /CHECKDRIVE %2
+if errorlevel 2 goto CLEANERR
+if not errorlevel 1 goto NEXTMAP
+
+:UNMAP
+if "%GM%"=="E" emudrv -d %2
+if "%GM%"=="S" subst %2 /D
+if "%GM%"=="W" swsubst %2 /D
+%1\gsetup.exe /CHECKDRIVE %2
+if errorlevel 1 goto CLEANERR
+
+:NEXTMAP
+if "%GS%"=="1" goto FINISH
+if "%GM%"=="E" goto TRYSUB
+if "%GM%"=="S" goto TRYSW
+goto MAPFAIL
+
+:FINISH
+echo.
+if not exist gfs.ini goto GFSINIFAIL
+rem Explicit ACTIVATE leaves the update marker unchanged.
+if "%GI%"=="1" goto CLEARMK
+if not "%3"=="" goto ACTIVATEDONE
+
+:CLEARMK
 if exist update.txt del update.txt
-echo.
+if "%GI%"=="1" goto INSTALLDONE
 
-if exist gfs.ini goto INSTALLDONE
-goto GFSINIFAIL
-
-rem Finish pure ACTIVATE flow.
 :ACTIVATEDONE
 echo Activate complete.
 goto END
 
-rem Finish combined INSTALL plus activate flow.
 :INSTALLDONE
 echo Install complete.
 goto END
 
-rem Abort when activate payload did not provide GFS.INI.
 :GFSINIFAIL
 echo ERROR: Activate payload did not provide GFS.INI.
+goto END
+
+:BUSY
+echo ERROR: Setup drive %2 is occupied or cannot be checked.
+goto END
+
+:MAPFAIL
+echo ERROR: Cannot map a free setup drive. Check EMUDRV, SUBST or SWSUBST.
+echo ERROR: DOS must have a free drive letter within its LASTDRIVE limit.
+goto END
+
+:CLEANERR
+echo ERROR: Cannot confirm removal of setup drive %2. Setup stopped.
+goto END
+
+:ENVFAIL
+echo ERROR: Not enough DOS environment space for setup.
 goto END
 
 rem Show launcher-only usage when GEOS_DIST_DIR is missing.
@@ -176,5 +241,6 @@ echo   FREEGEOS\600\GSETUP ACTIVATE
 
 rem Shared script exit label.
 :END
-set PINST=
-set PACT=
+set GI=
+set GM=
+set GS=

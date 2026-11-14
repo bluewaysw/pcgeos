@@ -28,10 +28,22 @@ static int appendCmdText(const char *src);
 static int appendCmdChar(char ch);
 static void normalizeSeparators(char *path);
 static void writeError(void);
+static int _pascal CheckDrive(unsigned drive);
+static char _pascal FindFreeDrive(void);
 
 int main(int argc, char *argv[])
 {
     int exitCode;
+
+    /* Internal batch check: 0 = free, 1 = occupied, 2 = unknown. */
+    if (argc > 1 && strcmp(argv[1], "/CHECKDRIVE") == 0) {
+        if (argc != 3 || strlen(argv[2]) != 2 || argv[2][1] != ':' ||
+            toupper((unsigned char)argv[2][0]) < 'C' ||
+            toupper((unsigned char)argv[2][0]) > 'Z') {
+            return 2;
+        }
+        return CheckDrive(toupper((unsigned char)argv[2][0]) - 'A' + 1);
+    }
 
     if (!resolveOwnPath(argv)) {
         writeError();
@@ -55,6 +67,47 @@ int main(int argc, char *argv[])
     }
 
     return exitCode;
+}
+
+/* Query drive assignment without reading media or changing directories. */
+static int _pascal CheckDrive(unsigned drive)
+{
+    union REGS regs;
+
+    memset(&regs, 0, sizeof(regs));
+    regs.x.ax = 0x4409;
+    regs.x.bx = drive;               /* A: = 1 */
+    (void)int86(0x21, &regs, &regs);
+    if (!regs.x.cflag) {
+        return 1;
+    }
+    return regs.x.ax == 15 ? 0 : 2;  /* Only invalid drive means free. */
+}
+
+/* Reserve A: and B:. Do not scan past the DOS drive table. */
+static char _pascal FindFreeDrive(void)
+{
+    union REGS regs;
+    unsigned drive;
+    unsigned limit;
+
+    memset(&regs, 0, sizeof(regs));
+    regs.h.ah = 0x19;
+    (void)int86(0x21, &regs, &regs);
+    regs.h.dl = regs.h.al;
+    regs.h.ah = 0x0e;                /* Reselect the current drive. */
+    (void)int86(0x21, &regs, &regs);
+    limit = regs.h.al;
+    if (limit > 26) {
+        limit = 26;
+    }
+
+    for (drive = 3; drive <= limit; drive++) {
+        if (CheckDrive(drive) == 0) {
+            return (char)('A' + drive - 1);
+        }
+    }
+    return '-';
 }
 
 static int resolveOwnPath(char *argv[])
@@ -167,6 +220,8 @@ static int buildBatchPath(void)
 
 static int buildCommandTail(int argc, char *argv[])
 {
+    char drive;
+
     cmdTail[0] = '\0';
 
     if (!appendCmdText(slashC)) {
@@ -179,6 +234,15 @@ static int buildCommandTail(int argc, char *argv[])
         return 0;
     }
     if (!appendCmdText(launcherDir)) {
+        return 0;
+    }
+
+    /* Internal arguments: distribution directory, drive, then user mode. */
+    drive = FindFreeDrive();
+    if (!appendCmdChar(' ') || !appendCmdChar(drive)) {
+        return 0;
+    }
+    if (drive != '-' && !appendCmdChar(':')) {
         return 0;
     }
 
